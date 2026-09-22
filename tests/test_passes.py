@@ -21,7 +21,8 @@ def test_event_elimination_inlines_pure_norm():
     plan = compile_graph(moe_layer.build(), "gfx942", b, moe_layer.runtime(b))
     assert "E_norm" in plan.eliminated_events
     assert "norm" not in [g.name for g in plan.graph.grids]
-    assert plan.graph.grid("qkv_proj").prologue == ["norm"]
+    assert [n for n, _ in plan.graph.grid("qkv_proj").prologue] == ["norm"]
+    assert "norm" in plan.inlined and plan.type_ids["norm"] == len(plan.graph.grids)
     off = compile_graph(moe_layer.build(), "gfx942", b, moe_layer.runtime(b), PassOptions(event_elimination=False))
     assert "E_norm" in off.events
 

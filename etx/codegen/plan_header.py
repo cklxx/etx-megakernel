@@ -102,9 +102,10 @@ def emit_plan_header(plan: Plan, device: int = 0) -> str:
     out.append("static const int32_t etx_arg_role[ETX_N_ARGS] = {" + ", ".join(str(ROLE_ID.get(g.tensors[n].role, 0)) for n in names) + "};")
     # per task type: global arg indices in the grid's own argument order (-1 = unused slot)
     n_types = len(plan.type_ids)
-    max_args = max([len(gg.args) for gg in g.grids] + [1])
+    all_grids = list(g.grids) + list(plan.inlined.values())
+    max_args = max([len(gg.args) for gg in all_grids] + [1])
     rows = []
-    by_type = {plan.type_ids[gg.name]: gg for gg in g.grids}
+    by_type = {plan.type_ids[gg.name]: gg for gg in all_grids}
     for t in range(n_types):
         gg = by_type.get(t)
         idx = [args[a] for a in gg.args] if gg else []

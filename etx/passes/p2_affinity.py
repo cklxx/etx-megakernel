@@ -22,6 +22,8 @@ def run(plan: Plan) -> None:
     plan.tasks.clear()
     plan.task_index.clear()
     plan.type_ids = {g.name: i for i, g in enumerate(g_all.grids)}
+    for name in plan.inlined:                       # inlined producers keep a type id for their argument table
+        plan.type_ids[name] = len(plan.type_ids)
     load: dict[tuple[int, int], int] = Counter()
     dom_of: dict[tuple[str, tuple[int, ...]], tuple[int, int]] = {}
 

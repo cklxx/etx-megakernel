@@ -73,8 +73,9 @@ def run(plan: Plan) -> bool:
             plan.say(f"P3: keep {name}: gain {gain:.2f} us <= recompute {cost:.2f} us")
             continue
         # rewrite ---------------------------------------------------------------
+        plan.inlined[p.name] = p
         for c in cons:
-            c.prologue = c.prologue + p.prologue + [p.name]
+            c.prologue = c.prologue + p.prologue + [(p.name, p.out_to_in)]
             del c.in_edges[name]
             for ev in p.in_edges:
                 if ev not in c.in_edges:

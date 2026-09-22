@@ -130,6 +130,23 @@ class EdgeMap:
         raise AssertionError(self.kind)
 
     # ---------------------------------------------------------------- codegen
+    def coord_exprs_c(self, coord_vars: Sequence[str], symbols: Mapping[str, str] | None = None) -> list[str]:
+        """Per-dimension C expressions of the target coordinate (affine maps without broadcast)."""
+        if self.kind != "affine" or any(k == "bcast" for k, _ in self.items):
+            raise ValueError(f"{self.text!r}: only affine maps without broadcast give a single coordinate")
+        env: dict[str, str] = dict(symbols or {})
+        env.update({letter: v for letter, v in zip(self.lhs, coord_vars)})
+        out = []
+        for kind, payload in self.items:
+            if kind == "idx":
+                out.append(env[payload])
+            else:
+                e = payload
+                for letter, v in env.items():
+                    e = re.sub(rf"\b{letter}\b", f"({v})", e)
+                out.append(e.replace("cdiv(", "etx_cdiv("))
+        return out
+
     def to_c(self, coord_vars: Sequence[str], ev_shape_expr: str, callback: str,
              runtime_ptrs: Mapping[str, str] | None = None, gather_width: str = "",
              symbols: Mapping[str, str] | None = None) -> str:

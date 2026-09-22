@@ -78,6 +78,7 @@ class Plan:
     tensor_placement: dict[str, str] = field(default_factory=dict)
     prefetch: list[dict[str, Any]] = field(default_factory=list)
     eliminated_events: list[str] = field(default_factory=list)
+    inlined: dict[str, Any] = field(default_factory=dict)      # producer grids removed by Pass 3 (name -> TaskGrid)
     log: list[str] = field(default_factory=list)
 
     # helpers -----------------------------------------------------------------

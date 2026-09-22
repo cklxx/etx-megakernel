@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from ..ir.edgemap import EdgeMap
 from ..ir.types import Scope, TaskGrid
 from ..passes.plan import Plan
 
@@ -56,6 +57,14 @@ def _gather_width(plan: Plan, tensor: str) -> str:
 
 def _symbols(plan: Plan) -> dict[str, str]:
     return {s: f"p.shape[{i}]" for i, s in enumerate(plan.graph.symbols)}
+
+
+def _runtime_count_c(plan: Plan, expr: str) -> str:
+    """'expert_counts[i]' -> '((const int32_t*)p.args[k])[i]' (rank-1 events; loop variable i)."""
+    import re as _re
+    def repl(m):
+        return f"((const int32_t*)p.args[{_arg_index(plan, m.group(1))}])["
+    return _re.sub(r"\b(\w+)\[", repl, expr)
 
 
 def _wait_code(plan: Plan, g: TaskGrid) -> str:
@@ -106,11 +115,36 @@ def emit_kernel(plan: Plan, device: int = 0) -> str:
     out.append("")
     for g in grids:
         out.append(f"extern \"C\" __device__ void {g.body.symbol}(const etx_ctx*);")
-        for pro in g.prologue:
-            out.append(f"// {g.name}: prologue recomputes {pro} (event eliminated by Pass 3)")
+        if g.body.prefetch:
+            out.append(f"extern \"C\" __device__ void {g.body.prefetch}(const etx_ctx*);")
+        for pro, m in g.prologue:
+            out.append(f"// {g.name}: prologue recomputes {pro} via {m!r} (event eliminated by Pass 3)")
+    for name, ig in plan.inlined.items():
+        out.append(f"extern \"C\" __device__ void {ig.body.symbol}(const etx_ctx*);   // inlined producer {name}")
     out.append("")
     out.append(f"#define ETX_THREADS {threads}")
     out.append(f"#define ETX_LDS_USED {lds}")
+    out.append("")
+    # non-blocking readiness probe per task type (same edge maps as the wait code)
+    out.append("static __device__ bool etx_deps_ready(const etx_params& p, int32_t tid) {")
+    out.append("  const etx_task t = p.descs[tid];")
+    out.append("  switch (t.type) {")
+    for g in grids:
+        if not g.in_edges:
+            continue
+        out.append(f"    case {plan.type_ids[g.name]}: {{")
+        coord_vars = [f"t.coord[{i}]" for i in range(len(g.grid))]
+        for ev, m in g.in_edges.items():
+            ep = plan.events[ev]
+            width = _gather_width(plan, m.gather_tensor) if m.kind == "gather" else ""
+            out.append(f"#define ETX_TARGET(idx) if (ETX_POLL_{ep.scope.name}(p.events + {ep.offset} + (idx)) > 0) return false")
+            out.append(m.to_c(coord_vars, f"p.ev_shape[{list(plan.events).index(ev)}]", "ETX_TARGET",
+                              _runtime_ptrs(plan, g), width, _symbols(plan)).rstrip())
+            out.append("#undef ETX_TARGET")
+        out.append("      return true; }")
+    out.append("    default: return true;")
+    out.append("  }")
+    out.append("}")
     out.append("")
     out.append("static __device__ __forceinline__ void etx_run_task(const etx_params& p, const etx_task t, uint32_t worker, uint32_t domain) {")
     out.append("  __shared__ __align__(16) unsigned char etx_lds[ETX_LDS_USED > 0 ? ETX_LDS_USED : 16];")
@@ -121,15 +155,32 @@ def emit_kernel(plan: Plan, device: int = 0) -> str:
     for g in grids:
         mode = plan.modes.get(g.name, "static")
         out.append(f"    case {plan.type_ids[g.name]}: {{ // {g.name} [{mode}] grid={g.grid}")
+        if g.body.prefetch and plan.options.prefetch and plan.machine.capabilities.get("async_copy_to_lds", "none") != "none":
+            out.append(f"      {g.body.prefetch}(&ctx);   // lever 3: weights do not depend on events; warm them before waiting")
         out.append("      if (threadIdx.x == 0) {")
         out.append(_wait_code(plan, g))
         out.append("      }")
         out.append("      __syncthreads();")
         for ev in g.in_edges:
             out.append(f"      ETX_ACQUIRE_{_scope_macro(plan, ev)}();")
+        coord_vars = [f"t.coord[{i}]" for i in range(len(g.grid))]
+        for pro, mtext in g.prologue:
+            ig = plan.inlined[pro]
+            exprs = EdgeMap.parse(mtext).coord_exprs_c(coord_vars, _symbols(plan))
+            out.append(f"      {{ // prologue: recompute {pro} for this task (Pass 3)")
+            out.append(f"        etx_ctx pctx = ctx; pctx.args = p.type_args + {plan.type_ids[pro]} * p.max_args;")
+            for d in range(4):
+                out.append(f"        pctx.coord[{d}] = {exprs[d] if d < len(exprs) else 0};")
+            out.append(f"        {ig.body.symbol}(&pctx); __syncthreads(); }}")
         out.append(f"      {g.body.symbol}(&ctx);")
         out.append("      __syncthreads();")
         out.append("      if (threadIdx.x == 0) {")
+        for ev_name, e in plan.graph.events.items():
+            if e.runtime_init_by == g.name and e.runtime_count is not None:
+                ep = plan.events[ev_name]
+                expr = _runtime_count_c(plan, e.runtime_count)
+                out.append(f"        for (int i = 0; i < p.ev_shape[{list(plan.events).index(ev_name)}][0]; ++i) "
+                           f"p.events[{ep.offset} + i] = {expr};   // runtime init of {ev_name}")
         for ev in g.out_edges:
             out.append(f"        ETX_RELEASE_{_scope_macro(plan, ev)}();")
         out.append(_arrive_code(plan, g, mode))
@@ -185,13 +236,14 @@ def emit_kernel(plan: Plan, device: int = 0) -> str:
 def emit_plan_json(plan: Plan) -> str:
     args = _arg_table(plan)
     data: dict[str, Any] = {
+        "inlined": {n: {"id": plan.type_ids[n], "symbol": gg.body.symbol} for n, gg in plan.inlined.items()},
         "graph": plan.graph.name, "arch": plan.arch, "bindings": plan.bindings,
         "symbols": plan.graph.symbols, "shape": [plan.bindings.get(s) for s in plan.graph.symbols],
         "devices": plan.n_devices, "domains": plan.n_domains, "workers_per_domain": plan.workers_per_domain,
         "threads": max([g.resource.threads for g in plan.graph.grids] + [64]),
         "args": args,
         "types": {g.name: {"id": plan.type_ids[g.name], "symbol": g.body.symbol, "mode": plan.modes.get(g.name),
-                           "grid": list(plan.inst.grid_shapes[g.name]), "prologue": g.prologue, "device": g.device}
+                           "grid": list(plan.inst.grid_shapes[g.name]), "prologue": [list(x) for x in g.prologue], "device": g.device}
                   for g in plan.graph.grids},
         "events": [{"name": e.name, "id": i, "offset": e.offset, "shape": list(e.shape), "scope": e.scope.name,
                     "memory": e.memory, "counts": e.counts, "runtime_init": e.runtime_init}

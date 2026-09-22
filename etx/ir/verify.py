@@ -99,6 +99,12 @@ def verify(graph: Graph, bindings: Mapping[str, int],
                 for c in graph.consumers_of(ev):
                     if order[e.runtime_init_by] >= order[c.name]:
                         issues.append(Issue("count", f"event {ev!r} counts written by {e.runtime_init_by!r} after consumer {c.name!r}"))
+            if e.runtime_count is not None:
+                # the runtime expression must agree with the producers enumerated from the same sample
+                bad = [coord for coord in inst.producers if coord[0] == ev and len(inst.producers[coord]) != inst.wait_counts[coord]]
+                if bad:
+                    c0 = bad[0]
+                    issues.append(Issue("count", f"event {ev}{list(c0[1])}: runtime_count gives {inst.wait_counts[c0]} but {len(inst.producers[c0])} producers notify it ({len(bad)} coords)"))
             continue
         bad = 0
         for coord in inst.producers:

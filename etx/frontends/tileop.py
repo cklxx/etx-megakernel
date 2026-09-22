@@ -9,13 +9,14 @@ from __future__ import annotations
 from ..ir.types import TileBody
 
 
-def hip_link(source: str, symbol: str) -> TileBody:
-    """Link mode: `symbol` is an extern "C" __device__ function with the etx_ctx ABI in `source`."""
-    return TileBody(kind="hip_link", symbol=symbol, source=source)
+def hip_link(source: str, symbol: str, prefetch: str | None = None) -> TileBody:
+    """Link mode: `symbol` is an extern "C" __device__ function with the etx_ctx ABI in `source`.
+    `prefetch` names an optional sibling that warms the tile's weights (Pass 7 hook)."""
+    return TileBody(kind="hip_link", symbol=symbol, source=source, prefetch=prefetch)
 
 
-def cuda_link(source: str, symbol: str) -> TileBody:
-    return TileBody(kind="cuda_link", symbol=symbol, source=source)
+def cuda_link(source: str, symbol: str, prefetch: str | None = None) -> TileBody:
+    return TileBody(kind="cuda_link", symbol=symbol, source=source, prefetch=prefetch)
 
 
 def triton_fn(module: str, name: str) -> TileBody:

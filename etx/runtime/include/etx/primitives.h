@@ -78,12 +78,10 @@ static __device__ __forceinline__ void etx_push_consumers(const etx_params& p, i
   }
 }
 
-// deps_ready: static-head probe without blocking. Conservative: the generated
-// wait code re-checks; this only decides whether to try the queues first.
-static __device__ __forceinline__ bool etx_deps_ready(const etx_params& p, int32_t task) {
-  (void)p; (void)task;
-  return true;   // v0: always take the static head; a per-task ready bitmap is the planned refinement
-}
+// deps_ready: non-blocking readiness probe of a task's in-events, generated per
+// task type by the kernel emitter from the same edge maps as the wait code.
+// The worker loop uses it to prefer queue work while its static head is blocked.
+static __device__ bool etx_deps_ready(const etx_params& p, int32_t task);
 
 static __device__ __forceinline__ bool etx_step_done(const etx_params& p) {
   return atomicAdd(p.ctrl_done, 0) >= p.n_tasks;

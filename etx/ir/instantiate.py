@@ -69,9 +69,14 @@ def instantiate(graph: Graph, bindings: Mapping[str, int],
                 for t in m.targets(c, inst.event_shapes[ev], runtime, bindings):
                     inst.task_in[tid].append((ev, t))
                     inst.consumers[(ev, t)].append(tid)
+    from .dims import eval_expr
     for e in graph.events.values():
         for c in _coords(inst.event_shapes[e.name]):
-            if e.is_runtime_count:
+            if e.runtime_count is not None:
+                env = dict(bindings)
+                env.update({letter: v for letter, v in zip("ijkl", c)})
+                inst.wait_counts[(e.name, c)] = eval_expr(e.runtime_count, env, runtime)
+            elif e.is_runtime_count:
                 inst.wait_counts[(e.name, c)] = len(inst.producers[(e.name, c)])
             else:
                 inst.wait_counts[(e.name, c)] = eval_dim(e.wait_count, bindings)

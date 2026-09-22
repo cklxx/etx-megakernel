@@ -49,6 +49,8 @@ class ETensor:
     wait_count: Dim | str = 1       # int, symbolic expr, or "runtime"
     init_kind: InitKind = InitKind.STATIC
     runtime_init_by: str | None = None      # task grid that writes the counts
+    runtime_count: str | None = None        # expression over event coords (i, j, ...) and runtime tensors,
+                                            # e.g. "expert_counts[i]"; the init grid's epilogue copies it into the counters
     # filled by passes
     scope: Scope | None = None
     domain_id: int | None = None
@@ -75,6 +77,7 @@ class TileBody:
     kind: str                       # hip_link | cuda_link | triton | builtin
     symbol: str                     # exported device function (link) or jit fn (triton)
     source: str | None = None       # path to source file
+    prefetch: str | None = None     # optional device function that warms this tile's weights (Pass 7 hook)
 
 
 @dataclass
@@ -97,7 +100,7 @@ class TaskGrid:
     duration_cv: float = 0.0        # coefficient of variation of tile duration
     device: int = 0
     # filled by passes
-    prologue: list[str] = field(default_factory=list)   # inlined producer grids (Pass 3)
+    prologue: list[tuple[str, str]] = field(default_factory=list)   # (inlined producer grid, out_to_in map) from Pass 3
 
     @property
     def has_runtime_edges(self) -> bool:
@@ -121,8 +124,9 @@ class Graph:
 
     def etensor(self, name: str, shape: tuple[Dim, ...], wait_count: Dim | str = 1, **kw) -> ETensor:
         e = ETensor(name, tuple(shape), wait_count, **kw)
-        if wait_count == "runtime":
+        if wait_count == "runtime" or e.runtime_count is not None:
             e.init_kind = InitKind.RUNTIME
+            e.wait_count = "runtime"
         self.events[name] = e
         self._collect(shape)
         if wait_count != "runtime":
