@@ -26,23 +26,32 @@ ETX_DEFINE_SCOPE(DEVICE)
 ETX_DEFINE_SCOPE(SYSTEM)
 #undef ETX_DEFINE_SCOPE
 
-// queues: many-producer many-consumer ring; slots hold task ids, -1 = empty
-static __device__ __forceinline__ int32_t etx_pop(etx_queue* q) {
-  if (q->capacity == 0) return -1;
-  int32_t h = atomicAdd(q->head, 0);
-  int32_t t = atomicAdd(q->tail, 0);
-  if (h >= t) return -1;
-  if (atomicCAS(q->head, h, h + 1) != h) return -1;       // lost the race; caller retries next loop
-  int32_t* slot = q->slots + (h % q->capacity);
-  int32_t v;
-  while ((v = atomicExch(slot, -1)) < 0) { ETX_BACKOFF(); }  // wait for the pusher's store
-  return v;
+// Queues: many-producer many-consumer *ticket* ring. Measured on MI300X
+// (bench/calib/queue_contention): a CAS-based pop costs ~1.1 us alone and its
+// retry storm makes aggregate throughput fall past 8 poppers. The ticket ring
+// pays one atomic per push (tail) and one per pop (head); the popper then polls
+// its own slot with a scoped load. Slots are written at most once per step
+// (the plan sizes capacity >= pushes per step; the host resets between steps),
+// so poppers never clear them. A ticket taken beyond the final tail is harmless:
+// the worker keeps servicing its static queue and exits at step_done.
+static __device__ __forceinline__ void etx_push(const etx_queue* q, int32_t task) {
+  const int32_t t = atomicAdd(q->tail, 1);
+  atomicExch(q->slots + (t % q->capacity), task);            // device-visible store
 }
 
-static __device__ __forceinline__ void etx_push(etx_queue* q, int32_t task) {
-  int32_t t = atomicAdd(q->tail, 1);
-  int32_t* slot = q->slots + (t % q->capacity);
-  while (atomicCAS(slot, -1, task) != -1) { ETX_BACKOFF(); } // slot still owned by a slow popper
+// Returns a task id, or -1 if nothing is available yet. `ticket` is per-worker
+// state (-1 = none held) and must persist across calls.
+static __device__ __forceinline__ int32_t etx_try_pop(const etx_queue* q, int32_t* ticket) {
+  if (q->capacity == 0) return -1;
+  if (*ticket < 0) {
+    const int32_t head = ETX_POLL_DEVICE(q->head);
+    const int32_t tail = ETX_POLL_DEVICE(q->tail);
+    if (head >= tail) return -1;                            // empty right now: do not reserve
+    *ticket = atomicAdd(q->head, 1);
+  }
+  const int32_t v = ETX_POLL_DEVICE(q->slots + (*ticket % q->capacity));
+  if (v >= 0) *ticket = -1;
+  return v;
 }
 
 // Push every dynamic consumer of event coordinate (ev_id, lin). The plan's push

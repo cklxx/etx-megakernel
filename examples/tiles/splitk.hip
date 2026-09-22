@@ -1,6 +1,7 @@
 // Tile bodies for examples/splitk_sum.py (link mode). Reference implementation,
 // not tuned: the point is the ABI, not the throughput.
 #include <hip/hip_runtime.h>
+#include <hip/hip_bf16.h>
 #include "etx/abi.h"
 
 extern "C" __device__ void etx_tile_partial_sum(const etx_ctx* c) {

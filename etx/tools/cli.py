@@ -51,6 +51,8 @@ def cmd_compile(a) -> int:
         (out / f"megakernel_d{d}.{ext}").write_text(emit_kernel(plan, d), encoding="utf-8")
     (out / "etx_tiles.h").write_text(emit_tile_decls(plan.graph), encoding="utf-8")
     (out / "plan.json").write_text(emit_plan_json(plan), encoding="utf-8")
+    from ..codegen.plan_header import emit_plan_header
+    (out / "plan_data.h").write_text(emit_plan_header(plan, 0), encoding="utf-8")
     (out / "decisions.log").write_text("\n".join(plan.log) + "\n", encoding="utf-8")
     if any(g.body.kind == "triton" for g in plan.graph.grids):
         (out / "megakernel_triton.py").write_text(emit_triton_skeleton(plan), encoding="utf-8")

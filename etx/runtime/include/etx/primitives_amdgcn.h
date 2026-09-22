@@ -14,6 +14,16 @@ static __device__ __forceinline__ uint32_t etx_amdgcn_xcc_id() {
 #endif
 }
 
+// Counter poll through L2: drop the per-CU L1 (buffer_inv sc0), then a plain
+// load. Measured on MI300X 2026-09-22 (bench/calib/atomic_pingpong): observes
+// agent-scope RMWs from any XCD, one-way 642 ns same-XCD / 742 ns cross-XCD vs
+// 873 / 892 ns for an agent-scope atomic load. A plain or sc0 load without the
+// invalidate never observes the arrive (stale L1).
+static __device__ __forceinline__ int32_t etx_amdgcn_poll_l2(const int32_t* p) {
+  asm volatile("buffer_inv sc0" ::: "memory");
+  return *(volatile const int32_t*)p;
+}
+
 // Sentinel signalling (capability sentinel_signal): poll a data word with an
 // agent-scope load instead of a counter. Kog measured 0.8 us vs 7.6 us for a
 // whole-GPU phase switch on MI300X. Use only when the producer writes the

@@ -20,17 +20,19 @@ resources:
 bandwidth: {hbm_tbs: 5.3, cache_bw_tbs: 4.3}
 visibility:
   # domain = within one XCD (one L2). L1 is write-through; the consumer only invalidates L1.
+  # poll = buffer_inv sc0 + plain load (etx_amdgcn_poll_l2): measured 2026-09-22 to observe
+  # agent-scope RMWs from any XCD at 642/742 ns one-way vs 873/892 ns for an agent atomic load.
   domain:
     release: ['asm volatile("s_waitcnt vmcnt(0)" ::: "memory");']
     acquire: ['asm volatile("buffer_inv sc0" ::: "memory");']
-    poll: '__hip_atomic_load({ptr}, __ATOMIC_RELAXED, __HIP_MEMORY_SCOPE_AGENT)'
+    poll: 'etx_amdgcn_poll_l2({ptr})'
     arrive: '__hip_atomic_fetch_sub({ptr}, 1, __ATOMIC_RELAXED, __HIP_MEMORY_SCOPE_AGENT)'
     memory: any
-  # device = across XCDs. Producer writes back its dirty L2 lines; consumer invalidates.
+  # device = across XCDs. Producer writes back its dirty L2 lines (payload); consumer invalidates.
   device:
     release: ['asm volatile("buffer_wbl2 sc1\n\ts_waitcnt vmcnt(0)" ::: "memory");']
     acquire: ['asm volatile("buffer_inv sc1" ::: "memory");']
-    poll: '__hip_atomic_load({ptr}, __ATOMIC_RELAXED, __HIP_MEMORY_SCOPE_AGENT)'
+    poll: 'etx_amdgcn_poll_l2({ptr})'
     arrive: '__hip_atomic_fetch_sub({ptr}, 1, __ATOMIC_RELAXED, __HIP_MEMORY_SCOPE_AGENT)'
     memory: any
   # system = across devices. Coarse-grained memory silently downgrades to device scope.
@@ -53,16 +55,19 @@ capabilities:
   hw_tile_trigger: false
   backoff: s_sleep
   comm_fusion_reduce_scatter: experimental   # no multimem path; see design §10.4
-costs:
-  t_local_ns: 116                # same-XCD atomic round trip (Chips and Cheese)
-  t_cross_ns: 203                # cross-XCD atomic round trip
-  t_flag_cross_ns: 703           # cross-XCD one-way flag latency
-  t_fence_ns: 115                # agent-scope release fence
-  t_phase_switch_counter_ns: 7600
+costs:                           # MEASURED 2026-09-22, Hot Aisle 1xMI300X VM, ROCm 7.2.4, bench/calib
+  t_local_ns: 642                # same-XCD one-way, DOMAIN protocol (RMW at fabric + inv-L1 poll)
+  t_cross_ns: 742                # cross-XCD one-way, same poll; +100 ns, not the 2x public pure-atomic gap
+  t_flag_cross_ns: 916           # one-way flag with payload, DEVICE protocol, 0 stale in 10k
+  t_flag_local_ns: 951
+  t_fence_ns: 181                # buffer_wbl2 sc1 + s_waitcnt (release); acquire buffer_inv sc1 = 120
+  t_fence_domain_ns: 44          # s_waitcnt + buffer_inv sc0 together
+  t_phase_switch_counter_ns: 7600   # public (Kog), not re-measured
   t_phase_switch_sentinel_ns: 850
-  t_dev_ns: null                 # xGMI P2P atomic, to calibrate
-  t_pop_ns: 300
-  t_push_ns: 300
+  t_dev_ns: null                 # xGMI P2P atomic: needs a 2-GPU VM
+  t_pop_ns: 870                  # ticket ring, uncontended
+  t_push_ns: 600                 # atomicAdd(tail) + atomicExch(slot), estimate from pop cost
+  queue_contention_us_per_pop: {1: 0.87, 8: 0.94, 64: 1.34, 128: 1.97, 256: 4.64, 512: 6.69}   # per popper, N poppers
   t_prologue_ns: null
 lowering:
   backoff: '__builtin_amdgcn_s_sleep(1);'
@@ -70,4 +75,5 @@ lowering:
   domain_id: 'etx_amdgcn_xcc_id()'          # runtime/include/etx/primitives_amdgcn.h
   launch: hipLaunchCooperativeKernel
 notes:
-  - "Plain loads hit the non-coherent L1 (wave scope = Hit LRU); flags must be polled with sc1 or atomic loads."
+  - "Plain and sc0 loads hit the stale per-CU L1 and never observe an arrive (measured); poll via buffer_inv sc0 + load or agent atomic load."
+  - "Workgroup k landed on XCD (k+6) mod 8 on the 2026-09-22 VM: round-robin with an offset, so discovery via HW_ID is mandatory."
