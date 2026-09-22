@@ -68,8 +68,9 @@ def emit_plan_header(plan: Plan, device: int = 0) -> str:
         push_index.append(len(offsets))
         for lin in range(e.numel):
             offsets.append(len(lists))
-            for tid in plan.ev_consumers.get((e.name, lin), []):
-                lists.append(tid if plan.tasks[tid].mode == "hybrid" else ~tid)
+            for tid in dict.fromkeys(plan.ev_consumers.get((e.name, lin), [])):     # dedupe, keep order
+                t = plan.tasks[tid]
+                lists.append(((t.domain << 24) | tid) if t.mode == "hybrid" else ~tid)
         offsets.append(len(lists))
     out.append(f"static const int32_t etx_push_index[{max(1, len(push_index))}] = {{{', '.join(map(str, push_index)) or '0'}}};")
     out.append(f"static const int32_t etx_push_offsets[{max(1, len(offsets))}] = {{{', '.join(map(str, offsets)) or '0'}}};")
@@ -78,16 +79,15 @@ def emit_plan_header(plan: Plan, device: int = 0) -> str:
     inst = plan.inst
     init_local: list[list[int]] = [[] for _ in range(plan.n_domains)]
     init_global: list[int] = []
+    remaining: list[int] = []
     for t in plan.tasks:
+        n_in = len(set(inst.task_in[(t.grid, t.coord)]))     # distinct in-event coordinates
+        remaining.append(n_in if t.mode != "static" else 0)
         if t.mode == "static" or t.device != device:
             continue
-        prods = {plan.task_index[p] for e in inst.task_in[(t.grid, t.coord)] for p in inst.producers[e]}
-        if t.mode == "hybrid":
-            local_prods = [p for p in prods if plan.tasks[p].domain == t.domain and plan.tasks[p].device == t.device]
-            if not local_prods:
-                init_local[t.domain].append(t.id)
-        elif not prods:
-            init_global.append(t.id)
+        if n_in == 0:
+            (init_local[t.domain] if t.mode == "hybrid" else init_global).append(t.id)
+    out.append(f"static const int32_t etx_task_remaining[ETX_N_TASKS] = {{{', '.join(map(str, remaining))}}};")
     flat = [tid for d in init_local for tid in d]
     lens = [len(d) for d in init_local]
     out.append(f"static const int32_t etx_init_local[{max(1, len(flat))}] = {{{', '.join(map(str, flat)) or '0'}}};")

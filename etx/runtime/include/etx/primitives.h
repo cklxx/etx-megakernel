@@ -14,9 +14,14 @@ static __device__ __forceinline__ int etx_ev_numel(const int32_t* shape) {
   int n = 1; for (int i = 0; i < 4; ++i) if (shape[i] > 0) n *= shape[i]; return n;
 }
 
+// waits check the abort word every 256 polls so the host watchdog can stop a hung step
 #define ETX_DEFINE_SCOPE(S)                                                              \
-  static __device__ __forceinline__ void etx_wait_##S(etx_event* e) {                    \
-    while (ETX_POLL_##S(e) > 0) { ETX_BACKOFF(); }                                        \
+  static __device__ __forceinline__ void etx_wait_##S(etx_event* e, const int32_t* abort_flag) { \
+    uint32_t n = 0;                                                                       \
+    while (ETX_POLL_##S(e) > 0) {                                                         \
+      ETX_BACKOFF();                                                                      \
+      if ((++n & 255u) == 0 && ETX_POLL_DEVICE(abort_flag) != 0) return;                  \
+    }                                                                                     \
   }                                                                                       \
   static __device__ __forceinline__ int32_t etx_arrive_##S(etx_event* e) {               \
     return ETX_ARRIVE_##S(e) - 1;                                                         \
@@ -64,17 +69,22 @@ static __device__ __forceinline__ int32_t etx_try_pop(const etx_queue* q, int32_
   return v & ETX_TASK_MASK;
 }
 
-// Push every dynamic consumer of event coordinate (ev_id, lin). The plan's push
-// lists carry, per consumer, the queue it belongs to: the pusher's domain-local
-// queue (hybrid) or the device-global queue (dynamic). Encoding: task id >= 0
-// -> local queue of `domain`; ~task id (negative) -> global queue.
+// Event coordinate (ev_id, lin) reached zero: for every dynamic / hybrid consumer
+// decrement its remaining-dependency counter; the arrival that brings it to zero
+// pushes the task exactly once (a task with several in-events is not pushed per
+// event -- caught on MI300X: combine tasks ran twice). Push-list encoding:
+//   enc >= 0 : hybrid consumer, its OWN domain in bits 24.., task id in bits 0..23
+//   enc <  0 : dynamic consumer, ~task id -> device-global queue
 static __device__ __forceinline__ void etx_push_consumers(const etx_params& p, int ev_id, int lin, uint32_t domain) {
+  (void)domain;
   const int32_t base = p.push_index[ev_id] + lin;
   const int32_t b = p.push_offsets[base], e = p.push_offsets[base + 1];
   for (int32_t i = b; i < e; ++i) {
     const int32_t enc = p.push_lists[i];
-    if (enc >= 0) etx_push(p.local_queue + domain, enc);
-    else          etx_push(&p.global_queue, ~enc);
+    const int32_t task = enc >= 0 ? (enc & ETX_TASK_MASK) : ~enc;
+    if (atomicSub(p.task_remaining + task, 1) != 1) continue;
+    if (enc >= 0) etx_push(p.local_queue + (enc >> ETX_TAG_SHIFT), task);
+    else          etx_push(&p.global_queue, task);
   }
 }
 

@@ -75,7 +75,7 @@ def _wait_code(plan: Plan, g: TaskGrid) -> str:
         sc = ep.scope.name
         width = _gather_width(plan, m.gather_tensor) if m.kind == "gather" else ""
         lines.append(f"      // wait {ev} via {m.text!r} ({sc})")
-        lines.append(f"#define ETX_TARGET(idx) etx_wait_{sc}(p.events + {ep.offset} + (idx))")
+        lines.append(f"#define ETX_TARGET(idx) etx_wait_{sc}(p.events + {ep.offset} + (idx), p.ctrl_abort)")
         lines.append(m.to_c(coord_vars, f"p.ev_shape[{list(plan.events).index(ev)}]", "ETX_TARGET",
                             _runtime_ptrs(plan, g), width, _symbols(plan)).rstrip())
         lines.append("#undef ETX_TARGET")
@@ -91,7 +91,8 @@ def _arrive_code(plan: Plan, g: TaskGrid, mode: str) -> str:
         ev_id = list(plan.events).index(ev)
         width = _gather_width(plan, m.gather_tensor) if m.kind == "gather" else ""
         lines.append(f"      // arrive {ev} via {m.text!r} ({sc})")
-        if mode == "static":
+        has_dynamic_consumers = any(k[0] == ev for k in plan.ev_consumers)
+        if not has_dynamic_consumers:       # the producer's own mode is irrelevant: a static producer must still push dynamic consumers
             lines.append(f"#define ETX_TARGET(idx) (void)etx_arrive_{sc}(p.events + {ep.offset} + (idx))")
         else:
             lines.append(f"#define ETX_TARGET(idx) do {{ if (etx_arrive_{sc}(p.events + {ep.offset} + (idx)) == 0) etx_push_consumers(p, {ev_id}, (idx), domain); }} while (0)")
@@ -253,8 +254,8 @@ def emit_plan_json(plan: Plan) -> str:
         "static_queues": {f"{d}:{w}": q for (d, w), q in plan.static_queues.items()},
         "local_queue_capacity": {f"{d}:{dom}": c for (d, dom), c in plan.local_queue_capacity.items()},
         "global_queue_capacity": plan.global_queue_capacity,
-        # push lists: task id for the pusher's local queue (hybrid), ~task id for the global queue (dynamic)
-        "ev_consumers": {f"{ev}:{lin}": [i if plan.tasks[i].mode == "hybrid" else ~i for i in ids]
+        # push lists: hybrid consumer -> (its domain << 24) | task id; dynamic consumer -> ~task id (global queue)
+        "ev_consumers": {f"{ev}:{lin}": [((plan.tasks[i].domain << 24) | i) if plan.tasks[i].mode == "hybrid" else ~i for i in ids]
                          for (ev, lin), ids in plan.ev_consumers.items()},
         "tensor_placement": plan.tensor_placement,
         "prefetch": plan.prefetch,

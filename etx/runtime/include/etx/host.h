@@ -20,7 +20,7 @@ extern "C" __global__ void etx_megakernel(etx_params p);
 struct etx_host {
   std::vector<void*> args;                 // device pointers, plan order
   etx_params p{};
-  int32_t *d_events = nullptr, *d_ctrl = nullptr, *d_slots = nullptr, *d_trace = nullptr;
+  int32_t *d_events = nullptr, *d_ctrl = nullptr, *d_slots = nullptr, *d_trace = nullptr, *d_remaining = nullptr;
   int32_t *d_lq_slots = nullptr, *d_lq_head = nullptr, *d_lq_tail = nullptr, *d_gq_slots = nullptr;
   etx_queue* d_local_queues = nullptr;
   double last_ms = 0.0;
@@ -89,6 +89,8 @@ struct etx_host {
     p.worker_domain = nullptr;
     ETX_CHECK(hipMalloc(&d_trace, ETX_N_TASKS * sizeof(int32_t)));
     p.trace_exec = d_trace;
+    ETX_CHECK(hipMalloc(&d_remaining, ETX_N_TASKS * sizeof(int32_t)));
+    p.task_remaining = d_remaining;
     p.workers_per_domain = ETX_WORKERS_PER_DOMAIN;
     p.n_workers = ETX_N_WORKERS;
     p.n_tasks = ETX_N_TASKS;
@@ -100,6 +102,7 @@ struct etx_host {
     ETX_CHECK(hipMemcpy(d_events, etx_ev_counts, ETX_EVENT_WORDS * sizeof(int32_t), hipMemcpyHostToDevice));
     ETX_CHECK(hipMemset(d_ctrl, 0, 64));
     ETX_CHECK(hipMemset(d_trace, 0, ETX_N_TASKS * sizeof(int32_t)));
+    ETX_CHECK(hipMemcpy(d_remaining, etx_task_remaining, ETX_N_TASKS * sizeof(int32_t), hipMemcpyHostToDevice));
     ETX_CHECK(hipMemset(d_slots, 0, ETX_N_DOMAINS * sizeof(int32_t)));
     // rings: clear slots, then seed the initially-ready dynamic/hybrid tasks and set the tails
     int32_t total = 0; for (int d = 0; d < ETX_N_DOMAINS; ++d) total += etx_local_capacity[d];
