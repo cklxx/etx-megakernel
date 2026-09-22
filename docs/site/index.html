@@ -1,0 +1,1292 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ETX 动态 Megakernel 架构</title>
+<meta name="description" content="Event Tensor / ETC 论文拆解，以及一个 DSL 无关、硬件无关（chiplet 感知）的动态 megakernel 编译器 ETX 的系统架构设计。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;700&display=swap">
+<style>
+  :root{
+    --bg:#F6F7F5; --surface:#FFFFFF; --ink:#16201C; --muted:#5F6E68; --line:#D9DFDA; --line-strong:#B9C3BD;
+    --accent:#0F7B78; --accent-soft:#DCEFEC; --accent-ink:#0B5B59;
+    --amber:#A8690A; --amber-soft:#FBEFD8;
+    --red:#B3402E; --red-soft:#F8E3DE;
+    --code-bg:#EEF1EE;
+    --sans:"IBM Plex Sans","Noto Sans SC","PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,sans-serif;
+    --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    color-scheme:light;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#0E1412; --surface:#151D1A; --ink:#E3EAE6; --muted:#97A69F; --line:#263129; --line-strong:#3A4740;
+      --accent:#45C2B4; --accent-soft:#143633; --accent-ink:#7ADCD0;
+      --amber:#E3A64B; --amber-soft:#3A2C12;
+      --red:#E5705C; --red-soft:#3D1D17;
+      --code-bg:#1B2521;
+      color-scheme:dark;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0E1412; --surface:#151D1A; --ink:#E3EAE6; --muted:#97A69F; --line:#263129; --line-strong:#3A4740;
+    --accent:#45C2B4; --accent-soft:#143633; --accent-ink:#7ADCD0;
+    --amber:#E3A64B; --amber-soft:#3A2C12;
+    --red:#E5705C; --red-soft:#3D1D17;
+    --code-bg:#1B2521;
+    color-scheme:dark;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  @media (prefers-reduced-motion: reduce){ html{scroll-behavior:auto} }
+  body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.8 var(--sans);-webkit-font-smoothing:antialiased;padding-inline:20px}
+  a{color:var(--accent-ink);text-decoration:none;border-bottom:1px solid var(--line-strong)}
+  a:hover{border-bottom-color:var(--accent)}
+  a:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  code,pre,kbd{font-family:var(--mono);font-size:.88em}
+  code{background:var(--code-bg);padding:.1em .4em;border-radius:3px}
+  pre{background:var(--code-bg);padding:14px 16px;border-radius:4px;overflow-x:auto;line-height:1.55;border:1px solid var(--line)}
+  pre code{background:none;padding:0;font-size:13px}
+  h1,h2,h3,h4{font-family:var(--sans);text-wrap:balance;line-height:1.25;letter-spacing:-.01em}
+  h1{font-size:clamp(28px,4vw,40px);font-weight:700;margin:12px 0 10px}
+  h2{font-size:26px;font-weight:700;margin:0 0 14px}
+  h3{font-size:19px;font-weight:600;margin:34px 0 8px}
+  h4{font-size:16px;font-weight:600;margin:24px 0 6px;color:var(--accent-ink)}
+  p{margin:10px 0;max-width:72ch}
+  li{max-width:70ch}
+  ul,ol{padding-left:1.4em}
+  li{margin:4px 0}
+  strong{font-weight:600}
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
+  .page{max-width:1240px;margin:0 auto;display:grid;grid-template-columns:230px minmax(0,1fr);gap:48px;padding-block:40px 96px}
+  @media (max-width:1000px){ .page{grid-template-columns:minmax(0,1fr);gap:24px} nav.toc{position:static;max-height:none} }
+  nav.toc{position:sticky;top:24px;align-self:start;max-height:calc(100vh - 48px);overflow:auto;font-size:13.5px;line-height:1.5;padding-right:8px}
+  nav.toc .eyebrow{display:block;margin-bottom:10px}
+  nav.toc ol{list-style:none;padding:0;margin:0}
+  nav.toc li{margin:0;max-width:none}
+  nav.toc a{display:flex;gap:10px;padding:5px 8px;border:none;border-left:2px solid transparent;color:var(--muted);border-radius:0}
+  nav.toc a:hover{color:var(--ink);background:var(--surface)}
+  nav.toc a.active{color:var(--accent-ink);border-left-color:var(--accent)}
+  nav.toc .n{font-family:var(--mono);font-size:11.5px;color:var(--accent);min-width:2.2em;padding-top:2px}
+  header.hero{padding-bottom:28px;border-bottom:1px solid var(--line);margin-bottom:8px}
+  header.hero .lede{font-size:18px;color:var(--muted);max-width:64ch;margin-top:8px}
+  header.hero .meta{display:flex;flex-wrap:wrap;gap:8px 20px;margin-top:18px;font-family:var(--mono);font-size:12.5px;color:var(--muted)}
+  header.hero .meta b{color:var(--ink);font-weight:500}
+  section{padding-block:40px 8px;border-bottom:1px solid var(--line)}
+  section:last-of-type{border-bottom:none}
+  section .eyebrow{display:block;margin-bottom:6px}
+  figure{margin:22px 0;background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:16px 16px 12px;overflow-x:auto}
+  figure svg{display:block;max-width:100%;height:auto;color:var(--ink);font-family:var(--mono);font-size:12px}
+  figcaption{font-size:13.5px;color:var(--muted);margin-top:10px;max-width:80ch;line-height:1.55}
+  figcaption b{color:var(--ink);font-weight:600}
+  .tbl{overflow-x:auto;margin:16px 0}
+  table{border-collapse:collapse;width:100%;font-size:14px;line-height:1.5;font-variant-numeric:tabular-nums}
+  th,td{text-align:left;vertical-align:top;padding:8px 10px;border-bottom:1px solid var(--line)}
+  th{font-weight:600;font-size:12.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--line-strong);white-space:nowrap}
+  td code{white-space:nowrap}
+  tr.hl td{background:var(--accent-soft)}
+  .num{font-family:var(--mono);white-space:nowrap}
+  .callout{border-left:3px solid var(--accent);background:var(--surface);padding:12px 16px;margin:18px 0;border-radius:0 4px 4px 0}
+  .callout.warn{border-left-color:var(--amber);background:var(--amber-soft)}
+  .callout.bad{border-left-color:var(--red);background:var(--red-soft)}
+  .callout p{margin:6px 0}
+  .callout .t{font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+  .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin:16px 0}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:14px 16px}
+  .card h4{margin:0 0 6px;color:var(--ink)}
+  .card p{font-size:14.5px;margin:4px 0;color:var(--muted)}
+  .card .k{font-family:var(--mono);font-size:12px;color:var(--accent);letter-spacing:.08em;text-transform:uppercase}
+  .tag{display:inline-block;font-family:var(--mono);font-size:11.5px;padding:1px 7px;border-radius:3px;background:var(--accent-soft);color:var(--accent-ink);margin-right:4px;white-space:nowrap}
+  .tag.amber{background:var(--amber-soft);color:var(--amber)}
+  .tag.red{background:var(--red-soft);color:var(--red)}
+  .kv{display:grid;grid-template-columns:max-content 1fr;gap:4px 18px;font-size:14.5px;margin:10px 0}
+  .kv dt{font-family:var(--mono);color:var(--muted);font-size:13px;padding-top:2px}
+  .kv dd{margin:0}
+  /* simulator */
+  .sim{background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:16px;margin:20px 0}
+  .sim .controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px 22px;margin-bottom:12px}
+  .sim label{display:block;font-size:13px;color:var(--muted);font-family:var(--mono)}
+  .sim label span{color:var(--ink);float:right}
+  .sim input[type=range]{width:100%;accent-color:var(--accent)}
+  .sim .results{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:10px 0 12px}
+  @media (max-width:600px){ .sim .results{grid-template-columns:1fr} }
+  .sim .res{border:1px solid var(--line);border-radius:4px;padding:8px 12px}
+  .sim .res .l{font-family:var(--mono);font-size:12px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase}
+  .sim .res .v{font-family:var(--mono);font-size:22px;font-weight:500}
+  .sim .res .v small{font-size:12px;color:var(--muted);margin-left:4px}
+  .sim .res.best{border-color:var(--accent);background:var(--accent-soft)}
+  .sim canvas{width:100%;height:auto;display:block;border-top:1px solid var(--line);padding-top:8px}
+  .sim .legend{display:flex;gap:16px;flex-wrap:wrap;font-family:var(--mono);font-size:12px;color:var(--muted);margin-top:8px}
+  .sim .legend i{display:inline-block;width:12px;height:12px;vertical-align:-2px;margin-right:5px;border-radius:2px}
+  .sim button{font:13px var(--mono);background:var(--accent);color:#fff;border:none;padding:6px 12px;border-radius:3px;cursor:pointer}
+  .foot{color:var(--muted);font-size:13px;margin-top:40px;font-family:var(--mono)}
+  .srcs li{font-size:14px;max-width:none}
+</style>
+</head>
+<body>
+<div class="page">
+<nav class="toc" aria-label="目录">
+  <span class="eyebrow">目录</span>
+  <ol>
+    <li><a href="#s1"><span class="n">01</span><span>论文拆解：ETC 到底做了什么</span></a></li>
+    <li><a href="#s2"><span class="n">02</span><span>从论文读出的七个架构判断</span></a></li>
+    <li><a href="#s3"><span class="n">03</span><span>ETX：目标、非目标、三个硬决定</span></a></li>
+    <li><a href="#s4"><span class="n">04</span><span>分层总览</span></a></li>
+    <li><a href="#s5"><span class="n">05</span><span>性能模型：两个下界与四个杠杆</span></a></li>
+    <li><a href="#s6"><span class="n">06</span><span>L1 · Tile 契约（DSL 无关怎么落地）</span></a></li>
+    <li><a href="#s7"><span class="n">07</span><span>L2 · Event Tensor IR</span></a></li>
+    <li><a href="#s8"><span class="n">08</span><span>L3 · 机器模型（chiplet 感知）</span></a></li>
+    <li><a href="#s9"><span class="n">09</span><span>L4 · 放置与调度 pass</span></a></li>
+    <li><a href="#s10"><span class="n">10</span><span>L5 · 后端 lowering 与运行时 ABI</span></a></li>
+    <li><a href="#s11"><span class="n">11</span><span>动态负载：三个层次</span></a></li>
+    <li><a href="#s12"><span class="n">12</span><span>负载覆盖矩阵</span></a></li>
+    <li><a href="#s13"><span class="n">13</span><span>验证策略</span></a></li>
+    <li><a href="#s14"><span class="n">14</span><span>与 ETC / MPK / Hazy 的差异</span></a></li>
+    <li><a href="#s15"><span class="n">15</span><span>里程碑、风险、未验证清单</span></a></li>
+    <li><a href="#s16"><span class="n">16</span><span>来源</span></a></li>
+  </ol>
+</nav>
+
+<main>
+<header class="hero">
+  <span class="eyebrow">Design note · v0.3 · 2026-09-22</span>
+  <h1>ETX：一个 DSL 无关、chiplet 感知的动态 Megakernel 编译器</h1>
+  <p class="lede">把「多个 GPU 算子融合进一个持久化内核，同时处理动态 shape 与数据依赖」做成一个编译器，而不是一份手写内核。抽象沿用 Event Tensor（MLSys 2026），再补上论文没有的两样东西：显式的机器模型，和按代价选出来的调度策略。</p>
+  <div class="meta">
+    <span>依据 <b>arXiv 2604.13327 v2</b>（Event Tensor / ETC，CMU + NVIDIA）</span>
+    <span>参照 <b>MPK</b>、<b>Hazy no-bubbles</b>、<b>fleet-mi300x</b>（MI300X 上的手写 megakernel）</span>
+    <span>状态 <b>设计稿，未实现</b></span>
+  </div>
+  <figure>
+    <svg viewBox="0 0 760 236" role="img" aria-label="三种 GPU 调度模型的 SM 时间线：逐内核启动有启动间隙；CUDA Graph 去掉间隙但保留内核边界；megakernel 把 B 的 tile 插进 A 的尾部，只剩细粒度依赖。">
+      <defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="currentColor"/></marker></defs>
+      <g font-size="12" fill="currentColor">
+        <text x="0" y="22" font-weight="600">逐内核启动</text>
+        <text x="0" y="96" font-weight="600">CUDA Graph</text>
+        <text x="0" y="170" font-weight="600">Megakernel</text>
+        <text x="0" y="40" fill="var(--muted)" font-size="11">SM0</text><text x="0" y="60" fill="var(--muted)" font-size="11">SM1</text>
+        <text x="0" y="114" fill="var(--muted)" font-size="11">SM0</text><text x="0" y="134" fill="var(--muted)" font-size="11">SM1</text>
+        <text x="0" y="188" fill="var(--muted)" font-size="11">SM0</text><text x="0" y="208" fill="var(--muted)" font-size="11">SM1</text>
+      </g>
+      <!-- row 1 -->
+      <g>
+        <rect x="120" y="30" width="60" height="14" fill="var(--accent)"/><rect x="184" y="30" width="60" height="14" fill="var(--accent)"/><rect x="248" y="30" width="60" height="14" fill="var(--accent)"/>
+        <rect x="120" y="50" width="60" height="14" fill="var(--accent)"/><rect x="184" y="50" width="60" height="14" fill="var(--accent)"/>
+        <rect x="312" y="30" width="80" height="34" fill="none" stroke="var(--red)" stroke-dasharray="3 3"/>
+        <text x="352" y="76" text-anchor="middle" font-size="11" fill="var(--red)">启动间隙 5–10 µs</text>
+        <rect x="396" y="30" width="60" height="14" fill="var(--amber)"/><rect x="460" y="30" width="60" height="14" fill="var(--amber)"/><rect x="524" y="30" width="60" height="14" fill="var(--amber)"/>
+        <rect x="396" y="50" width="60" height="14" fill="var(--amber)"/><rect x="460" y="50" width="60" height="14" fill="var(--amber)"/>
+        <text x="150" y="27" font-size="10" fill="currentColor">Kernel A · 5 tiles</text>
+        <text x="430" y="27" font-size="10" fill="currentColor">Kernel B · 5 tiles</text>
+      </g>
+      <!-- row 2 -->
+      <g>
+        <rect x="120" y="104" width="60" height="14" fill="var(--accent)"/><rect x="184" y="104" width="60" height="14" fill="var(--accent)"/><rect x="248" y="104" width="60" height="14" fill="var(--accent)"/>
+        <rect x="120" y="124" width="60" height="14" fill="var(--accent)"/><rect x="184" y="124" width="60" height="14" fill="var(--accent)"/>
+        <line x1="312" y1="98" x2="312" y2="142" stroke="var(--red)" stroke-width="2"/>
+        <text x="316" y="150" font-size="11" fill="var(--red)">内核边界 = 隐式全局屏障</text>
+        <rect x="316" y="104" width="60" height="14" fill="var(--amber)"/><rect x="380" y="104" width="60" height="14" fill="var(--amber)"/><rect x="444" y="104" width="60" height="14" fill="var(--amber)"/>
+        <rect x="316" y="124" width="60" height="14" fill="var(--amber)"/><rect x="380" y="124" width="60" height="14" fill="var(--amber)"/>
+      </g>
+      <!-- row 3 -->
+      <g>
+        <rect x="120" y="178" width="60" height="14" fill="var(--accent)"/><rect x="184" y="178" width="60" height="14" fill="var(--accent)"/><rect x="248" y="178" width="60" height="14" fill="var(--accent)"/>
+        <rect x="312" y="178" width="60" height="14" fill="var(--amber)"/><rect x="376" y="178" width="60" height="14" fill="var(--amber)"/>
+        <rect x="120" y="198" width="60" height="14" fill="var(--accent)"/><rect x="184" y="198" width="60" height="14" fill="var(--accent)"/>
+        <rect x="248" y="198" width="60" height="14" fill="var(--amber)"/><rect x="312" y="198" width="60" height="14" fill="var(--amber)"/><rect x="376" y="198" width="60" height="14" fill="var(--amber)"/>
+        <path d="M244 205 L 248 205" stroke="currentColor" marker-end="url(#arr)"/>
+        <text x="444" y="209" font-size="11" fill="var(--accent-ink)">B0 只等它依赖的 A 块，不等整个 A</text>
+        <text x="444" y="190" font-size="11" fill="currentColor">makespan 缩短 ≈ 1 个 tile + 全部启动间隙</text>
+      </g>
+      <line x1="120" y1="226" x2="600" y2="226" stroke="currentColor" marker-end="url(#arr)"/>
+      <text x="606" y="230" font-size="11" fill="var(--muted)">时间</text>
+    </svg>
+    <figcaption><b>为什么要 megakernel。</b>论文图 1 的重画：逐内核启动付启动间隙；CUDA Graph 去掉间隙但保留内核边界这个隐式屏障；megakernel 把算子拆成 tile 级任务，依赖细到 tile，B 的 tile 可以插进 A 的尾巴。低 batch 解码每步几百到上千个内核，最快的 2 µs 就结束，启动开销 5–10 µs 反而是大头。</figcaption>
+  </figure>
+</header>
+
+<!-- ============================ 01 ============================ -->
+<section id="s1">
+  <span class="eyebrow">01 · 论文拆解</span>
+  <h2>ETC 到底做了什么</h2>
+  <p>论文的核心是一个 IR 级别的抽象，不是一个新调度器。它把 megakernel 里「谁等谁」这件事，从散落在手写内核里的信号量，提升成编译器里的一等张量。剩下的静态 / 动态调度，都是对这个张量做变换。</p>
+
+  <h3>1.1 三个语言构件</h3>
+  <div class="grid2">
+    <div class="card"><span class="k">device function</span><h4>任务网格</h4><p>一个函数，按多维坐标启动成一组 tile 级任务。每个任务在一个 SM 上跑，内部可以 warp 特化、用 tensor core。任务坐标是符号表达式，比如 <code>(n, 4)</code>。</p></div>
+    <div class="card"><span class="k">Event Tensor</span><h4>事件张量</h4><p>多维数组，每个元素是一个事件：初始等待计数 <code>wait_count</code>，支持 <code>notify()</code>（原子减一）、<code>wait()</code>（自旋到零）。动态调度下事件归零还能触发消费者任务。shape 可以含符号维度。</p></div>
+    <div class="card"><span class="k">graph function</span><h4>图函数</h4><p>由 <code>call_device</code> 组成的计算图，节点既有数据张量也有事件张量。每次调用用 <code>in_edges</code> / <code>out_edges</code> 加一个 einsum 风格映射（如 <code>"ij->i"</code>）声明 task 坐标到 event 坐标的关系。</p></div>
+  </div>
+
+  <figure>
+    <svg viewBox="0 0 760 210" role="img" aria-label="split-K 求和例子：partial_sum 的 n×4 个任务按 ij→i 通知 n 个事件，每个事件计数 4，final_sum 的第 i 个任务只等 E[i]。">
+      <defs><marker id="arr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="currentColor"/></marker></defs>
+      <g font-size="12" fill="currentColor">
+        <text x="0" y="20" font-weight="600">partial_sum · tile_num=(n,4)</text>
+        <text x="330" y="20" font-weight="600">E = ETensor((n,), wait=4)</text>
+        <text x="560" y="20" font-weight="600">final_sum · tile_num=(n,)</text>
+      </g>
+      <g>
+        <!-- producer grid rows i=0..2, cols j=0..3 -->
+        <g fill="var(--accent)">
+          <rect x="0" y="40" width="40" height="26"/><rect x="46" y="40" width="40" height="26"/><rect x="92" y="40" width="40" height="26"/><rect x="138" y="40" width="40" height="26"/>
+          <rect x="0" y="76" width="40" height="26"/><rect x="46" y="76" width="40" height="26"/><rect x="92" y="76" width="40" height="26"/><rect x="138" y="76" width="40" height="26"/>
+          <rect x="0" y="112" width="40" height="26"/><rect x="46" y="112" width="40" height="26"/><rect x="92" y="112" width="40" height="26"/><rect x="138" y="112" width="40" height="26"/>
+        </g>
+        <g font-size="10" fill="#fff" text-anchor="middle">
+          <text x="20" y="57">B̂0,0</text><text x="66" y="57">B̂0,1</text><text x="112" y="57">B̂0,2</text><text x="158" y="57">B̂0,3</text>
+          <text x="20" y="93">B̂1,0</text><text x="66" y="93">B̂1,1</text><text x="112" y="93">B̂1,2</text><text x="158" y="93">B̂1,3</text>
+          <text x="20" y="129">B̂2,0</text><text x="66" y="129">B̂2,1</text><text x="112" y="129">B̂2,2</text><text x="158" y="129">B̂2,3</text>
+        </g>
+        <text x="60" y="160" font-size="11" fill="var(--muted)">… i = 3 … n−1</text>
+        <!-- edges ij->i -->
+        <path d="M180 53 L 330 53" stroke="currentColor" marker-end="url(#arr2)"/>
+        <path d="M180 89 L 330 89" stroke="currentColor" marker-end="url(#arr2)"/>
+        <path d="M180 125 L 330 125" stroke="currentColor" marker-end="url(#arr2)"/>
+        <text x="255" y="47" text-anchor="middle" font-size="11">"ij->i" · notify ×4</text>
+        <!-- events -->
+        <g>
+          <rect x="336" y="40" width="70" height="26" fill="none" stroke="currentColor" stroke-width="1.4"/><text x="371" y="57" text-anchor="middle" font-size="11">E[0] = 4</text>
+          <rect x="336" y="76" width="70" height="26" fill="none" stroke="currentColor" stroke-width="1.4"/><text x="371" y="93" text-anchor="middle" font-size="11">E[1] = 4</text>
+          <rect x="336" y="112" width="70" height="26" fill="none" stroke="currentColor" stroke-width="1.4"/><text x="371" y="129" text-anchor="middle" font-size="11">E[2] = 4</text>
+          <text x="371" y="160" text-anchor="middle" font-size="11" fill="var(--muted)">整型张量，一行 notify 一次 −1</text>
+        </g>
+        <path d="M408 53 L 560 53" stroke="currentColor" marker-end="url(#arr2)"/>
+        <path d="M408 89 L 560 89" stroke="currentColor" marker-end="url(#arr2)"/>
+        <path d="M408 125 L 560 125" stroke="currentColor" marker-end="url(#arr2)"/>
+        <text x="484" y="47" text-anchor="middle" font-size="11">"i->i" · wait 到 0</text>
+        <g fill="var(--amber)">
+          <rect x="566" y="40" width="44" height="26"/><rect x="566" y="76" width="44" height="26"/><rect x="566" y="112" width="44" height="26"/>
+        </g>
+        <g font-size="10" fill="#fff" text-anchor="middle"><text x="588" y="57">Ĉ0</text><text x="588" y="93">Ĉ1</text><text x="588" y="129">Ĉ2</text></g>
+        <text x="620" y="57" font-size="11">行 0 的 4 个部分和一到就能跑，</text>
+        <text x="620" y="73" font-size="11">不必等整张 B 算完</text>
+      </g>
+      <text x="0" y="196" font-size="11.5" fill="var(--muted)">n 是符号变量：编译一次，运行时用具体 n 实例化坐标空间。</text>
+    </svg>
+    <figcaption><b>Event Tensor 的最小例子</b>（论文图 3）。split-K 求和的第二阶段第 i 行只依赖第一阶段第 i 行的 4 个 tile。逐内核执行时第二阶段要等第一阶段全部结束；有了 <code>E[i]</code>，行与行之间是流水的。一张张量就表示了成千上万个事件，运行时不需要物化任务图。</figcaption>
+  </figure>
+
+  <h3>1.2 两种动态性怎么进 IR</h3>
+  <dl class="kv">
+    <dt>shape 动态</dt><dd>Tensor 与 ETensor 的维度都可以是符号变量（batch、seq len）。编译产物是一个模板，运行时填具体值就得到当次的任务图，不重编译、不重新捕获 graph。这是它能 AOT 的根本原因。</dd>
+    <dt>数据依赖动态</dt><dd>两个机制。<b>数据依赖更新</b>：谁通知哪个事件由运行时张量决定，如 <code>"i->topk[i,:]"</code>（token i 通知它被路由到的 k 个 expert 事件），并且事件的初始计数也在算 topk 的那个 tile 里一起算出来。<b>数据依赖触发</b>：一个事件触发多少消费者由运行时决定，如 <code>"i->range(indptr[i], indptr[i+1])"</code>（expert i 触发它需要的 GroupGEMM tile 数）。</dd>
+    <dt>不变量</dt><dd>整条依赖链仍然是前馈的：Attention → TopK → 分组 → GroupGEMM。动态只出现在后段的通知目标和触发范围上，图本身没有环、没有任意控制流。</dd>
+  </dl>
+
+  <h3>1.3 两条调度变换</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>维度</th><th>静态调度（§3.1）</th><th>动态调度（§3.2）</th></tr></thead>
+    <tbody>
+      <tr><td>谁决定任务顺序</td><td>host 在启动前为每个 SM 排好队列（论文用 round-robin），物化进全局内存</td><td>片上调度器：事件归零时把消费者任务原子 push 进就绪队列，空闲 SM 原子 pop</td></tr>
+      <tr><td>依赖如何保证</td><td>消费者任务开头 <code>wait()</code>，生产者任务结尾 <code>notify()</code></td><td>同样的 notify / wait，外加 push / pop</td></tr>
+      <tr><td>shape 动态</td><td>采样一组代表 shape 预排队列；没见过的 shape 复用「下一个更大的」采样值的队列</td><td>天然支持，顺序在运行时定</td></tr>
+      <tr><td>数据依赖动态</td><td>保守退化：相关 notify / wait 改写成 <code>E[0]</code>，等于回到全局屏障</td><td>天然支持</td></tr>
+      <tr><td>开销</td><td>最低，只有原子与自旋</td><td>队列 push / pop；中心化队列在全局内存，作者承认规模上有争用；附录 E 用 early push（生产者被派发即 push 消费者）把 push 挪出关键路径</td></tr>
+      <tr><td>适用</td><td>可预测负载、延迟敏感的小 batch、跨卡场景</td><td>不规则负载（MoE 路由）、通信抖动</td></tr>
+    </tbody>
+  </table></div>
+  <p>两者 lowering 之后都只剩两块运行时状态：一张整型事件张量（复用现有张量与内存规划）和调度器的任务队列。没有任务图遍历器，没有解释执行层。编译流水线是：图级优化 → tile 级优化 → 静态或动态调度变换 → 预取改写 → 持久化内核代码生成 → 静态队列物化。</p>
+
+  <h3>1.4 数字</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>实验（8×B200，NVLink）</th><th>对手</th><th>结果</th><th>用的调度</th></tr></thead>
+    <tbody>
+      <tr><td>GEMM + Reduce-Scatter（TP=8，8192 token）</td><td>cuBLAS+NCCL、TP-Async、Triton-Distributed、cuBLASMp</td><td class="num">最高 1.40×（对未融合）</td><td>dynamic（吃网络抖动）</td></tr>
+      <tr><td>All-Gather + GEMM</td><td>同上</td><td class="num">最高 1.40×</td><td>static（ring 顺序可预测）</td></tr>
+      <tr><td>MoE 层，Qwen3-30B-A3B（128 expert，top-8）</td><td>Triton 3.4、FlashInfer 0.2.14</td><td class="num">最高 1.23×（1024 token）</td><td>dynamic</td></tr>
+      <tr><td>端到端 TPOT，30B-A3B，bs=1</td><td>vLLM 0.11、SGLang 0.5.3（都开 CUDA Graph + torch.compile）</td><td class="num">1.48× / 1.20×</td><td>static</td></tr>
+      <tr><td>端到端 TPOT，Qwen3-32B，TP=1</td><td>同上</td><td class="num">最高 1.15× / 1.09×</td><td>static</td></tr>
+      <tr><td>端到端 TPOT，Qwen3-32B，TP=4</td><td>同上</td><td class="num">0.99–1.06×，SGLang 反而更快（CPU 侧调度更轻）</td><td>static</td></tr>
+      <tr><td>Qwen3-32B 引擎预热</td><td>SGLang 583 s / vLLM 123 s（JIT + 51 / 67 次 graph 捕获）</td><td class="num">35 s，0 次捕获；离线编译 107 s</td><td>—</td></tr>
+      <tr class="hl"><td>MoE 层：static vs dynamic（对同代码的未融合 megakernel）</td><td>1 / 128 / 1024 / 4096 token</td><td class="num">static 1.03 / 1.02 / 1.04 / 1.02；dynamic 0.95 / 1.06 / 1.08 / 1.03</td><td>动态在不规则负载上赢 4%</td></tr>
+      <tr class="hl"><td>Qwen3-32B TP=4：static vs dynamic</td><td>bs 1 / 16 / 32 / 128</td><td class="num">static 1.09 / 1.06 / 1.07 / 1.06；<b>dynamic 0.83 / 0.82 / 0.85 / 0.89</b></td><td>跨卡 push 让动态调度比不融合还慢</td></tr>
+    </tbody>
+  </table></div>
+  <p>高亮两行是本设计最重要的证据：同一套原语，调度策略选错就从 +9% 变成 −17%。所以调度策略不能由用户凭直觉配，得由代价模型按负载与拓扑选。</p>
+</section>
+
+<!-- ============================ 02 ============================ -->
+<section id="s2">
+  <span class="eyebrow">02 · 批判性阅读</span>
+  <h2>从论文读出的七个架构判断</h2>
+  <ol>
+    <li><strong>事件就是整型计数器，这个决定要保留。</strong>它让运行时状态压缩到两块内存，让符号 shape 的编译器基础设施能直接复用。任何「事件对象」「任务图节点」都是退步。</li>
+    <li><strong>调度是编译器变换，不是运行时组件。</strong>static / dynamic 都是对同一个 IR 的改写，运行时只剩 push / pop 两个函数。这使得策略可以按子图组合，而不是全局二选一。ETX 的 hybrid 调度就是在这个基础上做的。</li>
+    <li><strong>机器模型是隐式的，而且只在 B200 上成立。</strong>论文假设 SM 均质、L2 统一相干、有 <code>multimem</code> 归约写、有 NVLink。一张 MI300X 至少四处不成立：L2 是 8 段各 4 MB 的 XCD 私有缓存；没有 multimem；跨 XCD 原子走 Infinity Fabric；系统域原子对内存类型有要求。论文说抽象「不针对特定 GPU 代际」，是对 IR 说的，实现没验证过。</li>
+    <li><strong>静态调度对动态性的兜底太粗。</strong>shape 用「下一个更大的采样值」的队列；数据依赖直接退化成 <code>E[0]</code> 全局屏障。这在 MoE + 低 batch + 跨卡这种最常见的组合上正好是最差的一档，需要 hybrid 补上。</li>
+    <li><strong>动态调度的代价是拓扑函数。</strong>TP=4 上 0.83× 说明 push 一旦跨设备就得不偿失；中心化全局队列作者也承认有争用。队列必须分层，push 必须有域界。</li>
+    <li><strong>tile 质量与融合收益必须解耦。</strong>作者承认生成的 GEMM tile 在某些配置下不如 cuBLAS，导致 TP=4 上偶尔落后。系统必须允许内联手写 tile（CUTLASS / CK 风格），并且评测时把「融合的收益」和「tile 的质量」分开报。</li>
+    <li><strong>每步一次启动，图内没有循环。</strong>论文的 megakernel 覆盖一次解码迭代，continuous batching 的形状变化靠符号 shape 吸收，但内核本身每步重启。跨步持久化（内核常驻、host 通过环形缓冲喂步描述）论文没做，这是延迟敏感场景下另一个可拿的量。</li>
+    <li><strong>只有任务级的依赖变换，没有「改图」的变换。</strong>ETC 能把一个算子拆成 tile 并细化依赖，但不会删相位：没有以重算换事件、没有跨屏障的权重预取。小 batch 下关键路径由相位数和每相位固定延迟决定，这两项正是手写内核（Hazy、fleet-mi300x）和它拉开差距的地方。第 05 节把这笔账算清楚。</li>
+  </ol>
+  <h3>2.1 2026 年的生态：十条设计轴，以及 ETX 在每条轴上的取值</h3>
+  <p>论文之外，一年内出现了十几个 megakernel 系统。把它们摆在一起，差异集中在十条轴上。ETX 的每个取值都能在这张表里找到先例或反例。</p>
+  <div class="tbl"><table>
+    <thead><tr><th>设计轴</th><th>已有系统的取值</th><th>ETX 的取值与理由</th></tr></thead>
+    <tbody>
+      <tr><td>谁拥有调度器</td><td>专用调度 SM（MPK 4 个 SM；Fleet 每 XCD 一个 workgroup）· 每个 SM 自取全局计数器（Hazy 70B、Cohere）· host 预排、内核内无调度器（Hazy 1B、Ada-MK、Kog、ForgeMegakernel；MPK 的 2026 路线图也转向全静态）</td><td>按子图选：静态段无调度器；动态段每 domain 一个本地队列，worker 自取；不设专用调度 SM（fleet-mi300x 上它只做事件镜像，带宽受限时占 2.6% CU 无所谓，计算受限时不划算）</td></tr>
+      <tr><td>队列拓扑</td><td>每 worker 队列（MPK JIT/AOT 双队列、Fleet）· 单全局队列（Hazy 70B）· 按算子的 drain 队列（Cohere 的 <code>ATTN_DRAIN</code> / <code>MOE_*_DRAIN</code>）· 无队列（Kog、Ada-MK）</td><td>domain 本地队列 + 每 worker 静态表；数据依赖算子可再按算子拆 drain 队列（Cohere 的做法与 domain 分层正交，可叠加）</td></tr>
+      <tr><td>依赖何时解析</td><td>JIT（事件触发后才派发）vs AOT（预入队、worker 自旋）：MPK 两者混用，Cohere / Hazy 全 AOT 自旋，Ada-MK 编译期消灭</td><td>静态段 AOT 自旋（一跳）；动态段 JIT（两跳）；ETC 的 early push 作为动态段默认</td></tr>
+      <tr><td>事件粒度与编码</td><td>带扇入扇出范围的事件对象（MPK）· 每边一个计数器（Hazy、Forge）· 每任务一个目标计数（Cohere）· 数据缓冲里的哨兵值（Kog，0.8 µs vs 原子 7.6 µs）· 带 epoch 的标志（mKernel）</td><td>事件张量（整型）+ epoch 戳：跨步常驻时不必每步清零，比较 <code>count == epoch_target</code> 即可；哨兵值作为可选 lowering（能力位 <code>sentinel_signal</code>）</td></tr>
+      <tr><td>信号的内存模型</td><td>GPU-scope 原子 + threadfence（NVIDIA 系）· chiplet 分层：L2 本地计数 + 每 XCD 一次 <code>sc0 sc1</code> fence（Fleet，跨 chiplet 信号减少 14.5×）· 编译器可见的 acquire/release token（Triton-distributed 的 <code>consume_token</code>，Iris 的 block/gpu/sys scope）</td><td>scope 进 IR，lowering 表按架构给 fence；last-arriver 一次回写（Fleet 与 fleet-mi300x 都验证过）</td></tr>
+      <tr><td>动态 shape</td><td>按 batch 特化多张图（MPK、Fleet、ETC-static）· 编译期固定（Forge、Hazy 1B、Ada-MK）· 只对数据依赖算子用工作窃取（Cohere、MPK 的 JIT attention）· 角色自适应（mKernel）· 确定性填充（MoK）</td><td>符号 shape 模板 + shape 桶；数据依赖段本地队列；不做 padding 兜底</td></tr>
+      <tr><td>共享内存 / LDS 归属</td><td>页分配器、生命周期跟随指令（Hazy 13×16 KB 页、Forge、Ada-MK 的页状态机）· 按 task 类型最坏分配（MPK、Fleet，占用率抱怨的来源）</td><td>L5 骨架内置 LDS 页分配器：下一 tile 的权重装载与当前 tile 的写回重叠；页数由资源类与 LDS 容量（64 / 160 / 228 KB）算出</td></tr>
+      <tr><td>codegen 路径</td><td>超优化器 + 转译（MPK）· MLIR（Ada-MK、cuTile）· 手写 + tile 库（Hazy、Cohere、MoK、Kog）· agent 合成 + 校验器（Forge、AutoMegaKernel）· Triton + SHMEM 原语（Triton-distributed、Iris、DITRON）</td><td>不选边：link 模式吃手写与厂商库，host-DSL 模式吃 Triton；调度骨架由 ETX 生成</td></tr>
+      <tr><td>硬件覆盖</td><td>NVIDIA 占绝大多数；AMD 只有 Fleet（MI350X，MPK 衍生）、Kog（MI300X，专用）、Iris / DITRON（通信原语）；Rubin 宣称 tile 级依赖触发由硬件接管</td><td>chiplet 是一等概念；<code>wait</code> 的 lowering 允许落到硬件触发（能力位 <code>hw_tile_trigger</code>），硬件接管时 ETX 只少生成一段自旋</td></tr>
+      <tr><td>融合范围</td><td>整个解码步（MPK、Hazy、Cohere、Forge、Kog）· 单层类型（FlashInfer MegaMoE、MegaGDN、MoK）· 服务循环本身（Blink、MPK 的内核内准入）</td><td>子图级：融合失败的部分回退逐内核；跨步常驻是可选模式</td></tr>
+    </tbody>
+  </table></div>
+  <p>两条值得单独记住的证据：Cohere 在 H100 上用「host 预排静态波次 + 按算子的 drain 队列」拿到 30B-A3B bs=1 对 vLLM 1.58×，说明 hybrid 是对的方向；AMD 自己的 Fleet 在 MI350X 上用「XCD 内 L2 本地计数 + 每 XCD 一次 GPU-scope fence」比直接移植的 MPK 快 1.13–1.30×，说明 chiplet 感知不是可选项。</p>
+
+  <div class="callout">
+    <p class="t">从 fleet-mi300x 带来的经验</p>
+    <p>我们在 MI300X 上手写过同类 megakernel（DeepSeek-V2-Lite bs=1 解码，3.60 ms/token，比同机 vLLM 快 20%）。那份工作证明了三件事：跨 XCD 事件与 XCD 内事件的代价差一个量级，一层 MoE 里能把全局事件从 10 压到 3、XCD 局部事件 24 个；生产者 <code>buffer_wbl2</code> 回写不能省，消费者 L1 失效不能省；持久化内核的 workgroup 到 XCD 映射不是契约，要在启动时探测。这三条都直接进了 L3 与 L5 的设计。</p>
+  </div>
+</section>
+
+<!-- ============================ 03 ============================ -->
+<section id="s3">
+  <span class="eyebrow">03 · 定位</span>
+  <h2>ETX：目标、非目标、三个硬决定</h2>
+  <p>ETX（Event Tensor eXtended）是一个位于 tile DSL 之上的编译器：它不生成 tile 内的指令，只负责切 tile、连依赖、排调度、放置到机器上、生成持久化内核的骨架，再把各家 DSL 编译出的 tile 体链接进去。</p>
+  <div class="grid2">
+    <div class="card"><span class="k">目标 · 按优先级</span>
+      <ol style="padding-left:1.2em;margin:6px 0">
+        <li>DSL 无关：Triton、TileLang、CuTe DSL、CK、手写 HIP / CUDA 都能接。</li>
+        <li>硬件可移植：同一份 IR 在 CDNA2 / CDNA3 / CDNA4、RDNA、NVIDIA Hopper / Blackwell 上都出正确且合理的代码，chiplet 是一等概念。</li>
+        <li>动态负载一等支持：shape 动态、数据依赖动态、跨步动态（continuous batching、speculative decoding）。</li>
+        <li>调度决策自动化且可解释：编译器按代价表选 static / dynamic / hybrid，并打印理由。</li>
+        <li>可验证：每个融合内核都有可逐元素比对的未融合参考，死锁能定位。</li>
+      </ol>
+    </div>
+    <div class="card"><span class="k">非目标 · 明确不做</span>
+      <ul style="padding-left:1.2em;margin:6px 0">
+        <li>不做训练框架；第一版只做推理侧融合。</li>
+        <li>不自研全部 tile 级代码生成；允许内联已调优的手写 tile。</li>
+        <li>第一版不做跨节点；IR 不写死单机，调度器先只看单机拓扑。</li>
+        <li>不追求所有算子都能融合；融合失败要优雅退化成部分子图融合 + 逐内核执行。</li>
+        <li>不处理任意控制流；依赖必须能写成仿射映射或运行时范围映射。</li>
+      </ul>
+    </div>
+  </div>
+  <h3>三个硬决定</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>决定</th><th>内容</th><th>违反的代价</th></tr></thead>
+    <tbody>
+      <tr><td><b>硬件差异只以数据存在</b></td><td>pass 里不许出现 <code>if arch == gfx942</code>。所有差异写在 <code>arch/*.yaml</code> 的能力表、代价表和 lowering 表里。</td><td>新硬件接入要改 pass，每个 pass 都变成 if 森林</td></tr>
+      <tr><td><b>能力与代价分开建模</b></td><td>capability 是布尔 / 枚举，决定「能不能做」，错了是错的代码；cost 是数值，决定「值不值得做」，错了只是慢。</td><td>混在一起后没法回答「这个优化在这台机器上是不支持还是不划算」</td></tr>
+      <tr><td><b>调度策略由代价模型选</b></td><td>每个子图独立决策 static / dynamic / hybrid，输入是负载特征 + 拓扑代价，输出附带理由。</td><td>论文 TP=4 上 0.83× 的重演</td></tr>
+    </tbody>
+  </table></div>
+  <p>再加一条贯穿全部层的纪律：<strong>依赖语义、机器事实、放置决策三条线永不混写。</strong>依赖错了结果错或死锁，放在 L2；机器事实错了是静默错或性能差，放在 L3；决策错了只是慢，放在 L4。每条线出问题都能只查一层。</p>
+</section>
+
+<!-- ============================ 04 ============================ -->
+<section id="s4">
+  <span class="eyebrow">04 · 全景</span>
+  <h2>分层总览</h2>
+  <figure>
+    <svg viewBox="0 0 760 400" role="img" aria-label="ETX 五层：L1 前端适配器输出 TileOp；L2 Event Tensor IR；L3 机器模型；L4 放置与调度 pass；L5 后端 codegen 与极小运行时。层间流动的产物标在箭头上。">
+      <defs><marker id="arr3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="currentColor"/></marker></defs>
+      <g font-size="12" fill="currentColor">
+        <!-- L1 -->
+        <rect x="0" y="0" width="540" height="56" fill="var(--surface)" stroke="currentColor" stroke-width="1.4"/>
+        <text x="12" y="22" font-weight="600">L1 前端适配器</text>
+        <text x="12" y="42" font-size="11.5">Triton · TileLang · CuTe DSL · CK · 手写 HIP/CUDA → 只回答三个问题：坐标空间 / 依赖映射 / 资源需求</text>
+        <path d="M270 56 L 270 84" stroke="currentColor" marker-end="url(#arr3)"/>
+        <text x="282" y="76" font-size="11" fill="var(--accent-ink)">TileOp + EdgeMap（硬件无关，纯数据） + tile 体句柄</text>
+        <!-- L2 -->
+        <rect x="0" y="86" width="540" height="56" fill="var(--surface)" stroke="currentColor" stroke-width="1.4"/>
+        <text x="12" y="108" font-weight="600">L2 Event Tensor IR</text>
+        <text x="12" y="128" font-size="11.5">任务网格 · ETensor(shape, wait_count, scope, init) · 符号维度 · 数据依赖更新/触发 · 校验 pass</text>
+        <path d="M270 142 L 270 170" stroke="currentColor" marker-end="url(#arr3)"/>
+        <text x="282" y="162" font-size="11" fill="var(--accent-ink)">带 ETensor 的 tile 依赖图（已验证无环、计数守恒）</text>
+        <!-- L3 side -->
+        <rect x="560" y="86" width="200" height="142" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.4"/>
+        <text x="572" y="108" font-weight="600">L3 机器模型</text>
+        <text x="572" y="128" font-size="11.5">exec-domain 树</text>
+        <text x="572" y="146" font-size="11.5">可见性域 / 原子能力</text>
+        <text x="572" y="164" font-size="11.5">容量（LDS、寄存器、CU）</text>
+        <text x="572" y="182" font-size="11.5">代价表（标定得到）</text>
+        <text x="572" y="200" font-size="11.5">lowering 表</text>
+        <text x="572" y="218" font-size="11" fill="var(--muted)">arch/gfx942.yaml …</text>
+        <path d="M560 200 L 542 200" stroke="var(--accent)" marker-end="url(#arr3)"/>
+        <path d="M560 300 L 542 300" stroke="var(--accent)" marker-end="url(#arr3)"/>
+        <!-- L4 -->
+        <rect x="0" y="172" width="540" height="56" fill="var(--surface)" stroke="currentColor" stroke-width="1.4"/>
+        <text x="12" y="194" font-weight="600">L4 放置与调度 pass</text>
+        <text x="12" y="214" font-size="11.5">tile 尺寸/资源类 → 亲和性分片 → 事件消除（重算换同步） → 调度模式选择 → 队列分层 → 内存/事件分配 → 跨屏障预取</text>
+        <path d="M270 228 L 270 256" stroke="currentColor" marker-end="url(#arr3)"/>
+        <text x="282" y="248" font-size="11" fill="var(--accent-ink)">分片方案 + 每子图调度模式（附理由） + 队列布局 + 描述符表</text>
+        <!-- L5 -->
+        <rect x="0" y="258" width="540" height="56" fill="var(--surface)" stroke="currentColor" stroke-width="1.4"/>
+        <text x="12" y="280" font-weight="600">L5 后端 codegen + 极小运行时</text>
+        <text x="12" y="300" font-size="11.5">持久化内核骨架 · 原语 lowering（原子/fence/sleep） · 链接各 DSL 的 tile 体 · 内核族（多设备/多资源类）</text>
+        <path d="M270 314 L 270 342" stroke="currentColor" marker-end="url(#arr3)"/>
+        <text x="282" y="334" font-size="11" fill="var(--accent-ink)">内核二进制 + 启动参数（事件缓冲、队列、描述符、shape 标量、domain 映射）</text>
+        <!-- runtime -->
+        <rect x="0" y="344" width="540" height="48" fill="none" stroke="currentColor" stroke-dasharray="4 3"/>
+        <text x="12" y="364" font-weight="600">运行时（每步）</text>
+        <text x="12" y="382" font-size="11.5">host 写 shape 标量与指针 → 启动或投递到常驻内核 → 事件张量与队列是全部状态 → 看门狗 / 事件 dump</text>
+        <text x="560" y="300" font-size="11" fill="var(--muted)"></text>
+        <text x="560" y="262" font-size="11.5" fill="var(--muted)">L3 只被读，不被改：</text>
+        <text x="560" y="280" font-size="11.5" fill="var(--muted)">L4 读代价与容量，</text>
+        <text x="560" y="298" font-size="11.5" fill="var(--muted)">L5 读能力与 lowering 表</text>
+      </g>
+    </svg>
+    <figcaption><b>五层与层间产物。</b>每层的验收标准只有一条：L1 换前端不改下面任何一行；L2 校验全绿、符号维度可实例化；L3 新硬件只填表；L4 决策可解释；L5 逐元素对齐参考实现且无死锁。</figcaption>
+  </figure>
+</section>
+
+<!-- ============================ 05 ============================ -->
+<section id="s5">
+  <span class="eyebrow">05 · 性能模型</span>
+  <h2>两个下界与四个杠杆</h2>
+  <p>在写任何 pass 之前先把账算清楚：megakernel 到底能从哪里拿时间。解码一步的时间有两个下界，取大者：</p>
+<pre><code>T_step ≥ max( Σ bytes / BW_HBM ,                                   # 带宽项
+              Σ_相位 ( bytes_相位 / BW_HBM + T_fixed(相位) ) )       # 关键路径项
+T_fixed(相位) = 信号延迟 + 排空（最慢 worker 与平均的差）+ 下一相位的 prologue 爬坡</code></pre>
+  <p>大 batch 时带宽项占优，融合能拿的是相位边缘的空洞（wave 量化、启动间隙），收益 5% 到 15%。小 batch 时关键路径项占优，这时 megakernel 不是「重叠」而是「把链弄短」。同一套技术在两种场景下的倍数差一个量级，原因全在基线离下界多远：</p>
+  <div class="tbl"><table>
+    <thead><tr><th>场景</th><th>字节 / token</th><th>带宽下界</th><th>基线</th><th>megakernel</th><th>读法</th></tr></thead>
+    <tbody>
+      <tr><td>Llama-1B，H100（Hazy）</td><td class="num">≈ 2.4 GB</td><td class="num">≈ 0.7 ms</td><td class="num">vLLM ≈ 2.5 ms（28% MBU）</td><td class="num">&lt; 1 ms（78% MBU）</td><td>模型极小，基线被几百次 launch 淹没，所以 2.5×</td></tr>
+      <tr><td>Qwen3-32B，B200（ETC）</td><td class="num">≈ 66 GB</td><td class="num">≈ 8.2 ms</td><td class="num">vLLM ≈ 14 ms（57%）</td><td class="num">≈ 12.5 ms（65%）</td><td>基线已在下界六成，理论最多 1.77×，拿到 1.15×</td></tr>
+      <tr><td>DeepSeek-V2-Lite MoE，MI300X（fleet-mi300x）</td><td class="num">4.9 GB</td><td class="num">0.93 ms</td><td class="num">vLLM 4.52 ms（21%）</td><td class="num">3.60 ms（26%）</td><td>差距不是 launch，是 27 层 × 7 个相位的串行固定延迟</td></tr>
+    </tbody>
+  </table></div>
+  <figure>
+    <svg viewBox="0 0 760 150" role="img" aria-label="fleet-mi300x 一层 MoE 的时间预算：实测 133 微秒，其中带宽项只有 31 微秒，其余约 100 微秒是相位固定延迟：prologue 约 36 微秒，信号与排空、串行小任务合计约 66 微秒。">
+      <g font-size="11.5" fill="currentColor">
+        <text x="0" y="16" font-weight="600">一层 MoE 的 133 µs 去哪了（fleet-mi300x 实测 + 估计拆分）</text>
+        <rect x="0" y="30" width="177" height="26" fill="var(--accent)"/><text x="88" y="47" text-anchor="middle" fill="#fff" font-size="11">带宽项 31 µs</text>
+        <rect x="177" y="30" width="206" height="26" fill="var(--amber)"/><text x="280" y="47" text-anchor="middle" fill="#fff" font-size="11">prologue 搬运 / 折叠 ≈ 36 µs</text>
+        <rect x="383" y="30" width="120" height="26" fill="var(--line-strong)"/><text x="443" y="47" text-anchor="middle" font-size="11">信号 + 排空 ≈ 20 µs</text>
+        <rect x="503" y="30" width="257" height="26" fill="none" stroke="currentColor" stroke-dasharray="3 3"/><text x="631" y="47" text-anchor="middle" font-size="11">只有少数 worker 在跑的串行小任务 ≈ 46 µs</text>
+        <text x="0" y="80" font-size="11">7 个相位 × 3 个全局事件 + 24 个 XCD 局部事件；带宽项 = 166 MB / 5.3 TB/s。</text>
+        <text x="0" y="100" font-size="11" fill="var(--muted)">后三段是关键路径项，都不搬字节。它们分别对应下面的杠杆 2、2 和 1；杠杆 3 用下一相位的字节把它们填掉。</text>
+        <text x="0" y="120" font-size="11" fill="var(--muted)">拆分比例是估计值，只有总数和 prologue 是实测；阶段 0 的标定要把它换成每相位的 trace。</text>
+      </g>
+    </svg>
+    <figcaption><b>关键路径项是主体。</b>26% 的 MBU 不是 tile 慢，隔离出来的 GEMV 已到可达带宽的 93%；是每层有 100 µs 的时间里内核在跑却几乎不搬字节。</figcaption>
+  </figure>
+
+  <h3>四个杠杆，各吃一段</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>杠杆</th><th>吃掉哪一段</th><th>做法</th><th>落在哪个 pass</th><th>下限</th></tr></thead>
+    <tbody>
+      <tr><td>1 · 链变短</td><td>不必要的相位边界</td><td>以重算换事件：小生产者内联进消费者的 prologue，事件和任务一起删（Pass 3）</td><td>L4 Pass 3</td><td>只剩天然的全量依赖点：一层 MoE 是 3 个（o_proj 要全部 head、router 要完整向量、下一层要全部 expert 的和）</td></tr>
+      <tr><td>2 · 每一环变便宜</td><td>信号延迟、prologue</td><td>XCD 局部事件、哨兵值代替计数器（0.8 vs 7.6 µs）、last-arriver 回写；prologue 的搬运在 tile 设计里消掉（每 XCD 一次而不是每 worker 一次）</td><td>L5 lowering 表；L1 tile 契约</td><td>信号 ≈ 0.2 到 0.8 µs / 环</td></tr>
+      <tr><td>3 · 跨屏障重叠</td><td>等事件的空转</td><td>权重不依赖任何事件：worker 在自旋时把下一相位自己那份权重流进 LDS / 寄存器，事件一到直接算（Hazy 到 78% MBU 的主要办法）</td><td>L4 Pass 7 + LDS 分页 + 资源类</td><td>固定延迟被下一相位的字节填满</td></tr>
+      <tr><td>4 · 细粒度事件</td><td>排空（等最慢的 worker）</td><td>全局事件拆成按 head / 按行的事件（论文的 <code>ij->i</code>），消费者只等自己的生产者，straggler 只拖累自己的下游</td><td>L2 边映射 + Pass 2 分片</td><td>真全量的依赖点仍要等全部</td></tr>
+    </tbody>
+  </table></div>
+  <p>合起来，一层的时间从「7 × (字节/带宽 + 固定)」变成「3 × 字节/带宽 + 3 × 被预取填掉的固定延迟」，才有机会贴近 31 µs 的带宽项。这四个杠杆里，ETC 只有第 4 个；MPK 和 Fleet 有 2 的一部分；Hazy 手写了 1、2、3。ETX 把四个都做成 pass，这是它对手写内核的追赶路线，也是它对 ETC 的主要增量。</p>
+  <div class="callout warn">
+    <p class="t">对收益的诚实预期</p>
+    <p>30B 以上 dense 模型、bs ≥ 16：对 vLLM / SGLang 10% 到 30%，上限由基线 MBU 决定。MoE 小 batch 与 TP：基线 MBU 只有 10% 到 25%，1.5× 到 3× 是有物理空间的，但要同时拿到杠杆 1 到 3，只把算子塞进一个内核拿不到。评测一律报 MBU 和每相位的 trace，不单报倍数。</p>
+  </div>
+</section>
+
+<!-- ============================ 06 ============================ -->
+<section id="s6">
+  <span class="eyebrow">06 · L1</span>
+  <h2>Tile 契约：DSL 无关怎么落地</h2>
+  <p>megakernel 编译器只做三件事：切 tile、连依赖、排调度。三件事各需要一份输入。所以任何前端只要能回答三个问题，就能接入；答不出来的，就不该硬接，而应退化到逐内核执行。</p>
+  <div class="tbl"><table>
+    <thead><tr><th>问题</th><th>答案的形式</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>tile 坐标空间是什么</td><td><code>Grid = (expr_0, expr_1, …)</code></td><td>允许符号表达式，如 <code>(B*H, ceil(S/128))</code>。</td></tr>
+      <tr><td>每个 tile 读写什么</td><td>显式：<code>coord → {(tensor_slice, producer_coord)}</code><br>声明式：<code>reads/writes</code> 的切片表达式，由 ETX 反推</td><td>手写 IR 给显式；Triton 类前端给声明式。反推失败（切片不是仿射）就报错，不猜。</td></tr>
+      <tr><td>资源需求</td><td><code>Resource(threads, lds_bytes, vgpr, agpr, tensor_core, cluster?)</code></td><td>抽象需求；映射到 64 KB 还是 160 KB LDS 是 L4 的事。</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>5.1 两种接入模式（这是 DSL 无关的真正机制）</h3>
+  <p>「DSL 无关」不能只是一句 IR 层的声明。tile 体最终要和持久化循环编到同一个内核里，不同 DSL 能给出的产物形态不同，所以后端要提供两条路：</p>
+  <div class="grid2">
+    <div class="card"><span class="k">link 模式</span><h4>tile 体是可链接的设备函数</h4>
+      <p>前端把每个 tile 体编成一个符合固定 ABI 的设备函数（<code>-fgpu-rdc</code> / <code>-rdc=true</code>），ETX 用 HIP / CUDA C++ 生成持久化循环与 dispatch switch，链接时合并。CUTLASS、CK、CuTe DSL（导出 device function）、手写内核走这条路。</p>
+      <p><span class="tag">优点</span>tile 体不用知道 ETX 存在；可以内联厂商库级别的 tile。<br><span class="tag amber">代价</span>跨翻译单元内联受限，寄存器分配按全内核取并集。</p></div>
+    <div class="card"><span class="k">host-DSL 模式</span><h4>持久化循环用 tile 的 DSL 生成</h4>
+      <p>Triton 不导出可链接的设备函数，但 <code>@triton.jit</code> 函数可以互相调用。ETX 为这类前端生成一个同 DSL 的持久化内核：循环、pop、wait、dispatch 都用该 DSL 写，运行时原语通过 <code>tl.atomic_*</code>、extern 库函数或 <code>inline_asm</code> 提供（Triton-Distributed 已证明这条路可行）。</p>
+      <p><span class="tag">优点</span>整内核在一个编译单元里，能整体优化。<br><span class="tag amber">代价</span>每支持一个 DSL 要写一个骨架模板；DSL 的表达力限制骨架（比如 Triton 没有 warp 特化）。</p></div>
+  </div>
+
+  <h3>5.2 Tile ABI（link 模式）</h3>
+<pre><code>// 每个 tile 体的固定签名；前端负责按它导出
+struct etx_ctx {
+  int32_t   coord[4];        // 任务坐标（符号 shape 已实例化）
+  const int32_t* shape;      // 本步的符号标量表（B, S, n_expert_tiles, …）
+  void* const*   args;       // 张量指针表，索引由 L4 分配
+  etx_event*     events;     // 事件缓冲基址（整型）
+  uint32_t  domain, worker;  // 所在 exec domain 与 worker 编号（L5 启动时探测）
+  void*     lds;             // 本 worker 的 LDS 基址，大小按资源类
+};
+extern "C" __device__ void etx_tile_&lt;name&gt;(const etx_ctx*);
+
+// tile 体内可选调用的运行时原语（有默认实现，也允许前端重写）
+__device__ void     etx_wait  (etx_event*, int scope);
+__device__ int32_t  etx_arrive(etx_event*, int scope);   // 返回剩余计数
+__device__ void     etx_push  (etx_queue*, etx_task);
+__device__ bool     etx_pop   (etx_queue*, etx_task*);
+__device__ void     etx_backoff(int level);              // s_sleep / nanosleep</code></pre>
+  <p>ABI 有意只暴露六样东西：坐标、标量、指针表、事件、位置、LDS。任何需要更多信息的 tile 体，说明它试图做调度器的事，应该退回 L4。</p>
+
+  <h3>5.3 前端矩阵</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>前端</th><th>模式</th><th>依赖给法</th><th>备注</th></tr></thead>
+    <tbody>
+      <tr><td>Triton（NVIDIA / AMD 后端）</td><td>host-DSL</td><td>声明式（切片反推）</td><td>无 warp 特化、无 TMA 多播控制；适合 GEMV、norm、gather/scatter 类 tile。</td></tr>
+      <tr><td>TileLang / TVM TensorIR</td><td>两者皆可</td><td>声明式</td><td>论文的实现路径；已有符号 shape 支持。</td></tr>
+      <tr><td>CuTe DSL / CUTLASS</td><td>link</td><td>显式</td><td>GEMM、attention 主力 tile；Hopper / Blackwell 特性全开。</td></tr>
+      <tr><td>Composable Kernel（AMD）</td><td>link</td><td>显式</td><td>AMD 侧 GEMM / attention 主力；MFMA、LDS 布局都在 CK 内部解决。</td></tr>
+      <tr><td>手写 HIP / CUDA</td><td>link</td><td>显式</td><td>fleet-mi300x 的 GEMV 与 MLA tile 就是这一类。</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ============================ 07 ============================ -->
+<section id="s7">
+  <span class="eyebrow">07 · L2</span>
+  <h2>Event Tensor IR</h2>
+  <h3>6.1 核心类型</h3>
+<pre><code>Tensor  = (shape[sym|const], dtype, layout_hint)
+ETensor = (shape[sym|const], wait_count[sym|const|runtime], scope, domain_id, init_kind)
+TaskGrid = (grid[sym], tile_ref, resource_class, in_edges{ETensor: map}, out_edges{ETensor: map},
+            pure: bool, out_to_in: map)              # pure + 输出坐标→输入切片映射，Pass 3 内联重算的前提
+Step    = (graph_fn, shape_scalars, arg_table)        # 一次调用 = 一次迭代</code></pre>
+  <dl class="kv">
+    <dt>wait_count</dt><dd>归零前需要的 notify 次数。可以是常量、符号（<code>WORLD_SIZE</code>），或运行时值（路由到 expert i 的 token 数），运行时值必须由某个上游 tile 写出。</dd>
+    <dt>scope</dt><dd>事件的可见性范围：<code>workgroup &lt; cluster &lt; domain &lt; device &lt; system</code>。<code>domain</code> 是 ETX 相对论文新增的一级，对应 XCD / GCD / die。论文的事件只有一种 scope（device），这在均质 L2 上没问题，在 chiplet 上是一个量级的代价差。</dd>
+    <dt>domain_id</dt><dd>这个事件主要服务哪个 exec domain 的任务。由 L4 的分片 pass 填，L2 里留空。</dd>
+    <dt>init_kind</dt><dd><code>static</code>（常量）、<code>per_step</code>（host 每步写入，如 batch 相关计数）、<code>runtime</code>（某个 tile 写入，如 MoE 路由计数）。</dd>
+  </dl>
+
+  <h3>6.2 边映射的四种形式</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>形式</th><th>例子</th><th>用途</th><th>编译期能分析什么</th></tr></thead>
+    <tbody>
+      <tr><td>仿射（einsum 子集）</td><td><code>"ij->i"</code></td><td>规约、拆分、静态依赖</td><td>精确扇入扇出，可静态排队</td></tr>
+      <tr><td>索引算术</td><td><code>"ij->(i/2)j"</code></td><td>tile 尺寸不匹配（RS tile 是 MM tile 两倍）</td><td>同上</td></tr>
+      <tr><td>运行时范围</td><td><code>"i->range(indptr[i], indptr[i+1])"</code></td><td>一个 producer 触发变数量消费者（MoE expert → GroupGEMM tile）</td><td>只知道上界；静态调度只能按上界排队并用 wait_count 兜底</td></tr>
+      <tr><td>运行时 gather</td><td><code>"i->topk[i,:]"</code></td><td>producer 通知哪些事件由数据决定</td><td>只知道扇出 k；计数由 init_kind=runtime 的 tile 初始化</td></tr>
+    </tbody>
+  </table></div>
+  <p>约束是分析能力的前提：映射必须是仿射的，或 <code>range(仿射, 仿射)</code>、<code>gather(张量)</code> 形式；禁止任意控制流进边映射；运行时值张量必须来自上游 tile 的写出，且带 release 语义。</p>
+
+  <h3>6.3 语义（这是 IR 的一部分，不是后端细节）</h3>
+<pre><code>arrive(ev)  ≡  release-fence; atomic_dec(ev.count)       → 结果为 0 时 ev 触发
+wait(ev)    ≡  spin_until(ev.count == 0); acquire-fence
+trigger(ev) ≡  arrive 返回 0 时，把 ev 的消费者任务集合 push 进调度器（仅动态 / hybrid）</code></pre>
+  <p>生产者的写必须在 arrive 之前对消费者可见（release），消费者的读必须在 wait 返回之后（acquire），而且是<strong>在事件的 scope 上</strong>成立。后端若发现目标硬件在该 scope 上无法提供这个语义（见 L3 的原子陷阱），必须编译报错，不许静默降级。</p>
+
+  <h3>6.4 校验 pass（必须全绿才允许进 L4）</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>校验</th><th>检查</th><th>不做的后果</th></tr></thead>
+    <tbody>
+      <tr><td>无环</td><td>任务级依赖图无环（符号维度取任意值都成立）</td><td>死锁，现场极难定位</td></tr>
+      <tr><td>计数守恒</td><td><code>wait_count</code> 等于实际扇入（运行时范围取上界，且初始化 tile 必须在图中）</td><td>早触发（结果错）或永不触发（死锁）</td></tr>
+      <tr><td>运行时值先行</td><td><code>indptr</code> / <code>topk</code> 类张量的写出 tile 在依赖图上严格早于所有读它的 arrive / trigger</td><td>读到旧路由，MoE 结果错但看起来正常</td></tr>
+      <tr><td>tile 覆盖唯一</td><td>每个输出元素恰好被一个 tile 写</td><td>静默数据竞争</td></tr>
+      <tr><td>scope 单调</td><td>跨 domain 的边所用事件 scope ≥ domain；跨设备 ≥ system</td><td>本地可见、远端看不见</td></tr>
+      <tr><td>协同驻留可满足</td><td>持久化内核的 worker 数 ≤ 目标的共驻上限（按资源类算）</td><td>worker 不共驻 → 等一个永远不会被调度的生产者</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ============================ 08 ============================ -->
+<section id="s8">
+  <span class="eyebrow">08 · L3</span>
+  <h2>机器模型：让 chiplet 成为数据</h2>
+  <p>论文的 IR 是硬件无关的，但它的实现与全部评测只在一种机器上。要扩展到不同硬件，不是给后端加分支，而是把「一台机器长什么样」写成一棵树、几张表，让 L4 与 L5 只读表。</p>
+
+  <h3>7.1 exec-domain 树</h3>
+  <figure>
+    <svg viewBox="0 0 760 250" role="img" aria-label="四种 GPU 的 exec-domain 树：MI300X 一个设备下 8 个 XCD 各 38 CU，L2 按 XCD 私有；MI250X 两个 GCD 是两个设备；B200 两个 die 对软件是一个设备、L2 统一；MI355X 8 个 XCD 各 32 CU、LDS 160 KB。">
+      <g font-size="11.5" fill="currentColor">
+        <!-- MI300X -->
+        <text x="0" y="16" font-weight="600">MI300X · gfx942</text>
+        <rect x="0" y="26" width="170" height="24" fill="var(--surface)" stroke="currentColor"/><text x="85" y="42" text-anchor="middle">device（1 个 HIP 设备）</text>
+        <line x1="85" y1="50" x2="85" y2="66" stroke="currentColor"/>
+        <g>
+          <rect x="0" y="66" width="36" height="22" fill="var(--accent-soft)" stroke="var(--accent)"/><text x="18" y="81" text-anchor="middle" font-size="10">XCD0</text>
+          <rect x="44" y="66" width="36" height="22" fill="var(--accent-soft)" stroke="var(--accent)"/><text x="62" y="81" text-anchor="middle" font-size="10">XCD1</text>
+          <text x="96" y="81" font-size="10">…</text>
+          <rect x="134" y="66" width="36" height="22" fill="var(--accent-soft)" stroke="var(--accent)"/><text x="152" y="81" text-anchor="middle" font-size="10">XCD7</text>
+        </g>
+        <text x="0" y="106" font-size="10.5">每 XCD 38 CU · L2 4 MB 私有</text>
+        <text x="0" y="122" font-size="10.5">跨 XCD 只有 256 MB Infinity Cache</text>
+        <text x="0" y="138" font-size="10.5">LDS 64 KB · wave64 · 5.3 TB/s</text>
+        <text x="0" y="160" font-size="10.5" fill="var(--accent-ink)">domain = XCD，8 个</text>
+        <!-- MI250X -->
+        <text x="195" y="16" font-weight="600">MI250X · gfx90a</text>
+        <rect x="195" y="26" width="76" height="24" fill="var(--surface)" stroke="currentColor"/><text x="233" y="42" text-anchor="middle" font-size="10.5">device 0</text>
+        <rect x="289" y="26" width="76" height="24" fill="var(--surface)" stroke="currentColor"/><text x="327" y="42" text-anchor="middle" font-size="10.5">device 1</text>
+        <line x1="233" y1="50" x2="233" y2="66" stroke="currentColor"/><line x1="327" y1="50" x2="327" y2="66" stroke="currentColor"/>
+        <rect x="199" y="66" width="68" height="22" fill="var(--accent-soft)" stroke="var(--accent)"/><text x="233" y="81" text-anchor="middle" font-size="10">GCD0 · 110 CU</text>
+        <rect x="293" y="66" width="68" height="22" fill="var(--accent-soft)" stroke="var(--accent)"/><text x="327" y="81" text-anchor="middle" font-size="10">GCD1 · 110 CU</text>
+        <line x1="271" y1="38" x2="289" y2="38" stroke="var(--amber)" stroke-width="2"/>
+        <text x="195" y="106" font-size="10.5">两个 GCD 是两个 HIP 设备</text>
+        <text x="195" y="122" font-size="10.5">L2 8 MB / GCD · 无 Infinity Cache</text>
+        <text x="195" y="138" font-size="10.5">浮点原子不能过 Infinity Fabric</text>
+        <text x="195" y="160" font-size="10.5" fill="var(--accent-ink)">一卡 = 两个内核实例</text>
+        <!-- B200 -->
+        <text x="390" y="16" font-weight="600">B200 · sm_100</text>
+        <rect x="390" y="26" width="170" height="24" fill="var(--surface)" stroke="currentColor"/><text x="475" y="42" text-anchor="middle">device（2 die，软件看 1 颗）</text>
+        <line x1="475" y1="50" x2="475" y2="66" stroke="currentColor"/>
+        <rect x="390" y="66" width="170" height="22" fill="var(--accent-soft)" stroke="var(--accent)"/><text x="475" y="81" text-anchor="middle" font-size="10">SM ×148 · cluster 可选 · L2 统一</text>
+        <text x="390" y="106" font-size="10.5">DSMEM / TMA 多播 / multimem 归约</text>
+        <text x="390" y="122" font-size="10.5">smem 228 KB / SM · wave32</text>
+        <text x="390" y="138" font-size="10.5">die 间有延迟差，但相干</text>
+        <text x="390" y="160" font-size="10.5" fill="var(--accent-ink)">domain = 整卡（可选 die 亲和）</text>
+        <!-- MI355X -->
+        <text x="585" y="16" font-weight="600">MI355X · gfx950</text>
+        <rect x="585" y="26" width="170" height="24" fill="var(--surface)" stroke="currentColor"/><text x="670" y="42" text-anchor="middle">device</text>
+        <line x1="670" y1="50" x2="670" y2="66" stroke="currentColor"/>
+        <g>
+          <rect x="585" y="66" width="36" height="22" fill="var(--accent-soft)" stroke="var(--accent)"/><text x="603" y="81" text-anchor="middle" font-size="10">XCD0</text>
+          <rect x="629" y="66" width="36" height="22" fill="var(--accent-soft)" stroke="var(--accent)"/><text x="647" y="81" text-anchor="middle" font-size="10">XCD1</text>
+          <text x="681" y="81" font-size="10">…</text>
+          <rect x="719" y="66" width="36" height="22" fill="var(--accent-soft)" stroke="var(--accent)"/><text x="737" y="81" text-anchor="middle" font-size="10">XCD7</text>
+        </g>
+        <text x="585" y="106" font-size="10.5">每 XCD 32 CU · L2 4 MB 私有</text>
+        <text x="585" y="122" font-size="10.5">LDS 160 KB · 8 TB/s HBM3E</text>
+        <text x="585" y="138" font-size="10.5">树与 MI300X 同形，容量不同</text>
+        <text x="585" y="160" font-size="10.5" fill="var(--accent-ink)">同一份 yaml 改数字</text>
+        <line x1="0" y1="184" x2="760" y2="184" stroke="var(--line)"/>
+        <text x="0" y="206" font-size="11.5">ETX 只认这棵树。<tspan fill="var(--accent-ink)">同一 domain 内</tspan>：事件走本地 L2，代价 T_local；<tspan fill="var(--amber)">跨 domain</tspan>：走共享缓存 / 互联，代价 T_cross；<tspan fill="var(--red)">跨 device</tspan>：走 P2P / NVLink，代价 T_dev。</text>
+        <text x="0" y="226" font-size="11.5">新硬件 = 新的一棵树 + 三个代价系数 + 一张能力表。RDNA（WGP、wave32、无 MALL 分片）同样只是树的一种形状。</text>
+      </g>
+    </svg>
+    <figcaption><b>四种机器的 exec-domain 树。</b>chiplet 不是特殊情况，是树多一层。MI250X 的两个 GCD 是两个设备，所以「一张卡」在 ETX 里是两个内核实例共享 system-scope 事件；这与多卡 TP 是同一条代码路径。</figcaption>
+  </figure>
+
+  <h3>7.2 能力表（决定正确性）</h3>
+<pre><code># arch/gfx942.yaml（节选）
+name: gfx942            family: CDNA3        wave_size: 64
+exec_domains:
+  - {name: xcd, count: 8, cus: 38, l2_mb: 4}
+shared_cache: {kind: infinity_cache, mb: 256, coherent: false}   # 内存侧，不参与相干
+resources: {lds_kb: 64, regs_per_lane: 512, max_waves_per_simd: 8}
+visibility:                     # 哪个 scope 需要什么 fence / 轮询方式 / 内存类型（来源：LLVM gfx942 memory model）
+  domain: {release: "s_waitcnt vmcnt(0)",       acquire: "buffer_inv sc0",      poll: "load sc1", memory: any}   # L1 写穿，同 L2 内只需失效 L1
+  device: {release: "buffer_wbl2 sc1; s_waitcnt", acquire: "buffer_inv sc1",    poll: "load sc1", memory: any}   # 回写本 XCD 的脏 L2 行
+  system: {release: "buffer_wbl2 sc0 sc1",      acquire: "buffer_inv sc0 sc1",  poll: "load sc0 sc1", memory: fine_grained}  # coarse 会被静默降级到 device
+capabilities:
+  cluster_launch: false          # gfx942 无；gfx1250 才有 cluster scope，不支持时 LLVM 退化为 agent scope
+  dsmem: false
+  multicast_reduce: false        # 无 multimem 对应物，也没有交换机（8 卡是点对点 mesh）
+  async_copy_to_lds: dword_only  # 无 TMA / cp.async；gfx950 放宽到 128 bit/lane
+  fp_atomic_over_fabric: true    # 所有 RMW 原子都转发到 Infinity Fabric；MI200 浮点原子为 false
+  wg_to_domain_map: discover     # 文档只说 round-robin；有公开记录测到 (k+4) mod 8，所以启动时读 HW_ID.XCC_ID
+  cooperative_launch: true       # 超过共驻上限返回 hipErrorCooperativeLaunchTooLarge，而不是死锁
+  sentinel_signal: true          # 允许用数据缓冲里的哨兵值代替计数器（Kog：0.8 µs vs 7.6 µs）
+  hw_tile_trigger: false         # Rubin 类硬件 tile 触发器；有则 wait 不生成自旋
+  backoff: s_sleep               # 64×N 周期，最多 ~8000 周期；s_setprio 0–3；s_memrealtime 100 MHz
+costs:                           # 阶段 0 标定后填入；下表的公开数字是种子值
+  t_local_ns: 116   t_cross_ns: 203   t_flag_cross_ns: 703   t_fence_ns: 115
+  t_phase_switch_counter_ns: 7600   t_phase_switch_sentinel_ns: 850     # 全卡相位切换，两种信号 lowering
+  t_prologue_ns: null              # 每任务 prologue 爬坡，按资源类标定；Pass 3 / 7 的输入
+  t_dev_ns: null    queue_contention: null</code></pre>
+  <p>关键的一行是 <code>poll</code>：普通 load 命中非相干的 L1（wave scope 是「Hit LRU」），永远看不到别的 CU 的写；轮询事件必须用 <code>sc1</code> 位的 load 或原子读。Kog 为此写了内联汇编，因为 <code>__hip_atomic_load</code> 做不了 3-dword 读。这类事实只能以数据存在于表里，不能靠每个 tile 作者记得。</p>
+  <p>字段分两类，不允许混：<code>capabilities</code> 与 <code>visibility</code> 错了是错的代码；<code>costs</code> 错了只是慢。</p>
+
+  <h3>7.3 可移植性矩阵</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>字段</th><th>MI250X (gfx90a)</th><th>MI300X (gfx942)</th><th>MI355X (gfx950)</th><th>RDNA4 (gfx12)</th><th>H100 (sm_90)</th><th>B200 (sm_100)</th></tr></thead>
+    <tbody>
+      <tr><td>exec domain</td><td>2 GCD × 110 CU，各为一个 HIP 设备</td><td>8 XCD × 38 CU = 304（每 XCD 40 个，屏蔽 2 个）</td><td>8 XCD × 32 CU = 256（每 XCD 36 个，屏蔽 4 个）</td><td>WGP 阵列，单 domain</td><td>132 SM，单 domain（L2 两分区，远端命中 414 vs 258 周期）</td><td>148 SM（74 / die），单 domain</td></tr>
+      <tr><td>L2 归属</td><td>8 MB / GCD</td><td>4 MB / XCD，跨 XCD 靠 wbl2 / inv + MTYPE 探测</td><td>4 MB / XCD，16 通道</td><td>统一</td><td>50 MB，两分区</td><td>126 MB，die 间跨越约 30 周期</td></tr>
+      <tr><td>共享缓存</td><td>无（3 级延迟）</td><td>256 MB Infinity Cache，内存侧，≈218 ns</td><td>256 MB，2 个 IOD</td><td>Infinity Cache（消费级）</td><td>—</td><td>—</td></tr>
+      <tr><td>LDS / smem 每 CU</td><td>64 KB</td><td>64 KB</td><td>160 KB，读带宽翻倍</td><td>64 KB / CU，WGP 模式 128 KB 共享，单 workgroup 上限 64 KB</td><td>228 KB</td><td>228 KB</td></tr>
+      <tr><td>wave</td><td>64</td><td>64</td><td>64</td><td>32（WMMA 仅 wave32）</td><td>32</td><td>32</td></tr>
+      <tr><td>cluster / DSMEM</td><td>无</td><td>无</td><td>无</td><td>gfx1250 起有 cluster scope</td><td>有，可移植上限 8，最大 16；DSMEM 181–213 周期 vs 全局 ~1110</td><td>有</td></tr>
+      <tr><td>异步拷贝到 LDS</td><td>无</td><td>仅 32 bit / lane</td><td>128 bit / lane，带转置读</td><td>gfx11 无；gfx1250 有 TDM</td><td>TMA / cp.async</td><td>TMA + 多播</td></tr>
+      <tr><td>多播归约写</td><td>无</td><td>无</td><td>无</td><td>无</td><td>multimem（NVLink SHARP）</td><td>multimem</td></tr>
+      <tr><td>浮点原子过互联</td><td><b>否</b>（NOP 风险）</td><td>是（fp32 add、packed fp16 / bf16、fp64 add/min/max）</td><td>是</td><td>—</td><td>是</td><td>是</td></tr>
+      <tr><td>卡间互联</td><td>GCD 间 4 条 IF，200+200 GB/s；kernel 发起的 P2P 43–172 GB/s，延迟 8.7–18.2 µs</td><td>7 条 xGMI，64 GB/s 单向 / 链路，实测 ~48；点对点 mesh，无交换机</td><td>7 条 IF，聚合 &gt; 1 TB/s</td><td>PCIe</td><td>NVLink 900 GB/s + NVSwitch</td><td>NVLink 5 + NVSwitch</td></tr>
+      <tr><td>退避 / 计时</td><td>s_sleep</td><td>s_sleep（64×N 周期）· s_setprio · s_memrealtime</td><td>同左</td><td>同左</td><td>nanosleep（≤ 2t，上限 1 ms）· griddepcontrol</td><td>同左</td></tr>
+      <tr><td>带宽</td><td>3.2 TB/s</td><td>5.3 TB/s</td><td>8 TB/s，288 GB HBM3E</td><td>~0.6–0.9 TB/s</td><td>3.35 TB/s</td><td>8 TB/s</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="callout bad">
+    <p class="t">三个静默错误陷阱（AMD 原子）</p>
+    <p>1. coarse-grained 内存上的 system-scope 原子会被降级为 device scope。跨卡事件张量必须用 fine-grained 分配。<br>2. PCIe 不支持某原子时，GPU 侧退化成 load-op-store，CPU 看到的不是原子序列。<br>3. MI200 的浮点原子不能过 Infinity Fabric，在 uncached 内存上可能直接 NOP。<br>结论：<b>事件张量的分配器是 L4 的一部分，按 scope 选内存类型，并在编译期断言合法组合。</b>这一条是我们把 scope 放进 IR 的直接原因。</p>
+  </div>
+
+  <h3>7.4 代价表（决定性能）与标定</h3>
+<pre><code>T_sync(edge) =  T_local   若 producer 与 consumer 同 domain
+             =  T_cross   若跨 domain（经共享缓存 / 互联）
+             =  T_dev     若跨 device（P2P / NVLink / xGMI）
+T_push(edge) =  T_sync(edge) + T_queue(N_contenders)</code></pre>
+  <p>系数不猜，靠阶段 0 的七个微基准填（附在第 15 节）。公开数字先作种子值：</p>
+  <div class="tbl"><table>
+    <thead><tr><th>测量</th><th>MI300X</th><th>H100 / B200</th><th>对设计的含义</th></tr></thead>
+    <tbody>
+      <tr><td>两 workgroup 原子往返，同 XCD vs 跨 XCD</td><td class="num">116 ns vs 202 ns</td><td class="num">B200 全卡约 512 原子 / 周期</td><td>跨 domain 边至少贵 1.7×，而且要占 Infinity Fabric</td></tr>
+      <tr><td>agent-scope release / acquire fence</td><td class="num">115 / 137 ns</td><td>—</td><td>每个事件的 arrive 至少付一次 fence；last-arriver 合并回写</td></tr>
+      <tr><td>跨 XCD 单向标志延迟</td><td class="num">≈ 703 ns</td><td class="num">DSMEM 181–213 周期 vs 全局 ≈ 1110 周期</td><td>MI300X 上一个跨 XCD 事件 ≈ 1 µs 量级，一层里 10 个就是 1% 的 token 时间</td></tr>
+      <tr><td>持久化内核阶段切换：计数器 + fence vs 哨兵值 sc1 轮询</td><td class="num">7.6–7.9 µs vs 0.80–0.93 µs（Kog，256 CU）</td><td>—</td><td>全卡规模的计数器归零很贵；哨兵值是 lowering 的候选，事件张量抽象不变</td></tr>
+      <tr><td>XCD 感知的 program-id 重映射（AMD 官方）</td><td class="num">L2 miss ≈ 5M → 3.1M，+67 TFLOPS</td><td>—</td><td>纯放置决策就有 10% 量级</td></tr>
+      <tr><td>L2 / Infinity Cache / HBM 延迟</td><td class="num">81–108 / 218–258 / 342 ns</td><td class="num">H100 L2 近 258 远 414 周期</td><td>事件计数器落在哪一级缓存，决定 wait 的最短周期</td></tr>
+    </tbody>
+  </table></div>
+  <p>fleet-mi300x 的实测与此一致：一层 MoE 把全局事件从 10 压到 3 的收益约 1 ms / token 量级（27 层），跨 XCD 事件的代价比 XCD 内高一个量级以上。</p>
+</section>
+
+<!-- ============================ 09 ============================ -->
+<section id="s9">
+  <span class="eyebrow">09 · L4</span>
+  <h2>放置与调度 pass</h2>
+  <p>七个 pass 按顺序跑，每个 pass 只读 L3 的表，输出都是数据，不改 IR 语义。</p>
+
+  <h3>Pass 1 · tile 尺寸与资源类</h3>
+  <p>输入 TileOp 的抽象资源需求与目标容量，输出每个算子的 tile 尺寸与 tile 数。64 KB 与 160 KB 的 LDS 会改变可行 tile 尺寸，所以同一算子在 gfx942 和 gfx950 上 tile 数不同，事件张量的 shape 随之变，这正是 shape 保持符号的好处。</p>
+  <p>这一步还要解决论文没提的<strong>寄存器并集问题</strong>：一个内核的 VGPR / LDS 占用取所有 tile 类型的最大值，最重的 tile 决定全内核的占用率。ETX 把 tile 按资源分成<strong>资源类</strong>；同一资源类的 tile 进同一个持久化内核实例。多个实例同时驻留（不同流、各占一部分 CU），共享同一张事件张量。这个「内核族」机制和多设备实例是同一套代码（见 L5）。在 fleet-mi300x 上我们测过 343 个寄存器的并集对带宽受限的 GEMV 没有损失，所以资源类是一个可选优化，不是必需项；代价模型决定要不要拆。</p>
+  <p>LDS 同理不按最坏情况分配，而是切成固定大小的页（Hazy 在 H100 上是 13 页 × 16 KB）。tile 体向页分配器申请和释放，下一个 tile 的权重装载可以在当前 tile 还在写回时开始。页数由资源类和 L3 的 <code>lds_kb</code> 算出：gfx942 4 页、gfx950 10 页、sm_90 13 页。</p>
+
+  <h3>Pass 2 · 事件亲和性分片（chiplet 感知的核心）</h3>
+  <p>问题形式：把任务 / 事件图切成 k 块（k = domain 数），最小化跨块边权之和，边权 = 扇入扇出数 × 该边的 <code>T_sync</code>。第一版用贪心加局部改进：</p>
+  <ol>
+    <li>以扇入扇出最大的算子为种子，把它和它的事件放进同一 domain（MoE 的 GroupGEMM 与 expert 事件；attention 的 head 与它的 merge）。</li>
+    <li>连续 tile 坐标落同一 domain，再叠 <code>GROUP_SIZE_M</code> 式 swizzle 保 L2 局部性。</li>
+    <li>跨 domain 边超预算时，把该事件提升到共享缓存作汇聚点，或把这条边改成静态长队列（不 push）。</li>
+  </ol>
+  <p>输出：每个任务的 <code>domain_id</code>、每个事件的 scope 与存储类型（普通 VRAM / 共享缓存常驻 / 跨卡 fine-grained）。fleet-mi300x 的一层 MoE 里，这一步和 Pass 3 一起把全局事件从 10 压到 3，其余 24 个都是 XCD 局部的。</p>
+
+  <h3>Pass 3 · 事件消除：以重算换同步（杠杆 1）</h3>
+  <p>一个事件存在，是因为某个生产者的输出要被很多消费者用。如果生产者是纯函数、它的输入已经被更早的事件同步过、而且它便宜，那就让每个消费者在自己的 prologue 里重算它，事件和生产者任务一起删。付出的是并行的冗余微秒，换回的是串行的同步微秒。</p>
+  <figure>
+    <svg viewBox="0 0 760 200" role="img" aria-label="事件消除前：x 经一个 RMSNorm 任务和一个全局事件 E1 到 296 个 GEMV worker；消除后：296 个 GEMV worker 各自在 prologue 里重算 RMSNorm，没有 E1。">
+      <defs><marker id="arr7" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="currentColor"/></marker></defs>
+      <g font-size="11.5" fill="currentColor">
+        <text x="0" y="16" font-weight="600">消除前 · 两个相位</text>
+        <rect x="0" y="30" width="40" height="26" fill="var(--surface)" stroke="currentColor"/><text x="20" y="47" text-anchor="middle" font-size="10">x 4 KB</text>
+        <path d="M40 43 L 70 43" stroke="currentColor" marker-end="url(#arr7)"/>
+        <rect x="72" y="30" width="96" height="26" fill="var(--amber)"/><text x="120" y="47" text-anchor="middle" fill="#fff" font-size="10">RMSNorm · 1 任务</text>
+        <path d="M168 43 L 198 43" stroke="currentColor" marker-end="url(#arr7)"/>
+        <rect x="200" y="30" width="60" height="26" fill="none" stroke="var(--red)" stroke-width="1.4"/><text x="230" y="47" text-anchor="middle" font-size="10" fill="var(--red)">E1 全局</text>
+        <path d="M260 43 L 290 43" stroke="currentColor" marker-end="url(#arr7)"/>
+        <rect x="292" y="30" width="150" height="26" fill="var(--accent)"/><text x="367" y="47" text-anchor="middle" fill="#fff" font-size="10">GEMV · 296 worker</text>
+        <text x="72" y="76" font-size="10.5" fill="var(--muted)">相位 A：1 个 worker 干活，295 个空转</text>
+        <text x="200" y="92" font-size="10.5" fill="var(--red)">≈ 1 µs 跨 XCD 往返 + 排空 + 爬坡</text>
+        <text x="0" y="128" font-weight="600">消除后 · 一个相位</text>
+        <rect x="0" y="142" width="40" height="26" fill="var(--surface)" stroke="currentColor"/><text x="20" y="159" text-anchor="middle" font-size="10">x 4 KB</text>
+        <path d="M40 155 L 70 155" stroke="currentColor" marker-end="url(#arr7)"/>
+        <rect x="72" y="142" width="370" height="26" fill="var(--accent)"/><text x="257" y="159" text-anchor="middle" fill="#fff" font-size="10">GEMV · 296 worker，prologue 各自算 RMSNorm(x)（读 4 KB，在 L2）</text>
+        <text x="72" y="188" font-size="10.5" fill="var(--muted)">每个 worker 多 ≈ 1 µs，但 296 个并行，相位只长 1 µs；事件、任务、排空全没了</text>
+        <text x="470" y="47" font-size="10.5">冗余字节：296 × 4 KB = 1.2 MB，</text><text x="470" y="63" font-size="10.5">全部命中 L2，不占 HBM</text>
+        <text x="470" y="159" font-size="10.5">fleet-mi300x：这一类改写</text><text x="470" y="175" font-size="10.5">把一层的全局事件 10 → 3</text>
+      </g>
+    </svg>
+    <figcaption><b>以重算换事件。</b>编译器里叫 rematerialization（用重算代替 spill），HPC 里叫 communication-avoiding；这里省的是同步。batch 1 时每个相位本来就是几百个 worker 并行做同一件小事，冗余是并行的，事件是串行的，所以冗余几乎总是赢。</figcaption>
+  </figure>
+  <div class="tbl"><table>
+    <thead><tr><th>变体</th><th>做法</th><th>删掉什么</th><th>冗余代价</th></tr></thead>
+    <tbody>
+      <tr><td>prologue 重算</td><td>消费者各自重算小生产者（norm、RoPE、kv 后处理、q-absorb、router top-k）</td><td>生产者任务 + 事件</td><td>消费者数 × 生产者代价，并行</td></tr>
+      <tr><td>消费者侧折叠</td><td>不设 reduce 任务，每个消费者在 prologue 里把 k 个 partial 加起来</td><td>reduce 任务 + 事件</td><td>消费者数 × k 个 partial 的读取（fleet：296 × 8 × 4 KB，走 L2 / Infinity Cache）</td></tr>
+      <tr><td>最后到达者计算</td><td>事件计数归零的那个生产者顺手做归约</td><td>reduce 任务，事件保留</td><td>归约变串行；fleet 测出每个折叠点约 4 µs，反而更慢，默认关</td></tr>
+    </tbody>
+  </table></div>
+<pre><code>收益 = T_sync(E) + T_drain(生产者相位)                    # 同步往返 + 只有少数 worker 在跑的那段
+代价 = max_consumer( bytes_P / BW_cache + compute_P )     # 并行，取最大不取总和
+     + [P 的输入不在 L2] × consumers × bytes_P / BW_HBM    # 这时取总和，通常直接否决
+改写条件 = P.pure ∧ P 的 in_events ⊆ C 已等过的事件 ∧ P.out_to_in 能按 C 的坐标映射
+        ∧ 收益 &gt; 代价 ∧ 逐 bit 要求下 P 的浮点求和顺序与参考一致</code></pre>
+  <p>改写本身很机械：把 P 的 body 按坐标映射内联到 C 的 prologue，删 E，C 的 in_edges 换成 P 的 in_edges（映射后），然后重跑 L2 的无环和计数守恒校验。三条不能用的情况要写进日志：生产者要重读 HBM 里的权重（q-absorb 是边界案例，一层多读 2.1 MB，只因同 head 的 chunk 在同一 XCD 命中 L2 才划算）；partial 数超过 8 左右的大归约；消费者数太多且输入不在缓存里。日志打印被删掉的事件和换来的冗余字节，退化时能查到是哪次重算读爆了。</p>
+
+  <h3>Pass 4 · 调度模式选择</h3>
+<pre><code>S_balance = 动态调度预计省下的 straggler 时间（由负载方差估计或历史 profile）
+C_cross   = 跨 domain push 次数 × T_cross（跨设备则 × T_dev）
+C_queue   = 队列争用代价（标定曲线，随竞争者数上升）
+
+选 dynamic   当 S_balance &gt; C_cross + C_queue 且无跨设备边
+选 hybrid    当 domain 内有不规则负载、domain 间边多
+否则 static</code></pre>
+  <p>决策必须可解释，编译日志形如：</p>
+<pre><code>subgraph moe.group_gemm : hybrid   (S_balance=+7.6%, intra-domain dynamic, 3 cross-domain edges → static)
+subgraph attn.qkv_rope  : static   (S_balance≈0, 0 cross-domain edges)
+subgraph tp.gemm_rs     : static   (cross-device edges=18, C_cross=2.1ms &gt; S_balance=0.4ms)</code></pre>
+
+  <h3>Pass 5 · 队列分层（hybrid 的机制）</h3>
+  <figure>
+    <svg viewBox="0 0 760 270" role="img" aria-label="hybrid 调度：每个 domain 有本地就绪队列与 worker，domain 内动态 push/pop；domain 之间只有静态预排的事件边经过共享缓存里的事件计数器，没有跨 domain 的 push。">
+      <defs><marker id="arr4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="currentColor"/></marker></defs>
+      <g font-size="11.5" fill="currentColor">
+        <!-- domain A -->
+        <rect x="0" y="10" width="330" height="200" fill="none" stroke="var(--accent)" stroke-dasharray="5 3"/>
+        <text x="10" y="30" font-weight="600" fill="var(--accent-ink)">domain 0（XCD0）</text>
+        <rect x="14" y="44" width="120" height="30" fill="var(--surface)" stroke="currentColor"/><text x="74" y="63" text-anchor="middle">本地就绪队列 Q0</text>
+        <g>
+          <rect x="14" y="110" width="40" height="26" fill="var(--accent)"/><text x="34" y="127" text-anchor="middle" fill="#fff" font-size="10">w0</text>
+          <rect x="60" y="110" width="40" height="26" fill="var(--accent)"/><text x="80" y="127" text-anchor="middle" fill="#fff" font-size="10">w1</text>
+          <rect x="106" y="110" width="40" height="26" fill="var(--accent)"/><text x="126" y="127" text-anchor="middle" fill="#fff" font-size="10">w2</text>
+          <text x="152" y="127" font-size="10">… w36</text>
+        </g>
+        <path d="M60 74 L 60 108" stroke="currentColor" marker-end="url(#arr4)"/><text x="66" y="96" font-size="10">pop</text>
+        <path d="M100 108 L 100 76" stroke="currentColor" marker-end="url(#arr4)"/><text x="106" y="96" font-size="10">push（本地，T_local）</text>
+        <rect x="200" y="44" width="116" height="30" fill="var(--surface)" stroke="currentColor"/><text x="258" y="63" text-anchor="middle" font-size="10.5">局部事件 E_local</text>
+        <text x="200" y="96" font-size="10">scope = domain</text>
+        <text x="200" y="112" font-size="10">住在 XCD0 的 L2</text>
+        <rect x="14" y="156" width="302" height="40" fill="var(--surface)" stroke="currentColor"/>
+        <text x="24" y="172" font-size="10.5">静态段：每个 worker 一条预排长队列</text>
+        <text x="24" y="188" font-size="10.5">跨 domain 的消费者任务在这里，靠 wait 不靠 push</text>
+        <!-- domain B -->
+        <rect x="430" y="10" width="330" height="200" fill="none" stroke="var(--accent)" stroke-dasharray="5 3"/>
+        <text x="440" y="30" font-weight="600" fill="var(--accent-ink)">domain 1（XCD1）</text>
+        <rect x="444" y="44" width="120" height="30" fill="var(--surface)" stroke="currentColor"/><text x="504" y="63" text-anchor="middle">本地就绪队列 Q1</text>
+        <g>
+          <rect x="444" y="110" width="40" height="26" fill="var(--accent)"/><text x="464" y="127" text-anchor="middle" fill="#fff" font-size="10">w0</text>
+          <rect x="490" y="110" width="40" height="26" fill="var(--accent)"/><text x="510" y="127" text-anchor="middle" fill="#fff" font-size="10">w1</text>
+          <rect x="536" y="110" width="40" height="26" fill="var(--accent)"/><text x="556" y="127" text-anchor="middle" fill="#fff" font-size="10">w2</text>
+          <text x="582" y="127" font-size="10">… w36</text>
+        </g>
+        <path d="M490 74 L 490 108" stroke="currentColor" marker-end="url(#arr4)"/>
+        <path d="M530 108 L 530 76" stroke="currentColor" marker-end="url(#arr4)"/>
+        <rect x="630" y="44" width="116" height="30" fill="var(--surface)" stroke="currentColor"/><text x="688" y="63" text-anchor="middle" font-size="10.5">局部事件 E_local</text>
+        <rect x="444" y="156" width="302" height="40" fill="var(--surface)" stroke="currentColor"/>
+        <text x="454" y="172" font-size="10.5">静态段：每个 worker 一条预排长队列</text>
+        <text x="454" y="188" font-size="10.5">跨 domain 的消费者任务在这里，靠 wait 不靠 push</text>
+        <!-- shared -->
+        <rect x="345" y="86" width="70" height="60" fill="var(--amber-soft)" stroke="var(--amber)"/>
+        <text x="380" y="106" text-anchor="middle" font-size="10">全局事件</text><text x="380" y="120" text-anchor="middle" font-size="10">E_global</text><text x="380" y="136" text-anchor="middle" font-size="9.5">共享缓存 / IC</text>
+        <path d="M146 123 L 343 116" stroke="var(--amber)" marker-end="url(#arr4)"/><text x="190" y="108" font-size="10" fill="var(--amber)">arrive（T_cross，每边一次）</text>
+        <path d="M417 116 L 442 168" stroke="var(--amber)" marker-end="url(#arr4)"/><text x="400" y="180" font-size="10" fill="var(--amber)">wait</text>
+        <line x1="0" y1="226" x2="760" y2="226" stroke="var(--line)"/>
+        <text x="0" y="248" font-size="11.5">没有跨 domain 的 push。domain 内的不规则（MoE 路由）由本地队列吸收，domain 间的边数由 Pass 2 压到最少并静态排队。</text>
+        <text x="0" y="264" font-size="11" fill="var(--muted)">跨 device 时 E_global 住在 fine-grained 内存，形状完全相同：MI250X 的双 GCD 与 8 卡 TP 是同一条路。</text>
+      </g>
+    </svg>
+    <figcaption><b>hybrid 调度不是新机制，是同一套原语的不同组装。</b>domain 内用 push / pop，domain 间用 arrive / wait 加预排队列。全局队列只放跨 domain 任务，条目上限等于跨 domain 边数，这样中心化队列的争用就被结构压掉了。</figcaption>
+  </figure>
+
+  <div class="sim" id="sim">
+    <span class="eyebrow">交互 · 调度策略与拓扑代价</span>
+    <p style="font-size:14px;margin:6px 0 12px">一个离散事件模拟：GEMM 类 tile（青）两两产出一个 Reduce 类 tile（琥珀），worker 分成两个 domain。拖动方差看 static 何时输给 dynamic，拖动跨 domain push 代价看 dynamic 何时反过来输给 hybrid。这是 Pass 4 公式的直观版，不是性能预测。</p>
+    <div class="controls">
+      <label for="sim-var">tile 时长方差 <span id="sim-var-v">0.4</span><input id="sim-var" type="range" min="0" max="1" step="0.05" value="0.4"></label>
+      <label for="sim-push">跨 domain push 代价（tile 均时的倍数） <span id="sim-push-v">0.6</span><input id="sim-push" type="range" min="0" max="2" step="0.1" value="0.6"></label>
+      <label for="sim-cont">队列 pop 争用（每竞争者，tile 均时的倍数） <span id="sim-cont-v">0.005</span><input id="sim-cont" type="range" min="0" max="0.05" step="0.0025" value="0.005"></label>
+      <label for="sim-tiles">GEMM tile 数 <span id="sim-tiles-v">96</span><input id="sim-tiles" type="range" min="32" max="256" step="16" value="96"></label>
+    </div>
+    <div class="results">
+      <div class="res" id="res-static"><div class="l">static</div><div class="v"><span>—</span><small>makespan</small></div></div>
+      <div class="res" id="res-dynamic"><div class="l">dynamic · 全局队列</div><div class="v"><span>—</span><small>makespan</small></div></div>
+      <div class="res" id="res-hybrid"><div class="l">hybrid · domain 内动态</div><div class="v"><span>—</span><small>makespan</small></div></div>
+    </div>
+    <canvas id="sim-canvas" width="1200" height="420" aria-label="三种调度策略的 worker 时间线"></canvas>
+    <div class="legend"><span><i style="background:var(--accent)"></i>GEMM tile</span><span><i style="background:var(--amber)"></i>Reduce tile</span><span><i style="background:var(--line-strong)"></i>等待 / 调度开销</span><button id="sim-reseed" type="button">换一组随机时长</button></div>
+  </div>
+
+  <h3>Pass 6 · 内存规划与事件分配</h3>
+  <ul>
+    <li>中间张量的生命周期与放置：domain 内消费的中间量优先放能被该 domain 的 L2 抓住的位置（fleet-mi300x：每层 1.2 MB 的压缩 KV 缓存整层留在 XCD 的 4 MB L2 里）。</li>
+    <li>事件张量按 scope 选内存类型（普通 / uncached / fine-grained），编译期断言与 L3 的 <code>visibility</code> 表一致。</li>
+    <li>静态路径把每个 worker 的预排队列物化到全局内存；描述符压成定长记录 <code>(subgraph_id, coord, task_type)</code>，不做指针追逐。</li>
+  </ul>
+
+  <h3>Pass 7 · 跨屏障权重预取（杠杆 3）</h3>
+  <p>屏障挡住的是激活值。权重不依赖任何事件，静态可知，所以 worker 在自旋等事件的那段时间可以已经把下一相位自己那份权重流进 LDS 或寄存器，事件一到直接算。效果是每个屏障的固定延迟被下一相位的字节填满。</p>
+<pre><code>不重叠：  [phase k 算][等事件 · 空转        ][phase k+1 读权重][算]
+重叠：    [phase k 算][等事件 · 同时读 k+1 权重][算]</code></pre>
+  <p>这个 pass 做三件事：</p>
+  <ol>
+    <li><b>静态段的下一任务可知</b>：worker 的预排表里下一个任务是确定的，编译器把它的权重切片地址算进当前任务的 epilogue；动态段用 early push 之后也能知道，只是晚一些。</li>
+    <li><b>落点由能力表决定</b>：gfx942 没有 TMA，直接到 LDS 只有 32 bit / lane，预取进 VGPR / AGPR 或只做 L2 预热；gfx950 有 128 bit / lane 的直接到 LDS；Hopper / Blackwell 走 TMA 加 mbarrier。这是「能力决定做法」的典型例子，不能写成一段通用代码。</li>
+    <li><b>与资源类、LDS 分页一起决策</b>：预取占寄存器和 LDS 页，会挤掉当前 tile 的占用。fleet-mi300x 单独加过一版 <code>--prefetch-next</code>，慢 4%，原因是寄存器压力和 L2 污染；Hazy 之所以能到 78% MBU，是分页和预取一起设计的。所以 Pass 1 的资源类要把「预取缓冲」算作 tile 的资源需求，代价模型按 <code>T_fixed(屏障) − 预取造成的占用损失</code> 决定开关。</li>
+  </ol>
+  <p>预取和 Pass 3 是互补的：Pass 3 删掉能删的屏障，Pass 7 把删不掉的屏障的等待时间用掉。</p>
+</section>
+
+<!-- ============================ 10 ============================ -->
+<section id="s10">
+  <span class="eyebrow">10 · L5</span>
+  <h2>后端 lowering 与运行时 ABI</h2>
+
+  <h3>9.1 原语 × 架构 lowering 表</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>原语</th><th>NVIDIA sm_90 / sm_100</th><th>CDNA3 / CDNA4</th><th>CDNA2</th></tr></thead>
+    <tbody>
+      <tr><td><code>arrive</code>，domain scope</td><td>（无 domain 一级，退化为 device）</td><td><code>s_waitcnt vmcnt(0)</code>（L1 写穿）+ device-scope 原子；计数器落本 XCD 的 L2，不发 fence（Fleet 与 fleet-mi300x 都验证过 0 个陈旧字）</td><td>同，GCD 内</td></tr>
+      <tr><td><code>arrive</code>，device scope</td><td><code>fence.acq_rel.gpu</code> + <code>red.global.gpu.add</code></td><td><code>buffer_wbl2 sc1; s_waitcnt vmcnt(0)</code> + 原子（所有 RMW 转发到 Infinity Fabric）；生产者的 L2 回写不可省，但同 XCD 的 N 个生产者可由最后到达者回写一次</td><td>同</td></tr>
+      <tr><td><code>arrive</code>，system scope</td><td><code>red.global.sys.add</code></td><td><code>buffer_wbl2 sc0 sc1</code> + 原子；事件必须在 fine-grained 内存（<code>hipExtMallocWithFlags</code>），否则静默降级</td><td>整数原子可以；浮点原子不行</td></tr>
+      <tr><td><code>wait</code></td><td><code>ld.acquire.gpu</code> 自旋 + <code>nanosleep</code> 退避；有硬件 tile 触发器则不自旋</td><td><code>load sc1</code>（device）或 <code>load sc0 sc1</code>（system）自旋 + <code>s_sleep</code>；返回后 <code>buffer_inv sc0</code>（domain）/ <code>sc1</code>（device）/ <code>sc0 sc1</code>（system）。普通 load 会命中陈旧 L1，是最常见的静默错误</td><td>同</td></tr>
+      <tr><td>组内低代价同步</td><td>cluster barrier + DSMEM（181–213 周期）</td><td>无，退化为 domain 事件；gfx1250 起有 cluster scope</td><td>无</td></tr>
+      <tr><td>归约写（通信融合）</td><td><code>multimem.ld_reduce</code></td><td>无对应物，也无交换机：对端 fine-grained HBM 上的 P2P store / 原子累加（IPC handle 映射），或 owner 侧 L2 驻留归约（须实验）</td><td>无（且浮点原子不能过 IF）</td></tr>
+      <tr><td>共驻保证</td><td><code>cudaLaunchCooperativeKernel</code></td><td><code>hipLaunchCooperativeKernel</code>：CLR 按占用率算共驻上限，超过返回 <code>hipErrorCooperativeLaunchTooLarge</code>（比死锁好）；ROCm 自带的 <code>grid.sync</code> 就是 device-scope 原子 + <code>s_sleep(1)</code> 轮询</td><td>同</td></tr>
+      <tr><td>domain 探测</td><td>SM id 读 <code>%smid</code>，die 亲和可选</td><td>启动时读 HW_ID 的 XCC_ID，建 worker→domain 表；不信 <code>wgid % 8</code>（有公开记录测到 <code>(k+4) mod 8</code>）</td><td>设备 id 即 domain</td></tr>
+      <tr><td>LDS 页分配</td><td>smem 213 KB 切 13 页 × 16 KB（Hazy）；页由 mbarrier 守护</td><td>64 KB 切 4 页 × 16 KB；gfx950 160 KB 切 10 页；页由 workgroup barrier 守护</td><td>同 gfx942</td></tr>
+      <tr><td>Triton host-DSL 模式的限制</td><td>原语齐全：atomics、<code>nanosleep</code> 走 inline asm</td><td>AMD 后端有 <code>buffer_atomic_rmw</code>、<code>buffer_load_to_local</code>，没有 s_sleep / setprio 钩子，轮询退避走 inline asm；gfx942 无 async copy（gfx950 起有）</td><td>同 gfx942</td></tr>
+    </tbody>
+  </table></div>
+  <p>表里每一格都来自 LLVM 的 gfx942 内存模型、CDNA3 ISA 或 ROCm 原子文档，而不是推测；新架构接入时这张表是第一份要填的东西。生成器只做一件事：按事件的 <code>scope</code> 查表拼指令序列。</p>
+
+  <h3>9.2 生成的内核骨架与 worker 状态机</h3>
+  <figure>
+    <svg viewBox="0 0 760 190" role="img" aria-label="worker 循环状态机：取任务（静态表或 pop）→ 等依赖 → 执行 tile → arrive 输出事件 → 若计数归零且为动态段则 push 消费者 → 检查 abort → 回到取任务；队列空且步结束则退出或等下一步描述。">
+      <defs><marker id="arr5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="currentColor"/></marker></defs>
+      <g font-size="11.5" fill="currentColor">
+        <rect x="0" y="40" width="118" height="44" fill="var(--surface)" stroke="currentColor"/><text x="59" y="58" text-anchor="middle">取任务</text><text x="59" y="74" text-anchor="middle" font-size="10" fill="var(--muted)">静态表 / pop</text>
+        <path d="M118 62 L 150 62" stroke="currentColor" marker-end="url(#arr5)"/>
+        <rect x="152" y="40" width="118" height="44" fill="var(--surface)" stroke="currentColor"/><text x="211" y="58" text-anchor="middle">wait 输入事件</text><text x="211" y="74" text-anchor="middle" font-size="10" fill="var(--muted)">自旋 + 退避 + acquire</text>
+        <path d="M270 62 L 302 62" stroke="currentColor" marker-end="url(#arr5)"/>
+        <rect x="304" y="40" width="118" height="44" fill="var(--accent-soft)" stroke="var(--accent)"/><text x="363" y="58" text-anchor="middle">执行 tile 体</text><text x="363" y="74" text-anchor="middle" font-size="10" fill="var(--muted)">DSL 编译的函数</text>
+        <path d="M422 62 L 454 62" stroke="currentColor" marker-end="url(#arr5)"/>
+        <rect x="456" y="40" width="118" height="44" fill="var(--surface)" stroke="currentColor"/><text x="515" y="58" text-anchor="middle">arrive 输出事件</text><text x="515" y="74" text-anchor="middle" font-size="10" fill="var(--muted)">release + 原子减</text>
+        <path d="M574 62 L 606 62" stroke="currentColor" marker-end="url(#arr5)"/>
+        <rect x="608" y="40" width="152" height="44" fill="var(--amber-soft)" stroke="var(--amber)"/><text x="684" y="58" text-anchor="middle">计数归零？push 消费者</text><text x="684" y="74" text-anchor="middle" font-size="10" fill="var(--muted)">仅动态段；early push 可选</text>
+        <path d="M684 84 L 684 120 L 59 120 L 59 86" fill="none" stroke="currentColor" marker-end="url(#arr5)"/>
+        <text x="372" y="134" text-anchor="middle" font-size="10.5">每圈检查 abort 标志与步结束条件；静态段没有 push，动态段没有预排表，hybrid 两者都有</text>
+        <rect x="0" y="150" width="760" height="30" fill="none" stroke="currentColor" stroke-dasharray="4 3"/>
+        <text x="10" y="169" font-size="10.5">运行时状态只有：事件缓冲（整型）· 队列（本地 + 全局）· 描述符表 · shape 标量 · worker→domain 表。没有任务图对象，没有解释器。</text>
+      </g>
+    </svg>
+    <figcaption><b>每个 worker 的循环。</b>这是论文 §3.3「极小运行时」的延续：调度逻辑编进内核，运行时只剩两块内存状态。static / dynamic / hybrid 的差异只在「取任务」与「push」两个格子里。</figcaption>
+  </figure>
+<pre><code>persistent_kernel(events, queues, desc_table, shape, dom_map, ctrl):
+  w   = worker_id();  d = dom_map[w]          # 启动时探测，不假设映射公式
+  sched = init_scheduler(d, mode_of_subgraph)  # static 表 / 本地队列 / 两者
+  while true:
+    task = sched.next()                        # 静态表或 pop；都空则看 ctrl
+    if task.none: if ctrl.step_done(): break else: backoff(); continue
+    wait_all(task.in_events)                   # 由 ETensor 依赖生成
+    etx_tile_dispatch(task.type, ctx(task))    # switch 到各 DSL 的 tile 体
+    for ev in task.out_events:
+      if etx_arrive(ev, ev.scope) == 0 and ev.dynamic: sched.push(consumers_of(ev, task))
+    if ctrl.abort: break</code></pre>
+
+  <h3>9.3 内核族：一个抽象覆盖多设备与多资源类</h3>
+  <p>一次 Step 可以由多个内核实例执行，每个实例是一个 <code>(device, resource_class)</code> 对，共享同一张事件张量（同设备用普通 / uncached 内存，跨设备用 fine-grained）。三种场景是同一条路：</p>
+  <ul>
+    <li>MI250X：两个 GCD 是两个设备，一张卡启动两个实例，跨 GCD 事件是 system scope。</li>
+    <li>8 卡 TP：八个实例，跨卡事件 system scope，通信 tile 内联在各自实例里。</li>
+    <li>寄存器并集拆分：同一设备两个资源类（重 GEMM / 轻 GEMV），两个实例各占一部分 CU，事件 device scope。</li>
+  </ul>
+  <p>调度器不知道实例，只知道 domain 树；实例只是树的一棵子树被交给了一个内核。</p>
+
+  <h3>10.4 通信融合在没有 multimem 时怎么办</h3>
+  <p>论文 1.40× 的 GEMM + Reduce-Scatter 建立在 <code>multimem.ld_reduce</code>（NVLink SHARP）上，CDNA 没有对应指令。候选路径三条，都要单独实验，做不出正收益就在能力表里写 <code>comm_fusion.reduce_scatter: unsupported</code>，只做计算侧融合：</p>
+  <ol>
+    <li>owner 侧归约：每个 rank 的 GEMM tile 把结果写到 owner rank 的 fine-grained 缓冲区，owner 的 RS tile 等事件后在本地 L2 归约。写是单向 P2P store，事件是跨卡 arrive。</li>
+    <li>P2P 浮点原子累加：MI300 支持浮点原子过 IF，MI200 不支持；精度上求和顺序不确定，需要 fp32 累加加一次 bf16 舍入。</li>
+    <li>借用 rocSHMEM / Iris 的一侧通信原语作为 tile 体，把 ETX 只当调度器用。</li>
+  </ol>
+</section>
+
+<!-- ============================ 11 ============================ -->
+<section id="s11">
+  <span class="eyebrow">11 · 动态负载</span>
+  <h2>动态性的三个层次</h2>
+  <div class="tbl"><table>
+    <thead><tr><th>层次</th><th>例子</th><th>ETX 机制</th><th>论文覆盖</th></tr></thead>
+    <tbody>
+      <tr><td>shape 动态</td><td>continuous batching 的 B、S 变化；prefill / decode 混合</td><td>符号维度 + 每步 shape 标量；静态段用 shape 桶（而非「下一个更大」），桶内 worker 数按 tile 数缩放</td><td>覆盖</td></tr>
+      <tr><td>数据依赖动态</td><td>MoE 路由；speculative decoding 的接受长度；稀疏注意力的块选择</td><td>runtime 初始化的 wait_count + <code>range</code> / <code>gather</code> 边；domain 内动态队列吸收不均</td><td>覆盖 MoE；spec-decode 是同一机制的新实例（接受长度决定后续 tile 触发范围）</td></tr>
+      <tr><td>跨步动态</td><td>常驻内核跨多个解码步；请求随时加入 / 退出；多租户共置</td><td>host↔device 控制环：host 写步描述（shape 标量、指针表、事件初值）到环形缓冲，内核在步结束时取下一条；abort 标志；事件带 epoch 戳（mKernel 的做法），跨步不必清零，<code>wait</code> 比较的是 <code>count == target(epoch)</code></td><td>未覆盖（每步一次启动）；MPK 在内核内做准入，Blink 把整个服务循环放进内核</td></tr>
+    </tbody>
+  </table></div>
+  <figure>
+    <svg viewBox="0 0 760 130" role="img" aria-label="跨步控制环：host 端调度器把 step 描述写进环形缓冲，常驻 megakernel 在一步的全部事件归零后读取下一条；abort 标志由 host 写、所有 worker 每圈读。">
+      <defs><marker id="arr6" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="currentColor"/></marker></defs>
+      <g font-size="11.5" fill="currentColor">
+        <rect x="0" y="30" width="150" height="60" fill="var(--surface)" stroke="currentColor"/><text x="75" y="52" text-anchor="middle">host 引擎调度器</text><text x="75" y="70" text-anchor="middle" font-size="10" fill="var(--muted)">continuous batching</text>
+        <path d="M150 60 L 214 60" stroke="currentColor" marker-end="url(#arr6)"/><text x="182" y="52" text-anchor="middle" font-size="10">写</text>
+        <g>
+          <rect x="216" y="38" width="60" height="44" fill="var(--amber-soft)" stroke="var(--amber)"/><text x="246" y="56" text-anchor="middle" font-size="10">step k</text><text x="246" y="72" text-anchor="middle" font-size="9.5">B=7,S=…</text>
+          <rect x="280" y="38" width="60" height="44" fill="var(--amber-soft)" stroke="var(--amber)"/><text x="310" y="56" text-anchor="middle" font-size="10">step k+1</text><text x="310" y="72" text-anchor="middle" font-size="9.5">B=9,S=…</text>
+          <rect x="344" y="38" width="60" height="44" fill="none" stroke="var(--amber)" stroke-dasharray="3 2"/><text x="374" y="63" text-anchor="middle" font-size="10" fill="var(--muted)">空</text>
+          <text x="310" y="100" text-anchor="middle" font-size="10" fill="var(--muted)">环形缓冲（fine-grained 内存）</text>
+        </g>
+        <path d="M404 60 L 468 60" stroke="currentColor" marker-end="url(#arr6)"/><text x="436" y="52" text-anchor="middle" font-size="10">步结束时读</text>
+        <rect x="470" y="30" width="180" height="60" fill="var(--accent-soft)" stroke="var(--accent)"/><text x="560" y="52" text-anchor="middle">常驻 megakernel</text><text x="560" y="70" text-anchor="middle" font-size="10" fill="var(--muted)">按描述实例化本步坐标空间</text>
+        <path d="M100 90 L 100 116 L 560 116 L 560 92" fill="none" stroke="var(--red)" marker-end="url(#arr6)"/><text x="330" y="112" text-anchor="middle" font-size="10" fill="var(--red)">abort / 抢占标志，每圈检查</text>
+        <text x="660" y="52" font-size="10.5">零启动开销，</text><text x="660" y="68" font-size="10.5">形状每步可变</text>
+      </g>
+    </svg>
+    <figcaption><b>跨步持久化是可选模式。</b>收益是零启动与更早的权重预取，代价是常驻内核占住 GPU、抢占只能靠标志位。多租户或需要与其他内核共享 GPU 时应关闭，回到每步一次启动。</figcaption>
+  </figure>
+  <p>三个层次共用一条原则：<strong>编译产物是模板，不为任何具体值重编译</strong>。变化的东西全部是启动参数或运行时张量。</p>
+</section>
+
+<!-- ============================ 12 ============================ -->
+<section id="s12">
+  <span class="eyebrow">12 · 负载</span>
+  <h2>负载覆盖矩阵</h2>
+  <div class="tbl"><table>
+    <thead><tr><th>负载</th><th>动态性</th><th>预期调度</th><th>主要收益来源</th><th>风险</th></tr></thead>
+    <tbody>
+      <tr><td>低 batch decode（dense）</td><td>shape</td><td>static</td><td>打破算子边界：Q 与 K 的 norm+RoPE 并行、GEMM 间流水、权重预取、去掉几百次启动</td><td>tile 质量不如手写库时收益被吃掉；论文 TP=4 上 CPU 侧开销反而是瓶颈</td></tr>
+      <tr><td>MoE decode / 小 batch prefill</td><td>数据依赖</td><td>hybrid</td><td>domain 内负载均衡 + GroupGEMM 两阶段流水 + 消除 wave 量化</td><td>跨 domain push 代价；路由极不均时本地队列也救不了</td></tr>
+      <tr><td>TP 通信融合（GEMM+RS / AG+GEMM）</td><td>通信抖动</td><td>RS：dynamic（域内）；AG：static</td><td>计算与通信重叠</td><td><b>CDNA 无 multimem</b>，需 10.4 的替代路径</td></tr>
+      <tr><td>大 batch prefill</td><td>shape</td><td>static 或不融合</td><td>收益有限，主要是不退化</td><td>回归测试项：论文称大 batch 不退化，我们要把它写成测试</td></tr>
+      <tr><td>speculative decoding</td><td>数据依赖（接受长度）</td><td>hybrid</td><td>验证与下一步草稿的 tile 按接受长度触发，无 host 往返</td><td>树形草稿的依赖不是仿射的，需限制为链式或固定树</td></tr>
+      <tr><td>多模型 / 多租户共置</td><td>跨步</td><td>按 domain 隔离</td><td>domain 级隔离，互不拖累</td><td>队列与内存隔离；抢占只有标志位</td></tr>
+      <tr><td>非 LLM 的 tile DAG（扩散模型、视觉编码器）</td><td>多为静态</td><td>static</td><td>通用性证明</td><td>缺参考实现与基线</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ============================ 13 ============================ -->
+<section id="s13">
+  <span class="eyebrow">13 · 验证</span>
+  <h2>验证策略</h2>
+  <div class="grid2">
+    <div class="card"><span class="k">正确性</span>
+      <ul style="padding-left:1.2em;margin:6px 0;font-size:14.5px">
+        <li><b>协议模拟器</b>：host 上用 Python 模拟事件协议，对采样 shape 与随机路由跑整个任务图，检查无死锁、计数守恒、每个 tile 的输入在它执行前已被写。fleet-mi300x 已有原型（3 个 token 的事件协议模拟 + 12 个注入缺陷的变异测试）。</li>
+        <li><b>差分测试</b>：每个融合内核配一份未融合参考（逐算子提交、同 tile 代码 + 全局屏障），随机 shape、随机路由，逐元素比对。</li>
+        <li><b>scope 测试</b>：专门构造跨 XCD / 跨卡的事件，验证真的可见；能抓住系统域原子被静默降级。</li>
+        <li><b>原子能力断言</b>：对目标内存类型做一次原子写读回，不成立则编译期失败。</li>
+        <li><b>看门狗</b>：所有测试带超时，hang 视为失败，并 dump 事件张量（哪个事件计数没归零、谁没 arrive）。</li>
+      </ul></div>
+    <div class="card"><span class="k">性能</span>
+      <ul style="padding-left:1.2em;margin:6px 0;font-size:14.5px">
+        <li>基线三档分开报：逐算子提交、同 tile 代码 + 全局屏障（隔离出「融合收益」）、官方库（cuBLAS / RCCL、CK / hipBLASLt）。</li>
+        <li>每个 PR 跑固定 shape 集合，超阈值报警；报数一律带 shape、batch、并行度。</li>
+        <li>调度决策日志入库，事后能回答「为什么这个子图选了 static」。</li>
+      </ul></div>
+    <div class="card"><span class="k">可移植性回归</span>
+      <ul style="padding-left:1.2em;margin:6px 0;font-size:14.5px">
+        <li>同一份 IR 在 gfx90a / gfx942 / gfx950 / sm_90 上跑同一个小模型：逐元素一致、不 hang。</li>
+        <li>决策日志必须打印能力位差异，证明决策真的读了机器模型，而不是碰巧一样。</li>
+        <li>能力表里每个 <code>discover</code> 字段（如 XCD 映射）在 CI 里跑探测并与 yaml 对账。</li>
+      </ul></div>
+  </div>
+</section>
+
+<!-- ============================ 14 ============================ -->
+<section id="s14">
+  <span class="eyebrow">14 · 对比</span>
+  <h2>与 ETC / MPK / Hazy 的差异</h2>
+  <div class="tbl"><table>
+    <thead><tr><th>维度</th><th>ETC（本论文）</th><th>MPK（Mirage）</th><th>Hazy no-bubbles</th><th>ETX</th></tr></thead>
+    <tbody>
+      <tr><td>抽象</td><td>Event Tensor（一等张量）</td><td>ttGraph：任务与事件的二分图，事件融合后每任务恰一个入事件一个出事件，描述符 352 B</td><td>指令流 + 每边一个计数器；共享内存分页</td><td>Event Tensor + scope / domain / init_kind / epoch</td></tr>
+      <tr><td>调度</td><td>static 或 dynamic，二选一</td><td>4 个专用调度 SM；worker 有 JIT / AOT 双队列；2026 路线图转向全静态</td><td>1B 静态每 SM 指令流；70B 全局原子计数器自取</td><td>static / dynamic / <b>hybrid</b>，按子图由代价模型选</td></tr>
+      <tr><td>硬件</td><td>B200，NVLink</td><td>NVIDIA；AMD 由 Fleet 移植（MI350X，每 XCD 一个调度 workgroup，分层事件，比直接移植快 1.13–1.30×）</td><td>H100 / B200</td><td>CDNA2/3/4、RDNA、Hopper / Blackwell，能力表驱动</td></tr>
+      <tr><td>chiplet</td><td>无概念</td><td>Fleet 补上：四级任务（wave / CU / chiplet / device）+ XCD 内 L2 本地计数</td><td>无</td><td>exec-domain 树是一等概念；事件有 domain scope；调度器分层</td></tr>
+      <tr><td>动态 shape</td><td>符号 shape 模板</td><td>按 2 的幂 batch 特化多张图；MoE 用元张量半静态切分</td><td>1B 固定 batch；70B 靠全局队列吸收</td><td>符号 shape 模板 + shape 桶 + 本地队列</td></tr>
+      <tr><td>DSL</td><td>声明可接 Triton / CuteDSL，实现是 TVM DSL</td><td>自有超优化器 + 转译器，任务切分仍手工</td><td>ThunderKittens 手写</td><td>最小契约 + link / host-DSL 两种模式</td></tr>
+      <tr><td>内存类型</td><td>未展开</td><td>未强调</td><td>—</td><td>事件按 scope 分配，非法组合编译期报错</td></tr>
+      <tr><td>跨步</td><td>每步启动</td><td>内核内准入 / 驱逐（起始事件触发）</td><td>每步启动</td><td>可选常驻 + 控制环 + epoch 事件</td></tr>
+      <tr><td>tile 质量</td><td>编译器生成，承认不如 cuBLAS</td><td>编译器生成，寄存器按最大任务分配（占用率问题）</td><td>手写，78% HBM 带宽</td><td>允许内联手写 / 厂商 tile；资源类拆内核族；LDS 分页</td></tr>
+    </tbody>
+  </table></div>
+  <p>还有两家值得单列。<b>Cohere（2026-09）</b>：host 预排静态波次 + 按算子的 drain 队列做工作窃取，固定 12-warp ABI，H100 上 30B-A3B bs=1 对 vLLM 1.58×，但 batch ≤ 8、无多卡。它证明 hybrid 在真实 MoE 服务上成立，ETX 的 domain 分层与它的算子分层正交。<b>Ada-MK（百度）</b>：把调度全部前移到编译期（PTX 级 DAG、共享内存页状态机），在没有 TMA 的 L20 上部署到广告推理；它是「静态段」做到极致的样子，也说明静态段值得单独优化而不是当作动态段的退化。</p>
+</section>
+
+<!-- ============================ 15 ============================ -->
+<section id="s15">
+  <span class="eyebrow">15 · 路线</span>
+  <h2>里程碑、风险、未验证清单</h2>
+  <div class="tbl"><table>
+    <thead><tr><th>阶段</th><th>交付</th><th>完成定义</th></tr></thead>
+    <tbody>
+      <tr><td>0 · 基线与标定</td><td>MI300X 上 MoE / dense 的逐算子参考 + 计时脚手架 + 七个同步代价微基准</td><td>未融合基线到手；<code>t_local / t_cross / t_dev</code> 与争用曲线入 yaml</td></tr>
+      <tr><td>1 · 单卡闭环</td><td>L2 IR + L5 codegen（link 模式，手写 tile），static，事件按 XCD 分片</td><td>MoE 层 ≥ 1.05× 未融合基线；差分测试通过；协议模拟器接入 CI</td></tr>
+      <tr><td>1.5 · 关键路径</td><td>Pass 3 事件消除 + Pass 7 跨屏障预取 + 哨兵信号 lowering；每相位 trace 工具</td><td>MoE 层的全局事件数降到天然依赖点数（3）；每层固定延迟占比从约 75% 降到 50% 以下；MBU 报表进 CI</td></tr>
+      <tr><td>2 · 动态与能力表</td><td>本地队列、hybrid、能力表 + 代价表、决策日志</td><td>MoE 上 hybrid ≥ static（对标论文 1.08 vs 1.04）；日志可解释</td></tr>
+      <tr><td>3 · 第二前端 + 第二硬件</td><td>Triton host-DSL 模式；同一 IR 跑 gfx950 或 gfx90a（双实例）</td><td>换前端 / 换硬件只改 yaml 与骨架模板，IR 与 pass 零改动</td></tr>
+      <tr><td>4 · 通信融合</td><td>GEMM + RS 在 MI300X 上的无 multimem 路径</td><td>有正收益就报数，没有就在能力表标不支持</td></tr>
+      <tr><td>5 · 跨步常驻</td><td>控制环、abort、shape 桶</td><td>continuous batching 下 TPOT 不劣于每步启动，且抢占延迟有上界</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>风险与退路</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>风险</th><th>为什么</th><th>先测什么</th><th>失败时的退路</th></tr></thead>
+    <tbody>
+      <tr><td>AMD 无 multimem</td><td>论文的通信融合依赖它</td><td>10.4 的三条路径单点实验</td><td>标不支持，只做计算侧融合</td></tr>
+      <tr><td>跨 XCD 同步代价高</td><td>4 MB 私有 L2，跨域只有 Infinity Cache</td><td>阶段 0 标定</td><td>提高同域分片比例，牺牲并行度</td></tr>
+      <tr><td>cluster / DSMEM 能力按目标变</td><td>LLVM 文档：不支持时退化为 agent scope</td><td>逐目标实测写进 yaml</td><td>一律走全局原子</td></tr>
+      <tr><td>动态队列争用</td><td>论文自认中心队列有争用</td><td>争用曲线标定</td><td>domain 级队列（已是默认）</td></tr>
+      <tr><td>tile 质量不如手写库</td><td>ETC 自己承认</td><td>同构对比</td><td>融合与 tile 解耦，内联手写</td></tr>
+      <tr><td>静态调度的 shape 兜底粗</td><td>论文用「下一个更大 shape」</td><td>shape 长尾实验</td><td>shape 桶 + 桶内动态</td></tr>
+      <tr><td>事件内存类型写错</td><td>系统域原子有内存类型要求</td><td>scope 测试</td><td>编译期断言禁掉非法组合</td></tr>
+      <tr><td>持久化内核难调试</td><td>hang 不报错</td><td>看门狗 + 事件 dump 先于一切功能</td><td>没有退路，这是必需品</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>阶段 0 的七个微基准</h3>
+  <ol>
+    <li>同 XCD 内两个 workgroup 的原子计数往返延迟（<code>t_local</code>）。</li>
+    <li>相邻 XCD 与最远 XCD 的同一测量（<code>t_cross</code>，取两档）。</li>
+    <li>事件张量放普通 VRAM、uncached、fine-grained 三种内存的差异。</li>
+    <li>双卡 P2P 原子 + fence 的延迟与带宽（<code>t_dev</code>）。</li>
+    <li>N 个 workgroup 抢同一队列的吞吐曲线，扫 N（争用曲线）。</li>
+    <li>静态队列长度与 straggler 时间的关系（静态调度的适用边界）。</li>
+    <li>MoE 路由不均程度与动态调度收益的关系（复现论文 1.08 vs 1.04 的条件）。</li>
+  </ol>
+</section>
+
+<!-- ============================ 16 ============================ -->
+<section id="s16">
+  <span class="eyebrow">16 · 来源</span>
+  <h2>来源</h2>
+  <ul class="srcs">
+    <li>Jin, Hou, Wang, Lai et al. <a href="https://arxiv.org/abs/2604.13327">Event Tensor: A Unified Abstraction for Compiling Dynamic Megakernel</a>. MLSys 2026. 本文所有「论文」数字均出自 v2。</li>
+    <li>Cheng et al. <a href="https://arxiv.org/abs/2512.22219">Mirage Persistent Kernel: A Compiler and Runtime for Mega-Kernelizing Tensor Programs</a>.</li>
+    <li>Spector et al. <a href="https://hazyresearch.stanford.edu/blog/2025-05-27-no-bubbles">Look Ma, No Bubbles! Designing a Low-Latency Megakernel for Llama-1B</a>.</li>
+    <li>Zheng et al. <a href="https://arxiv.org/abs/2504.19442">Triton-Distributed: Programming Overlapping Kernels on Distributed AI Systems with the Triton Compiler</a>.</li>
+    <li>Hou et al. <a href="https://arxiv.org/abs/2601.19092">Axe: A Simple Unified Layout Abstraction for Machine Learning Compilers</a>（ETC 的 tile DSL）。</li>
+    <li>AMD. <a href="https://arxiv.org/abs/2604.15379">Fleet: chiplet-aware megakernel on MI350X</a>（MPK 的 ROCm 移植，四级任务、分层事件、每 XCD 一个调度 workgroup）；<a href="https://github.com/ROCm/fleet-chiplet-megakernel">ROCm/fleet-chiplet-megakernel</a>。</li>
+    <li>Cohere. <a href="https://cohere.com/blog/megakernels">Megakernels</a>（2026-09，H100，静态波次 + 按算子 drain 队列，30B-A3B bs=1 对 vLLM 1.58×）。</li>
+    <li>Kog. <a href="https://blog.kog.ai/building-a-single-kernel-latency-optimized-llm-inference-engine-on-amd-mi300x-gpus/">Building a single-kernel latency-optimized LLM inference engine on MI300X</a>（哨兵值轮询 0.8 µs vs 计数器 7.6 µs）。</li>
+    <li>Ada-MK <a href="https://arxiv.org/abs/2605.11581">2605.11581</a> · ForgeMegakernel <a href="https://arxiv.org/abs/2609.12379">2609.12379</a> · mKernel <a href="https://arxiv.org/abs/2609.13585">2609.13585</a> · DITRON <a href="https://arxiv.org/abs/2605.02953">2605.02953</a> · Iris <a href="https://arxiv.org/abs/2511.12500">2511.12500</a>（<a href="https://github.com/ROCm/iris">ROCm/iris</a>）。</li>
+    <li>Chips and Cheese. <a href="https://chipsandcheese.com/p/testing-amds-giant-mi300x">Testing AMD's giant MI300X</a>（同 XCD / 跨 XCD 原子 116 / 202 ns）；<a href="https://arxiv.org/pdf/2501.12084">Hopper 微基准</a>（DSMEM 与 L2 分区延迟）；<a href="https://docs.nvidia.com/cuda/blackwell-tuning-guide/index.html">NVIDIA Blackwell tuning guide</a>；<a href="https://docs.nvidia.com/cuda/parallel-thread-execution/index.html">PTX ISA</a>（multimem、nanosleep、griddepcontrol）。</li>
+    <li>AMD. <a href="https://rocm.docs.amd.com/en/latest/reference/gpu-arch/mi300.html">MI300 微架构</a>；<a href="https://rocm.docs.amd.com/en/latest/reference/gpu-arch/mi350.html">MI350 微架构</a>；<a href="https://rocm.blogs.amd.com/software-tools-optimization/compute-memory-modes/README.html">SPX / CPX 分区与 round-robin 派发</a>；<a href="https://github.com/ROCm/llvm-project/blob/amd-staging/amd/device-libs/ockl/src/cg.cl">device-libs cg.cl（grid.sync 实现）</a>。</li>
+    <li>AMD. <a href="https://rocm.docs.amd.com/en/latest/reference/gpu-arch-specs.html">ROCm GPU architecture specs</a>；<a href="https://rocm.docs.amd.com/en/latest/reference/gpu-atomics-operation.html">GPU atomics operation support</a>；<a href="https://rocm.docs.amd.com/projects/ai-ecosystem/en/latest/optimization/workload-optimization.html">MI300 / MI350 workload optimization（XCD-aware swizzle）</a>；<a href="https://instinct.docs.amd.com/projects/amdgpu-docs/en/latest/gpu-partitioning/mi300x/overview.html">MI300X partitioning</a>；AMD Instinct MI300 CDNA3 ISA Reference Guide（2025-08）。</li>
+    <li>LLVM. <a href="https://llvm.org/docs/AMDGPUUsage.html#memory-model-gfx942">AMDGPU backend usage（gfx942 memory model：wbl2 / inv 序列、cluster launch）</a>；<a href="https://clang.llvm.org/docs/AMDGPUBuiltinReference.html">Clang AMDGPU builtins</a>（s_sleep、s_setprio、s_memrealtime）。</li>
+    <li>cklxx. <a href="https://github.com/cklxx/fleet-mi300x">fleet-mi300x</a>：MI300X 上的手写 batch-1 MoE 解码 megakernel，本文引用的跨 XCD 事件、fence、探测经验出自其 docs/STATUS.md。</li>
+  </ul>
+  <p class="foot">ETX v0.3 设计稿 · 2026-09-22 · 未实现，所有 ETX 侧数字为目标或估计，论文侧数字为引用。</p>
+</section>
+</main>
+</div>
+
+<script>
+(function(){
+  // ---------- TOC active state ----------
+  var links = Array.prototype.slice.call(document.querySelectorAll('nav.toc a'));
+  var secs = links.map(function(a){ return document.querySelector(a.getAttribute('href')); });
+  function onScroll(){
+    var y = window.scrollY + 120, idx = 0;
+    for (var i=0;i<secs.length;i++){ if (secs[i] && secs[i].offsetTop <= y) idx = i; }
+    links.forEach(function(a,i){ a.classList.toggle('active', i===idx); });
+  }
+  window.addEventListener('scroll', onScroll, {passive:true}); onScroll();
+
+  // ---------- scheduling simulator ----------
+  var W = 16, DOM = 2;                     // workers, domains
+  var elVar = document.getElementById('sim-var'), elPush = document.getElementById('sim-push'),
+      elCont = document.getElementById('sim-cont'), elTiles = document.getElementById('sim-tiles');
+  var cv = document.getElementById('sim-canvas'), ctx = cv.getContext('2d');
+  var seed = 7;
+  function rnd(){ seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; }
+  function css(n){ return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+
+  function makeTasks(nGemm, variance){
+    var t = [];
+    for (var i=0;i<nGemm;i++) t.push({id:i, type:0, dur: 1 + variance*(rnd()*2-1)*0.9, deps:[], dom: Math.floor(i*DOM/nGemm)});
+    for (var j=0;j<nGemm/2;j++) t.push({id:nGemm+j, type:1, dur: 0.6*(1 + variance*(rnd()*2-1)*0.9), deps:[2*j,2*j+1], dom: t[2*j].dom});
+    return t;
+  }
+  // generic list scheduler over per-worker queues (static) or ready queues (dynamic/hybrid)
+  function simulate(tasks, mode, pushCost, cont){
+    var n = tasks.length, done = new Array(n).fill(-1), remaining = tasks.map(function(t){return t.deps.length;});
+    var wfree = new Array(W).fill(0), wdom = []; for (var w=0;w<W;w++) wdom.push(Math.floor(w*DOM/W));
+    var segs = [];   // {w, s, e, type}
+    if (mode === 'static'){
+      var q = []; for (var w=0;w<W;w++) q.push([]);
+      // round-robin within domain, GEMM first then reduce, like ETC's static pass
+      var perDom = []; for (var d=0; d<DOM; d++) perDom.push(0);
+      tasks.forEach(function(t){ var d=t.dom; var wl = W/DOM; var w = d*wl + (perDom[d]++ % wl); q[w].push(t.id); });
+      var ptr = new Array(W).fill(0), progress = true;
+      while (progress){
+        progress = false;
+        for (var w=0;w<W;w++){
+          if (ptr[w] >= q[w].length) continue;
+          var t = tasks[q[w][ptr[w]]];
+          var ready = t.deps.every(function(d){ return done[d] >= 0; });
+          if (!ready) continue;
+          var depEnd = t.deps.reduce(function(m,d){ return Math.max(m, done[d]); }, 0);
+          var s = Math.max(wfree[w], depEnd);
+          if (s > wfree[w]) segs.push({w:w, s:wfree[w], e:s, type:2});
+          segs.push({w:w, s:s, e:s+t.dur, type:t.type});
+          done[t.id] = s + t.dur; wfree[w] = s + t.dur; ptr[w]++; progress = true;
+        }
+      }
+      var make = Math.max.apply(null, wfree);
+      return {segs:segs, make:make, deadlock: done.some(function(x){return x<0;})};
+    }
+    // dynamic / hybrid: event-driven with ready queues
+    var queues = (mode==='dynamic') ? [[]] : []; if (mode==='hybrid') for (var d=0; d<DOM; d++) queues.push([]);
+    var readyAt = new Array(n).fill(0);
+    tasks.forEach(function(t){ if (t.deps.length===0) (mode==='dynamic'?queues[0]:queues[t.dom]).push(t.id); });
+    var contenders = W; // contention scales with workers sharing a queue
+    var perQueueW = (mode==='dynamic') ? W : W/DOM;
+    var guard = 0;
+    while (guard++ < 100000){
+      // pick the worker that frees earliest and has something poppable
+      var best = -1, bestT = Infinity, bestQ = -1, bestI = -1;
+      for (var w=0;w<W;w++){
+        var qi = (mode==='dynamic') ? 0 : wdom[w];
+        var q = queues[qi];
+        for (var k=0;k<q.length;k++){
+          var tid = q[k]; var st = Math.max(wfree[w], readyAt[tid]);
+          if (st < bestT){ bestT = st; best = w; bestQ = qi; bestI = k; }
+        }
+      }
+      if (best < 0) break;
+      var tid = queues[bestQ].splice(bestI,1)[0], t = tasks[tid], w = best;
+      var popCost = cont * perQueueW;                       // queue contention on pop
+      var s = bestT;
+      if (s + popCost > wfree[w]) segs.push({w:w, s:wfree[w], e:s+popCost, type:2});
+      s += popCost;
+      segs.push({w:w, s:s, e:s+t.dur, type:t.type});
+      done[tid] = s + t.dur; wfree[w] = s + t.dur;
+      // arrive on consumers
+      for (var c=0;c<n;c++){
+        var ct = tasks[c]; if (ct.deps.indexOf(tid) < 0) continue;
+        remaining[c]--;
+        if (remaining[c] === 0){
+          var cross = (mode==='dynamic') ? (ct.dom !== wdom[w]) : false;
+          var pc = cross ? pushCost : 0.05;
+          segs.push({w:w, s:wfree[w], e:wfree[w]+pc, type:2}); wfree[w] += pc;
+          readyAt[c] = wfree[w];
+          (mode==='dynamic'?queues[0]:queues[ct.dom]).push(c);
+        }
+      }
+    }
+    return {segs:segs, make:Math.max.apply(null, wfree), deadlock:false};
+  }
+  function draw(results){
+    var dpr = 1; var Wc = cv.width, Hc = cv.height;
+    ctx.clearRect(0,0,Wc,Hc);
+    var colors = [css('--accent'), css('--amber'), css('--line-strong')];
+    var ink = css('--ink'), muted = css('--muted');
+    var maxT = Math.max(results.static.make, results.dynamic.make, results.hybrid.make) * 1.02;
+    var names = ['static','dynamic','hybrid'], keys = ['static','dynamic','hybrid'];
+    var rowH = 6, gap = 2, blockH = W*(rowH+gap), left = 90, top = 18, x0 = left, xw = Wc - left - 20;
+    ctx.font = '12px IBM Plex Mono, monospace';
+    for (var b=0;b<3;b++){
+      var r = results[keys[b]], y0 = top + b*(blockH+28);
+      ctx.fillStyle = ink; ctx.fillText(names[b] + '  ' + r.make.toFixed(1), 0, y0+10);
+      ctx.fillStyle = muted; ctx.fillText('w0–w7 | w8–w15', 0, y0+24);
+      // domain divider
+      ctx.strokeStyle = css('--line'); ctx.beginPath(); ctx.moveTo(x0, y0 + (W/2)*(rowH+gap)-1); ctx.lineTo(x0+xw, y0 + (W/2)*(rowH+gap)-1); ctx.stroke();
+      r.segs.forEach(function(sg){
+        var x = x0 + sg.s/maxT*xw, wpx = Math.max(0.5,(sg.e-sg.s)/maxT*xw);
+        ctx.fillStyle = colors[sg.type]; ctx.fillRect(x, y0 + sg.w*(rowH+gap), wpx, rowH);
+      });
+      ctx.strokeStyle = ink; ctx.beginPath(); var mx = x0 + r.make/maxT*xw; ctx.moveTo(mx, y0); ctx.lineTo(mx, y0+blockH); ctx.stroke();
+    }
+  }
+  function run(){
+    var variance = +elVar.value, pushCost = +elPush.value, cont = +elCont.value, nT = +elTiles.value;
+    document.getElementById('sim-var-v').textContent = variance.toFixed(2);
+    document.getElementById('sim-push-v').textContent = pushCost.toFixed(1);
+    document.getElementById('sim-cont-v').textContent = cont.toFixed(3);
+    document.getElementById('sim-tiles-v').textContent = nT;
+    var s0 = seed; var tasks = makeTasks(nT, variance); seed = s0;
+    var res = { static: simulate(tasks,'static',pushCost,cont), dynamic: simulate(tasks,'dynamic',pushCost,cont), hybrid: simulate(tasks,'hybrid',pushCost,cont) };
+    var best = Object.keys(res).reduce(function(a,b){ return res[a].make <= res[b].make ? a : b; });
+    ['static','dynamic','hybrid'].forEach(function(k){
+      var el = document.getElementById('res-'+k); el.classList.toggle('best', k===best);
+      el.querySelector('.v span').textContent = res[k].make.toFixed(2) + (k===best?'':'  (+' + ((res[k].make/res[best].make-1)*100).toFixed(0) + '%)');
+    });
+    draw(res);
+  }
+  [elVar, elPush, elCont, elTiles].forEach(function(e){ e.addEventListener('input', run); });
+  document.getElementById('sim-reseed').addEventListener('click', function(){ seed = (seed*7919+13) >>> 0; run(); });
+  if (window.matchMedia) window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', run);
+  run();
+})();
+</script>
+</body>
+</html>

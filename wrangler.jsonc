@@ -1,0 +1,7 @@
+{
+  "name": "etc-dynamic-megakernel-arch",
+  "compatibility_date": "2025-01-01",
+  "assets": {
+    "directory": "./docs/site"
+  }
+}

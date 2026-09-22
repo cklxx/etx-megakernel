@@ -1,0 +1,67 @@
+# AMD Instinct MI350X / MI355X (CDNA4). Same tree shape as gfx942 with different
+# capacities: 32 active CUs per XCD (36 physical), LDS 160 KB, 128-bit/lane
+# direct-to-LDS loads, HBM3E 8 TB/s. Costs copied from gfx942 as placeholders
+# until calibrated (Fleet paper measured on this part but did not publish latencies).
+name: gfx950
+family: CDNA4
+vendor: amd
+wave_size: 64
+devices_per_package: 1
+exec_domains:
+  - {name: xcd, count: 8, cus: 32, l2_mb: 4}
+shared_cache: {kind: infinity_cache, mb: 256, coherent: false}
+resources:
+  lds_kb: 160
+  regs_per_lane: 512
+  max_waves_per_simd: 8
+  simds_per_cu: 4
+  max_wg_per_cu: 2
+  lds_page_kb: 16
+bandwidth: {hbm_tbs: 8.0, cache_bw_tbs: 6.0}
+visibility:
+  domain:
+    release: ['asm volatile("s_waitcnt vmcnt(0)" ::: "memory");']
+    acquire: ['asm volatile("buffer_inv sc0" ::: "memory");']
+    poll: '__hip_atomic_load({ptr}, __ATOMIC_RELAXED, __HIP_MEMORY_SCOPE_AGENT)'
+    arrive: '__hip_atomic_fetch_sub({ptr}, 1, __ATOMIC_RELAXED, __HIP_MEMORY_SCOPE_AGENT)'
+    memory: any
+  device:
+    release: ['asm volatile("buffer_wbl2 sc1\n\ts_waitcnt vmcnt(0)" ::: "memory");']
+    acquire: ['asm volatile("buffer_inv sc1" ::: "memory");']
+    poll: '__hip_atomic_load({ptr}, __ATOMIC_RELAXED, __HIP_MEMORY_SCOPE_AGENT)'
+    arrive: '__hip_atomic_fetch_sub({ptr}, 1, __ATOMIC_RELAXED, __HIP_MEMORY_SCOPE_AGENT)'
+    memory: any
+  system:
+    release: ['asm volatile("buffer_wbl2 sc0 sc1\n\ts_waitcnt vmcnt(0)" ::: "memory");']
+    acquire: ['asm volatile("buffer_inv sc0 sc1" ::: "memory");']
+    poll: '__hip_atomic_load({ptr}, __ATOMIC_RELAXED, __HIP_MEMORY_SCOPE_SYSTEM)'
+    arrive: '__hip_atomic_fetch_sub({ptr}, 1, __ATOMIC_RELAXED, __HIP_MEMORY_SCOPE_SYSTEM)'
+    memory: fine_grained
+capabilities:
+  cluster_launch: false
+  dsmem: false
+  multicast_reduce: false
+  async_copy_to_lds: wide         # GLOBAL_LOAD_LDS up to 128 bit/lane, transpose reads
+  tma: false
+  fp_atomic_over_fabric: true
+  wg_to_domain_map: discover
+  cooperative_launch: true
+  sentinel_signal: true
+  hw_tile_trigger: false
+  backoff: s_sleep
+  comm_fusion_reduce_scatter: experimental
+costs:
+  t_local_ns: 116
+  t_cross_ns: 203
+  t_flag_cross_ns: 703
+  t_fence_ns: 115
+  t_dev_ns: null
+  t_pop_ns: 300
+  t_push_ns: 300
+lowering:
+  backoff: '__builtin_amdgcn_s_sleep(1);'
+  timer: '__builtin_amdgcn_s_memrealtime()'
+  domain_id: 'etx_amdgcn_xcc_id()'
+  launch: hipLaunchCooperativeKernel
+notes:
+  - "Costs are gfx942 placeholders; run bench/calib on real hardware."

@@ -1,0 +1,59 @@
+# AMD Instinct MI250X (CDNA2). Two GCDs per package, each a separate HIP device
+# with its own 8 MB L2; no Infinity Cache. A "one card" megakernel is therefore two
+# kernel instances sharing system-scope events in fine-grained memory (design §10.3).
+# Floating-point atomics do not cross Infinity Fabric on MI200 (capability, not cost).
+name: gfx90a
+family: CDNA2
+vendor: amd
+wave_size: 64
+devices_per_package: 2
+exec_domains:
+  - {name: gcd, count: 1, cus: 110, l2_mb: 8}
+shared_cache: {kind: none, mb: 0, coherent: false}
+resources:
+  lds_kb: 64
+  regs_per_lane: 512
+  max_waves_per_simd: 8
+  simds_per_cu: 4
+  max_wg_per_cu: 2
+  lds_page_kb: 16
+bandwidth: {hbm_tbs: 1.6, cache_bw_tbs: 2.0}     # per GCD
+visibility:
+  device:
+    release: ['asm volatile("buffer_wbl2\n\ts_waitcnt vmcnt(0)" ::: "memory");']
+    acquire: ['asm volatile("buffer_invl2\n\tbuffer_wbinvl1_vol" ::: "memory");']
+    poll: '__hip_atomic_load({ptr}, __ATOMIC_RELAXED, __HIP_MEMORY_SCOPE_AGENT)'
+    arrive: '__hip_atomic_fetch_sub({ptr}, 1, __ATOMIC_RELAXED, __HIP_MEMORY_SCOPE_AGENT)'
+    memory: any
+  system:
+    release: ['asm volatile("buffer_wbl2\n\ts_waitcnt vmcnt(0)" ::: "memory");']
+    acquire: ['asm volatile("buffer_invl2\n\tbuffer_wbinvl1_vol" ::: "memory");']
+    poll: '__hip_atomic_load({ptr}, __ATOMIC_RELAXED, __HIP_MEMORY_SCOPE_SYSTEM)'
+    arrive: '__hip_atomic_fetch_sub({ptr}, 1, __ATOMIC_RELAXED, __HIP_MEMORY_SCOPE_SYSTEM)'
+    memory: fine_grained
+capabilities:
+  cluster_launch: false
+  dsmem: false
+  multicast_reduce: false
+  async_copy_to_lds: none
+  tma: false
+  fp_atomic_over_fabric: false    # integer atomics only across GCDs / to host
+  wg_to_domain_map: single
+  cooperative_launch: true
+  sentinel_signal: true
+  hw_tile_trigger: false
+  backoff: s_sleep
+  comm_fusion_reduce_scatter: unsupported
+costs:
+  t_local_ns: 130
+  t_cross_ns: null
+  t_dev_ns: 9000                 # kernel-initiated P2P latency 8.7-18.2 us (arXiv 2410.00801)
+  t_pop_ns: 300
+  t_push_ns: 300
+lowering:
+  backoff: '__builtin_amdgcn_s_sleep(1);'
+  timer: '__builtin_amdgcn_s_memrealtime()'
+  domain_id: '0'
+  launch: hipLaunchCooperativeKernel
+notes:
+  - "Each GCD is one device: the pipeline emits devices_per_package kernel instances."

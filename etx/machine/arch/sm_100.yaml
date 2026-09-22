@@ -1,0 +1,60 @@
+# NVIDIA B200 (Blackwell). Two dies presented as one device with a unified,
+# coherent L2 (die crossing ~30 cycles): a single domain for placement purposes,
+# with an optional die-affinity cost. 148 SMs, 228 KB smem, TMA multicast, CLC.
+name: sm_100
+family: Blackwell
+vendor: nvidia
+wave_size: 32
+devices_per_package: 1
+exec_domains:
+  - {name: gpu, count: 1, cus: 148, l2_mb: 126}
+shared_cache: {kind: none, mb: 0, coherent: true}
+resources:
+  lds_kb: 228
+  regs_per_lane: 255
+  max_waves_per_simd: 16
+  simds_per_cu: 4
+  max_wg_per_cu: 32
+  lds_page_kb: 16
+bandwidth: {hbm_tbs: 8.0, cache_bw_tbs: 10.0}
+visibility:
+  device:
+    release: ['__threadfence();']
+    acquire: ['__threadfence();']
+    poll: 'etx_ld_acquire_gpu({ptr})'
+    arrive: 'atomicSub({ptr}, 1)'
+    memory: any
+  system:
+    release: ['__threadfence_system();']
+    acquire: ['__threadfence_system();']
+    poll: 'etx_ld_acquire_sys({ptr})'
+    arrive: 'etx_atomic_sub_sys({ptr})'
+    memory: any
+capabilities:
+  cluster_launch: true
+  dsmem: true
+  multicast_reduce: true
+  async_copy_to_lds: wide
+  tma: true
+  tma_multicast: true
+  fp_atomic_over_fabric: true
+  wg_to_domain_map: single
+  cooperative_launch: true
+  sentinel_signal: true
+  hw_tile_trigger: false        # Rubin-class tile triggers: flip when available
+  pdl: true
+  clc: true                     # cluster launch control work fetching
+  backoff: nanosleep
+  comm_fusion_reduce_scatter: supported
+costs:
+  t_local_ns: 500
+  t_cross_ns: null
+  t_dev_ns: 1500
+  t_die_cross_ns: 16
+  t_pop_ns: 250
+  t_push_ns: 250
+lowering:
+  backoff: '__nanosleep(200);'
+  timer: 'clock64()'
+  domain_id: '0'
+  launch: cudaLaunchCooperativeKernel

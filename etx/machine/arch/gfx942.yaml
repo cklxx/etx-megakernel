@@ -1,0 +1,73 @@
+# AMD Instinct MI300X (CDNA3). Sources: ROCm MI300 microarchitecture doc, CDNA3 ISA
+# §9.1 cache-scope bits, LLVM AMDGPUUsage "Memory Model GFX942", ROCm GPU atomics guide,
+# Chips and Cheese MI300X microbenchmarks. Costs are public seed values; phase-0
+# calibration (bench/calib) overwrites them.
+name: gfx942
+family: CDNA3
+vendor: amd
+wave_size: 64
+devices_per_package: 1
+exec_domains:
+  - {name: xcd, count: 8, cus: 38, l2_mb: 4}      # 40 CUs per XCD, 38 active
+shared_cache: {kind: infinity_cache, mb: 256, coherent: false}   # memory-side, holds the snoop filter
+resources:
+  lds_kb: 64
+  regs_per_lane: 512          # VGPR + AGPR share one 512-entry file
+  max_waves_per_simd: 8
+  simds_per_cu: 4
+  max_wg_per_cu: 2
+  lds_page_kb: 16
+bandwidth: {hbm_tbs: 5.3, cache_bw_tbs: 4.3}
+visibility:
+  # domain = within one XCD (one L2). L1 is write-through; the consumer only invalidates L1.
+  domain:
+    release: ['asm volatile("s_waitcnt vmcnt(0)" ::: "memory");']
+    acquire: ['asm volatile("buffer_inv sc0" ::: "memory");']
+    poll: '__hip_atomic_load({ptr}, __ATOMIC_RELAXED, __HIP_MEMORY_SCOPE_AGENT)'
+    arrive: '__hip_atomic_fetch_sub({ptr}, 1, __ATOMIC_RELAXED, __HIP_MEMORY_SCOPE_AGENT)'
+    memory: any
+  # device = across XCDs. Producer writes back its dirty L2 lines; consumer invalidates.
+  device:
+    release: ['asm volatile("buffer_wbl2 sc1\n\ts_waitcnt vmcnt(0)" ::: "memory");']
+    acquire: ['asm volatile("buffer_inv sc1" ::: "memory");']
+    poll: '__hip_atomic_load({ptr}, __ATOMIC_RELAXED, __HIP_MEMORY_SCOPE_AGENT)'
+    arrive: '__hip_atomic_fetch_sub({ptr}, 1, __ATOMIC_RELAXED, __HIP_MEMORY_SCOPE_AGENT)'
+    memory: any
+  # system = across devices. Coarse-grained memory silently downgrades to device scope.
+  system:
+    release: ['asm volatile("buffer_wbl2 sc0 sc1\n\ts_waitcnt vmcnt(0)" ::: "memory");']
+    acquire: ['asm volatile("buffer_inv sc0 sc1" ::: "memory");']
+    poll: '__hip_atomic_load({ptr}, __ATOMIC_RELAXED, __HIP_MEMORY_SCOPE_SYSTEM)'
+    arrive: '__hip_atomic_fetch_sub({ptr}, 1, __ATOMIC_RELAXED, __HIP_MEMORY_SCOPE_SYSTEM)'
+    memory: fine_grained
+capabilities:
+  cluster_launch: false
+  dsmem: false
+  multicast_reduce: false        # no multimem, and no switch: 8 GPUs are a point-to-point xGMI mesh
+  async_copy_to_lds: dword_only  # buffer_load ... lds is 32 bit/lane; no TMA / cp.async
+  tma: false
+  fp_atomic_over_fabric: true
+  wg_to_domain_map: discover     # docs say round-robin; not contractual; read HW_ID.XCC_ID at start
+  cooperative_launch: true
+  sentinel_signal: true
+  hw_tile_trigger: false
+  backoff: s_sleep
+  comm_fusion_reduce_scatter: experimental   # no multimem path; see design §10.4
+costs:
+  t_local_ns: 116                # same-XCD atomic round trip (Chips and Cheese)
+  t_cross_ns: 203                # cross-XCD atomic round trip
+  t_flag_cross_ns: 703           # cross-XCD one-way flag latency
+  t_fence_ns: 115                # agent-scope release fence
+  t_phase_switch_counter_ns: 7600
+  t_phase_switch_sentinel_ns: 850
+  t_dev_ns: null                 # xGMI P2P atomic, to calibrate
+  t_pop_ns: 300
+  t_push_ns: 300
+  t_prologue_ns: null
+lowering:
+  backoff: '__builtin_amdgcn_s_sleep(1);'
+  timer: '__builtin_amdgcn_s_memrealtime()'
+  domain_id: 'etx_amdgcn_xcc_id()'          # runtime/include/etx/primitives_amdgcn.h
+  launch: hipLaunchCooperativeKernel
+notes:
+  - "Plain loads hit the non-coherent L1 (wave scope = Hit LRU); flags must be polled with sc1 or atomic loads."

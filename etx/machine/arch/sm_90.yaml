@@ -1,0 +1,59 @@
+# NVIDIA H100 (Hopper). Single coherent domain (L2 in two partitions: far hit 414 vs
+# near 258 cycles, which is a cost, not a visibility difference). Clusters + DSMEM,
+# TMA, multimem over NVLink. Sources: Blackwell/Hopper tuning guides, PTX ISA,
+# arXiv 2501.12084 microbenchmarks.
+name: sm_90
+family: Hopper
+vendor: nvidia
+wave_size: 32
+devices_per_package: 1
+exec_domains:
+  - {name: gpu, count: 1, cus: 132, l2_mb: 50}
+shared_cache: {kind: none, mb: 0, coherent: true}
+resources:
+  lds_kb: 228
+  regs_per_lane: 255
+  max_waves_per_simd: 16
+  simds_per_cu: 4
+  max_wg_per_cu: 32
+  lds_page_kb: 16
+bandwidth: {hbm_tbs: 3.35, cache_bw_tbs: 5.5}
+visibility:
+  device:
+    release: ['__threadfence();']
+    acquire: ['__threadfence();']
+    poll: 'etx_ld_acquire_gpu({ptr})'
+    arrive: 'atomicSub({ptr}, 1)'
+    memory: any
+  system:
+    release: ['__threadfence_system();']
+    acquire: ['__threadfence_system();']
+    poll: 'etx_ld_acquire_sys({ptr})'
+    arrive: 'etx_atomic_sub_sys({ptr})'
+    memory: any                 # NVLink peer memory mapped via cudaDeviceEnablePeerAccess / NVSHMEM
+capabilities:
+  cluster_launch: true
+  dsmem: true
+  multicast_reduce: true        # multimem.ld_reduce over NVLink SHARP
+  async_copy_to_lds: wide
+  tma: true
+  fp_atomic_over_fabric: true
+  wg_to_domain_map: single
+  cooperative_launch: true
+  sentinel_signal: true
+  hw_tile_trigger: false
+  pdl: true                     # programmatic dependent launch (griddepcontrol)
+  backoff: nanosleep
+  comm_fusion_reduce_scatter: supported
+costs:
+  t_local_ns: 600               # ~1110 cycles global-memory round trip between SMs
+  t_cross_ns: null
+  t_dev_ns: 2000
+  t_dsmem_ns: 110               # 181-213 cycles
+  t_pop_ns: 250
+  t_push_ns: 250
+lowering:
+  backoff: '__nanosleep(200);'
+  timer: 'clock64()'
+  domain_id: '0'
+  launch: cudaLaunchCooperativeKernel
