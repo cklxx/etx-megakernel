@@ -19,7 +19,7 @@ def compile_graph(graph: Graph, machine: MachineModel | str, bindings: Mapping[s
     g = copy.deepcopy(graph)                 # passes rewrite the graph; keep the caller's intact
     verify(g, bindings, runtime)
     plan = Plan(arch=m.name, graph=g, inst=instantiate(g, bindings, runtime), machine=m,
-                bindings=dict(bindings), options=options)
+                bindings=dict(bindings), options=options, runtime=runtime)
     p1_tiling.run(plan)
     p2_affinity.run(plan)
     if options.event_elimination:

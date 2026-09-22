@@ -25,7 +25,8 @@ def _wg_per_cu(plan: Plan, vgpr: int, agpr: int, lds_bytes: int, threads: int) -
     waves_per_simd_by_regs = max(1, int(res["regs_per_lane"] // regs)) if regs > res["regs_per_lane"] // res["max_waves_per_simd"] else res["max_waves_per_simd"]
     waves_per_cu = waves_per_simd_by_regs * res["simds_per_cu"]
     by_regs = max(1, waves_per_cu // waves_per_wg)
-    by_lds = max(1, int(res["lds_kb"] * 1024 // max(1, lds_bytes))) if lds_bytes else res["max_wg_per_cu"]
+    # the persistent kernel itself keeps a few shared words (domain, worker, task id); reserve 256 B
+    by_lds = max(1, int(res["lds_kb"] * 1024 // (lds_bytes + 256))) if lds_bytes else res["max_wg_per_cu"]
     return max(1, min(res["max_wg_per_cu"], by_regs, by_lds))
 
 

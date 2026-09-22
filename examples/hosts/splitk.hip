@@ -11,9 +11,12 @@
 #include "plan_data.h"
 #include "etx/host.h"
 
+extern "C" __global__ void etx_megakernel_d0(etx_params);
+
 int main(int argc, char** argv) {
   const int reps = argc > 1 ? atoi(argv[1]) : 20;
-  etx_host h;
+  etx_host h(0);
+  h.kernel = (const void*)etx_megakernel_d0;
   h.setup();
   const int n = etx_shape[0];                 // symbol n
   const int rows = n * 32, K = 128;

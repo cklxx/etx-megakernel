@@ -59,6 +59,7 @@ class Plan:
     machine: MachineModel
     bindings: dict[str, int]
     options: PassOptions
+    runtime: Any = None                     # the runtime sample the plan was instantiated with
     tasks: list[TaskInst] = field(default_factory=list)
     task_index: dict[TaskId, int] = field(default_factory=dict)
     type_ids: dict[str, int] = field(default_factory=dict)

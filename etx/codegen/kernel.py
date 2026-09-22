@@ -191,7 +191,7 @@ def emit_kernel(plan: Plan, device: int = 0) -> str:
     out.append("  }")
     out.append("}")
     out.append("")
-    out.append("extern \"C\" __global__ void __launch_bounds__(ETX_THREADS) etx_megakernel(etx_params p) {")
+    out.append(f"extern \"C\" __global__ void __launch_bounds__(ETX_THREADS) etx_megakernel_d{device}(etx_params p) {{")
     out.append("  // Logical worker id = domain * workers_per_domain + slot, where the slot is claimed at start.")
     out.append("  // This makes the static queues domain-affine under ANY workgroup->domain mapping (measured (k+6) mod 8 on one VM).")
     out.append("  __shared__ uint32_t s_domain, s_worker; __shared__ int32_t s_tid;")

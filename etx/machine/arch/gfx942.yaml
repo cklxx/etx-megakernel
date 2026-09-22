@@ -62,9 +62,11 @@ costs:                           # MEASURED 2026-09-22, Hot Aisle 1xMI300X VM, R
   t_flag_local_ns: 951
   t_fence_ns: 181                # buffer_wbl2 sc1 + s_waitcnt (release); acquire buffer_inv sc1 = 120
   t_fence_domain_ns: 44          # s_waitcnt + buffer_inv sc0 together
-  t_phase_switch_counter_ns: 7600   # public (Kog), not re-measured
-  t_phase_switch_sentinel_ns: 850
-  t_dev_ns: null                 # xGMI P2P atomic: needs a 2-GPU VM
+  t_phase_switch_counter_ns: 8600   # MEASURED: 304 WGs 8.6 us, 608 WGs 17.3 us per whole-GPU counter barrier (Kog: 7.6)
+  t_phase_switch_leader_flags_ns: 52000   # leader polling 304 flag words: 52 us; sentinel gains are point-to-point, not barriers
+  t_phase_switch_sentinel_ns: 850         # public (Kog), point-to-point payload polling
+  t_dev_ns: 10600                # MEASURED: cross-device system-scope flag one-way, fine-grained memory + peer access
+  peer_store_gbs: 285            # MEASURED: device 1 -> device 0 HBM, 256 MB, xGMI
   t_pop_ns: 870                  # ticket ring, uncontended
   t_push_ns: 600                 # atomicAdd(tail) + atomicExch(slot), estimate from pop cost
   queue_contention_us_per_pop: {1: 0.87, 8: 0.94, 64: 1.34, 128: 1.97, 256: 4.64, 512: 6.69}   # per popper, N poppers

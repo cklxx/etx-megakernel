@@ -56,6 +56,30 @@ def run(plan: Plan) -> None:
         for c in inst.tasks[g.name]:
             plan.task((g.name, c)).mode = mode
         plan.say(f"P4: {g.name}: {mode} ({why})")
+    # A statically scheduled grid with runtime edge maps evaluates those maps
+    # when its task is taken, which can be before the runtime tensors are written.
+    # Dynamic/hybrid tasks are only pushed after their producers, so they are
+    # safe; static ones get an explicit "*" wait on the writer's out-events first
+    # (the E[0]-barrier degradation the paper describes). Caught on MI300X:
+    # forced-static MoE read tile_expert before grouping wrote it.
+    from ..ir.edgemap import EdgeMap
+    for g in plan.graph.grids:
+        if plan.modes[g.name] != "static" or not g.has_runtime_edges:
+            continue
+        rts = {rt for mm in list(g.in_edges.values()) + list(g.out_edges.values()) for rt in mm.runtime}
+        barrier: dict[str, EdgeMap] = {}
+        for rt in rts:
+            for w in plan.graph.grids:
+                if rt in w.writes:
+                    for ev in w.out_edges:
+                        barrier[ev] = EdgeMap.parse("*")
+        if barrier:
+            g.in_edges = {**barrier, **{k: v for k, v in g.in_edges.items() if k not in barrier}}   # barrier waits come first
+            plan.say(f"P4: {g.name}: static with runtime maps -> waits on all of {list(barrier)} before evaluating them")
+            plan.inst = None  # type: ignore  # re-instantiated by the pipeline below
+    if plan.inst is None:
+        from ..ir.instantiate import instantiate
+        plan.inst = instantiate(plan.graph, plan.bindings, plan.runtime)
     # A globally scheduled (dynamic) grid runs its tasks on any domain, so the
     # placement that justified a DOMAIN scope no longer holds: escalate every
     # event it produces or consumes to DEVICE. Caught on MI300X: with DOMAIN

@@ -25,10 +25,13 @@
 typedef __hip_bfloat16 bf16;
 static float b2f(bf16 v) { return __bfloat162float(v); }
 
+extern "C" __global__ void etx_megakernel_d0(etx_params);
+
 int main(int argc, char** argv) {
   const int reps = argc > 1 ? atoi(argv[1]) : 20;
-  const int B = etx_shape[0], n_gg = etx_shape[1];
-  etx_host hst;
+  const int B = etx_shape[ETX_SYM_B], n_gg = etx_shape[ETX_SYM_n_gg];
+  etx_host hst(0);
+  hst.kernel = (const void*)etx_megakernel_d0;
   hst.setup();
 
   // ---- inputs: x from the same LCG as the Python example (bf16-exact values)
