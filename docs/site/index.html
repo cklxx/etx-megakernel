@@ -755,6 +755,10 @@ T_push(edge) =  T_sync(edge) + T_queue(N_contenders)</code></pre>
     </tbody>
   </table></div>
   <p>fleet-mi300x 的实测与此一致：一层 MoE 把全局事件从 10 压到 3 的收益约 1 ms / token 量级（27 层），跨 XCD 事件的代价比 XCD 内高一个量级以上。</p>
+  <div class="callout">
+    <p class="t">2026-09-22 晚 · 阶段 0 在 MI300X 上实测（仓库 bench/calib，数字已写入 gfx942.yaml）</p>
+    <p>workgroup k 落在 XCD (k+6) mod 8，不是从 0 开始的 round-robin，印证「启动时探测」。计数器单向延迟：inv-L1 后普通 load 轮询 642 ns（同 XCD）/ 742 ns（跨 XCD）；agent-scope 原子读轮询 873 / 892 ns；普通或 sc0 load 永远看不到 arrive。DEVICE 级 release 181 ns、acquire 120 ns；DOMAIN 级两者合计 44 ns。带 payload 的标志单向约 930 ns，1 万次 0 次陈旧。CAS 队列在 8 个 popper 之后崩溃，ticket 环在 512 个 popper 下 76 M pops/s。生成的 split-K megakernel 在 static / hybrid / dynamic 三种模式下都通过 CPU 参考：5120 任务时 0.128 / 0.441 / 0.512 ms，队列开销约 1 µs / pop 在 2 µs 的任务上让 static 赢 3.5 到 4 倍，和 Pass 4 的 C_queue 项一致。硬件抓出两处设计缺陷并已写成规则：ticket 环回绕重复执行（槽位带 pass 标签）；全局队列调度的 grid 事件必须至少 DEVICE scope（否则消费者读到陈旧 L2）。</p>
+  </div>
 </section>
 
 <!-- ============================ 09 ============================ -->

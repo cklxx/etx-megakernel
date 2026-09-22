@@ -26,9 +26,9 @@ Two additions distinguish ETX from the paper's implementation:
 
 ### 1.2 Why
 
-Low-batch decoding issues hundreds to over a thousand kernels per step; the shortest finish in about 2 us and the launch gap is 5-10 us, so launch overhead dominates (ETC paper, figure 1). CUDA Graphs remove the gap but keep the kernel boundary, which is an implicit global barrier. A megakernel replaces the boundary with tile-level dependencies: a tile of operator B can start as soon as the tiles of A it depends on have finished.
+Low-batch decoding issues hundreds to over a thousand kernels per step; the shortest finish in about 2 us and the launch gap is 5-10 us, so launch overhead dominates (ETC paper, figure 1). CUDA Graphs remove the gap but keep the kernel boundary, an implicit global barrier. A megakernel replaces the boundary with tile-level dependencies: a tile of operator B starts as soon as the tiles of A it depends on have finished.
 
-The ETC paper shows that this can be done by a compiler rather than by hand, and it also shows the risk: on the MoE layer its dynamic scheduler wins 4% over static, and on the dense TP=4 model the same dynamic scheduler is 17% slower than not fusing at all. The scheduling policy is a function of the workload and the interconnect topology, and it must be chosen by a cost model, not by intuition. The paper's implementation also assumes one machine: homogeneous SMs, one coherent L2, `multimem` reduction loads, NVLink. On an MI300X none of these hold, and a direct port would be silently wrong (system-scope atomics on coarse-grained memory downgrade to device scope) before it was slow.
+The ETC paper shows that a compiler can do this, and also shows the risk: on its MoE layer dynamic scheduling wins 4% over static, and on the dense TP=4 model the same dynamic scheduler is 17% slower than not fusing. The policy is a function of workload and interconnect topology and must be chosen by a cost model. The paper's implementation also assumes one machine (homogeneous SMs, one coherent L2, `multimem`, NVLink); on an MI300X none of these hold, and a direct port would be silently wrong before it was slow.
 
 ### 1.3 Expected outcomes
 
@@ -258,9 +258,9 @@ The answers form a `TileOp` containing no hardware detail. In code (`etx/ir/type
 
 "DSL-agnostic" cannot remain an IR-level declaration. Tile bodies must end up in the same kernel as the persistent loop, and different DSLs produce different artefacts, so the backend offers two routes.
 
-Link mode: the tile body is a linkable device function. The frontend compiles each tile body to a device function with a fixed ABI (`-fgpu-rdc` / `-rdc=true`); ETX generates the persistent loop and dispatch switch in HIP / CUDA C++ and the two are merged at link time. CUTLASS, CK, CuTe DSL (exporting device functions) and hand-written kernels take this route. Advantage: the tile body need not know ETX exists, and vendor-library-grade tiles can be inlined. Cost: cross-translation-unit inlining is limited, and register allocation is the union over the whole kernel.
+Link mode: the tile body is a linkable device function. The frontend compiles each tile body to a device function with a fixed ABI (`-fgpu-rdc` / `-rdc=true`); ETX generates the persistent loop and dispatch switch in HIP / CUDA C++ and the two are merged at link time. CUTLASS, CK, CuTe DSL (exporting device functions) and hand-written kernels take this route. Advantage: the tile body need not know ETX exists, and vendor-library-grade tiles can be inlined. Cost: limited cross-translation-unit inlining, and register allocation is the union over the whole kernel.
 
-Host-DSL mode: the persistent loop is generated in the tile's own DSL. Triton does not export linkable device functions, but `@triton.jit` functions can call one another. ETX generates a persistent kernel in the same DSL: loop, pop, wait and dispatch are written in that DSL, and runtime primitives come from `tl.atomic_*`, extern library functions or `inline_asm` (Triton-Distributed has shown the route is viable). Advantage: the whole kernel is one compilation unit and can be optimised as a whole. Cost: one skeleton template per DSL, and the DSL's expressiveness limits the skeleton (Triton has no warp specialisation).
+Host-DSL mode: the persistent loop is generated in the tile's own DSL. Triton does not export linkable device functions, but `@triton.jit` functions can call one another, so ETX generates the loop, pop, wait and dispatch in Triton, with runtime primitives from `tl.atomic_*`, extern library functions or `inline_asm` (Triton-Distributed has shown the route is viable). Advantage: one compilation unit, optimised as a whole. Cost: one skeleton template per DSL, and the DSL's expressiveness limits the skeleton (Triton has no warp specialisation).
 
 ### 6.3 Tile ABI (link mode)
 
@@ -375,12 +375,7 @@ In code (`etx/machine/model.py`), `effective_scope()` collapses scopes a machine
 
 ### 8.2 Capability table versus cost table
 
-The capability and visibility blocks decide correctness; the cost block decides performance. The two are never mixed. Selected gfx942 entries (the trimmed file is in Appendix A):
-
-- `visibility.domain`: release `s_waitcnt vmcnt(0)` (L1 is write-through; within one L2 only the consumer's L1 must be invalidated), acquire `buffer_inv sc0`, memory type any.
-- `visibility.device`: release `buffer_wbl2 sc1; s_waitcnt vmcnt(0)` (write back the producer XCD's dirty L2 lines), acquire `buffer_inv sc1`, memory any.
-- `visibility.system`: release `buffer_wbl2 sc0 sc1`, acquire `buffer_inv sc0 sc1`, memory fine-grained (coarse-grained silently downgrades to device scope).
-- `capabilities`: `cluster_launch: false` (gfx1250 introduces cluster scope; when unsupported LLVM degrades to agent scope); `dsmem: false`; `multicast_reduce: false` (no `multimem` and no switch: eight GPUs are a point-to-point xGMI mesh); `async_copy_to_lds: dword_only` (no TMA / cp.async; gfx950 widens to 128 bit per lane); `fp_atomic_over_fabric: true` (all RMW atomics are forwarded to Infinity Fabric; false on MI200); `wg_to_domain_map: discover`; `cooperative_launch: true` (exceeding the co-residency limit returns `hipErrorCooperativeLaunchTooLarge` rather than deadlocking); `sentinel_signal: true`; `hw_tile_trigger: false`; `backoff: s_sleep` (64 x N cycles, up to about 8000; `s_setprio` 0-3; `s_memrealtime` at 100 MHz).
+The capability and visibility blocks decide correctness; the cost block decides performance. The two are never mixed. The gfx942 file (Appendix A) has three visibility rows: `domain` (release `s_waitcnt vmcnt(0)`, since L1 is write-through and within one L2 only the consumer's L1 needs invalidating; acquire `buffer_inv sc0`; any memory), `device` (release `buffer_wbl2 sc1; s_waitcnt vmcnt(0)` to write back the producer XCD's dirty L2 lines; acquire `buffer_inv sc1`; any memory) and `system` (release `buffer_wbl2 sc0 sc1`; acquire `buffer_inv sc0 sc1`; fine-grained memory, since coarse-grained silently downgrades to device scope). Its capability rows record, among others, no cluster launch or DSMEM (gfx1250 introduces cluster scope; LLVM degrades unsupported cluster scope to agent scope), no `multimem` and no switch (eight GPUs are a point-to-point xGMI mesh), dword-only direct-to-LDS loads (gfx950 widens to 128 bit per lane), FP atomics over Infinity Fabric (false on MI200), `wg_to_domain_map: discover`, cooperative launch that returns `hipErrorCooperativeLaunchTooLarge` rather than deadlocking, and `s_sleep` backoff (64 x N cycles, up to about 8000; `s_setprio` 0-3; `s_memrealtime` at 100 MHz).
 
 The critical row is `poll`. A plain load hits the non-coherent per-CU L1 (wave scope is "Hit LRU") and never sees another CU's write; event polling must use a load with the `sc1` bit, an atomic load, or an L1 invalidate followed by a load. Kog wrote inline assembly for this because `__hip_atomic_load` cannot do a 3-dword read. Facts of this kind can only exist as data in a table, not as something each tile author must remember.
 
@@ -878,28 +873,20 @@ All values measured on 2026-09-22 on a rented Hot Aisle 1x MI300X VM, ROCm 7.2.4
 
 | Term | Meaning |
 |---|---|
-| task / tile | One workgroup-level unit of work: a tile body executed at one coordinate of a task grid |
-| task grid | A tile body launched over a (symbolic) multidimensional coordinate space |
+| task / tile | One workgroup-level unit of work: a tile body at one coordinate of a task grid |
+| task grid | A tile body launched over a symbolic multidimensional coordinate space |
 | event | One integer counter; producers arrive (decrement), consumers wait (spin until zero) |
-| event tensor (ETensor) | A multidimensional array of events, a first-class IR object; lowered to one integer tensor |
-| edge map | The map from task coordinates to event coordinates: affine, index arithmetic, runtime range or runtime gather |
+| event tensor (ETensor) | A multidimensional array of events; a first-class IR object lowered to one integer tensor |
+| edge map | Map from task coordinates to event coordinates: affine, index arithmetic, runtime range, runtime gather |
 | scope | Visibility range of an event: workgroup < cluster < domain < device < system |
 | exec domain | One level of the execution-resource tree: XCD, GCD, die or whole GPU |
-| intra-domain / cross-domain | Synchronisation within one exec domain / across exec domains |
-| capability | A hardware capability bit or enumeration; decides correctness |
-| cost | A synchronisation or placement coefficient; decides performance |
-| visibility table | Per scope: release sequence, acquire sequence, poll expression, arrive expression, required memory type |
+| capability / cost | A hardware bit or enumeration deciding correctness / a coefficient deciding performance |
 | worker | One persistent workgroup executing the worker loop |
-| static scheduling | Host-pre-ordered per-worker queues; dependencies enforced only by arrive / wait |
-| dynamic scheduling | Ready queues; an event reaching zero pushes its consumers; idle workers pop |
-| hybrid scheduling | Dynamic inside a domain, static across domains; no cross-domain push |
-| resource class | A group of tiles with compatible register / LDS footprint; may become its own kernel instance |
-| kernel family | The set of kernel instances, one per (device, resource class), sharing one event tensor |
+| static / dynamic / hybrid | Pre-ordered per-worker queues with arrive / wait only; ready queues with push / pop; dynamic inside a domain and static across domains with no cross-domain push |
+| resource class / kernel family | Tiles with compatible register / LDS footprint; the set of kernel instances, one per (device, resource class), sharing one event tensor |
 | early push | Pushing a consumer when its producer is dispatched rather than when the event fires (ETC appendix E) |
-| epoch event | An event whose target is a per-step epoch value so a resident kernel need not clear counters |
-| control ring | Ring buffer of step descriptors from host to a resident kernel |
-| MBU | Model bandwidth utilisation: bytes moved per token divided by (HBM bandwidth x step time) |
-| TPOT | Time per output token |
+| epoch event / control ring | An event compared against a per-step epoch target; the host-to-kernel ring of step descriptors |
+| MBU / TPOT | Model bandwidth utilisation (bytes per token / (HBM bandwidth x step time)); time per output token |
 
 ## Appendix E. References
 
