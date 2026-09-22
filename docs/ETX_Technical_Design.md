@@ -672,7 +672,7 @@ Portability regression:
 
 ## 14. Implementation Status and Repository Layout
 
-Repository: `/Users/ckl/code/etx`. Layout by layer:
+Repository: https://github.com/cklxx/etx-megakernel (private; working copy `/Users/ckl/code/etx`). Layout by layer:
 
 | Path | Layer | Content |
 |---|---|---|

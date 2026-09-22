@@ -7,7 +7,7 @@ inputs, and it targets different machines (MI300X's 8 XCDs, MI250X's two GCDs,
 MI355X, H100, B200) from one IR by reading a machine model instead of
 branching on an architecture name.
 
-Design page (the spec): https://etc-dynamic-megakernel-arch.q1293822641.workers.dev
+Repository: https://github.com/cklxx/etx-megakernel (private). Design page (the spec): https://etc-dynamic-megakernel-arch.q1293822641.workers.dev
 (source in `docs/site/index.html`). Code map: `docs/ARCHITECTURE.md`.
 
 ## What runs today (no GPU needed)
