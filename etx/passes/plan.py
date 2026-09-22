@@ -127,6 +127,12 @@ def verify_plan(plan: Plan) -> list[str]:
             errors.append(f"event {name}: scope {ep.scope.name} < required {need.name}")
         if ep.scope == Scope.SYSTEM and m.vis(Scope.SYSTEM).memory == "fine_grained" and ep.memory != "fine_grained":
             errors.append(f"event {name}: system scope on {m.name} requires fine_grained memory, got {ep.memory}")
+    # 5b. globally scheduled grids need at least DEVICE scope on their events
+    for g in plan.graph.grids:
+        if plan.modes.get(g.name) == "dynamic":
+            for ev in list(g.in_edges) + list(g.out_edges):
+                if m.effective_scope(plan.events[ev].scope) < m.effective_scope(Scope.DEVICE):
+                    errors.append(f"event {ev}: DOMAIN scope but {g.name} is dynamically scheduled across domains")
     # 6. co-residency
     max_workers = m.total_cus() * plan.wg_per_cu
     if plan.workers_per_device() > max_workers:

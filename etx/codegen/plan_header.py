@@ -74,6 +74,26 @@ def emit_plan_header(plan: Plan, device: int = 0) -> str:
     out.append(f"static const int32_t etx_push_index[{max(1, len(push_index))}] = {{{', '.join(map(str, push_index)) or '0'}}};")
     out.append(f"static const int32_t etx_push_offsets[{max(1, len(offsets))}] = {{{', '.join(map(str, offsets)) or '0'}}};")
     out.append(f"static const int32_t etx_push_lists[{max(1, len(lists))}] = {{{', '.join(map(str, lists)) or '0'}}};")
+    # initially ready dynamic / hybrid tasks: seeded into the rings by the host at step start
+    inst = plan.inst
+    init_local: list[list[int]] = [[] for _ in range(plan.n_domains)]
+    init_global: list[int] = []
+    for t in plan.tasks:
+        if t.mode == "static" or t.device != device:
+            continue
+        prods = {plan.task_index[p] for e in inst.task_in[(t.grid, t.coord)] for p in inst.producers[e]}
+        if t.mode == "hybrid":
+            local_prods = [p for p in prods if plan.tasks[p].domain == t.domain and plan.tasks[p].device == t.device]
+            if not local_prods:
+                init_local[t.domain].append(t.id)
+        elif not prods:
+            init_global.append(t.id)
+    flat = [tid for d in init_local for tid in d]
+    lens = [len(d) for d in init_local]
+    out.append(f"static const int32_t etx_init_local[{max(1, len(flat))}] = {{{', '.join(map(str, flat)) or '0'}}};")
+    out.append(f"static const int32_t etx_init_local_len[ETX_N_DOMAINS] = {{{', '.join(map(str, lens))}}};")
+    out.append(f"static const int32_t etx_init_global[{max(1, len(init_global))}] = {{{', '.join(map(str, init_global)) or '0'}}};")
+    out.append(f"#define ETX_INIT_GLOBAL_LEN {len(init_global)}")
     # tensors
     names = [n for n, _ in sorted(args.items(), key=lambda kv: kv[1])]
     out.append(f"#define ETX_N_ARGS {len(names)}")

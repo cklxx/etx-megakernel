@@ -56,3 +56,17 @@ def run(plan: Plan) -> None:
         for c in inst.tasks[g.name]:
             plan.task((g.name, c)).mode = mode
         plan.say(f"P4: {g.name}: {mode} ({why})")
+    # A globally scheduled (dynamic) grid runs its tasks on any domain, so the
+    # placement that justified a DOMAIN scope no longer holds: escalate every
+    # event it produces or consumes to DEVICE. Caught on MI300X: with DOMAIN
+    # scope the consumer read stale L2 and produced zeros.
+    for g in plan.graph.grids:
+        if plan.modes[g.name] != "dynamic":
+            continue
+        for ev in list(g.in_edges) + list(g.out_edges):
+            ep = plan.events[ev]
+            need = m.effective_scope(Scope.DEVICE)
+            if ep.scope < need:
+                ep.scope = need
+                plan.graph.events[ev].scope = need
+                plan.say(f"P4: event {ev}: scope raised to {need.name} because {g.name} is globally scheduled")

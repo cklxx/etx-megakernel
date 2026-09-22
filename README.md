@@ -27,14 +27,31 @@ prototypes, `plan.json` (queues, descriptors, event layout, push lists) and
 were eliminated by recomputation). `--sim` runs the host-side protocol
 simulator: deadlock check, makespan, busy / wait / scheduling budget.
 
+## What has run on hardware (MI300X, ROCm 7.2.4, 2026-09-22)
+
+* `bench/calib/*.hip` ran and their numbers are in `etx/machine/arch/gfx942.yaml`
+  (`costs:` block, marked MEASURED): counter one-way 642 ns same-XCD / 742 ns
+  cross-XCD with the inv-L1 poll, DEVICE fences 181 / 120 ns, flag one-way ~930 ns
+  with zero stale payloads, ticket-ring queue 76 M pops/s at 512 poppers versus a
+  CAS ring that collapses past 8.
+* The generated split-K megakernel (`examples/splitk_sum.py`, static schedule)
+  executed on the GPU and matched the CPU reference bit for bit in the fp32
+  tolerance: 320 tasks, 64 events, 85 µs best per step.
+
+```bash
+python -m etx compile examples/splitk_sum.py --arch gfx942 --out build/splitk_sum
+hipcc -O2 --offload-arch=gfx942 -fgpu-rdc -I etx/runtime/include -I build/splitk_sum \
+      build/splitk_sum/megakernel_d0.hip examples/tiles/splitk.hip examples/hosts/splitk.hip -o build/splitk_sum/run
+build/splitk_sum/run 50
+```
+
 ## What does not run yet
 
-* Nothing has been compiled or executed on a GPU. The generated HIP / CUDA
-  and the runtime headers are written against documented instruction
-  sequences (LLVM gfx942 memory model, CDNA3 ISA, PTX ISA) but are untested.
-* Tile bodies in `examples/tiles/` are stubs with the right ABI.
-* Cost tables are public seed values; `bench/calib/` produces the real ones.
+* Only the split-K example has real tile bodies; `examples/tiles/moe.hip` and
+  `gemm_rs.hip` are ABI stubs.
+* CUDA emission is untested; `t_dev_ns` (cross-GPU) is uncalibrated (needs a 2-GPU VM).
 * The Triton host-DSL emitter produces a skeleton, not a runnable kernel.
+* `etx_deps_ready` always takes the static head first; the ready bitmap is planned.
 
 ## Layout
 

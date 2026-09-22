@@ -20,7 +20,7 @@ extern "C" __global__ void etx_megakernel(etx_params p);
 struct etx_host {
   std::vector<void*> args;                 // device pointers, plan order
   etx_params p{};
-  int32_t *d_events = nullptr, *d_ctrl = nullptr, *d_slots = nullptr;
+  int32_t *d_events = nullptr, *d_ctrl = nullptr, *d_slots = nullptr, *d_trace = nullptr;
   int32_t *d_lq_slots = nullptr, *d_lq_head = nullptr, *d_lq_tail = nullptr, *d_gq_slots = nullptr;
   etx_queue* d_local_queues = nullptr;
   double last_ms = 0.0;
@@ -87,6 +87,8 @@ struct etx_host {
     ETX_CHECK(hipMemset(d_slots, 0, ETX_N_DOMAINS * sizeof(int32_t)));
     p.domain_slots = d_slots;
     p.worker_domain = nullptr;
+    ETX_CHECK(hipMalloc(&d_trace, ETX_N_TASKS * sizeof(int32_t)));
+    p.trace_exec = d_trace;
     p.workers_per_domain = ETX_WORKERS_PER_DOMAIN;
     p.n_workers = ETX_N_WORKERS;
     p.n_tasks = ETX_N_TASKS;
@@ -96,10 +98,25 @@ struct etx_host {
   // reset per-step state (events, queues, ctrl, slots)
   void reset_step() {
     ETX_CHECK(hipMemcpy(d_events, etx_ev_counts, ETX_EVENT_WORDS * sizeof(int32_t), hipMemcpyHostToDevice));
-    ETX_CHECK(hipMemset(d_lq_head, 0, 2 * ETX_N_DOMAINS * sizeof(int32_t)));
     ETX_CHECK(hipMemset(d_ctrl, 0, 64));
+    ETX_CHECK(hipMemset(d_trace, 0, ETX_N_TASKS * sizeof(int32_t)));
     ETX_CHECK(hipMemset(d_slots, 0, ETX_N_DOMAINS * sizeof(int32_t)));
-    ETX_CHECK(hipMemset((void*)p.global_queue.head, 0, 8));
+    // rings: clear slots, then seed the initially-ready dynamic/hybrid tasks and set the tails
+    int32_t total = 0; for (int d = 0; d < ETX_N_DOMAINS; ++d) total += etx_local_capacity[d];
+    if (total) ETX_CHECK(hipMemset(d_lq_slots, 0xFF, total * sizeof(int32_t)));
+    std::vector<int32_t> heads(ETX_N_DOMAINS, 0), tails(ETX_N_DOMAINS, 0);
+    int32_t off = 0, src = 0;
+    for (int d = 0; d < ETX_N_DOMAINS; ++d) {
+      const int32_t n = etx_init_local_len[d];
+      if (n) ETX_CHECK(hipMemcpy(d_lq_slots + off, etx_init_local + src, n * sizeof(int32_t), hipMemcpyHostToDevice));
+      tails[d] = n; src += n; off += etx_local_capacity[d];
+    }
+    ETX_CHECK(hipMemcpy(d_lq_head, heads.data(), ETX_N_DOMAINS * sizeof(int32_t), hipMemcpyHostToDevice));
+    ETX_CHECK(hipMemcpy(d_lq_tail, tails.data(), ETX_N_DOMAINS * sizeof(int32_t), hipMemcpyHostToDevice));
+    if (ETX_GLOBAL_CAPACITY) ETX_CHECK(hipMemset(d_gq_slots, 0xFF, ETX_GLOBAL_CAPACITY * sizeof(int32_t)));
+    if (ETX_INIT_GLOBAL_LEN) ETX_CHECK(hipMemcpy(d_gq_slots, etx_init_global, ETX_INIT_GLOBAL_LEN * sizeof(int32_t), hipMemcpyHostToDevice));
+    int32_t gq[2] = {0, ETX_INIT_GLOBAL_LEN};
+    ETX_CHECK(hipMemcpy((void*)p.global_queue.head, gq, 8, hipMemcpyHostToDevice));
   }
   // returns true on success; false on watchdog timeout (with event dump)
   bool run(double timeout_s = 5.0) {
@@ -136,6 +153,7 @@ struct etx_host {
     return true;
   }
   void dump_events() {
+    dump_trace();
     std::vector<int32_t> ev(ETX_EVENT_WORDS);
     ETX_CHECK(hipMemcpy(ev.data(), d_events, ETX_EVENT_WORDS * sizeof(int32_t), hipMemcpyDeviceToHost));
     int shown = 0;
@@ -146,5 +164,20 @@ struct etx_host {
     }
     if (shown > 32) fprintf(stderr, "  ... %d non-zero events\n", shown);
     if (shown == 0) fprintf(stderr, "  all events reached zero\n");
+  }
+  // execution-count histogram + queue state (debug)
+  void dump_trace() {
+    std::vector<int32_t> tr(ETX_N_TASKS);
+    ETX_CHECK(hipMemcpy(tr.data(), d_trace, ETX_N_TASKS * sizeof(int32_t), hipMemcpyDeviceToHost));
+    int hist[4] = {0, 0, 0, 0}; int first_dup = -1;
+    for (int i = 0; i < ETX_N_TASKS; ++i) { int c = tr[i] < 3 ? tr[i] : 3; hist[c]++; if (tr[i] > 1 && first_dup < 0) first_dup = i; }
+    fprintf(stderr, "  exec counts: 0x=%d 1x=%d 2x=%d 3x+=%d%s", hist[0], hist[1], hist[2], hist[3], first_dup >= 0 ? " first dup task " : "\n");
+    if (first_dup >= 0) fprintf(stderr, "%d (type %d)\n", first_dup, etx_descs[first_dup].type);
+    std::vector<int32_t> ht(2 * ETX_N_DOMAINS);
+    ETX_CHECK(hipMemcpy(ht.data(), d_lq_head, 2 * ETX_N_DOMAINS * sizeof(int32_t), hipMemcpyDeviceToHost));
+    fprintf(stderr, "  local queues head/tail:");
+    for (int d = 0; d < ETX_N_DOMAINS; ++d) fprintf(stderr, " %d/%d", ht[d], ht[ETX_N_DOMAINS + d]);
+    int32_t gq[2]; ETX_CHECK(hipMemcpy(gq, p.global_queue.head, 8, hipMemcpyDeviceToHost));
+    fprintf(stderr, "  global %d/%d (cap %d)\n", gq[0], gq[1], ETX_GLOBAL_CAPACITY);
   }
 };

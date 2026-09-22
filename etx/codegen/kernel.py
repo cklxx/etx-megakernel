@@ -172,6 +172,7 @@ def emit_kernel(plan: Plan, device: int = 0) -> str:
     out.append("      __syncthreads(); continue;")
     out.append("    }")
     out.append("    spins = 0;")
+    out.append("    if (p.trace_exec && threadIdx.x == 0) atomicAdd(p.trace_exec + tid, 1);")
     out.append("    etx_run_task(p, p.descs[tid], worker, domain);")
     out.append("    if (threadIdx.x == 0) atomicAdd(p.ctrl_done, 1);")
     out.append("    __syncthreads();")

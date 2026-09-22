@@ -34,9 +34,18 @@ ETX_DEFINE_SCOPE(SYSTEM)
 // (the plan sizes capacity >= pushes per step; the host resets between steps),
 // so poppers never clear them. A ticket taken beyond the final tail is harmless:
 // the worker keeps servicing its static queue and exits at step_done.
+// Slot values carry a pass tag in the top bits: value = (t / capacity) << 24 | task.
+// A worker that over-popped (its ticket is beyond the final tail) wraps onto a
+// slot consumed in an earlier pass; the tag mismatch makes it keep waiting
+// instead of re-executing that task (this exact bug was caught by the trace
+// on MI300X: 267 of 320 tasks ran twice). Pushes never wrap because the plan
+// sizes capacity >= pushes per step. Task ids must be < 2^24.
+#define ETX_TAG_SHIFT 24
+#define ETX_TASK_MASK 0x00FFFFFF
+
 static __device__ __forceinline__ void etx_push(const etx_queue* q, int32_t task) {
   const int32_t t = atomicAdd(q->tail, 1);
-  atomicExch(q->slots + (t % q->capacity), task);            // device-visible store
+  atomicExch(q->slots + (t % q->capacity), ((t / q->capacity) << ETX_TAG_SHIFT) | task);
 }
 
 // Returns a task id, or -1 if nothing is available yet. `ticket` is per-worker
@@ -50,8 +59,9 @@ static __device__ __forceinline__ int32_t etx_try_pop(const etx_queue* q, int32_
     *ticket = atomicAdd(q->head, 1);
   }
   const int32_t v = ETX_POLL_DEVICE(q->slots + (*ticket % q->capacity));
-  if (v >= 0) *ticket = -1;
-  return v;
+  if (v < 0 || (v >> ETX_TAG_SHIFT) != (*ticket / q->capacity)) return -1;
+  *ticket = -1;
+  return v & ETX_TASK_MASK;
 }
 
 // Push every dynamic consumer of event coordinate (ev_id, lin). The plan's push

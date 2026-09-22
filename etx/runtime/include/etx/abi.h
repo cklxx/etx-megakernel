@@ -51,6 +51,7 @@ struct etx_params {
   const int32_t*   push_offsets;       // CSR: (event id, linear) -> consumer task ids
   const int32_t*   push_lists;
   const int32_t*   push_index;         // per event id: base offset into push_offsets
+  int32_t*         trace_exec;         // optional: per-task execution counter (debug); nullptr to disable
   int32_t*         ctrl_abort;         // host writes 1 to abort; kernel writes 2 on spin timeout
   int32_t*         ctrl_done;          // tasks completed this step
   int32_t          n_tasks;
