@@ -45,14 +45,17 @@ static __device__ __forceinline__ void etx_push(etx_queue* q, int32_t task) {
   while (atomicCAS(slot, -1, task) != -1) { ETX_BACKOFF(); } // slot still owned by a slow popper
 }
 
-static __device__ __forceinline__ void etx_push_consumers(const etx_params& p, int ev_id, int lin, uint32_t worker) {
+// Push every dynamic consumer of event coordinate (ev_id, lin). The plan's push
+// lists carry, per consumer, the queue it belongs to: the pusher's domain-local
+// queue (hybrid) or the device-global queue (dynamic). Encoding: task id >= 0
+// -> local queue of `domain`; ~task id (negative) -> global queue.
+static __device__ __forceinline__ void etx_push_consumers(const etx_params& p, int ev_id, int lin, uint32_t domain) {
   const int32_t base = p.push_index[ev_id] + lin;
   const int32_t b = p.push_offsets[base], e = p.push_offsets[base + 1];
   for (int32_t i = b; i < e; ++i) {
-    const int32_t task = p.push_lists[i];
-    const etx_task d = p.descs[task];
-    (void)d;
-    etx_push(p.local_queue + p.worker_domain[worker], task);   // domain-local push (hybrid); global handled by host layout
+    const int32_t enc = p.push_lists[i];
+    if (enc >= 0) etx_push(p.local_queue + domain, enc);
+    else          etx_push(&p.global_queue, ~enc);
   }
 }
 

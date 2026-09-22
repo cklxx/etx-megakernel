@@ -85,7 +85,7 @@ def _arrive_code(plan: Plan, g: TaskGrid, mode: str) -> str:
         if mode == "static":
             lines.append(f"#define ETX_TARGET(idx) (void)etx_arrive_{sc}(p.events + {ep.offset} + (idx))")
         else:
-            lines.append(f"#define ETX_TARGET(idx) do {{ if (etx_arrive_{sc}(p.events + {ep.offset} + (idx)) == 0) etx_push_consumers(p, {ev_id}, (idx), worker); }} while (0)")
+            lines.append(f"#define ETX_TARGET(idx) do {{ if (etx_arrive_{sc}(p.events + {ep.offset} + (idx)) == 0) etx_push_consumers(p, {ev_id}, (idx), domain); }} while (0)")
         lines.append(m.to_c(coord_vars, f"p.ev_shape[{ev_id}]", "ETX_TARGET", _runtime_ptrs(plan, g), width, _symbols(plan)).rstrip())
         lines.append("#undef ETX_TARGET")
     return "\n".join(lines)
@@ -193,7 +193,9 @@ def emit_plan_json(plan: Plan) -> str:
         "static_queues": {f"{d}:{w}": q for (d, w), q in plan.static_queues.items()},
         "local_queue_capacity": {f"{d}:{dom}": c for (d, dom), c in plan.local_queue_capacity.items()},
         "global_queue_capacity": plan.global_queue_capacity,
-        "ev_consumers": {f"{ev}:{lin}": ids for (ev, lin), ids in plan.ev_consumers.items()},
+        # push lists: task id for the pusher's local queue (hybrid), ~task id for the global queue (dynamic)
+        "ev_consumers": {f"{ev}:{lin}": [i if plan.tasks[i].mode == "hybrid" else ~i for i in ids]
+                         for (ev, lin), ids in plan.ev_consumers.items()},
         "tensor_placement": plan.tensor_placement,
         "prefetch": plan.prefetch,
         "eliminated_events": plan.eliminated_events,
