@@ -5,13 +5,22 @@
 // Dimensions must match examples/moe_layer.py.
 #include "etx/tile_util.h"
 
+// dimensions may be overridden with -D flags to match examples/moe_layer.py (ETX_MOE_SMALL)
+#ifndef D
 #define D 1024
+#endif
+#ifndef H
 #define H 8
+#endif
 #define HD 128
+#ifndef S
 #define S 512
+#endif
 #define NE 8
 #define K 2
+#ifndef FF
 #define FF 512
+#endif
 #define TPT 4
 
 // ---------------------------------------------------------------- norm (pure; inlined by Pass 3)

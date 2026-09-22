@@ -43,9 +43,14 @@ def run(plan: Plan) -> None:
             mode, why = plan.options.force_mode, "forced by options"
         elif cross_dev > 0:
             mode, why = "static", f"{cross_dev} cross-device edges: pushes over P2P are prohibitive (ETC TP=4 dynamic 0.83x)"
-        elif g.has_runtime_edges:
+        elif g.has_runtime_edges and s_balance > MARGIN * (c_cross + c_queue):
             mode = "hybrid" if cross_dom else "dynamic"
-            why = f"data-dependent edges (static would degrade to E[0]); cross-domain edges={cross_dom}"
+            why = f"data-dependent edges and S_balance={s_balance:.2f}us > {MARGIN}x(C_cross={c_cross:.2f}+C_queue={c_queue:.2f})"
+        elif g.has_runtime_edges:
+            # measured on MI300X (small MoE, B=64): forced static with the runtime-map barrier
+            # ran 0.445 ms vs 0.654 ms hybrid; the barrier costs less than the queue path for short tasks
+            mode = "static"
+            why = f"data-dependent edges but S_balance={s_balance:.2f}us <= {MARGIN}x(C_cross={c_cross:.2f}+C_queue={c_queue:.2f}); static with a barrier on the runtime-tensor writer"
         elif s_balance > MARGIN * (c_cross + c_queue):
             mode = "dynamic" if cross_dom == 0 else "hybrid"
             why = f"S_balance={s_balance:.2f}us > {MARGIN}x(C_cross={c_cross:.2f}+C_queue={c_queue:.2f}); cross-domain edges={cross_dom}"

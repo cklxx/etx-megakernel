@@ -13,13 +13,21 @@
 #include "plan_data.h"
 #include "etx/host.h"
 
+#ifndef D
 #define D 1024
+#endif
+#ifndef H
 #define H 8
+#endif
 #define HD 128
+#ifndef S
 #define S 512
+#endif
 #define NE 8
 #define K 2
+#ifndef FF
 #define FF 512
+#endif
 #define TPT 4
 
 typedef __hip_bfloat16 bf16;

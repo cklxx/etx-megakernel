@@ -23,7 +23,9 @@ expert id on both sides.
 from etx.frontends import hip_link
 from etx.ir import Graph, Resource
 
-D, H, HD, S, NE, K, FF, TPT = 1024, 8, 128, 512, 8, 2, 512, 4
+import os
+_SMALL = os.environ.get("ETX_MOE_SMALL") == "1"      # short tasks: build tiles with -DD=256 -DH=2 -DS=128 -DFF=128
+D, H, HD, S, NE, K, FF, TPT = (256, 2, 128, 128, 8, 2, 128, 4) if _SMALL else (1024, 8, 128, 512, 8, 2, 512, 4)
 T = "examples/tiles/moe.hip"
 
 

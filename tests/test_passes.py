@@ -36,11 +36,19 @@ def test_chiplet_scopes_are_lowered_per_machine():
     assert all(e.scope == Scope.DEVICE for e in h100.events.values())
 
 
-def test_data_dependent_grids_never_static():
+def test_data_dependent_grids_static_only_with_barrier():
+    """A grid with runtime edge maps may be static only if it first waits on the
+    writer of the runtime tensors (otherwise it evaluates the map on stale data)."""
     b = moe_layer.bindings()
     plan = compile_graph(moe_layer.build(), "gfx942", b, moe_layer.runtime(b))
-    for g in ("gather", "group_gemm", "down", "combine"):
-        assert plan.modes[g] != "static", plan.reasons[g]
+    for name in ("gather", "group_gemm", "down", "combine"):
+        g = plan.graph.grid(name)
+        if plan.modes[name] == "static":
+            first = next(iter(g.in_edges.values()))
+            assert first.kind == "all", f"{name}: static with runtime maps must start with a '*' barrier wait"
+            assert "E_group" in g.in_edges or "E_route" in g.in_edges
+    forced = compile_graph(moe_layer.build(), "gfx942", b, moe_layer.runtime(b), PassOptions(force_mode="static"))
+    assert forced.graph.grid("group_gemm").in_edges["E_group"].kind == "all"
 
 
 def test_cross_device_forces_static_and_system_scope():
