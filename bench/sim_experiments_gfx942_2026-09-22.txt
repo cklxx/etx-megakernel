@@ -1,0 +1,15 @@
+study 6: tile-duration variance vs schedule (split-K, n=256 -> 1280 tasks, gfx942 costs)
+   cv    static   dynamic    hybrid   best
+ 0.00       5.4      23.9      10.0   static
+ 0.10       6.4      24.6      10.7   static
+ 0.30       8.4      25.8      11.9   static
+ 0.60      11.3      27.6      13.3   static
+ 1.00      15.2      30.0      15.3   static
+
+study 7: MoE routing imbalance vs schedule (B=32 tokens, 8 experts, gfx942 costs)
+ skew  max/mean    static   dynamic    hybrid   best
+  0.0      1.38      49.9     156.2      77.1   static
+  0.5      1.75      52.1     152.2      79.2   static
+  1.0      2.88      52.3     161.2      79.8   static
+  2.0      3.75      52.3     173.7      79.8   static
+  4.0      4.00      47.0     193.1      76.6   static

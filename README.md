@@ -34,9 +34,19 @@ simulator: deadlock check, makespan, busy / wait / scheduling budget.
   cross-XCD with the inv-L1 poll, DEVICE fences 181 / 120 ns, flag one-way ~930 ns
   with zero stale payloads, ticket-ring queue 76 M pops/s at 512 poppers versus a
   CAS ring that collapses past 8.
-* The generated split-K megakernel (`examples/splitk_sum.py`, static schedule)
-  executed on the GPU and matched the CPU reference bit for bit in the fp32
-  tolerance: 320 tasks, 64 events, 85 µs best per step.
+* All three examples executed on the GPU with real tiles and passed their CPU
+  references: split-K (static / hybrid / dynamic, two sizes), a full MoE layer
+  (device-side top-2 routing, runtime counter initialisation, gather and range
+  maps; 3.2 ms per step with per-token GEMV reference tiles), and GEMM +
+  reduce-scatter across two MI300X (shared system-scope events in fine-grained
+  memory, peer reads over xGMI, 0.365 ms per step).
+* Measured on the short-task MoE configuration (`ETX_MOE_SMALL=1`, B=64): static
+  0.445 ms vs hybrid 0.654 ms vs dynamic 0.653 ms; Pass 3 event elimination 0.546
+  vs 0.653 ms in the hybrid regime; the l2-warm prefetch showed no effect.
+* Cross-device: system-scope flag one-way 10.6 µs, peer store 285 GB/s; whole-GPU
+  counter barrier 8.6 µs at 304 workgroups.
+* Five runtime defects were found only on hardware and are now rules with tests
+  (see `docs/ETX_Technical_Design.md`, Appendix C).
 
 ```bash
 python -m etx compile examples/splitk_sum.py --arch gfx942 --out build/splitk_sum
@@ -47,11 +57,10 @@ build/splitk_sum/run 50
 
 ## What does not run yet
 
-* Only the split-K example has real tile bodies; `examples/tiles/moe.hip` and
-  `gemm_rs.hip` are ABI stubs.
-* CUDA emission is untested; `t_dev_ns` (cross-GPU) is uncalibrated (needs a 2-GPU VM).
+* CUDA emission is untested (no NVIDIA machine was available).
 * The Triton host-DSL emitter produces a skeleton, not a runnable kernel.
-* `etx_deps_ready` always takes the static head first; the ready bitmap is planned.
+* The tiles are correctness references (per-token GEMVs), so there is no
+  fusion-gain figure against a tuned unfused baseline yet.
 
 ## Layout
 

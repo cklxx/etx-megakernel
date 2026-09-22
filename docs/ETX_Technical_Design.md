@@ -9,7 +9,7 @@ Author: Kailun Chen · Status: v0.3 design (pre-implementation, phase-0 calibrat
 - The performance model has two lower bounds (bandwidth and critical path) and four levers. At small batch the critical-path term dominates: a hand-written MI300X MoE megakernel (fleet-mi300x) spends 31 us of a 133 us layer moving bytes and about 100 us in fixed per-phase latency. ETX turns the four levers that hand-written kernels use (fewer phases, cheaper signals, cross-barrier prefetch, fine-grained events) into compiler passes.
 - The chiplet is a first-class concept: an exec-domain tree, a `domain` event scope between `cluster` and `device`, per-scope fence / poll / memory-type lowering rows, and a hybrid scheduler that pushes only inside a domain and uses statically pre-ordered queues across domains.
 - Phase-0 calibration on a rented MI300X (ROCm 7.2.4) on 2026-09-22 measured: workgroup k lands on XCD (k+6) mod 8, not the documented round-robin; one-way arrive latency 642 ns same-XCD / 742 ns cross-XCD when polling through L2 after an L1 invalidate (vs 873 / 892 ns with agent-scope atomic loads); a plain load never observes the arrive; release / acquire sequences from the lowering table produced 0 stale payloads in 20,000 trials; a ticket-based ready queue sustains 76.6 M pops/s at 512 poppers where a CAS-based ring collapses to 0.41 M pops/s.
-- What exists today: the L1-L5 pipeline in Python (IR, six verification checks, seven passes, lowering-table code generation, protocol simulator), 46 passing tests, and the phase-0 benchmark programs. On 2026-09-22 the first ETX-generated megakernel (the split-K row-sum example) ran end to end on the MI300X with 608 cooperative workers and matched the CPU fp32 reference (max abs error 4.8e-7) under static, hybrid and dynamic scheduling: 0.101 / 0.115 / 0.118 ms per step at n=64 and 0.128 / 0.441 / 0.512 ms at n=1024. Two defects visible only on hardware (ticket-ring wrap-around, event scope under global scheduling) are now encoded as runtime and pass rules. MoE and GEMM + reduce-scatter tiles are still stubs.
+- What exists today: the L1-L5 pipeline in Python (IR, six verification checks, seven passes, lowering-table code generation, protocol simulator), 46 passing tests, and the phase-0 benchmark programs. On 2026-09-22 the first ETX-generated megakernel (the split-K row-sum example) ran end to end on the MI300X with 608 cooperative workers and matched the CPU fp32 reference (max abs error 4.8e-7) under static, hybrid and dynamic scheduling: 0.101 / 0.115 / 0.118 ms per step at n=64 and 0.128 / 0.441 / 0.512 ms at n=1024. Later the same day a complete MoE layer with real tiles (data-dependent routing computed on device, runtime counter initialisation, gather and range maps) ran reference-checked on one MI300X, and GEMM + reduce-scatter ran reference-checked across two MI300X through one shared system-scope event buffer over xGMI. Five defects visible only on hardware (ticket-ring wrap-around, event scope under global scheduling, multi-in-event consumers pushed twice, pushes to the wrong domain queue, runtime maps evaluated before their tensors exist) are now encoded as runtime and pass rules. On short tasks the static schedule beat the queue path by 32% and Pass 3 recovered 16% in the hybrid regime; the cross-device flag latency is 10.6 us.
 
 ## 1. Executive Summary
 
@@ -36,7 +36,7 @@ The performance model in section 4 bounds the gain. For dense models of 30B para
 
 ### 1.4 Delivered now versus later
 
-Delivered now: the full L1-L5 pipeline in Python (IR, six verification checks, machine models for five architectures, seven passes with printed reasons, lowering-table code generation, protocol simulator), three example graphs, phase-0 microbenchmarks with first MI300X measurements, 46 tests, and a first end-to-end run of the generated split-K megakernel on MI300X with a host launcher, reference check and watchdog (section 14). Not yet delivered: MoE and GEMM + reduce-scatter tile bodies (stubs), CUDA emission on hardware, a runnable Triton host-DSL kernel, the cross-device cost `t_dev_ns` and cost tables for architectures other than gfx942, the cross-step control ring, and the communication-fusion path without `multimem`.
+Delivered now: the full L1-L5 pipeline in Python (IR, six verification checks, machine models for five architectures, seven passes with printed reasons, lowering-table code generation, protocol simulator), three example graphs with real tile bodies and CPU-reference hosts, the complete phase-0 calibration on MI300X, 45 tests, and reference-checked hardware runs of all three examples: split-K and a full MoE layer on one MI300X, GEMM + reduce-scatter across two MI300X (section 14, Appendix C). Not yet delivered: CUDA emission on hardware, a runnable Triton host-DSL kernel, cost tables for architectures other than gfx942, the cross-step control ring, tuned tiles and therefore any fusion-gain figure against an unfused baseline.
 
 ## 2. Background and Prior Art
 
@@ -508,7 +508,7 @@ The implemented rule (`p4_schedule_mode.py`), per task grid g with n task instan
 - `S_balance = duration_cv x duration_us x waves x 2.0`.
 - `C_cross = cross_dom x t_push_us(cross_domain=True) / total_workers + (waves x t_sync_us(DEVICE) if cross_dom > 0 else 0)`, where `t_push_us(cross)` is `t_push_ns` plus the device-scope sync cost.
 - `sharing = total_workers` if no cross-domain edges (one device-global queue) else `workers_per_domain` (domain-local queues); `C_queue = waves x t_pop_us x (1 + 0.01 x sharing)`.
-- Decision order: a forced mode from options; else `cross_dev > 0` gives static ("pushes over P2P are prohibitive, ETC TP=4 dynamic 0.83x"); else a grid with runtime edges gives hybrid if `cross_dom > 0` else dynamic (data-dependent grids never go static, since static would degrade to an `E[0]` barrier); else if `S_balance > MARGIN x (C_cross + C_queue)` with `MARGIN = 1.5`, dynamic if `cross_dom == 0` else hybrid; else static.
+- Decision order: a forced mode from options; else `cross_dev > 0` gives static ("pushes over P2P are prohibitive, ETC TP=4 dynamic 0.83x"); else if `S_balance > MARGIN x (C_cross + C_queue)` with `MARGIN = 1.5`, dynamic if `cross_dom == 0` else hybrid; else static. A grid with runtime edge maps may be static only behind a barrier: Pass 4 prepends a `"*"` wait on every out-event of the grid that writes the runtime tensors, so the maps are evaluated after those tensors exist (this is the paper's `E[0]` degradation, made explicit). The barrier variant was measured on MI300X (small MoE, 647 tasks): forced static 0.445 ms versus hybrid 0.654 ms and dynamic 0.653 ms, because the queue path costs about 1 us per task on tasks of a few microseconds; an earlier rule that never let data-dependent grids go static was therefore removed. Dynamic and hybrid tasks need no barrier: they are pushed only after their producers complete.
 
 The 1.5x margin biases the decision toward static because the paper's regular workloads lose 6% to 17% under dynamic scheduling; dynamic must be predicted to win clearly before it is chosen. The first hardware run confirmed the bias in the other direction as well: on the split-K example with about 2 us tasks, static ran the n=1024 step in 0.128 ms against 0.441 ms hybrid and 0.512 ms dynamic (section 8.6).
 
@@ -684,34 +684,40 @@ Repository: https://github.com/cklxx/etx-megakernel (private; working copy `/Use
 | `etx/frontends` | L1 | `tileop.py`, `linkmode.py`, `triton_host.py` |
 | `etx/sim` | - | `protocol.py`: deadlock, makespan, critical-path budget |
 | `etx/tools` | - | `cli.py`: the `archs`, `explain` and `compile [--sim]` subcommands of `python -m etx` |
-| `examples/` | - | `splitk_sum.py` (paper figure 3; real tiles in `tiles/splitk.hip`, host launcher in `hosts/splitk.hip`), `moe_layer.py` (both dynamisms), `gemm_rs.py` (two devices); MoE and GEMM + RS tiles are ABI-correct stubs |
-| `bench/calib/` | - | `atomic_pingpong.hip`, `flag_latency.hip`, `queue_contention.hip`, `run_calib.sh`, README (also lists `phase_switch`, `discover_domain`, `p2p_atomic` as planned programs) |
+| `examples/` | - | `splitk_sum.py` (paper figure 3), `moe_layer.py` (both dynamisms, real tiles: norm, qkv GEMV, attention over a KV cache, o_proj, top-2 router, grouping with runtime counter initialisation, gather, grouped GEMM with SiLU, down projection, combine), `gemm_rs.py` (two devices, 128x128 GEMM tile and owner-side reduce-scatter over peer access); every example has real tile bodies in `tiles/` and a host with a CPU reference in `hosts/`; `ETX_MOE_SMALL=1` selects a short-task MoE configuration |
+| `bench/calib/` | - | `atomic_pingpong.hip`, `flag_latency.hip`, `queue_contention.hip`, `phase_switch.hip`, `p2p_atomic.hip`, `run_calib.sh`; `bench/sim_experiments.py` for the two simulator studies |
 | `tests/` | - | `test_edgemap.py`, `test_ir_verify.py`, `test_machine.py`, `test_passes.py`, `test_sim.py`, `test_codegen.py`, `test_no_arch_branches.py`; 46 tests collected and passing (also on the MI300X VM) |
 | `docs/` | - | `ARCHITECTURE.md` (code map), `DESIGN-v0.1.md`, `site/index.html` (published specification) |
 
 What runs today without a GPU: `make setup`, `make test`, `python -m etx compile examples/moe_layer.py --arch gfx942 --out build/moe_gfx942 --sim`. `compile` verifies the graph, runs the seven passes, and writes `megakernel_d0.hip`, the lowering header, tile prototypes, `plan.json` and `decisions.log` (why each subgraph is static / dynamic / hybrid; which events were eliminated); `--sim` runs the protocol simulator.
 
-Known gaps (from `ARCHITECTURE.md` and `README.md`):
+Executed on hardware (all on 2026-09-22; details in Appendix C):
 
-- `etx_deps_ready` always returns true (the static head is taken before the queues); the planned refinement is a per-task ready bitmap.
+- Split-K row sum on one MI300X: static, hybrid and dynamic schedules, two problem sizes, reference-checked.
+- A complete MoE layer on one MI300X with real tiles: routing computed on device matches the host, output within 3.5e-5 relative of the CPU reference, all schedule modes; with the short-task configuration the effect of Pass 3 and of the schedule choice is measurable.
+- GEMM + reduce-scatter on two MI300X: one kernel instance per device, one shared system-scope event buffer in fine-grained memory, C tiles read over xGMI peer access, reference-checked.
+- All seven phase-0 measurements: the three synchronisation benchmarks, the whole-GPU phase switch, the cross-device flag and peer bandwidth, and the two simulator studies (queue length versus stragglers, routing imbalance versus schedule).
+
+Known gaps:
+
 - Dynamic consumer lists are materialised host-side per step; the in-kernel inverse-map alternative is not implemented.
-- Sentinel-value signalling is a capability bit and a helper (`etx_amdgcn_load_agent`), not yet a lowering option chosen by the cost model.
-- Tile bodies in `examples/tiles/` are stubs with the right ABI; the Triton host-DSL emitter produces a skeleton, not a runnable kernel.
-- Cost tables for gfx90a, gfx950, sm_90 and sm_100 are public seed values; gfx942 has the first measured values (Appendix C) to be written into the YAML.
-- Only the split-K example has executed on a GPU (MI300X, 2026-09-22, all three modes, reference-checked; section 8.6). MoE and GEMM + reduce-scatter tiles are still stubs; CUDA emission is untested on hardware; the cross-device cost `t_dev_ns` is uncalibrated; the Triton emitter is a skeleton only.
+- Sentinel-value signalling is a capability bit and a helper; it is not a lowering option chosen by the cost model (the whole-GPU measurement shows counters are the right primitive for barriers; the sentinel gain is point-to-point).
+- The reference tiles are per-token GEMVs; absolute step times of the MoE example are dominated by weight re-reads and are not performance claims.
+- Cost tables for gfx90a, gfx950, sm_90 and sm_100 are public seed values; gfx942 carries the measured values.
+- CUDA emission is untested on hardware (no NVIDIA machine was available); the Triton host-DSL emitter is a skeleton only.
 
-Runtime details fixed by the hardware run and now part of the design (sections 9.4, 10.2, 10.3, 13): domain-affine logical worker ids claimed by atomic after HW_ID discovery; a per-type argument pointer table; host seeding of initially ready dynamic and hybrid tasks; pass-tagged ticket-ring slots; DEVICE scope for events of globally scheduled grids; and a host watchdog that dumps non-zero event counters and a per-task execution-count histogram.
+Runtime rules established by the hardware runs and now part of the design (sections 9.4, 10.2, 10.3, 13): domain-affine logical worker ids claimed by atomic after HW_ID discovery; a per-type argument pointer table; host seeding of initially ready dynamic and hybrid tasks; pass-tagged ticket-ring slots; DEVICE scope for events of globally scheduled grids; a per-task remaining-dependency counter so a consumer with several in-events is pushed exactly once; push lists that carry the consumer's own domain; waits that check the abort word so the watchdog can stop a hung step; a static producer that pushes its dynamic consumers; a `"*"` barrier for static grids with runtime edge maps; LDS residency accounting that reserves the kernel's own shared words; the generated non-blocking readiness probe (`etx_deps_ready`) built from the same edge maps as the wait code; and a host watchdog that dumps non-zero event counters and a per-task execution-count histogram.
 
 ## 15. Roadmap and Milestones
 
 | Phase | Deliverable | Completion criterion |
 |---|---|---|
-| 0. Baseline and calibration | Per-operator MoE / dense reference on MI300X, timing scaffold, seven synchronisation-cost microbenchmarks | Unfused baseline in hand; `t_local / t_cross / t_dev` and the contention curve in the YAML. Status: atomic ping-pong, flag latency and queue contention measured on 2026-09-22 (Appendix C); memory-type comparison, P2P, static-queue-length and routing-imbalance experiments remain |
-| 1. Single-card closed loop | L2 IR + L5 codegen (link mode, hand-written tiles), static scheduling, events partitioned by XCD | MoE layer at least 1.05x the unfused baseline; differential test passes; protocol simulator in CI. The 1.05x is a self-imposed floor: below it, fusion gain is being eaten by something else, which must be diagnosed before continuing. Status: the closed loop (compile, cooperative launch, reference check, watchdog) is proven on the split-K example in all three modes; MoE tiles are the remaining work |
-| 1.5. Critical path | Pass 3 event elimination + Pass 7 cross-barrier prefetch + sentinel-signal lowering; per-phase trace tooling | Global events per MoE layer down to the natural dependency count (3); fixed-latency share per layer from about 75% to under 50%; MBU report in CI |
-| 2. Dynamism and tables | Local queues, hybrid scheduling, capability + cost tables, decision log | Hybrid at least static on MoE (reference: the paper's 1.08 vs 1.04); logs explainable |
-| 3. Second frontend + second hardware | Triton host-DSL mode; the same IR on gfx950 or gfx90a (two instances) | Switching frontend / hardware changes only YAML and the skeleton template; IR and passes unchanged |
-| 4. Communication fusion | GEMM + RS on MI300X without multimem | Report a positive gain if there is one; otherwise mark unsupported in the capability table |
+| 0. Baseline and calibration | Per-operator MoE / dense reference on MI300X, timing scaffold, seven synchronisation-cost microbenchmarks | `t_local / t_cross / t_dev` and the contention curve in the YAML. Status: done on 2026-09-22 (Appendix C): ping-pong, flag latency, queue contention, whole-GPU phase switch, cross-device flag and peer bandwidth, and the two simulator studies. Not done: an unfused per-operator baseline for the MoE example (the reference tiles are not tuned, so a fusion-gain figure would not be meaningful yet) |
+| 1. Single-card closed loop | L2 IR + L5 codegen (link mode, hand-written tiles), static scheduling, events partitioned by XCD | Differential test passes; protocol simulator in CI. Status: done. Split-K and the MoE layer run reference-checked on MI300X in all three modes. The 1.05x-over-unfused criterion waits for tuned tiles |
+| 1.5. Critical path | Pass 3 event elimination + Pass 7 cross-barrier prefetch + sentinel-signal lowering; per-phase trace tooling | Global events per MoE layer down to the natural dependency count; fixed-latency share per layer under 50%; MBU report in CI. Status: Pass 3 measured (16% on the short-task MoE in the hybrid regime, none in the static regime); Pass 7 l2-warm prefetch measured with no effect at this scale; sentinel lowering not adopted (counters win for barriers); per-phase trace not built |
+| 2. Dynamism and tables | Local queues, hybrid scheduling, capability + cost tables, decision log | Logs explainable; the cost model's choice validated. Status: done; the measured short-task MoE shows static 0.445 ms vs hybrid 0.654 ms, and the automatic choice now selects static there |
+| 3. Second frontend + second hardware | Triton host-DSL mode; the same IR on gfx950 or gfx90a (two instances) | Switching frontend / hardware changes only YAML and the skeleton template; IR and passes unchanged. Status: the two-instance path is proven with two MI300X (same code path as MI250X's two GCDs); gfx950 and Triton not exercised |
+| 4. Communication fusion | GEMM + RS on MI300X without multimem | Report a positive gain if there is one; otherwise mark unsupported. Status: the owner-side reduction path runs correctly across two MI300X (0.365 ms per step at M=1024, K=512, N=512); no gain figure yet because there is no tuned unfused baseline |
 | 5. Cross-step residency | Control ring, abort, shape buckets | TPOT under continuous batching no worse than per-step launch, with a bounded pre-emption latency |
 
 The seven phase-0 microbenchmarks: (1) atomic-counter round trip between two workgroups in one XCD (`t_local`); (2) the same for adjacent and farthest XCDs (`t_cross`, two values); (3) event tensor in plain VRAM, uncached and fine-grained memory; (4) two-card P2P atomic + fence latency and bandwidth (`t_dev`); (5) throughput of N workgroups contending for one queue, sweeping N (contention curve); (6) static queue length versus straggler time (the boundary of static scheduling); (7) MoE routing imbalance versus dynamic-scheduling gain (reproducing the conditions of the paper's 1.08 vs 1.04).
@@ -876,12 +882,53 @@ All values measured on 2026-09-22 on a rented Hot Aisle 1x MI300X VM, ROCm 7.2.4
 | Queue: ticket-based pop, aggregate throughput | N = 1 / 8 / 64 / 128 / 256 / 512 | 1.15 / 8.48 / 47.6 / 65.0 / 55.2 / 76.6 M pops/s | Adopted as the v0.2 runtime ring; feeds `C_queue` |
 | Uncontended pop cost | Ticket ring, N = 1 | about 870 ns | Replaces the 300 ns seed for `t_pop_ns` |
 | Per-popper pop latency (derived: N / throughput) | Ticket ring, N = 128 / 256 | about 2.0 us / 4.6 us | The linear contention factor in Pass 4 matches at 128 and underestimates at 256 |
-| Toolchain | Generated split-K and MoE kernels | Pass `hipcc -fgpu-rdc -fsyntax-only` for gfx942; 46 tests pass on the VM | MoE tiles remain stubs |
+| Toolchain | Generated split-K and MoE kernels | Pass `hipcc -fgpu-rdc -fsyntax-only` for gfx942; the test suite passes on the VM | Superseded by the end-to-end runs below |
 | End-to-end split-K megakernel, correctness | 608 cooperative workers (8 XCDs x 76 workgroups, 2 per CU, 256 threads); static, hybrid and dynamic modes | Matches CPU fp32 reference, max abs error 4.8e-7, in all three modes | First ETX-generated kernel to run; lowering, queues, discovery and per-type argument tables validated |
 | Split-K per-step time, n=64 (320 tasks, 64 events) | Best of 30-50 repetitions; first launch about 21 ms including code load | static 0.101 ms, hybrid 0.115 ms, dynamic 0.118 ms | Queue overhead small relative to the step at this size |
 | Split-K per-step time, n=1024 (5120 tasks, 1024 events) | Same | static 0.128 ms, hybrid 0.441 ms, dynamic 0.512 ms | Tasks about 2 us; about 1 us per pop plus a push; static wins 3.5-4x on tiny tasks, as the `C_queue` term predicts |
 | Ticket-ring wrap-around defect | Over-popping workers wrapped onto slots consumed in an earlier pass | 267 of 320 tasks executed twice; event counters at -4 | Slot values now carry a pass tag (`(ticket / capacity) << 24` OR-ed with the task id); a tag mismatch means "not yet pushed" |
 | Scope under global scheduling defect | Grid scheduled through the device-global queue with DOMAIN-scope events | Consumers read stale L2 and produced zeros while the kernel "completed" | Pass 4 raises events of dynamically scheduled grids to DEVICE scope; `verify_plan` rejects violations |
+
+Second session, 2x MI300X VM (enc1-gpuvm005), same date; `phase_switch.hip`, `p2p_atomic.hip`, the MoE and GEMM + RS examples and `bench/sim_experiments.py`. Status: measured.
+
+| Measurement | Condition | Value | Implication |
+|---|---|---|---|
+| Whole-GPU phase switch, counter barrier | Every resident workgroup does one atomic RMW then polls the counter; 304 / 608 workgroups | 8.61 us / 17.30 us per phase | Matches Kog's 7.6 us; `t_phase_switch_counter_ns` = 8600 |
+| Whole-GPU phase switch, leader-gathered flags | Each workgroup stores its own flag; workgroup 0 polls all flags with inv-L1 loads and releases one "go" word | 52.1 us / 105.7 us per phase | Flag polling does not replace counters for barriers; the sentinel gain is point-to-point payload polling only |
+| Cross-device flag, system scope | Fine-grained memory on device 0, peer access from device 1, one-way | 10.6 us | `t_dev_ns` = 10600; two orders of magnitude above intra-device events, which is why cross-device consumers are always static |
+| Peer store bandwidth | Device 1 writes 256 MB into device 0 HBM | 285 GB/s | Owner-side reduce-scatter reads run at xGMI, not HBM, speed |
+| MoE layer, full configuration (D=1024, 8 heads, 8 experts, top-2), B=8 | 137 tasks, 50 events, 608 workers; device routing compared with host routing; y compared with a double-precision CPU reference | 0 routing mismatches; max relative error 3.5e-5; 3.22 ms per step | First data-dependent megakernel: runtime counter initialisation, gather-map notifications, range-map waits and pushes all correct |
+| MoE, full configuration, schedule modes and passes | Best of 20 | base 3.224, no P3 3.189, no P7 3.181, static 3.147, hybrid 2.688, dynamic 2.561 ms; B=32: 3.141 (static 3.061, dynamic 2.718) | Per-token GEMV tiles dominate (each task about 100 us); pass effects are within noise; dynamic balances the few heavy tasks better than round-robin |
+| MoE, short-task configuration (D=256, 2 heads, S=128, FF=128), B=64 | 647 tasks, 245 events; best of 30 | automatic 0.439 ms (static chosen); forced static 0.445; hybrid 0.654; dynamic 0.653; no P3 (hybrid regime) 0.653 vs 0.546 with P3; no P7 0.547 | Queue path loses 32% on short tasks; Pass 3 recovers 16% where events are on the critical path; l2-warm prefetch is not measurable here |
+| MoE, short-task configuration, B=8 | 89 tasks | 0.304 ms automatic; 0.327 with P3 vs 0.332 without | Small graphs are launch- and barrier-bound |
+| Three further defects found only on hardware | MoE bring-up | (1) a consumer with two in-events was pushed and executed twice; (2) hybrid consumers were pushed to the pusher's domain queue instead of their own; (3) a static grid with runtime edge maps evaluated `tile_expert` before `grouping` wrote it (forced-static B=32 failed) | Fixed by per-task remaining-dependency counters, domain-tagged push lists, and the `"*"` barrier rule of Pass 4 |
+| GEMM + reduce-scatter, two devices | M=1024, K=512, N=512, world 2; 96 tasks (48 per device), 32 system-scope events in fine-grained memory; local C check and reduce-scattered D check | Local C max relative error 3.5e-5 / 1.1e-5; D max relative error 3.0e-4, 0 mismatches; 0.365 ms per step | Kernel family across devices works: same code path as MI250X's two GCDs; residency caught the 32 KB LDS tile (one workgroup per CU) |
+
+Simulator studies (`bench/sim_experiments.py`, calibrated gfx942 costs: pop 0.87 us, cross-domain sync 0.74 us, local 0.64 us). Both are model results, not hardware measurements; they use the examples' annotated durations (about 1-8 us per task), so they describe the short-task regime, where the measured hardware runs also favoured static.
+
+Study 6, tile-duration variance versus schedule (split-K, n=256, 1280 tasks; makespan in us):
+
+| cv of tile duration | static | dynamic | hybrid | best |
+|---|---|---|---|---|
+| 0.0 | 5.4 | 23.9 | 10.0 | static |
+| 0.1 | 6.4 | 24.6 | 10.7 | static |
+| 0.3 | 8.4 | 25.8 | 11.9 | static |
+| 0.6 | 11.3 | 27.6 | 13.3 | static |
+| 1.0 | 15.2 | 30.0 | 15.3 | static (hybrid equal) |
+
+Reading: static degrades linearly with variance (its makespan triples from cv 0 to 1) while hybrid's queue cost is flat, so the crossover sits just above cv = 1 for 2 us tasks; for tasks ten times longer the same queue cost is amortised ten times better and the crossover moves to cv of roughly 0.1-0.3, which is the regime the paper's MoE result (dynamic 1.08 vs static 1.04) occupies. The global dynamic queue never wins in this model because every pop contends with all 608 workers.
+
+Study 7, MoE routing imbalance versus schedule (B=32 tokens, 8 experts, top-2; makespan in us):
+
+| routing skew | max / mean tokens per expert | static | dynamic | hybrid | best |
+|---|---|---|---|---|---|
+| 0.0 | 1.38 | 49.9 | 156.2 | 77.1 | static |
+| 0.5 | 1.75 | 52.1 | 152.2 | 79.2 | static |
+| 1.0 | 2.88 | 52.3 | 161.2 | 79.8 | static |
+| 2.0 | 3.75 | 52.3 | 173.7 | 79.8 | static |
+| 4.0 | 4.00 | 47.0 | 193.1 | 76.6 | static |
+
+Reading: with 5 us GroupGEMM tiles and 8 experts the imbalance changes the number of tiles per expert, not the length of the critical chain, so static absorbs it; the study confirms the direction of the automatic choice on the short-task MoE (static, 0.439 ms measured). Reproducing the paper's regime needs tile durations of tens of microseconds and hundreds of experts, which the annotated example does not model.
 
 ## Appendix D. Glossary
 

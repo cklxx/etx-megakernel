@@ -67,12 +67,17 @@ generated lowering header.
 * New optimisation: a pass reading the Plan and the MachineModel, writing
   data into the Plan and a line into `plan.log`.
 
-## Known gaps (v0.1)
+## Known gaps (v0.3)
 
-* `etx_deps_ready` in the runtime always returns true (static head is taken
-  before queues); the planned refinement is a per-task ready bitmap.
 * Dynamic consumer lists are materialised host-side per step; the in-kernel
   inverse-map alternative (MPK-style ranges) is not implemented.
-* Sentinel-value signalling is a capability bit and a helper, not yet a
-  lowering option chosen by the cost model.
-* Nothing has run on a GPU.
+* Sentinel-value signalling is a capability bit and a helper, not a lowering
+  option (measured: counters are the right primitive for barriers).
+* CUDA emission untested on hardware; Triton emitter is a skeleton.
+* Tiles are correctness references; no tuned unfused baseline yet.
+
+## Verified on hardware (MI300X, 2026-09-22)
+
+Split-K, full MoE layer, and two-device GEMM + reduce-scatter all pass their
+CPU references; see `README.md` and the design document's Appendix C for the
+numbers and the five runtime rules that came out of the bring-up.

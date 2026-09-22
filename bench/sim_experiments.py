@@ -22,7 +22,7 @@ from examples import moe_layer, splitk_sum                  # noqa: E402
 
 
 def study_variance() -> None:
-    print("study 6: tile-duration variance vs schedule (split-K, n=1024 -> 5120 tasks, gfx942 costs)")
+    print("study 6: tile-duration variance vs schedule (split-K, n=256 -> 1280 tasks, gfx942 costs)")
     print(f"{'cv':>5} {'static':>9} {'dynamic':>9} {'hybrid':>9}   best")
     for cv in (0.0, 0.1, 0.3, 0.6, 1.0):
         res = {}
@@ -30,7 +30,7 @@ def study_variance() -> None:
             g = splitk_sum.build()
             for gg in g.grids:
                 gg.duration_cv = cv
-            b = splitk_sum.bindings(n=1024)
+            b = splitk_sum.bindings(n=256)
             plan = compile_graph(g, "gfx942", b, {}, PassOptions(force_mode=mode))
             r = simulate(plan, seed=1)
             res[mode] = r.makespan_us
@@ -39,13 +39,13 @@ def study_variance() -> None:
 
 
 def study_routing_skew() -> None:
-    print("\nstudy 7: MoE routing imbalance vs schedule (B=64 tokens, 8 experts, gfx942 costs)")
+    print("\nstudy 7: MoE routing imbalance vs schedule (B=32 tokens, 8 experts, gfx942 costs)")
     print(f"{'skew':>5} {'max/mean':>9} {'static':>9} {'dynamic':>9} {'hybrid':>9}   best")
     for skew in (0.0, 0.5, 1.0, 2.0, 4.0):
         rng = random.Random(3)
         # replace the LCG routing with a skewed distribution over experts
         weights = [pow(2.0, -skew * e) for e in range(moe_layer.NE)]
-        B = 64
+        B = 32
         topk = []
         for _ in range(B):
             picks: list[int] = []
