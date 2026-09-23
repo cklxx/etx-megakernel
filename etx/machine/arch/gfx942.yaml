@@ -65,7 +65,9 @@ costs:                           # MEASURED 2026-09-22, Hot Aisle 1xMI300X VM, R
   t_phase_switch_counter_ns: 8600   # MEASURED: 304 WGs 8.6 us, 608 WGs 17.3 us per whole-GPU counter barrier (Kog: 7.6)
   t_phase_switch_leader_flags_ns: 52000   # leader polling 304 flag words: 52 us; sentinel gains are point-to-point, not barriers
   t_phase_switch_sentinel_ns: 850         # public (Kog), point-to-point payload polling
-  t_dev_ns: 10600                # MEASURED: cross-device system-scope flag one-way, fine-grained memory + peer access
+  t_dev_ns: 1000                 # MEASURED 2026-09-23 (p2p_sync): one-way, flag in the CONSUMER's fine-grained memory, idle
+  t_dev_loaded_ns: 3000          # same under 2x1 GB streaming load on both GPUs; via host pinned memory 2-6 us;
+                                 # polling a REMOTE flag without payload is the pathological case (10.7 us)
   peer_store_gbs: 285            # MEASURED: device 1 -> device 0 HBM, 256 MB, xGMI
   t_pop_ns: 870                  # ticket ring, uncontended
   t_push_ns: 600                 # atomicAdd(tail) + atomicExch(slot), estimate from pop cost

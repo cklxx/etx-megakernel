@@ -751,7 +751,19 @@ Consequences, all applied in the v0.4 runtime: static tasks cost no completion a
 
 The static path now sits at 2-4x the unfused two-kernel step for a toy whose work is a few microseconds; the remaining fixed cost is the launch (12 us ordinary) plus about 2 us per task slot of loop, descriptor fetch and event traffic. The queue path (hybrid, dynamic) is the next target: at 76 poppers per domain ring it costs about 50 us per task slot, far above the 1-2 us the contention benchmark measured for pops alone, so the per-domain ring will be replaced by per-worker queues (MPK's JIT/AOT pair) before the fleet port needs any dynamic segment (it needs none: fleet's graph is entirely static).
 
-Cross-device synchronisation for MoE decode (expert parallelism) has one measured point (10.6 us one-way, fine-grained memory on device 0); the extended study (flag location on device 0 / device 1 / host, 4 KB payload, under streaming load; `bench/calib/p2p_sync.hip`) is written and waits for a two-GPU VM.
+Cross-device synchronisation for MoE decode (expert parallelism), measured 2026-09-23 on 2x MI300X (`bench/calib/p2p_sync.hip`; each device times its own round trip with `s_memrealtime`, one-way = half):
+
+| Condition | Flag location | Payload | Device 0 one-way | Device 1 one-way |
+|---|---|---|---|---|
+| idle | device 0 fine-grained | none | 10.73 us | 0.95 us |
+| idle | device 0 fine-grained | 4 KB | 2.24 us | 0.88 us |
+| idle | device 1 fine-grained | none | 1.17 us | 0.83 us |
+| idle | device 1 fine-grained | 4 KB | 1.96 us | 0.90 us |
+| idle | host pinned coherent | none / 4 KB | 2.48 / 4.90 us | 2.07 / 2.06 us |
+| 2 x 1 GB streaming load | device 0 or 1 | none / 4 KB | 4.4 / 5.6 us | 3.0 / 2.3 us |
+| 2 x 1 GB streaming load | host pinned | none / 4 KB | 3.9 / 6.1 us | 3.0 / 2.6 us |
+
+Reading: a cross-device event costs about 1 us one-way when the flag lives in the consumer's own memory (the producer issues one remote system-scope atomic; the consumer polls locally), 2-3 us under load, and 2-6 us through host memory; tight remote polling of a flag with nothing else in flight is the pathological case (10.7 us). Against 0.64-0.74 us for an intra-device event this is 1.5-4x, not the two orders of magnitude the first single point (10.6 us) suggested; `t_dev_ns` is now 1000 with a loaded value of 3000. For expert-parallel MoE decode the rule that follows is: the event tensor for a cross-device edge is allocated on the consumer device, and the producer arrives remotely.
 
 ### 15.3 Phases of the general architecture (after M3)
 
