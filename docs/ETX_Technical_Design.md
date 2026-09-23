@@ -720,8 +720,8 @@ Build-up, in order:
 |---|---|---|---|
 | M0 Baselines | Per-step fixed cost decomposed (empty cooperative launch, empty worker loop, per-task-slot cost, unfused kernel-per-op step); fleet's own numbers as the target | Every ETX overhead term has a measured value and a baseline to compare with | Done 2026-09-23 (section 15.2, Appendix C) |
 | M1 fleet graph in ETX | fleet's `taskgraph.py` expressed as an ETX graph: Chiplet-tasks as `(xcd, worker)` grids pinned by `domain_map`, XCD-local events as DOMAIN scope, global events as DEVICE scope; verifier, placement and simulator agree with fleet's structure | 2 DEVICE and 6 DOMAIN event tensors per MoE layer; simulator prediction within 2x of 3.60 ms | Done: `examples/dsv2lite/graph.py`, 6,370 tasks for 3 layers, all static, predicted 169-211 us per layer vs 133 measured |
-| M2 fleet tiles in ETX | A shim exports fleet's `run_task` cases as ETX tile bodies (`etx_ctx` -> `TaskDescriptor` fields; in-body waits become second in-edges or stay in-body against ETX counters); fleet's weights and activations as the argument table | The ETX-generated kernel decodes 32 tokens identical to HuggingFace | Next |
-| M3 Match 3.60 ms | Per-phase trace on both kernels; close the gaps (worker assignment order, polling scheme, fences) until ETX is within 3% of fleet | 3.60 ms per token, 32/32 tokens | After M2 |
+| M2 fleet tiles in ETX | A shim exports fleet's `run_task` cases as ETX tile bodies (`etx_ctx` -> `TaskDescriptor` fields); fleet's weights and activations as the argument table; fleet's own host loaders and HuggingFace checks | The ETX-generated kernel decodes 32 tokens identical to HuggingFace | Done 2026-09-23: first run 32/32 tokens, 27/27 layers within the gate, 5.42 ms/token (section 15.4) |
+| M3 Match 3.60 ms | Per-phase trace on both kernels; close the gaps until ETX is within 3% of fleet | 3.60 ms per token, 32/32 tokens | In progress: 4.09 ms/token vs fleet's 3.55 on the same VM (15% gap) after four fixes (section 15.4); remaining: the per-barrier transition (~2 us x 8 per layer) and the qkv body (+4 us) |
 | M4 Generalise | Only now: MoE example with tuned tiles, second machine (gfx950 or MI250X two-instance), Triton host-DSL mode, cross-step residency | Each generalisation changes only YAML, a frontend adapter or a graph, never the passes | After M3 |
 
 ### 15.2 Baselines (M0), measured 2026-09-23 on one MI300X
@@ -764,6 +764,23 @@ Cross-device synchronisation for MoE decode (expert parallelism), measured 2026-
 | 2 x 1 GB streaming load | host pinned | none / 4 KB | 3.9 / 6.1 us | 3.0 / 2.6 us |
 
 Reading: a cross-device event costs about 1 us one-way when the flag lives in the consumer's own memory (the producer issues one remote system-scope atomic; the consumer polls locally), 2-3 us under load, and 2-6 us through host memory; tight remote polling of a flag with nothing else in flight is the pathological case (10.7 us). Against 0.64-0.74 us for an intra-device event this is 1.5-4x, not the two orders of magnitude the first single point (10.6 us) suggested; `t_dev_ns` is now 1000 with a loaded value of 3000. For expert-parallel MoE decode the rule that follows is: the event tensor for a cross-device edge is allocated on the consumer device, and the producer arrives remotely.
+
+### 15.4 M2 and M3 on hardware (2026-09-23, 2x MI300X VM, fleet's bootstrap on the same box)
+
+The port: `examples/dsv2lite/fleet_shim.hip` includes fleet's kernel source unchanged and exports 15 `extern "C"` tile symbols that rebuild the fleet `TaskDescriptor` from the ETX coordinate and the grid's constants; every grid's argument 0 is one `FleetParams` struct (fleet's `RuntimeState`, `ModelDims`, `Weights`, `Activations`, `KVCache`, plus token, epoch and position), argument 1 a device int with the layer index. `examples/dsv2lite/host.hip` reuses fleet's loaders (manifest, packed weights, YaRN tables, KV cache, golden tokens) and its checks (tokens versus HuggingFace greedy, per-layer gate on the first step, on-device embed-to-argmax timing). One ETX step per token. Fleet's own binary, built by its bootstrap on the same VM, runs at 3.55-3.56 ms/token, 32/32 tokens.
+
+| Step | Change | ms/token (embed -> argmax, device clock) | Tokens | Evidence |
+|---|---|---|---|---|
+| first light | fleet graph in ETX (section 15.1 M1), fleet tiles through the shim, all events per-producer write-back, ETX polling through L2 | 5.42 | 32/32, 27/27 layers | first run passed; trace: 200 us/layer vs fleet 126 |
+| + worker pinning, cached routing | `worker_map="xw->w"` keeps each XCD's gate_up and down of one expert unit on the same worker, so fleet's `FLAG_ROUTING_CACHED` path is valid (down 22.6 -> 17.3 us) | 4.81 (with the next row) | 32/32 | trace |
+| + last-arriver flush | DEVICE-scope events: each domain's last producer does the one `buffer_wbl2` and subtracts the domain's share (fleet's scheme); A/B without it 5.32 | 4.81 | 32/32 | A/B |
+| + agent-scope polling | replaced the inv-L1 + L2-load poll (25% faster idle in the microbenchmark) by the agent-scope atomic load: 36 waiting CUs per XCD polling through the L2 slowed the 37 streaming ones; `s_sleep(8)` backoff | 4.60 | 32/32 | four-way A/B (4.84 / 4.60 / 4.59 / 4.80) |
+| + in-body q_c wait | attention waits for the published q_c inside the body after kv_post (fleet's `PUB_WAIT`), through an epoch up-counter the qabs wrapper bumps; attention starts 8 us earlier per layer | 4.49 | 32/32 | timeline |
+| + one acquire per workgroup | `buffer_inv sc1` issued by the waiting thread only, not by all four waves (4x the L2 invalidates after every DEVICE-scope event slowed qkv and router by 12 and 7 us) | **4.09** | 32/32, 27/27 | timeline: router body 17.7 -> 10.7 us (fleet 10.8), qkv 29 -> 21 (fleet 17) |
+
+Layer-5 timeline after these fixes (us from the layer's first qkv ready; fleet's numbers from its own trace on the same VM in parentheses): qkv done 22.9 (19.4), attention 26.7-42.4 (20.3-39.3), merge 42.3-55.9 (37.6-49.7), o_proj 55.1-66.5 (47.7-58.4), router 68.7-81.1 (59.3-71.6), gate_up 83.4-121.0 (71.0-106.4), down 120.5-141.1 (105.1-126.1); next layer at 143.5 (126.1). What remains: about 2 us of transition at each of the eight barriers where fleet's mirrored scheduler loses about 1 us, and 4 us in the qkv body. Not needed for these results: any change to fleet's tile code; the compiler's placement, events and runtime carried all of it.
+
+Two lessons for the design itself. First, a microbenchmark-optimal primitive can be wrong under load: the inv-L1 poll was chosen because it was faster idle and it cost 5% end to end; the cost table now records both figures and the poll row cites the loaded measurement. Second, "one fence per workgroup" is a rule the code generator must own: a tile author cannot see that the generated prologue executed the acquire on every wave.
 
 ### 15.3 Phases of the general architecture (after M3)
 

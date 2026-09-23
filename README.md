@@ -10,6 +10,22 @@ branching on an architecture name.
 Repository: https://github.com/cklxx/etx-megakernel (private). Design page (the spec): https://etc-dynamic-megakernel-arch.q1293822641.workers.dev
 (source in `docs/site/index.html`). Code map: `docs/ARCHITECTURE.md`.
 
+## Status: the real model runs (2026-09-23)
+
+`examples/dsv2lite/` is fleet-mi300x's DeepSeek-Coder-V2-Lite decode graph in
+ETX with fleet's own tile bodies linked through a shim. On one MI300X it
+decodes 32 tokens identical to HuggingFace greedy with all 27 layers inside
+fleet's per-layer gate, at **4.09 ms/token** against fleet's hand-written
+3.55 ms on the same VM. The gap closed from 54% to 15% through four compiler
+and runtime rules (last-arriver flush, agent-scope polling, in-body q_c wait,
+one acquire per workgroup), with no change to fleet's tile code. Build:
+
+```bash
+bash examples/dsv2lite/build.sh /path/to/fleet-mi300x      # needs hipcc + fleet's build/ (weights, cache, golden tokens)
+cd /path/to/fleet-mi300x && /path/to/etx/build/dsv2lite/run --tokens 32 --context 1024 --repeat 2
+ETX_TRACE=1 .../run --tokens 4          # per-phase timeline (wait / body / first-ready / last-done per task type)
+```
+
 ## Starting point (reworked 2026-09-23)
 
 The architecture is broad; the proof is narrow. The target is one real model on
