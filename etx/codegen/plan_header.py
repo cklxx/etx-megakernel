@@ -76,6 +76,18 @@ def emit_plan_header(plan: Plan, device: int = 0) -> str:
         counts.extend(e.counts)
     out.append(_arr("etx_ev_counts", counts, dims="ETX_EVENT_WORDS"))
     out.append(_arr("etx_ev_runtime_init", [1 if e.runtime_init else 0 for e in evs]))
+    # per (device, domain) producer share of every event word: DEVICE-scope events with a share > 1
+    # use the last-arriver flush; runtime-initialised events keep 0 (plain arrives)
+    share_flat: list[int] = []
+    for d in range(nd):
+        for dom in range(ndom):
+            for e in evs:
+                row = e.share.get((d, dom))
+                if e.runtime_init or e.scope != Scope.DEVICE or row is None:
+                    share_flat.extend([0] * e.numel)
+                else:
+                    share_flat.extend(row)
+    out.append(_arr("etx_ev_share", share_flat, dims="ETX_N_DEVICES * ETX_N_DOMAINS * ETX_EVENT_WORDS"))
     # queues per device
     out.append(_arr("etx_local_capacity", [plan.local_queue_capacity.get((d, dom), 0) for d in range(nd) for dom in range(ndom)],
                     dims="ETX_N_DEVICES * ETX_N_DOMAINS"))
@@ -132,6 +144,10 @@ def emit_plan_header(plan: Plan, device: int = 0) -> str:
         idx = [args[a] for a in gg.args] if gg else []
         idx += [-1] * (max_args - len(idx))
         rows.append("{" + ", ".join(map(str, idx)) + "}")
+    names_by_type = [""] * n_types
+    for gg in all_grids:
+        names_by_type[plan.type_ids[gg.name]] = gg.name
+    out.append("static const char* const etx_type_names[" + str(max(1, n_types)) + "] = {" + ", ".join(f'"{n}"' for n in names_by_type) + "};")
     out.append(f"#define ETX_N_TYPES {n_types}")
     out.append(f"#define ETX_MAX_ARGS {max_args}")
     out.append(f"static const int32_t etx_type_arg_index[ETX_N_TYPES][ETX_MAX_ARGS] = {{{', '.join(rows)}}};")

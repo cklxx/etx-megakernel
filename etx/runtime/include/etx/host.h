@@ -23,6 +23,8 @@ struct etx_host {
   std::vector<void*> args;                 // device pointers, plan order (pre-fill to control placement)
   etx_params p{};
   int32_t *d_events = nullptr, *d_ctrl = nullptr, *d_slots = nullptr, *d_trace = nullptr, *d_remaining = nullptr;
+  uint64_t* d_trace_time = nullptr;
+  int32_t* d_ev_sub = nullptr;
   int32_t *d_lq_slots = nullptr, *d_lq_head = nullptr, *d_lq_tail = nullptr, *d_gq_slots = nullptr;
   etx_queue* d_local_queues = nullptr;
   bool owns_events = true;
@@ -107,6 +109,14 @@ struct etx_host {
     p.trace_exec = d_trace;
     ETX_CHECK(hipMalloc(&d_remaining, ETX_N_TASKS * sizeof(int32_t)));
     p.task_remaining = d_remaining;
+    p.trace_time = nullptr;
+    if (getenv("ETX_TRACE")) { ETX_CHECK(hipMalloc(&d_trace_time, (size_t)ETX_N_TASKS * 4 * sizeof(uint64_t))); p.trace_time = d_trace_time; }
+    // last-arriver flush tables: this device's share rows and zeroed sub-counters
+    p.event_words = ETX_EVENT_WORDS;
+    p.ev_share = upload(etx_ev_share + (size_t)device * ETX_N_DOMAINS * ETX_EVENT_WORDS, (size_t)ETX_N_DOMAINS * ETX_EVENT_WORDS);
+    ETX_CHECK(hipMalloc(&d_ev_sub, (size_t)ETX_N_DOMAINS * ETX_EVENT_WORDS * sizeof(int32_t)));
+    p.ev_sub = d_ev_sub;
+    if (getenv("ETX_NO_LASTFLUSH")) p.ev_share = nullptr;      // A/B: per-producer write-back
     p.workers_per_domain = ETX_WORKERS_PER_DOMAIN;
     p.n_workers = ETX_N_WORKERS;
     p.n_tasks = etx_n_tasks_dev[device];
@@ -125,6 +135,7 @@ struct etx_host {
     ETX_CHECK(hipMemset(d_slots, 0, ETX_N_DOMAINS * sizeof(int32_t)));
     ETX_CHECK(hipMemset(d_trace, 0, ETX_N_TASKS * sizeof(int32_t)));
     ETX_CHECK(hipMemcpy(d_remaining, etx_task_remaining, ETX_N_TASKS * sizeof(int32_t), hipMemcpyHostToDevice));
+    ETX_CHECK(hipMemset(d_ev_sub, 0, (size_t)ETX_N_DOMAINS * ETX_EVENT_WORDS * sizeof(int32_t)));
     int32_t total = 0; for (int d = 0; d < ETX_N_DOMAINS; ++d) total += etx_local_capacity[device * ETX_N_DOMAINS + d];
     if (total) ETX_CHECK(hipMemset(d_lq_slots, 0xFF, total * sizeof(int32_t)));
     std::vector<int32_t> heads(ETX_N_DOMAINS, 0), tails(ETX_N_DOMAINS, 0);
@@ -216,6 +227,32 @@ struct etx_host {
     }
     if (shown > 32) fprintf(stderr, "  ... %d non-zero events\n", shown);
     if (shown == 0) fprintf(stderr, "  all events reached zero\n");
+  }
+  // Per-phase attribution from the timestamp trace (ETX_TRACE=1): for every task type
+  // (grid) the mean wait (taken -> deps ready) and body (ready -> done) time, and the
+  // phase span (first task taken -> last task done). Ticks are ETX_TIMER units
+  // (100 MHz on AMD: 10 ns). `type_names[t]` labels the types (nullptr -> ids).
+  void report_phases(const char* const* type_names, int n_types, double tick_ns = 10.0, FILE* out = stdout) {
+    if (!d_trace_time) return;
+    ETX_CHECK(hipSetDevice(device));
+    std::vector<uint64_t> tr((size_t)ETX_N_TASKS * 4);
+    ETX_CHECK(hipMemcpy(tr.data(), d_trace_time, tr.size() * sizeof(uint64_t), hipMemcpyDeviceToHost));
+    std::vector<double> wait(n_types, 0), body(n_types, 0); std::vector<int> cnt(n_types, 0);
+    std::vector<uint64_t> first(n_types, ~0ull), last_(n_types, 0);
+    uint64_t t_min = ~0ull, t_max = 0;
+    for (int i = 0; i < ETX_N_TASKS; ++i) {
+      const uint64_t* r = &tr[(size_t)i * 4];
+      if (r[0] == 0 || r[2] == 0) continue;
+      const int ty = etx_descs[i].type; if (ty < 0 || ty >= n_types) continue;
+      wait[ty] += (double)(r[1] - r[0]); body[ty] += (double)(r[2] - r[1]); cnt[ty]++;
+      first[ty] = std::min(first[ty], r[0]); last_[ty] = std::max(last_[ty], r[2]);
+      t_min = std::min(t_min, r[0]); t_max = std::max(t_max, r[2]);
+    }
+    fprintf(out, "phase trace (us): total span %.1f\n", (double)(t_max - t_min) * tick_ns / 1000.0);
+    fprintf(out, "  %-22s %6s %10s %10s %10s\n", "type", "tasks", "mean wait", "mean body", "span");
+    for (int ty = 0; ty < n_types; ++ty) if (cnt[ty])
+      fprintf(out, "  %-22s %6d %10.2f %10.2f %10.1f\n", type_names ? type_names[ty] : "", cnt[ty],
+              wait[ty] / cnt[ty] * tick_ns / 1000.0, body[ty] / cnt[ty] * tick_ns / 1000.0, (double)(last_[ty] - first[ty]) * tick_ns / 1000.0);
   }
   void dump_trace() {
     ETX_CHECK(hipSetDevice(device));

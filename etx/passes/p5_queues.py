@@ -21,12 +21,18 @@ def run(plan: Plan) -> None:
             plan.static_queues[(d, w)] = []
     local_count: dict[tuple[int, int], int] = {}
     global_count: dict[int, int] = {}
+    from ..ir.edgemap import EdgeMap
+    pins = {g.name: EdgeMap.parse(g.worker_map) for g in plan.graph.grids if g.worker_map}
     for t in plan.tasks:                    # program order
         key = (t.device, t.domain)
         if t.mode == "static":
-            k = rr.get(key, 0)
-            w = t.domain * wpd + (k % wpd)
-            rr[key] = k + 1
+            if t.grid in pins:              # explicit slot: (xcd, w) -> worker w of its domain
+                slot = pins[t.grid].targets(t.coord, (wpd,), None, plan.bindings)[0][0] % wpd
+                w = t.domain * wpd + slot
+            else:
+                k = rr.get(key, 0)
+                w = t.domain * wpd + (k % wpd)
+                rr[key] = k + 1
             t.worker = w
             plan.static_queues[(t.device, w)].append(t.id)
         else:

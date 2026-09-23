@@ -47,8 +47,9 @@ static __device__ __forceinline__ void fleet_call(const etx_ctx* c, uint16_t kin
   tc.sin = fp->act.sin + (int64_t)fp->pos * fp->d.qk_rope;
   tc.dump = fp->dump != 0;
   tc.trace = false;
-  fleet::Activations act = fp->act;          // pointer table, by value as run_task wants a non-const ref
-  fleet::KVCache kv = fp->kv;
+  // run_task takes Activations / KVCache by non-const reference but only writes through their pointers
+  fleet::Activations& act = *const_cast<fleet::Activations*>(&fp->act);
+  fleet::KVCache& kv = *const_cast<fleet::KVCache*>(&fp->kv);
   fleet::Scratch& s = *reinterpret_cast<fleet::Scratch*>(c->lds);
   fleet::run_task(t, fp->rt, fp->d, fp->w, act, kv, s, tc, (int)c->domain, worker);
 }

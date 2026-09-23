@@ -92,10 +92,13 @@ def _arrive_code(plan: Plan, g: TaskGrid, mode: str) -> str:
         width = _gather_width(plan, m.gather_tensor) if m.kind == "gather" else ""
         lines.append(f"      // arrive {ev} via {m.text!r} ({sc})")
         has_dynamic_consumers = any(k[0] == ev for k in plan.ev_consumers)
+        # DEVICE scope: last-arriver flush per domain (one L2 write-back per domain per coordinate)
+        arrive = (f"etx_arrive_flush_DEVICE(p, {ep.offset} + (idx), domain)" if ep.scope == Scope.DEVICE
+                  else f"etx_arrive_{sc}(p.events + {ep.offset} + (idx))")
         if not has_dynamic_consumers:       # the producer's own mode is irrelevant: a static producer must still push dynamic consumers
-            lines.append(f"#define ETX_TARGET(idx) (void)etx_arrive_{sc}(p.events + {ep.offset} + (idx))")
+            lines.append(f"#define ETX_TARGET(idx) (void){arrive}")
         else:
-            lines.append(f"#define ETX_TARGET(idx) do {{ if (etx_arrive_{sc}(p.events + {ep.offset} + (idx)) == 0) etx_push_consumers(p, {ev_id}, (idx), domain); }} while (0)")
+            lines.append(f"#define ETX_TARGET(idx) do {{ if ({arrive} == 0) etx_push_consumers(p, {ev_id}, (idx), domain); }} while (0)")
         lines.append(m.to_c(coord_vars, f"p.ev_shape[{ev_id}]", "ETX_TARGET", _runtime_ptrs(plan, g), width, _symbols(plan)).rstrip())
         lines.append("#undef ETX_TARGET")
     return "\n".join(lines)
@@ -152,8 +155,10 @@ def emit_kernel(plan: Plan, device: int = 0) -> str:
     out.append("  }")
     out.append("}")
     out.append("")
-    out.append("static __device__ __forceinline__ void etx_run_task(const etx_params& p, const etx_task t, uint32_t worker, uint32_t domain) {")
+    out.append("static __device__ __forceinline__ void etx_run_task(const etx_params& p, const etx_task t, uint32_t worker, uint32_t domain, int32_t tid) {")
     out.append("  __shared__ __align__(16) unsigned char etx_lds[ETX_LDS_USED > 0 ? ETX_LDS_USED : 16];")
+    out.append("  uint64_t* tr = p.trace_time ? p.trace_time + (size_t)tid * 4 : nullptr;")
+    out.append("  if (tr && threadIdx.x == 0) tr[0] = (uint64_t)ETX_TIMER();")
     out.append("  etx_ctx ctx; for (int i = 0; i < 4; ++i) ctx.coord[i] = t.coord[i];")
     out.append("  ctx.shape = p.shape; ctx.args = p.type_args + t.type * p.max_args; ctx.events = p.events; ctx.ev_offset = p.ev_offset; ctx.ev_shape = (const int32_t*)p.ev_shape;")
     out.append("  ctx.domain = domain; ctx.worker = worker; ctx.lds = etx_lds;")
@@ -167,6 +172,7 @@ def emit_kernel(plan: Plan, device: int = 0) -> str:
         out.append(_wait_code(plan, g))
         out.append("      }")
         out.append("      __syncthreads();")
+        out.append("      if (tr && threadIdx.x == 0) tr[1] = (uint64_t)ETX_TIMER();")
         for ev in g.in_edges:
             out.append(f"      ETX_ACQUIRE_{_scope_macro(plan, ev)}();")
         coord_vars = [f"t.coord[{i}]" for i in range(len(g.grid))]
@@ -180,6 +186,7 @@ def emit_kernel(plan: Plan, device: int = 0) -> str:
             out.append(f"        {ig.body.symbol}(&pctx); __syncthreads(); }}")
         out.append(f"      {g.body.symbol}(&ctx);")
         out.append("      __syncthreads();")
+        out.append("      if (tr && threadIdx.x == 0) { tr[2] = (uint64_t)ETX_TIMER(); tr[3] = worker; }")
         out.append("      if (threadIdx.x == 0) {")
         for ev_name, e in plan.graph.events.items():
             if e.runtime_init_by == g.name and e.runtime_count is not None:
@@ -188,7 +195,8 @@ def emit_kernel(plan: Plan, device: int = 0) -> str:
                 out.append(f"        for (int i = 0; i < p.ev_shape[{list(plan.events).index(ev_name)}][0]; ++i) "
                            f"p.events[{ep.offset} + i] = {expr};   // runtime init of {ev_name}")
         for ev in g.out_edges:
-            out.append(f"        ETX_RELEASE_{_scope_macro(plan, ev)}();")
+            if plan.events[ev].scope != Scope.DEVICE:          # DEVICE-scope arrives carry their own (last-arriver) release
+                out.append(f"        ETX_RELEASE_{_scope_macro(plan, ev)}();")
         out.append(_arrive_code(plan, g, mode))
         out.append("      }")
         out.append("      break; }")
@@ -231,7 +239,7 @@ def emit_kernel(plan: Plan, device: int = 0) -> str:
     out.append("    spins = 0;")
     out.append("    if (p.trace_exec && threadIdx.x == 0) atomicAdd(p.trace_exec + tid, 1);")
     out.append("    const etx_task cur = p.descs[tid];")
-    out.append("    etx_run_task(p, cur, worker, domain);")
+    out.append("    etx_run_task(p, cur, worker, domain, tid);")
     out.append("    if (threadIdx.x == 0 && etx_type_is_dynamic[cur.type]) atomicAdd(p.ctrl_done, 1);   // static tasks cost no atomic")
     out.append("    __syncthreads();")
     out.append("  }")

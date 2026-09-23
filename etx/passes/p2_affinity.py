@@ -85,14 +85,18 @@ def run(plan: Plan) -> None:
                 scope = Scope.SYSTEM
             elif len(parties) > 1 and scope < Scope.DEVICE:
                 scope = Scope.DEVICE
-        # flattened counts in linear order
+        # flattened counts in linear order, and per-domain producer shares (last-arriver flush)
         import itertools
-        for c in itertools.product(*[range(d) for d in shape]):
+        share: dict[tuple[int, int], list[int]] = {}
+        for lin, c in enumerate(itertools.product(*[range(d) for d in shape])):
             counts.append(inst.wait_counts[(name, c)])
+            for p in inst.producers[(name, c)]:
+                key = dom_of[p]
+                share.setdefault(key, [0] * numel)[lin] += 1
         eff = m.effective_scope(scope)
         plan.events[name] = EventPlan(name=name, shape=shape, scope=eff, offset=offset, numel=numel,
                                       cross_domain_edges=cross_dom, cross_device_edges=cross_dev,
-                                      counts=counts, runtime_init=e.is_runtime_count)
+                                      counts=counts, runtime_init=e.is_runtime_count, share=share)
         e.scope = eff
         offset += numel
     per_domain = Counter(t.domain for t in plan.tasks)

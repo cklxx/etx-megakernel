@@ -52,7 +52,11 @@ struct etx_params {
   const int32_t*   push_lists;
   const int32_t*   push_index;         // per event id: base offset into push_offsets
   int32_t*         task_remaining;     // per task: in-event coordinates not yet at zero (dynamic/hybrid tasks); pushed at 0
+  int32_t*         ev_sub;             // [n_domains][event words]: per-domain arrival sub-counters (last-arriver flush), zeroed per step
+  const int32_t*   ev_share;           // [n_domains][event words]: producers of each coordinate on each domain (0 = plain arrive)
+  int32_t          event_words;
   int32_t*         trace_exec;         // optional: per-task execution counter (debug); nullptr to disable
+  uint64_t*        trace_time;         // optional: per task 4 x ETX_TIMER ticks {taken, deps ready, body done, worker}; nullptr to disable
   int32_t*         ctrl_abort;         // host writes 1 to abort; kernel writes 2 on spin timeout
   int32_t*         ctrl_done;          // tasks completed this step
   int32_t          n_tasks;            // this device's tasks (diagnostics)

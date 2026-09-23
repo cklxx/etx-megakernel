@@ -49,6 +49,7 @@ class EventPlan:
     cross_device_edges: int = 0
     counts: list[int] = field(default_factory=list)
     runtime_init: bool = False
+    share: dict[tuple[int, int], list[int]] = field(default_factory=dict)   # (device, domain) -> producers per linear coordinate
 
 
 @dataclass

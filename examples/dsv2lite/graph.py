@@ -47,7 +47,7 @@ def _res(lds: int = SCRATCH_BYTES) -> Resource:
 
 def _chiplet(g: Graph, name: str, symbol: str, L: int, in_edges: dict, out_edges: dict, dur: float, **kw):
     return g.call_device(name, (XCDS, W), hip_link(T, symbol), resource=_res(), args=["fleet", f"layer_{L}"],
-                         domain_map="xw->x", in_edges=in_edges, out_edges=out_edges, duration_us=dur, duration_cv=0.05, **kw)
+                         domain_map="xw->x", worker_map="xw->w", in_edges=in_edges, out_edges=out_edges, duration_us=dur, duration_cv=0.05, **kw)
 
 
 def build_attention_block(g: Graph, L: int, e_in: str, e_in_map: str, fold: bool) -> str:
@@ -93,7 +93,7 @@ def build_dense_layer(g: Graph, L: int, e_in: str, e_in_map: str, fold: bool) ->
     return f"E_dense_{L}"
 
 
-def build(layers: int = LAYERS, routing_cached: bool = False) -> Graph:
+def build(layers: int = LAYERS, routing_cached: bool = True) -> Graph:
     g = Graph("dsv2lite_decode")
     g.tensor("fleet", (1,), role="weight", bytes_per_elem=8)   # FleetParams*, set by the host
     g.tensor("layer_-1", (1,), role="runtime", bytes_per_elem=4)

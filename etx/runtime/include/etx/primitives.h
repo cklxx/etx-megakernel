@@ -31,6 +31,22 @@ ETX_DEFINE_SCOPE(DEVICE)
 ETX_DEFINE_SCOPE(SYSTEM)
 #undef ETX_DEFINE_SCOPE
 
+// Last-arriver flush (fleet's scheme, measured 13 -> 6 us per layer on MI300X): for a
+// DEVICE-scope event with several producers on one domain, every producer drains its
+// stores and bumps the domain's sub-counter; only the arrival that completes the
+// domain's share performs the L2 write-back and subtracts the whole share from the
+// global counter. Returns the global counter's new value when this call updated it,
+// else a positive dummy (the caller only acts on 0).
+static __device__ __forceinline__ int32_t etx_arrive_flush_DEVICE(const etx_params& p, int32_t idx, uint32_t domain) {
+  const int32_t share = p.ev_share ? p.ev_share[(size_t)domain * p.event_words + idx] : 0;
+  if (share <= 1) { ETX_RELEASE_DEVICE(); return ETX_ARRIVE_DEVICE(p.events + idx) - 1; }
+  ETX_RELEASE_DOMAIN();                                              // drain this workgroup's stores into the domain's L2
+  const int32_t old = atomicAdd(p.ev_sub + (size_t)domain * p.event_words + idx, 1);
+  if (old + 1 != share) return 1;
+  ETX_RELEASE_DEVICE();                                              // one write-back covers every earlier arrival's stores
+  return __hip_atomic_fetch_sub(p.events + idx, share, __ATOMIC_RELAXED, __HIP_MEMORY_SCOPE_AGENT) - share;
+}
+
 // Queues: many-producer many-consumer *ticket* ring. Measured on MI300X
 // (bench/calib/queue_contention): a CAS-based pop costs ~1.1 us alone and its
 // retry storm makes aggregate throughput fall past 8 poppers. The ticket ring

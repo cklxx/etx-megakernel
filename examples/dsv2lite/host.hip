@@ -111,7 +111,8 @@ int main(int argc, char** argv) {
     uint32_t* misc = dev_alloc<uint32_t>(16); rt.xcd_arrivals = misc; rt.grid_arrivals = misc + kXCDs; rt.abort = misc + kXCDs + 1;
     rt.teacher = teacher ? 1 : 0; rt.spin_limit = 1u << 22; rt.coherent_acts = 0; rt.smoke = 0; rt.direct_poll = 1;
     for (int i = 0; i < 4; ++i) rt.fenced_events[i] = -1; rt.epoch0 = 1; rt.n_tokens = 1; rt.trace = nullptr; rt.trace_token = -1; }
-  FleetParams fp{}; fp.rt = rt; fp.d = d; fp.w = w; fp.act = act; fp.kv = kv;
+  FleetParams fp{}; fp.rt = rt; fp.d = d; fp.w = w; fp.kv = kv;
+  std::memcpy(&fp.act, &act, sizeof(act));    // Activations has __restrict__ array members: no implicit copy-assignment
   FleetParams* d_fp = nullptr; HIP_CHECK(hipMalloc(&d_fp, sizeof(FleetParams)));
 
   // ---- ETX host: argument table = FleetParams pointer + per-grid layer ids
@@ -169,6 +170,7 @@ int main(int argc, char** argv) {
     }
     std::printf("  consecutive layers within the gate: %d of %d\n", layers_ok, d.layers);
   }
+  hst.report_phases(etx_type_names, ETX_N_TYPES);     // ETX_TRACE=1: per-type wait / body / span of the last token
   std::vector<float> sorted(ms); std::sort(sorted.begin(), sorted.end());
   double sum = 0; for (float v : ms) sum += v;
   std::printf("\nper-token latency (embed -> argmax on device): median %.3f ms  mean %.3f ms; step wall (launch to end) %.3f ms/token\n",
