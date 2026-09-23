@@ -47,6 +47,58 @@ static __device__ __forceinline__ int32_t etx_arrive_flush_DEVICE(const etx_para
   return __hip_atomic_fetch_sub(p.events + idx, share, __ATOMIC_RELAXED, __HIP_MEMORY_SCOPE_AGENT) - share;
 }
 
+// Relay (P5, fleet's per-XCD scheduler mirror generalised). One workgroup per domain
+// polls the DEVICE-scope words and copies every change into its domain's mirror, so a
+// global word has n_domains pollers instead of every consumer. Happens-before chain:
+// producer release -> global arrive -> relay's relaxed poll -> relay ACQUIRE_DEVICE
+// (on AMD this invalidates the domain's L2 once) -> relay RELEASE -> mirror store ->
+// consumer's relaxed poll of the mirror -> consumer ACQUIRE_DOMAIN (its own L1). With
+// relay_local_acquire = 0 the consumer does the full ACQUIRE_DEVICE itself (fleet's
+// choice; A/B switch). The relay exits when every mirrored word reached zero.
+static __device__ void etx_relay(const etx_params& p, uint32_t domain) {
+  __shared__ int s_live;
+  etx_event* mirror = p.ev_mirror + (size_t)domain * p.event_words;
+  ETX_PRIO_HIGH();
+  for (;;) {
+    int live = 0, changed = 0;
+    for (int k = threadIdx.x; k < p.n_relay; k += blockDim.x) {
+      const int32_t w = p.relay_words[k];
+      const int32_t g = ETX_POLL_DEVICE(p.events + w);
+      if (g > 0) live = 1;
+      if (ETX_POLL_DOMAIN(mirror + w) != g) {
+        if (!changed) { ETX_ACQUIRE_DEVICE(); ETX_RELEASE_DEVICE(); changed = 1; }
+        etx_store_relaxed_device(mirror + w, g);
+      }
+    }
+    if (threadIdx.x == 0) s_live = 0;
+    __syncthreads();
+    if (live) s_live = 1;
+    __syncthreads();
+    if (!s_live || ETX_POLL_DEVICE(p.ctrl_abort) != 0) break;
+    if (!changed) ETX_BACKOFF();
+    __syncthreads();
+  }
+  ETX_PRIO_NORMAL();
+}
+
+// DEVICE-scope wait through the domain's mirror. Returns true when the relay's
+// acquire covers this domain (the caller then only needs ACQUIRE_DOMAIN). Every 64th
+// poll also reads the global word, so a domain without a relay (a workgroup placement
+// the plan did not expect) degrades to slow polling instead of hanging.
+static __device__ __forceinline__ bool etx_wait_DEVICE_mirror(const etx_params& p, int32_t w, uint32_t domain) {
+  if (!p.ev_mirror) { etx_wait_DEVICE(p.events + w, p.ctrl_abort); return false; }
+  const etx_event* m = p.ev_mirror + (size_t)domain * p.event_words + w;
+  uint32_t n = 0;
+  while (ETX_POLL_DOMAIN(m) > 0) {
+    ETX_BACKOFF();
+    if ((++n & 63u) == 0) {
+      if (ETX_POLL_DEVICE(p.events + w) <= 0) return false;
+      if ((n & 1023u) == 0 && ETX_POLL_DEVICE(p.ctrl_abort) != 0) return false;
+    }
+  }
+  return p.relay_local_acquire != 0;
+}
+
 // Queues: many-producer many-consumer *ticket* ring. Measured on MI300X
 // (bench/calib/queue_contention): a CAS-based pop costs ~1.1 us alone and its
 // retry storm makes aggregate throughput fall past 8 poppers. The ticket ring

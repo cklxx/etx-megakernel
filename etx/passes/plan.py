@@ -23,6 +23,7 @@ class PassOptions:
     affinity_imbalance: float = 1.25       # max load / mean load tolerated when following producers
     sentinel_signals: bool = False         # lower waits to sentinel polling where the capability exists
     inline_tiles: bool = False             # emit #include of the tile sources into the kernel TU (single-TU build, bodies inlinable)
+    relay: str = "auto"                    # per-domain relay of DEVICE-scope counters: auto (cost model) | on | off
 
 
 @dataclass
@@ -82,6 +83,8 @@ class Plan:
     prefetch: list[dict[str, Any]] = field(default_factory=list)
     eliminated_events: list[str] = field(default_factory=list)
     inlined: dict[str, Any] = field(default_factory=dict)      # producer grids removed by Pass 3 (name -> TaskGrid)
+    relay: bool = False                     # one workgroup per domain mirrors DEVICE-scope counters (P5)
+    relay_words: dict[int, list[int]] = field(default_factory=dict)   # device -> DEVICE-scope event words it mirrors
     log: list[str] = field(default_factory=list)
 
     # helpers -----------------------------------------------------------------

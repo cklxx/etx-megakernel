@@ -28,6 +28,7 @@ struct etx_ctx {
   uint32_t        domain;
   uint32_t        worker;
   void*           lds;
+  int32_t         cst[4];              // per-grid compile-time constants (TaskGrid.consts): immediates, no load after the wait
 };
 
 struct etx_params {
@@ -40,6 +41,7 @@ struct etx_params {
   const int32_t  (*ev_shape)[4];
   const etx_task*  descs;
   const int32_t*   static_queue;       // concatenated per-worker queues
+  const etx_task*  static_descs;       // descs[static_queue[i]], so a static worker takes its head with one load
   const int32_t*   static_begin;       // per worker
   const int32_t*   static_end;
   etx_queue*       local_queue;        // one per domain
@@ -63,4 +65,10 @@ struct etx_params {
   int32_t          n_dynamic;          // this device's dynamic + hybrid tasks: the only ones counted in ctrl_done
   uint32_t         spin_limit;
   int32_t          n_events;
+  // relay (P5): one workgroup per domain mirrors the DEVICE-scope words into ev_mirror[domain][word];
+  // DEVICE-scope waits poll their domain's mirror. nullptr = off (waits poll the global words).
+  etx_event*       ev_mirror;
+  const int32_t*   relay_words;        // this device's mirrored word offsets
+  int32_t          n_relay;
+  int32_t          relay_local_acquire; // 1: the relay's acquire covers the domain, consumers only drop L1
 };

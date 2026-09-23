@@ -9,10 +9,51 @@ the in-kernel alternative; kept host-side in this version).
 """
 from __future__ import annotations
 
+from ..ir.types import Scope
 from .plan import Plan
 
 
+def _decide_relay(plan: Plan) -> None:
+    """Per-domain relay for DEVICE-scope events (fleet's scheduler mirror, generalised).
+
+    Without it every consumer polls the one global counter word: on MI300X 296
+    workers polling one line cost ~2 us per phase transition on the full model.
+    With it, one workgroup per domain polls the global words and copies changes
+    into a domain-local mirror that the domain's consumers poll, and it performs
+    the domain-level half of the acquire (the L2 invalidate) once per domain, so
+    consumers only drop their own L1.  Costs one workgroup per domain.
+    """
+    plan.relay = False
+    plan.relay_words = {}
+    opt = plan.options.relay
+    if opt == "off" or plan.n_domains <= 1:
+        return
+    threshold = int(plan.machine.costs.get("relay_min_pollers") or 64)
+    worst = 0
+    words: dict[int, list[int]] = {}
+    for ev, ep in plan.events.items():
+        if ep.scope != Scope.DEVICE:
+            continue
+        for (e, c), cons in plan.inst.consumers.items():
+            if e != ev or not cons:
+                continue
+            worst = max(worst, len(cons))
+            for d in sorted({plan.tasks[plan.task_index[t]].device for t in cons}):
+                words.setdefault(d, []).append(ep.offset + plan.linear(ev, c))
+    if not words:
+        return
+    if opt == "auto" and worst < threshold:
+        plan.say(f"P5: no relay: at most {worst} consumers poll one DEVICE-scope word (< {threshold})")
+        return
+    plan.relay = True
+    plan.relay_words = {d: sorted(set(w)) for d, w in words.items()}
+    plan.workers_per_domain -= 1
+    plan.say(f"P5: relay on: up to {worst} consumers poll one DEVICE-scope word (>= {threshold}); one workgroup per domain "
+             f"mirrors {max(len(w) for w in plan.relay_words.values())} words, workers/domain -> {plan.workers_per_domain}")
+
+
 def run(plan: Plan) -> None:
+    _decide_relay(plan)
     wpd = plan.workers_per_domain
     rr: dict[tuple[int, int], int] = {}
     plan.static_queues.clear()

@@ -30,11 +30,31 @@ struct FleetParams {
   int32_t dump;         // 1: copy every layer's x to act.layer_dump (first token)
 };
 
+// FleetParams location. FLEET_CONST_PARAMS=1 (default): a __constant__ copy the host refreshes per
+// token, so the bodies read weights / dims / runtime state with scalar loads the way fleet's kernel
+// reads its kernel arguments. 0: through the pointer in argument 0 (global memory, vector loads).
+#ifndef FLEET_CONST_PARAMS
+#define FLEET_CONST_PARAMS 1
+#endif
+#if FLEET_CONST_PARAMS
+__constant__ FleetParams etx_fleet_const;
+#define FP(c) (&etx_fleet_const)
+extern "C" void fleet_set_params(const void* host_fp, hipStream_t s) {
+  (void)hipMemcpyToSymbolAsync(HIP_SYMBOL(etx_fleet_const), host_fp, sizeof(FleetParams), 0, hipMemcpyHostToDevice, s);
+  (void)hipStreamSynchronize(s);
+}
+#else
+#define FP(c) ((const FleetParams*)(c)->args[0])
+extern "C" void fleet_set_params(const void*, hipStream_t) {}
+#endif
+// the layer index is a per-grid constant (graph.py consts=(L,)): an immediate in ctx.cst, not a load
+#define LAYER(c) ((c)->cst[0])
+
 static __device__ __forceinline__ void fleet_call(const etx_ctx* c, uint16_t kind, int16_t flags,
                                                   int head, int kv_chunk, int n_split, int expert_slot,
                                                   int worker) {
-  const FleetParams* fp = (const FleetParams*)c->args[0];
-  const int32_t L = *(const int32_t*)c->args[1];
+  const FleetParams* fp = FP(c);
+  const int32_t L = LAYER(c);
   fleet::TaskDescriptor t{};
   t.kind = kind; t.layer = (int16_t)L; t.xcd = (int16_t)c->domain; t.worker = (int16_t)worker;
   t.wait_event = -1; t.signal_event = -1; t.signal_scope = 0; t.n_split = (int16_t)n_split;
@@ -69,16 +89,16 @@ extern "C" __device__ void fleet_q_absorb(const etx_ctx* c) {
   fleet_call(c, fleet::TASK_Q_ABSORB, 0, c->coord[0], c->coord[1], fleet::kQAbsSlices, -1, 0);
   __syncthreads();
   if (threadIdx.x == 0) {
-    const FleetParams* fp = (const FleetParams*)c->args[0];
-    const int32_t L = *(const int32_t*)c->args[1];
+    const FleetParams* fp = FP(c);
+    const int32_t L = LAYER(c);
     fleet::drain_stores();
     __hip_atomic_fetch_add(&fp->rt.xcd_counters[(size_t)c->domain * fleet::kMaxEvents + QABS_EVENT(L, c->coord[0])], 1u,
                            __ATOMIC_RELAXED, __HIP_MEMORY_SCOPE_AGENT);
   }
 }
 extern "C" __device__ void fleet_attention(const etx_ctx* c) {
-  const FleetParams* fp = (const FleetParams*)c->args[0];
-  const int32_t L = *(const int32_t*)c->args[1];
+  const FleetParams* fp = FP(c);
+  const int32_t L = LAYER(c);
   fleet::TaskDescriptor t{};
   t.kind = fleet::TASK_ATTENTION; t.layer = (int16_t)L; t.xcd = (int16_t)c->domain; t.worker = 0;
   t.wait_event = -1; t.signal_event = -1; t.n_split = fleet::kMaxKvChunks; t.head = (int16_t)c->coord[0];
@@ -97,15 +117,15 @@ extern "C" __device__ void fleet_merge_uv(const etx_ctx* c) { fleet_call(c, flee
 extern "C" __device__ void fleet_o_proj(const etx_ctx* c) { fleet_call(c, fleet::TASK_O_PROJ, 0, -1, -1, 1, -1, CHIPLET_WORKER); }
 extern "C" __device__ void fleet_norm_router(const etx_ctx* c) { fleet_call(c, fleet::TASK_NORM_ROUTER, 0, -1, -1, 1, -1, CHIPLET_WORKER); }
 extern "C" __device__ void fleet_expert_gate_up(const etx_ctx* c) {
-  const FleetParams* fp = (const FleetParams*)c->args[0];
+  const FleetParams* fp = FP(c);
   fleet_call(c, fleet::TASK_EXPERT_GATE_UP, fleet::FLAG_CHUNK_SIGNAL, -1, 1, 1, SLOT_OF_XCD(fp->d.top_k), CHIPLET_WORKER);
 }
 extern "C" __device__ void fleet_expert_down(const etx_ctx* c) {
-  const FleetParams* fp = (const FleetParams*)c->args[0];
+  const FleetParams* fp = FP(c);
   fleet_call(c, fleet::TASK_EXPERT_DOWN, fleet::FLAG_CHUNK_WAIT, -1, 1, 1, SLOT_OF_XCD(fp->d.top_k), CHIPLET_WORKER);
 }
 extern "C" __device__ void fleet_expert_down_cached(const etx_ctx* c) {
-  const FleetParams* fp = (const FleetParams*)c->args[0];
+  const FleetParams* fp = FP(c);
   fleet_call(c, fleet::TASK_EXPERT_DOWN, fleet::FLAG_CHUNK_WAIT | fleet::FLAG_ROUTING_CACHED, -1, 1, 1, SLOT_OF_XCD(fp->d.top_k), CHIPLET_WORKER);
 }
 extern "C" __device__ void fleet_dense_gate_up(const etx_ctx* c) { fleet_call(c, fleet::TASK_DENSE_GATE_UP, 0, -1, -1, 1, -1, CHIPLET_WORKER); }

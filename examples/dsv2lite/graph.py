@@ -46,7 +46,7 @@ def _res(lds: int = SCRATCH_BYTES) -> Resource:
 
 
 def _chiplet(g: Graph, name: str, symbol: str, L: int, in_edges: dict, out_edges: dict, dur: float, **kw):
-    return g.call_device(name, (XCDS, W), hip_link(T, symbol), resource=_res(), args=["fleet", f"layer_{L}"],
+    return g.call_device(name, (XCDS, W), hip_link(T, symbol), resource=_res(), args=["fleet", f"layer_{L}"], consts=(L,),
                          domain_map="xw->x", worker_map="xw->w", in_edges=in_edges, out_edges=out_edges, duration_us=dur, duration_cv=0.05, **kw)
 
 
@@ -59,14 +59,14 @@ def build_attention_block(g: Graph, L: int, e_in: str, e_in_map: str, fold: bool
     g.etensor(f"E_merge_{L}", (XCDS,), wait_count=(HEADS // XCDS) * KV_CHUNKS)
     g.etensor(f"E_oproj_{L}", (1,), wait_count=XCDS * W)
     _chiplet(g, f"qkv_{L}", "fleet_qkv_fused_fold" if fold else "fleet_qkv_fused", L, {e_in: e_in_map}, {f"E_qkv_{L}": "xw->x"}, DUR["qkv"])
-    g.call_device(f"qabs_{L}", (HEADS, QABS), hip_link(T, "fleet_q_absorb"), resource=_res(), args=["fleet", f"layer_{L}"],
+    g.call_device(f"qabs_{L}", (HEADS, QABS), hip_link(T, "fleet_q_absorb"), resource=_res(), args=["fleet", f"layer_{L}"], consts=(L,),
                   domain_map="hs->(h/2)", in_edges={f"E_qkv_{L}": "hs->(h/2)"}, out_edges={f"E_qabs_{L}": "hs->h"}, duration_us=DUR["qabs"])
-    g.call_device(f"attn_{L}", (HEADS, KV_CHUNKS), hip_link(T, "fleet_attention"), resource=_res(), args=["fleet", f"layer_{L}"],
+    g.call_device(f"attn_{L}", (HEADS, KV_CHUNKS), hip_link(T, "fleet_attention"), resource=_res(), args=["fleet", f"layer_{L}"], consts=(L,),
                   # E_qabs is consumed INSIDE the attention body (fleet's PUB_WAIT, kept for overlap; see fleet_shim.hip);
                   # ETX still orders attention after E_qkv, and qabs after E_qkv, so the in-body wait is deadlock-free.
                   domain_map="hc->(h/2)", in_edges={f"E_qkv_{L}": "hc->(h/2)"},
                   out_edges={f"E_attn_{L}": "hc->h"}, duration_us=DUR["attn"], duration_cv=0.1)
-    g.call_device(f"merge_{L}", (HEADS, KV_CHUNKS), hip_link(T, "fleet_merge_uv"), resource=_res(), args=["fleet", f"layer_{L}"],
+    g.call_device(f"merge_{L}", (HEADS, KV_CHUNKS), hip_link(T, "fleet_merge_uv"), resource=_res(), args=["fleet", f"layer_{L}"], consts=(L,),
                   domain_map="hc->(h/2)", in_edges={f"E_attn_{L}": "hc->h"}, out_edges={f"E_merge_{L}": "hc->(h/2)"}, duration_us=DUR["merge"])
     _chiplet(g, f"oproj_{L}", "fleet_o_proj", L, {f"E_merge_{L}": "xw->x"}, {f"E_oproj_{L}": "xw->(0)"}, DUR["oproj"])
     return f"E_oproj_{L}"
@@ -100,7 +100,7 @@ def build(layers: int = LAYERS, routing_cached: bool = True) -> Graph:
     g.tensor("fleet", (1,), role="weight", bytes_per_elem=8)   # FleetParams*, set by the host
     g.tensor("layer_-1", (1,), role="runtime", bytes_per_elem=4)
     g.etensor("E_embed", (1,), wait_count=1)
-    g.call_device("embed", (1,), hip_link(T, "fleet_embed"), resource=_res(), args=["fleet", "layer_-1"],
+    g.call_device("embed", (1,), hip_link(T, "fleet_embed"), resource=_res(), args=["fleet", "layer_-1"], consts=(-1,),
                   out_edges={"E_embed": "i->i"}, duration_us=DUR["embed"])
     e, m = "E_embed", "xw->(0)"
     prev_moe = False
@@ -112,7 +112,7 @@ def build(layers: int = LAYERS, routing_cached: bool = True) -> Graph:
     g.etensor("E_lm", (1,), wait_count=XCDS * W)
     g.etensor("E_argmax", (1,), wait_count=1)
     _chiplet(g, "lm_head", "fleet_lm_head_fold" if prev_moe else "fleet_lm_head", -1, {e: "xw->(0)"}, {"E_lm": "xw->(0)"}, DUR["lm_head"])
-    g.call_device("argmax", (1,), hip_link(T, "fleet_argmax"), resource=_res(), args=["fleet", "layer_-1"],
+    g.call_device("argmax", (1,), hip_link(T, "fleet_argmax"), resource=_res(), args=["fleet", "layer_-1"], consts=(-1,),
                   in_edges={"E_lm": "i->i"}, out_edges={"E_argmax": "i->i"}, duration_us=DUR["argmax"])
     return g
 

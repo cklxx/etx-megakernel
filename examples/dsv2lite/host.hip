@@ -23,6 +23,7 @@ struct FleetParams {                    // must match fleet_shim.hip
   int32_t tok; uint32_t epoch; int32_t pos; int32_t dump;
 };
 extern "C" __global__ void etx_megakernel_d0(etx_params);
+extern "C" void fleet_set_params(const void* host_fp, hipStream_t s);   // fleet_shim.hip: refresh the __constant__ copy
 extern "C" size_t fleet_scratch_bytes();
 
 int main(int argc, char** argv) {
@@ -141,6 +142,7 @@ int main(int argc, char** argv) {
     for (int t = 0; t < tokens; ++t) {
       fp.tok = t; fp.epoch = (uint32_t)(run * tokens + t + 1); fp.pos = context + t; fp.dump = (last && t == 0) ? 1 : 0;
       HIP_CHECK(hipMemcpy(d_fp, &fp, sizeof(fp), hipMemcpyHostToDevice));
+      fleet_set_params(&fp, hst.stream);
       if (!hst.run(20.0)) { std::printf("token %d: ETX step failed\n", t); return 2; }
       wall_total += hst.last_ms;
     }

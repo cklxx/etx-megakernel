@@ -67,15 +67,24 @@ def _runtime_count_c(plan: Plan, expr: str) -> str:
     return _re.sub(r"\b(\w+)\[", repl, expr)
 
 
+def _relayed(plan: Plan, ep) -> bool:
+    return plan.relay and ep.scope == Scope.DEVICE
+
+
 def _wait_code(plan: Plan, g: TaskGrid) -> str:
     lines = []
+    if any(_relayed(plan, plan.events[ev]) for ev in g.in_edges):
+        lines.append("      bool etx_lok = true;   // every relayed wait was covered by its domain relay's acquire")
     coord_vars = [f"t.coord[{i}]" for i in range(len(g.grid))]
     for ev, m in g.in_edges.items():
         ep = plan.events[ev]
         sc = ep.scope.name
         width = _gather_width(plan, m.gather_tensor) if m.kind == "gather" else ""
-        lines.append(f"      // wait {ev} via {m.text!r} ({sc})")
-        lines.append(f"#define ETX_TARGET(idx) etx_wait_{sc}(p.events + {ep.offset} + (idx), p.ctrl_abort)")
+        lines.append(f"      // wait {ev} via {m.text!r} ({sc}{', relay mirror' if _relayed(plan, ep) else ''})")
+        if _relayed(plan, ep):
+            lines.append(f"#define ETX_TARGET(idx) etx_lok &= etx_wait_DEVICE_mirror(p, {ep.offset} + (idx), domain)")
+        else:
+            lines.append(f"#define ETX_TARGET(idx) etx_wait_{sc}(p.events + {ep.offset} + (idx), p.ctrl_abort)")
         lines.append(m.to_c(coord_vars, f"p.ev_shape[{list(plan.events).index(ev)}]", "ETX_TARGET",
                             _runtime_ptrs(plan, g), width, _symbols(plan)).rstrip())
         lines.append("#undef ETX_TARGET")
@@ -179,11 +188,14 @@ def emit_kernel(plan: Plan, device: int = 0) -> str:
     out.append("  if (tr && threadIdx.x == 0) tr[0] = (uint64_t)ETX_TIMER();")
     out.append("  etx_ctx ctx; for (int i = 0; i < 4; ++i) ctx.coord[i] = t.coord[i];")
     out.append("  ctx.shape = p.shape; ctx.args = p.type_args + t.type * p.max_args; ctx.events = p.events; ctx.ev_offset = p.ev_offset; ctx.ev_shape = (const int32_t*)p.ev_shape;")
-    out.append("  ctx.domain = domain; ctx.worker = worker; ctx.lds = etx_lds;")
+    out.append("  ctx.domain = domain; ctx.worker = worker; ctx.lds = etx_lds; ctx.cst[0] = ctx.cst[1] = ctx.cst[2] = ctx.cst[3] = 0;")
     out.append("  switch (t.type) {")
     for g in grids:
         mode = plan.modes.get(g.name, "static")
         out.append(f"    case {plan.type_ids[g.name]}: {{ // {g.name} [{mode}] grid={g.grid}")
+        if g.consts:
+            cs = list(g.consts)[:4] + [0] * (4 - min(4, len(g.consts)))
+            out.append(f"      ctx.cst[0] = {cs[0]}; ctx.cst[1] = {cs[1]}; ctx.cst[2] = {cs[2]}; ctx.cst[3] = {cs[3]};")
         if g.body.prefetch and plan.options.prefetch and plan.machine.capabilities.get("async_copy_to_lds", "none") != "none":
             out.append(f"      {g.body.prefetch}(&ctx);   // lever 3: weights do not depend on events; warm them before waiting")
         out.append("      if (threadIdx.x == 0) {")
@@ -192,8 +204,12 @@ def emit_kernel(plan: Plan, device: int = 0) -> str:
         # not from all 4 waves (measured on MI300X: 4x the L2 invalidates slowed the phases after
         # DEVICE-scope events); __syncthreads orders every other wave's loads after it
         acq = sorted({_scope_macro(plan, ev) for ev in g.in_edges}, key=lambda s: Scope[s].value)
+        relayed = any(_relayed(plan, plan.events[ev]) for ev in g.in_edges)
         for sc in acq:
-            out.append(f"        ETX_ACQUIRE_{sc}();")
+            if sc == "DEVICE" and relayed:
+                out.append("        if (etx_lok) ETX_ACQUIRE_DOMAIN(); else ETX_ACQUIRE_DEVICE();   // relay did the domain-level half")
+            else:
+                out.append(f"        ETX_ACQUIRE_{sc}();")
         out.append("      }")
         out.append("      __syncthreads();")
         out.append("      if (tr && threadIdx.x == 0) tr[1] = (uint64_t)ETX_TIMER();")
@@ -203,6 +219,8 @@ def emit_kernel(plan: Plan, device: int = 0) -> str:
             exprs = EdgeMap.parse(mtext).coord_exprs_c(coord_vars, _symbols(plan))
             out.append(f"      {{ // prologue: recompute {pro} for this task (Pass 3)")
             out.append(f"        etx_ctx pctx = ctx; pctx.args = p.type_args + {plan.type_ids[pro]} * p.max_args;")
+            pc = list(ig.consts)[:4] + [0] * (4 - min(4, len(ig.consts)))
+            out.append(f"        pctx.cst[0] = {pc[0]}; pctx.cst[1] = {pc[1]}; pctx.cst[2] = {pc[2]}; pctx.cst[3] = {pc[3]};")
             for d in range(4):
                 out.append(f"        pctx.coord[{d}] = {exprs[d] if d < len(exprs) else 0};")
             out.append(f"        etx_call_body({symbols.index(ig.body.symbol)}, &pctx); __syncthreads(); }}   // {ig.body.symbol}")
@@ -226,19 +244,44 @@ def emit_kernel(plan: Plan, device: int = 0) -> str:
     out.append("  }")
     out.append("}")
     out.append("")
+    static_only = all(t.mode == "static" for t in plan.tasks if t.device == device)
     out.append(f"extern \"C\" __global__ void __launch_bounds__(ETX_THREADS) etx_megakernel_d{device}(etx_params p) {{")
     out.append("  // Logical worker id = domain * workers_per_domain + slot, where the slot is claimed at start.")
     out.append("  // This makes the static queues domain-affine under ANY workgroup->domain mapping (measured (k+6) mod 8 on one VM).")
-    out.append("  __shared__ uint32_t s_domain, s_worker; __shared__ int32_t s_tid;")
+    out.append("  __shared__ uint32_t s_domain, s_worker; __shared__ int32_t s_tid, s_slot;")
     out.append("  if (threadIdx.x == 0) {")
     out.append("    const uint32_t d = etx_discover_domain(p, blockIdx.x);")
     out.append("    const int32_t slot = atomicAdd(p.domain_slots + d, 1);")
-    out.append("    s_domain = d; s_worker = (slot < p.workers_per_domain) ? d * p.workers_per_domain + slot : 0xFFFFFFFFu;")
+    out.append("    s_domain = d; s_slot = slot; s_worker = (slot < p.workers_per_domain) ? d * p.workers_per_domain + slot : 0xFFFFFFFFu;")
     out.append("  }")
     out.append("  __syncthreads();")
     out.append("  const uint32_t domain = s_domain, worker = s_worker;")
+    if plan.relay:
+        out.append("  if (worker == 0xFFFFFFFFu && s_slot == p.workers_per_domain && p.ev_mirror) {   // first surplus workgroup of each domain: its relay (P5)")
+        out.append("    etx_relay(p, domain);")
+        out.append("    return;")
+        out.append("  }")
     out.append("  int32_t cursor = 0, cend = 0;")
     out.append("  if (worker != 0xFFFFFFFFu) { cursor = p.static_begin[worker]; cend = p.static_end[worker]; }   // surplus workers only serve queues")
+    if static_only:
+        out.append("  // every task on this device is static: no readiness probe, no queue pops -- take the head and")
+        out.append("  // wait on it (the probe was one more poller of the same word and one more round trip per task)")
+        out.append("  __shared__ etx_task s_task;")
+        out.append("  for (;;) {")
+        out.append("    if (threadIdx.x == 0) {")
+        out.append("      if (cursor < cend) { s_tid = p.static_queue[cursor]; s_task = p.static_descs[cursor]; ++cursor; } else s_tid = -1;")
+        out.append("    }")
+        out.append("    __syncthreads();")
+        out.append("    const int32_t tid = s_tid;")
+        out.append("    if (tid < 0) break;")
+        out.append("    const etx_task cur = s_task;")
+        out.append("    if (p.trace_exec && threadIdx.x == 0) atomicAdd(p.trace_exec + tid, 1);")
+        out.append("    etx_run_task(p, cur, worker, domain, tid);")
+        out.append("    __syncthreads();")
+        out.append("  }")
+        out.append("}")
+        out.append("")
+        return "\n".join(out)
     out.append("  int32_t ticket_local = -1, ticket_global = -1;   // ticket-ring reservations, see etx_try_pop")
     out.append("  uint32_t spins = 0;")
     out.append("  for (;;) {")

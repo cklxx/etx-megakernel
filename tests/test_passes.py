@@ -67,3 +67,24 @@ def test_reasons_are_printed():
     plan = compile_graph(moe_layer.build(), "gfx942", b, moe_layer.runtime(b))
     assert all(plan.reasons[g] for g in plan.modes)
     assert any(line.startswith("P3: eliminate E_norm") for line in plan.log)
+
+
+def test_relay_decision_dsv2lite():
+    """P5 turns the per-domain relay on when hundreds of workers poll one DEVICE word."""
+    from examples.dsv2lite import graph as G
+    from etx.passes import compile_graph
+    from etx.passes.plan import PassOptions
+    plan = compile_graph(G.build(layers=2), "gfx942", {})
+    assert plan.relay and plan.workers_per_domain == 37
+    assert plan.relay_words[0], "mirrored words"
+    off = compile_graph(G.build(layers=2), "gfx942", {}, options=PassOptions(relay="off"))
+    assert not off.relay and off.workers_per_domain == 38
+
+
+def test_relay_off_for_small_fanout():
+    from etx.passes import compile_graph
+    import importlib.util, pathlib
+    spec = importlib.util.spec_from_file_location("sk", pathlib.Path(__file__).parent.parent / "examples" / "splitk_sum.py")
+    m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+    plan = compile_graph(m.build(), "gfx942", m.bindings())
+    assert not plan.relay

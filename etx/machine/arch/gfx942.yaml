@@ -74,10 +74,13 @@ costs:                           # MEASURED 2026-09-22, Hot Aisle 1xMI300X VM, R
   t_push_ns: 600                 # atomicAdd(tail) + atomicExch(slot), estimate from pop cost
   queue_contention_us_per_pop: {1: 0.87, 8: 0.94, 64: 1.34, 128: 1.97, 256: 4.64, 512: 6.69}   # per popper, N poppers
   t_prologue_ns: null
+  relay_min_pollers: 64          # P5 turns the per-domain relay on above this many pollers of one DEVICE word
 lowering:
   backoff: '__builtin_amdgcn_s_sleep(8);'   # ~256 cycles between polls; 8 vs 1 measured 4.59 vs 4.60 ms/token
   timer: '__builtin_amdgcn_s_memrealtime()'
   domain_id: 'etx_amdgcn_xcc_id()'          # runtime/include/etx/primitives_amdgcn.h
+  prio_high: 'asm volatile("s_setprio 3");'  # relay waves win issue arbitration (fleet does the same)
+  prio_normal: 'asm volatile("s_setprio 0");'
   launch: hipLaunchCooperativeKernel
 notes:
   - "Plain and sc0 loads hit the stale per-CU L1 and never observe an arrive (measured); poll via buffer_inv sc0 + load or agent atomic load."

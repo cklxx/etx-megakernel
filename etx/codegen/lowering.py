@@ -23,6 +23,8 @@ def emit_lowering_header(m: MachineModel) -> str:
            f"#define ETX_BACKOFF() do {{ {m.lowering.get('backoff', '')} }} while (0)",
            f"#define ETX_TIMER() ({m.lowering.get('timer', '0')})",
            f"#define ETX_DOMAIN_ID() ({m.lowering.get('domain_id', '0')})",
+           f"#define ETX_PRIO_HIGH() do {{ {m.lowering.get('prio_high', '')} }} while (0)",
+           f"#define ETX_PRIO_NORMAL() do {{ {m.lowering.get('prio_normal', '')} }} while (0)",
            ""]
     for s in SCOPES:
         v = m.vis(s)

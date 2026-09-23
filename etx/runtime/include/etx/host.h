@@ -25,6 +25,8 @@ struct etx_host {
   int32_t *d_events = nullptr, *d_ctrl = nullptr, *d_slots = nullptr, *d_trace = nullptr, *d_remaining = nullptr;
   uint64_t* d_trace_time = nullptr;
   int32_t* d_ev_sub = nullptr;
+  int32_t* d_mirror = nullptr;             // relay mirrors [n_domains][event words]
+  std::vector<int32_t> mirror_init;
   int32_t *d_lq_slots = nullptr, *d_lq_head = nullptr, *d_lq_tail = nullptr, *d_gq_slots = nullptr;
   etx_queue* d_local_queues = nullptr;
   bool owns_events = true;
@@ -73,6 +75,11 @@ struct etx_host {
     p.shape = upload(etx_shape, ETX_N_SYMBOLS ? ETX_N_SYMBOLS : 1);
     p.descs = upload(etx_descs, ETX_N_TASKS);
     p.static_queue = upload(etx_static_queue, ETX_STATIC_LEN);
+    {
+      std::vector<etx_task> sd(ETX_STATIC_LEN);
+      for (int i = 0; i < ETX_STATIC_LEN; ++i) sd[i] = etx_descs[etx_static_queue[i] >= 0 ? etx_static_queue[i] : 0];
+      p.static_descs = upload(sd.data(), sd.size());
+    }
     p.static_begin = upload(etx_static_begin + device * ETX_N_WORKERS, ETX_N_WORKERS);
     p.static_end = upload(etx_static_end + device * ETX_N_WORKERS, ETX_N_WORKERS);
     p.ev_offset = upload(etx_ev_offset, ETX_N_EVENTS ? ETX_N_EVENTS : 1);
@@ -118,6 +125,21 @@ struct etx_host {
     p.ev_sub = d_ev_sub;
     if (getenv("ETX_NO_LASTFLUSH")) p.ev_share = nullptr;      // A/B: per-producer write-back
     p.workers_per_domain = ETX_WORKERS_PER_DOMAIN;
+    // relay (P5): ETX_RELAY=0 turns it off at run time (waits then poll the global words; A/B);
+    // ETX_RELAY_ACQ=consumer makes every consumer do the full device acquire itself (fleet's choice)
+    p.ev_mirror = nullptr; p.n_relay = 0; p.relay_words = nullptr; p.relay_local_acquire = 1;
+    {
+      const char* r = getenv("ETX_RELAY");
+      const int32_t b = etx_relay_begin[device], e = etx_relay_begin[device + 1];
+      if (ETX_RELAY && e > b && !(r && !strcmp(r, "0"))) {
+        ETX_CHECK(hipMalloc(&d_mirror, (size_t)ETX_N_DOMAINS * ETX_EVENT_WORDS * sizeof(int32_t)));
+        mirror_init.resize((size_t)ETX_N_DOMAINS * ETX_EVENT_WORDS);
+        for (int d = 0; d < ETX_N_DOMAINS; ++d) memcpy(mirror_init.data() + (size_t)d * ETX_EVENT_WORDS, etx_ev_counts, ETX_EVENT_WORDS * sizeof(int32_t));
+        p.ev_mirror = d_mirror; p.n_relay = e - b; p.relay_words = upload(etx_relay_words + b, (size_t)(e - b));
+        const char* a = getenv("ETX_RELAY_ACQ");
+        p.relay_local_acquire = (a && !strcmp(a, "consumer")) ? 0 : 1;
+      }
+    }
     p.n_workers = ETX_N_WORKERS;
     p.n_tasks = etx_n_tasks_dev[device];
     p.n_dynamic = etx_n_dynamic_dev[device];
@@ -136,6 +158,7 @@ struct etx_host {
     ETX_CHECK(hipMemset(d_trace, 0, ETX_N_TASKS * sizeof(int32_t)));
     ETX_CHECK(hipMemcpy(d_remaining, etx_task_remaining, ETX_N_TASKS * sizeof(int32_t), hipMemcpyHostToDevice));
     ETX_CHECK(hipMemset(d_ev_sub, 0, (size_t)ETX_N_DOMAINS * ETX_EVENT_WORDS * sizeof(int32_t)));
+    if (d_mirror) ETX_CHECK(hipMemcpy(d_mirror, mirror_init.data(), mirror_init.size() * sizeof(int32_t), hipMemcpyHostToDevice));
     int32_t total = 0; for (int d = 0; d < ETX_N_DOMAINS; ++d) total += etx_local_capacity[device * ETX_N_DOMAINS + d];
     if (total) ETX_CHECK(hipMemset(d_lq_slots, 0xFF, total * sizeof(int32_t)));
     std::vector<int32_t> heads(ETX_N_DOMAINS, 0), tails(ETX_N_DOMAINS, 0);
@@ -161,8 +184,8 @@ struct etx_host {
     int max_blocks = 0;
     ETX_CHECK(hipOccupancyMaxActiveBlocksPerMultiprocessor(&max_blocks, kernel, ETX_THREADS, 0));
     hipDeviceProp_t prop; ETX_CHECK(hipGetDeviceProperties(&prop, device));
-    if ((long)max_blocks * prop.multiProcessorCount < ETX_N_WORKERS) {
-      fprintf(stderr, "device %d co-residency: %d workers requested, only %d x %d resident possible\n", device, ETX_N_WORKERS, max_blocks, prop.multiProcessorCount);
+    if ((long)max_blocks * prop.multiProcessorCount < ETX_N_LAUNCH) {
+      fprintf(stderr, "device %d co-residency: %d workgroups requested, only %d x %d resident possible\n", device, ETX_N_LAUNCH, max_blocks, prop.multiProcessorCount);
       return false;
     }
     return true;
@@ -174,8 +197,8 @@ struct etx_host {
     if (!ev_start) { ETX_CHECK(hipEventCreate(&ev_start)); ETX_CHECK(hipEventCreate(&ev_stop)); }
     ETX_CHECK(hipEventRecord(ev_start, stream));
     void* kargs[] = {&p};
-    if (cooperative) ETX_CHECK(hipLaunchCooperativeKernel(kernel, dim3(ETX_N_WORKERS), dim3(ETX_THREADS), kargs, 0, stream));
-    else ETX_CHECK(hipLaunchKernel(kernel, dim3(ETX_N_WORKERS), dim3(ETX_THREADS), kargs, 0, stream));   // residency checked by check_residency()
+    if (cooperative) ETX_CHECK(hipLaunchCooperativeKernel(kernel, dim3(ETX_N_LAUNCH), dim3(ETX_THREADS), kargs, 0, stream));
+    else ETX_CHECK(hipLaunchKernel(kernel, dim3(ETX_N_LAUNCH), dim3(ETX_THREADS), kargs, 0, stream));   // residency checked by check_residency()
     ETX_CHECK(hipEventRecord(ev_stop, stream));
   }
   // wait with watchdog; returns false on timeout / spin limit / incomplete

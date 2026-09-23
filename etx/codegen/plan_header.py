@@ -39,6 +39,15 @@ def emit_plan_header(plan: Plan, device: int = 0) -> str:
     out.append(f"#define ETX_N_DOMAINS {ndom}")
     out.append(f"#define ETX_WORKERS_PER_DOMAIN {wpd}")
     out.append(f"#define ETX_N_WORKERS {nw}")
+    # relay: one extra workgroup per domain (slot == workers_per_domain) mirrors DEVICE-scope words
+    out.append(f"#define ETX_RELAY {int(plan.relay)}")
+    out.append(f"#define ETX_N_LAUNCH {nw + (ndom if plan.relay else 0)}")
+    rw_begin, rw = [], []
+    for d in range(nd):
+        rw_begin.append(len(rw)); rw.extend(plan.relay_words.get(d, []))
+    rw_begin.append(len(rw))
+    out.append(_arr("etx_relay_begin", rw_begin, dims="ETX_N_DEVICES + 1"))
+    out.append(_arr("etx_relay_words", rw))
     out.append(f"#define ETX_THREADS {max([gg.resource.threads for gg in g.grids] + [64])}")
     out.append(f"#define ETX_LDS_BYTES {max([gg.resource.lds_bytes + gg.resource.prefetch_bytes for gg in g.grids] + [0])}")
     out.append(_arr("etx_n_tasks_dev", [sum(1 for t in plan.tasks if t.device == d) for d in range(nd)]))

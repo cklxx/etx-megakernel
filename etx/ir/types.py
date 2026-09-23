@@ -101,8 +101,13 @@ class TaskGrid:
     duration_us: float = 1.0
     duration_cv: float = 0.0        # coefficient of variation of tile duration
     device: int = 0
+    consts: tuple[int, ...] = ()    # up to 4 per-grid integers handed to the body as immediates (ctx.cst), e.g. a layer index
     # filled by passes
     prologue: list[tuple[str, str]] = field(default_factory=list)   # (inlined producer grid, out_to_in map) from Pass 3
+
+    def __post_init__(self) -> None:
+        if len(self.consts) > 4 or not all(isinstance(c, int) for c in self.consts):
+            raise ValueError(f"{self.name}: consts must be at most 4 ints, got {self.consts!r}")
 
     @property
     def has_runtime_edges(self) -> bool:

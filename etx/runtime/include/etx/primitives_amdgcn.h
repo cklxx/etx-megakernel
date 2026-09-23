@@ -31,3 +31,8 @@ static __device__ __forceinline__ int32_t etx_amdgcn_poll_l2(const int32_t* p) {
 static __device__ __forceinline__ int32_t etx_amdgcn_load_agent(const int32_t* p) {
   return __hip_atomic_load(p, __ATOMIC_RELAXED, __HIP_MEMORY_SCOPE_AGENT);
 }
+
+// Relaxed device-scope store (relay mirror writes).
+static __device__ __forceinline__ void etx_store_relaxed_device(int32_t* p, int32_t v) {
+  __hip_atomic_store(p, v, __ATOMIC_RELAXED, __HIP_MEMORY_SCOPE_AGENT);
+}
