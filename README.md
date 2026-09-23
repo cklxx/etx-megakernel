@@ -10,6 +10,22 @@ branching on an architecture name.
 Repository: https://github.com/cklxx/etx-megakernel (private). Design page (the spec): https://etc-dynamic-megakernel-arch.q1293822641.workers.dev
 (source in `docs/site/index.html`). Code map: `docs/ARCHITECTURE.md`.
 
+## Starting point (reworked 2026-09-23)
+
+The architecture is broad; the proof is narrow. The target is one real model on
+one machine with a known hand-written result: DeepSeek-Coder-V2-Lite-Base,
+batch 1, one MI300X, where fleet-mi300x runs at 3.60 ms/token. Order of work:
+M0 baselines (done: the per-step fixed cost is decomposed, see below), M1
+fleet's task graph in ETX (done: `examples/dsv2lite/graph.py`, verified and
+simulated), M2 fleet's tile bodies through a shim (next), M3 match 3.60 ms,
+M4 generalise.
+
+Baselines on MI300X: cooperative launch of an empty 608-workgroup kernel 16 µs,
+ordinary launch 1.6 µs, empty worker loop 28 µs, unfused two-kernel split-K
+step 5.7 µs. The v0.3 per-task completion atomic and idle atomic polling cost
+15 µs per task slot; removing them (v0.4 runtime) took the split-K step from
+101 µs to 23 µs (cooperative) / 12 µs (ordinary, `ETX_LAUNCH=ordinary`).
+
 ## What runs today (no GPU needed)
 
 ```bash

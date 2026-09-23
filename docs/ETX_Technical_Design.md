@@ -710,6 +710,51 @@ Runtime rules established by the hardware runs and now part of the design (secti
 
 ## 15. Roadmap and Milestones
 
+### 15.1 Starting point, reworked (2026-09-23)
+
+Review feedback on v0.3: the architecture is deliberately broad, but the proof must be narrow. The starting point is therefore one real model on one machine with a known hand-written result: DeepSeek-Coder-V2-Lite-Base, batch 1, 1,024-token context, one MI300X, where fleet-mi300x (same author, same task structure, hand-written HIP) runs at 3.60 ms per token and matches HuggingFace token for token. The core claim to prove is that the ETX compiler, fed fleet's task graph and fleet's tile bodies, produces a megakernel that matches 3.60 ms; only then is the architecture generalised.
+
+Build-up, in order:
+
+| Milestone | What | Done when | Status |
+|---|---|---|---|
+| M0 Baselines | Per-step fixed cost decomposed (empty cooperative launch, empty worker loop, per-task-slot cost, unfused kernel-per-op step); fleet's own numbers as the target | Every ETX overhead term has a measured value and a baseline to compare with | Done 2026-09-23 (section 15.2, Appendix C) |
+| M1 fleet graph in ETX | fleet's `taskgraph.py` expressed as an ETX graph: Chiplet-tasks as `(xcd, worker)` grids pinned by `domain_map`, XCD-local events as DOMAIN scope, global events as DEVICE scope; verifier, placement and simulator agree with fleet's structure | 2 DEVICE and 6 DOMAIN event tensors per MoE layer; simulator prediction within 2x of 3.60 ms | Done: `examples/dsv2lite/graph.py`, 6,370 tasks for 3 layers, all static, predicted 169-211 us per layer vs 133 measured |
+| M2 fleet tiles in ETX | A shim exports fleet's `run_task` cases as ETX tile bodies (`etx_ctx` -> `TaskDescriptor` fields; in-body waits become second in-edges or stay in-body against ETX counters); fleet's weights and activations as the argument table | The ETX-generated kernel decodes 32 tokens identical to HuggingFace | Next |
+| M3 Match 3.60 ms | Per-phase trace on both kernels; close the gaps (worker assignment order, polling scheme, fences) until ETX is within 3% of fleet | 3.60 ms per token, 32/32 tokens | After M2 |
+| M4 Generalise | Only now: MoE example with tuned tiles, second machine (gfx950 or MI250X two-instance), Triton host-DSL mode, cross-step residency | Each generalisation changes only YAML, a frontend adapter or a graph, never the passes | After M3 |
+
+### 15.2 Baselines (M0), measured 2026-09-23 on one MI300X
+
+`bench/calib/step_overhead.hip`, 608 x 256 workgroups, host wall-clock over 200 iterations:
+
+| Baseline | Value | Meaning |
+|---|---|---|
+| Cooperative launch of an empty kernel | 16.1 us | The residency-guaranteed launch alone |
+| Ordinary launch of an empty kernel | 1.6 us | 10x cheaper; usable when the host has verified the grid fits (it does: `check_residency`) |
+| ETX-shaped worker loop, 0 tasks | 28 us | Launch + XCD discovery + slot claim + drain |
+| Same, 5,120 no-op tasks, v0.3 protocol (per-task completion atomic, idle workers polling it with atomics) | 145 us | 15 us per task slot: one shared word hammered by 608 workers |
+| Same, workers exit when drained, per-task atomic kept | 73 us | 6.8 us per slot |
+| Same, no per-task atomic | 31 us | 1.8 us per slot at 5,120 tasks, 0.7 us at 20,480 |
+| Unfused split-K step (two ordinary kernels) | 5.7 us at n=64 and n=1024 | The kernel-per-op baseline for a step whose work is negligible |
+
+Consequences, all applied in the v0.4 runtime: static tasks cost no completion atomic (the trace verifies them on the host); only dynamic and hybrid tasks are counted; a worker exits as soon as its static queue is drained and no dynamic work exists; idle polling uses a plain scoped load, not an atomic; `ETX_LAUNCH=ordinary` selects a plain launch when the residency check passes. Re-measured with device-event timing (kernel start to end, no host polling jitter):
+
+| Step | v0.3 | v0.4 cooperative | v0.4 ordinary |
+|---|---|---|---|
+| Split-K n=64, 320 tasks, static | 101 us | 23 us | 12 us |
+| Split-K n=1024, 5,120 tasks, static | 128 us | 35 us | 25 us |
+| Split-K n=1024, hybrid | 441 us | 412 us | 374 us |
+| Short-task MoE, B=64, automatic (static) | 439 us | 389 us | 378 us |
+| Short-task MoE, B=8 | 304 us | 296 us | 280 us |
+| Full MoE, B=8 | 3.22 ms | 3.22 ms | 3.21 ms |
+
+The static path now sits at 2-4x the unfused two-kernel step for a toy whose work is a few microseconds; the remaining fixed cost is the launch (12 us ordinary) plus about 2 us per task slot of loop, descriptor fetch and event traffic. The queue path (hybrid, dynamic) is the next target: at 76 poppers per domain ring it costs about 50 us per task slot, far above the 1-2 us the contention benchmark measured for pops alone, so the per-domain ring will be replaced by per-worker queues (MPK's JIT/AOT pair) before the fleet port needs any dynamic segment (it needs none: fleet's graph is entirely static).
+
+Cross-device synchronisation for MoE decode (expert parallelism) has one measured point (10.6 us one-way, fine-grained memory on device 0); the extended study (flag location on device 0 / device 1 / host, 4 KB payload, under streaming load; `bench/calib/p2p_sync.hip`) is written and waits for a two-GPU VM.
+
+### 15.3 Phases of the general architecture (after M3)
+
 | Phase | Deliverable | Completion criterion |
 |---|---|---|
 | 0. Baseline and calibration | Per-operator MoE / dense reference on MI300X, timing scaffold, seven synchronisation-cost microbenchmarks | `t_local / t_cross / t_dev` and the contention curve in the YAML. Status: done on 2026-09-22 (Appendix C): ping-pong, flag latency, queue contention, whole-GPU phase switch, cross-device flag and peer bandwidth, and the two simulator studies. Not done: an unfused per-operator baseline for the MoE example (the reference tiles are not tuned, so a fusion-gain figure would not be meaningful yet) |
