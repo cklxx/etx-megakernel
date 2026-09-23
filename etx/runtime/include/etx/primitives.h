@@ -55,6 +55,14 @@ static __device__ __forceinline__ int32_t etx_arrive_flush_DEVICE(const etx_para
 // consumer's relaxed poll of the mirror -> consumer ACQUIRE_DOMAIN (its own L1). With
 // relay_local_acquire = 0 the consumer does the full ACQUIRE_DEVICE itself (fleet's
 // choice; A/B switch). The relay exits when every mirrored word reached zero.
+// Between the relay's acquire (domain-level invalidate) and its mirror store only the
+// invalidate's completion must be ordered; a full device release would also write back
+// the domain's whole L2. ETX_RELAY_FULL_RELEASE=1 restores it (A/B).
+#if defined(ETX_RELAY_FULL_RELEASE) && ETX_RELAY_FULL_RELEASE
+#define ETX_RELAY_ORDER() ETX_RELEASE_DEVICE()
+#else
+#define ETX_RELAY_ORDER() ETX_RELEASE_DOMAIN()
+#endif
 static __device__ __forceinline__ void etx_relay(const etx_params& p, uint32_t domain) {
   __shared__ int s_live;
   etx_event* mirror = p.ev_mirror + (size_t)domain * p.event_words;
@@ -66,7 +74,7 @@ static __device__ __forceinline__ void etx_relay(const etx_params& p, uint32_t d
       const int32_t g = ETX_POLL_DEVICE(p.events + w);
       if (g > 0) live = 1;
       if (ETX_POLL_DOMAIN(mirror + w) != g) {
-        if (!changed) { ETX_ACQUIRE_DEVICE(); ETX_RELEASE_DEVICE(); changed = 1; }
+        if (!changed) { ETX_ACQUIRE_DEVICE(); ETX_RELAY_ORDER(); changed = 1; }
         etx_store_relaxed_device(mirror + w, g);
       }
     }
