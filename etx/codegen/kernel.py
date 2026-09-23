@@ -182,6 +182,12 @@ def emit_kernel(plan: Plan, device: int = 0) -> str:
     out.append("  }")
     out.append("}")
     out.append("")
+    # Three phases, so every tile body has exactly ONE call site (two if it is also a Pass-3 prologue):
+    # (1) per-type switch: immediates, waits, acquire, pick the body symbol; (2) one etx_call_body;
+    # (3) per-type switch: releases and arrives. Emitting the body call inside each type's case made
+    # 219 call sites per body on the DeepSeek port, so the compiler stopped inlining and paid the call
+    # ABI (400 B/lane of scratch, vs fleet's 48 with one call site per body).
+    max_pro = max([len(g.prologue) for g in grids] + [0])
     out.append("static __device__ __forceinline__ void etx_run_task(const etx_params& p, const etx_task t, uint32_t worker, uint32_t domain, int32_t tid) {")
     out.append("  __shared__ __align__(16) unsigned char etx_lds[ETX_LDS_USED > 0 ? ETX_LDS_USED : 16];")
     out.append("  uint64_t* tr = p.trace_time ? p.trace_time + (size_t)tid * 4 : nullptr;")
@@ -189,7 +195,11 @@ def emit_kernel(plan: Plan, device: int = 0) -> str:
     out.append("  etx_ctx ctx; for (int i = 0; i < 4; ++i) ctx.coord[i] = t.coord[i];")
     out.append("  ctx.shape = p.shape; ctx.args = p.type_args + t.type * p.max_args; ctx.events = p.events; ctx.ev_offset = p.ev_offset; ctx.ev_shape = (const int32_t*)p.ev_shape;")
     out.append("  ctx.domain = domain; ctx.worker = worker; ctx.lds = etx_lds; ctx.cst[0] = ctx.cst[1] = ctx.cst[2] = ctx.cst[3] = 0;")
-    out.append("  switch (t.type) {")
+    out.append("  int sym = -1;")
+    if max_pro:
+        out.append(f"  etx_ctx pctx[{max_pro}]; int psym[{max_pro}];")
+        out.append(f"  for (int j = 0; j < {max_pro}; ++j) psym[j] = -1;")
+    out.append("  switch (t.type) {   // phase 1: immediates, waits, acquire")
     for g in grids:
         mode = plan.modes.get(g.name, "static")
         out.append(f"    case {plan.type_ids[g.name]}: {{ // {g.name} [{mode}] grid={g.grid}")
@@ -198,48 +208,61 @@ def emit_kernel(plan: Plan, device: int = 0) -> str:
             out.append(f"      ctx.cst[0] = {cs[0]}; ctx.cst[1] = {cs[1]}; ctx.cst[2] = {cs[2]}; ctx.cst[3] = {cs[3]};")
         if g.body.prefetch and plan.options.prefetch and plan.machine.capabilities.get("async_copy_to_lds", "none") != "none":
             out.append(f"      {g.body.prefetch}(&ctx);   // lever 3: weights do not depend on events; warm them before waiting")
-        out.append("      if (threadIdx.x == 0) {")
-        out.append(_wait_code(plan, g))
-        # the acquire (cache invalidate) is a per-CU operation: issue it once, from the waiting thread,
-        # not from all 4 waves (measured on MI300X: 4x the L2 invalidates slowed the phases after
-        # DEVICE-scope events); __syncthreads orders every other wave's loads after it
-        acq = sorted({_scope_macro(plan, ev) for ev in g.in_edges}, key=lambda s: Scope[s].value)
-        relayed = any(_relayed(plan, plan.events[ev]) for ev in g.in_edges)
-        for sc in acq:
-            if sc == "DEVICE" and relayed:
-                out.append("        if (etx_lok) ETX_ACQUIRE_DOMAIN(); else ETX_ACQUIRE_DEVICE();   // relay did the domain-level half")
-            else:
-                out.append(f"        ETX_ACQUIRE_{sc}();")
-        out.append("      }")
-        out.append("      __syncthreads();")
-        out.append("      if (tr && threadIdx.x == 0) tr[1] = (uint64_t)ETX_TIMER();")
+        if g.in_edges:
+            out.append("      if (threadIdx.x == 0) {")
+            out.append(_wait_code(plan, g))
+            # the acquire (cache invalidate) is a per-CU operation: issue it once, from the waiting thread,
+            # not from all 4 waves (measured on MI300X: 4x the L2 invalidates slowed the phases after
+            # DEVICE-scope events); the __syncthreads after the switch orders every other wave's loads after it
+            acq = sorted({_scope_macro(plan, ev) for ev in g.in_edges}, key=lambda s: Scope[s].value)
+            relayed = any(_relayed(plan, plan.events[ev]) for ev in g.in_edges)
+            for sc in acq:
+                if sc == "DEVICE" and relayed:
+                    out.append("        if (etx_lok) ETX_ACQUIRE_DOMAIN(); else ETX_ACQUIRE_DEVICE();   // relay did the domain-level half")
+                else:
+                    out.append(f"        ETX_ACQUIRE_{sc}();")
+            out.append("      }")
         coord_vars = [f"t.coord[{i}]" for i in range(len(g.grid))]
-        for pro, mtext in g.prologue:
+        for j, (pro, mtext) in enumerate(g.prologue):
             ig = plan.inlined[pro]
             exprs = EdgeMap.parse(mtext).coord_exprs_c(coord_vars, _symbols(plan))
-            out.append(f"      {{ // prologue: recompute {pro} for this task (Pass 3)")
-            out.append(f"        etx_ctx pctx = ctx; pctx.args = p.type_args + {plan.type_ids[pro]} * p.max_args;")
+            out.append(f"      // prologue {j}: recompute {pro} for this task (Pass 3)")
+            out.append(f"      pctx[{j}] = ctx; pctx[{j}].args = p.type_args + {plan.type_ids[pro]} * p.max_args; psym[{j}] = {symbols.index(ig.body.symbol)};   // {ig.body.symbol}")
             pc = list(ig.consts)[:4] + [0] * (4 - min(4, len(ig.consts)))
-            out.append(f"        pctx.cst[0] = {pc[0]}; pctx.cst[1] = {pc[1]}; pctx.cst[2] = {pc[2]}; pctx.cst[3] = {pc[3]};")
+            out.append(f"      pctx[{j}].cst[0] = {pc[0]}; pctx[{j}].cst[1] = {pc[1]}; pctx[{j}].cst[2] = {pc[2]}; pctx[{j}].cst[3] = {pc[3]};")
             for d in range(4):
-                out.append(f"        pctx.coord[{d}] = {exprs[d] if d < len(exprs) else 0};")
-            out.append(f"        etx_call_body({symbols.index(ig.body.symbol)}, &pctx); __syncthreads(); }}   // {ig.body.symbol}")
-        out.append(f"      etx_call_body({symbols.index(g.body.symbol)}, &ctx);   // {g.body.symbol}")
-        out.append("      __syncthreads();")
-        out.append("      if (tr && threadIdx.x == 0) { tr[2] = (uint64_t)ETX_TIMER(); tr[3] = worker; }")
-        out.append("      if (threadIdx.x == 0) {")
+                out.append(f"      pctx[{j}].coord[{d}] = {exprs[d] if d < len(exprs) else 0};")
+        out.append(f"      sym = {symbols.index(g.body.symbol)};   // {g.body.symbol}")
+        out.append("      break; }")
+    out.append("    default: break;")
+    out.append("  }")
+    out.append("  __syncthreads();")
+    out.append("  if (tr && threadIdx.x == 0) tr[1] = (uint64_t)ETX_TIMER();")
+    if max_pro:
+        out.append(f"  for (int j = 0; j < {max_pro}; ++j) if (psym[j] >= 0) {{ etx_call_body(psym[j], &pctx[j]); __syncthreads(); }}")
+    out.append("  etx_call_body(sym, &ctx);   // phase 2: the only call site of each body")
+    out.append("  __syncthreads();")
+    out.append("  if (tr && threadIdx.x == 0) { tr[2] = (uint64_t)ETX_TIMER(); tr[3] = worker; }")
+    out.append("  if (threadIdx.x != 0) return;")
+    out.append("  switch (t.type) {   // phase 3: releases, arrives, pushes")
+    for g in grids:
+        mode = plan.modes.get(g.name, "static")
+        body: list[str] = []
         for ev_name, e in plan.graph.events.items():
             if e.runtime_init_by == g.name and e.runtime_count is not None:
                 ep = plan.events[ev_name]
                 expr = _runtime_count_c(plan, e.runtime_count)
-                out.append(f"        for (int i = 0; i < p.ev_shape[{list(plan.events).index(ev_name)}][0]; ++i) "
-                           f"p.events[{ep.offset} + i] = {expr};   // runtime init of {ev_name}")
+                body.append(f"        for (int i = 0; i < p.ev_shape[{list(plan.events).index(ev_name)}][0]; ++i) "
+                            f"p.events[{ep.offset} + i] = {expr};   // runtime init of {ev_name}")
         for ev in g.out_edges:
             if plan.events[ev].scope != Scope.DEVICE:          # DEVICE-scope arrives carry their own (last-arriver) release
-                out.append(f"        ETX_RELEASE_{_scope_macro(plan, ev)}();")
-        out.append(_arrive_code(plan, g, mode))
-        out.append("      }")
-        out.append("      break; }")
+                body.append(f"        ETX_RELEASE_{_scope_macro(plan, ev)}();")
+        if g.out_edges:
+            body.append(_arrive_code(plan, g, mode))
+        if body:
+            out.append(f"    case {plan.type_ids[g.name]}: {{ // {g.name}")
+            out.extend(body)
+            out.append("      break; }")
     out.append("    default: break;")
     out.append("  }")
     out.append("}")
