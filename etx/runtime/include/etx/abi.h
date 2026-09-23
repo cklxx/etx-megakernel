@@ -55,7 +55,8 @@ struct etx_params {
   int32_t*         trace_exec;         // optional: per-task execution counter (debug); nullptr to disable
   int32_t*         ctrl_abort;         // host writes 1 to abort; kernel writes 2 on spin timeout
   int32_t*         ctrl_done;          // tasks completed this step
-  int32_t          n_tasks;
+  int32_t          n_tasks;            // this device's tasks (diagnostics)
+  int32_t          n_dynamic;          // this device's dynamic + hybrid tasks: the only ones counted in ctrl_done
   uint32_t         spin_limit;
   int32_t          n_events;
 };

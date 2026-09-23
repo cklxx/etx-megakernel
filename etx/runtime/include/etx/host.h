@@ -110,9 +110,13 @@ struct etx_host {
     p.workers_per_domain = ETX_WORKERS_PER_DOMAIN;
     p.n_workers = ETX_N_WORKERS;
     p.n_tasks = etx_n_tasks_dev[device];
+    p.n_dynamic = etx_n_dynamic_dev[device];
     p.n_events = ETX_N_EVENTS;
     p.spin_limit = 200000000u;
+    const char* lm = getenv("ETX_LAUNCH");                 // "ordinary": plain launch when the grid is known to fit
+    cooperative = !(lm && !strcmp(lm, "ordinary"));
   }
+  bool cooperative = true;
   // reset per-step state (events if owned, queues, ctrl, slots, counters)
   void reset_step() {
     ETX_CHECK(hipSetDevice(device));
@@ -152,11 +156,16 @@ struct etx_host {
     }
     return true;
   }
+  hipEvent_t ev_start = nullptr, ev_stop = nullptr;
   // asynchronous launch (call reset_step first; for multi-device, reset all then launch all, then wait all)
   void launch() {
     ETX_CHECK(hipSetDevice(device));
+    if (!ev_start) { ETX_CHECK(hipEventCreate(&ev_start)); ETX_CHECK(hipEventCreate(&ev_stop)); }
+    ETX_CHECK(hipEventRecord(ev_start, stream));
     void* kargs[] = {&p};
-    ETX_CHECK(hipLaunchCooperativeKernel(kernel, dim3(ETX_N_WORKERS), dim3(ETX_THREADS), kargs, 0, stream));
+    if (cooperative) ETX_CHECK(hipLaunchCooperativeKernel(kernel, dim3(ETX_N_WORKERS), dim3(ETX_THREADS), kargs, 0, stream));
+    else ETX_CHECK(hipLaunchKernel(kernel, dim3(ETX_N_WORKERS), dim3(ETX_THREADS), kargs, 0, stream));   // residency checked by check_residency()
+    ETX_CHECK(hipEventRecord(ev_stop, stream));
   }
   // wait with watchdog; returns false on timeout / spin limit / incomplete
   bool wait(double timeout_s, std::chrono::steady_clock::time_point t0) {
@@ -173,10 +182,17 @@ struct etx_host {
       std::this_thread::sleep_for(std::chrono::microseconds(50));
     }
     ETX_CHECK(hipStreamSynchronize(stream));
-    last_ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+    float ms = 0.f; ETX_CHECK(hipEventElapsedTime(&ms, ev_start, ev_stop));   // device timestamps: launch to kernel end, no host polling jitter
+    last_ms = ms;
     int32_t ctrl[2]; ETX_CHECK(hipMemcpy(ctrl, d_ctrl, 8, hipMemcpyDeviceToHost));
     if (ctrl[0] & 2) { fprintf(stderr, "device %d: kernel hit spin limit (abort=%d, done=%d/%d)\n", device, ctrl[0], ctrl[1], p.n_tasks); dump_events(); return false; }
-    if (ctrl[1] != p.n_tasks) { fprintf(stderr, "device %d: done=%d of %d tasks\n", device, ctrl[1], p.n_tasks); dump_events(); return false; }
+    if (ctrl[1] != p.n_dynamic) { fprintf(stderr, "device %d: dynamic done=%d of %d\n", device, ctrl[1], p.n_dynamic); dump_events(); return false; }
+    // static tasks are not counted on the device; the trace (one increment per executed task) verifies them
+    std::vector<int32_t> tr(ETX_N_TASKS);
+    ETX_CHECK(hipMemcpy(tr.data(), d_trace, ETX_N_TASKS * sizeof(int32_t), hipMemcpyDeviceToHost));
+    int executed = 0;
+    for (int i = 0; i < ETX_N_TASKS; ++i) if (tr[i] == 1) executed++;
+    if (executed != p.n_tasks) { fprintf(stderr, "device %d: %d of %d tasks executed exactly once\n", device, executed, p.n_tasks); dump_events(); return false; }
     return true;
   }
   // single-device convenience

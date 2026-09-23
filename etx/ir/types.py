@@ -95,6 +95,7 @@ class TaskGrid:
     pure: bool = False
     out_to_in: str | None = None
     weight_args: list[str] = field(default_factory=list)
+    domain_map: str | None = None   # pin tasks to exec domains, e.g. "xw->x" (fleet's Chiplet-tasks: one per XCD, 37 workers each)
     bytes_per_tile: Dim = 0
     duration_us: float = 1.0
     duration_cv: float = 0.0        # coefficient of variation of tile duration

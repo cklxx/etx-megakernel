@@ -27,15 +27,19 @@ def run(plan: Plan) -> None:
     load: dict[tuple[int, int], int] = Counter()
     dom_of: dict[tuple[str, tuple[int, ...]], tuple[int, int]] = {}
 
+    from ..ir.edgemap import EdgeMap
     for g in g_all.grids:
         coords = inst.tasks[g.name]
         n = max(1, len(coords))
         per_dom = n / nd
+        pin = EdgeMap.parse(g.domain_map) if g.domain_map else None
         for lin, c in enumerate(coords):
             tid = (g.name, c)
             chunk = min(nd - 1, int(lin * nd // n))
             dom = chunk
-            if g.in_edges:
+            if pin is not None:
+                dom = pin.targets(c, (nd,), None, inst.bindings)[0][0] % nd      # explicit placement wins
+            elif g.in_edges:
                 votes: Counter = Counter()
                 for ev in inst.task_in[tid]:
                     for p in inst.producers[ev]:

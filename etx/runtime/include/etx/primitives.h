@@ -93,8 +93,14 @@ static __device__ __forceinline__ void etx_push_consumers(const etx_params& p, i
 // The worker loop uses it to prefer queue work while its static head is blocked.
 static __device__ bool etx_deps_ready(const etx_params& p, int32_t task);
 
+// Step termination for a worker whose static queue is drained: only dynamic /
+// hybrid tasks are counted (one atomic per such task; static tasks cost none),
+// and the count is polled with a plain scoped load, not an atomic. Measured on
+// MI300X (bench/calib/step_overhead): a per-task atomic on one word from 608
+// workers plus atomic idle polling cost ~6 us per task slot and doubled the
+// step time; without them the loop costs ~0.7 us per slot.
 static __device__ __forceinline__ bool etx_step_done(const etx_params& p) {
-  return atomicAdd(p.ctrl_done, 0) >= p.n_tasks;
+  return p.n_dynamic == 0 || ETX_POLL_DEVICE(p.ctrl_done) >= p.n_dynamic;
 }
 
 static __device__ __forceinline__ uint32_t etx_discover_domain(const etx_params& p, uint32_t worker) {
