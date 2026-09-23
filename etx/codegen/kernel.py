@@ -162,7 +162,7 @@ def emit_kernel(plan: Plan, device: int = 0) -> str:
     out.append(f"static __device__ const unsigned char etx_type_is_dynamic[{max(1, n_types)}] = {{{', '.join(dyn_flags) or '0'}}};")
     out.append("")
     # non-blocking readiness probe per task type (same edge maps as the wait code)
-    out.append("static __device__ bool etx_deps_ready(const etx_params& p, int32_t tid) {")
+    out.append("static __device__ __forceinline__ bool etx_deps_ready(const etx_params& p, int32_t tid) {")
     out.append("  const etx_task t = p.descs[tid];")
     out.append("  switch (t.type) {")
     for g in grids:

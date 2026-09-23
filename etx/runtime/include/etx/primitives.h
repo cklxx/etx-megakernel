@@ -55,7 +55,7 @@ static __device__ __forceinline__ int32_t etx_arrive_flush_DEVICE(const etx_para
 // consumer's relaxed poll of the mirror -> consumer ACQUIRE_DOMAIN (its own L1). With
 // relay_local_acquire = 0 the consumer does the full ACQUIRE_DEVICE itself (fleet's
 // choice; A/B switch). The relay exits when every mirrored word reached zero.
-static __device__ void etx_relay(const etx_params& p, uint32_t domain) {
+static __device__ __forceinline__ void etx_relay(const etx_params& p, uint32_t domain) {
   __shared__ int s_live;
   etx_event* mirror = p.ev_mirror + (size_t)domain * p.event_words;
   ETX_PRIO_HIGH();
@@ -159,7 +159,7 @@ static __device__ __forceinline__ void etx_push_consumers(const etx_params& p, i
 // deps_ready: non-blocking readiness probe of a task's in-events, generated per
 // task type by the kernel emitter from the same edge maps as the wait code.
 // The worker loop uses it to prefer queue work while its static head is blocked.
-static __device__ bool etx_deps_ready(const etx_params& p, int32_t task);
+static __device__ __forceinline__ bool etx_deps_ready(const etx_params& p, int32_t task);
 
 // Step termination for a worker whose static queue is drained: only dynamic /
 // hybrid tasks are counted (one atomic per such task; static tasks cost none),
