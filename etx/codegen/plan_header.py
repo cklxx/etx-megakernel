@@ -40,6 +40,7 @@ def emit_plan_header(plan: Plan, device: int = 0) -> str:
     out.append(f"#define ETX_WORKERS_PER_DOMAIN {wpd}")
     out.append(f"#define ETX_N_WORKERS {nw}")
     out.append(f"#define ETX_THREADS {max([gg.resource.threads for gg in g.grids] + [64])}")
+    out.append(f"#define ETX_LDS_BYTES {max([gg.resource.lds_bytes + gg.resource.prefetch_bytes for gg in g.grids] + [0])}")
     out.append(_arr("etx_n_tasks_dev", [sum(1 for t in plan.tasks if t.device == d) for d in range(nd)]))
     out.append(_arr("etx_n_dynamic_dev", [sum(1 for t in plan.tasks if t.device == d and t.mode != "static") for d in range(nd)]))
     # descriptors (global ids)
