@@ -188,11 +188,15 @@ def emit_kernel(plan: Plan, device: int = 0) -> str:
             out.append(f"      {g.body.prefetch}(&ctx);   // lever 3: weights do not depend on events; warm them before waiting")
         out.append("      if (threadIdx.x == 0) {")
         out.append(_wait_code(plan, g))
+        # the acquire (cache invalidate) is a per-CU operation: issue it once, from the waiting thread,
+        # not from all 4 waves (measured on MI300X: 4x the L2 invalidates slowed the phases after
+        # DEVICE-scope events); __syncthreads orders every other wave's loads after it
+        acq = sorted({_scope_macro(plan, ev) for ev in g.in_edges}, key=lambda s: Scope[s].value)
+        for sc in acq:
+            out.append(f"        ETX_ACQUIRE_{sc}();")
         out.append("      }")
         out.append("      __syncthreads();")
         out.append("      if (tr && threadIdx.x == 0) tr[1] = (uint64_t)ETX_TIMER();")
-        for ev in g.in_edges:
-            out.append(f"      ETX_ACQUIRE_{_scope_macro(plan, ev)}();")
         coord_vars = [f"t.coord[{i}]" for i in range(len(g.grid))]
         for pro, mtext in g.prologue:
             ig = plan.inlined[pro]

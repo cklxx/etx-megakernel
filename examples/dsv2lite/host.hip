@@ -105,7 +105,7 @@ int main(int argc, char** argv) {
   // ---- fleet runtime state as the bodies see it: dummy counters saturate every in-body wait
   RuntimeState rt{};
   { uint32_t* sat = dev_alloc<uint32_t>((size_t)kXCDs * kMaxEvents);
-    std::vector<uint32_t> h((size_t)kXCDs * kMaxEvents, 0x40000000u);
+    std::vector<uint32_t> h((size_t)kXCDs * kMaxEvents, 0u);   // epoch-counted up-counters (qabs publication); never reset
     HIP_CHECK(hipMemcpy(sat, h.data(), h.size() * 4, hipMemcpyHostToDevice));
     rt.xcd_counters = sat; rt.global_events = sat; rt.xcd_flags = sat;
     uint32_t* misc = dev_alloc<uint32_t>(16); rt.xcd_arrivals = misc; rt.grid_arrivals = misc + kXCDs; rt.abort = misc + kXCDs + 1;
@@ -139,7 +139,7 @@ int main(int argc, char** argv) {
     HIP_CHECK(hipMemset(act.token_time, 0, (size_t)tokens * 16));
     matched = compared = 0; first_div = -1; wall_total = 0;
     for (int t = 0; t < tokens; ++t) {
-      fp.tok = t; fp.epoch = 1; fp.pos = context + t; fp.dump = (last && t == 0) ? 1 : 0;
+      fp.tok = t; fp.epoch = (uint32_t)(run * tokens + t + 1); fp.pos = context + t; fp.dump = (last && t == 0) ? 1 : 0;
       HIP_CHECK(hipMemcpy(d_fp, &fp, sizeof(fp), hipMemcpyHostToDevice));
       if (!hst.run(20.0)) { std::printf("token %d: ETX step failed\n", t); return 2; }
       wall_total += hst.last_ms;

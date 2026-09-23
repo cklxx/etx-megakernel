@@ -62,7 +62,9 @@ def build_attention_block(g: Graph, L: int, e_in: str, e_in_map: str, fold: bool
     g.call_device(f"qabs_{L}", (HEADS, QABS), hip_link(T, "fleet_q_absorb"), resource=_res(), args=["fleet", f"layer_{L}"],
                   domain_map="hs->(h/2)", in_edges={f"E_qkv_{L}": "hs->(h/2)"}, out_edges={f"E_qabs_{L}": "hs->h"}, duration_us=DUR["qabs"])
     g.call_device(f"attn_{L}", (HEADS, KV_CHUNKS), hip_link(T, "fleet_attention"), resource=_res(), args=["fleet", f"layer_{L}"],
-                  domain_map="hc->(h/2)", in_edges={f"E_qkv_{L}": "hc->(h/2)", f"E_qabs_{L}": "hc->h"},
+                  # E_qabs is consumed INSIDE the attention body (fleet's PUB_WAIT, kept for overlap; see fleet_shim.hip);
+                  # ETX still orders attention after E_qkv, and qabs after E_qkv, so the in-body wait is deadlock-free.
+                  domain_map="hc->(h/2)", in_edges={f"E_qkv_{L}": "hc->(h/2)"},
                   out_edges={f"E_attn_{L}": "hc->h"}, duration_us=DUR["attn"], duration_cv=0.1)
     g.call_device(f"merge_{L}", (HEADS, KV_CHUNKS), hip_link(T, "fleet_merge_uv"), resource=_res(), args=["fleet", f"layer_{L}"],
                   domain_map="hc->(h/2)", in_edges={f"E_attn_{L}": "hc->h"}, out_edges={f"E_merge_{L}": "hc->(h/2)"}, duration_us=DUR["merge"])

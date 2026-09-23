@@ -60,8 +60,39 @@ static __device__ __forceinline__ void fleet_call(const etx_ctx* c, uint16_t kin
 extern "C" __device__ void fleet_embed(const etx_ctx* c) { fleet_call(c, fleet::TASK_EMBED, 0, -1, -1, 1, -1, 0); }
 extern "C" __device__ void fleet_qkv_fused(const etx_ctx* c) { fleet_call(c, fleet::TASK_QKV_FUSED, 0, -1, -1, 1, -1, CHIPLET_WORKER); }
 extern "C" __device__ void fleet_qkv_fused_fold(const etx_ctx* c) { fleet_call(c, fleet::TASK_QKV_FUSED, fleet::FLAG_FOLD_PARTIALS, -1, -1, 1, -1, CHIPLET_WORKER); }
-extern "C" __device__ void fleet_q_absorb(const etx_ctx* c) { fleet_call(c, fleet::TASK_Q_ABSORB, 0, c->coord[0], c->coord[1], fleet::kQAbsSlices, -1, 0); }
-extern "C" __device__ void fleet_attention(const etx_ctx* c) { fleet_call(c, fleet::TASK_ATTENTION, fleet::FLAG_PUB_WAIT, c->coord[0], c->coord[1], fleet::kMaxKvChunks, -1, 0); }
+// q_c publication: fleet's attention waits for the two q_abs slices INSIDE its body (after kv_post),
+// through an XCD-local up-counter (rt.xcd_counters[xcd][local_event] >= epoch * slices). The qabs
+// wrapper bumps that counter itself after its body, so the overlap fleet measured is preserved and
+// ETX carries no E_qabs edge for attention (an in-body dependency, outside the IR; see graph.py).
+#define QABS_EVENT(L, h) (256 + (L) * 16 + (h))
+extern "C" __device__ void fleet_q_absorb(const etx_ctx* c) {
+  fleet_call(c, fleet::TASK_Q_ABSORB, 0, c->coord[0], c->coord[1], fleet::kQAbsSlices, -1, 0);
+  __syncthreads();
+  if (threadIdx.x == 0) {
+    const FleetParams* fp = (const FleetParams*)c->args[0];
+    const int32_t L = *(const int32_t*)c->args[1];
+    fleet::drain_stores();
+    __hip_atomic_fetch_add(&fp->rt.xcd_counters[(size_t)c->domain * fleet::kMaxEvents + QABS_EVENT(L, c->coord[0])], 1u,
+                           __ATOMIC_RELAXED, __HIP_MEMORY_SCOPE_AGENT);
+  }
+}
+extern "C" __device__ void fleet_attention(const etx_ctx* c) {
+  const FleetParams* fp = (const FleetParams*)c->args[0];
+  const int32_t L = *(const int32_t*)c->args[1];
+  fleet::TaskDescriptor t{};
+  t.kind = fleet::TASK_ATTENTION; t.layer = (int16_t)L; t.xcd = (int16_t)c->domain; t.worker = 0;
+  t.wait_event = -1; t.signal_event = -1; t.n_split = fleet::kMaxKvChunks; t.head = (int16_t)c->coord[0];
+  t.kv_chunk = (int16_t)c->coord[1]; t.expert_slot = -1; t.wait_count = fleet::kQAbsSlices;
+  t.local_event = (int16_t)QABS_EVENT(L, c->coord[0]); t.flags = fleet::FLAG_PUB_WAIT;
+  fleet::TokenCtx tc;
+  tc.tok = fp->tok; tc.epoch = fp->epoch; tc.pos = fp->pos; tc.seq_len = fp->pos + 1;
+  tc.cos = fp->act.cos + (int64_t)fp->pos * fp->d.qk_rope; tc.sin = fp->act.sin + (int64_t)fp->pos * fp->d.qk_rope;
+  tc.dump = fp->dump != 0; tc.trace = false;
+  fleet::Activations& act = *const_cast<fleet::Activations*>(&fp->act);
+  fleet::KVCache& kv = *const_cast<fleet::KVCache*>(&fp->kv);
+  fleet::Scratch& s = *reinterpret_cast<fleet::Scratch*>(c->lds);
+  fleet::run_task(t, fp->rt, fp->d, fp->w, act, kv, s, tc, (int)c->domain, 0);
+}
 extern "C" __device__ void fleet_merge_uv(const etx_ctx* c) { fleet_call(c, fleet::TASK_MERGE_UV, 0, c->coord[0], c->coord[1], fleet::kMaxKvChunks, -1, 0); }
 extern "C" __device__ void fleet_o_proj(const etx_ctx* c) { fleet_call(c, fleet::TASK_O_PROJ, 0, -1, -1, 1, -1, CHIPLET_WORKER); }
 extern "C" __device__ void fleet_norm_router(const etx_ctx* c) { fleet_call(c, fleet::TASK_NORM_ROUTER, 0, -1, -1, 1, -1, CHIPLET_WORKER); }
