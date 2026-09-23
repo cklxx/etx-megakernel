@@ -22,6 +22,7 @@ class PassOptions:
     force_mode: str | None = None          # static | dynamic | hybrid (debug / experiments)
     affinity_imbalance: float = 1.25       # max load / mean load tolerated when following producers
     sentinel_signals: bool = False         # lower waits to sentinel polling where the capability exists
+    inline_tiles: bool = False             # emit #include of the tile sources into the kernel TU (single-TU build, bodies inlinable)
 
 
 @dataclass

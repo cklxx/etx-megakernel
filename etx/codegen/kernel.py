@@ -117,14 +117,32 @@ def emit_kernel(plan: Plan, device: int = 0) -> str:
     out.append("#include \"etx_lowering.h\"")
     out.append("#include \"etx/primitives.h\"")
     out.append("")
+    symbols: list[str] = []                     # distinct body symbols: one call site each (keeps inlining sane)
+    for g in list(grids) + list(plan.inlined.values()):
+        if g.body.symbol not in symbols:
+            symbols.append(g.body.symbol)
+    if plan.options.inline_tiles:
+        out.append("// single-TU build: tile sources included so the bodies can inline into the dispatch")
+        for src in dict.fromkeys(g.body.source for g in grids if g.body.source and g.body.kind in ("hip_link", "cuda_link")):
+            out.append(f"#include \"{src}\"")
+    else:
+        for g in grids:
+            out.append(f"extern \"C\" __device__ void {g.body.symbol}(const etx_ctx*);")
+            if g.body.prefetch:
+                out.append(f"extern \"C\" __device__ void {g.body.prefetch}(const etx_ctx*);")
+        for name, ig in plan.inlined.items():
+            out.append(f"extern \"C\" __device__ void {ig.body.symbol}(const etx_ctx*);   // inlined producer {name}")
     for g in grids:
-        out.append(f"extern \"C\" __device__ void {g.body.symbol}(const etx_ctx*);")
-        if g.body.prefetch:
-            out.append(f"extern \"C\" __device__ void {g.body.prefetch}(const etx_ctx*);")
         for pro, m in g.prologue:
             out.append(f"// {g.name}: prologue recomputes {pro} via {m!r} (event eliminated by Pass 3)")
-    for name, ig in plan.inlined.items():
-        out.append(f"extern \"C\" __device__ void {ig.body.symbol}(const etx_ctx*);   // inlined producer {name}")
+    out.append("")
+    out.append("static __device__ __forceinline__ void etx_call_body(int sym, const etx_ctx* ctx) {")
+    out.append("  switch (sym) {")
+    for i, s in enumerate(symbols):
+        out.append(f"    case {i}: {s}(ctx); break;")
+    out.append("    default: break;")
+    out.append("  }")
+    out.append("}")
     out.append("")
     out.append(f"#define ETX_THREADS {threads}")
     out.append(f"#define ETX_LDS_USED {lds}")
@@ -183,8 +201,8 @@ def emit_kernel(plan: Plan, device: int = 0) -> str:
             out.append(f"        etx_ctx pctx = ctx; pctx.args = p.type_args + {plan.type_ids[pro]} * p.max_args;")
             for d in range(4):
                 out.append(f"        pctx.coord[{d}] = {exprs[d] if d < len(exprs) else 0};")
-            out.append(f"        {ig.body.symbol}(&pctx); __syncthreads(); }}")
-        out.append(f"      {g.body.symbol}(&ctx);")
+            out.append(f"        etx_call_body({symbols.index(ig.body.symbol)}, &pctx); __syncthreads(); }}   // {ig.body.symbol}")
+        out.append(f"      etx_call_body({symbols.index(g.body.symbol)}, &ctx);   // {g.body.symbol}")
         out.append("      __syncthreads();")
         out.append("      if (tr && threadIdx.x == 0) { tr[2] = (uint64_t)ETX_TIMER(); tr[3] = worker; }")
         out.append("      if (threadIdx.x == 0) {")

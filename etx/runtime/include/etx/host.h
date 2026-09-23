@@ -238,21 +238,24 @@ struct etx_host {
     std::vector<uint64_t> tr((size_t)ETX_N_TASKS * 4);
     ETX_CHECK(hipMemcpy(tr.data(), d_trace_time, tr.size() * sizeof(uint64_t), hipMemcpyDeviceToHost));
     std::vector<double> wait(n_types, 0), body(n_types, 0); std::vector<int> cnt(n_types, 0);
-    std::vector<uint64_t> first(n_types, ~0ull), last_(n_types, 0);
+    std::vector<uint64_t> first_taken(n_types, ~0ull), first_ready(n_types, ~0ull), last_ready(n_types, 0), last_done(n_types, 0);
     uint64_t t_min = ~0ull, t_max = 0;
     for (int i = 0; i < ETX_N_TASKS; ++i) {
       const uint64_t* r = &tr[(size_t)i * 4];
       if (r[0] == 0 || r[2] == 0) continue;
       const int ty = etx_descs[i].type; if (ty < 0 || ty >= n_types) continue;
       wait[ty] += (double)(r[1] - r[0]); body[ty] += (double)(r[2] - r[1]); cnt[ty]++;
-      first[ty] = std::min(first[ty], r[0]); last_[ty] = std::max(last_[ty], r[2]);
+      first_taken[ty] = std::min(first_taken[ty], r[0]); first_ready[ty] = std::min(first_ready[ty], r[1]);
+      last_ready[ty] = std::max(last_ready[ty], r[1]); last_done[ty] = std::max(last_done[ty], r[2]);
       t_min = std::min(t_min, r[0]); t_max = std::max(t_max, r[2]);
     }
-    fprintf(out, "phase trace (us): total span %.1f\n", (double)(t_max - t_min) * tick_ns / 1000.0);
-    fprintf(out, "  %-22s %6s %10s %10s %10s\n", "type", "tasks", "mean wait", "mean body", "span");
+    const double k = tick_ns / 1000.0;
+    fprintf(out, "phase trace (us): total span %.1f; per type: mean wait/body, then first-ready, last-ready, last-done relative to the type's first-ready (fleet's timeline columns)\n", (double)(t_max - t_min) * k);
+    fprintf(out, "  %-22s %6s %9s %9s %11s %10s %10s\n", "type", "tasks", "wait", "body", "first-ready", "last-ready", "last-done");
     for (int ty = 0; ty < n_types; ++ty) if (cnt[ty])
-      fprintf(out, "  %-22s %6d %10.2f %10.2f %10.1f\n", type_names ? type_names[ty] : "", cnt[ty],
-              wait[ty] / cnt[ty] * tick_ns / 1000.0, body[ty] / cnt[ty] * tick_ns / 1000.0, (double)(last_[ty] - first[ty]) * tick_ns / 1000.0);
+      fprintf(out, "  %-22s %6d %9.2f %9.2f %11.1f %10.1f %10.1f\n", type_names ? type_names[ty] : "", cnt[ty],
+              wait[ty] / cnt[ty] * k, body[ty] / cnt[ty] * k, (double)(first_ready[ty] - t_min) * k,
+              (double)(last_ready[ty] - first_ready[ty]) * k, (double)(last_done[ty] - first_ready[ty]) * k);
   }
   void dump_trace() {
     ETX_CHECK(hipSetDevice(device));
