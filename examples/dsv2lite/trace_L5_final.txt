@@ -1,0 +1,21 @@
+phase trace (us): total span 3683.4; per type: mean wait/body, then first-ready, last-ready, last-done relative to the type's first-ready (fleet's timeline columns)
+  type                    tasks      wait      body first-ready last-ready  last-done
+  embed                       1      1.04      3.52         2.9        0.0        3.5
+  qkv_5                     296      3.67     18.64       649.2        1.1       20.2
+  qabs_5                     32      2.05      2.67       670.8        3.2        5.8
+  attn_5                    256      2.00     12.95       670.8        3.9       16.6
+  merge_5                   256      2.94      8.63       686.2        5.8       14.2
+  oproj_5                   296      2.26      6.03       697.0        5.8       11.8
+  router_5                  296      4.24      8.49       711.6        1.1        9.8
+  gate_up_5                 296      1.43     31.32       722.5        3.1       35.0
+  down_5                    296      1.36     16.07       756.2        4.6       21.2
+  qkv_6                     296      4.34     18.20       780.0        1.1       19.5
+  qabs_6                     32      2.73      2.63       803.1        1.2        3.8
+  attn_6                    256      2.21     12.96       802.4        1.9       16.2
+  merge_6                   256      4.09      8.61       818.5        6.3       14.5
+  oproj_6                   296      2.81      5.92       829.8        6.5       12.6
+  router_6                  296      5.01      8.60       845.6        0.9        9.7
+  gate_up_6                 296      1.00     30.83       856.0        3.7       35.2
+  down_6                    296      3.44     15.98       891.8        5.5       21.6
+  lm_head                   296      4.57    125.51      3547.1        1.1      130.0
+  argmax                      1      5.60      2.92      3680.5        0.0        2.9

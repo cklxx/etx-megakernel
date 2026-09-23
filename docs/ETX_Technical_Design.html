@@ -1,0 +1,2353 @@
+<!doctype html><html><head><meta charset='utf-8'><title>ETX: A DSL-Agnostic, Chiplet-Aware Compiler for Dynamic GPU Megakernels</title><style>
+@page { size: A4; margin: 18mm 16mm 18mm 16mm; }
+body { font-family: "DejaVu Sans", "Helvetica Neue", Arial, sans-serif; font-size: 10.5pt; line-height: 1.45; color: #111; max-width: 178mm; margin: 0 auto; }
+h1 { font-size: 20pt; margin: 0 0 6pt; line-height: 1.25; }
+h2 { font-size: 14.5pt; margin: 22pt 0 6pt; padding-bottom: 3pt; border-bottom: 1px solid #999; page-break-after: avoid; }
+h3 { font-size: 12pt; margin: 14pt 0 4pt; page-break-after: avoid; }
+h4 { font-size: 10.5pt; margin: 10pt 0 3pt; }
+p { margin: 5pt 0; text-align: left; }
+ul, ol { margin: 4pt 0 6pt; padding-left: 18pt; }
+li { margin: 2pt 0; }
+table { border-collapse: collapse; width: 100%; margin: 6pt 0 10pt; font-size: 9pt; page-break-inside: auto; }
+th, td { border: 1px solid #999; padding: 3pt 5pt; vertical-align: top; text-align: left; }
+th { background: #eee; font-weight: bold; }
+tr { page-break-inside: avoid; }
+code { font-family: "DejaVu Sans Mono", Menlo, Consolas, monospace; font-size: 8.8pt; }
+pre { background: #f4f4f4; border: 1px solid #ccc; padding: 6pt 8pt; font-size: 8.5pt; line-height: 1.35; white-space: pre-wrap; word-break: break-word; page-break-inside: avoid; }
+hr { border: none; border-top: 1px solid #999; margin: 12pt 0; }
+blockquote { margin: 6pt 0; padding-left: 10pt; border-left: 3px solid #bbb; color: #333; }
+.meta { color: #333; margin-bottom: 10pt; }
+a { color: #0645ad; text-decoration: none; }
+</style></head><body><h1 id="etx-a-dsl-agnostic-chiplet-aware-compiler-for-dynamic-gpu-megakernels">ETX: A DSL-Agnostic, Chiplet-Aware Compiler for Dynamic GPU Megakernels</h1>
+<p>Author: Kailun Chen · Status: v0.3 design (pre-implementation, phase-0 calibration measured) · Date: 2026-09-22 · Target hardware: AMD MI300X (gfx942) first; CDNA2/CDNA4, RDNA, NVIDIA Hopper/Blackwell via the machine model</p>
+<h2 id="0-summary">0. Summary</h2>
+<ul>
+<li>ETX compiles a graph of tile-level operators into one persistent GPU kernel while keeping shape dynamism, data-dependent control flow (MoE routing, speculative decoding) and cross-step dynamism as first-class inputs. It adopts the Event Tensor abstraction of the ETC paper (arXiv 2604.13327 v2, MLSys 2026) and adds the two things that paper does not have: an explicit machine model and a cost-driven choice of scheduling policy.</li>
+<li>Three hard decisions are enforced in code: hardware differences exist only as data (<code>etx/machine/arch/*.yaml</code>; a test fails if an architecture name appears in a pass); capabilities (correctness) and costs (performance) are modelled separately; and static / dynamic / hybrid scheduling is chosen per subgraph by a cost model that prints its reasons. The paper&rsquo;s own numbers motivate the third: the same primitives give +9% with static and -17% with dynamic scheduling on Qwen3-32B TP=4.</li>
+<li>The performance model has two lower bounds (bandwidth and critical path) and four levers. At small batch the critical-path term dominates: a hand-written MI300X MoE megakernel (fleet-mi300x) spends 31 us of a 133 us layer moving bytes and about 100 us in fixed per-phase latency. ETX turns the four levers that hand-written kernels use (fewer phases, cheaper signals, cross-barrier prefetch, fine-grained events) into compiler passes.</li>
+<li>The chiplet is a first-class concept: an exec-domain tree, a <code>domain</code> event scope between <code>cluster</code> and <code>device</code>, per-scope fence / poll / memory-type lowering rows, and a hybrid scheduler that pushes only inside a domain and uses statically pre-ordered queues across domains.</li>
+<li>Phase-0 calibration on a rented MI300X (ROCm 7.2.4) on 2026-09-22 measured: workgroup k lands on XCD (k+6) mod 8, not the documented round-robin; one-way arrive latency 642 ns same-XCD / 742 ns cross-XCD when polling through L2 after an L1 invalidate (vs 873 / 892 ns with agent-scope atomic loads); a plain load never observes the arrive; release / acquire sequences from the lowering table produced 0 stale payloads in 20,000 trials; a ticket-based ready queue sustains 76.6 M pops/s at 512 poppers where a CAS-based ring collapses to 0.41 M pops/s.</li>
+<li>What exists today: the L1-L5 pipeline in Python (IR, six verification checks, seven passes, lowering-table code generation, protocol simulator), 46 passing tests, and the phase-0 benchmark programs. On 2026-09-22 the first ETX-generated megakernel (the split-K row-sum example) ran end to end on the MI300X with 608 cooperative workers and matched the CPU fp32 reference (max abs error 4.8e-7) under static, hybrid and dynamic scheduling: 0.101 / 0.115 / 0.118 ms per step at n=64 and 0.128 / 0.441 / 0.512 ms at n=1024. Later the same day a complete MoE layer with real tiles (data-dependent routing computed on device, runtime counter initialisation, gather and range maps) ran reference-checked on one MI300X, and GEMM + reduce-scatter ran reference-checked across two MI300X through one shared system-scope event buffer over xGMI. Five defects visible only on hardware (ticket-ring wrap-around, event scope under global scheduling, multi-in-event consumers pushed twice, pushes to the wrong domain queue, runtime maps evaluated before their tensors exist) are now encoded as runtime and pass rules. On short tasks the static schedule beat the queue path by 32% and Pass 3 recovered 16% in the hybrid regime; the cross-device flag latency is 10.6 us.</li>
+</ul>
+<h2 id="1-executive-summary">1. Executive Summary</h2>
+<h3 id="11-what-etx-is">1.1 What ETX is</h3>
+<p>ETX (Event Tensor eXtended) is a compiler that sits above tile-level DSLs. It does not generate the instructions inside a tile. It cuts operators into tiles, connects tile-level dependencies, chooses a schedule, places tasks on the machine, generates the skeleton of a persistent kernel, and links in tile bodies compiled by whichever DSL produced them (Triton, TileLang, CuTe DSL, Composable Kernel, hand-written HIP or CUDA).</p>
+<p>The abstraction is the Event Tensor from the ETC paper: dependencies between tile-level tasks are expressed as multidimensional arrays of integer counters, and the mapping from task coordinates to event coordinates is an einsum-style expression such as <code>"ij-&gt;i"</code>. ETX keeps that abstraction unchanged and extends it with an event scope (<code>workgroup &lt; cluster &lt; domain &lt; device &lt; system</code>), a domain assignment, an initialisation kind, and an optional epoch stamp.</p>
+<p>Two additions distinguish ETX from the paper&rsquo;s implementation:</p>
+<ol>
+<li>An explicit machine model. A machine is a tree of execution domains (for MI300X: one device, eight XCDs of 38 active CUs, each with a private 4 MB L2), a visibility table that says which fence, poll and memory type each event scope needs, a capability table (booleans and enumerations that decide whether an optimisation is legal) and a cost table (numbers that decide whether it is worthwhile). Passes and code generators read this object; they never test the architecture name.</li>
+<li>A cost-driven scheduling decision. For every task grid the compiler chooses static, dynamic or hybrid scheduling from workload variance and topology costs, and it records the reason. Hybrid scheduling, which the paper does not have, uses a dynamic ready queue inside each domain and statically pre-ordered queues plus event counters across domains, so no push ever crosses a domain or a device.</li>
+</ol>
+<h3 id="12-why">1.2 Why</h3>
+<p>Low-batch decoding issues hundreds to over a thousand kernels per step; the shortest finish in about 2 us and the launch gap is 5-10 us, so launch overhead dominates (ETC paper, figure 1). CUDA Graphs remove the gap but keep the kernel boundary, an implicit global barrier. A megakernel replaces the boundary with tile-level dependencies: a tile of operator B starts as soon as the tiles of A it depends on have finished.</p>
+<p>The ETC paper shows that a compiler can do this, and also shows the risk: on its MoE layer dynamic scheduling wins 4% over static, and on the dense TP=4 model the same dynamic scheduler is 17% slower than not fusing. The policy is a function of workload and interconnect topology and must be chosen by a cost model. The paper&rsquo;s implementation also assumes one machine (homogeneous SMs, one coherent L2, <code>multimem</code>, NVLink); on an MI300X none of these hold, and a direct port would be silently wrong before it was slow.</p>
+<h3 id="13-expected-outcomes">1.3 Expected outcomes</h3>
+<p>The performance model in section 4 bounds the gain. For dense models of 30B parameters and more at batch 16 and above, the baseline (vLLM / SGLang with CUDA Graphs and torch.compile) already runs at 55-60% of the bandwidth bound and the realistic gain is 10% to 30%. For MoE and tensor-parallel decoding at small batch, baselines run at 10% to 25% of the bound; 1.5x to 3x is physically available, but only if the critical path is shortened (levers 1 to 3), not merely by placing the operators in one kernel. ETC reached 1.15x on Qwen3-32B at TP=1 and 1.48x over vLLM on 30B-A3B at batch 1; fleet-mi300x, hand-written, reached 3.60 ms/token on DeepSeek-V2-Lite at batch 1 against vLLM&rsquo;s 4.52 ms on the same MI300X. All ETX-side numbers in this document are targets or estimates unless marked measured; paper-side numbers are citations.</p>
+<h3 id="14-delivered-now-versus-later">1.4 Delivered now versus later</h3>
+<p>Delivered now: the full L1-L5 pipeline in Python (IR, six verification checks, machine models for five architectures, seven passes with printed reasons, lowering-table code generation, protocol simulator), three example graphs with real tile bodies and CPU-reference hosts, the complete phase-0 calibration on MI300X, 45 tests, and reference-checked hardware runs of all three examples: split-K and a full MoE layer on one MI300X, GEMM + reduce-scatter across two MI300X (section 14, Appendix C). Not yet delivered: CUDA emission on hardware, a runnable Triton host-DSL kernel, cost tables for architectures other than gfx942, the cross-step control ring, tuned tiles and therefore any fusion-gain figure against an unfused baseline.</p>
+<h2 id="2-background-and-prior-art">2. Background and Prior Art</h2>
+<h3 id="21-the-etc-paper-abstraction">2.1 The ETC paper: abstraction</h3>
+<p>The paper (Jin, Hou, Wang, Lai et al., &ldquo;Event Tensor: A Unified Abstraction for Compiling Dynamic Megakernel&rdquo;, MLSys 2026, arXiv 2604.13327 v2, CMU and NVIDIA) contributes an IR-level abstraction, not a new scheduler. It lifts &ldquo;who waits for whom&rdquo; from semaphores scattered through hand-written kernels into a first-class tensor in the compiler. Three language constructs:</p>
+<table>
+<thead>
+<tr>
+<th>Construct</th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Device function</td>
+<td>A function launched over a multidimensional coordinate space as a grid of tile-level tasks. Each task runs on one SM and may use warp specialisation and tensor cores. The coordinate space is symbolic, e.g. <code>(n, 4)</code>.</td>
+</tr>
+<tr>
+<td>Event Tensor</td>
+<td>A multidimensional array whose elements are events: an initial <code>wait_count</code>, <code>notify()</code> (atomic decrement) and <code>wait()</code> (spin until zero). Under dynamic scheduling reaching zero can also trigger consumer tasks. Shapes may contain symbolic dimensions.</td>
+</tr>
+<tr>
+<td>Graph function</td>
+<td>A computation graph of <code>call_device</code> nodes over data tensors and event tensors. Each call declares <code>in_edges</code> / <code>out_edges</code> with an einsum-style map (e.g. <code>"ij-&gt;i"</code>) from task coordinates to event coordinates.</td>
+</tr>
+</tbody>
+</table>
+<p>The paper&rsquo;s minimal example (figure 3) is split-K summation: <code>partial_sum</code> has <code>tile_num = (n, 4)</code> and notifies <code>E = ETensor((n,), wait=4)</code> through <code>"ij-&gt;i"</code>; <code>final_sum</code> has <code>tile_num = (n,)</code> and waits on <code>E[i]</code> through <code>"i-&gt;i"</code>. Row i of the second phase starts as soon as its four partial sums exist; with per-kernel execution it would wait for the whole first phase. One tensor represents thousands of events and the runtime never materialises a task graph.</p>
+<p>Two kinds of dynamism enter the IR:</p>
+<ul>
+<li>Shape dynamism. Tensor and ETensor dimensions may be symbolic (batch, sequence length). The compiled artefact is a template instantiated with concrete values at run time; no recompilation and no graph re-capture. This is why the system can be compiled ahead of time.</li>
+<li>Data-dependent dynamism, through two mechanisms. Data-dependent update: which event a task notifies is decided by a runtime tensor, e.g. <code>"i-&gt;topk[i,:]"</code> (token i notifies the k expert events it is routed to), and the events&rsquo; initial counts are computed in the same tile that computes top-k. Data-dependent trigger: how many consumers an event triggers is decided at run time, e.g. <code>"i-&gt;range(indptr[i], indptr[i+1])"</code> (expert i triggers the number of GroupGEMM tiles it needs).</li>
+</ul>
+<p>The invariant is that the dependency chain stays feed-forward (Attention, TopK, grouping, GroupGEMM); dynamism appears only in notification targets and trigger ranges, never as cycles or arbitrary control flow.</p>
+<h3 id="22-the-two-scheduling-transforms">2.2 The two scheduling transforms</h3>
+<table>
+<thead>
+<tr>
+<th>Dimension</th>
+<th>Static scheduling (paper section 3.1)</th>
+<th>Dynamic scheduling (paper section 3.2)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Who orders tasks</td>
+<td>The host pre-orders a queue per SM before launch (round-robin in the paper) and materialises it in global memory</td>
+<td>An on-chip scheduler: when an event reaches zero its consumers are atomically pushed to a ready queue; idle SMs atomically pop</td>
+</tr>
+<tr>
+<td>How dependencies are enforced</td>
+<td><code>wait()</code> at task start, <code>notify()</code> at task end</td>
+<td>The same notify / wait, plus push / pop</td>
+</tr>
+<tr>
+<td>Shape dynamism</td>
+<td>Queues are pre-ordered for a sampled set of shapes; an unseen shape reuses the queue of the next larger sampled shape</td>
+<td>Native; order is decided at run time</td>
+</tr>
+<tr>
+<td>Data-dependent dynamism</td>
+<td>Conservative fallback: the affected notify / wait are rewritten to <code>E[0]</code>, which is a global barrier</td>
+<td>Native</td>
+</tr>
+<tr>
+<td>Overhead</td>
+<td>Lowest: atomics and spinning only</td>
+<td>Queue push / pop; the authors acknowledge contention on the centralised global-memory queue; appendix E moves the push off the critical path with early push (consumers are pushed when the producer is dispatched)</td>
+</tr>
+<tr>
+<td>Suited to</td>
+<td>Predictable workloads, latency-sensitive small batch, multi-GPU</td>
+<td>Irregular workloads (MoE routing), communication jitter</td>
+</tr>
+</tbody>
+</table>
+<p>After lowering, both leave two pieces of runtime state, one integer event tensor and the scheduler&rsquo;s task queues, with no task-graph walker and no interpreter. The pipeline is: graph-level optimisation, tile-level optimisation, static or dynamic scheduling transform, prefetch rewriting, persistent-kernel code generation, static-queue materialisation.</p>
+<h3 id="23-results">2.3 Results</h3>
+<p>All numbers are from the paper, 8x B200 with NVLink.</p>
+<table>
+<thead>
+<tr>
+<th>Experiment</th>
+<th>Baselines</th>
+<th>Result</th>
+<th>Schedule used</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GEMM + Reduce-Scatter (TP=8, 8192 tokens)</td>
+<td>cuBLAS+NCCL, TP-Async, Triton-Distributed, cuBLASMp</td>
+<td>up to 1.40x (vs unfused)</td>
+<td>dynamic (absorbs network jitter)</td>
+</tr>
+<tr>
+<td>All-Gather + GEMM</td>
+<td>same</td>
+<td>up to 1.40x</td>
+<td>static (ring order is predictable)</td>
+</tr>
+<tr>
+<td>MoE layer, Qwen3-30B-A3B (128 experts, top-8)</td>
+<td>Triton 3.4, FlashInfer 0.2.14</td>
+<td>up to 1.23x (1024 tokens)</td>
+<td>dynamic</td>
+</tr>
+<tr>
+<td>End-to-end TPOT, 30B-A3B, bs=1</td>
+<td>vLLM 0.11, SGLang 0.5.3 (CUDA Graph + torch.compile)</td>
+<td>1.48x / 1.20x</td>
+<td>static</td>
+</tr>
+<tr>
+<td>End-to-end TPOT, Qwen3-32B, TP=1</td>
+<td>same</td>
+<td>up to 1.15x / 1.09x</td>
+<td>static</td>
+</tr>
+<tr>
+<td>End-to-end TPOT, Qwen3-32B, TP=4</td>
+<td>same</td>
+<td>0.99-1.06x; SGLang is faster (lighter CPU-side scheduling)</td>
+<td>static</td>
+</tr>
+<tr>
+<td>Qwen3-32B engine warm-up</td>
+<td>SGLang 583 s / vLLM 123 s (JIT + 51 / 67 graph captures)</td>
+<td>35 s, 0 captures; offline compile 107 s</td>
+<td>-</td>
+</tr>
+<tr>
+<td>MoE layer, static vs dynamic (vs unfused megakernel of the same code)</td>
+<td>1 / 128 / 1024 / 4096 tokens</td>
+<td>static 1.03 / 1.02 / 1.04 / 1.02; dynamic 0.95 / 1.06 / 1.08 / 1.03</td>
+<td>dynamic wins 4% on irregular load</td>
+</tr>
+<tr>
+<td>Qwen3-32B TP=4, static vs dynamic</td>
+<td>bs 1 / 16 / 32 / 128</td>
+<td>static 1.09 / 1.06 / 1.07 / 1.06; dynamic 0.83 / 0.82 / 0.85 / 0.89</td>
+<td>cross-device pushes make dynamic slower than unfused</td>
+</tr>
+</tbody>
+</table>
+<p>The last two rows are the most important evidence for this design: with identical primitives, the wrong scheduling policy turns +9% into -17%.</p>
+<h3 id="24-seven-critical-judgements">2.4 Seven critical judgements</h3>
+<ol>
+<li>Events as integer counters must be kept. It compresses runtime state to two memory blocks and lets the symbolic-shape compiler infrastructure be reused directly. Any &ldquo;event object&rdquo; or &ldquo;task-graph node&rdquo; is a regression.</li>
+<li>Scheduling is a compiler transform, not a runtime component. Static and dynamic are rewrites of the same IR; the runtime keeps only push and pop. This is what allows the policy to be chosen per subgraph rather than globally; ETX&rsquo;s hybrid scheduling is built on it.</li>
+<li>The machine model is implicit and holds only on B200. The paper assumes homogeneous SMs, a coherent unified L2, <code>multimem</code> reduction writes and NVLink. On MI300X at least four assumptions fail: L2 is eight private 4 MB segments; there is no <code>multimem</code>; cross-XCD atomics travel over Infinity Fabric; system-scope atomics have memory-type requirements. The paper&rsquo;s claim that the abstraction is &ldquo;not specific to a GPU generation&rdquo; is about the IR; the implementation was not validated elsewhere.</li>
+<li>Static scheduling&rsquo;s fallback for dynamism is too coarse. Shapes reuse the next larger sampled queue; data dependence degrades to an <code>E[0]</code> global barrier. This is the worst case exactly for the most common combination (MoE, low batch, multi-GPU), which hybrid scheduling must cover.</li>
+<li>The cost of dynamic scheduling is a function of topology. 0.83x at TP=4 shows that a push across devices never pays; the authors also acknowledge contention on the centralised queue. Queues must be hierarchical and pushes must have a domain boundary.</li>
+<li>Tile quality and fusion gain must be decoupled. The authors acknowledge that their generated GEMM tiles are sometimes slower than cuBLAS, which explains the occasional TP=4 loss. The system must allow hand-written tiles (CUTLASS / CK style) to be inlined, and evaluations must report fusion gain separately from tile quality.</li>
+<li>One launch per step, no loops inside the graph. The paper&rsquo;s megakernel covers one decoding iteration; continuous batching is absorbed by symbolic shapes but the kernel restarts every step. Cross-step persistence (a resident kernel fed step descriptors through a ring buffer) is untouched and is another source of gain at low latency.</li>
+<li>Only task-level dependency transforms, no graph-changing transforms. ETC can split an operator into tiles and refine dependencies, but it never removes a phase: no recomputation in exchange for an event, no cross-barrier weight prefetch. At small batch the critical path is set by the number of phases and the fixed latency per phase, which is exactly where hand-written kernels (Hazy, fleet-mi300x) pull ahead. Section 4 quantifies this.</li>
+</ol>
+<p>(The specification&rsquo;s heading says seven; its list carries the eighth as the consequence developed in section 4.)</p>
+<h3 id="25-the-2026-landscape-ten-design-axes">2.5 The 2026 landscape: ten design axes</h3>
+<p>Within a year of the paper more than a dozen megakernel systems appeared. Their differences concentrate on ten axes; every ETX choice has a precedent or a counter-example in this table.</p>
+<table>
+<thead>
+<tr>
+<th>Axis</th>
+<th>Choices in existing systems</th>
+<th>ETX choice and reason</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Who owns the scheduler</td>
+<td>Dedicated scheduler SMs (MPK: 4 SMs; Fleet: one workgroup per XCD) · every SM pulls from a global counter (Hazy 70B, Cohere) · host pre-orders, no in-kernel scheduler (Hazy 1B, Ada-MK, Kog, ForgeMegakernel; MPK&rsquo;s 2026 roadmap also moves to fully static)</td>
+<td>Chosen per subgraph: static segments have no scheduler; dynamic segments have one local queue per domain and workers pull. No dedicated scheduler workgroups (in fleet-mi300x such a workgroup only mirrored events; 2.6% of CUs is irrelevant when bandwidth-bound and a loss when compute-bound).</td>
+</tr>
+<tr>
+<td>Queue topology</td>
+<td>Per-worker queues (MPK&rsquo;s JIT/AOT pair, Fleet) · one global queue (Hazy 70B) · per-operator drain queues (Cohere&rsquo;s <code>ATTN_DRAIN</code> / <code>MOE_*_DRAIN</code>) · no queue (Kog, Ada-MK)</td>
+<td>Domain-local queue plus a static table per worker; data-dependent operators may add per-operator drain queues (Cohere&rsquo;s split is orthogonal to the domain split and composes with it).</td>
+</tr>
+<tr>
+<td>When dependencies are resolved</td>
+<td>JIT (dispatch after the event fires) vs AOT (pre-enqueued, worker spins): MPK mixes both, Cohere and Hazy are fully AOT, Ada-MK resolves at compile time</td>
+<td>Static segments AOT spin (one hop); dynamic segments JIT (two hops); ETC&rsquo;s early push is the default in dynamic segments.</td>
+</tr>
+<tr>
+<td>Event granularity and encoding</td>
+<td>Event objects with fan-in / fan-out ranges (MPK) · one counter per edge (Hazy, Forge) · one target count per task (Cohere) · sentinel values inside the data buffer (Kog: 0.8 us vs 7.6 us for atomics) · flags with epochs (mKernel)</td>
+<td>Integer event tensor plus epoch stamp: a resident kernel need not clear counters between steps, <code>wait</code> compares <code>count == epoch_target</code>; sentinel values are an optional lowering (capability bit <code>sentinel_signal</code>).</td>
+</tr>
+<tr>
+<td>Memory model of signals</td>
+<td>GPU-scope atomics plus <code>threadfence</code> (NVIDIA systems) · chiplet hierarchy: L2-local counts plus one <code>sc0 sc1</code> fence per XCD (Fleet, 14.5x fewer cross-chiplet signals) · compiler-visible acquire / release tokens (Triton-Distributed <code>consume_token</code>, Iris block / gpu / sys scopes)</td>
+<td>Scope is in the IR; the lowering table gives the fence per architecture; last-arriver writes back once (validated by Fleet and fleet-mi300x).</td>
+</tr>
+<tr>
+<td>Dynamic shape</td>
+<td>Specialised graphs per batch size (MPK, Fleet, ETC-static) · fixed at compile time (Forge, Hazy 1B, Ada-MK) · work stealing only for data-dependent operators (Cohere, MPK&rsquo;s JIT attention) · role adaptation (mKernel) · deterministic padding (MoK)</td>
+<td>Symbolic-shape template plus shape buckets; local queues for data-dependent segments; no padding fallback.</td>
+</tr>
+<tr>
+<td>Shared memory / LDS ownership</td>
+<td>Page allocator with instruction-tracked lifetimes (Hazy 13 x 16 KB pages, Forge, Ada-MK&rsquo;s page state machine) · worst-case allocation per task type (MPK, Fleet; the source of occupancy complaints)</td>
+<td>The L5 skeleton has a built-in LDS page allocator so the next tile&rsquo;s weight load overlaps the current tile&rsquo;s write-back; page count derived from resource class and LDS capacity (64 / 160 / 228 KB).</td>
+</tr>
+<tr>
+<td>Code-generation path</td>
+<td>Superoptimiser plus transpiler (MPK) · MLIR (Ada-MK, cuTile) · hand-written plus tile library (Hazy, Cohere, MoK, Kog) · agent synthesis plus checker (Forge, AutoMegaKernel) · Triton plus SHMEM primitives (Triton-Distributed, Iris, DITRON)</td>
+<td>No side taken: link mode accepts hand-written and vendor-library tiles, host-DSL mode accepts Triton; ETX generates the scheduling skeleton.</td>
+</tr>
+<tr>
+<td>Hardware coverage</td>
+<td>NVIDIA almost exclusively; AMD only Fleet (MI350X, MPK derivative), Kog (MI300X, bespoke), Iris / DITRON (communication primitives); Rubin claims hardware tile-level dependency triggering</td>
+<td>Chiplet is first-class; <code>wait</code> may lower to a hardware trigger (capability bit <code>hw_tile_trigger</code>), in which case ETX simply omits the spin loop.</td>
+</tr>
+<tr>
+<td>Fusion scope</td>
+<td>Whole decode step (MPK, Hazy, Cohere, Forge, Kog) · one layer type (FlashInfer MegaMoE, MegaGDN, MoK) · the serving loop itself (Blink, MPK&rsquo;s in-kernel admission)</td>
+<td>Subgraph level: parts that fail to fuse fall back to per-kernel execution; cross-step residency is an optional mode.</td>
+</tr>
+</tbody>
+</table>
+<p>Two data points deserve separate mention. Cohere (2026-09) reached 1.58x over vLLM on 30B-A3B at batch 1 on H100 with host-pre-ordered static waves plus per-operator drain queues, which shows hybrid is the right direction. AMD&rsquo;s Fleet on MI350X, using XCD-local L2 counts plus one GPU-scope fence per XCD, is 1.13-1.30x faster than a direct MPK port, which shows chiplet awareness is not optional.</p>
+<h3 id="26-experience-from-fleet-mi300x">2.6 Experience from fleet-mi300x</h3>
+<p>A hand-written megakernel of the same kind was built on MI300X (DeepSeek-V2-Lite, batch-1 decode, 3.60 ms/token, 20% faster than vLLM on the same machine; github.com/cklxx/fleet-mi300x, docs/STATUS.md). It established three facts that entered L3 and L5 directly: cross-XCD events cost an order of magnitude more than intra-XCD events, and one MoE layer could be reduced from 10 global events to 3 with 24 XCD-local events; the producer&rsquo;s <code>buffer_wbl2</code> write-back and the consumer&rsquo;s L1 invalidate cannot be omitted; and the workgroup-to-XCD mapping of a persistent kernel is not a contract and must be discovered at launch.</p>
+<h2 id="3-goals-non-goals-and-design-principles">3. Goals, Non-Goals and Design Principles</h2>
+<h3 id="31-goals-by-priority">3.1 Goals, by priority</h3>
+<ol>
+<li>DSL-agnostic: Triton, TileLang, CuTe DSL, CK and hand-written HIP / CUDA all connect.</li>
+<li>Hardware-portable: one IR produces correct and reasonable code on CDNA2 / CDNA3 / CDNA4, RDNA and NVIDIA Hopper / Blackwell; the chiplet is a first-class concept.</li>
+<li>First-class dynamic workloads: shape dynamism, data-dependent dynamism, cross-step dynamism (continuous batching, speculative decoding).</li>
+<li>Automated and explainable scheduling: the compiler chooses static / dynamic / hybrid from cost tables and prints the reason.</li>
+<li>Verifiable: every fused kernel has an unfused reference for element-wise comparison, and a deadlock can be located.</li>
+</ol>
+<h3 id="32-non-goals">3.2 Non-goals</h3>
+<ul>
+<li>No training framework; the first version fuses inference only.</li>
+<li>No in-house generation of all tile-level code; tuned hand-written tiles may be inlined.</li>
+<li>No multi-node in the first version; the IR does not hard-code a single machine, but the scheduler sees only single-machine topology.</li>
+<li>No attempt to fuse every operator; failed fusion degrades gracefully to partial-subgraph fusion plus per-kernel execution.</li>
+<li>No arbitrary control flow; dependencies must be expressible as affine maps or runtime range / gather maps.</li>
+</ul>
+<h3 id="33-three-hard-decisions">3.3 Three hard decisions</h3>
+<table>
+<thead>
+<tr>
+<th>Decision</th>
+<th>Content</th>
+<th>Cost of violating it</th>
+<th>Enforcement in code</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Hardware differences exist only as data</td>
+<td>No <code>if arch == gfx942</code> in any pass. All differences live in the capability, cost and lowering tables of <code>arch/*.yaml</code>.</td>
+<td>New hardware requires pass changes; every pass becomes a forest of conditionals</td>
+<td><code>tests/test_no_arch_branches.py</code> fails if an architecture name appears under <code>ir/</code>, <code>passes/</code>, <code>sim/</code>, <code>codegen/</code> or <code>frontends/</code></td>
+</tr>
+<tr>
+<td>Capability and cost are modelled separately</td>
+<td>A capability is a boolean or enumeration deciding whether something can be done; wrong means wrong code. A cost is a number deciding whether it is worth doing; wrong means slow.</td>
+<td>It becomes impossible to answer &ldquo;is this optimisation unsupported here, or merely unprofitable?&rdquo;</td>
+<td><code>capabilities:</code> / <code>visibility:</code> blocks versus <code>costs:</code> blocks in each YAML; <code>MachineModel.vis()</code> raises on a missing scope; <code>t_sync_us()</code> falls back to a pessimistic value and logs a note when a cost is uncalibrated</td>
+</tr>
+<tr>
+<td>Scheduling policy is chosen by the cost model</td>
+<td>Each subgraph is decided static / dynamic / hybrid from workload features plus topology costs, with a reason attached.</td>
+<td>A repeat of the paper&rsquo;s 0.83x at TP=4</td>
+<td><code>passes/p4_schedule_mode.py</code> writes <code>plan.reasons[grid]</code> for every grid; <code>tests/test_passes.py::test_reasons_are_printed</code></td>
+</tr>
+</tbody>
+</table>
+<p>One discipline runs through every layer: dependency semantics, machine facts and placement decisions are never mixed. A wrong dependency gives wrong results or deadlock and lives in L2; a wrong machine fact gives silent errors or poor performance and lives in L3; a wrong decision is only slow and lives in L4. Each kind of failure is diagnosed in exactly one layer.</p>
+<h2 id="4-performance-model">4. Performance Model</h2>
+<h3 id="41-two-lower-bounds">4.1 Two lower bounds</h3>
+<p>Before writing any pass, the accounting must show where a megakernel can take time from. The time of one decode step has two lower bounds; the larger applies:</p>
+<pre><code>T_step &gt;= max( sum(bytes) / BW_HBM ,                                    # bandwidth term
+               sum over phases ( bytes_phase / BW_HBM + T_fixed(phase) ) )  # critical-path term
+
+T_fixed(phase) = signal latency + drain (slowest worker minus the mean) + prologue ramp of the next phase
+</code></pre>
+<p>At large batch the bandwidth term dominates and fusion recovers the holes at phase edges (wave quantisation, launch gaps): 5% to 15%. At small batch the critical-path term dominates and a megakernel is not &ldquo;overlapping&rdquo; but &ldquo;shortening the chain&rdquo;. The same technique gives multipliers an order of magnitude apart in the two regimes, and the reason is entirely how far the baseline is from its bound:</p>
+<table>
+<thead>
+<tr>
+<th>Scenario</th>
+<th>Bytes per token</th>
+<th>Bandwidth bound</th>
+<th>Baseline</th>
+<th>Megakernel</th>
+<th>Reading</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Llama-1B, H100 (Hazy)</td>
+<td>about 2.4 GB</td>
+<td>about 0.7 ms</td>
+<td>vLLM about 2.5 ms (28% MBU)</td>
+<td>under 1 ms (78% MBU)</td>
+<td>Tiny model; baseline is drowned by hundreds of launches; hence 2.5x</td>
+</tr>
+<tr>
+<td>Qwen3-32B, B200 (ETC)</td>
+<td>about 66 GB</td>
+<td>about 8.2 ms</td>
+<td>vLLM about 14 ms (57%)</td>
+<td>about 12.5 ms (65%)</td>
+<td>Baseline already at 60% of bound; theoretical maximum 1.77x, achieved 1.15x</td>
+</tr>
+<tr>
+<td>DeepSeek-V2-Lite MoE, MI300X (fleet-mi300x)</td>
+<td>4.9 GB</td>
+<td>0.93 ms</td>
+<td>vLLM 4.52 ms (21%)</td>
+<td>3.60 ms (26%)</td>
+<td>The gap is not launches; it is 27 layers x 7 phases of serial fixed latency</td>
+</tr>
+</tbody>
+</table>
+<h3 id="42-where-one-moe-layers-133-us-goes-fleet-mi300x-measured-total-estimated-split">4.2 Where one MoE layer&rsquo;s 133 us goes (fleet-mi300x, measured total, estimated split)</h3>
+<table>
+<thead>
+<tr>
+<th>Segment</th>
+<th>Time</th>
+<th>Nature</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Bandwidth term (166 MB / 5.3 TB/s)</td>
+<td>31 us</td>
+<td>Moves bytes</td>
+</tr>
+<tr>
+<td>Prologue data movement / folding</td>
+<td>about 36 us</td>
+<td>Critical-path term; measured</td>
+</tr>
+<tr>
+<td>Signalling plus drain</td>
+<td>about 20 us</td>
+<td>Critical-path term; estimated</td>
+</tr>
+<tr>
+<td>Serial small tasks with only a few workers active</td>
+<td>about 46 us</td>
+<td>Critical-path term; estimated</td>
+</tr>
+</tbody>
+</table>
+<p>The layer has 7 phases x 3 global events plus 24 XCD-local events. Only the total and the prologue are measured; the split is an estimate, and phase-0 calibration is to replace it with a per-phase trace. The 26% MBU is not because tiles are slow: the GEMV in isolation reaches 93% of achievable bandwidth. It is because the kernel runs for about 100 us per layer while moving almost no bytes. The last three segments correspond to levers 2, 2 and 1 below; lever 3 fills them with the next phase&rsquo;s bytes.</p>
+<h3 id="43-four-levers">4.3 Four levers</h3>
+<table>
+<thead>
+<tr>
+<th>Lever</th>
+<th>What it removes</th>
+<th>Method</th>
+<th>Pass</th>
+<th>Floor</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1. Shorter chain</td>
+<td>Unnecessary phase boundaries</td>
+<td>Recomputation in exchange for events: small producers are inlined into consumers&rsquo; prologues; the event and the task are deleted (Pass 3)</td>
+<td>L4 Pass 3</td>
+<td>Only the natural all-to-all dependency points remain: 3 in a MoE layer (o_proj needs all heads, the router needs the full vector, the next layer needs the sum over all experts)</td>
+</tr>
+<tr>
+<td>2. Cheaper links</td>
+<td>Signal latency, prologue</td>
+<td>XCD-local events; sentinel values instead of counters (0.8 vs 7.6 us); last-arriver write-back; prologue data movement removed in tile design (once per XCD rather than once per worker)</td>
+<td>L5 lowering table; L1 tile contract</td>
+<td>Signal about 0.2 to 0.8 us per link</td>
+</tr>
+<tr>
+<td>3. Cross-barrier overlap</td>
+<td>Idle spinning while waiting on events</td>
+<td>Weights depend on no event: while spinning, a worker streams its share of the next phase&rsquo;s weights into LDS / registers and computes immediately when the event fires (Hazy&rsquo;s main route to 78% MBU)</td>
+<td>L4 Pass 7 + LDS paging + resource classes</td>
+<td>Fixed latency is covered by the next phase&rsquo;s bytes</td>
+</tr>
+<tr>
+<td>4. Fine-grained events</td>
+<td>Drain (waiting for the slowest worker)</td>
+<td>Global events split per head / per row (the paper&rsquo;s <code>ij-&gt;i</code>); consumers wait only for their producers; a straggler delays only its own downstream</td>
+<td>L2 edge maps + Pass 2 partitioning</td>
+<td>True all-to-all points still wait for everyone</td>
+</tr>
+</tbody>
+</table>
+<p>Together, a layer moves from &ldquo;7 x (bytes / bandwidth + fixed)&rdquo; to &ldquo;3 x bytes / bandwidth + 3 x fixed latency covered by prefetch&rdquo;, which is the only way to approach the 31 us bandwidth term. Of the four levers ETC has only the fourth; MPK and Fleet have part of the second; Hazy hand-wrote the first three. ETX implements all four as passes; that is its route to catch up with hand-written kernels and its main increment over ETC.</p>
+<h3 id="44-cost-model-coefficients">4.4 Cost model coefficients</h3>
+<pre><code>T_sync(edge) = T_local   if producer and consumer share a domain
+             = T_cross   if they cross a domain (through the shared cache / fabric)
+             = T_dev     if they cross a device (P2P / NVLink / xGMI)
+T_push(edge) = T_sync(edge) + T_queue(N_contenders)
+</code></pre>
+<p>The coefficients are not guessed; phase-0 microbenchmarks fill them. Public numbers serve as seed values (section 8.5), and the first measured values from 2026-09-22 are in section 8.6 and Appendix C, including the first end-to-end split-K run, where about 1 us of queue cost per 2 us task made static 3.5-4x faster than dynamic at n=1024, exactly the regime the <code>C_queue</code> term is meant to capture. In the code, <code>MachineModel.t_sync_us(scope)</code> maps <code>DOMAIN</code> to <code>t_local_ns</code>, <code>DEVICE</code> to <code>t_cross_ns</code> and <code>SYSTEM</code> to <code>t_dev_ns</code>; on a machine without a domain level <code>DEVICE</code> also maps to <code>t_local_ns</code>; an uncalibrated value falls back to 200 / 800 / 10,000 ns and a note is appended to the plan log.</p>
+<h3 id="45-honest-expectations">4.5 Honest expectations</h3>
+<p>Dense models of 30B parameters and above at batch 16 and above: 10% to 30% over vLLM / SGLang, with the ceiling set by the baseline&rsquo;s MBU. MoE at small batch and tensor parallelism: baseline MBU is 10% to 25%, so 1.5x to 3x has physical room, but only if levers 1 to 3 are obtained together; putting the operators into one kernel does not by itself get there. Evaluations always report MBU and a per-phase trace, never a bare multiplier.</p>
+<h2 id="5-system-architecture-overview">5. System Architecture Overview</h2>
+<h3 id="51-five-layers">5.1 Five layers</h3>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Content</th>
+<th>Product passed downward</th>
+<th>Acceptance criterion</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>L1 Frontend adapters</td>
+<td>Triton, TileLang, CuTe DSL, CK, hand-written HIP / CUDA; each answers only three questions: coordinate space, dependency map, resource need</td>
+<td><code>TileOp</code> + <code>EdgeMap</code> (hardware-independent pure data) + tile-body handle</td>
+<td>Switching frontends changes no line below L1</td>
+</tr>
+<tr>
+<td>L2 Event Tensor IR</td>
+<td>Task grids, <code>ETensor(shape, wait_count, scope, init)</code>, symbolic dimensions, data-dependent update / trigger, verification passes</td>
+<td>Tile dependency graph with ETensors, verified acyclic and count-conserving</td>
+<td>All verification checks green; symbolic dimensions instantiable</td>
+</tr>
+<tr>
+<td>L3 Machine model</td>
+<td>Exec-domain tree, visibility and atomic capabilities, capacities (LDS, registers, CUs), cost table (calibrated), lowering table; <code>arch/gfx942.yaml</code> and others</td>
+<td>Read-only tables: L4 reads costs and capacities, L5 reads capabilities and lowering</td>
+<td>New hardware is a new YAML file only</td>
+</tr>
+<tr>
+<td>L4 Placement and scheduling passes</td>
+<td>Tile size / resource class, affinity partitioning, event elimination by recomputation, schedule-mode selection, queue hierarchy, memory / event allocation, cross-barrier prefetch</td>
+<td>Partition + per-subgraph mode with reason + queue layout + descriptor table</td>
+<td>Every decision is explainable (&ldquo;why static&rdquo;)</td>
+</tr>
+<tr>
+<td>L5 Backend codegen + minimal runtime</td>
+<td>Persistent-kernel skeleton, primitive lowering (atomics / fences / sleep), linking of DSL tile bodies, kernel family (multi-device / multi-resource-class)</td>
+<td>Kernel binary + launch parameters (event buffer, queues, descriptors, shape scalars, domain map)</td>
+<td>Element-wise match with the reference; no deadlock</td>
+</tr>
+</tbody>
+</table>
+<p>L3 is only read, never modified, by L4 and L5. At run time, per step, the host writes shape scalars and pointers, launches or posts to the resident kernel; the event tensor and the queues are the entire state; a watchdog and an event dump exist for diagnosis.</p>
+<h3 id="52-data-flow-of-one-compile">5.2 Data flow of one compile</h3>
+<pre><code>Graph (symbolic)  --verify--&gt;  Instance (one step's tasks and events)
+   --P1--&gt; worker counts  --P2--&gt; domains + scopes  --P3--&gt; smaller graph (re-P2)
+   --P4--&gt; modes  --P5--&gt; queues  --P6--&gt; memory  --P7--&gt; prefetch  --verify_plan--&gt;  Plan
+Plan --codegen--&gt; megakernel_d&lt;i&gt;.hip + etx_lowering.h + etx_tiles.h + plan.json
+Plan --sim--&gt;     deadlock check, makespan, budget
+</code></pre>
+<p>The kernel is per (graph, machine). <code>plan.json</code> is per step: shape scalars, descriptors, static queues, event counts, push lists. Shape dynamism means regenerating the plan, never the kernel.</p>
+<h2 id="6-layer-1-tile-contract-and-frontends">6. Layer 1: Tile Contract and Frontends</h2>
+<h3 id="61-three-questions">6.1 Three questions</h3>
+<p>A megakernel compiler does three things: cut tiles, connect dependencies, order a schedule. Each needs one input, so any frontend that can answer three questions can be connected; one that cannot should not be forced in, and the operator should run as a separate kernel.</p>
+<table>
+<thead>
+<tr>
+<th>Question</th>
+<th>Form of the answer</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>What is the tile coordinate space?</td>
+<td><code>Grid = (expr_0, expr_1, ...)</code></td>
+<td>Symbolic expressions allowed, e.g. <code>(B*H, ceil(S/128))</code></td>
+</tr>
+<tr>
+<td>What does each tile read and write?</td>
+<td>Explicit: <code>coord -&gt; {(tensor_slice, producer_coord)}</code>. Declarative: slice expressions for <code>reads</code> / <code>writes</code>, from which ETX infers the map</td>
+<td>Hand-written IR gives the explicit form; Triton-like frontends give the declarative form. If inference fails (a slice that is not affine) the compiler reports an error; it never guesses</td>
+</tr>
+<tr>
+<td>What resources does a tile need?</td>
+<td><code>Resource(threads, lds_bytes, vgpr, agpr, tensor_core, cluster?)</code></td>
+<td>Abstract need; mapping it onto a 64 KB or 160 KB LDS is L4&rsquo;s job</td>
+</tr>
+</tbody>
+</table>
+<p>The answers form a <code>TileOp</code> containing no hardware detail. In code (<code>etx/ir/types.py</code>) a <code>TaskGrid</code> carries the grid, a <code>TileBody(kind, symbol, source)</code>, the resource, <code>args / reads / writes</code>, the edge maps, and optimisation annotations (<code>pure</code>, <code>out_to_in</code>, <code>weight_args</code>, <code>bytes_per_tile</code>, <code>duration_us</code>, <code>duration_cv</code>, <code>device</code>); <code>Resource.prefetch_bytes</code> is reserved for Pass 7.</p>
+<h3 id="62-two-integration-modes">6.2 Two integration modes</h3>
+<p>&ldquo;DSL-agnostic&rdquo; cannot remain an IR-level declaration. Tile bodies must end up in the same kernel as the persistent loop, and different DSLs produce different artefacts, so the backend offers two routes.</p>
+<p>Link mode: the tile body is a linkable device function. The frontend compiles each tile body to a device function with a fixed ABI (<code>-fgpu-rdc</code> / <code>-rdc=true</code>); ETX generates the persistent loop and dispatch switch in HIP / CUDA C++ and the two are merged at link time. CUTLASS, CK, CuTe DSL (exporting device functions) and hand-written kernels take this route. Advantage: the tile body need not know ETX exists, and vendor-library-grade tiles can be inlined. Cost: limited cross-translation-unit inlining, and register allocation is the union over the whole kernel.</p>
+<p>Host-DSL mode: the persistent loop is generated in the tile&rsquo;s own DSL. Triton does not export linkable device functions, but <code>@triton.jit</code> functions can call one another, so ETX generates the loop, pop, wait and dispatch in Triton, with runtime primitives from <code>tl.atomic_*</code>, extern library functions or <code>inline_asm</code> (Triton-Distributed has shown the route is viable). Advantage: one compilation unit, optimised as a whole. Cost: one skeleton template per DSL, and the DSL&rsquo;s expressiveness limits the skeleton (Triton has no warp specialisation).</p>
+<h3 id="63-tile-abi-link-mode">6.3 Tile ABI (link mode)</h3>
+<pre><code class="language-c">// Fixed signature of every tile body; the frontend exports to it
+struct etx_ctx {
+  int32_t         coord[4];    // task coordinate (symbolic shape already instantiated)
+  const int32_t*  shape;       // this step's symbolic scalars, in graph.symbols order
+  void* const*    args;        // tensor pointer table, indexed by plan.json &quot;args&quot;
+  etx_event*      events;      // event buffer base (int32 counters)
+  const int32_t*  ev_offset;   // per-event-tensor offset into events
+  const int32_t*  ev_shape;    // per-event-tensor shape, 4 ints each
+  uint32_t        domain;      // exec domain and worker id (discovered at launch by L5)
+  uint32_t        worker;
+  void*           lds;         // this worker's LDS base, sized by resource class
+};
+extern &quot;C&quot; __device__ void etx_tile_&lt;name&gt;(const etx_ctx*);
+
+// Runtime primitives a tile body may call (defaults provided; a frontend may override)
+__device__ void     etx_wait_&lt;SCOPE&gt;  (etx_event*);       // SCOPE in DOMAIN | DEVICE | SYSTEM
+__device__ int32_t  etx_arrive_&lt;SCOPE&gt;(etx_event*);       // returns remaining count
+__device__ void     etx_push (const etx_queue*, int32_t task);
+__device__ int32_t  etx_try_pop(const etx_queue*, int32_t* ticket);
+ETX_BACKOFF();                                            // s_sleep / nanosleep
+ETX_DOMAIN_ID();                                          // HW_ID.XCC_ID / %smid / 0
+</code></pre>
+<p>The ABI deliberately exposes six things: coordinate, scalars, pointer table, events, position, LDS. A tile body that needs more is attempting to schedule and belongs in L4.</p>
+<h3 id="64-frontend-matrix">6.4 Frontend matrix</h3>
+<table>
+<thead>
+<tr>
+<th>Frontend</th>
+<th>Mode</th>
+<th>Dependency form</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Triton (NVIDIA / AMD backends)</td>
+<td>host-DSL</td>
+<td>declarative (slice inference)</td>
+<td>No warp specialisation, no TMA multicast control; suited to GEMV, norm, gather / scatter tiles</td>
+</tr>
+<tr>
+<td>TileLang / TVM TensorIR</td>
+<td>either</td>
+<td>declarative</td>
+<td>The paper&rsquo;s implementation path; symbolic shapes already supported</td>
+</tr>
+<tr>
+<td>CuTe DSL / CUTLASS</td>
+<td>link</td>
+<td>explicit</td>
+<td>Main GEMM and attention tiles; Hopper / Blackwell features fully available</td>
+</tr>
+<tr>
+<td>Composable Kernel (AMD)</td>
+<td>link</td>
+<td>explicit</td>
+<td>Main AMD GEMM / attention tiles; MFMA and LDS layout handled inside CK</td>
+</tr>
+<tr>
+<td>Hand-written HIP / CUDA</td>
+<td>link</td>
+<td>explicit</td>
+<td>fleet-mi300x&rsquo;s GEMV and MLA tiles are of this kind</td>
+</tr>
+</tbody>
+</table>
+<p>In the repository, <code>etx/frontends/tileop.py</code> defines the contract, <code>linkmode.py</code> emits the link-mode prototypes header, and <code>triton_host.py</code> emits a Triton skeleton (not yet runnable). <code>TileBody.kind</code> is one of <code>hip_link</code>, <code>cuda_link</code>, <code>triton</code>, <code>builtin</code>.</p>
+<h2 id="7-layer-2-event-tensor-ir">7. Layer 2: Event Tensor IR</h2>
+<h3 id="71-core-types">7.1 Core types</h3>
+<pre><code>Tensor   = (shape[sym|const], dtype, layout_hint)
+ETensor  = (shape[sym|const], wait_count[sym|const|runtime], scope, domain_id, init_kind)
+TaskGrid = (grid[sym], tile_ref, resource_class, in_edges{ETensor: map}, out_edges{ETensor: map},
+            pure: bool, out_to_in: map)      # pure + output-to-input map: precondition for Pass 3 inlining
+Step     = (graph_fn, shape_scalars, arg_table)   # one call = one iteration
+</code></pre>
+<ul>
+<li><code>wait_count</code>: number of notifies before the event reaches zero. A constant, a symbol (<code>WORLD_SIZE</code>), or a runtime value (tokens routed to expert i); a runtime value must be written by an upstream tile.</li>
+<li><code>scope</code>: visibility range: <code>workgroup &lt; cluster &lt; domain &lt; device &lt; system</code>. <code>domain</code> is the level ETX adds relative to the paper; it corresponds to an XCD, GCD or die. The paper&rsquo;s events have one scope (device), which is fine on a homogeneous L2 and an order of magnitude of cost on a chiplet part.</li>
+<li><code>domain_id</code>: the exec domain whose tasks this event mainly serves. Filled by the L4 partitioning pass; empty in L2.</li>
+<li><code>init_kind</code>: <code>static</code> (constant), <code>per_step</code> (host writes the counts each step, e.g. batch-dependent counts), <code>runtime</code> (a tile writes the counts, e.g. MoE routing counts). In code: <code>InitKind.STATIC / PER_STEP / RUNTIME</code>, with <code>runtime_init_by</code> naming the writing grid.</li>
+<li><code>epoch</code>: optional flag for resident kernels (section 11).</li>
+</ul>
+<p>Graphs keep grids in program order, which is required to be a topological order.</p>
+<h3 id="72-four-edge-map-forms">7.2 Four edge-map forms</h3>
+<table>
+<thead>
+<tr>
+<th>Form</th>
+<th>Example</th>
+<th>Use</th>
+<th>What the compiler can analyse</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Affine (einsum subset)</td>
+<td><code>"ij-&gt;i"</code></td>
+<td>Reductions, splits, static dependencies</td>
+<td>Exact fan-in / fan-out; can be statically queued</td>
+</tr>
+<tr>
+<td>Index arithmetic</td>
+<td><code>"ij-&gt;(i/2)j"</code></td>
+<td>Mismatched tile sizes (an RS tile is twice an MM tile)</td>
+<td>Same</td>
+</tr>
+<tr>
+<td>Runtime range</td>
+<td><code>"i-&gt;range(indptr[i], indptr[i+1])"</code></td>
+<td>One producer triggers a variable number of consumers (MoE expert to GroupGEMM tiles)</td>
+<td>Only the upper bound; static scheduling can queue by the bound and rely on <code>wait_count</code></td>
+</tr>
+<tr>
+<td>Runtime gather</td>
+<td><code>"i-&gt;topk[i,:]"</code></td>
+<td>Which events a producer notifies is data-dependent</td>
+<td>Only the fan-out k; counts are initialised by the <code>init_kind=runtime</code> tile</td>
+</tr>
+</tbody>
+</table>
+<p>The constraints are the precondition for analysis: maps must be affine, or <code>range(affine, affine)</code>, or <code>gather(tensor)</code>; arbitrary control flow is forbidden in edge maps; runtime-value tensors must come from an upstream tile&rsquo;s writes with release semantics. Pass 3 additionally uses the special map <code>"*"</code> (all coordinates) when a consumer inherits a removed producer&rsquo;s in-edges.</p>
+<h3 id="73-semantics-part-of-the-ir-not-a-backend-detail">7.3 Semantics (part of the IR, not a backend detail)</h3>
+<pre><code>arrive(ev)  ==  release-fence; atomic_dec(ev.count)      -&gt; ev fires when the result is 0
+wait(ev)    ==  spin_until(ev.count == 0); acquire-fence
+trigger(ev) ==  when arrive returns 0, push ev's consumer task set to the scheduler (dynamic / hybrid only)
+</code></pre>
+<p>The producer&rsquo;s writes must be visible to consumers before <code>arrive</code> (release); the consumer&rsquo;s reads must follow the return of <code>wait</code> (acquire); and both hold at the event&rsquo;s scope. If the backend finds the target cannot provide these semantics at that scope (the atomic pitfalls in section 8.4), it must fail at compile time, never downgrade silently.</p>
+<h3 id="74-six-verification-checks">7.4 Six verification checks</h3>
+<p>All six must be green before a graph enters L4. Checks 1-4 concern dependency semantics and run in <code>etx/ir/verify.py</code>; checks 5-6 need placement results and run in <code>etx/passes/plan.py::verify_plan</code>, which also checks static-queue order.</p>
+<table>
+<thead>
+<tr>
+<th>Check</th>
+<th>What it checks</th>
+<th>Consequence of omitting it</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Acyclic</td>
+<td>The task-level dependency graph has no cycle for any value of the symbolic dimensions (in code: every in-edge event is produced by an earlier grid in program order, and no grid reaches itself through events)</td>
+<td>Deadlock that is very hard to locate on the device</td>
+</tr>
+<tr>
+<td>Count conservation</td>
+<td><code>wait_count</code> equals the actual fan-in (runtime ranges use the upper bound, and the initialising tile must be in the graph and precede every consumer)</td>
+<td>Early trigger (wrong result) or never trigger (deadlock)</td>
+</tr>
+<tr>
+<td>Runtime values first</td>
+<td>The tile that writes <code>indptr</code> / <code>topk</code>-class tensors is strictly earlier on the dependency graph than every arrive / trigger that reads them, and an event path orders them</td>
+<td>Stale routing is read; MoE results are wrong but look plausible</td>
+</tr>
+<tr>
+<td>Unique tile coverage</td>
+<td>Every output element is written by exactly one tile (in code: exactly one writer grid per tensor; per-element coverage is a frontend obligation)</td>
+<td>Silent data race</td>
+</tr>
+<tr>
+<td>Scope monotonicity</td>
+<td>An edge crossing domains uses an event scope of at least <code>domain</code>; crossing devices at least <code>system</code>; any event of a grid scheduled through the device-global queue is at least <code>device</code> (section 9.4)</td>
+<td>Visible locally, invisible remotely</td>
+</tr>
+<tr>
+<td>Co-residency satisfiable</td>
+<td>The persistent kernel&rsquo;s worker count is at most the target&rsquo;s co-residency limit for the resource class</td>
+<td>Workers not co-resident wait for a producer that is never scheduled</td>
+</tr>
+</tbody>
+</table>
+<h2 id="8-layer-3-machine-model">8. Layer 3: Machine Model</h2>
+<h3 id="81-exec-domain-tree">8.1 Exec-domain tree</h3>
+<p>The paper&rsquo;s IR is hardware-independent but its implementation and evaluation ran on one machine. Extending to other hardware is not a matter of adding backend branches; the shape of a machine is written as a tree and a few tables, and L4 / L5 only read them.</p>
+<table>
+<thead>
+<tr>
+<th>Machine</th>
+<th>Tree</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>MI300X (gfx942)</td>
+<td>device (one HIP device) -&gt; 8 XCDs</td>
+<td>38 CUs per XCD, private 4 MB L2 per XCD; cross-XCD only through the 256 MB Infinity Cache; LDS 64 KB, wave64, 5.3 TB/s. domain = XCD, 8 of them</td>
+</tr>
+<tr>
+<td>MI250X (gfx90a)</td>
+<td>device 0 -&gt; GCD0 (110 CUs); device 1 -&gt; GCD1 (110 CUs)</td>
+<td>The two GCDs are two HIP devices; 8 MB L2 per GCD; no Infinity Cache; floating-point atomics do not cross Infinity Fabric. One card = two kernel instances</td>
+</tr>
+<tr>
+<td>B200 (sm_100)</td>
+<td>device (2 dies, one to software) -&gt; 148 SMs, optional clusters, unified L2</td>
+<td>DSMEM, TMA multicast, multimem reduction; 228 KB smem per SM; wave32; latency difference between dies but coherent. domain = whole card (optional die affinity)</td>
+</tr>
+<tr>
+<td>MI355X (gfx950)</td>
+<td>device -&gt; 8 XCDs</td>
+<td>32 CUs per XCD, private 4 MB L2; LDS 160 KB; 8 TB/s HBM3E; same tree shape as MI300X with different capacities: the same YAML with different numbers</td>
+</tr>
+</tbody>
+</table>
+<p>ETX recognises only this tree. Within one domain an event goes through the local L2 at cost <code>T_local</code>; across domains through the shared cache / interconnect at <code>T_cross</code>; across devices through P2P / NVLink at <code>T_dev</code>. New hardware is a new tree, three cost coefficients and one capability table; RDNA (WGPs, wave32, no shared-cache partitioning) is just another tree shape, and a chiplet is one more tree level, not a special case. Because MI250X&rsquo;s two GCDs are two devices, &ldquo;one card&rdquo; is two kernel instances sharing system-scope events, on the same code path as multi-GPU tensor parallelism.</p>
+<p>In code (<code>etx/machine/model.py</code>), <code>effective_scope()</code> collapses scopes a machine does not distinguish: <code>CLUSTER</code> becomes <code>DOMAIN</code> without <code>cluster_launch</code>; <code>DOMAIN</code> becomes <code>DEVICE</code> on a machine with a single domain; <code>WORKGROUP</code> becomes <code>DOMAIN</code> or <code>DEVICE</code>.</p>
+<h3 id="82-capability-table-versus-cost-table">8.2 Capability table versus cost table</h3>
+<p>The capability and visibility blocks decide correctness; the cost block decides performance. The two are never mixed. The gfx942 file (Appendix A) has three visibility rows: <code>domain</code> (release <code>s_waitcnt vmcnt(0)</code>, since L1 is write-through and within one L2 only the consumer&rsquo;s L1 needs invalidating; acquire <code>buffer_inv sc0</code>; any memory), <code>device</code> (release <code>buffer_wbl2 sc1; s_waitcnt vmcnt(0)</code> to write back the producer XCD&rsquo;s dirty L2 lines; acquire <code>buffer_inv sc1</code>; any memory) and <code>system</code> (release <code>buffer_wbl2 sc0 sc1</code>; acquire <code>buffer_inv sc0 sc1</code>; fine-grained memory, since coarse-grained silently downgrades to device scope). Its capability rows record, among others, no cluster launch or DSMEM (gfx1250 introduces cluster scope; LLVM degrades unsupported cluster scope to agent scope), no <code>multimem</code> and no switch (eight GPUs are a point-to-point xGMI mesh), dword-only direct-to-LDS loads (gfx950 widens to 128 bit per lane), FP atomics over Infinity Fabric (false on MI200), <code>wg_to_domain_map: discover</code>, cooperative launch that returns <code>hipErrorCooperativeLaunchTooLarge</code> rather than deadlocking, and <code>s_sleep</code> backoff (64 x N cycles, up to about 8000; <code>s_setprio</code> 0-3; <code>s_memrealtime</code> at 100 MHz).</p>
+<p>The critical row is <code>poll</code>. A plain load hits the non-coherent per-CU L1 (wave scope is &ldquo;Hit LRU&rdquo;) and never sees another CU&rsquo;s write; event polling must use a load with the <code>sc1</code> bit, an atomic load, or an L1 invalidate followed by a load. Kog wrote inline assembly for this because <code>__hip_atomic_load</code> cannot do a 3-dword read. Facts of this kind can only exist as data in a table, not as something each tile author must remember.</p>
+<h3 id="83-portability-matrix">8.3 Portability matrix</h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>MI250X (gfx90a)</th>
+<th>MI300X (gfx942)</th>
+<th>MI355X (gfx950)</th>
+<th>RDNA4 (gfx12)</th>
+<th>H100 (sm_90)</th>
+<th>B200 (sm_100)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Exec domain</td>
+<td>2 GCD x 110 CU, each a HIP device</td>
+<td>8 XCD x 38 CU = 304 (40 per XCD, 2 disabled)</td>
+<td>8 XCD x 32 CU = 256 (36 per XCD, 4 disabled)</td>
+<td>WGP array, single domain</td>
+<td>132 SMs, single domain (L2 in two partitions, far hit 414 vs near 258 cycles)</td>
+<td>148 SMs (74 per die), single domain</td>
+</tr>
+<tr>
+<td>L2 ownership</td>
+<td>8 MB per GCD</td>
+<td>4 MB per XCD; cross-XCD via wbl2 / inv plus MTYPE probing</td>
+<td>4 MB per XCD, 16 channels</td>
+<td>Unified</td>
+<td>50 MB, two partitions</td>
+<td>126 MB, die crossing about 30 cycles</td>
+</tr>
+<tr>
+<td>Shared cache</td>
+<td>None (3-level latency)</td>
+<td>256 MB Infinity Cache, memory-side, about 218 ns</td>
+<td>256 MB, 2 IODs</td>
+<td>Infinity Cache (consumer)</td>
+<td>-</td>
+<td>-</td>
+</tr>
+<tr>
+<td>LDS / smem per CU</td>
+<td>64 KB</td>
+<td>64 KB</td>
+<td>160 KB, double read bandwidth</td>
+<td>64 KB per CU, 128 KB shared in WGP mode, 64 KB per workgroup</td>
+<td>228 KB</td>
+<td>228 KB</td>
+</tr>
+<tr>
+<td>Wave</td>
+<td>64</td>
+<td>64</td>
+<td>64</td>
+<td>32 (WMMA wave32 only)</td>
+<td>32</td>
+<td>32</td>
+</tr>
+<tr>
+<td>Cluster / DSMEM</td>
+<td>None</td>
+<td>None</td>
+<td>None</td>
+<td>cluster scope from gfx1250</td>
+<td>Yes; portable limit 8, max 16; DSMEM 181-213 cycles vs global about 1110</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>Async copy to LDS</td>
+<td>None</td>
+<td>32 bit per lane only</td>
+<td>128 bit per lane, with transposing reads</td>
+<td>gfx11 none; gfx1250 TDM</td>
+<td>TMA / cp.async</td>
+<td>TMA + multicast</td>
+</tr>
+<tr>
+<td>Multicast reduction write</td>
+<td>None</td>
+<td>None</td>
+<td>None</td>
+<td>None</td>
+<td>multimem (NVLink SHARP)</td>
+<td>multimem</td>
+</tr>
+<tr>
+<td>FP atomics over the fabric</td>
+<td>No (NOP risk)</td>
+<td>Yes (fp32 add, packed fp16 / bf16, fp64 add / min / max)</td>
+<td>Yes</td>
+<td>-</td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>Inter-card link</td>
+<td>4 IF links between GCDs, 200+200 GB/s; kernel-initiated P2P 43-172 GB/s, latency 8.7-18.2 us</td>
+<td>7 xGMI links, 64 GB/s per direction per link, about 48 measured; point-to-point mesh, no switch</td>
+<td>7 IF links, aggregate over 1 TB/s</td>
+<td>PCIe</td>
+<td>NVLink 900 GB/s + NVSwitch</td>
+<td>NVLink 5 + NVSwitch</td>
+</tr>
+<tr>
+<td>Backoff / timer</td>
+<td>s_sleep</td>
+<td>s_sleep (64 x N cycles), s_setprio, s_memrealtime</td>
+<td>same</td>
+<td>same</td>
+<td>nanosleep (up to 2t, cap 1 ms), griddepcontrol</td>
+<td>same</td>
+</tr>
+<tr>
+<td>Bandwidth</td>
+<td>3.2 TB/s</td>
+<td>5.3 TB/s</td>
+<td>8 TB/s, 288 GB HBM3E</td>
+<td>about 0.6-0.9 TB/s</td>
+<td>3.35 TB/s</td>
+<td>8 TB/s</td>
+</tr>
+</tbody>
+</table>
+<p>Note the FP-atomics row: on MI200 a floating-point atomic cannot cross Infinity Fabric, and if the target is host memory and PCIe does not support the atomic the hardware degrades to load-op-store or, in the extreme, a NOP. This is not a performance problem; it is a silent error, so &ldquo;does this atomic&rsquo;s semantics hold on the target memory&rdquo; must be a compile-time-queryable capability bit.</p>
+<h3 id="84-three-silent-error-pitfalls-amd-atomics">8.4 Three silent-error pitfalls (AMD atomics)</h3>
+<ol>
+<li>A system-scope atomic on coarse-grained memory is downgraded to device scope. Event tensors used for cross-device synchronisation must be allocated fine-grained.</li>
+<li>When PCIe does not support an atomic, the GPU side degrades to load-op-store; all waves committing to that address stall together and the CPU does not see an atomic sequence.</li>
+<li>Unsupported floating-point atomics on uncached memory may be NOPs on MI200: wrong results, no error.</li>
+</ol>
+<p>Conclusion: the event-tensor allocator is part of L4, not a runtime detail; it chooses the memory type by scope and asserts legal combinations at compile time. This is the direct reason scope is in the IR. In code, Pass 6 sets <code>ep.memory = machine.memory_for(scope)</code>, which raises if the lowering table lacks the scope, and logs when a system-scope event lands on a machine without <code>fp_atomic_over_fabric</code> (integer counters only).</p>
+<h3 id="85-cost-table-seed-values-public-measurements">8.5 Cost table seed values (public measurements)</h3>
+<table>
+<thead>
+<tr>
+<th>Measurement</th>
+<th>MI300X</th>
+<th>H100 / B200</th>
+<th>Design implication</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Atomic round trip between two workgroups, same vs cross XCD</td>
+<td>116 ns vs 202 ns (Chips and Cheese)</td>
+<td>B200 about 512 atomics per cycle over the whole card</td>
+<td>A cross-domain edge is at least 1.7x more expensive and occupies Infinity Fabric</td>
+</tr>
+<tr>
+<td>Agent-scope release / acquire fence</td>
+<td>115 / 137 ns</td>
+<td>-</td>
+<td>Every arrive pays at least one fence; last-arriver merges the write-back</td>
+</tr>
+<tr>
+<td>Cross-XCD one-way flag latency</td>
+<td>about 703 ns</td>
+<td>DSMEM 181-213 cycles vs global about 1110 cycles</td>
+<td>A cross-XCD event on MI300X is of order 1 us; ten per layer is 1% of token time</td>
+</tr>
+<tr>
+<td>Persistent-kernel phase switch: counter + fence vs sentinel <code>sc1</code> poll</td>
+<td>7.6-7.9 us vs 0.80-0.93 us (Kog, 256 CUs)</td>
+<td>-</td>
+<td>Whole-card counter zeroing is expensive; a sentinel is a candidate lowering with the event-tensor abstraction unchanged</td>
+</tr>
+<tr>
+<td>XCD-aware program-id remap (AMD)</td>
+<td>L2 misses about 5M -&gt; 3.1M, +67 TFLOPS</td>
+<td>-</td>
+<td>Placement alone is worth about 10%</td>
+</tr>
+<tr>
+<td>L2 / Infinity Cache / HBM latency</td>
+<td>81-108 / 218-258 / 342 ns</td>
+<td>H100 L2 near 258, far 414 cycles</td>
+<td>The cache level holding the counter sets the minimum wait period</td>
+</tr>
+</tbody>
+</table>
+<p>fleet-mi300x is consistent with this: reducing global events from 10 to 3 per MoE layer was worth about 1 ms per token over 27 layers, and a cross-XCD event cost more than an order of magnitude above an intra-XCD one.</p>
+<h3 id="86-measured-calibration-values-2026-09-22-mi300x-rocm-724">8.6 Measured calibration values (2026-09-22, MI300X, ROCm 7.2.4)</h3>
+<p>The following were measured on a rented Hot Aisle 1x MI300X VM with the repository&rsquo;s <code>bench/calib</code> programs; the full table is in Appendix C. They are the first real entries for the <code>costs:</code> block of <code>gfx942.yaml</code>, and each corrects or confirms a seed assumption.</p>
+<ul>
+<li>Workgroup-to-XCD mapping: workgroup k landed on XCD (k+6) mod 8 (first sixteen: 6 7 0 1 2 3 4 5 6 7 0 1 2 3 4 5), neither the documented round-robin from XCD 0 nor the (k+4) mod 8 reported publicly. This confirms <code>wg_to_domain_map: discover</code>: read HW_ID.XCC_ID at kernel start; never assume the formula.</li>
+<li>One-way arrive latency (arrive is an agent-scope atomic RMW). DEVICE protocol (producer <code>buffer_wbl2 sc1</code>, consumer agent-scope atomic-load poll): 873 ns same XCD, 892 ns cross XCD. INVL1 protocol (no write-back; consumer <code>buffer_inv sc0</code> then a plain load): 642 ns same XCD, 742 ns cross XCD, observing the arrive correctly in both cases. A plain or <code>sc0</code> load without the invalidate never observes the arrive; it spins forever on the stale per-CU L1. Implications: (a) polling counters through L2 after an L1 invalidate is correct and about 25% cheaper than agent-scope atomic loads; (b) the same-versus-cross-XCD difference for counters is about 100 ns, far smaller than the public pure-atomic figures (116 vs 202 ns) suggested, because every RMW executes at the fabric, so the domain-scope advantage lies mostly in skipping the producer&rsquo;s L2 write-back of payload data, not in the counter; (c) plain loads are never acceptable for flags. The helper <code>etx_amdgcn_poll_l2()</code> implements the INVL1 poll; the v0.3 visibility table still lists the atomic load as <code>poll</code>, and switching the domain and device rows is a one-row table change scheduled with the phase-1 bring-up.</li>
+<li>One-way flag latency with payload, timed with the global 100 MHz <code>s_memrealtime</code> counter (producer stamps payload, <code>buffer_wbl2 sc1</code>, agent-scope store; consumer agent-scope poll plus <code>buffer_inv sc1</code>): 951 ns same XCD, 916 ns cross XCD, 0 stale payloads in 10,000 iterations each. The lowering table&rsquo;s release / acquire sequences are correct; the 703 ns seed for <code>t_flag_cross_ns</code> becomes about 0.92 us.</li>
+<li>Fence costs: DEVICE release (<code>buffer_wbl2 sc1</code> + <code>s_waitcnt</code>) 181 ns; DEVICE acquire (<code>buffer_inv sc1</code>) 120 ns; DOMAIN release plus acquire (<code>s_waitcnt</code> + <code>buffer_inv sc0</code>) 44 ns together. A domain-scope edge saves about 257 ns of fences per arrive / wait pair, in addition to the payload write-back.</li>
+<li>Queue contention, 65,536 pops of one ring by N workgroups, aggregate million pops per second. CAS-based pop (v0.1 design): N=1 0.89, N=8 1.85, N=64 1.10, N=512 0.41; it collapses past 8 poppers. Ticket-based pop (v0.2 design: one <code>atomicAdd</code> on head per pop, then the popper polls its own slot; one <code>atomicAdd</code> on tail plus one <code>atomicExch</code> per push): N=1 1.15, N=8 8.48, N=64 47.6, N=128 65.0, N=256 55.2, N=512 76.6. The uncontended pop costs about 870 ns. The v0.2 runtime uses the ticket ring, and the <code>C_queue</code> term of the schedule-mode formula is fed by this curve: per-popper latency grows roughly as N divided by aggregate throughput, about 2 us at 128 poppers and 4.6 us at 256.</li>
+<li>Toolchain: the generated split-K and MoE persistent kernels pass <code>hipcc -fgpu-rdc -fsyntax-only</code> for gfx942 and the 46 tests pass on the VM.</li>
+<li>First end-to-end execution. After the calibration runs, the split-K row-sum example (<code>examples/splitk_sum.py</code>, tiles <code>examples/tiles/splitk.hip</code>, host <code>examples/hosts/splitk.hip</code>) was compiled with <code>hipcc -fgpu-rdc</code>, launched cooperatively with 608 workers (8 XCDs x 76 workgroups, 2 per CU, 256 threads) and matched the CPU fp32 reference with max abs error 4.8e-7 under all three scheduling modes. Per-step time, best of 30-50 repetitions (the first launch, about 21 ms, includes code load): n=64 (320 tasks, 64 events) static 0.101 ms, hybrid 0.115 ms, dynamic 0.118 ms; n=1024 (5120 tasks, 1024 events) static 0.128 ms, hybrid 0.441 ms, dynamic 0.512 ms. Tasks are about 2 us and the queue path costs about 1 us per pop plus a push, so on tiny tasks static wins by 3.5-4x, consistent with the <code>C_queue</code> term of the schedule-mode formula and with the paper&rsquo;s static-versus-dynamic results on regular workloads. Two defects were found only on hardware and are described in sections 9.4 and 10.3.</li>
+</ul>
+<h2 id="9-layer-4-placement-and-scheduling-passes">9. Layer 4: Placement and Scheduling Passes</h2>
+<p>Seven passes run in order. Each reads only the L3 tables, and each writes data into the plan and a line into the plan log; none changes IR semantics.</p>
+<h3 id="91-pass-1-tile-size-resource-classes-worker-count">9.1 Pass 1: tile size, resource classes, worker count</h3>
+<p>Input: the abstract resource need of every <code>TileOp</code> and the target capacities. Output: workgroups per CU, workers per domain, kernel instances. Tile shapes are the frontend&rsquo;s business; the pass checks that they fit (LDS need including <code>prefetch_bytes</code> within <code>lds_kb</code>, <code>vgpr + agpr</code> within <code>regs_per_lane</code>, raising otherwise) and derives the co-resident workgroups per CU from registers, LDS and <code>max_wg_per_cu</code>, which fixes the persistent grid: <code>workers_per_domain = cus_per_domain x wg_per_cu</code>. A 64 KB versus 160 KB LDS changes the feasible tile size, so the same operator has different tile counts on gfx942 and gfx950 and the event tensor&rsquo;s shape changes with it; this is why shapes stay symbolic.</p>
+<p>The pass also addresses the register-union problem the paper does not mention: a kernel&rsquo;s VGPR / LDS footprint is the maximum over all tile types, so the heaviest tile sets the occupancy of the whole kernel. ETX groups tiles into resource classes (<code>rc&lt;N&gt;</code>, N being the workgroups per CU the tile permits); tiles of one class go into one persistent-kernel instance, several instances are co-resident on different streams with a share of the CUs each, and all share one event tensor. This kernel-family mechanism is the same code as multi-device instances (section 10.4). Splitting is optional and off by default: on fleet-mi300x a 343-register union caused no loss for the bandwidth-bound GEMV, so the cost model decides.</p>
+<p>LDS is likewise not allocated worst-case but cut into fixed-size pages (Hazy on H100: 13 pages x 16 KB). Tile bodies request and release pages from a page allocator so the next tile&rsquo;s weight load can start while the current tile is still writing back. The page count follows from the resource class and <code>lds_kb</code>: gfx942 4 pages, gfx950 10, sm_90 13.</p>
+<h3 id="92-pass-2-event-affinity-partitioning-the-chiplet-aware-core">9.2 Pass 2: event-affinity partitioning (the chiplet-aware core)</h3>
+<p>Problem: partition the task / event graph into k blocks (k = number of domains) minimising the total weight of crossing edges, where edge weight = fan-in / fan-out count x <code>T_sync</code> of the edge. The first version is greedy with local improvement:</p>
+<ol>
+<li>Seed with the operator of largest fan-in / fan-out and put it and its events in one domain (MoE&rsquo;s GroupGEMM with its expert events; attention&rsquo;s heads with their merge).</li>
+<li>Consecutive tile coordinates land in the same domain, with a <code>GROUP_SIZE_M</code>-style swizzle on top to preserve L2 locality.</li>
+<li>When cross-domain edges exceed budget, promote the event to the shared cache as the meeting point, or convert the edge to a statically ordered long queue (no push).</li>
+</ol>
+<p>Output: <code>domain_id</code> per task, and scope plus storage type per event (plain VRAM / shared-cache resident / cross-device fine-grained). In fleet-mi300x&rsquo;s MoE layer this step together with Pass 3 reduced global events from 10 to 3; the remaining 24 are XCD-local.</p>
+<p>In code (<code>p2_affinity.py</code>): grids without dependencies are chunked contiguously across domains; dependent tasks follow the majority domain of their producers unless that domain is loaded beyond <code>options.affinity_imbalance</code> times the mean; every event then receives the lowest scope that is still correct (<code>DOMAIN</code> if all parties share a domain, <code>DEVICE</code> if they share a device, <code>SYSTEM</code> otherwise), passed through <code>effective_scope()</code>; cross-domain and cross-device edge counts are recorded per event.</p>
+<h3 id="93-pass-3-event-elimination-by-recomputation-lever-1">9.3 Pass 3: event elimination by recomputation (lever 1)</h3>
+<p>An event exists because a producer&rsquo;s output is consumed by many tasks. If the producer is a pure function, its inputs have already been synchronised by an earlier event, and it is cheap, then every consumer recomputes it in its own prologue and the event and the producer task are deleted. The price is redundant parallel microseconds; the return is serial synchronisation microseconds.</p>
+<p>Example (fleet-mi300x): before elimination, <code>x</code> (4 KB) goes through one RMSNorm task and one global event E1 to 296 GEMV workers; phase A has 1 worker busy and 295 idle, followed by about 1 us of cross-XCD round trip, drain and ramp. After elimination, each of the 296 GEMV workers computes RMSNorm(x) in its prologue (4 KB read from L2); each worker takes about 1 us longer, in parallel, so the phase grows by 1 us while the event, the task and the drain disappear. Redundant bytes: 296 x 4 KB = 1.2 MB, all L2 hits. Compilers call this rematerialisation; HPC calls it communication-avoiding; here the saving is synchronisation. At batch 1 every phase is already hundreds of workers doing the same small thing; redundancy is parallel and the event is serial, so redundancy almost always wins.</p>
+<p>Three variants:</p>
+<table>
+<thead>
+<tr>
+<th>Variant</th>
+<th>Method</th>
+<th>Removes</th>
+<th>Redundancy cost</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Prologue recomputation</td>
+<td>Consumers recompute a small producer (norm, RoPE, KV post-processing, q-absorb, router top-k)</td>
+<td>Producer task + event</td>
+<td>consumers x producer cost, in parallel</td>
+</tr>
+<tr>
+<td>Consumer-side folding</td>
+<td>No reduce task; each consumer sums the k partials in its prologue</td>
+<td>Reduce task + event</td>
+<td>consumers x k partial reads (fleet: 296 x 8 x 4 KB through L2 / Infinity Cache)</td>
+</tr>
+<tr>
+<td>Last-arriver compute</td>
+<td>The producer whose arrive reaches zero performs the reduction</td>
+<td>Reduce task; the event stays</td>
+<td>Reduction becomes serial; fleet measured about 4 us per fold point, slower; off by default</td>
+</tr>
+</tbody>
+</table>
+<p>Design inequality:</p>
+<pre><code>gain = T_sync(E) + T_drain(producer phase)                 # sync round trip + the stretch with few workers active
+cost = max over consumers ( bytes_P / BW_cache + compute_P )   # parallel: maximum, not sum
+     + [P's inputs not in L2] x consumers x bytes_P / BW_HBM   # then a sum, usually a veto
+rewrite if  P.pure  and  P.in_events subset of events C has already waited on
+        and  P.out_to_in maps under C's coordinates
+        and  gain &gt; cost
+        and  (bit-exact mode) P's floating-point summation order matches the reference
+</code></pre>
+<p>Three cases in which it must not fire are logged: the producer would re-read weights from HBM (q-absorb is the boundary case: 2.1 MB more per layer, worthwhile only because chunks of one head sit on one XCD and hit L2); reductions with more than about 8 partials; and too many consumers with inputs not in cache. The log prints the removed events and the redundant bytes bought, so a regression can be traced to the recomputation that blew the cache.</p>
+<p>The implemented rule (<code>p3_event_elim.py</code>) is a conservative form of the above. For each event with exactly one producer P and at least one consumer:</p>
+<ul>
+<li>P must be marked <code>pure</code> and carry <code>out_to_in</code>; no consumer may be on a different device from P; P&rsquo;s outputs may be used only by those consumers and must not appear in any runtime edge map (runtime tensors must be produced exactly once).</li>
+<li><code>gain = t_sync_us(E.scope) + P.duration_us x (1 - min(1, n_P / total_workers))</code>, the second term being the drain of a phase in which only n_P of the workers are busy.</li>
+<li><code>cost = P.duration_us</code>; if P reads weight tensors and <code>bytes_per_tile x consumers_per_domain</code> exceeds the leaf domain&rsquo;s L2, <code>bytes_per_tile x n_consumers / BW_HBM / total_workers</code> is added and the log notes how many MB would be re-read from HBM.</li>
+<li>The rewrite fires only if <code>gain &gt; cost</code>. Each consumer&rsquo;s prologue receives P&rsquo;s prologue chain followed by P; the consumer drops the eliminated in-edge and inherits P&rsquo;s in-edges with the <code>"*"</code> map (waiting for everything P would have waited for, correct for any coordinate mapping); P&rsquo;s reads and args are merged in; the consumer&rsquo;s duration grows by <code>cost</code>. The producer grid and the event are removed, P&rsquo;s outputs are re-labelled <code>recomputed</code>, and the plan records the eliminated event. The pipeline then re-instantiates and re-runs Pass 2.</li>
+</ul>
+<h3 id="94-pass-4-schedule-mode-selection">9.4 Pass 4: schedule-mode selection</h3>
+<pre><code>S_balance = straggler time dynamic scheduling is expected to recover (from load variance or a profile)
+C_cross   = cross-domain pushes x T_cross (x T_dev across devices)
+C_queue   = queue-contention cost (calibrated curve, rising with the number of contenders)
+
+dynamic  if S_balance &gt; C_cross + C_queue and there are no cross-device edges
+hybrid   if the domain has irregular load and there are many cross-domain edges
+static   otherwise
+</code></pre>
+<p>The empirical thresholds start from the paper&rsquo;s two data points: MoE (same domain, irregular routing, 1024 tokens) dynamic 1.08 vs static 1.04, choose dynamic; dense TP=4 (cross-device) dynamic 0.83 vs static 1.09, choose static. As cross-domain edges multiply, the gain of dynamic scheduling is consumed by push cost.</p>
+<p>The implemented rule (<code>p4_schedule_mode.py</code>), per task grid g with n task instances:</p>
+<ul>
+<li><code>waves = ceil(n / total_workers)</code>; <code>cross_dom</code> and <code>cross_dev</code> count, over all of g&rsquo;s tasks and in-edge producers, the producer-consumer pairs in different domains or different devices.</li>
+<li><code>S_balance = duration_cv x duration_us x waves x 2.0</code>.</li>
+<li><code>C_cross = cross_dom x t_push_us(cross_domain=True) / total_workers + (waves x t_sync_us(DEVICE) if cross_dom &gt; 0 else 0)</code>, where <code>t_push_us(cross)</code> is <code>t_push_ns</code> plus the device-scope sync cost.</li>
+<li><code>sharing = total_workers</code> if no cross-domain edges (one device-global queue) else <code>workers_per_domain</code> (domain-local queues); <code>C_queue = waves x t_pop_us x (1 + 0.01 x sharing)</code>.</li>
+<li>Decision order: a forced mode from options; else <code>cross_dev &gt; 0</code> gives static (&ldquo;pushes over P2P are prohibitive, ETC TP=4 dynamic 0.83x&rdquo;); else if <code>S_balance &gt; MARGIN x (C_cross + C_queue)</code> with <code>MARGIN = 1.5</code>, dynamic if <code>cross_dom == 0</code> else hybrid; else static. A grid with runtime edge maps may be static only behind a barrier: Pass 4 prepends a <code>"*"</code> wait on every out-event of the grid that writes the runtime tensors, so the maps are evaluated after those tensors exist (this is the paper&rsquo;s <code>E[0]</code> degradation, made explicit). The barrier variant was measured on MI300X (small MoE, 647 tasks): forced static 0.445 ms versus hybrid 0.654 ms and dynamic 0.653 ms, because the queue path costs about 1 us per task on tasks of a few microseconds; an earlier rule that never let data-dependent grids go static was therefore removed. Dynamic and hybrid tasks need no barrier: they are pushed only after their producers complete.</li>
+</ul>
+<p>The 1.5x margin biases the decision toward static because the paper&rsquo;s regular workloads lose 6% to 17% under dynamic scheduling; dynamic must be predicted to win clearly before it is chosen. The first hardware run confirmed the bias in the other direction as well: on the split-K example with about 2 us tasks, static ran the n=1024 step in 0.128 ms against 0.441 ms hybrid and 0.512 ms dynamic (section 8.6).</p>
+<p>A scope rule found on hardware is attached to this pass. A grid scheduled through the device-global queue runs its tasks on any XCD, so the DOMAIN scope that Pass 2 assigned to its events from placement is wrong: on the first dynamic run consumers read stale L2 and produced zeros while the kernel &ldquo;completed&rdquo;. Pass 4 therefore raises every event produced or consumed by a dynamically scheduled grid to DEVICE scope, and <code>verify_plan</code> rejects a plan that violates this. Hybrid mode does not need the rule because its pushes and pops stay inside the domain.</p>
+<p>The reason string with the computed terms is stored in <code>plan.reasons[grid]</code> and printed, for example:</p>
+<pre><code>subgraph moe.group_gemm : hybrid   (S_balance=+7.6%, intra-domain dynamic, 3 cross-domain edges -&gt; static)
+subgraph attn.qkv_rope  : static   (S_balance~0, 0 cross-domain edges)
+subgraph tp.gemm_rs     : static   (cross-device edges=18, C_cross=2.1ms &gt; S_balance=0.4ms)
+</code></pre>
+<p>With <code>t_pop_ns</code> set to the measured uncontended 870 ns, the linear contention factor reproduces the measured per-popper latency of the ticket ring at 128 poppers (about 2.0 us both ways) and underestimates it by about 30% at 256 poppers (3.1 us predicted, 4.6 us measured); replacing the linear factor by the measured curve is a cost-table change, not a pass change.</p>
+<h3 id="95-pass-5-queue-hierarchy-the-mechanism-of-hybrid-scheduling">9.5 Pass 5: queue hierarchy (the mechanism of hybrid scheduling)</h3>
+<p>Hybrid scheduling is not a new mechanism but a different assembly of the same primitives: push / pop inside a domain, arrive / wait plus pre-ordered queues between domains.</p>
+<ul>
+<li>Each domain has a local ready queue and its workers; pushes inside the domain cost <code>T_local</code>. Local events (<code>scope = domain</code>) live in that XCD&rsquo;s L2.</li>
+<li>Each worker also has a statically pre-ordered long queue holding the static segment; cross-domain consumer tasks live there and rely on <code>wait</code>, not push.</li>
+<li>Global events (<code>scope = device</code>) live in the shared cache; each cross-domain edge pays one arrive at <code>T_cross</code>.</li>
+<li>There is no cross-domain push. Intra-domain irregularity (MoE routing) is absorbed by the local queue; the number of cross-domain edges is minimised by Pass 2 and queued statically. The global queue holds only tasks of pure-dynamic grids whose consumers cross domains, and its entry count is bounded by the number of such tasks, so the centralised queue&rsquo;s contention is removed structurally.</li>
+<li>Across devices the global event lives in fine-grained memory and the shape is identical: MI250X&rsquo;s two GCDs and 8-card TP are the same path.</li>
+</ul>
+<p>In code (<code>p5_queues.py</code>): static tasks are assigned round-robin to the workers of their domain in program order, so producers always precede consumers in every worker queue; local queue capacity per (device, domain) is the number of dynamic / hybrid tasks there plus 16; the global queue capacity per device is the number of pure-dynamic tasks plus 16; consumer lists per event coordinate are materialised for pushes (the in-kernel inverse-map alternative, MPK-style ranges, is not implemented). The design page carries an interactive discrete-event illustration of the same trade-off (variance makes static lose to dynamic; cross-domain push cost makes dynamic lose to hybrid); it is an illustration, not a prediction.</p>
+<h3 id="96-pass-6-memory-planning-and-event-allocation">9.6 Pass 6: memory planning and event allocation</h3>
+<ul>
+<li>Intermediate tensors: lifetime and placement; an intermediate consumed within one domain is placed where that domain&rsquo;s L2 can hold it (fleet-mi300x keeps each layer&rsquo;s 1.2 MB compressed KV cache in the XCD&rsquo;s 4 MB L2 for the whole layer). In code a tensor read and written within one domain is <code>domain_local</code>, within one device <code>device</code>, otherwise <code>fine_grained</code>; weights are <code>weights_hbm</code>.</li>
+<li>Event tensors: memory type by scope (plain / uncached / fine-grained), asserted at compile time against L3&rsquo;s visibility table.</li>
+<li>Static path: each worker&rsquo;s pre-ordered queue is materialised in global memory; descriptors are fixed-length records <code>(subgraph_id, coord, task_type)</code> with no pointer chasing (<code>etx_task</code> in the ABI: <code>type</code> plus <code>coord[4]</code>).</li>
+</ul>
+<h3 id="97-pass-7-cross-barrier-weight-prefetch-lever-3">9.7 Pass 7: cross-barrier weight prefetch (lever 3)</h3>
+<p>Barriers block activations. Weights depend on no event and are statically known, so while a worker spins on an event it can already stream its share of the next phase&rsquo;s weights into LDS or registers, and compute the moment the event fires. The effect is that each barrier&rsquo;s fixed latency is covered by the next phase&rsquo;s bytes.</p>
+<pre><code>No overlap:  [phase k compute][wait for event: idle          ][phase k+1 load weights][compute]
+Overlap:     [phase k compute][wait for event: load k+1 weights][compute]
+</code></pre>
+<p>The pass does three things:</p>
+<ol>
+<li>The next task of a static segment is known: the worker&rsquo;s pre-ordered table names it, so the compiler computes its weight-slice addresses into the current task&rsquo;s epilogue; in dynamic segments early push also makes it known, only later.</li>
+<li>Where the bytes land is a capability. gfx942 has no TMA and direct-to-LDS is 32 bit per lane, so prefetch goes to VGPRs / AGPRs or only warms L2; gfx950 has 128-bit-per-lane direct-to-LDS; Hopper / Blackwell use TMA with an mbarrier. This is the canonical &ldquo;capability decides the method&rdquo; case and cannot be one generic code path. In code the method is <code>tma</code>, <code>lds</code> (<code>async_copy_to_lds == wide</code>), <code>l2_warm</code> (<code>dword_only</code>), or the pass is skipped with a log line.</li>
+<li>It is decided together with resource classes and LDS paging, because prefetch consumes registers and LDS pages and can squeeze the current tile&rsquo;s occupancy. fleet-mi300x once added a <code>--prefetch-next</code> option alone and lost 4% from register pressure and L2 pollution; Hazy reached 78% MBU because paging and prefetch were designed together. Pass 1 therefore counts the prefetch buffer as a resource need, and the cost model enables prefetch when <code>T_fixed(barrier) - occupancy loss caused by prefetch</code> is positive. In code, entries whose <code>lds_bytes + prefetch_bytes</code> exceed the LDS budget under the <code>lds</code> method are skipped and counted.</li>
+</ol>
+<p>Pass 7 and Pass 3 are complementary: Pass 3 deletes the barriers that can be deleted; Pass 7 uses up the waiting time of those that cannot.</p>
+<h2 id="10-layer-5-lowering-runtime-and-generated-kernel">10. Layer 5: Lowering, Runtime and Generated Kernel</h2>
+<h3 id="101-primitive-x-architecture-lowering-table">10.1 Primitive x architecture lowering table</h3>
+<table>
+<thead>
+<tr>
+<th>Primitive</th>
+<th>NVIDIA sm_90 / sm_100</th>
+<th>CDNA3 / CDNA4</th>
+<th>CDNA2</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>arrive</code>, domain scope</td>
+<td>(no domain level; degrades to device)</td>
+<td><code>s_waitcnt vmcnt(0)</code> (L1 is write-through) + agent-scope atomic; the counter lands in this XCD&rsquo;s L2; no write-back fence (Fleet and fleet-mi300x both observed 0 stale words)</td>
+<td>Same, within the GCD</td>
+</tr>
+<tr>
+<td><code>arrive</code>, device scope</td>
+<td><code>fence.acq_rel.gpu</code> + <code>red.global.gpu.add</code></td>
+<td><code>buffer_wbl2 sc1; s_waitcnt vmcnt(0)</code> + atomic (all RMWs forward to Infinity Fabric); the producer&rsquo;s L2 write-back cannot be skipped, but N producers on one XCD can have the last arriver write back once</td>
+<td>Same</td>
+</tr>
+<tr>
+<td><code>arrive</code>, system scope</td>
+<td><code>red.global.sys.add</code></td>
+<td><code>buffer_wbl2 sc0 sc1</code> + atomic; the event must be in fine-grained memory (<code>hipExtMallocWithFlags</code>) or it silently downgrades</td>
+<td>Integer atomics only; no floating-point atomics</td>
+</tr>
+<tr>
+<td><code>wait</code></td>
+<td><code>ld.acquire.gpu</code> spin + <code>nanosleep</code> backoff; no spin if a hardware tile trigger exists</td>
+<td><code>load sc1</code> (device) or <code>load sc0 sc1</code> (system) spin + <code>s_sleep</code>; after return <code>buffer_inv sc0</code> (domain) / <code>sc1</code> (device) / <code>sc0 sc1</code> (system). A plain load hits stale L1: the most common silent error</td>
+<td>Same</td>
+</tr>
+<tr>
+<td>Low-cost intra-group sync</td>
+<td>cluster barrier + DSMEM (181-213 cycles)</td>
+<td>None; degrades to a domain event; gfx1250 introduces cluster scope</td>
+<td>None</td>
+</tr>
+<tr>
+<td>Reduction write (communication fusion)</td>
+<td><code>multimem.ld_reduce</code></td>
+<td>No equivalent and no switch: P2P store / atomic accumulate into the peer&rsquo;s fine-grained HBM (IPC-handle mapping), or owner-side L2-resident reduction (to be tested)</td>
+<td>None (and FP atomics do not cross IF)</td>
+</tr>
+<tr>
+<td>Co-residency guarantee</td>
+<td><code>cudaLaunchCooperativeKernel</code></td>
+<td><code>hipLaunchCooperativeKernel</code>: CLR computes the co-residency limit from occupancy and returns <code>hipErrorCooperativeLaunchTooLarge</code> when exceeded (better than deadlock); ROCm&rsquo;s own <code>grid.sync</code> is a device-scope atomic plus <code>s_sleep(1)</code> polling</td>
+<td>Same</td>
+</tr>
+<tr>
+<td>Domain discovery</td>
+<td>SM id from <code>%smid</code>; die affinity optional</td>
+<td>Read HW_ID.XCC_ID at start and build the worker-to-domain table; never trust <code>wgid % 8</code> (measured (k+6) mod 8 on 2026-09-22; (k+4) mod 8 reported publicly before)</td>
+<td>Device id is the domain</td>
+</tr>
+<tr>
+<td>LDS page allocation</td>
+<td>213 KB smem in 13 pages x 16 KB (Hazy); pages guarded by mbarrier</td>
+<td>64 KB in 4 pages x 16 KB; gfx950 160 KB in 10 pages; pages guarded by the workgroup barrier</td>
+<td>Same as gfx942</td>
+</tr>
+<tr>
+<td>Triton host-DSL limits</td>
+<td>Primitives complete: atomics, <code>nanosleep</code> via inline asm</td>
+<td>AMD backend has <code>buffer_atomic_rmw</code> and <code>buffer_load_to_local</code>, no s_sleep / setprio hooks; poll backoff via inline asm; gfx942 has no async copy (gfx950 does)</td>
+<td>Same as gfx942</td>
+</tr>
+</tbody>
+</table>
+<p>Every cell comes from the LLVM gfx942 memory model, the CDNA3 ISA or the ROCm atomics documentation, not from conjecture; for a new architecture this table is the first thing to fill in. The generator does one thing: it looks up the event&rsquo;s <code>scope</code> and assembles the instruction sequence. In code (<code>codegen/lowering.py</code>) the generated <code>etx_lowering.h</code> defines <code>ETX_RELEASE_&lt;SCOPE&gt;</code>, <code>ETX_ACQUIRE_&lt;SCOPE&gt;</code>, <code>ETX_POLL_&lt;SCOPE&gt;</code>, <code>ETX_ARRIVE_&lt;SCOPE&gt;</code>, <code>ETX_BACKOFF</code> and <code>ETX_DOMAIN_ID</code> from the YAML rows; <code>primitives.h</code> builds <code>etx_wait_&lt;SCOPE&gt;</code> (spin on <code>ETX_POLL</code> with <code>ETX_BACKOFF</code>) and <code>etx_arrive_&lt;SCOPE&gt;</code> (returns the count after decrement) from those macros and names no architecture.</p>
+<h3 id="102-worker-loop">10.2 Worker loop</h3>
+<p>Each worker&rsquo;s loop: fetch a task (static table or pop), wait on its in-events (spin, backoff, acquire), execute the tile body (a DSL-compiled function), arrive on its out-events (release plus atomic decrement), and if the count reached zero in a dynamic segment push the consumers (early push optional). Every iteration checks the abort flag and the step-end condition. Static segments have no push, dynamic segments have no pre-ordered table, hybrid has both. Runtime state is only the event buffer (integers), the queues (local plus global), the descriptor table, the shape scalars and the worker-to-domain table; there is no task-graph object and no interpreter. This continues the paper&rsquo;s minimal runtime: scheduling logic is compiled into the kernel, and the three modes differ only in the &ldquo;fetch&rdquo; and &ldquo;push&rdquo; boxes.</p>
+<pre><code>persistent_kernel(events, queues, desc_table, shape, dom_map, ctrl):
+  w = worker_id();  d = discover_domain(w)      # discovered at launch, no assumed formula
+  sched = init_scheduler(d, mode_of_subgraph)    # static table / local queue / both
+  while true:
+    task = sched.next()                          # static table or pop; if both empty consult ctrl
+    if task.none: if ctrl.step_done(): break else: backoff(); continue
+    wait_all(task.in_events)                     # generated from ETensor dependencies
+    etx_tile_dispatch(task.type, ctx(task))      # switch into the DSL tile bodies
+    for ev in task.out_events:
+      if etx_arrive(ev, ev.scope) == 0 and ev.dynamic: sched.push(consumers_of(ev, task))
+    if ctrl.abort: break
+</code></pre>
+<p>The emitted kernel (<code>codegen/kernel.py</code>) follows this shape. Thread 0 of each workgroup discovers the domain (HW_ID when <code>wg_to_domain_map</code> is <code>discover</code>, else the host-provided <code>worker_domain</code> table), claims a slot within that domain with an atomic, and forms the logical worker id <code>domain x workers_per_domain + slot</code>, so static queues are domain-affine under any workgroup-to-XCD mapping (the measured (k+6) mod 8 included). Each task type receives its own argument pointer table in the grid&rsquo;s declared order; the first hardware run returned zeros because tiles indexed the global table. The workgroup then loops: take the static head if <code>etx_deps_ready</code> (v0: always true), else try the domain-local ticket queue, else the global ticket queue, else take the static head anyway and spin inside the generated wait code. With nothing available it checks <code>ctrl_abort</code> (host writes 1) and <code>ctrl_done &gt;= n_tasks</code>, backs off, and after <code>spin_limit</code> idle iterations writes 2 into <code>ctrl_abort</code> and exits: the on-device watchdog. Per task type the generated code waits on every in-edge target enumerated from the edge map, applies <code>ETX_ACQUIRE_&lt;scope&gt;</code>, calls the tile body, applies <code>ETX_RELEASE_&lt;scope&gt;</code>, arrives on every out-edge target, and in dynamic or hybrid mode pushes the consumers of any event whose count reached zero; each completed task increments <code>ctrl_done</code>.</p>
+<h3 id="103-ticket-queues">10.3 Ticket queues</h3>
+<p>The v0.1 design used a CAS-based ring. Measured on MI300X (section 8.6), a CAS pop costs about 1.1 us alone and its retry storm collapses aggregate throughput past 8 poppers. The v0.2 runtime uses a many-producer many-consumer ticket ring: <code>etx_push</code> does one <code>atomicAdd</code> on tail and one <code>atomicExch</code> into the slot; <code>etx_try_pop</code> first reads head and tail with a device-scope poll and returns empty without reserving if <code>head &gt;= tail</code>, otherwise takes a ticket with one <code>atomicAdd</code> on head and then polls its own slot until a task id appears. Pass 5 sizes each ring&rsquo;s capacity to at least the number of pushes per step, so pushes never wrap, and the host resets the rings between steps. Push lists encode the destination queue: a non-negative task id means the pusher&rsquo;s domain-local queue (hybrid), a bitwise-complemented id means the device-global queue (dynamic). The host seeds the initially ready dynamic and hybrid tasks into the rings before launch.</p>
+<p>The first hardware run exposed a wrap-around defect in the original scheme, under which a ticket taken beyond the final tail was assumed harmless: over-popping workers wrapped onto slots consumed in an earlier pass over the ring and re-executed those tasks; the execution trace showed 267 of 320 tasks executed twice and event counters at -4. The rule now is that every slot value carries a pass tag, <code>value = (ticket / capacity) &lt;&lt; 24 | task id</code>, and a popper treats a tag mismatch as &ldquo;not yet pushed&rdquo; and keeps polling. This is the only change needed because pushes cannot wrap.</p>
+<h3 id="104-kernel-family-multiple-devices-and-resource-classes">10.4 Kernel family: multiple devices and resource classes</h3>
+<p>One Step may be executed by several kernel instances, each a <code>(device, resource_class)</code> pair, all sharing one event tensor (plain or uncached memory on one device, fine-grained across devices). Three cases take the same path:</p>
+<ul>
+<li>MI250X: two GCDs are two devices; one card launches two instances; cross-GCD events are system scope.</li>
+<li>8-card TP: eight instances; cross-card events are system scope; communication tiles are inlined into each instance.</li>
+<li>Register-union split: two resource classes on one device (heavy GEMM / light GEMV); two instances each own part of the CUs; events are device scope.</li>
+</ul>
+<p>The scheduler does not know about instances, only the domain tree; an instance is a subtree of that tree handed to one kernel. The code generator emits one translation unit per instance (<code>megakernel_d&lt;i&gt;.hip</code>), and <code>gfx90a.yaml</code> declares <code>devices_per_package: 2</code> so the pipeline emits two.</p>
+<h3 id="105-communication-fusion-without-multimem">10.5 Communication fusion without multimem</h3>
+<p>The paper&rsquo;s 1.40x on GEMM + Reduce-Scatter rests on <code>multimem.ld_reduce</code> (NVLink SHARP), which CDNA lacks. Three candidate paths, each to be tested separately; if none yields a positive gain the capability table records <code>comm_fusion_reduce_scatter: unsupported</code> and only compute-side fusion is done:</p>
+<ol>
+<li>Owner-side reduction: each rank&rsquo;s GEMM tile writes its result into the owner rank&rsquo;s fine-grained buffer; the owner&rsquo;s RS tile waits on the event and reduces in its local L2. The write is a one-way P2P store; the event is a cross-card arrive.</li>
+<li>P2P floating-point atomic accumulation: MI300 supports FP atomics over IF, MI200 does not; summation order is non-deterministic, so fp32 accumulation with a single bf16 rounding is required.</li>
+<li>Borrow rocSHMEM / Iris one-sided communication primitives as tile bodies and use ETX only as the scheduler.</li>
+</ol>
+<p>The gfx942 and gfx950 tables carry <code>comm_fusion_reduce_scatter: experimental</code>; gfx90a carries <code>unsupported</code>; sm_90 and sm_100 carry <code>supported</code>.</p>
+<h2 id="11-dynamic-workloads">11. Dynamic Workloads</h2>
+<table>
+<thead>
+<tr>
+<th>Level</th>
+<th>Examples</th>
+<th>ETX mechanism</th>
+<th>Paper coverage</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Shape dynamism</td>
+<td>B and S changing under continuous batching; mixed prefill / decode</td>
+<td>Symbolic dimensions plus per-step shape scalars; static segments use shape buckets (rather than &ldquo;the next larger sampled shape&rdquo;), and the worker count inside a bucket scales with tile count</td>
+<td>Covered</td>
+</tr>
+<tr>
+<td>Data-dependent dynamism</td>
+<td>MoE routing; accepted length in speculative decoding; block selection in sparse attention</td>
+<td>Runtime-initialised <code>wait_count</code> plus <code>range</code> / <code>gather</code> edges; the domain-local dynamic queue absorbs imbalance</td>
+<td>MoE covered; speculative decoding is a new instance of the same mechanism (the accepted length decides the trigger range of subsequent tiles)</td>
+</tr>
+<tr>
+<td>Cross-step dynamism</td>
+<td>A resident kernel across many decode steps; requests joining and leaving at any time; multi-tenant co-location</td>
+<td>Host-device control ring: the host writes step descriptors (shape scalars, pointer table, event initial values) into a ring buffer and the kernel reads the next one when a step&rsquo;s events have all reached zero; an abort flag; events carry an epoch stamp (mKernel&rsquo;s approach) so counters need not be cleared between steps and <code>wait</code> compares <code>count == target(epoch)</code></td>
+<td>Not covered (one launch per step); MPK does in-kernel admission; Blink puts the whole serving loop in the kernel</td>
+</tr>
+</tbody>
+</table>
+<p>Cross-step control ring: the host engine scheduler (continuous batching) writes step k, k+1, &hellip; into a ring buffer in fine-grained memory; the resident megakernel reads the next descriptor at step end and instantiates that step&rsquo;s coordinate space; the abort / pre-emption flag is written by the host and read by every worker on every iteration. Residency is optional: it buys zero launch overhead and earlier weight prefetch at the cost of a kernel that occupies the GPU with pre-emption only through the flag. Under multi-tenancy, or when the GPU is shared with other kernels, it should be off.</p>
+<p>All three levels share one principle: the compiled artefact is a template, never recompiled for a concrete value; everything that varies is a launch parameter or a runtime tensor. In code, <code>ir/instantiate.py</code> instantiates the symbolic graph per step and examples supply <code>bindings()</code> and <code>runtime()</code> for their dynamism; dynamic consumer lists are currently materialised host-side per step.</p>
+<h2 id="12-workload-coverage">12. Workload Coverage</h2>
+<table>
+<thead>
+<tr>
+<th>Workload</th>
+<th>Dynamism</th>
+<th>Expected schedule</th>
+<th>Main source of gain</th>
+<th>Risk</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Low-batch decode (dense)</td>
+<td>shape</td>
+<td>static</td>
+<td>Breaking operator boundaries: Q and K norm + RoPE in parallel, pipelining between GEMMs, weight prefetch, hundreds of launches removed</td>
+<td>Gain consumed when tile quality trails hand-written libraries; at TP=4 the paper found CPU-side overhead to be the bottleneck</td>
+</tr>
+<tr>
+<td>MoE decode / small-batch prefill</td>
+<td>data-dependent</td>
+<td>hybrid</td>
+<td>Intra-domain load balancing + two-stage GroupGEMM pipelining + removal of wave quantisation</td>
+<td>Cross-domain push cost; with extremely uneven routing the local queue cannot help either</td>
+</tr>
+<tr>
+<td>TP communication fusion (GEMM+RS / AG+GEMM)</td>
+<td>communication jitter</td>
+<td>RS: dynamic (intra-domain); AG: static</td>
+<td>Compute-communication overlap</td>
+<td>CDNA has no multimem; needs the section 10.5 alternatives</td>
+</tr>
+<tr>
+<td>Large-batch prefill</td>
+<td>shape</td>
+<td>static or unfused</td>
+<td>Limited gain; mainly no regression</td>
+<td>Regression-test item: the paper claims no large-batch regression, and this is written as a test</td>
+</tr>
+<tr>
+<td>Speculative decoding</td>
+<td>data-dependent (accepted length)</td>
+<td>hybrid</td>
+<td>Verification and next-step draft tiles trigger by accepted length with no host round trip</td>
+<td>Tree-draft dependencies are not affine; restrict to chains or fixed trees</td>
+</tr>
+<tr>
+<td>Multi-model / multi-tenant co-location</td>
+<td>cross-step</td>
+<td>isolation by domain</td>
+<td>Domain-level isolation; tenants do not slow each other</td>
+<td>Queue and memory isolation; pre-emption only through the flag</td>
+</tr>
+<tr>
+<td>Non-LLM tile DAGs (diffusion, vision encoders)</td>
+<td>mostly static</td>
+<td>static</td>
+<td>Generality proof</td>
+<td>Reference implementations and baselines are missing</td>
+</tr>
+</tbody>
+</table>
+<h2 id="13-verification-and-validation-strategy">13. Verification and Validation Strategy</h2>
+<p>Correctness:</p>
+<ul>
+<li>Protocol simulator. The event protocol is simulated on the host in Python over the whole task graph for sampled shapes and random routing, checking no deadlock, count conservation, and that every tile&rsquo;s inputs were written before it executes. fleet-mi300x had a prototype (a 3-token simulation plus 12 mutation tests with injected defects); <code>etx/sim/protocol.py</code> runs the deadlock check and reports makespan and the busy / wait / scheduling budget per plan.</li>
+<li>Differential testing. Every fused kernel is paired with an unfused reference (per-operator submission, and the same tile code with global barriers); random shapes, random routing, element-wise comparison. This is the only way to separate fusion gain from operator quality.</li>
+<li>Scope tests. Deliberately constructed cross-XCD and cross-card events verify that they are actually visible; this catches silently downgraded system-scope atomics. The 2026-09-22 flag-latency runs (0 stale payloads in 20,000 trials) are the first instance.</li>
+<li>Atomic capability assertion. One atomic write-and-read-back on the target memory type; if the semantics do not hold, compilation fails.</li>
+<li>Watchdog. Every test has a timeout; a hang is a failure and dumps the event tensor (which event&rsquo;s count did not reach zero, who did not arrive). The generated kernel&rsquo;s <code>spin_limit</code> and <code>ctrl_abort = 2</code> provide the on-device half; the host side aborts after a timeout and dumps every non-zero event counter plus a per-task execution-count histogram. This dump is what located both hardware defects on 2026-09-22 (267 of 320 tasks executed twice with counters at -4; zeros from stale L2 under global scheduling).</li>
+</ul>
+<p>Performance:</p>
+<ul>
+<li>Three baselines reported separately: per-operator submission; the same tile code plus global barriers (isolating &ldquo;fusion gain&rdquo;); official libraries (cuBLAS / RCCL, CK / hipBLASLt).</li>
+<li>A fixed shape set per pull request with alerts on threshold; every number carries shape, batch and parallelism.</li>
+<li>Scheduling-decision logs are stored so &ldquo;why did this subgraph choose static&rdquo; can be answered afterwards.</li>
+</ul>
+<p>Portability regression:</p>
+<ul>
+<li>The same IR runs the same small model on gfx90a / gfx942 / gfx950 / sm_90: element-wise identical, no hang.</li>
+<li>The decision log must print the capability differences, proving the decision read the machine model rather than coinciding.</li>
+<li>Every <code>discover</code> field in the capability table (such as the XCD map) is probed in CI and reconciled with the YAML.</li>
+</ul>
+<h2 id="14-implementation-status-and-repository-layout">14. Implementation Status and Repository Layout</h2>
+<p>Repository: https://github.com/cklxx/etx-megakernel (private; working copy <code>/Users/ckl/code/etx</code>). Layout by layer:</p>
+<table>
+<thead>
+<tr>
+<th>Path</th>
+<th>Layer</th>
+<th>Content</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>etx/ir</code></td>
+<td>L2</td>
+<td><code>types.py</code> (Scope, InitKind, Tensor, ETensor, Resource, TileBody, TaskGrid, Graph), <code>edgemap.py</code> (four edge-map forms, C emission), <code>dims.py</code> (symbolic dimensions), <code>instantiate.py</code> (per-step instantiation), <code>verify.py</code> (checks 1-4)</td>
+</tr>
+<tr>
+<td><code>etx/machine</code></td>
+<td>L3</td>
+<td><code>model.py</code> (MachineModel, effective scopes, cost accessors) and <code>arch/</code> with <code>gfx90a.yaml</code>, <code>gfx942.yaml</code>, <code>gfx950.yaml</code>, <code>sm_90.yaml</code>, <code>sm_100.yaml</code></td>
+</tr>
+<tr>
+<td><code>etx/passes</code></td>
+<td>L4</td>
+<td><code>p1_tiling.py</code>, <code>p2_affinity.py</code>, <code>p3_event_elim.py</code>, <code>p4_schedule_mode.py</code>, <code>p5_queues.py</code>, <code>p6_memory.py</code>, <code>p7_prefetch.py</code>, <code>plan.py</code> (Plan, <code>verify_plan</code>), <code>pipeline.py</code></td>
+</tr>
+<tr>
+<td><code>etx/codegen</code></td>
+<td>L5</td>
+<td><code>lowering.py</code> (YAML rows to <code>etx_lowering.h</code>), <code>kernel.py</code> (persistent-kernel emitter, <code>plan.json</code>)</td>
+</tr>
+<tr>
+<td><code>etx/runtime/include/etx</code></td>
+<td>L5</td>
+<td><code>abi.h</code>, <code>primitives.h</code> (wait / arrive / ticket queues / discovery built on the macros), <code>primitives_amdgcn.h</code>, <code>primitives_nvptx.h</code></td>
+</tr>
+<tr>
+<td><code>etx/frontends</code></td>
+<td>L1</td>
+<td><code>tileop.py</code>, <code>linkmode.py</code>, <code>triton_host.py</code></td>
+</tr>
+<tr>
+<td><code>etx/sim</code></td>
+<td>-</td>
+<td><code>protocol.py</code>: deadlock, makespan, critical-path budget</td>
+</tr>
+<tr>
+<td><code>etx/tools</code></td>
+<td>-</td>
+<td><code>cli.py</code>: the <code>archs</code>, <code>explain</code> and <code>compile [--sim]</code> subcommands of <code>python -m etx</code></td>
+</tr>
+<tr>
+<td><code>examples/</code></td>
+<td>-</td>
+<td><code>splitk_sum.py</code> (paper figure 3), <code>moe_layer.py</code> (both dynamisms, real tiles: norm, qkv GEMV, attention over a KV cache, o_proj, top-2 router, grouping with runtime counter initialisation, gather, grouped GEMM with SiLU, down projection, combine), <code>gemm_rs.py</code> (two devices, 128x128 GEMM tile and owner-side reduce-scatter over peer access); every example has real tile bodies in <code>tiles/</code> and a host with a CPU reference in <code>hosts/</code>; <code>ETX_MOE_SMALL=1</code> selects a short-task MoE configuration</td>
+</tr>
+<tr>
+<td><code>bench/calib/</code></td>
+<td>-</td>
+<td><code>atomic_pingpong.hip</code>, <code>flag_latency.hip</code>, <code>queue_contention.hip</code>, <code>phase_switch.hip</code>, <code>p2p_atomic.hip</code>, <code>run_calib.sh</code>; <code>bench/sim_experiments.py</code> for the two simulator studies</td>
+</tr>
+<tr>
+<td><code>tests/</code></td>
+<td>-</td>
+<td><code>test_edgemap.py</code>, <code>test_ir_verify.py</code>, <code>test_machine.py</code>, <code>test_passes.py</code>, <code>test_sim.py</code>, <code>test_codegen.py</code>, <code>test_no_arch_branches.py</code>; 46 tests collected and passing (also on the MI300X VM)</td>
+</tr>
+<tr>
+<td><code>docs/</code></td>
+<td>-</td>
+<td><code>ARCHITECTURE.md</code> (code map), <code>DESIGN-v0.1.md</code>, <code>site/index.html</code> (published specification)</td>
+</tr>
+</tbody>
+</table>
+<p>What runs today without a GPU: <code>make setup</code>, <code>make test</code>, <code>python -m etx compile examples/moe_layer.py --arch gfx942 --out build/moe_gfx942 --sim</code>. <code>compile</code> verifies the graph, runs the seven passes, and writes <code>megakernel_d0.hip</code>, the lowering header, tile prototypes, <code>plan.json</code> and <code>decisions.log</code> (why each subgraph is static / dynamic / hybrid; which events were eliminated); <code>--sim</code> runs the protocol simulator.</p>
+<p>Executed on hardware (all on 2026-09-22; details in Appendix C):</p>
+<ul>
+<li>Split-K row sum on one MI300X: static, hybrid and dynamic schedules, two problem sizes, reference-checked.</li>
+<li>A complete MoE layer on one MI300X with real tiles: routing computed on device matches the host, output within 3.5e-5 relative of the CPU reference, all schedule modes; with the short-task configuration the effect of Pass 3 and of the schedule choice is measurable.</li>
+<li>GEMM + reduce-scatter on two MI300X: one kernel instance per device, one shared system-scope event buffer in fine-grained memory, C tiles read over xGMI peer access, reference-checked.</li>
+<li>All seven phase-0 measurements: the three synchronisation benchmarks, the whole-GPU phase switch, the cross-device flag and peer bandwidth, and the two simulator studies (queue length versus stragglers, routing imbalance versus schedule).</li>
+</ul>
+<p>Known gaps:</p>
+<ul>
+<li>Dynamic consumer lists are materialised host-side per step; the in-kernel inverse-map alternative is not implemented.</li>
+<li>Sentinel-value signalling is a capability bit and a helper; it is not a lowering option chosen by the cost model (the whole-GPU measurement shows counters are the right primitive for barriers; the sentinel gain is point-to-point).</li>
+<li>The reference tiles are per-token GEMVs; absolute step times of the MoE example are dominated by weight re-reads and are not performance claims.</li>
+<li>Cost tables for gfx90a, gfx950, sm_90 and sm_100 are public seed values; gfx942 carries the measured values.</li>
+<li>CUDA emission is untested on hardware (no NVIDIA machine was available); the Triton host-DSL emitter is a skeleton only.</li>
+</ul>
+<p>Runtime rules established by the hardware runs and now part of the design (sections 9.4, 10.2, 10.3, 13): domain-affine logical worker ids claimed by atomic after HW_ID discovery; a per-type argument pointer table; host seeding of initially ready dynamic and hybrid tasks; pass-tagged ticket-ring slots; DEVICE scope for events of globally scheduled grids; a per-task remaining-dependency counter so a consumer with several in-events is pushed exactly once; push lists that carry the consumer&rsquo;s own domain; waits that check the abort word so the watchdog can stop a hung step; a static producer that pushes its dynamic consumers; a <code>"*"</code> barrier for static grids with runtime edge maps; LDS residency accounting that reserves the kernel&rsquo;s own shared words; the generated non-blocking readiness probe (<code>etx_deps_ready</code>) built from the same edge maps as the wait code; and a host watchdog that dumps non-zero event counters and a per-task execution-count histogram.</p>
+<h2 id="15-roadmap-and-milestones">15. Roadmap and Milestones</h2>
+<h3 id="151-starting-point-reworked-2026-09-23">15.1 Starting point, reworked (2026-09-23)</h3>
+<p>Review feedback on v0.3: the architecture is deliberately broad, but the proof must be narrow. The starting point is therefore one real model on one machine with a known hand-written result: DeepSeek-Coder-V2-Lite-Base, batch 1, 1,024-token context, one MI300X, where fleet-mi300x (same author, same task structure, hand-written HIP) runs at 3.60 ms per token and matches HuggingFace token for token. The core claim to prove is that the ETX compiler, fed fleet&rsquo;s task graph and fleet&rsquo;s tile bodies, produces a megakernel that matches 3.60 ms; only then is the architecture generalised.</p>
+<p>Build-up, in order:</p>
+<table>
+<thead>
+<tr>
+<th>Milestone</th>
+<th>What</th>
+<th>Done when</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>M0 Baselines</td>
+<td>Per-step fixed cost decomposed (empty cooperative launch, empty worker loop, per-task-slot cost, unfused kernel-per-op step); fleet&rsquo;s own numbers as the target</td>
+<td>Every ETX overhead term has a measured value and a baseline to compare with</td>
+<td>Done 2026-09-23 (section 15.2, Appendix C)</td>
+</tr>
+<tr>
+<td>M1 fleet graph in ETX</td>
+<td>fleet&rsquo;s <code>taskgraph.py</code> expressed as an ETX graph: Chiplet-tasks as <code>(xcd, worker)</code> grids pinned by <code>domain_map</code>, XCD-local events as DOMAIN scope, global events as DEVICE scope; verifier, placement and simulator agree with fleet&rsquo;s structure</td>
+<td>2 DEVICE and 6 DOMAIN event tensors per MoE layer; simulator prediction within 2x of 3.60 ms</td>
+<td>Done: <code>examples/dsv2lite/graph.py</code>, 6,370 tasks for 3 layers, all static, predicted 169-211 us per layer vs 133 measured</td>
+</tr>
+<tr>
+<td>M2 fleet tiles in ETX</td>
+<td>A shim exports fleet&rsquo;s <code>run_task</code> cases as ETX tile bodies (<code>etx_ctx</code> -&gt; <code>TaskDescriptor</code> fields); fleet&rsquo;s weights and activations as the argument table; fleet&rsquo;s own host loaders and HuggingFace checks</td>
+<td>The ETX-generated kernel decodes 32 tokens identical to HuggingFace</td>
+<td>Done 2026-09-23: first run 32/32 tokens, 27/27 layers within the gate, 5.42 ms/token (section 15.4)</td>
+</tr>
+<tr>
+<td>M3 Match 3.60 ms</td>
+<td>Per-phase trace on both kernels; close the gaps until ETX is within 3% of fleet</td>
+<td>3.60 ms per token, 32/32 tokens</td>
+<td>In progress: 3.70 ms/token vs fleet&rsquo;s 3.556 on the same VM (4% gap; was 4.09 / 15%) after four fixes (section 15.4); remaining: the per-barrier transition (~2 us x 8 per layer) and the qkv body (+4 us)</td>
+</tr>
+<tr>
+<td>M4 Generalise</td>
+<td>Only now: MoE example with tuned tiles, second machine (gfx950 or MI250X two-instance), Triton host-DSL mode, cross-step residency</td>
+<td>Each generalisation changes only YAML, a frontend adapter or a graph, never the passes</td>
+<td>After M3</td>
+</tr>
+</tbody>
+</table>
+<h3 id="152-baselines-m0-measured-2026-09-23-on-one-mi300x">15.2 Baselines (M0), measured 2026-09-23 on one MI300X</h3>
+<p><code>bench/calib/step_overhead.hip</code>, 608 x 256 workgroups, host wall-clock over 200 iterations:</p>
+<table>
+<thead>
+<tr>
+<th>Baseline</th>
+<th>Value</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Cooperative launch of an empty kernel</td>
+<td>16.1 us</td>
+<td>The residency-guaranteed launch alone</td>
+</tr>
+<tr>
+<td>Ordinary launch of an empty kernel</td>
+<td>1.6 us</td>
+<td>10x cheaper; usable when the host has verified the grid fits (it does: <code>check_residency</code>)</td>
+</tr>
+<tr>
+<td>ETX-shaped worker loop, 0 tasks</td>
+<td>28 us</td>
+<td>Launch + XCD discovery + slot claim + drain</td>
+</tr>
+<tr>
+<td>Same, 5,120 no-op tasks, v0.3 protocol (per-task completion atomic, idle workers polling it with atomics)</td>
+<td>145 us</td>
+<td>15 us per task slot: one shared word hammered by 608 workers</td>
+</tr>
+<tr>
+<td>Same, workers exit when drained, per-task atomic kept</td>
+<td>73 us</td>
+<td>6.8 us per slot</td>
+</tr>
+<tr>
+<td>Same, no per-task atomic</td>
+<td>31 us</td>
+<td>1.8 us per slot at 5,120 tasks, 0.7 us at 20,480</td>
+</tr>
+<tr>
+<td>Unfused split-K step (two ordinary kernels)</td>
+<td>5.7 us at n=64 and n=1024</td>
+<td>The kernel-per-op baseline for a step whose work is negligible</td>
+</tr>
+</tbody>
+</table>
+<p>Consequences, all applied in the v0.4 runtime: static tasks cost no completion atomic (the trace verifies them on the host); only dynamic and hybrid tasks are counted; a worker exits as soon as its static queue is drained and no dynamic work exists; idle polling uses a plain scoped load, not an atomic; <code>ETX_LAUNCH=ordinary</code> selects a plain launch when the residency check passes. Re-measured with device-event timing (kernel start to end, no host polling jitter):</p>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>v0.3</th>
+<th>v0.4 cooperative</th>
+<th>v0.4 ordinary</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Split-K n=64, 320 tasks, static</td>
+<td>101 us</td>
+<td>23 us</td>
+<td>12 us</td>
+</tr>
+<tr>
+<td>Split-K n=1024, 5,120 tasks, static</td>
+<td>128 us</td>
+<td>35 us</td>
+<td>25 us</td>
+</tr>
+<tr>
+<td>Split-K n=1024, hybrid</td>
+<td>441 us</td>
+<td>412 us</td>
+<td>374 us</td>
+</tr>
+<tr>
+<td>Short-task MoE, B=64, automatic (static)</td>
+<td>439 us</td>
+<td>389 us</td>
+<td>378 us</td>
+</tr>
+<tr>
+<td>Short-task MoE, B=8</td>
+<td>304 us</td>
+<td>296 us</td>
+<td>280 us</td>
+</tr>
+<tr>
+<td>Full MoE, B=8</td>
+<td>3.22 ms</td>
+<td>3.22 ms</td>
+<td>3.21 ms</td>
+</tr>
+</tbody>
+</table>
+<p>The static path now sits at 2-4x the unfused two-kernel step for a toy whose work is a few microseconds; the remaining fixed cost is the launch (12 us ordinary) plus about 2 us per task slot of loop, descriptor fetch and event traffic. The queue path (hybrid, dynamic) is the next target: at 76 poppers per domain ring it costs about 50 us per task slot, far above the 1-2 us the contention benchmark measured for pops alone, so the per-domain ring will be replaced by per-worker queues (MPK&rsquo;s JIT/AOT pair) before the fleet port needs any dynamic segment (it needs none: fleet&rsquo;s graph is entirely static).</p>
+<p>Cross-device synchronisation for MoE decode (expert parallelism), measured 2026-09-23 on 2x MI300X (<code>bench/calib/p2p_sync.hip</code>; each device times its own round trip with <code>s_memrealtime</code>, one-way = half):</p>
+<table>
+<thead>
+<tr>
+<th>Condition</th>
+<th>Flag location</th>
+<th>Payload</th>
+<th>Device 0 one-way</th>
+<th>Device 1 one-way</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>idle</td>
+<td>device 0 fine-grained</td>
+<td>none</td>
+<td>10.73 us</td>
+<td>0.95 us</td>
+</tr>
+<tr>
+<td>idle</td>
+<td>device 0 fine-grained</td>
+<td>4 KB</td>
+<td>2.24 us</td>
+<td>0.88 us</td>
+</tr>
+<tr>
+<td>idle</td>
+<td>device 1 fine-grained</td>
+<td>none</td>
+<td>1.17 us</td>
+<td>0.83 us</td>
+</tr>
+<tr>
+<td>idle</td>
+<td>device 1 fine-grained</td>
+<td>4 KB</td>
+<td>1.96 us</td>
+<td>0.90 us</td>
+</tr>
+<tr>
+<td>idle</td>
+<td>host pinned coherent</td>
+<td>none / 4 KB</td>
+<td>2.48 / 4.90 us</td>
+<td>2.07 / 2.06 us</td>
+</tr>
+<tr>
+<td>2 x 1 GB streaming load</td>
+<td>device 0 or 1</td>
+<td>none / 4 KB</td>
+<td>4.4 / 5.6 us</td>
+<td>3.0 / 2.3 us</td>
+</tr>
+<tr>
+<td>2 x 1 GB streaming load</td>
+<td>host pinned</td>
+<td>none / 4 KB</td>
+<td>3.9 / 6.1 us</td>
+<td>3.0 / 2.6 us</td>
+</tr>
+</tbody>
+</table>
+<p>Reading: a cross-device event costs about 1 us one-way when the flag lives in the consumer&rsquo;s own memory (the producer issues one remote system-scope atomic; the consumer polls locally), 2-3 us under load, and 2-6 us through host memory; tight remote polling of a flag with nothing else in flight is the pathological case (10.7 us). Against 0.64-0.74 us for an intra-device event this is 1.5-4x, not the two orders of magnitude the first single point (10.6 us) suggested; <code>t_dev_ns</code> is now 1000 with a loaded value of 3000. For expert-parallel MoE decode the rule that follows is: the event tensor for a cross-device edge is allocated on the consumer device, and the producer arrives remotely.</p>
+<h3 id="154-m2-and-m3-on-hardware-2026-09-23-2x-mi300x-vm-fleets-bootstrap-on-the-same-box">15.4 M2 and M3 on hardware (2026-09-23, 2x MI300X VM, fleet&rsquo;s bootstrap on the same box)</h3>
+<p>The port: <code>examples/dsv2lite/fleet_shim.hip</code> includes fleet&rsquo;s kernel source unchanged and exports 15 <code>extern "C"</code> tile symbols that rebuild the fleet <code>TaskDescriptor</code> from the ETX coordinate and the grid&rsquo;s constants; every grid&rsquo;s argument 0 is one <code>FleetParams</code> struct (fleet&rsquo;s <code>RuntimeState</code>, <code>ModelDims</code>, <code>Weights</code>, <code>Activations</code>, <code>KVCache</code>, plus token, epoch and position), argument 1 a device int with the layer index. <code>examples/dsv2lite/host.hip</code> reuses fleet&rsquo;s loaders (manifest, packed weights, YaRN tables, KV cache, golden tokens) and its checks (tokens versus HuggingFace greedy, per-layer gate on the first step, on-device embed-to-argmax timing). One ETX step per token. Fleet&rsquo;s own binary, built by its bootstrap on the same VM, runs at 3.55-3.56 ms/token, 32/32 tokens.</p>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Change</th>
+<th>ms/token (embed -&gt; argmax, device clock)</th>
+<th>Tokens</th>
+<th>Evidence</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>first light</td>
+<td>fleet graph in ETX (section 15.1 M1), fleet tiles through the shim, all events per-producer write-back, ETX polling through L2</td>
+<td>5.42</td>
+<td>32/32, 27/27 layers</td>
+<td>first run passed; trace: 200 us/layer vs fleet 126</td>
+</tr>
+<tr>
+<td>+ worker pinning, cached routing</td>
+<td><code>worker_map="xw-&gt;w"</code> keeps each XCD&rsquo;s gate_up and down of one expert unit on the same worker, so fleet&rsquo;s <code>FLAG_ROUTING_CACHED</code> path is valid (down 22.6 -&gt; 17.3 us)</td>
+<td>4.81 (with the next row)</td>
+<td>32/32</td>
+<td>trace</td>
+</tr>
+<tr>
+<td>+ last-arriver flush</td>
+<td>DEVICE-scope events: each domain&rsquo;s last producer does the one <code>buffer_wbl2</code> and subtracts the domain&rsquo;s share (fleet&rsquo;s scheme); A/B without it 5.32</td>
+<td>4.81</td>
+<td>32/32</td>
+<td>A/B</td>
+</tr>
+<tr>
+<td>+ agent-scope polling</td>
+<td>replaced the inv-L1 + L2-load poll (25% faster idle in the microbenchmark) by the agent-scope atomic load: 36 waiting CUs per XCD polling through the L2 slowed the 37 streaming ones; <code>s_sleep(8)</code> backoff</td>
+<td>4.60</td>
+<td>32/32</td>
+<td>four-way A/B (4.84 / 4.60 / 4.59 / 4.80)</td>
+</tr>
+<tr>
+<td>+ in-body q_c wait</td>
+<td>attention waits for the published q_c inside the body after kv_post (fleet&rsquo;s <code>PUB_WAIT</code>), through an epoch up-counter the qabs wrapper bumps; attention starts 8 us earlier per layer</td>
+<td>4.49</td>
+<td>32/32</td>
+<td>timeline</td>
+</tr>
+<tr>
+<td>+ one acquire per workgroup</td>
+<td><code>buffer_inv sc1</code> issued by the waiting thread only, not by all four waves (4x the L2 invalidates after every DEVICE-scope event slowed qkv and router by 12 and 7 us)</td>
+<td><strong>4.09</strong></td>
+<td>32/32, 27/27</td>
+<td>timeline: router body 17.7 -&gt; 10.7 us (fleet 10.8), qkv 29 -&gt; 21 (fleet 17)</td>
+</tr>
+<tr>
+<td>+ one call site per tile body</td>
+<td>the emitter now splits each task into a per-type wait switch, ONE body call, and a per-type arrive switch; before, the body dispatch was inlined into each of the 219 per-layer task types, so the compiler stopped inlining and paid the call ABI</td>
+<td>3.90 (with the next three rows)</td>
+<td>32/32, 27/27</td>
+<td>accumulation registers 180 -&gt; 47</td>
+</tr>
+<tr>
+<td>+ lean static loop, layer immediates</td>
+<td>an all-static device gets a loop without the readiness probe and queue pops (one poller and one round trip less per task); per-grid constants (<code>TaskGrid.consts</code>, <code>ctx.cst</code>) hand the layer index to the body as an immediate instead of two dependent loads after the wait</td>
+<td>3.90</td>
+<td>32/32</td>
+<td>A/B against the 4.10 build on the same VM</td>
+</tr>
+<tr>
+<td>+ per-domain relay, hierarchical acquire</td>
+<td>P5 reserves one workgroup per XCD to mirror the DEVICE-scope counters (fleet&rsquo;s scheduler mirror, chosen by a cost-table threshold of 64 pollers per word); the relay invalidates its XCD&rsquo;s L2 once and consumers drop only their L1</td>
+<td>3.90 (relay on) vs 3.88 (off)</td>
+<td>32/32</td>
+<td>neutral on its own; with the relay but per-consumer full acquire 4.04, so the hierarchical acquire is what pays for the relay hop</td>
+</tr>
+<tr>
+<td>+ no <code>-fgpu-rdc</code></td>
+<td>whole-program device compile, as fleet builds; a non-inlined relay taking <code>etx_params&amp;</code> had also spilled the parameter block to scratch (fixed by force-inlining)</td>
+<td><strong>3.70</strong></td>
+<td>32/32, 27/27</td>
+<td>scratch 112 -&gt; 0 B/lane; sweeps: <code>s_sleep</code> 1 / 3 / 8 = 3.74 / 3.73 / 3.71; 38 workers without relay 3.78; descriptors staged in LDS 3.72 (reverted)</td>
+</tr>
+</tbody>
+</table>
+<p>Layer-5 timeline after these fixes (us from the layer&rsquo;s first qkv ready; fleet&rsquo;s numbers from its own trace on the same VM in parentheses): qkv done 22.9 (19.4), attention 26.7-42.4 (20.3-39.3), merge 42.3-55.9 (37.6-49.7), o_proj 55.1-66.5 (47.7-58.4), router 68.7-81.1 (59.3-71.6), gate_up 83.4-121.0 (71.0-106.4), down 120.5-141.1 (105.1-126.1); next layer at 143.5 (126.1). What remains: about 2 us of transition at each of the eight barriers where fleet&rsquo;s mirrored scheduler loses about 1 us, and 4 us in the qkv body. Not needed for these results: any change to fleet&rsquo;s tile code; the compiler&rsquo;s placement, events and runtime carried all of it.</p>
+<p>Second round (2026-09-23 evening, fresh VM; old build re-measured at 4.10, fleet 3.556): layer span 130.8 us traced vs fleet&rsquo;s 126.9; every tile body now matches or beats fleet&rsquo;s (qkv 18.6 vs 17.1, attention 13.0, merge 8.6 vs 9.1, o_proj 6.0 vs 6.9, router 8.5 vs 10.7, gate_up 31.3 vs 33.6, down 16.1 vs 18.0 us). The remaining ~4 us per layer is in three handoffs (after o_proj, after the router, after down), each 2-3 us where fleet shows about 1 us; fleet also keeps 32 tokens in one launch, which ETX&rsquo;s per-token launch does not. Full A/B log: <code>examples/dsv2lite/ab_2026-09-23.log</code>.</p>
+<p>Three lessons for the design itself. First, a microbenchmark-optimal primitive can be wrong under load: the inv-L1 poll was chosen because it was faster idle and it cost 5% end to end; the cost table now records both figures and the poll row cites the loaded measurement. Second, &ldquo;one fence per workgroup&rdquo; is a rule the code generator must own: a tile author cannot see that the generated prologue executed the acquire on every wave. Third, code shape is part of the performance contract: a dispatch that gives a body hundreds of call sites, or one non-inlined helper that takes the parameter block by reference, costs more than any synchronisation choice measured here (0.2 ms/token each).</p>
+<h3 id="153-phases-of-the-general-architecture-after-m3">15.3 Phases of the general architecture (after M3)</h3>
+<table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>Deliverable</th>
+<th>Completion criterion</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0. Baseline and calibration</td>
+<td>Per-operator MoE / dense reference on MI300X, timing scaffold, seven synchronisation-cost microbenchmarks</td>
+<td><code>t_local / t_cross / t_dev</code> and the contention curve in the YAML. Status: done on 2026-09-22 (Appendix C): ping-pong, flag latency, queue contention, whole-GPU phase switch, cross-device flag and peer bandwidth, and the two simulator studies. Not done: an unfused per-operator baseline for the MoE example (the reference tiles are not tuned, so a fusion-gain figure would not be meaningful yet)</td>
+</tr>
+<tr>
+<td>1. Single-card closed loop</td>
+<td>L2 IR + L5 codegen (link mode, hand-written tiles), static scheduling, events partitioned by XCD</td>
+<td>Differential test passes; protocol simulator in CI. Status: done. Split-K and the MoE layer run reference-checked on MI300X in all three modes. The 1.05x-over-unfused criterion waits for tuned tiles</td>
+</tr>
+<tr>
+<td>1.5. Critical path</td>
+<td>Pass 3 event elimination + Pass 7 cross-barrier prefetch + sentinel-signal lowering; per-phase trace tooling</td>
+<td>Global events per MoE layer down to the natural dependency count; fixed-latency share per layer under 50%; MBU report in CI. Status: Pass 3 measured (16% on the short-task MoE in the hybrid regime, none in the static regime); Pass 7 l2-warm prefetch measured with no effect at this scale; sentinel lowering not adopted (counters win for barriers); per-phase trace not built</td>
+</tr>
+<tr>
+<td>2. Dynamism and tables</td>
+<td>Local queues, hybrid scheduling, capability + cost tables, decision log</td>
+<td>Logs explainable; the cost model&rsquo;s choice validated. Status: done; the measured short-task MoE shows static 0.445 ms vs hybrid 0.654 ms, and the automatic choice now selects static there</td>
+</tr>
+<tr>
+<td>3. Second frontend + second hardware</td>
+<td>Triton host-DSL mode; the same IR on gfx950 or gfx90a (two instances)</td>
+<td>Switching frontend / hardware changes only YAML and the skeleton template; IR and passes unchanged. Status: the two-instance path is proven with two MI300X (same code path as MI250X&rsquo;s two GCDs); gfx950 and Triton not exercised</td>
+</tr>
+<tr>
+<td>4. Communication fusion</td>
+<td>GEMM + RS on MI300X without multimem</td>
+<td>Report a positive gain if there is one; otherwise mark unsupported. Status: the owner-side reduction path runs correctly across two MI300X (0.365 ms per step at M=1024, K=512, N=512); no gain figure yet because there is no tuned unfused baseline</td>
+</tr>
+<tr>
+<td>5. Cross-step residency</td>
+<td>Control ring, abort, shape buckets</td>
+<td>TPOT under continuous batching no worse than per-step launch, with a bounded pre-emption latency</td>
+</tr>
+</tbody>
+</table>
+<p>The seven phase-0 microbenchmarks: (1) atomic-counter round trip between two workgroups in one XCD (<code>t_local</code>); (2) the same for adjacent and farthest XCDs (<code>t_cross</code>, two values); (3) event tensor in plain VRAM, uncached and fine-grained memory; (4) two-card P2P atomic + fence latency and bandwidth (<code>t_dev</code>); (5) throughput of N workgroups contending for one queue, sweeping N (contention curve); (6) static queue length versus straggler time (the boundary of static scheduling); (7) MoE routing imbalance versus dynamic-scheduling gain (reproducing the conditions of the paper&rsquo;s 1.08 vs 1.04).</p>
+<h2 id="16-risks-and-mitigations">16. Risks and Mitigations</h2>
+<table>
+<thead>
+<tr>
+<th>Risk</th>
+<th>Why</th>
+<th>Test first</th>
+<th>Fallback</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>AMD has no multimem</td>
+<td>The paper&rsquo;s communication fusion depends on it</td>
+<td>Single-point experiments on the three section 10.5 paths</td>
+<td>Mark unsupported; compute-side fusion only</td>
+</tr>
+<tr>
+<td>Cross-XCD synchronisation is expensive</td>
+<td>4 MB private L2; only the Infinity Cache across domains</td>
+<td>Phase-0 calibration (first values: about 0.92 us one-way flag with payload; counters about 100 ns dearer cross-XCD)</td>
+<td>Raise the intra-domain partition share at the expense of parallelism</td>
+</tr>
+<tr>
+<td>Cluster / DSMEM capability varies by target</td>
+<td>LLVM: unsupported targets degrade to agent scope</td>
+<td>Measure per target and record in YAML</td>
+<td>Global atomics everywhere</td>
+</tr>
+<tr>
+<td>Dynamic-queue contention</td>
+<td>The paper acknowledges contention on its central queue</td>
+<td>Contention-curve calibration (done: CAS collapses past 8 poppers; ticket ring scales to 512)</td>
+<td>Domain-level queues (already the default) and the ticket ring (already the runtime)</td>
+</tr>
+<tr>
+<td>Tile quality below hand-written libraries</td>
+<td>ETC acknowledges it</td>
+<td>Like-for-like comparison</td>
+<td>Decouple fusion from tiles; inline hand-written tiles</td>
+</tr>
+<tr>
+<td>Static scheduling&rsquo;s shape fallback is coarse</td>
+<td>The paper reuses &ldquo;the next larger shape&rdquo;</td>
+<td>Shape long-tail experiment</td>
+<td>Shape buckets plus intra-bucket dynamic scheduling</td>
+</tr>
+<tr>
+<td>Wrong event memory type</td>
+<td>System-scope atomics have memory-type requirements</td>
+<td>Scope tests</td>
+<td>Compile-time assertion forbids illegal combinations</td>
+</tr>
+<tr>
+<td>Persistent kernels are hard to debug</td>
+<td>A hang raises no error; a wrong scope &ldquo;completes&rdquo; with wrong data</td>
+<td>Watchdog and event dump before any feature work (done: it found both 2026-09-22 defects)</td>
+<td>None; this is a prerequisite</td>
+</tr>
+</tbody>
+</table>
+<h2 id="appendix-a-machine-model-schema">Appendix A. Machine Model Schema</h2>
+<p>Trimmed excerpt of <code>etx/machine/arch/gfx942.yaml</code> with comments. Sources for the entries: ROCm MI300 microarchitecture document, CDNA3 ISA section 9.1 (cache-scope bits), LLVM AMDGPUUsage &ldquo;Memory Model GFX942&rdquo;, ROCm GPU atomics guide, Chips and Cheese MI300X microbenchmarks. The <code>costs:</code> values shown are the public seed values that phase-0 calibration overwrites; the measured replacements are in Appendix C.</p>
+<pre><code class="language-yaml">name: gfx942
+family: CDNA3
+vendor: amd
+wave_size: 64
+devices_per_package: 1
+exec_domains:                                   # the tree; one entry per level below the device
+  - {name: xcd, count: 8, cus: 38, l2_mb: 4}    # 40 CUs per XCD, 38 active
+shared_cache: {kind: infinity_cache, mb: 256, coherent: false}   # memory-side; holds the snoop filter
+resources:
+  lds_kb: 64
+  regs_per_lane: 512          # VGPR + AGPR share one 512-entry file
+  max_waves_per_simd: 8
+  simds_per_cu: 4
+  max_wg_per_cu: 2
+  lds_page_kb: 16
+bandwidth: {hbm_tbs: 5.3, cache_bw_tbs: 4.3}
+visibility:                   # correctness: what each event scope needs (LLVM gfx942 memory model)
+  domain:                     # within one XCD (one L2). L1 is write-through; consumer invalidates L1 only
+    release: ['asm volatile(&quot;s_waitcnt vmcnt(0)&quot; ::: &quot;memory&quot;);']
+    acquire: ['asm volatile(&quot;buffer_inv sc0&quot; ::: &quot;memory&quot;);']
+    poll: '__hip_atomic_load({ptr}, __ATOMIC_RELAXED, __HIP_MEMORY_SCOPE_AGENT)'
+    arrive: '__hip_atomic_fetch_sub({ptr}, 1, __ATOMIC_RELAXED, __HIP_MEMORY_SCOPE_AGENT)'
+    memory: any
+  device:                     # across XCDs. Producer writes back dirty L2 lines; consumer invalidates
+    release: ['asm volatile(&quot;buffer_wbl2 sc1\n\ts_waitcnt vmcnt(0)&quot; ::: &quot;memory&quot;);']
+    acquire: ['asm volatile(&quot;buffer_inv sc1&quot; ::: &quot;memory&quot;);']
+    poll: '__hip_atomic_load({ptr}, __ATOMIC_RELAXED, __HIP_MEMORY_SCOPE_AGENT)'
+    arrive: '__hip_atomic_fetch_sub({ptr}, 1, __ATOMIC_RELAXED, __HIP_MEMORY_SCOPE_AGENT)'
+    memory: any
+  system:                     # across devices. Coarse-grained memory silently downgrades to device scope
+    release: ['asm volatile(&quot;buffer_wbl2 sc0 sc1\n\ts_waitcnt vmcnt(0)&quot; ::: &quot;memory&quot;);']
+    acquire: ['asm volatile(&quot;buffer_inv sc0 sc1&quot; ::: &quot;memory&quot;);']
+    poll: '__hip_atomic_load({ptr}, __ATOMIC_RELAXED, __HIP_MEMORY_SCOPE_SYSTEM)'
+    arrive: '__hip_atomic_fetch_sub({ptr}, 1, __ATOMIC_RELAXED, __HIP_MEMORY_SCOPE_SYSTEM)'
+    memory: fine_grained
+capabilities:                 # correctness: booleans and enums; wrong = wrong code
+  cluster_launch: false
+  dsmem: false
+  multicast_reduce: false        # no multimem, and no switch: 8 GPUs are a point-to-point xGMI mesh
+  async_copy_to_lds: dword_only  # buffer_load ... lds is 32 bit/lane; no TMA / cp.async
+  tma: false
+  fp_atomic_over_fabric: true
+  wg_to_domain_map: discover     # docs say round-robin; not contractual; read HW_ID.XCC_ID at start
+  cooperative_launch: true
+  sentinel_signal: true
+  hw_tile_trigger: false
+  backoff: s_sleep
+  comm_fusion_reduce_scatter: experimental   # no multimem path; see section 10.5
+costs:                        # performance: numbers; wrong = slow. Seed values below, overwritten by bench/calib
+  t_local_ns: 116                # same-XCD atomic round trip (Chips and Cheese)
+  t_cross_ns: 203                # cross-XCD atomic round trip
+  t_flag_cross_ns: 703           # cross-XCD one-way flag latency
+  t_fence_ns: 115                # agent-scope release fence
+  t_phase_switch_counter_ns: 7600
+  t_phase_switch_sentinel_ns: 850
+  t_dev_ns: null                 # xGMI P2P atomic, to calibrate
+  t_pop_ns: 300
+  t_push_ns: 300
+  t_prologue_ns: null
+lowering:                     # misc C snippets referenced by the generated header
+  backoff: '__builtin_amdgcn_s_sleep(1);'
+  timer: '__builtin_amdgcn_s_memrealtime()'
+  domain_id: 'etx_amdgcn_xcc_id()'          # runtime/include/etx/primitives_amdgcn.h
+  launch: hipLaunchCooperativeKernel
+notes:
+  - &quot;Plain loads hit the non-coherent L1 (wave scope = Hit LRU); flags must be polled with sc1 or atomic loads.&quot;
+</code></pre>
+<p>For contrast, <code>sm_90.yaml</code> declares one domain (<code>{name: gpu, count: 1, cus: 132, l2_mb: 50}</code>), a coherent shared cache, <code>lds_kb: 228</code>, <code>regs_per_lane: 255</code>, <code>wave_size: 32</code>, only <code>device</code> and <code>system</code> visibility rows (<code>__threadfence()</code> / <code>__threadfence_system()</code> with acquire loads), capabilities <code>cluster_launch</code>, <code>dsmem</code>, <code>multicast_reduce</code>, <code>tma</code>, <code>pdl</code> all true, <code>wg_to_domain_map: single</code>, <code>backoff: nanosleep</code>, and costs <code>t_local_ns: 600</code>, <code>t_dev_ns: 2000</code>, <code>t_dsmem_ns: 110</code>, <code>t_pop_ns: 250</code>. The H100&rsquo;s two L2 partitions (far hit 414 vs near 258 cycles) are treated as a cost, not a visibility difference.</p>
+<h2 id="appendix-b-runtime-abi">Appendix B. Runtime ABI</h2>
+<p>From <code>etx/runtime/include/etx/abi.h</code>, shared by generated kernels, tile bodies and the host launcher.</p>
+<pre><code class="language-c">typedef int32_t etx_event;            // one counter; an ETensor is a contiguous run of them
+
+struct etx_task {
+  int32_t type;                        // task-type id == index into the dispatch switch
+  int32_t coord[4];
+};
+
+struct etx_queue {                     // ring of task ids; many-producer many-consumer via atomics
+  int32_t* slots;
+  int32_t  capacity;
+  int32_t* head;                       // pop cursor
+  int32_t* tail;                       // push cursor
+};
+
+struct etx_ctx {
+  int32_t         coord[4];
+  const int32_t*  shape;               // symbolic scalars of this step, in graph.symbols order
+  void* const*    args;                // tensor pointers, indexed by plan.json &quot;args&quot;
+  etx_event*      events;              // event buffer base
+  const int32_t*  ev_offset;           // per-event-tensor offset into events
+  const int32_t*  ev_shape;            // per-event-tensor shape, 4 ints each
+  uint32_t        domain;
+  uint32_t        worker;
+  void*           lds;
+};
+</code></pre>
+<p><code>etx_params</code> fields, as passed to <code>etx_megakernel</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>shape</code>, <code>args</code>, <code>events</code>, <code>ev_offset</code>, <code>ev_shape</code></td>
+<td>As in <code>etx_ctx</code>; copied into every task&rsquo;s context</td>
+</tr>
+<tr>
+<td><code>descs</code></td>
+<td>Task descriptor table (<code>etx_task</code>), indexed by task id</td>
+</tr>
+<tr>
+<td><code>static_queue</code>, <code>static_begin</code>, <code>static_end</code></td>
+<td>Concatenated per-worker static queues and each worker&rsquo;s [begin, end) range</td>
+</tr>
+<tr>
+<td><code>local_queue</code></td>
+<td>One ticket ring per domain</td>
+</tr>
+<tr>
+<td><code>global_queue</code></td>
+<td>Device-global ticket ring; capacity 0 when unused</td>
+</tr>
+<tr>
+<td><code>worker_domain</code></td>
+<td>Optional host-provided worker-to-domain map, used when discovery is not needed</td>
+</tr>
+<tr>
+<td><code>push_index</code>, <code>push_offsets</code>, <code>push_lists</code></td>
+<td>CSR consumer lists: per event id a base offset, then per event coordinate a [b, e) range of encoded consumer task ids</td>
+</tr>
+<tr>
+<td><code>ctrl_abort</code></td>
+<td>Host writes 1 to abort; the kernel writes 2 on spin timeout</td>
+</tr>
+<tr>
+<td><code>ctrl_done</code></td>
+<td>Tasks completed this step; the step ends when it reaches <code>n_tasks</code></td>
+</tr>
+<tr>
+<td><code>n_tasks</code>, <code>spin_limit</code>, <code>n_events</code></td>
+<td>Step size, watchdog threshold, event count</td>
+</tr>
+</tbody>
+</table>
+<p>Since the first hardware run, <code>args</code> in <code>etx_ctx</code> is the per-task-type pointer table in the grid&rsquo;s declared argument order rather than the global table, and the ring slots carry the pass tag described in section 10.3.</p>
+<p>Primitives, all built from the generated lowering macros and naming no architecture: <code>etx_wait_DOMAIN / DEVICE / SYSTEM</code>, <code>etx_arrive_DOMAIN / DEVICE / SYSTEM</code> (returns the remaining count), <code>etx_push</code>, <code>etx_try_pop</code> (ticket ring; returns -1 when nothing is available, keeps the ticket in per-worker state), <code>etx_push_consumers</code>, <code>etx_deps_ready</code>, <code>etx_step_done</code>, <code>etx_discover_domain</code>, <code>ETX_BACKOFF</code>, <code>ETX_DOMAIN_ID</code>. AMD helpers in <code>primitives_amdgcn.h</code>: <code>etx_amdgcn_xcc_id()</code> (HW_ID.XCC_ID via <code>s_getreg_b32</code>, bits [3:0], on gfx940-gfx950), <code>etx_amdgcn_poll_l2()</code> (<code>buffer_inv sc0</code> then a volatile load), <code>etx_amdgcn_load_agent()</code> (agent-scope relaxed load for sentinel polling).</p>
+<h2 id="appendix-c-phase-0-calibration-results">Appendix C. Phase-0 Calibration Results</h2>
+<p>All values measured on 2026-09-22 on a rented Hot Aisle 1x MI300X VM, ROCm 7.2.4, target gfx942, using <code>bench/calib/atomic_pingpong.hip</code>, <code>flag_latency.hip</code> and <code>queue_contention.hip</code>. Status: measured.</p>
+<table>
+<thead>
+<tr>
+<th>Measurement</th>
+<th>Condition</th>
+<th>Value</th>
+<th>Implication</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Workgroup-to-XCD mapping</td>
+<td>Persistent kernel, HW_ID.XCC_ID read per workgroup</td>
+<td>Workgroup k on XCD (k+6) mod 8; first 16: 6 7 0 1 2 3 4 5 6 7 0 1 2 3 4 5</td>
+<td>Not the documented round-robin from 0 and not the (k+4) mod 8 reported publicly; discovery at kernel start is mandatory</td>
+</tr>
+<tr>
+<td>One-way arrive latency, DEVICE protocol</td>
+<td>Producer <code>buffer_wbl2 sc1</code>; consumer agent-scope atomic-load poll; same XCD</td>
+<td>873 ns</td>
+<td>Reference for the current <code>poll</code> row</td>
+</tr>
+<tr>
+<td>Same</td>
+<td>Cross XCD</td>
+<td>892 ns</td>
+<td>Counter cost differs by about 20 ns across XCDs under this protocol</td>
+</tr>
+<tr>
+<td>One-way arrive latency, INVL1 protocol</td>
+<td>No write-back; consumer <code>buffer_inv sc0</code> then plain load; same XCD</td>
+<td>642 ns</td>
+<td>Correct and about 25% cheaper than the atomic-load poll</td>
+</tr>
+<tr>
+<td>Same</td>
+<td>Cross XCD</td>
+<td>742 ns</td>
+<td>Same-vs-cross difference about 100 ns; every RMW executes at the fabric</td>
+</tr>
+<tr>
+<td>Poll with plain or sc0 load, no invalidate</td>
+<td>Either XCD</td>
+<td>Never observes the arrive (spins forever)</td>
+<td>Plain loads are never acceptable for flags</td>
+</tr>
+<tr>
+<td>One-way flag latency with payload</td>
+<td><code>s_memrealtime</code> (100 MHz); producer stamps payload, <code>buffer_wbl2 sc1</code>, agent store; consumer agent poll + <code>buffer_inv sc1</code>; same XCD</td>
+<td>951 ns, 0 stale payloads / 10,000</td>
+<td>Release / acquire sequences of the lowering table are correct</td>
+</tr>
+<tr>
+<td>Same</td>
+<td>Cross XCD</td>
+<td>916 ns, 0 stale payloads / 10,000</td>
+<td>Replaces the 703 ns seed for <code>t_flag_cross_ns</code></td>
+</tr>
+<tr>
+<td>DEVICE release fence</td>
+<td><code>buffer_wbl2 sc1</code> + <code>s_waitcnt</code></td>
+<td>181 ns</td>
+<td>Per device-scope arrive</td>
+</tr>
+<tr>
+<td>DEVICE acquire fence</td>
+<td><code>buffer_inv sc1</code></td>
+<td>120 ns</td>
+<td>Per device-scope wait</td>
+</tr>
+<tr>
+<td>DOMAIN release + acquire</td>
+<td><code>s_waitcnt</code> + <code>buffer_inv sc0</code></td>
+<td>44 ns together</td>
+<td>A domain-scope edge saves about 257 ns of fences per pair plus the payload write-back</td>
+</tr>
+<tr>
+<td>Queue: CAS-based pop, aggregate throughput</td>
+<td>65,536 pops of one ring; N = 1 / 8 / 64 / 512</td>
+<td>0.89 / 1.85 / 1.10 / 0.41 M pops/s</td>
+<td>Collapses past 8 poppers; abandoned</td>
+</tr>
+<tr>
+<td>Queue: ticket-based pop, aggregate throughput</td>
+<td>N = 1 / 8 / 64 / 128 / 256 / 512</td>
+<td>1.15 / 8.48 / 47.6 / 65.0 / 55.2 / 76.6 M pops/s</td>
+<td>Adopted as the v0.2 runtime ring; feeds <code>C_queue</code></td>
+</tr>
+<tr>
+<td>Uncontended pop cost</td>
+<td>Ticket ring, N = 1</td>
+<td>about 870 ns</td>
+<td>Replaces the 300 ns seed for <code>t_pop_ns</code></td>
+</tr>
+<tr>
+<td>Per-popper pop latency (derived: N / throughput)</td>
+<td>Ticket ring, N = 128 / 256</td>
+<td>about 2.0 us / 4.6 us</td>
+<td>The linear contention factor in Pass 4 matches at 128 and underestimates at 256</td>
+</tr>
+<tr>
+<td>Toolchain</td>
+<td>Generated split-K and MoE kernels</td>
+<td>Pass <code>hipcc -fgpu-rdc -fsyntax-only</code> for gfx942; the test suite passes on the VM</td>
+<td>Superseded by the end-to-end runs below</td>
+</tr>
+<tr>
+<td>End-to-end split-K megakernel, correctness</td>
+<td>608 cooperative workers (8 XCDs x 76 workgroups, 2 per CU, 256 threads); static, hybrid and dynamic modes</td>
+<td>Matches CPU fp32 reference, max abs error 4.8e-7, in all three modes</td>
+<td>First ETX-generated kernel to run; lowering, queues, discovery and per-type argument tables validated</td>
+</tr>
+<tr>
+<td>Split-K per-step time, n=64 (320 tasks, 64 events)</td>
+<td>Best of 30-50 repetitions; first launch about 21 ms including code load</td>
+<td>static 0.101 ms, hybrid 0.115 ms, dynamic 0.118 ms</td>
+<td>Queue overhead small relative to the step at this size</td>
+</tr>
+<tr>
+<td>Split-K per-step time, n=1024 (5120 tasks, 1024 events)</td>
+<td>Same</td>
+<td>static 0.128 ms, hybrid 0.441 ms, dynamic 0.512 ms</td>
+<td>Tasks about 2 us; about 1 us per pop plus a push; static wins 3.5-4x on tiny tasks, as the <code>C_queue</code> term predicts</td>
+</tr>
+<tr>
+<td>Ticket-ring wrap-around defect</td>
+<td>Over-popping workers wrapped onto slots consumed in an earlier pass</td>
+<td>267 of 320 tasks executed twice; event counters at -4</td>
+<td>Slot values now carry a pass tag (<code>(ticket / capacity) &lt;&lt; 24</code> OR-ed with the task id); a tag mismatch means &ldquo;not yet pushed&rdquo;</td>
+</tr>
+<tr>
+<td>Scope under global scheduling defect</td>
+<td>Grid scheduled through the device-global queue with DOMAIN-scope events</td>
+<td>Consumers read stale L2 and produced zeros while the kernel &ldquo;completed&rdquo;</td>
+<td>Pass 4 raises events of dynamically scheduled grids to DEVICE scope; <code>verify_plan</code> rejects violations</td>
+</tr>
+</tbody>
+</table>
+<p>Second session, 2x MI300X VM (enc1-gpuvm005), same date; <code>phase_switch.hip</code>, <code>p2p_atomic.hip</code>, the MoE and GEMM + RS examples and <code>bench/sim_experiments.py</code>. Status: measured.</p>
+<table>
+<thead>
+<tr>
+<th>Measurement</th>
+<th>Condition</th>
+<th>Value</th>
+<th>Implication</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Whole-GPU phase switch, counter barrier</td>
+<td>Every resident workgroup does one atomic RMW then polls the counter; 304 / 608 workgroups</td>
+<td>8.61 us / 17.30 us per phase</td>
+<td>Matches Kog&rsquo;s 7.6 us; <code>t_phase_switch_counter_ns</code> = 8600</td>
+</tr>
+<tr>
+<td>Whole-GPU phase switch, leader-gathered flags</td>
+<td>Each workgroup stores its own flag; workgroup 0 polls all flags with inv-L1 loads and releases one &ldquo;go&rdquo; word</td>
+<td>52.1 us / 105.7 us per phase</td>
+<td>Flag polling does not replace counters for barriers; the sentinel gain is point-to-point payload polling only</td>
+</tr>
+<tr>
+<td>Cross-device flag, system scope</td>
+<td>Fine-grained memory on device 0, peer access from device 1, one-way</td>
+<td>10.6 us</td>
+<td><code>t_dev_ns</code> = 10600; two orders of magnitude above intra-device events, which is why cross-device consumers are always static</td>
+</tr>
+<tr>
+<td>Peer store bandwidth</td>
+<td>Device 1 writes 256 MB into device 0 HBM</td>
+<td>285 GB/s</td>
+<td>Owner-side reduce-scatter reads run at xGMI, not HBM, speed</td>
+</tr>
+<tr>
+<td>MoE layer, full configuration (D=1024, 8 heads, 8 experts, top-2), B=8</td>
+<td>137 tasks, 50 events, 608 workers; device routing compared with host routing; y compared with a double-precision CPU reference</td>
+<td>0 routing mismatches; max relative error 3.5e-5; 3.22 ms per step</td>
+<td>First data-dependent megakernel: runtime counter initialisation, gather-map notifications, range-map waits and pushes all correct</td>
+</tr>
+<tr>
+<td>MoE, full configuration, schedule modes and passes</td>
+<td>Best of 20</td>
+<td>base 3.224, no P3 3.189, no P7 3.181, static 3.147, hybrid 2.688, dynamic 2.561 ms; B=32: 3.141 (static 3.061, dynamic 2.718)</td>
+<td>Per-token GEMV tiles dominate (each task about 100 us); pass effects are within noise; dynamic balances the few heavy tasks better than round-robin</td>
+</tr>
+<tr>
+<td>MoE, short-task configuration (D=256, 2 heads, S=128, FF=128), B=64</td>
+<td>647 tasks, 245 events; best of 30</td>
+<td>automatic 0.439 ms (static chosen); forced static 0.445; hybrid 0.654; dynamic 0.653; no P3 (hybrid regime) 0.653 vs 0.546 with P3; no P7 0.547</td>
+<td>Queue path loses 32% on short tasks; Pass 3 recovers 16% where events are on the critical path; l2-warm prefetch is not measurable here</td>
+</tr>
+<tr>
+<td>MoE, short-task configuration, B=8</td>
+<td>89 tasks</td>
+<td>0.304 ms automatic; 0.327 with P3 vs 0.332 without</td>
+<td>Small graphs are launch- and barrier-bound</td>
+</tr>
+<tr>
+<td>Three further defects found only on hardware</td>
+<td>MoE bring-up</td>
+<td>(1) a consumer with two in-events was pushed and executed twice; (2) hybrid consumers were pushed to the pusher&rsquo;s domain queue instead of their own; (3) a static grid with runtime edge maps evaluated <code>tile_expert</code> before <code>grouping</code> wrote it (forced-static B=32 failed)</td>
+<td>Fixed by per-task remaining-dependency counters, domain-tagged push lists, and the <code>"*"</code> barrier rule of Pass 4</td>
+</tr>
+<tr>
+<td>GEMM + reduce-scatter, two devices</td>
+<td>M=1024, K=512, N=512, world 2; 96 tasks (48 per device), 32 system-scope events in fine-grained memory; local C check and reduce-scattered D check</td>
+<td>Local C max relative error 3.5e-5 / 1.1e-5; D max relative error 3.0e-4, 0 mismatches; 0.365 ms per step</td>
+<td>Kernel family across devices works: same code path as MI250X&rsquo;s two GCDs; residency caught the 32 KB LDS tile (one workgroup per CU)</td>
+</tr>
+</tbody>
+</table>
+<p>Simulator studies (<code>bench/sim_experiments.py</code>, calibrated gfx942 costs: pop 0.87 us, cross-domain sync 0.74 us, local 0.64 us). Both are model results, not hardware measurements; they use the examples&rsquo; annotated durations (about 1-8 us per task), so they describe the short-task regime, where the measured hardware runs also favoured static.</p>
+<p>Study 6, tile-duration variance versus schedule (split-K, n=256, 1280 tasks; makespan in us):</p>
+<table>
+<thead>
+<tr>
+<th>cv of tile duration</th>
+<th>static</th>
+<th>dynamic</th>
+<th>hybrid</th>
+<th>best</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0.0</td>
+<td>5.4</td>
+<td>23.9</td>
+<td>10.0</td>
+<td>static</td>
+</tr>
+<tr>
+<td>0.1</td>
+<td>6.4</td>
+<td>24.6</td>
+<td>10.7</td>
+<td>static</td>
+</tr>
+<tr>
+<td>0.3</td>
+<td>8.4</td>
+<td>25.8</td>
+<td>11.9</td>
+<td>static</td>
+</tr>
+<tr>
+<td>0.6</td>
+<td>11.3</td>
+<td>27.6</td>
+<td>13.3</td>
+<td>static</td>
+</tr>
+<tr>
+<td>1.0</td>
+<td>15.2</td>
+<td>30.0</td>
+<td>15.3</td>
+<td>static (hybrid equal)</td>
+</tr>
+</tbody>
+</table>
+<p>Reading: static degrades linearly with variance (its makespan triples from cv 0 to 1) while hybrid&rsquo;s queue cost is flat, so the crossover sits just above cv = 1 for 2 us tasks; for tasks ten times longer the same queue cost is amortised ten times better and the crossover moves to cv of roughly 0.1-0.3, which is the regime the paper&rsquo;s MoE result (dynamic 1.08 vs static 1.04) occupies. The global dynamic queue never wins in this model because every pop contends with all 608 workers.</p>
+<p>Study 7, MoE routing imbalance versus schedule (B=32 tokens, 8 experts, top-2; makespan in us):</p>
+<table>
+<thead>
+<tr>
+<th>routing skew</th>
+<th>max / mean tokens per expert</th>
+<th>static</th>
+<th>dynamic</th>
+<th>hybrid</th>
+<th>best</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0.0</td>
+<td>1.38</td>
+<td>49.9</td>
+<td>156.2</td>
+<td>77.1</td>
+<td>static</td>
+</tr>
+<tr>
+<td>0.5</td>
+<td>1.75</td>
+<td>52.1</td>
+<td>152.2</td>
+<td>79.2</td>
+<td>static</td>
+</tr>
+<tr>
+<td>1.0</td>
+<td>2.88</td>
+<td>52.3</td>
+<td>161.2</td>
+<td>79.8</td>
+<td>static</td>
+</tr>
+<tr>
+<td>2.0</td>
+<td>3.75</td>
+<td>52.3</td>
+<td>173.7</td>
+<td>79.8</td>
+<td>static</td>
+</tr>
+<tr>
+<td>4.0</td>
+<td>4.00</td>
+<td>47.0</td>
+<td>193.1</td>
+<td>76.6</td>
+<td>static</td>
+</tr>
+</tbody>
+</table>
+<p>Reading: with 5 us GroupGEMM tiles and 8 experts the imbalance changes the number of tiles per expert, not the length of the critical chain, so static absorbs it; the study confirms the direction of the automatic choice on the short-task MoE (static, 0.439 ms measured). Reproducing the paper&rsquo;s regime needs tile durations of tens of microseconds and hundreds of experts, which the annotated example does not model.</p>
+<h2 id="appendix-d-glossary">Appendix D. Glossary</h2>
+<table>
+<thead>
+<tr>
+<th>Term</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>task / tile</td>
+<td>One workgroup-level unit of work: a tile body at one coordinate of a task grid</td>
+</tr>
+<tr>
+<td>task grid</td>
+<td>A tile body launched over a symbolic multidimensional coordinate space</td>
+</tr>
+<tr>
+<td>event</td>
+<td>One integer counter; producers arrive (decrement), consumers wait (spin until zero)</td>
+</tr>
+<tr>
+<td>event tensor (ETensor)</td>
+<td>A multidimensional array of events; a first-class IR object lowered to one integer tensor</td>
+</tr>
+<tr>
+<td>edge map</td>
+<td>Map from task coordinates to event coordinates: affine, index arithmetic, runtime range, runtime gather</td>
+</tr>
+<tr>
+<td>scope</td>
+<td>Visibility range of an event: workgroup &lt; cluster &lt; domain &lt; device &lt; system</td>
+</tr>
+<tr>
+<td>exec domain</td>
+<td>One level of the execution-resource tree: XCD, GCD, die or whole GPU</td>
+</tr>
+<tr>
+<td>capability / cost</td>
+<td>A hardware bit or enumeration deciding correctness / a coefficient deciding performance</td>
+</tr>
+<tr>
+<td>worker</td>
+<td>One persistent workgroup executing the worker loop</td>
+</tr>
+<tr>
+<td>static / dynamic / hybrid</td>
+<td>Pre-ordered per-worker queues with arrive / wait only; ready queues with push / pop; dynamic inside a domain and static across domains with no cross-domain push</td>
+</tr>
+<tr>
+<td>resource class / kernel family</td>
+<td>Tiles with compatible register / LDS footprint; the set of kernel instances, one per (device, resource class), sharing one event tensor</td>
+</tr>
+<tr>
+<td>early push</td>
+<td>Pushing a consumer when its producer is dispatched rather than when the event fires (ETC appendix E)</td>
+</tr>
+<tr>
+<td>epoch event / control ring</td>
+<td>An event compared against a per-step epoch target; the host-to-kernel ring of step descriptors</td>
+</tr>
+<tr>
+<td>MBU / TPOT</td>
+<td>Model bandwidth utilisation (bytes per token / (HBM bandwidth x step time)); time per output token</td>
+</tr>
+</tbody>
+</table>
+<h2 id="appendix-e-references">Appendix E. References</h2>
+<ul>
+<li>Jin, Hou, Wang, Lai et al. Event Tensor: A Unified Abstraction for Compiling Dynamic Megakernel. MLSys 2026. https://arxiv.org/abs/2604.13327 (all &ldquo;paper&rdquo; numbers are from v2)</li>
+<li>Cheng et al. Mirage Persistent Kernel: A Compiler and Runtime for Mega-Kernelizing Tensor Programs. https://arxiv.org/abs/2512.22219</li>
+<li>Spector et al. Look Ma, No Bubbles! Designing a Low-Latency Megakernel for Llama-1B. https://hazyresearch.stanford.edu/blog/2025-05-27-no-bubbles</li>
+<li>Zheng et al. Triton-Distributed: Programming Overlapping Kernels on Distributed AI Systems with the Triton Compiler. https://arxiv.org/abs/2504.19442</li>
+<li>Hou et al. Axe: A Simple Unified Layout Abstraction for Machine Learning Compilers (ETC&rsquo;s tile DSL). https://arxiv.org/abs/2601.19092</li>
+<li>AMD. Fleet: chiplet-aware megakernel on MI350X (MPK&rsquo;s ROCm port; four-level tasks, hierarchical events, one scheduling workgroup per XCD). https://arxiv.org/abs/2604.15379 ; https://github.com/ROCm/fleet-chiplet-megakernel</li>
+<li>Cohere. Megakernels (2026-09; H100; static waves plus per-operator drain queues; 30B-A3B bs=1, 1.58x over vLLM). https://cohere.com/blog/megakernels</li>
+<li>Kog. Building a single-kernel latency-optimized LLM inference engine on AMD MI300X GPUs (sentinel polling 0.8 us vs counters 7.6 us). https://blog.kog.ai/building-a-single-kernel-latency-optimized-llm-inference-engine-on-amd-mi300x-gpus/</li>
+<li>Ada-MK. https://arxiv.org/abs/2605.11581</li>
+<li>ForgeMegakernel. https://arxiv.org/abs/2609.12379</li>
+<li>mKernel. https://arxiv.org/abs/2609.13585</li>
+<li>DITRON. https://arxiv.org/abs/2605.02953</li>
+<li>Iris. https://arxiv.org/abs/2511.12500 ; https://github.com/ROCm/iris</li>
+<li>Chips and Cheese. Testing AMD&rsquo;s giant MI300X (same-XCD / cross-XCD atomics 116 / 202 ns). https://chipsandcheese.com/p/testing-amds-giant-mi300x</li>
+<li>Hopper microbenchmarks (DSMEM and L2 partition latency). https://arxiv.org/pdf/2501.12084</li>
+<li>NVIDIA. Blackwell tuning guide. https://docs.nvidia.com/cuda/blackwell-tuning-guide/index.html</li>
+<li>NVIDIA. PTX ISA (multimem, nanosleep, griddepcontrol). https://docs.nvidia.com/cuda/parallel-thread-execution/index.html</li>
+<li>AMD. MI300 microarchitecture. https://rocm.docs.amd.com/en/latest/reference/gpu-arch/mi300.html</li>
+<li>AMD. MI350 microarchitecture. https://rocm.docs.amd.com/en/latest/reference/gpu-arch/mi350.html</li>
+<li>AMD. SPX / CPX partitioning and round-robin dispatch. https://rocm.blogs.amd.com/software-tools-optimization/compute-memory-modes/README.html</li>
+<li>AMD. device-libs cg.cl (grid.sync implementation). https://github.com/ROCm/llvm-project/blob/amd-staging/amd/device-libs/ockl/src/cg.cl</li>
+<li>AMD. ROCm GPU architecture specs. https://rocm.docs.amd.com/en/latest/reference/gpu-arch-specs.html</li>
+<li>AMD. GPU atomics operation support. https://rocm.docs.amd.com/en/latest/reference/gpu-atomics-operation.html</li>
+<li>AMD. MI300 / MI350 workload optimization (XCD-aware swizzle). https://rocm.docs.amd.com/projects/ai-ecosystem/en/latest/optimization/workload-optimization.html</li>
+<li>AMD. MI300X partitioning. https://instinct.docs.amd.com/projects/amdgpu-docs/en/latest/gpu-partitioning/mi300x/overview.html</li>
+<li>AMD. AMD Instinct MI300 CDNA3 ISA Reference Guide (2025-08).</li>
+<li>LLVM. AMDGPU backend usage (gfx942 memory model: wbl2 / inv sequences, cluster launch). https://llvm.org/docs/AMDGPUUsage.html#memory-model-gfx942</li>
+<li>LLVM. Clang AMDGPU builtins (s_sleep, s_setprio, s_memrealtime). https://clang.llvm.org/docs/AMDGPUBuiltinReference.html</li>
+<li>MI250X kernel-initiated P2P latency (8.7-18.2 us). https://arxiv.org/abs/2410.00801</li>
+<li>cklxx. fleet-mi300x: hand-written batch-1 MoE decode megakernel on MI300X; cross-XCD event, fence and discovery experience cited from docs/STATUS.md. https://github.com/cklxx/fleet-mi300x</li>
+<li>ETX design page (source of this document). https://etc-dynamic-megakernel-arch.q1293822641.workers.dev</li>
+</ul></body></html>

@@ -1,0 +1,25 @@
+  new build/ab/new/megakernel_d0.hip:5088:0: VGPRs: 256
+  new build/ab/new/megakernel_d0.hip:5088:0: AGPRs: 65
+  new build/ab/new/megakernel_d0.hip:5088:0: ScratchSize [bytes/lane]: 112
+  new build/ab/new/megakernel_d0.hip:5088:0: Occupancy [waves/SIMD]: 1
+  nocp build/ab/nocp/megakernel_d0.hip:5088:0: VGPRs: 256
+  nocp build/ab/nocp/megakernel_d0.hip:5088:0: AGPRs: 31
+  nocp build/ab/nocp/megakernel_d0.hip:5088:0: ScratchSize [bytes/lane]: 112
+  nocp build/ab/nocp/megakernel_d0.hip:5088:0: Occupancy [waves/SIMD]: 1
+  nordc /home/hotaisle/etx/build/ab/nordc/megakernel_d0.hip:5088:1: remark: VGPRs: 256 [-Rpass-analysis=kernel-resource-usage]
+  nordc /home/hotaisle/etx/build/ab/nordc/megakernel_d0.hip:5088:1: remark: AGPRs: 53 [-Rpass-analysis=kernel-resource-usage]
+  nordc /home/hotaisle/etx/build/ab/nordc/megakernel_d0.hip:5088:1: remark: ScratchSize [bytes/lane]: 0 [-Rpass-analysis=kernel-resource-usage]
+  nordc /home/hotaisle/etx/build/ab/nordc/megakernel_d0.hip:5088:1: remark: Occupancy [waves/SIMD]: 1 [-Rpass-analysis=kernel-resource-usage]
+  relayoff build/ab/relayoff/megakernel_d0.hip:5031:0: VGPRs: 256
+  relayoff build/ab/relayoff/megakernel_d0.hip:5031:0: AGPRs: 66
+  relayoff build/ab/relayoff/megakernel_d0.hip:5031:0: ScratchSize [bytes/lane]: 112
+  relayoff build/ab/relayoff/megakernel_d0.hip:5031:0: Occupancy [waves/SIMD]: 1
+base                               median 4.106 ms/token  tokens ok 32  layers 27/27
+new                                median 3.898 ms/token  tokens ok 32  layers 27/27
+new_relay0                         median 3.878 ms/token  tokens ok 32  layers 27/27
+new_acqcons                        median 4.035 ms/token  tokens ok 32  layers 27/27
+nocp                               median 3.923 ms/token  tokens ok 32  layers 27/27
+nordc                              median 3.720 ms/token  tokens ok 32  layers 27/27
+relayoff                           median 3.922 ms/token  tokens ok 32  layers 27/27
+base_again                         median 4.102 ms/token  tokens ok 32  layers 27/27
+new_again                          median 3.925 ms/token  tokens ok 32  layers 27/27

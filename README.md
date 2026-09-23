@@ -15,10 +15,13 @@ Repository: https://github.com/cklxx/etx-megakernel (private). Design page (the 
 `examples/dsv2lite/` is fleet-mi300x's DeepSeek-Coder-V2-Lite decode graph in
 ETX with fleet's own tile bodies linked through a shim. On one MI300X it
 decodes 32 tokens identical to HuggingFace greedy with all 27 layers inside
-fleet's per-layer gate, at **4.09 ms/token** against fleet's hand-written
-3.55 ms on the same VM. The gap closed from 54% to 15% through four compiler
-and runtime rules (last-arriver flush, agent-scope polling, in-body q_c wait,
-one acquire per workgroup), with no change to fleet's tile code. Build:
+fleet's per-layer gate, at **3.70 ms/token** against fleet's hand-written
+3.556 ms on the same VM. The gap closed from 54% to 4% through compiler and
+runtime rules (last-arriver flush, agent-scope polling, in-body q_c wait, one
+acquire per workgroup, one call site per tile body, a lean all-static loop,
+per-grid immediates, a per-XCD relay with hierarchical acquire, and a
+whole-program device build), with no change to fleet's tile code.
+`examples/dsv2lite/ab.sh` re-runs the A/B on one VM. Build:
 
 ```bash
 bash examples/dsv2lite/build.sh /path/to/fleet-mi300x      # needs hipcc + fleet's build/ (weights, cache, golden tokens)

@@ -14,7 +14,7 @@ else
   "$ROOT/.venv/bin/python" -m etx compile examples/dsv2lite/graph.py --arch gfx942 --out "$OUT" --relay "$RELAY" | grep -E "tasks=|workers/domain"
   SHIM="$ROOT/examples/dsv2lite/fleet_shim.hip"
 fi
-RDC="${ETX_RDC:-1}"                # 0: whole-program device compile per TU (fleet builds this way); needs INLINE=1
+RDC="${ETX_RDC:-0}"                # 0 (default): whole-program device compile, as fleet builds (3.72 vs 3.90 ms/token, scratch 112 -> 0 B/lane); needs INLINE=1
 RDCFLAG="-fgpu-rdc"; if [ "$RDC" = "0" ] && [ "$INLINE" = "1" ]; then RDCFLAG=""; fi
 hipcc -O3 -std=c++17 --offload-arch=gfx942 $RDCFLAG -DFLEET_NT_WEIGHTS=1 "$@" \
   -I "$FLEET/src" -I "$ROOT/etx/runtime/include" -I "$OUT" -I "$ROOT" \
