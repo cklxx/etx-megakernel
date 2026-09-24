@@ -30,7 +30,7 @@ def reference(src: Path, prompt: str, gen: int):
     model.eval()
     ids = tok(prompt, return_tensors="pt").input_ids.cuda()
     with torch.no_grad():
-        out = model.generate(ids, max_new_tokens=gen, do_sample=False, num_beams=1, eos_token_id=None,
+        out = model.generate(ids, max_new_tokens=gen, min_new_tokens=gen, do_sample=False, num_beams=1,
                              pad_token_id=tok.eos_token_id)
         full = out[:, : ids.shape[1] + gen]
         logits = model(full).logits[0].float()                 # teacher-forced logits for the margins
