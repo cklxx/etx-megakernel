@@ -11,7 +11,9 @@ IMG=${VLLM_IMAGE:-rocm/vllm:latest}
 DOCKER="sudo docker run --rm --device=/dev/kfd --device=/dev/dri --group-add video --ipc=host --shm-size 16g --security-opt seccomp=unconfined -e HIP_VISIBLE_DEVICES=0 -v $HOME:$HOME -w $HOME/etx"
 
 log "background: fleet bootstrap on GPU 1, vLLM image pull"
-[ -d ~/fleet-mi300x ] && (cd ~/fleet-mi300x && HIP_VISIBLE_DEVICES=1 nohup bash scripts/hotaisle_bootstrap.sh > ~/bootstrap.log 2>&1 &)
+NGPU=$(rocm-smi --showproductname 2>/dev/null | grep -c "Card Series")
+start_fleet() { [ -d ~/fleet-mi300x ] && (cd ~/fleet-mi300x && HIP_VISIBLE_DEVICES=$1 nohup bash scripts/hotaisle_bootstrap.sh > ~/bootstrap.log 2>&1 &); }
+if [ "$NGPU" -ge 2 ]; then start_fleet 1; else echo "one GPU: fleet's bootstrap runs after the Qwen benchmarks"; fi
 command -v docker >/dev/null || { sudo apt-get update -qq; sudo apt-get install -y -qq docker.io > /tmp/docker_apt.log 2>&1; }
 (sudo docker pull -q $IMG > /tmp/pull.log 2>&1; echo PULL-DONE >> /tmp/pull.log) &
 
@@ -64,6 +66,7 @@ for m in "${MODELS[@]}"; do set -- $m
 done
 
 log "DeepSeek-V2-Lite: wait for fleet's bootstrap"
+[ "$NGPU" -ge 2 ] || start_fleet 0
 until grep -q "=== .* variants" ~/bootstrap.log 2>/dev/null || grep -q "BOOTSTRAP-DONE" ~/bootstrap.log 2>/dev/null; do sleep 20; done
 pkill -f hotaisle_bootstrap.sh; sleep 1; pkill -f fleet_decode; sleep 2
 grep -E "per-token latency" ~/bootstrap.log | tail -2 | sed "s/^/fleet (GPU 1, bootstrap): /"
