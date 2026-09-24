@@ -45,6 +45,20 @@ greedy decoding (bf16, 32 tokens), deterministic over three runs:
 The tiles are general, not tuned. On a fresh VM, `bash examples/llm/vm_run.sh` prepares, builds
 and runs all three.
 
+Head-to-head, 1024-token context, batch 1, one MI300X (2026-09-25; `examples/llm/vm_bench.sh`):
+
+| Model | vLLM, best of default / AITER | ETX tiles, unfused (one kernel per grid, HIP graph) | ETX megakernel | Hand-written fleet |
+|---|---|---|---|---|
+| Qwen2.5-1.5B | 1.86 ms | 4.05 ms | 4.47 ms | - |
+| Qwen3-8B | 4.91 ms | 9.45 ms | 10.07 ms | - |
+| Qwen3-30B-A3B | 4.84 ms | 9.07 ms | 10.48 ms | - |
+| DeepSeek-Coder-V2-Lite | 4.12 ms (AITER; default 6.36) | - | 3.78 ms (fleet's tiles) | 3.57 ms |
+
+With fleet's tuned tiles ETX beats vLLM by 8%; with the generic tiles it is about 2x slower, and the
+per-phase trace puts that gap in the tiles, not in synchronisation. The megakernel does not yet beat
+the same tiles run as one kernel per grid from a HIP graph (6-15% slower): at batch 1 the graph is a
+chain of device-wide barriers, and an ETX barrier costs about 2 us more than a graph kernel boundary.
+
 ## Starting point (reworked 2026-09-23)
 
 The architecture is broad; the proof is narrow. The target is one real model on

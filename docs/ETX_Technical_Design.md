@@ -804,6 +804,25 @@ Every result is deterministic over three runs. The compiler chose static schedul
 
 The run found a correctness defect in the runtime that DeepSeek-V2-Lite and Qwen3-8B had not exposed. The hierarchical acquire of the per-XCD relay (section 15.4) made Qwen2.5-1.5B nondeterministic: different tokens on every run, at small-margin positions. In the relay design, the relay invalidates its XCD's L2 once and consumers drop only their L1. The tokens were deterministic with the relay off, and with the relay on but every consumer doing its own full acquire. They stayed nondeterministic with the relay doing a full release before its mirror store. So a remote relay's L2 invalidate does not stand in for the consumer's own acquire on MI300X. The relay is now off by default (`PassOptions.relay="off"`; run-time opt-in `ETX_RELAY=1`; the local acquire only with `ETX_RELAY_ACQ=local`, documented as unsafe). The DeepSeek-V2-Lite port keeps one reserved CU per XCD, like fleet's scheduler CU, and measures **3.76 to 3.78 ms/token against fleet's 3.557 to 3.562** on the same GPU, 32/32 tokens and 27/27 layers. That is a 6% gap. The earlier 3.70 figure (section 15.4) included 0.03 to 0.05 ms from the unsafe acquire and about 1% of VM-to-VM variation. The same binary built from that commit runs at 3.76 on this VM without the relay. Results and logs are in `examples/llm/results/`.
 
+### 15.6 Head-to-head with vLLM and with the same tiles unfused (2026-09-25, 1x MI300X)
+
+Batch 1, greedy, a 1024-token context (fleet's benchmark prompt, identical token ids for every system), per-token time = (t(32 tokens) - t(1 token)) / 31 for vLLM and the embed-to-argmax device clock for ETX. vLLM 0.27.1 (rocm/vllm container, CUDA graphs), run with and without AITER; the faster is listed. Every ETX run produced 32/32 tokens equal to Hugging Face greedy; vLLM matched too on the three Qwen models.
+
+| Model | vLLM, best of default / AITER | ETX tiles, unfused (one kernel per grid, HIP graph) | ETX megakernel | Hand-written fleet |
+|---|---|---|---|---|
+| Qwen2.5-1.5B | 1.86 ms | 4.05 ms | 4.47 ms | - |
+| Qwen3-8B | 4.91 ms | 9.45 ms | 10.07 ms | - |
+| Qwen3-30B-A3B | 4.84 ms | 9.07 ms | 10.48 ms | - |
+| DeepSeek-Coder-V2-Lite | 4.12 ms (AITER; default 6.36) | - | 3.78 ms (fleet's tiles) | 3.57 ms |
+
+Three findings.
+
+1. With tuned tiles, the compiled megakernel beats vLLM: on DeepSeek-V2-Lite, ETX with fleet's tiles runs 8% faster than vLLM with AITER, and 6% slower than the hand-written kernel.
+2. With the generic tiles of `examples/llm`, ETX runs about 2x slower than vLLM. The per-phase trace of Qwen3-8B puts the time in the tiles: GEMVs at 1.5-2.5 TB/s, attention and its merge at 25-38 us per layer. Synchronisation is about 9 us of a 274 us layer. The tiles are the gap, not the scheduling.
+3. The megakernel itself does not yet beat the same tiles launched as one kernel per grid from a HIP graph: it is 6% (dense) to 15% (MoE) slower. At batch 1 every phase needs the whole previous vector, so the graph is a chain of device-wide barriers with little to overlap. An ETX device-scope counter barrier costs about 2 us more than a graph kernel boundary on MI300X. The measurement also found a placement defect: Pass 2's affinity votes pushed 39-49 of ~300 tasks onto XCD 0 (38 workers), so some workers ran two tasks per phase and the megakernel was 25-45% slower still. Pass 2 now caps each grid at ceil(n/8) tasks per domain when the grid fits one wave, and barrier in-events no longer vote.
+
+What would change the picture: tiles of vLLM/AITER quality linked into ETX (link mode takes any HIP tile), cheaper device-wide barriers, and cross-barrier weight prefetch, the one overlap a graph of kernels cannot express. Logs: `examples/llm/results/bench_2026-09-25.log`, vLLM JSON per model in the same folder.
+
 ### 15.3 Phases of the general architecture (after M3)
 
 | Phase | Deliverable | Completion criterion |

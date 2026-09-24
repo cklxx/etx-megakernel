@@ -1,0 +1,67 @@
+
+=== 19:45:04 background: fleet bootstrap on GPU 1, vLLM image pull
+one GPU: fleet's bootstrap runs after the Qwen benchmarks
+
+=== 19:45:04 python envs and downloads
+WARNING: huggingface-hub 2.0.0 does not provide the extra 'hf-transfer'
+DL-DONE qwen2.5-1.5b
+DL-DONE qwen3-8b
+DL-DONE qwen3-30b-a3b
+PULL-DONE
+
+=== 19:53:39 prep + build qwen2.5-1.5b
+
+=== 19:54:49 prep + build qwen3-8b
+
+=== 19:56:30 prep + build qwen3-30b-a3b
+
+=== 20:01:26 ETX qwen2.5-1.5b (context 1024)
+model: H=1536 NH=12 NKV=2 HD=128 L=28 V=151936 dense  steps=1055 (prompt 1024, gen 32) run 1: 32/32 generated tokens match HF greedy mode: ETX megakernel RESULT model=/home/hotaisle/llm/qwen2.5-1.5b matched=32 gen=32 median_ms=5.793 active_GB=3.087  [qwen2.5-1.5b fused]
+model: H=1536 NH=12 NKV=2 HD=128 L=28 V=151936 dense  steps=1055 (prompt 1024, gen 32) run 1: 32/32 generated tokens match HF greedy mode: unfused (HIP graph) RESULT model=/home/hotaisle/llm/qwen2.5-1.5b matched=32 gen=32 median_ms=4.477 active_GB=3.087  [qwen2.5-1.5b unfused]
+model: H=1536 NH=12 NKV=2 HD=128 L=28 V=151936 dense  steps=1055 (prompt 1024, gen 32) run 1: 32/32 generated tokens match HF greedy mode: ETX megakernel RESULT model=/home/hotaisle/llm/qwen2.5-1.5b matched=32 gen=32 median_ms=5.490 active_GB=3.087  [qwen2.5-1.5b-nt fused]
+model: H=1536 NH=12 NKV=2 HD=128 L=28 V=151936 dense  steps=1055 (prompt 1024, gen 32) run 1: 32/32 generated tokens match HF greedy mode: unfused (HIP graph) RESULT model=/home/hotaisle/llm/qwen2.5-1.5b matched=32 gen=32 median_ms=4.189 active_GB=3.087  [qwen2.5-1.5b-nt unfused]
+teacher: run 0: 32/32 generated tokens match HF greedy (teacher-forced argmax)
+
+=== 20:02:20 ETX qwen3-8b (context 1024)
+model: H=4096 NH=32 NKV=8 HD=128 L=36 V=151936 dense  steps=1055 (prompt 1024, gen 32) run 1: 32/32 generated tokens match HF greedy mode: ETX megakernel RESULT model=/home/hotaisle/llm/qwen3-8b matched=32 gen=32 median_ms=16.871 active_GB=15.136  [qwen3-8b fused]
+model: H=4096 NH=32 NKV=8 HD=128 L=36 V=151936 dense  steps=1055 (prompt 1024, gen 32) run 1: 32/32 generated tokens match HF greedy mode: unfused (HIP graph) RESULT model=/home/hotaisle/llm/qwen3-8b matched=32 gen=32 median_ms=11.292 active_GB=15.136  [qwen3-8b unfused]
+model: H=4096 NH=32 NKV=8 HD=128 L=36 V=151936 dense  steps=1055 (prompt 1024, gen 32) run 1: 32/32 generated tokens match HF greedy mode: ETX megakernel RESULT model=/home/hotaisle/llm/qwen3-8b matched=32 gen=32 median_ms=15.308 active_GB=15.136  [qwen3-8b-nt fused]
+model: H=4096 NH=32 NKV=8 HD=128 L=36 V=151936 dense  steps=1055 (prompt 1024, gen 32) run 1: 32/32 generated tokens match HF greedy mode: unfused (HIP graph) RESULT model=/home/hotaisle/llm/qwen3-8b matched=32 gen=32 median_ms=10.522 active_GB=15.136  [qwen3-8b-nt unfused]
+teacher: run 0: 32/32 generated tokens match HF greedy (teacher-forced argmax)
+
+=== 20:04:46 ETX qwen3-30b-a3b (context 1024)
+model: H=2048 NH=32 NKV=4 HD=128 L=48 V=151936 MoE  steps=1055 (prompt 1024, gen 32) run 1: 32/32 generated tokens match HF greedy mode: ETX megakernel RESULT model=/home/hotaisle/llm/qwen3-30b-a3b matched=32 gen=32 median_ms=14.769 active_GB=6.083  [qwen3-30b-a3b fused]
+model: H=2048 NH=32 NKV=4 HD=128 L=48 V=151936 MoE  steps=1055 (prompt 1024, gen 32) run 1: 32/32 generated tokens match HF greedy mode: unfused (HIP graph) RESULT model=/home/hotaisle/llm/qwen3-30b-a3b matched=32 gen=32 median_ms=9.771 active_GB=6.083  [qwen3-30b-a3b unfused]
+model: H=2048 NH=32 NKV=4 HD=128 L=48 V=151936 MoE  steps=1055 (prompt 1024, gen 32) run 1: 32/32 generated tokens match HF greedy mode: ETX megakernel RESULT model=/home/hotaisle/llm/qwen3-30b-a3b matched=32 gen=32 median_ms=14.214 active_GB=6.083  [qwen3-30b-a3b-nt fused]
+model: H=2048 NH=32 NKV=4 HD=128 L=48 V=151936 MoE  steps=1055 (prompt 1024, gen 32) run 1: 32/32 generated tokens match HF greedy mode: unfused (HIP graph) RESULT model=/home/hotaisle/llm/qwen3-30b-a3b matched=32 gen=32 median_ms=9.271 active_GB=6.083  [qwen3-30b-a3b-nt unfused]
+teacher: run 0: 32/32 generated tokens match HF greedy (teacher-forced argmax)
+
+=== 20:07:44 vLLM qwen2.5-1.5b AITER=1
+VLLM label=qwen2.5-1.5b aiter=1 version=0.27.1.dev5+gf46a9dfe2.d20260827 context=1024 median_ms=1.859 per_token=[1.872, 1.859, 1.859] first_divergence=32/32
+
+=== 20:09:28 vLLM qwen2.5-1.5b AITER=0
+VLLM label=qwen2.5-1.5b aiter=0 version=0.27.1.dev5+gf46a9dfe2.d20260827 context=1024 median_ms=1.875 per_token=[1.922, 1.874, 1.875] first_divergence=32/32
+
+=== 20:11:00 vLLM qwen3-8b AITER=1
+VLLM label=qwen3-8b aiter=1 version=0.27.1.dev5+gf46a9dfe2.d20260827 context=1024 median_ms=5.089 per_token=[5.089, 5.094, 5.087] first_divergence=32/32
+
+=== 20:13:20 vLLM qwen3-8b AITER=0
+VLLM label=qwen3-8b aiter=0 version=0.27.1.dev5+gf46a9dfe2.d20260827 context=1024 median_ms=4.912 per_token=[4.918, 4.906, 4.912] first_divergence=32/32
+
+=== 20:15:12 vLLM qwen3-30b-a3b AITER=1
+VLLM label=qwen3-30b-a3b aiter=1 version=0.27.1.dev5+gf46a9dfe2.d20260827 context=1024 median_ms=4.916 per_token=[4.916, 4.924, 4.913] first_divergence=32/32
+
+=== 20:18:11 vLLM qwen3-30b-a3b AITER=0
+VLLM label=qwen3-30b-a3b aiter=0 version=0.27.1.dev5+gf46a9dfe2.d20260827 context=1024 median_ms=4.836 per_token=[4.836, 4.837, 4.834] first_divergence=32/32
+
+=== 20:20:39 DeepSeek-V2-Lite: wait for fleet's bootstrap
+Terminated
+fleet (GPU 1, bootstrap): per-token latency (embed -> argmax on device): median 3.572 ms  p95 3.584 ms  mean 3.573 ms  (279.9 tok/s)
+fleet (GPU 1, bootstrap): per-token latency (embed -> argmax on device): median 3.576 ms  p95 3.591 ms  mean 3.578 ms  (279.5 tok/s)
+fleet GPU0: per-token latency (embed -> argmax on device): median 3.569 ms  p95 3.584 ms  mean 3.569 ms  (280.2 tok/s)
+fleet GPU0: tokens: 32/32 match HF greedy
+  consecutive layers within the gate: 27 of 27 per-token latency (embed -> argmax on device): median 3.775 ms  mean 3.774 ms; step wall (launch to end) 3.811 ms/token  [ETX DeepSeek]
+decode: median 4.118 ms/token  mean 4.126 ms/token  (242.4 tok/s) tokens vs golden: 0/32 equal  [vLLM DeepSeek AITER=1]
+decode: median 6.360 ms/token  mean 6.380 ms/token  (156.7 tok/s) tokens vs golden: 0/32 equal  [vLLM DeepSeek AITER=0]
+
+=== 20:33:01 BENCH DONE
