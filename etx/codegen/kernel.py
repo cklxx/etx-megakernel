@@ -102,8 +102,13 @@ def _arrive_code(plan: Plan, g: TaskGrid, mode: str) -> str:
         lines.append(f"      // arrive {ev} via {m.text!r} ({sc})")
         has_dynamic_consumers = any(k[0] == ev for k in plan.ev_consumers)
         # DEVICE scope: last-arriver flush per domain (one L2 write-back per domain per coordinate)
-        arrive = (f"etx_arrive_flush_DEVICE(p, {ep.offset} + (idx), domain)" if ep.scope == Scope.DEVICE
-                  else f"etx_arrive_{sc}(p.events + {ep.offset} + (idx))")
+        shares = {v for row in ep.share.values() for v in row if v > 0}
+        if ep.scope == Scope.DEVICE and not ep.runtime_init and len(shares) == 1:
+            arrive = f"etx_arrive_flush_DEVICE_s(p, {ep.offset} + (idx), domain, {next(iter(shares))})"   # share as an immediate
+        elif ep.scope == Scope.DEVICE:
+            arrive = f"etx_arrive_flush_DEVICE(p, {ep.offset} + (idx), domain)"
+        else:
+            arrive = f"etx_arrive_{sc}(p.events + {ep.offset} + (idx))"
         if not has_dynamic_consumers:       # the producer's own mode is irrelevant: a static producer must still push dynamic consumers
             lines.append(f"#define ETX_TARGET(idx) (void){arrive}")
         else:
