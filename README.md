@@ -15,8 +15,9 @@ Repository: https://github.com/cklxx/etx-megakernel (private). Design page (the 
 `examples/dsv2lite/` is fleet-mi300x's DeepSeek-Coder-V2-Lite decode graph in
 ETX with fleet's own tile bodies linked through a shim. On one MI300X it
 decodes 32 tokens identical to HuggingFace greedy with all 27 layers inside
-fleet's per-layer gate, at **3.70 ms/token** against fleet's hand-written
-3.556 ms on the same VM. The gap closed from 54% to 4% through compiler and
+fleet's per-layer gate, at **3.76-3.78 ms/token** against fleet's hand-written
+3.557 ms on the same GPU (3.70 was measured with the relay's hierarchical acquire,
+since shown unsafe and turned off). The gap closed from 54% to 6% through compiler and
 runtime rules (last-arriver flush, agent-scope polling, in-body q_c wait, one
 acquire per workgroup, one call site per tile body, a lean all-static loop,
 per-grid immediates, a per-XCD relay with hierarchical acquire, and a
@@ -28,6 +29,21 @@ bash examples/dsv2lite/build.sh /path/to/fleet-mi300x      # needs hipcc + fleet
 cd /path/to/fleet-mi300x && /path/to/etx/build/dsv2lite/run --tokens 32 --context 1024 --repeat 2
 ETX_TRACE=1 .../run --tokens 4          # per-phase timeline (wait / body / first-ready / last-done per task type)
 ```
+
+## More models, same compiler (2026-09-24)
+
+`examples/llm` builds the graph from a Hugging Face `config.json` and runs one set of generic
+batch-1 tiles, with no model-specific runtime code. Results on one MI300X, against Hugging Face
+greedy decoding (bf16, 32 tokens), deterministic over three runs:
+
+| Model | Teacher-forced argmax | Free-running | ms/token |
+|---|---|---|---|
+| Qwen2.5-1.5B (dense, QKV bias, tied) | 31/32 (the miss is an exact HF tie) | 24/32, diverging at that tie | 5.11 |
+| Qwen3-8B (dense, q/k norm) | 32/32 | 32/32 | 13.4 |
+| Qwen3-30B-A3B (MoE, 128 experts, top-8) | 32/32 | 32/32 | 14.4 |
+
+The tiles are general, not tuned. On a fresh VM, `bash examples/llm/vm_run.sh` prepares, builds
+and runs all three.
 
 ## Starting point (reworked 2026-09-23)
 

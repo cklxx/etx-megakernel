@@ -1,0 +1,80 @@
+
+=== 14:16:29 python envs
+WARNING: huggingface-hub 2.0.0 does not provide the extra 'hf-transfer'
+
+=== 14:17:02 downloads (background, parallel)
+torch 2.10.0+rocm7.0 True transformers 4.57.6
+DL-DONE qwen2.5-1.5b
+DL-DONE qwen3-8b
+DL-DONE qwen3-30b-a3b
+
+=== 14:20:40 prep qwen2.5-1.5b
+`torch_dtype` is deprecated! Use `dtype` instead!
+HF greedy: ' developed the first transistor. The transistor was a revolutionary invention that would change the world. It was a device that could amplify and switch electronic signals and was the first'
+  packed layer 1/28  packed layer 2/28  packed layer 3/28  packed layer 4/28  packed layer 5/28  packed layer 6/28  packed layer 7/28  packed layer 8/28  packed layer 9/28  packed layer 10/28  packed layer 11/28  packed layer 12/28  packed layer 13/28  packed layer 14/28  packed layer 15/28  packed layer 16/28  packed layer 17/28  packed layer 18/28  packed layer 19/28  packed layer 20/28  packed layer 21/28  packed layer 22/28  packed layer 23/28  packed layer 24/28  packed layer 25/28  packed layer 26/28  packed layer 27/28  packed layer 28/28
+packed 3.09 GB; active per token 3.09 GB
+
+=== 14:21:04 build qwen2.5-1.5b
+  devices=1 domains/device=8 workers/domain=37 (wg/CU=1)
+  tasks=27737 events=199 eliminated=[]
+
+=== 14:21:25 run qwen2.5-1.5b (free-running)
+weights: 3.09 GB
+etx: 27737 tasks, 255 event words, 296 workers (8 domains x 37), lds 39936 B
+run 0: 9/32 generated tokens match HF greedy; first divergence at 7 (HF top-1 margin there 0.3750)
+run 1: 8/32 generated tokens match HF greedy; first divergence at 0 (HF top-1 margin there 0.2500)
+per-token latency (embed -> argmax on device): median 5.699 ms  min 5.344  max 5.946; weights 3.09 GB -> 542 GB/s effective
+RESULT model=/home/hotaisle/llm/qwen2.5-1.5b matched=8 gen=32 median_ms=5.699 active_GB=3.087
+
+=== 14:21:27 run qwen2.5-1.5b (teacher-forced)
+run 0: 26/32 generated tokens match HF greedy (teacher-forced argmax); first divergence at 4 (HF top-1 margin there 0.3750)
+per-token latency (embed -> argmax on device): median 5.686 ms  min 5.343  max 5.922; weights 3.09 GB -> 543 GB/s effective
+RESULT model=/home/hotaisle/llm/qwen2.5-1.5b matched=26 gen=32 median_ms=5.686 active_GB=3.087
+
+=== 14:21:28 prep qwen3-8b
+The following generation flags are not valid and may be ignored: ['temperature', 'top_p', 'top_k']. Set `TRANSFORMERS_VERBOSITY=info` for more details.
+HF greedy: ' discovered the point-contact transistor. The invention was announced to the public on June 1947. The first transistors were made of germanium,'
+  packed layer 1/36  packed layer 2/36  packed layer 3/36  packed layer 4/36  packed layer 5/36  packed layer 6/36  packed layer 7/36  packed layer 8/36  packed layer 9/36  packed layer 10/36  packed layer 11/36  packed layer 12/36  packed layer 13/36  packed layer 14/36  packed layer 15/36  packed layer 16/36  packed layer 17/36  packed layer 18/36  packed layer 19/36  packed layer 20/36  packed layer 21/36  packed layer 22/36  packed layer 23/36  packed layer 24/36  packed layer 25/36  packed layer 26/36  packed layer 27/36  packed layer 28/36  packed layer 29/36  packed layer 30/36  packed layer 31/36  packed layer 32/36  packed layer 33/36  packed layer 34/36  packed layer 35/36  packed layer 36/36
+packed 16.38 GB; active per token 15.14 GB
+
+=== 14:22:11 build qwen3-8b
+  devices=1 domains/device=8 workers/domain=37 (wg/CU=1)
+  tasks=45513 events=255 eliminated=[]
+
+=== 14:22:38 run qwen3-8b (free-running)
+weights: 16.38 GB
+etx: 45513 tasks, 759 event words, 296 workers (8 domains x 37), lds 53248 B
+run 0: 32/32 generated tokens match HF greedy
+run 1: 32/32 generated tokens match HF greedy
+per-token latency (embed -> argmax on device): median 15.578 ms  min 15.361  max 15.762; weights 16.38 GB -> 972 GB/s effective
+RESULT model=/home/hotaisle/llm/qwen3-8b matched=32 gen=32 median_ms=15.578 active_GB=15.136
+
+=== 14:22:43 run qwen3-8b (teacher-forced)
+run 0: 32/32 generated tokens match HF greedy (teacher-forced argmax)
+per-token latency (embed -> argmax on device): median 15.595 ms  min 15.301  max 15.772; weights 16.38 GB -> 971 GB/s effective
+RESULT model=/home/hotaisle/llm/qwen3-8b matched=32 gen=32 median_ms=15.595 active_GB=15.136
+
+=== 14:22:48 prep qwen3-30b-a3b
+The following generation flags are not valid and may be ignored: ['temperature', 'top_p', 'top_k']. Set `TRANSFORMERS_VERBOSITY=info` for more details.
+HF greedy: ' developed the first working transistor. The transistor is a semiconductor device that can amplify or switch electronic signals and electrical power. It is the fundamental building block of modern electronic'
+  packed layer 1/48  packed layer 2/48  packed layer 3/48  packed layer 4/48  packed layer 5/48  packed layer 6/48  packed layer 7/48  packed layer 8/48  packed layer 9/48  packed layer 10/48  packed layer 11/48  packed layer 12/48  packed layer 13/48  packed layer 14/48  packed layer 15/48  packed layer 16/48  packed layer 17/48  packed layer 18/48  packed layer 19/48  packed layer 20/48  packed layer 21/48  packed layer 22/48  packed layer 23/48  packed layer 24/48  packed layer 25/48  packed layer 26/48  packed layer 27/48  packed layer 28/48  packed layer 29/48  packed layer 30/48  packed layer 31/48  packed layer 32/48  packed layer 33/48  packed layer 34/48  packed layer 35/48  packed layer 36/48  packed layer 37/48  packed layer 38/48  packed layer 39/48  packed layer 40/48  packed layer 41/48  packed layer 42/48  packed layer 43/48  packed layer 44/48  packed layer 45/48  packed layer 46/48  packed layer 47/48  packed layer 48/48
+packed 61.06 GB; active per token 6.08 GB
+
+=== 14:25:32 build qwen3-30b-a3b
+  devices=1 domains/device=8 workers/domain=75 (wg/CU=2)
+  tasks=102884 events=387 eliminated=[]
+
+=== 14:26:35 run qwen3-30b-a3b (free-running)
+weights: 61.06 GB
+etx: 102884 tasks, 675 event words, 600 workers (8 domains x 75), lds 28672 B
+run 0: 32/32 generated tokens match HF greedy
+run 1: 32/32 generated tokens match HF greedy
+per-token latency (embed -> argmax on device): median 16.975 ms  min 16.322  max 17.555; weights 61.06 GB -> 358 GB/s effective
+RESULT model=/home/hotaisle/llm/qwen3-30b-a3b matched=32 gen=32 median_ms=16.975 active_GB=6.083
+
+=== 14:26:50 run qwen3-30b-a3b (teacher-forced)
+run 0: 32/32 generated tokens match HF greedy (teacher-forced argmax)
+per-token latency (embed -> argmax on device): median 16.961 ms  min 16.301  max 17.556; weights 61.06 GB -> 359 GB/s effective
+RESULT model=/home/hotaisle/llm/qwen3-30b-a3b matched=32 gen=32 median_ms=16.961 active_GB=6.083
+
+=== 14:27:04 ALL DONE

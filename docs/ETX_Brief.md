@@ -1,13 +1,14 @@
 # ETX: Dynamic GPU Megakernels from One Compiler (Brief)
 
-Author: Kailun Chen · Status: v0.4, measured on AMD MI300X · Date: 2026-09-23 · Full design: `docs/ETX_Technical_Design.pdf` · Repository: github.com/cklxx/etx-megakernel (private)
+Author: Kailun Chen · Status: v0.5, measured on AMD MI300X · Date: 2026-09-24 · Full design: `docs/ETX_Technical_Design.pdf` · Repository: github.com/cklxx/etx-megakernel (private)
 
 ## 0. Summary
 
 - ETX is a compiler that fuses a graph of tile-level operators into one persistent GPU kernel. It is DSL-agnostic: tile bodies come from Triton, TileLang, CK, CuTe or hand-written HIP/CUDA. It is chiplet-aware: MI300X's eight XCDs are a first-class part of the machine model. Dynamic workloads (MoE routing, variable shapes) remain inputs to the schedule, not reasons to fall back to separate kernels.
 - It adopts the Event Tensor abstraction of the ETC paper (arXiv 2604.13327) and adds two things the paper lacks: an explicit machine model, with hardware differences expressed only as data, and a cost model that chooses static, dynamic or hybrid scheduling per subgraph and prints its reasons.
 - The proof is deliberately narrow: one real model on one machine against a known hand-written result. The target is DeepSeek-Coder-V2-Lite at batch 1 on one MI300X, where the hand-written fleet-mi300x megakernel runs at 3.556 ms/token.
-- **Result:** ETX, driving fleet's unchanged tile bodies through a shim, decodes 32/32 tokens identical to HuggingFace greedy with all 27 layers inside the accuracy gate, at **3.70 ms/token**. That is within 4% of the hand-written kernel, down from 5.42 ms at first light. Every tile body now runs as fast as fleet's or faster. The remaining 4% is in three phase handoffs per layer.
+- **Result:** ETX, driving fleet's unchanged tile bodies through a shim, decodes 32/32 tokens identical to HuggingFace greedy with all 27 layers inside the accuracy gate, at **3.76-3.78 ms/token** with the safe runtime. That is within 6% of the hand-written kernel (3.557 ms on the same GPU), down from 5.42 ms at first light. An earlier 3.70 figure relied on a relay optimisation later shown unsafe; it is now off.
+- **Generalisation:** three more models run from their Hugging Face configs with one set of generic tiles and no model-specific runtime code, deterministic and matching HF greedy: Qwen3-8B and Qwen3-30B-A3B (MoE) 32/32 tokens, Qwen2.5-1.5B 31/32 teacher-forced, where the one miss is an exact tie in HF's own logits.
 - Baselines requested by review are measured: launch, empty-loop and unfused costs; per-step fixed cost reduced from 101 us to 12-23 us; cross-device sync of about 1 us one-way when idle, 2-3 us under load.
 
 ## 1. Problem
@@ -56,7 +57,7 @@ A fused kernel has two lower bounds: bytes moved divided by bandwidth, and the c
 
 The v0.3 fixed cost came from a per-task completion atomic and atomic idle polling, about 15 us per task slot. v0.4 counts only dynamic tasks, exits when the static queue drains, and polls with plain scoped loads.
 
-### 3.2 The real model: progression to 3.70 ms/token
+### 3.2 The real model: progression to 3.76 ms/token
 
 Same model, same VM class, fleet's tile code unchanged. Each row adds one compiler or runtime rule.
 
@@ -68,22 +69,39 @@ Same model, same VM class, fleet's tile code unchanged. Each row adds one compil
 | In-body q_c wait | Attention waits for q_c inside its body, as fleet does | 4.49 |
 | One acquire per workgroup | The L2 invalidate issued once, not by all four waves | 4.09 |
 | One call site per tile body; lean static loop; layer as immediate | Emitter restructured into wait switch, single body call, arrive switch | 3.90 |
-| Whole-program device build | No `-fgpu-rdc`; scratch 112 to 0 B/lane | **3.70** |
-| Fleet, hand-written, same VM | | 3.556 |
+| Whole-program device build | No `-fgpu-rdc`; scratch 112 to 0 B/lane | 3.70 |
+| Relay's hierarchical acquire removed (unsafe, section 3.5) | Consumers do their own full acquire; one CU per XCD stays reserved | **3.76-3.78** |
+| Fleet, hand-written, same GPU | | 3.557 |
 
 Levers measured and found neutral or worse on this model:
 
-- **Per-XCD relay of global counters:** neutral (3.90 vs 3.88). It is kept because it only breaks even through its hierarchical acquire; with a per-consumer L2 invalidate under the relay the time was 4.04.
+- **Per-XCD relay of global counters:** neutral (3.90 vs 3.88), and only through its hierarchical acquire, which later proved unsafe. With a per-consumer L2 invalidate under the relay the time was 4.04. It is off by default.
 - **Fleet parameters in constant memory:** no measurable effect.
 - **Poll backoff:** `s_sleep` values 1, 3 and 8 gave 3.74, 3.73 and 3.71; 8 is the default.
-- **38 workers per XCD without a relay:** 3.78, slower than 37 plus relay.
+- **38 workers per XCD instead of 37 plus one reserved CU:** slower (3.78 vs 3.72 on that VM).
 - **Descriptors staged in LDS:** 3.72, reverted.
 
-### 3.3 Where the last 4% is
+### 3.3 Where the remaining gap is
 
 Traced layer span is 130.8 us against fleet's 126.9 us. Per-task body times now match or beat fleet's (router 8.5 vs 10.7 us, gate_up 31.3 vs 33.6, down 16.1 vs 18.0, qkv 18.6 vs 17.1). The gap is in three handoffs per layer, after o_proj, the router and down, each 2-3 us where fleet shows about 1 us. Fleet also decodes 32 tokens in one launch with epoch counters; ETX launches once per token.
 
-### 3.4 Other examples on hardware
+### 3.4 More models from Hugging Face configs (M4)
+
+`examples/llm` builds the graph from `config.json` and runs one set of generic batch-1 tiles. The reference is Hugging Face greedy decoding (bf16, 32 tokens, unconstrained) on the same prompt. All results are deterministic over three runs, and the compiler chose static scheduling for every grid.
+
+| Model | Structure | Teacher-forced argmax | Free-running | ms/token |
+|---|---|---|---|---|
+| Qwen2.5-1.5B | dense, GQA 12/2, QKV bias, tied embeddings | 31/32; the miss is an exact HF tie | 24/32, diverging at that tie | 5.11 |
+| Qwen3-8B | dense, GQA 32/8, q/k norm | 32/32 | 32/32 | 13.4 |
+| Qwen3-30B-A3B | MoE, 128 experts, top-8 | 32/32 | 32/32 | 14.4 |
+
+The tiles are general, not tuned; the time goes to latency-bound GEMV bodies on small tasks, not to synchronisation.
+
+### 3.5 A runtime defect found by the new models
+
+With the per-XCD relay, the relay invalidated its XCD's L2 once and consumers dropped only their L1. That made Qwen2.5-1.5B nondeterministic: different tokens on every run. Tokens were deterministic with the relay off, and with the relay on but every consumer doing its own full acquire. So a remote L2 invalidate does not replace the consumer's own acquire on MI300X. The relay is now off by default. DeepSeek-V2-Lite and Qwen3-8B had not exposed it.
+
+### 3.6 Other examples on hardware
 
 | Example | Result |
 |---|---|
@@ -100,6 +118,7 @@ These defects and costs were invisible in simulation. Each is now a pass rule, r
 - **Scope:** grids scheduled across XCDs need device-scope events. A domain-scope event under global scheduling returned stale data.
 - **Signals:** one L2 write-back per XCD per global event (last-arriver flush); one acquire per workgroup, not per wave; poll with agent-scope atomics, because a poll that is faster idle can be slower under load.
 - **Code shape:** each tile body must have one call site. A non-inlined helper taking the parameter block by reference spills the whole block to scratch. Each of these cost about 0.2 ms/token, more than any synchronisation choice.
+- **Acquire:** each consumer performs its own device-scope acquire; a relay's invalidate on its behalf is not enough (section 3.5).
 - **Placement:** discover the workgroup-to-XCD mapping from the hardware ID register. It was (k+6) mod 8, not the documented round-robin.
 
 ## 5. Status and Next Steps
@@ -109,19 +128,19 @@ These defects and costs were invisible in simulation. Each is now a pass rule, r
 | M0 Baselines | Done |
 | M1 Fleet graph in ETX | Done |
 | M2 Fleet tiles through the shim, HF-exact | Done |
-| M3 Match fleet within 3% | 4% (3.70 vs 3.556 ms/token) |
-| M4 Generalise | Not started |
+| M3 Match fleet within 3% | 6% (3.76-3.78 vs 3.557 ms/token) |
+| M4 Generalise | Started: three more models from HF configs, HF-matching, generic tiles |
 
 Next, in order:
 
-1. **Close M3:** multi-token launches with epoch counters instead of per-step resets, then the three remaining handoffs.
-2. **M4, generalise:**
-   - a second model, dense or a larger MoE, with ETX-scheduled but not hand-placed tasks;
+1. **Close M3:** the qkv body (about 2 us per layer) and the merge to o_proj handoff (about 1.5 us). Multi-token launches are not a lever: fleet measured one launch per token at 3.665 vs 3.660 ms.
+2. **M4, generalise further:**
+   - tuned tiles for the generic models (they run at 10-28% of HBM bandwidth), then a comparison with vLLM;
    - per-worker queues for the dynamic path, which costs about 50 us per task slot today;
    - a second architecture from YAML only (gfx950 or an NVIDIA machine; the CUDA backend is untested).
 
 Main risks:
 
-- **Tile bodies are borrowed, not generated.** The 3.70 result reuses fleet's tuned tiles. A fusion-gain figure for arbitrary models needs tuned tiles from a DSL frontend.
+- **Tile bodies are borrowed, not generated.** The DeepSeek result reuses fleet's tuned tiles; the generic tiles are correct but slow. A fusion-gain figure for arbitrary models needs tuned tiles from a DSL frontend.
 - **The dynamic path is expensive.** On short tasks its queue overhead exceeds the gain, so the cost model must keep choosing static where it applies.
 - **Portability claims are untested beyond MI300X.**
