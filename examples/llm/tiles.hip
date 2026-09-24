@@ -48,6 +48,34 @@ template <class Epi>
 static __device__ __forceinline__ void gemv_rows(const __hip_bfloat16* __restrict__ W, int K, const float* xs, int r0, int r1, float* part, Epi epi) {
   constexpr int R = 8, STEP = ETX_WAVE_SIZE * 8;
   const int lane = etx_lane(), wv = etx_wave(), nw = etx_nwaves(), nrt = r1 - r0;
+  if (nrt >= 8) {                         // enough rows: rows to waves, 4 at a time (measured faster on the dense models)
+    for (int base = r0 + wv * 4; base < r1; base += nw * 4) {
+      const int nr = min(4, r1 - base);
+      float acc[4] = {0.f, 0.f, 0.f, 0.f};
+      const __hip_bfloat16* w0 = W + (size_t)base * K;
+#pragma unroll 2
+      for (int k = lane * 8; k < K; k += STEP) {
+        float xv[8];
+        const float4 a = *(const float4*)(xs + k), b = *(const float4*)(xs + k + 4);
+        xv[0] = a.x; xv[1] = a.y; xv[2] = a.z; xv[3] = a.w; xv[4] = b.x; xv[5] = b.y; xv[6] = b.z; xv[7] = b.w;
+        uint4 w4[4];
+#pragma unroll
+        for (int j = 0; j < 4; ++j) if (j < nr) w4[j] = *(const uint4*)(w0 + (size_t)j * K + k);
+#pragma unroll
+        for (int j = 0; j < 4; ++j) if (j < nr) acc[j] += dot8(w4[j], xv);
+      }
+#pragma unroll
+      for (int j = 0; j < 4; ++j) {
+        const float v = etx_wave_sum(acc[j]);
+        if (j < nr && lane == 0) part[(base - r0) + j] = v;
+      }
+    }
+    __syncthreads();
+    for (int r = r0 + (int)threadIdx.x; r < r1; r += blockDim.x) epi(r, part[r - r0]);
+    __syncthreads();
+    return;
+  }
+  // few rows: split K across the waves so all four keep loads in flight
   const int kq = ((K + nw * STEP - 1) / (nw * STEP)) * STEP;
   const int kb = wv * kq, ke = min(K, kb + kq);
   for (int base = r0; base < r1; base += R) {
