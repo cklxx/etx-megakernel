@@ -30,7 +30,10 @@ for m in "${MODELS[@]}"; do set -- $m; tail -1 /tmp/dl_$2.log; done
 
 for m in "${MODELS[@]}"; do set -- $m
   log "prep $2"
-  python3 examples/llm/prep.py --model "$1" --out ~/llm/$2 --gen $GEN 2>&1 | grep -vE "Loading checkpoint|it/s\]|^\s*$" | tail -4
+  grep -q "DL-DONE $2" /tmp/dl_$2.log || { echo "download of $2 incomplete, prep retries it"; tail -3 /tmp/dl_$2.log; }
+  python3 examples/llm/prep.py --model "$1" --out ~/llm/$2 --gen $GEN > /tmp/prep_$2.log 2>&1; rc=$?
+  grep -vE "Loading checkpoint|it/s\]|^\s*$" /tmp/prep_$2.log | tail -4
+  if [ "$rc" != 0 ] || [ ! -f ~/llm/$2/golden.txt ] || [ ! -f ~/llm/$2/llm.manifest ]; then echo "PREP FAILED $2 (rc=$rc)"; continue; fi
   log "build $2"
   bash examples/llm/build.sh ~/llm/$2 > /tmp/build_$2.log 2>&1 || { echo "BUILD FAILED"; grep -E "error" /tmp/build_$2.log | head -20; continue; }
   grep -E "tasks=|workers" /tmp/build_$2.log

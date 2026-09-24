@@ -30,7 +30,7 @@ def reference(src: Path, prompt: str, gen: int):
     model.eval()
     ids = tok(prompt, return_tensors="pt").input_ids.cuda()
     with torch.no_grad():
-        out = model.generate(ids, max_new_tokens=gen, min_new_tokens=gen, do_sample=False, num_beams=1,
+        out = model.generate(ids, max_new_tokens=gen, do_sample=False, num_beams=1, eos_token_id=None,   # unconstrained greedy, like the device argmax
                              pad_token_id=tok.eos_token_id)
         full = out[:, : ids.shape[1] + gen]
         logits = model(full).logits[0].float()                 # teacher-forced logits for the margins
@@ -115,7 +115,7 @@ def main():
     a = ap.parse_args()
     out = Path(os.path.expanduser(a.out)); out.mkdir(parents=True, exist_ok=True)
     src = Path(a.src) if a.src else out / "hf"
-    if not (src / "config.json").exists():
+    if not a.src:                                   # idempotent: completes a partial snapshot
         from huggingface_hub import snapshot_download
         snapshot_download(a.model, local_dir=src, allow_patterns=["*.json", "*.safetensors", "tokenizer*", "*.txt", "*.model"], max_workers=16)
     cfg = json.loads((src / "config.json").read_text())
