@@ -39,32 +39,47 @@ static __device__ __forceinline__ float dot8(uint4 w, const float* x) {
   return s;
 }
 
-// rows [r0, r1) of a row-major bf16 matrix W with K columns, times xs (fp32, LDS). Each wave takes
-// groups of 4 rows; lane 0 of the wave calls epi(row, dot) for each finished row.
+// rows [r0, r1) of a row-major bf16 matrix W with K columns, times xs (fp32, LDS). K is split across
+// the waves (every wave streams all rows of the task over its K slice, 8 rows at a time, so all four
+// waves keep loads in flight even for a handful of rows); the per-wave partials meet in `part`
+// (LDS, >= nwaves * (r1 - r0) floats) and are summed in wave order (deterministic). epi(row, dot) is
+// then called once per row, by one thread each.
 template <class Epi>
-static __device__ __forceinline__ void gemv_rows(const __hip_bfloat16* __restrict__ W, int K, const float* xs, int r0, int r1, Epi epi) {
-  const int lane = etx_lane(), nw = etx_nwaves();
-  for (int base = r0 + etx_wave() * 4; base < r1; base += nw * 4) {
-    const int nr = min(4, r1 - base);
-    float acc[4] = {0.f, 0.f, 0.f, 0.f};
+static __device__ __forceinline__ void gemv_rows(const __hip_bfloat16* __restrict__ W, int K, const float* xs, int r0, int r1, float* part, Epi epi) {
+  constexpr int R = 8, STEP = ETX_WAVE_SIZE * 8;
+  const int lane = etx_lane(), wv = etx_wave(), nw = etx_nwaves(), nrt = r1 - r0;
+  const int kq = ((K + nw * STEP - 1) / (nw * STEP)) * STEP;
+  const int kb = wv * kq, ke = min(K, kb + kq);
+  for (int base = r0; base < r1; base += R) {
+    const int nr = min(R, r1 - base);
+    float acc[R];
+#pragma unroll
+    for (int j = 0; j < R; ++j) acc[j] = 0.f;
     const __hip_bfloat16* w0 = W + (size_t)base * K;
 #pragma unroll 2
-    for (int k = lane * 8; k < K; k += ETX_WAVE_SIZE * 8) {
+    for (int k = kb + lane * 8; k < ke; k += STEP) {
       float xv[8];
       const float4 a = *(const float4*)(xs + k), b = *(const float4*)(xs + k + 4);
       xv[0] = a.x; xv[1] = a.y; xv[2] = a.z; xv[3] = a.w; xv[4] = b.x; xv[5] = b.y; xv[6] = b.z; xv[7] = b.w;
-      uint4 wv[4];
+      uint4 wv8[R];
 #pragma unroll
-      for (int j = 0; j < 4; ++j) if (j < nr) wv[j] = *(const uint4*)(w0 + (size_t)j * K + k);
+      for (int j = 0; j < R; ++j) if (j < nr) wv8[j] = *(const uint4*)(w0 + (size_t)j * K + k);
 #pragma unroll
-      for (int j = 0; j < 4; ++j) if (j < nr) acc[j] += dot8(wv[j], xv);
+      for (int j = 0; j < R; ++j) if (j < nr) acc[j] += dot8(wv8[j], xv);
     }
 #pragma unroll
-    for (int j = 0; j < 4; ++j) {
+    for (int j = 0; j < R; ++j) {
       const float v = etx_wave_sum(acc[j]);
-      if (j < nr && lane == 0) epi(base + j, v);
+      if (j < nr && lane == 0) part[wv * nrt + (base - r0) + j] = v;
     }
   }
+  __syncthreads();
+  for (int r = r0 + (int)threadIdx.x; r < r1; r += blockDim.x) {
+    float v = 0.f;
+    for (int w = 0; w < nw; ++w) v += part[w * nrt + (r - r0)];
+    epi(r, v);
+  }
+  __syncthreads();
 }
 
 // HF Qwen2RMSNorm in bf16: weight * bf16(x * rsqrt(mean(x^2) + eps)), rounded again after the weight.
@@ -101,7 +116,7 @@ extern "C" __device__ void llm_lmhead(const etx_ctx* c) {
   rmsnorm_to(P.x, P.final_norm, P.H, xs, red);
   int r1; const int r0 = task_rows(c->coord[0], P.rpt_lm, P.V, &r1);
   const __hip_bfloat16* W = P.tie ? P.embed : P.lm_head;
-  gemv_rows(W, P.H, xs, r0, r1, [&](int r, float v) { lv[r - r0] = bfr(v); });
+  gemv_rows(W, P.H, xs, r0, r1, lv + P.rpt_lm, [&](int r, float v) { lv[r - r0] = bfr(v); });
   __syncthreads();
   if (etx_wave() == 0) {                 // argmax over this task's rows, ties -> lowest row (torch.argmax)
     float bv = -INFINITY; int bi = 0x7fffffff;
@@ -143,7 +158,7 @@ extern "C" __device__ void llm_qkv(const etx_ctx* c) {
   const int nqkv = (P.NH + 2 * P.NKV) * P.HD;
   int r1; const int r0 = task_rows(c->coord[0], P.rpt_qkv, nqkv, &r1);
   const __hip_bfloat16* b = Ly.bqkv;
-  gemv_rows(Ly.wqkv, P.H, xs, r0, r1, [&](int r, float v) { P.qkv[r] = bfr(v + (b ? etx_b2f(b[r]) : 0.f)); });
+  gemv_rows(Ly.wqkv, P.H, xs, r0, r1, xs + P.H, [&](int r, float v) { P.qkv[r] = bfr(v + (b ? etx_b2f(b[r]) : 0.f)); });
 }
 
 // q/k post-processing of one head: optional per-head RMSNorm, then RoPE (rotate_half), each product in bf16
@@ -255,7 +270,7 @@ extern "C" __device__ void llm_oproj(const etx_ctx* c) {
   const int K = P.NH * P.HD;
   copy_to(P.o, K, xs);
   int r1; const int r0 = task_rows(c->coord[0], P.rpt_o, P.H, &r1);
-  gemv_rows(Ly.wo, K, xs, r0, r1, [&](int r, float v) { P.x[r] = bfr(P.x[r] + bfr(v)); });
+  gemv_rows(Ly.wo, K, xs, r0, r1, xs + K, [&](int r, float v) { P.x[r] = bfr(P.x[r] + bfr(v)); });
 }
 
 // ---------------------------------------------------------------- dense MLP
@@ -265,9 +280,8 @@ extern "C" __device__ void llm_gateup(const etx_ctx* c) {
   float* gtmp = red + 64;                 // up to 192 rows per task
   rmsnorm_to(P.x, Ly.ln2, P.H, xs, red);
   int r1; const int r0 = task_rows(c->coord[0], P.rpt_gu, P.INTER, &r1);
-  gemv_rows(Ly.wg, P.H, xs, r0, r1, [&](int r, float v) { gtmp[r - r0] = bfr(v); });
-  __syncthreads();
-  gemv_rows(Ly.wu, P.H, xs, r0, r1, [&](int r, float v) { P.h[r] = bfr(bfr(silu(gtmp[r - r0])) * bfr(v)); });
+  gemv_rows(Ly.wg, P.H, xs, r0, r1, xs + P.H, [&](int r, float v) { gtmp[r - r0] = bfr(v); });
+  gemv_rows(Ly.wu, P.H, xs, r0, r1, xs + P.H, [&](int r, float v) { P.h[r] = bfr(bfr(silu(gtmp[r - r0])) * bfr(v)); });
 }
 
 extern "C" __device__ void llm_down(const etx_ctx* c) {
@@ -275,7 +289,7 @@ extern "C" __device__ void llm_down(const etx_ctx* c) {
   float* xs = LLM_VEC(c);
   copy_to(P.h, P.INTER, xs);
   int r1; const int r0 = task_rows(c->coord[0], P.rpt_dn, P.H, &r1);
-  gemv_rows(Ly.wd, P.INTER, xs, r0, r1, [&](int r, float v) { P.x[r] = bfr(P.x[r] + bfr(v)); });
+  gemv_rows(Ly.wd, P.INTER, xs, r0, r1, xs + P.INTER, [&](int r, float v) { P.x[r] = bfr(P.x[r] + bfr(v)); });
 }
 
 // ---------------------------------------------------------------- MoE
@@ -284,7 +298,7 @@ extern "C" __device__ void llm_router(const etx_ctx* c) {
   float* xs = LLM_VEC(c);
   rmsnorm_to(P.x, Ly.ln2, P.H, xs, LLM_RED(c));
   int r1; const int r0 = task_rows(c->coord[0], P.rpt_r, P.E, &r1);
-  gemv_rows(Ly.wr, P.H, xs, r0, r1, [&](int r, float v) { P.rlogits[r] = bfr(v); });
+  gemv_rows(Ly.wr, P.H, xs, r0, r1, xs + P.H, [&](int r, float v) { P.rlogits[r] = bfr(v); });
 }
 
 // Every expert task recomputes the token's routing from the E logits (one wave; E <= 256):
@@ -331,9 +345,8 @@ extern "C" __device__ void llm_egu(const etx_ctx* c) {
   rmsnorm_to(P.x, Ly.ln2, P.H, xs, red);
   int r1; const int r0 = task_rows(c->coord[1], P.rpt_egu, P.MI, &r1);
   const size_t eoff = (size_t)e * P.MI * P.H;
-  gemv_rows(Ly.eg + eoff, P.H, xs, r0, r1, [&](int r, float v) { gtmp[r - r0] = bfr(v); });
-  __syncthreads();
-  gemv_rows(Ly.eu + eoff, P.H, xs, r0, r1, [&](int r, float v) { P.hexp[(size_t)s * P.MI + r] = bfr(bfr(silu(gtmp[r - r0])) * bfr(v)); });
+  gemv_rows(Ly.eg + eoff, P.H, xs, r0, r1, xs + P.H, [&](int r, float v) { gtmp[r - r0] = bfr(v); });
+  gemv_rows(Ly.eu + eoff, P.H, xs, r0, r1, xs + P.H, [&](int r, float v) { P.hexp[(size_t)s * P.MI + r] = bfr(bfr(silu(gtmp[r - r0])) * bfr(v)); });
 }
 
 // rows of x: x[r] += sum over the token's experts in ascending id of bf16(bf16(down_e . h_s) * w_s)
@@ -352,9 +365,8 @@ extern "C" __device__ void llm_edn(const etx_ctx* c) {
   int r1; const int r0 = task_rows(c->coord[0], P.rpt_edn, P.H, &r1);
   const int nr = r1 - r0;
   for (int s = 0; s < P.TOPK; ++s)
-    gemv_rows(Ly.ed + (size_t)ids[s] * P.H * P.MI, P.MI, xs + (size_t)s * P.MI, r0, r1,
+    gemv_rows(Ly.ed + (size_t)ids[s] * P.H * P.MI, P.MI, xs + (size_t)s * P.MI, r0, r1, xs + (size_t)P.TOPK * P.MI,
               [&](int r, float v) { ys[s * nr + (r - r0)] = bfr(bfr(v) * wts[s]); });
-  __syncthreads();
   for (int r = r0 + threadIdx.x; r < r1; r += blockDim.x) {
     float acc = 0.f;
     for (int t = 0; t < P.TOPK; ++t) acc = bfr(acc + ys[order[t] * nr + (r - r0)]);

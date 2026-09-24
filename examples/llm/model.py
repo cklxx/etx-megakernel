@@ -37,8 +37,8 @@ from etx.ir import Graph, Resource
 T = "examples/llm/tiles.hip"
 HERE = Path(__file__).resolve().parent
 WORKERS = 304              # 8 XCDs x 38 CUs (default when the LDS allows one workgroup per CU)
-CTX = int(os.environ.get("ETX_LLM_CTX", "2048"))
-CHUNK = 128                # attention chunk (positions per task)
+CTX = int(os.environ.get("ETX_LLM_CTX", "1024"))
+CHUNK = int(os.environ.get("ETX_LLM_CHUNK", "32"))   # attention chunk (positions per task); small so short contexts still spread
 HBM_BPS = 4.0e12           # for the duration estimates only
 
 
@@ -116,9 +116,22 @@ def partition(d: Dims) -> dict[str, int]:
     return p
 
 
+def _ctx_chunk() -> tuple[int, int]:
+    """CTX / CHUNK the host will use: from llm.manifest next to the config when it exists (prep.py wrote it)."""
+    cfg = os.environ.get("ETX_LLM_CONFIG")
+    if cfg:
+        man = Path(cfg).parent / "llm.manifest"
+        if man.exists():
+            kv = dict(l.split()[1:3] for l in man.read_text().splitlines() if l.startswith("cfg "))
+            return int(float(kv["CTX"])), int(float(kv["CHUNK"]))
+    return CTX, CHUNK
+
+
 def lds_bytes(d: Dims) -> int:
+    """Input vector + GEMV partials (4 waves x rows per task) + attention scratch, in floats, plus 4 KB."""
     vec = max(d.H, d.NH * d.HD, d.INTER if not d.moe else 0, d.TOPK * d.MI)
-    return vec * 4 + 4096
+    part = 4 * 520                        # largest task: lm_head rows (<= 516) x 4 waves; lm_head also keeps its logits
+    return (max(vec + 4 * 64, d.H + 520 + part)) * 4 + 4096
 
 
 def _us(nbytes: float, tasks: int) -> float:
@@ -128,7 +141,8 @@ def _us(nbytes: float, tasks: int) -> float:
 def build() -> Graph:
     d = load_dims()
     p = partition(d)
-    NC = CTX // CHUNK
+    ctx, chunk = _ctx_chunk()
+    NC = ctx // chunk
     res = Resource(threads=256, vgpr=128, agpr=0, lds_bytes=lds_bytes(d))
     g = Graph(f"llm_{d.name}")
     g.tensor("llm", (1,), role="weight", bytes_per_elem=8)          # placeholder: the tiles read __constant__ params
