@@ -1,0 +1,12 @@
+round 1  prev   median 3.699 ms  ok=32 gate: 27 of 27
+round 1  imm    median 3.711 ms  ok=32 gate: 27 of 27
+round 1  spin   median 3.729 ms  ok=32 gate: 27 of 27
+round 1  fleet  median 3.553 ms  tokens: 32/32
+round 2  prev   median 3.707 ms  ok=32 gate: 27 of 27
+round 2  imm    median 3.719 ms  ok=32 gate: 27 of 27
+round 2  spin   median 3.731 ms  ok=32 gate: 27 of 27
+round 2  fleet  median 3.550 ms  tokens: 32/32
+round 3  prev   median 3.719 ms  ok=32 gate: 27 of 27
+round 3  imm    median 3.718 ms  ok=32 gate: 27 of 27
+round 3  spin   median 3.728 ms  ok=32 gate: 27 of 27
+round 3  fleet  median 3.559 ms  tokens: 32/32
