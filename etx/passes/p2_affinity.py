@@ -28,10 +28,17 @@ def run(plan: Plan) -> None:
     dom_of: dict[tuple[str, tuple[int, ...]], tuple[int, int]] = {}
 
     from ..ir.edgemap import EdgeMap
+    wpd = max(1, plan.workers_per_domain)
     for g in g_all.grids:
         coords = inst.tasks[g.name]
         n = max(1, len(coords))
         per_dom = n / nd
+        # Per-grid cap. A grid that fits in one wave of workers must not put more tasks on a domain than
+        # ceil(n / nd): each extra task there is a second task on some worker and doubles the phase
+        # (measured on MI300X, 2026-09-25: domain 0 got 39-49 of ~300 tasks, the fused Qwen3-8B ran
+        # 45% slower than the same tiles unfused). Larger grids keep the imbalance tolerance.
+        cap = -(-n // nd) if n <= nd * wpd else plan.options.affinity_imbalance * per_dom
+        gload: Counter = Counter()
         pin = EdgeMap.parse(g.domain_map) if g.domain_map else None
         for lin, c in enumerate(coords):
             tid = (g.name, c)
@@ -42,16 +49,24 @@ def run(plan: Plan) -> None:
             elif g.in_edges:
                 votes: Counter = Counter()
                 for ev in inst.task_in[tid]:
-                    for p in inst.producers[ev]:
+                    prods = inst.producers[ev]
+                    if len(prods) > wpd:          # a barrier (producers on every domain): no locality to follow
+                        continue
+                    for p in prods:
                         pd = dom_of.get(p)
                         if pd is not None and pd[0] == g.device:
                             votes[pd[1]] += 1
-                if votes:
-                    best, _ = votes.most_common(1)[0]
-                    mean = max(1.0, sum(v for k, v in load.items() if k[0] == g.device) / nd)
-                    if load[(g.device, best)] + 1 <= plan.options.affinity_imbalance * max(mean, per_dom):
+                for best, _ in votes.most_common():
+                    if gload[best] + 1 <= cap:
                         dom = best
+                        break
+                else:
+                    if gload[dom] + 1 > cap:      # the contiguous chunk is full: least-loaded domain of this grid
+                        dom = min(range(nd), key=lambda d: (gload[d], d))
+            elif gload[dom] + 1 > cap:
+                dom = min(range(nd), key=lambda d: (gload[d], d))
             dom_of[tid] = (g.device, dom)
+            gload[dom] += 1
             load[(g.device, dom)] += 1
             t = TaskInst(id=len(plan.tasks), grid=g.name, coord=c, type_id=plan.type_ids[g.name],
                          device=g.device, domain=dom, duration_us=g.duration_us)
