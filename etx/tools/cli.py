@@ -38,7 +38,7 @@ def _plan_from_args(a):
     runtime = mod.runtime(bindings)
     opts = PassOptions(event_elimination=not a.no_event_elim, prefetch=not a.no_prefetch,
                        split_resource_classes=a.split_classes, force_mode=a.force_mode,
-                       inline_tiles=getattr(a, "inline_tiles", False), relay=getattr(a, "relay", "auto"))
+                       inline_tiles=getattr(a, "inline_tiles", False), relay=getattr(a, "relay", "off"))
     plan = compile_graph(graph, load_machine(a.arch), bindings, runtime, opts)
     return plan, graph
 
@@ -107,7 +107,7 @@ def main(argv=None) -> int:
         s.add_argument("--split-classes", action="store_true")
         s.add_argument("--force-mode", choices=["static", "dynamic", "hybrid"], default=None)
         s.add_argument("--inline-tiles", action="store_true", help="#include the tile sources into the kernel TU so bodies can inline")
-        s.add_argument("--relay", choices=["auto", "on", "off"], default="auto", help="per-domain relay of DEVICE-scope counters (P5)")
+        s.add_argument("--relay", choices=["auto", "on", "off"], default="off", help="per-domain relay of DEVICE-scope counters (P5); off by default")
         s.set_defaults(fn=fn)
     s = sub.add_parser("archs")
     s.set_defaults(fn=cmd_archs)
