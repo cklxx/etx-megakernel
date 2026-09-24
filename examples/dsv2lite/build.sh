@@ -6,7 +6,7 @@ ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 OUT="${ETX_OUT:-$ROOT/build/dsv2lite}"
 mkdir -p "$OUT"
 INLINE="${ETX_INLINE_TILES:-1}"
-RELAY="${ETX_RELAY_PLAN:-auto}"   # auto | on | off (compile-time; ETX_RELAY=0 at run time also disables it)     # 1: single-TU kernel (tile bodies included and inlinable); 0: separate shim TU
+RELAY="${ETX_RELAY_PLAN:-on}"   # on: reserve one CU per XCD like fleet's scheduler CU (3.72 vs 3.78 ms/token with 38 workers); the relay itself runs only with ETX_RELAY=1     # 1: single-TU kernel (tile bodies included and inlinable); 0: separate shim TU
 if [ "$INLINE" = "1" ]; then
   "$ROOT/.venv/bin/python" -m etx compile examples/dsv2lite/graph.py --arch gfx942 --out "$OUT" --inline-tiles --relay "$RELAY" | grep -E "tasks=|workers/domain"
   SHIM=""

@@ -163,6 +163,11 @@ int main(int argc, char** argv) {
       if (out[t] == golden[i]) ++matched; else if (first_div < 0) first_div = i;
       step_ms.push_back((tt[2 * t + 1] - tt[2 * t]) * 1e-5);     // 100 MHz ticks -> ms
     }
+    if (getenv("ETX_LLM_DUMP")) {        // per-position: ours / HF / margin
+      for (int i = 0; i < gen; ++i) { const int t = (int)prompt.size() - 1 + i; printf("  %2d: %6d %6d %s %.3f\n", i, out[t], golden[i], out[t] == golden[i] ? "  " : "XX", i < (int)margin.size() ? margin[i] : -1.f); }
+      std::vector<int32_t> all(steps); ETX_CHECK(hipMemcpy(all.data(), hp.token_out, steps * 4, hipMemcpyDeviceToHost));
+      printf("  prompt-step argmax:"); for (int t = 0; t + 1 < (int)prompt.size(); ++t) printf(" %d", all[t]); printf("\n");
+    }
     printf("run %d: %d/%d generated tokens match HF greedy%s", run, matched, gen, teacher ? " (teacher-forced argmax)" : "");
     if (first_div >= 0) printf("; first divergence at %d (HF top-1 margin there %.4f)", first_div, first_div < (int)margin.size() ? margin[first_div] : -1.f);
     printf("\n");

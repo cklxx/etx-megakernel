@@ -23,7 +23,10 @@ class PassOptions:
     affinity_imbalance: float = 1.25       # max load / mean load tolerated when following producers
     sentinel_signals: bool = False         # lower waits to sentinel polling where the capability exists
     inline_tiles: bool = False             # emit #include of the tile sources into the kernel TU (single-TU build, bodies inlinable)
-    relay: str = "auto"                    # per-domain relay of DEVICE-scope counters: auto (cost model) | on | off
+    relay: str = "off"                     # per-domain relay of DEVICE-scope counters: off (default) | auto | on.
+                                           # Off by default: measured neutral on MI300X, and its hierarchical acquire
+                                           # (relay invalidates L2 once, consumers drop only L1) was shown UNSAFE on
+                                           # 2026-09-24 (Qwen2.5-1.5B: nondeterministic tokens; deterministic with it off)
 
 
 @dataclass

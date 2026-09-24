@@ -126,18 +126,19 @@ struct etx_host {
     if (getenv("ETX_NO_LASTFLUSH")) p.ev_share = nullptr;      // A/B: per-producer write-back
     p.workers_per_domain = ETX_WORKERS_PER_DOMAIN;
     // relay (P5): ETX_RELAY=0 turns it off at run time (waits then poll the global words; A/B);
-    // ETX_RELAY_ACQ=consumer makes every consumer do the full device acquire itself (fleet's choice)
-    p.ev_mirror = nullptr; p.n_relay = 0; p.relay_words = nullptr; p.relay_local_acquire = 1;
+    // consumers do the full device acquire themselves by default; ETX_RELAY_ACQ=local enables the hierarchical
+    // acquire (relay invalidates the domain's L2, consumers drop only L1) -- measured UNSAFE on MI300X 2026-09-24
+    p.ev_mirror = nullptr; p.n_relay = 0; p.relay_words = nullptr; p.relay_local_acquire = 0;
     {
       const char* r = getenv("ETX_RELAY");
       const int32_t b = etx_relay_begin[device], e = etx_relay_begin[device + 1];
-      if (ETX_RELAY && e > b && !(r && !strcmp(r, "0"))) {
+      if (ETX_RELAY && e > b && r && !strcmp(r, "1")) {     // opt-in at run time; otherwise the reserved workgroup idles
         ETX_CHECK(hipMalloc(&d_mirror, (size_t)ETX_N_DOMAINS * ETX_EVENT_WORDS * sizeof(int32_t)));
         mirror_init.resize((size_t)ETX_N_DOMAINS * ETX_EVENT_WORDS);
         for (int d = 0; d < ETX_N_DOMAINS; ++d) memcpy(mirror_init.data() + (size_t)d * ETX_EVENT_WORDS, etx_ev_counts, ETX_EVENT_WORDS * sizeof(int32_t));
         p.ev_mirror = d_mirror; p.n_relay = e - b; p.relay_words = upload(etx_relay_words + b, (size_t)(e - b));
         const char* a = getenv("ETX_RELAY_ACQ");
-        p.relay_local_acquire = (a && !strcmp(a, "consumer")) ? 0 : 1;
+        p.relay_local_acquire = (a && !strcmp(a, "local")) ? 1 : 0;
       }
     }
     p.n_workers = ETX_N_WORKERS;

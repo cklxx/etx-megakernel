@@ -20,6 +20,6 @@ def test_llm_graph_compiles(name, monkeypatch):
     for rows, key in ((d.NQKV, "qkv"), (d.H, "o"), (d.V, "lm")):
         assert math.ceil(rows / p[key]) <= M.workers(d), key        # one wave of tasks per GEMV phase
     plan = compile_graph(M.build(), "gfx942", {})
-    assert plan.relay                                                  # hundreds of pollers per DEVICE word
+    assert not plan.relay                                              # relay off by default (hierarchical acquire unsafe)
     assert all(m == "static" for m in plan.modes.values())
     assert plan.workers_per_domain * plan.n_domains == M.workers(d)    # the partition assumed the plan's worker count

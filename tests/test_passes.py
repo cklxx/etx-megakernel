@@ -74,7 +74,7 @@ def test_relay_decision_dsv2lite():
     from examples.dsv2lite import graph as G
     from etx.passes import compile_graph
     from etx.passes.plan import PassOptions
-    plan = compile_graph(G.build(layers=2), "gfx942", {})
+    plan = compile_graph(G.build(layers=2), "gfx942", {}, options=PassOptions(relay="auto"))
     assert plan.relay and plan.workers_per_domain == 37
     assert plan.relay_words[0], "mirrored words"
     off = compile_graph(G.build(layers=2), "gfx942", {}, options=PassOptions(relay="off"))
@@ -86,5 +86,5 @@ def test_relay_off_for_small_fanout():
     import importlib.util, pathlib
     spec = importlib.util.spec_from_file_location("sk", pathlib.Path(__file__).parent.parent / "examples" / "splitk_sum.py")
     m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
-    plan = compile_graph(m.build(), "gfx942", m.bindings())
+    plan = compile_graph(m.build(), "gfx942", m.bindings(), options=__import__("etx.passes.plan", fromlist=["PassOptions"]).PassOptions(relay="auto"))
     assert not plan.relay

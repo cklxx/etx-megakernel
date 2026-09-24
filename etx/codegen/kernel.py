@@ -246,6 +246,9 @@ def emit_kernel(plan: Plan, device: int = 0) -> str:
     if max_pro:
         out.append(f"  for (int j = 0; j < {max_pro}; ++j) if (psym[j] >= 0) {{ etx_call_body(psym[j], &pctx[j]); __syncthreads(); }}")
     out.append("  etx_call_body(sym, &ctx);   // phase 2: the only call site of each body")
+    out.append("#ifndef ETX_NO_ALLWAVE_DRAIN")
+    out.append("  ETX_RELEASE_DOMAIN();   // every wave drains its own stores before the barrier: thread 0's release only covers wave 0")
+    out.append("#endif")
     out.append("  __syncthreads();")
     out.append("  if (tr && threadIdx.x == 0) { tr[2] = (uint64_t)ETX_TIMER(); tr[3] = worker; }")
     out.append("  if (threadIdx.x != 0) return;")

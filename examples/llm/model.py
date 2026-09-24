@@ -36,7 +36,7 @@ from etx.ir import Graph, Resource
 
 T = "examples/llm/tiles.hip"
 HERE = Path(__file__).resolve().parent
-WORKERS = 296              # 8 XCDs x 37 workers (P5 reserves one CU per XCD for the relay on MI300X)
+WORKERS = 304              # 8 XCDs x 38 CUs (default when the LDS allows one workgroup per CU)
 CTX = int(os.environ.get("ETX_LLM_CTX", "2048"))
 CHUNK = 128                # attention chunk (positions per task)
 HBM_BPS = 4.0e12           # for the duration estimates only
@@ -91,10 +91,10 @@ def load_dims(path: str | None = None) -> Dims:
 
 
 def workers(d: "Dims") -> int:
-    """Workers the plan will get on MI300X: 8 XCDs x (38 CUs x wg/CU - 1 relay). Two workgroups fit a CU
-    when the LDS allows it (vgpr is declared 128, so __launch_bounds__ caps the registers accordingly)."""
+    """Workers the plan will get on MI300X: 8 XCDs x 38 CUs x wg/CU (no relay by default). Two workgroups fit
+    a CU when the LDS allows it (vgpr is declared 128, so __launch_bounds__ caps the registers accordingly)."""
     wg = 2 if 2 * (lds_bytes(d) + 256) <= 65536 else 1
-    return 8 * (38 * wg - 1)
+    return 8 * 38 * wg
 
 
 def rows_per_task(rows: int, target: int = WORKERS, mult: int = 4) -> int:
