@@ -260,6 +260,17 @@ struct etx_host {
     ETX_CHECK(hipSetDevice(device));
     std::vector<uint64_t> tr((size_t)ETX_N_TASKS * 4);
     ETX_CHECK(hipMemcpy(tr.data(), d_trace_time, tr.size() * sizeof(uint64_t), hipMemcpyDeviceToHost));
+    if (const char* raw = getenv("ETX_TRACE_RAW")) {   // per task: type, coord[0..3], taken, ready, done, worker (int64 x 9)
+      FILE* f = fopen(raw, "wb");
+      if (f) {
+        for (int i = 0; i < ETX_N_TASKS; ++i) {
+          int64_t row[9] = {etx_descs[i].type, etx_descs[i].coord[0], etx_descs[i].coord[1], etx_descs[i].coord[2], etx_descs[i].coord[3],
+                            (int64_t)tr[i * 4], (int64_t)tr[i * 4 + 1], (int64_t)tr[i * 4 + 2], (int64_t)tr[i * 4 + 3]};
+          fwrite(row, sizeof(row), 1, f);
+        }
+        fclose(f);
+      }
+    }
     std::vector<double> wait(n_types, 0), body(n_types, 0); std::vector<int> cnt(n_types, 0);
     std::vector<uint64_t> first_taken(n_types, ~0ull), first_ready(n_types, ~0ull), last_ready(n_types, 0), last_done(n_types, 0);
     uint64_t t_min = ~0ull, t_max = 0;
