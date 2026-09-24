@@ -301,15 +301,26 @@ extern "C" __device__ void llm_attn(const etx_ctx* c) {
 }
 
 extern "C" __device__ void llm_merge(const etx_ctx* c) {
+  // chunk weights once into LDS (w_c = exp(m_c - M), empty chunks 0), then every thread sums its d over
+  // the chunks with independent loads (the old loop re-read m per chunk per thread: 31 us per layer at NC=64)
   const int qh = c->coord[0], HD = P.HD, NC = P.NC, stride = HD + 2;
   const float* part = P.attn_part + (size_t)qh * NC * stride;
-  float M = -INFINITY;
-  for (int ch = 0; ch < NC; ++ch) M = fmaxf(M, part[ch * stride + HD]);
-  float Lsum = 0.f;
-  for (int ch = 0; ch < NC; ++ch) { const float m = part[ch * stride + HD]; if (m > -INFINITY) Lsum += __expf(m - M) * part[ch * stride + HD + 1]; }
+  float* red = LLM_RED(c);
+  float* wch = LLM_VEC(c);                // NC weights
+  float m = -INFINITY;
+  for (int ch = threadIdx.x; ch < NC; ch += blockDim.x) m = fmaxf(m, part[ch * stride + HD]);
+  const float M = etx_block_max(m, red);
+  float l = 0.f;
+  for (int ch = threadIdx.x; ch < NC; ch += blockDim.x) {
+    const float mc = part[ch * stride + HD];
+    const float w = mc > -INFINITY ? __expf(mc - M) : 0.f;
+    wch[ch] = w; l += w * part[ch * stride + HD + 1];
+  }
+  const float Lsum = etx_block_sum(l, red);   // its __syncthreads also publishes wch
   for (int d = threadIdx.x; d < HD; d += blockDim.x) {
     float acc = 0.f;
-    for (int ch = 0; ch < NC; ++ch) { const float m = part[ch * stride + HD]; if (m > -INFINITY) acc += __expf(m - M) * part[ch * stride + d]; }
+#pragma unroll 8
+    for (int ch = 0; ch < NC; ++ch) acc += wch[ch] * part[ch * stride + d];
     P.o[(size_t)qh * HD + d] = bfr(acc / Lsum);
   }
 }
