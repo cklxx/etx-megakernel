@@ -25,6 +25,7 @@ def _load_example(path: str):
     mod = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
     sys.path.insert(0, str(p.parent.parent))
+    sys.modules[spec.name] = mod            # dataclasses in the example resolve their module through sys.modules
     spec.loader.exec_module(mod)
     return mod
 
