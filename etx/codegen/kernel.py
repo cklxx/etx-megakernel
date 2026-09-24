@@ -118,6 +118,30 @@ def _arrive_code(plan: Plan, g: TaskGrid, mode: str) -> str:
     return "\n".join(lines)
 
 
+def _setup_consts(g: TaskGrid) -> list[str]:
+    if not g.consts:
+        return []
+    cs = list(g.consts)[:4] + [0] * (4 - min(4, len(g.consts)))
+    return [f"      ctx.cst[0] = {cs[0]}; ctx.cst[1] = {cs[1]}; ctx.cst[2] = {cs[2]}; ctx.cst[3] = {cs[3]};"]
+
+
+def _setup_body(plan: Plan, g: TaskGrid, symbols: list[str]) -> list[str]:
+    """Pass-3 prologue contexts and the body symbol of one task type (shared by the fused and unfused kernels)."""
+    out = []
+    coord_vars = [f"t.coord[{i}]" for i in range(len(g.grid))]
+    for j, (pro, mtext) in enumerate(g.prologue):
+        ig = plan.inlined[pro]
+        exprs = EdgeMap.parse(mtext).coord_exprs_c(coord_vars, _symbols(plan))
+        out.append(f"      // prologue {j}: recompute {pro} for this task (Pass 3)")
+        out.append(f"      pctx[{j}] = ctx; pctx[{j}].args = p.type_args + {plan.type_ids[pro]} * p.max_args; psym[{j}] = {symbols.index(ig.body.symbol)};   // {ig.body.symbol}")
+        pc = list(ig.consts)[:4] + [0] * (4 - min(4, len(ig.consts)))
+        out.append(f"      pctx[{j}].cst[0] = {pc[0]}; pctx[{j}].cst[1] = {pc[1]}; pctx[{j}].cst[2] = {pc[2]}; pctx[{j}].cst[3] = {pc[3]};")
+        for d in range(4):
+            out.append(f"      pctx[{j}].coord[{d}] = {exprs[d] if d < len(exprs) else 0};")
+    out.append(f"      sym = {symbols.index(g.body.symbol)};   // {g.body.symbol}")
+    return out
+
+
 def emit_kernel(plan: Plan, device: int = 0) -> str:
     m = plan.machine
     is_hip = m.vendor == "amd"
@@ -208,9 +232,7 @@ def emit_kernel(plan: Plan, device: int = 0) -> str:
     for g in grids:
         mode = plan.modes.get(g.name, "static")
         out.append(f"    case {plan.type_ids[g.name]}: {{ // {g.name} [{mode}] grid={g.grid}")
-        if g.consts:
-            cs = list(g.consts)[:4] + [0] * (4 - min(4, len(g.consts)))
-            out.append(f"      ctx.cst[0] = {cs[0]}; ctx.cst[1] = {cs[1]}; ctx.cst[2] = {cs[2]}; ctx.cst[3] = {cs[3]};")
+        out.extend(_setup_consts(g))
         if g.body.prefetch and plan.options.prefetch and plan.machine.capabilities.get("async_copy_to_lds", "none") != "none":
             out.append(f"      {g.body.prefetch}(&ctx);   // lever 3: weights do not depend on events; warm them before waiting")
         if g.in_edges:
@@ -227,17 +249,7 @@ def emit_kernel(plan: Plan, device: int = 0) -> str:
                 else:
                     out.append(f"        ETX_ACQUIRE_{sc}();")
             out.append("      }")
-        coord_vars = [f"t.coord[{i}]" for i in range(len(g.grid))]
-        for j, (pro, mtext) in enumerate(g.prologue):
-            ig = plan.inlined[pro]
-            exprs = EdgeMap.parse(mtext).coord_exprs_c(coord_vars, _symbols(plan))
-            out.append(f"      // prologue {j}: recompute {pro} for this task (Pass 3)")
-            out.append(f"      pctx[{j}] = ctx; pctx[{j}].args = p.type_args + {plan.type_ids[pro]} * p.max_args; psym[{j}] = {symbols.index(ig.body.symbol)};   // {ig.body.symbol}")
-            pc = list(ig.consts)[:4] + [0] * (4 - min(4, len(ig.consts)))
-            out.append(f"      pctx[{j}].cst[0] = {pc[0]}; pctx[{j}].cst[1] = {pc[1]}; pctx[{j}].cst[2] = {pc[2]}; pctx[{j}].cst[3] = {pc[3]};")
-            for d in range(4):
-                out.append(f"      pctx[{j}].coord[{d}] = {exprs[d] if d < len(exprs) else 0};")
-        out.append(f"      sym = {symbols.index(g.body.symbol)};   // {g.body.symbol}")
+        out.extend(_setup_body(plan, g, symbols))
         out.append("      break; }")
     out.append("    default: break;")
     out.append("  }")
@@ -319,6 +331,7 @@ def emit_kernel(plan: Plan, device: int = 0) -> str:
         out.append("  }")
         out.append("}")
         out.append("")
+        out.extend(_emit_unfused(plan, device, grids, symbols, max_pro))
         return "\n".join(out)
     out.append("  int32_t ticket_local = -1, ticket_global = -1;   // ticket-ring reservations, see etx_try_pop")
     out.append("  uint32_t spins = 0;")
@@ -348,7 +361,44 @@ def emit_kernel(plan: Plan, device: int = 0) -> str:
     out.append("  }")
     out.append("}")
     out.append("")
+    out.extend(_emit_unfused(plan, device, grids, symbols, max_pro))
     return "\n".join(out)
+
+
+def _emit_unfused(plan: Plan, device: int, grids, symbols: list[str], max_pro: int) -> list[str]:
+    """Unfused baseline: one ordinary kernel launch per task grid (the host replays them in plan order,
+    optionally as one HIP graph); one workgroup per task, the SAME tile bodies, no events -- the kernel
+    boundary is the only synchronisation. Measures what the megakernel itself buys."""
+    out = ["", "// ---- unfused baseline: launched once per grid, blockIdx = task within the grid (see etx_host::run_unfused)",
+           "#if ETX_MIN_WG_PER_CU > 0",
+           f"extern \"C\" __global__ void __launch_bounds__(ETX_THREADS, ETX_MIN_WG_PER_CU) etx_unfused_d{device}(etx_params p, int32_t first) {{",
+           "#else",
+           f"extern \"C\" __global__ void __launch_bounds__(ETX_THREADS) etx_unfused_d{device}(etx_params p, int32_t first) {{",
+           "#endif",
+           "  __shared__ __align__(16) unsigned char etx_lds[ETX_LDS_USED > 0 ? ETX_LDS_USED : 16];",
+           "  const int32_t tid = first + (int32_t)blockIdx.x;",
+           "  const etx_task t = p.descs[tid];",
+           "  etx_ctx ctx; for (int i = 0; i < 4; ++i) ctx.coord[i] = t.coord[i];",
+           "  ctx.shape = p.shape; ctx.args = p.type_args + t.type * p.max_args; ctx.events = p.events; ctx.ev_offset = p.ev_offset; ctx.ev_shape = (const int32_t*)p.ev_shape;",
+           "  ctx.domain = etx_discover_domain(p, blockIdx.x); ctx.worker = blockIdx.x; ctx.lds = etx_lds; ctx.cst[0] = ctx.cst[1] = ctx.cst[2] = ctx.cst[3] = 0;",
+           "  int sym = -1;"]
+    if max_pro:
+        out.append(f"  etx_ctx pctx[{max_pro}]; int psym[{max_pro}];")
+        out.append(f"  for (int j = 0; j < {max_pro}; ++j) psym[j] = -1;")
+    out.append("  switch (t.type) {")
+    for g in grids:
+        out.append(f"    case {plan.type_ids[g.name]}: {{ // {g.name}")
+        out.extend(_setup_consts(g))
+        out.extend(_setup_body(plan, g, symbols))
+        out.append("      break; }")
+    out.append("    default: break;")
+    out.append("  }")
+    if max_pro:
+        out.append(f"  for (int j = 0; j < {max_pro}; ++j) if (psym[j] >= 0) {{ etx_call_body(psym[j], &pctx[j]); __syncthreads(); }}")
+    out.append("  etx_call_body(sym, &ctx);")
+    out.append("}")
+    out.append("")
+    return out
 
 
 def emit_plan_json(plan: Plan) -> str:

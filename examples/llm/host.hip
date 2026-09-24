@@ -16,6 +16,7 @@
 #include <string>
 
 extern "C" __global__ void etx_megakernel_d0(etx_params);
+extern "C" __global__ void etx_unfused_d0(etx_params, int32_t);
 extern "C" void llm_set_params(const void* host_params, hipStream_t s);
 extern "C" size_t llm_params_bytes();
 
@@ -50,15 +51,17 @@ template <class T> static T* dalloc(size_t n) { T* p; ETX_CHECK(hipMalloc(&p, n 
 int main(int argc, char** argv) {
   if (argc < 2) die("usage: run <packed-dir> [--gen N] [--repeat R] [--teacher]");
   const std::string dir = argv[1];
-  int gen = -1, repeat = 2; bool teacher = false;
+  int gen = -1, repeat = 2; bool teacher = false, unfused = false; std::string golden_name = "golden.txt";
   for (int i = 2; i < argc; ++i) {
     const std::string a = argv[i];
     if (a == "--gen" && i + 1 < argc) gen = atoi(argv[++i]);
     else if (a == "--repeat" && i + 1 < argc) repeat = atoi(argv[++i]);
     else if (a == "--teacher") teacher = true;
+    else if (a == "--unfused") unfused = true;       // baseline: same tiles, one launch per grid (HIP graph)
+    else if (a == "--golden" && i + 1 < argc) golden_name = argv[++i];
   }
   const Manifest m = read_manifest(dir + "/llm.manifest");
-  std::ifstream gf(dir + "/golden.txt"); if (!gf) die("no golden.txt");
+  std::ifstream gf(dir + "/" + golden_name); if (!gf) die("no " + golden_name);
   const std::vector<int> prompt = read_ints(gf), golden = read_ints(gf);
   std::vector<float> margin; { std::string line; std::getline(gf, line); std::istringstream s(line); std::string h; s >> h; float x; while (s >> x) margin.push_back(x); }
   if (gen < 0 || gen > (int)golden.size()) gen = (int)golden.size();
@@ -136,6 +139,7 @@ int main(int argc, char** argv) {
   // ---- ETX host
   etx_host hst(0);
   hst.kernel = (const void*)etx_megakernel_d0;
+  hst.unfused_kernel = (const void*)etx_unfused_d0;
   hst.setup();
   printf("etx: %d tasks, %d event words, %d workers (%d domains x %d), lds %d B\n", ETX_N_TASKS, ETX_EVENT_WORDS, ETX_N_WORKERS,
          ETX_N_DOMAINS, ETX_WORKERS_PER_DOMAIN, (int)ETX_LDS_BYTES);
@@ -153,7 +157,8 @@ int main(int argc, char** argv) {
     for (int t = 0; t < steps; ++t) {
       hp.tok = t; hp.pos = t; hp.write_next = (!teacher && t + 1 >= (int)prompt.size()) ? 1 : 0;
       llm_set_params(&hp, hst.stream);
-      if (!hst.run(60.0)) { printf("step %d: ETX step failed\n", t); return 2; }
+      if (unfused) { if (!hst.run_unfused()) { printf("step %d: unfused step failed\n", t); return 2; } }
+      else if (!hst.run(60.0)) { printf("step %d: ETX step failed\n", t); return 2; }
     }
     ETX_CHECK(hipMemcpy(out.data(), hp.token_out, steps * 4, hipMemcpyDeviceToHost));
     ETX_CHECK(hipMemcpy(tt.data(), hp.token_time, 2 * steps * 8, hipMemcpyDeviceToHost));
@@ -176,6 +181,7 @@ int main(int argc, char** argv) {
   const double med = s.empty() ? 0 : s[s.size() / 2];
   printf("per-token latency (embed -> argmax on device): median %.3f ms  min %.3f  max %.3f; weights %.2f GB -> %.0f GB/s effective\n",
          med, s.empty() ? 0 : s.front(), s.empty() ? 0 : s.back(), wbytes / 1e9, med > 0 ? (m.cfg.at("active_bytes") / 1e9) / (med / 1e3) : 0.0);
+  printf("mode: %s\n", unfused ? (getenv("ETX_UNFUSED_NOGRAPH") ? "unfused (stream launches)" : "unfused (HIP graph)") : "ETX megakernel");
   printf("RESULT model=%s matched=%d gen=%d median_ms=%.3f active_GB=%.3f\n", dir.c_str(), matched, gen, med, m.cfg.at("active_bytes") / 1e9);
   if (getenv("ETX_TRACE")) hst.report_phases(etx_type_names, ETX_N_TYPES);
   return matched == gen ? 0 : 1;

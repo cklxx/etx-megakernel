@@ -7,8 +7,7 @@
 // adds, RMSNorm before and after the weight, each RoPE product, SiLU, the MoE combine in ascending
 // expert order), so the argmax agrees with HF greedy except at near-ties.
 //
-// The GEMV is simple and general, not tuned: each wave streams 4 weight rows at a time with 16-byte
-// loads against the input vector held in LDS as fp32.
+// The GEMV streams each task's contiguous weight block with U loads in flight per lane (gemv_stream).
 #include "etx/tile_util.h"
 #include "examples/llm/llm_params.h"
 
@@ -39,74 +38,97 @@ static __device__ __forceinline__ float dot8(uint4 w, const float* x) {
   return s;
 }
 
-// rows [r0, r1) of a row-major bf16 matrix W with K columns, times xs (fp32, LDS). K is split across
-// the waves (every wave streams all rows of the task over its K slice, 8 rows at a time, so all four
-// waves keep loads in flight even for a handful of rows); the per-wave partials meet in `part`
-// (LDS, >= nwaves * (r1 - r0) floats) and are summed in wave order (deterministic). epi(row, dot) is
-// then called once per row, by one thread each.
-template <class Epi>
-static __device__ __forceinline__ void gemv_rows(const __hip_bfloat16* __restrict__ W, int K, const float* xs, int r0, int r1, float* part, Epi epi) {
-  constexpr int R = 8, STEP = ETX_WAVE_SIZE * 8;
+// ---------------------------------------------------------------- GEMV
+// rows [r0, r1) of a row-major bf16 matrix W with K columns, times xs (fp32, LDS). The task's rows are one
+// contiguous block of (r1-r0)*K bf16, so it is streamed as a flat sequence of segments of 64 lanes x EPL
+// elements (EPL = 8 -> 16-byte loads when K % 512 == 0, else 4 -> 8-byte loads when K % 256 == 0); each
+// segment lies inside one row. Wave w takes a contiguous quarter of the segments and keeps U loads in flight
+// per lane (U x 16 B x 256 lanes = 64 KB per CU at U=16), which is what hides HBM latency on small tasks.
+// A wave's running sum is reduced when its segment run crosses a row boundary; the per-wave partials meet
+// in `part` (LDS, >= nwaves * (r1 - r0) floats) and are summed in wave order (deterministic); epi(row, dot)
+// is then called once per row by one thread. LLM_GEMV_U overrides the depth; LLM_NT_WEIGHTS=1 uses
+// non-temporal weight loads (weights are read once per token).
+#ifndef LLM_GEMV_U
+#define LLM_GEMV_U 16
+#endif
+typedef unsigned int llm_u32x4 __attribute__((ext_vector_type(4)));
+typedef unsigned int llm_u32x2 __attribute__((ext_vector_type(2)));
+template <int EPL> struct wvec;
+template <> struct wvec<8> { typedef llm_u32x4 T; };
+template <> struct wvec<4> { typedef llm_u32x2 T; };
+
+static __device__ __forceinline__ float dotn(llm_u32x4 w, const float* x) {
+  float s = 0.f;
+#pragma unroll
+  for (int i = 0; i < 4; ++i) { s += __uint_as_float(w[i] << 16) * x[2 * i]; s += __uint_as_float(w[i] & 0xffff0000u) * x[2 * i + 1]; }
+  return s;
+}
+static __device__ __forceinline__ float dotn(llm_u32x2 w, const float* x) {
+  return __uint_as_float(w.x << 16) * x[0] + __uint_as_float(w.x & 0xffff0000u) * x[1]
+       + __uint_as_float(w.y << 16) * x[2] + __uint_as_float(w.y & 0xffff0000u) * x[3];
+}
+template <class V> static __device__ __forceinline__ V wload(const V* p) {
+#if defined(LLM_NT_WEIGHTS) && LLM_NT_WEIGHTS
+  return __builtin_nontemporal_load(p);
+#else
+  return *p;
+#endif
+}
+
+template <int EPL, class Epi>
+static __device__ __forceinline__ void gemv_stream(const __hip_bfloat16* __restrict__ W, int K, const float* xs, int r0, int r1, float* part, Epi epi) {
+  typedef typename wvec<EPL>::T V;
+  constexpr int U = LLM_GEMV_U, SEG = ETX_WAVE_SIZE * EPL;
   const int lane = etx_lane(), wv = etx_wave(), nw = etx_nwaves(), nrt = r1 - r0;
-  if (nrt >= 8) {                         // enough rows: rows to waves, 4 at a time (measured faster on the dense models)
-    for (int base = r0 + wv * 4; base < r1; base += nw * 4) {
-      const int nr = min(4, r1 - base);
-      float acc[4] = {0.f, 0.f, 0.f, 0.f};
-      const __hip_bfloat16* w0 = W + (size_t)base * K;
-#pragma unroll 2
-      for (int k = lane * 8; k < K; k += STEP) {
-        float xv[8];
-        const float4 a = *(const float4*)(xs + k), b = *(const float4*)(xs + k + 4);
-        xv[0] = a.x; xv[1] = a.y; xv[2] = a.z; xv[3] = a.w; xv[4] = b.x; xv[5] = b.y; xv[6] = b.z; xv[7] = b.w;
-        uint4 w4[4];
+  const int spr = K / SEG;                                   // segments per row
+  const int S = nrt * spr;
+  const int per = (S + nw - 1) / nw, sb = wv * per, se = min(S, sb + per);
+  for (int i = lane; i < nrt; i += ETX_WAVE_SIZE) part[wv * nrt + i] = 0.f;
+  const V* base = (const V*)(W + (size_t)r0 * K) + lane;     // segment s starts at element s * SEG
+  int cur = sb / (spr > 0 ? spr : 1);
+  float acc = 0.f;
+  for (int s0 = sb; s0 < se; s0 += U) {
+    V w[U];
 #pragma unroll
-        for (int j = 0; j < 4; ++j) if (j < nr) w4[j] = *(const uint4*)(w0 + (size_t)j * K + k);
+    for (int u = 0; u < U; ++u) if (s0 + u < se) w[u] = wload(base + (size_t)(s0 + u) * ETX_WAVE_SIZE);
 #pragma unroll
-        for (int j = 0; j < 4; ++j) if (j < nr) acc[j] += dot8(w4[j], xv);
-      }
-#pragma unroll
-      for (int j = 0; j < 4; ++j) {
-        const float v = etx_wave_sum(acc[j]);
-        if (j < nr && lane == 0) part[(base - r0) + j] = v;
+    for (int u = 0; u < U; ++u) {
+      const int sg = s0 + u;
+      if (sg < se) {
+        const int row = sg / spr;
+        if (row != cur) {                                    // uniform across the wave
+          const float v = etx_wave_sum(acc);
+          if (lane == 0) part[wv * nrt + cur] += v;
+          acc = 0.f; cur = row;
+        }
+        acc += dotn(w[u], xs + (sg - row * spr) * SEG + lane * EPL);
       }
     }
-    __syncthreads();
-    for (int r = r0 + (int)threadIdx.x; r < r1; r += blockDim.x) epi(r, part[r - r0]);
-    __syncthreads();
-    return;
   }
-  // few rows: split K across the waves so all four keep loads in flight
-  const int kq = ((K + nw * STEP - 1) / (nw * STEP)) * STEP;
-  const int kb = wv * kq, ke = min(K, kb + kq);
-  for (int base = r0; base < r1; base += R) {
-    const int nr = min(R, r1 - base);
-    float acc[R];
-#pragma unroll
-    for (int j = 0; j < R; ++j) acc[j] = 0.f;
-    const __hip_bfloat16* w0 = W + (size_t)base * K;
-#pragma unroll 2
-    for (int k = kb + lane * 8; k < ke; k += STEP) {
-      float xv[8];
-      const float4 a = *(const float4*)(xs + k), b = *(const float4*)(xs + k + 4);
-      xv[0] = a.x; xv[1] = a.y; xv[2] = a.z; xv[3] = a.w; xv[4] = b.x; xv[5] = b.y; xv[6] = b.z; xv[7] = b.w;
-      uint4 wv8[R];
-#pragma unroll
-      for (int j = 0; j < R; ++j) if (j < nr) wv8[j] = *(const uint4*)(w0 + (size_t)j * K + k);
-#pragma unroll
-      for (int j = 0; j < R; ++j) if (j < nr) acc[j] += dot8(wv8[j], xv);
-    }
-#pragma unroll
-    for (int j = 0; j < R; ++j) {
-      const float v = etx_wave_sum(acc[j]);
-      if (j < nr && lane == 0) part[wv * nrt + (base - r0) + j] = v;
-    }
+  if (sb < se) { const float v = etx_wave_sum(acc); if (lane == 0) part[wv * nrt + cur] += v; }
+  __syncthreads();
+  for (int r = (int)threadIdx.x; r < nrt; r += blockDim.x) {
+    float v = 0.f;
+    for (int w2 = 0; w2 < nw; ++w2) v += part[w2 * nrt + r];
+    epi(r0 + r, v);
   }
   __syncthreads();
-  for (int r = r0 + (int)threadIdx.x; r < r1; r += blockDim.x) {
-    float v = 0.f;
-    for (int w = 0; w < nw; ++w) v += part[w * nrt + (r - r0)];
-    epi(r, v);
+}
+
+template <class Epi>
+static __device__ __forceinline__ void gemv_rows(const __hip_bfloat16* __restrict__ W, int K, const float* xs, int r0, int r1, float* part, Epi epi) {
+  if (K % (ETX_WAVE_SIZE * 8) == 0) { gemv_stream<8>(W, K, xs, r0, r1, part, epi); return; }
+  if (K % (ETX_WAVE_SIZE * 4) == 0) { gemv_stream<4>(W, K, xs, r0, r1, part, epi); return; }
+  // generic fallback (K % 8 == 0): rows to waves, lanes stride K
+  const int lane = etx_lane(), nw = etx_nwaves(), nrt = r1 - r0;
+  for (int r = r0 + etx_wave(); r < r1; r += nw) {
+    float acc = 0.f;
+    for (int k = lane * 8; k < K; k += ETX_WAVE_SIZE * 8) acc += dot8(*(const uint4*)(W + (size_t)r * K + k), xs + k);
+    const float v = etx_wave_sum(acc);
+    if (lane == 0) part[r - r0] = v;
   }
+  __syncthreads();
+  for (int r = (int)threadIdx.x; r < nrt; r += blockDim.x) epi(r0 + r, part[r]);
   __syncthreads();
 }
 

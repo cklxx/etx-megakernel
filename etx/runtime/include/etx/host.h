@@ -230,6 +230,36 @@ struct etx_host {
     if (executed != p.n_tasks) { fprintf(stderr, "device %d: %d of %d tasks executed exactly once\n", device, executed, p.n_tasks); dump_events(); return false; }
     return true;
   }
+  // Unfused baseline: the same tiles, one ordinary launch per task grid in plan order (etx_unfused_d<dev>),
+  // captured once into a HIP graph and replayed per step (ETX_UNFUSED_NOGRAPH=1: plain stream launches).
+  // Kernel boundaries are the only synchronisation; events are not used.
+  const void* unfused_kernel = nullptr;
+  hipGraphExec_t unfused_exec = nullptr;
+  void enqueue_unfused() {
+    for (int i = etx_launch_begin[device]; i < etx_launch_begin[device + 1]; ++i) {
+      int32_t first = etx_launch_first[i];
+      void* kargs[] = {&p, &first};
+      ETX_CHECK(hipLaunchKernel(unfused_kernel, dim3(etx_launch_count[i]), dim3(ETX_THREADS), kargs, 0, stream));
+    }
+  }
+  bool run_unfused() {
+    ETX_CHECK(hipSetDevice(device));
+    if (!ev_start) { ETX_CHECK(hipEventCreate(&ev_start)); ETX_CHECK(hipEventCreate(&ev_stop)); }
+    const bool graph = !getenv("ETX_UNFUSED_NOGRAPH");
+    if (graph && !unfused_exec) {
+      hipGraph_t g;
+      ETX_CHECK(hipStreamBeginCapture(stream, hipStreamCaptureModeGlobal));
+      enqueue_unfused();
+      ETX_CHECK(hipStreamEndCapture(stream, &g));
+      ETX_CHECK(hipGraphInstantiate(&unfused_exec, g, nullptr, nullptr, 0));
+    }
+    ETX_CHECK(hipEventRecord(ev_start, stream));
+    if (graph) ETX_CHECK(hipGraphLaunch(unfused_exec, stream)); else enqueue_unfused();
+    ETX_CHECK(hipEventRecord(ev_stop, stream));
+    ETX_CHECK(hipStreamSynchronize(stream));
+    float ms = 0.f; ETX_CHECK(hipEventElapsedTime(&ms, ev_start, ev_stop)); last_ms = ms;
+    return true;
+  }
   // single-device convenience
   bool run(double timeout_s = 5.0) {
     reset_step();

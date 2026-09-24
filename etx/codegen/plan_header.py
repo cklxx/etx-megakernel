@@ -64,6 +64,21 @@ def emit_plan_header(plan: Plan, device: int = 0) -> str:
         for w in range(nw):
             q = plan.static_queues.get((d, w), [])
             begin.append(len(sq)); sq.extend(q); end.append(len(sq))
+    # unfused baseline: one launch per run of same-type tasks, in plan (topological) order, per device
+    lfirst, lcount, lbegin = [], [], []
+    for d in range(nd):
+        lbegin.append(len(lfirst))
+        for t in plan.tasks:
+            if t.device != d:
+                continue
+            if lfirst and lcount and len(lfirst) > lbegin[-1] and plan.tasks[lfirst[-1]].type_id == t.type_id and lfirst[-1] + lcount[-1] == t.id:
+                lcount[-1] += 1
+            else:
+                lfirst.append(t.id); lcount.append(1)
+    lbegin.append(len(lfirst))
+    out.append(_arr("etx_launch_begin", lbegin, dims="ETX_N_DEVICES + 1"))
+    out.append(_arr("etx_launch_first", lfirst))
+    out.append(_arr("etx_launch_count", lcount))
     out.append(f"#define ETX_STATIC_LEN {max(1, len(sq))}")
     out.append(_arr("etx_static_queue", sq, dims="ETX_STATIC_LEN"))
     out.append(_arr("etx_static_begin", begin, dims="ETX_N_DEVICES * ETX_N_WORKERS"))
