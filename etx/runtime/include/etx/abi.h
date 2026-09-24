@@ -3,6 +3,7 @@
 // table, events, position, LDS. A tile that needs more is trying to schedule.
 #pragma once
 #include <stdint.h>
+#include <stddef.h>
 
 typedef int32_t etx_event;            // one counter; an ETensor is a contiguous run of them
 
