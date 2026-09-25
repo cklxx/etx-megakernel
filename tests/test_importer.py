@@ -68,3 +68,37 @@ def test_wvsplitk_import_links_and_inlines(tmp_path):
     assert int(re.search(r"\.vgpr_spill_count:\s+(\d+)", asm).group(1)) == 0
     assert int(re.search(r"\.group_segment_fixed_size:\s+(\d+)", asm).group(1)) >= 24576
     assert "v_mfma" in asm
+
+
+SYN = """%"struct.T" = type { [16 x float] }
+@k.s = internal addrspace(3) global %"struct.T" undef, align 16
+@k.v = internal addrspace(3) global float undef, align 4
+
+define amdgpu_kernel void @k(ptr addrspace(1) noundef %o, i32 noundef %n) #0 {
+  %t = tail call i64 @__ockl_get_local_id(i32 noundef 0)
+  %b = tail call i64 @__ockl_get_group_id(i32 noundef 0)
+  %t32 = trunc i64 %t to i32
+  %p = getelementptr inbounds float, ptr addrspace(3) @k.s, i32 %t32
+  store float 1.0, ptr addrspace(3) %p, align 4
+  tail call void @llvm.amdgcn.s.barrier()
+  %x = load float, ptr addrspace(3) @k.v, align 4
+  %q = getelementptr inbounds float, ptr addrspace(1) %o, i64 %b
+  store float %x, ptr addrspace(1) %q, align 4
+  ret void
+}
+declare i64 @__ockl_get_local_id(i32)
+declare i64 @__ockl_get_group_id(i32)
+declare void @llvm.amdgcn.s.barrier()
+attributes #0 = { "amdgpu-flat-work-group-size"="1,64" "amdgpu-no-workgroup-id-x" }
+"""
+
+
+def test_import_slots_and_quoted_struct_lds():
+    out, info = import_kernel(SYN, "k", "etx_imp_k", (16, 1, 1), 256)
+    assert info.slots == 4 and info.slot_threads == 64 and info.slot_barrier
+    assert info.lds_bytes_per_slot == 80 and info.lds_bytes == 320          # the quoted struct (64 B) + the float, 16-aligned
+    assert "@k.s" not in out and "@k.v" not in out                            # both moved into the arena
+    assert out.count("define internal void @etx_imp_k.body.s") == 4
+    assert "@etx_imp_slot_barrier(i32 %etx.slot, i32 1)" in out
+    assert "icmp ult i32 %tid, 16" in out                                     # lanes past the 16-thread block skip the body
+    assert "call i64 @__ockl_get" not in out                                  # every id read rewritten

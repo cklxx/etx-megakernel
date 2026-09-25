@@ -152,9 +152,9 @@ _REFUSE = re.compile(r"@llvm\.amdgcn\.(implicitarg\.ptr|dispatch\.ptr|kernarg\.s
 
 def _lds_globals(text: str) -> list[tuple[str, int, int, str]]:
     """(name, bytes, align, full line) of every static LDS variable."""
-    types = {m.group(1): m.group(2) for m in re.finditer(r"^(%[\w.$\"]+) = type (\{[^\n]*\}|<\{[^\n]*\}>)", text, flags=re.M)}
+    types = {m.group(1): m.group(2) for m in re.finditer(r'^(%"[^"]+"|%[\w.$]+) = type (\{[^\n]*\}|<\{[^\n]*\}>)', text, flags=re.M)}
     out = []
-    for m in re.finditer(r"^@([\w.$\"]+) = [^\n]*?addrspace\(3\) global (\[[^\n]*?\]|[%\w.<> ]+?) (undef|poison|zeroinitializer)[^\n]*?(?:, align (\d+))?[^\n]*$",
+    for m in re.finditer(r'^@("[^"]+"|[\w.$]+) = [^\n]*?addrspace\(3\) global (\[[^\n]*?\]|%"[^"]+"|[%\w.<> ]+?) (undef|poison|zeroinitializer)[^\n]*?(?:, align (\d+))?[^\n]*$',
                          text, flags=re.M):
         name, ty = m.group(1).strip('"'), m.group(2)
         out.append((name, _type_bytes(ty, types)[0], int(m.group(4) or 4), m.group(0)))
@@ -305,6 +305,10 @@ def import_kernel(text: str, kernel: str, export: str, block: tuple[int, int, in
 
     # ---- LDS into the arena
     lds = [g for g in _lds_globals(text) if re.search(r"@" + re.escape(g[0]) + r"\b", body)]
+    all_lds = set(re.findall(r'^@("[^"]+"|[\w.$]+) = [^\n]*addrspace\(3\) global', text, flags=re.M))
+    missed = [n for n in all_lds if n.strip('"') not in {g[0] for g in lds} and re.search(r"@" + re.escape(n) + r"(?![\w.$])", body)]
+    if missed:
+        raise ImportError_(f"{kname}: LDS variables the importer could not size: {missed}")
     offs, cur = [], 0
     for name, nbytes, align, _ in lds:
         cur = (cur + max(align, 4) - 1) // max(align, 4) * max(align, 4)
