@@ -30,6 +30,7 @@ from examples.llm import model as M
 
 T = "examples/llm/tiles.hip"
 X = 8
+F = 4                      # fold tasks per XCD (each folds H/F of the residual; must equal LlmParams.F on the host)
 
 
 def split(n: int, parts: int, unit: int = 1) -> list[tuple[int, int]]:
@@ -92,17 +93,17 @@ def build() -> Graph:
         # one fold task per XCD is the only device-scope consumer: it sums the partials once into an
         # XCD-local vector; the 37 other workers wait on a local event and read that (measured: folding
         # in every task cost 35 us per phase, 304 tasks each re-fetching 147 KB after their L2 invalidate)
-        g.etensor(f"E_fold_{L}", (X,), wait_count=1)
+        g.etensor(f"E_fold_{L}", (X,), wait_count=F)
         g.etensor(f"E_qkv_{L}", (X,), wait_count=W)
         g.etensor(f"E_attn_{L}", (X,), wait_count=NC)
         g.etensor(f"E_o_{L}", (1,), wait_count=X * W)
-        g.etensor(f"E_folo_{L}", (X,), wait_count=1)
+        g.etensor(f"E_folo_{L}", (X,), wait_count=F)
         g.etensor(f"E_down_{L}", (1,), wait_count=X * W)
-        grid(f"fold_{L}", (X, 1), "llm_s_fold_d", L, {e_in: e_map}, {f"E_fold_{L}": "xw->x"}, 2.0, "xw->x")
+        grid(f"fold_{L}", (X, F), "llm_s_fold_d", L, {e_in: e_map}, {f"E_fold_{L}": "xw->x"}, 2.0, "xw->x")
         grid(f"qkv_{L}", (X, W), "llm_s_qkv", L, {f"E_fold_{L}": "xw->x"}, {f"E_qkv_{L}": "xw->x"}, us(d.NQKV * d.H * 2), "xw->x", "xw->w")
         grid(f"attn_{L}", (X, NC), "llm_s_attn", L, {f"E_qkv_{L}": "xc->x"}, {f"E_attn_{L}": "xc->x"}, 6.0, "xc->x")
         grid(f"oproj_{L}", (X, W), "llm_s_oproj", L, {f"E_attn_{L}": "xw->x"}, {f"E_o_{L}": "xw->(0)"}, us(d.H * d.NH * d.HD * 2), "xw->x", "xw->w")
-        grid(f"folo_{L}", (X, 1), "llm_s_fold_o", L, {f"E_o_{L}": "xw->(0)"}, {f"E_folo_{L}": "xw->x"}, 2.0, "xw->x")
+        grid(f"folo_{L}", (X, F), "llm_s_fold_o", L, {f"E_o_{L}": "xw->(0)"}, {f"E_folo_{L}": "xw->x"}, 2.0, "xw->x")
         if d.moe:
             g.etensor(f"E_r_{L}", (X,), wait_count=W)
             g.etensor(f"E_egu_{L}", (X,), wait_count=W)
@@ -115,11 +116,11 @@ def build() -> Graph:
             grid(f"down_{L}", (X, W), "llm_s_down", L, {f"E_gu_{L}": "xw->x"}, {f"E_down_{L}": "xw->(0)"}, us(d.H * d.INTER * 2), "xw->x", "xw->w")
         e_in, e_map = f"E_down_{L}", "xw->(0)"
     n_lm = math.ceil(d.V / p["lm"])
-    g.etensor("E_lmf", (1,), wait_count=1)
+    g.etensor("E_lmf", (1,), wait_count=F)
     g.etensor("E_lm", (1,), wait_count=n_lm)
     g.etensor("E_argmax", (1,), wait_count=1)
-    g.call_device("lmfold", (1,), hip_link(T, "llm_s_lmfold"), resource=res, args=["llm"], consts=(d.L,),
-                  in_edges={e_in: "i->(0)"}, out_edges={"E_lmf": "i->i"}, duration_us=2.0)
+    g.call_device("lmfold", (F,), hip_link(T, "llm_s_lmfold"), resource=res, args=["llm"], consts=(d.L,),
+                  in_edges={e_in: "i->(0)"}, out_edges={"E_lmf": "i->(0)"}, duration_us=2.0)
     g.call_device("lmhead", (n_lm,), hip_link(T, "llm_s_lmhead"), resource=res, args=["llm"], consts=(-1,),
                   in_edges={"E_lmf": "i->(0)"}, out_edges={"E_lm": "i->(0)"}, duration_us=M._us(d.V * d.H * 2, n_lm))
     g.call_device("argmax", (1,), hip_link(T, "llm_argmax"), resource=res, args=["llm"], consts=(-1,),

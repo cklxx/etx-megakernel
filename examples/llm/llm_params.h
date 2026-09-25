@@ -52,7 +52,10 @@ struct LlmParams {
   int32_t qh0[8], nqh[8], kv0[8], nkv[8], i0[8], ni[8], h0[8], nh[8];
   float *xa;                                // residual after attention [H] (xb is `x`)
   float *xin_x, *xa_x;                      // [8][H] XCD-local copies of the folded residual (written by the XCD's fold task)
-  float *xs1_x, *xs2_x;                     // [8][H] XCD-local normed inputs (ln1 for qkv, ln2 for the MLP / router), by the fold tasks
+  float *xs1_x, *xs2_x;                     // [8][H] (unused since the folds went parallel; kept for the per-op path)
+  int32_t F;                                // fold tasks per XCD: each folds H/F of the vector
+  float *ss_x;                              // [8][2][F] partial sums of squares (slot 0: layer input, slot 1: after o_proj), by the fold tasks
+  float *ss_f;                              // [F] the same for the final residual (lmfold)
   float *xsf;                               // [H] final-normed residual for lm_head (by lmfold)
   int32_t *rids_x; float *rw_x;             // [8][16] the token's top-k expert ids / weights, by the XCD's last router task
   float *xfin;                              // [H] folded final residual for lm_head

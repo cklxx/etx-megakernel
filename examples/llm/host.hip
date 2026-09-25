@@ -154,6 +154,7 @@ int main(int argc, char** argv) {
   }
   hp.layer_dump = dump_path.empty() ? nullptr : dalloc<float>((size_t)(hp.L + 1) * hp.H); hp.dump_step = (int)prompt.size() - 1;
   hp.ctr_qkv = dalloc<int32_t>((size_t)hp.L * 8); hp.ctr_attn = dalloc<int32_t>((size_t)hp.L * 8); hp.step_seq = 0; hp.unfused = unfused ? 1 : 0;
+  hp.F = 4; hp.ss_x = dalloc<float>((size_t)8 * 2 * hp.F); hp.ss_f = dalloc<float>(hp.F);
   hp.xs1_x = dalloc<float>((size_t)8 * hp.H); hp.xs2_x = dalloc<float>((size_t)8 * hp.H); hp.xsf = dalloc<float>(hp.H);
   hp.rids_x = dalloc<int32_t>(8 * 16); hp.rw_x = dalloc<float>(8 * 16);
   hp.xa = dalloc<float>(hp.H); hp.xin_x = dalloc<float>((size_t)8 * hp.H); hp.xa_x = dalloc<float>((size_t)8 * hp.H); hp.xfin = dalloc<float>(hp.H); hp.o_part = dalloc<float>((size_t)8 * hp.H); hp.d_part = dalloc<float>((size_t)std::max(8, hp.TOPK) * hp.H);
