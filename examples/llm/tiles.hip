@@ -432,6 +432,20 @@ extern "C" __device__ void llm_s_lmfold(const etx_ctx* c) {
   if (P.layer_dump && P.dump_step == P.tok) for (int i = threadIdx.x; i < P.H; i += blockDim.x) P.layer_dump[(size_t)c->cst[0] * P.H + i] = P.xfin[i];
 }
 
+// Last-arriver pattern inside one XCD (all producers and the consumer are on the same L2): every wave drains
+// its stores, thread 0 bumps the XCD's counter, and the task that completes the group invalidates its L1
+// and returns true. Counters are monotonic; the target scales with the step number.
+static __device__ __forceinline__ bool last_arriver(int32_t* ctr, int target, float* red) {
+  int* flag = (int*)(red + 255);          // last float of the scratch region: nothing else uses it
+  ETX_RELEASE_DOMAIN();
+  __syncthreads();
+  if (threadIdx.x == 0) { const int old = __hip_atomic_fetch_add(ctr, 1, __ATOMIC_RELAXED, __HIP_MEMORY_SCOPE_AGENT); *flag = (old + 1 == target); }
+  __syncthreads();
+  const bool last = *flag != 0;
+  if (last) ETX_ACQUIRE_DOMAIN();
+  return last;
+}
+
 // local qkv row r of XCD x -> global row in P.qkv (q rows, then [k; v] per needed KV head)
 static __device__ __forceinline__ int qkv_row(int x, int r) {
   const int HD = P.HD, nq = P.nqh[x] * HD;
@@ -447,9 +461,21 @@ extern "C" __device__ void llm_s_qkv(const etx_ctx* c) {
   rmsnorm_to(P.xin_x + (size_t)x * P.H, Ly.ln1, P.H, xs, red);
   const int nrows = (P.nqh[x] + 2 * P.nkv[x]) * P.HD;
   int r1; const int r0 = rows_of(nrows, w, P.W, &r1);
-  if (r0 >= r1) return;
   const __hip_bfloat16* b = Ly.bqkv_x[x];
-  gemv_rows(Ly.wqkv_x[x], P.H, xs, r0, r1, xs + P.H, [&](int r, float v) { P.qkv[qkv_row(x, r)] = bfr(v + (b ? etx_b2f(b[r]) : 0.f)); });
+  if (r0 < r1) gemv_rows(Ly.wqkv_x[x], P.H, xs, r0, r1, xs + P.H, [&](int r, float v) { P.qkv[qkv_row(x, r)] = bfr(v + (b ? etx_b2f(b[r]) : 0.f)); });
+  // the XCD's last qkv task does the post-processing of its heads (q/k norm, RoPE, KV-cache write): no post phase
+  if (!last_arriver(P.ctr_qkv + (size_t)L * 8 + x, P.W * (P.step_seq + 1), red)) return;
+  for (int j = 0; j < P.nqh[x]; ++j) {
+    const int qh = P.qh0[x] + j;
+    head_post(P.qkv + (size_t)qh * P.HD, P.qk_norm ? Ly.qn : nullptr, P.q + (size_t)qh * P.HD, nullptr, red);
+  }
+  for (int j = 0; j < P.nkv[x]; ++j) {
+    const int kvh = P.kv0[x] + j;
+    const size_t row = ((size_t)P.pos * P.NKV + kvh) * P.HD;
+    head_post(P.qkv + (size_t)(P.NH + kvh) * P.HD, P.qk_norm ? Ly.kn : nullptr, nullptr, Ly.kc + row, red);
+    const float* v = P.qkv + (size_t)(P.NH + P.NKV + kvh) * P.HD;
+    for (int d = threadIdx.x; d < P.HD; d += blockDim.x) Ly.vc[row + d] = __float2bfloat16(v[d]);
+  }
 }
 
 extern "C" __device__ void llm_s_post_q(const etx_ctx* c) {
@@ -470,7 +496,10 @@ extern "C" __device__ void llm_s_post_kv(const etx_ctx* c) {
   else { const float* v = P.qkv + (size_t)(P.NH + P.NKV + kvh) * P.HD; for (int d = threadIdx.x; d < P.HD; d += blockDim.x) Ly.vc[row + d] = __float2bfloat16(v[d]); }
 }
 
-// one chunk of positions for ALL of XCD x's heads: heads that share a KV head share its K/V loads
+// one chunk of positions for ALL of XCD x's heads: heads that share a KV head share its K/V loads.
+// The chunk's K rows, then its V rows, are staged through LDS with 16-byte coalesced loads by every thread
+// (CHUNK x HD bf16 = 16 KB at CHUNK 64), so the scores and P.V loops read LDS instead of issuing one
+// dependent global load per position per thread. Same arithmetic order as before: results are identical.
 static __device__ __forceinline__ void attn_heads(const LlmLayer& Ly, int qh_begin, int nheads, int kvh, int ch, float* red, float* qs) {
   const int HD = P.HD, NC = P.NC, stride = HD + 2;
   const int n = P.pos + 1, t0 = ch * P.CHUNK, t1 = min(t0 + P.CHUNK, n), len = t1 - t0;
@@ -484,15 +513,21 @@ static __device__ __forceinline__ void attn_heads(const LlmLayer& Ly, int qh_beg
     return;
   }
   float* sc = qs + nheads * HD;                            // [nheads][CHUNK]
+  uint4* kv = (uint4*)(sc + nheads * P.CHUNK);             // [CHUNK][HD] bf16 = CHUNK * HD / 8 uint4
+  const int per_row = HD / 8;
   for (int i = threadIdx.x; i < nheads * HD; i += blockDim.x) qs[i] = P.q[(size_t)qh_begin * HD + i];
+  for (int i = threadIdx.x; i < len * per_row; i += blockDim.x) {
+    const int t = i / per_row, u = i % per_row;
+    kv[i] = *(const uint4*)(Ly.kc + ((size_t)(t0 + t) * P.NKV + kvh) * HD + u * 8);
+  }
   __syncthreads();
   const float scale = rsqrtf((float)HD);
   for (int idx = threadIdx.x; idx < nheads * len; idx += blockDim.x) {
     const int j = idx / len, t = idx % len;
-    const __hip_bfloat16* k = Ly.kc + ((size_t)(t0 + t) * P.NKV + kvh) * HD;
+    const uint4* k = kv + t * per_row;
     const float* q = qs + j * HD;
     float sacc = 0.f;
-    for (int d = 0; d < HD; d += 8) sacc += dot8(*(const uint4*)(k + d), q + d);
+    for (int u = 0; u < per_row; ++u) sacc += dot8(k[u], q + u * 8);
     sc[j * P.CHUNK + t] = sacc * scale;
   }
   __syncthreads();
@@ -506,11 +541,17 @@ static __device__ __forceinline__ void attn_heads(const LlmLayer& Ly, int qh_beg
     l = etx_wave_sum(l);
     if (etx_lane() == 0) { mrow[j] = m; lrow[j] = l; }
   }
+  __syncthreads();                                         // everyone is done with K: reuse the buffer for V
+  for (int i = threadIdx.x; i < len * per_row; i += blockDim.x) {
+    const int t = i / per_row, u = i % per_row;
+    kv[i] = *(const uint4*)(Ly.vc + ((size_t)(t0 + t) * P.NKV + kvh) * HD + u * 8);
+  }
   __syncthreads();
+  const __hip_bfloat16* vb = (const __hip_bfloat16*)kv;
   for (int idx = threadIdx.x; idx < nheads * HD; idx += blockDim.x) {
     const int j = idx / HD, d = idx % HD;
     float acc = 0.f;
-    for (int t = 0; t < len; ++t) acc += sc[j * P.CHUNK + t] * etx_b2f(Ly.vc[((size_t)(t0 + t) * P.NKV + kvh) * HD + d]);
+    for (int t = 0; t < len; ++t) acc += sc[j * P.CHUNK + t] * etx_b2f(vb[t * HD + d]);
     float* part = P.attn_part + ((size_t)(qh_begin + j) * NC + ch) * stride;
     part[d] = acc;
     if (d == 0) { part[HD] = mrow[j]; part[HD + 1] = lrow[j]; }
@@ -519,9 +560,9 @@ static __device__ __forceinline__ void attn_heads(const LlmLayer& Ly, int qh_beg
 }
 
 extern "C" __device__ void llm_s_attn(const etx_ctx* c) {
-  const int x = c->coord[0], ch = c->coord[1];
+  const int L = c->cst[0], x = c->coord[0], ch = c->coord[1];
   if (P.nqh[x] == 0) return;
-  const LlmLayer& Ly = P.layer[c->cst[0]];
+  const LlmLayer& Ly = P.layer[L];
   float* red = LLM_RED(c); float* qs = LLM_VEC(c);
   const int qend = P.qh0[x] + P.nqh[x];
   for (int qh = P.qh0[x]; qh < qend;) {                     // one call per KV head the XCD's heads use
@@ -529,6 +570,10 @@ extern "C" __device__ void llm_s_attn(const etx_ctx* c) {
     attn_heads(Ly, qh, last - qh, kvh, ch, red, qs);
     qh = last;
   }
+  // the XCD's last chunk task merges the chunks of every head it owns: no merge phase
+  if (!last_arriver(P.ctr_attn + (size_t)L * 8 + x, P.NC * (P.step_seq + 1), red)) return;
+  etx_ctx cc = *c;
+  for (int j = 0; j < P.nqh[x]; ++j) { cc.coord[0] = P.qh0[x] + j; llm_merge(&cc); __syncthreads(); }
 }
 
 extern "C" __device__ void llm_s_merge(const etx_ctx* c) {

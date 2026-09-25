@@ -55,6 +55,8 @@ struct LlmParams {
   float *d_part;                            // [max(8, TOPK)][H] per-XCD (dense) or per-slot (MoE) down partial sums
   float *rlog_x;                            // [8][E] router logits, one copy per XCD
   int32_t *eid;                             // [TOPK] expert id per slot (written by the slot's XCD)
+  int32_t *ctr_qkv, *ctr_attn;              // [L][8] last-arriver counters per layer and XCD (monotonic; step_seq scales the target)
+  int32_t step_seq;                         // steps launched so far in this process (never reset)
   float *layer_dump;                        // [L+1][H]: residual entering each layer and the final one, when dump_step == tok
   int32_t dump_step;
   // per step

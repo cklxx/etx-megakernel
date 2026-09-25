@@ -137,7 +137,10 @@ def lds_bytes(d: Dims) -> int:
     vec = max(d.H, d.NH * d.HD, d.INTER if not d.moe else 0, d.TOPK * d.MI)
     part = 4 * 520                        # largest task: lm_head rows (<= 516) x 4 waves; lm_head also keeps its logits
     lm = 2 * d.H + 520 + part             # sliced lm_head: folded residual + normed input + logits + partials
-    return (max(vec + 4 * 64, lm)) * 4 + 4096
+    _, chunk = _ctx_chunk()
+    hmax = -(-d.NH // 8)
+    attn = hmax * d.HD + hmax * chunk + chunk * d.HD // 2   # sliced attention: q heads, scores, staged K/V chunk (bf16)
+    return (max(vec + 4 * 64, lm, attn)) * 4 + 4096
 
 
 def _us(nbytes: float, tasks: int) -> float:

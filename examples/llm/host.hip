@@ -152,6 +152,7 @@ int main(int argc, char** argv) {
     }
   }
   hp.layer_dump = dump_path.empty() ? nullptr : dalloc<float>((size_t)(hp.L + 1) * hp.H); hp.dump_step = (int)prompt.size() - 1;
+  hp.ctr_qkv = dalloc<int32_t>((size_t)hp.L * 8); hp.ctr_attn = dalloc<int32_t>((size_t)hp.L * 8); hp.step_seq = 0;
   hp.xa = dalloc<float>(hp.H); hp.xin_x = dalloc<float>((size_t)8 * hp.H); hp.xa_x = dalloc<float>((size_t)8 * hp.H); hp.xfin = dalloc<float>(hp.H); hp.o_part = dalloc<float>((size_t)8 * hp.H); hp.d_part = dalloc<float>((size_t)std::max(8, hp.TOPK) * hp.H);
   hp.rlog_x = dalloc<float>((size_t)8 * std::max(1, hp.E)); hp.eid = dalloc<int32_t>(std::max(8, hp.TOPK));
   const bool sliced_graph = strncmp(ETX_GRAPH_NAME, "llm_sliced_", 11) == 0;
@@ -202,6 +203,7 @@ int main(int argc, char** argv) {
     for (int t = 0; t < steps; ++t) {
       hp.tok = t; hp.pos = t; hp.write_next = (!teacher && t + 1 >= (int)prompt.size()) ? 1 : 0;
       llm_set_params(&hp, hst.stream);
+      hp.step_seq++;
       if (unfused) { if (!hst.run_unfused()) { printf("step %d: unfused step failed\n", t); return 2; } }
       else if (!hst.run(60.0)) { printf("step %d: ETX step failed\n", t); return 2; }
     }

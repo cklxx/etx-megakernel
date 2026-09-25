@@ -8,10 +8,8 @@ phase's prologue instead of a barrier (fleet's FOLD_PARTIALS, the design's recom
   XCD k owns query heads [qh0_k, qh0_k + nqh_k) and computes the K/V rows of the KV heads they need
   (duplicated across XCDs that share a KV head; they write identical values).
   qkv_s    (X, W)        rows of XCD k's q/k/v slice, split over the W workers     -> E_qkv[x]   local
-  post_q_s (X, HMAX)     q-norm + RoPE per owned head                               -> E_post[x]  local
-  post_kv_s(X, KVMAX, 2) k-norm + RoPE + KV-cache write per needed KV head          -> E_post[x]  local
-  attn_s   (X, HMAX, NC) one owned head x one chunk                                 -> E_attn[x,j] local
-  merge_s  (X, HMAX)     combine the chunks of one head                             -> E_merge[x] local
+                         the XCD's LAST qkv task also does q/k norm, RoPE and the KV write (last-arriver counter)
+  attn_s   (X, NC)       one chunk for all of the XCD's heads; the LAST chunk task merges them -> E_attn[x] local
   oproj_s  (X, W)        o_part[x] = Wo[:, cols of x's heads] . o[x's heads]        -> E_o        DEVICE
   gateup_s (X, W)        fold xa = xb + sum o_part (w==0 writes its slice of xa); h rows of slice x -> E_gu[x] local
   down_s   (X, W)        d_part[x] = Wd[:, inter slice x] . h[inter slice x]        -> E_down     DEVICE
@@ -94,20 +92,15 @@ def build() -> Graph:
         # XCD-local vector; the 37 other workers wait on a local event and read that (measured: folding
         # in every task cost 35 us per phase, 304 tasks each re-fetching 147 KB after their L2 invalidate)
         g.etensor(f"E_fold_{L}", (X,), wait_count=1)
-        g.etensor(f"E_qkv_{L}", (X,), wait_count=W)
-        g.etensor(f"E_post_{L}", (X,), wait_count=HMAX + 2 * KVMAX)
-        g.etensor(f"E_attn_{L}", (X,), wait_count=NC)
-        g.etensor(f"E_merge_{L}", (X,), wait_count=HMAX)
+        g.etensor(f"E_qkv_{L}", (X,), wait_count=W)          # completed by the XCD's last qkv task, after its head posts
+        g.etensor(f"E_attn_{L}", (X,), wait_count=NC)         # completed by the XCD's last chunk task, after the merge
         g.etensor(f"E_o_{L}", (1,), wait_count=X * W)
         g.etensor(f"E_folo_{L}", (X,), wait_count=1)
         g.etensor(f"E_down_{L}", (1,), wait_count=X * W)
         grid(f"fold_{L}", (X, 1), "llm_s_fold_d", L, {e_in: e_map}, {f"E_fold_{L}": "xw->x"}, 2.0, "xw->x")
         grid(f"qkv_{L}", (X, W), "llm_s_qkv", L, {f"E_fold_{L}": "xw->x"}, {f"E_qkv_{L}": "xw->x"}, us(d.NQKV * d.H * 2), "xw->x", "xw->w")
-        grid(f"post_q_{L}", (X, HMAX), "llm_s_post_q", L, {f"E_qkv_{L}": "xj->x"}, {f"E_post_{L}": "xj->x"}, 1.0, "xj->x")
-        grid(f"post_kv_{L}", (X, KVMAX, 2), "llm_s_post_kv", L, {f"E_qkv_{L}": "xjs->x"}, {f"E_post_{L}": "xjs->x"}, 1.0, "xjs->x")
-        grid(f"attn_{L}", (X, NC), "llm_s_attn", L, {f"E_post_{L}": "xc->x"}, {f"E_attn_{L}": "xc->x"}, 6.0, "xc->x")
-        grid(f"merge_{L}", (X, HMAX), "llm_s_merge", L, {f"E_attn_{L}": "xj->x"}, {f"E_merge_{L}": "xj->x"}, 1.0, "xj->x")
-        grid(f"oproj_{L}", (X, W), "llm_s_oproj", L, {f"E_merge_{L}": "xw->x"}, {f"E_o_{L}": "xw->(0)"}, us(d.H * d.NH * d.HD * 2), "xw->x", "xw->w")
+        grid(f"attn_{L}", (X, NC), "llm_s_attn", L, {f"E_qkv_{L}": "xc->x"}, {f"E_attn_{L}": "xc->x"}, 6.0, "xc->x")
+        grid(f"oproj_{L}", (X, W), "llm_s_oproj", L, {f"E_attn_{L}": "xw->x"}, {f"E_o_{L}": "xw->(0)"}, us(d.H * d.NH * d.HD * 2), "xw->x", "xw->w")
         grid(f"folo_{L}", (X, 1), "llm_s_fold_o", L, {f"E_o_{L}": "xw->(0)"}, {f"E_folo_{L}": "xw->x"}, 2.0, "xw->x")
         if d.moe:
             g.etensor(f"E_r_{L}", (X,), wait_count=W)

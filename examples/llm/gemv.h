@@ -12,7 +12,7 @@
 // is then called once per row by one thread. LLM_GEMV_U overrides the depth; LLM_NT_WEIGHTS=1 uses
 // non-temporal weight loads (weights are read once per token).
 #ifndef LLM_GEMV_U
-#define LLM_GEMV_U 16
+#define LLM_GEMV_U 32          // one workgroup per CU leaves 512 registers per lane: 32 x 16 B loads in flight
 #endif
 typedef unsigned int llm_u32x4 __attribute__((ext_vector_type(4)));
 typedef unsigned int llm_u32x2 __attribute__((ext_vector_type(2)));
