@@ -34,6 +34,7 @@ def emit_plan_header(plan: Plan, device: int = 0) -> str:
     for i, s in enumerate(g.symbols):
         out.append(f"#define ETX_SYM_{s} {i}")
     out.append(_arr("etx_shape", shape))
+    out.append(f"#define ETX_GRAPH_NAME \"{g.name}\"")
     out.append(f"#define ETX_N_DEVICES {nd}")
     out.append(f"#define ETX_N_TASKS {len(plan.tasks)}")
     out.append(f"#define ETX_N_DOMAINS {ndom}")

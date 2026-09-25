@@ -44,6 +44,12 @@ static std::vector<int> read_ints(std::istream& in) {
   std::vector<int> v; int x; while (s >> x) v.push_back(x); return v;
 }
 
+// same rule as examples/llm/model_sliced.py::split: n/unit units split evenly, the remainder to the first parts
+static void split8(int n, int unit, int32_t* start, int32_t* count) {
+  const int u = n / unit, base = u / 8, rem = u % 8; int s = 0;
+  for (int k = 0; k < 8; ++k) { const int c = base + (k < rem ? 1 : 0); start[k] = s * unit; count[k] = c * unit; s += c; }
+}
+
 static inline float bf16_round(float v) { return __bfloat162float(__float2bfloat16(v)); }
 
 template <class T> static T* dalloc(size_t n) { T* p; ETX_CHECK(hipMalloc(&p, n * sizeof(T))); ETX_CHECK(hipMemset(p, 0, n * sizeof(T))); return p; }
@@ -111,6 +117,43 @@ int main(int argc, char** argv) {
     else { y.wg = W(p + "wg"); y.wu = W(p + "wu"); y.wd = W(p + "wd"); }
     y.kc = dalloc<__hip_bfloat16>(kv_elems); y.vc = dalloc<__hip_bfloat16>(kv_elems);
   }
+  // ---- sliced layout (model_sliced.py): per-XCD tables and the slice blob, when prep.py --sliced ran
+  hp.X = 8; hp.W = ETX_WORKERS_PER_DOMAIN;
+  split8(hp.NH, 1, hp.qh0, hp.nqh);
+  for (int k = 0; k < 8; ++k) {
+    if (hp.nqh[k] == 0) { hp.kv0[k] = 0; hp.nkv[k] = 0; }
+    else { const int kv0 = hp.qh0[k] / hp.G, kv1 = (hp.qh0[k] + hp.nqh[k] - 1) / hp.G; hp.kv0[k] = kv0; hp.nkv[k] = kv1 - kv0 + 1; }
+  }
+  if (hp.moe) for (int k = 0; k < 8; ++k) { hp.i0[k] = 0; hp.ni[k] = 0; } else split8(hp.INTER, 8, hp.i0, hp.ni);
+  split8(hp.H, 8, hp.h0, hp.nh);
+  bool sliced = false;
+  {
+    std::ifstream sm(dir + "/sliced.manifest");
+    if (sm) {
+      Manifest ms; std::string kind;
+      while (sm >> kind) { if (kind == "t") { std::string n; size_t off, cnt; sm >> n >> off >> cnt; ms.t[n] = {off, cnt}; } else { std::string rest; std::getline(sm, rest); } }
+      const std::string spath = dir + "/sliced.bin";
+      FILE* sf = fopen(spath.c_str(), "rb"); if (!sf) die("cannot open " + spath);
+      fseek(sf, 0, SEEK_END); const size_t sbytes = (size_t)ftell(sf); fseek(sf, 0, SEEK_SET);
+      char* dS; ETX_CHECK(hipMalloc(&dS, sbytes));
+      { const size_t chunk = 256ull << 20; void* pinned; ETX_CHECK(hipHostMalloc(&pinned, chunk));
+        for (size_t off = 0; off < sbytes; off += chunk) { const size_t n = std::min(chunk, sbytes - off);
+          if (fread(pinned, 1, n, sf) != n) die("short read on sliced.bin"); ETX_CHECK(hipMemcpy(dS + off, pinned, n, hipMemcpyHostToDevice)); }
+        ETX_CHECK(hipHostFree(pinned)); fclose(sf); }
+      auto WS = [&](const std::string& n) -> const __hip_bfloat16* { auto it = ms.t.find(n); return it == ms.t.end() ? nullptr : (const __hip_bfloat16*)(dS + it->second.first); };
+      for (int L = 0; L < hp.L; ++L) for (int k = 0; k < 8; ++k) {
+        const std::string p = "L" + std::to_string(L) + ".", x = ".x" + std::to_string(k);
+        hp.layer[L].wqkv_x[k] = WS(p + "wqkv" + x); hp.layer[L].bqkv_x[k] = WS(p + "bqkv" + x);
+        hp.layer[L].wo_x[k] = WS(p + "wo" + x); hp.layer[L].wd_x[k] = WS(p + "wd" + x);
+      }
+      sliced = true;
+      printf("sliced weights: %.2f GB\n", sbytes / 1e9);
+    }
+  }
+  hp.xa = dalloc<float>(hp.H); hp.o_part = dalloc<float>((size_t)8 * hp.H); hp.d_part = dalloc<float>((size_t)std::max(8, hp.TOPK) * hp.H);
+  hp.rlog_x = dalloc<float>((size_t)8 * std::max(1, hp.E)); hp.eid = dalloc<int32_t>(std::max(8, hp.TOPK));
+  const bool sliced_graph = strstr(ETX_GRAPH_NAME, "sliced") != nullptr;
+  if (sliced_graph && !sliced) die("this binary was built from model_sliced.py: run prep.py --sliced for " + dir);
   // ---- RoPE tables, computed like HF (fp32 inv_freq and angles, cos/sin rounded to bf16)
   {
     const int half = hp.HD / 2; const float theta = (float)m.cfg.at("theta");
@@ -181,6 +224,7 @@ int main(int argc, char** argv) {
   const double med = s.empty() ? 0 : s[s.size() / 2];
   printf("per-token latency (embed -> argmax on device): median %.3f ms  min %.3f  max %.3f; weights %.2f GB -> %.0f GB/s effective\n",
          med, s.empty() ? 0 : s.front(), s.empty() ? 0 : s.back(), wbytes / 1e9, med > 0 ? (m.cfg.at("active_bytes") / 1e9) / (med / 1e3) : 0.0);
+  printf("graph: %s\n", sliced_graph ? "sliced (one slice per XCD, two device-wide barriers per layer)" : "per-operator barriers");
   printf("mode: %s\n", unfused ? (getenv("ETX_UNFUSED_NOGRAPH") ? "unfused (stream launches)" : "unfused (HIP graph)") : "ETX megakernel");
   printf("RESULT model=%s matched=%d gen=%d median_ms=%.3f active_GB=%.3f\n", dir.c_str(), matched, gen, med, m.cfg.at("active_bytes") / 1e9);
   if (getenv("ETX_TRACE")) hst.report_phases(etx_type_names, ETX_N_TYPES);

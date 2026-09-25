@@ -116,6 +116,70 @@ def pack(src: Path, out: Path, d: M.Dims):
     return lines, off
 
 
+def pack_sliced(src: Path, out: Path, d: M.Dims):
+    """Per-XCD slices for examples/llm/model_sliced.py, in a second blob: qkv rows of each XCD's heads
+    (q rows, then [k; v] per needed KV head), o_proj columns of its heads as [H][K], dense down columns
+    of its intermediate slice as [H][K]."""
+    from safetensors import safe_open
+    from examples.llm import model_sliced as MS
+    S = MS.slices(d)
+    index = {}
+    for f in sorted(src.glob("*.safetensors")):
+        with safe_open(f, framework="pt") as h:
+            for k in h.keys():
+                index[k] = f
+    handles = {}
+
+    def get(name):
+        f = index[name]
+        if f not in handles:
+            handles[f] = safe_open(f, framework="pt")
+        return handles[f].get_tensor(name).to(torch.bfloat16)
+
+    lines, off = [], 0
+    wf = open(out / "sliced.bin", "wb")
+
+    def put(name, t):
+        nonlocal off
+        pad = (-off) % 256
+        if pad:
+            wf.write(b"\0" * pad); off += pad
+        b = t.to(torch.bfloat16).contiguous().view(torch.uint16).numpy().tobytes()
+        wf.write(b); lines.append(f"t {name} {off} {t.numel()}"); off += len(b)
+
+    HD = d.HD
+    for L in range(d.L):
+        a = f"model.layers.{L}.self_attn."
+        q, k, v = get(a + "q_proj.weight"), get(a + "k_proj.weight"), get(a + "v_proj.weight")
+        bq = get(a + "q_proj.bias") if (a + "q_proj.bias") in index else None
+        bk = get(a + "k_proj.bias") if bq is not None else None
+        bv = get(a + "v_proj.bias") if bq is not None else None
+        wo = get(a + "o_proj.weight")
+        wd = get(f"model.layers.{L}.mlp.down_proj.weight") if not d.moe else None
+        for x in range(MS.X):
+            qh0, nqh = S["q"][x]; kv0, nkv = S["kv"][x]
+            rows = [q[qh0 * HD:(qh0 + nqh) * HD]]
+            brows = [bq[qh0 * HD:(qh0 + nqh) * HD]] if bq is not None else []
+            for j in range(kv0, kv0 + nkv):
+                rows += [k[j * HD:(j + 1) * HD], v[j * HD:(j + 1) * HD]]
+                if bq is not None:
+                    brows += [bk[j * HD:(j + 1) * HD], bv[j * HD:(j + 1) * HD]]
+            if nqh:
+                put(f"L{L}.wqkv.x{x}", torch.cat(rows, 0))
+                if bq is not None:
+                    put(f"L{L}.bqkv.x{x}", torch.cat(brows, 0))
+                put(f"L{L}.wo.x{x}", wo[:, qh0 * HD:(qh0 + nqh) * HD].contiguous())
+            if wd is not None:
+                i0, ni = S["inter"][x]
+                if ni:
+                    put(f"L{L}.wd.x{x}", wd[:, i0:i0 + ni].contiguous())
+        print(f"  sliced layer {L + 1}/{d.L}", end="\r", flush=True)
+    wf.close()
+    print()
+    (out / "sliced.manifest").write_text("\n".join(lines) + "\n")
+    return off
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--model", required=True)
@@ -124,6 +188,7 @@ def main():
     ap.add_argument("--prompt", default=PROMPT)
     ap.add_argument("--src", default=None, help="local snapshot dir (default: download to <out>/hf)")
     ap.add_argument("--context", type=int, default=0, help="use fleet's benchmark prompt of this many tokens; writes golden_c<N>.txt")
+    ap.add_argument("--sliced", action="store_true", help="also pack the per-XCD slices (sliced.bin / sliced.manifest)")
     a = ap.parse_args()
     out = Path(os.path.expanduser(a.out)); out.mkdir(parents=True, exist_ok=True)
     src = Path(a.src) if a.src else out / "hf"
@@ -154,6 +219,9 @@ def main():
             **{f"rpt_{k}": v for k, v in part.items()}).items()]
         (out / "llm.manifest").write_text("\n".join(cfg_lines + tlines) + "\n")
         print(f"packed {nbytes / 1e9:.2f} GB; active per token {active / 1e9:.2f} GB")
+    if a.sliced and not (out / "sliced.manifest").exists():
+        nb = pack_sliced(src, out, d)
+        print(f"packed slices {nb / 1e9:.2f} GB")
 
 
 if __name__ == "__main__":

@@ -16,6 +16,10 @@ struct LlmLayer {
   const __hip_bfloat16 *wr;                 // MoE router [E][H]
   const __hip_bfloat16 *eg, *eu, *ed;       // MoE experts: [E][MI][H], [E][MI][H], [E][H][MI]
   __hip_bfloat16 *kc, *vc;                  // KV cache [CTX][NKV][HD]
+  // sliced layout (examples/llm/model_sliced.py), one per XCD; null when not packed
+  const __hip_bfloat16 *wqkv_x[8], *bqkv_x[8];   // [nrows_x][H]: q rows of the XCD's heads, then [k rows; v rows] per needed KV head
+  const __hip_bfloat16 *wo_x[8];                 // [H][nqh_x * HD]: o_proj columns of the XCD's heads
+  const __hip_bfloat16 *wd_x[8];                 // dense: [H][ninter_x]: down columns of the XCD's intermediate slice
 };
 
 struct LlmParams {
@@ -41,6 +45,14 @@ struct LlmParams {
   float *lm_val; int32_t *lm_idx;           // per lm_head task: best logit and its row
   int32_t *token_in, *token_out;            // [steps + 1], [steps]
   uint64_t *token_time;                     // [steps][2]: embed start, argmax end (s_memrealtime, 100 MHz)
+  // sliced layout tables (model_sliced.slices): per XCD
+  int32_t X, W;                             // XCDs, workers per XCD
+  int32_t qh0[8], nqh[8], kv0[8], nkv[8], i0[8], ni[8], h0[8], nh[8];
+  float *xa;                                // residual after attention [H] (xb is `x`)
+  float *o_part;                            // [8][H] per-XCD o_proj partial sums
+  float *d_part;                            // [max(8, TOPK)][H] per-XCD (dense) or per-slot (MoE) down partial sums
+  float *rlog_x;                            // [8][E] router logits, one copy per XCD
+  int32_t *eid;                             // [TOPK] expert id per slot (written by the slot's XCD)
   // per step
   int32_t tok, pos, write_next;
 };

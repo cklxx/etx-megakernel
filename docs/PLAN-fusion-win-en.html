@@ -1,0 +1,220 @@
+<!doctype html><html><head><meta charset='utf-8'><title>ETX: Making Fusion Win</title><style>
+@page { size: A4; margin: 18mm 16mm 18mm 16mm; }
+body { font-family: "DejaVu Sans", "Helvetica Neue", Arial, sans-serif; font-size: 10.5pt; line-height: 1.45; color: #111; max-width: 178mm; margin: 0 auto; }
+h1 { font-size: 20pt; margin: 0 0 6pt; line-height: 1.25; }
+h2 { font-size: 14.5pt; margin: 22pt 0 6pt; padding-bottom: 3pt; border-bottom: 1px solid #999; page-break-after: avoid; }
+h3 { font-size: 12pt; margin: 14pt 0 4pt; page-break-after: avoid; }
+h4 { font-size: 10.5pt; margin: 10pt 0 3pt; }
+p { margin: 5pt 0; text-align: left; }
+ul, ol { margin: 4pt 0 6pt; padding-left: 18pt; }
+li { margin: 2pt 0; }
+table { border-collapse: collapse; width: 100%; margin: 6pt 0 10pt; font-size: 9pt; page-break-inside: auto; }
+th, td { border: 1px solid #999; padding: 3pt 5pt; vertical-align: top; text-align: left; }
+th { background: #eee; font-weight: bold; }
+tr { page-break-inside: avoid; }
+code { font-family: "DejaVu Sans Mono", Menlo, Consolas, monospace; font-size: 8.8pt; }
+pre { background: #f4f4f4; border: 1px solid #ccc; padding: 6pt 8pt; font-size: 8.5pt; line-height: 1.35; white-space: pre-wrap; word-break: break-word; page-break-inside: avoid; }
+hr { border: none; border-top: 1px solid #999; margin: 12pt 0; }
+blockquote { margin: 6pt 0; padding-left: 10pt; border-left: 3px solid #bbb; color: #333; }
+.meta { color: #333; margin-bottom: 10pt; }
+a { color: #0645ad; text-decoration: none; }
+</style></head><body><h1 id="etx-making-fusion-win">ETX: Making Fusion Win</h1>
+<p>Author: Kailun Chen · Status: v1 plan · Date: 2026-09-25 · Evidence: <code>examples/llm/results/bench_2026-09-25.log</code>, <code>docs/ETX_Technical_Design.md</code> sections 15.4-15.6</p>
+<h2 id="0-summary">0. Summary</h2>
+<ul>
+<li><strong>Goal 1 (must):</strong> with the same tiles, the ETX megakernel runs at least 15% faster than one kernel per operator replayed from a HIP graph. Today it is 6-15% slower.</li>
+<li><strong>Goal 2:</strong> on the three Qwen models, at least 15% faster than vLLM&rsquo;s best configuration. Today it is about 2x slower.</li>
+<li><strong>Goal 3:</strong> every token identical to Hugging Face greedy, deterministic across runs.</li>
+<li><strong>Route:</strong> first make the barriers cheap (device-wide barriers per layer from 8 down to 2), then give the barriers something to overlap (cross-barrier weight prefetch), and last bring the tiles above 3 TB/s. The first two steps are compiler and runtime work, which is where ETX&rsquo;s value lies; the third is tile engineering, which sets the distance to vLLM.</li>
+<li><strong>Budget:</strong> 7 phases, about 10 GPU sessions of 1-2 hours on a 1x MI300X at $2.99/h, $40-60 in total. The balance is $26.20 and needs topping up.</li>
+</ul>
+<h2 id="1-where-we-are-and-why">1. Where we are and why</h2>
+<p>Same MI300X, 1024-token context, batch 1 (2026-09-25):</p>
+<table>
+<thead>
+<tr>
+<th>Model</th>
+<th>vLLM best</th>
+<th>ETX unfused (same tiles, HIP graph)</th>
+<th>ETX fused</th>
+<th>Hand-written fleet</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Qwen2.5-1.5B</td>
+<td>1.86 ms</td>
+<td>4.05</td>
+<td>4.47</td>
+<td>-</td>
+</tr>
+<tr>
+<td>Qwen3-8B</td>
+<td>4.91 ms</td>
+<td>9.45</td>
+<td>10.07</td>
+<td>-</td>
+</tr>
+<tr>
+<td>Qwen3-30B-A3B</td>
+<td>4.84 ms</td>
+<td>9.07</td>
+<td>10.48</td>
+<td>-</td>
+</tr>
+<tr>
+<td>DeepSeek-V2-Lite</td>
+<td>4.12 ms</td>
+<td>not measured</td>
+<td>3.78 (fleet&rsquo;s tiles)</td>
+<td>3.57</td>
+</tr>
+</tbody>
+</table>
+<p>Per-phase trace of Qwen3-8B: 274 us per layer against a bandwidth floor of about 98 us.</p>
+<table>
+<thead>
+<tr>
+<th>Where it goes</th>
+<th>Time</th>
+<th>Root cause</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>The four GEMV phases</td>
+<td>190 us</td>
+<td>1.5-2.5 TB/s effective: small tasks, too few loads in flight</td>
+</tr>
+<tr>
+<td>Attention plus merge</td>
+<td>63 us</td>
+<td>Serial dot products per thread after chunking by position; merge reads 64 chunks serially</td>
+</tr>
+<tr>
+<td>Eight device-wide barriers</td>
+<td>about 9 us more than kernel boundaries</td>
+<td>300 workers poll one counter, the last arriver writes back L2, eight XCDs each invalidate</td>
+</tr>
+</tbody>
+</table>
+<p>Three root causes:
+1. <strong>The graph has the wrong shape.</strong> The Qwen graph has eight device-wide barriers per layer. Fleet&rsquo;s has two; the other six are XCD-local events. The Qwen graph does not use ETX&rsquo;s most valuable ability, building the graph around the chiplets.
+2. <strong>A barrier costs more than a kernel boundary,</strong> about 2 us more each. Batch-1 decode is a chain in which every link needs the whole output of the previous one, so the number of barriers is fixed by the model; each one must get cheaper, or the waiting time must be put to use.
+3. <strong>The tiles are weak.</strong> GEMV and attention are latency-bound. That has nothing to do with fusion, but it sets the distance to vLLM.</p>
+<h2 id="2-design-one-slice-of-every-layer-per-xcd">2. Design: one slice of every layer per XCD</h2>
+<p>Fleet&rsquo;s hand-made scheme generalises into a compiler rule. A layer&rsquo;s work is cut into eight slices, one per XCD; inside a slice only local events are used, and the slices meet at two points only:</p>
+<pre><code>                inside XCD k (local events, L1 invalidate only)
+x --norm--&gt; slice k of the qkv rows --&gt; attention for this XCD's KV-head group --&gt; merge --&gt; K-slice k of o_proj
+                                                                                   | writes this XCD's partial sum o_k
+        ================ device-wide barrier 1: eight partial sums ready ================
+x + sum(o_k) --norm--&gt; slice k of the gate_up rows --&gt; K-slice k of down --&gt; writes this XCD's partial sum d_k
+        ================ device-wide barrier 2: eight partial sums ready ================
+prologue of the next layer's qkv: x = x + sum(d_k)   (reads eight vectors: cheaper than a barrier)
+</code></pre>
+<p>Key points:
+- <strong>Rows go to XCDs, K goes to XCDs.</strong> qkv and gate_up are cut by output rows; each slice is exactly what the same XCD needs next. o_proj and down are cut by K; each XCD consumes only the input its own slice produced and writes a partial sum.
+- <strong>Summing the partials happens in the next phase&rsquo;s prologue.</strong> This is fleet&rsquo;s FOLD_PARTIALS and the design document&rsquo;s &ldquo;recompute for events&rdquo;: reading 8 x H floats is far cheaper than a device-wide barrier.
+- <strong>Attention follows the KV-head groups.</strong> Under GQA each XCD holds NKV/8 KV heads and their query heads, so KV-cache reads and writes stay inside the XCD.
+- <strong>Weights are packed per slice.</strong> The packer lays out each XCD&rsquo;s row slice and K slice as one contiguous block, so a task streams contiguous memory.</p>
+<p>Device-wide barriers per layer drop from eight to two. Everything else is an XCD-local event at about 1 us with no L2 invalidate.</p>
+<h2 id="3-phases">3. Phases</h2>
+<h3 id="phase-0-complete-the-measurements-1-session">Phase 0: complete the measurements (1 session)</h3>
+<ul>
+<li>Measure &ldquo;fleet&rsquo;s tiles, unfused&rdquo; on DeepSeek. That number decides whether a locality-aware graph makes fusion pay.</li>
+<li>Barrier microbenchmark at 304 workgroups: the ETX device-wide barrier, a two-level barrier, and a HIP-graph kernel boundary, in microseconds. The numbers go into the cost table of <code>gfx942.yaml</code>.</li>
+<li>Done when: the three numbers are in the table and the DeepSeek unfused figure is in the comparison table.</li>
+</ul>
+<h3 id="phase-1-the-compiler-builds-xcd-local-graphs-2-sessions">Phase 1: the compiler builds XCD-local graphs (2 sessions)</h3>
+<ul>
+<li><strong>P2 extension, &ldquo;slice by domain&rdquo;:</strong> when a grid&rsquo;s output is consumed per domain downstream, place the producer slices per domain and lower the event to DOMAIN scope. The input is an edge map, for example qkv row blocks to KV-head groups as <code>"i-&gt;(i/rows_per_group)"</code>.</li>
+<li><strong>Sliced graph builder:</strong> <code>examples/llm/model.py</code> emits the grids and events of section 2; partial-sum buffers of shape <code>[8][H]</code>; the fold as a Pass-3 recompute prologue.</li>
+<li><strong>Per-slice weight packing:</strong> <code>prep.py</code> writes slice-contiguous layouts and the manifest records slice offsets.</li>
+<li>Done when: all three Qwen models still match HF token for token; two device-wide barriers per layer; the fused kernel at least equals the unfused one.</li>
+</ul>
+<h3 id="phase-2-a-two-level-device-wide-barrier-1-session">Phase 2: a two-level device-wide barrier (1 session)</h3>
+<ul>
+<li>Arrival in two levels: first the XCD&rsquo;s counter, then the XCD&rsquo;s last arriver performs one L2 write-back and arrives at the device counter. This half exists already.</li>
+<li>Waiting in two levels: one waiter per XCD polls the device counter; the other workers poll a word local to their XCD. When the waiter sees completion it invalidates its XCD&rsquo;s L2 first, then writes the local word; the others only invalidate L1. This differs from the relay shown unsafe: the invalidate is done by a worker inside the XCD, the waiter waits for it to complete with <code>s_waitcnt</code> before writing the local word, and every other worker still performs its own L1 invalidate after reading the word. The scheme is enabled only after it passes the Qwen2.5 determinism test.</li>
+<li>Done when: the barrier costs about 1 us; Qwen2.5 produces identical tokens over three runs.</li>
+</ul>
+<h3 id="phase-3-cross-barrier-weight-prefetch-2-sessions">Phase 3: cross-barrier weight prefetch (2 sessions)</h3>
+<p>This is what a sequence of independent kernels structurally cannot do, and where fusion actually pulls ahead.</p>
+<ul>
+<li>A worker&rsquo;s next task is known from its static queue, so the weight addresses are known before the wait. The wait loop interleaves loads of the next task&rsquo;s weight block, into L2 (touch loads) or straight into an LDS staging area.</li>
+<li>LDS budget: dense models run one workgroup per CU; of the 64 KB the input vector takes 16-48 KB and the rest stages weights; when that is too small, fall back to warming L2.</li>
+<li>This is Pass 7 of the design; the machine model marks <code>async_copy_to_lds</code> as none on gfx942, so the degraded implementation is ordinary loads into LDS.</li>
+<li>Done when: the GEMV start-up after a barrier (first-ready to body start in the trace) shrinks visibly; fused beats unfused by at least 15%.</li>
+</ul>
+<h3 id="phase-4-merge-the-small-phases-1-session">Phase 4: merge the small phases (1 session)</h3>
+<ul>
+<li>post (q/k norm, RoPE, KV write) folds into qkv&rsquo;s epilogue: each qkv task covers a whole number of heads and finishes them in place.</li>
+<li>merge is done by the last attention task of each head to finish (the last-arriver pattern the runtime already supports).</li>
+<li>Done when: phases per layer drop from 8 to 5 and their 30-40 us disappear.</li>
+</ul>
+<h3 id="phase-5-tiles-above-3-tbs-2-3-sessions">Phase 5: tiles above 3 TB/s (2-3 sessions)</h3>
+<ul>
+<li><strong>GEMV:</strong> keep the input vector in LDS as bf16 to halve its footprint so dense models also fit two workgroups per CU; weight blocks of 256 KB or more per task; 32 loads in flight; non-temporal loads on by default. Target 3.2 TB/s, against vLLM&rsquo;s 3.0 TB/s on the 8B model.</li>
+<li><strong>Attention:</strong> a flash-decode layout, four waves over position ranges with vectorised 128-dimension dot products, partial sums out; target under 5 us per layer at 1024 context.</li>
+<li><strong>lm_head:</strong> already at 3 TB/s, unchanged.</li>
+<li>The alternative is linking vLLM or AITER GEMV and attention as tiles. ETX&rsquo;s link mode accepts any HIP function, but those are whole kernels and would have to be cut into tiles; kept as a fallback.</li>
+<li>Done when: fused Qwen3-8B under 6 ms.</li>
+</ul>
+<h3 id="phase-6-comparison-and-delivery-1-session">Phase 6: comparison and delivery (1 session)</h3>
+<ul>
+<li>Four models x {vLLM best, unfused, fused}, 1024 context, three rounds each, every run checked token by token against HF.</li>
+<li>Update the design document, the brief and the README; put the barrier costs and prefetch gains into the machine model&rsquo;s cost table.</li>
+</ul>
+<h2 id="4-expected-gains-qwen3-8b-per-token">4. Expected gains (Qwen3-8B, per token)</h2>
+<table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>Fused, expected</th>
+<th>Basis</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Today</td>
+<td>10.07 ms</td>
+<td>measured</td>
+</tr>
+<tr>
+<td>Phase 1, barriers 8 to 2</td>
+<td>about 9.3 ms</td>
+<td>six barriers plus waits of about 5 us saved per layer, 36 layers</td>
+</tr>
+<tr>
+<td>Phase 2, two-level barrier</td>
+<td>about 9.2 ms</td>
+<td>1 us saved on each remaining barrier</td>
+</tr>
+<tr>
+<td>Phase 3, prefetch</td>
+<td>about 8.3 ms</td>
+<td>about 10 us of GEMV start-up hidden after every barrier</td>
+</tr>
+<tr>
+<td>Phase 4, merged phases</td>
+<td>about 7.2 ms</td>
+<td>30 us saved per layer</td>
+</tr>
+<tr>
+<td>Phase 5, tiles at 3.2 TB/s</td>
+<td>about 5.5 ms</td>
+<td>15.1 GB / 3.2 TB/s plus the remaining synchronisation</td>
+</tr>
+</tbody>
+</table>
+<p>Unfused is expected at 6.3 ms after phase 5; vLLM is at 4.91 ms. So: beating unfused by 15% rests on phases 1-4; catching vLLM rests on phase 5; beating vLLM by 15% needs tiles above 3.6 TB/s, or the larger routing gain available on MoE. The MoE model should do better: with 128 experts and top-8, the expert weights can be prefetched the moment the routing is known, which independent kernels cannot do.</p>
+<h2 id="5-risks">5. Risks</h2>
+<ul>
+<li><strong>Correctness of the two-level barrier.</strong> The relay&rsquo;s hierarchical acquire was shown unsafe. The new scheme must pass the Qwen2.5 determinism test; if it does not, only the arrival side stays two-level and waiting stays per worker.</li>
+<li><strong>Prefetch competes for LDS and registers.</strong> It can lower the GEMV&rsquo;s loads in flight; the resource accounting of Pass 1 must allocate both, with the depth decided by A/B.</li>
+<li><strong>The sliced graph assumes divisibility.</strong> Head counts or expert counts not divisible by eight need uneven slices; the builder must handle remainders.</li>
+<li><strong>Tile speed-up is the largest uncertainty.</strong> 3.2 TB/s is an estimate; if it is missed, ETX still trails vLLM, but goal 1 is unaffected.</li>
+<li><strong>GPU availability.</strong> Hot Aisle has often had no 1x or 2x VM for hours at a time.</li>
+</ul>
+<h2 id="6-order-and-the-decision-point">6. Order and the decision point</h2>
+<p>Phases 0 and 1 come first. Phase 0 takes 20 minutes and answers whether a locality-aware graph makes fusion pay; phase 1 is the foundation of everything after it and the most valuable single rule in the compiler. If, after those two, the fused kernel still cannot equal the unfused one, the right move is to reconsider whether batch-1 decode is the correct target for a megakernel at all and to shift the weight to MoE routing and multi-GPU, where independent kernels cannot follow.</p></body></html>

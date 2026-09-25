@@ -1,0 +1,220 @@
+<!doctype html><html><head><meta charset='utf-8'><title>ETX 融合反超方案</title><style>
+@page { size: A4; margin: 18mm 16mm 18mm 16mm; }
+body { font-family: "DejaVu Sans", "Helvetica Neue", Arial, sans-serif; font-size: 10.5pt; line-height: 1.45; color: #111; max-width: 178mm; margin: 0 auto; }
+h1 { font-size: 20pt; margin: 0 0 6pt; line-height: 1.25; }
+h2 { font-size: 14.5pt; margin: 22pt 0 6pt; padding-bottom: 3pt; border-bottom: 1px solid #999; page-break-after: avoid; }
+h3 { font-size: 12pt; margin: 14pt 0 4pt; page-break-after: avoid; }
+h4 { font-size: 10.5pt; margin: 10pt 0 3pt; }
+p { margin: 5pt 0; text-align: left; }
+ul, ol { margin: 4pt 0 6pt; padding-left: 18pt; }
+li { margin: 2pt 0; }
+table { border-collapse: collapse; width: 100%; margin: 6pt 0 10pt; font-size: 9pt; page-break-inside: auto; }
+th, td { border: 1px solid #999; padding: 3pt 5pt; vertical-align: top; text-align: left; }
+th { background: #eee; font-weight: bold; }
+tr { page-break-inside: avoid; }
+code { font-family: "DejaVu Sans Mono", Menlo, Consolas, monospace; font-size: 8.8pt; }
+pre { background: #f4f4f4; border: 1px solid #ccc; padding: 6pt 8pt; font-size: 8.5pt; line-height: 1.35; white-space: pre-wrap; word-break: break-word; page-break-inside: avoid; }
+hr { border: none; border-top: 1px solid #999; margin: 12pt 0; }
+blockquote { margin: 6pt 0; padding-left: 10pt; border-left: 3px solid #bbb; color: #333; }
+.meta { color: #333; margin-bottom: 10pt; }
+a { color: #0645ad; text-decoration: none; }
+</style></head><body><h1 id="etx">ETX 融合反超方案</h1>
+<p>作者：Kailun Chen · 状态：v1 计划 · 日期：2026-09-25 · 依据：<code>examples/llm/results/bench_2026-09-25.log</code>、<code>docs/ETX_Technical_Design.md</code> 第 15.4–15.6 节</p>
+<h2 id="0">0. 结论先行</h2>
+<ul>
+<li><strong>目标 1（必须）：</strong> 同一套 tile，ETX 融合版比&rdquo;每个算子一个 kernel 加 HIP Graph&rdquo;快 15% 以上。现在慢 6–15%。</li>
+<li><strong>目标 2：</strong> 三个 Qwen 模型上超过 vLLM 最强配置 15% 以上。现在慢 2 倍。</li>
+<li><strong>目标 3：</strong> 全程保持逐 token 与 HF greedy 一致，输出可复现。</li>
+<li><strong>路线：</strong> 先让屏障变便宜（每层全卡屏障从 8 次降到 2 次），再让屏障有事可做（跨屏障预取权重），最后把 tile 提到 3 TB/s 以上。前两步是编译器和运行时的工作，是 ETX 的价值所在；第三步是 tile 工程，决定和 vLLM 的差距。</li>
+<li><strong>预算：</strong> 7 个阶段，约 10 次 GPU 会话，每次 1–2 小时，1x MI300X 每小时 $2.99，合计约 $40–60。现有余额 $26.20，需要补充。</li>
+</ul>
+<h2 id="1">1. 现状与根因</h2>
+<p>同一台 MI300X，1024 上下文，batch 1（2026-09-25）：</p>
+<table>
+<thead>
+<tr>
+<th>模型</th>
+<th>vLLM 最强</th>
+<th>ETX 不融合（同 tile，HIP Graph）</th>
+<th>ETX 融合</th>
+<th>手写 fleet</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Qwen2.5-1.5B</td>
+<td>1.86 ms</td>
+<td>4.05</td>
+<td>4.47</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Qwen3-8B</td>
+<td>4.91 ms</td>
+<td>9.45</td>
+<td>10.07</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Qwen3-30B-A3B</td>
+<td>4.84 ms</td>
+<td>9.07</td>
+<td>10.48</td>
+<td>—</td>
+</tr>
+<tr>
+<td>DeepSeek-V2-Lite</td>
+<td>4.12 ms</td>
+<td>未测</td>
+<td>3.78（fleet 的 tile）</td>
+<td>3.57</td>
+</tr>
+</tbody>
+</table>
+<p>Qwen3-8B 逐阶段 trace，每层 274 µs，带宽下限约 98 µs：</p>
+<table>
+<thead>
+<tr>
+<th>去向</th>
+<th>时间</th>
+<th>根因</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>4 个 GEMV 阶段</td>
+<td>190 µs</td>
+<td>有效带宽 1.5–2.5 TB/s，任务小、在途读请求不足</td>
+</tr>
+<tr>
+<td>attention 加 merge</td>
+<td>63 µs</td>
+<td>按位置分块后线程串行点积；merge 串行读 64 个分块</td>
+</tr>
+<tr>
+<td>8 次全卡屏障</td>
+<td>约 9 µs 多于 kernel 边界</td>
+<td>300 个 worker 轮询一个计数器，最后到达者回写，8 个 XCD 各自失效缓存</td>
+</tr>
+</tbody>
+</table>
+<p>三个根因：
+1. <strong>图的形状错了。</strong> 我给 Qwen 建的图每层 8 次全卡屏障。fleet 的图每层只有 2 次，其余 6 次是 XCD 内部事件。ETX 最有价值的能力是按 chiplet 建图，Qwen 的图没有用。
+2. <strong>屏障比 kernel 边界贵。</strong> 一次约多 2 µs。batch=1 的 decode 是一条&rdquo;每环都要上一环完整输出&rdquo;的链，屏障次数是结构决定的，只能让每次变便宜，或者让等待的时间有事可做。
+3. <strong>tile 差。</strong> GEMV 和 attention 都被访存延迟卡住。这和融合无关，但决定了和 vLLM 的距离。</p>
+<h2 id="2-xcd">2. 总体设计：把每层做成&rdquo;每个 XCD 一片&rdquo;</h2>
+<p>fleet 的做法可以推广成编译器规则。一层的计算按 XCD 切成 8 片，片内只用本地事件，片与片之间只在两处汇合：</p>
+<pre><code>                XCD k 内部（本地事件，L1 失效即可）
+x ──norm──&gt; qkv 的第 k 片行 ──&gt; 本 XCD 的 KV 头组 attention ──&gt; merge ──&gt; o_proj 的第 k 段 K
+                                                                          │ 写本 XCD 的部分和 o_k
+        ════════════════════ 全卡屏障 1：8 个部分和就绪 ══════════════════
+x + Σo_k ──norm──&gt; gate_up 的第 k 片行 ──&gt; down 的第 k 段 K ──&gt; 写本 XCD 的部分和 d_k
+        ════════════════════ 全卡屏障 2：8 个部分和就绪 ══════════════════
+下一层 qkv 的前置：x = x + Σd_k（读 8 个向量，比一次屏障便宜）
+</code></pre>
+<p>要点：
+- <strong>行切分给 XCD，K 切分给 XCD。</strong> qkv、gate_up 按输出行切片，每片正好是本 XCD 后续需要的那部分；o_proj、down 按 K 切片，每个 XCD 只用自己片内产生的输入，输出是部分和。
+- <strong>部分和的求和放进下一阶段的前置。</strong> 这就是 fleet 的 FOLD_PARTIALS，也是设计文档里的&rdquo;重算换事件&rdquo;。求和读 8×H 个浮点，远比一次全卡屏障便宜。
+- <strong>attention 按 KV 头组分给 XCD。</strong> GQA 下每个 XCD 拿到 NKV/8 个 KV 头和它们的 query 头，KV cache 的读写都在本 XCD 内。
+- <strong>权重布局按片重排。</strong> 打包时把每个 XCD 的行片和 K 片放成连续块，任务读的是连续内存。</p>
+<p>每层全卡屏障从 8 次降到 2 次，其余同步都是 XCD 内部的本地事件，成本约 1 µs 且不需要 L2 失效。</p>
+<h2 id="3">3. 分阶段计划</h2>
+<h3 id="01">阶段 0：补齐测量（1 次会话）</h3>
+<ul>
+<li>DeepSeek 上补测&rdquo;fleet 的 tile 不融合&rdquo;。这一档决定&rdquo;本地事件的图能否让融合赚钱&rdquo;的结论。</li>
+<li>屏障微基准：304 个 workgroup 下，ETX 全卡屏障、两级屏障、HIP Graph kernel 边界各多少微秒。把数字写进 <code>gfx942.yaml</code> 的成本表。</li>
+<li>验收：三个数字进表，DeepSeek 不融合的数据进对比表。</li>
+</ul>
+<h3 id="1-xcd-2">阶段 1：编译器自动生成 XCD 本地图（2 次会话）</h3>
+<ul>
+<li><strong>P2 扩展&rdquo;按域切片&rdquo;：</strong> 一个 grid 的输出被下游按域消费时，把生产者按域切片放置，事件降为 DOMAIN 作用域。输入是 edge map，比如 qkv 行块到 KV 头组的映射 <code>"i-&gt;(i/rows_per_group)"</code>。</li>
+<li><strong>构图器改成分片图：</strong> <code>examples/llm/model.py</code> 按第 2 节生成 grid 和事件；部分和缓冲区 <code>[8][H]</code>；前置求和作为 Pass 3 的重算前置。</li>
+<li><strong>权重打包按片重排：</strong> <code>prep.py</code> 输出片连续的布局，manifest 记录片的偏移。</li>
+<li><strong>验收：</strong> 三个 Qwen 模型逐 token 仍与 HF 一致；每层全卡屏障 2 次；融合版至少追平不融合版。</li>
+</ul>
+<h3 id="21">阶段 2：两级全卡屏障（1 次会话）</h3>
+<ul>
+<li>到达分两级：先到本 XCD 的计数器，XCD 的最后到达者做一次 L2 回写并到达全卡计数器。这一半已经有了。</li>
+<li>等待也分两级：每个 XCD 只有一个 waiter 轮询全卡计数器，其余 worker 轮询本 XCD 的本地字。waiter 看到完成后先做本 XCD 的 L2 失效，再写本地字；其余 worker 只做 L1 失效。这和之前被证明不安全的 relay 不同：失效由本 XCD 内的 worker 做，并且 waiter 在写本地字前用 <code>s_waitcnt</code> 等失效完成，其他 worker 读到本地字后再各自做 L1 失效。两级方案要先用 Qwen2.5 的非确定性测试验证，通过才启用。</li>
+<li><strong>验收：</strong> 屏障成本降到 1 µs 附近；Qwen2.5 三次运行输出一致。</li>
+</ul>
+<h3 id="32">阶段 3：跨屏障预取权重（2 次会话）</h3>
+<p>这是独立 kernel 结构上做不到的事，也是融合真正反超的来源。</p>
+<ul>
+<li>worker 的下一个任务在静态队列里是已知的，权重地址在等待前就能算出。等待循环里穿插发出下一任务权重块的读请求，目标是 L2（用 touch 读）或直接进 LDS 暂存区。</li>
+<li>LDS 预算：dense 模型每个 CU 一个 workgroup，64 KB 里输入向量占 16–48 KB，剩余部分做权重暂存；不够时退回 L2 预热。</li>
+<li>这就是设计文档的 Pass 7，机器模型里的 <code>async_copy_to_lds</code> 能力在 gfx942 上标为 none，改成&rdquo;普通读进 LDS&rdquo;的降级实现。</li>
+<li><strong>验收：</strong> 屏障后的 GEMV 起步时间（trace 里的 first-ready 到 body 开始）明显缩短；融合版比不融合版快 15% 以上。</li>
+</ul>
+<h3 id="41">阶段 4：合并小阶段（1 次会话）</h3>
+<ul>
+<li>post（q/k norm 加 RoPE 加写 KV）并进 qkv 的收尾：让 qkv 的每个任务正好覆盖整数个头的行，收尾直接做。</li>
+<li>merge 由每个头最后完成的 attention 任务顺手做（最后到达者模式，运行时已支持）。</li>
+<li><strong>验收：</strong> 每层阶段数从 8 降到 5；这两处的 30–40 µs 消失。</li>
+</ul>
+<h3 id="5tile-3-tbs-23">阶段 5：tile 提速到 3 TB/s 以上（2–3 次会话）</h3>
+<ul>
+<li><strong>GEMV：</strong> 输入向量改成 bf16 存 LDS，占用减半，让 dense 模型也能每 CU 放两个 workgroup；每个任务的权重块提到 256 KB 以上；在途读请求 32 个；non-temporal 读取默认开。目标 3.2 TB/s，参照 vLLM 在 8B 上的 3.0 TB/s。</li>
+<li><strong>attention：</strong> 改成 4 个 wave 各管一段位置、按 128 维向量化点积的 flash-decode 写法，输出部分和；1024 上下文下每层目标 5 µs 以内。</li>
+<li><strong>lm_head：</strong> 已在 3 TB/s，不动。</li>
+<li>另一条路是把 vLLM 或 AITER 的 GEMV 和 attention 作为 tile 链进来。ETX 的链接模式接受任何 HIP 函数，但它们是整 kernel 形态，要拆成 tile 才能用，工作量不小，作为备选。</li>
+<li><strong>验收：</strong> Qwen3-8B 融合版 6 ms 以内。</li>
+</ul>
+<h3 id="61">阶段 6：对比与交付（1 次会话）</h3>
+<ul>
+<li>四个模型 × {vLLM 最强、不融合、融合}，1024 上下文，各 3 轮，全部逐 token 对 HF。</li>
+<li>更新设计文档、精简版 PDF、README；把屏障成本和预取收益写进机器模型的成本表。</li>
+</ul>
+<h2 id="4-qwen3-8b-token">4. 预期收益（Qwen3-8B，每 token）</h2>
+<table>
+<thead>
+<tr>
+<th>阶段</th>
+<th>融合版预计</th>
+<th>依据</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>现在</td>
+<td>10.07 ms</td>
+<td>实测</td>
+</tr>
+<tr>
+<td>阶段 1，屏障 8→2</td>
+<td>约 9.3 ms</td>
+<td>每层省 6 次约 5 µs 的屏障加等待，36 层</td>
+</tr>
+<tr>
+<td>阶段 2，两级屏障</td>
+<td>约 9.2 ms</td>
+<td>剩余 2 次各省 1 µs</td>
+</tr>
+<tr>
+<td>阶段 3，预取</td>
+<td>约 8.3 ms</td>
+<td>每次屏障后 GEMV 的起步延迟约 10 µs 被隐藏</td>
+</tr>
+<tr>
+<td>阶段 4，合并小阶段</td>
+<td>约 7.2 ms</td>
+<td>每层省 30 µs</td>
+</tr>
+<tr>
+<td>阶段 5，tile 3.2 TB/s</td>
+<td>约 5.5 ms</td>
+<td>15.1 GB ÷ 3.2 TB/s 加剩余同步</td>
+</tr>
+</tbody>
+</table>
+<p>不融合版在阶段 5 后预计 6.3 ms，vLLM 4.91 ms。所以：融合反超不融合 15% 靠阶段 1–4；追上 vLLM 靠阶段 5；超过 vLLM 15% 需要 tile 到 3.6 TB/s 以上或 MoE 上更大的路由收益。MoE 模型上预期更好：128 个专家选 8 个，专家权重的读取可以在路由确定后立刻预取，独立 kernel 做不到。</p>
+<h2 id="5">5. 风险</h2>
+<ul>
+<li><strong>两级屏障的正确性。</strong> relay 的分层 acquire 已被证明不安全，新方案必须过 Qwen2.5 的确定性测试，不通过就只做到达两级、等待仍各自轮询。</li>
+<li><strong>预取占用 LDS 和寄存器。</strong> 可能压低 GEMV 的在途请求数，需要在 P1 的资源账里统一分配，A/B 决定深度。</li>
+<li><strong>分片图对模型结构的假设。</strong> 头数不能被 8 整除、专家数不能被 8 整除时要退化成不均匀切片，构图器要处理余数。</li>
+<li><strong>tile 提速的不确定性最大。</strong> 3.2 TB/s 是估计，达不到时 ETX 相对 vLLM 仍会落后，但目标 1 不受影响。</li>
+<li><strong>GPU 可用性。</strong> Hot Aisle 近两天经常没有 1x 或 2x 空位，每次要等几小时。</li>
+</ul>
+<h2 id="6">6. 顺序和取舍</h2>
+<p>先做阶段 0 和 1。阶段 0 只要 20 分钟，直接回答&rdquo;本地事件的图能不能让融合赚钱&rdquo;；阶段 1 是所有后续工作的基础，也是编译器里最有价值的一条规则。这两步做完，如果融合版仍不能追平不融合版，就应该重新考虑 batch=1 是否是 megakernel 的正确场景，把重心转向 MoE 路由和多卡这些独立 kernel 做不到的地方。</p></body></html>
