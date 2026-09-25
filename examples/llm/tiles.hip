@@ -520,27 +520,39 @@ static __device__ __forceinline__ void attn_heads(const LlmLayer& Ly, int qh_beg
     return;
   }
   float* sc = qs + nheads * HD;                            // [nheads][CHUNK]
-  uint4* kv = (uint4*)(sc + nheads * P.CHUNK);             // [CHUNK][HD] bf16
+  uint4* kk = (uint4*)(sc + nheads * P.CHUNK);             // [CHUNK][HD] bf16 K
   const int per_row = HD / 8;
-  for (int j = 0; j < nheads; ++j)
-    head_post(P.qkv + (size_t)(qh_begin + j) * HD, P.qk_norm ? Ly.qn : nullptr, qs + j * HD, nullptr, red);
-  if (t0 <= P.pos && P.pos < t1) {
-    const size_t row = ((size_t)P.pos * P.NKV + kvh) * HD;
-    head_post(P.qkv + (size_t)(P.NH + kvh) * HD, P.qk_norm ? Ly.kn : nullptr, nullptr, Ly.kc + row, red);
-    const float* v = P.qkv + (size_t)(P.NH + P.NKV + kvh) * HD;
-    for (int d = threadIdx.x; d < HD; d += blockDim.x) Ly.vc[row + d] = __float2bfloat16(v[d]);
-    ETX_RELEASE_DOMAIN(); ETX_ACQUIRE_DOMAIN();           // this task reads the row back below: drain the stores, drop L1
-  }
-  __syncthreads();
+  uint4* vv = kk + P.CHUNK * per_row;                      // [CHUNK][HD] bf16 V
+  float* kt = (float*)(vv + P.CHUNK * per_row);            // HD floats: the new K row before it is stored
+  const bool mine = t0 <= P.pos && P.pos < t1;
+  // K and V rows of the chunk into LDS first, both in flight at once, before the q post (the row of the new
+  // position, if it is this chunk's, is computed below and written to the cache and the staging together)
   for (int i = threadIdx.x; i < len * per_row; i += blockDim.x) {
     const int t = i / per_row, u = i % per_row;
-    kv[i] = *(const uint4*)(Ly.kc + ((size_t)(t0 + t) * P.NKV + kvh) * HD + u * 8);
+    if (mine && t0 + t == P.pos) continue;
+    const size_t off = ((size_t)(t0 + t) * P.NKV + kvh) * HD + u * 8;
+    kk[i] = *(const uint4*)(Ly.kc + off);
+    vv[i] = *(const uint4*)(Ly.vc + off);
+  }
+  for (int j = 0; j < nheads; ++j)
+    head_post(P.qkv + (size_t)(qh_begin + j) * HD, P.qk_norm ? Ly.qn : nullptr, qs + j * HD, nullptr, red);
+  if (mine) {
+    const size_t row = ((size_t)P.pos * P.NKV + kvh) * HD;
+    head_post(P.qkv + (size_t)(P.NH + kvh) * HD, P.qk_norm ? Ly.kn : nullptr, kt, nullptr, red);
+    __syncthreads();
+    const float* v = P.qkv + (size_t)(P.NH + P.NKV + kvh) * HD;
+    __hip_bfloat16* kb = (__hip_bfloat16*)kk; __hip_bfloat16* vb = (__hip_bfloat16*)vv;
+    const int tl = P.pos - t0;
+    for (int d = threadIdx.x; d < HD; d += blockDim.x) {
+      const __hip_bfloat16 kd = __float2bfloat16(kt[d]), vd = __float2bfloat16(v[d]);
+      Ly.kc[row + d] = kd; Ly.vc[row + d] = vd; kb[tl * HD + d] = kd; vb[tl * HD + d] = vd;
+    }
   }
   __syncthreads();
   const float scale = rsqrtf((float)HD);
   for (int idx = threadIdx.x; idx < nheads * len; idx += blockDim.x) {
     const int j = idx / len, t = idx % len;
-    const uint4* k = kv + t * per_row;
+    const uint4* k = kk + t * per_row;
     const float* q = qs + j * HD;
     float sacc = 0.f;
     for (int u = 0; u < per_row; ++u) sacc += dot8(k[u], q + u * 8);
@@ -558,12 +570,7 @@ static __device__ __forceinline__ void attn_heads(const LlmLayer& Ly, int qh_beg
     if (etx_lane() == 0) { mrow[j] = m; lrow[j] = l; }
   }
   __syncthreads();
-  for (int i = threadIdx.x; i < len * per_row; i += blockDim.x) {
-    const int t = i / per_row, u = i % per_row;
-    kv[i] = *(const uint4*)(Ly.vc + ((size_t)(t0 + t) * P.NKV + kvh) * HD + u * 8);
-  }
-  __syncthreads();
-  const __hip_bfloat16* vb = (const __hip_bfloat16*)kv;
+  const __hip_bfloat16* vb = (const __hip_bfloat16*)vv;
   for (int idx = threadIdx.x; idx < nheads * HD; idx += blockDim.x) {
     const int j = idx / HD, d = idx % HD;
     float acc = 0.f;
