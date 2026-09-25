@@ -17,7 +17,6 @@
 // 225 VGPRs to scratch at U=16 and ran 30% slower than the unfused kernel). Both keep 128 loads in flight per CU.
 #define LLM_GEMV_U 16
 #endif
-#endif
 typedef unsigned int llm_u32x4 __attribute__((ext_vector_type(4)));
 typedef unsigned int llm_u32x2 __attribute__((ext_vector_type(2)));
 template <int EPL> struct wvec;

@@ -12,4 +12,5 @@ U=(); [ "${ETX_LLM_THREADS:-256}" -ge 512 ] && U=(-DLLM_GEMV_U=8)   # 8 waves pe
 hipcc -O3 -std=c++17 --offload-arch=gfx942 "${U[@]}" "$@" -I "$ROOT/etx/runtime/include" -I "$OUT" -I "$ROOT" \
   -Rpass-analysis=kernel-resource-usage "$OUT/megakernel_d0.hip" "$ROOT/examples/llm/host.hip" -o "$OUT/run" 2>&1 \
   | grep -E "Function Name|VGPRs:|ScratchSize|VGPRs Spill|error" | sed -E "s/.*remark: +//; s/ \[-Rpass.*//" | paste - - - - || true
+[ -x "$OUT/run" ] || { echo "build failed: no $OUT/run"; exit 1; }
 echo "built $OUT/run"
