@@ -1,0 +1,41 @@
+
+=== 13:16:49 build v5 qwen3-30b-a3b
+run 1: 32/32 generated tokens match HF greedy RESULT model=/home/hotaisle/llm/qwen3-30b-a3b matched=32 gen=32 median_ms=8.020 active_GB=6.083  [qwen3-30b-a3b v5 fused]
+run 1: 32/32 generated tokens match HF greedy RESULT model=/home/hotaisle/llm/qwen3-30b-a3b matched=32 gen=32 median_ms=7.784 active_GB=6.083  [qwen3-30b-a3b v5 unfused]
+run 1: 32/32 generated tokens match HF greedy RESULT model=/home/hotaisle/llm/qwen3-30b-a3b matched=32 gen=32 median_ms=7.948 active_GB=6.083  [qwen3-30b-a3b v5 fused]
+run 0: 32/32 generated tokens match HF greedy (teacher-forced argmax);run 1: 32/32 generated tokens match HF greedy (teacher-forced argmax);run 2: 32/32 generated tokens match HF greedy (teacher-forced argmax);
+
+=== 13:19:36 build v5 qwen3-8b
+run 1: 32/32 generated tokens match HF greedy RESULT model=/home/hotaisle/llm/qwen3-8b matched=32 gen=32 median_ms=9.025 active_GB=15.136  [qwen3-8b v5 fused]
+run 1: 32/32 generated tokens match HF greedy RESULT model=/home/hotaisle/llm/qwen3-8b matched=32 gen=32 median_ms=8.806 active_GB=15.136  [qwen3-8b v5 unfused]
+run 1: 32/32 generated tokens match HF greedy RESULT model=/home/hotaisle/llm/qwen3-8b matched=32 gen=32 median_ms=9.021 active_GB=15.136  [qwen3-8b v5 fused]
+run 0: 32/32 generated tokens match HF greedy (teacher-forced argmax);run 1: 32/32 generated tokens match HF greedy (teacher-forced argmax);run 2: 32/32 generated tokens match HF greedy (teacher-forced argmax);
+
+=== 13:21:46 build v5 qwen2.5-1.5b
+run 1: 32/32 generated tokens match HF greedy RESULT model=/home/hotaisle/llm/qwen2.5-1.5b matched=32 gen=32 median_ms=3.620 active_GB=3.087  [qwen2.5-1.5b v5 fused]
+run 1: 32/32 generated tokens match HF greedy RESULT model=/home/hotaisle/llm/qwen2.5-1.5b matched=32 gen=32 median_ms=3.314 active_GB=3.087  [qwen2.5-1.5b v5 unfused]
+run 1: 32/32 generated tokens match HF greedy RESULT model=/home/hotaisle/llm/qwen2.5-1.5b matched=32 gen=32 median_ms=3.583 active_GB=3.087  [qwen2.5-1.5b v5 fused]
+run 0: 32/32 generated tokens match HF greedy (teacher-forced argmax);run 1: 32/32 generated tokens match HF greedy (teacher-forced argmax);run 2: 32/32 generated tokens match HF greedy (teacher-forced argmax);
+
+=== 13:22:47 trace moe v5
+  fold_10                    32      3.06      7.15      1629.6        0.5        8.2
+  qkv_10                    304     11.68     12.02      1638.6        5.0       15.3
+  attn_10                   256      2.33     11.62      1654.6        2.6       22.6
+  oproj_10                  304     13.40     18.21      1677.5        7.2       24.4
+  folo_10                    32      4.34      2.16      1704.7        0.2        2.5
+  router_10                 304      7.17      7.20      1708.0        3.1        9.9
+  egu_10                    304      2.36     31.45      1720.0        2.8       36.7
+  edn_10                    304      5.90     23.66      1756.4        9.2       33.0
+  lmhead                    304     15.48    225.02      7772.4        2.9      241.8
+
+=== 13:23:09 trace 8b v5
+  fold_10                    32      5.62      3.20      2398.2        1.5        4.0
+  qkv_10                    304     12.73     23.07      2405.3        4.8       26.2
+  attn_10                   256      2.85     12.05      2432.4        3.8       27.2
+  oproj_10                  304     15.88     37.56      2459.2        6.5       42.4
+  folo_10                    32      2.15      4.73      2503.6        1.1        6.2
+  gateup_10                 304      8.76     72.71      2510.3        4.7       84.6
+  down_10                   304     10.33     37.91      2592.9        9.0       45.8
+  lmhead                    304      9.57    407.98      8588.5        2.9      441.1
+
+=== 13:23:23 R11 DONE

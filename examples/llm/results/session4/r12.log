@@ -1,0 +1,18 @@
+
+=== 13:23:35 build v6 qwen3-30b-a3b
+run 1: 32/32 generated tokens match HF greedy RESULT model=/home/hotaisle/llm/qwen3-30b-a3b matched=32 gen=32 median_ms=9.309 active_GB=6.083  [qwen3-30b-a3b v6 fused]
+run 1: 32/32 generated tokens match HF greedy RESULT model=/home/hotaisle/llm/qwen3-30b-a3b matched=32 gen=32 median_ms=9.232 active_GB=6.083  [qwen3-30b-a3b v6 unfused]
+run 1: 32/32 generated tokens match HF greedy RESULT model=/home/hotaisle/llm/qwen3-30b-a3b matched=32 gen=32 median_ms=9.348 active_GB=6.083  [qwen3-30b-a3b v6 fused]
+run 0: 32/32 generated tokens match HF greedy (teacher-forced argmax);run 1: 32/32 generated tokens match HF greedy (teacher-forced argmax);run 2: 32/32 generated tokens match HF greedy (teacher-forced argmax);
+
+=== 13:26:32 trace moe v6
+  fold_10                    32      2.98      7.94      1889.8        1.9        9.4
+  qkv_10                    304     11.90     12.09      1899.4        4.9       15.1
+  attn_10                   256      2.65     11.32      1915.9        2.9       23.0
+  oproj_10                  304     13.87     17.98      1939.1        7.5       24.2
+  folo_10                    32      4.16      2.42      1965.8        0.4        3.0
+  egu_10                    304      7.22     71.80      1969.6        2.2       76.9
+  edn_10                    304      3.85     25.46      2047.4        3.0       28.0
+  lmhead                    304     12.97    224.91      9055.9        2.9      241.3
+
+=== 13:26:54 R12 DONE

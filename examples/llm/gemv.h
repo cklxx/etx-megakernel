@@ -12,7 +12,11 @@
 // is then called once per row by one thread. LLM_GEMV_U overrides the depth; LLM_NT_WEIGHTS=1 uses
 // non-temporal weight loads (weights are read once per token).
 #ifndef LLM_GEMV_U
-#define LLM_GEMV_U 16          // measured on MI300X 2026-09-25: 16 beats 32 at every task size (3.0-3.3 vs 1.2-2.7 TB/s)
+// loads in flight per batch (two batches are in flight, see gemv_stream). 16 at 4 waves per CU (256 threads:
+// the wave owns 512 registers); build.sh passes 8 at 8 waves (256 registers each: the megakernel spilled
+// 225 VGPRs to scratch at U=16 and ran 30% slower than the unfused kernel). Both keep 128 loads in flight per CU.
+#define LLM_GEMV_U 16
+#endif
 #endif
 typedef unsigned int llm_u32x4 __attribute__((ext_vector_type(4)));
 typedef unsigned int llm_u32x2 __attribute__((ext_vector_type(2)));
