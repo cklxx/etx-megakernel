@@ -21,16 +21,21 @@ template <> struct wvec<8> { typedef llm_u32x4 T; };
 template <> struct wvec<4> { typedef llm_u32x2 T; };
 template <> struct wvec<2> { typedef unsigned int T; };
 
-static __device__ __forceinline__ float dotn(llm_u32x4 w, const float* x) {
+// xs lives in LDS: it is read through an explicit address_space(3) pointer, otherwise the compiler emits flat
+// loads for it (a generic pointer), and every flat load in the dot product waits on the vector memory counter,
+// i.e. on the weight stream (measured in the assembly: flat_load_dwordx4 + s_waitcnt per product)
+typedef __attribute__((address_space(3))) const float llm_lds_f;
+typedef __attribute__((address_space(3))) float llm_lds_fw;
+static __device__ __forceinline__ float dotn(llm_u32x4 w, const llm_lds_f* x) {
   float s = 0.f;
 #pragma unroll
   for (int i = 0; i < 4; ++i) { s += __uint_as_float(w[i] << 16) * x[2 * i]; s += __uint_as_float(w[i] & 0xffff0000u) * x[2 * i + 1]; }
   return s;
 }
-static __device__ __forceinline__ float dotn(unsigned int w, const float* x) {
+static __device__ __forceinline__ float dotn(unsigned int w, const llm_lds_f* x) {
   return __uint_as_float(w << 16) * x[0] + __uint_as_float(w & 0xffff0000u) * x[1];
 }
-static __device__ __forceinline__ float dotn(llm_u32x2 w, const float* x) {
+static __device__ __forceinline__ float dotn(llm_u32x2 w, const llm_lds_f* x) {
   return __uint_as_float(w.x << 16) * x[0] + __uint_as_float(w.x & 0xffff0000u) * x[1]
        + __uint_as_float(w.y << 16) * x[2] + __uint_as_float(w.y & 0xffff0000u) * x[3];
 }
@@ -46,37 +51,57 @@ template <int EPL, class Epi>
 static __device__ __forceinline__ void gemv_stream(const __hip_bfloat16* __restrict__ W, int K, const float* xs, int r0, int r1, float* part, Epi epi) {
   typedef typename wvec<EPL>::T V;
   constexpr int U = LLM_GEMV_U, SEG = ETX_WAVE_SIZE * EPL;
+  const llm_lds_f* xl = (const llm_lds_f*)xs;
+  llm_lds_fw* pl = (llm_lds_fw*)part;
   const int lane = etx_lane(), wv = etx_wave(), nw = etx_nwaves(), nrt = r1 - r0;
   const int spr = K / SEG;                                   // segments per row
   const int S = nrt * spr;
   const int per = (S + nw - 1) / nw, sb = wv * per, se = min(S, sb + per);
-  for (int i = lane; i < nrt; i += ETX_WAVE_SIZE) part[wv * nrt + i] = 0.f;
+  for (int i = lane; i < nrt; i += ETX_WAVE_SIZE) pl[wv * nrt + i] = 0.f;
   const V* base = (const V*)(W + (size_t)r0 * K) + lane;     // segment s starts at element s * SEG
   int cur = sb / (spr > 0 ? spr : 1);
   float acc = 0.f;
-  for (int s0 = sb; s0 < se; s0 += U) {
-    V w[U];
-#pragma unroll
-    for (int u = 0; u < U; ++u) if (s0 + u < se) w[u] = wload(base + (size_t)(s0 + u) * ETX_WAVE_SIZE);
-#pragma unroll
-    for (int u = 0; u < U; ++u) {
-      const int sg = s0 + u;
-      if (sg < se) {
-        const int row = sg / spr;
-        if (row != cur) {                                    // uniform across the wave
-          const float v = etx_wave_sum(acc);
-          if (lane == 0) part[wv * nrt + cur] += v;
-          acc = 0.f; cur = row;
-        }
-        acc += dotn(w[u], xs + (sg - row * spr) * SEG + lane * EPL);
-      }
+  auto consume = [&](int sg, V w) {
+    const int row = sg / spr;
+    if (row != cur) {                                        // uniform across the wave
+      const float v = etx_wave_sum(acc);
+      if (lane == 0) pl[wv * nrt + cur] += v;
+      acc = 0.f; cur = row;
     }
+    acc += dotn(w, xl + (sg - row * spr) * SEG + lane * EPL);
+  };
+  auto load = [&](V* w, int s) {
+#pragma unroll
+    for (int u = 0; u < U; ++u) w[u] = wload(base + (size_t)(s + u) * ETX_WAVE_SIZE);
+  };
+  auto use = [&](const V* w, int s) {
+#pragma unroll
+    for (int u = 0; u < U; ++u) consume(s + u, w[u]);
+  };
+  // two batches of U loads in flight: batch b is issued before batch a is consumed, so the stream never
+  // drains while the products are computed (single-buffered, the loop waited for all U loads, computed,
+  // then issued the next U: one latency per batch exposed)
+  int s0 = sb;
+  V wa[U], wb[U];
+  if (s0 + U <= se) load(wa, s0);
+  for (; s0 + 2 * U <= se; s0 += 2 * U) {
+    load(wb, s0 + U);
+    use(wa, s0);
+    if (s0 + 3 * U <= se) load(wa, s0 + 2 * U);
+    use(wb, s0 + U);
   }
-  if (sb < se) { const float v = etx_wave_sum(acc); if (lane == 0) part[wv * nrt + cur] += v; }
+  if (s0 + U <= se) { use(wa, s0); s0 += U; }
+  if (s0 < se) {                                             // tail of fewer than U segments
+#pragma unroll
+    for (int u = 0; u < U; ++u) if (s0 + u < se) wa[u] = wload(base + (size_t)(s0 + u) * ETX_WAVE_SIZE);
+#pragma unroll
+    for (int u = 0; u < U; ++u) if (s0 + u < se) consume(s0 + u, wa[u]);
+  }
+  if (sb < se) { const float v = etx_wave_sum(acc); if (lane == 0) pl[wv * nrt + cur] += v; }
   __syncthreads();
   for (int r = (int)threadIdx.x; r < nrt; r += blockDim.x) {
     float v = 0.f;
-    for (int w2 = 0; w2 < nw; ++w2) v += part[w2 * nrt + r];
+    for (int w2 = 0; w2 < nw; ++w2) v += pl[w2 * nrt + r];
     epi(r0 + r, v);
   }
   __syncthreads();
