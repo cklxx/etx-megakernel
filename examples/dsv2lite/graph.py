@@ -27,6 +27,8 @@ bodies exactly as in fleet.  Tile bodies are fleet's own, exported by
 argument 1 a device int holding the layer index.  Durations are fleet's
 measured per-task times (docs/STATUS.md).
 """
+import os
+
 from etx.frontends import hip_link
 from etx.ir import Graph, Resource
 
@@ -95,7 +97,11 @@ def build_dense_layer(g: Graph, L: int, e_in: str, e_in_map: str, fold: bool) ->
     return f"E_dense_{L}"
 
 
-def build(layers: int = LAYERS, routing_cached: bool = True) -> Graph:
+def build(layers: int = LAYERS, routing_cached: bool | None = None) -> Graph:
+    # ETX_DSV2_ROUTING_CACHED=0: expert_down recomputes the top-k instead of reusing its worker's LDS
+    # (needed for the unfused baseline, where LDS does not survive the kernel boundary)
+    if routing_cached is None:
+        routing_cached = os.environ.get("ETX_DSV2_ROUTING_CACHED", "1") != "0"
     g = Graph("dsv2lite_decode")
     g.tensor("fleet", (1,), role="weight", bytes_per_elem=8)   # FleetParams*, set by the host
     g.tensor("layer_-1", (1,), role="runtime", bytes_per_elem=4)
