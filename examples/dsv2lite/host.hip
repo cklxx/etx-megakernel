@@ -23,13 +23,14 @@ struct FleetParams {                    // must match fleet_shim.hip
   int32_t tok; uint32_t epoch; int32_t pos; int32_t dump;
 };
 extern "C" __global__ void etx_megakernel_d0(etx_params);
+extern "C" __global__ void etx_unfused_d0(etx_params, int32_t);
 extern "C" void fleet_set_params(const void* host_fp, hipStream_t s);   // fleet_shim.hip: refresh the __constant__ copy
 extern "C" size_t fleet_scratch_bytes();
 
 int main(int argc, char** argv) {
   std::string weights_path = "build/weights.bin", cache_path = "build/fleet_cache.bin";
   std::string golden_path = "build/golden_tokens.txt", hidden_path = "build/golden_hidden.bin", json_path;
-  int tokens = 32, context = 1024, first_token = -1, repeat = 1;
+  int tokens = 32, context = 1024, first_token = -1, repeat = 1; bool unfused = false;
   bool teacher = false;
   for (int i = 1; i < argc; ++i) {
     std::string a = argv[i];
@@ -43,6 +44,7 @@ int main(int argc, char** argv) {
     else if (a == "--context") context = std::atoi(next().c_str());
     else if (a == "--first-token") first_token = std::atoi(next().c_str());
     else if (a == "--repeat") repeat = std::atoi(next().c_str());
+    else if (a == "--unfused") unfused = true;     // baseline: fleet's tiles, one launch per grid (HIP graph)
     else if (a == "--teacher-force") teacher = true;
     else die("unknown argument " + a);
   }
@@ -119,6 +121,7 @@ int main(int argc, char** argv) {
   // ---- ETX host: argument table = FleetParams pointer + per-grid layer ids
   etx_host hst(0);
   hst.kernel = (const void*)etx_megakernel_d0;
+  hst.unfused_kernel = (const void*)etx_unfused_d0;
   hst.alloc_args();
   hst.args[etx_host::arg_index("fleet")] = d_fp;
   for (int a = 0; a < ETX_N_ARGS; ++a) {
@@ -143,7 +146,8 @@ int main(int argc, char** argv) {
       fp.tok = t; fp.epoch = (uint32_t)(run * tokens + t + 1); fp.pos = context + t; fp.dump = (last && t == 0) ? 1 : 0;
       HIP_CHECK(hipMemcpy(d_fp, &fp, sizeof(fp), hipMemcpyHostToDevice));
       fleet_set_params(&fp, hst.stream);
-      if (!hst.run(20.0)) { std::printf("token %d: ETX step failed\n", t); return 2; }
+      if (unfused) { if (!hst.run_unfused()) { std::printf("token %d: unfused step failed\n", t); return 2; } }
+      else if (!hst.run(20.0)) { std::printf("token %d: ETX step failed\n", t); return 2; }
       wall_total += hst.last_ms;
     }
     HIP_CHECK(hipMemcpy(produced.data(), act.token_out, tokens * 4, hipMemcpyDeviceToHost));
