@@ -87,34 +87,44 @@ def build() -> Graph:
                   out_edges={"E_embed": "i->i"}, duration_us=1.0)
     e_in, e_map = "E_embed", "xw->(0)"
     for L in range(d.L):
+        # one fold task per XCD is the only device-scope consumer: it sums the partials once into an
+        # XCD-local vector; the 37 other workers wait on a local event and read that (measured: folding
+        # in every task cost 35 us per phase, 304 tasks each re-fetching 147 KB after their L2 invalidate)
+        g.etensor(f"E_fold_{L}", (X,), wait_count=1)
         g.etensor(f"E_qkv_{L}", (X,), wait_count=W)
         g.etensor(f"E_post_{L}", (X,), wait_count=HMAX + 2 * KVMAX)
-        g.etensor(f"E_attn_{L}", (X, HMAX), wait_count=NC)
+        g.etensor(f"E_attn_{L}", (X,), wait_count=NC)
         g.etensor(f"E_merge_{L}", (X,), wait_count=HMAX)
         g.etensor(f"E_o_{L}", (1,), wait_count=X * W)
+        g.etensor(f"E_folo_{L}", (X,), wait_count=1)
         g.etensor(f"E_down_{L}", (1,), wait_count=X * W)
-        grid(f"qkv_{L}", (X, W), "llm_s_qkv", L, {e_in: e_map}, {f"E_qkv_{L}": "xw->x"}, us(d.NQKV * d.H * 2), "xw->x", "xw->w")
+        grid(f"fold_{L}", (X, 1), "llm_s_fold_d", L, {e_in: e_map}, {f"E_fold_{L}": "xw->x"}, 2.0, "xw->x")
+        grid(f"qkv_{L}", (X, W), "llm_s_qkv", L, {f"E_fold_{L}": "xw->x"}, {f"E_qkv_{L}": "xw->x"}, us(d.NQKV * d.H * 2), "xw->x", "xw->w")
         grid(f"post_q_{L}", (X, HMAX), "llm_s_post_q", L, {f"E_qkv_{L}": "xj->x"}, {f"E_post_{L}": "xj->x"}, 1.0, "xj->x")
         grid(f"post_kv_{L}", (X, KVMAX, 2), "llm_s_post_kv", L, {f"E_qkv_{L}": "xjs->x"}, {f"E_post_{L}": "xjs->x"}, 1.0, "xjs->x")
-        grid(f"attn_{L}", (X, HMAX, NC), "llm_s_attn", L, {f"E_post_{L}": "xjc->x"}, {f"E_attn_{L}": "xjc->xj"}, 3.0, "xjc->x")
-        grid(f"merge_{L}", (X, HMAX), "llm_s_merge", L, {f"E_attn_{L}": "xj->xj"}, {f"E_merge_{L}": "xj->x"}, 1.0, "xj->x")
+        grid(f"attn_{L}", (X, NC), "llm_s_attn", L, {f"E_post_{L}": "xc->x"}, {f"E_attn_{L}": "xc->x"}, 6.0, "xc->x")
+        grid(f"merge_{L}", (X, HMAX), "llm_s_merge", L, {f"E_attn_{L}": "xj->x"}, {f"E_merge_{L}": "xj->x"}, 1.0, "xj->x")
         grid(f"oproj_{L}", (X, W), "llm_s_oproj", L, {f"E_merge_{L}": "xw->x"}, {f"E_o_{L}": "xw->(0)"}, us(d.H * d.NH * d.HD * 2), "xw->x", "xw->w")
+        grid(f"folo_{L}", (X, 1), "llm_s_fold_o", L, {f"E_o_{L}": "xw->(0)"}, {f"E_folo_{L}": "xw->x"}, 2.0, "xw->x")
         if d.moe:
             g.etensor(f"E_r_{L}", (X,), wait_count=W)
             g.etensor(f"E_egu_{L}", (X,), wait_count=W)
-            grid(f"router_{L}", (X, W), "llm_s_router", L, {f"E_o_{L}": "xw->(0)"}, {f"E_r_{L}": "xw->x"}, us(X * d.E * d.H * 2), "xw->x", "xw->w")
+            grid(f"router_{L}", (X, W), "llm_s_router", L, {f"E_folo_{L}": "xw->x"}, {f"E_r_{L}": "xw->x"}, us(X * d.E * d.H * 2), "xw->x", "xw->w")
             grid(f"egu_{L}", (X, W), "llm_s_egu", L, {f"E_r_{L}": "xw->x"}, {f"E_egu_{L}": "xw->x"}, us(d.TOPK * 2 * d.MI * d.H * 2), "xw->x", "xw->w")
             grid(f"edn_{L}", (X, W), "llm_s_edn", L, {f"E_egu_{L}": "xw->x"}, {f"E_down_{L}": "xw->(0)"}, us(d.TOPK * d.H * d.MI * 2), "xw->x", "xw->w")
         else:
             g.etensor(f"E_gu_{L}", (X,), wait_count=W)
-            grid(f"gateup_{L}", (X, W), "llm_s_gateup", L, {f"E_o_{L}": "xw->(0)"}, {f"E_gu_{L}": "xw->x"}, us(2 * d.INTER * d.H * 2), "xw->x", "xw->w")
+            grid(f"gateup_{L}", (X, W), "llm_s_gateup", L, {f"E_folo_{L}": "xw->x"}, {f"E_gu_{L}": "xw->x"}, us(2 * d.INTER * d.H * 2), "xw->x", "xw->w")
             grid(f"down_{L}", (X, W), "llm_s_down", L, {f"E_gu_{L}": "xw->x"}, {f"E_down_{L}": "xw->(0)"}, us(d.H * d.INTER * 2), "xw->x", "xw->w")
         e_in, e_map = f"E_down_{L}", "xw->(0)"
     n_lm = math.ceil(d.V / p["lm"])
+    g.etensor("E_lmf", (1,), wait_count=1)
     g.etensor("E_lm", (1,), wait_count=n_lm)
     g.etensor("E_argmax", (1,), wait_count=1)
+    g.call_device("lmfold", (1,), hip_link(T, "llm_s_lmfold"), resource=res, args=["llm"], consts=(d.L,),
+                  in_edges={e_in: "i->(0)"}, out_edges={"E_lmf": "i->i"}, duration_us=2.0)
     g.call_device("lmhead", (n_lm,), hip_link(T, "llm_s_lmhead"), resource=res, args=["llm"], consts=(-1,),
-                  in_edges={e_in: "i->(0)"}, out_edges={"E_lm": "i->(0)"}, duration_us=M._us(d.V * d.H * 2, n_lm))
+                  in_edges={"E_lmf": "i->(0)"}, out_edges={"E_lm": "i->(0)"}, duration_us=M._us(d.V * d.H * 2, n_lm))
     g.call_device("argmax", (1,), hip_link(T, "llm_argmax"), resource=res, args=["llm"], consts=(-1,),
                   in_edges={"E_lm": "i->i"}, out_edges={"E_argmax": "i->i"}, duration_us=2.0)
     return g

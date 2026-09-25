@@ -150,7 +150,7 @@ int main(int argc, char** argv) {
       printf("sliced weights: %.2f GB\n", sbytes / 1e9);
     }
   }
-  hp.xa = dalloc<float>(hp.H); hp.o_part = dalloc<float>((size_t)8 * hp.H); hp.d_part = dalloc<float>((size_t)std::max(8, hp.TOPK) * hp.H);
+  hp.xa = dalloc<float>(hp.H); hp.xin_x = dalloc<float>((size_t)8 * hp.H); hp.xa_x = dalloc<float>((size_t)8 * hp.H); hp.xfin = dalloc<float>(hp.H); hp.o_part = dalloc<float>((size_t)8 * hp.H); hp.d_part = dalloc<float>((size_t)std::max(8, hp.TOPK) * hp.H);
   hp.rlog_x = dalloc<float>((size_t)8 * std::max(1, hp.E)); hp.eid = dalloc<int32_t>(std::max(8, hp.TOPK));
   const bool sliced_graph = strncmp(ETX_GRAPH_NAME, "llm_sliced_", 11) == 0;
   if (sliced_graph && !sliced) die("this binary was built from model_sliced.py: run prep.py --sliced for " + dir);

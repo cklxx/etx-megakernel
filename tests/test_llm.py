@@ -39,7 +39,7 @@ def test_llm_sliced_graph(name, monkeypatch):
     plan = compile_graph(MS.build(), "gfx942", {})
     from etx.ir.types import Scope
     dev = [e.name for e in plan.events.values() if e.scope == Scope.DEVICE]
-    assert dev == ["E_embed", "E_o_0", "E_down_0", "E_o_1", "E_down_1", "E_lm"]
+    assert dev == ["E_embed", "E_o_0", "E_down_0", "E_o_1", "E_down_1", "E_lmf", "E_lm"]
     for g in plan.graph.grids:
         if len(g.grid) != 2 or g.grid[1] != M.workers(d) // MS.X:
             continue                                                  # (X, W) GEMV grids: one task per worker

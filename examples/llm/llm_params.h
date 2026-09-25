@@ -49,6 +49,8 @@ struct LlmParams {
   int32_t X, W;                             // XCDs, workers per XCD
   int32_t qh0[8], nqh[8], kv0[8], nkv[8], i0[8], ni[8], h0[8], nh[8];
   float *xa;                                // residual after attention [H] (xb is `x`)
+  float *xin_x, *xa_x;                      // [8][H] XCD-local copies of the folded residual (written by the XCD's fold task)
+  float *xfin;                              // [H] folded final residual for lm_head
   float *o_part;                            // [8][H] per-XCD o_proj partial sums
   float *d_part;                            // [max(8, TOPK)][H] per-XCD (dense) or per-slot (MoE) down partial sums
   float *rlog_x;                            // [8][E] router logits, one copy per XCD
