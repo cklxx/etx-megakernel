@@ -12,10 +12,7 @@
 // is then called once per row by one thread. LLM_GEMV_U overrides the depth; LLM_NT_WEIGHTS=1 uses
 // non-temporal weight loads (weights are read once per token).
 #ifndef LLM_GEMV_U
-// loads in flight per batch (two batches are in flight, see gemv_stream). 16 at 4 waves per CU (256 threads:
-// the wave owns 512 registers); build.sh passes 8 at 8 waves (256 registers each: the megakernel spilled
-// 225 VGPRs to scratch at U=16 and ran 30% slower than the unfused kernel). Both keep 128 loads in flight per CU.
-#define LLM_GEMV_U 16
+#define LLM_GEMV_U 16          // measured on MI300X 2026-09-25: 16 beats 32 at every task size (3.0-3.3 vs 1.2-2.7 TB/s)
 #endif
 typedef unsigned int llm_u32x4 __attribute__((ext_vector_type(4)));
 typedef unsigned int llm_u32x2 __attribute__((ext_vector_type(2)));
@@ -81,24 +78,16 @@ static __device__ __forceinline__ void gemv_stream(const __hip_bfloat16* __restr
 #pragma unroll
     for (int u = 0; u < U; ++u) consume(s + u, w[u]);
   };
-  // two batches of U loads in flight: batch b is issued before batch a is consumed, so the stream never
-  // drains while the products are computed (single-buffered, the loop waited for all U loads, computed,
-  // then issued the next U: one latency per batch exposed)
+  // one batch of U loads, then the products (a software-pipelined variant with two batches in flight
+  // measured no gain at 4 waves per CU and a loss at 8, 2026-09-25; the megakernel spills there)
   int s0 = sb;
-  V wa[U], wb[U];
-  if (s0 + U <= se) load(wa, s0);
-  for (; s0 + 2 * U <= se; s0 += 2 * U) {
-    load(wb, s0 + U);
-    use(wa, s0);
-    if (s0 + 3 * U <= se) load(wa, s0 + 2 * U);
-    use(wb, s0 + U);
-  }
-  if (s0 + U <= se) { use(wa, s0); s0 += U; }
+  V w[U];
+  for (; s0 + U <= se; s0 += U) { load(w, s0); use(w, s0); }
   if (s0 < se) {                                             // tail of fewer than U segments
 #pragma unroll
-    for (int u = 0; u < U; ++u) if (s0 + u < se) wa[u] = wload(base + (size_t)(s0 + u) * ETX_WAVE_SIZE);
+    for (int u = 0; u < U; ++u) if (s0 + u < se) w[u] = wload(base + (size_t)(s0 + u) * ETX_WAVE_SIZE);
 #pragma unroll
-    for (int u = 0; u < U; ++u) if (s0 + u < se) consume(s0 + u, wa[u]);
+    for (int u = 0; u < U; ++u) if (s0 + u < se) consume(s0 + u, w[u]);
   }
   if (sb < se) { const float v = etx_wave_sum(acc); if (lane == 0) pl[wv * nrt + cur] += v; }
   __syncthreads();
