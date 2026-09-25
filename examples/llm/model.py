@@ -146,7 +146,7 @@ def build() -> Graph:
     p = partition(d)
     ctx, chunk = _ctx_chunk()
     NC = ctx // chunk
-    res = Resource(threads=256, vgpr=256 if workers(d) == 304 else 128, agpr=0, lds_bytes=lds_bytes(d))
+    res = Resource(threads=256, vgpr=384 if workers(d) == 304 else 128, agpr=0, lds_bytes=lds_bytes(d))
     g = Graph(f"llm_{d.name}")
     g.tensor("llm", (1,), role="weight", bytes_per_elem=8)          # placeholder: the tiles read __constant__ params
 
