@@ -1,0 +1,176 @@
+<!doctype html><html><head><meta charset='utf-8'><title>ETX Plan v2: Beat vLLM on MoE Decode</title><style>
+@page { size: A4; margin: 18mm 16mm 18mm 16mm; }
+body { font-family: "DejaVu Sans", "Helvetica Neue", Arial, sans-serif; font-size: 10.5pt; line-height: 1.45; color: #111; max-width: 178mm; margin: 0 auto; }
+h1 { font-size: 20pt; margin: 0 0 6pt; line-height: 1.25; }
+h2 { font-size: 14.5pt; margin: 22pt 0 6pt; padding-bottom: 3pt; border-bottom: 1px solid #999; page-break-after: avoid; }
+h3 { font-size: 12pt; margin: 14pt 0 4pt; page-break-after: avoid; }
+h4 { font-size: 10.5pt; margin: 10pt 0 3pt; }
+p { margin: 5pt 0; text-align: left; }
+ul, ol { margin: 4pt 0 6pt; padding-left: 18pt; }
+li { margin: 2pt 0; }
+table { border-collapse: collapse; width: 100%; margin: 6pt 0 10pt; font-size: 9pt; page-break-inside: auto; }
+th, td { border: 1px solid #999; padding: 3pt 5pt; vertical-align: top; text-align: left; }
+th { background: #eee; font-weight: bold; }
+tr { page-break-inside: avoid; }
+code { font-family: "DejaVu Sans Mono", Menlo, Consolas, monospace; font-size: 8.8pt; }
+pre { background: #f4f4f4; border: 1px solid #ccc; padding: 6pt 8pt; font-size: 8.5pt; line-height: 1.35; white-space: pre-wrap; word-break: break-word; page-break-inside: avoid; }
+hr { border: none; border-top: 1px solid #999; margin: 12pt 0; }
+blockquote { margin: 6pt 0; padding-left: 10pt; border-left: 3px solid #bbb; color: #333; }
+.meta { color: #333; margin-bottom: 10pt; }
+a { color: #0645ad; text-decoration: none; }
+</style></head><body><h1 id="etx-plan-v2-beat-vllm-on-moe-decode">ETX Plan v2: Beat vLLM on MoE Decode</h1>
+<p>Author: Kailun Chen · Status: v2 plan, supersedes <code>PLAN-fusion-win.md</code> · Date: 2026-09-25 · Evidence: design document sections 15.5-15.7, <code>examples/llm/results/</code></p>
+<h2 id="0-summary">0. Summary</h2>
+<ul>
+<li><strong>Change of target.</strong> Stop trying to prove fusion on batch-1 dense decode. Measurement showed it is a barrier chain with nothing to overlap; a megakernel can at best equal a HIP graph there.</li>
+<li><strong>New target.</strong> Qwen3-30B-A3B (128 experts, top-8) decode on one MI300X: <strong>at most 3.5 ms per token</strong> at batch 1, against vLLM&rsquo;s best 4.84 ms; and ahead of vLLM at batch 4-8. Every token identical to HF.</li>
+<li><strong>Why MoE.</strong> vLLM reaches only 26% of bandwidth on this model (6.1 GB read per token in 4.84 ms; the floor is about 1.5 ms) against 60% on the dense 8B. The loss comes from choosing experts only after the router, from small fragmented expert matrices, and from kernels that depend on the routing and so cannot be frozen into a graph. Those three are exactly what a megakernel is good at.</li>
+<li><strong>Two independent problems, solved separately.</strong> Fusion gains are sought only in the MoE structure; tile speed is its own job, with targets of 3 TB/s for GEMV and under 5 us per layer for attention.</li>
+<li><strong>Budget.</strong> Four phases, about six GPU sessions on a 1x MI300X at $2.99/h, $25-35 in total. Balance $22.37.</li>
+</ul>
+<h2 id="1-established-facts">1. Established facts</h2>
+<table>
+<thead>
+<tr>
+<th>Fact</th>
+<th>Evidence</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>With the same tiles, fused and HIP-graph unfused are equal on dense models (2-5% apart)</td>
+<td>sliced graph, three models</td>
+</tr>
+<tr>
+<td>The 2x gap to vLLM is entirely in the tiles: GEMV at 1.5-2.5 TB/s, attention plus merge 50 us per layer</td>
+<td>Qwen3-8B per-phase trace</td>
+</tr>
+<tr>
+<td>With good tiles the compiled kernel beats vLLM by 8% and is within 6% of hand-written</td>
+<td>DeepSeek with fleet&rsquo;s tiles</td>
+</tr>
+<tr>
+<td>vLLM uses 26% of bandwidth on the MoE model</td>
+<td>4.84 ms for 6.1 GB</td>
+</tr>
+<tr>
+<td>One workgroup per CU is right for the persistent kernel; L2-warming prefetch loses; the relay&rsquo;s hierarchical acquire is unsafe</td>
+<td>measured 2026-09-24/25</td>
+</tr>
+</tbody>
+</table>
+<h2 id="2-what-one-moe-layer-looks-like">2. What one MoE layer looks like</h2>
+<p>Today, sliced graph, one workgroup per CU: 219 us per layer on Qwen3-30B-A3B.</p>
+<table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>Today</th>
+<th>Target</th>
+<th>Means</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>qkv</td>
+<td>22 us</td>
+<td>10</td>
+<td>GEMV tile</td>
+</tr>
+<tr>
+<td>post (q/k norm, RoPE, KV write)</td>
+<td>15</td>
+<td>0</td>
+<td>folded into qkv&rsquo;s epilogue</td>
+</tr>
+<tr>
+<td>attention</td>
+<td>45</td>
+<td>10</td>
+<td>flash-decode layout</td>
+</tr>
+<tr>
+<td>merge</td>
+<td>22</td>
+<td>0</td>
+<td>done by each head&rsquo;s last attention chunk</td>
+</tr>
+<tr>
+<td>o_proj</td>
+<td>21</td>
+<td>5</td>
+<td>small-K GEMV tile</td>
+</tr>
+<tr>
+<td>fold + router</td>
+<td>15</td>
+<td>8</td>
+<td>already XCD-local</td>
+</tr>
+<tr>
+<td>expert gate_up</td>
+<td>51</td>
+<td>18</td>
+<td>expert GEMV tile</td>
+</tr>
+<tr>
+<td>expert down</td>
+<td>34</td>
+<td>12</td>
+<td>expert GEMV tile</td>
+</tr>
+<tr>
+<td>two device-wide handoffs</td>
+<td>6</td>
+<td>6</td>
+<td>-</td>
+</tr>
+<tr>
+<td>total</td>
+<td>219</td>
+<td>about 70</td>
+<td>48 layers about 3.4 ms, plus lm_head 0.2 ms</td>
+</tr>
+</tbody>
+</table>
+<p>The structural fusion gain on MoE is already in the sliced graph: every XCD computes the router itself, there is no device-wide barrier between the router and the experts, and XCD k starts streaming its expert&rsquo;s weights the moment it knows them. vLLM runs router, top-k and fused_moe as separate kernels with boundaries between them, and fused_moe&rsquo;s grouped GEMM is built for large batches and inefficient for one token.</p>
+<h2 id="3-phases">3. Phases</h2>
+<h3 id="phase-1-tile-speed-2-3-sessions">Phase 1: tile speed (2-3 sessions)</h3>
+<ul>
+<li><strong>GEMV:</strong> with one workgroup per CU the register budget is 512; raise loads in flight to 32-48 per lane; weight blocks of at least 128 KB per task, small matrices (o_proj, router) merged into fewer tasks; the input vector kept in LDS as bf16, which is exact because HF&rsquo;s linear inputs are bf16 already. Target 3 TB/s.</li>
+<li><strong>Attention:</strong> four waves over position ranges, vectorised 128-dimension dot products, partial sums out; the last chunk of each head merges in place, removing the merge phase.</li>
+<li><strong>post folded into qkv:</strong> qkv tasks cover whole heads and finish norm, RoPE and the KV write in their epilogue.</li>
+<li>Done when: fused Qwen3-30B-A3B at most 5 ms (vLLM parity), Qwen3-8B at most 6 ms; tokens identical to HF.</li>
+</ul>
+<h3 id="phase-2-the-moe-structural-gain-1-2-sessions">Phase 2: the MoE structural gain (1-2 sessions)</h3>
+<ul>
+<li><strong>Expert weights prefetched into LDS:</strong> once the XCD&rsquo;s fold task has the routing, the expert gate_up tasks pull their slice of the weights into an LDS staging area (about 30 KB free per CU) while waiting on the local event; no L2 warming.</li>
+<li><strong>Assignment when top-k differs from the XCD count:</strong> experts distributed by load, not one slot per XCD.</li>
+<li>Done when: Qwen3-30B-A3B at most 3.5 ms, at least 25% ahead of vLLM.</li>
+</ul>
+<h3 id="phase-3-small-batches-1-2-sessions">Phase 3: small batches (1-2 sessions)</h3>
+<ul>
+<li>Batch 4-8: tokens of one step grouped by expert, expressed with ETX&rsquo;s data-dependent edges (<code>"b-&gt;topk[b,:]"</code>, indptr range maps), so each expert&rsquo;s weights are read once.</li>
+<li>Waiting at a handoff is filled by other tokens&rsquo; tasks, which a graph cannot do.</li>
+<li>Done when: per-token time at batch 4 and 8 at most 80% of vLLM&rsquo;s at the same batch.</li>
+</ul>
+<h3 id="phase-4-comparison-and-delivery-1-session">Phase 4: comparison and delivery (1 session)</h3>
+<ul>
+<li>Qwen3-30B-A3B x {vLLM best, ETX fused, ETX unfused} x batch {1, 4, 8}, 1024-token context, three rounds each, every run checked token by token against HF.</li>
+<li>Update the design document, the brief and the README.</li>
+</ul>
+<h2 id="4-risks">4. Risks</h2>
+<ul>
+<li><strong>3 TB/s for expert GEMV is an estimate.</strong> One expert is only 3 MB, 80 KB per task across 38 workers, so latency is harder to hide; at 2 TB/s the result is about 4.3 ms, still 11% ahead of vLLM.</li>
+<li><strong>LDS prefetch needs room.</strong> The attention and GEMV input vectors already take most of the LDS; the depth is decided by A/B.</li>
+<li><strong>Small-batch routing groups touch the compiler&rsquo;s instantiation path.</strong> That code was validated on the MoE example, not yet on a real model.</li>
+<li><strong>GPU availability.</strong> Several-hour waits for a free VM in recent days.</li>
+</ul>
+<h2 id="5-validation-from-2026-09-25">5. Validation (from 2026-09-25)</h2>
+<ul>
+<li><strong>CPU reference <code>examples/llm/ref_numpy.py</code>:</strong> the whole pipeline in numpy with the tiles&rsquo; operation order and bf16 rounding points, checked locally against HF on Qwen2.5-0.5B token by token and layer by layer (8/8 tokens, per-layer cosine above 0.9999), 3.4 s per run. Algorithmic tile changes are validated here first; the GPU is for speed.</li>
+<li><strong>Per-layer dump:</strong> <code>run --dump</code> writes each layer&rsquo;s input residual on the GPU and <code>compare_dump.py</code> compares it with the reference, so one run locates the first layer that diverges.</li>
+<li><strong>GEMV microbenchmark <code>bench/gemv_bench.hip</code>:</strong> shares <code>examples/llm/gemv.h</code> with the tiles and sweeps task sizes and K in seconds, so tile tuning no longer needs whole-model runs.</li>
+</ul>
+<h2 id="6-order">6. Order</h2>
+<p>Phase 1 first. It answers two things at once: whether the tiles reach 3 TB/s, and whether the fused MoE kernel then already equals vLLM. If phase 1 clears its bar, phases 2 and 3 decide by how much ETX wins; if it does not, the problem is unambiguously tile engineering, and linking external tiles becomes the option.</p></body></html>

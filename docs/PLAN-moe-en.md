@@ -72,6 +72,12 @@ The structural fusion gain on MoE is already in the sliced graph: every XCD comp
 - **Small-batch routing groups touch the compiler's instantiation path.** That code was validated on the MoE example, not yet on a real model.
 - **GPU availability.** Several-hour waits for a free VM in recent days.
 
-## 5. Order
+## 5. Validation (from 2026-09-25)
+
+- **CPU reference `examples/llm/ref_numpy.py`:** the whole pipeline in numpy with the tiles' operation order and bf16 rounding points, checked locally against HF on Qwen2.5-0.5B token by token and layer by layer (8/8 tokens, per-layer cosine above 0.9999), 3.4 s per run. Algorithmic tile changes are validated here first; the GPU is for speed.
+- **Per-layer dump:** `run --dump` writes each layer's input residual on the GPU and `compare_dump.py` compares it with the reference, so one run locates the first layer that diverges.
+- **GEMV microbenchmark `bench/gemv_bench.hip`:** shares `examples/llm/gemv.h` with the tiles and sweeps task sizes and K in seconds, so tile tuning no longer needs whole-model runs.
+
+## 6. Order
 
 Phase 1 first. It answers two things at once: whether the tiles reach 3 TB/s, and whether the fused MoE kernel then already equals vLLM. If phase 1 clears its bar, phases 2 and 3 decide by how much ETX wins; if it does not, the problem is unambiguously tile engineering, and linking external tiles becomes the option.

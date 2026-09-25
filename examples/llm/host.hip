@@ -57,7 +57,7 @@ template <class T> static T* dalloc(size_t n) { T* p; ETX_CHECK(hipMalloc(&p, n 
 int main(int argc, char** argv) {
   if (argc < 2) die("usage: run <packed-dir> [--gen N] [--repeat R] [--teacher]");
   const std::string dir = argv[1];
-  int gen = -1, repeat = 2; bool teacher = false, unfused = false; std::string golden_name = "golden.txt";
+  int gen = -1, repeat = 2; bool teacher = false, unfused = false; std::string golden_name = "golden.txt", dump_path;
   for (int i = 2; i < argc; ++i) {
     const std::string a = argv[i];
     if (a == "--gen" && i + 1 < argc) gen = atoi(argv[++i]);
@@ -65,6 +65,7 @@ int main(int argc, char** argv) {
     else if (a == "--teacher") teacher = true;
     else if (a == "--unfused") unfused = true;       // baseline: same tiles, one launch per grid (HIP graph)
     else if (a == "--golden" && i + 1 < argc) golden_name = argv[++i];
+    else if (a == "--dump" && i + 1 < argc) dump_path = argv[++i];   // per-layer residuals of the last prompt step (sliced graph)
   }
   const Manifest m = read_manifest(dir + "/llm.manifest");
   std::ifstream gf(dir + "/" + golden_name); if (!gf) die("no " + golden_name);
@@ -150,6 +151,7 @@ int main(int argc, char** argv) {
       printf("sliced weights: %.2f GB\n", sbytes / 1e9);
     }
   }
+  hp.layer_dump = dump_path.empty() ? nullptr : dalloc<float>((size_t)(hp.L + 1) * hp.H); hp.dump_step = (int)prompt.size() - 1;
   hp.xa = dalloc<float>(hp.H); hp.xin_x = dalloc<float>((size_t)8 * hp.H); hp.xa_x = dalloc<float>((size_t)8 * hp.H); hp.xfin = dalloc<float>(hp.H); hp.o_part = dalloc<float>((size_t)8 * hp.H); hp.d_part = dalloc<float>((size_t)std::max(8, hp.TOPK) * hp.H);
   hp.rlog_x = dalloc<float>((size_t)8 * std::max(1, hp.E)); hp.eid = dalloc<int32_t>(std::max(8, hp.TOPK));
   const bool sliced_graph = strncmp(ETX_GRAPH_NAME, "llm_sliced_", 11) == 0;
@@ -219,6 +221,10 @@ int main(int argc, char** argv) {
     printf("run %d: %d/%d generated tokens match HF greedy%s", run, matched, gen, teacher ? " (teacher-forced argmax)" : "");
     if (first_div >= 0) printf("; first divergence at %d (HF top-1 margin there %.4f)", first_div, first_div < (int)margin.size() ? margin[first_div] : -1.f);
     printf("\n");
+  }
+  if (hp.layer_dump) {
+    std::vector<float> ld((size_t)(hp.L + 1) * hp.H); ETX_CHECK(hipMemcpy(ld.data(), hp.layer_dump, ld.size() * 4, hipMemcpyDeviceToHost));
+    FILE* f = fopen(dump_path.c_str(), "wb"); if (f) { const int32_t hdr[2] = {hp.L + 1, hp.H}; fwrite(hdr, 4, 2, f); fwrite(ld.data(), 4, ld.size(), f); fclose(f); printf("wrote %s (%d x %d residuals: layer inputs 0..L-1 and the final residual)\n", dump_path.c_str(), hp.L + 1, hp.H); }
   }
   std::vector<double> s(step_ms); std::sort(s.begin(), s.end());
   const double med = s.empty() ? 0 : s[s.size() / 2];
