@@ -44,6 +44,10 @@ for m in "${MODELS[@]}"; do name=${m##*:}
     timeout 1800 $B/run ~/llm/$name $B/vl_plan.txt --repeat 2 $flag 2>&1 | grep -E "^run 1|^RESULT|rror|failed" | tr "\n" " "; echo " [$name vl $mode]"
   done
   timeout 1800 $B/run ~/llm/$name $B/vl_plan.txt --repeat 1 --teacher 2>&1 | grep -E "^run" | tr "\n" " "; echo " [$name vl teacher]"
+  log "variant: small launches between qkv and o_proj pinned to one XCD (XCD-local events) $name"
+  ETX_VL_PIN=1 ETX_OUT=build/vl/${name}_pin VLLM=~/vllm ETX_TORCH_HEADERS=~/rocm-headers/pytorch bash examples/vllm_llm/build.sh ~/llm/$name > /tmp/vlbuild_${name}_pin.log 2>&1 || { echo "BUILD FAILED ${name}_pin"; grep -iE "error|failed" /tmp/vlbuild_${name}_pin.log | head; continue; }
+  P=build/vl/${name}_pin
+  for r in 1 2; do timeout 1800 $P/run ~/llm/$name $P/vl_plan.txt --repeat 2 2>&1 | grep -E "^run 1|^RESULT|rror|failed" | tr "\n" " "; echo " [$name vl-pin fused]"; done
 done
 
 log "vLLM (same prompt ids): default and custom_ops=all; kernel traces"

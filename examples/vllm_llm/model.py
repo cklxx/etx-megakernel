@@ -40,6 +40,9 @@ BS = 16                       # KV block size (vLLM default on ROCm)
 PART = 256                    # paged attention partition size (fixed in paged_attention_custom_launcher)
 THREADS = 1024                # megakernel workgroup = the largest imported block (wvSplitK 64 x 16)
 MAXLEN = int(os.environ.get("ETX_VL_MAXLEN", "1072"))    # vLLM's max_model_len for the benchmark (prompt + 32 + 16)
+# ETX_VL_PIN=1: the small launches between qkv and o_proj (q/k norm, rope, cache, attention, reduce) all run on
+# XCD 0, so the events between them are XCD-local (a wait on L2 of one XCD) instead of device-wide
+PIN_ROLES = {"q_norm", "k_norm", "rope", "cache", "attn", "reduce"} if os.environ.get("ETX_VL_PIN", "0") == "1" else set()
 
 
 def imports() -> dict:
@@ -134,8 +137,9 @@ def build() -> Graph:
         ev = f"E_{n}"
         g.etensor(ev, (1,), wait_count=i["tasks"])
         name = f"{i['role']}_{i['layer']}" if i["layer"] >= 0 else i["role"]
+        pin = {"domain_map": "i->(0)"} if i["role"] in PIN_ROLES else {}
         g.call_device(name, (i["tasks"],), hip_link(adapters, f"etx_tile_{i['export']}"), resource=res, args=["impargs"],
-                      consts=(i["offset"],), in_edges={prev: "i->(0)"}, out_edges={ev: "i->(0)"},
+                      consts=(i["offset"],), in_edges={prev: "i->(0)"}, out_edges={ev: "i->(0)"}, **pin,
                       duration_us=2.0 if not i["export"].startswith("wvsplitk") else max(2.0, i["M"] * i["K"] * 2 / 4.0e12 * 1e6 / 1.0))
         prev = ev
     g.etensor("E_argmax", (1,), wait_count=1)
