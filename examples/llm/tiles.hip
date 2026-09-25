@@ -437,12 +437,12 @@ extern "C" __device__ void llm_s_lmfold(const etx_ctx* c) {
 // and returns true. Counters are monotonic; the target scales with the step number.
 static __device__ __forceinline__ bool last_arriver(int32_t* ctr, int target, float* red) {
   int* flag = (int*)(red + 255);          // last float of the scratch region: nothing else uses it
-  ETX_RELEASE_DOMAIN();
+  if (P.unfused) ETX_RELEASE_DEVICE(); else ETX_RELEASE_DOMAIN();   // unfused: the group is spread over XCDs
   __syncthreads();
   if (threadIdx.x == 0) { const int old = __hip_atomic_fetch_add(ctr, 1, __ATOMIC_RELAXED, __HIP_MEMORY_SCOPE_AGENT); *flag = (old + 1 == target); }
   __syncthreads();
   const bool last = *flag != 0;
-  if (last) ETX_ACQUIRE_DOMAIN();
+  if (last) { if (P.unfused) ETX_ACQUIRE_DEVICE(); else ETX_ACQUIRE_DOMAIN(); }
   return last;
 }
 

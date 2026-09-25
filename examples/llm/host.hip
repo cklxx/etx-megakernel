@@ -152,7 +152,7 @@ int main(int argc, char** argv) {
     }
   }
   hp.layer_dump = dump_path.empty() ? nullptr : dalloc<float>((size_t)(hp.L + 1) * hp.H); hp.dump_step = (int)prompt.size() - 1;
-  hp.ctr_qkv = dalloc<int32_t>((size_t)hp.L * 8); hp.ctr_attn = dalloc<int32_t>((size_t)hp.L * 8); hp.step_seq = 0;
+  hp.ctr_qkv = dalloc<int32_t>((size_t)hp.L * 8); hp.ctr_attn = dalloc<int32_t>((size_t)hp.L * 8); hp.step_seq = 0; hp.unfused = unfused ? 1 : 0;
   hp.xa = dalloc<float>(hp.H); hp.xin_x = dalloc<float>((size_t)8 * hp.H); hp.xa_x = dalloc<float>((size_t)8 * hp.H); hp.xfin = dalloc<float>(hp.H); hp.o_part = dalloc<float>((size_t)8 * hp.H); hp.d_part = dalloc<float>((size_t)std::max(8, hp.TOPK) * hp.H);
   hp.rlog_x = dalloc<float>((size_t)8 * std::max(1, hp.E)); hp.eid = dalloc<int32_t>(std::max(8, hp.TOPK));
   const bool sliced_graph = strncmp(ETX_GRAPH_NAME, "llm_sliced_", 11) == 0;
