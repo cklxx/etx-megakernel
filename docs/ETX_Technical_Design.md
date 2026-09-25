@@ -843,6 +843,31 @@ What the round established:
 
 The bar of the plan (fused 15% faster than unfused with the same tiles) is therefore not met on batch-1 dense decode, and the decision point of section 6 applies: the weight shifts to MoE routing and multi-GPU, where independent kernels cannot follow, and to tile quality, which sets the 2x distance to vLLM.
 
+### 15.8 Tile rounds on the sliced graph, and what they showed (2026-09-25 night, 2x MI300X, GPU 0 only)
+
+Ten rounds of tile work on `examples/llm/model_sliced.py`, every run 32/32 tokens equal to HF greedy (logs in `examples/llm/results/session4/`). Best figures in ms/token, 1024-token context:
+
+| | start of the session (fused / unfused) | best fused | best unfused | vLLM best |
+|---|---|---|---|---|
+| Qwen3-30B-A3B | 8.41 / 9.30 | 7.86 | 7.39 | 4.84 |
+| Qwen3-8B | 9.99 / 10.07 | 7.73 (512 threads) | 8.01 | 4.91 |
+| Qwen2.5-1.5B | 3.89 / 4.11 | 3.22 (512 threads) | 3.19 | 1.86 |
+
+What helped: parallel folds (four tasks per XCD, RMSNorm applied by the consumers while copying into LDS), eight waves per CU for the dense models, K and V staged together in attention, a rank-based top-k in LDS published once per XCD. What did not: the router folded into every expert task (38 tasks miss the same 512 KB in L2 at once, +28 us per layer), a two-batch software pipeline in the GEMV (no gain at four waves; at eight waves the persistent kernel spills 96-190 VGPRs where the unfused kernel spills none), eight waves for MoE (expert tasks are too small to use the depth).
+
+Two conclusions, one about the work and one about the megakernel. The remaining 1.6x to vLLM is tile quality, and hand-tuning our own tiles is not what this project should prove. And the persistent kernel has structural costs that the same tiles do not have unfused: one register budget for every tile (plus the loop's live state), one workgroup per CU, and shared L2 working sets. These now belong in Pass 1 and Pass 2 as rules.
+
+### 15.9 Importing the state-of-the-art kernels (from 2026-09-25)
+
+The claim ETX has to prove is that fusing the kernels people actually use beats launching those same kernels one by one. ETX therefore now imports compiled kernels instead of re-implementing them (`etx/importer/`):
+
+1. **Slicing.** `slice_device.py` keeps the device side of a torch extension source (vLLM's `.cu` files) byte for byte and drops the torch host wrappers; a host function that takes the address of each specialisation vLLM's host code launches makes the device compile emit exactly those kernels.
+2. **IR import.** `ir_import.py` turns an `amdgpu_kernel` from the pre-device-library IR into an inlinable device function: parameters come from an argument block laid out like the launch's kernel arguments; block and thread ids (`__ockl_get_*`, `llvm.amdgcn.work{group,item}.id.*`) are rewritten from the ETX task and the kernel's own block shape; static LDS moves into one arena shared by all imported tiles; when the megakernel workgroup holds k of the kernel's blocks, k slots run side by side on separate LDS copies and `s_barrier` becomes a barrier over the slot's waves. Anything not understood (implicit-argument pointers, dynamic LDS, ids read out of line) is refused with the reason.
+3. **Adapters and bundle.** `adapter.py` generates one link-mode tile per import (always inlined; the thread id passes through a volatile asm so per-thread values are not hoisted out of the persistent loop) and the host header with every argument's offset and type. `bundle.py` links the imports with the device-library functions they call and internalizes them, because clang links the device libraries before `-mlink-builtin-bitcode` files.
+4. **The vLLM set.** `vllm_kernels.py` lists the twelve kernels vLLM runs for Qwen decode at batch 1 on MI300X with its fastest configuration (AITER off: 4.91 ms Qwen3-8B, 4.84 ms Qwen3-30B-A3B): `wvSplitK` for every linear layer, `paged_attention_rocm` (ll4mi mfma4/mfma16 plus its reduction), `rms_norm`, `fused_add_rms_norm`, `rotary_embedding`, `reshape_and_cache`, `silu_and_mul`, with the specialisation and launch shape vLLM's host code picks. `examples/vllm_llm` is the model in vLLM's stream order (472 grid instances per token for Qwen3-8B); its host fills each argument block exactly as vLLM's host code would.
+
+Status before GPU time: the whole chain compiles for gfx942 locally with the ROCm 7.2.4 headers and device libraries; the Qwen3-8B megakernel uses 128 VGPRs with no spills and no calls (Qwen2.5-1.5B: 4 spills from the mfma16 attention). The comparison to run: ETX fused vs ETX unfused (the same imported code, one launch per grid, HIP graph) vs vLLM with `custom_ops=all` (the same kernels) and vLLM default (Inductor-generated norm/activation kernels), plus a kernel trace of vLLM that separates kernel time from the gaps between kernels, which bounds what fusion can recover. MoE is next: vLLM's `fused_moe` is a Triton kernel, so the importer needs the Triton IR path.
+
 ### 15.3 Phases of the general architecture (after M3)
 
 | Phase | Deliverable | Completion criterion |
