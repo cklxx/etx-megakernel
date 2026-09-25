@@ -72,11 +72,14 @@ def build() -> Graph:
     g.tensor("llm", (1,), role="weight", bytes_per_elem=8)
     HMAX, KVMAX = S["HMAX"], S["KVMAX"]
 
+    PF = {"llm_s_qkv": "llm_s_qkv_pf", "llm_s_oproj": "llm_s_oproj_pf", "llm_s_gateup": "llm_s_gateup_pf", "llm_s_down": "llm_s_down_pf",
+          "llm_s_egu": "llm_s_egu_pf"} if os.environ.get("ETX_LLM_PREFETCH", "1") != "0" else {}
+
     def grid(name, shape, sym, L, ins, outs, dur, dmap, wmap=None):
         kw = {"domain_map": dmap}
         if wmap:
             kw["worker_map"] = wmap
-        return g.call_device(name, shape, hip_link(T, sym), resource=res, args=["llm"], consts=(L,),
+        return g.call_device(name, shape, hip_link(T, sym, prefetch=PF.get(sym)), resource=res, args=["llm"], consts=(L,),
                              in_edges=ins, out_edges=outs, duration_us=dur, duration_cv=0.05, **kw)
 
     def us(nbytes):

@@ -765,3 +765,43 @@ extern "C" __device__ void llm_s_lmhead(const etx_ctx* c) {
     if (etx_lane() == 0) { P.lm_val[c->coord[0]] = bv; P.lm_idx[c->coord[0]] = bi; }
   }
 }
+
+// ---------------------------------------------------------------- cross-barrier weight prefetch (Pass 7 hook)
+// Runs before the task's wait, in every wave but wave 0 (thread 0 polls the event meanwhile). Touches the
+// first LLM_PF_KB kilobytes of THIS task's weight block so the lines sit in the XCD's L2 when the body
+// streams them: 38 tasks x 64 KB = 2.4 MB per XCD, inside the 4 MB L2. Weights never depend on events.
+#ifndef LLM_PF_KB
+#define LLM_PF_KB 64
+#endif
+static __device__ __forceinline__ void pf_touch(const void* p, size_t bytes) {
+  if (etx_wave() == 0) return;
+  const char* base = (const char*)p;
+  const size_t lines = min(bytes, (size_t)LLM_PF_KB * 1024) / 128;
+  int acc = 0;
+  for (size_t l = threadIdx.x - ETX_WAVE_SIZE; l < lines; l += blockDim.x - ETX_WAVE_SIZE) acc += *(const volatile int*)(base + l * 128);
+  asm volatile("" :: "v"(acc));
+}
+extern "C" __device__ void llm_s_qkv_pf(const etx_ctx* c) {
+  const int x = c->coord[0], w = c->coord[1]; const LlmLayer& Ly = P.layer[c->cst[0]];
+  int r1; const int r0 = rows_of((P.nqh[x] + 2 * P.nkv[x]) * P.HD, w, P.W, &r1);
+  if (r0 < r1) pf_touch(Ly.wqkv_x[x] + (size_t)r0 * P.H, (size_t)(r1 - r0) * P.H * 2);
+}
+extern "C" __device__ void llm_s_oproj_pf(const etx_ctx* c) {
+  const int x = c->coord[0], w = c->coord[1]; const LlmLayer& Ly = P.layer[c->cst[0]];
+  const int K = P.nqh[x] * P.HD; int r1; const int r0 = rows_of(P.H, w, P.W, &r1);
+  if (K && r0 < r1) pf_touch(Ly.wo_x[x] + (size_t)r0 * K, (size_t)(r1 - r0) * K * 2);
+}
+extern "C" __device__ void llm_s_gateup_pf(const etx_ctx* c) {
+  const int x = c->coord[0], w = c->coord[1]; const LlmLayer& Ly = P.layer[c->cst[0]];
+  int r1; const int r0 = rows_of(P.ni[x], w, P.W, &r1);
+  if (r0 < r1) { const size_t b = (size_t)(P.i0[x] + r0) * P.H, n = (size_t)(r1 - r0) * P.H * 2;
+    pf_touch(Ly.wg + b, n / 2); pf_touch(Ly.wu + b, n / 2); }
+}
+extern "C" __device__ void llm_s_down_pf(const etx_ctx* c) {
+  const int x = c->coord[0], w = c->coord[1]; const LlmLayer& Ly = P.layer[c->cst[0]];
+  const int K = P.ni[x]; int r1; const int r0 = rows_of(P.H, w, P.W, &r1);
+  if (K && r0 < r1) pf_touch(Ly.wd_x[x] + (size_t)r0 * K, (size_t)(r1 - r0) * K * 2);
+}
+extern "C" __device__ void llm_s_egu_pf(const etx_ctx* c) {   // the expert is only known after the router: warm the router-independent part, nothing
+  (void)c;
+}
