@@ -41,5 +41,7 @@ def test_llm_sliced_graph(name, monkeypatch):
     dev = [e.name for e in plan.events.values() if e.scope == Scope.DEVICE]
     assert dev == ["E_embed", "E_o_0", "E_down_0", "E_o_1", "E_down_1", "E_lm"]
     for g in plan.graph.grids:
+        if len(g.grid) != 2 or g.grid[1] != M.workers(d) // MS.X:
+            continue                                                  # (X, W) GEMV grids: one task per worker
         per_w = collections.Counter(t.worker for t in plan.tasks if t.grid == g.name)
         assert max(per_w.values()) == 1, g.name
