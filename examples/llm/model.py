@@ -94,6 +94,8 @@ def workers(d: "Dims") -> int:
     """Workers the plan will get on MI300X: 8 XCDs x 38 CUs x wg/CU (no relay by default). Two workgroups fit
     a CU when the LDS allows it (vgpr is declared 128, so __launch_bounds__ caps the registers accordingly)."""
     wg = 2 if 2 * (lds_bytes(d) + 256) <= 65536 else 1
+    if os.environ.get("ETX_LLM_WG"):
+        wg = int(os.environ["ETX_LLM_WG"])               # experiment: force the residency
     return 8 * 38 * wg
 
 
@@ -144,7 +146,7 @@ def build() -> Graph:
     p = partition(d)
     ctx, chunk = _ctx_chunk()
     NC = ctx // chunk
-    res = Resource(threads=256, vgpr=128, agpr=0, lds_bytes=lds_bytes(d))
+    res = Resource(threads=256, vgpr=256 if workers(d) == 304 else 128, agpr=0, lds_bytes=lds_bytes(d))
     g = Graph(f"llm_{d.name}")
     g.tensor("llm", (1,), role="weight", bytes_per_elem=8)          # placeholder: the tiles read __constant__ params
 
