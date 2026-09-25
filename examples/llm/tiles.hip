@@ -658,11 +658,10 @@ extern "C" __device__ void llm_s_down(const etx_ctx* c) {
 
 // MoE router: every XCD computes all E logits into its own copy; the XCD's last router task selects the
 // top-k once and publishes ids / weights for the expert tasks
-static __device__ __forceinline__ void topk_local(int x, float* red) {   // ids at red+64.., weights at red+80..
+static __device__ __forceinline__ void topk_local(const float* lg, float* red) {   // ids at red+64.., weights at red+80..
   int* ids = (int*)(red + 64); float* wts = red + 80;
   if (etx_wave() == 0) {
     const int lane = etx_lane(), E = P.E;
-    const float* lg = P.rlog_x + (size_t)x * E;
     float p[4]; bool taken[4]; float m = -INFINITY;
 #pragma unroll
     for (int k = 0; k < 4; ++k) { const int e = lane + k * ETX_WAVE_SIZE; p[k] = e < E ? lg[e] : -INFINITY; taken[k] = e >= E; m = fmaxf(m, p[k]); }
@@ -704,9 +703,14 @@ extern "C" __device__ void llm_s_egu(const etx_ctx* c) {
   const int x = c->coord[0], w = c->coord[1];
   const LlmLayer& Ly = P.layer[c->cst[0]];
   float* red = LLM_RED(c); float* xs = LLM_VEC(c); float* gu = red + 96;   // ids/weights live at red+64..96
-  topk_local(x, red);
-  const int* ids = (const int*)(red + 64);
   norm_copy_to(P.xa_x + (size_t)x * P.H, P.ss_x + ((size_t)x * 2 + 1) * P.F, P.F, Ly.ln2, P.H, xs);
+  // the router, computed by every expert task (E x H bf16 = 512 KB, served from the XCD's L2 after the first
+  // touch) instead of a router phase with its own handoff; the same code and order everywhere, so identical
+  float* part = xs + P.H; float* lg = part + 4 * P.E;
+  float* rlog = P.rlog_x + (size_t)x * P.E;
+  gemv_rows(Ly.wr, P.H, xs, 0, P.E, part, [&](int r, float v) { const float l = bfr(v); lg[r] = l; if (w == 0) rlog[r] = l; });
+  topk_local(lg, red);
+  const int* ids = (const int*)(red + 64);
   int r1; const int r0 = rows_of(P.MI, w, P.W, &r1);
   for (int s = x; s < P.TOPK; s += P.X) {
     const int e = ids[s];
@@ -722,7 +726,7 @@ extern "C" __device__ void llm_s_edn(const etx_ctx* c) {
   const int x = c->coord[0], w = c->coord[1];
   const LlmLayer& Ly = P.layer[c->cst[0]];
   float* red = LLM_RED(c); float* xs = LLM_VEC(c);
-  topk_local(x, red);
+  topk_local(P.rlog_x + (size_t)x * P.E, red);
   const int* ids = (const int*)(red + 64); const float* wts = red + 80;
   int r1; const int r0 = rows_of(P.H, w, P.W, &r1);
   for (int s = x; s < P.TOPK; s += P.X) {

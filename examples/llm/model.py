@@ -140,7 +140,8 @@ def lds_bytes(d: Dims) -> int:
     _, chunk = _ctx_chunk()
     hmax = -(-d.NH // 8)
     attn = hmax * d.HD + hmax * chunk + chunk * d.HD // 2   # sliced attention: q heads, scores, staged K/V chunk (bf16)
-    return (max(vec + 4 * 64, lm, attn)) * 4 + 4096
+    moe_egu = vec + 5 * d.E if d.moe else 0   # sliced egu: normed input + router partials (4 x E) + logits
+    return (max(vec + 4 * 64, lm, attn, moe_egu)) * 4 + 4096
 
 
 def _us(nbytes: float, tasks: int) -> float:
