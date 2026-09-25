@@ -132,16 +132,29 @@ def _ctx_chunk() -> tuple[int, int]:
     return CTX, CHUNK
 
 
+def threads() -> int:
+    """Workgroup size of every task (ETX_LLM_THREADS, default 256 = 4 waves; 512 doubles the loads in flight per CU)."""
+    return int(os.environ.get("ETX_LLM_THREADS", "256"))
+
+
 def lds_bytes(d: Dims) -> int:
-    """Input vector + GEMV partials (4 waves x rows per task) + attention scratch, in floats, plus 4 KB."""
+    """Input vector + GEMV partials (waves x rows per task) + attention scratch, in floats, plus 4 KB."""
+    nw = threads() // 64
     vec = max(d.H, d.NH * d.HD, d.INTER if not d.moe else 0, d.TOPK * d.MI)
-    part = 4 * 520                        # largest task: lm_head rows (<= 516) x 4 waves; lm_head also keeps its logits
+    part = nw * 520                       # largest task: lm_head rows (<= 516) x waves; lm_head also keeps its logits
     lm = 2 * d.H + 520 + part             # sliced lm_head: folded residual + normed input + logits + partials
     _, chunk = _ctx_chunk()
     hmax = -(-d.NH // 8)
     attn = hmax * d.HD + hmax * chunk + chunk * d.HD // 2   # sliced attention: q heads, scores, staged K/V chunk (bf16)
-    moe_egu = vec + 5 * d.E if d.moe else 0   # sliced egu: normed input + router partials (4 x E) + logits
-    return (max(vec + 4 * 64, lm, attn, moe_egu)) * 4 + 4096
+    moe_egu = vec + (nw + 1) * d.E if d.moe else 0   # sliced egu: normed input + router partials (waves x E) + logits
+    merge = vec + (nw // 2 + 1) * d.HD    # sliced o_proj prologue: chunk-group partial sums after the o vector
+    return (max(vec + nw * 64, lm, attn, moe_egu, merge)) * 4 + 4096
+
+
+def resource(d: Dims) -> Resource:
+    """One workgroup per CU when every CU is a worker: the register budget is set so P1 cannot fit a second."""
+    t = threads()
+    return Resource(threads=t, vgpr=(384 if t <= 256 else 256) if workers(d) == 304 else 128, agpr=0, lds_bytes=lds_bytes(d))
 
 
 def _us(nbytes: float, tasks: int) -> float:
@@ -153,7 +166,7 @@ def build() -> Graph:
     p = partition(d)
     ctx, chunk = _ctx_chunk()
     NC = ctx // chunk
-    res = Resource(threads=256, vgpr=384 if workers(d) == 304 else 128, agpr=0, lds_bytes=lds_bytes(d))
+    res = resource(d)
     g = Graph(f"llm_{d.name}")
     g.tensor("llm", (1,), role="weight", bytes_per_elem=8)          # placeholder: the tiles read __constant__ params
 

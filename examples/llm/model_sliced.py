@@ -67,7 +67,7 @@ def build() -> Graph:
     W = M.workers(d) // X
     ctx, chunk = M._ctx_chunk()
     NC = ctx // chunk
-    res = Resource(threads=256, vgpr=384 if M.workers(d) == 304 else 128, agpr=0, lds_bytes=M.lds_bytes(d))
+    res = M.resource(d)
     g = Graph(f"llm_sliced_{d.name}")
     g.tensor("llm", (1,), role="weight", bytes_per_elem=8)
     HMAX, KVMAX = S["HMAX"], S["KVMAX"]

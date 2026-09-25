@@ -602,17 +602,22 @@ static __device__ __forceinline__ void merge_head(int qh, float* out, float* wch
     wch[ch] = w; l += w * part[ch * stride + HD + 1];
   }
   const float Lsum = etx_block_sum(l, red);
-  // 256 threads = HD (128) columns x 2 chunk groups: each thread sums NC/2 chunks with all loads in flight
+  // threads = HD (128) columns x ng chunk groups: each thread sums NC/ng chunks with all loads in flight
+  const int ng = max(1, (int)blockDim.x / HD);
   {
-    const int d = threadIdx.x % HD, g = threadIdx.x / HD, ng = blockDim.x / HD;
+    const int d = threadIdx.x % HD, g = threadIdx.x / HD;
     float acc = 0.f;
-    if (d < HD)
+    if (g < ng)
 #pragma unroll 16
       for (int ch = g; ch < NC; ch += ng) acc += wch[ch] * part[ch * stride + d];
-    if (g < 2 && d < HD) half_sum[g * HD + d] = acc;
+    if (g < ng) half_sum[g * HD + d] = acc;
   }
   __syncthreads();
-  for (int d = threadIdx.x; d < HD; d += blockDim.x) out[d] = bfr((half_sum[d] + (blockDim.x / HD > 1 ? half_sum[HD + d] : 0.f)) / Lsum);
+  for (int d = threadIdx.x; d < HD; d += blockDim.x) {
+    float v = 0.f;
+    for (int g = 0; g < ng; ++g) v += half_sum[g * HD + d];
+    out[d] = bfr(v / Lsum);
+  }
   __syncthreads();
 }
 
@@ -626,7 +631,7 @@ extern "C" __device__ void llm_s_oproj(const etx_ctx* c) {
   int r1; const int r0 = rows_of(P.H, w, P.W, &r1);
   float* out = P.o_part + (size_t)x * P.H;
   if (K == 0) { for (int r = r0 + threadIdx.x; r < r1; r += blockDim.x) out[r] = 0.f; return; }
-  for (int j = 0; j < P.nqh[x]; ++j) merge_head(P.qh0[x] + j, xs + j * P.HD, red + 64, red, xs + K);   // wch at red+64 (NC <= 128), 2 x HD scratch after the o vector
+  for (int j = 0; j < P.nqh[x]; ++j) merge_head(P.qh0[x] + j, xs + j * P.HD, red + 64, red, xs + K);   // wch at red+64 (NC <= 128), ng x HD scratch after the o vector
   if (r0 >= r1) return;
   gemv_rows(Ly.wo_x[x], K, xs, r0, r1, xs + K, [&](int r, float v) { out[r] = v; });
 }
@@ -711,7 +716,7 @@ extern "C" __device__ void llm_s_egu(const etx_ctx* c) {
   norm_copy_to(P.xa_x + (size_t)x * P.H, P.ss_x + ((size_t)x * 2 + 1) * P.F, P.F, Ly.ln2, P.H, xs);
   // the router, computed by every expert task (E x H bf16 = 512 KB, served from the XCD's L2 after the first
   // touch) instead of a router phase with its own handoff; the same code and order everywhere, so identical
-  float* part = xs + P.H; float* lg = part + 4 * P.E;
+  float* part = xs + P.H; float* lg = part + etx_nwaves() * P.E;
   float* rlog = P.rlog_x + (size_t)x * P.E;
   gemv_rows(Ly.wr, P.H, xs, 0, P.E, part, [&](int r, float v) { const float l = bfr(v); lg[r] = l; if (w == 0) rlog[r] = l; });
   topk_local(lg, part, red);                                        // the partials are dead by now
