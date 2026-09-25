@@ -453,26 +453,44 @@ static __device__ __forceinline__ int rows_of(int n, int w, int W, int* r1) {   
 
 // residual entering layer L: xb for L == 0, else bf16(xa + bf16(sum of the down partials)); MoE sums the
 // slots in ascending expert id in bf16 (HF's index_add_). Written to `out` (global, H floats).
+// The partials were written by other XCDs, so every load is a remote miss (~2 us). Issue the loads of
+// eight output elements at once (up to 8 x TOPK values in registers) instead of one element at a time:
+// measured 36 us -> a few us for H = 4096.
+template <int NB>
+static __device__ __forceinline__ void fold_sum_rows(const float* base, int n, int H, const float* addend, float* out, bool bf16_chain,
+                                                     const int* order) {
+  for (int i0 = threadIdx.x; i0 < H; i0 += blockDim.x * NB) {
+    float v[NB][16]; float a[NB];
+#pragma unroll
+    for (int m = 0; m < NB; ++m) {
+      const int i = i0 + m * blockDim.x;
+      a[m] = i < H ? addend[i] : 0.f;
+#pragma unroll
+      for (int k = 0; k < 16; ++k) v[m][k] = (k < n && i < H) ? base[(size_t)(order ? order[k] : k) * H + i] : 0.f;
+    }
+#pragma unroll
+    for (int m = 0; m < NB; ++m) {
+      const int i = i0 + m * blockDim.x;
+      if (i >= H) continue;
+      float acc = 0.f;
+      if (bf16_chain) { for (int k = 0; k < n; ++k) acc = bfr(acc + v[m][k]); out[i] = bfr(a[m] + acc); }
+      else { for (int k = 0; k < n; ++k) acc += v[m][k]; out[i] = bfr(a[m] + bfr(acc)); }
+    }
+  }
+}
+
 static __device__ __forceinline__ void fold_down_to(int L, float* out, int* order_scratch) {
   const int H = P.H;
   if (L <= 0) { for (int i = threadIdx.x; i < H; i += blockDim.x) out[i] = P.x[i]; return; }
   if (P.moe) {
-    if (threadIdx.x == 0) {
+    if (threadIdx.x == 0) {                 // slots sorted by expert id (HF's index_add_ order); TOPK <= 16
       for (int t = 0; t < P.TOPK; ++t) order_scratch[t] = t;
       for (int a = 1; a < P.TOPK; ++a) for (int b = a; b > 0 && P.eid[order_scratch[b]] < P.eid[order_scratch[b - 1]]; --b) { const int tmp = order_scratch[b]; order_scratch[b] = order_scratch[b - 1]; order_scratch[b - 1] = tmp; }
     }
     __syncthreads();
-    for (int i = threadIdx.x; i < H; i += blockDim.x) {
-      float acc = 0.f;
-      for (int t = 0; t < P.TOPK; ++t) acc = bfr(acc + P.d_part[(size_t)order_scratch[t] * H + i]);
-      out[i] = bfr(P.xa[i] + acc);
-    }
+    fold_sum_rows<8>(P.d_part, P.TOPK, H, P.xa, out, true, order_scratch);
   } else {
-    for (int i = threadIdx.x; i < H; i += blockDim.x) {
-      float acc = 0.f;
-      for (int k = 0; k < P.X; ++k) acc += P.d_part[(size_t)k * H + i];
-      out[i] = bfr(P.xa[i] + bfr(acc));
-    }
+    fold_sum_rows<8>(P.d_part, P.X, H, P.xa, out, false, nullptr);
   }
 }
 
@@ -489,11 +507,7 @@ extern "C" __device__ void llm_s_fold_d(const etx_ctx* c) {
 extern "C" __device__ void llm_s_fold_o(const etx_ctx* c) {
   const int x = c->coord[0], H = P.H;
   float* out = P.xa_x + (size_t)x * H;
-  for (int i = threadIdx.x; i < H; i += blockDim.x) {
-    float acc = 0.f;
-    for (int k = 0; k < P.X; ++k) acc += P.o_part[(size_t)k * H + i];
-    out[i] = bfr(P.x[i] + bfr(acc));
-  }
+  fold_sum_rows<8>(P.o_part, P.X, H, P.x, out, false, nullptr);
   __syncthreads();
   for (int i = P.h0[x] + threadIdx.x; i < P.h0[x] + P.nh[x]; i += blockDim.x) P.xa[i] = out[i];
 }
