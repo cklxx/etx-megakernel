@@ -658,33 +658,38 @@ extern "C" __device__ void llm_s_down(const etx_ctx* c) {
 
 // MoE router: every XCD computes all E logits into its own copy; the XCD's last router task selects the
 // top-k once and publishes ids / weights for the expert tasks
-static __device__ __forceinline__ void topk_local(const float* lg, float* red) {   // ids at red+64.., weights at red+80..
-  int* ids = (int*)(red + 64); float* wts = red + 80;
-  if (etx_wave() == 0) {
-    const int lane = etx_lane(), E = P.E;
-    float p[4]; bool taken[4]; float m = -INFINITY;
-#pragma unroll
-    for (int k = 0; k < 4; ++k) { const int e = lane + k * ETX_WAVE_SIZE; p[k] = e < E ? lg[e] : -INFINITY; taken[k] = e >= E; m = fmaxf(m, p[k]); }
-    m = etx_wave_max(m);
-    float s = 0.f;
-#pragma unroll
-    for (int k = 0; k < 4; ++k) { p[k] = taken[k] ? 0.f : __expf(p[k] - m); s += p[k]; }
-    s = etx_wave_sum(s);
-    float sel = 0.f;
-    for (int t = 0; t < P.TOPK; ++t) {
-      float bv = -1.f; int bi = 0x7fffffff;
-#pragma unroll
-      for (int k = 0; k < 4; ++k) { const int e = lane + k * ETX_WAVE_SIZE; if (!taken[k] && p[k] / s > bv) { bv = p[k] / s; bi = e; } }
-      for (int off = ETX_WAVE_SIZE / 2; off > 0; off >>= 1) {
-        const float ov = __shfl_xor(bv, off, ETX_WAVE_SIZE); const int oi = __shfl_xor(bi, off, ETX_WAVE_SIZE);
-        if (ov > bv || (ov == bv && oi < bi)) { bv = ov; bi = oi; }
-      }
-#pragma unroll
-      for (int k = 0; k < 4; ++k) if (lane + k * ETX_WAVE_SIZE == bi) taken[k] = true;
-      if (lane == 0) { ids[t] = bi; wts[t] = bv; }
-      sel += bv;
+// top-k of softmax(lg[0..E)), ids at red+64.., bf16 weights at red+80.. Every thread ranks one logit against
+// all the others with LDS broadcast reads, so there is no serial shuffle chain (the wave-reduction version cost
+// about 6 us per task); ties -> lower id, like torch.topk on a sorted softmax. lg may be global or LDS;
+// scratch: 2 * E floats of LDS. E % 4 == 0.
+static __device__ __forceinline__ void topk_local(const float* lg, float* scratch, float* red) {
+  int* ids = (int*)(red + 64); float* wts = red + 80; float* pl = scratch; float* pp = scratch + P.E;
+  const int E = P.E, E4 = E / 4, t = threadIdx.x;
+  for (int e = t; e < E; e += blockDim.x) pl[e] = lg[e];
+  __syncthreads();
+  const float4* pl4 = (const float4*)pl; const float4* pp4 = (const float4*)pp;
+  float m = -INFINITY;
+#pragma unroll 8
+  for (int j = 0; j < E4; ++j) { const float4 v = pl4[j]; m = fmaxf(fmaxf(m, v.x), fmaxf(v.y, fmaxf(v.z, v.w))); }
+  for (int e = t; e < E; e += blockDim.x) pp[e] = __expf(pl[e] - m);
+  __syncthreads();
+  float s = 0.f;
+#pragma unroll 8
+  for (int j = 0; j < E4; ++j) { const float4 v = pp4[j]; s += v.x + v.y + v.z + v.w; }
+  for (int e = t; e < E; e += blockDim.x) {
+    const float pe = pp[e]; int rank = 0;
+#pragma unroll 8
+    for (int j = 0; j < E4; ++j) {
+      const float4 v = pp4[j]; const int j0 = 4 * j;
+      rank += (v.x > pe || (v.x == pe && j0 < e)) + (v.y > pe || (v.y == pe && j0 + 1 < e)) + (v.z > pe || (v.z == pe && j0 + 2 < e)) + (v.w > pe || (v.w == pe && j0 + 3 < e));
     }
-    if (lane == 0) for (int t = 0; t < P.TOPK; ++t) wts[t] = bfr(P.norm_topk ? wts[t] / sel : wts[t]);
+    if (rank < P.TOPK) { ids[rank] = e; wts[rank] = pe / s; }
+  }
+  __syncthreads();
+  if (t == 0) {
+    float sel = 0.f;
+    for (int k = 0; k < P.TOPK; ++k) sel += wts[k];
+    for (int k = 0; k < P.TOPK; ++k) wts[k] = bfr(P.norm_topk ? wts[k] / sel : wts[k]);
   }
   __syncthreads();
 }
@@ -709,7 +714,7 @@ extern "C" __device__ void llm_s_egu(const etx_ctx* c) {
   float* part = xs + P.H; float* lg = part + 4 * P.E;
   float* rlog = P.rlog_x + (size_t)x * P.E;
   gemv_rows(Ly.wr, P.H, xs, 0, P.E, part, [&](int r, float v) { const float l = bfr(v); lg[r] = l; if (w == 0) rlog[r] = l; });
-  topk_local(lg, red);
+  topk_local(lg, part, red);                                        // the partials are dead by now
   const int* ids = (const int*)(red + 64);
   int r1; const int r0 = rows_of(P.MI, w, P.W, &r1);
   for (int s = x; s < P.TOPK; s += P.X) {
@@ -726,7 +731,7 @@ extern "C" __device__ void llm_s_edn(const etx_ctx* c) {
   const int x = c->coord[0], w = c->coord[1];
   const LlmLayer& Ly = P.layer[c->cst[0]];
   float* red = LLM_RED(c); float* xs = LLM_VEC(c);
-  topk_local(P.rlog_x + (size_t)x * P.E, red);
+  topk_local(P.rlog_x + (size_t)x * P.E, xs, red);                  // xs is free until the hexp copy
   const int* ids = (const int*)(red + 64); const float* wts = red + 80;
   int r1; const int r0 = rows_of(P.H, w, P.W, &r1);
   for (int s = x; s < P.TOPK; s += P.X) {
