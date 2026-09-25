@@ -564,7 +564,7 @@ static __device__ __forceinline__ void attn_heads(const LlmLayer& Ly, int qh_beg
   const float scale = rsqrtf((float)HD);
   // LDS-typed views: through the generic pointers the compiler emits flat loads, which are slower and wait
   // on the vector memory counter as well
-  typedef __attribute__((address_space(3))) const uint4 lds_u4;
+  typedef __attribute__((address_space(3))) const llm_u32x4 lds_u4;   // a plain vector type: uint4's class does not take the address space (host pass)
   typedef __attribute__((address_space(3))) const unsigned short lds_u16;
   lds_u4* kl = (lds_u4*)kk; lds_cf* ql = (lds_cf*)qs; lds_f* scl = (lds_f*)sc;
   for (int idx = threadIdx.x; idx < nheads * len; idx += blockDim.x) {
@@ -572,7 +572,7 @@ static __device__ __forceinline__ void attn_heads(const LlmLayer& Ly, int qh_beg
     lds_u4* k = kl + t * per_row;
     lds_cf* q = ql + j * HD;
     float sacc = 0.f;
-    for (int u = 0; u < per_row; ++u) sacc += dot8(k[u], q + u * 8);
+    for (int u = 0; u < per_row; ++u) { const llm_u32x4 w = k[u]; sacc += dot8(make_uint4(w.x, w.y, w.z, w.w), q + u * 8); }
     scl[j * P.CHUNK + t] = sacc * scale;
   }
   __syncthreads();

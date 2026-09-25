@@ -1,0 +1,53 @@
+
+=== 13:41:41 build v9 (gemv LDS + pipelined, 512 threads) qwen3-30b-a3b
+run 1: 32/32 generated tokens match HF greedy RESULT model=/home/hotaisle/llm/qwen3-30b-a3b matched=32 gen=32 median_ms=11.014 active_GB=6.083  [qwen3-30b-a3b v9 t512 fused]
+run 1: 32/32 generated tokens match HF greedy RESULT model=/home/hotaisle/llm/qwen3-30b-a3b matched=32 gen=32 median_ms=7.978 active_GB=6.083  [qwen3-30b-a3b v9 t512 unfused]
+run 1: 32/32 generated tokens match HF greedy RESULT model=/home/hotaisle/llm/qwen3-30b-a3b matched=32 gen=32 median_ms=11.033 active_GB=6.083  [qwen3-30b-a3b v9 t512 fused]
+
+=== 13:44:15 build v9 (gemv LDS + pipelined, 512 threads) qwen3-8b
+run 1: 32/32 generated tokens match HF greedy RESULT model=/home/hotaisle/llm/qwen3-8b matched=32 gen=32 median_ms=10.131 active_GB=15.136  [qwen3-8b v9 t512 fused]
+run 1: 32/32 generated tokens match HF greedy RESULT model=/home/hotaisle/llm/qwen3-8b matched=32 gen=32 median_ms=8.841 active_GB=15.136  [qwen3-8b v9 t512 unfused]
+run 1: 32/32 generated tokens match HF greedy RESULT model=/home/hotaisle/llm/qwen3-8b matched=32 gen=32 median_ms=10.105 active_GB=15.136  [qwen3-8b v9 t512 fused]
+
+=== 13:46:09 build v9 (gemv LDS + pipelined, 512 threads) qwen2.5-1.5b
+run 1: 32/32 generated tokens match HF greedy RESULT model=/home/hotaisle/llm/qwen2.5-1.5b matched=32 gen=32 median_ms=4.323 active_GB=3.087  [qwen2.5-1.5b v9 t512 fused]
+run 1: 32/32 generated tokens match HF greedy RESULT model=/home/hotaisle/llm/qwen2.5-1.5b matched=32 gen=32 median_ms=3.267 active_GB=3.087  [qwen2.5-1.5b v9 t512 unfused]
+run 1: 32/32 generated tokens match HF greedy RESULT model=/home/hotaisle/llm/qwen2.5-1.5b matched=32 gen=32 median_ms=4.375 active_GB=3.087  [qwen2.5-1.5b v9 t512 fused]
+
+=== 13:47:10 build v9 (gemv LDS + pipelined, 256 threads) qwen3-30b-a3b
+run 1: 32/32 generated tokens match HF greedy RESULT model=/home/hotaisle/llm/qwen3-30b-a3b matched=32 gen=32 median_ms=7.952 active_GB=6.083  [qwen3-30b-a3b v9 t256 fused]
+run 1: 32/32 generated tokens match HF greedy RESULT model=/home/hotaisle/llm/qwen3-30b-a3b matched=32 gen=32 median_ms=7.681 active_GB=6.083  [qwen3-30b-a3b v9 t256 unfused]
+run 1: 32/32 generated tokens match HF greedy RESULT model=/home/hotaisle/llm/qwen3-30b-a3b matched=32 gen=32 median_ms=7.974 active_GB=6.083  [qwen3-30b-a3b v9 t256 fused]
+
+=== 13:49:31 build v9 (gemv LDS + pipelined, 256 threads) qwen3-8b
+run 1: 32/32 generated tokens match HF greedy RESULT model=/home/hotaisle/llm/qwen3-8b matched=32 gen=32 median_ms=8.942 active_GB=15.136  [qwen3-8b v9 t256 fused]
+run 1: 32/32 generated tokens match HF greedy RESULT model=/home/hotaisle/llm/qwen3-8b matched=32 gen=32 median_ms=8.913 active_GB=15.136  [qwen3-8b v9 t256 unfused]
+run 1: 32/32 generated tokens match HF greedy RESULT model=/home/hotaisle/llm/qwen3-8b matched=32 gen=32 median_ms=8.934 active_GB=15.136  [qwen3-8b v9 t256 fused]
+
+=== 13:51:17 build v9 (gemv LDS + pipelined, 256 threads) qwen2.5-1.5b
+run 1: 32/32 generated tokens match HF greedy RESULT model=/home/hotaisle/llm/qwen2.5-1.5b matched=32 gen=32 median_ms=3.499 active_GB=3.087  [qwen2.5-1.5b v9 t256 fused]
+run 1: 32/32 generated tokens match HF greedy RESULT model=/home/hotaisle/llm/qwen2.5-1.5b matched=32 gen=32 median_ms=3.327 active_GB=3.087  [qwen2.5-1.5b v9 t256 unfused]
+run 1: 32/32 generated tokens match HF greedy RESULT model=/home/hotaisle/llm/qwen2.5-1.5b matched=32 gen=32 median_ms=3.493 active_GB=3.087  [qwen2.5-1.5b v9 t256 fused]
+
+=== 13:52:14 trace qwen3-30b-a3b v9 512
+  fold_10                    32     12.03      8.84      2280.1        7.2       14.6
+  qkv_10                    304     22.07     15.33      2293.5       12.7       26.6
+  attn_10                   256      8.90     17.27      2319.6        4.5       35.0
+  oproj_10                  304     22.14     27.37      2355.4       13.3       37.5
+  folo_10                    32     10.13      4.73      2397.9        5.4        9.5
+  router_10                 304     15.16      6.79      2405.4       11.2       19.1
+  egu_10                    304      9.79     31.77      2419.9       14.9       47.4
+  edn_10                    304     10.22     14.62      2465.4       16.9       33.3
+  lmhead                    304     30.01    213.15     10923.0       14.6      219.4
+
+=== 13:52:39 trace qwen3-8b v9 512
+  fold_10                    32     11.91      4.62      2690.2        3.1        7.5
+  qkv_10                    304     19.46     17.84      2698.5       14.2       28.2
+  attn_10                   256      8.99     11.97      2727.5        7.2       28.2
+  oproj_10                  304     17.50     35.87      2753.7       13.0       44.4
+  folo_10                    32      9.59      6.30      2802.7        9.2       13.8
+  gateup_10                 304     18.93     69.26      2813.5       22.9       84.7
+  down_10                   304     16.53     36.38      2897.2       21.9       52.2
+  lmhead                    304     25.17    381.11      9730.3        8.5      386.9
+
+=== 13:52:54 R15 DONE
