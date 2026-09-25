@@ -112,8 +112,9 @@ def compile_ir(src_hip: Path, out_ll: Path, vllm: Path, s: Source, compiler: str
     if compiler == "local":
         cmd = ["bash", str(HERE / "hip_ir_local.sh"), str(src_hip), str(out_ll)] + defs + inc
     else:   # the VM: ROCm's own hipcc, device only, before the device libraries
+        th = os.environ.get("ETX_TORCH_HEADERS", str(Path.home() / "rocm-headers/pytorch"))     # torch/headeronly (sparse pytorch checkout)
         cmd = ["hipcc", "-x", "hip", "--cuda-device-only", "--offload-arch=gfx942", "-nogpulib", "-std=c++17", "-O3", "-S", "-emit-llvm",
-               "-DUSE_ROCM", "-DNDEBUG", "-include", str(HERE / "shim/etx_cuda2hip.h"), "-I", str(HERE / "shim")] + defs + inc + [str(src_hip), "-o", str(out_ll)]
+               "-D__HIP_PLATFORM_AMD__", "-DUSE_ROCM", "-DNDEBUG", "-isystem", th, "-include", str(HERE / "shim/etx_cuda2hip.h"), "-I", str(HERE / "shim")] + defs + inc + [str(src_hip), "-o", str(out_ll)]
     r = subprocess.run(cmd, capture_output=True, text=True)
     if r.returncode:
         raise SystemExit(f"compile {s.path} failed:\n{r.stderr[-4000:]}")
@@ -121,8 +122,8 @@ def compile_ir(src_hip: Path, out_ll: Path, vllm: Path, s: Source, compiler: str
 
 def run(vllm: Path, out: Path, threads: int, compiler: str, blocks: dict[str, tuple[int, int, int]], only: set[str] | None = None) -> dict:
     out.mkdir(parents=True, exist_ok=True)
-    llvm = Path(os.environ.get("ETX_LLVM", "/opt/homebrew/opt/llvm/bin"))
-    llvm_as = str(llvm / "llvm-as") if compiler == "local" else "llvm-as"
+    from etx.importer.bundle import llvm_tool
+    llvm_as = llvm_tool("llvm-as")
     report = {}
     for s in SOURCES:
         ks = [k for k in s.kernels if only is None or k.export in only]

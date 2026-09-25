@@ -32,6 +32,7 @@ def main() -> None:
     ap.add_argument("--repeats", type=int, default=3)
     ap.add_argument("--label", default="")
     ap.add_argument("--json", type=Path, default=None)
+    ap.add_argument("--custom-ops", default=None, help="'all': vLLM's own HIP ops instead of Inductor-generated ones (the kernels ETX imports)")
     a = ap.parse_args()
 
     import vllm
@@ -39,8 +40,9 @@ def main() -> None:
     from vllm.inputs import TokensPrompt
 
     prompt_ids, golden = read_golden(a.golden)
+    kw = {"compilation_config": {"custom_ops": [a.custom_ops]}} if a.custom_ops else {}
     llm = LLM(model=a.model, dtype="bfloat16", trust_remote_code=True,
-              max_model_len=len(prompt_ids) + a.tokens + 16, gpu_memory_utilization=0.85, enforce_eager=False)
+              max_model_len=len(prompt_ids) + a.tokens + 16, gpu_memory_utilization=0.85, enforce_eager=False, **kw)
     prompt = TokensPrompt(prompt_token_ids=prompt_ids)
 
     def gen(n_new: int):
@@ -59,7 +61,7 @@ def main() -> None:
     n = min(len(golden), len(toks))
     match = next((i for i in range(n) if golden[i] != toks[i]), n)
     aiter = os.environ.get("VLLM_ROCM_USE_AITER", "0")
-    print(f"VLLM label={a.label} aiter={aiter} version={vllm.__version__} context={len(prompt_ids)} "
+    print(f"VLLM label={a.label} aiter={aiter} custom_ops={a.custom_ops} version={vllm.__version__} context={len(prompt_ids)} "
           f"median_ms={med:.3f} per_token={[round(x, 3) for x in per_tok]} first_divergence={match}/{n}")
     if a.json:
         a.json.write_text(json.dumps({"label": a.label, "aiter": aiter, "version": vllm.__version__, "context": len(prompt_ids),
