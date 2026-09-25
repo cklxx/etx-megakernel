@@ -1,0 +1,40 @@
+
+=== 07:21:31 build sliced v2 qwen3-8b
+run 1: 32/32 generated tokens match HF greedy RESULT model=/home/hotaisle/llm/qwen3-8b matched=32 gen=32 median_ms=12.340 active_GB=15.136  [qwen3-8b sliced-v2 fused]
+run 1: 32/32 generated tokens match HF greedy RESULT model=/home/hotaisle/llm/qwen3-8b matched=32 gen=32 median_ms=12.142 active_GB=15.136  [qwen3-8b sliced-v2 unfused]
+run 0: 32/32 generated tokens match HF greedy (teacher-forced argmax);run 1: 32/32 generated tokens match HF greedy (teacher-forced argmax);run 2: 32/32 generated tokens match HF greedy (teacher-forced argmax);
+
+=== 07:23:52 build sliced v2 qwen2.5-1.5b
+run 1: 32/32 generated tokens match HF greedy RESULT model=/home/hotaisle/llm/qwen2.5-1.5b matched=32 gen=32 median_ms=4.718 active_GB=3.087  [qwen2.5-1.5b sliced-v2 fused]
+run 1: 32/32 generated tokens match HF greedy RESULT model=/home/hotaisle/llm/qwen2.5-1.5b matched=32 gen=32 median_ms=4.553 active_GB=3.087  [qwen2.5-1.5b sliced-v2 unfused]
+run 0: 32/32 generated tokens match HF greedy (teacher-forced argmax);run 1: 32/32 generated tokens match HF greedy (teacher-forced argmax);run 2: 32/32 generated tokens match HF greedy (teacher-forced argmax);
+
+=== 07:24:58 build sliced v2 qwen3-30b-a3b
+run 1: 32/32 generated tokens match HF greedy RESULT model=/home/hotaisle/llm/qwen3-30b-a3b matched=32 gen=32 median_ms=12.629 active_GB=6.083  [qwen3-30b-a3b sliced-v2 fused]
+run 1: 32/32 generated tokens match HF greedy RESULT model=/home/hotaisle/llm/qwen3-30b-a3b matched=32 gen=32 median_ms=9.733 active_GB=6.083  [qwen3-30b-a3b sliced-v2 unfused]
+run 0: 32/32 generated tokens match HF greedy (teacher-forced argmax);run 1: 32/32 generated tokens match HF greedy (teacher-forced argmax);run 2: 32/32 generated tokens match HF greedy (teacher-forced argmax);
+
+=== 07:28:04 trace 8b sliced v2
+  fold_10                     8      5.01     36.73      3305.0        0.4       37.4
+  qkv_10                    304     42.24     30.72      3342.4        2.7       33.4
+  post_q_10                  32      1.99      2.01      3377.0        5.0        6.9
+  post_kv_10                 16      2.06      1.54      3377.7        3.1        5.2
+  attn_10                   256      6.43     16.20      3381.4        3.6       35.6
+  merge_10                   32     33.59      9.46      3413.3        5.8       15.5
+  oproj_10                  304     24.79     20.97      3423.9        7.5       27.6
+  folo_10                     8      4.45     36.69      3454.5        1.2       38.4
+  gateup_10                 304     41.52     83.78      3491.7        3.8       88.9
+  down_10                   304      6.40     44.30      3583.0        5.9       50.3
+  lmfold                      1      2.96     36.40     11953.4        0.0       36.4
+  lmhead                    304     41.60    417.01     11991.5        2.9      430.7
+
+=== 07:28:21 fleet bootstrap (sequential)
+Terminated
+
+=== 07:35:44 DeepSeek
+fleet: per-token latency (embed -> argmax on device): median 3.568 ms  p95 3.586 ms  mean 3.571 ms  (280.1 tok/s)
+fleet: tokens: 32/32 match HF greedy
+  consecutive layers within the gate: 27 of 27 per-token latency (embed -> argmax on device): median 3.771 ms  mean 3.771 ms; step wall (launch to end) 3.810 ms/token  [ETX DeepSeek fused]
+  consecutive layers within the gate: 0 of 27 per-token latency (embed -> argmax on device): median 7.398 ms  mean 7.398 ms; step wall (launch to end) 7.426 ms/token  [ETX DeepSeek --unfused]
+
+=== 07:36:32 R3 DONE

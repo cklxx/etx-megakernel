@@ -1767,6 +1767,55 @@ Overlap:     [phase k compute][wait for event: load k+1 weights][compute]
 <li>The megakernel itself does not yet beat the same tiles launched as one kernel per grid from a HIP graph: it is 6% (dense) to 15% (MoE) slower. At batch 1 every phase needs the whole previous vector, so the graph is a chain of device-wide barriers with little to overlap. An ETX device-scope counter barrier costs about 2 us more than a graph kernel boundary on MI300X. The measurement also found a placement defect: Pass 2&rsquo;s affinity votes pushed 39-49 of ~300 tasks onto XCD 0 (38 workers), so some workers ran two tasks per phase and the megakernel was 25-45% slower still. Pass 2 now caps each grid at ceil(n/8) tasks per domain when the grid fits one wave, and barrier in-events no longer vote.</li>
 </ol>
 <p>What would change the picture: tiles of vLLM/AITER quality linked into ETX (link mode takes any HIP tile), cheaper device-wide barriers, and cross-barrier weight prefetch, the one overlap a graph of kernels cannot express. Logs: <code>examples/llm/results/bench_2026-09-25.log</code>, vLLM JSON per model in the same folder.</p>
+<h3 id="157-phase-1-of-the-fusion-plan-measured-2026-09-25-1x-mi300x-1024-token-context">15.7 Phase 1 of the fusion plan, measured (2026-09-25, 1x MI300X, 1024-token context)</h3>
+<p><code>examples/llm/model_sliced.py</code> is the per-XCD sliced layer of <code>docs/PLAN-fusion-win.md</code>: two device-wide events per layer, everything else XCD-local, partial sums folded once per XCD by a fold task (the only device-scope consumer) into an XCD-local vector, attention per chunk over all of an XCD&rsquo;s heads. Every run 32/32 tokens equal to HF greedy, deterministic over three runs.</p>
+<table>
+<thead>
+<tr>
+<th>ms/token</th>
+<th>per-op graph fused</th>
+<th>per-op graph unfused</th>
+<th>sliced graph fused</th>
+<th>sliced graph unfused</th>
+<th>vLLM best</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Qwen2.5-1.5B</td>
+<td>4.50</td>
+<td>4.10</td>
+<td>4.72</td>
+<td>4.55</td>
+<td>1.86</td>
+</tr>
+<tr>
+<td>Qwen3-8B</td>
+<td>10.26</td>
+<td>9.62</td>
+<td>10.09</td>
+<td>9.90</td>
+<td>4.91</td>
+</tr>
+<tr>
+<td>Qwen3-30B-A3B</td>
+<td>11.52</td>
+<td>9.17</td>
+<td>9.2 (one WG per CU)</td>
+<td>8.74</td>
+<td>4.84</td>
+</tr>
+</tbody>
+</table>
+<p>What the round established:</p>
+<ol>
+<li><strong>The sliced graph does what it was meant to do for synchronisation:</strong> with the same tiles, fused is now within 2-5% of unfused (it was 6-25% behind on the per-operator graph). It does not pull ahead: with barrier-shaped batch-1 decode the remaining chain (10 phases per layer, each 3-5 us of transition) matches a HIP graph&rsquo;s kernel boundaries but does not beat them.</li>
+<li><strong>Three tile defects were found through the trace and fixed on the way:</strong> every task folding the partial sums itself re-fetched 147 KB after its own L2 invalidate (35 us per phase, 304 tasks; now one fold task per XCD, 4.6 us); a 16-wide register block in that fold spilled and doubled its time (now a fixed 4x8 unroll); attention per single head ran four rounds per XCD (now all of an XCD&rsquo;s heads per chunk).</li>
+<li><strong>Two workgroups per CU hurt the persistent kernel:</strong> the waiting workgroup&rsquo;s polling wave shares the CU with a computing one and reacts 8-14 us late per phase. One workgroup per CU took fused Qwen3-30B-A3B from 10.6 to 9.2 ms/token and is now the default. This belongs in Pass 1 as a rule for persistent kernels.</li>
+<li><strong>L2-warming prefetch of the task&rsquo;s own weights before its wait is a loss</strong> (+2.5-3.5%, 64 or 128 KB per task): the extra loads compete with the previous phase&rsquo;s streaming tail. Cross-barrier prefetch needs LDS staging or a smaller, later window, not L2 warming.</li>
+<li><strong>DeepSeek unfused is not measurable with fleet&rsquo;s tiles:</strong> they assume a persistent kernel (routing cached in LDS across tasks, in-body waits), and a per-grid launch produces wrong layers even with routing recomputed. The DeepSeek control stays fleet 3.575 / ETX fused 3.785 ms.</li>
+</ol>
+<p>The bar of the plan (fused 15% faster than unfused with the same tiles) is therefore not met on batch-1 dense decode, and the decision point of section 6 applies: the weight shifts to MoE routing and multi-GPU, where independent kernels cannot follow, and to tile quality, which sets the 2x distance to vLLM.</p>
 <h3 id="153-phases-of-the-general-architecture-after-m3">15.3 Phases of the general architecture (after M3)</h3>
 <table>
 <thead>

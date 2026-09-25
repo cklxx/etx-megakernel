@@ -1,0 +1,42 @@
+
+=== 07:36:44 build sliced v3 qwen3-8b
+run 1: 32/32 generated tokens match HF greedy RESULT model=/home/hotaisle/llm/qwen3-8b matched=32 gen=32 median_ms=14.928 active_GB=15.136  [qwen3-8b sliced-v3 fused]
+run 1: 32/32 generated tokens match HF greedy RESULT model=/home/hotaisle/llm/qwen3-8b matched=32 gen=32 median_ms=15.040 active_GB=15.136  [qwen3-8b sliced-v3 unfused]
+run 1: 32/32 generated tokens match HF greedy RESULT model=/home/hotaisle/llm/qwen3-8b matched=32 gen=32 median_ms=14.937 active_GB=15.136  [qwen3-8b sliced-v3 fused]
+
+=== 07:39:07 build sliced v3 qwen3-30b-a3b
+run 1: 32/32 generated tokens match HF greedy RESULT model=/home/hotaisle/llm/qwen3-30b-a3b matched=32 gen=32 median_ms=14.469 active_GB=6.083  [qwen3-30b-a3b sliced-v3 fused]
+run 1: 32/32 generated tokens match HF greedy RESULT model=/home/hotaisle/llm/qwen3-30b-a3b matched=32 gen=32 median_ms=12.743 active_GB=6.083  [qwen3-30b-a3b sliced-v3 unfused]
+run 1: 32/32 generated tokens match HF greedy RESULT model=/home/hotaisle/llm/qwen3-30b-a3b matched=32 gen=32 median_ms=14.299 active_GB=6.083  [qwen3-30b-a3b sliced-v3 fused]
+
+=== 07:42:09 build sliced v3 qwen2.5-1.5b
+run 1: 32/32 generated tokens match HF greedy RESULT model=/home/hotaisle/llm/qwen2.5-1.5b matched=32 gen=32 median_ms=5.952 active_GB=3.087  [qwen2.5-1.5b sliced-v3 fused]
+run 1: 32/32 generated tokens match HF greedy RESULT model=/home/hotaisle/llm/qwen2.5-1.5b matched=32 gen=32 median_ms=5.840 active_GB=3.087  [qwen2.5-1.5b sliced-v3 unfused]
+run 1: 32/32 generated tokens match HF greedy RESULT model=/home/hotaisle/llm/qwen2.5-1.5b matched=32 gen=32 median_ms=5.979 active_GB=3.087  [qwen2.5-1.5b sliced-v3 fused]
+
+=== 07:43:18 trace 8b v3
+  fold_10                     8      1.93     76.31      3966.6        0.7       82.5
+  qkv_10                    304     77.69     27.88      4040.8       10.5       37.8
+  post_q_10                  32      1.52      2.09      4071.5        9.7       11.6
+  post_kv_10                 16      1.58      1.57      4072.1        8.8       10.3
+  attn_10                   256      6.02     16.31      4077.0        7.2       39.0
+  merge_10                   32     33.97      9.47      4110.4        7.6       17.3
+  oproj_10                  304     24.86     20.23      4121.1        8.8       28.2
+  folo_10                     8      5.91     75.13      4152.1        0.2       79.9
+  gateup_10                 304     79.81     78.31      4225.6        8.7       90.8
+  down_10                   304      4.63     42.11      4309.0       10.2       50.5
+
+=== 07:43:38 trace moe v3
+  fold_10                     8      6.50     53.39      2889.8        0.3       56.7
+  qkv_10                    608     60.69     13.94      2940.5        8.6       29.4
+  post_q_10                  32      5.10      2.83      2958.0       26.3       28.4
+  post_kv_10                 16      3.58      1.83      2959.1       24.6       26.8
+  attn_10                   256     18.09     20.70      2964.6       26.1       62.2
+  merge_10                   32     58.16      9.59      3011.2       17.4       27.0
+  oproj_10                  608     47.37      8.87      3022.6       19.8       28.4
+  folo_10                     8     10.77     45.56      3054.5        0.4       48.6
+  router_10                 608     56.54      8.42      3097.6        8.2       15.7
+  egu_10                    608      3.70     30.15      3112.9        8.5       49.6
+  edn_10                    608      9.77     20.28      3153.6       14.2       35.5
+
+=== 07:44:05 R4 DONE

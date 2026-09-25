@@ -1,0 +1,16 @@
+qwen3-8b pf0: median_ms=10.119 run 1: 32/32
+qwen3-8b pf64: median_ms=10.370 run 1: 32/32
+qwen3-8b pf128: median_ms=10.487 run 1: 32/32
+qwen3-8b pf0: median_ms=10.116 run 1: 32/32
+qwen3-8b pf64: median_ms=10.370 run 1: 32/32
+qwen3-8b pf128: median_ms=10.435 run 1: 32/32
+qwen3-8b unfused(sliced): median_ms=9.932
+qwen3-30b-a3b pf0: median_ms=10.613 run 1: 32/32
+qwen3-30b-a3b pf64: median_ms=10.919 run 1: 32/32
+qwen3-30b-a3b pf128: median_ms=10.874 run 1: 32/32
+qwen3-30b-a3b pf0: median_ms=10.681 run 1: 32/32
+qwen3-30b-a3b pf64: median_ms=10.876 run 1: 32/32
+qwen3-30b-a3b pf128: median_ms=11.016 run 1: 32/32
+qwen3-30b-a3b unfused(sliced): median_ms=8.657
+
+[exited with code 0]

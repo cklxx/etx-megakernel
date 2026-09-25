@@ -93,9 +93,12 @@ def load_dims(path: str | None = None) -> Dims:
 def workers(d: "Dims") -> int:
     """Workers the plan will get on MI300X: 8 XCDs x 38 CUs x wg/CU (no relay by default). Two workgroups fit
     a CU when the LDS allows it (vgpr is declared 128, so __launch_bounds__ caps the registers accordingly)."""
-    wg = 2 if 2 * (lds_bytes(d) + 256) <= 65536 else 1
-    if os.environ.get("ETX_LLM_WG"):
-        wg = int(os.environ["ETX_LLM_WG"])               # experiment: force the residency
+    # One workgroup per CU by default: with two, the waiting workgroup's polling wave shares the CU with a
+    # computing one and reacts 8-14 us late per phase (measured on Qwen3-30B-A3B, 2026-09-25: fused
+    # 10.6 -> 9.2 ms/token with one per CU). ETX_LLM_WG=2 restores the LDS-based choice.
+    wg = int(os.environ.get("ETX_LLM_WG", "1"))
+    if wg == 2 and 2 * (lds_bytes(d) + 256) > 65536:
+        wg = 1
     return 8 * 38 * wg
 
 

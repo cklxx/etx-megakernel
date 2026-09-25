@@ -55,9 +55,10 @@ Head-to-head, 1024-token context, batch 1, one MI300X (2026-09-25; `examples/llm
 | DeepSeek-Coder-V2-Lite | 4.12 ms (AITER; default 6.36) | - | 3.78 ms (fleet's tiles) | 3.57 ms |
 
 With fleet's tuned tiles ETX beats vLLM by 8%; with the generic tiles it is about 2x slower, and the
-per-phase trace puts that gap in the tiles, not in synchronisation. The megakernel does not yet beat
-the same tiles run as one kernel per grid from a HIP graph (6-15% slower): at batch 1 the graph is a
-chain of device-wide barriers, and an ETX barrier costs about 2 us more than a graph kernel boundary.
+per-phase trace puts that gap in the tiles, not in synchronisation. A per-XCD sliced graph
+(`examples/llm/model_sliced.py`, two device-wide events per layer) brings the megakernel to within
+2-5% of the same tiles run as one kernel per grid from a HIP graph, but not ahead of them: at batch 1
+the graph is a chain of barriers with nothing to overlap (design document, section 15.7).
 
 ## Starting point (reworked 2026-09-23)
 

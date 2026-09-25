@@ -1,0 +1,44 @@
+
+=== 06:55:18 envs + downloads + fleet bootstrap
+WARNING: huggingface-hub 2.0.0 does not provide the extra 'hf-transfer'
+DL-DONE qwen2.5-1.5b
+DL-DONE qwen3-8b
+DL-DONE qwen3-30b-a3b
+
+=== 06:59:40 waiting for fleet's bootstrap (one GPU)
+
+=== 06:59:41 prep + build qwen2.5-1.5b
+  devices=1 domains/device=8 workers/domain=38 (wg/CU=1)   tasks=50034 events=199 eliminated=[] VGPRs: 256 ScratchSize [bytes/lane]: 108 
+run 1: 32/32 generated tokens match HF greedy graph: sliced (one slice per XCD, two device-wide barriers per layer) RESULT model=/home/hotaisle/llm/qwen2.5-1.5b matched=32 gen=32 median_ms=5.084 active_GB=3.087  [qwen2.5-1.5b-sl fused]
+run 1: 32/32 generated tokens match HF greedy graph: sliced (one slice per XCD, two device-wide barriers per layer) RESULT model=/home/hotaisle/llm/qwen2.5-1.5b matched=32 gen=32 median_ms=4.709 active_GB=3.087  [qwen2.5-1.5b-sl unfused]
+run 1: 32/32 generated tokens match HF greedy graph: per-operator barriers RESULT model=/home/hotaisle/llm/qwen2.5-1.5b matched=32 gen=32 median_ms=4.504 active_GB=3.087  [qwen2.5-1.5b-op fused]
+run 1: 32/32 generated tokens match HF greedy graph: per-operator barriers RESULT model=/home/hotaisle/llm/qwen2.5-1.5b matched=32 gen=32 median_ms=4.102 active_GB=3.087  [qwen2.5-1.5b-op unfused]
+sliced teacher: run 0: 32/32 generated tokens match HF greedy (teacher-forced argmax)
+sliced teacher: run 1: 32/32 generated tokens match HF greedy (teacher-forced argmax)
+sliced teacher: run 2: 32/32 generated tokens match HF greedy (teacher-forced argmax)
+
+=== 07:02:02 prep + build qwen3-8b
+  devices=1 domains/device=8 workers/domain=38 (wg/CU=1)   tasks=83826 events=255 eliminated=[] VGPRs: 256 ScratchSize [bytes/lane]: 108 
+run 1: 32/32 generated tokens match HF greedy graph: sliced (one slice per XCD, two device-wide barriers per layer) RESULT model=/home/hotaisle/llm/qwen3-8b matched=32 gen=32 median_ms=13.331 active_GB=15.136  [qwen3-8b-sl fused]
+run 1: 32/32 generated tokens match HF greedy graph: sliced (one slice per XCD, two device-wide barriers per layer) RESULT model=/home/hotaisle/llm/qwen3-8b matched=32 gen=32 median_ms=13.225 active_GB=15.136  [qwen3-8b-sl unfused]
+run 1: 32/32 generated tokens match HF greedy graph: per-operator barriers RESULT model=/home/hotaisle/llm/qwen3-8b matched=32 gen=32 median_ms=10.255 active_GB=15.136  [qwen3-8b-op fused]
+run 1: 32/32 generated tokens match HF greedy graph: per-operator barriers RESULT model=/home/hotaisle/llm/qwen3-8b matched=32 gen=32 median_ms=9.624 active_GB=15.136  [qwen3-8b-op unfused]
+sliced teacher: run 0: 32/32 generated tokens match HF greedy (teacher-forced argmax)
+sliced teacher: run 1: 32/32 generated tokens match HF greedy (teacher-forced argmax)
+sliced teacher: run 2: 32/32 generated tokens match HF greedy (teacher-forced argmax)
+
+=== 07:06:37 prep + build qwen3-30b-a3b
+  devices=1 domains/device=8 workers/domain=76 (wg/CU=2)   tasks=199517 events=387 eliminated=[] VGPRs: 256 ScratchSize [bytes/lane]: 284 
+run 1: 32/32 generated tokens match HF greedy graph: sliced (one slice per XCD, two device-wide barriers per layer) RESULT model=/home/hotaisle/llm/qwen3-30b-a3b matched=32 gen=32 median_ms=13.622 active_GB=6.083  [qwen3-30b-a3b-sl fused]
+run 1: 32/32 generated tokens match HF greedy graph: sliced (one slice per XCD, two device-wide barriers per layer) RESULT model=/home/hotaisle/llm/qwen3-30b-a3b matched=32 gen=32 median_ms=10.610 active_GB=6.083  [qwen3-30b-a3b-sl unfused]
+run 1: 32/32 generated tokens match HF greedy graph: per-operator barriers RESULT model=/home/hotaisle/llm/qwen3-30b-a3b matched=32 gen=32 median_ms=11.516 active_GB=6.083  [qwen3-30b-a3b-op fused]
+run 1: 32/32 generated tokens match HF greedy graph: per-operator barriers RESULT model=/home/hotaisle/llm/qwen3-30b-a3b matched=32 gen=32 median_ms=9.173 active_GB=6.083  [qwen3-30b-a3b-op unfused]
+sliced teacher: run 0: 32/32 generated tokens match HF greedy (teacher-forced argmax)
+sliced teacher: run 1: 32/32 generated tokens match HF greedy (teacher-forced argmax)
+sliced teacher: run 2: 32/32 generated tokens match HF greedy (teacher-forced argmax)
+
+=== 07:14:26 DeepSeek: fleet, ETX fused, ETX unfused (fleet's tiles)
+ [ETX DeepSeek fused]
+ [ETX DeepSeek --unfused]
+
+=== 07:14:57 BENCH2 DONE

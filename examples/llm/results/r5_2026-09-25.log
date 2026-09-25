@@ -1,0 +1,9 @@
+
+=== 07:44:12 DeepSeek unfused with recomputed routing (and fused with the same graph for a like-for-like pair)
+  consecutive layers within the gate: 0 of 27 per-token latency (embed -> argmax on device): median 8.358 ms  mean 8.358 ms; step wall (launch to end) 8.389 ms/token  [ETX DeepSeek routing-recomputed --unfused]
+  consecutive layers within the gate: 27 of 27 per-token latency (embed -> argmax on device): median 3.889 ms  mean 3.890 ms; step wall (launch to end) 3.928 ms/token  [ETX DeepSeek routing-recomputed fused]
+  consecutive layers within the gate: 0 of 27 per-token latency (embed -> argmax on device): median 8.361 ms  mean 8.361 ms; step wall (launch to end) 8.392 ms/token  [ETX DeepSeek routing-recomputed --unfused]
+  consecutive layers within the gate: 27 of 27 per-token latency (embed -> argmax on device): median 3.785 ms  mean 3.786 ms; step wall (launch to end) 3.822 ms/token  [ETX DeepSeek fused, routing cached]
+fleet: per-token latency (embed -> argmax on device): median 3.575 ms  p95 3.593 ms  mean 3.576 ms  (279.7 tok/s)
+
+=== 07:45:14 R5 DONE
