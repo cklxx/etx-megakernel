@@ -10,6 +10,22 @@ branching on an architecture name.
 Repository: https://github.com/cklxx/etx-megakernel (private). Design page (the spec): https://etc-dynamic-megakernel-arch.q1293822641.workers.dev
 (source in `docs/site/index.html`). Code map: `docs/ARCHITECTURE.md`.
 
+## Fusing the state-of-the-art kernels (2026-09-25)
+
+ETX now imports compiled kernels instead of re-implementing them: `etx/importer/` takes a kernel's AMDGPU
+IR (vLLM's HIP sources today, Triton IR next), turns the `amdgpu_kernel` into an inlinable device function
+(arguments from an argument block, block/thread ids from the ETX task, LDS into a shared arena, several
+blocks per workgroup with slot barriers) and generates the ETX tiles around it. `examples/vllm_llm` runs
+Qwen decode with the twelve kernels vLLM itself uses on MI300X at batch 1 (`wvSplitK`,
+`paged_attention_rocm`, `rms_norm`, `fused_add_rms_norm`, `rotary_embedding`, `reshape_and_cache`,
+`silu_and_mul`), in vLLM's stream order, one ETX grid per vLLM launch. The comparison it is built for:
+the same kernels fused (ETX), launched one by one (ETX unfused, HIP graph) and inside vLLM
+(`custom_ops=all`), plus a vLLM kernel trace that bounds what fusion can recover. See design section 15.9.
+
+    python -m etx.importer.vllm_kernels --vllm ~/code/vllm --out build/imp --block rms_norm_2d=512 --block reshape_and_cache=128
+    VLLM=~/vllm bash examples/vllm_llm/build.sh ~/llm/qwen3-8b            # on the GPU host
+    nohup bash examples/vllm_llm/vm_run.sh > ~/vl.log 2>&1 &              # the whole comparison on a fresh VM
+
 ## Status: the real model runs (2026-09-23)
 
 `examples/dsv2lite/` is fleet-mi300x's DeepSeek-Coder-V2-Lite decode graph in
