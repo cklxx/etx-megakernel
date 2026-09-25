@@ -299,6 +299,9 @@ def emit_kernel(plan: Plan, device: int = 0) -> str:
     out.append("  // Logical worker id = domain * workers_per_domain + slot, where the slot is claimed at start.")
     out.append("  // This makes the static queues domain-affine under ANY workgroup->domain mapping (measured (k+6) mod 8 on one VM).")
     out.append("  __shared__ uint32_t s_domain, s_worker; __shared__ int32_t s_tid, s_slot;")
+    out.append("#ifdef ETX_HAS_IMPORTS")
+    out.append("  etx_import_init();   // imported tiles' slot barriers (etx/import.h); ordered by the barrier below")
+    out.append("#endif")
     out.append("  if (threadIdx.x == 0) {")
     out.append("    const uint32_t d = etx_discover_domain(p, blockIdx.x);")
     out.append("    const int32_t slot = atomicAdd(p.domain_slots + d, 1);")
@@ -376,6 +379,9 @@ def _emit_unfused(plan: Plan, device: int, grids, symbols: list[str], max_pro: i
            f"extern \"C\" __global__ void __launch_bounds__(ETX_THREADS) etx_unfused_d{device}(etx_params p, int32_t first) {{",
            "#endif",
            "  __shared__ __align__(16) unsigned char etx_lds[ETX_LDS_USED > 0 ? ETX_LDS_USED : 16];",
+           "#ifdef ETX_HAS_IMPORTS",
+           "  etx_import_init(); __syncthreads();",
+           "#endif",
            "  const int32_t tid = first + (int32_t)blockIdx.x;",
            "  const etx_task t = p.descs[tid];",
            "  etx_ctx ctx; for (int i = 0; i < 4; ++i) ctx.coord[i] = t.coord[i];",

@@ -61,6 +61,8 @@ class ImportInfo:
     lds_bytes_per_slot: int = 0
     lds_bytes: int = 0                     # arena bytes this import needs (all slots)
     barriers: int = 0
+    slot_threads: int = 0                  # threads per slot (the kernel's block rounded up to whole waves)
+    slot_barrier: bool = False             # s_barrier replaced by the slot barrier
 
     def to_json(self) -> dict:
         d = dict(self.__dict__)
@@ -194,13 +196,18 @@ def _type_bytes(ty: str, types: dict[str, str]) -> tuple[int, int]:
 
 
 def import_kernel(text: str, kernel: str, export: str, block: tuple[int, int, int], threads: int,
-                  lds_cap: int | None = None) -> tuple[str, ImportInfo]:
+                  lds_cap: int | None = None, inline: bool = True) -> tuple[str, ImportInfo]:
+    """inline=False keeps the entry out of line: the kernel then gets its own register allocation instead of
+    sharing the megakernel's (for register-heavy tiles off the critical path; a call costs the callee's
+    saved registers per task)."""
     bx, by, bz = block
     nthr = bx * by * bz
-    if nthr % 64 or threads % nthr:
-        raise ImportError_(f"block {block} ({nthr} threads) must be whole waves and divide the workgroup ({threads})")
-    slots = threads // nthr
+    slot_thr = (nthr + 63) // 64 * 64                 # a slot is whole waves; a partial wave runs with its lanes masked, as on hardware
+    if slot_thr > threads:
+        raise ImportError_(f"block {block} ({nthr} threads) is larger than the megakernel workgroup ({threads})")
+    slots = threads // slot_thr
     info = ImportInfo(export=export, kernel="", block=block, threads=threads, slots=slots)
+    info.slot_threads = slot_thr
 
     funcs = _functions(text)
     cand = [f for f in funcs if kernel in f[2] and "amdgpu_kernel" in text[f[0]: text.find("\n", f[0])]]
@@ -212,7 +219,7 @@ def import_kernel(text: str, kernel: str, export: str, block: tuple[int, int, in
     if _REFUSE.search(body):
         raise ImportError_(f"{kname} uses {_REFUSE.search(body).group(0)}: not importable yet")
     for f0, f1, fname in funcs:                        # helpers that read ids out of line would need the ids too
-        if (f0, f1) != (k0, k1) and _ID_CALL.search(text[f0:f1]):
+        if (f0, f1) != (k0, k1) and "amdgpu_kernel" not in text[f0: text.find("\n", f0)] and _ID_CALL.search(text[f0:f1]):
             raise ImportError_(f"helper {fname} reads thread/block ids out of line (compile with -O3 so it inlines)")
 
     # ---- header: parameters, calling convention, linkage, attributes
@@ -280,8 +287,9 @@ def import_kernel(text: str, kernel: str, export: str, block: tuple[int, int, in
 
     rest = _ID_CALL.sub(id_repl, rest)
     info.barriers = len(_BARRIER.findall(rest))
-    if slots > 1:
-        rest = _BARRIER.sub(lambda m: f"{m.group(1)}call void @{SLOT_BARRIER}(i32 %etx.slot, i32 {nthr // 64})", rest)
+    if slots > 1 or slot_thr != threads:             # other waves of the workgroup are not in this block
+        rest = _BARRIER.sub(lambda m: f"{m.group(1)}call void @{SLOT_BARRIER}(i32 %etx.slot, i32 {slot_thr // 64})", rest)
+        info.slot_barrier = True
     if re.search(r"@(__ockl_get_\w+|llvm\.amdgcn\.work(group|item)\.id)", rest):
         raise ImportError_(f"{kname}: an id read the importer did not recognise remains")
     # thread coordinates in the kernel's own block shape, at the top of the entry block
@@ -346,6 +354,8 @@ def import_kernel(text: str, kernel: str, export: str, block: tuple[int, int, in
              "  %gz = load i32, ptr addrspace(4) %gz.p, align 4",
              "  %bx = urem i32 %blk, %gx", "  %b1 = udiv i32 %blk, %gx", "  %by = urem i32 %b1, %gy", "  %bz = udiv i32 %b1, %gy"]
     ids = "i32 %bx, i32 %by, i32 %bz, i32 %gx, i32 %gy, i32 %gz, i32 %tid, i32 %slot"
+    if slot_thr != nthr:
+        entry += [f"  %inblk = icmp ult i32 %tid, {nthr}", "  br i1 %inblk, label %run, label %skip", "skip:", "  ret void", "run:"]
     call_args = ", ".join(argv + [ids]) if argv else ids
     if slots == 1:
         entry += [f"  call void @{export}.body.s0({call_args})", "  ret void", "}"]
@@ -356,7 +366,7 @@ def import_kernel(text: str, kernel: str, export: str, block: tuple[int, int, in
         entry += ["done:", "  ret void", "}"]
     n_entry = (max(int(x) for x in re.findall(r"^attributes #(\d+)", text + attrs_text, flags=re.M)) + 1)
     entry_txt = "\n".join(entry).replace("#ENTRY", f"#{n_entry}") + "\n"
-    attrs_text += f'attributes #{n_entry} = {{ alwaysinline convergent nounwind "target-cpu"="gfx942" }}\n'
+    attrs_text += f'attributes #{n_entry} = {{ {"alwaysinline" if inline else "noinline"} convergent nounwind "target-cpu"="gfx942" }}\n'
 
     # ---- assemble: the module minus every kernel and the imported LDS variables, plus the new functions
     pieces, last = [], 0
@@ -368,8 +378,9 @@ def import_kernel(text: str, kernel: str, export: str, block: tuple[int, int, in
     for name, _, _, line in lds:
         mod = mod.replace(line + "\n", "")
     mod = re.sub(r"^@llvm\.(compiler\.)?used = [^\n]*\n", "", mod, flags=re.M)
+    mod = re.sub(r"^@__hip_cuid_\w+ = [^\n]*\n", "", mod, flags=re.M)    # per-TU id for the HIP runtime; clashes when imports are linked together
     decls = [f"@{ARENA} = external addrspace(3) global [0 x i8], align 16"]
-    if slots > 1 and info.barriers:
+    if getattr(info, "slot_barrier", False) and info.barriers:
         decls.append(f"declare void @{SLOT_BARRIER}(i32, i32) #{n_entry}")
     mod = mod.rstrip() + "\n\n" + "\n".join(decls) + "\n\n" + "\n".join(out_bodies) + "\n" + entry_txt + attrs_text
     return mod, info

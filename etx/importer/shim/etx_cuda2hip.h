@@ -1,6 +1,8 @@
 // The renames hipify applies to vLLM's CUDA-named ROCm sources when vLLM is built for ROCm (only the ones
 // its kernels and headers use); included first by hip_ir_local.sh so the sources compile unmodified.
 #pragma once
+#include <cfloat>   // torch headers bring these in for the real build
+#include <climits>
 #define cudaDeviceProp hipDeviceProp_t
 #define cudaGetDevice hipGetDevice
 #define cudaGetDeviceProperties hipGetDeviceProperties
@@ -19,5 +21,7 @@
 #ifndef TORCH_CHECK
 #define TORCH_CHECK(...) ((void)0)
 #endif
-// torch scalar tags used as template keys by the kernels' type maps (never instantiated on the device)
-namespace c10 { struct Half; struct BFloat16; }
+// torch's scalar types (header-only), which the libtorch_stable kernels are instantiated with
+#include <hip/hip_runtime.h>
+#include <torch/headeronly/util/BFloat16.h>
+#include <torch/headeronly/util/Half.h>

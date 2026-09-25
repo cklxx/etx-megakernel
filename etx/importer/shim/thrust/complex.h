@@ -8,4 +8,5 @@ template <class T> struct complex {
   __host__ __device__ constexpr T real() const { return re_; }
   __host__ __device__ constexpr T imag() const { return im_; }
 };
+template <class T> __host__ __device__ complex<T> polar(const T& r, const T& t = T()) { return complex<T>(r, t); }  // never evaluated
 }  // namespace thrust
