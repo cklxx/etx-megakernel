@@ -15,7 +15,7 @@ phase's prologue instead of a barrier (fleet's FOLD_PARTIALS, the design's recom
   gateup_s (X, W)        fold xa = xb + sum o_part (w==0 writes its slice of xa); h rows of slice x -> E_gu[x] local
   down_s   (X, W)        d_part[x] = Wd[:, inter slice x] . h[inter slice x]        -> E_down     DEVICE
   next qkv_s prologue    fold xin = xa + sum d_part (w==0 writes its slice of xb)
-MoE layers: no router phase (every egu task computes all E logits from L2 itself); egu_s / edn_s (X, W) handle
+MoE layers: router_s (X, W) every XCD computes all E logits (no barrier); egu_s / edn_s (X, W) handle
 the top-k slots s = x, x+X, ... ; d_part is per slot and the fold sums the slots in ascending expert id.
 """
 from __future__ import annotations
@@ -105,9 +105,10 @@ def build() -> Graph:
         grid(f"oproj_{L}", (X, W), "llm_s_oproj", L, {f"E_attn_{L}": "xw->x"}, {f"E_o_{L}": "xw->(0)"}, us(d.H * d.NH * d.HD * 2), "xw->x", "xw->w")
         grid(f"folo_{L}", (X, F), "llm_s_fold_o", L, {f"E_o_{L}": "xw->(0)"}, {f"E_folo_{L}": "xw->x"}, 2.0, "xw->x")
         if d.moe:
+            g.etensor(f"E_r_{L}", (X,), wait_count=W)
             g.etensor(f"E_egu_{L}", (X,), wait_count=W)
-            # no router phase: every egu task computes the router itself (see llm_s_egu)
-            grid(f"egu_{L}", (X, W), "llm_s_egu", L, {f"E_folo_{L}": "xw->x"}, {f"E_egu_{L}": "xw->x"}, us(d.TOPK * 2 * d.MI * d.H * 2), "xw->x", "xw->w")
+            grid(f"router_{L}", (X, W), "llm_s_router", L, {f"E_folo_{L}": "xw->x"}, {f"E_r_{L}": "xw->x"}, us(X * d.E * d.H * 2), "xw->x", "xw->w")
+            grid(f"egu_{L}", (X, W), "llm_s_egu", L, {f"E_r_{L}": "xw->x"}, {f"E_egu_{L}": "xw->x"}, us(d.TOPK * 2 * d.MI * d.H * 2), "xw->x", "xw->w")
             grid(f"edn_{L}", (X, W), "llm_s_edn", L, {f"E_egu_{L}": "xw->x"}, {f"E_down_{L}": "xw->(0)"}, us(d.TOPK * d.H * d.MI * 2), "xw->x", "xw->w")
         else:
             g.etensor(f"E_gu_{L}", (X,), wait_count=W)

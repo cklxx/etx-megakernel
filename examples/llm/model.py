@@ -146,7 +146,7 @@ def lds_bytes(d: Dims) -> int:
     _, chunk = _ctx_chunk()
     hmax = -(-d.NH // 8)
     attn = hmax * d.HD + hmax * chunk + chunk * d.HD + d.HD   # sliced attention: q heads, scores, staged K and V chunks (bf16), new K row
-    moe_egu = vec + (nw + 1) * d.E if d.moe else 0   # sliced egu: normed input + router partials (waves x E) + logits
+    moe_egu = 2 * d.E if d.moe else 0     # sliced egu / edn: top-k scratch (logits and probabilities) before the input vector
     merge = vec + (nw // 2 + 1) * d.HD    # sliced o_proj prologue: chunk-group partial sums after the o vector
     return (max(vec + nw * 64, lm, attn, moe_egu, merge)) * 4 + 4096
 

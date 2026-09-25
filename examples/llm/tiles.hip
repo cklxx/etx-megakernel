@@ -720,14 +720,11 @@ extern "C" __device__ void llm_s_egu(const etx_ctx* c) {
   const int x = c->coord[0], w = c->coord[1];
   const LlmLayer& Ly = P.layer[c->cst[0]];
   float* red = LLM_RED(c); float* xs = LLM_VEC(c); float* gu = red + 96;   // ids/weights live at red+64..96
-  norm_copy_to(P.xa_x + (size_t)x * P.H, P.ss_x + ((size_t)x * 2 + 1) * P.F, P.F, Ly.ln2, P.H, xs);
-  // the router, computed by every expert task (E x H bf16 = 512 KB, served from the XCD's L2 after the first
-  // touch) instead of a router phase with its own handoff; the same code and order everywhere, so identical
-  float* part = xs + P.H; float* lg = part + etx_nwaves() * P.E;
-  float* rlog = P.rlog_x + (size_t)x * P.E;
-  gemv_rows(Ly.wr, P.H, xs, 0, P.E, part, [&](int r, float v) { const float l = bfr(v); lg[r] = l; if (w == 0) rlog[r] = l; });
-  topk_local(lg, part, red);                                        // the partials are dead by now
+  // (computing the router inside every expert task instead of a router phase was tried: 38 tasks per XCD
+  // touching the same 512 KB at once cost ~28 us per layer, the L2 does not merge those misses)
+  topk_local(P.rlog_x + (size_t)x * P.E, xs, red);                  // xs is free until the copy below
   const int* ids = (const int*)(red + 64);
+  norm_copy_to(P.xa_x + (size_t)x * P.H, P.ss_x + ((size_t)x * 2 + 1) * P.F, P.F, Ly.ln2, P.H, xs);
   int r1; const int r0 = rows_of(P.MI, w, P.W, &r1);
   for (int s = x; s < P.TOPK; s += P.X) {
     const int e = ids[s];
