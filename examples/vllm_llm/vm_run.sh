@@ -56,4 +56,18 @@ for m in "${MODELS[@]}"; do name=${m##*:}
     $DOCKER $IMG bash -c "rm -rf /tmp/prof_${name}_$ops; rocprofv3 --kernel-trace --output-format csv -d /tmp/prof_${name}_$ops -- python3 examples/vllm_llm/vllm_profile.py run --model ~/llm/$name/hf --golden ~/llm/$name/golden_c1024.txt $co > /tmp/profrun.log 2>&1; tail -2 /tmp/profrun.log; python3 examples/vllm_llm/vllm_profile.py analyze /tmp/prof_${name}_$ops --json examples/vllm_llm/results/prof_${ops}_$name.json" 2>&1 | grep -vE "^\s*$" | head -24
   done
 done
+if [ "${VL_MOE:-1}" = 1 ]; then
+  log "MoE capture for offline work: vLLM Qwen3-30B-A3B kernel trace + Triton cache (fused_moe IR and launch metadata)"
+  . ~/llmenv/bin/activate
+  HF_HUB_ENABLE_HF_TRANSFER=1 python3 -c "
+from huggingface_hub import snapshot_download
+snapshot_download('Qwen/Qwen3-30B-A3B', local_dir='$HOME/llm/qwen3-30b-a3b/hf', allow_patterns=['*.json','*.safetensors','tokenizer*','*.txt','*.model'], max_workers=16)
+print('DL-DONE')" > /tmp/dl_moe.log 2>&1; tail -1 /tmp/dl_moe.log
+  cp examples/llm/results/golden_c1024_qwen3-30b-a3b.txt ~/llm/qwen3-30b-a3b/golden_c1024.txt
+  mkdir -p ~/moe_capture && chmod 777 ~/moe_capture
+  for ops in none all; do co=$([ $ops = all ] && echo "--custom-ops all" || echo)
+    $DOCKER -e TRITON_CACHE_DIR=$HOME/moe_capture/triton_$ops $IMG bash -c "rocprofv3 --kernel-trace --output-format csv -d $HOME/moe_capture/prof_$ops -- python3 examples/vllm_llm/vllm_profile.py run --model ~/llm/qwen3-30b-a3b/hf --golden ~/llm/qwen3-30b-a3b/golden_c1024.txt $co > /tmp/profrun_moe.log 2>&1; tail -1 /tmp/profrun_moe.log; python3 examples/vllm_llm/vllm_profile.py analyze $HOME/moe_capture/prof_$ops --json examples/vllm_llm/results/prof_${ops}_qwen3-30b-a3b.json" 2>&1 | grep -vE "^\s*$" | head -30
+  done
+  sudo chown -R $USER ~/moe_capture; (cd ~ && tar czf moe_capture.tgz moe_capture/triton_* moe_capture/prof_*/*/*kernel_trace.csv 2>/dev/null); ls -la ~/moe_capture.tgz
+fi
 log "ALL DONE"
