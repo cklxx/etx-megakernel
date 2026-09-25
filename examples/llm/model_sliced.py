@@ -8,8 +8,9 @@ phase's prologue instead of a barrier (fleet's FOLD_PARTIALS, the design's recom
   XCD k owns query heads [qh0_k, qh0_k + nqh_k) and computes the K/V rows of the KV heads they need
   (duplicated across XCDs that share a KV head; they write identical values).
   qkv_s    (X, W)        rows of XCD k's q/k/v slice, split over the W workers     -> E_qkv[x]   local
-                         the XCD's LAST qkv task also does q/k norm, RoPE and the KV write (last-arriver counter)
-  attn_s   (X, NC)       one chunk for all of the XCD's heads; the LAST chunk task merges them -> E_attn[x] local
+  attn_s   (X, NC)       one chunk for all of the XCD's heads; every chunk task norms/rotates q itself, the chunk
+                         holding the newest position writes the K/V cache row            -> E_attn[x]  local
+  oproj_s                merges the chunk partials of the XCD's heads in its prologue
   oproj_s  (X, W)        o_part[x] = Wo[:, cols of x's heads] . o[x's heads]        -> E_o        DEVICE
   gateup_s (X, W)        fold xa = xb + sum o_part (w==0 writes its slice of xa); h rows of slice x -> E_gu[x] local
   down_s   (X, W)        d_part[x] = Wd[:, inter slice x] . h[inter slice x]        -> E_down     DEVICE
@@ -92,8 +93,8 @@ def build() -> Graph:
         # XCD-local vector; the 37 other workers wait on a local event and read that (measured: folding
         # in every task cost 35 us per phase, 304 tasks each re-fetching 147 KB after their L2 invalidate)
         g.etensor(f"E_fold_{L}", (X,), wait_count=1)
-        g.etensor(f"E_qkv_{L}", (X,), wait_count=W)          # completed by the XCD's last qkv task, after its head posts
-        g.etensor(f"E_attn_{L}", (X,), wait_count=NC)         # completed by the XCD's last chunk task, after the merge
+        g.etensor(f"E_qkv_{L}", (X,), wait_count=W)
+        g.etensor(f"E_attn_{L}", (X,), wait_count=NC)
         g.etensor(f"E_o_{L}", (1,), wait_count=X * W)
         g.etensor(f"E_folo_{L}", (X,), wait_count=1)
         g.etensor(f"E_down_{L}", (1,), wait_count=X * W)

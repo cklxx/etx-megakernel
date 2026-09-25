@@ -122,6 +122,7 @@ extern "C" __device__ void llm_qkv(const etx_ctx* c) {
 // q/k post-processing of one head: optional per-head RMSNorm, then RoPE (rotate_half), each product in bf16
 static __device__ __forceinline__ void head_post(const float* src, const __hip_bfloat16* nw, float* dst_f, __hip_bfloat16* dst_b, float* red) {
   const int HD = P.HD, half = HD / 2, d = threadIdx.x;
+  __syncthreads();                       // the previous call's threads may still be reading v[]; this call rewrites it
   float* v = red + 64;                   // HD floats (HD <= 192 fits the 1 KB scratch)
   float x = d < HD ? src[d] : 0.f;
   if (nw) {
