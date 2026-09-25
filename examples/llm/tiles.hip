@@ -27,6 +27,18 @@ static __device__ __forceinline__ float silu(float g) { return g / (1.f + __expf
 #define LLM_RED(c)  ((float*)(c)->lds)
 #define LLM_VEC(c)  ((float*)(c)->lds + 256)
 
+typedef __attribute__((address_space(3))) const float lds_cf;
+typedef __attribute__((address_space(3))) float lds_f;
+static __device__ __forceinline__ float dot8(uint4 w, lds_cf* x) {
+  const uint32_t u[4] = {w.x, w.y, w.z, w.w};
+  float s = 0.f;
+#pragma unroll
+  for (int i = 0; i < 4; ++i) {
+    s += __uint_as_float(u[i] << 16) * x[2 * i];
+    s += __uint_as_float(u[i] & 0xffff0000u) * x[2 * i + 1];
+  }
+  return s;
+}
 static __device__ __forceinline__ float dot8(uint4 w, const float* x) {
   const uint32_t u[4] = {w.x, w.y, w.z, w.w};
   float s = 0.f;
@@ -550,31 +562,36 @@ static __device__ __forceinline__ void attn_heads(const LlmLayer& Ly, int qh_beg
   }
   __syncthreads();
   const float scale = rsqrtf((float)HD);
+  // LDS-typed views: through the generic pointers the compiler emits flat loads, which are slower and wait
+  // on the vector memory counter as well
+  typedef __attribute__((address_space(3))) const uint4 lds_u4;
+  typedef __attribute__((address_space(3))) const unsigned short lds_u16;
+  lds_u4* kl = (lds_u4*)kk; lds_cf* ql = (lds_cf*)qs; lds_f* scl = (lds_f*)sc;
   for (int idx = threadIdx.x; idx < nheads * len; idx += blockDim.x) {
     const int j = idx / len, t = idx % len;
-    const uint4* k = kk + t * per_row;
-    const float* q = qs + j * HD;
+    lds_u4* k = kl + t * per_row;
+    lds_cf* q = ql + j * HD;
     float sacc = 0.f;
     for (int u = 0; u < per_row; ++u) sacc += dot8(k[u], q + u * 8);
-    sc[j * P.CHUNK + t] = sacc * scale;
+    scl[j * P.CHUNK + t] = sacc * scale;
   }
   __syncthreads();
   float* mrow = red + 64; float* lrow = mrow + 16;
   for (int j = etx_wave(); j < nheads; j += etx_nwaves()) {
     float m = -INFINITY;
-    for (int t = etx_lane(); t < len; t += ETX_WAVE_SIZE) m = fmaxf(m, sc[j * P.CHUNK + t]);
+    for (int t = etx_lane(); t < len; t += ETX_WAVE_SIZE) m = fmaxf(m, scl[j * P.CHUNK + t]);
     m = etx_wave_max(m);
     float l = 0.f;
-    for (int t = etx_lane(); t < len; t += ETX_WAVE_SIZE) { const float pv = __expf(sc[j * P.CHUNK + t] - m); sc[j * P.CHUNK + t] = pv; l += pv; }
+    for (int t = etx_lane(); t < len; t += ETX_WAVE_SIZE) { const float pv = __expf(scl[j * P.CHUNK + t] - m); scl[j * P.CHUNK + t] = pv; l += pv; }
     l = etx_wave_sum(l);
     if (etx_lane() == 0) { mrow[j] = m; lrow[j] = l; }
   }
   __syncthreads();
-  const __hip_bfloat16* vb = (const __hip_bfloat16*)vv;
+  lds_u16* vl = (lds_u16*)vv;
   for (int idx = threadIdx.x; idx < nheads * HD; idx += blockDim.x) {
     const int j = idx / HD, d = idx % HD;
     float acc = 0.f;
-    for (int t = 0; t < len; ++t) acc += sc[j * P.CHUNK + t] * etx_b2f(vb[t * HD + d]);
+    for (int t = 0; t < len; ++t) acc += scl[j * P.CHUNK + t] * __uint_as_float((unsigned)vl[t * HD + d] << 16);
     float* part = P.attn_part + ((size_t)(qh_begin + j) * NC + ch) * stride;
     part[d] = acc;
     if (d == 0) { part[HD] = mrow[j]; part[HD + 1] = lrow[j]; }
@@ -611,18 +628,19 @@ static __device__ __forceinline__ void merge_head(int qh, float* out, float* wch
   const float Lsum = etx_block_sum(l, red);
   // threads = HD (128) columns x ng chunk groups: each thread sums NC/ng chunks with all loads in flight
   const int ng = max(1, (int)blockDim.x / HD);
+  lds_cf* wl = (lds_cf*)wch; lds_f* hs = (lds_f*)half_sum;      // LDS-typed: no flat loads in the loop
   {
     const int d = threadIdx.x % HD, g = threadIdx.x / HD;
     float acc = 0.f;
     if (g < ng)
 #pragma unroll 16
-      for (int ch = g; ch < NC; ch += ng) acc += wch[ch] * part[ch * stride + d];
-    if (g < ng) half_sum[g * HD + d] = acc;
+      for (int ch = g; ch < NC; ch += ng) acc += wl[ch] * part[ch * stride + d];
+    if (g < ng) hs[g * HD + d] = acc;
   }
   __syncthreads();
   for (int d = threadIdx.x; d < HD; d += blockDim.x) {
     float v = 0.f;
-    for (int g = 0; g < ng; ++g) v += half_sum[g * HD + d];
+    for (int g = 0; g < ng; ++g) v += hs[g * HD + d];
     out[d] = bfr(v / Lsum);
   }
   __syncthreads();
