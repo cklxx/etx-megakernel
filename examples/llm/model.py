@@ -131,7 +131,8 @@ def lds_bytes(d: Dims) -> int:
     """Input vector + GEMV partials (4 waves x rows per task) + attention scratch, in floats, plus 4 KB."""
     vec = max(d.H, d.NH * d.HD, d.INTER if not d.moe else 0, d.TOPK * d.MI)
     part = 4 * 520                        # largest task: lm_head rows (<= 516) x 4 waves; lm_head also keeps its logits
-    return (max(vec + 4 * 64, d.H + 520 + part)) * 4 + 4096
+    lm = 2 * d.H + 520 + part             # sliced lm_head: folded residual + normed input + logits + partials
+    return (max(vec + 4 * 64, lm)) * 4 + 4096
 
 
 def _us(nbytes: float, tasks: int) -> float:

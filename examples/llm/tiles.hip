@@ -56,12 +56,16 @@ typedef unsigned int llm_u32x2 __attribute__((ext_vector_type(2)));
 template <int EPL> struct wvec;
 template <> struct wvec<8> { typedef llm_u32x4 T; };
 template <> struct wvec<4> { typedef llm_u32x2 T; };
+template <> struct wvec<2> { typedef unsigned int T; };
 
 static __device__ __forceinline__ float dotn(llm_u32x4 w, const float* x) {
   float s = 0.f;
 #pragma unroll
   for (int i = 0; i < 4; ++i) { s += __uint_as_float(w[i] << 16) * x[2 * i]; s += __uint_as_float(w[i] & 0xffff0000u) * x[2 * i + 1]; }
   return s;
+}
+static __device__ __forceinline__ float dotn(unsigned int w, const float* x) {
+  return __uint_as_float(w << 16) * x[0] + __uint_as_float(w & 0xffff0000u) * x[1];
 }
 static __device__ __forceinline__ float dotn(llm_u32x2 w, const float* x) {
   return __uint_as_float(w.x << 16) * x[0] + __uint_as_float(w.x & 0xffff0000u) * x[1]
@@ -119,6 +123,7 @@ template <class Epi>
 static __device__ __forceinline__ void gemv_rows(const __hip_bfloat16* __restrict__ W, int K, const float* xs, int r0, int r1, float* part, Epi epi) {
   if (K % (ETX_WAVE_SIZE * 8) == 0) { gemv_stream<8>(W, K, xs, r0, r1, part, epi); return; }
   if (K % (ETX_WAVE_SIZE * 4) == 0) { gemv_stream<4>(W, K, xs, r0, r1, part, epi); return; }
+  if (K % (ETX_WAVE_SIZE * 2) == 0) { gemv_stream<2>(W, K, xs, r0, r1, part, epi); return; }
   // generic fallback (K % 8 == 0): rows to waves, lanes stride K
   const int lane = etx_lane(), nw = etx_nwaves(), nrt = r1 - r0;
   for (int r = r0 + etx_wave(); r < r1; r += nw) {

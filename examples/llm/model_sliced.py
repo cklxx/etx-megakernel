@@ -54,7 +54,7 @@ def slices(d: M.Dims) -> dict:
         else:
             kv0, kv1 = qh0 // d.G, (qh0 + nqh - 1) // d.G
             kv.append((kv0, kv1 - kv0 + 1))
-    inter = split(d.INTER, X, unit=8) if not d.moe else [(0, 0)] * X
+    inter = split(d.INTER, X, unit=128) if not d.moe else [(0, 0)] * X    # K of the down slices stays streamable (K % 128 == 0)
     hs = split(d.H, X, unit=8)
     return {"q": q, "kv": kv, "inter": inter, "h": hs,
             "HMAX": max(c for _, c in q), "KVMAX": max(c for _, c in kv)}

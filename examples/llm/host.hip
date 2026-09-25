@@ -124,7 +124,7 @@ int main(int argc, char** argv) {
     if (hp.nqh[k] == 0) { hp.kv0[k] = 0; hp.nkv[k] = 0; }
     else { const int kv0 = hp.qh0[k] / hp.G, kv1 = (hp.qh0[k] + hp.nqh[k] - 1) / hp.G; hp.kv0[k] = kv0; hp.nkv[k] = kv1 - kv0 + 1; }
   }
-  if (hp.moe) for (int k = 0; k < 8; ++k) { hp.i0[k] = 0; hp.ni[k] = 0; } else split8(hp.INTER, 8, hp.i0, hp.ni);
+  if (hp.moe) for (int k = 0; k < 8; ++k) { hp.i0[k] = 0; hp.ni[k] = 0; } else split8(hp.INTER, 128, hp.i0, hp.ni);
   split8(hp.H, 8, hp.h0, hp.nh);
   bool sliced = false;
   {
@@ -152,7 +152,7 @@ int main(int argc, char** argv) {
   }
   hp.xa = dalloc<float>(hp.H); hp.o_part = dalloc<float>((size_t)8 * hp.H); hp.d_part = dalloc<float>((size_t)std::max(8, hp.TOPK) * hp.H);
   hp.rlog_x = dalloc<float>((size_t)8 * std::max(1, hp.E)); hp.eid = dalloc<int32_t>(std::max(8, hp.TOPK));
-  const bool sliced_graph = strstr(ETX_GRAPH_NAME, "sliced") != nullptr;
+  const bool sliced_graph = strncmp(ETX_GRAPH_NAME, "llm_sliced_", 11) == 0;
   if (sliced_graph && !sliced) die("this binary was built from model_sliced.py: run prep.py --sliced for " + dir);
   // ---- RoPE tables, computed like HF (fp32 inv_freq and angles, cos/sin rounded to bf16)
   {
