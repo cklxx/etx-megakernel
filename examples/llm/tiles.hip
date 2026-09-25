@@ -572,7 +572,7 @@ static __device__ __forceinline__ void attn_heads(const LlmLayer& Ly, int qh_beg
     lds_u4* k = kl + t * per_row;
     lds_cf* q = ql + j * HD;
     float sacc = 0.f;
-    for (int u = 0; u < per_row; ++u) { const llm_u32x4 w = k[u]; sacc += dot8(make_uint4(w.x, w.y, w.z, w.w), q + u * 8); }
+    for (int u = 0; u < per_row; ++u) { const llm_u32x4 w = k[u]; sacc += dot8(uint4{w.x, w.y, w.z, w.w}, q + u * 8); }
     scl[j * P.CHUNK + t] = sacc * scale;
   }
   __syncthreads();
