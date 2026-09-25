@@ -13,8 +13,10 @@ struct LlmLayer {
   const __hip_bfloat16 *qn, *kn;            // per-head q / k RMSNorm [HD] (Qwen3; may be null)
   const __hip_bfloat16 *wo;                 // [H][NH*HD]
   const __hip_bfloat16 *wg, *wu, *wd;       // dense MLP: [INTER][H], [INTER][H], [H][INTER]
+  const __hip_bfloat16 *wgu;                // dense MLP, layout 2: gate/up rows interleaved [2*INTER][H] (one stream per task)
   const __hip_bfloat16 *wr;                 // MoE router [E][H]
   const __hip_bfloat16 *eg, *eu, *ed;       // MoE experts: [E][MI][H], [E][MI][H], [E][H][MI]
+  const __hip_bfloat16 *egu;                // MoE experts, layout 2: gate/up rows interleaved [E][2*MI][H]
   __hip_bfloat16 *kc, *vc;                  // KV cache [CTX][NKV][HD]
   // sliced layout (examples/llm/model_sliced.py), one per XCD; null when not packed
   const __hip_bfloat16 *wqkv_x[8], *bqkv_x[8];   // [nrows_x][H]: q rows of the XCD's heads, then [k rows; v rows] per needed KV head
@@ -50,6 +52,9 @@ struct LlmParams {
   int32_t qh0[8], nqh[8], kv0[8], nkv[8], i0[8], ni[8], h0[8], nh[8];
   float *xa;                                // residual after attention [H] (xb is `x`)
   float *xin_x, *xa_x;                      // [8][H] XCD-local copies of the folded residual (written by the XCD's fold task)
+  float *xs1_x, *xs2_x;                     // [8][H] XCD-local normed inputs (ln1 for qkv, ln2 for the MLP / router), by the fold tasks
+  float *xsf;                               // [H] final-normed residual for lm_head (by lmfold)
+  int32_t *rids_x; float *rw_x;             // [8][16] the token's top-k expert ids / weights, by the XCD's last router task
   float *xfin;                              // [H] folded final residual for lm_head
   float *o_part;                            // [8][H] per-XCD o_proj partial sums
   float *d_part;                            // [max(8, TOPK)][H] per-XCD (dense) or per-slot (MoE) down partial sums

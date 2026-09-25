@@ -249,8 +249,8 @@ extern "C" __device__ void llm_gateup(const etx_ctx* c) {
   float* gtmp = red + 64;                 // up to 192 rows per task
   rmsnorm_to(P.x, Ly.ln2, P.H, xs, red);
   int r1; const int r0 = task_rows(c->coord[0], P.rpt_gu, P.INTER, &r1);
-  gemv_rows(Ly.wg, P.H, xs, r0, r1, xs + P.H, [&](int r, float v) { gtmp[r - r0] = bfr(v); });
-  gemv_rows(Ly.wu, P.H, xs, r0, r1, xs + P.H, [&](int r, float v) { P.h[r] = bfr(bfr(silu(gtmp[r - r0])) * bfr(v)); });
+  gemv_rows(Ly.wgu, P.H, xs, 2 * r0, 2 * r1, xs + P.H, [&](int r, float v) { gtmp[r - 2 * r0] = bfr(v); });   // rows: g0 u0 g1 u1 ...
+  for (int r = r0 + threadIdx.x; r < r1; r += blockDim.x) P.h[r] = bfr(bfr(silu(gtmp[2 * (r - r0)])) * gtmp[2 * (r - r0) + 1]);
 }
 
 extern "C" __device__ void llm_down(const etx_ctx* c) {
@@ -313,9 +313,9 @@ extern "C" __device__ void llm_egu(const etx_ctx* c) {
   float* gtmp = red + 96;                 // up to 160 rows per task
   rmsnorm_to(P.x, Ly.ln2, P.H, xs, red);
   int r1; const int r0 = task_rows(c->coord[1], P.rpt_egu, P.MI, &r1);
-  const size_t eoff = (size_t)e * P.MI * P.H;
-  gemv_rows(Ly.eg + eoff, P.H, xs, r0, r1, xs + P.H, [&](int r, float v) { gtmp[r - r0] = bfr(v); });
-  gemv_rows(Ly.eu + eoff, P.H, xs, r0, r1, xs + P.H, [&](int r, float v) { P.hexp[(size_t)s * P.MI + r] = bfr(bfr(silu(gtmp[r - r0])) * bfr(v)); });
+  const size_t eoff = (size_t)e * 2 * P.MI * P.H;
+  gemv_rows(Ly.egu + eoff, P.H, xs, 2 * r0, 2 * r1, xs + P.H, [&](int r, float v) { gtmp[r - 2 * r0] = bfr(v); });
+  for (int r = r0 + threadIdx.x; r < r1; r += blockDim.x) P.hexp[(size_t)s * P.MI + r] = bfr(bfr(silu(gtmp[2 * (r - r0)])) * gtmp[2 * (r - r0) + 1]);
 }
 
 // rows of x: x[r] += sum over the token's experts in ascending id of bf16(bf16(down_e . h_s) * w_s)
@@ -407,37 +407,43 @@ static __device__ __forceinline__ void fold_down_to(int L, float* out, int* orde
   }
 }
 
-// fold task of XCD x before layer L: xin_x[x] = folded residual; also stores its slice of xb (= P.x)
+// fold task of XCD x before layer L: xin_x[x] = folded residual, xs1_x[x] = ln1-normed input for qkv; stores its slice of xb
 extern "C" __device__ void llm_s_fold_d(const etx_ctx* c) {
   const int L = c->cst[0], x = c->coord[0];
+  float* red = LLM_RED(c);
   float* out = P.xin_x + (size_t)x * P.H;
-  fold_down_to(L, out, (int*)LLM_RED(c));
+  fold_down_to(L, out, (int*)red);
   __syncthreads();
   if (L > 0) for (int i = P.h0[x] + threadIdx.x; i < P.h0[x] + P.nh[x]; i += blockDim.x) P.x[i] = out[i];
   if (P.layer_dump && P.dump_step == P.tok && x == 0) for (int i = threadIdx.x; i < P.H; i += blockDim.x) P.layer_dump[(size_t)L * P.H + i] = out[i];
+  rmsnorm_to(out, P.layer[L].ln1, P.H, P.xs1_x + (size_t)x * P.H, red);
 }
 
-// fold task of XCD x after o_proj: xa_x[x] = bf16(xb + bf16(sum of the o_proj partials)); stores its slice of xa
+// fold task of XCD x after o_proj: xa_x[x] = bf16(xb + bf16(sum o_part)), xs2_x[x] = ln2-normed; stores its slice of xa
 extern "C" __device__ void llm_s_fold_o(const etx_ctx* c) {
-  const int x = c->coord[0], H = P.H;
+  const int L = c->cst[0], x = c->coord[0], H = P.H;
+  float* red = LLM_RED(c);
   float* out = P.xa_x + (size_t)x * H;
   fold_sum_rows(P.o_part, P.X, H, P.x, out, false, nullptr);
   __syncthreads();
   for (int i = P.h0[x] + threadIdx.x; i < P.h0[x] + P.nh[x]; i += blockDim.x) P.xa[i] = out[i];
+  rmsnorm_to(out, P.layer[L].ln2, H, P.xs2_x + (size_t)x * H, red);
 }
 
 extern "C" __device__ void llm_s_lmfold(const etx_ctx* c) {
-  fold_down_to(c->cst[0], P.xfin, (int*)LLM_RED(c));
+  float* red = LLM_RED(c);
+  fold_down_to(c->cst[0], P.xfin, (int*)red);
   __syncthreads();
   if (P.layer_dump && P.dump_step == P.tok) for (int i = threadIdx.x; i < P.H; i += blockDim.x) P.layer_dump[(size_t)c->cst[0] * P.H + i] = P.xfin[i];
+  rmsnorm_to(P.xfin, P.final_norm, P.H, P.xsf, red);
 }
 
-// Last-arriver pattern inside one XCD (all producers and the consumer are on the same L2): every wave drains
-// its stores, thread 0 bumps the XCD's counter, and the task that completes the group invalidates its L1
-// and returns true. Counters are monotonic; the target scales with the step number.
+// Last-arriver pattern inside one XCD: every wave drains its stores, thread 0 bumps the XCD's counter, and the
+// task that completes the group invalidates its L1 and returns true. Counters are monotonic; the target scales
+// with the step number. Unfused launches spread the group over XCDs, so they use device-scope fences.
 static __device__ __forceinline__ bool last_arriver(int32_t* ctr, int target, float* red) {
-  int* flag = (int*)(red + 255);          // last float of the scratch region: nothing else uses it
-  if (P.unfused) ETX_RELEASE_DEVICE(); else ETX_RELEASE_DOMAIN();   // unfused: the group is spread over XCDs
+  int* flag = (int*)(red + 255);
+  if (P.unfused) ETX_RELEASE_DEVICE(); else ETX_RELEASE_DOMAIN();
   __syncthreads();
   if (threadIdx.x == 0) { const int old = __hip_atomic_fetch_add(ctr, 1, __ATOMIC_RELAXED, __HIP_MEMORY_SCOPE_AGENT); *flag = (old + 1 == target); }
   __syncthreads();
@@ -454,52 +460,22 @@ static __device__ __forceinline__ int qkv_row(int x, int r) {
   return o < HD ? (P.NH + P.kv0[x] + j) * HD + o : (P.NH + P.NKV + P.kv0[x] + j) * HD + (o - HD);
 }
 
+// raw q/k/v rows of the XCD's slice; the post-processing (norm, RoPE, KV write) is done by the attention tasks
 extern "C" __device__ void llm_s_qkv(const etx_ctx* c) {
   const int L = c->cst[0], x = c->coord[0], w = c->coord[1];
   const LlmLayer& Ly = P.layer[L];
-  float* red = LLM_RED(c); float* xs = LLM_VEC(c);
-  rmsnorm_to(P.xin_x + (size_t)x * P.H, Ly.ln1, P.H, xs, red);
+  float* xs = LLM_VEC(c);
+  copy_to(P.xs1_x + (size_t)x * P.H, P.H, xs);
   const int nrows = (P.nqh[x] + 2 * P.nkv[x]) * P.HD;
   int r1; const int r0 = rows_of(nrows, w, P.W, &r1);
+  if (r0 >= r1) return;
   const __hip_bfloat16* b = Ly.bqkv_x[x];
-  if (r0 < r1) gemv_rows(Ly.wqkv_x[x], P.H, xs, r0, r1, xs + P.H, [&](int r, float v) { P.qkv[qkv_row(x, r)] = bfr(v + (b ? etx_b2f(b[r]) : 0.f)); });
-  // the XCD's last qkv task does the post-processing of its heads (q/k norm, RoPE, KV-cache write): no post phase
-  if (!last_arriver(P.ctr_qkv + (size_t)L * 8 + x, P.W * (P.step_seq + 1), red)) return;
-  for (int j = 0; j < P.nqh[x]; ++j) {
-    const int qh = P.qh0[x] + j;
-    head_post(P.qkv + (size_t)qh * P.HD, P.qk_norm ? Ly.qn : nullptr, P.q + (size_t)qh * P.HD, nullptr, red);
-  }
-  for (int j = 0; j < P.nkv[x]; ++j) {
-    const int kvh = P.kv0[x] + j;
-    const size_t row = ((size_t)P.pos * P.NKV + kvh) * P.HD;
-    head_post(P.qkv + (size_t)(P.NH + kvh) * P.HD, P.qk_norm ? Ly.kn : nullptr, nullptr, Ly.kc + row, red);
-    const float* v = P.qkv + (size_t)(P.NH + P.NKV + kvh) * P.HD;
-    for (int d = threadIdx.x; d < P.HD; d += blockDim.x) Ly.vc[row + d] = __float2bfloat16(v[d]);
-  }
+  gemv_rows(Ly.wqkv_x[x], P.H, xs, r0, r1, xs + P.H, [&](int r, float v) { P.qkv[qkv_row(x, r)] = bfr(v + (b ? etx_b2f(b[r]) : 0.f)); });
 }
 
-extern "C" __device__ void llm_s_post_q(const etx_ctx* c) {
-  const int x = c->coord[0], j = c->coord[1];
-  if (j >= P.nqh[x]) return;
-  const LlmLayer& Ly = P.layer[c->cst[0]];
-  const int qh = P.qh0[x] + j;
-  head_post(P.qkv + (size_t)qh * P.HD, P.qk_norm ? Ly.qn : nullptr, P.q + (size_t)qh * P.HD, nullptr, LLM_RED(c));
-}
-
-extern "C" __device__ void llm_s_post_kv(const etx_ctx* c) {
-  const int x = c->coord[0], j = c->coord[1], which = c->coord[2];
-  if (j >= P.nkv[x]) return;
-  const LlmLayer& Ly = P.layer[c->cst[0]];
-  const int kvh = P.kv0[x] + j;
-  const size_t row = ((size_t)P.pos * P.NKV + kvh) * P.HD;
-  if (which == 0) head_post(P.qkv + (size_t)(P.NH + kvh) * P.HD, P.qk_norm ? Ly.kn : nullptr, nullptr, Ly.kc + row, LLM_RED(c));
-  else { const float* v = P.qkv + (size_t)(P.NH + P.NKV + kvh) * P.HD; for (int d = threadIdx.x; d < P.HD; d += blockDim.x) Ly.vc[row + d] = __float2bfloat16(v[d]); }
-}
-
-// one chunk of positions for ALL of XCD x's heads: heads that share a KV head share its K/V loads.
-// The chunk's K rows, then its V rows, are staged through LDS with 16-byte coalesced loads by every thread
-// (CHUNK x HD bf16 = 16 KB at CHUNK 64), so the scores and P.V loops read LDS instead of issuing one
-// dependent global load per position per thread. Same arithmetic order as before: results are identical.
+// one chunk of positions for ALL of XCD x's heads. Every chunk task norms and rotates the q of the XCD's heads
+// into LDS (cheap, redundant); the chunk task holding the newest position also writes that K/V cache row.
+// K rows, then V rows, are staged through LDS with 16-byte coalesced loads. Same arithmetic order as before.
 static __device__ __forceinline__ void attn_heads(const LlmLayer& Ly, int qh_begin, int nheads, int kvh, int ch, float* red, float* qs) {
   const int HD = P.HD, NC = P.NC, stride = HD + 2;
   const int n = P.pos + 1, t0 = ch * P.CHUNK, t1 = min(t0 + P.CHUNK, n), len = t1 - t0;
@@ -513,9 +489,18 @@ static __device__ __forceinline__ void attn_heads(const LlmLayer& Ly, int qh_beg
     return;
   }
   float* sc = qs + nheads * HD;                            // [nheads][CHUNK]
-  uint4* kv = (uint4*)(sc + nheads * P.CHUNK);             // [CHUNK][HD] bf16 = CHUNK * HD / 8 uint4
+  uint4* kv = (uint4*)(sc + nheads * P.CHUNK);             // [CHUNK][HD] bf16
   const int per_row = HD / 8;
-  for (int i = threadIdx.x; i < nheads * HD; i += blockDim.x) qs[i] = P.q[(size_t)qh_begin * HD + i];
+  for (int j = 0; j < nheads; ++j)
+    head_post(P.qkv + (size_t)(qh_begin + j) * HD, P.qk_norm ? Ly.qn : nullptr, qs + j * HD, nullptr, red);
+  if (t0 <= P.pos && P.pos < t1) {
+    const size_t row = ((size_t)P.pos * P.NKV + kvh) * HD;
+    head_post(P.qkv + (size_t)(P.NH + kvh) * HD, P.qk_norm ? Ly.kn : nullptr, nullptr, Ly.kc + row, red);
+    const float* v = P.qkv + (size_t)(P.NH + P.NKV + kvh) * HD;
+    for (int d = threadIdx.x; d < HD; d += blockDim.x) Ly.vc[row + d] = __float2bfloat16(v[d]);
+    ETX_RELEASE_DOMAIN(); ETX_ACQUIRE_DOMAIN();           // this task reads the row back below: drain the stores, drop L1
+  }
+  __syncthreads();
   for (int i = threadIdx.x; i < len * per_row; i += blockDim.x) {
     const int t = i / per_row, u = i % per_row;
     kv[i] = *(const uint4*)(Ly.kc + ((size_t)(t0 + t) * P.NKV + kvh) * HD + u * 8);
@@ -541,7 +526,7 @@ static __device__ __forceinline__ void attn_heads(const LlmLayer& Ly, int qh_beg
     l = etx_wave_sum(l);
     if (etx_lane() == 0) { mrow[j] = m; lrow[j] = l; }
   }
-  __syncthreads();                                         // everyone is done with K: reuse the buffer for V
+  __syncthreads();
   for (int i = threadIdx.x; i < len * per_row; i += blockDim.x) {
     const int t = i / per_row, u = i % per_row;
     kv[i] = *(const uint4*)(Ly.vc + ((size_t)(t0 + t) * P.NKV + kvh) * HD + u * 8);
@@ -565,48 +550,62 @@ extern "C" __device__ void llm_s_attn(const etx_ctx* c) {
   const LlmLayer& Ly = P.layer[L];
   float* red = LLM_RED(c); float* qs = LLM_VEC(c);
   const int qend = P.qh0[x] + P.nqh[x];
-  for (int qh = P.qh0[x]; qh < qend;) {                     // one call per KV head the XCD's heads use
+  for (int qh = P.qh0[x]; qh < qend;) {
     const int kvh = qh / P.G, last = min(qend, (kvh + 1) * P.G);
     attn_heads(Ly, qh, last - qh, kvh, ch, red, qs);
     qh = last;
   }
-  // the XCD's last chunk task merges the chunks of every head it owns: no merge phase
-  if (!last_arriver(P.ctr_attn + (size_t)L * 8 + x, P.NC * (P.step_seq + 1), red)) return;
-  etx_ctx cc = *c;
-  for (int j = 0; j < P.nqh[x]; ++j) { cc.coord[0] = P.qh0[x] + j; llm_merge(&cc); __syncthreads(); }
 }
 
-extern "C" __device__ void llm_s_merge(const etx_ctx* c) {
-  const int x = c->coord[0], j = c->coord[1];
-  if (j >= P.nqh[x]) return;
-  etx_ctx cc = *c; cc.coord[0] = P.qh0[x] + j;
-  llm_merge(&cc);
+// merge of one head's chunks into `out`: chunk weights once into wch (NC floats), then per d
+static __device__ __forceinline__ void merge_head(int qh, float* out, float* wch, float* red) {
+  const int HD = P.HD, NC = P.NC, stride = HD + 2;
+  const float* part = P.attn_part + (size_t)qh * NC * stride;
+  float m = -INFINITY;
+  for (int ch = threadIdx.x; ch < NC; ch += blockDim.x) m = fmaxf(m, part[ch * stride + HD]);
+  const float M = etx_block_max(m, red);
+  float l = 0.f;
+  for (int ch = threadIdx.x; ch < NC; ch += blockDim.x) {
+    const float mc = part[ch * stride + HD];
+    const float w = mc > -INFINITY ? __expf(mc - M) : 0.f;
+    wch[ch] = w; l += w * part[ch * stride + HD + 1];
+  }
+  const float Lsum = etx_block_sum(l, red);
+  for (int d = threadIdx.x; d < HD; d += blockDim.x) {
+    float acc = 0.f;
+#pragma unroll 8
+    for (int ch = 0; ch < NC; ++ch) acc += wch[ch] * part[ch * stride + d];
+    out[d] = bfr(acc / Lsum);
+  }
+  __syncthreads();
 }
 
-// o_part[x] = Wo[:, columns of XCD x's heads] . o[those heads]; zero when the XCD owns no head
+// o_part[x] = Wo[:, columns of XCD x's heads] . o[those heads]; every task merges the XCD's heads in its
+// prologue (4 x 16 KB of partials from the XCD's L2, in parallel, instead of one task doing it serially)
 extern "C" __device__ void llm_s_oproj(const etx_ctx* c) {
   const int x = c->coord[0], w = c->coord[1];
   const LlmLayer& Ly = P.layer[c->cst[0]];
-  float* xs = LLM_VEC(c);
+  float* red = LLM_RED(c); float* xs = LLM_VEC(c);
   const int K = P.nqh[x] * P.HD;
   int r1; const int r0 = rows_of(P.H, w, P.W, &r1);
   float* out = P.o_part + (size_t)x * P.H;
   if (K == 0) { for (int r = r0 + threadIdx.x; r < r1; r += blockDim.x) out[r] = 0.f; return; }
-  copy_to(P.o + (size_t)P.qh0[x] * P.HD, K, xs);
+  for (int j = 0; j < P.nqh[x]; ++j) merge_head(P.qh0[x] + j, xs + j * P.HD, red + 64, red);   // NC <= 128
   if (r0 >= r1) return;
   gemv_rows(Ly.wo_x[x], K, xs, r0, r1, xs + K, [&](int r, float v) { out[r] = v; });
 }
 
+// dense MLP, one interleaved gate/up stream per task; the normed input comes from the XCD's fold task
 extern "C" __device__ void llm_s_gateup(const etx_ctx* c) {
   const int x = c->coord[0], w = c->coord[1];
   const LlmLayer& Ly = P.layer[c->cst[0]];
-  float* red = LLM_RED(c); float* xs = LLM_VEC(c); float* gtmp = red + 64;
-  rmsnorm_to(P.xa_x + (size_t)x * P.H, Ly.ln2, P.H, xs, red);
+  float* red = LLM_RED(c); float* xs = LLM_VEC(c); float* gu = red + 64;   // 2 * rows per task <= 190
+  copy_to(P.xs2_x + (size_t)x * P.H, P.H, xs);
   int r1; const int r0 = rows_of(P.ni[x], w, P.W, &r1);
   if (r0 >= r1) return;
   const int base = P.i0[x];
-  gemv_rows(Ly.wg + (size_t)base * P.H, P.H, xs, r0, r1, xs + P.H, [&](int r, float v) { gtmp[r - r0] = bfr(v); });
-  gemv_rows(Ly.wu + (size_t)base * P.H, P.H, xs, r0, r1, xs + P.H, [&](int r, float v) { P.h[base + r] = bfr(bfr(silu(gtmp[r - r0])) * bfr(v)); });
+  gemv_rows(Ly.wgu + (size_t)2 * base * P.H, P.H, xs, 2 * r0, 2 * r1, xs + P.H, [&](int r, float v) { gu[r - 2 * r0] = bfr(v); });
+  for (int r = r0 + threadIdx.x; r < r1; r += blockDim.x) P.h[base + r] = bfr(bfr(silu(gu[2 * (r - r0)])) * gu[2 * (r - r0) + 1]);
 }
 
 extern "C" __device__ void llm_s_down(const etx_ctx* c) {
@@ -621,19 +620,9 @@ extern "C" __device__ void llm_s_down(const etx_ctx* c) {
   gemv_rows(Ly.wd_x[x], K, xs, r0, r1, xs + K, [&](int r, float v) { out[r] = v; });
 }
 
-// MoE: every XCD computes all E logits into its own copy (no barrier), then handles slots x, x+X, ...
-extern "C" __device__ void llm_s_router(const etx_ctx* c) {
-  const int x = c->coord[0], w = c->coord[1];
-  const LlmLayer& Ly = P.layer[c->cst[0]];
-  float* red = LLM_RED(c); float* xs = LLM_VEC(c);
-  rmsnorm_to(P.xa_x + (size_t)x * P.H, Ly.ln2, P.H, xs, red);
-  int r1; const int r0 = rows_of(P.E, w, P.W, &r1);
-  if (r0 >= r1) return;
-  float* out = P.rlog_x + (size_t)x * P.E;
-  gemv_rows(Ly.wr, P.H, xs, r0, r1, xs + P.H, [&](int r, float v) { out[r] = bfr(v); });
-}
-
-static __device__ __forceinline__ void topk_route_x(int x, float* red) {   // topk_route on XCD x's logits
+// MoE router: every XCD computes all E logits into its own copy; the XCD's last router task selects the
+// top-k once and publishes ids / weights for the expert tasks
+static __device__ __forceinline__ void topk_publish(int x, float* red) {
   int* ids = (int*)(red + 64); float* wts = red + 80;
   if (etx_wave() == 0) {
     const int lane = etx_lane(), E = P.E;
@@ -660,48 +649,56 @@ static __device__ __forceinline__ void topk_route_x(int x, float* red) {   // to
       if (lane == 0) { ids[t] = bi; wts[t] = bv; }
       sel += bv;
     }
-    if (lane == 0) for (int t = 0; t < P.TOPK; ++t) wts[t] = bfr(P.norm_topk ? wts[t] / sel : wts[t]);
+    if (lane == 0) for (int t = 0; t < P.TOPK; ++t) { const float wv = bfr(P.norm_topk ? wts[t] / sel : wts[t]); P.rids_x[x * 16 + t] = ids[t]; P.rw_x[x * 16 + t] = wv; }
   }
   __syncthreads();
+}
+
+extern "C" __device__ void llm_s_router(const etx_ctx* c) {
+  const int L = c->cst[0], x = c->coord[0], w = c->coord[1];
+  const LlmLayer& Ly = P.layer[L];
+  float* red = LLM_RED(c); float* xs = LLM_VEC(c);
+  copy_to(P.xs2_x + (size_t)x * P.H, P.H, xs);
+  int r1; const int r0 = rows_of(P.E, w, P.W, &r1);
+  float* out = P.rlog_x + (size_t)x * P.E;
+  if (r0 < r1) gemv_rows(Ly.wr, P.H, xs, r0, r1, xs + P.H, [&](int r, float v) { out[r] = bfr(v); });
+  if (!last_arriver(P.ctr_qkv + (size_t)L * 8 + x, P.W * (P.step_seq + 1), red)) return;   // counter array reused (qkv no longer needs one)
+  topk_publish(x, red);
 }
 
 extern "C" __device__ void llm_s_egu(const etx_ctx* c) {
   const int x = c->coord[0], w = c->coord[1];
   const LlmLayer& Ly = P.layer[c->cst[0]];
-  float* red = LLM_RED(c); float* xs = LLM_VEC(c); float* gtmp = red + 96;
-  topk_route_x(x, red);
-  const int* ids = (const int*)(red + 64);
-  rmsnorm_to(P.xa_x + (size_t)x * P.H, Ly.ln2, P.H, xs, red);
+  float* red = LLM_RED(c); float* xs = LLM_VEC(c); float* gu = red + 64;
+  copy_to(P.xs2_x + (size_t)x * P.H, P.H, xs);
   int r1; const int r0 = rows_of(P.MI, w, P.W, &r1);
   for (int s = x; s < P.TOPK; s += P.X) {
-    const int e = ids[s];
+    const int e = P.rids_x[x * 16 + s];
     if (w == 0 && threadIdx.x == 0) P.eid[s] = e;
     if (r0 >= r1) continue;
-    const size_t eoff = (size_t)e * P.MI * P.H;
-    gemv_rows(Ly.eg + eoff, P.H, xs, r0, r1, xs + P.H, [&](int r, float v) { gtmp[r - r0] = bfr(v); });
-    gemv_rows(Ly.eu + eoff, P.H, xs, r0, r1, xs + P.H, [&](int r, float v) { P.hexp[(size_t)s * P.MI + r] = bfr(bfr(silu(gtmp[r - r0])) * bfr(v)); });
+    gemv_rows(Ly.egu + (size_t)e * 2 * P.MI * P.H, P.H, xs, 2 * r0, 2 * r1, xs + P.H, [&](int r, float v) { gu[r - 2 * r0] = bfr(v); });
+    for (int r = r0 + threadIdx.x; r < r1; r += blockDim.x) P.hexp[(size_t)s * P.MI + r] = bfr(bfr(silu(gu[2 * (r - r0)])) * gu[2 * (r - r0) + 1]);
+    __syncthreads();
   }
 }
 
 extern "C" __device__ void llm_s_edn(const etx_ctx* c) {
   const int x = c->coord[0], w = c->coord[1];
   const LlmLayer& Ly = P.layer[c->cst[0]];
-  float* red = LLM_RED(c); float* xs = LLM_VEC(c);
-  topk_route_x(x, red);
-  const int* ids = (const int*)(red + 64); const float* wts = red + 80;
+  float* xs = LLM_VEC(c);
   int r1; const int r0 = rows_of(P.H, w, P.W, &r1);
   for (int s = x; s < P.TOPK; s += P.X) {
     copy_to(P.hexp + (size_t)s * P.MI, P.MI, xs);
     if (r0 >= r1) continue;
     float* out = P.d_part + (size_t)s * P.H;
-    const float ws = wts[s];
-    gemv_rows(Ly.ed + (size_t)ids[s] * P.H * P.MI, P.MI, xs, r0, r1, xs + P.MI, [&](int r, float v) { out[r] = bfr(bfr(v) * ws); });
+    const float ws = P.rw_x[x * 16 + s];
+    gemv_rows(Ly.ed + (size_t)P.rids_x[x * 16 + s] * P.H * P.MI, P.MI, xs, r0, r1, xs + P.MI, [&](int r, float v) { out[r] = bfr(bfr(v) * ws); });
   }
 }
 
 extern "C" __device__ void llm_s_lmhead(const etx_ctx* c) {
-  float* red = LLM_RED(c); float* xs = LLM_VEC(c); float* lv = xs + P.H;
-  rmsnorm_to(P.xfin, P.final_norm, P.H, xs, red);
+  float* xs = LLM_VEC(c); float* lv = xs + P.H;
+  copy_to(P.xsf, P.H, xs);
   int r1; const int r0 = task_rows(c->coord[0], P.rpt_lm, P.V, &r1);
   const __hip_bfloat16* W = P.tie ? P.embed : P.lm_head;
   gemv_rows(W, P.H, xs, r0, r1, lv + P.rpt_lm, [&](int r, float v) { lv[r - r0] = bfr(v); });
@@ -745,8 +742,7 @@ extern "C" __device__ void llm_s_oproj_pf(const etx_ctx* c) {
 extern "C" __device__ void llm_s_gateup_pf(const etx_ctx* c) {
   const int x = c->coord[0], w = c->coord[1]; const LlmLayer& Ly = P.layer[c->cst[0]];
   int r1; const int r0 = rows_of(P.ni[x], w, P.W, &r1);
-  if (r0 < r1) { const size_t b = (size_t)(P.i0[x] + r0) * P.H, n = (size_t)(r1 - r0) * P.H * 2;
-    pf_touch(Ly.wg + b, n / 2); pf_touch(Ly.wu + b, n / 2); }
+  if (r0 < r1) pf_touch(Ly.wgu + (size_t)2 * (P.i0[x] + r0) * P.H, (size_t)2 * (r1 - r0) * P.H * 2);
 }
 extern "C" __device__ void llm_s_down_pf(const etx_ctx* c) {
   const int x = c->coord[0], w = c->coord[1]; const LlmLayer& Ly = P.layer[c->cst[0]];

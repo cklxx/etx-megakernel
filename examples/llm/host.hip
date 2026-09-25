@@ -68,6 +68,7 @@ int main(int argc, char** argv) {
     else if (a == "--dump" && i + 1 < argc) dump_path = argv[++i];   // per-layer residuals of the last prompt step (sliced graph)
   }
   const Manifest m = read_manifest(dir + "/llm.manifest");
+  if (m.cfg.count("layout") == 0 || (int)m.cfg.at("layout") < 2) die("weights are layout 1: rerun prep.py (interleaved gate/up)");
   std::ifstream gf(dir + "/" + golden_name); if (!gf) die("no " + golden_name);
   const std::vector<int> prompt = read_ints(gf), golden = read_ints(gf);
   std::vector<float> margin; { std::string line; std::getline(gf, line); std::istringstream s(line); std::string h; s >> h; float x; while (s >> x) margin.push_back(x); }
@@ -114,8 +115,8 @@ int main(int argc, char** argv) {
     LlmLayer& y = hp.layer[L];
     y.ln1 = W(p + "ln1"); y.ln2 = W(p + "ln2"); y.wqkv = W(p + "wqkv"); y.bqkv = W(p + "bqkv", false);
     y.qn = W(p + "qn", false); y.kn = W(p + "kn", false); y.wo = W(p + "wo");
-    if (hp.moe) { y.wr = W(p + "wr"); y.eg = W(p + "eg"); y.eu = W(p + "eu"); y.ed = W(p + "ed"); }
-    else { y.wg = W(p + "wg"); y.wu = W(p + "wu"); y.wd = W(p + "wd"); }
+    if (hp.moe) { y.wr = W(p + "wr"); y.egu = W(p + "egu"); y.ed = W(p + "ed"); }
+    else { y.wgu = W(p + "wgu"); y.wd = W(p + "wd"); }
     y.kc = dalloc<__hip_bfloat16>(kv_elems); y.vc = dalloc<__hip_bfloat16>(kv_elems);
   }
   // ---- sliced layout (model_sliced.py): per-XCD tables and the slice blob, when prep.py --sliced ran
@@ -153,6 +154,8 @@ int main(int argc, char** argv) {
   }
   hp.layer_dump = dump_path.empty() ? nullptr : dalloc<float>((size_t)(hp.L + 1) * hp.H); hp.dump_step = (int)prompt.size() - 1;
   hp.ctr_qkv = dalloc<int32_t>((size_t)hp.L * 8); hp.ctr_attn = dalloc<int32_t>((size_t)hp.L * 8); hp.step_seq = 0; hp.unfused = unfused ? 1 : 0;
+  hp.xs1_x = dalloc<float>((size_t)8 * hp.H); hp.xs2_x = dalloc<float>((size_t)8 * hp.H); hp.xsf = dalloc<float>(hp.H);
+  hp.rids_x = dalloc<int32_t>(8 * 16); hp.rw_x = dalloc<float>(8 * 16);
   hp.xa = dalloc<float>(hp.H); hp.xin_x = dalloc<float>((size_t)8 * hp.H); hp.xa_x = dalloc<float>((size_t)8 * hp.H); hp.xfin = dalloc<float>(hp.H); hp.o_part = dalloc<float>((size_t)8 * hp.H); hp.d_part = dalloc<float>((size_t)std::max(8, hp.TOPK) * hp.H);
   hp.rlog_x = dalloc<float>((size_t)8 * std::max(1, hp.E)); hp.eid = dalloc<int32_t>(std::max(8, hp.TOPK));
   const bool sliced_graph = strncmp(ETX_GRAPH_NAME, "llm_sliced_", 11) == 0;

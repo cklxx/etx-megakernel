@@ -104,11 +104,12 @@ def pack(src: Path, out: Path, d: M.Dims):
         m = p + "mlp."
         if d.moe:
             put(f"L{L}.wr", get(m + "gate.weight"))
-            for kind, key in (("eg", "gate_proj"), ("eu", "up_proj"), ("ed", "down_proj")):
-                put(f"L{L}.{kind}", torch.stack([get(f"{m}experts.{e}.{key}.weight") for e in range(d.E)], 0))
+            # layout 2: gate and up rows interleaved per expert ([E][2*MI][H]) so one task streams both in one pass
+            put(f"L{L}.egu", torch.stack([torch.stack([get(f"{m}experts.{e}.gate_proj.weight"), get(f"{m}experts.{e}.up_proj.weight")], 1).reshape(2 * d.MI, d.H)
+                                          for e in range(d.E)], 0))
+            put(f"L{L}.ed", torch.stack([get(f"{m}experts.{e}.down_proj.weight") for e in range(d.E)], 0))
         else:
-            put(f"L{L}.wg", get(m + "gate_proj.weight"))
-            put(f"L{L}.wu", get(m + "up_proj.weight"))
+            put(f"L{L}.wgu", torch.stack([get(m + "gate_proj.weight"), get(m + "up_proj.weight")], 1).reshape(2 * d.INTER, d.H))
             put(f"L{L}.wd", get(m + "down_proj.weight"))
         print(f"  packed layer {L + 1}/{d.L}", end="\r", flush=True)
     wf.close()
@@ -206,7 +207,10 @@ def main():
         (out / gname).write_text("prompt: " + " ".join(map(str, pids)) + "\n" + "gen: " + " ".join(map(str, gids)) + "\n"
                                         + "margin: " + " ".join(f"{m:.4f}" for m in margins) + "\n")
         print("HF greedy:", repr(text))
-    if not (out / "llm.manifest").exists():
+    man = out / "llm.manifest"
+    if man.exists() and "cfg layout 2" not in man.read_text():
+        print("repacking: manifest is layout 1"); man.unlink(); (out / "sliced.manifest").unlink(missing_ok=True)
+    if not man.exists():
         tlines, nbytes = pack(src, out, d)
         # bytes of weights one decode step reads (embedding row excluded; MoE: only the top-k experts)
         attn = (d.NQKV * d.H + d.H * d.NH * d.HD) * 2
@@ -215,7 +219,7 @@ def main():
         cfg_lines = [f"cfg {k} {v}" for k, v in dict(
             H=d.H, NH=d.NH, NKV=d.NKV, HD=d.HD, INTER=d.INTER if not d.moe else 0, L=d.L, V=d.V, E=d.E, TOPK=d.TOPK, MI=d.MI,
             CTX=M.CTX, CHUNK=M.CHUNK, qk_norm=int(d.qk_norm), bias=int(d.bias), moe=int(d.moe), norm_topk=int(d.norm_topk),
-            tie=int(d.tie), eps=d.eps, theta=d.theta, active_bytes=active,
+            tie=int(d.tie), eps=d.eps, theta=d.theta, active_bytes=active, layout=2,
             **{f"rpt_{k}": v for k, v in part.items()}).items()]
         (out / "llm.manifest").write_text("\n".join(cfg_lines + tlines) + "\n")
         print(f"packed {nbytes / 1e9:.2f} GB; active per token {active / 1e9:.2f} GB")
