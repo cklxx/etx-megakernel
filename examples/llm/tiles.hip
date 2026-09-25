@@ -723,7 +723,8 @@ extern "C" __device__ void llm_s_egu(const etx_ctx* c) {
   // (computing the router inside every expert task instead of a router phase was tried: 38 tasks per XCD
   // touching the same 512 KB at once cost ~28 us per layer, the L2 does not merge those misses)
   topk_local(P.rlog_x + (size_t)x * P.E, xs, red);                  // xs is free until the copy below
-  const int* ids = (const int*)(red + 64);
+  const int* ids = (const int*)(red + 64); const float* wts = red + 80;
+  if (w == 0 && threadIdx.x < P.TOPK) { P.rids_x[x * 16 + threadIdx.x] = ids[threadIdx.x]; P.rw_x[x * 16 + threadIdx.x] = wts[threadIdx.x]; }   // for the down tasks
   norm_copy_to(P.xa_x + (size_t)x * P.H, P.ss_x + ((size_t)x * 2 + 1) * P.F, P.F, Ly.ln2, P.H, xs);
   int r1; const int r0 = rows_of(P.MI, w, P.W, &r1);
   for (int s = x; s < P.TOPK; s += P.X) {
@@ -739,9 +740,8 @@ extern "C" __device__ void llm_s_egu(const etx_ctx* c) {
 extern "C" __device__ void llm_s_edn(const etx_ctx* c) {
   const int x = c->coord[0], w = c->coord[1];
   const LlmLayer& Ly = P.layer[c->cst[0]];
-  float* red = LLM_RED(c); float* xs = LLM_VEC(c);
-  topk_local(P.rlog_x + (size_t)x * P.E, xs, red);                  // xs is free until the hexp copy
-  const int* ids = (const int*)(red + 64); const float* wts = red + 80;
+  float* xs = LLM_VEC(c);
+  const int* ids = P.rids_x + x * 16; const float* wts = P.rw_x + x * 16;   // published by gate_up task 0 of this XCD
   int r1; const int r0 = rows_of(P.H, w, P.W, &r1);
   for (int s = x; s < P.TOPK; s += P.X) {
     copy_to(P.hexp + (size_t)s * P.MI, P.MI, xs);
