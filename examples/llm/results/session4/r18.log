@@ -1,0 +1,13 @@
+
+=== 14:02:38 build v12 (final: single-batch gemv, LDS-typed, 256 threads) qwen3-30b-a3b
+Function Name: etx_megakernel_d0	VGPRs: 256	ScratchSize [bytes/lane]: 112	VGPRs Spill: 0
+Function Name: etx_unfused_d0	VGPRs: 248	ScratchSize [bytes/lane]: 112	VGPRs Spill: 0
+run 1: 32/32 generated tokens match HF greedy RESULT model=/home/hotaisle/llm/qwen3-30b-a3b matched=32 gen=32 median_ms=7.998 active_GB=6.083  [qwen3-30b-a3b v12 t256 fused]
+run 1: 32/32 generated tokens match HF greedy RESULT model=/home/hotaisle/llm/qwen3-30b-a3b matched=32 gen=32 median_ms=7.769 active_GB=6.083  [qwen3-30b-a3b v12 t256 unfused]
+run 1: 32/32 generated tokens match HF greedy RESULT model=/home/hotaisle/llm/qwen3-30b-a3b matched=32 gen=32 median_ms=7.965 active_GB=6.083  [qwen3-30b-a3b v12 t256 fused]
+run 0: 32/32 generated tokens match HF greedy (teacher-forced argmax);run 1: 32/32 generated tokens match HF greedy (teacher-forced argmax);run 2: 32/32 generated tokens match HF greedy (teacher-forced argmax);
+
+=== 14:05:55 build v12 (final: single-batch gemv, LDS-typed, 512 threads) qwen3-8b
+Function Name: etx_megakernel_d0	VGPRs: 256	ScratchSize [bytes/lane]: 104	VGPRs Spill: 0
+Function Name: etx_unfused_d0	VGPRs: 248	ScratchSize [bytes/lane]: 104	VGPRs Spill: 0
+run 1: 32/32 generated tokens match HF greedy RESULT model=/home/hotaisle/llm/qwen3-8b matched=32 gen=32 median_ms=8.504 active_GB=15.136  [qwen3-8b v12 t512 fused]
