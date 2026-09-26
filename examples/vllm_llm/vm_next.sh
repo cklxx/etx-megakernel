@@ -58,4 +58,14 @@ mkdir -p examples/vllm_llm/results; chmod 777 examples/vllm_llm/results ~/vlnext
 for n in qwen2.5-1.5b qwen3-8b; do
   $DOCKER $IMG bash -c "rocprofv3 --kernel-trace --output-format csv -d $HOME/vlnext/prof_$n -- python3 examples/vllm_llm/vllm_profile.py run --model ~/llm/$n/hf --golden ~/llm/$n/golden_c1024.txt --custom-ops all > $HOME/vlnext/profrun_$n.log 2>&1; tail -3 $HOME/vlnext/profrun_$n.log; python3 examples/vllm_llm/vllm_profile.py analyze $HOME/vlnext/prof_$n --json examples/vllm_llm/results/prof_all_$n.json" 2>&1 | grep -vE "^\s*$|simple_timer" | head -34
 done
+log "MoE capture: vLLM's Triton cache (fused_moe_kernel IR + metadata) and kernel trace for Qwen3-30B-A3B"
+. ~/llmenv/bin/activate
+HF_HUB_ENABLE_HF_TRANSFER=1 python3 -c "
+from huggingface_hub import snapshot_download
+snapshot_download('Qwen/Qwen3-30B-A3B', local_dir='$HOME/llm/qwen3-30b-a3b/hf', allow_patterns=['*.json','*.safetensors','tokenizer*','*.txt','*.model'], max_workers=16)
+print('DL-DONE')" > /tmp/dl_moe.log 2>&1; tail -1 /tmp/dl_moe.log
+cp examples/llm/results/golden_c1024_qwen3-30b-a3b.txt ~/llm/qwen3-30b-a3b/golden_c1024.txt
+mkdir -p ~/vlnext/moe && chmod 777 ~/vlnext/moe
+$DOCKER -e TRITON_CACHE_DIR=$HOME/vlnext/moe/triton $IMG bash -c "rocprofv3 --kernel-trace --output-format csv -d $HOME/vlnext/moe/prof -- python3 examples/vllm_llm/vllm_profile.py run --model ~/llm/qwen3-30b-a3b/hf --golden ~/llm/qwen3-30b-a3b/golden_c1024.txt > $HOME/vlnext/moe/profrun.log 2>&1; tail -2 $HOME/vlnext/moe/profrun.log; python3 examples/vllm_llm/vllm_profile.py analyze $HOME/vlnext/moe/prof --json examples/vllm_llm/results/prof_none_qwen3-30b-a3b.json" 2>&1 | grep -vE "^\s*$|simple_timer" | head -34
+sudo chown -R $USER ~/vlnext; find ~/vlnext/moe/triton -name "fused_moe_kernel*" | head; (cd ~ && tar czf vlnext_moe.tgz vlnext/moe/triton vlnext/moe/profrun.log 2>/dev/null); ls -la ~/vlnext_moe.tgz
 log "ALL DONE"
