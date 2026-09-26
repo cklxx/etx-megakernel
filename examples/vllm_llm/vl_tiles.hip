@@ -10,7 +10,7 @@
 #include "etx/abi.h"
 
 struct VlParams {
-  int32_t tok, pos, write_next, H, V, pad;
+  int32_t tok, pos, write_next, H, V, nrep;   // nrep: copies of the residual (one per XCD with ETX_VL_XCD, else 1)
   const __hip_bfloat16* embed;         // [V][H]
   __hip_bfloat16* resid;               // [H] embedding row -> residual stream
   int64_t* positions;                  // [1]
@@ -34,7 +34,8 @@ extern "C" __device__ __attribute__((always_inline)) void vl_prologue(const etx_
   const int id = VP.token_in[t];
   const uint4* src = (const uint4*)(VP.embed + (size_t)id * VP.H);
   uint4* dst = (uint4*)VP.resid;
-  for (int i = threadIdx.x; i < VP.H / 8; i += blockDim.x) dst[i] = src[i];
+  const int n8 = VP.H / 8;
+  for (int i = threadIdx.x; i < n8 * VP.nrep; i += blockDim.x) dst[i] = src[i % n8];
 }
 
 extern "C" __device__ __attribute__((always_inline)) void vl_argmax(const etx_ctx* c) {

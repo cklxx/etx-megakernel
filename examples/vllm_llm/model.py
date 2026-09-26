@@ -48,6 +48,14 @@ PIN_ROLES = {"q_norm", "k_norm", "rope", "cache", "attn", "reduce"} if os.enviro
 CHAIN_ROLES = ("q_norm", "k_norm", "rope", "cache")
 CHAIN = os.environ.get("ETX_VL_CHAIN", "0") == "1"
 CHAIN_FILE = os.environ.get("ETX_VL_CHAINS", str(HERE / "build" / "chain_tiles.hip"))
+# ETX_VL_XCD=1: the one-block launches between the GEMVs (in/post/final norm, silu_and_mul) run once per XCD on
+# that XCD's own copies (residual, normed input, activation), and the GEMV that follows is a grid of
+# (8 XCDs x 38) tasks each reading its XCD's copy: a device-wide handoff with 304 waiters becomes one with 8
+# waiters plus an XCD-local one. The kernels are unchanged; only argument blocks and buffers are per XCD.
+XCD = os.environ.get("ETX_VL_XCD", "0") == "1"
+NX, WPX = 8, 38
+REP_ROLES = {"in_norm", "post_norm", "act", "final_norm"}
+XGEMV_AFTER = {"qkv": "in_norm", "gate_up": "post_norm", "down": "act", "lm_head": "final_norm"}
 
 
 def imports() -> dict:
@@ -107,13 +115,23 @@ def instances(d) -> list[dict]:
 
 
 def plan_offsets(insts: list[dict], imp: dict) -> int:
+    """Byte offsets of every argument block; replicated launches (ETX_VL_XCD) get one block per XCD at `stride`,
+    and copies (src, dst, bytes: 32 B per XCD) when the kernel works in place on its XCD's copy."""
     off = 0
-    for i in insts:
+    for n, i in enumerate(insts):
         info = imp[i["export"]]
+        i["tasks"] = math.ceil(i["grid"][0] * i["grid"][1] * i["grid"][2] / info["slots"])
+        stride = (info["arg_bytes"] + 15) // 16 * 16
+        i["rep"] = NX if XCD and (i["role"] in REP_ROLES or
+                                   (i["role"] in XGEMV_AFTER and n > 0 and insts[n - 1]["role"] == XGEMV_AFTER[i["role"]])) else 1
+        i["stride"] = stride
         off = (off + 15) // 16 * 16
         i["offset"] = off
-        i["tasks"] = math.ceil(i["grid"][0] * i["grid"][1] * i["grid"][2] / info["slots"])
-        off += info["arg_bytes"]
+        off += stride * i["rep"]
+        i["copyoff"] = -1
+        if i["rep"] > 1 and i["role"] in REP_ROLES and not (i["role"] == "in_norm" and i["layer"] == 0) and i["role"] != "act":
+            i["copyoff"] = off
+            off += 32 * NX
     return (off + 15) // 16 * 16
 
 
@@ -153,7 +171,23 @@ def build() -> Graph:
     chains = {}
     for n, grp in enumerate(groups):
         ev = f"E_{n}"
-        if len(grp) == 1:
+        if len(grp) == 1 and grp[0]["rep"] > 1 and grp[0]["role"] in REP_ROLES:
+            i = grp[0]
+            g.etensor(ev, (NX,), wait_count=1)
+            name = f"{i['role']}_{i['layer']}_x" if i["layer"] >= 0 else f"{i['role']}_x"
+            g.call_device(name, (NX,), hip_link(adapters, f"etx_tile_rep_{i['export']}"), resource=res, args=["impargs"],
+                          consts=(i["offset"], i["stride"], i["copyoff"]), in_edges={prev: "x->(0)"}, out_edges={ev: "x->x"},
+                          domain_map="x->x", duration_us=3.0)
+        elif len(grp) == 1 and grp[0]["rep"] > 1:
+            i = grp[0]
+            if i["tasks"] != NX * WPX:
+                raise SystemExit(f"{i['export']}: {i['tasks']} tasks, the per-XCD GEMV needs {NX * WPX}")
+            g.etensor(ev, (1,), wait_count=i["tasks"])
+            name = f"{i['role']}_{i['layer']}" if i["layer"] >= 0 else i["role"]
+            g.call_device(name, (NX, WPX), hip_link(adapters, f"etx_tile_x_{i['export']}"), resource=res, args=["impargs"],
+                          consts=(i["offset"], i["stride"], WPX), in_edges={prev: "xw->x"}, out_edges={ev: "xw->(0)"},
+                          domain_map="xw->x", duration_us=max(2.0, i["M"] * i["K"] * 2 / 4.0e12 * 1e6))
+        elif len(grp) == 1:
             i = grp[0]
             g.etensor(ev, (1,), wait_count=i["tasks"])
             name = f"{i['role']}_{i['layer']}" if i["layer"] >= 0 else i["role"]
@@ -186,12 +220,12 @@ def build() -> Graph:
     plan = os.environ.get("ETX_VL_PLAN")
     if plan:
         with open(plan, "w") as f:
-            f.write(f"# vl plan {d.name}: instance export layer role gx gy gz offset tasks M K wvprgrp; total {total} bytes\n")
+            f.write(f"# vl plan {d.name}: instance export layer role gx gy gz offset tasks M K wvprgrp rep stride copyoff; total {total} bytes\n")
             f.write(f"total {total} parts {math.ceil(MAXLEN / PART)} maxlen {MAXLEN}\n")
             for n, i in enumerate(insts):
                 gx, gy, gz = i["grid"]
                 f.write(f"{n} {i['export']} {i['layer']} {i['role']} {gx} {gy} {gz} {i['offset']} {i['tasks']} "
-                        f"{i.get('M', 0)} {i.get('K', 0)} {i.get('wvprgrp', 0)}\n")
+                        f"{i.get('M', 0)} {i.get('K', 0)} {i.get('wvprgrp', 0)} {i['rep']} {i['stride']} {i['copyoff']}\n")
     return g
 
 

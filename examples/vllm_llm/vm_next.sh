@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # One session, both models: per-kernel timing against vLLM's originals (--check), the synchronisation
-# variants (chained launches, one block per workgroup, both), and vLLM's kernel trace. Full logs kept in
+# variants (chained launches, one block per workgroup, per-XCD replicas of the one-block launches), and
+# vLLM's kernel trace. Full logs kept in
 # ~/vlnext/ (nothing filtered away). Repo at ~/etx, vLLM sources at ~/vllm, torch headers at ~/rocm-headers.
 #   nohup bash ~/etx/examples/vllm_llm/vm_next.sh > ~/next.log 2>&1 &
 set -uo pipefail
@@ -34,15 +35,17 @@ for n in qwen2.5-1.5b qwen3-8b; do
   env $V ETX_VL_CHAIN=1 ETX_OUT=build/vl/${n}_chain bash examples/vllm_llm/build.sh ~/llm/$n > ~/vlnext/build_${n}_chain.log 2>&1 &
   env $V ETX_VL_SLOTS=$SLOTS1 ETX_OUT=build/vl/${n}_s1 bash examples/vllm_llm/build.sh ~/llm/$n > ~/vlnext/build_${n}_s1.log 2>&1 &
   env $V ETX_VL_CHAIN=1 ETX_VL_SLOTS=$SLOTS1 ETX_OUT=build/vl/${n}_chain_s1 bash examples/vllm_llm/build.sh ~/llm/$n > ~/vlnext/build_${n}_chain_s1.log 2>&1 &
+  env $V ETX_VL_XCD=1 ETX_VL_CHAIN=1 ETX_OUT=build/vl/${n}_xcd bash examples/vllm_llm/build.sh ~/llm/$n > ~/vlnext/build_${n}_xcd.log 2>&1 &
+  env $V ETX_VL_XCD=1 ETX_VL_CHAIN=1 ETX_VL_SLOTS=$SLOTS1 ETX_OUT=build/vl/${n}_xcd_s1 bash examples/vllm_llm/build.sh ~/llm/$n > ~/vlnext/build_${n}_xcd_s1.log 2>&1 &
   wait
-  for v in "" _chain _s1 _chain_s1; do grep -E "Function Name|built|error|failed" ~/vlnext/build_${n}$v.log | head -3 | sed "s/^/[$n$v] /"; done
+  for v in "" _chain _s1 _chain_s1 _xcd _xcd_s1; do grep -E "Function Name|built|error|failed" ~/vlnext/build_${n}$v.log | head -3 | sed "s/^/[$n$v] /"; done
 done
 for n in qwen2.5-1.5b qwen3-8b; do
   log "per-kernel check and timing $n"
   B=build/vl/$n
   timeout 900 stdbuf -oL $B/run ~/llm/$n $B/vl_plan.txt --check 2 > ~/vlnext/check_$n.log 2>&1; echo "rc=$?"
   grep -E "HANG|DIFFERS|CHECK|original .* imported|ETX\)" ~/vlnext/check_$n.log | tail -16
-  for v in "" _chain _s1 _chain_s1; do for mode in fused unfused; do
+  for v in _xcd _xcd_s1 "" _chain _s1 _chain_s1; do for mode in fused unfused; do
     [ "$mode" = unfused ] && [ "$v" != "" ] && [ "$v" != "_s1" ] && continue
     R=build/vl/$n$v; f=$([ $mode = unfused ] && echo --unfused)
     timeout 900 stdbuf -oL $R/run ~/llm/$n $R/vl_plan.txt --repeat 2 $f > ~/vlnext/run_${n}${v}_$mode.log 2>&1; rc=$?

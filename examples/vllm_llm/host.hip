@@ -68,7 +68,7 @@ static std::vector<int> read_ints(std::istream& in) {
   std::vector<int> v; int x; while (s >> x) v.push_back(x); return v;
 }
 
-struct Inst { int n; std::string exp; int layer; std::string role; int gx, gy, gz; size_t off; int tasks; int M, K, wv; };
+struct Inst { int n; std::string exp; int layer; std::string role; int gx, gy, gz; size_t off; int tasks; int M, K, wv; int rep = 1; size_t stride = 0; long long copyoff = -1; };
 
 // fills one argument block in declaration order, checking every value's type against the import's layout
 struct Args {
@@ -116,7 +116,9 @@ int main(int argc, char** argv) {
       if (line.empty() || line[0] == '#') continue;
       std::istringstream s(line);
       if (line.rfind("total", 0) == 0) { std::string k; int ml; s >> k >> total >> k >> parts >> k >> ml; if (ml != MAXLEN) die("plan maxlen differs from the packed model's"); continue; }
-      Inst x; s >> x.n >> x.exp >> x.layer >> x.role >> x.gx >> x.gy >> x.gz >> x.off >> x.tasks >> x.M >> x.K >> x.wv; insts.push_back(x);
+      Inst x; s >> x.n >> x.exp >> x.layer >> x.role >> x.gx >> x.gy >> x.gz >> x.off >> x.tasks >> x.M >> x.K >> x.wv;
+      if (!(s >> x.rep >> x.stride >> x.copyoff)) { x.rep = 1; x.stride = 0; x.copyoff = -1; }
+      insts.push_back(x);
     }
   }
 
@@ -141,7 +143,11 @@ int main(int argc, char** argv) {
 
   // ---- activations and caches (bf16 unless noted), shaped as vLLM's tensors for one token
   typedef uint16_t bf;
-  bf *resid = dalloc<bf>(H), *hn = dalloc<bf>(H), *qkv = dalloc<bf>(NQKV), *qn = dalloc<bf>(NH * HD), *kn = dalloc<bf>(NKV * HD);
+  // ETX_VL_XCD plans replicate the one-block launches per XCD: residual, normed input, o and activation then
+  // have one copy per XCD (NR = 8); everything else is shared
+  int NR = 1; for (const Inst& x : insts) NR = std::max(NR, x.rep);
+  bf *resid = dalloc<bf>((size_t)NR * H), *hn = dalloc<bf>((size_t)NR * H), *qkv = dalloc<bf>(NQKV), *qn = dalloc<bf>(NH * HD), *kn = dalloc<bf>(NKV * HD);
+  bf *dx = dalloc<bf>((size_t)NR * H), *ox = dalloc<bf>((size_t)NR * H), *actx = dalloc<bf>((size_t)NR * I);
   bf *attn_out = dalloc<bf>(NH * HD), *o = dalloc<bf>(H), *gu = dalloc<bf>(2 * I), *act = dalloc<bf>(I), *dn = dalloc<bf>(H), *logits = dalloc<bf>(V);
   float *exp_sums = dalloc<float>(NH * parts), *max_logits = dalloc<float>(NH * parts); bf* tmp_out = dalloc<bf>((size_t)NH * parts * HD);
   int64_t *positions = dalloc<int64_t>(1), *slot_mapping = dalloc<int64_t>(1); int32_t* seq_lens = dalloc<int32_t>(1);
@@ -155,18 +161,29 @@ int main(int argc, char** argv) {
 
   // ---- argument blocks, instance by instance (see model.py for the vLLM call each role mirrors)
   std::vector<uint8_t> ab(total, 0);
-  for (const Inst& x : insts) {
-    Args a(x.exp.c_str(), ab.data() + x.off);
+  for (const Inst& x : insts) for (int rr = 0; rr < x.rep; ++rr) {
+    Args a(x.exp.c_str(), ab.data() + x.off + rr * x.stride);
     const std::string r = x.role; const std::string pl = "L" + std::to_string(x.layer) + ".";
-    bf* qkv_in = x.layer == 0 ? hn : dn;                                  // the normed hidden state entering qkv
+    const bool per_xcd = NR > 1;                                          // replicas read / write their XCD's copies
+    bf* res_r = resid + (size_t)rr * H;
+    bf* hn_r = hn + (size_t)rr * H; bf* dx_r = dx + (size_t)rr * H; bf* ox_r = ox + (size_t)rr * H; bf* act_r = actx + (size_t)rr * I;
+    bf* d_norm = per_xcd ? dx_r : dn;                                     // down output after the in / final norm
+    bf* o_norm = per_xcd ? ox_r : o;                                      // o_proj output after the post norm
+    bf* act_out = per_xcd ? act_r : act;
+    bf* qkv_in = x.layer == 0 ? hn_r : d_norm;                            // the normed hidden state entering qkv
     bf* qbuf = qk_norm ? qn : qkv; bf* kbuf = qk_norm ? kn : qkv + NH * HD;
     const long long qstr = qk_norm ? NH * HD : NQKV, kstr = qk_norm ? NKV * HD : NQKV;
     auto gemv = [&](const void* w, const void* in, void* out, const void* b) {   // ops.wvSplitK(weight, x, cu_count, bias)
       a.i32(x.K).i32(x.K).i32(x.K).i32(x.M).i32(b ? x.M : 1).i32(1).ptr(w).ptr(in).ptr(b).ptr(out).i32(x.wv).i32(304);
     };
-    auto fused_add = [&](bf* in, const void* w) { a.ptr(in).i64(H).ptr(resid).ptr(w).f32(eps).i32(1).i32(H).i64(H); };
-    if (r == "in_norm" && x.layer == 0) a.ptr(hn).ptr(resid).i64(H).i64(0).i64(0).i64(0).i64(0).ptr(W(pl + "ln1")).i64(0).f32(eps).i32(1).i32(H);
-    else if (r == "in_norm") fused_add(dn, W(pl + "ln1"));
+    auto copy = [&](const void* src, void* dst, size_t bytes) {         // the replica's copy before an in-place kernel
+      if (x.copyoff < 0) return;
+      const unsigned long long c3[4] = {(unsigned long long)src, (unsigned long long)dst, bytes, 0};
+      memcpy(ab.data() + x.copyoff + rr * 32, c3, 32);
+    };
+    auto fused_add = [&](bf* in, const void* w) { a.ptr(in).i64(H).ptr(res_r).ptr(w).f32(eps).i32(1).i32(H).i64(H); };
+    if (r == "in_norm" && x.layer == 0) a.ptr(hn_r).ptr(res_r).i64(H).i64(0).i64(0).i64(0).i64(0).ptr(W(pl + "ln1")).i64(0).f32(eps).i32(1).i32(H);
+    else if (r == "in_norm") { copy(dn, d_norm, H * 2); fused_add(d_norm, W(pl + "ln1")); }
     else if (r == "qkv") gemv(W(pl + "wqkv"), qkv_in, qkv, bias ? W(pl + "bqkv") : nullptr);
     else if (r == "q_norm") a.ptr(qn).ptr(qkv).i64(HD).i64(NQKV).i64(0).i64(NH).i64(0).ptr(W(pl + "qn")).i64(0).f32(eps).i32(NH).i32(HD);
     else if (r == "k_norm") a.ptr(kn).ptr(qkv + NH * HD).i64(HD).i64(NQKV).i64(0).i64(NKV).i64(0).ptr(W(pl + "kn")).i64(0).f32(eps).i32(NKV).i32(HD);
@@ -176,12 +193,12 @@ int main(int argc, char** argv) {
                             .i32((int)qstr).i32(NKV * HD * BS).i32(HD * BS).ptr(exp_sums).ptr(max_logits).ptr(tmp_out).ptr(attn_out).i32(MAXBLK).ptr(kv_scale).ptr(kv_scale);
     else if (r == "reduce") a.ptr(attn_out).ptr(exp_sums).ptr(max_logits).ptr(tmp_out).ptr(seq_lens).ptr(nullptr).i32(parts).ptr(nullptr);
     else if (r == "o_proj") gemv(W(pl + "wo"), attn_out, o, nullptr);
-    else if (r == "post_norm") fused_add(o, W(pl + "ln2"));
-    else if (r == "gate_up") gemv(W(pl + "wgu"), o, gu, nullptr);
-    else if (r == "act") a.ptr(act).ptr(gu).i32(I).f32(0.0f).f32(1.0f).f32(0.0f);
-    else if (r == "down") gemv(W(pl + "wd"), act, dn, nullptr);
-    else if (r == "final_norm") fused_add(dn, W("final_norm"));
-    else if (r == "lm_head") gemv(tie ? W("embed") : W("lm_head"), dn, logits, nullptr);
+    else if (r == "post_norm") { copy(o, o_norm, H * 2); fused_add(o_norm, W(pl + "ln2")); }
+    else if (r == "gate_up") gemv(W(pl + "wgu"), o_norm, gu, nullptr);
+    else if (r == "act") a.ptr(act_out).ptr(gu).i32(I).f32(0.0f).f32(1.0f).f32(0.0f);
+    else if (r == "down") gemv(W(pl + "wd"), act_out, dn, nullptr);
+    else if (r == "final_norm") { copy(dn, d_norm, H * 2); fused_add(d_norm, W("final_norm")); }
+    else if (r == "lm_head") gemv(tie ? W("embed") : W("lm_head"), d_norm, logits, nullptr);
     else die("unknown role " + r);
     a.grid(x.gx, x.gy, x.gz);
   }
@@ -201,9 +218,10 @@ int main(int argc, char** argv) {
   if (vl_params_bytes() != (int)sizeof(VlParams)) die("VlParams layout differs between host and device");
   if (!hst.check_residency()) die("the persistent grid does not fit");
 
-  VlParams vp{}; vp.H = H; vp.V = V; vp.embed = W("embed"); vp.resid = resid; vp.positions = positions; vp.seq_lens = seq_lens;
+  VlParams vp{}; vp.H = H; vp.V = V; vp.pad = NR; vp.embed = W("embed"); vp.resid = resid; vp.positions = positions; vp.seq_lens = seq_lens;
   vp.slot_mapping = slot_mapping; vp.logits = logits; vp.token_in = token_in; vp.token_out = token_out; vp.token_time = token_time;
 
+  if (check_layers > 0 && NR > 1) die("--check needs a plan without per-XCD replicas (build without ETX_VL_XCD)");
   if (check_layers > 0) {
 #ifndef ETX_VL_CHECK
     die("--check needs a build with ETX_VL_CHECK=1 (the original kernels linked in)");
