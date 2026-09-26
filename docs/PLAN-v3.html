@@ -1,0 +1,265 @@
+<!doctype html><html><head><meta charset='utf-8'><title>ETX 方案 v3：用同样的 SOTA kernel，融合后更快</title><style>
+@page { size: A4; margin: 18mm 16mm 18mm 16mm; }
+body { font-family: "DejaVu Sans", "Helvetica Neue", Arial, sans-serif; font-size: 10.5pt; line-height: 1.45; color: #111; max-width: 178mm; margin: 0 auto; }
+h1 { font-size: 20pt; margin: 0 0 6pt; line-height: 1.25; }
+h2 { font-size: 14.5pt; margin: 22pt 0 6pt; padding-bottom: 3pt; border-bottom: 1px solid #999; page-break-after: avoid; }
+h3 { font-size: 12pt; margin: 14pt 0 4pt; page-break-after: avoid; }
+h4 { font-size: 10.5pt; margin: 10pt 0 3pt; }
+p { margin: 5pt 0; text-align: left; }
+ul, ol { margin: 4pt 0 6pt; padding-left: 18pt; }
+li { margin: 2pt 0; }
+table { border-collapse: collapse; width: 100%; margin: 6pt 0 10pt; font-size: 9pt; page-break-inside: auto; }
+th, td { border: 1px solid #999; padding: 3pt 5pt; vertical-align: top; text-align: left; }
+th { background: #eee; font-weight: bold; }
+tr { page-break-inside: avoid; }
+code { font-family: "DejaVu Sans Mono", Menlo, Consolas, monospace; font-size: 8.8pt; }
+pre { background: #f4f4f4; border: 1px solid #ccc; padding: 6pt 8pt; font-size: 8.5pt; line-height: 1.35; white-space: pre-wrap; word-break: break-word; page-break-inside: avoid; }
+hr { border: none; border-top: 1px solid #999; margin: 12pt 0; }
+blockquote { margin: 6pt 0; padding-left: 10pt; border-left: 3px solid #bbb; color: #333; }
+.meta { color: #333; margin-bottom: 10pt; }
+a { color: #0645ad; text-decoration: none; }
+</style></head><body><h1 id="etx-v3-sota-kernel">ETX 方案 v3：用同样的 SOTA kernel，融合后更快</h1>
+<p>作者：Kailun Chen · 状态：v3，取代 <code>PLAN-moe.md</code> 和 <code>PLAN-fusion-win.md</code> · 日期：2026-09-26 · 依据：设计文档 15.9–15.10 节，<code>docs/RESEARCH-sync-hardware.md</code>，<code>docs/RESEARCH-moe-import.md</code></p>
+<h2 id="0">0. 结论先行</h2>
+<ul>
+<li><strong>要证明的一件事：</strong> 把生产环境真正在用的 kernel（vLLM 的）原封不动放进 ETX 的一个持久化 megakernel，比同样这些 kernel 一个个 launch 更快。这样比较的只有&rdquo;融合&rdquo;本身，tile 写得好不好不参与比较。</li>
+<li><strong>已经做到的：</strong> ETX 能原样导入 vLLM 的 kernel，GPU 上逐字节一致，完整模型 32/32 token 与 Hugging Face 一致。</li>
+<li><strong>还没做到的：</strong> 融合版比同样的 kernel 逐个 launch 慢 7–16%。原因已经定位：ETX 的整卡同步比 kernel 边界贵。</li>
+<li><strong>修法：</strong> 同步做三层处理。</li>
+<li><strong>少做：</strong> 小 kernel 在每个 XCD 上各算一份，连续的小 kernel 合成一个任务。已写好。</li>
+<li><strong>做得便宜：</strong> 跨 XCD 传递的小数据放进不经过 L2 的内存，每次同步不再需要写回和作废整个 L2。只动内存分配，不改 kernel。</li>
+<li><strong>等得快：</strong> 每个 XCD 只留一个轮询者，调整休眠和优先级。</li>
+<li><strong>之后：</strong> 在 MoE 模型上重复同样的比较，这是融合收益最大的场景；再扩展到小 batch 和多 GPU。</li>
+<li><strong>资源：</strong> 单卡 MI300X 约 15 小时加 8 卡节点约 8 小时，前提是 GPU 随时可用，大约一周做完。当前余额 $1.78。</li>
+</ul>
+<h2 id="1">1. 目标与验收标准</h2>
+<table>
+<thead>
+<tr>
+<th>层级</th>
+<th>标准</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>正确性（每一步都要满足）</td>
+<td>每个导入的 launch 与 vLLM 原版逐字节一致（<code>--check</code>）；完整模型 32/32 token 与 HF greedy 一致</td>
+</tr>
+<tr>
+<td>核心目标</td>
+<td>同样的 kernel，ETX 融合版比 ETX 逐个 launch 快 <strong>至少 10%</strong>，并且快于 vLLM <code>custom_ops=all</code>（vLLM 用同一组 kernel）</td>
+</tr>
+<tr>
+<td>延伸目标</td>
+<td>快于 vLLM 默认配置（Inductor 生成的 norm/激活 kernel）；MoE 模型上快于 vLLM 最好成绩</td>
+</tr>
+</tbody>
+</table>
+<h2 id="2">2. 已有成果</h2>
+<p><strong>导入工具 <code>etx/importer/</code>：</strong></p>
+<ul>
+<li>从 vLLM 源码里切掉 torch 的 host 代码，编成 AMDGPU IR。</li>
+<li>把 <code>amdgpu_kernel</code> 改写成可内联的设备函数：参数从参数块读，block/线程 id 从 ETX 任务坐标换算，LDS 并进共用区。</li>
+<li>一个 workgroup 里可以并排跑多个原版 block（slot），各有自己的屏障。</li>
+<li>自动生成 ETX tile 和 host 端的参数布局，再和设备库打成一个 bundle。</li>
+</ul>
+<p><strong>已接入 12 个 vLLM kernel：</strong> <code>wvSplitK</code>、<code>paged_attention_rocm</code>（mfma4/mfma16 两种加 reduce）、<code>rms_norm</code>、<code>fused_add_rms_norm</code>、<code>rotary_embedding</code>、<code>reshape_and_cache</code>、<code>silu_and_mul</code>。模板实例和 launch 形状都按 vLLM host 端的选择逻辑推出。</p>
+<p><strong>实测</strong>（MI300X，batch 1，1024 上下文，ms/token）：</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Qwen2.5-1.5B</th>
+<th>Qwen3-8B</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>vLLM 默认</td>
+<td>1.862</td>
+<td>4.906</td>
+</tr>
+<tr>
+<td>vLLM <code>custom_ops=all</code>（同一组 kernel）</td>
+<td>1.937</td>
+<td>5.039</td>
+</tr>
+<tr>
+<td>ETX 逐个 launch（同一份导入代码，HIP graph）</td>
+<td>2.24–2.25</td>
+<td>5.74</td>
+</tr>
+<tr>
+<td>ETX 融合</td>
+<td>2.61–2.62</td>
+<td>6.16（2 个 token 的短测）*</td>
+</tr>
+<tr>
+<td>ETX 融合，小 kernel 固定到单个 XCD</td>
+<td>2.58</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<p>* 8B 融合版完整 32 token 那次运行失败，没有输出，原因未查清（见第 6 节）。其余各行都是 32/32 token 正确；8B 的短测 2/2 正确。</p>
+<h2 id="3">3. 诊断：两个差距</h2>
+<p><strong>差距 A：融合比逐个 launch 慢 0.4 ms（8B）。</strong></p>
+<ul>
+<li>每个 token 要过 310–472 个整卡事件，每个比一次 kernel 边界多花约 1.2 µs。</li>
+<li>根本原因在硬件：MI300X 的 8 个 XCD 各有一块 4 MB 的 L2，彼此不保持一致。ETX 的每个整卡事件都要生产者写回本 XCD 的 L2（<code>buffer_wbl2 sc1</code>），每个等待的 workgroup 再作废自己 L2 的非本地行（<code>buffer_inv sc1</code>）。kernel 边界每次 dispatch 只做一次，ETX 却是每个等待者都做一次。</li>
+</ul>
+<p><strong>差距 B：ETX 逐个 launch 比 vLLM 用同一组 kernel 慢 0.3–0.7 ms。</strong> 嫌疑按可能性排：</p>
+<ol>
+<li>ETX 自写的 argmax 旧写法：每个线程约 150 次相互依赖的加载。已改成向量化。</li>
+<li>小 kernel 被塞进同一个 1024 线程的 workgroup：attention 的 40 个 block 只占 10 个 CU，vLLM 是 40 个。已加 slot 数配置。</li>
+<li>导入后编译器按常量 blockDim 重新优化，生成的代码和 vLLM 的二进制不同。<code>--check</code> 已经能逐 kernel 计时对比。</li>
+</ol>
+<h2 id="4">4. 技术方案</h2>
+<h3 id="41">4.1 同步：少做、做得便宜、等得快</h3>
+<table>
+<thead>
+<tr>
+<th>手段</th>
+<th>内容</th>
+<th>状态</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>按 XCD 复制</strong>（<code>ETX_VL_XCD</code>）</td>
+<td>norm 和 SiLU 在 8 个 XCD 上各算一份（结果完全相同），写 XCD 本地的缓冲区；紧跟的 GEMV 排成 8×38 个任务，只等本 XCD 的事件。8B 的整卡事件从 472 个降到 254 个</td>
+<td>已写好，本地编译零溢出，待测</td>
+</tr>
+<tr>
+<td><strong>合并小 kernel</strong>（<code>ETX_VL_CHAIN</code>）</td>
+<td>q/k norm → RoPE → 写 cache 在一个任务里顺序执行，中间只隔 <code>__syncthreads</code>，每层少 3 个事件</td>
+<td>已写好，待测</td>
+</tr>
+<tr>
+<td><strong>uncached 通信内存</strong></td>
+<td>跨 XCD 传递的激活向量（每层几 KB）和事件计数器放进 uncached 内存（<code>hipDeviceMallocUncached</code>，MTYPE UC，不经过 L2）。release 只剩 <code>s_waitcnt vmcnt(0)</code>，acquire 只剩作废 L1（<code>buffer_inv sc0</code>）。权重运行中从不写，照常缓存。内存类型是页属性，<strong>kernel 不改</strong></td>
+<td>待实现：一个内存分配开关，加上机器模型里一行&rdquo;一致内存的 DEVICE 作用域&rdquo;lowering</td>
+</tr>
+<tr>
+<td><strong>每 XCD 一个轮询者</strong>（relay，P5）</td>
+<td>304 个轮询者降到 8 个。之前测出分层 acquire 不安全，是因为 L2 里可能留着陈旧的行；数据放进 uncached 内存后就没有陈旧行了</td>
+<td>代码已有，要和上一项一起测</td>
+</tr>
+<tr>
+<td><strong>等待方式</strong></td>
+<td><code>s_sleep</code> 先短后长（目前固定 8，约 0.2 µs）；<code>s_setprio</code> 降低轮询 wave 的优先级；<code>s_wakeup</code> 提前叫醒同一 workgroup 里在睡的 wave</td>
+<td>待调</td>
+</tr>
+<tr>
+<td><strong>硬件全局屏障 GWS</strong></td>
+<td>指令集里有：64 个资源，硬件排队，不用轮询。但 ROCm 在 gfx942 上自己也不用它，而且需要驱动给队列分配资源</td>
+<td>只做一次微基准</td>
+</tr>
+</tbody>
+</table>
+<h3 id="42-vllm-launch">4.2 追平 vLLM 的逐个 launch</h3>
+<p>用 <code>--check</code> 测出逐 kernel 的时间对比，确认差距 B 的构成，再用上面第 3 节的三项改动（argmax 向量化、slot 数配置、代码对比）逐项消除。</p>
+<h3 id="43-moeqwen3-30b-a3b">4.3 MoE（Qwen3-30B-A3B）</h3>
+<p>batch 1 时，每个 MoE 层 vLLM 只跑 6 个 kernel：</p>
+<ul>
+<li>router（<code>wvSplitK</code>）：已导入</li>
+<li><code>topk_softmax</code>：HIP，可直接接</li>
+<li>专家 gate_up：Triton <code>fused_moe_kernel</code>，192 个 program</li>
+<li><code>silu_and_mul</code>：已导入</li>
+<li>专家 down：Triton <code>fused_moe_kernel</code>，256 个 program</li>
+<li><code>moe_sum</code>：HIP，可直接接</li>
+</ul>
+<p>vLLM 在这个模型上只用到 26% 的带宽，是融合收益最大的地方。要补的有：</p>
+<ul>
+<li><strong>Triton 的 IR 用 LLVM 23 生成，hipcc 是 LLVM 22。</strong> megakernel 的设备代码改用 LLVM 23 编（本地已在用这套），再用 <code>hipModuleLoad</code> 加载。</li>
+<li><strong>导入器支持 Triton 的写法：</strong> 动态 LDS，以及末尾追加的 scratch 指针参数。</li>
+<li><strong>Triton kernel 可能超过 128 个 VGPR 的上限：</strong> 先从缓存读出它的实际用量；超了就用 512 线程的 megakernel。</li>
+<li><strong>IR 要从 GPU 上 vLLM 实际跑过的 Triton 缓存里取：</strong> 已加进上机脚本。</li>
+</ul>
+<h3 id="44">4.4 之后</h3>
+<ul>
+<li><strong>小 batch（4–16）和更长上下文：</strong> 这是 serving 的常见场景。</li>
+<li><strong>多 GPU：</strong> 把通信和计算融合在一起，对 kernel 边界来说这是最难的地方，megakernel 的优势最大。</li>
+</ul>
+<h2 id="5-gpu">5. 执行计划与 GPU 需求</h2>
+<table>
+<thead>
+<tr>
+<th>阶段</th>
+<th>天数</th>
+<th>内容</th>
+<th>完成标准</th>
+<th>GPU</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>第 1–2 天</td>
+<td>4 个同步微基准（事件往返 vs uncached、L2 写回/作废代价、kernel 边界间隔、GWS）；<code>vm_next.sh</code> 跑完 6 个变体和逐 kernel 计时；实现并测 uncached 通信内存 + relay</td>
+<td>8B 和 1.5B 上，融合版比逐个 launch 快 10% 以上，32/32 正确</td>
+<td>单卡约 3 小时</td>
+</tr>
+<tr>
+<td>2</td>
+<td>第 2–4 天</td>
+<td>MoE：接入 <code>topk_softmax</code> 和 <code>moe_sum</code>；LLVM 23 设备编译 + <code>hipModuleLoad</code>；导入 Triton <code>fused_moe_kernel</code>，<code>--check</code> 验证，然后跑整个模型</td>
+<td>Qwen3-30B-A3B 融合版快于 vLLM</td>
+<td>单卡约 6 小时</td>
+</tr>
+<tr>
+<td>3</td>
+<td>第 4–5 天</td>
+<td>batch 4–16，更长上下文</td>
+<td>每 token 时间优于 vLLM 同 batch</td>
+<td>单卡约 6 小时</td>
+</tr>
+<tr>
+<td>4</td>
+<td>第 5–7 天</td>
+<td>多 GPU：张量并行/专家并行，通信融合</td>
+<td>8 卡上优于 vLLM</td>
+<td>8 卡约 8 小时</td>
+</tr>
+</tbody>
+</table>
+<p>合计：单卡约 15 小时加 8 卡约 8 小时。本地能做的开发都放在上机之前完成，GPU 时间只用来验证和测量。</p>
+<p><strong>最理想的资源形式：</strong> 一台能随开随关的单卡 MI300X，带持久磁盘，模型和 vLLM 镜像不用每次重新下载，省掉每次开机约 15 分钟的准备时间；第 5–7 天再加一块 8 卡节点的时间。</p>
+<h2 id="6">6. 风险与应对</h2>
+<table>
+<thead>
+<tr>
+<th>风险</th>
+<th>应对</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>uncached 内存带来的延迟抵消了同步节省</td>
+<td>只放每层几 KB 的向量和计数器，先用微基准量化；不行就退回&rdquo;按 XCD 复制 + 合并&rdquo;，只保留 XCD 本地的同步</td>
+</tr>
+<tr>
+<td>同步修好后，融合仍然没有赢</td>
+<td>那就说明 batch 1 dense 解码本身就是一条屏障链，没有重叠空间（之前手写 tile 时就这么判断过），重点转向 MoE 和多 GPU，那里有 kernel 边界做不到的重叠</td>
+</tr>
+<tr>
+<td>Triton kernel 在 megakernel 里溢出寄存器</td>
+<td>512 线程 megakernel；或者只把 MoE 层单独做成一个 megakernel</td>
+</tr>
+<tr>
+<td>8B 融合版完整运行失败（未查清）</td>
+<td>下次上机保留完整日志，不再 grep 过滤；看门狗超时时打印事件状态</td>
+</tr>
+<tr>
+<td>GPU 拿不到</td>
+<td>本地先把代码准备好；每次上机按脚本一次跑完；最好有专用机器</td>
+</tr>
+</tbody>
+</table>
+<h2 id="7">7. 已经准备好的东西</h2>
+<ul>
+<li>代码：<code>github.com/metalopscloud/amdproject</code>（<code>main</code> 分支），也同步在 <code>cklxx/etx-megakernel</code>。</li>
+<li>上机脚本：<code>examples/vllm_llm/vm_next.sh</code>。一次跑完两个模型、6 个同步变体、逐 kernel 计时对比、vLLM 的 kernel trace，最后顺带采集 MoE 的 Triton 缓存。完整日志保留在 <code>~/vlnext/</code>。</li>
+<li>调研：<code>docs/RESEARCH-sync-hardware.md</code>（同步的硬件手段）、<code>docs/RESEARCH-moe-import.md</code>（MoE 导入路线）。</li>
+<li>设计文档：<code>docs/ETX_Technical_Design.md</code> 15.8–15.10 节（导入方法与实测）。</li>
+</ul></body></html>
