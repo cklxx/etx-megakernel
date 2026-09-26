@@ -41,8 +41,10 @@ UC_BAR=$(grep "RESULT barrier  mode=uc    relay=0 L2 load   0" ~/vlnext/sync_bar
 DEV_BAR=$(grep "RESULT barrier  mode=dev   relay=0 L2 load   0" ~/vlnext/sync_barrier.log | grep -oE "[0-9.]+ us per barrier" | awk '{print $1}')
 UC_BAD=$(grep -cE "mode=uc .*(NO PROGRESS|HUNG|NOT AS INTENDED)" ~/vlnext/sync_pingpong.log ~/vlnext/sync_barrier.log | awk -F: '{s+=$2} END {print s+0}')
 UC_BAR_STALE=$(grep "RESULT barrier  mode=uc" ~/vlnext/sync_barrier.log | grep -oE "stale [0-9]+" | awk '{s+=$2} END {print s+0}')
-UC_GO=0; [ "${UC_STALE:-1}" = 0 ] && [ "$UC_BAR_STALE" = 0 ] && [ "$UC_BAD" = 0 ] && [ -n "$UC_BAR" ] && [ -n "$DEV_BAR" ] && awk -v u="$UC_BAR" -v d="$DEV_BAR" 'BEGIN {exit !(u < d)}' && UC_GO=1
-log "GATE: uncached stale words ${UC_STALE:-?} (hand-off) + ${UC_BAR_STALE:-?} (barrier), failed runs ${UC_BAD:-?}, barrier uncached ${UC_BAR:-?} us vs device-fence ${DEV_BAR:-?} us -> UC_GO=$UC_GO"
+UC_N=$(grep -c "RESULT pingpong mode=uc .*stale words" ~/vlnext/sync_pingpong.log); UC_NB=$(grep -c "RESULT barrier  mode=uc .*stale" ~/vlnext/sync_barrier.log)
+# a missing line (crash, timeout) must not read as "0 stale": all 3 uncached hand-offs and all 4 uncached barriers must have reported
+UC_GO=0; [ "$UC_N" = 3 ] && [ "$UC_NB" = 4 ] && [ "${UC_STALE:-1}" = 0 ] && [ "$UC_BAR_STALE" = 0 ] && [ "$UC_BAD" = 0 ] && [ -n "$UC_BAR" ] && [ -n "$DEV_BAR" ] && awk -v u="$UC_BAR" -v d="$DEV_BAR" 'BEGIN {exit !(u < d)}' && UC_GO=1
+log "GATE: uncached results ${UC_N}/3 hand-off ${UC_NB}/4 barrier; stale words ${UC_STALE:-?} (hand-off) + ${UC_BAR_STALE:-?} (barrier), failed runs ${UC_BAD:-?}, barrier uncached ${UC_BAR:-?} us vs device-fence ${DEV_BAR:-?} us -> UC_GO=$UC_GO"
 
 log "2. ceiling: vLLM kernel traces (custom_ops=all: the kernels ETX imports)"
 until grep -q ENV-DONE ~/vlnext/env.log 2>/dev/null && grep -q PULL-DONE ~/vlnext/pull.log; do sleep 10; done
@@ -50,7 +52,7 @@ for n in qwen2.5-1.5b qwen3-8b; do tail -1 ~/vlnext/dl_$n.log; done
 mkdir -p examples/vllm_llm/results; chmod 777 examples/vllm_llm/results ~/vlnext
 for n in qwen2.5-1.5b qwen3-8b; do
   cp examples/llm/results/golden_c1024_$n.txt ~/llm/$n/golden_c1024.txt
-  timeout 900 $DOCKER $IMG bash -c "rocprofv3 --kernel-trace --output-format csv -d $HOME/vlnext/prof_$n -- python3 examples/vllm_llm/vllm_profile.py run --model ~/llm/$n/hf --golden ~/llm/$n/golden_c1024.txt --custom-ops all > $HOME/vlnext/profrun_$n.log 2>&1; tail -3 $HOME/vlnext/profrun_$n.log; python3 examples/vllm_llm/vllm_profile.py analyze $HOME/vlnext/prof_$n --json examples/vllm_llm/results/prof_all_$n.json" > ~/vlnext/prof_$n.out 2>&1
+  timeout 900 $DOCKER $IMG bash -c "rocprofv3 --kernel-trace --output-format csv -d $HOME/vlnext/prof_$n -- python3 examples/vllm_llm/vllm_profile.py run --model $HOME/llm/$n/hf --golden $HOME/llm/$n/golden_c1024.txt --custom-ops all > $HOME/vlnext/profrun_$n.log 2>&1; tail -3 $HOME/vlnext/profrun_$n.log; python3 examples/vllm_llm/vllm_profile.py analyze $HOME/vlnext/prof_$n --json examples/vllm_llm/results/prof_all_$n.json" > ~/vlnext/prof_$n.out 2>&1
   echo "[prof $n] rc=$?"; grep -vE "^\s*$|simple_timer" ~/vlnext/prof_$n.out | head -34
 done
 
@@ -102,7 +104,7 @@ snapshot_download('Qwen/Qwen3-30B-A3B', local_dir='$HOME/llm/qwen3-30b-a3b/hf', 
 print('DL-DONE')" > ~/vlnext/dl_moe.log 2>&1; tail -1 ~/vlnext/dl_moe.log
   cp examples/llm/results/golden_c1024_qwen3-30b-a3b.txt ~/llm/qwen3-30b-a3b/golden_c1024.txt
   mkdir -p ~/vlnext/moe && chmod 777 ~/vlnext/moe
-  timeout 1200 $DOCKER -e TRITON_CACHE_DIR=$HOME/vlnext/moe/triton $IMG bash -c "rocprofv3 --kernel-trace --output-format csv -d $HOME/vlnext/moe/prof -- python3 examples/vllm_llm/vllm_profile.py run --model ~/llm/qwen3-30b-a3b/hf --golden ~/llm/qwen3-30b-a3b/golden_c1024.txt > $HOME/vlnext/moe/profrun.log 2>&1; tail -2 $HOME/vlnext/moe/profrun.log; python3 examples/vllm_llm/vllm_profile.py analyze $HOME/vlnext/moe/prof --json examples/vllm_llm/results/prof_none_qwen3-30b-a3b.json" > ~/vlnext/moe/prof.out 2>&1
+  timeout 1200 $DOCKER -e TRITON_CACHE_DIR=$HOME/vlnext/moe/triton $IMG bash -c "rocprofv3 --kernel-trace --output-format csv -d $HOME/vlnext/moe/prof -- python3 examples/vllm_llm/vllm_profile.py run --model $HOME/llm/qwen3-30b-a3b/hf --golden $HOME/llm/qwen3-30b-a3b/golden_c1024.txt > $HOME/vlnext/moe/profrun.log 2>&1; tail -2 $HOME/vlnext/moe/profrun.log; python3 examples/vllm_llm/vllm_profile.py analyze $HOME/vlnext/moe/prof --json examples/vllm_llm/results/prof_none_qwen3-30b-a3b.json" > ~/vlnext/moe/prof.out 2>&1
   echo "[moe] rc=$?"; grep -vE "^\s*$|simple_timer" ~/vlnext/moe/prof.out | head -34
   sudo chown -R $USER ~/vlnext; find ~/vlnext/moe/triton -name "fused_moe_kernel*" | head
 fi
