@@ -19,7 +19,8 @@ DEVLIBS="${ETX_DEVLIBS:-$(ls -d /opt/rocm/lib/llvm/lib/clang/*/lib/amdgcn/bitcod
 CONFIG="$DIR/hf/config.json"; [ -f "$CONFIG" ] || CONFIG="$DIR/config.json"
 
 echo "== import ($EXPORTS)"
-"$PY" -m etx.importer.vllm_kernels --vllm "$VLLM" --out "$OUT/imp" --compiler hipcc --only "$EXPORTS" \
+ORIG=(); CHK=(); [ "${ETX_VL_CHECK:-0}" = 1 ] && ORIG=(--orig) && CHK=(-DETX_VL_CHECK)
+"$PY" -m etx.importer.vllm_kernels --vllm "$VLLM" --out "$OUT/imp" --compiler hipcc --only "$EXPORTS" "${ORIG[@]}" \
   --block rms_norm_2d=$((H / 8)) --block reshape_and_cache=$((NKV * HD / 8))
 "$PY" -m etx.importer.adapter "$OUT/imp/imports.json" --tiles "$OUT/imp_tiles.hip" --header "$OUT/imports.h"
 "$PY" -m etx.importer.bundle --imports "$OUT/imp" --exports "$EXPORTS" --devlibs "$DEVLIBS" -o "$OUT/imports.bc"
@@ -30,7 +31,7 @@ grep -E "tasks=|workers/domain" "$OUT/compile.log" || true
 echo "== hipcc"
 hipcc -O3 -std=c++17 --offload-arch=gfx942 -I "$ROOT/etx/runtime/include" -I "$OUT" -I "$ROOT" \
   -Xclang -mlink-builtin-bitcode -Xclang "$OUT/imports.bc" -Rpass-analysis=kernel-resource-usage \
-  "$OUT/megakernel_d0.hip" "$ROOT/examples/vllm_llm/host.hip" -o "$OUT/run" 2>&1 \
+  "${CHK[@]}" "$OUT/megakernel_d0.hip" "$ROOT/examples/vllm_llm/host.hip" $([ "${ETX_VL_CHECK:-0}" = 1 ] && echo "$OUT/imp/orig_table.hip $OUT/imp/orig_*.o") -o "$OUT/run" 2>&1 \
   | grep -E "Function Name|VGPRs:|ScratchSize|VGPRs Spill|LDS Size|error" | sed -E "s/.*remark: +//; s/ \[-Rpass.*//" | paste - - - - - || true
 [ -x "$OUT/run" ] || { echo "build failed: no $OUT/run"; exit 1; }
 echo "built $OUT/run (plan $OUT/vl_plan.txt)"

@@ -20,7 +20,8 @@ OCLC = ["oclc_unsafe_math_off.bc", "oclc_finite_only_off.bc", "oclc_wavefrontsiz
 
 
 def llvm_tool(name: str) -> str:
-    for d in (os.environ.get("ETX_LLVM"), "/opt/rocm/llvm/bin", "/opt/rocm/lib/llvm/bin", "/opt/homebrew/opt/llvm/bin"):
+    import glob
+    for d in [os.environ.get("ETX_LLVM"), "/opt/rocm/llvm/bin", "/opt/rocm/lib/llvm/bin"] + sorted(glob.glob("/opt/rocm-*/lib/llvm/bin")) + ["/opt/homebrew/opt/llvm/bin"]:
         if d and (Path(d) / name).exists():
             return str(Path(d) / name)
     return name

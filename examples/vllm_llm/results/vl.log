@@ -1,0 +1,38 @@
+
+=== 22:58:09 background: vLLM image
+
+=== 22:58:09 python envs and downloads
+WARNING: huggingface-hub 2.0.0 does not provide the extra 'hf-transfer'
+DL-DONE qwen3-8b
+DL-DONE qwen2.5-1.5b
+PULL-DONE
+
+=== 23:05:36 prep + build qwen3-8b
+wrote /home/hotaisle/llm/qwen3-8b/vl.bin (16.38 GB) and vl.manifest: {"H": 4096, "NH": 32, "NKV": 8, "HD": 128, "INTER": 12288, "L": 36, "V": 151936, "tie": 0, "bias": 0, "qk_norm": 1, "maxlen": 1072, "bytes": 16381745152}
+BUILD FAILED qwen3-8b
+FileNotFoundError: [Errno 2] No such file or directory: 'llvm-as'
+
+=== 23:06:01 prep + build qwen2.5-1.5b
+wrote /home/hotaisle/llm/qwen2.5-1.5b/vl.bin (3.09 GB) and vl.manifest: {"H": 1536, "NH": 12, "NKV": 2, "HD": 128, "INTER": 8960, "L": 28, "V": 151936, "tie": 1, "bias": 1, "qk_norm": 0, "maxlen": 1072, "bytes": 3087703040}
+BUILD FAILED qwen2.5-1.5b
+FileNotFoundError: [Errno 2] No such file or directory: 'llvm-as'
+
+=== 23:06:07 vLLM (same prompt ids): default and custom_ops=all; kernel traces
+VLLM label=qwen3-8b aiter=0 custom_ops=None version=0.27.1.dev5+gf46a9dfe2.d20260827 context=1024 median_ms=4.906 per_token=[4.906, 4.909, 4.895] first_divergence=32/32
+W0925 23:08:57.373096       8 simple_timer.cpp:55] [rocprofv3] output generation ::     0.003361 sec
+W0925 23:08:57.373172       8 simple_timer.cpp:55] [rocprofv3] tool finalization ::     0.003776 sec
+no kernel_trace.csv under /tmp/prof_qwen3-8b_none
+VLLM label=qwen3-8b aiter=0 custom_ops=all version=0.27.1.dev5+gf46a9dfe2.d20260827 context=1024 median_ms=5.039 per_token=[5.029, 5.043, 5.039] first_divergence=32/32
+W0925 23:11:16.602535       8 simple_timer.cpp:55] [rocprofv3] output generation ::     0.002537 sec
+W0925 23:11:16.603375       8 simple_timer.cpp:55] [rocprofv3] tool finalization ::     0.003847 sec
+no kernel_trace.csv under /tmp/prof_qwen3-8b_all
+VLLM label=qwen2.5-1.5b aiter=0 custom_ops=None version=0.27.1.dev5+gf46a9dfe2.d20260827 context=1024 median_ms=1.862 per_token=[1.862, 1.859, 1.867] first_divergence=32/32
+W0925 23:13:23.579122       8 simple_timer.cpp:55] [rocprofv3] output generation ::     0.003358 sec
+W0925 23:13:23.579183       8 simple_timer.cpp:55] [rocprofv3] tool finalization ::     0.003773 sec
+no kernel_trace.csv under /tmp/prof_qwen2.5-1.5b_none
+VLLM label=qwen2.5-1.5b aiter=0 custom_ops=all version=0.27.1.dev5+gf46a9dfe2.d20260827 context=1024 median_ms=1.937 per_token=[1.994, 1.937, 1.931] first_divergence=32/32
+W0925 23:15:21.581127       8 simple_timer.cpp:55] [rocprofv3] output generation ::     0.003380 sec
+W0925 23:15:21.581184       8 simple_timer.cpp:55] [rocprofv3] tool finalization ::     0.003863 sec
+no kernel_trace.csv under /tmp/prof_qwen2.5-1.5b_all
+
+=== 23:15:22 MoE capture for offline work: vLLM Qwen3-30B-A3B kernel trace + Triton cache (fused_moe IR and launch metadata)

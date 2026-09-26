@@ -103,6 +103,41 @@ SOURCES = [
 ]
 
 
+def _flags(vllm: Path, s: Source) -> list[str]:
+    th = os.environ.get("ETX_TORCH_HEADERS", str(Path.home() / "rocm-headers/pytorch"))
+    inc = []
+    for i in s.includes:
+        inc += ["-I", str(HERE / i)]
+    inc += ["-I", str(vllm / "csrc"), "-I", str(vllm / Path(s.path).parent), "-I", str(vllm / "csrc/libtorch_stable")]
+    return (["-D__HIP_PLATFORM_AMD__", "-DUSE_ROCM", "-DNDEBUG", "-isystem", th, "-include", str(HERE / "shim/etx_cuda2hip.h"), "-I", str(HERE / "shim")]
+            + [f"-D{d}" for d in s.defines] + inc)
+
+
+def compile_orig(out: Path, vllm: Path, exports: set[str] | None) -> list[Path]:
+    """The original kernels, compiled as vLLM compiles them (host + device), each behind an accessor
+    etx_orig_<export>() returning the kernel's host handle: the reference for host.hip --check."""
+    objs, table = [], ['#include <hip/hip_runtime.h>', '#include <cstring>']
+    names = []
+    for s in SOURCES:
+        ks = [k for k in s.kernels if exports is None or k.export in exports]
+        if not ks:
+            continue
+        base = Path(s.path).stem
+        src = out / f"orig_{base}.hip"
+        src.write_text(f'#include "{base}.hip"\n' + "".join(f'extern "C" const void* etx_orig_{k.export}() {{ return (const void*)&{k.spec}; }}\n' for k in ks))
+        obj = out / f"orig_{base}.o"
+        cmd = ["hipcc", "-x", "hip", "-c", "--offload-arch=gfx942", "-std=c++17", "-O3", "-I", str(out)] + _flags(vllm, s) + [str(src), "-o", str(obj)]
+        r = subprocess.run(cmd, capture_output=True, text=True)
+        if r.returncode:
+            raise SystemExit(f"compile orig {s.path} failed:\n{r.stderr[-4000:]}")
+        objs.append(obj)
+        names += [k.export for k in ks]
+    table += [f'extern "C" const void* etx_orig_{e}();' for e in names]
+    table += ['extern "C" const void* etx_orig_find(const char* n) {'] + [f'  if (!strcmp(n, "{e}")) return etx_orig_{e}();' for e in names] + ["  return nullptr;", "}"]
+    (out / "orig_table.hip").write_text("\n".join(table) + "\n")
+    return objs
+
+
 def compile_ir(src_hip: Path, out_ll: Path, vllm: Path, s: Source, compiler: str) -> None:
     inc = []
     for i in s.includes:
@@ -124,6 +159,8 @@ def run(vllm: Path, out: Path, threads: int, compiler: str, blocks: dict[str, tu
     out.mkdir(parents=True, exist_ok=True)
     from etx.importer.bundle import llvm_tool
     llvm_as = llvm_tool("llvm-as")
+    if not Path(llvm_as).exists():            # ROCm ships llvm-link but not llvm-as; llvm-link reads textual IR too
+        llvm_as = llvm_tool("llvm-link")
     report = {}
     for s in SOURCES:
         ks = [k for k in s.kernels if only is None or k.export in only]
@@ -160,13 +197,18 @@ def main():
     ap.add_argument("--compiler", choices=["local", "hipcc"], default="local")
     ap.add_argument("--block", action="append", default=[], help="export=bx,by,bz for model-dependent launches")
     ap.add_argument("--only", default=None, help="comma-separated exports")
+    ap.add_argument("--orig", action="store_true", help="also compile the original kernels (hipcc) for host.hip --check")
     a = ap.parse_args()
     blocks = {}
     for b in a.block:
         e, v = b.split("=")
         t = tuple(int(x) for x in v.split(","))
         blocks[e] = t + (1,) * (3 - len(t))
-    rep = run(Path(a.vllm).expanduser(), Path(a.out), a.threads, a.compiler, blocks, set(a.only.split(",")) if a.only else None)
+    only = set(a.only.split(",")) if a.only else None
+    rep = run(Path(a.vllm).expanduser(), Path(a.out), a.threads, a.compiler, blocks, only)
+    if a.orig:
+        for o in compile_orig(Path(a.out), Path(a.vllm).expanduser(), only):
+            print("orig", o)
     for e, i in rep.items():
         print(f"{e:22s} {i['block']} slots={i['slots']} args={i['arg_bytes']}B lds={i['lds_bytes']}B barriers={i['barriers']}")
 

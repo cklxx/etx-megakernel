@@ -30,6 +30,20 @@ extern "C" __global__ void etx_megakernel_d0(etx_params);
 extern "C" __global__ void etx_unfused_d0(etx_params, int32_t);
 void vl_set_params(const VlParams* p, hipStream_t s);
 extern "C" int vl_params_bytes();
+#ifdef ETX_VL_CHECK
+extern "C" const void* etx_orig_find(const char* name);    // orig_table.hip: vLLM's kernels compiled as vLLM compiles them
+#endif
+
+// wait for the stream with a deadline: a hung kernel is reported by name instead of hanging the run
+static bool wait_stream(hipStream_t s, double seconds) {
+  const auto t0 = std::chrono::steady_clock::now();
+  for (;;) {
+    const hipError_t e = hipStreamQuery(s);
+    if (e == hipSuccess) return true;
+    if (e != hipErrorNotReady) { fprintf(stderr, "stream error %s\n", hipGetErrorString(e)); return false; }
+    if (std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count() > seconds) return false;
+  }
+}
 
 static void die(const std::string& m) { fprintf(stderr, "error: %s\n", m.c_str()); exit(1); }
 template <class T> static T* dalloc(size_t n) { T* p; ETX_CHECK(hipMalloc(&p, std::max<size_t>(n, 1) * sizeof(T))); ETX_CHECK(hipMemset(p, 0, std::max<size_t>(n, 1) * sizeof(T))); return p; }
@@ -76,7 +90,7 @@ struct Args {
 int main(int argc, char** argv) {
   if (argc < 3) die("usage: run <packed-dir> <plan.txt> [--golden F] [--gen N] [--repeat R] [--teacher] [--unfused]");
   const std::string dir = argv[1], plan_path = argv[2];
-  int gen = -1, repeat = 2; bool teacher = false, unfused = false; std::string golden_name = "golden_c1024.txt";
+  int gen = -1, repeat = 2, check_layers = 0; bool teacher = false, unfused = false; std::string golden_name = "golden_c1024.txt";
   for (int i = 3; i < argc; ++i) {
     const std::string a = argv[i];
     if (a == "--gen" && i + 1 < argc) gen = atoi(argv[++i]);
@@ -84,6 +98,7 @@ int main(int argc, char** argv) {
     else if (a == "--teacher") teacher = true;
     else if (a == "--unfused") unfused = true;
     else if (a == "--golden" && i + 1 < argc) golden_name = argv[++i];
+    else if (a == "--check" && i + 1 < argc) check_layers = atoi(argv[++i]);   // compare each imported launch with vLLM's original, layers < N
   }
   const Manifest m = read_manifest(dir + "/vl.manifest");
   const int H = m.geti("H"), NH = m.geti("NH"), NKV = m.geti("NKV"), HD = m.geti("HD"), I = m.geti("INTER"), L = m.geti("L"), V = m.geti("V");
@@ -188,9 +203,66 @@ int main(int argc, char** argv) {
 
   VlParams vp{}; vp.H = H; vp.V = V; vp.embed = W("embed"); vp.resid = resid; vp.positions = positions; vp.seq_lens = seq_lens;
   vp.slot_mapping = slot_mapping; vp.logits = logits; vp.token_in = token_in; vp.token_out = token_out; vp.token_time = token_time;
+
+  if (check_layers > 0) {
+#ifndef ETX_VL_CHECK
+    die("--check needs a build with ETX_VL_CHECK=1 (the original kernels linked in)");
+#else
+    // one decode step at position 0 of the prompt, launch by launch: vLLM's original kernel and the imported one
+    // on the same inputs (a snapshot of every buffer they can touch), compared byte for byte
+    std::vector<std::pair<void*, size_t>> bufs = {{resid, H * 2}, {hn, H * 2}, {qkv, NQKV * 2}, {qn, NH * HD * 2}, {kn, NKV * HD * 2}, {attn_out, NH * HD * 2},
+      {o, H * 2}, {gu, 4 * I}, {act, 2 * I}, {dn, H * 2}, {logits, (size_t)V * 2}, {exp_sums, (size_t)NH * parts * 4}, {max_logits, (size_t)NH * parts * 4},
+      {tmp_out, (size_t)NH * parts * HD * 2}};
+    const char* names[] = {"resid", "hn", "qkv", "qn", "kn", "attn_out", "o", "gu", "act", "dn", "logits", "exp_sums", "max_logits", "tmp_out"};
+    for (int l = 0; l < std::min(L, check_layers); ++l) { bufs.push_back({kc[l], cache_elems * 2}); bufs.push_back({vc[l], cache_elems * 2}); }
+    std::vector<void*> save(bufs.size()), ref(bufs.size());
+    for (size_t b = 0; b < bufs.size(); ++b) { save[b] = dalloc<char>(bufs[b].second); ref[b] = dalloc<char>(bufs[b].second); }
+    std::vector<int32_t> tin(steps + 2, 0); for (size_t i = 0; i < prompt.size(); ++i) tin[i] = prompt[i];
+    ETX_CHECK(hipMemcpy(token_in, tin.data(), tin.size() * 4, hipMemcpyHostToDevice));
+    vp.tok = 0; vp.pos = 0; vp.write_next = 0; vl_set_params(&vp, hst.stream);
+    auto launch_imported = [&](int li) {
+      int32_t first = etx_launch_first[li]; void* kargs[] = {&hst.p, &first};
+      ETX_CHECK(hipLaunchKernel(hst.unfused_kernel, dim3(etx_launch_count[li]), dim3(ETX_THREADS), kargs, 0, hst.stream));
+    };
+    launch_imported(0);                                              // prologue: embedding row, positions, lengths
+    if (!wait_stream(hst.stream, 5.0)) die("prologue hung");
+    int bad = 0;
+    for (const Inst& x : insts) {
+      if (x.layer >= check_layers || (x.layer < 0 && check_layers < L)) break;
+      const etx_imp_desc* d = etx_imp_find(x.exp.c_str());
+      const void* fn = etx_orig_find(x.exp.c_str()); if (!fn) die("no original for " + x.exp);
+      if (etx_launch_count[x.n + 1] != x.tasks) die("launch table does not follow the plan at instance " + std::to_string(x.n));
+      for (size_t b = 0; b < bufs.size(); ++b) ETX_CHECK(hipMemcpyAsync(save[b], bufs[b].first, bufs[b].second, hipMemcpyDeviceToDevice, hst.stream));
+      std::vector<void*> av(d->nparams); for (int k = 0; k < d->nparams; ++k) av[k] = ab.data() + x.off + d->off[k];
+      ETX_CHECK(hipLaunchKernel(fn, dim3(x.gx, x.gy, x.gz), dim3(d->block[0], d->block[1], d->block[2]), av.data(), 0, hst.stream));
+      if (!wait_stream(hst.stream, 5.0)) { printf("HANG original %s L%d %s\n", x.role.c_str(), x.layer, x.exp.c_str()); return 3; }
+      for (size_t b = 0; b < bufs.size(); ++b) {
+        ETX_CHECK(hipMemcpyAsync(ref[b], bufs[b].first, bufs[b].second, hipMemcpyDeviceToDevice, hst.stream));
+        ETX_CHECK(hipMemcpyAsync(bufs[b].first, save[b], bufs[b].second, hipMemcpyDeviceToDevice, hst.stream));
+      }
+      launch_imported(x.n + 1);
+      const auto t0 = std::chrono::steady_clock::now();
+      if (!wait_stream(hst.stream, 5.0)) { printf("HANG imported %s L%d %s (%d tasks)\n", x.role.c_str(), x.layer, x.exp.c_str(), x.tasks); return 3; }
+      const double us = std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now() - t0).count();
+      std::string diff;
+      for (size_t b = 0; b < bufs.size(); ++b) {
+        std::vector<uint8_t> A(bufs[b].second), B(bufs[b].second);
+        ETX_CHECK(hipMemcpy(A.data(), bufs[b].first, A.size(), hipMemcpyDeviceToHost)); ETX_CHECK(hipMemcpy(B.data(), ref[b], B.size(), hipMemcpyDeviceToHost));
+        size_t n = 0, first = 0; for (size_t k = 0; k < A.size(); ++k) if (A[k] != B[k]) { if (!n) first = k; ++n; }
+        if (n) diff += std::string(" ") + (b < 14 ? names[b] : (((b - 14) % 2) ? "vc" : "kc")) + ":" + std::to_string(n) + "B@" + std::to_string(first);
+      }
+      printf("  %-10s L%-3d %-20s %s%s  (%.0f us)\n", x.role.c_str(), x.layer, x.exp.c_str(), diff.empty() ? "identical" : "DIFFERS", diff.c_str(), us);
+      if (!diff.empty()) ++bad;
+    }
+    printf("CHECK %s: %d launch(es) differ\n", bad ? "FAILED" : "OK", bad);
+    return bad ? 4 : 0;
+#endif
+  }
   std::vector<int32_t> seq(prompt); seq.insert(seq.end(), golden.begin(), golden.end());
   std::vector<int32_t> out(steps + 1); std::vector<uint64_t> tt(2 * (steps + 1));
   std::vector<double> step_ms, wall_ms;
+  const int progress = getenv("ETX_VL_PROGRESS") ? atoi(getenv("ETX_VL_PROGRESS")) : 0;   // print every N-th step's wall time
+  setvbuf(stdout, nullptr, _IOLBF, 0);
   int matched = 0, first_div = -1;
   for (int run = 0; run < repeat; ++run) {
     std::vector<int32_t> tin(steps + 2, 0);
@@ -203,7 +275,9 @@ int main(int argc, char** argv) {
       vl_set_params(&vp, hst.stream);
       if (unfused) { if (!hst.run_unfused()) { printf("step %d: unfused step failed\n", t); return 2; } }
       else if (!hst.run(60.0)) { printf("step %d: ETX step failed\n", t); return 2; }
-      if (t + 1 >= (int)prompt.size()) wall_ms.push_back(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - w0).count());
+      const double wms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - w0).count();
+      if (t + 1 >= (int)prompt.size()) wall_ms.push_back(wms);
+      if (progress && (t % progress == 0 || t < 3)) { printf("  step %d: %.3f ms wall\n", t, wms); fflush(stdout); }
     }
     ETX_CHECK(hipMemcpy(out.data(), token_out, steps * 4, hipMemcpyDeviceToHost));
     ETX_CHECK(hipMemcpy(tt.data(), token_time, 2 * steps * 8, hipMemcpyDeviceToHost));
