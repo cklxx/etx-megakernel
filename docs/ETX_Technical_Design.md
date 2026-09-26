@@ -868,6 +868,20 @@ The claim ETX has to prove is that fusing the kernels people actually use beats 
 
 Status before GPU time: the whole chain compiles for gfx942 locally with the ROCm 7.2.4 headers and device libraries; the Qwen3-8B megakernel uses 128 VGPRs with no spills and no calls (Qwen2.5-1.5B: 4 spills from the mfma16 attention). The comparison to run: ETX fused vs ETX unfused (the same imported code, one launch per grid, HIP graph) vs vLLM with `custom_ops=all` (the same kernels) and vLLM default (Inductor-generated norm/activation kernels), plus a kernel trace of vLLM that separates kernel time from the gaps between kernels, which bounds what fusion can recover. MoE is next: vLLM's `fused_moe` is a Triton kernel, so the importer needs the Triton IR path.
 
+### 15.10 vLLM's kernels inside the megakernel, measured (2026-09-26, 1x MI300X, 1024-token context)
+
+Every imported launch of the first two layers was run against vLLM's original kernel on the same inputs (`host --check`): all 22 (Qwen2.5-1.5B) and 26 (Qwen3-8B) launches are byte-identical, and every run below decodes 32/32 tokens equal to HF greedy. The one bug found on hardware: the slot-barrier words were sized for 8 slots while `rms_norm_3d` (16-thread blocks) runs 16 per workgroup; now sized by the adapter.
+
+| ms/token | Qwen2.5-1.5B | Qwen3-8B |
+|---|---|---|
+| vLLM default (Inductor norm/activation kernels) | 1.862 | 4.906 |
+| vLLM `custom_ops=all` (exactly the imported kernels) | 1.937 | 5.039 |
+| ETX unfused: the same imported code, one launch per grid, HIP graph | 2.24-2.25 | 5.74 |
+| ETX megakernel | 2.61-2.62 | 6.16 (2-token run) |
+| ETX megakernel, the launches between qkv and o_proj on one XCD | 2.58 | - |
+
+With the kernels vLLM uses, fusion as built today loses: the megakernel is 16% (1.5B) and 7% (8B) slower than the same code launched kernel by kernel, because each token crosses 310-472 device-wide barriers and an ETX barrier costs more than a kernel boundary. Pinning the small launches to one XCD recovers little (2.58). ETX's own unfused path is also 0.3-0.7 ms behind vLLM with the same kernels; candidates are the ETX prologue/argmax tiles and the workgroup shape of the small kernels (several blocks per 1024-thread workgroup instead of separate workgroups), not yet separated because the vLLM kernel trace failed in this session. The import itself is sound; what remains is making the barrier cheaper than a kernel boundary (XCD-local replication of the one-block launches, fewer device-wide handoffs) and finding the unfused gap.
+
 ### 15.3 Phases of the general architecture (after M3)
 
 | Phase | Deliverable | Completion criterion |

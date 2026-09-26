@@ -1,0 +1,20 @@
+
+=== 01:14:48 envs and downloads
+WARNING: huggingface-hub 2.0.0 does not provide the extra 'hf-transfer'
+
+=== 01:18:03 prep + check build qwen2.5-1.5b
+wrote /home/hotaisle/llm/qwen2.5-1.5b/vl.bin (3.09 GB) and vl.manifest: {"H": 1536, "NH": 12, "NKV": 2, "HD": 128, "INTER": 8960, "L": 28, "V": 151936, "tie": 1, "bias": 1, "qk_norm": 0, "maxlen": 1072, "bytes": 3087703040}
+BUILD FAILED
+/home/hotaisle/etx/build/vl/qwen2.5-1.5b/imp/orig_activation_kernels.o:1:1: error: expected unqualified-id	/home/hotaisle/etx/build/vl/qwen2.5-1.5b/imp/orig_activation_kernels.o:1:65: error: source file is not valid UTF-8	/home/hotaisle/etx/build/vl/qwen2.5-1.5b/imp/orig_activation_kernels.o:1:75: error: source file is not valid UTF-8	/home/hotaisle/etx/build/vl/qwen2.5-1.5b/imp/orig_activation_kernels.o:1:81: error: source file is not valid UTF-8	/home/hotaisle/etx/build/vl/qwen2.5-1.5b/imp/orig_activation_kernels.o:1:86: error: source file is not valid UTF-8
+/home/hotaisle/etx/build/vl/qwen2.5-1.5b/imp/orig_activation_kernels.o:1:91: error: source file is not valid UTF-8	/home/hotaisle/etx/build/vl/qwen2.5-1.5b/imp/orig_activation_kernels.o:1:98: error: source file is not valid UTF-8	/home/hotaisle/etx/build/vl/qwen2.5-1.5b/imp/orig_activation_kernels.o:1:99: error: source file is not valid UTF-8	/home/hotaisle/etx/build/vl/qwen2.5-1.5b/imp/orig_activation_kernels.o:1:102: error: source file is not valid UTF-8	/home/hotaisle/etx/build/vl/qwen2.5-1.5b/imp/orig_activation_kernels.o:1:109: error: source file is not valid UTF-8
+/home/hotaisle/etx/build/vl/qwen2.5-1.5b/imp/orig_activation_kernels.o:1:110: error: source file is not valid UTF-8	/home/hotaisle/etx/build/vl/qwen2.5-1.5b/imp/orig_activation_kernels.o:1:113: error: source file is not valid UTF-8	/home/hotaisle/etx/build/vl/qwen2.5-1.5b/imp/orig_activation_kernels.o:1:118: error: source file is not valid UTF-8	/home/hotaisle/etx/build/vl/qwen2.5-1.5b/imp/orig_activation_kernels.o:1:124: error: source file is not valid UTF-8	/home/hotaisle/etx/build/vl/qwen2.5-1.5b/imp/orig_activation_kernels.o:1:125: error: source file is not valid UTF-8
+/home/hotaisle/etx/build/vl/qwen2.5-1.5b/imp/orig_activation_kernels.o:1:127: error: source file is not valid UTF-8	/home/hotaisle/etx/build/vl/qwen2.5-1.5b/imp/orig_activation_kernels.o:1:135: error: source file is not valid UTF-8	/home/hotaisle/etx/build/vl/qwen2.5-1.5b/imp/orig_activation_kernels.o:1:145: error: source file is not valid UTF-8	/home/hotaisle/etx/build/vl/qwen2.5-1.5b/imp/orig_activation_kernels.o:1:150: error: source file is not valid UTF-8	fatal error: too many errors emitted, stopping now [-ferror-limit=]
+86 warnings and 20 errors generated when compiling for gfx942.				
+build failed: no /home/hotaisle/etx/build/vl/qwen2.5-1.5b/run
+Function Name: etx_megakernel_d0	VGPRs: 128	ScratchSize [bytes/lane]: 0	VGPRs Spill: 0	LDS Size [bytes/block]: 41312
+Function Name: etx_unfused_d0	VGPRs: 110	ScratchSize [bytes/lane]: 0	VGPRs Spill: 0	LDS Size [bytes/block]: 41280
+
+=== 01:18:58 check qwen2.5-1.5b (layers 0-1)
+stdbuf: failed to run command ‘build/vl/qwen2.5-1.5b/run’: No such file or directory
+
+=== 01:18:58 CHECK DONE

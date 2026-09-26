@@ -1,0 +1,4 @@
+ [8b fused]
+run 0: 32/32 generated tokens match HF greedy run 1: 32/32 generated tokens match HF greedy qwen3-8b matched=32 gen=32 median_ms=5.739 wall_ms=5.781  [8b --unfused]
+run 1: 32/32 generated tokens match HF greedy qwen2.5-1.5b matched=32 gen=32 median_ms=2.576 wall_ms=2.872  [1.5b pin fused]
+FIN DONE

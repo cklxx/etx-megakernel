@@ -15,7 +15,7 @@
 #define ETX_IMPORT_LDS 16
 #endif
 #ifndef ETX_IMPORT_SLOTS
-#define ETX_IMPORT_SLOTS 8
+#define ETX_IMPORT_SLOTS 16    // the most slots a 1024-thread workgroup can hold (one wave each)
 #endif
 
 extern "C" {   // a linkage block, not `extern "C" <decl>`: this must be the definition
