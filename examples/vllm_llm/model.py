@@ -141,6 +141,8 @@ def build() -> Graph:
     insts = instances(d)
     skip = set(filter(None, os.environ.get("ETX_VL_SKIP", "").split(",")))    # register analysis only: drop roles
     if skip:
+        if XCD:
+            raise SystemExit("ETX_VL_SKIP cannot be combined with ETX_VL_XCD (a replica or its GEMV could be dropped alone)")
         insts = [i for i in insts if i["role"] not in skip]
     total = plan_offsets(insts, imp)
     # the imported tiles use the import arena of etx/import.h (sized by the adapter); lds_bytes here is only
