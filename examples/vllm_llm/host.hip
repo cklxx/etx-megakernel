@@ -227,6 +227,10 @@ int main(int argc, char** argv) {
     launch_imported(0);                                              // prologue: embedding row, positions, lengths
     if (!wait_stream(hst.stream, 5.0)) die("prologue hung");
     int bad = 0;
+    hipEvent_t e0, e1; ETX_CHECK(hipEventCreate(&e0)); ETX_CHECK(hipEventCreate(&e1));
+    auto elapsed_us = [&]() { float ms = 0.f; ETX_CHECK(hipEventElapsedTime(&ms, e0, e1)); return 1000.0 * ms; };
+    std::map<std::string, std::pair<double, double>> by_kernel;      // export -> (original us, imported us), summed
+    double sum_o = 0, sum_i = 0;
     for (const Inst& x : insts) {
       if (x.layer >= check_layers || (x.layer < 0 && check_layers < L)) break;
       const etx_imp_desc* d = etx_imp_find(x.exp.c_str());
@@ -234,16 +238,21 @@ int main(int argc, char** argv) {
       if (etx_launch_count[x.n + 1] != x.tasks) die("launch table does not follow the plan at instance " + std::to_string(x.n));
       for (size_t b = 0; b < bufs.size(); ++b) ETX_CHECK(hipMemcpyAsync(save[b], bufs[b].first, bufs[b].second, hipMemcpyDeviceToDevice, hst.stream));
       std::vector<void*> av(d->nparams); for (int k = 0; k < d->nparams; ++k) av[k] = ab.data() + x.off + d->off[k];
+      ETX_CHECK(hipEventRecord(e0, hst.stream));
       ETX_CHECK(hipLaunchKernel(fn, dim3(x.gx, x.gy, x.gz), dim3(d->block[0], d->block[1], d->block[2]), av.data(), 0, hst.stream));
+      ETX_CHECK(hipEventRecord(e1, hst.stream));
       if (!wait_stream(hst.stream, 5.0)) { printf("HANG original %s L%d %s\n", x.role.c_str(), x.layer, x.exp.c_str()); return 3; }
+      const double us_o = elapsed_us();
       for (size_t b = 0; b < bufs.size(); ++b) {
         ETX_CHECK(hipMemcpyAsync(ref[b], bufs[b].first, bufs[b].second, hipMemcpyDeviceToDevice, hst.stream));
         ETX_CHECK(hipMemcpyAsync(bufs[b].first, save[b], bufs[b].second, hipMemcpyDeviceToDevice, hst.stream));
       }
+      ETX_CHECK(hipEventRecord(e0, hst.stream));
       launch_imported(x.n + 1);
-      const auto t0 = std::chrono::steady_clock::now();
+      ETX_CHECK(hipEventRecord(e1, hst.stream));
       if (!wait_stream(hst.stream, 5.0)) { printf("HANG imported %s L%d %s (%d tasks)\n", x.role.c_str(), x.layer, x.exp.c_str(), x.tasks); return 3; }
-      const double us = std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now() - t0).count();
+      const double us_i = elapsed_us();
+      by_kernel[x.exp].first += us_o; by_kernel[x.exp].second += us_i; sum_o += us_o; sum_i += us_i;
       std::string diff;
       for (size_t b = 0; b < bufs.size(); ++b) {
         std::vector<uint8_t> A(bufs[b].second), B(bufs[b].second);
@@ -251,9 +260,22 @@ int main(int argc, char** argv) {
         size_t n = 0, first = 0; for (size_t k = 0; k < A.size(); ++k) if (A[k] != B[k]) { if (!n) first = k; ++n; }
         if (n) diff += std::string(" ") + (b < 14 ? names[b] : (((b - 14) % 2) ? "vc" : "kc")) + ":" + std::to_string(n) + "B@" + std::to_string(first);
       }
-      printf("  %-10s L%-3d %-20s %s%s  (%.0f us)\n", x.role.c_str(), x.layer, x.exp.c_str(), diff.empty() ? "identical" : "DIFFERS", diff.c_str(), us);
+      printf("  %-10s L%-3d %-20s %s%s  original %6.1f us  imported %6.1f us\n", x.role.c_str(), x.layer, x.exp.c_str(),
+             diff.empty() ? "identical" : "DIFFERS", diff.c_str(), us_o, us_i);
       if (!diff.empty()) ++bad;
     }
+    {   // the ETX tiles with no vLLM counterpart (vLLM uses torch's embedding and argmax kernels)
+      const int last = (int)insts.size() + 1;
+      for (int li : {0, last}) {
+        ETX_CHECK(hipEventRecord(e0, hst.stream)); launch_imported(li); ETX_CHECK(hipEventRecord(e1, hst.stream));
+        if (!wait_stream(hst.stream, 5.0)) die("native tile hung");
+        printf("  %-20s imported %6.1f us  (%d task(s))\n", li == 0 ? "prologue (ETX)" : "argmax (ETX)", elapsed_us(), etx_launch_count[li]);
+      }
+    }
+    printf("kernel time, summed over the checked launches (GPU events, one launch each):\n");
+    for (auto& kv : by_kernel) printf("  %-20s original %8.1f us  imported %8.1f us  (%+.0f%%)\n", kv.first.c_str(), kv.second.first, kv.second.second,
+                                      100.0 * (kv.second.second / std::max(kv.second.first, 1e-9) - 1.0));
+    printf("  %-20s original %8.1f us  imported %8.1f us\n", "total", sum_o, sum_i);
     printf("CHECK %s: %d launch(es) differ\n", bad ? "FAILED" : "OK", bad);
     return bad ? 4 : 0;
 #endif

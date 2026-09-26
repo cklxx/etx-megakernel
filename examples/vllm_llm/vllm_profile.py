@@ -23,6 +23,10 @@ from pathlib import Path
 
 
 def run(a):
+    import os
+    # vLLM V1 runs the engine core in a child process by default; the kernel tracer follows the process it
+    # launched, so keep the engine in this one (the 2026-09-26 traces came back empty)
+    os.environ.setdefault("VLLM_ENABLE_V1_MULTIPROCESSING", "0")
     from vllm import LLM, SamplingParams
     from vllm.inputs import TokensPrompt
     lines = Path(a.golden).read_text().splitlines()

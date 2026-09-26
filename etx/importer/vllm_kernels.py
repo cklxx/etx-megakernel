@@ -155,7 +155,8 @@ def compile_ir(src_hip: Path, out_ll: Path, vllm: Path, s: Source, compiler: str
         raise SystemExit(f"compile {s.path} failed:\n{r.stderr[-4000:]}")
 
 
-def run(vllm: Path, out: Path, threads: int, compiler: str, blocks: dict[str, tuple[int, int, int]], only: set[str] | None = None) -> dict:
+def run(vllm: Path, out: Path, threads: int, compiler: str, blocks: dict[str, tuple[int, int, int]], only: set[str] | None = None,
+        slots: dict[str, int] | None = None) -> dict:
     out.mkdir(parents=True, exist_ok=True)
     from etx.importer.bundle import llvm_tool
     llvm_as = llvm_tool("llvm-as")
@@ -178,7 +179,7 @@ def run(vllm: Path, out: Path, threads: int, compiler: str, blocks: dict[str, tu
             blk = blocks.get(k.export, k.block)
             if blk[0] == 0:
                 raise SystemExit(f"{k.export}: the block shape depends on the model ({k.note}); pass it in blocks")
-            txt, info = import_kernel(mod, k.match, f"etx_imp_{k.export}", blk, threads, k.lds_cap, k.inline)
+            txt, info = import_kernel(mod, k.match, f"etx_imp_{k.export}", blk, threads, k.lds_cap, k.inline, (slots or {}).get(k.export))
             (out / f"{k.export}.ll").write_text(txt)
             r = subprocess.run([llvm_as, str(out / f"{k.export}.ll"), "-o", str(out / f"{k.export}.bc")], capture_output=True, text=True)
             if r.returncode:
@@ -198,6 +199,7 @@ def main():
     ap.add_argument("--block", action="append", default=[], help="export=bx,by,bz for model-dependent launches")
     ap.add_argument("--only", default=None, help="comma-separated exports")
     ap.add_argument("--orig", action="store_true", help="also compile the original kernels (hipcc) for host.hip --check")
+    ap.add_argument("--slots", default="", help="export=N,... : at most N of the kernel's blocks per megakernel workgroup")
     a = ap.parse_args()
     blocks = {}
     for b in a.block:
@@ -205,7 +207,8 @@ def main():
         t = tuple(int(x) for x in v.split(","))
         blocks[e] = t + (1,) * (3 - len(t))
     only = set(a.only.split(",")) if a.only else None
-    rep = run(Path(a.vllm).expanduser(), Path(a.out), a.threads, a.compiler, blocks, only)
+    slots = {kv.split("=")[0]: int(kv.split("=")[1]) for kv in a.slots.split(",") if kv}
+    rep = run(Path(a.vllm).expanduser(), Path(a.out), a.threads, a.compiler, blocks, only, slots)
     if a.orig:
         for o in compile_orig(Path(a.out), Path(a.vllm).expanduser(), only):
             print("orig", o)

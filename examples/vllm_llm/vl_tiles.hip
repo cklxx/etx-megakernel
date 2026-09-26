@@ -40,8 +40,28 @@ extern "C" __device__ __attribute__((always_inline)) void vl_prologue(const etx_
 extern "C" __device__ __attribute__((always_inline)) void vl_argmax(const etx_ctx* c) {
   float* sv = (float*)c->lds; int* si = (int*)(sv + blockDim.x);
   float bv = -INFINITY; int bi = 0x7fffffff;
+  // 16-byte loads (8 logits), four in flight per thread: ~19 loads per thread for V = 151936 instead of ~150
+  // dependent 2-byte ones. Each thread scans ascending indices, so the first maximum wins within a thread;
+  // the reduction below breaks ties by the lower index, which keeps torch.argmax's first-maximum rule.
+  const uint4* lg4 = (const uint4*)VP.logits;
+  const int n4 = VP.V / 8;
+  auto scan = [&](const uint4 w, int base) {
+    const unsigned u[4] = {w.x, w.y, w.z, w.w};
+#pragma unroll
+    for (int k = 0; k < 4; ++k) {
+      const float lo = __uint_as_float(u[k] << 16), hi = __uint_as_float(u[k] & 0xffff0000u);
+      if (lo > bv) { bv = lo; bi = base + 2 * k; }
+      if (hi > bv) { bv = hi; bi = base + 2 * k + 1; }
+    }
+  };
+  int j = threadIdx.x;
+  for (; j + 3 * (int)blockDim.x < n4; j += 4 * blockDim.x) {
+    const uint4 a0 = lg4[j], a1 = lg4[j + blockDim.x], a2 = lg4[j + 2 * blockDim.x], a3 = lg4[j + 3 * blockDim.x];
+    scan(a0, 8 * j); scan(a1, 8 * (j + blockDim.x)); scan(a2, 8 * (j + 2 * blockDim.x)); scan(a3, 8 * (j + 3 * blockDim.x));
+  }
+  for (; j < n4; j += blockDim.x) scan(lg4[j], 8 * j);
   const unsigned short* lg = (const unsigned short*)VP.logits;
-  for (int i = threadIdx.x; i < VP.V; i += blockDim.x) {       // ascending per thread: the first maximum wins
+  for (int i = 8 * n4 + threadIdx.x; i < VP.V; i += blockDim.x) {   // tail when V % 8 != 0
     const float v = __uint_as_float((unsigned)lg[i] << 16);
     if (v > bv) { bv = v; bi = i; }
   }

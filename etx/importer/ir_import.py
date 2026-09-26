@@ -196,7 +196,7 @@ def _type_bytes(ty: str, types: dict[str, str]) -> tuple[int, int]:
 
 
 def import_kernel(text: str, kernel: str, export: str, block: tuple[int, int, int], threads: int,
-                  lds_cap: int | None = None, inline: bool = True) -> tuple[str, ImportInfo]:
+                  lds_cap: int | None = None, inline: bool = True, max_slots: int | None = None) -> tuple[str, ImportInfo]:
     """inline=False keeps the entry out of line: the kernel then gets its own register allocation instead of
     sharing the megakernel's (for register-heavy tiles off the critical path; a call costs the callee's
     saved registers per task)."""
@@ -206,6 +206,8 @@ def import_kernel(text: str, kernel: str, export: str, block: tuple[int, int, in
     if slot_thr > threads:
         raise ImportError_(f"block {block} ({nthr} threads) is larger than the megakernel workgroup ({threads})")
     slots = threads // slot_thr
+    if max_slots:                                      # fewer blocks per workgroup: the grid spreads over more CUs
+        slots = max(1, min(slots, max_slots))
     info = ImportInfo(export=export, kernel="", block=block, threads=threads, slots=slots)
     info.slot_threads = slot_thr
 

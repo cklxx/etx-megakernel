@@ -31,6 +31,18 @@ def emit_adapters(imports: dict) -> str:
                 f"  const int nblk = *(const int*)(a + {g + 12});",
                 f"  const int blk = c->coord[0] * {k} + slot;",
                 f"  if (blk < nblk) etx_imp_{e}(a, blk, tid, slot);",
+                "}",
+                f"// every block of one launch on this workgroup, {k} at a time (chained tasks, see examples/vllm_llm ETX_VL_CHAIN);",
+                "// waves past the last slot skip the calls but take every __syncthreads",
+                f"static __device__ __attribute__((always_inline)) void etx_all_blocks_{e}(const unsigned char* a) {{",
+                "  int tx; asm volatile(\"v_mov_b32 %0, %1\" : \"=v\"(tx) : \"v\"((int)threadIdx.x));",
+                f"  const int slot = tx / {st}, tid = tx - slot * {st};",
+                f"  const int nblk = *(const int*)(a + {g + 12});",
+                f"  for (int first = 0; first < nblk; first += {k}) {{",
+                f"    const int blk = first + slot;",
+                f"    if (slot < {k} && blk < nblk) etx_imp_{e}(a, blk, tid, slot);",
+                "    __syncthreads();",
+                "  }",
                 "}", ""]
     return "\n".join(out)
 
