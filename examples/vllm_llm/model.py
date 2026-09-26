@@ -200,9 +200,10 @@ def build() -> Graph:
             chains[sig] = [x["export"] for x in grp]
             g.etensor(ev, (1,), wait_count=1)
             name = "chain_" + "_".join(x["role"] for x in grp) + f"_{grp[0]['layer']}"
+            pin = {"domain_map": "i->(0)"} if any(x["role"] in PIN_ROLES for x in grp) else {}
             g.call_device(name, (1,), hip_link(CHAIN_FILE, f"etx_chain_{sig}"), resource=res, args=["impargs"],
                           consts=tuple(x["offset"] for x in grp), in_edges={prev: "i->(0)"}, out_edges={ev: "i->(0)"},
-                          duration_us=2.0 * len(grp))
+                          duration_us=2.0 * len(grp), **pin)
         prev = ev
     if chains:
         with open(CHAIN_FILE, "w") as f:

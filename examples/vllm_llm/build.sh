@@ -25,6 +25,10 @@ ORIG=(); CHK=(); [ "${ETX_VL_CHECK:-0}" = 1 ] && ORIG=(--orig) && CHK=(-DETX_VL_
   --block rms_norm_2d=$((H / 8)) --block reshape_and_cache=$((NKV * HD / 8))
 "$PY" -m etx.importer.adapter "$OUT/imp/imports.json" --tiles "$OUT/imp_tiles.hip" --header "$OUT/imports.h"
 "$PY" -m etx.importer.bundle --imports "$OUT/imp" --exports "$EXPORTS" --devlibs "$DEVLIBS" -o "$OUT/imports.bc"
+# ETX_VL_UC=1: cross-XCD tensors in uncached memory and DOMAIN fences for DEVICE events (ETX_COHERENT_DEVICE_DATA);
+# the KV cache stays cached, so its writer and readers must share an XCD: ETX_VL_PIN is forced on
+UCF=()
+if [ "${ETX_VL_UC:-0}" = 1 ]; then export ETX_VL_PIN=1; UCF=(-DETX_VL_UC -DETX_COHERENT_DEVICE_DATA); fi
 echo "== plan"
 ETX_VL_IMPORTS="$OUT/imp/imports.json" ETX_VL_ADAPTERS="$OUT/imp_tiles.hip" ETX_VL_PLAN="$OUT/vl_plan.txt" ETX_LLM_CONFIG="$CONFIG" ETX_VL_CHAINS="$OUT/chain_tiles.hip" \
   "$PY" -m etx compile examples/vllm_llm/model.py --arch gfx942 --out "$OUT" --inline-tiles > "$OUT/compile.log" 2>&1 || { tail -20 "$OUT/compile.log"; exit 1; }
@@ -32,7 +36,7 @@ grep -E "tasks=|workers/domain" "$OUT/compile.log" || true
 echo "== hipcc"
 hipcc -O3 -std=c++17 --offload-arch=gfx942 -I "$ROOT/etx/runtime/include" -I "$OUT" -I "$ROOT" \
   -Xclang -mlink-builtin-bitcode -Xclang "$OUT/imports.bc" -Rpass-analysis=kernel-resource-usage \
-  "${CHK[@]}" "$OUT/megakernel_d0.hip" "$ROOT/examples/vllm_llm/host.hip" $([ "${ETX_VL_CHECK:-0}" = 1 ] && echo "$OUT/imp/orig_table.hip -x none $OUT/imp/orig_*.o") -o "$OUT/run" 2>&1 \
+  "${CHK[@]}" "${UCF[@]}" "$OUT/megakernel_d0.hip" "$ROOT/examples/vllm_llm/host.hip" $([ "${ETX_VL_CHECK:-0}" = 1 ] && echo "$OUT/imp/orig_table.hip -x none $OUT/imp/orig_*.o") -o "$OUT/run" 2>&1 \
   | grep -E "Function Name|VGPRs:|ScratchSize|VGPRs Spill|LDS Size|error" | sed -E "s/.*remark: +//; s/ \[-Rpass.*//" | paste - - - - - || true
 [ -x "$OUT/run" ] || { echo "build failed: no $OUT/run"; exit 1; }
 echo "built $OUT/run (plan $OUT/vl_plan.txt)"

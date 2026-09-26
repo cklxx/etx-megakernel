@@ -66,7 +66,7 @@
 |---|---|---|
 | **按 XCD 复制**（`ETX_VL_XCD`） | norm 和 SiLU 在 8 个 XCD 上各算一份（结果完全相同），写 XCD 本地的缓冲区；紧跟的 GEMV 排成 8×38 个任务，只等本 XCD 的事件。8B 的整卡事件从 472 个降到 254 个 | 已写好，本地编译零溢出，待测 |
 | **合并小 kernel**（`ETX_VL_CHAIN`） | q/k norm → RoPE → 写 cache 在一个任务里顺序执行，中间只隔 `__syncthreads`，每层少 3 个事件 | 已写好，待测 |
-| **uncached 通信内存** | 跨 XCD 传递的激活向量（每层几 KB）和事件计数器放进 uncached 内存（`hipDeviceMallocUncached`，MTYPE UC，不经过 L2）。release 只剩 `s_waitcnt vmcnt(0)`，acquire 只剩作废 L1（`buffer_inv sc0`）。权重运行中从不写，照常缓存。内存类型是页属性，**kernel 不改** | 待实现：一个内存分配开关，加上机器模型里一行"一致内存的 DEVICE 作用域"lowering |
+| **uncached 通信内存** | 跨 XCD 传递的激活向量（每层几 KB）和事件计数器放进 uncached 内存（`hipDeviceMallocUncached`，MTYPE UC，不经过 L2）。release 只剩 `s_waitcnt vmcnt(0)`，acquire 只剩作废 L1（`buffer_inv sc0`）。权重运行中从不写，照常缓存。内存类型是页属性，**kernel 不改** | 已写好（`ETX_VL_UC`，`ETX_COHERENT_DEVICE_DATA`；KV cache 的写入和读取固定在同一个 XCD），本地编译零溢出；是否运行由同步微基准判定 |
 | **每 XCD 一个轮询者**（relay，P5） | 304 个轮询者降到 8 个。之前测出分层 acquire 不安全，是因为 L2 里可能留着陈旧的行；数据放进 uncached 内存后就没有陈旧行了 | 代码已有，要和上一项一起测 |
 | **等待方式** | `s_sleep` 先短后长（目前固定 8，约 0.2 µs）；`s_setprio` 降低轮询 wave 的优先级；`s_wakeup` 提前叫醒同一 workgroup 里在睡的 wave | 待调 |
 | **硬件全局屏障 GWS** | 指令集里有：64 个资源，硬件排队，不用轮询。但 ROCm 在 gfx942 上自己也不用它，而且需要驱动给队列分配资源 | 只做一次微基准 |
@@ -102,7 +102,7 @@ vLLM 在这个模型上只用到 26% 的带宽，是融合收益最大的地方�
 
 | 阶段 | 天数 | 内容 | 完成标准 | GPU |
 |---|---|---|---|---|
-| 1 | 第 1–2 天 | 4 个同步微基准（事件往返 vs uncached、L2 写回/作废代价、kernel 边界间隔、GWS）；`vm_next.sh` 跑完 6 个变体和逐 kernel 计时；实现并测 uncached 通信内存 + relay | 8B 和 1.5B 上，融合版比逐个 launch 快 10% 以上，32/32 正确 | 单卡约 3 小时 |
+| 1 | 第 1–2 天 | `vm_next.sh`：先跑同步微基准（`bench/sync/sync_bench.hip`：带数据和陈旧检查的 XCD 间往返、304 个 workgroup 的整卡屏障、kernel 边界间隔、GWS），按事先定好的门槛决定是否测 uncached 变体；再抓 vLLM trace 定天花板；然后逐 kernel 计时和各变体整模型 | 8B 和 1.5B 上，融合版比逐个 launch 快 10% 以上，32/32 正确 | 单卡约 3 小时 |
 | 2 | 第 2–4 天 | MoE：接入 `topk_softmax` 和 `moe_sum`；LLVM 23 设备编译 + `hipModuleLoad`；导入 Triton `fused_moe_kernel`，`--check` 验证，然后跑整个模型 | Qwen3-30B-A3B 融合版快于 vLLM | 单卡约 6 小时 |
 | 3 | 第 4–5 天 | batch 4–16，更长上下文 | 每 token 时间优于 vLLM 同 batch | 单卡约 6 小时 |
 | 4 | 第 5–7 天 | 多 GPU：张量并行/专家并行，通信融合 | 8 卡上优于 vLLM | 8 卡约 8 小时 |

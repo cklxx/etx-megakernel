@@ -41,6 +41,18 @@ def emit_lowering_header(m: MachineModel) -> str:
         out.append(f"#define ETX_POLL_{name}(ptr) ({v.poll.format(ptr='(ptr)')})")
         out.append(f"#define ETX_ARRIVE_{name}(ptr) ({v.arrive.format(ptr='(ptr)')})")
         out.append("")
+    # ETX_COHERENT_DEVICE_DATA: the host allocated every tensor a DEVICE event protects in memory that bypasses the
+    # per-domain caches (MTYPE UC on gfx942), so a DEVICE hand-off needs only the DOMAIN fences: drain the stores,
+    # drop L1. No whole-L2 writeback / invalidate per event (docs/RESEARCH-sync-hardware.md 2.1). The build asserts
+    # it by defining the macro; the lowering cannot check where the host put the data.
+    dom = m.vis(Scope.DOMAIN)
+    out.append("#ifdef ETX_COHERENT_DEVICE_DATA")
+    out.append("#undef ETX_RELEASE_DEVICE")
+    out.append("#undef ETX_ACQUIRE_DEVICE")
+    out.append(f"#define ETX_RELEASE_DEVICE() do {{ {' '.join(dom.release) or '/* none */;'} }} while (0)")
+    out.append(f"#define ETX_ACQUIRE_DEVICE() do {{ {' '.join(dom.acquire) or '/* none */;'} }} while (0)")
+    out.append("#endif")
+    out.append("")
     for k, val in sorted(m.capabilities.items()):
         if isinstance(val, bool):
             out.append(f"#define ETX_CAP_{k.upper()} {int(val)}")

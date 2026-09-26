@@ -138,7 +138,7 @@ a { color: #0645ad; text-decoration: none; }
 <tr>
 <td><strong>uncached 通信内存</strong></td>
 <td>跨 XCD 传递的激活向量（每层几 KB）和事件计数器放进 uncached 内存（<code>hipDeviceMallocUncached</code>，MTYPE UC，不经过 L2）。release 只剩 <code>s_waitcnt vmcnt(0)</code>，acquire 只剩作废 L1（<code>buffer_inv sc0</code>）。权重运行中从不写，照常缓存。内存类型是页属性，<strong>kernel 不改</strong></td>
-<td>待实现：一个内存分配开关，加上机器模型里一行&rdquo;一致内存的 DEVICE 作用域&rdquo;lowering</td>
+<td>已写好（<code>ETX_VL_UC</code>，<code>ETX_COHERENT_DEVICE_DATA</code>；KV cache 的写入和读取固定在同一个 XCD），本地编译零溢出；是否运行由同步微基准判定</td>
 </tr>
 <tr>
 <td><strong>每 XCD 一个轮询者</strong>（relay，P5）</td>
@@ -196,7 +196,7 @@ a { color: #0645ad; text-decoration: none; }
 <tr>
 <td>1</td>
 <td>第 1–2 天</td>
-<td>4 个同步微基准（事件往返 vs uncached、L2 写回/作废代价、kernel 边界间隔、GWS）；<code>vm_next.sh</code> 跑完 6 个变体和逐 kernel 计时；实现并测 uncached 通信内存 + relay</td>
+<td><code>vm_next.sh</code>：先跑同步微基准（<code>bench/sync/sync_bench.hip</code>：带数据和陈旧检查的 XCD 间往返、304 个 workgroup 的整卡屏障、kernel 边界间隔、GWS），按事先定好的门槛决定是否测 uncached 变体；再抓 vLLM trace 定天花板；然后逐 kernel 计时和各变体整模型</td>
 <td>8B 和 1.5B 上，融合版比逐个 launch 快 10% 以上，32/32 正确</td>
 <td>单卡约 3 小时</td>
 </tr>

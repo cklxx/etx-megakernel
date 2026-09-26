@@ -36,6 +36,6 @@ These rules come from what went wrong in 2026-09 (weeks spent tuning our own til
 
 ## 6. Where things are
 
-- `etx/importer/`: kernel import (slice, IR import, adapters, bundle, vLLM manifest). `examples/vllm_llm/`: Qwen with vLLM's kernels; `vm_next.sh` is the prepared next session.
+- `etx/importer/`: kernel import (slice, IR import, adapters, bundle, vLLM manifest). `examples/vllm_llm/`: Qwen with vLLM's kernels; `vm_next.sh` is the prepared next session (microbenchmarks and gate first). `bench/sync/sync_bench.hip`: the synchronisation microbenchmarks.
 - Plans and research: `docs/PLAN-v3.md`, `docs/RESEARCH-sync-hardware.md`, `docs/RESEARCH-moe-import.md`; results in `docs/ETX_Technical_Design.md` section 15.
 - Tests: `.venv/bin/python -m pytest -q`. Local toolchain: `/opt/homebrew/opt/llvm/bin` (LLVM 23) with the ROCm 7.2.4 headers and device libraries in `~/code/rocm-headers`.

@@ -46,6 +46,19 @@ static bool wait_stream(hipStream_t s, double seconds) {
 }
 
 static void die(const std::string& m) { fprintf(stderr, "error: %s\n", m.c_str()); exit(1); }
+// ETX_VL_UC builds: the tensors that cross XCDs inside a step live in uncached memory (MTYPE UC), which is what
+// lets the build use ETX_COHERENT_DEVICE_DATA (DOMAIN fences for DEVICE events). The KV cache stays cached: its
+// writer and its readers are pinned to one XCD (the build sets ETX_VL_PIN).
+template <class T> static T* ualloc(size_t n) {
+  T* p;
+#ifdef ETX_VL_UC
+  ETX_CHECK(hipExtMallocWithFlags((void**)&p, std::max<size_t>(n, 1) * sizeof(T), hipDeviceMallocUncached));
+#else
+  ETX_CHECK(hipMalloc(&p, std::max<size_t>(n, 1) * sizeof(T)));
+#endif
+  ETX_CHECK(hipMemset(p, 0, std::max<size_t>(n, 1) * sizeof(T)));
+  return p;
+}
 template <class T> static T* dalloc(size_t n) { T* p; ETX_CHECK(hipMalloc(&p, std::max<size_t>(n, 1) * sizeof(T))); ETX_CHECK(hipMemset(p, 0, std::max<size_t>(n, 1) * sizeof(T))); return p; }
 
 struct Manifest {
@@ -146,18 +159,18 @@ int main(int argc, char** argv) {
   // ETX_VL_XCD plans replicate the one-block launches per XCD: residual, normed input, o and activation then
   // have one copy per XCD (NR = 8); everything else is shared
   int NR = 1; for (const Inst& x : insts) NR = std::max(NR, x.rep);
-  bf *resid = dalloc<bf>((size_t)NR * H), *hn = dalloc<bf>((size_t)NR * H), *qkv = dalloc<bf>(NQKV), *qn = dalloc<bf>(NH * HD), *kn = dalloc<bf>(NKV * HD);
-  bf *dx = dalloc<bf>((size_t)NR * H), *ox = dalloc<bf>((size_t)NR * H), *actx = dalloc<bf>((size_t)NR * I);
-  bf *attn_out = dalloc<bf>(NH * HD), *o = dalloc<bf>(H), *gu = dalloc<bf>(2 * I), *act = dalloc<bf>(I), *dn = dalloc<bf>(H), *logits = dalloc<bf>(V);
-  float *exp_sums = dalloc<float>(NH * parts), *max_logits = dalloc<float>(NH * parts); bf* tmp_out = dalloc<bf>((size_t)NH * parts * HD);
-  int64_t *positions = dalloc<int64_t>(1), *slot_mapping = dalloc<int64_t>(1); int32_t* seq_lens = dalloc<int32_t>(1);
+  bf *resid = ualloc<bf>((size_t)NR * H), *hn = ualloc<bf>((size_t)NR * H), *qkv = ualloc<bf>(NQKV), *qn = ualloc<bf>(NH * HD), *kn = ualloc<bf>(NKV * HD);
+  bf *dx = ualloc<bf>((size_t)NR * H), *ox = ualloc<bf>((size_t)NR * H), *actx = ualloc<bf>((size_t)NR * I);
+  bf *attn_out = ualloc<bf>(NH * HD), *o = ualloc<bf>(H), *gu = ualloc<bf>(2 * I), *act = ualloc<bf>(I), *dn = ualloc<bf>(H), *logits = ualloc<bf>(V);
+  float *exp_sums = ualloc<float>(NH * parts), *max_logits = ualloc<float>(NH * parts); bf* tmp_out = ualloc<bf>((size_t)NH * parts * HD);
+  int64_t *positions = ualloc<int64_t>(1), *slot_mapping = ualloc<int64_t>(1); int32_t* seq_lens = ualloc<int32_t>(1);
   std::vector<int32_t> bt(MAXBLK); for (int i = 0; i < MAXBLK; ++i) bt[i] = i;
   int32_t* block_tables = etx_host::upload(bt.data(), bt.size());
   const float one = 1.0f; float* kv_scale = etx_host::upload(&one, 1);
   std::vector<bf*> kc(L), vc(L);
   const size_t cache_elems = (size_t)MAXBLK * NKV * HD * BS;        // [blocks][NKV][HD/x][BS][x] and [blocks][NKV][HD][BS]
   for (int l = 0; l < L; ++l) { kc[l] = dalloc<bf>(cache_elems); vc[l] = dalloc<bf>(cache_elems); }
-  int32_t *token_in = dalloc<int32_t>(steps + 2), *token_out = dalloc<int32_t>(steps + 1); uint64_t* token_time = dalloc<uint64_t>(2 * (steps + 1));
+  int32_t *token_in = ualloc<int32_t>(steps + 2), *token_out = ualloc<int32_t>(steps + 1); uint64_t* token_time = dalloc<uint64_t>(2 * (steps + 1));
 
   // ---- argument blocks, instance by instance (see model.py for the vLLM call each role mirrors)
   std::vector<uint8_t> ab(total, 0);
