@@ -36,12 +36,13 @@ print('DL-DONE $n')" > ~/vlnext/dl_$n.log 2>&1 &
 log "1. synchronisation microbenchmarks (the deciding measurement)"
 hipcc -O3 -std=c++17 --offload-arch=gfx942 bench/sync/sync_bench.hip -o ~/vlnext/sync_bench > ~/vlnext/sync_build.log 2>&1 || { echo "sync_bench BUILD FAILED"; cat ~/vlnext/sync_build.log; }
 for w in pingpong barrier boundary; do timeout 300 stdbuf -oL ~/vlnext/sync_bench $w > ~/vlnext/sync_$w.log 2>&1; echo "[$w] rc=$?"; grep -E "RESULT|HUNG|error" ~/vlnext/sync_$w.log; done
-timeout 90 stdbuf -oL ~/vlnext/sync_bench gws > ~/vlnext/sync_gws.log 2>&1; echo "[gws] rc=$?"; grep -E "RESULT|error" ~/vlnext/sync_gws.log
 UC_STALE=$(grep "RESULT pingpong mode=uc" ~/vlnext/sync_pingpong.log | grep -oE "stale words [0-9]+" | awk '{s+=$3} END {print s+0}')
 UC_BAR=$(grep "RESULT barrier  mode=uc    relay=0 L2 load   0" ~/vlnext/sync_barrier.log | grep -oE "[0-9.]+ us per barrier" | awk '{print $1}')
 DEV_BAR=$(grep "RESULT barrier  mode=dev   relay=0 L2 load   0" ~/vlnext/sync_barrier.log | grep -oE "[0-9.]+ us per barrier" | awk '{print $1}')
-UC_GO=0; [ "${UC_STALE:-1}" = 0 ] && [ -n "$UC_BAR" ] && [ -n "$DEV_BAR" ] && awk -v u="$UC_BAR" -v d="$DEV_BAR" 'BEGIN {exit !(u < d)}' && UC_GO=1
-log "GATE: uncached stale words ${UC_STALE:-?}, barrier uncached ${UC_BAR:-?} us vs device-fence ${DEV_BAR:-?} us -> UC_GO=$UC_GO"
+UC_BAD=$(grep -cE "mode=uc .*(NO PROGRESS|HUNG|NOT AS INTENDED)" ~/vlnext/sync_pingpong.log ~/vlnext/sync_barrier.log | awk -F: '{s+=$2} END {print s+0}')
+UC_BAR_STALE=$(grep "RESULT barrier  mode=uc" ~/vlnext/sync_barrier.log | grep -oE "stale [0-9]+" | awk '{s+=$2} END {print s+0}')
+UC_GO=0; [ "${UC_STALE:-1}" = 0 ] && [ "$UC_BAR_STALE" = 0 ] && [ "$UC_BAD" = 0 ] && [ -n "$UC_BAR" ] && [ -n "$DEV_BAR" ] && awk -v u="$UC_BAR" -v d="$DEV_BAR" 'BEGIN {exit !(u < d)}' && UC_GO=1
+log "GATE: uncached stale words ${UC_STALE:-?} (hand-off) + ${UC_BAR_STALE:-?} (barrier), failed runs ${UC_BAD:-?}, barrier uncached ${UC_BAR:-?} us vs device-fence ${DEV_BAR:-?} us -> UC_GO=$UC_GO"
 
 log "2. ceiling: vLLM kernel traces (custom_ops=all: the kernels ETX imports)"
 until grep -q ENV-DONE ~/vlnext/env.log 2>/dev/null && grep -q PULL-DONE ~/vlnext/pull.log; do sleep 10; done
@@ -88,7 +89,7 @@ for n in qwen2.5-1.5b qwen3-8b; do
     [ $mode = unfused ] && [ $v != base ] && [ $v != xcd_s1 ] && continue
     R=build/vl/${n}_$v; f=$([ $mode = unfused ] && echo --unfused)
     [ -x $R/run ] || { echo "[$n $v $mode] not built"; continue; }
-    timeout 900 stdbuf -oL $R/run ~/llm/$n $R/vl_plan.txt --repeat 2 $f > ~/vlnext/run_${n}_${v}_$mode.log 2>&1; rc=$?
+    timeout 600 stdbuf -oL $R/run ~/llm/$n $R/vl_plan.txt --repeat 2 $f > ~/vlnext/run_${n}_${v}_$mode.log 2>&1; rc=$?
     echo "[$n $v $mode] rc=$rc $(grep -E '^run |^RESULT|failed|rror' ~/vlnext/run_${n}_${v}_$mode.log | tr '\n' ' ' | cut -c1-300)"
   done; done
 done
@@ -105,5 +106,7 @@ print('DL-DONE')" > ~/vlnext/dl_moe.log 2>&1; tail -1 ~/vlnext/dl_moe.log
   echo "[moe] rc=$?"; grep -vE "^\s*$|simple_timer" ~/vlnext/moe/prof.out | head -34
   sudo chown -R $USER ~/vlnext; find ~/vlnext/moe/triton -name "fused_moe_kernel*" | head
 fi
+log "7. GWS hardware barrier (last: an unsupported GWS could leave the queue in a bad state)"
+timeout 90 stdbuf -oL ~/vlnext/sync_bench gws > ~/vlnext/sync_gws.log 2>&1; echo "[gws] rc=$?"; grep -E "RESULT|error" ~/vlnext/sync_gws.log
 sudo chown -R $USER ~/vlnext examples/vllm_llm/results 2>/dev/null; (cd ~ && tar czf vlnext.tgz --exclude='vlnext/prof_*' --exclude='*.o' vlnext 2>/dev/null); ls -la ~/vlnext.tgz
 log "ALL DONE"

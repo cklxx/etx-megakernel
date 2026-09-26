@@ -10,7 +10,8 @@
 //
 // Memory/fence variants (the "mode" column):
 //   dev    cached memory, today's ETX device scope: release s_waitcnt + buffer_wbl2 sc1, acquire buffer_inv sc1
-//   uc     uncached memory (hipDeviceMallocUncached, MTYPE UC), release s_waitcnt, acquire buffer_inv sc0 (L1 only)
+//   uc     payload in uncached memory (hipDeviceMallocUncached, MTYPE UC), release s_waitcnt, acquire buffer_inv sc0
+//          (L1 only); counters and flags stay in ordinary memory in every mode, as ETX's event words do
 //   light  cached memory with the uc fences: expected to go STALE across XCDs (proves the check detects it)
 //   xcd    same-XCD pair, cached memory, XCD fences (s_waitcnt / buffer_inv sc0): the floor
 // Output lines start with RESULT; a hand-off that cannot complete reports NO PROGRESS instead of hanging.
@@ -79,7 +80,7 @@ __global__ void __launch_bounds__(1024) k_pingpong(int* pay_ab, int* pay_ba, int
       }
     }
   }
-  if (threadIdx.x == 0) { ticks[me] = wall_clock64() - t0; errors[me] = s_err; progress[0] = rounds + 1; }
+  if (threadIdx.x == 0) { ticks[me] = wall_clock64() - t0; errors[me] = s_err; progress[0] = rounds + 1; ticks[2 + me] = xcc_id(); }
 }
 
 // ------------------------------------------------------------------ barrier
@@ -189,16 +190,17 @@ int main(int argc, char** argv) {
     const int rounds = 2000;
     for (int mode : {DEV, UC, LIGHT, XCD}) for (int words : {16, 2048, 16384}) {
       const bool uc = mode == UC;
-      int* ab = alloc(words * 4, uc); int* ba = alloc(words * 4, uc); int* fl = alloc(128 * 4, uc);
-      int *err = alloc(8, false), *prog = alloc(4, false); unsigned long long* ticks; CHECK(hipMalloc(&ticks, 16));
+      int* ab = alloc(words * 4, uc); int* ba = alloc(words * 4, uc); int* fl = alloc(128 * 4, false);   // flags: ordinary memory, like ETX's event words
+      int *err = alloc(8, false), *prog = alloc(4, false); unsigned long long* ticks; CHECK(hipMalloc(&ticks, 32));
       const int wb = mode == XCD ? wb_same : wb_cross;
       hipLaunchKernelGGL(k_pingpong, dim3(ncu), dim3(1024), 0, st, ab, ba, fl, words, rounds, mode, wa, wb, err, prog, ticks);
       if (!wait_stream(st, 30.0)) { printf("RESULT pingpong mode=%s bytes=%d HUNG\n", mode_name[mode], words * 4); return 3; }
-      int e[2], p; unsigned long long t[2];
-      CHECK(hipMemcpy(e, err, 8, hipMemcpyDeviceToHost)); CHECK(hipMemcpy(&p, prog, 4, hipMemcpyDeviceToHost)); CHECK(hipMemcpy(t, ticks, 16, hipMemcpyDeviceToHost));
+      int e[2], p; unsigned long long t[4];
+      CHECK(hipMemcpy(e, err, 8, hipMemcpyDeviceToHost)); CHECK(hipMemcpy(&p, prog, 4, hipMemcpyDeviceToHost)); CHECK(hipMemcpy(t, ticks, 32, hipMemcpyDeviceToHost));
       if (p <= rounds) printf("RESULT pingpong mode=%-5s bytes=%-6d NO PROGRESS at round %d\n", mode_name[mode], words * 4, p);
-      else printf("RESULT pingpong mode=%-5s bytes=%-6d one-way %.3f us  stale words %d\n", mode_name[mode], words * 4,
-                  t[0] * 10.0 / 1000.0 / (2.0 * rounds), e[0] + e[1]);
+      else printf("RESULT pingpong mode=%-5s bytes=%-6d one-way %.3f us  stale words %d  (XCDs %llu -> %llu%s)\n", mode_name[mode], words * 4,
+                  t[0] * 10.0 / 1000.0 / (2.0 * rounds), e[0] + e[1], t[2], t[3],
+                  (mode == XCD) == (t[2] == t[3]) ? "" : ", PLACEMENT NOT AS INTENDED");
       CHECK(hipFree(ab)); CHECK(hipFree(ba)); CHECK(hipFree(fl)); CHECK(hipFree(err)); CHECK(hipFree(prog)); CHECK(hipFree(ticks));
     }
   }
@@ -209,7 +211,7 @@ int main(int argc, char** argv) {
     for (int mode : {DEV, UC}) for (int relay : {0, 1}) for (int load : {0, 1}) {
       if (mode == DEV && relay) continue;                      // the relay's cheap acquire is only valid with uncached data
       const bool uc = mode == UC;
-      int* slots = alloc(ncu * 16 * 4, uc); int* cx = alloc(8 * 64 * 4, uc); int* ca = alloc(64 * 4, uc); int* lf = alloc(8 * 64 * 4, false);
+      int* slots = alloc(ncu * 16 * 4, uc); int* cx = alloc(8 * 64 * 4, false); int* ca = alloc(64 * 4, false); int* lf = alloc(8 * 64 * 4, false);
       int *err = alloc(4, false), *prog = alloc(4, false);
       const int dkb = load ? 64 : 0, ckb = load ? 128 : 0;
       hipEvent_t e0, e1; CHECK(hipEventCreate(&e0)); CHECK(hipEventCreate(&e1));
