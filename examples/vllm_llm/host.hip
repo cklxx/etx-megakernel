@@ -399,6 +399,8 @@ int main(int argc, char** argv) {
     if (first_div >= 0) printf("; first divergence at %d (ours %d, HF %d)", first_div, out[(int)prompt.size() - 1 + first_div], golden[first_div]);
     printf("\n");
   }
+  // ETX_TRACE=1: per-type wait / body / span of the last step, and the raw per-task stamps (ETX_TRACE_RAW=<file>)
+  if (getenv("ETX_TRACE") && !unfused) hst.report_phases(etx_type_names, ETX_N_TYPES);
   std::vector<double> s(step_ms), w(wall_ms); std::sort(s.begin(), s.end()); std::sort(w.begin(), w.end());
   const double med = s.empty() ? 0 : s[s.size() / 2], wmed = w.empty() ? 0 : w[w.size() / 2];
   printf("per-token latency on device (prologue -> argmax): median %.3f ms  min %.3f  max %.3f; host wall per step median %.3f ms\n",
