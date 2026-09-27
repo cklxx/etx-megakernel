@@ -6,7 +6,16 @@ condition (new code, new configuration) or to validate a prediction, never to re
 The full data sets live outside git (they are large and binary) in `~/code/etx/results_<date><session>/`, each with a
 `SHA256SUMS` of every file (verify with `cd <dir> && shasum -a 256 -c SHA256SUMS`). The hash of each `SHA256SUMS` is recorded
 below, so the local copy can be checked against this file. Small, human-readable subsets are committed under
-`examples/*/results/<date>/`. **The full sets have no off-machine copy yet.**
+`examples/*/results/<date>/`. Off-machine copies of the full sets: release `data-2026-09-27` of the private repositories
+`cklxx/etx-data` and `metalopscloud/amdproject` (one tarball per set, `TARBALLS.sha256`, this file), verified by download.
+Restore: `gh release download data-2026-09-27 --repo cklxx/etx-data && shasum -a 256 -c TARBALLS.sha256 && tar xzf <set>.tgz`.
+
+| tarball | sha256 (first 16) |
+|---|---|
+| results_2026-09-27.tgz (28 MB) | 21bd605370f16f19 |
+| results_2026-09-27b.tgz (2 MB) | 3c598aa6f19b9872 |
+| results_2026-09-27c.tgz (6 MB) | 49a8b3f89008fdd4 |
+| results_2026-09-27d.tgz (7 MB) | 45c0f6da519031f9 |
 
 | set | session (code) | files / size | SHA256SUMS hash (first 16) | contents | used by |
 |---|---|---|---|---|---|
