@@ -205,7 +205,7 @@ int main(int argc, char** argv) {
       std::vector<uint32_t> xcc(ncu); CHECK(hipMemcpy(xcc.data(), dxcc, ncu * 4, hipMemcpyDeviceToHost));
       int same = 0; for (int i = 0; i < ncu; ++i) same += xcc[i] == xcc[(i + 1) % ncu];
       printf("RESULT stream %6.1f MB  cold %.2f TB/s  warm %.2f TB/s  mall %.2f TB/s  (median of 5; mall pass: %d of %d neighbours share an XCD%s)\n",
-             mb, pct(cold, 0.5), pct(warm, 0.5), pct(mall, 0.5), same, ncu, same > ncu / 8 ? ", MALL PASS PARTLY L2" : "");
+             n_chunks * chunk_bytes / 1e6, pct(cold, 0.5), pct(warm, 0.5), pct(mall, 0.5), same, ncu, same > ncu / 8 ? ", MALL PASS PARTLY L2" : "");
       CHECK(hipFree(buf));
     }
   }
