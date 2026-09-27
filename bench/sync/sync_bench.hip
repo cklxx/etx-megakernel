@@ -11,6 +11,7 @@
 // Memory/fence variants (the "mode" column):
 //   dev    cached memory, today's ETX device scope: release s_waitcnt + buffer_wbl2 sc1, acquire buffer_inv sc1
 //   uc     payload in uncached memory (hipDeviceMallocUncached, MTYPE UC), release s_waitcnt, acquire buffer_inv sc0
+//          (measured stale 2026-09-27: sc0 leaves the consumer's L1 stale; uc1 / xcd1 use sc1 and are clean)
 //          (L1 only); counters and flags stay in ordinary memory in every mode, as ETX's event words do
 //   light  cached memory with the uc fences: expected to go STALE across XCDs (proves the check detects it)
 //   xcd    same-XCD pair, cached memory, XCD fences (s_waitcnt / buffer_inv sc0): the floor
@@ -25,8 +26,13 @@
 
 #define CHECK(x) do { hipError_t e_ = (x); if (e_ != hipSuccess) { fprintf(stderr, "%s:%d %s: %s\n", __FILE__, __LINE__, #x, hipGetErrorString(e_)); exit(1); } } while (0)
 
-enum Mode { DEV = 0, UC = 1, LIGHT = 2, XCD = 3 };
-static const char* mode_name[] = {"dev", "uc", "light", "xcd"};
+enum Mode { DEV = 0, UC = 1, LIGHT = 2, XCD = 3, UC1 = 4, XCD1 = 5 };
+static const char* mode_name[] = {"dev", "uc", "light", "xcd", "uc1", "xcd1"};
+// uc1 / xcd1: as uc / xcd but the acquire is buffer_inv sc1 (agent scope). Added 2026-09-27 after uc and xcd read stale
+// data at 64 B and 8 KB (not at 64 KB): the hypothesis is that buffer_inv sc0 (workgroup scope) does not invalidate
+// the vector L1 outside threadgroup-split mode, so a consumer re-reading the same lines sees its own stale L1 copy.
+static bool is_uc(int m) { return m == UC || m == UC1; }
+static bool is_xcd(int m) { return m == XCD || m == XCD1; }
 
 __device__ __forceinline__ uint32_t xcc_id() { return __builtin_amdgcn_s_getreg((3 << 11) | (0 << 6) | 20) & 0xF; }
 __device__ __forceinline__ void release(int mode) {
@@ -34,7 +40,7 @@ __device__ __forceinline__ void release(int mode) {
   else asm volatile("s_waitcnt vmcnt(0) lgkmcnt(0)" ::: "memory");
 }
 __device__ __forceinline__ void acquire(int mode) {
-  if (mode == DEV) asm volatile("buffer_inv sc1" ::: "memory");
+  if (mode == DEV || mode == UC1 || mode == XCD1) asm volatile("buffer_inv sc1" ::: "memory");
   else asm volatile("buffer_inv sc0" ::: "memory");
 }
 __device__ __forceinline__ int poll(const int* p) { return __hip_atomic_load(p, __ATOMIC_RELAXED, __HIP_MEMORY_SCOPE_AGENT); }
@@ -188,11 +194,11 @@ int main(int argc, char** argv) {
 
   if (what == "all" || what == "pingpong") {
     const int rounds = 2000;
-    for (int mode : {DEV, UC, LIGHT, XCD}) for (int words : {16, 2048, 16384}) {
-      const bool uc = mode == UC;
+    for (int mode : {DEV, UC, LIGHT, XCD, UC1, XCD1}) for (int words : {16, 2048, 16384}) {
+      const bool uc = is_uc(mode);
       int* ab = alloc(words * 4, uc); int* ba = alloc(words * 4, uc); int* fl = alloc(128 * 4, false);   // flags: ordinary memory, like ETX's event words
       int *err = alloc(8, false), *prog = alloc(4, false); unsigned long long* ticks; CHECK(hipMalloc(&ticks, 32));
-      const int wb = mode == XCD ? wb_same : wb_cross;
+      const int wb = is_xcd(mode) ? wb_same : wb_cross;
       hipLaunchKernelGGL(k_pingpong, dim3(ncu), dim3(1024), 0, st, ab, ba, fl, words, rounds, mode, wa, wb, err, prog, ticks);
       if (!wait_stream(st, 30.0)) { printf("RESULT pingpong mode=%s bytes=%d HUNG\n", mode_name[mode], words * 4); return 3; }
       int e[2], p; unsigned long long t[4];
@@ -200,7 +206,7 @@ int main(int argc, char** argv) {
       if (p <= rounds) printf("RESULT pingpong mode=%-5s bytes=%-6d NO PROGRESS at round %d\n", mode_name[mode], words * 4, p);
       else printf("RESULT pingpong mode=%-5s bytes=%-6d one-way %.3f us  stale words %d  (XCDs %llu -> %llu%s)\n", mode_name[mode], words * 4,
                   t[0] * 10.0 / 1000.0 / (2.0 * rounds), e[0] + e[1], t[2], t[3],
-                  (mode == XCD) == (t[2] == t[3]) ? "" : ", PLACEMENT NOT AS INTENDED");
+                  is_xcd(mode) == (t[2] == t[3]) ? "" : ", PLACEMENT NOT AS INTENDED");
       CHECK(hipFree(ab)); CHECK(hipFree(ba)); CHECK(hipFree(fl)); CHECK(hipFree(err)); CHECK(hipFree(prog)); CHECK(hipFree(ticks));
     }
   }
@@ -208,9 +214,9 @@ int main(int argc, char** argv) {
   if (what == "all" || what == "barrier") {
     const int iters = 500;
     int* scratch; CHECK(hipMalloc(&scratch, (size_t)ncu * 256 * 1024));
-    for (int mode : {DEV, UC}) for (int relay : {0, 1}) for (int load : {0, 1}) {
+    for (int mode : {DEV, UC, UC1}) for (int relay : {0, 1}) for (int load : {0, 1}) {
       if (mode == DEV && relay) continue;                      // the relay's cheap acquire is only valid with uncached data
-      const bool uc = mode == UC;
+      const bool uc = is_uc(mode);
       int* slots = alloc(ncu * 16 * 4, uc); int* cx = alloc(8 * 64 * 4, false); int* ca = alloc(64 * 4, false); int* lf = alloc(8 * 64 * 4, false);
       int *err = alloc(4, false), *prog = alloc(4, false);
       const int dkb = load ? 64 : 0, ckb = load ? 128 : 0;

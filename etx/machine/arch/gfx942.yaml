@@ -19,13 +19,17 @@ resources:
   lds_page_kb: 16
 bandwidth: {hbm_tbs: 5.3, cache_bw_tbs: 4.3}
 visibility:
-  # domain = within one XCD (one L2). L1 is write-through; the consumer only invalidates L1.
+  # domain = within one XCD (one L2). L1 is write-through; the consumer invalidates L1 (agent-scope buffer_inv:
+  # the workgroup-scope one leaves L1 stale outside threadgroup-split mode).
   # poll = agent-scope atomic load (bypasses L2). The inv-L1 + L2 load variant is 25% faster IDLE
   # (642 vs 873 ns) but on the full model it costs 5% (4.84 vs 4.60 ms/token, 2026-09-23): 36 CUs
   # per XCD polling through the L2 slow the 37 CUs streaming weights through it. Load beats latency.
   domain:
     release: ['asm volatile("s_waitcnt vmcnt(0)" ::: "memory");']
-    acquire: ['asm volatile("buffer_inv sc0" ::: "memory");']
+    # buffer_inv sc1, not sc0: measured 2026-09-27 (bench/sync/sync_bench.hip modes xcd / xcd1, uc / uc1): with sc0 a
+    # consumer re-reading lines it read before sees its stale L1 copy (64 B and 8 KB payloads stale in almost every
+    # round, same XCD or uncached memory); with sc1 0 stale, and the same-XCD one-way hand-off is 0.96 us.
+    acquire: ['asm volatile("buffer_inv sc1" ::: "memory");']
     poll: '__hip_atomic_load({ptr}, __ATOMIC_RELAXED, __HIP_MEMORY_SCOPE_AGENT)'
     arrive: '__hip_atomic_fetch_sub({ptr}, 1, __ATOMIC_RELAXED, __HIP_MEMORY_SCOPE_AGENT)'
     memory: any
@@ -62,7 +66,7 @@ costs:                           # MEASURED 2026-09-22, Hot Aisle 1xMI300X VM, R
   t_flag_cross_ns: 916           # one-way flag with payload, DEVICE protocol, 0 stale in 10k
   t_flag_local_ns: 951
   t_fence_ns: 181                # buffer_wbl2 sc1 + s_waitcnt (release); acquire buffer_inv sc1 = 120
-  t_fence_domain_ns: 44          # s_waitcnt + buffer_inv sc0 together
+  t_fence_domain_ns: 44          # s_waitcnt + buffer_inv (measured with sc0; sc1 hand-off 0.96 us one-way, 2026-09-27)
   t_phase_switch_counter_ns: 8600   # MEASURED: 304 WGs 8.6 us, 608 WGs 17.3 us per whole-GPU counter barrier (Kog: 7.6)
   t_phase_switch_leader_flags_ns: 52000   # leader polling 304 flag words: 52 us; sentinel gains are point-to-point, not barriers
   t_phase_switch_sentinel_ns: 850         # public (Kog), point-to-point payload polling

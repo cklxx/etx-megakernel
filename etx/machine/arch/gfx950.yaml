@@ -21,7 +21,10 @@ bandwidth: {hbm_tbs: 8.0, cache_bw_tbs: 6.0}
 visibility:
   domain:
     release: ['asm volatile("s_waitcnt vmcnt(0)" ::: "memory");']
-    acquire: ['asm volatile("buffer_inv sc0" ::: "memory");']
+    # buffer_inv sc1, not sc0: measured 2026-09-27 (bench/sync/sync_bench.hip modes xcd / xcd1, uc / uc1): with sc0 a
+    # consumer re-reading lines it read before sees its stale L1 copy (64 B and 8 KB payloads stale in almost every
+    # round, same XCD or uncached memory); with sc1 0 stale, and the same-XCD one-way hand-off is 0.96 us. gfx950: assumed the same, not measured.
+    acquire: ['asm volatile("buffer_inv sc1" ::: "memory");']
     poll: '__hip_atomic_load({ptr}, __ATOMIC_RELAXED, __HIP_MEMORY_SCOPE_AGENT)'
     arrive: '__hip_atomic_fetch_sub({ptr}, 1, __ATOMIC_RELAXED, __HIP_MEMORY_SCOPE_AGENT)'
     memory: any
