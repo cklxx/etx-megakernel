@@ -78,10 +78,13 @@ def interleave_period(f: float, g: float = 1.0) -> float:
     return 2.0 * max(latency_us() * f, expert_us() * g)
 
 
+ROUTED_UNION: dict[int, float] = {}      # measured distinct routed experts per step for N sequences (--routing)
+
+
 def batch2_step() -> float:
     """Two tokens per weight read: latency phases as today, the expert stream over the union of both tokens' units."""
     units1 = TOPK + SHARED
-    units2 = routed_union_units(2) + SHARED
+    units2 = ROUTED_UNION.get(2, routed_union_units(2)) + SHARED
     return latency_us() + expert_us() * units2 / units1
 
 
@@ -116,6 +119,7 @@ def f_curve(parsed: dict) -> list[tuple[float, float]]:
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--overlap", type=Path, help="overlap_bench output (RESULT lines)")
+    ap.add_argument("--routing", type=Path, help="routing_overlap.py JSON: measured expert union instead of uniform routing")
     ap.add_argument("--event-us", type=float, default=None, help="cross-XCD event cost under load, us (default: sweep 1.4 / 6.2)")
     a = ap.parse_args(argv)
 
@@ -145,6 +149,11 @@ def main(argv=None) -> int:
                 print(f"  {mb:6.1f}  {r['cold']:.2f} / {r['warm']:.2f} / {r['mall']:.2f}")
         print()
     events = [a.event_us] if a.event_us is not None else [1.4, 6.2]
+    if a.routing and a.routing.exists():
+        import json
+        r = json.loads(a.routing.read_text())
+        ROUTED_UNION.update({int(k): float(v) for k, v in r["overall"].items()})
+        print(f"measured routed-expert union (routing_overlap.py): " + ", ".join(f"{k} seq {v:.2f}" for k, v in sorted(ROUTED_UNION.items())) + "\n")
 
     print("layout      condition                         layer us   token ms   faster by  per-request latency   throughput")
     print(f"base        fleet today                        {base():8.1f}   {token_ms(base()):8.2f}   {'':8}   {'':19}   1.00x")
@@ -161,10 +170,11 @@ def main(argv=None) -> int:
               f"{(lat_ms / TOKEN_MS - 1) * 100:+5.0f}% per token        {2 * TOKEN_MS / lat_ms:.2f}x")
     b2 = batch2_step()
     b2_ms = token_ms(b2)
-    print(f"batch2      union {routed_union_units(2):.1f}+{SHARED} units (uniform routing)  {b2:8.1f}   {b2_ms:8.2f}   {'':8}   "
+    src = "measured" if 2 in ROUTED_UNION else "uniform routing"
+    print(f"batch2      union {ROUTED_UNION.get(2, routed_union_units(2)):.1f}+{SHARED} units ({src})  {b2:8.1f}   {b2_ms:8.2f}   {'':8}   "
           f"{(b2_ms / TOKEN_MS - 1) * 100:+5.0f}% per token        {2 * TOKEN_MS / b2_ms:.2f}x")
     print("\nReading: interleave beats batch2 only while f stays below "
-          f"{(latency_us() + expert_us() * (routed_union_units(2) + SHARED) / (TOPK + SHARED)) / 2 / latency_us():.2f}; "
+          f"{batch2_step() / 2 / latency_us():.2f}; "
           "compare both against vLLM at batch 2 (vllm_bench --batch 2) before building either.")
     return 0
 

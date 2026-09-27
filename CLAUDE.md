@@ -24,7 +24,7 @@ These rules come from what went wrong in 2026-09 (weeks spent tuning our own til
 ## 4. GPU sessions (money)
 
 - **Before provisioning:** everything that can run locally has run: unit tests, local gfx942 compile with the ROCm device libraries (`ETX_DEVLIBS`), shell syntax, a dry run of the script's non-GPU parts (for the vLLM path: `examples/vllm_llm/local_matrix.sh`, all 12 builds). Check the balance; state the session budget (hours, dollars) up front.
-- **One script per session**, prepared and committed beforehand; it keeps **full, unfiltered logs** under one directory. Never grep errors away.
+- **One script per session**, prepared and committed beforehand; it keeps **full, unfiltered logs** under one directory. Never grep errors away. Sessions are job files for `etx/tools/gpu_jobs.py` (every GPU of the VM busy at once, CPU builds in parallel, pinned A/B pairs, deadlines, silence warnings; one runner per VM with `machine` tags when there are two VMs), driven by `tools/session.sh push|start|status|fetch` and provisioned with `tools/hotaisle_grab.sh [1x|2x|any]`. Example: `examples/sessions/ds_gap.py`.
 - **Nothing runs silently.** Line-buffered output (`stdbuf -oL`), progress every N steps, a per-step deadline that prints the stuck state, timeouts sized to the expected time plus a margin, not 30 minutes blind. If a process shows no output for about 3 minutes past its expected time, probe it (ps, log, GPU use) instead of waiting.
 - Order inside a session: microbenchmarks and correctness checks first, full runs second, nice-to-have captures last.
 - Delete the VM the moment the planned work is done (no asking), verify "No virtual machines", record the balance in memory.

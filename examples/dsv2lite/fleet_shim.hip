@@ -28,7 +28,30 @@ struct FleetParams {
   uint32_t epoch;
   int32_t pos;          // absolute position of this token in the cache
   int32_t dump;         // 1: copy every layer's x to act.layer_dump (first token)
+  uint64_t* pro_trace;  // optional (host: ETX_DS_PROLOGUE): per task {body start, end of staging, end of prologue}
 };
+// pro_trace slot of a task: layer (-1..26) x fleet task kind (< 32) x coordinate (coord[0] * 64 + coord[1] < 1024)
+#ifndef ETX_DS_PRO
+#define ETX_DS_PRO 0
+#endif
+#define PRO_SLOT(L, kind, c) ((((int64_t)(L) + 1) * 32 + (kind)) * 1024 + (int64_t)(c)->coord[0] * 64 + (c)->coord[1])
+// compiled in only with -DETX_DS_PRO=1 (the stamps cost registers: 286 -> 292 total per lane), so timing builds are unchanged
+static __device__ __forceinline__ void pro_begin(const FleetParams* fp, fleet::TokenCtx& tc, fleet::Scratch& s, uint64_t& t0) {
+#if !ETX_DS_PRO
+  return;
+#endif
+  tc.trace = fp->pro_trace != nullptr;
+  if (tc.trace && threadIdx.x == 0) { s.stamp = 0; s.stamp_stage = 0; t0 = __builtin_amdgcn_s_memrealtime(); }
+}
+static __device__ __forceinline__ void pro_end(const FleetParams* fp, const fleet::Scratch& s, int64_t slot, uint64_t t0) {
+#if !ETX_DS_PRO
+  return;
+#endif
+  if (fp->pro_trace != nullptr && threadIdx.x == 0) {
+    uint64_t* r = fp->pro_trace + slot * 3;
+    r[0] = t0; r[1] = s.stamp_stage; r[2] = s.stamp;
+  }
+}
 
 // FleetParams location. FLEET_CONST_PARAMS=1 (default): a __constant__ copy the host refreshes per
 // token, so the bodies read weights / dims / runtime state with scalar loads the way fleet's kernel
@@ -71,7 +94,10 @@ static __device__ __forceinline__ void fleet_call(const etx_ctx* c, uint16_t kin
   fleet::Activations& act = *const_cast<fleet::Activations*>(&fp->act);
   fleet::KVCache& kv = *const_cast<fleet::KVCache*>(&fp->kv);
   fleet::Scratch& s = *reinterpret_cast<fleet::Scratch*>(c->lds);
+  uint64_t t0 = 0;
+  pro_begin(fp, tc, s, t0);
   fleet::run_task(t, fp->rt, fp->d, fp->w, act, kv, s, tc, (int)c->domain, worker);
+  pro_end(fp, s, PRO_SLOT(L, kind, c), t0);
 }
 
 #define CHIPLET_WORKER (c->coord[1])
@@ -111,7 +137,10 @@ extern "C" __device__ void fleet_attention(const etx_ctx* c) {
   fleet::Activations& act = *const_cast<fleet::Activations*>(&fp->act);
   fleet::KVCache& kv = *const_cast<fleet::KVCache*>(&fp->kv);
   fleet::Scratch& s = *reinterpret_cast<fleet::Scratch*>(c->lds);
+  uint64_t t0 = 0;
+  pro_begin(fp, tc, s, t0);
   fleet::run_task(t, fp->rt, fp->d, fp->w, act, kv, s, tc, (int)c->domain, 0);
+  pro_end(fp, s, PRO_SLOT(L, fleet::TASK_ATTENTION, c), t0);
 }
 extern "C" __device__ void fleet_merge_uv(const etx_ctx* c) { fleet_call(c, fleet::TASK_MERGE_UV, 0, c->coord[0], c->coord[1], fleet::kMaxKvChunks, -1, 0); }
 extern "C" __device__ void fleet_o_proj(const etx_ctx* c) { fleet_call(c, fleet::TASK_O_PROJ, 0, -1, -1, 1, -1, CHIPLET_WORKER); }

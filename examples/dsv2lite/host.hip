@@ -21,6 +21,7 @@ using namespace fleet;
 struct FleetParams {                    // must match fleet_shim.hip
   RuntimeState rt; ModelDims d; Weights w; Activations act; KVCache kv;
   int32_t tok; uint32_t epoch; int32_t pos; int32_t dump;
+  uint64_t* pro_trace;                  // ETX_DS_PROLOGUE=<file>: per-task prologue stamps of the last step
 };
 extern "C" __global__ void etx_megakernel_d0(etx_params);
 extern "C" __global__ void etx_unfused_d0(etx_params, int32_t);
@@ -115,6 +116,9 @@ int main(int argc, char** argv) {
     rt.teacher = teacher ? 1 : 0; rt.spin_limit = 1u << 22; rt.coherent_acts = 0; rt.smoke = 0; rt.direct_poll = 1;
     for (int i = 0; i < 4; ++i) rt.fenced_events[i] = -1; rt.epoch0 = 1; rt.n_tokens = 1; rt.trace = nullptr; rt.trace_token = -1; }
   FleetParams fp{}; fp.rt = rt; fp.d = d; fp.w = w; fp.kv = kv;
+  const char* pro_path = getenv("ETX_DS_PROLOGUE");
+  const size_t pro_words = (size_t)28 * 32 * 1024 * 3;       // PRO_SLOT range (fleet_shim.hip) x 3 stamps
+  if (pro_path) { HIP_CHECK(hipMalloc(&fp.pro_trace, pro_words * 8)); HIP_CHECK(hipMemset(fp.pro_trace, 0, pro_words * 8)); }
   std::memcpy(&fp.act, &act, sizeof(act));    // Activations has __restrict__ array members: no implicit copy-assignment
   FleetParams* d_fp = nullptr; HIP_CHECK(hipMalloc(&d_fp, sizeof(FleetParams)));
 
@@ -177,6 +181,11 @@ int main(int argc, char** argv) {
     std::printf("  consecutive layers within the gate: %d of %d\n", layers_ok, d.layers);
   }
   hst.report_phases(etx_type_names, ETX_N_TYPES);     // ETX_TRACE=1: per-type wait / body / span of the last token
+  if (pro_path) {                                      // raw u64 x 3 per slot, slots as PRO_SLOT; zero = not run
+    std::vector<uint64_t> pt(pro_words); HIP_CHECK(hipMemcpy(pt.data(), fp.pro_trace, pro_words * 8, hipMemcpyDeviceToHost));
+    std::ofstream f(pro_path, std::ios::binary); f.write((const char*)pt.data(), pt.size() * 8);
+    std::printf("wrote prologue stamps to %s\n", pro_path);
+  }
   std::vector<float> sorted(ms); std::sort(sorted.begin(), sorted.end());
   double sum = 0; for (float v : ms) sum += v;
   std::printf("\nper-token latency (embed -> argmax on device): median %.3f ms  mean %.3f ms; step wall (launch to end) %.3f ms/token\n",
