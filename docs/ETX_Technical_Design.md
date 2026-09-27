@@ -932,6 +932,22 @@ Correction (found after the session): the "cap256" build's compiler report says 
 
 Where ETX loses to fleet (MoE layers 1-26, mean phase start/end relative to the layer start): fleet 127.6 us per layer, ETX 134.5. The q/kv_a phase ends 3 us later because the shim runs the replicated-kv_a variant (fleet's default is `FLAG_KVA_SHARED`, one kv_a split over the XCDs behind a global event); attention wins it back. The rest is in XCD-local hand-offs: fleet starts gate_up 0.7 us before the router phase ends and down 1.7 us before gate_up ends (the fastest XCD goes first), ETX starts each about 1 us after the slower phase ends; router->gate_up, gate_up->down and merge->o_proj together cost about 7 us per layer (0.18 ms per token). Per task, only q/kv_a is slower in ETX (21.4 vs 17.4 us, all in the weight stream; its prologue is shorter, 6.8 vs 7.6 us).
 
+### 15.13 Two DeepSeek-V2-Lite requests in one megakernel (2026-09-27, third session, 2x MI300X)
+
+`examples/sessions/ds_interleave.py`, logs in `examples/dsv2lite/results/2026-09-27c/`. The two-request graph (`ETX_DSV2_REQUESTS=2`) runs one workgroup per request per CU (`ETX_SLOT_BY_CU`), fleet's tiles with the `gemv_noinline` build patch: 248 VGPR + 4 AGPR, 32 B/lane scratch, 2 waves/SIMD. Request 1 decodes the golden prompt rotated by 97 tokens (`reference_rotated.py`). Every run: both requests 32/32 tokens and 27/27 layers.
+
+| two rounds, GPU 0 | ms per step | tokens/s |
+|---|---|---|
+| fleet, one request | 3.543 / 3.547 | 282 |
+| ETX, one request (sc0) | 3.737 / 3.733 | 268 |
+| ETX, one request, gemv_noinline + 2 WG/CU bounds (still 1 wave/SIMD: 260 registers; not a valid cap measurement) | 3.832 / 3.832 | 261 |
+| ETX, two requests, coupling `router` (strict half-layer offset) | 6.373 / 6.460 | 314 / 310 |
+| ETX, two requests, coupling `experts` (expert streams alternate) | 5.846 / 5.879 | 342 / 340 |
+| ETX, two requests, no coupling | 5.470 / 5.508 | 366 / 363 |
+| vLLM, batch 2, same two prompts (AITER on; 15.11) | 5.318 | 376 |
+
+The best interleave gives 1.30x fleet's and 1.37x ETX's single-request throughput and stays 3% below vLLM at batch 2 (per-request latency 5.45 vs 5.32 ms). The estimate (1.72-1.78x) did not hold. The trace of the uncoupled build shows why: the two requests fall into lockstep (layer 5: both qkv tasks ready at 0 us, both gate_up at 104.7 us, 195 us for the pair against 130 for one request), so the latency-bound phases do not hide behind the other request's expert stream; they run side by side and slow down (q/kv_a 29-31 us per task against 21; gate_up 46-50 against 32). Forcing the offset costs more than it saves: with `router` coupling each request waits out the other's latency phases, with `experts` the streams alternate but the latency phases stay serial. Two requests in one megakernel work and are correct; beating vLLM's batching needs the latency phases to share work (one q/kv_a, o_proj, attention prologue for both tokens) rather than overlap.
+
 ### 15.3 Phases of the general architecture (after M3)
 
 | Phase | Deliverable | Completion criterion |

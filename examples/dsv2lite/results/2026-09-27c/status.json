@@ -1,0 +1,210 @@
+[
+ {
+  "name": "apt",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 21.004719257354736,
+  "note": ""
+ },
+ {
+  "name": "etx_env",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 3.001999616622925,
+  "note": ""
+ },
+ {
+  "name": "fleet_env",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 130.03560638427734,
+  "note": ""
+ },
+ {
+  "name": "dl_ds",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 87.0303270816803,
+  "note": ""
+ },
+ {
+  "name": "build_x1",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 35.012113094329834,
+  "note": ""
+ },
+ {
+  "name": "build_x1cap",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 36.011993646621704,
+  "note": ""
+ },
+ {
+  "name": "build_x2_router",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 61.01760697364807,
+  "note": ""
+ },
+ {
+  "name": "build_x2_experts",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 63.017635107040405,
+  "note": ""
+ },
+ {
+  "name": "build_x2_none",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 59.01478314399719,
+  "note": ""
+ },
+ {
+  "name": "build_fleet",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 10.002146005630493,
+  "note": ""
+ },
+ {
+  "name": "ds_prep",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 1,
+  "seconds": 153.0549123287201,
+  "note": ""
+ },
+ {
+  "name": "ref_r1",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 118.0413589477539,
+  "note": ""
+ },
+ {
+  "name": "t1_fleet",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 8.00266981124878,
+  "note": ""
+ },
+ {
+  "name": "t1_x1",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 8.004006147384644,
+  "note": ""
+ },
+ {
+  "name": "t1_x1cap",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 7.001447439193726,
+  "note": ""
+ },
+ {
+  "name": "t1_x2_router",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 7.001613616943359,
+  "note": ""
+ },
+ {
+  "name": "t1_x2_experts",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 8.001500606536865,
+  "note": ""
+ },
+ {
+  "name": "t1_x2_none",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 7.001430034637451,
+  "note": ""
+ },
+ {
+  "name": "t2_fleet",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 7.001405954360962,
+  "note": ""
+ },
+ {
+  "name": "t2_x1",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 7.001381158828735,
+  "note": ""
+ },
+ {
+  "name": "t2_x1cap",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 7.0012946128845215,
+  "note": ""
+ },
+ {
+  "name": "t2_x2_router",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 7.001386880874634,
+  "note": ""
+ },
+ {
+  "name": "t2_x2_experts",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 7.001113414764404,
+  "note": ""
+ },
+ {
+  "name": "t2_x2_none",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 7.001157522201538,
+  "note": ""
+ },
+ {
+  "name": "trace_x2",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 1,
+  "seconds": 8.002583503723145,
+  "note": ""
+ },
+ {
+  "name": "timeline_x2",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 3.000650644302368,
+  "note": ""
+ }
+]

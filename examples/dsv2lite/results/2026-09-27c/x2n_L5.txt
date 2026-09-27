@@ -1,0 +1,74 @@
+window 953.3 .. 1148.5 us (span 195.1 us), 4048 tasks, 8 XCDs x 76 workers
+
+per type (us, relative to the window start)
+  type                      tasks    wait    body  1st ready  last ready  last done       MB
+  r0_qkv_5                    296    6.74   28.82        0.0         3.5       33.9    14.94
+  r1_qkv_5                    296    4.41   30.59        0.0         4.4       36.3    14.94
+  r0_attn_5                   256    3.74   14.93       33.0        44.6       60.8     1.18
+  r0_qabs_5                    32    4.50    4.72       33.0        39.6       42.8     2.10
+  r1_qabs_5                    32    2.88    3.27       34.8        40.8       43.8     2.10
+  r1_attn_5                   256    3.28   15.78       34.8        45.4       66.1     1.18
+  r0_merge_5                  256    3.79   10.61       49.5        64.7       76.0     2.10
+  r1_merge_5                  256    3.86    9.40       53.2        68.3       77.2     2.10
+  r0_oproj_5                  296    8.55    8.62       66.8        80.8       88.2     8.39
+  r1_oproj_5                  296    9.28    6.70       68.3        82.2       88.5     8.39
+  r0_router_5                 296    6.40   13.39       90.0        92.7      104.2     0.26
+  r1_router_5                 296    6.74   11.44       90.3        95.1      104.3     0.26
+  r1_gate_up_5                296    1.97   50.30      104.6       109.8      163.1    92.27
+  r0_gate_up_5                296    1.25   46.51      104.7       109.5      162.5    92.27
+  r0_down_5                   296    4.83   27.22      153.4       166.7      194.0    46.14
+  r1_down_5                   296    3.17   26.46      159.5       169.2      195.1    46.14
+
+per XCD: share of worker time in bodies / waiting for events / idle (no task taken)
+  XCD 0   74 workers  body  76.9%  wait  14.9%  idle   8.2%      41.8 MB
+  XCD 1   74 workers  body  75.9%  wait  15.0%  idle   9.1%      41.8 MB
+  XCD 2   74 workers  body  76.8%  wait  14.2%  idle   9.0%      41.8 MB
+  XCD 3   74 workers  body  75.6%  wait  14.8%  idle   9.7%      41.8 MB
+  XCD 4   74 workers  body  77.0%  wait  12.6%  idle  10.5%      41.8 MB
+  XCD 5   74 workers  body  75.6%  wait  13.0%  idle  11.4%      41.8 MB
+  XCD 6   74 workers  body  75.3%  wait  15.6%  idle   9.1%      41.8 MB
+  XCD 7   74 workers  body  71.3%  wait  15.4%  idle  13.2%      41.8 MB
+
+XCD finish skew per type (last XCD done - first XCD done)
+  r0_qkv_5                   4.51 us  (first XCD 7, last XCD 1, 8 XCDs)
+  r1_qkv_5                   3.71 us  (first XCD 0, last XCD 4, 8 XCDs)
+  r0_attn_5                  9.15 us  (first XCD 7, last XCD 5, 8 XCDs)
+  r0_qabs_5                  5.73 us  (first XCD 7, last XCD 3, 8 XCDs)
+  r1_qabs_5                  5.81 us  (first XCD 7, last XCD 3, 8 XCDs)
+  r1_attn_5                 11.41 us  (first XCD 7, last XCD 4, 8 XCDs)
+  r0_merge_5                11.25 us  (first XCD 7, last XCD 3, 8 XCDs)
+  r1_merge_5                10.49 us  (first XCD 7, last XCD 4, 8 XCDs)
+  r0_oproj_5                13.53 us  (first XCD 7, last XCD 3, 8 XCDs)
+  r1_oproj_5                12.25 us  (first XCD 7, last XCD 4, 8 XCDs)
+  r0_router_5                0.54 us  (first XCD 3, last XCD 1, 8 XCDs)
+  r1_router_5                0.56 us  (first XCD 3, last XCD 4, 8 XCDs)
+  r1_gate_up_5               5.46 us  (first XCD 7, last XCD 0, 8 XCDs)
+  r0_gate_up_5              10.96 us  (first XCD 7, last XCD 2, 8 XCDs)
+  r0_down_5                 16.95 us  (first XCD 7, last XCD 1, 8 XCDs)
+  r1_down_5                  9.30 us  (first XCD 7, last XCD 0, 8 XCDs)
+
+critical path: 8 tasks, 170.2 us in bodies + 24.9 us in gaps = 195.1 us (span 195.1)
+  type                      tasks     body  dep gap  queue gap
+  r1_qkv_5                      1    36.12     0.16       0.00
+  r1_qabs_5                     1     2.84     4.48       0.00
+  r1_attn_5                     1    21.00     0.00       1.48
+  r1_merge_5                    1     9.56     1.56       0.00
+  r1_oproj_5                    1     7.52     3.80       0.00
+  r1_router_5                   1    11.76     3.97       0.00
+  r1_gate_up_5                  1    53.96     4.88       0.00
+  r1_down_5                     1    27.48     4.56       0.00
+
+memory: 334.8 MB in the window, floor 77.9 us at 4.3 TB/s (40% of the span); mean demand 40% of the bandwidth
+  below 25% of the bandwidth for 106.0 us (54% of the span); running then (by task kind, all layers):
+    r0_qkv                      27.5 us  (25.9%)
+    r0_attn                     14.0 us  (13.2%)
+    r0_router                   13.0 us  (12.3%)
+    r0_merge                    10.0 us  ( 9.4%)
+    r1_attn                      9.5 us  ( 9.0%)
+    r0_oproj                     9.5 us  ( 9.0%)
+    r1_qkv                       5.5 us  ( 5.2%)
+    r1_merge                     4.5 us  ( 4.2%)
+    r1_oproj                     3.0 us  ( 2.8%)
+    r1_down                      3.0 us  ( 2.8%)
+
+wrote /home/hotaisle/sess/x2n_L5.html

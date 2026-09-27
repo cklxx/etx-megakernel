@@ -1,0 +1,205 @@
+[07:28:17 +  0m00s] start apt (cpu)
+[07:28:38 +  0m21s] ok      apt rc=0 21s
+[07:28:38 +  0m21s] start etx_env (cpu)
+[07:28:38 +  0m21s] start fleet_env (cpu)
+[07:28:41 +  0m24s] ok      etx_env rc=0 3s
+[07:28:41 +  0m24s] start build_x1 (cpu)
+[07:28:41 +  0m24s] start build_x1cap (cpu)
+[07:28:41 +  0m24s] start build_x2_router (cpu)
+[07:28:41 +  0m24s] start build_x2_experts (cpu)
+[07:28:41 +  0m24s] start build_x2_none (cpu)
+[07:29:16 +  0m59s] ok      build_x1 rc=0 35s
+    #  ETX_OUT=$HOME/sess/b_x1 bash examples/dsv2lite/build.sh ~/fleet-mi300x -Rpass-analysis=kernel-resource-usage -DETX_ACQUIRE_DOMAIN_RELAXED 2>&1 | tee $HOME/sess/b_x1.buildlog | grep -A12 'Function Name: etx_megakernel_d0' | grep -E 'VGPRs
+    /home/hotaisle/sess/b_x1/megakernel_d0.hip:5095:1: remark:     VGPRs: 256 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/sess/b_x1/megakernel_d0.hip:5095:1: remark:     AGPRs: 52 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/sess/b_x1/megakernel_d0.hip:5095:1: remark:     ScratchSize [bytes/lane]: 0 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/sess/b_x1/megakernel_d0.hip:5095:1: remark:     Occupancy [waves/SIMD]: 1 [-Rpass-analysis=kernel-resource-usage]
+[07:29:17 +  1m00s] ok      build_x1cap rc=0 36s
+    # ETX_FLEET_PATCH=gemv_noinline ETX_OUT=$HOME/sess/b_x1cap bash examples/dsv2lite/build.sh ~/fleet-mi300x -Rpass-analysis=kernel-resource-usage -DETX_ACQUIRE_DOMAIN_RELAXED -DETX_MIN_WG_PER_CU=2 2>&1 | tee $HOME/sess/b_x1cap.buildlog | grep
+    /home/hotaisle/sess/b_x1cap/megakernel_d0.hip:5095:1: remark:     VGPRs: 256 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/sess/b_x1cap/megakernel_d0.hip:5095:1: remark:     AGPRs: 4 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/sess/b_x1cap/megakernel_d0.hip:5095:1: remark:     ScratchSize [bytes/lane]: 144 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/sess/b_x1cap/megakernel_d0.hip:5095:1: remark:     Occupancy [waves/SIMD]: 1 [-Rpass-analysis=kernel-resource-usage]
+[07:29:17 +  1m00s] progress: 4 running, 18 waiting, 4 done
+    fleet_env [cpu] 39s / 1800s: WARNING: huggingface-hub 2.0.0 does not provide the extra 'hf-transfer'
+    build_x2_router [cpu] 36s / 1800s: # ETX_DSV2_REQUESTS=2 ETX_RELAY_PLAN=off ETX_FLEET_PATCH=gemv_noinline ETX_DSV2_COUPLE=router ETX_OUT=$HOME/sess/b_x2_router bash examples/dsv2lite/build.sh ~/f
+    build_x2_experts [cpu] 36s / 1800s: # ETX_DSV2_REQUESTS=2 ETX_RELAY_PLAN=off ETX_FLEET_PATCH=gemv_noinline ETX_DSV2_COUPLE=experts ETX_OUT=$HOME/sess/b_x2_experts bash examples/dsv2lite/build.sh ~
+    build_x2_none [cpu] 36s / 1800s: # ETX_DSV2_REQUESTS=2 ETX_RELAY_PLAN=off ETX_FLEET_PATCH=gemv_noinline ETX_DSV2_COUPLE=none ETX_OUT=$HOME/sess/b_x2_none bash examples/dsv2lite/build.sh ~/fleet
+[07:29:40 +  1m23s] ok      build_x2_none rc=0 59s
+    # ETX_DSV2_REQUESTS=2 ETX_RELAY_PLAN=off ETX_FLEET_PATCH=gemv_noinline ETX_DSV2_COUPLE=none ETX_OUT=$HOME/sess/b_x2_none bash examples/dsv2lite/build.sh ~/fleet-mi300x -Rpass-analysis=kernel-resource-usage -DETX_ACQUIRE_DOMAIN_RELAXED -DETX
+    /home/hotaisle/sess/b_x2_none/megakernel_d0.hip:10006:1: remark:     VGPRs: 248 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/sess/b_x2_none/megakernel_d0.hip:10006:1: remark:     AGPRs: 4 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/sess/b_x2_none/megakernel_d0.hip:10006:1: remark:     ScratchSize [bytes/lane]: 32 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/sess/b_x2_none/megakernel_d0.hip:10006:1: remark:     Occupancy [waves/SIMD]: 2 [-Rpass-analysis=kernel-resource-usage]
+[07:29:42 +  1m25s] ok      build_x2_router rc=0 61s
+    # ETX_DSV2_REQUESTS=2 ETX_RELAY_PLAN=off ETX_FLEET_PATCH=gemv_noinline ETX_DSV2_COUPLE=router ETX_OUT=$HOME/sess/b_x2_router bash examples/dsv2lite/build.sh ~/fleet-mi300x -Rpass-analysis=kernel-resource-usage -DETX_ACQUIRE_DOMAIN_RELAXED -
+    /home/hotaisle/sess/b_x2_router/megakernel_d0.hip:10430:1: remark:     VGPRs: 248 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/sess/b_x2_router/megakernel_d0.hip:10430:1: remark:     AGPRs: 4 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/sess/b_x2_router/megakernel_d0.hip:10430:1: remark:     ScratchSize [bytes/lane]: 32 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/sess/b_x2_router/megakernel_d0.hip:10430:1: remark:     Occupancy [waves/SIMD]: 2 [-Rpass-analysis=kernel-resource-usage]
+[07:29:44 +  1m27s] ok      build_x2_experts rc=0 63s
+    # ETX_DSV2_REQUESTS=2 ETX_RELAY_PLAN=off ETX_FLEET_PATCH=gemv_noinline ETX_DSV2_COUPLE=experts ETX_OUT=$HOME/sess/b_x2_experts bash examples/dsv2lite/build.sh ~/fleet-mi300x -Rpass-analysis=kernel-resource-usage -DETX_ACQUIRE_DOMAIN_RELAXED
+    /home/hotaisle/sess/b_x2_experts/megakernel_d0.hip:10414:1: remark:     VGPRs: 248 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/sess/b_x2_experts/megakernel_d0.hip:10414:1: remark:     AGPRs: 4 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/sess/b_x2_experts/megakernel_d0.hip:10414:1: remark:     ScratchSize [bytes/lane]: 32 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/sess/b_x2_experts/megakernel_d0.hip:10414:1: remark:     Occupancy [waves/SIMD]: 2 [-Rpass-analysis=kernel-resource-usage]
+[07:30:17 +  2m00s] progress: 1 running, 18 waiting, 7 done
+    fleet_env [cpu] 99s / 1800s: WARNING: huggingface-hub 2.0.0 does not provide the extra 'hf-transfer'
+[07:30:48 +  2m31s] ok      fleet_env rc=0 130s
+[07:30:48 +  2m31s] start dl_ds (cpu)
+[07:30:48 +  2m31s] start build_fleet (cpu)
+[07:30:58 +  2m41s] ok      build_fleet rc=0 10s
+[07:31:17 +  3m00s] progress: 1 running, 16 waiting, 9 done
+    dl_ds [cpu] 29s / 1800s: # HF_HUB_ENABLE_HF_TRANSFER=1 .venv/bin/python -c "from huggingface_hub import snapshot_download; snapshot_download('deepseek-ai/DeepSeek-Coder-V2-Lite-Base', l
+[07:32:15 +  3m58s] ok      dl_ds rc=0 87s
+[07:32:15 +  3m58s] start ds_prep on GPU 1
+[07:32:15 +  3m58s] start ref_r1 on GPU 0
+[07:32:17 +  4m00s] progress: 2 running, 14 waiting, 10 done
+    ds_prep [GPU 1] 2s / 2400s: # . .venv/bin/activate && mkdir -p build && python3 src/host/reference_run.py --model $HOME/models/dsv2-lite-base --out build/golden.npz && python3 src/host/pac
+    ref_r1 [GPU 0] 2s / 2400s: # ~/fleet-mi300x/.venv/bin/python examples/dsv2lite/reference_rotated.py --fleet ~/fleet-mi300x --rotate 97 -- --model $HOME/models/dsv2-lite-base --out $HOME/f
+[07:33:17 +  5m00s] progress: 2 running, 14 waiting, 10 done
+    ds_prep [GPU 1] 62s / 2400s: loading /home/hotaisle/models/dsv2-lite-base (bf16)
+    ref_r1 [GPU 0] 62s / 2400s: loading /home/hotaisle/models/dsv2-lite-base (bf16)
+[07:34:13 +  5m56s] ok      ref_r1 rc=0 118s
+    prompt rotated by 97 tokens (first ids [1558, 8708, 7, 77])
+    wrote /home/hotaisle/fleet-mi300x/build_r1/golden_tokens.txt (33 tokens)
+      smallest top-2 margin over the run: 6.0000 (a small margin here is where bf16 drift would flip a token)
+[07:34:17 +  6m00s] progress: 1 running, 14 waiting, 11 done
+    ds_prep [GPU 1] 122s / 2400s: loading /home/hotaisle/models/dsv2-lite-base
+[07:34:48 +  6m31s] ok      ds_prep rc=0 153s
+    wrote build/golden.npz and build/golden.json
+    wrote build/fleet_cache.bin  [27][1056][576] cols 0:512 = c (post kv_a_layernorm), 512:576 = k_pe (post RoPE)  -> 32.8 MB bf16
+    wrote build/golden_tokens.txt (33 tokens)
+    wrote build/golden_hidden.bin (27, 2048)
+      smallest top-2 margin over the run: 6.6250 (a small margin here is where bf16 drift would flip a token)
+    wrote build/weights.bin (31.41 GB), build/weights.bin.json and build/weights.bin.manifest
+      expert stride: 8650752 elems (17.3 MB) — matches design.md §1's 17.3 MB per routed expert
+[07:34:48 +  6m31s] start t1_fleet on GPU 0
+[07:34:48 +  6m31s] start trace_x2 on GPU 1
+[07:34:56 +  6m39s] ok      t1_fleet rc=0 8s
+    per-token latency (embed -> argmax on device): median 3.543 ms  p95 3.557 ms  mean 3.543 ms  (282.2 tok/s)
+    tokens: 32/32 match HF greedy
+      consecutive layers within the gate: 27 of 27
+[07:34:56 +  6m39s] ok      trace_x2 rc=0 8s
+    r0 per-token latency (embed -> argmax on device): median 6.309 ms  mean 6.316 ms; step wall (launch to end) 8.254 ms/token
+    r1 per-token latency (embed -> argmax on device): median 6.421 ms  mean 6.423 ms; step wall (launch to end) 8.254 ms/token
+    r0 tokens: 8/8 match HF greedy
+    r1 tokens: 8/8 match HF greedy
+      r0 consecutive layers within the gate: 27 of 27
+      r1 consecutive layers within the gate: 27 of 27
+    RESULT requests=2 step median 6.467 ms -> 309.3 tokens/s (2 tokens per step); tokens 16/16 match
+[07:34:56 +  6m39s] start t1_x1 on GPU 0
+[07:34:56 +  6m39s] start timeline_x2 (cpu)
+[07:34:59 +  6m42s] ok      timeline_x2 rc=0 3s
+    window 1106.4 .. 1417.3 us (span 311.0 us), 5517 tasks, 8 XCDs x 76 workers
+    critical path: 14 tasks, 249.5 us in bodies + 61.5 us in gaps = 311.0 us (span 311.0)
+    memory: 494.2 MB in the window, floor 114.9 us at 4.3 TB/s (37% of the span); mean demand 37% of the bandwidth
+      below 25% of the bandwidth for 106.5 us (34% of the span); running then (by task kind, all layers):
+[07:35:04 +  6m47s] ok      t1_x1 rc=0 8s
+    per-token latency (embed -> argmax on device): median 3.737 ms  mean 3.734 ms; step wall (launch to end) 3.770 ms/token
+    tokens: 32/32 match HF greedy
+      consecutive layers within the gate: 27 of 27
+[07:35:04 +  6m47s] start t1_x1cap on GPU 0
+[07:35:11 +  6m54s] ok      t1_x1cap rc=0 7s
+    per-token latency (embed -> argmax on device): median 3.831 ms  mean 3.831 ms; step wall (launch to end) 3.867 ms/token
+    tokens: 32/32 match HF greedy
+      consecutive layers within the gate: 27 of 27
+[07:35:11 +  6m54s] start t1_x2_router on GPU 0
+[07:35:17 +  7m00s] progress: 1 running, 8 waiting, 17 done
+    t1_x2_router [GPU 0] 6s / 600s: # $HOME/sess/b_x2_router/run --tokens 32 --context 1024 --repeat 2 --r1-dir build_r1
+[07:35:18 +  7m01s] ok      t1_x2_router rc=0 7s
+    r0 per-token latency (embed -> argmax on device): median 6.223 ms  mean 6.213 ms; step wall (launch to end) 6.365 ms/token
+    r1 per-token latency (embed -> argmax on device): median 6.326 ms  mean 6.317 ms; step wall (launch to end) 6.365 ms/token
+    r0 tokens: 32/32 match HF greedy
+    r1 tokens: 32/32 match HF greedy
+      r0 consecutive layers within the gate: 27 of 27
+      r1 consecutive layers within the gate: 27 of 27
+    RESULT requests=2 step median 6.373 ms -> 313.8 tokens/s (2 tokens per step); tokens 64/64 match
+[07:35:18 +  7m01s] start t1_x2_experts on GPU 0
+[07:35:26 +  7m09s] ok      t1_x2_experts rc=0 8s
+    r0 per-token latency (embed -> argmax on device): median 5.697 ms  mean 5.691 ms; step wall (launch to end) 5.839 ms/token
+    r1 per-token latency (embed -> argmax on device): median 5.801 ms  mean 5.792 ms; step wall (launch to end) 5.839 ms/token
+    r0 tokens: 32/32 match HF greedy
+    r1 tokens: 32/32 match HF greedy
+      r0 consecutive layers within the gate: 27 of 27
+      r1 consecutive layers within the gate: 27 of 27
+    RESULT requests=2 step median 5.846 ms -> 342.1 tokens/s (2 tokens per step); tokens 64/64 match
+[07:35:26 +  7m09s] start t1_x2_none on GPU 0
+[07:35:33 +  7m16s] ok      t1_x2_none rc=0 7s
+    r0 per-token latency (embed -> argmax on device): median 5.422 ms  mean 5.434 ms; step wall (launch to end) 5.483 ms/token
+    r1 per-token latency (embed -> argmax on device): median 5.425 ms  mean 5.437 ms; step wall (launch to end) 5.483 ms/token
+    r0 tokens: 32/32 match HF greedy
+    r1 tokens: 32/32 match HF greedy
+      r0 consecutive layers within the gate: 27 of 27
+      r1 consecutive layers within the gate: 27 of 27
+    RESULT requests=2 step median 5.470 ms -> 365.6 tokens/s (2 tokens per step); tokens 64/64 match
+[07:35:33 +  7m16s] start t2_fleet on GPU 0
+[07:35:40 +  7m23s] ok      t2_fleet rc=0 7s
+    per-token latency (embed -> argmax on device): median 3.547 ms  p95 3.562 ms  mean 3.548 ms  (281.8 tok/s)
+    tokens: 32/32 match HF greedy
+      consecutive layers within the gate: 27 of 27
+[07:35:40 +  7m23s] start t2_x1 on GPU 0
+[07:35:47 +  7m30s] ok      t2_x1 rc=0 7s
+    per-token latency (embed -> argmax on device): median 3.733 ms  mean 3.732 ms; step wall (launch to end) 3.768 ms/token
+    tokens: 32/32 match HF greedy
+      consecutive layers within the gate: 27 of 27
+[07:35:47 +  7m30s] start t2_x1cap on GPU 0
+[07:35:54 +  7m37s] ok      t2_x1cap rc=0 7s
+    per-token latency (embed -> argmax on device): median 3.832 ms  mean 3.832 ms; step wall (launch to end) 3.868 ms/token
+    tokens: 32/32 match HF greedy
+      consecutive layers within the gate: 27 of 27
+[07:35:54 +  7m37s] start t2_x2_router on GPU 0
+[07:36:01 +  7m44s] ok      t2_x2_router rc=0 7s
+    r0 per-token latency (embed -> argmax on device): median 6.309 ms  mean 6.311 ms; step wall (launch to end) 6.464 ms/token
+    r1 per-token latency (embed -> argmax on device): median 6.412 ms  mean 6.413 ms; step wall (launch to end) 6.464 ms/token
+    r0 tokens: 32/32 match HF greedy
+    r1 tokens: 32/32 match HF greedy
+      r0 consecutive layers within the gate: 27 of 27
+      r1 consecutive layers within the gate: 27 of 27
+    RESULT requests=2 step median 6.460 ms -> 309.6 tokens/s (2 tokens per step); tokens 64/64 match
+[07:36:01 +  7m44s] start t2_x2_experts on GPU 0
+[07:36:08 +  7m51s] ok      t2_x2_experts rc=0 7s
+    r0 per-token latency (embed -> argmax on device): median 5.723 ms  mean 5.719 ms; step wall (launch to end) 5.871 ms/token
+    r1 per-token latency (embed -> argmax on device): median 5.831 ms  mean 5.823 ms; step wall (launch to end) 5.871 ms/token
+    r0 tokens: 32/32 match HF greedy
+    r1 tokens: 32/32 match HF greedy
+      r0 consecutive layers within the gate: 27 of 27
+      r1 consecutive layers within the gate: 27 of 27
+    RESULT requests=2 step median 5.879 ms -> 340.2 tokens/s (2 tokens per step); tokens 64/64 match
+[07:36:08 +  7m51s] start t2_x2_none on GPU 0
+[07:36:15 +  7m58s] ok      t2_x2_none rc=0 7s
+    r0 per-token latency (embed -> argmax on device): median 5.457 ms  mean 5.459 ms; step wall (launch to end) 5.514 ms/token
+    r1 per-token latency (embed -> argmax on device): median 5.460 ms  mean 5.468 ms; step wall (launch to end) 5.514 ms/token
+    r0 tokens: 32/32 match HF greedy
+    r1 tokens: 32/32 match HF greedy
+      r0 consecutive layers within the gate: 27 of 27
+      r1 consecutive layers within the gate: 27 of 27
+    RESULT requests=2 step median 5.508 ms -> 363.1 tokens/s (2 tokens per step); tokens 64/64 match
+[07:36:15 +  7m58s] session done
+  job                              status     rc  gpu  seconds
+  apt                              ok          0            21  
+  etx_env                          ok          0             3  
+  fleet_env                        ok          0           130  
+  dl_ds                            ok          0            87  
+  build_x1                         ok          0            35  
+  build_x1cap                      ok          0            36  
+  build_x2_router                  ok          0            61  
+  build_x2_experts                 ok          0            63  
+  build_x2_none                    ok          0            59  
+  build_fleet                      ok          0            10  
+  ds_prep                          ok          0    1      153  
+  ref_r1                           ok          0    0      118  
+  t1_fleet                         ok          0    0        8  
+  t1_x1                            ok          0    0        8  
+  t1_x1cap                         ok          0    0        7  
+  t1_x2_router                     ok          0    0        7  
+  t1_x2_experts                    ok          0    0        8  
+  t1_x2_none                       ok          0    0        7  
+  t2_fleet                         ok          0    0        7  
+  t2_x1                            ok          0    0        7  
+  t2_x1cap                         ok          0    0        7  
+  t2_x2_router                     ok          0    0        7  
+  t2_x2_experts                    ok          0    0        7  
+  t2_x2_none                       ok          0    0        7  
+  trace_x2                         ok          0    1        8  
+  timeline_x2                      ok          0             3  
