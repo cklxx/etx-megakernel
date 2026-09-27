@@ -3,6 +3,8 @@
 
 vLLM's layout: qkv_proj rows = [q; k; v] (QKVParallelLinear), gate_up_proj rows = [gate; up]
 (MergedColumnParallelLinear, silu_and_mul takes x[:d] and x[d:]), every weight row-major [out][in] bf16.
+MoE layers (FusedMoE): the router `gate` [E][H]; w13 [E][2 * I][H] with each expert's gate rows then its up rows
+(FusedMoE.weight_loader: w1 -> shard 0, w3 -> shard 1 of w13_weight); w2 [E][H][I].
 The rotary cache is vLLM's RotaryEmbedding.cos_sin_cache: float32 cos | sin of pos * base^(-2i/rot),
 cast to the model dtype (bf16), computed with torch like vLLM does (on the GPU when there is one, as
 vLLM builds it under the model's device context).
@@ -40,8 +42,6 @@ def main():
     src, out = Path(a.src).expanduser(), Path(a.out).expanduser()
     out.mkdir(parents=True, exist_ok=True)
     d = M.load_dims(str(src / "config.json"))
-    if d.moe:
-        raise SystemExit("MoE layers are not in the vLLM import set yet (fused_moe is a Triton kernel)")
     from safetensors import safe_open
     index = {}
     for f in sorted(src.glob("*.safetensors")):
@@ -88,13 +88,20 @@ def main():
             put(f"L{L}.kn", get(s + "k_norm.weight"))
         put(f"L{L}.wo", get(s + "o_proj.weight"))
         m = p + "mlp."
-        put(f"L{L}.wgu", torch.cat([get(m + "gate_proj.weight"), get(m + "up_proj.weight")], 0))
-        put(f"L{L}.wd", get(m + "down_proj.weight"))
+        if d.moe:
+            put(f"L{L}.wr", get(m + "gate.weight"))
+            put(f"L{L}.w13", torch.stack([torch.cat([get(f"{m}experts.{e}.gate_proj.weight"), get(f"{m}experts.{e}.up_proj.weight")], 0)
+                                          for e in range(d.E)]))
+            put(f"L{L}.w2", torch.stack([get(f"{m}experts.{e}.down_proj.weight") for e in range(d.E)]))
+        else:
+            put(f"L{L}.wgu", torch.cat([get(m + "gate_proj.weight"), get(m + "up_proj.weight")], 0))
+            put(f"L{L}.wd", get(m + "down_proj.weight"))
         print(f"  packed layer {L + 1}/{d.L}", end="\r", flush=True)
     wf.close()
     print()
     cfg = {"H": d.H, "NH": d.NH, "NKV": d.NKV, "HD": d.HD, "INTER": d.INTER, "L": d.L, "V": d.V, "tie": int(d.tie),
-           "bias": int(d.bias), "qk_norm": int(d.qk_norm), "maxlen": a.maxlen, "bytes": off}
+           "bias": int(d.bias), "qk_norm": int(d.qk_norm), "maxlen": a.maxlen, "bytes": off,
+           "moe": int(d.moe), "E": d.E, "TOPK": d.TOPK, "MI": d.MI, "norm_topk": int(d.norm_topk)}
     with open(out / "vl.manifest", "w") as f:
         for k, v in cfg.items():
             f.write(f"cfg {k} {v}\n")

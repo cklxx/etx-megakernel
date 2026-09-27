@@ -18,10 +18,7 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import re
-import subprocess
-import tempfile
 from pathlib import Path
 
 from etx.importer.ir_import import ImportError_, import_kernel
@@ -59,18 +56,26 @@ _FPLIT = re.compile(r"\b(half|bfloat|float|double) ([+-])(inf|qnan|snan|nan)(?:\
 
 
 def strip_debug(text: str) -> str:
-    """Debug info (LLVM 23 adds DIDerivedType fields LLVM 22 rejects) does not change code: drop it with an LLVM >= 23
-    `opt` (ETX_LLVM23, default the local Homebrew LLVM), which reads the IR as written."""
-    opt = Path(os.environ.get("ETX_LLVM23", "/opt/homebrew/opt/llvm/bin")) / "opt"
-    if not opt.exists():
-        raise ImportError_(f"{opt} not found: set ETX_LLVM23 to a bin directory of LLVM >= 23 (Triton's IR version)")
-    with tempfile.TemporaryDirectory() as d:
-        src, dst = Path(d) / "in.ll", Path(d) / "out.ll"
-        src.write_text(text)
-        r = subprocess.run([str(opt), "-S", "--strip-debug", str(src), "-o", str(dst)], capture_output=True, text=True)
-        if r.returncode:
-            raise ImportError_(f"opt --strip-debug: {r.stderr[-2000:]}")
-        return dst.read_text()
+    """Debug info does not change code, and LLVM 23's DI nodes carry fields LLVM 22 rejects (dwarfAddressSpace):
+    drop every !dbg attachment and the !llvm.dbg.cu list, then keep only the metadata nodes still reachable from the
+    code or the remaining named metadata (plain Python, so the import runs on the VM without an LLVM 23)."""
+    text = re.sub(r",? !dbg !\d+", "", text)
+    text = re.sub(r"(?m)^\s*#dbg_\w+\(.*\n", "", text)
+    text = re.sub(r"(?m)^!llvm\.dbg\.cu = .*\n", "", text)
+    defs = {m.group(1): m.group(2) for m in re.finditer(r"(?m)^!(\d+) = (.*)$", text)}
+    body = re.sub(r"(?m)^!\d+ = .*\n?", "", text)
+    todo = set(re.findall(r"!(\d+)\b", body))
+    keep = set()
+    while todo:
+        n = todo.pop()
+        if n in keep or n not in defs:
+            continue
+        keep.add(n)
+        todo |= set(re.findall(r"!(\d+)\b", defs[n])) - keep
+    text = re.sub(r"(?m)^!(\d+) = .*\n?", lambda m: m.group(0) if m.group(1) in keep else "", text)
+    if "!DI" in text:
+        raise ImportError_("a debug-info node is still reachable after stripping !dbg")
+    return text
 
 
 def downgrade_ir(text: str) -> tuple[str, list[str]]:
@@ -106,6 +111,19 @@ def dynamic_lds_to_static(text: str, shared: int) -> str:
     return pat.sub(lambda m: f"@global_smem = internal addrspace(3) global [{shared} x i8] undef, align {m.group(2) or 16}", text)
 
 
+def drop_module_flag(text: str, flag: str) -> str:
+    """Remove one entry of !llvm.module.flags. Used for amdhsa_code_object_version: Triton builds v5, ROCm 7.2's hipcc
+    v6, and llvm-link refuses to merge the two; the version only fixes the implicit-argument layout, which an import
+    never reads (ir_import refuses implicitarg.ptr), so the megakernel's own version applies."""
+    m = re.search(rf'(?m)^!(\d+) = !{{i32 \d+, !"{flag}", [^}}]*}}\n', text)
+    if not m:
+        return text
+    n = m.group(1)
+    text = text[:m.start()] + text[m.end():]
+    return re.sub(r"(?m)^(!llvm\.module\.flags = !\{)(.*)\}$",
+                  lambda f: f.group(1) + ", ".join(x for x in f.group(2).split(", ") if x.strip() != f"!{n}") + "}", text)
+
+
 def import_triton(cache_dir: Path, name: str, export: str, threads: int, max_slots: int | None = None):
     meta = json.loads((cache_dir / f"{name}.json").read_text())
     for k in ("global_scratch_size", "profile_scratch_size"):
@@ -113,6 +131,7 @@ def import_triton(cache_dir: Path, name: str, export: str, threads: int, max_slo
             raise ImportError_(f"{name}: {k} = {meta[k]} (the importer passes null scratch pointers)")
     text, notes = downgrade_ir((cache_dir / f"{name}.llir").read_text())
     text = dynamic_lds_to_static(text, int(meta["shared"]))
+    text = drop_module_flag(text, "amdhsa_code_object_version")
     block = (64 * int(meta["num_warps"]), 1, 1)
     out, info = import_kernel(text, name, export, block, threads, None, True, max_slots)
     return out, info, meta, notes

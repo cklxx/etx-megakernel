@@ -14,7 +14,18 @@ exactly the work vLLM's HIP graph runs, with the launches replaced by ETX events
             o_proj         wvSplitK
             post-norm      fused_add_rms_norm(o, residual)
             gate_up        wvSplitK      silu_and_mul        down   wvSplitK
+            or, for MoE layers (Qwen3-30B-A3B; fused_moe/fused_moe.py, TritonExperts at batch 1):
+            router         wvSplitK (YTILE 1, 128 rows)
+            topk           topk_softmax (softmax, top-8, renormalised)
+            moe_up         Triton fused_moe_kernel, gate_up of the 8 experts (naive block assignment)
+            act            silu_and_mul over the 8 rows
+            moe_down       Triton fused_moe_kernel, down, times the routing weight
+            moe_sum        moe_sum over the 8 rows, straight into the buffer the next norm reads
   then fused_add_rms_norm, lm_head (wvSplitK), argmax.
+
+Two launches of vLLM's MoE layer are not in the graph: torch.full() of num_tokens_post_padded (8 * BLOCK_SIZE_M at
+batch 1, a constant the host writes once) and the copy of moe_sum's output into the MoE custom op's out tensor (moe_sum
+writes where the copy would put it).
 
 Embedding lookup, the per-step position/slot/length scalars and argmax are ETX tiles (vLLM uses torch
 kernels for those). The host fills one argument block per grid instance (vl_plan.txt lists them in order:
@@ -39,6 +50,7 @@ CU = 304                      # MI300X compute units (vLLM passes cu_count to wv
 BS = 16                       # KV block size (vLLM default on ROCm)
 PART = 256                    # paged attention partition size (fixed in paged_attention_custom_launcher)
 THREADS = 1024                # megakernel workgroup = the largest imported block (wvSplitK 64 x 16)
+MOE_BN = 64                   # fused_moe_kernel BLOCK_SIZE_N of vLLM's default config at batch 1 (examples/vllm_llm/triton)
 MAXLEN = int(os.environ.get("ETX_VL_MAXLEN", "1072"))    # vLLM's max_model_len for the benchmark (prompt + 32 + 16)
 # ETX_VL_PIN=1: the small launches between qkv and o_proj (q/k norm, rope, cache, attention, reduce) all run on
 # XCD 0, so the events between them are XCD-local (a wait on L2 of one XCD) instead of device-wide
@@ -106,6 +118,14 @@ def instances(d) -> list[dict]:
         add("attn_reduce", L, "reduce", (d.NH, 1, 1))
         gemv(L, "o_proj", d.H, d.NH * d.HD)
         add("fused_add_rms_norm", L, "post_norm", (1, 1, 1))
+        if d.moe:
+            gemv(L, "router", d.E, d.H)
+            add("topk_softmax_e128", L, "topk", (1, 1, 1))
+            add("fused_moe_up", L, "moe_up", (d.TOPK * math.ceil(2 * d.MI / MOE_BN), 1, 1))
+            add("silu_and_mul", L, "act", (d.TOPK, 1, 1))
+            add("fused_moe_down", L, "moe_down", (d.TOPK * math.ceil(d.H / MOE_BN), 1, 1))
+            add("moe_sum_k8", L, "moe_sum", (1, 1, 1))
+            continue
         gemv(L, "gate_up", 2 * d.INTER, d.H)
         add("silu_and_mul", L, "act", (1, 1, 1))
         gemv(L, "down", d.H, d.INTER)
@@ -137,6 +157,8 @@ def plan_offsets(insts: list[dict], imp: dict) -> int:
 
 def build() -> Graph:
     d = load_dims()
+    if d.moe and XCD:
+        raise SystemExit("ETX_VL_XCD is not defined for MoE layers yet (its replicated roles are the dense ones)")
     imp = imports()
     insts = instances(d)
     skip = set(filter(None, os.environ.get("ETX_VL_SKIP", "").split(",")))    # register analysis only: drop roles

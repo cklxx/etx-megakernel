@@ -32,6 +32,8 @@ void vl_set_params(const VlParams* p, hipStream_t s);
 extern "C" int vl_params_bytes();
 #ifdef ETX_VL_CHECK
 extern "C" const void* etx_orig_find(const char* name);    // orig_table.hip: vLLM's kernels compiled as vLLM compiles them
+// Triton kernels: vLLM's own code object from its Triton cache (etx.importer.vllm_kernels TRITON)
+extern "C" bool etx_orig_triton(const char* name, const char** hsaco, const char** fn, int* shared);
 #endif
 
 // wait for the stream with a deadline: a hung kernel is reported by name instead of hanging the run
@@ -92,6 +94,7 @@ struct Args {
   Args& i32(int v) { chk('i'); memcpy(p + d->off[i++], &v, 4); return *this; }
   Args& i64(long long v) { chk('l'); memcpy(p + d->off[i++], &v, 8); return *this; }
   Args& f32(float v) { chk('f'); memcpy(p + d->off[i++], &v, 4); return *this; }
+  Args& f64(double v) { chk('d'); memcpy(p + d->off[i++], &v, 8); return *this; }
   Args& b8(bool v) { chk('b'); p[d->off[i++]] = v ? 1 : 0; return *this; }
   void grid(int gx, int gy, int gz) {
     if (i != d->nparams) die(std::string(d->name) + ": " + std::to_string(i) + " of " + std::to_string(d->nparams) + " arguments given");
@@ -118,6 +121,9 @@ int main(int argc, char** argv) {
   const bool tie = m.geti("tie"), bias = m.geti("bias"), qk_norm = m.geti("qk_norm");
   const int MAXLEN = m.geti("maxlen"), NQKV = (NH + 2 * NKV) * HD;
   const float eps = (float)m.cfg.at("eps"), scale = 1.0f / sqrtf((float)HD);
+  auto cfg0 = [&](const char* k) { auto it = m.cfg.find(k); return it == m.cfg.end() ? 0 : (int)it->second; };
+  const bool moe = cfg0("moe"); const int E = cfg0("E"), TOPK = cfg0("TOPK"), MI = cfg0("MI"); const bool norm_topk = cfg0("norm_topk");
+  const int MOE_BM = 16;                  // fused_moe_kernel BLOCK_SIZE_M (vLLM's default config at batch 1)
   const int BS = 16, X = 8, MAXBLK = (MAXLEN + BS - 1) / BS;
 
   // ---- plan
@@ -146,9 +152,16 @@ int main(int argc, char** argv) {
   // ---- weights
   std::ifstream wf(dir + "/vl.bin", std::ios::binary); if (!wf) die("cannot open vl.bin");
   const size_t wbytes = (size_t)m.cfg.at("bytes");
-  std::vector<char> blob(wbytes); wf.read(blob.data(), wbytes);
-  char* dw; ETX_CHECK(hipMalloc(&dw, wbytes)); ETX_CHECK(hipMemcpy(dw, blob.data(), wbytes, hipMemcpyHostToDevice));
-  blob.clear(); blob.shrink_to_fit();
+  // in 1 GB pieces: the MoE model is 61 GB, more than a host copy should hold
+  char* dw; ETX_CHECK(hipMalloc(&dw, wbytes));
+  {
+    const size_t piece = (size_t)1 << 30; std::vector<char> blob(std::min(piece, wbytes));
+    for (size_t o = 0; o < wbytes; o += piece) {
+      const size_t n = std::min(piece, wbytes - o);
+      wf.read(blob.data(), n); if ((size_t)wf.gcount() != n) die("vl.bin is shorter than the manifest says");
+      ETX_CHECK(hipMemcpy(dw + o, blob.data(), n, hipMemcpyHostToDevice));
+    }
+  }
   auto W = [&](const std::string& n, bool required = true) -> void* {
     auto it = m.t.find(n); if (it == m.t.end()) { if (required) die("manifest lacks " + n); return nullptr; }
     return dw + it->second.first;
@@ -171,6 +184,13 @@ int main(int argc, char** argv) {
   const size_t cache_elems = (size_t)MAXBLK * NKV * HD * BS;        // [blocks][NKV][HD/x][BS][x] and [blocks][NKV][HD][BS]
   for (int l = 0; l < L; ++l) { kc[l] = dalloc<bf>(cache_elems); vc[l] = dalloc<bf>(cache_elems); }
   int32_t *token_in = ualloc<int32_t>(steps + 2), *token_out = ualloc<int32_t>(steps + 1); uint64_t* token_time = dalloc<uint64_t>(2 * (steps + 1));
+  // MoE (fused_experts at batch 1): router logits, top-k weights / ids / token_expert_indices, num_tokens_post_padded
+  // (vLLM's torch.full: TOPK * BLOCK_SIZE_M, a constant, written here once), intermediate caches 1-3 (vLLM aliases 1
+  // and 3 in one buffer; separate here, same values)
+  bf* rlog = ualloc<bf>(std::max(E, 1)); float* topk_w = ualloc<float>(std::max(TOPK, 1));
+  int32_t *topk_ids = ualloc<int32_t>(std::max(TOPK, 1)), *tei = ualloc<int32_t>(std::max(TOPK, 1));
+  const int32_t ntpp_val = TOPK * MOE_BM; int32_t* ntpp = etx_host::upload(&ntpp_val, 1);
+  bf *mc1 = ualloc<bf>((size_t)std::max(TOPK, 1) * 2 * MI), *mc2 = ualloc<bf>((size_t)std::max(TOPK, 1) * MI), *mc3 = ualloc<bf>((size_t)std::max(TOPK, 1) * H);
 
   // ---- argument blocks, instance by instance (see model.py for the vLLM call each role mirrors)
   std::vector<uint8_t> ab(total, 0);
@@ -208,7 +228,25 @@ int main(int argc, char** argv) {
     else if (r == "o_proj") gemv(W(pl + "wo"), attn_out, o, nullptr);
     else if (r == "post_norm") { copy(o, o_norm, H * 2); fused_add(o_norm, W(pl + "ln2")); }
     else if (r == "gate_up") gemv(W(pl + "wgu"), o_norm, gu, nullptr);
+    else if (r == "act" && moe) a.ptr(mc2).ptr(mc1).i32(MI).f32(0.0f).f32(1.0f).f32(0.0f);    // one row per expert
     else if (r == "act") a.ptr(act_out).ptr(gu).i32(I).f32(0.0f).f32(1.0f).f32(0.0f);
+    else if (r == "router") gemv(W(pl + "wr"), o_norm, rlog, nullptr);
+    // topk_softmax -> topkGatingLauncherHelper(gating_output, nullptr, topk_weights, topk_indices, token_expert_indices,
+    // num_tokens, topk, 0, num_experts, renormalize, bias, 1.0, stream, is_padding)
+    else if (r == "topk") a.ptr(rlog).ptr(nullptr).ptr(topk_w).i32(1).ptr(topk_ids).ptr(tei).i32(TOPK).i32(0).i32(E).b8(norm_topk)
+                            .ptr(nullptr).f64(1.0).ptr(nullptr);
+    // invoke_fused_moe_triton_kernel, naive block assignment: EM = M * top_k * BLOCK_SIZE_M, num_valid_tokens = M * top_k;
+    // Triton dropped the None pointers and the strides equal to 1 (stride_ak, stride_bk, stride_cn) from the signature
+    // and appended its global / profile scratch pointers (both sizes 0)
+    else if (r == "moe_up") a.ptr(o_norm).ptr(W(pl + "w13")).ptr(mc1).ptr(topk_ids).ptr(ntpp)
+                              .i32(2 * MI).i32(H).i32(TOPK * MOE_BM).i32(TOPK)
+                              .i32(H).i32(2 * MI * H).i32(H).i32(2 * MI).i32(0).i32(0).i32(0).i32(0).i32(0).i32(0).i32(0).ptr(nullptr).ptr(nullptr);
+    else if (r == "moe_down") a.ptr(mc2).ptr(W(pl + "w2")).ptr(mc3).ptr(topk_w).ptr(topk_ids).ptr(ntpp)
+                                .i32(H).i32(MI).i32(TOPK * MOE_BM).i32(TOPK)
+                                .i32(MI).i32(H * MI).i32(MI).i32(H).i32(0).i32(0).i32(0).i32(0).i32(0).i32(0).i32(0).ptr(nullptr).ptr(nullptr);
+    // moe_sum, vectorised: (out, input, num_tokens, hidden, stride_token, stride_topk, nullptr, nullptr, 0, 0); the output
+    // is the buffer the next fused_add_rms_norm reads (vLLM copies it there)
+    else if (r == "moe_sum") a.ptr(dn).ptr(mc3).i64(1).i32(H).i64((long long)TOPK * H).i64(H).ptr(nullptr).ptr(nullptr).i64(0).i64(0);
     else if (r == "down") gemv(W(pl + "wd"), act_out, dn, nullptr);
     else if (r == "final_norm") { copy(dn, d_norm, H * 2); fused_add(d_norm, W("final_norm")); }
     else if (r == "lm_head") gemv(tie ? W("embed") : W("lm_head"), d_norm, logits, nullptr);
@@ -243,8 +281,12 @@ int main(int argc, char** argv) {
     // on the same inputs (a snapshot of every buffer they can touch), compared byte for byte
     std::vector<std::pair<void*, size_t>> bufs = {{resid, H * 2}, {hn, H * 2}, {qkv, NQKV * 2}, {qn, NH * HD * 2}, {kn, NKV * HD * 2}, {attn_out, NH * HD * 2},
       {o, H * 2}, {gu, 4 * I}, {act, 2 * I}, {dn, H * 2}, {logits, (size_t)V * 2}, {exp_sums, (size_t)NH * parts * 4}, {max_logits, (size_t)NH * parts * 4},
-      {tmp_out, (size_t)NH * parts * HD * 2}};
-    const char* names[] = {"resid", "hn", "qkv", "qn", "kn", "attn_out", "o", "gu", "act", "dn", "logits", "exp_sums", "max_logits", "tmp_out"};
+      {tmp_out, (size_t)NH * parts * HD * 2}, {rlog, (size_t)std::max(E, 1) * 2}, {topk_w, (size_t)std::max(TOPK, 1) * 4},
+      {topk_ids, (size_t)std::max(TOPK, 1) * 4}, {tei, (size_t)std::max(TOPK, 1) * 4}, {mc1, (size_t)std::max(TOPK, 1) * 4 * MI},
+      {mc2, (size_t)std::max(TOPK, 1) * 2 * MI}, {mc3, (size_t)std::max(TOPK, 1) * 2 * H}};
+    const char* names[] = {"resid", "hn", "qkv", "qn", "kn", "attn_out", "o", "gu", "act", "dn", "logits", "exp_sums", "max_logits", "tmp_out",
+                           "router_logits", "topk_weights", "topk_ids", "token_expert_indices", "moe_cache1", "moe_cache2", "moe_cache3"};
+    const size_t NB = sizeof(names) / sizeof(names[0]);
     for (int l = 0; l < std::min(L, check_layers); ++l) { bufs.push_back({kc[l], cache_elems * 2}); bufs.push_back({vc[l], cache_elems * 2}); }
     std::vector<void*> save(bufs.size()), ref(bufs.size());
     for (size_t b = 0; b < bufs.size(); ++b) { save[b] = dalloc<char>(bufs[b].second); ref[b] = dalloc<char>(bufs[b].second); }
@@ -265,12 +307,20 @@ int main(int argc, char** argv) {
     for (const Inst& x : insts) {
       if (x.layer >= check_layers || (x.layer < 0 && check_layers < L)) break;
       const etx_imp_desc* d = etx_imp_find(x.exp.c_str());
-      const void* fn = etx_orig_find(x.exp.c_str()); if (!fn) die("no original for " + x.exp);
+      const void* fn = etx_orig_find(x.exp.c_str());
+      const char *tri_path = nullptr, *tri_fn = nullptr; int tri_shared = 0; hipFunction_t tri = nullptr;
+      if (!fn) {
+        if (!etx_orig_triton(x.exp.c_str(), &tri_path, &tri_fn, &tri_shared)) die("no original for " + x.exp);
+        static std::map<std::string, hipFunction_t> mods;
+        if (!mods.count(x.exp)) { hipModule_t mod; ETX_CHECK(hipModuleLoad(&mod, tri_path)); ETX_CHECK(hipModuleGetFunction(&mods[x.exp], mod, tri_fn)); }
+        tri = mods[x.exp];
+      }
       if (etx_launch_count[x.n + 1] != x.tasks) die("launch table does not follow the plan at instance " + std::to_string(x.n));
       for (size_t b = 0; b < bufs.size(); ++b) ETX_CHECK(hipMemcpyAsync(save[b], bufs[b].first, bufs[b].second, hipMemcpyDeviceToDevice, hst.stream));
       std::vector<void*> av(d->nparams); for (int k = 0; k < d->nparams; ++k) av[k] = ab.data() + x.off + d->off[k];
       ETX_CHECK(hipEventRecord(e0, hst.stream));
-      ETX_CHECK(hipLaunchKernel(fn, dim3(x.gx, x.gy, x.gz), dim3(d->block[0], d->block[1], d->block[2]), av.data(), 0, hst.stream));
+      if (fn) ETX_CHECK(hipLaunchKernel(fn, dim3(x.gx, x.gy, x.gz), dim3(d->block[0], d->block[1], d->block[2]), av.data(), 0, hst.stream));
+      else ETX_CHECK(hipModuleLaunchKernel(tri, x.gx, x.gy, x.gz, d->block[0], d->block[1], d->block[2], tri_shared, hst.stream, av.data(), nullptr));
       ETX_CHECK(hipEventRecord(e1, hst.stream));
       if (!wait_stream(hst.stream, 5.0)) { printf("HANG original %s L%d %s\n", x.role.c_str(), x.layer, x.exp.c_str()); return 3; }
       const double us_o = elapsed_us();
@@ -289,7 +339,7 @@ int main(int argc, char** argv) {
         std::vector<uint8_t> A(bufs[b].second), B(bufs[b].second);
         ETX_CHECK(hipMemcpy(A.data(), bufs[b].first, A.size(), hipMemcpyDeviceToHost)); ETX_CHECK(hipMemcpy(B.data(), ref[b], B.size(), hipMemcpyDeviceToHost));
         size_t n = 0, first = 0; for (size_t k = 0; k < A.size(); ++k) if (A[k] != B[k]) { if (!n) first = k; ++n; }
-        if (n) diff += std::string(" ") + (b < 14 ? names[b] : (((b - 14) % 2) ? "vc" : "kc")) + ":" + std::to_string(n) + "B@" + std::to_string(first);
+        if (n) diff += std::string(" ") + (b < NB ? names[b] : (((b - NB) % 2) ? "vc" : "kc")) + ":" + std::to_string(n) + "B@" + std::to_string(first);
       }
       printf("  %-10s L%-3d %-20s %s%s  original %6.1f us  imported %6.1f us\n", x.role.c_str(), x.layer, x.exp.c_str(),
              diff.empty() ? "identical" : "DIFFERS", diff.c_str(), us_o, us_i);

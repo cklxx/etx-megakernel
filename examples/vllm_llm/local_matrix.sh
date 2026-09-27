@@ -12,12 +12,15 @@ one() {
   local n=$1 v=$2 O=$S/${1}_$2; mkdir -p $O
   local cfg=examples/llm/configs/$n.json E=""
   case $n in qwen3-8b) BLK="--block rms_norm_2d=512 --block reshape_and_cache=128"; EXP=wvsplitk_y2,attn_mfma4_g4,attn_reduce,rms_norm_2d,fused_add_rms_norm,rope_neox,reshape_and_cache,silu_and_mul,rms_norm_3d;;
-             qwen2.5-1.5b) BLK="--block rms_norm_2d=192 --block reshape_and_cache=32"; EXP=wvsplitk_y2,attn_mfma16_g6,attn_reduce,rms_norm_2d,fused_add_rms_norm,rope_neox,reshape_and_cache,silu_and_mul;; esac
+             qwen2.5-1.5b) BLK="--block rms_norm_2d=192 --block reshape_and_cache=32"; EXP=wvsplitk_y2,attn_mfma16_g6,attn_reduce,rms_norm_2d,fused_add_rms_norm,rope_neox,reshape_and_cache,silu_and_mul;;
+             qwen3-30b-a3b) BLK="--block rms_norm_2d=256 --block reshape_and_cache=64 --block silu_and_mul=96"
+                            EXP=wvsplitk_y2,wvsplitk_y1,attn_mfma16_g8,attn_reduce,rms_norm_2d,fused_add_rms_norm,rope_neox,reshape_and_cache,silu_and_mul,rms_norm_3d,topk_softmax_e128,moe_sum_k8,fused_moe_up,fused_moe_down;; esac
+  local MS=""; [ $n = qwen3-30b-a3b ] && MS="fused_moe_up=1,fused_moe_down=1"
   local SL="" UCF=""
   case $v in base) E="";; xcd) E="ETX_VL_XCD=1 ETX_VL_CHAIN=1";; xcd_s1) E="ETX_VL_XCD=1 ETX_VL_CHAIN=1"; SL=$SLOTS1;; chain) E="ETX_VL_CHAIN=1";;
              uc) E="ETX_VL_UC=1 ETX_VL_PIN=1 ETX_VL_XCD=1 ETX_VL_CHAIN=1"; UCF="-DETX_VL_UC -DETX_COHERENT_DEVICE_DATA";;
              uc_s1) E="ETX_VL_UC=1 ETX_VL_PIN=1 ETX_VL_XCD=1 ETX_VL_CHAIN=1"; SL=$SLOTS1; UCF="-DETX_VL_UC -DETX_COHERENT_DEVICE_DATA";; esac
-  { $PY -m etx.importer.vllm_kernels --out $O/imp --only $EXP $BLK --slots "$SL" \
+  { $PY -m etx.importer.vllm_kernels --out $O/imp --only $EXP $BLK --slots "${SL:+$SL,}$MS" \
     && $PY -m etx.importer.adapter $O/imp/imports.json --tiles $O/imp_tiles.hip --header $O/imports.h \
     && $PY -m etx.importer.bundle --imports $O/imp --exports $EXP --devlibs $DL -o $O/imports.bc \
     && env $E ETX_VL_IMPORTS=$O/imp/imports.json ETX_VL_ADAPTERS=$O/imp_tiles.hip ETX_VL_PLAN=$O/vl_plan.txt ETX_VL_CHAINS=$O/chain_tiles.hip ETX_LLM_CONFIG=$cfg \
@@ -38,7 +41,12 @@ for blk in a.split('  - .agpr_count')[1:]:
 " 2>/dev/null)
   echo "[$n $v] rc=$rc $(grep -E 'tasks=' $O/compile.log 2>/dev/null | head -1) $st $(grep -E 'UC plan|REJECTED' $O/matrix.log) $(grep -m2 -E 'error' $O/matrix.log | cut -c1-200)"
 }
+# LOCAL_MATRIX="model:variant ..." builds only those
+if [ -n "${LOCAL_MATRIX:-}" ]; then
+  for mv in $LOCAL_MATRIX; do one ${mv%%:*} ${mv##*:} & done; wait; exit 0
+fi
 for n in qwen3-8b qwen2.5-1.5b; do
   for v in base chain xcd xcd_s1 uc uc_s1; do one $n $v & done
   wait
 done
+for v in base chain; do one qwen3-30b-a3b $v & done; wait

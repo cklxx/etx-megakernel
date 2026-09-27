@@ -14,6 +14,13 @@ H=$(cfg H); NH=$(cfg NH); NKV=$(cfg NKV); HD=$(cfg HD); QKN=$(cfg qk_norm); G=$(
 case $G in 4) ATTN=attn_mfma4_g4;; 6) ATTN=attn_mfma16_g6;; 8) ATTN=attn_mfma16_g8;; *) echo "no attention import for GQA $G"; exit 1;; esac
 EXPORTS="wvsplitk_y2,$ATTN,attn_reduce,rms_norm_2d,fused_add_rms_norm,rope_neox,reshape_and_cache,silu_and_mul"
 [ "$QKN" = 1 ] && EXPORTS="$EXPORTS,rms_norm_3d"
+# MoE (Qwen3-30B-A3B): router GEMV (YTILE 1), top-k, the two Triton fused_moe launches, moe_sum; silu over the 8 expert
+# rows runs with block MI / 8; one fused_moe program per workgroup (4 would need 80 KB of LDS and put 192 programs on 48 CUs)
+MOEBLK=(); MOESLOTS=""
+if [ "$(cfg moe)" = 1 ]; then
+  EXPORTS="$EXPORTS,wvsplitk_y1,topk_softmax_e128,moe_sum_k8,fused_moe_up,fused_moe_down"
+  MOEBLK=(--block silu_and_mul=$(( $(cfg MI) / 8 ))); MOESLOTS="fused_moe_up=1,fused_moe_down=1"
+fi
 DEVLIBS="${ETX_DEVLIBS:-$(ls -d /opt/rocm/lib/llvm/lib/clang/*/lib/amdgcn/bitcode 2>/dev/null | head -1)}"
 [ -d "$DEVLIBS" ] || DEVLIBS=/opt/rocm/amdgcn/bitcode
 CONFIG="$DIR/hf/config.json"; [ -f "$CONFIG" ] || CONFIG="$DIR/config.json"
@@ -21,8 +28,9 @@ CONFIG="$DIR/hf/config.json"; [ -f "$CONFIG" ] || CONFIG="$DIR/config.json"
 echo "== import ($EXPORTS)"
 ORIG=(); CHK=(); [ "${ETX_VL_CHECK:-0}" = 1 ] && ORIG=(--orig) && CHK=(-DETX_VL_CHECK)
 # ETX_VL_SLOTS="attn_mfma4_g4=1,attn_reduce=1": fewer of a kernel's blocks per workgroup (more CUs, idle waves)
-"$PY" -m etx.importer.vllm_kernels --vllm "$VLLM" --out "$OUT/imp" --compiler hipcc --only "$EXPORTS" "${ORIG[@]}" --slots "${ETX_VL_SLOTS:-}" \
-  --block rms_norm_2d=$((H / 8)) --block reshape_and_cache=$((NKV * HD / 8))
+SLOTS="${ETX_VL_SLOTS:-}"; [ -n "$MOESLOTS" ] && SLOTS="${SLOTS:+$SLOTS,}$MOESLOTS"
+"$PY" -m etx.importer.vllm_kernels --vllm "$VLLM" --out "$OUT/imp" --compiler hipcc --only "$EXPORTS" "${ORIG[@]}" --slots "$SLOTS" \
+  --block rms_norm_2d=$((H / 8)) --block reshape_and_cache=$((NKV * HD / 8)) "${MOEBLK[@]}"
 "$PY" -m etx.importer.adapter "$OUT/imp/imports.json" --tiles "$OUT/imp_tiles.hip" --header "$OUT/imports.h"
 "$PY" -m etx.importer.bundle --imports "$OUT/imp" --exports "$EXPORTS" --devlibs "$DEVLIBS" -o "$OUT/imports.bc"
 # ETX_VL_UC=1: cross-XCD tensors in uncached memory and DOMAIN fences for DEVICE events (ETX_COHERENT_DEVICE_DATA);

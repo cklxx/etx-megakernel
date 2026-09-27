@@ -118,6 +118,16 @@ SOURCES = [
     ]),
 ]
 
+# Triton kernels, taken from the Triton cache vLLM wrote on the VM (vLLM compiles them at run time, so the exact kernel
+# is the cached one; examples/vllm_llm/triton/<export>/CACHE_DIR names the cache entry). fused_moe_kernel at batch 1
+# (naive block assignment, default config BLOCK_SIZE_M/N/K = 16/64/128, 4 warps, 20 KB LDS): num_valid_tokens = 8
+# is not a multiple of 16, which selects the entries without that divisibility specialisation.
+TRITON_DIR = HERE.parents[1] / "examples/vllm_llm/triton"
+TRITON = {
+    "fused_moe_up": ("fused_moe_kernel", "experts gate_up: top_k = 8, MUL_ROUTED_WEIGHT = False; grid 8 x 1536/64 = 192"),
+    "fused_moe_down": ("fused_moe_kernel", "experts down: top_k = 1, MUL_ROUTED_WEIGHT = True; grid 8 x 2048/64 = 256"),
+}
+
 
 def _flags(vllm: Path, s: Source) -> list[str]:
     th = os.environ.get("ETX_TORCH_HEADERS", str(Path.home() / "rocm-headers/pytorch"))
@@ -148,6 +158,14 @@ def compile_orig(out: Path, vllm: Path, exports: set[str] | None) -> list[Path]:
             raise SystemExit(f"compile orig {s.path} failed:\n{r.stderr[-4000:]}")
         objs.append(obj)
         names += [k.export for k in ks]
+    # Triton originals: vLLM's own code object from its cache, launched with hipModuleLaunchKernel by host.hip
+    tri = [e for e in TRITON if exports is None or e in exports]
+    table += ['extern "C" bool etx_orig_triton(const char* n, const char** hsaco, const char** fn, int* shared) {']
+    for e in tri:
+        meta = json.loads((TRITON_DIR / e / f"{TRITON[e][0]}.json").read_text())
+        table.append(f'  if (!strcmp(n, "{e}")) {{ *hsaco = "{TRITON_DIR / e / (TRITON[e][0] + ".hsaco")}"; *fn = "{TRITON[e][0]}"; '
+                     f'*shared = {int(meta["shared"])}; return true; }}')
+    table += ["  return false;", "}"]
     table += [f'extern "C" const void* etx_orig_{e}();' for e in names]
     table += ['extern "C" const void* etx_orig_find(const char* n) {'] + [f'  if (!strcmp(n, "{e}")) return etx_orig_{e}();' for e in names] + ["  return nullptr;", "}"]
     (out / "orig_table.hip").write_text("\n".join(table) + "\n")
@@ -201,6 +219,17 @@ def run(vllm: Path, out: Path, threads: int, compiler: str, blocks: dict[str, tu
             if r.returncode:
                 raise SystemExit(f"llvm-as {k.export}: {r.stderr[-2000:]}")
             report[k.export] = info.to_json() | {"source": s.path, "spec": k.spec, "note": k.note}
+    from etx.importer.triton_import import import_triton
+    for e, (kname, note) in TRITON.items():
+        if only is not None and e not in only:
+            continue
+        txt, info, meta, notes = import_triton(TRITON_DIR / e, kname, f"etx_imp_{e}", threads, (slots or {}).get(e))
+        (out / f"{e}.ll").write_text(txt)
+        r = subprocess.run([llvm_as, str(out / f"{e}.ll"), "-o", str(out / f"{e}.bc")], capture_output=True, text=True)
+        if r.returncode:
+            raise SystemExit(f"llvm-as {e}: {r.stderr[-2000:]}")
+        report[e] = info.to_json() | {"source": f"triton:{(TRITON_DIR / e / 'CACHE_DIR').read_text().strip()}", "spec": kname,
+                                      "note": note, "downgrade": notes}
     old = json.loads((out / "imports.json").read_text()) if only and (out / "imports.json").exists() else {}
     (out / "imports.json").write_text(json.dumps(old | report, indent=1))     # --only updates, it does not drop the rest
     return report

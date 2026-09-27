@@ -11,7 +11,16 @@
 #ifndef ETX_EV_STRIDE
 #define ETX_EV_STRIDE 1
 #endif
+#if ETX_EV_STRIDE > 1 && defined(__HIP_DEVICE_COMPILE__) && !defined(ETX_EVW_FOLD)   // -DETX_EVW_FOLD: the old folded form (A/B)
+// Device code: the word index goes through an empty asm, so p.events + ETX_EVW(const) is computed where it is used.
+// With a constant index LLVM hoists every event's address out of the persistent loop; at stride 1 the offsets fit the
+// load/atomic immediate (4 KB) and cost nothing, at stride 32 they do not, and the hoisted 64-bit addresses spilled
+// (Qwen3-8B megakernel: 2 -> 35 VGPR spills, ROCm 7.2.4 clang, examples/vllm_llm/rocm_build_check.sh).
+static inline __attribute__((device, always_inline)) int etx_evw(int x) { asm volatile("" : "+v"(x)); return x * ETX_EV_STRIDE; }
+#define ETX_EVW(x) etx_evw(x)
+#else
 #define ETX_EVW(x) ((x) * ETX_EV_STRIDE)
+#endif
 
 typedef int32_t etx_event;            // one counter; an ETensor is a contiguous run of them
 
