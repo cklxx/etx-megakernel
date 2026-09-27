@@ -106,7 +106,7 @@ struct Args {
 int main(int argc, char** argv) {
   if (argc < 3) die("usage: run <packed-dir> <plan.txt> [--golden F] [--gen N] [--repeat R] [--teacher] [--unfused]");
   const std::string dir = argv[1], plan_path = argv[2];
-  int gen = -1, repeat = 2, check_layers = 0; bool teacher = false, unfused = false; std::string golden_name = "golden_c1024.txt";
+  int gen = -1, repeat = 2, check_layers = 0, max_steps = 0; bool teacher = false, unfused = false; std::string golden_name = "golden_c1024.txt";
   for (int i = 3; i < argc; ++i) {
     const std::string a = argv[i];
     if (a == "--gen" && i + 1 < argc) gen = atoi(argv[++i]);
@@ -114,6 +114,7 @@ int main(int argc, char** argv) {
     else if (a == "--teacher") teacher = true;
     else if (a == "--unfused") unfused = true;
     else if (a == "--golden" && i + 1 < argc) golden_name = argv[++i];
+    else if (a == "--max-steps" && i + 1 < argc) max_steps = atoi(argv[++i]);   // traces: stop after N steps (no token check)
     else if (a == "--check" && i + 1 < argc) check_layers = atoi(argv[++i]);   // compare each imported launch with vLLM's original, layers < N
   }
   const Manifest m = read_manifest(dir + "/vl.manifest");
@@ -374,7 +375,8 @@ int main(int argc, char** argv) {
     for (int i = 0; i < (int)(teacher ? seq.size() : prompt.size()); ++i) tin[i] = seq[i];
     ETX_CHECK(hipMemcpy(token_in, tin.data(), tin.size() * 4, hipMemcpyHostToDevice));
     wall_ms.clear();
-    for (int t = 0; t < steps; ++t) {
+    const int nsteps = max_steps > 0 ? std::min(steps, max_steps) : steps;
+    for (int t = 0; t < nsteps; ++t) {
       vp.tok = t; vp.pos = t; vp.write_next = (!teacher && t + 1 >= (int)prompt.size()) ? 1 : 0;
       const auto w0 = std::chrono::steady_clock::now();
       vl_set_params(&vp, hst.stream);
@@ -384,6 +386,7 @@ int main(int argc, char** argv) {
       if (t + 1 >= (int)prompt.size()) wall_ms.push_back(wms);
       if (progress && (t % progress == 0 || t < 3)) { printf("  step %d: %.3f ms wall\n", t, wms); fflush(stdout); }
     }
+    if (nsteps < steps) { printf("run %d: stopped after %d of %d steps (--max-steps): no token check\n", run, nsteps, steps); continue; }
     ETX_CHECK(hipMemcpy(out.data(), token_out, steps * 4, hipMemcpyDeviceToHost));
     ETX_CHECK(hipMemcpy(tt.data(), token_time, 2 * steps * 8, hipMemcpyDeviceToHost));
     matched = 0; first_div = -1; step_ms.clear();

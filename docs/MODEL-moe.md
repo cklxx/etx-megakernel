@@ -125,3 +125,25 @@ As in `docs/RESEARCH-moe-import.md` section 3: `topkGating` and `moe_sum` are HI
 `BLOCK_SIZE_M/N/K = 16/64/128`, 4 warps, 20 KB dynamic LDS, naive block assignment), taken from the Triton cache vLLM
 wrote (`results_2026-09-27/vlnext/moe/triton`, LLVM 23 IR). Inside the megakernel it runs one program per workgroup
 (slots = 1): four programs per 1024-thread workgroup would need 80 KB of LDS and would put 192 programs on 48 CUs.
+
+## 6. Local status before the session (2026-09-27)
+
+- **Imports:** `topk_softmax_e128`, `moe_sum_k8` (HIP, `etx.importer.vllm_kernels`); `fused_moe_up` / `fused_moe_down`
+  (Triton, `etx.importer.triton_import`, from `examples/vllm_llm/triton/`: the batch-1 cache entries, gate_up `top_k = 8`,
+  down `top_k = 1` with the routing weight; both 4 warps, 20 KB LDS, argument lists checked against the TTIR signature).
+  Triton's IR is LLVM 23; three constructs had to be rewritten for ROCm 7.2.4's LLVM 22 (special float literals such as
+  `bfloat +nan(0x3F)` to hex, the `nocreateundeforpoison` attribute, debug info), plus the `amdhsa_code_object_version`
+  module flag (Triton v5, hipcc v6).
+- **ROCm 7.2.4 compiler on the laptop:** `examples/vllm_llm/rocm_build_check.sh` runs build.sh's device half with the
+  VM's exact clang (rocm-llvm 7.2.4 in an x86 container). It reproduces the VM's register report (Qwen3-8B at commit
+  7d8f874: 128 VGPR, 12 B/lane, 2 spills, as the VM printed).
+- **Found with it:** at `ETX_EV_STRIDE` 32 the event offsets no longer fit the load/atomic immediate and LLVM hoisted
+  every event address out of the persistent loop: Qwen3-8B megakernel 2 -> 35 VGPR spills, MoE 21. Event word indices
+  now pass through an empty asm (`etx_evw`, abi.h; `-DETX_EVW_FOLD` restores the folded form): Qwen3-8B 0 spills,
+  Qwen2.5-1.5B xcd 0, MoE base 1, MoE xcd 5 (DeepSeek's fleet-tile build was not affected: 256 VGPR + AGPRs, 0 scratch).
+  Stride 1 vs 32 in the session is therefore measured with the fix in both builds.
+- **Graph:** vLLM's 17 launches per layer minus the fill and the copy. With `ETX_VL_XCD` (the schedule this work is
+  about): top-k and moe_sum run once per XCD, and XCD x runs expert slot x of gate_up (24 of the 192 programs), of silu
+  (row x) and of down (32 of 256), each waiting only on its own XCD's part of the previous launch. Per layer that makes
+  6 XCD-local and 7 device-wide hand-offs (`tests/test_vllm_moe.py` checks the placement and the event scopes).
+- **Session:** `examples/sessions/moe_gate.py` (G1-G3 of section 4, the MoE check, fused and unfused timing).
