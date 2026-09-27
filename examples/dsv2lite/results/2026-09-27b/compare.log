@@ -1,0 +1,44 @@
+# job compare gpu=None cwd=/home/hotaisle/etx
+# .venv/bin/python -m examples.dsv2lite.compare_fleet --fleet-trace $HOME/sess/fleet_trace.bin --fleet-graph $HOME/sess/taskgraph_d16.bin --fleet-src ~/fleet-mi300x/src --etx-plan $HOME/sess/etx_plan.json --etx-trace $HOME/sess/etx_trace.bin --etx-prologue $HOME/sess/etx_pro.bin
+  layer fleet span  ETX span    diff   (us)
+  embed        5.8       4.5    -1.2
+      0      122.1     124.3    +2.2
+      1      129.0     134.7    +5.7
+      2      126.2     133.9    +7.7
+      3      126.8     138.6   +11.8
+      4      125.9     133.9    +8.1
+      5      127.5     134.3    +6.8
+      6      128.6     133.5    +4.9
+      7      130.5     139.1    +8.6
+      8      128.0     132.8    +4.8
+      9      126.9     132.7    +5.8
+     10      128.5     134.2    +5.8
+     11      128.1     135.5    +7.5
+     12      128.1     133.0    +4.9
+     13      128.3     135.5    +7.2
+     14      127.2     135.4    +8.2
+     15      129.0     135.2    +6.1
+     16      127.4     133.4    +6.0
+     17      127.3     132.3    +4.9
+     18      128.3     135.0    +6.7
+     19      129.1     133.8    +4.7
+     20      127.9     133.0    +5.1
+     21      127.4     132.6    +5.2
+     22      128.7     137.8    +9.1
+     23      125.6     135.5   +10.0
+     24      125.1     133.5    +8.4
+     25      125.7     133.7    +8.0
+     26      126.1     132.9    +6.8
+lm_head      142.3     139.9    -2.4
+token: fleet 3612.9 us, ETX 3819.1 us (+206.2); inside layers +177.2, between layers +28.9
+
+per task kind, MoE layers 1-26, per task (us): body = ready -> done; prologue = before the weight stream, staging its first part
+  kind                 n fleet body  ETX body   diff   fleet pro/stage  ETX pro/stage
+  EXPERT_GATE_UP    7696      32.33     31.92  -0.41      5.96/ 4.95       5.37/ 4.48
+  EXPERT_DOWN       7696      18.39     17.15  -1.24      1.65/ 0.00       0.88/ 0.00
+  ATTENTION         6656      17.47     13.44  -4.03      8.40/ 6.15       5.18/ 3.30
+  QKV_FUSED         7696      17.42     21.43  +4.01      7.64/ 4.55       6.79/ 3.69
+  NORM_ROUTER       7696      11.12     11.02  -0.10      7.47/ 4.66       5.51/ 2.41
+  MERGE_UV          6656       9.38      8.58  -0.80      0.00/ 0.00       0.00/ 0.00
+  O_PROJ            7696       7.15      6.25  -0.90      0.83/ 0.00       0.36/ 0.00
+  Q_ABSORB           832       5.98      3.16  -2.82      0.00/ 0.00       0.00/ 0.00

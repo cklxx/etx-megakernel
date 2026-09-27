@@ -1,0 +1,234 @@
+[
+ {
+  "name": "apt",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 1.0002143383026123,
+  "note": ""
+ },
+ {
+  "name": "etx_env",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 1.001413345336914,
+  "note": ""
+ },
+ {
+  "name": "fleet_env",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 6.009789228439331,
+  "note": ""
+ },
+ {
+  "name": "dl_ds",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 88.0303144454956,
+  "note": ""
+ },
+ {
+  "name": "build_relaxed",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 35.024314880371094,
+  "note": ""
+ },
+ {
+  "name": "build_sc1",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 35.02386498451233,
+  "note": ""
+ },
+ {
+  "name": "build_cap256",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 34.0212881565094,
+  "note": ""
+ },
+ {
+  "name": "build_nocp",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 33.018070936203,
+  "note": ""
+ },
+ {
+  "name": "build_relayoff",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 32.01423168182373,
+  "note": ""
+ },
+ {
+  "name": "build_pro",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 33.012901306152344,
+  "note": ""
+ },
+ {
+  "name": "build_fleet",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 11.004653692245483,
+  "note": ""
+ },
+ {
+  "name": "ds_prep",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 1,
+  "seconds": 86.01819038391113,
+  "note": ""
+ },
+ {
+  "name": "t1_fleet",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 8.002867937088013,
+  "note": ""
+ },
+ {
+  "name": "t1_relaxed",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 8.002438306808472,
+  "note": ""
+ },
+ {
+  "name": "t1_sc1",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 8.006481409072876,
+  "note": ""
+ },
+ {
+  "name": "t1_cap256",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 7.001603603363037,
+  "note": ""
+ },
+ {
+  "name": "t1_nocp",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 7.0012781620025635,
+  "note": ""
+ },
+ {
+  "name": "t1_relayoff",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 7.001430988311768,
+  "note": ""
+ },
+ {
+  "name": "t2_fleet",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 8.003885269165039,
+  "note": ""
+ },
+ {
+  "name": "t2_relaxed",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 7.0013580322265625,
+  "note": ""
+ },
+ {
+  "name": "t2_sc1",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 7.0010809898376465,
+  "note": ""
+ },
+ {
+  "name": "t2_cap256",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 7.001034736633301,
+  "note": ""
+ },
+ {
+  "name": "t2_nocp",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 7.001147747039795,
+  "note": ""
+ },
+ {
+  "name": "t2_relayoff",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 7.001028060913086,
+  "note": ""
+ },
+ {
+  "name": "trace_etx",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 1,
+  "seconds": 8.002959728240967,
+  "note": ""
+ },
+ {
+  "name": "trace_fleet",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 1,
+  "seconds": 8.001946449279785,
+  "note": ""
+ },
+ {
+  "name": "routing",
+  "status": "fail",
+  "rc": 1,
+  "gpu": 1,
+  "seconds": 36.020012617111206,
+  "note": ""
+ },
+ {
+  "name": "compare",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 2.002732038497925,
+  "note": ""
+ },
+ {
+  "name": "whatif",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 1.0010814666748047,
+  "note": ""
+ }
+]

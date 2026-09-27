@@ -1,0 +1,264 @@
+[07:03:02 +  0m00s] start apt (cpu)
+[07:03:03 +  0m01s] ok      apt rc=0 1s
+[07:03:03 +  0m01s] start etx_env (cpu)
+[07:03:03 +  0m01s] start fleet_env (cpu)
+[07:03:04 +  0m02s] ok      etx_env rc=0 1s
+[07:03:04 +  0m02s] start build_relaxed (cpu)
+[07:03:04 +  0m02s] start build_sc1 (cpu)
+[07:03:04 +  0m02s] start build_cap256 (cpu)
+[07:03:04 +  0m02s] start build_nocp (cpu)
+[07:03:04 +  0m02s] start build_relayoff (cpu)
+[07:03:09 +  0m07s] ok      fleet_env rc=0 6s
+[07:03:09 +  0m07s] start dl_ds (cpu)
+[07:03:36 +  0m34s] ok      build_relayoff rc=0 32s
+    /home/hotaisle/fleet-mi300x/src/kernels/fleet_kernel.hip:826:1: remark:     VGPRs: 256 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/fleet-mi300x/src/kernels/fleet_kernel.hip:826:1: remark:     AGPRs: 95 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/fleet-mi300x/src/kernels/fleet_kernel.hip:826:1: remark:     ScratchSize [bytes/lane]: 48 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/fleet-mi300x/src/kernels/fleet_kernel.hip:826:1: remark:     Occupancy [waves/SIMD]: 1 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/fleet-mi300x/src/kernels/fleet_kernel.hip:939:1: remark:     VGPRs: 2 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/fleet-mi300x/src/kernels/fleet_kernel.hip:939:1: remark:     AGPRs: 0 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/fleet-mi300x/src/kernels/fleet_kernel.hip:939:1: remark:     ScratchSize [bytes/lane]: 0 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/fleet-mi300x/src/kernels/fleet_kernel.hip:939:1: remark:     Occupancy [waves/SIMD]: 8 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/sess/b_relayoff/megakernel_d0.hip:5038:1: remark:     VGPRs: 256 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/sess/b_relayoff/megakernel_d0.hip:5038:1: remark:     AGPRs: 53 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/sess/b_relayoff/megakernel_d0.hip:5038:1: remark:     ScratchSize [bytes/lane]: 0 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/sess/b_relayoff/megakernel_d0.hip:5038:1: remark:     Occupancy [waves/SIMD]: 1 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/sess/b_relayoff/megakernel_d0.hip:5077:1: remark:     VGPRs: 248 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/sess/b_relayoff/megakernel_d0.hip:5077:1: remark:     AGPRs: 14 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/sess/b_relayoff/megakernel_d0.hip:5077:1: remark:     ScratchSize [bytes/lane]: 0 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/sess/b_relayoff/megakernel_d0.hip:5077:1: remark:     Occupancy [waves/SIMD]: 1 [-Rpass-analysis=kernel-resource-usage]
+    built /home/hotaisle/sess/b_relayoff/run  (run it from /home/hotaisle/fleet-mi300x so build/weights.bin, fleet_cache.bin, golden_tokens.txt resolve)
+[07:03:36 +  0m34s] start build_pro (cpu)
+[07:03:37 +  0m35s] ok      build_nocp rc=0 33s
+    /home/hotaisle/fleet-mi300x/src/kernels/fleet_kernel.hip:826:1: remark:     VGPRs: 256 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/fleet-mi300x/src/kernels/fleet_kernel.hip:826:1: remark:     AGPRs: 95 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/fleet-mi300x/src/kernels/fleet_kernel.hip:826:1: remark:     ScratchSize [bytes/lane]: 48 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/fleet-mi300x/src/kernels/fleet_kernel.hip:826:1: remark:     Occupancy [waves/SIMD]: 1 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/fleet-mi300x/src/kernels/fleet_kernel.hip:939:1: remark:     VGPRs: 2 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/fleet-mi300x/src/kernels/fleet_kernel.hip:939:1: remark:     AGPRs: 0 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/fleet-mi300x/src/kernels/fleet_kernel.hip:939:1: remark:     ScratchSize [bytes/lane]: 0 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/fleet-mi300x/src/kernels/fleet_kernel.hip:939:1: remark:     Occupancy [waves/SIMD]: 8 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/sess/b_nocp/megakernel_d0.hip:5095:1: remark:     VGPRs: 256 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/sess/b_nocp/megakernel_d0.hip:5095:1: remark:     AGPRs: 28 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/sess/b_nocp/megakernel_d0.hip:5095:1: remark:     ScratchSize [bytes/lane]: 0 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/sess/b_nocp/megakernel_d0.hip:5095:1: remark:     Occupancy [waves/SIMD]: 1 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/sess/b_nocp/megakernel_d0.hip:5138:1: remark:     VGPRs: 248 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/sess/b_nocp/megakernel_d0.hip:5138:1: remark:     AGPRs: 14 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/sess/b_nocp/megakernel_d0.hip:5138:1: remark:     ScratchSize [bytes/lane]: 0 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/sess/b_nocp/megakernel_d0.hip:5138:1: remark:     Occupancy [waves/SIMD]: 1 [-Rpass-analysis=kernel-resource-usage]
+    built /home/hotaisle/sess/b_nocp/run  (run it from /home/hotaisle/fleet-mi300x so build/weights.bin, fleet_cache.bin, golden_tokens.txt resolve)
+[07:03:37 +  0m35s] start build_fleet (cpu)
+[07:03:38 +  0m36s] ok      build_cap256 rc=0 34s
+    /home/hotaisle/fleet-mi300x/src/kernels/fleet_kernel.hip:826:1: remark:     VGPRs: 256 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/fleet-mi300x/src/kernels/fleet_kernel.hip:826:1: remark:     AGPRs: 95 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/fleet-mi300x/src/kernels/fleet_kernel.hip:826:1: remark:     ScratchSize [bytes/lane]: 48 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/fleet-mi300x/src/kernels/fleet_kernel.hip:826:1: remark:     Occupancy [waves/SIMD]: 1 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/fleet-mi300x/src/kernels/fleet_kernel.hip:939:1: remark:     VGPRs: 2 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/fleet-mi300x/src/kernels/fleet_kernel.hip:939:1: remark:     AGPRs: 0 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/fleet-mi300x/src/kernels/fleet_kernel.hip:939:1: remark:     ScratchSize [bytes/lane]: 0 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/fleet-mi300x/src/kernels/fleet_kernel.hip:939:1: remark:     Occupancy [waves/SIMD]: 8 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/sess/b_cap256/megakernel_d0.hip:5095:1: remark:     VGPRs: 256 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/sess/b_cap256/megakernel_d0.hip:5095:1: remark:     AGPRs: 14 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/sess/b_cap256/megakernel_d0.hip:5095:1: remark:     ScratchSize [bytes/lane]: 144 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/sess/b_cap256/megakernel_d0.hip:5095:1: remark:     Occupancy [waves/SIMD]: 1 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/sess/b_cap256/megakernel_d0.hip:5138:1: remark:     VGPRs: 248 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/sess/b_cap256/megakernel_d0.hip:5138:1: remark:     AGPRs: 14 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/sess/b_cap256/megakernel_d0.hip:5138:1: remark:     ScratchSize [bytes/lane]: 0 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/sess/b_cap256/megakernel_d0.hip:5138:1: remark:     Occupancy [waves/SIMD]: 1 [-Rpass-analysis=kernel-resource-usage]
+    built /home/hotaisle/sess/b_cap256/run  (run it from /home/hotaisle/fleet-mi300x so build/weights.bin, fleet_cache.bin, golden_tokens.txt resolve)
+[07:03:39 +  0m37s] ok      build_relaxed rc=0 35s
+    /home/hotaisle/fleet-mi300x/src/kernels/fleet_kernel.hip:826:1: remark:     VGPRs: 256 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/fleet-mi300x/src/kernels/fleet_kernel.hip:826:1: remark:     AGPRs: 95 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/fleet-mi300x/src/kernels/fleet_kernel.hip:826:1: remark:     ScratchSize [bytes/lane]: 48 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/fleet-mi300x/src/kernels/fleet_kernel.hip:826:1: remark:     Occupancy [waves/SIMD]: 1 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/fleet-mi300x/src/kernels/fleet_kernel.hip:939:1: remark:     VGPRs: 2 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/fleet-mi300x/src/kernels/fleet_kernel.hip:939:1: remark:     AGPRs: 0 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/fleet-mi300x/src/kernels/fleet_kernel.hip:939:1: remark:     ScratchSize [bytes/lane]: 0 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/fleet-mi300x/src/kernels/fleet_kernel.hip:939:1: remark:     Occupancy [waves/SIMD]: 8 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/sess/b_relaxed/megakernel_d0.hip:5095:1: remark:     VGPRs: 256 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/sess/b_relaxed/megakernel_d0.hip:5095:1: remark:     AGPRs: 52 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/sess/b_relaxed/megakernel_d0.hip:5095:1: remark:     ScratchSize [bytes/lane]: 0 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/sess/b_relaxed/megakernel_d0.hip:5095:1: remark:     Occupancy [waves/SIMD]: 1 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/sess/b_relaxed/megakernel_d0.hip:5138:1: remark:     VGPRs: 248 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/sess/b_relaxed/megakernel_d0.hip:5138:1: remark:     AGPRs: 14 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/sess/b_relaxed/megakernel_d0.hip:5138:1: remark:     ScratchSize [bytes/lane]: 0 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/sess/b_relaxed/megakernel_d0.hip:5138:1: remark:     Occupancy [waves/SIMD]: 1 [-Rpass-analysis=kernel-resource-usage]
+    built /home/hotaisle/sess/b_relaxed/run  (run it from /home/hotaisle/fleet-mi300x so build/weights.bin, fleet_cache.bin, golden_tokens.txt resolve)
+[07:03:39 +  0m37s] ok      build_sc1 rc=0 35s
+    /home/hotaisle/fleet-mi300x/src/kernels/fleet_kernel.hip:826:1: remark:     VGPRs: 256 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/fleet-mi300x/src/kernels/fleet_kernel.hip:826:1: remark:     AGPRs: 95 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/fleet-mi300x/src/kernels/fleet_kernel.hip:826:1: remark:     ScratchSize [bytes/lane]: 48 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/fleet-mi300x/src/kernels/fleet_kernel.hip:826:1: remark:     Occupancy [waves/SIMD]: 1 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/fleet-mi300x/src/kernels/fleet_kernel.hip:939:1: remark:     VGPRs: 2 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/fleet-mi300x/src/kernels/fleet_kernel.hip:939:1: remark:     AGPRs: 0 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/fleet-mi300x/src/kernels/fleet_kernel.hip:939:1: remark:     ScratchSize [bytes/lane]: 0 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/fleet-mi300x/src/kernels/fleet_kernel.hip:939:1: remark:     Occupancy [waves/SIMD]: 8 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/sess/b_sc1/megakernel_d0.hip:5095:1: remark:     VGPRs: 256 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/sess/b_sc1/megakernel_d0.hip:5095:1: remark:     AGPRs: 52 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/sess/b_sc1/megakernel_d0.hip:5095:1: remark:     ScratchSize [bytes/lane]: 0 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/sess/b_sc1/megakernel_d0.hip:5095:1: remark:     Occupancy [waves/SIMD]: 1 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/sess/b_sc1/megakernel_d0.hip:5138:1: remark:     VGPRs: 248 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/sess/b_sc1/megakernel_d0.hip:5138:1: remark:     AGPRs: 14 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/sess/b_sc1/megakernel_d0.hip:5138:1: remark:     ScratchSize [bytes/lane]: 0 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/sess/b_sc1/megakernel_d0.hip:5138:1: remark:     Occupancy [waves/SIMD]: 1 [-Rpass-analysis=kernel-resource-usage]
+    built /home/hotaisle/sess/b_sc1/run  (run it from /home/hotaisle/fleet-mi300x so build/weights.bin, fleet_cache.bin, golden_tokens.txt resolve)
+[07:03:48 +  0m46s] ok      build_fleet rc=0 11s
+[07:04:02 +  1m00s] progress: 2 running, 18 waiting, 9 done
+    dl_ds [cpu] 53s / 1800s: # HF_HUB_ENABLE_HF_TRANSFER=1 .venv/bin/python -c "from huggingface_hub import snapshot_download; snapshot_download('deepseek-ai/DeepSeek-Coder-V2-Lite-Base', l
+    build_pro [cpu] 26s / 1200s: /home/hotaisle/sess/b_pro/megakernel_d0.hip:5095:1: remark:     LDS Size [bytes/block]: 26668 [-Rpass-analysis=kernel-resource-usage]
+[07:04:09 +  1m07s] ok      build_pro rc=0 33s
+    /home/hotaisle/fleet-mi300x/src/kernels/fleet_kernel.hip:826:1: remark:     VGPRs: 256 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/fleet-mi300x/src/kernels/fleet_kernel.hip:826:1: remark:     AGPRs: 95 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/fleet-mi300x/src/kernels/fleet_kernel.hip:826:1: remark:     ScratchSize [bytes/lane]: 48 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/fleet-mi300x/src/kernels/fleet_kernel.hip:826:1: remark:     Occupancy [waves/SIMD]: 1 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/fleet-mi300x/src/kernels/fleet_kernel.hip:939:1: remark:     VGPRs: 2 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/fleet-mi300x/src/kernels/fleet_kernel.hip:939:1: remark:     AGPRs: 0 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/fleet-mi300x/src/kernels/fleet_kernel.hip:939:1: remark:     ScratchSize [bytes/lane]: 0 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/fleet-mi300x/src/kernels/fleet_kernel.hip:939:1: remark:     Occupancy [waves/SIMD]: 8 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/sess/b_pro/megakernel_d0.hip:5095:1: remark:     VGPRs: 256 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/sess/b_pro/megakernel_d0.hip:5095:1: remark:     AGPRs: 62 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/sess/b_pro/megakernel_d0.hip:5095:1: remark:     ScratchSize [bytes/lane]: 0 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/sess/b_pro/megakernel_d0.hip:5095:1: remark:     Occupancy [waves/SIMD]: 1 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/sess/b_pro/megakernel_d0.hip:5138:1: remark:     VGPRs: 248 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/sess/b_pro/megakernel_d0.hip:5138:1: remark:     AGPRs: 14 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/sess/b_pro/megakernel_d0.hip:5138:1: remark:     ScratchSize [bytes/lane]: 0 [-Rpass-analysis=kernel-resource-usage]
+    /home/hotaisle/sess/b_pro/megakernel_d0.hip:5138:1: remark:     Occupancy [waves/SIMD]: 1 [-Rpass-analysis=kernel-resource-usage]
+    built /home/hotaisle/sess/b_pro/run  (run it from /home/hotaisle/fleet-mi300x so build/weights.bin, fleet_cache.bin, golden_tokens.txt resolve)
+[07:04:37 +  1m35s] ok      dl_ds rc=0 88s
+[07:04:37 +  1m35s] start ds_prep on GPU 1
+[07:05:02 +  2m00s] progress: 1 running, 17 waiting, 11 done
+    ds_prep [GPU 1] 25s / 2400s: Loading checkpoint shards: 100%|██████████| 4/4 [00:03<00:00,  1.09it/s]
+[07:06:02 +  3m00s] progress: 1 running, 17 waiting, 11 done
+    ds_prep [GPU 1] 85s / 2400s:   expert stride: 8650752 elems (17.3 MB) — matches design.md §1's 17.3 MB per routed expert
+[07:06:03 +  3m01s] ok      ds_prep rc=0 86s
+    wrote build/golden.npz and build/golden.json
+    wrote build/fleet_cache.bin  [27][1056][576] cols 0:512 = c (post kv_a_layernorm), 512:576 = k_pe (post RoPE)  -> 32.8 MB bf16
+    wrote build/golden_tokens.txt (33 tokens)
+    wrote build/golden_hidden.bin (27, 2048)
+      smallest top-2 margin over the run: 6.6250 (a small margin here is where bf16 drift would flip a token)
+    wrote build/weights.bin (31.41 GB), build/weights.bin.json and build/weights.bin.manifest
+      expert stride: 8650752 elems (17.3 MB) — matches design.md §1's 17.3 MB per routed expert
+[07:06:03 +  3m01s] start t1_fleet on GPU 0
+[07:06:03 +  3m01s] start trace_etx on GPU 1
+[07:06:11 +  3m09s] ok      t1_fleet rc=0 8s
+    per-token latency (embed -> argmax on device): median 3.545 ms  p95 3.554 ms  mean 3.545 ms  (282.1 tok/s)
+    tokens: 32/32 match HF greedy
+      consecutive layers within the gate: 27 of 27
+[07:06:11 +  3m09s] ok      trace_etx rc=0 8s
+    per-token latency (embed -> argmax on device): median 3.821 ms  mean 3.823 ms; step wall (launch to end) 5.588 ms/token
+    tokens: 8/8 match HF greedy
+      consecutive layers within the gate: 27 of 27
+    wrote prologue stamps to /home/hotaisle/sess/etx_pro.bin
+[07:06:11 +  3m09s] start t1_relaxed on GPU 0
+[07:06:11 +  3m09s] start trace_fleet on GPU 1
+[07:06:19 +  3m17s] ok      t1_relaxed rc=0 8s
+    per-token latency (embed -> argmax on device): median 3.745 ms  mean 3.920 ms; step wall (launch to end) 3.955 ms/token
+    tokens: 32/32 match HF greedy
+      consecutive layers within the gate: 27 of 27
+[07:06:19 +  3m17s] ok      trace_fleet rc=0 8s
+    per-token latency (embed -> argmax on device): median 3.553 ms  p95 3.596 ms  mean 3.556 ms  (281.2 tok/s)
+    tokens: 32/32 match HF greedy
+      consecutive layers within the gate: 27 of 27
+[07:06:19 +  3m17s] start t1_sc1 on GPU 0
+[07:06:19 +  3m17s] start routing on GPU 1
+[07:06:19 +  3m17s] start compare (cpu)
+[07:06:21 +  3m19s] ok      compare rc=0 2s
+    token: fleet 3612.9 us, ETX 3819.1 us (+206.2); inside layers +177.2, between layers +28.9
+      EXPERT_GATE_UP    7696      32.33     31.92  -0.41      5.96/ 4.95       5.37/ 4.48
+      QKV_FUSED         7696      17.42     21.43  +4.01      7.64/ 4.55       6.79/ 3.69
+      NORM_ROUTER       7696      11.12     11.02  -0.10      7.47/ 4.66       5.51/ 2.41
+[07:06:27 +  3m25s] ok      t1_sc1 rc=0 8s
+    per-token latency (embed -> argmax on device): median 3.987 ms  mean 3.990 ms; step wall (launch to end) 4.028 ms/token
+    tokens: 32/32 match HF greedy
+      consecutive layers within the gate: 27 of 27
+[07:06:27 +  3m25s] start t1_cap256 on GPU 0
+[07:06:34 +  3m32s] ok      t1_cap256 rc=0 7s
+    per-token latency (embed -> argmax on device): median 3.772 ms  mean 3.772 ms; step wall (launch to end) 3.810 ms/token
+    tokens: 32/32 match HF greedy
+      consecutive layers within the gate: 27 of 27
+[07:06:34 +  3m32s] start t1_nocp on GPU 0
+[07:06:41 +  3m39s] ok      t1_nocp rc=0 7s
+    per-token latency (embed -> argmax on device): median 3.725 ms  mean 3.723 ms; step wall (launch to end) 3.754 ms/token
+    tokens: 32/32 match HF greedy
+      consecutive layers within the gate: 27 of 27
+[07:06:41 +  3m39s] start t1_relayoff on GPU 0
+[07:06:48 +  3m46s] ok      t1_relayoff rc=0 7s
+    per-token latency (embed -> argmax on device): median 3.758 ms  mean 3.757 ms; step wall (launch to end) 3.793 ms/token
+    tokens: 32/32 match HF greedy
+      consecutive layers within the gate: 27 of 27
+[07:06:48 +  3m46s] start t2_fleet on GPU 0
+[07:06:55 +  3m53s] fail    routing rc=1 36s
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+      File "/home/hotaisle/.cache/huggingface/modules/transformers_modules/dsv2-lite-base/modeling_deepseek.py", line 880, in forward
+        assert attention_mask is not None
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    AssertionError
+[07:06:55 +  3m53s] start whatif (cpu)
+[07:06:56 +  3m54s] ok      t2_fleet rc=0 8s
+    per-token latency (embed -> argmax on device): median 3.546 ms  p95 3.556 ms  mean 3.545 ms  (282.1 tok/s)
+    tokens: 32/32 match HF greedy
+      consecutive layers within the gate: 27 of 27
+[07:06:56 +  3m54s] ok      whatif rc=0 1s
+    interleave  f=1.00 (2 requests)                  146.4       4.04                +12% per token        1.78x
+    interleave  f=1.02 (2 requests)                  149.3       4.12                +14% per token        1.75x
+    interleave  f=1.04 (2 requests)                  152.3       4.20                +17% per token        1.72x
+    batch2      union 11.4+2 units (uniform routing)     167.4       4.59                +28% per token        1.57x
+    Reading: interleave beats batch2 only while f stays below 1.14; compare both against vLLM at batch 2 (vllm_bench --batch 2) before building either.
+[07:06:56 +  3m54s] start t2_relaxed on GPU 0
+[07:07:02 +  4m00s] progress: 1 running, 4 waiting, 24 done
+    t2_relaxed [GPU 0] 6s / 600s: # $HOME/sess/b_relaxed/run --tokens 32 --context 1024 --repeat 2
+[07:07:03 +  4m01s] ok      t2_relaxed rc=0 7s
+    per-token latency (embed -> argmax on device): median 3.733 ms  mean 3.731 ms; step wall (launch to end) 3.767 ms/token
+    tokens: 32/32 match HF greedy
+      consecutive layers within the gate: 27 of 27
+[07:07:03 +  4m01s] start t2_sc1 on GPU 0
+[07:07:10 +  4m08s] ok      t2_sc1 rc=0 7s
+    per-token latency (embed -> argmax on device): median 3.988 ms  mean 3.987 ms; step wall (launch to end) 4.025 ms/token
+    tokens: 32/32 match HF greedy
+      consecutive layers within the gate: 27 of 27
+[07:07:10 +  4m08s] start t2_cap256 on GPU 0
+[07:07:17 +  4m15s] ok      t2_cap256 rc=0 7s
+    per-token latency (embed -> argmax on device): median 3.770 ms  mean 3.769 ms; step wall (launch to end) 3.808 ms/token
+    tokens: 32/32 match HF greedy
+      consecutive layers within the gate: 27 of 27
+[07:07:17 +  4m15s] start t2_nocp on GPU 0
+[07:07:24 +  4m22s] ok      t2_nocp rc=0 7s
+    per-token latency (embed -> argmax on device): median 3.723 ms  mean 3.722 ms; step wall (launch to end) 3.754 ms/token
+    tokens: 32/32 match HF greedy
+      consecutive layers within the gate: 27 of 27
+[07:07:24 +  4m22s] start t2_relayoff on GPU 0
+[07:07:31 +  4m29s] ok      t2_relayoff rc=0 7s
+    per-token latency (embed -> argmax on device): median 3.760 ms  mean 3.759 ms; step wall (launch to end) 3.797 ms/token
+    tokens: 32/32 match HF greedy
+      consecutive layers within the gate: 27 of 27
+[07:07:31 +  4m29s] session done
+  job                              status     rc  gpu  seconds
+  apt                              ok          0             1  
+  etx_env                          ok          0             1  
+  fleet_env                        ok          0             6  
+  dl_ds                            ok          0            88  
+  build_relaxed                    ok          0            35  
+  build_sc1                        ok          0            35  
+  build_cap256                     ok          0            34  
+  build_nocp                       ok          0            33  
+  build_relayoff                   ok          0            32  
+  build_pro                        ok          0            33  
+  build_fleet                      ok          0            11  
+  ds_prep                          ok          0    1       86  
+  t1_fleet                         ok          0    0        8  
+  t1_relaxed                       ok          0    0        8  
+  t1_sc1                           ok          0    0        8  
+  t1_cap256                        ok          0    0        7  
+  t1_nocp                          ok          0    0        7  
+  t1_relayoff                      ok          0    0        7  
+  t2_fleet                         ok          0    0        8  
+  t2_relaxed                       ok          0    0        7  
+  t2_sc1                           ok          0    0        7  
+  t2_cap256                        ok          0    0        7  
+  t2_nocp                          ok          0    0        7  
+  t2_relayoff                      ok          0    0        7  
+  trace_etx                        ok          0    1        8  
+  trace_fleet                      ok          0    1        8  
+  routing                          fail        1    1       36  
+  compare                          ok          0             2  
+  whatif                           ok          0             1  

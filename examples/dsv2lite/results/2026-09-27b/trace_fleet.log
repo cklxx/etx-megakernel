@@ -1,0 +1,96 @@
+# job trace_fleet gpu=1 cwd=/home/hotaisle/fleet-mi300x
+# ./build/fleet_decode_nt --graph build/taskgraph_d16.bin --repeat 1 --trace $HOME/sess/fleet_trace.bin && cp build/taskgraph_d16.bin $HOME/sess/
+device: AMD Instinct MI300X VF  arch gfx942:sramecc+:xnack-  CUs 304
+graph: 54946 descriptors across 296 workers, 1589 events (85 global, mirrored), kv_chunks 16, final event 1588 (argmax)
+event counters: cached + release fence (scheme i); workers poll the per-XCD scheduler mirror; 32 token(s) per launch
+model: hidden 2048 heads 16 kv_lora 512 rope 64 experts 64/2 top-6 layers 27 (dense < 1) vocab 102400  softmax_scale 0.114721
+  build/weights.bin: 31.4 GB uploaded
+  build/fleet_cache.bin: 0.0 GB uploaded
+occupancy: 1 workgroup(s)/CU at 256 threads (need >= 1 for grid 304)
+placement: 304 workgroups by XCC_ID: [0]=38 [1]=38 [2]=38 [3]=38 [4]=38 [5]=38 [6]=38 [7]=38  (8 XCDs x 38 CUs x blocks/CU, as assumed)
+
+free-running decode: 32 tokens over a 1024-token context, 32 per launch, 1 run(s)
+token  0:    3.596 ms  in     77 -> out   1780  ok
+token  1:    3.611 ms  in   1780 -> out    185  ok
+token  2:    3.553 ms  in    185 -> out    300  ok
+token  3:    3.551 ms  in    300 -> out   1501  ok
+token  4:    3.540 ms  in   1501 -> out  11747  ok
+token  5:    3.550 ms  in  11747 -> out    254  ok
+token  6:    3.548 ms  in    254 -> out   3510  ok
+token  7:    3.552 ms  in   3510 -> out    185  ok
+token  8:    3.547 ms  in    185 -> out   1558  ok
+token  9:    3.557 ms  in   1558 -> out   8708  ok
+token 10:    3.544 ms  in   8708 -> out      7  ok
+token 11:    3.546 ms  in      7 -> out     77  ok
+token 12:    3.552 ms  in     77 -> out   1780  ok
+token 13:    3.551 ms  in   1780 -> out    185  ok
+token 14:    3.543 ms  in    185 -> out    300  ok
+token 15:    3.546 ms  in    300 -> out   1501  ok
+token 16:    3.543 ms  in   1501 -> out  11747  ok
+token 17:    3.544 ms  in  11747 -> out    254  ok
+token 18:    3.558 ms  in    254 -> out   3510  ok
+token 19:    3.563 ms  in   3510 -> out    185  ok
+token 20:    3.564 ms  in    185 -> out   1558  ok
+token 21:    3.553 ms  in   1558 -> out   8708  ok
+token 22:    3.557 ms  in   8708 -> out      7  ok
+token 23:    3.574 ms  in      7 -> out     77  ok
+token 24:    3.558 ms  in     77 -> out   1780  ok
+token 25:    3.565 ms  in   1780 -> out    185  ok
+token 26:    3.536 ms  in    185 -> out    300  ok
+token 27:    3.555 ms  in    300 -> out   1501  ok
+token 28:    3.558 ms  in   1501 -> out  11747  ok
+token 29:    3.552 ms  in  11747 -> out    254  ok
+token 30:    3.567 ms  in    254 -> out   3510  ok
+token 31:    3.570 ms  in   3510 -> out    185  ok
+
+per-layer output vs HF, first decode step (gate: max rel <= 2e-2, cosine >= 0.999)
+  layer  0 dense: max rel  1.72e-03  cosine 0.999996  [ok]
+  layer  1 moe  : max rel  3.13e-03  cosine 0.999993  [ok]
+  layer  2 moe  : max rel  2.96e-03  cosine 0.999988  [ok]
+  layer  3 moe  : max rel  2.45e-03  cosine 0.999982  [ok]
+  layer  4 moe  : max rel  2.45e-03  cosine 0.999980  [ok]
+  layer  5 moe  : max rel  1.16e-03  cosine 0.999985  [ok]
+  layer  6 moe  : max rel  1.27e-03  cosine 0.999984  [ok]
+  layer  7 moe  : max rel  1.10e-03  cosine 0.999983  [ok]
+  layer  8 moe  : max rel  1.88e-03  cosine 0.999979  [ok]
+  layer  9 moe  : max rel  1.56e-03  cosine 0.999983  [ok]
+  layer 10 moe  : max rel  2.11e-03  cosine 0.999982  [ok]
+  layer 11 moe  : max rel  1.62e-03  cosine 0.999984  [ok]
+  layer 12 moe  : max rel  1.53e-03  cosine 0.999989  [ok]
+  layer 13 moe  : max rel  1.61e-03  cosine 0.999987  [ok]
+  layer 14 moe  : max rel  1.74e-03  cosine 0.999958  [ok]
+  layer 15 moe  : max rel  1.57e-03  cosine 0.999964  [ok]
+  layer 16 moe  : max rel  1.43e-03  cosine 0.999944  [ok]
+  layer 17 moe  : max rel  1.35e-03  cosine 0.999956  [ok]
+  layer 18 moe  : max rel  1.64e-03  cosine 0.999906  [ok]
+  layer 19 moe  : max rel  5.10e-03  cosine 0.999930  [ok]
+  layer 20 moe  : max rel  4.41e-03  cosine 0.999945  [ok]
+  layer 21 moe  : max rel  9.80e-03  cosine 0.999918  [ok]
+  layer 22 moe  : max rel  1.04e-02  cosine 0.999878  [ok]
+  layer 23 moe  : max rel  5.99e-03  cosine 0.999919  [ok]
+  layer 24 moe  : max rel  4.56e-03  cosine 0.999928  [ok]
+  layer 25 moe  : max rel  1.97e-03  cosine 0.999968  [ok]
+  layer 26 moe  : max rel  6.25e-03  cosine 0.999979  [ok]
+  consecutive layers within the gate: 27 of 27
+
+trace of token 1: 3.626 ms from first wait to last signal
+  kind             tasks   busy-sum   wait-sum   avg-busy avg-prologue  avg-stage
+  QKV_FUSED         7992   139.08 ms    30.80 ms     17.4 us        7.6 us      4.5 us
+  ATTENTION         6912   120.91 ms    18.22 ms     17.5 us        8.4 us      6.2 us
+  MERGE_UV          6912    64.77 ms    18.83 ms      9.4 us        0.0 us      0.0 us
+  O_PROJ            7992    57.14 ms    16.88 ms      7.1 us        0.8 us      0.0 us
+  NORM_ROUTER       7992    88.04 ms    26.52 ms     11.0 us        7.5 us      4.7 us
+  EXPERT_GATE_UP    7696   248.78 ms     5.71 ms     32.3 us        6.0 us      5.0 us
+  EXPERT_DOWN       7696   141.53 ms     6.14 ms     18.4 us        1.7 us      0.0 us
+  DENSE_GATE_UP      296     8.04 ms     0.22 ms     27.2 us        0.0 us      0.0 us
+  DENSE_DOWN         296     6.03 ms     0.92 ms     20.4 us        0.0 us      0.0 us
+  EMBED                1     0.01 ms     0.01 ms      5.8 us        0.0 us      0.0 us
+  LM_HEAD            296    38.70 ms     1.14 ms    130.7 us        8.2 us      0.0 us
+  ARGMAX               1     0.00 ms     0.01 ms      4.6 us        0.0 us      0.0 us
+  Q_ABSORB           864     5.16 ms     2.32 ms      6.0 us        0.0 us      0.0 us
+  per-layer span (first task ready -> last task signalled): L0 122 us  L1 129 us  L2 126 us  L26 126 us  ... sum 3.44 ms
+wrote /home/hotaisle/sess/fleet_trace.bin (54946 descriptors x 4 uint64: wait-start, ready, done, xcd; 10 ns ticks)
+
+per-token latency (embed -> argmax on device): median 3.553 ms  p95 3.596 ms  mean 3.556 ms  (281.2 tok/s)
+wall time of the launches: 128.045 ms for 32 tokens = 4.001 ms/token (249.9 tok/s), 1 launch(es)
+tokens: 32/32 match HF greedy

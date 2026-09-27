@@ -52,11 +52,13 @@ def main() -> None:
 
     handles = [lay.mlp.gate.register_forward_hook(hook(i)) for i, lay in enumerate(model.model.layers) if hasattr(lay.mlp, "gate")]
     with torch.no_grad():
-        out = model(input_ids=ids, use_cache=True)
+        mask = torch.ones_like(ids)                  # the remote model code asserts a mask; no padding (equal lengths)
+        out = model(input_ids=ids, attention_mask=mask, use_cache=True)
         past, nxt = out.past_key_values, out.logits[:, -1].argmax(-1, keepdim=True)
         decoding["on"] = True
         for step in range(a.steps):
-            out = model(input_ids=nxt, past_key_values=past, use_cache=True)
+            mask = torch.cat([mask, torch.ones_like(nxt)], dim=1)
+            out = model(input_ids=nxt, attention_mask=mask, past_key_values=past, use_cache=True)
             past, nxt = out.past_key_values, out.logits[:, -1].argmax(-1, keepdim=True)
             if step % 8 == 0:
                 print(f"step {step}", flush=True)

@@ -915,6 +915,23 @@ The best megakernel is still 8% (1.5B) and 3% (8B) slower than the same code unf
 
 `examples/dsv2lite/whatif.py` with the measured fold slowdown: re-laying out batch 1 (shared experts into the router window) gains at most 5%; two requests interleaved one workgroup per CU give an estimated 1.72-1.78x fleet's throughput (about 490 tokens/s against vLLM's 376 at batch 2) and two tokens per weight read an estimated 1.57x (about 440). Interleaving needs the megakernel at <= 256 registers per lane (today 286; fleet's GEMV path takes 262 from its double-buffered rows x depth).
 
+### 15.12 DeepSeek-V2-Lite: ETX vs fleet, the register cap, routing overlap (2026-09-27, second session, 2x MI300X)
+
+Run with `etx.tools.gpu_jobs` and `examples/sessions/ds_gap.py` (timing pinned to GPU 0 and alternated; traces and the routing run on GPU 1); logs in `examples/dsv2lite/results/2026-09-27b/`. Every run 32/32 tokens and 27/27 layers.
+
+| ms/token, two alternated rounds | round 1 | round 2 |
+|---|---|---|
+| fleet | 3.553 | 3.546 |
+| ETX, domain acquire sc0 (`-DETX_ACQUIRE_DOMAIN_RELAXED`) | 3.745 | 3.733 |
+| ETX, sc1 (default, correct) | 3.987 | 3.988 |
+| ETX sc0, megakernel capped at 256 registers per lane (2 WG/CU launch bounds; 144 B/lane scratch) | 3.772 | 3.770 |
+| ETX sc0, fleet params through global memory | 3.725 | 3.723 |
+| ETX sc0, no relay CU (38 workers per XCD) | 3.758 | 3.760 |
+
+The 256-register cap costs 0.8%: two requests per CU can keep fleet's tiles. Routing overlap (HF reference, 4 distinct prompts, 32 decode steps, 26 MoE layers): distinct routed experts per step 6.00 / 11.38 / 20.63 for 1 / 2 / 4 sequences against 6.00 / 11.44 / 20.83 for uniform routing, so co-scheduled requests share almost no experts and batching saves few bytes. With the measured fold slowdown (x1.00-1.04) `whatif.py` gives two interleaved requests 1.72-1.78x fleet's throughput against 1.57x for two tokens per weight read: the interleave is the next build.
+
+Where ETX loses to fleet (MoE layers 1-26, mean phase start/end relative to the layer start): fleet 127.6 us per layer, ETX 134.5. The q/kv_a phase ends 3 us later because the shim runs the replicated-kv_a variant (fleet's default is `FLAG_KVA_SHARED`, one kv_a split over the XCDs behind a global event); attention wins it back. The rest is in XCD-local hand-offs: fleet starts gate_up 0.7 us before the router phase ends and down 1.7 us before gate_up ends (the fastest XCD goes first), ETX starts each about 1 us after the slower phase ends; router->gate_up, gate_up->down and merge->o_proj together cost about 7 us per layer (0.18 ms per token). Per task, only q/kv_a is slower in ETX (21.4 vs 17.4 us, all in the weight stream; its prologue is shorter, 6.8 vs 7.6 us).
+
 ### 15.3 Phases of the general architecture (after M3)
 
 | Phase | Deliverable | Completion criterion |
