@@ -35,7 +35,7 @@ job(name="etx_env", lane="cpu", after="apt", timeout=600,
         ".venv/bin/python -c 'import yaml' 2>/dev/null || .venv/bin/pip install -q pyyaml; .venv/bin/python -c 'import etx; print(\"etx ok\")'")
 job(name="fleet_env", lane="cpu", after="apt", timeout=1800, cwd=FLEET,
     cmd=".venv/bin/python -c 1 2>/dev/null || { rm -rf .venv; python3 -m venv .venv; }; . .venv/bin/activate; "
-        "pip install -q --upgrade pip; pip install -q numpy 'huggingface_hub[hf_transfer]'; "
+        "pip install -q --upgrade pip; pip install -q numpy 'huggingface_hub[hf_transfer]' hf_transfer; "
         "python3 -c 'import torch' 2>/dev/null || pip install -q --index-url https://download.pytorch.org/whl/rocm7.0 torch; "
         "pip install -q 'transformers>=4.39,<5' 'tokenizers<0.20' accelerate safetensors; "
         "SP=$(python3 -c 'import site;print(site.getsitepackages()[0])'); mkdir -p $SP/flash_attn; "
@@ -44,7 +44,8 @@ job(name="fleet_env", lane="cpu", after="apt", timeout=1800, cwd=FLEET,
 job(name="dl_ds", lane="cpu", after="fleet_env", timeout=1800, cwd=FLEET,
     cmd="HF_HUB_ENABLE_HF_TRANSFER=1 .venv/bin/python -c \"from huggingface_hub import snapshot_download; "
         "snapshot_download('deepseek-ai/DeepSeek-Coder-V2-Lite-Base', local_dir='$HOME/models/dsv2-lite-base', "
-        "allow_patterns=['*.json', '*.safetensors', '*.py', 'tokenizer*'], max_workers=8); print('DL-DONE')\"; du -sh ~/models/dsv2-lite-base")
+        "allow_patterns=['*.json', '*.safetensors', '*.py', 'tokenizer*'], max_workers=8); print('DL-DONE')\" && du -sh ~/models/dsv2-lite-base "
+        "&& test -f ~/models/dsv2-lite-base/config.json")
 
 # ---------------------------------------------------------------- builds (cpu lane, parallel)
 BUILDS = {   # name -> (env, extra hipcc flags)
