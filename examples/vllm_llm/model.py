@@ -66,8 +66,13 @@ CHAIN_FILE = os.environ.get("ETX_VL_CHAINS", str(HERE / "build" / "chain_tiles.h
 # waiters plus an XCD-local one. The kernels are unchanged; only argument blocks and buffers are per XCD.
 XCD = os.environ.get("ETX_VL_XCD", "0") == "1"
 NX, WPX = 8, 38
-REP_ROLES = {"in_norm", "post_norm", "act", "final_norm"}
-XGEMV_AFTER = {"qkv": "in_norm", "gate_up": "post_norm", "down": "act", "lm_head": "final_norm"}
+REP_ROLES = {"in_norm", "post_norm", "act", "final_norm", "topk", "moe_sum"}
+XGEMV_AFTER = {"qkv": "in_norm", "gate_up": "post_norm", "down": "act", "lm_head": "final_norm", "router": "post_norm"}
+# MoE with ETX_VL_XCD: the expert path stays on one XCD per selected expert. top-k runs once per XCD (a replica); XCD x
+# then runs the blocks of expert slot x of gate_up (fused_moe pid_m = pid // (N / BLOCK_SIZE_N) = x), of silu (row x) and
+# of down, each waiting only on its own XCD's part of the previous launch; moe_sum runs once per XCD again. The kernels
+# and their blocks are vLLM's; only which XCD runs which block, and what each block waits for, is ETX's.
+XAFF_ROLES = {"moe_up", "moe_act", "moe_down"}
 
 
 def imports() -> dict:
@@ -122,7 +127,7 @@ def instances(d) -> list[dict]:
             gemv(L, "router", d.E, d.H)
             add("topk_softmax_e128", L, "topk", (1, 1, 1))
             add("fused_moe_up", L, "moe_up", (d.TOPK * math.ceil(2 * d.MI / MOE_BN), 1, 1))
-            add("silu_and_mul", L, "act", (d.TOPK, 1, 1))
+            add("silu_and_mul", L, "moe_act", (d.TOPK, 1, 1))
             add("fused_moe_down", L, "moe_down", (d.TOPK * math.ceil(d.H / MOE_BN), 1, 1))
             add("moe_sum_k8", L, "moe_sum", (1, 1, 1))
             continue
@@ -142,14 +147,18 @@ def plan_offsets(insts: list[dict], imp: dict) -> int:
         info = imp[i["export"]]
         i["tasks"] = math.ceil(i["grid"][0] * i["grid"][1] * i["grid"][2] / info["slots"])
         stride = (info["arg_bytes"] + 15) // 16 * 16
-        i["rep"] = NX if XCD and (i["role"] in REP_ROLES or
+        i["rep"] = NX if XCD and (i["role"] in REP_ROLES or i["role"] in XAFF_ROLES or
                                    (i["role"] in XGEMV_AFTER and n > 0 and insts[n - 1]["role"] == XGEMV_AFTER[i["role"]])) else 1
         i["stride"] = stride
         off = (off + 15) // 16 * 16
         i["offset"] = off
         off += stride * i["rep"]
         i["copyoff"] = -1
-        if i["rep"] > 1 and i["role"] in REP_ROLES and not (i["role"] == "in_norm" and i["layer"] == 0) and i["role"] != "act":
+        # in-place norms copy the shared input into their XCD's copy first; after moe_sum (itself a replica writing its
+        # XCD's copy) there is nothing to copy
+        after_moe = n > 0 and insts[n - 1]["role"] == "moe_sum"
+        if (i["rep"] > 1 and i["role"] in ("in_norm", "post_norm", "final_norm") and not (i["role"] == "in_norm" and i["layer"] == 0)
+                and not after_moe):
             i["copyoff"] = off
             off += 32 * NX
     return (off + 15) // 16 * 16
@@ -157,8 +166,6 @@ def plan_offsets(insts: list[dict], imp: dict) -> int:
 
 def build() -> Graph:
     d = load_dims()
-    if d.moe and XCD:
-        raise SystemExit("ETX_VL_XCD is not defined for MoE layers yet (its replicated roles are the dense ones)")
     imp = imports()
     insts = instances(d)
     skip = set(filter(None, os.environ.get("ETX_VL_SKIP", "").split(",")))    # register analysis only: drop roles
@@ -203,14 +210,25 @@ def build() -> Graph:
                           consts=(i["offset"], i["stride"], i["copyoff"]), in_edges={prev: "x->(0)"}, out_edges={ev: "x->x"},
                           domain_map="x->x", duration_us=3.0)
         elif len(grp) == 1 and grp[0]["rep"] > 1:
+            # a grid split over the XCDs, (XCDs, tasks per XCD) pinned xw->x, each part waiting on its XCD's part of the
+            # previous launch: the GEMV after a replica (38 per XCD) or an XCD-affine MoE launch (one expert slot per XCD)
             i = grp[0]
-            if i["tasks"] != NX * WPX:
-                raise SystemExit(f"{i['export']}: {i['tasks']} tasks, the per-XCD GEMV needs {NX * WPX}")
-            g.etensor(ev, (1,), wait_count=i["tasks"])
+            per = i["tasks"] // NX
+            if per * NX != i["tasks"] or (i["role"] not in XAFF_ROLES and per != WPX):
+                raise SystemExit(f"{i['export']}: {i['tasks']} tasks do not split over {NX} XCDs as {i['role']} needs")
+            nxt = groups[n + 1][0] if n + 1 < len(groups) else None
+            local_next = nxt is not None and len(groups[n + 1]) == 1 and nxt["role"] in XAFF_ROLES and nxt["rep"] > 1
+            if local_next:        # the next launch's part on this XCD waits for this XCD's part only
+                g.etensor(ev, (NX,), wait_count=per)
+                out = {ev: "xw->x"}
+            else:
+                g.etensor(ev, (1,), wait_count=i["tasks"])
+                out = {ev: "xw->(0)"}
             name = f"{i['role']}_{i['layer']}" if i["layer"] >= 0 else i["role"]
-            g.call_device(name, (NX, WPX), hip_link(adapters, f"etx_tile_x_{i['export']}"), resource=res, args=["impargs"],
-                          consts=(i["offset"], i["stride"], WPX), in_edges={prev: "xw->x"}, out_edges={ev: "xw->(0)"},
-                          domain_map="xw->x", duration_us=max(2.0, i["M"] * i["K"] * 2 / 4.0e12 * 1e6))
+            dur = max(2.0, i["M"] * i["K"] * 2 / 4.0e12 * 1e6) if i["export"].startswith("wvsplitk") else 3.0
+            g.call_device(name, (NX, per), hip_link(adapters, f"etx_tile_x_{i['export']}"), resource=res, args=["impargs"],
+                          consts=(i["offset"], i["stride"], per), in_edges={prev: "xw->x"}, out_edges=out,
+                          domain_map="xw->x", duration_us=dur)
         elif len(grp) == 1:
             i = grp[0]
             g.etensor(ev, (1,), wait_count=i["tasks"])

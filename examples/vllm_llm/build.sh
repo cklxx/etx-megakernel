@@ -15,11 +15,12 @@ case $G in 4) ATTN=attn_mfma4_g4;; 6) ATTN=attn_mfma16_g6;; 8) ATTN=attn_mfma16_
 EXPORTS="wvsplitk_y2,$ATTN,attn_reduce,rms_norm_2d,fused_add_rms_norm,rope_neox,reshape_and_cache,silu_and_mul"
 [ "$QKN" = 1 ] && EXPORTS="$EXPORTS,rms_norm_3d"
 # MoE (Qwen3-30B-A3B): router GEMV (YTILE 1), top-k, the two Triton fused_moe launches, moe_sum; silu over the 8 expert
-# rows runs with block MI / 8; one fused_moe program per workgroup (4 would need 80 KB of LDS and put 192 programs on 48 CUs)
+# rows runs with block MI / 8, one row per task (as vLLM: 8 workgroups); one fused_moe program per workgroup (4 would
+# need 80 KB of LDS and put 192 programs on 48 CUs)
 MOEBLK=(); MOESLOTS=""
 if [ "$(cfg moe)" = 1 ]; then
   EXPORTS="$EXPORTS,wvsplitk_y1,topk_softmax_e128,moe_sum_k8,fused_moe_up,fused_moe_down"
-  MOEBLK=(--block silu_and_mul=$(( $(cfg MI) / 8 ))); MOESLOTS="fused_moe_up=1,fused_moe_down=1"
+  MOEBLK=(--block silu_and_mul=$(( $(cfg MI) / 8 ))); MOESLOTS="fused_moe_up=1,fused_moe_down=1,silu_and_mul=1"
 fi
 DEVLIBS="${ETX_DEVLIBS:-$(ls -d /opt/rocm/lib/llvm/lib/clang/*/lib/amdgcn/bitcode 2>/dev/null | head -1)}"
 [ -d "$DEVLIBS" ] || DEVLIBS=/opt/rocm/amdgcn/bitcode

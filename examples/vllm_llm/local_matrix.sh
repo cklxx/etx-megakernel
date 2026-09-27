@@ -15,7 +15,7 @@ one() {
              qwen2.5-1.5b) BLK="--block rms_norm_2d=192 --block reshape_and_cache=32"; EXP=wvsplitk_y2,attn_mfma16_g6,attn_reduce,rms_norm_2d,fused_add_rms_norm,rope_neox,reshape_and_cache,silu_and_mul;;
              qwen3-30b-a3b) BLK="--block rms_norm_2d=256 --block reshape_and_cache=64 --block silu_and_mul=96"
                             EXP=wvsplitk_y2,wvsplitk_y1,attn_mfma16_g8,attn_reduce,rms_norm_2d,fused_add_rms_norm,rope_neox,reshape_and_cache,silu_and_mul,rms_norm_3d,topk_softmax_e128,moe_sum_k8,fused_moe_up,fused_moe_down;; esac
-  local MS=""; [ $n = qwen3-30b-a3b ] && MS="fused_moe_up=1,fused_moe_down=1"
+  local MS=""; [ $n = qwen3-30b-a3b ] && MS="fused_moe_up=1,fused_moe_down=1,silu_and_mul=1"
   local SL="" UCF=""
   case $v in base) E="";; xcd) E="ETX_VL_XCD=1 ETX_VL_CHAIN=1";; xcd_s1) E="ETX_VL_XCD=1 ETX_VL_CHAIN=1"; SL=$SLOTS1;; chain) E="ETX_VL_CHAIN=1";;
              uc) E="ETX_VL_UC=1 ETX_VL_PIN=1 ETX_VL_XCD=1 ETX_VL_CHAIN=1"; UCF="-DETX_VL_UC -DETX_COHERENT_DEVICE_DATA";;

@@ -35,7 +35,7 @@ case $M in qwen3*) EXP="$EXP,rms_norm_3d";; esac
 BLK=(--block rms_norm_2d=$((H / 8)) --block reshape_and_cache=$((NKV * HD / 8))); SL=""
 if [ "$(cfg num_experts)" != 0 ]; then
   EXP="$EXP,wvsplitk_y1,topk_softmax_e128,moe_sum_k8,fused_moe_up,fused_moe_down"
-  BLK+=(--block silu_and_mul=$(( $(cfg moe_intermediate_size) / 8 ))); SL="fused_moe_up=1,fused_moe_down=1"
+  BLK+=(--block silu_and_mul=$(( $(cfg moe_intermediate_size) / 8 ))); SL="fused_moe_up=1,fused_moe_down=1,silu_and_mul=1"
 fi
 echo "== import ($EXP)"
 python3 -m etx.importer.vllm_kernels --vllm /code/vllm --out $OUT/imp --compiler hipcc --only "$EXP" --slots "$SL" "${BLK[@]}"

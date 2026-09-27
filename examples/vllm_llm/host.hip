@@ -187,8 +187,9 @@ int main(int argc, char** argv) {
   // MoE (fused_experts at batch 1): router logits, top-k weights / ids / token_expert_indices, num_tokens_post_padded
   // (vLLM's torch.full: TOPK * BLOCK_SIZE_M, a constant, written here once), intermediate caches 1-3 (vLLM aliases 1
   // and 3 in one buffer; separate here, same values)
-  bf* rlog = ualloc<bf>(std::max(E, 1)); float* topk_w = ualloc<float>(std::max(TOPK, 1));
-  int32_t *topk_ids = ualloc<int32_t>(std::max(TOPK, 1)), *tei = ualloc<int32_t>(std::max(TOPK, 1));
+  // with ETX_VL_XCD the top-k outputs have one copy per XCD (top-k runs as a replica on each)
+  bf* rlog = ualloc<bf>(std::max(E, 1)); float* topk_w = ualloc<float>((size_t)NR * std::max(TOPK, 1));
+  int32_t *topk_ids = ualloc<int32_t>((size_t)NR * std::max(TOPK, 1)), *tei = ualloc<int32_t>((size_t)NR * std::max(TOPK, 1));
   const int32_t ntpp_val = TOPK * MOE_BM; int32_t* ntpp = etx_host::upload(&ntpp_val, 1);
   bf *mc1 = ualloc<bf>((size_t)std::max(TOPK, 1) * 2 * MI), *mc2 = ualloc<bf>((size_t)std::max(TOPK, 1) * MI), *mc3 = ualloc<bf>((size_t)std::max(TOPK, 1) * H);
 
@@ -204,6 +205,7 @@ int main(int argc, char** argv) {
     bf* o_norm = per_xcd ? ox_r : o;                                      // o_proj output after the post norm
     bf* act_out = per_xcd ? act_r : act;
     bf* qkv_in = x.layer == 0 ? hn_r : d_norm;                            // the normed hidden state entering qkv
+    float* tw_r = topk_w + (size_t)rr * TOPK; int32_t* ti_r = topk_ids + (size_t)rr * TOPK;   // this XCD's top-k copy
     bf* qbuf = qk_norm ? qn : qkv; bf* kbuf = qk_norm ? kn : qkv + NH * HD;
     const long long qstr = qk_norm ? NH * HD : NQKV, kstr = qk_norm ? NKV * HD : NQKV;
     auto gemv = [&](const void* w, const void* in, void* out, const void* b) {   // ops.wvSplitK(weight, x, cu_count, bias)
@@ -228,25 +230,25 @@ int main(int argc, char** argv) {
     else if (r == "o_proj") gemv(W(pl + "wo"), attn_out, o, nullptr);
     else if (r == "post_norm") { copy(o, o_norm, H * 2); fused_add(o_norm, W(pl + "ln2")); }
     else if (r == "gate_up") gemv(W(pl + "wgu"), o_norm, gu, nullptr);
-    else if (r == "act" && moe) a.ptr(mc2).ptr(mc1).i32(MI).f32(0.0f).f32(1.0f).f32(0.0f);    // one row per expert
+    else if (r == "moe_act") a.ptr(mc2).ptr(mc1).i32(MI).f32(0.0f).f32(1.0f).f32(0.0f);    // one row per expert
     else if (r == "act") a.ptr(act_out).ptr(gu).i32(I).f32(0.0f).f32(1.0f).f32(0.0f);
     else if (r == "router") gemv(W(pl + "wr"), o_norm, rlog, nullptr);
     // topk_softmax -> topkGatingLauncherHelper(gating_output, nullptr, topk_weights, topk_indices, token_expert_indices,
     // num_tokens, topk, 0, num_experts, renormalize, bias, 1.0, stream, is_padding)
-    else if (r == "topk") a.ptr(rlog).ptr(nullptr).ptr(topk_w).i32(1).ptr(topk_ids).ptr(tei).i32(TOPK).i32(0).i32(E).b8(norm_topk)
+    else if (r == "topk") a.ptr(rlog).ptr(nullptr).ptr(tw_r).i32(1).ptr(ti_r).ptr(tei + (size_t)rr * TOPK).i32(TOPK).i32(0).i32(E).b8(norm_topk)
                             .ptr(nullptr).f64(1.0).ptr(nullptr);
     // invoke_fused_moe_triton_kernel, naive block assignment: EM = M * top_k * BLOCK_SIZE_M, num_valid_tokens = M * top_k;
     // Triton dropped the None pointers and the strides equal to 1 (stride_ak, stride_bk, stride_cn) from the signature
     // and appended its global / profile scratch pointers (both sizes 0)
-    else if (r == "moe_up") a.ptr(o_norm).ptr(W(pl + "w13")).ptr(mc1).ptr(topk_ids).ptr(ntpp)
+    else if (r == "moe_up") a.ptr(o_norm).ptr(W(pl + "w13")).ptr(mc1).ptr(ti_r).ptr(ntpp)
                               .i32(2 * MI).i32(H).i32(TOPK * MOE_BM).i32(TOPK)
                               .i32(H).i32(2 * MI * H).i32(H).i32(2 * MI).i32(0).i32(0).i32(0).i32(0).i32(0).i32(0).i32(0).ptr(nullptr).ptr(nullptr);
-    else if (r == "moe_down") a.ptr(mc2).ptr(W(pl + "w2")).ptr(mc3).ptr(topk_w).ptr(topk_ids).ptr(ntpp)
+    else if (r == "moe_down") a.ptr(mc2).ptr(W(pl + "w2")).ptr(mc3).ptr(tw_r).ptr(ti_r).ptr(ntpp)
                                 .i32(H).i32(MI).i32(TOPK * MOE_BM).i32(TOPK)
                                 .i32(MI).i32(H * MI).i32(MI).i32(H).i32(0).i32(0).i32(0).i32(0).i32(0).i32(0).i32(0).ptr(nullptr).ptr(nullptr);
     // moe_sum, vectorised: (out, input, num_tokens, hidden, stride_token, stride_topk, nullptr, nullptr, 0, 0); the output
     // is the buffer the next fused_add_rms_norm reads (vLLM copies it there)
-    else if (r == "moe_sum") a.ptr(dn).ptr(mc3).i64(1).i32(H).i64((long long)TOPK * H).i64(H).ptr(nullptr).ptr(nullptr).i64(0).i64(0);
+    else if (r == "moe_sum") a.ptr(d_norm).ptr(mc3).i64(1).i32(H).i64((long long)TOPK * H).i64(H).ptr(nullptr).ptr(nullptr).i64(0).i64(0);
     else if (r == "down") gemv(W(pl + "wd"), act_out, dn, nullptr);
     else if (r == "final_norm") { copy(dn, d_norm, H * 2); fused_add(d_norm, W("final_norm")); }
     else if (r == "lm_head") gemv(tie ? W("embed") : W("lm_head"), d_norm, logits, nullptr);
