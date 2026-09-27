@@ -20,8 +20,8 @@ case $CMD in
     $SSH 'rocm-smi --showproductname | grep -c "Card Series" | sed "s/^/GPUs: /"; nproc | sed "s/^/cores: /"; df -h ~ | tail -1' ;;
   start)
     SESS=${3:?session file (path inside the etx repo)}; GPUS=${4:-}; M=${5:-A}
-    $SSH bash -s -- "$SESS" "$GPUS" "$M" <<'REMOTE'
-SESS=$1; G=$2; M=$3
+    $SSH bash -s -- "$SESS" "${GPUS:-auto}" "$M" <<'REMOTE'
+SESS=$1; G=$2; M=$3; [ "$G" = auto ] && G=""
 cd ~/etx || exit 1
 [ -n "$G" ] || G=$(rocm-smi --showproductname | grep -c "Card Series" | awk '{for (i = 0; i < $1; i++) printf "%s%d", (i ? "," : ""), i}')
 mkdir -p ~/sess
