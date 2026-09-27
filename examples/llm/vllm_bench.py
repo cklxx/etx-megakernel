@@ -6,6 +6,10 @@ Same method as fleet-mi300x/bench/vllm_decode_timing.py: per-token decode cost =
 Run inside the rocm/vllm container; VLLM_ROCM_USE_AITER=1 selects AITER kernels (the "best kernels" run).
 
   python3 examples/llm/vllm_bench.py --model ~/llm/qwen3-8b/hf --golden ~/llm/qwen3-8b/golden_c1024.txt --label qwen3-8b
+
+--batch N decodes N sequences together: sequence 0 is the golden prompt (checked against the golden tokens), sequence i
+the same prompt rotated by 97*i tokens, so every sequence has the same length but different content (a MoE routes them
+to different experts, as real concurrent requests would). The reported step time is per decode step of the whole batch.
 """
 from __future__ import annotations
 
@@ -32,6 +36,7 @@ def main() -> None:
     ap.add_argument("--repeats", type=int, default=3)
     ap.add_argument("--label", default="")
     ap.add_argument("--json", type=Path, default=None)
+    ap.add_argument("--batch", type=int, default=1, help="sequences decoded together (distinct prompts of equal length)")
     ap.add_argument("--custom-ops", default=None, help="'all': vLLM's own HIP ops instead of Inductor-generated ones (the kernels ETX imports)")
     a = ap.parse_args()
 
@@ -43,13 +48,14 @@ def main() -> None:
     kw = {"compilation_config": {"custom_ops": [a.custom_ops]}} if a.custom_ops else {}
     llm = LLM(model=a.model, dtype="bfloat16", trust_remote_code=True,
               max_model_len=len(prompt_ids) + a.tokens + 16, gpu_memory_utilization=0.85, enforce_eager=False, **kw)
-    prompt = TokensPrompt(prompt_token_ids=prompt_ids)
+    plen = len(prompt_ids)
+    prompts = [TokensPrompt(prompt_token_ids=prompt_ids[(97 * i) % plen:] + prompt_ids[:(97 * i) % plen]) for i in range(a.batch)]
 
     def gen(n_new: int):
         sp = SamplingParams(temperature=0.0, max_tokens=n_new, ignore_eos=True)
         t0 = time.perf_counter()
-        out = llm.generate([prompt], sp, use_tqdm=False)[0]
-        return (time.perf_counter() - t0) * 1e3, list(out.outputs[0].token_ids)
+        outs = llm.generate(prompts, sp, use_tqdm=False)
+        return (time.perf_counter() - t0) * 1e3, list(outs[0].outputs[0].token_ids)
 
     gen(a.tokens); gen(1)                                   # warm-up (graph capture, autotuning)
     full, one, toks = [], [], []
@@ -61,10 +67,11 @@ def main() -> None:
     n = min(len(golden), len(toks))
     match = next((i for i in range(n) if golden[i] != toks[i]), n)
     aiter = os.environ.get("VLLM_ROCM_USE_AITER", "0")
-    print(f"VLLM label={a.label} aiter={aiter} custom_ops={a.custom_ops} version={vllm.__version__} context={len(prompt_ids)} "
-          f"median_ms={med:.3f} per_token={[round(x, 3) for x in per_tok]} first_divergence={match}/{n}")
+    print(f"VLLM label={a.label} aiter={aiter} custom_ops={a.custom_ops} batch={a.batch} version={vllm.__version__} "
+          f"context={len(prompt_ids)} median_ms={med:.3f} tokens_per_s={a.batch * 1e3 / med:.0f} "
+          f"per_token={[round(x, 3) for x in per_tok]} first_divergence={match}/{n}")
     if a.json:
-        a.json.write_text(json.dumps({"label": a.label, "aiter": aiter, "version": vllm.__version__, "context": len(prompt_ids),
+        a.json.write_text(json.dumps({"label": a.label, "aiter": aiter, "batch": a.batch, "version": vllm.__version__, "context": len(prompt_ids),
                                       "median_ms": med, "per_token_ms": per_tok, "full_ms": full, "one_ms": one,
                                       "tokens_out": toks, "golden_prefix_match": match}, indent=1))
 

@@ -436,4 +436,13 @@ def emit_plan_json(plan: Plan) -> str:
         "kernel_instances": plan.kernel_instances,
         "log": plan.log,
     }
+    # dependencies, for trace analysis (etx.tools.timeline: critical path): every event instance once with its
+    # producer task ids, and per task the indices of the event instances it waits on
+    ev_ids: dict[Any, int] = {}
+    ev_inst: list[list[Any]] = []
+    for ev, prods in plan.inst.producers.items():
+        ev_ids[ev] = len(ev_inst)
+        ev_inst.append([ev[0], list(ev[1]), [plan.task_index[p] for p in prods]])
+    data["ev_inst"] = ev_inst
+    data["task_in"] = [[ev_ids[e] for e in plan.inst.task_in[(t.grid, t.coord)] if e in ev_ids] for t in plan.tasks]
     return json.dumps(data, indent=1)

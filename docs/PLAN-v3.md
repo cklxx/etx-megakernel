@@ -66,7 +66,7 @@
 |---|---|---|
 | **按 XCD 复制**（`ETX_VL_XCD`） | norm 和 SiLU 在 8 个 XCD 上各算一份（结果完全相同），写 XCD 本地的缓冲区；紧跟的 GEMV 排成 8×38 个任务，只等本 XCD 的事件。8B 的整卡事件从 472 个降到 254 个 | 已写好，本地编译零溢出，待测 |
 | **合并小 kernel**（`ETX_VL_CHAIN`） | q/k norm → RoPE → 写 cache 在一个任务里顺序执行，中间只隔 `__syncthreads`，每层少 3 个事件 | 已写好，待测 |
-| **uncached 通信内存** | 跨 XCD 传递的激活向量（每层几 KB）和事件计数器放进 uncached 内存（`hipDeviceMallocUncached`，MTYPE UC，不经过 L2）。release 只剩 `s_waitcnt vmcnt(0)`，acquire 只剩作废 L1（`buffer_inv sc0`）。权重运行中从不写，照常缓存。内存类型是页属性，**kernel 不改** | 已写好（`ETX_VL_UC`，`ETX_COHERENT_DEVICE_DATA`；KV cache 的写入和读取固定在同一个 XCD），本地编译零溢出；是否运行由同步微基准判定 |
+| **uncached 通信内存** | 跨 XCD 传递的激活向量（每层几 KB）和事件计数器放进 uncached 内存（`hipDeviceMallocUncached`，MTYPE UC，不经过 L2）。release 只剩 `s_waitcnt vmcnt(0)`，acquire 只剩作废 L1（`buffer_inv sc0`）。权重运行中从不写，照常缓存。内存类型是页属性，**kernel 不改** | 已写好（`ETX_VL_UC`，`ETX_COHERENT_DEVICE_DATA`；KV cache 的写入和读取固定在同一个 XCD），本地编译零溢出；是否运行由同步微基准判定。**预期已调低：** fleet 当年实测 uncached 计数器不比普通内存快（1.44 对 1.40 µs），绕过 L2 的激活在完整解码里没有收益，负载下一次跨 XCD 事件 6.16 µs 主要是显存争用（`RESEARCH-sync-hardware.md` 2.1） |
 | **每 XCD 一个轮询者**（relay，P5） | 304 个轮询者降到 8 个。之前测出分层 acquire 不安全，是因为 L2 里可能留着陈旧的行；数据放进 uncached 内存后就没有陈旧行了 | 代码已有，要和上一项一起测 |
 | **等待方式** | `s_sleep` 先短后长（目前固定 8，约 0.2 µs）；`s_setprio` 降低轮询 wave 的优先级；`s_wakeup` 提前叫醒同一 workgroup 里在睡的 wave | 待调 |
 | **硬件全局屏障 GWS** | 指令集里有：64 个资源，硬件排队，不用轮询。但 ROCm 在 gfx942 上自己也不用它，而且需要驱动给队列分配资源 | 只做一次微基准 |
@@ -93,7 +93,28 @@ vLLM 在这个模型上只用到 26% 的带宽，是融合收益最大的地方�
 - **Triton kernel 可能超过 128 个 VGPR 的上限：** 先从缓存读出它的实际用量；超了就用 512 线程的 megakernel。
 - **IR 要从 GPU 上 vLLM 实际跑过的 Triton 缓存里取：** 已加进上机脚本。
 
-### 4.4 之后
+### 4.4 DeepSeek-V2-Lite：用 ETX 重排任务，填满闲置的带宽
+
+**依据（fleet 实测第 5 层，129.3 µs）：** 前 5 个阶段（q/kv_a、attention、merge、o_proj、norm+router）共 73 µs，显存利用率 0–20%，时间花在每个任务 3–4 次约 5 µs 的读取往返上；专家阶段 56 µs，带宽 50–60%。整层的字节下限是 39 µs。
+
+**batch 1 能填进空闲窗口的只有共享专家（34.6 MB）。** 路由专家（104 MB，占 62%）要等 router 算完才知道读哪几个。`examples/dsv2lite/whatif.py` 的估算：共享专家挪进 router 窗口、路由专家分到 8 个 XCD，最好情况每个 token 快 5%，前台被拖慢 1.3 倍或跨 XCD 事件要 6 µs 时就没有收益。
+
+**多请求才有大空间。** 两个请求交错（A 的延迟阶段和 B 的专家阶段同时跑），前台不被拖慢时吞吐是 1.78 倍，单请求延迟多 12%；对照方案"两个 token 合读一次权重"是 1.57 倍、多 28%。前台被拖慢超过 1.14 倍，交错就不如合读。两者都要和 vLLM 的 batch 2 比。
+
+**本地已查明的限制：** 交错要求每个 CU 同时驻留两个 workgroup，也就是每条 lane 不超过 256 个寄存器。现在 megakernel 是 286（fleet 的 GEMV 路径 262，来自双缓冲的行数×深度，和 `FLEET_STREAM_DEPTH` 无关），强制压到 256 会溢出 41 个。
+
+**下次上机要测的（都已写好）：**
+
+| 测量 | 代码 | 决定什么 |
+|---|---|---|
+| 同一个 CU 上有流式读取时，64 KB 读取往返慢多少（深度 0/1/2/4/8），以及分开 CU 时 | `bench/overlap/overlap_bench.hip fold` | f：共享专家挪窗口、交错是否划算 |
+| 专家大小的数据从 Infinity Cache 读和从显存读的速度 | `overlap_bench stream` | 预取有没有意义 |
+| ETX 版 DeepSeek 的逐任务 trace | `ETX_TRACE_RAW` + `python -m etx.tools.timeline` | 每个 XCD 的忙闲、关键路径、闲置带宽的窗口 |
+| vLLM 在 DeepSeek 和 Qwen3-30B-A3B 上 batch 1/2/4 | `examples/llm/vllm_bench.py --batch` | 多请求方案的对照 |
+
+**事先定好的门槛：** `whatif.py` 读入实测后估算每 token 快 5% 以上，才做 batch 1 的重排；交错要满足 f 低于它打印的合读临界值，并且吞吐高于 vLLM batch 2，才改寄存器和 host。
+
+### 4.5 之后
 
 - **小 batch（4–16）和更长上下文：** 这是 serving 的常见场景。
 - **多 GPU：** 把通信和计算融合在一起，对 kernel 边界来说这是最难的地方，megakernel 的优势最大。
@@ -102,7 +123,7 @@ vLLM 在这个模型上只用到 26% 的带宽，是融合收益最大的地方�
 
 | 阶段 | 天数 | 内容 | 完成标准 | GPU |
 |---|---|---|---|---|
-| 1 | 第 1–2 天 | `vm_next.sh`：先跑同步微基准（`bench/sync/sync_bench.hip`：带数据和陈旧检查的 XCD 间往返、304 个 workgroup 的整卡屏障、kernel 边界间隔、GWS），按事先定好的门槛决定是否测 uncached 变体；再抓 vLLM trace 定天花板；然后逐 kernel 计时和各变体整模型 | 8B 和 1.5B 上，融合版比逐个 launch 快 10% 以上，32/32 正确 | 单卡约 3 小时 |
+| 1 | 第 1–2 天 | `vm_next.sh`：先跑同步微基准（`bench/sync/sync_bench.hip`）和 overlap 微基准（`bench/overlap/overlap_bench.hip`），按事先定好的门槛决定是否测 uncached 变体；再抓 vLLM trace 定天花板；然后逐 kernel 计时和各变体整模型；DeepSeek 的 trace、调度分析和 vLLM batch 1/2/4 | 8B 和 1.5B 上，融合版比逐个 launch 快 10% 以上，32/32 正确；DeepSeek 各方案的估算有实测输入 | 单卡约 3 小时 |
 | 2 | 第 2–4 天 | MoE：接入 `topk_softmax` 和 `moe_sum`；LLVM 23 设备编译 + `hipModuleLoad`；导入 Triton `fused_moe_kernel`，`--check` 验证，然后跑整个模型 | Qwen3-30B-A3B 融合版快于 vLLM | 单卡约 6 小时 |
 | 3 | 第 4–5 天 | batch 4–16，更长上下文 | 每 token 时间优于 vLLM 同 batch | 单卡约 6 小时 |
 | 4 | 第 5–7 天 | 多 GPU：张量并行/专家并行，通信融合 | 8 卡上优于 vLLM | 8 卡约 8 小时 |
@@ -124,6 +145,7 @@ vLLM 在这个模型上只用到 26% 的带宽，是融合收益最大的地方�
 ## 7. 已经准备好的东西
 
 - 代码：`github.com/metalopscloud/amdproject`（`main` 分支），也同步在 `cklxx/etx-megakernel`。
-- 上机脚本：`examples/vllm_llm/vm_next.sh`。一次跑完两个模型、6 个同步变体、逐 kernel 计时对比、vLLM 的 kernel trace，最后顺带采集 MoE 的 Triton 缓存。完整日志保留在 `~/vlnext/`。
+- 上机脚本：`examples/vllm_llm/vm_next.sh`。一次跑完两个模型、6 个同步变体、逐 kernel 计时对比、vLLM 的 kernel trace、DeepSeek 的 trace 与调度分析、vLLM 多 batch 成绩，最后采集 MoE 的 Triton 缓存。完整日志保留在 `~/vlnext/`。本地预检：`examples/vllm_llm/local_matrix.sh`。
+- 调度检测：`python -m etx.tools.timeline`（每个 XCD 的忙闲、关键路径、显存需求曲线、HTML 时间线；也能分析模拟出的排布）。
 - 调研：`docs/RESEARCH-sync-hardware.md`（同步的硬件手段）、`docs/RESEARCH-moe-import.md`（MoE 导入路线）。
 - 设计文档：`docs/ETX_Technical_Design.md` 15.8–15.10 节（导入方法与实测）。

@@ -75,6 +75,7 @@ def simulate(plan: Plan, seed: int = 0, cv_scale: float = 1.0) -> SimResult:
     remaining_all: dict[int, int] = {}
     ev_ready: dict[tuple[str, tuple[int, ...]], float] = {}
     ev_pending: dict[tuple[str, tuple[int, ...]], int] = {}
+    ev_last_end: dict[tuple[str, tuple[int, ...]], float] = {}     # latest producer end so far (tasks finish out of order)
     segs: list[Segment] = []
 
     # per-task durations
@@ -177,11 +178,11 @@ def simulate(plan: Plan, seed: int = 0, cv_scale: float = 1.0) -> SimResult:
         # arrive on out events
         for ev in inst.task_out[(t.grid, t.coord)]:
             ev_pending[ev] -= 1
+            ev_last_end[ev] = max(ev_last_end.get(ev, 0.0), end)
             if ev_pending[ev] == 0:
-                scope = plan.events[ev[0]].scope
-                ev_ready[ev] = end + m.t_sync_us(scope)
-                if ev in ev_ready and plan.events[ev[0]].scope == Scope.SYSTEM:
-                    pass
+                # the event completes with its LAST-finishing producer, not the last one processed: the loop picks
+                # tasks by start time, so a producer processed later can end earlier than one processed before it
+                ev_ready[ev] = ev_last_end[ev] + m.t_sync_us(plan.events[ev[0]].scope)
         # pushes for dynamic consumers
         for ev in inst.task_out[(t.grid, t.coord)]:
             for c_tid in inst.consumers[ev]:

@@ -32,6 +32,18 @@ AMDGPUUsage: "PCIe access from the GPU to the CPU can be kept coherent by using 
 - Cost: accesses to those buffers go to HBM (about 350 ns instead of about 100 ns for L2). They are vectors of a few KB read once per phase, so the latency matters and the bandwidth does not. The KV cache is the open question: one row is written per token and 1024 rows are read, so it probably stays cached, with the new row made visible by the cache-write kernel's event.
 - In ETX this is a machine-model change: a DEVICE-scope lowering row for "coherent memory" (release `s_waitcnt vmcnt(0)`, acquire `buffer_inv sc0`), chosen when every tensor an event protects is allocated uncached.
 
+**Prior measurements that lower the expectation (fleet-mi300x, same GPU type, found 2026-09-27; this section was written without them).** `fleet-mi300x/results/microbench_summary.txt` and `docs/STATUS.md`:
+
+| fleet measurement | result |
+|---|---|
+| (a) cross-XCD event round trip, counters in device memory vs uncached | 1.40 vs 1.44 us: uncached counters are not faster |
+| (d'') payload in uncached memory, **no fences at all** | 12.3 M of 16.4 M words stale (75%) |
+| (d''') ordinary memory, every payload access an agent-scope atomic (L2 bypass), no fences | 0 stale |
+| `--coherent-acts` (L2-bypassing activations, consumer L2 invalidate dropped, producer writeback kept) in the full decode | correct, 1.5-2% faster before the prologue loads were vectorised, within noise after |
+| (e) cross-XCD event round trip while 302 workgroups stream HBM | 6.16 us (1.40 idle): under load the cost is memory contention, not the fence |
+
+(d'') did not invalidate the consumer's L1, so it does not refute the protocol above (`bench/sync/sync_bench.hip` mode `uc` does invalidate L1 and counts stale words). But (a), `--coherent-acts` and (e) say the same thing: in a loaded persistent kernel the fences are a small part of an event's cost. Expect little from 2.1; the gate in `vm_next.sh` measures it before anything depends on it.
+
 ### 2.2 Stay inside one XCD (built, not measured)
 
 XCD-local events need only `s_waitcnt vmcnt(0)` and `buffer_inv sc0`, because the L2 is shared. `ETX_VL_XCD` replicates the one-block launches per XCD so that the GEMVs wait on XCD-local events: device-scope events for Qwen3-8B go from 472 to 254. `ETX_VL_CHAIN` removes three more events per layer by running q/k norm, RoPE and the cache write as one task.

@@ -14,6 +14,8 @@ These rules come from what went wrong in 2026-09 (weeks spent tuning our own til
 2. **Measure the deciding unknown with a microbenchmark** (minutes of GPU time) before building anything that depends on it. Example: whether an ETX synchronisation is cheaper than a kernel boundary decides whether fusing vLLM's kernels can win at all.
 3. **Write down the go/no-go threshold before the experiment**, and what happens next in each case.
 
+4. **Check what was already measured.** Before proposing a lever, search `~/code/fleet-mi300x/docs/STATUS.md` and `results/` (the DeepSeek megakernel on the same GPU, sessions 1-9) and this repo's section 15: occupancy, uncached activations, prefetch, split worker groups, last-arriver folds and more were measured there. Missing this cost a plan its main lever on 2026-09-27.
+
 ## 3. Correctness gates
 
 - No performance number without correctness: every imported launch byte-identical to the original (`host --check`), the full model 32/32 tokens equal to HF greedy.
@@ -37,5 +39,6 @@ These rules come from what went wrong in 2026-09 (weeks spent tuning our own til
 ## 6. Where things are
 
 - `etx/importer/`: kernel import (slice, IR import, adapters, bundle, vLLM manifest). `examples/vllm_llm/`: Qwen with vLLM's kernels; `vm_next.sh` is the prepared next session (microbenchmarks and gate first). `bench/sync/sync_bench.hip`: the synchronisation microbenchmarks.
+- Schedule inspection: `python -m etx.tools.timeline <plan.json> <ETX_TRACE_RAW file> --bytes <spec> --grids <regex> --html out.html` (per-XCD occupancy, critical path, memory demand; also runs on a simulated schedule). DeepSeek-V2-Lite (fleet's tiles under ETX): `examples/dsv2lite/` (`bytes.py` per-task bytes, `whatif.py` layout estimates from measured phases). `bench/overlap/overlap_bench.hip`: Infinity Cache read rate and latency under a co-running stream.
 - Plans and research: `docs/PLAN-v3.md`, `docs/RESEARCH-sync-hardware.md`, `docs/RESEARCH-moe-import.md`; results in `docs/ETX_Technical_Design.md` section 15.
 - Tests: `.venv/bin/python -m pytest -q`. Local toolchain: `/opt/homebrew/opt/llvm/bin` (LLVM 23) with the ROCm 7.2.4 headers and device libraries in `~/code/rocm-headers`.
