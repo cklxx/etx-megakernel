@@ -17,7 +17,9 @@ import sys
 TORCH = re.compile(r"\b(at::|torch::|c10::(?!Half|BFloat16)|TORCH_CHECK|AT_DISPATCH|STD_TORCH_CHECK|"
                    r"torch_utils|OptionalCUDAGuard|getCurrentCUDAStream|THO_DISPATCH|VLLM_DISPATCH|"
                    r"torch::stable|Tensor\b)")
-DROP_INCLUDE = re.compile(r'#\s*include\s*[<"](torch/|ATen/|c10/|torch_utils\.h|libtorch_stable/|core/registration)')
+# libtorch_stable/ headers are dropped except the device-only ones kernels use (vec_n_t, ceil_div)
+DROP_INCLUDE = re.compile(r'#\s*include\s*[<"](torch/|ATen/|c10/|torch_utils\.h|'
+                          r'libtorch_stable/(?!quantization/vectorization\.cuh|core/math\.hpp)|core/registration)')
 
 
 def _top_level_chunks(src: str):
@@ -87,7 +89,11 @@ def slice_device(src: str, drop: str | None = None) -> str:
             keep.append("// [etx: dropped] " + text.strip().replace("\n", " ") + "\n" if text.lstrip().startswith("#") and DROP_INCLUDE.search(text) else text)
             continue
         body = re.sub(r"//[^\n]*|/\*.*?\*/", "", text, flags=re.S)
-        if TORCH.search(body):
+        ns = re.match(r"(\s*(?://[^\n]*\n\s*|/\*.*?\*/\s*)*namespace\s+[\w:]*\s*\{)(.*)\}\s*$", text, flags=re.S)
+        if ns and TORCH.search(body):
+            # a namespace holding kernels next to their torch launchers (topk_softmax_kernels.cu): slice inside it
+            keep.append(ns.group(1) + slice_device(ns.group(2), drop) + "\n}")
+        elif TORCH.search(body):
             keep.append("\n// [etx: dropped a torch host definition]\n")
         elif extra and extra.search(body):
             keep.append("\n// [etx: dropped by --drop]\n")

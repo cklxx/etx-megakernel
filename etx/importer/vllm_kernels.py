@@ -98,7 +98,23 @@ SOURCES = [
         # silu_and_mul: grid num_tokens, block min(d / vec, 1024), vec = 16 / 2 (d % 8 == 0)
         Kernel("silu_and_mul", "act_and_mul_kernelIN3c108BFloat16E",
                f"vllm::act_and_mul_kernel<{CB}, typename vllm::PackedTypeConverter<{CB}>::Type, vllm::silu_kernel<{CB}>, "
-               f"vllm::packed_silu_kernel<typename vllm::PackedTypeConverter<{CB}>::Type>, true, true, false, false>", (1024, 1, 1)),
+               f"vllm::packed_silu_kernel<typename vllm::PackedTypeConverter<{CB}>::Type>, true, true, false, false>", (1024, 1, 1),
+               note="dense: 1 row, block 1024; MoE (fused_experts): 8 rows of 768, block 768/8 = 96: set per model"),
+    ]),
+    # Qwen3-30B-A3B MoE at batch 1 (fused_moe/fused_moe.py, TritonExperts; docs/RESEARCH-moe-import.md): router
+    # (wvsplitk_y1), top-k, two Triton fused_moe_kernel launches (etx.importer.triton_import), silu, moe_sum
+    Source("csrc/libtorch_stable/moe/topk_softmax_kernels.cu", kernels=[
+        # topkGatingLauncherHelper: BYTES_PER_LDG = min(16, 2 * 128) = 16, VPT = 128 / (64 / (256 / 16)) ... = 8,
+        # ROWS_PER_WARP = 64 / 16 = 4; block (64, WARPS_PER_TB = 4); grid ceil(ceil(rows / 4) / 4) = 1 at batch 1
+        Kernel("topk_softmax_e128", "topkGatingILi8ELi128ELi4ELi16ELi64Ei14__hip_bfloat16LNS0_11ScoringFuncE0E",
+               f"vllm::moe::topkGating<8, 128, 4, 16, 64, int, {BF}, vllm::moe::ScoringFunc::SCORING_SOFTMAX>", (64, 4, 1),
+               note="128 experts, softmax scoring, int32 ids (Qwen3-30B-A3B)"),
+    ]),
+    Source("csrc/libtorch_stable/moe/moe_align_sum_kernels.cu", kernels=[
+        # moe_sum, vectorised path (hidden contiguous, 16 B aligned): block 256, grid min(ceil(tokens * d / 8 / 256), 65535)
+        Kernel("moe_sum_k8", "moe_sum_vec_kernelIN3c108BFloat16EiLi8ELb0E",
+               f"vllm::moe::moe_sum_vec_kernel<{CB}, int32_t, 8, false>", (256, 1, 1),
+               note="top-8, not pad-aware (no expert map)"),
     ]),
 ]
 

@@ -102,3 +102,47 @@ def test_import_slots_and_quoted_struct_lds():
     assert "@etx_imp_slot_barrier(i32 %etx.slot, i32 1)" in out
     assert "icmp ult i32 %tid, 16" in out                                     # lanes past the 16-thread block skip the body
     assert "call i64 @__ockl_get" not in out                                  # every id read rewritten
+
+
+def test_slice_enters_namespace_holding_host_launchers():
+    # topk_softmax_kernels.cu: kernels and their torch launchers share `namespace vllm { namespace moe {`
+    src = ('namespace vllm {\nnamespace moe {\n__global__ void k(float* x) { x[0] = 1; }\n'
+           'void launch(torch::stable::Tensor& t) { k<<<1, 1>>>(nullptr); }\n} // namespace moe\n} // namespace vllm\n')
+    out = slice_device(src)
+    assert "__global__ void k" in out and "torch::stable" not in out
+    body = re.sub(r"//[^\n]*", "", out)
+    assert body.count("{") == body.count("}")
+
+
+def test_slice_keeps_device_only_libtorch_stable_headers():
+    out = slice_device('#include "libtorch_stable/quantization/vectorization.cuh"\n#include "libtorch_stable/torch_utils.h"\n')
+    assert out.startswith('#include "libtorch_stable/quantization/vectorization.cuh"') and "dropped] #include \"libtorch_stable/torch_utils.h" in out
+
+
+def test_triton_downgrade_float_literals_and_attrs():
+    from etx.importer.triton_import import _fp_bits, downgrade_ir, dynamic_lds_to_static
+    # llvm-dis 23 prints these bit patterns as the literals on the left (checked with the local LLVM 23)
+    assert _fp_bits("bfloat", "+", "nan", 0x3F) == "0xR7FFF"
+    assert _fp_bits("bfloat", "+", "qnan", 0) == "0xR7FC0"
+    assert _fp_bits("bfloat", "+", "snan", 1) == "0xR7F81"
+    assert _fp_bits("bfloat", "-", "qnan", 0) == "0xRFFC0"
+    assert _fp_bits("half", "+", "qnan", 0) == "0xH7E00"
+    assert _fp_bits("float", "+", "qnan", 0) == "0x7FF8000000000000"
+    assert _fp_bits("bfloat", "+", "inf", 0) == "0xR7F80"
+    t, notes = downgrade_ir("select <2 x i1> %c, <2 x bfloat> splat (bfloat +nan(0x3F)), <2 x bfloat> %v\n"
+                            "attributes #2 = { convergent nocreateundeforpoison nounwind }\n")
+    assert "bfloat 0xR7FFF" in t and "nocreateundeforpoison" not in t and len(notes) == 2
+    lds = dynamic_lds_to_static("@global_smem = external addrspace(3) global [0 x i8], align 16\n", 20480)
+    assert lds.startswith("@global_smem = internal addrspace(3) global [20480 x i8] undef, align 16")
+
+
+@pytest.mark.skipif(not (LLVM / "llvm-as").exists(), reason="local LLVM not available")
+def test_triton_downgrade_hex_literals_parse_back(tmp_path):
+    # the hex literal must name the same value LLVM 23 printed: round-trip through the local LLVM 23
+    from etx.importer.triton_import import downgrade_ir
+    src = "define <2 x bfloat> @f() {\n  ret <2 x bfloat> <bfloat +nan(0x3F), bfloat -qnan>\n}\n"
+    t, _ = downgrade_ir(src)
+    (tmp_path / "a.ll").write_text(t)
+    run([str(LLVM / "llvm-as"), str(tmp_path / "a.ll"), "-o", str(tmp_path / "a.bc")])
+    back = run([str(LLVM / "llvm-dis"), str(tmp_path / "a.bc"), "-o", "-"])
+    assert "bfloat +nan(0x3F), bfloat -qnan" in back
