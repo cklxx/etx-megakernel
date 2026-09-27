@@ -56,3 +56,13 @@ def test_two_request_interleave_graph(monkeypatch):
     monkeypatch.setenv("ETX_DSV2_COUPLE", "router")
     g = dsv.build(layers=3, requests=2)
     assert "r0_E_norm_1" in g.grid("r1_qkv_1").in_edges and "r1_E_norm_0" in g.grid("r0_qkv_1").in_edges
+
+
+def test_cli_compile_path(tmp_path, monkeypatch):
+    """The build scripts compile through `python -m etx compile` (bindings() / runtime() of the example module), not
+    through compile_graph: exercise that path, with an isolated block, so a broken example module fails here."""
+    from etx.tools.cli import main
+    monkeypatch.setenv("ETX_DSV2_ISOLATE", "0:qkv_5;0:gate_up_5+down_5")
+    monkeypatch.setenv("ETX_DSV2_ISOLATE_REPS", "2")
+    assert main(["compile", "examples/dsv2lite/graph.py", "--arch", "gfx942", "--out", str(tmp_path), "--inline-tiles"]) == 0
+    assert (tmp_path / "megakernel_d0.hip").exists() and "iso1x1_r0_down_5" in (tmp_path / "plan.json").read_text()

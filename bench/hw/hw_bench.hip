@@ -151,7 +151,7 @@ __global__ void __launch_bounds__(kT) k_shared(float* vec, int readers, int remo
 // scope 0: XCD-local (37 producers -> the same 37 workgroups wait); scope 1: device (per-XCD sub-counter, last arriver
 // writes back and adds to the device word; all 296 wait on it). Producers finish at a common time (after a barrier + a
 // staggered spin to mimic a phase tail of `skew` us).
-__global__ void __launch_bounds__(kT) k_handoff(int* counters, int scope, int sleep, int acq_sc1, int dirty_kb, int skew_ticks,
+__global__ void __launch_bounds__(kT) k_handoff(int* counters, int pad, int scope, int sleep, int acq_sc1, int dirty_kb, int skew_ticks,
                                                 int iters, Ctl* ctl, float* scratch, uint64_t* t_arr, uint64_t* t_wake) {
   __shared__ int s_slot;
   if (threadIdx.x == 0) s_slot = claim_xslot(ctl);
@@ -170,8 +170,8 @@ __global__ void __launch_bounds__(kT) k_handoff(int* counters, int scope, int sl
       const uint64_t until = now() + (uint64_t)((slot * 7919 + x * 131) % (skew_ticks + 1));
       while (now() < until) {}
       asm volatile("s_waitcnt vmcnt(0)" ::: "memory");
-      int* xc = counters + (size_t)it * 64 + x;                // per-iteration words: no reset needed
-      int* dev = counters + (size_t)it * 64 + 32;
+      int* xc = counters + (size_t)it * 64 * pad + x * pad;    // per-iteration words: no reset needed; pad 1 = 8 XCDs in one line
+      int* dev = counters + (size_t)it * 64 * pad + 32 * pad;
       if (scope == 0) {
         t_arr[(size_t)it * 296 + wid] = now();
         atomicAdd(xc, 1);
@@ -362,13 +362,15 @@ int main(int argc, char** argv) {
 
   if (what == "all" || what == "handoff") {
     const int iters = 24;
-    int* counters; CHECK(hipMalloc(&counters, (size_t)iters * 64 * 4));
+    const int pad_max = 32;                                  // 32 ints = 128 B: every XCD's counter in its own cache line
+    int* counters; CHECK(hipMalloc(&counters, (size_t)iters * 64 * pad_max * 4));
     float* scratch; CHECK(hipMalloc(&scratch, (size_t)296 * 16384 * 4));
     uint64_t *ta, *tw; CHECK(hipMalloc(&ta, (size_t)iters * 296 * 8)); CHECK(hipMalloc(&tw, (size_t)iters * 296 * 8));
-    for (int scope = 0; scope < 2; ++scope) for (int sleep : {0, 1, 8, 32}) for (int sc1 = 0; sc1 < 2; ++sc1) for (int dirty : {0, 64}) {
+    for (int pad : {1, pad_max}) for (int scope = 0; scope < 2; ++scope) for (int sleep : {0, 1, 8, 32}) for (int sc1 = 0; sc1 < 2; ++sc1) for (int dirty : {0, 64}) {
       if (dirty && sleep != 8) continue;
-      reset(); CHECK(hipMemset(counters, 0, (size_t)iters * 64 * 4)); CHECK(hipMemset(ta, 0, (size_t)iters * 296 * 8)); CHECK(hipMemset(tw, 0, (size_t)iters * 296 * 8));
-      hipLaunchKernelGGL(k_handoff, dim3(ncu), dim3(kT), lds1, st, counters, scope, sleep, sc1, dirty, 100 /* 1 us of arrival skew */, iters, ctl, scratch, ta, tw);
+      if (pad != 1 && (sleep != 8 || sc1)) continue;          // padded: the ETX setting only (sleep 8, sc0), clean and dirty
+      reset(); CHECK(hipMemset(counters, 0, (size_t)iters * 64 * pad_max * 4)); CHECK(hipMemset(ta, 0, (size_t)iters * 296 * 8)); CHECK(hipMemset(tw, 0, (size_t)iters * 296 * 8));
+      hipLaunchKernelGGL(k_handoff, dim3(ncu), dim3(kT), lds1, st, counters, pad, scope, sleep, sc1, dirty, 100 /* 1 us of arrival skew */, iters, ctl, scratch, ta, tw);
       if (!wait_stream(st, 30)) { printf("RESULT handoff HUNG\n"); return 3; }
       std::vector<uint64_t> a((size_t)iters * 296), b((size_t)iters * 296);
       CHECK(hipMemcpy(a.data(), ta, a.size() * 8, hipMemcpyDeviceToHost)); CHECK(hipMemcpy(b.data(), tw, b.size() * 8, hipMemcpyDeviceToHost));
@@ -380,8 +382,8 @@ int main(int argc, char** argv) {
         if (wk.empty() || !arr) continue;
         std::sort(wk.begin(), wk.end()); first.push_back(wk.front()); med.push_back(wk[wk.size() / 2]); last.push_back(wk.back());
       }
-      printf("RESULT handoff %-6s sleep %2d acquire %s dirty %2d KB: last arrival -> first %5.2f  median %5.2f  last %5.2f us\n",
-             scope ? "device" : "xcd", sleep, sc1 ? "sc1" : "sc0", dirty, pct(first, 0.5), pct(med, 0.5), pct(last, 0.5));
+      printf("RESULT handoff %-6s %s sleep %2d acquire %s dirty %2d KB: last arrival -> first %5.2f  median %5.2f  last %5.2f us\n",
+             scope ? "device" : "xcd", pad == 1 ? "shared-line" : "padded    ", sleep, sc1 ? "sc1" : "sc0", dirty, pct(first, 0.5), pct(med, 0.5), pct(last, 0.5));
     }
   }
 
@@ -414,6 +416,8 @@ int main(int argc, char** argv) {
     std::vector<std::vector<double>> base(5);
     for (int fg : {B_STREAM, B_CHAIN, B_ALU, B_LDS}) for (int bg : {B_IDLE, B_STREAM, B_CHAIN, B_ALU, B_LDS}) {
       CHECK(hipMemset(cu_slots, 0, 4096 * 4)); CHECK(hipMemset(ctr, 0, 4)); CHECK(hipMemset(tf, 0, (size_t)2 * ncu * reps * 8));
+      CHECK(hipMemset(w, (fg * 7 + bg) & 0xFF, buf_bytes / 2));      // evict: 1 GB written between configurations (MALL is 256 MB)
+      CHECK(hipStreamSynchronize(st));
       hipLaunchKernelGGL(k_pair, dim3(2 * ncu), dim3(kT), lds2, st, w, buf_u4, vec, fg, bg, reps, cu_slots, ctr, tf, sink);
       if (!wait_stream(st, 60)) { printf("RESULT pair HUNG\n"); return 3; }
       std::vector<uint64_t> h((size_t)2 * ncu * reps); CHECK(hipMemcpy(h.data(), tf, h.size() * 8, hipMemcpyDeviceToHost));

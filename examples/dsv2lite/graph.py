@@ -236,3 +236,11 @@ def _isolate(g: Graph, spec: str, reps: int, qs: list) -> None:
                     prev_ev = f"E_{name}"
                 ends.append(prev_ev)
             prev = ends
+
+
+def bindings(**overrides) -> dict:
+    return {}
+
+
+def runtime(bindings, rng=None):
+    return {}
