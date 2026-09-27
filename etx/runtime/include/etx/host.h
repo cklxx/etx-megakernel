@@ -24,6 +24,7 @@ struct etx_host {
   const void* kernel = nullptr;            // etx_megakernel_d<device>, set by the example host
   std::vector<void*> args;                 // device pointers, plan order (pre-fill to control placement)
   etx_params p{};
+  std::vector<int32_t> ev_strided;   // initial counts at their strided positions (ETX_EV_STRIDE > 1)
   int32_t *d_events = nullptr, *d_ctrl = nullptr, *d_slots = nullptr, *d_trace = nullptr, *d_remaining = nullptr;
   uint64_t* d_trace_time = nullptr;
   int32_t* d_ev_sub = nullptr;
@@ -56,8 +57,9 @@ struct etx_host {
   static int32_t* alloc_events(int on_device) {
     ETX_CHECK(hipSetDevice(on_device));
     int32_t* e;
-    if (ETX_EVENTS_FINE_GRAINED) ETX_CHECK(hipExtMallocWithFlags((void**)&e, ETX_EVENT_WORDS * sizeof(int32_t), hipDeviceMallocFinegrained));
-    else ETX_CHECK(hipMalloc(&e, ETX_EVENT_WORDS * sizeof(int32_t)));
+    if (ETX_EVENTS_FINE_GRAINED) ETX_CHECK(hipExtMallocWithFlags((void**)&e, (size_t)ETX_EVENT_WORDS * ETX_EV_STRIDE * sizeof(int32_t), hipDeviceMallocFinegrained));
+    else ETX_CHECK(hipMalloc(&e, (size_t)ETX_EVENT_WORDS * ETX_EV_STRIDE * sizeof(int32_t)));
+    ETX_CHECK(hipMemset(e, 0, (size_t)ETX_EVENT_WORDS * ETX_EV_STRIDE * sizeof(int32_t)));
     return e;
   }
   void setup(int32_t* shared_events = nullptr) {
@@ -156,7 +158,13 @@ struct etx_host {
   // reset per-step state (events if owned, queues, ctrl, slots, counters)
   void reset_step() {
     ETX_CHECK(hipSetDevice(device));
-    if (owns_events) ETX_CHECK(hipMemcpy(d_events, etx_ev_counts, ETX_EVENT_WORDS * sizeof(int32_t), hipMemcpyHostToDevice));
+    if (owns_events) {
+      if (ETX_EV_STRIDE == 1) ETX_CHECK(hipMemcpy(d_events, etx_ev_counts, ETX_EVENT_WORDS * sizeof(int32_t), hipMemcpyHostToDevice));
+      else {                                             // counters at word * ETX_EV_STRIDE (one cache line each)
+        if (ev_strided.empty()) { ev_strided.assign((size_t)ETX_EVENT_WORDS * ETX_EV_STRIDE, 0); for (int i = 0; i < ETX_EVENT_WORDS; ++i) ev_strided[(size_t)ETX_EVW(i)] = etx_ev_counts[i]; }
+        ETX_CHECK(hipMemcpy(d_events, ev_strided.data(), ev_strided.size() * sizeof(int32_t), hipMemcpyHostToDevice));
+      }
+    }
     ETX_CHECK(hipMemset(d_ctrl, 0, 64));
     ETX_CHECK(hipMemset(d_slots, 0, (ETX_N_DOMAINS * 2 + ETX_N_DOMAINS * 256) * sizeof(int32_t)));
     ETX_CHECK(hipMemset(d_slots + ETX_N_DOMAINS * 2 + ETX_N_DOMAINS * 256, 0xFF, ETX_N_DOMAINS * 256 * sizeof(int32_t)));
@@ -275,8 +283,9 @@ struct etx_host {
   void dump_events() {
     dump_trace();
     ETX_CHECK(hipSetDevice(device));
-    std::vector<int32_t> ev(ETX_EVENT_WORDS);
-    ETX_CHECK(hipMemcpy(ev.data(), d_events, ETX_EVENT_WORDS * sizeof(int32_t), hipMemcpyDeviceToHost));
+    std::vector<int32_t> evs((size_t)ETX_EVENT_WORDS * ETX_EV_STRIDE), ev(ETX_EVENT_WORDS);
+    ETX_CHECK(hipMemcpy(evs.data(), d_events, evs.size() * sizeof(int32_t), hipMemcpyDeviceToHost));
+    for (int i = 0; i < ETX_EVENT_WORDS; ++i) ev[i] = evs[(size_t)ETX_EVW(i)];
     int shown = 0;
     for (int e = 0; e < ETX_N_EVENTS; ++e) {
       int n = 1; for (int d = 0; d < 4; ++d) if (etx_ev_shape[e][d] > 0) n *= etx_ev_shape[e][d];

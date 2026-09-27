@@ -40,22 +40,22 @@ ETX_DEFINE_SCOPE(SYSTEM)
 // Share known at compile time (the plan's share is the same on every domain): no table load on the
 // critical path of the domain's last producer (the table read was an L2 miss under the weight stream).
 static __device__ __forceinline__ int32_t etx_arrive_flush_DEVICE_s(const etx_params& p, int32_t idx, uint32_t domain, int32_t share) {
-  if (!p.ev_share || share <= 1) { ETX_RELEASE_DEVICE(); return ETX_ARRIVE_DEVICE(p.events + idx) - 1; }   // ev_share == nullptr: A/B switch
+  if (!p.ev_share || share <= 1) { ETX_RELEASE_DEVICE(); return ETX_ARRIVE_DEVICE(p.events + ETX_EVW(idx)) - 1; }   // ev_share == nullptr: A/B switch
   ETX_RELEASE_DOMAIN();
   const int32_t old = atomicAdd(p.ev_sub + (size_t)domain * p.event_words + idx, 1);
   if (old + 1 != share) return 1;
   ETX_RELEASE_DEVICE();
-  return __hip_atomic_fetch_sub(p.events + idx, share, __ATOMIC_RELAXED, __HIP_MEMORY_SCOPE_AGENT) - share;
+  return __hip_atomic_fetch_sub(p.events + ETX_EVW(idx), share, __ATOMIC_RELAXED, __HIP_MEMORY_SCOPE_AGENT) - share;
 }
 
 static __device__ __forceinline__ int32_t etx_arrive_flush_DEVICE(const etx_params& p, int32_t idx, uint32_t domain) {
   const int32_t share = p.ev_share ? p.ev_share[(size_t)domain * p.event_words + idx] : 0;
-  if (share <= 1) { ETX_RELEASE_DEVICE(); return ETX_ARRIVE_DEVICE(p.events + idx) - 1; }
+  if (share <= 1) { ETX_RELEASE_DEVICE(); return ETX_ARRIVE_DEVICE(p.events + ETX_EVW(idx)) - 1; }
   ETX_RELEASE_DOMAIN();                                              // drain this workgroup's stores into the domain's L2
   const int32_t old = atomicAdd(p.ev_sub + (size_t)domain * p.event_words + idx, 1);
   if (old + 1 != share) return 1;
   ETX_RELEASE_DEVICE();                                              // one write-back covers every earlier arrival's stores
-  return __hip_atomic_fetch_sub(p.events + idx, share, __ATOMIC_RELAXED, __HIP_MEMORY_SCOPE_AGENT) - share;
+  return __hip_atomic_fetch_sub(p.events + ETX_EVW(idx), share, __ATOMIC_RELAXED, __HIP_MEMORY_SCOPE_AGENT) - share;
 }
 
 // Relay (P5, fleet's per-XCD scheduler mirror generalised). One workgroup per domain
@@ -82,7 +82,7 @@ static __device__ __forceinline__ void etx_relay(const etx_params& p, uint32_t d
     int live = 0, changed = 0;
     for (int k = threadIdx.x; k < p.n_relay; k += blockDim.x) {
       const int32_t w = p.relay_words[k];
-      const int32_t g = ETX_POLL_DEVICE(p.events + w);
+      const int32_t g = ETX_POLL_DEVICE(p.events + ETX_EVW(w));
       if (g > 0) live = 1;
       if (ETX_POLL_DOMAIN(mirror + w) != g) {
         if (!changed) { ETX_ACQUIRE_DEVICE(); ETX_RELAY_ORDER(); changed = 1; }
@@ -107,13 +107,13 @@ static __device__ __forceinline__ void etx_relay(const etx_params& p, uint32_t d
 // poll also reads the global word, so a domain without a relay (a workgroup placement
 // the plan did not expect) degrades to slow polling instead of hanging.
 static __device__ __forceinline__ bool etx_wait_DEVICE_mirror(const etx_params& p, int32_t w, uint32_t domain) {
-  if (!p.ev_mirror) { etx_wait_DEVICE(p.events + w, p.ctrl_abort); return false; }
+  if (!p.ev_mirror) { etx_wait_DEVICE(p.events + ETX_EVW(w), p.ctrl_abort); return false; }
   const etx_event* m = p.ev_mirror + (size_t)domain * p.event_words + w;
   uint32_t n = 0;
   while (ETX_POLL_DOMAIN(m) > 0) {
     ETX_BACKOFF();
     if ((++n & 63u) == 0) {
-      if (ETX_POLL_DEVICE(p.events + w) <= 0) return false;
+      if (ETX_POLL_DEVICE(p.events + ETX_EVW(w)) <= 0) return false;
       if ((n & 1023u) == 0 && ETX_POLL_DEVICE(p.ctrl_abort) != 0) return false;
     }
   }
