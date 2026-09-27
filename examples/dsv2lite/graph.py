@@ -193,12 +193,46 @@ def build(layers: int = LAYERS, routing_cached: bool | None = None, requests: in
         g.call_device(n("argmax"), (1,), hip_link(T, "fleet_argmax"), resource=_res(paired=q.paired), args=[q.fleet, "layer_-1"],
                       consts=(-1, q.r), in_edges={n("E_lm"): "i->i"}, out_edges={n("E_argmax"): "i->i"}, duration_us=DUR["argmax"],
                       worker_map=q.wmap("i->(OFF)"))
+    spec = os.environ.get("ETX_DSV2_ISOLATE", "")
+    if spec:
+        _isolate(g, spec, int(os.environ.get("ETX_DSV2_ISOLATE_REPS", "8")), qs)
     return g
 
 
-def bindings(**overrides) -> dict:
-    return {}
+def _all_map(grid) -> str:
+    return "".join("xyzw"[i] for i in range(len(grid))) + "->(0)"
 
 
-def runtime(bindings, rng=None):
-    return {}
+def _isolate(g: Graph, spec: str, reps: int, qs: list) -> None:
+    """In-situ microbenchmark (docs/MODEL-dsv2.md section 4): after the whole token (so every activation the tiles read
+    is real), run the phases in `spec` again. spec = blocks separated by ';', run one after the other; a block = groups
+    separated by ',', started together; a group = "<request>:<phase>[+<phase>...]" (phases named as in this graph without
+    the request prefix, run in order). Each block is repeated `reps` times, every repetition after the previous one has
+    finished (device-wide). E.g. "0:qkv_5;0:gate_up_5+down_5;0:attn_5,1:gate_up_5". Every copy keeps its original tile,
+    constants and worker pins; grids are named iso<b>x<k>_r<request>_<phase>."""
+    prev = [q.n("E_argmax") for q in qs]
+    for b, block in enumerate(spec.split(";")):
+        groups = []
+        for grp in block.split(","):
+            r, chain = grp.split(":")
+            groups.append((int(r), chain.split("+")))
+        for k in range(reps):
+            ends = []
+            for r, chain in groups:
+                q = qs[r]
+                prev_ev = None
+                for ph in chain:
+                    src = g.grid(q.n(ph))
+                    name = f"iso{b}x{k}_r{r}_{ph}"
+                    n = 1
+                    for d in src.grid:
+                        n *= int(d)
+                    g.etensor(f"E_{name}", (1,), wait_count=n)
+                    waits = [prev_ev] if prev_ev else prev
+                    g.call_device(name, src.grid, src.body, resource=src.resource, args=list(src.args), consts=src.consts,
+                                  domain_map=src.domain_map, worker_map=src.worker_map,
+                                  in_edges={e: _all_map(src.grid) for e in waits}, out_edges={f"E_{name}": _all_map(src.grid)},
+                                  duration_us=src.duration_us)
+                    prev_ev = f"E_{name}"
+                ends.append(prev_ev)
+            prev = ends
