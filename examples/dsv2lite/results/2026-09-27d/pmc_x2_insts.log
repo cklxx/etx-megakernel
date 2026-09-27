@@ -1,0 +1,24 @@
+# job pmc_x2_insts gpu=1 cwd=/home/hotaisle/fleet-mi300x
+# rocprofv3 --pmc SQ_WAVES SQ_INSTS_VALU SQ_INSTS_SALU SQ_INSTS_VMEM_RD SQ_INSTS_LDS -d $HOME/sess/pmc_x2_insts -o pmc --output-format csv -- $HOME/sess/b_x2/run --tokens 4 --context 1024 --r1-dir build_r1 > $HOME/sess/pmc_x2_insts.run.log 2>&1; find $HOME/sess/pmc_x2_insts -name '*counter_collection.csv' | head -1 | xargs -r cat | cut -c1-400 | head -20
+bash: line 1:  6273 Segmentation fault      (core dumped) rocprofv3 --pmc SQ_WAVES SQ_INSTS_VALU SQ_INSTS_SALU SQ_INSTS_VMEM_RD SQ_INSTS_LDS -d $HOME/sess/pmc_x2_insts -o pmc --output-format csv -- $HOME/sess/b_x2/run --tokens 4 --context 1024 --r1-dir build_r1 > $HOME/sess/pmc_x2_insts.run.log 2>&1
+"Correlation_Id","Dispatch_Id","Agent_Id","Queue_Id","Process_Id","Thread_Id","Grid_Size","Kernel_Id","Kernel_Name","Workgroup_Size","LDS_Block_Size","Scratch_Size","VGPR_Count","Accum_VGPR_Count","SGPR_Count","Counter_Name","Counter_Value","Start_Timestamp","End_Timestamp"
+1,1,"Agent 3",1,6273,6273,256,10,"__amd_rocclr_fillBufferAligned",256,0,0,12,4,48,"SQ_INSTS_LDS",0.00000000e+00,2724522734328,2724522736493
+1,1,"Agent 3",1,6273,6273,256,10,"__amd_rocclr_fillBufferAligned",256,0,0,12,4,48,"SQ_INSTS_SALU",84.000000,2724522734328,2724522736493
+1,1,"Agent 3",1,6273,6273,256,10,"__amd_rocclr_fillBufferAligned",256,0,0,12,4,48,"SQ_INSTS_VALU",35.000000,2724522734328,2724522736493
+1,1,"Agent 3",1,6273,6273,256,10,"__amd_rocclr_fillBufferAligned",256,0,0,12,4,48,"SQ_INSTS_VMEM_RD",0.00000000e+00,2724522734328,2724522736493
+1,1,"Agent 3",1,6273,6273,256,10,"__amd_rocclr_fillBufferAligned",256,0,0,12,4,48,"SQ_WAVES",4.000000,2724522734328,2724522736493
+2,2,"Agent 3",1,6273,6273,256,10,"__amd_rocclr_fillBufferAligned",256,0,0,12,4,48,"SQ_INSTS_LDS",0.00000000e+00,2724523903785,2724523905469
+2,2,"Agent 3",1,6273,6273,256,10,"__amd_rocclr_fillBufferAligned",256,0,0,12,4,48,"SQ_INSTS_SALU",85.000000,2724523903785,2724523905469
+2,2,"Agent 3",1,6273,6273,256,10,"__amd_rocclr_fillBufferAligned",256,0,0,12,4,48,"SQ_INSTS_VALU",34.000000,2724523903785,2724523905469
+2,2,"Agent 3",1,6273,6273,256,10,"__amd_rocclr_fillBufferAligned",256,0,0,12,4,48,"SQ_INSTS_VMEM_RD",1.000000,2724523903785,2724523905469
+2,2,"Agent 3",1,6273,6273,256,10,"__amd_rocclr_fillBufferAligned",256,0,0,12,4,48,"SQ_WAVES",4.000000,2724523903785,2724523905469
+3,3,"Agent 3",1,6273,6273,512,8,"__amd_rocclr_copyBuffer",512,0,0,16,0,32,"SQ_INSTS_LDS",0.00000000e+00,2724523994271,2724523998480
+3,3,"Agent 3",1,6273,6273,512,8,"__amd_rocclr_copyBuffer",512,0,0,16,0,32,"SQ_INSTS_SALU",163.000000,2724523994271,2724523998480
+3,3,"Agent 3",1,6273,6273,512,8,"__amd_rocclr_copyBuffer",512,0,0,16,0,32,"SQ_INSTS_VALU",65.000000,2724523994271,2724523998480
+3,3,"Agent 3",1,6273,6273,512,8,"__amd_rocclr_copyBuffer",512,0,0,16,0,32,"SQ_INSTS_VMEM_RD",9.000000,2724523994271,2724523998480
+3,3,"Agent 3",1,6273,6273,512,8,"__amd_rocclr_copyBuffer",512,0,0,16,0,32,"SQ_WAVES",8.000000,2724523994271,2724523998480
+4,4,"Agent 3",1,6273,6273,256,10,"__amd_rocclr_fillBufferAligned",256,0,0,12,4,48,"SQ_INSTS_LDS",0.00000000e+00,2724524078021,2724524079584
+4,4,"Agent 3",1,6273,6273,256,10,"__amd_rocclr_fillBufferAligned",256,0,0,12,4,48,"SQ_INSTS_SALU",84.000000,2724524078021,2724524079584
+4,4,"Agent 3",1,6273,6273,256,10,"__amd_rocclr_fillBufferAligned",256,0,0,12,4,48,"SQ_INSTS_VALU",35.000000,2724524078021,2724524079584
+4,4,"Agent 3",1,6273,6273,256,10,"__amd_rocclr_fillBufferAligned",256,0,0,12,4,48,"SQ_INSTS_VMEM_RD",0.00000000e+00,2724524078021,2724524079584
+xargs: cat: terminated by signal 13

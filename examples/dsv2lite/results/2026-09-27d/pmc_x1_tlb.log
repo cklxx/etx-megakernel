@@ -1,0 +1,23 @@
+# job pmc_x1_tlb gpu=1 cwd=/home/hotaisle/fleet-mi300x
+# rocprofv3 --pmc TCP_UTCL1_TRANSLATION_HIT_sum TCP_UTCL1_TRANSLATION_MISS_sum -d $HOME/sess/pmc_x1_tlb -o pmc --output-format csv -- $HOME/sess/b_x1/run --tokens 4 --context 1024 > $HOME/sess/pmc_x1_tlb.run.log 2>&1; find $HOME/sess/pmc_x1_tlb -name '*counter_collection.csv' | head -1 | xargs -r cat | cut -c1-400 | head -20
+bash: line 1:  6185 Segmentation fault      (core dumped) rocprofv3 --pmc TCP_UTCL1_TRANSLATION_HIT_sum TCP_UTCL1_TRANSLATION_MISS_sum -d $HOME/sess/pmc_x1_tlb -o pmc --output-format csv -- $HOME/sess/b_x1/run --tokens 4 --context 1024 > $HOME/sess/pmc_x1_tlb.run.log 2>&1
+"Correlation_Id","Dispatch_Id","Agent_Id","Queue_Id","Process_Id","Thread_Id","Grid_Size","Kernel_Id","Kernel_Name","Workgroup_Size","LDS_Block_Size","Scratch_Size","VGPR_Count","Accum_VGPR_Count","SGPR_Count","Counter_Name","Counter_Value","Start_Timestamp","End_Timestamp"
+1,1,"Agent 3",1,6185,6185,256,10,"__amd_rocclr_fillBufferAligned",256,0,0,12,4,48,"TCP_UTCL1_TRANSLATION_HIT_sum",0.00000000e+00,2715554441633,2715554444519
+1,1,"Agent 3",1,6185,6185,256,10,"__amd_rocclr_fillBufferAligned",256,0,0,12,4,48,"TCP_UTCL1_TRANSLATION_MISS_sum",1.000000,2715554441633,2715554444519
+2,2,"Agent 3",1,6185,6185,256,10,"__amd_rocclr_fillBufferAligned",256,0,0,12,4,48,"TCP_UTCL1_TRANSLATION_HIT_sum",0.00000000e+00,2715555733127,2715555734891
+2,2,"Agent 3",1,6185,6185,256,10,"__amd_rocclr_fillBufferAligned",256,0,0,12,4,48,"TCP_UTCL1_TRANSLATION_MISS_sum",2.000000,2715555733127,2715555734891
+3,3,"Agent 3",1,6185,6185,512,7,"__amd_rocclr_copyBuffer",512,0,0,16,0,32,"TCP_UTCL1_TRANSLATION_HIT_sum",16.000000,2715555959121,2715555963330
+3,3,"Agent 3",1,6185,6185,512,7,"__amd_rocclr_copyBuffer",512,0,0,16,0,32,"TCP_UTCL1_TRANSLATION_MISS_sum",2.000000,2715555959121,2715555963330
+4,4,"Agent 3",1,6185,6185,256,10,"__amd_rocclr_fillBufferAligned",256,0,0,12,4,48,"TCP_UTCL1_TRANSLATION_HIT_sum",0.00000000e+00,2715556160618,2715556162222
+4,4,"Agent 3",1,6185,6185,256,10,"__amd_rocclr_fillBufferAligned",256,0,0,12,4,48,"TCP_UTCL1_TRANSLATION_MISS_sum",1.000000,2715556160618,2715556162222
+5,5,"Agent 3",1,6185,6185,256,10,"__amd_rocclr_fillBufferAligned",256,0,0,12,4,48,"TCP_UTCL1_TRANSLATION_HIT_sum",0.00000000e+00,2715556352294,2715556353898
+5,5,"Agent 3",1,6185,6185,256,10,"__amd_rocclr_fillBufferAligned",256,0,0,12,4,48,"TCP_UTCL1_TRANSLATION_MISS_sum",2.000000,2715556352294,2715556353898
+6,6,"Agent 3",1,6185,6185,512,7,"__amd_rocclr_copyBuffer",512,0,0,16,0,32,"TCP_UTCL1_TRANSLATION_HIT_sum",16.000000,2715556549943,2715556554153
+6,6,"Agent 3",1,6185,6185,512,7,"__amd_rocclr_copyBuffer",512,0,0,16,0,32,"TCP_UTCL1_TRANSLATION_MISS_sum",2.000000,2715556549943,2715556554153
+7,7,"Agent 3",1,6185,6185,256,10,"__amd_rocclr_fillBufferAligned",256,0,0,12,4,48,"TCP_UTCL1_TRANSLATION_HIT_sum",0.00000000e+00,2715556750118,2715556751481
+7,7,"Agent 3",1,6185,6185,256,10,"__amd_rocclr_fillBufferAligned",256,0,0,12,4,48,"TCP_UTCL1_TRANSLATION_MISS_sum",1.000000,2715556750118,2715556751481
+8,8,"Agent 3",1,6185,6185,256,10,"__amd_rocclr_fillBufferAligned",256,0,0,12,4,48,"TCP_UTCL1_TRANSLATION_HIT_sum",0.00000000e+00,2715556942234,2715556943718
+8,8,"Agent 3",1,6185,6185,256,10,"__amd_rocclr_fillBufferAligned",256,0,0,12,4,48,"TCP_UTCL1_TRANSLATION_MISS_sum",2.000000,2715556942234,2715556943718
+9,9,"Agent 3",1,6185,6185,512,7,"__amd_rocclr_copyBuffer",512,0,0,16,0,32,"TCP_UTCL1_TRANSLATION_HIT_sum",16.000000,2715557134391,2715557138400
+9,9,"Agent 3",1,6185,6185,512,7,"__amd_rocclr_copyBuffer",512,0,0,16,0,32,"TCP_UTCL1_TRANSLATION_MISS_sum",2.000000,2715557134391,2715557138400
+10,10,"Agent 3",1,6185,6185,256,10,"__amd_rocclr_fillBufferAligned",256,0,0,12,4,48,"TCP_UTCL1_TRANSLATION_HIT_sum",0.00000000e+00,2715557332040,2715557333523

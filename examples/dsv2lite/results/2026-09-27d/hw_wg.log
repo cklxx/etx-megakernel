@@ -1,0 +1,11 @@
+# job hw_wg gpu=0 cwd=/home/hotaisle/etx
+# stdbuf -oL $HOME/sess/hw_bench wg
+device gfx942:sramecc+:xnack-, 304 CUs, clockRate 2100000 kHz
+RESULT wg __syncthreads                              77.0 ns per rep (   161 cycles), all CUs busy
+RESULT wg LDS 8 KB write+read (2 barriers)          612.7 ns per rep (  1276 cycles), all CUs busy
+RESULT wg 64-lane shuffle reduce                    336.6 ns per rep (   700 cycles), all CUs busy
+RESULT wg 4-wave reduce (shuffle + LDS)             414.5 ns per rep (   865 cycles), all CUs busy
+RESULT wg 64 fp32 FMA / lane                        216.2 ns per rep (   444 cycles), all CUs busy
+RESULT wg 32 bf16->fp32 pair products / lane        445.5 ns per rep (   909 cycles), all CUs busy
+RESULT wg 16 expf + rsqrtf / lane                   693.9 ns per rep (  1353 cycles), all CUs busy
+RESULT clock under a full-GPU FMA load: 1.977 GHz (median over CUs; min 1.965)

@@ -85,6 +85,10 @@ costs:                           # MEASURED 2026-09-22, Hot Aisle 1xMI300X VM, R
   t_prologue_ns: null
   relay_min_pollers: 64          # P5 turns the per-domain relay on above this many pollers of one DEVICE word
 lowering:
+  # words between event counters (ETX_EV_STRIDE): 32 = one 128 B line per counter. Packed, the 8 coordinates of an XCD-local
+  # event share a line: hand-off 3.3 us vs 1.0 us (bench/hw/hw_bench.hip handoff); DeepSeek-V2-Lite 3.72 -> 3.47 ms/token,
+  # two requests 365 -> 416 tokens/s (2026-09-27, examples/sessions/ds_evstride.py)
+  event_stride_words: 32
   backoff: '__builtin_amdgcn_s_sleep(8);'   # ~256 cycles between polls; 8 vs 1 measured 4.59 vs 4.60 ms/token
   timer: '__builtin_amdgcn_s_memrealtime()'
   domain_id: 'etx_amdgcn_xcc_id()'          # runtime/include/etx/primitives_amdgcn.h

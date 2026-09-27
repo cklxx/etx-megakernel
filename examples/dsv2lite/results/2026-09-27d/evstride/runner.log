@@ -1,0 +1,93 @@
+[08:33:45 +  0m00s] start build_x1 (cpu)
+[08:33:45 +  0m00s] start build_x1s (cpu)
+[08:33:45 +  0m00s] start build_x2 (cpu)
+[08:33:45 +  0m00s] start build_x2s (cpu)
+[08:34:14 +  0m29s] ok      build_x1 rc=0 29s
+[08:34:14 +  0m29s] start t1_x1 on GPU 0
+[08:34:15 +  0m30s] ok      build_x1s rc=0 30s
+[08:34:15 +  0m30s] start trace_x1s on GPU 1
+[08:34:22 +  0m37s] ok      t1_x1 rc=0 8s
+    per-token latency (embed -> argmax on device): median 3.723 ms  mean 3.721 ms; step wall (launch to end) 3.756 ms/token
+    tokens: 32/32 match HF greedy
+      consecutive layers within the gate: 27 of 27
+[08:34:22 +  0m37s] ok      trace_x1s rc=0 7s
+    per-token latency (embed -> argmax on device): median 3.500 ms  mean 3.508 ms; step wall (launch to end) 5.280 ms/token
+    tokens: 8/8 match HF greedy
+[08:34:22 +  0m37s] start t1_x1s on GPU 0
+[08:34:22 +  0m37s] start ledger_x1s (cpu)
+[08:34:23 +  0m38s] ok      ledger_x1s rc=0 1s
+    == x1 stride 32 request 0: token 3501.0 us (ledger sum 3501.0)
+       handoff   125.7  ramp   132.3  staging     0.0  prologue     0.0  floor  1134.4  stream  1916.0  tail   192.5
+       per MoE layer (mean of layers 2-25), us:
+       phase     handoff     ramp  staging prologue    floor   stream     tail    total
+       layer        4.48     4.85     0.00     0.00    38.44    69.71     7.09   124.57
+[08:34:28 +  0m43s] ok      build_x2 rc=0 43s
+[08:34:29 +  0m44s] ok      t1_x1s rc=0 7s
+    per-token latency (embed -> argmax on device): median 3.474 ms  mean 3.472 ms; step wall (launch to end) 3.507 ms/token
+    tokens: 32/32 match HF greedy
+      consecutive layers within the gate: 27 of 27
+[08:34:29 +  0m44s] start t1_x2 on GPU 0
+[08:34:30 +  0m45s] ok      build_x2s rc=0 45s
+[08:34:36 +  0m51s] ok      t1_x2 rc=0 7s
+    r0 per-token latency (embed -> argmax on device): median 5.460 ms  mean 5.460 ms; step wall (launch to end) 5.526 ms/token
+    r1 per-token latency (embed -> argmax on device): median 5.474 ms  mean 5.480 ms; step wall (launch to end) 5.526 ms/token
+    r0 tokens: 32/32 match HF greedy
+    r1 tokens: 32/32 match HF greedy
+      r0 consecutive layers within the gate: 27 of 27
+      r1 consecutive layers within the gate: 27 of 27
+    RESULT requests=2 step median 5.519 ms -> 362.4 tokens/s (2 tokens per step); tokens 64/64 match
+[08:34:36 +  0m51s] start t1_x2s on GPU 0
+[08:34:43 +  0m58s] ok      t1_x2s rc=0 7s
+    r0 per-token latency (embed -> argmax on device): median 4.766 ms  mean 4.761 ms; step wall (launch to end) 4.813 ms/token
+    r1 per-token latency (embed -> argmax on device): median 4.770 ms  mean 4.769 ms; step wall (launch to end) 4.813 ms/token
+    r0 tokens: 32/32 match HF greedy
+    r1 tokens: 32/32 match HF greedy
+      r0 consecutive layers within the gate: 27 of 27
+      r1 consecutive layers within the gate: 27 of 27
+    RESULT requests=2 step median 4.813 ms -> 415.5 tokens/s (2 tokens per step); tokens 64/64 match
+[08:34:43 +  0m58s] start t2_x1 on GPU 0
+[08:34:45 +  1m00s] progress: 1 running, 3 waiting, 10 done
+    t2_x1 [GPU 0] 2s / 600s: # $HOME/sess2/b_x1/run --tokens 32 --context 1024 --repeat 2
+[08:34:50 +  1m05s] ok      t2_x1 rc=0 7s
+    per-token latency (embed -> argmax on device): median 3.716 ms  mean 3.716 ms; step wall (launch to end) 3.752 ms/token
+    tokens: 32/32 match HF greedy
+      consecutive layers within the gate: 27 of 27
+[08:34:50 +  1m05s] start t2_x1s on GPU 0
+[08:34:57 +  1m12s] ok      t2_x1s rc=0 7s
+    per-token latency (embed -> argmax on device): median 3.473 ms  mean 3.473 ms; step wall (launch to end) 3.508 ms/token
+    tokens: 32/32 match HF greedy
+      consecutive layers within the gate: 27 of 27
+[08:34:57 +  1m12s] start t2_x2 on GPU 0
+[08:35:05 +  1m20s] ok      t2_x2 rc=0 8s
+    r0 per-token latency (embed -> argmax on device): median 5.379 ms  mean 5.381 ms; step wall (launch to end) 5.431 ms/token
+    r1 per-token latency (embed -> argmax on device): median 5.385 ms  mean 5.386 ms; step wall (launch to end) 5.431 ms/token
+    r0 tokens: 32/32 match HF greedy
+    r1 tokens: 32/32 match HF greedy
+      r0 consecutive layers within the gate: 27 of 27
+      r1 consecutive layers within the gate: 27 of 27
+    RESULT requests=2 step median 5.428 ms -> 368.5 tokens/s (2 tokens per step); tokens 64/64 match
+[08:35:05 +  1m20s] start t2_x2s on GPU 0
+[08:35:12 +  1m27s] ok      t2_x2s rc=0 7s
+    r0 per-token latency (embed -> argmax on device): median 4.758 ms  mean 4.766 ms; step wall (launch to end) 4.814 ms/token
+    r1 per-token latency (embed -> argmax on device): median 4.764 ms  mean 4.770 ms; step wall (launch to end) 4.814 ms/token
+    r0 tokens: 32/32 match HF greedy
+    r1 tokens: 32/32 match HF greedy
+      r0 consecutive layers within the gate: 27 of 27
+      r1 consecutive layers within the gate: 27 of 27
+    RESULT requests=2 step median 4.807 ms -> 416.0 tokens/s (2 tokens per step); tokens 64/64 match
+[08:35:12 +  1m27s] session done
+  job                              status     rc  gpu  seconds
+  build_x1                         ok          0            29  
+  build_x1s                        ok          0            30  
+  build_x2                         ok          0            43  
+  build_x2s                        ok          0            45  
+  t1_x1                            ok          0    0        8  
+  t1_x1s                           ok          0    0        7  
+  t1_x2                            ok          0    0        7  
+  t1_x2s                           ok          0    0        7  
+  t2_x1                            ok          0    0        7  
+  t2_x1s                           ok          0    0        7  
+  t2_x2                            ok          0    0        8  
+  t2_x2s                           ok          0    0        7  
+  trace_x1s                        ok          0    1        7  
+  ledger_x1s                       ok          0             1  

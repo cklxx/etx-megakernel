@@ -1,0 +1,15 @@
+# job ledger_x1s gpu=None cwd=/home/hotaisle/etx
+# PYTHONPATH=. .venv/bin/python -m examples.dsv2lite.ledger --etx $HOME/sess2/x1s_plan.json $HOME/sess2/x1s_trace.bin --label 'x1 stride 32' --fleet-src ~/fleet-mi300x/src
+
+== x1 stride 32 request 0: token 3501.0 us (ledger sum 3501.0)
+   handoff   125.7  ramp   132.3  staging     0.0  prologue     0.0  floor  1134.4  stream  1916.0  tail   192.5
+   per MoE layer (mean of layers 2-25), us:
+   phase     handoff     ramp  staging prologue    floor   stream     tail    total
+   qkv          2.03     0.14     0.00     0.00     3.47    17.35     0.81    23.81
+   attn         0.37     0.65     0.00     0.00     0.27    13.07     0.67    15.03
+   merge       -0.07     1.14     0.00     0.00     0.49     7.97     0.85    10.38
+   oproj       -0.15     1.17     0.00     0.00     1.95     4.19     1.16     8.32
+   router       2.10     0.14     0.00     0.00     0.06    10.71     0.72    13.73
+   gate_up      0.41     0.60     0.00     0.00    21.46     9.97     1.35    33.80
+   down        -0.20     1.00     0.00     0.00    10.73     6.45     1.52    19.49
+   layer        4.48     4.85     0.00     0.00    38.44    69.71     7.09   124.57

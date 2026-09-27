@@ -960,6 +960,19 @@ The offset works (113 us, half a period), but a request's latency phases slow by
 
 **vLLM's kernels at batch 1** (rocprofv3 traces; kernel times, not the inflated span): Qwen3-30B-A3B runs 843 kernels per token, 724 of them under 8 us (median 4.4 us) taking 3.63 ms of 5.27 ms busy (69%); only `fused_moe_kernel` (96 launches, 14.6 us each, about 3.4 TB/s) does heavy work. Qwen3-8B: 310 of 455 kernels small, 1.39 ms of 5.06 (27%); Qwen2.5-1.5B: 273 of 331, 1.21 ms of 1.99 (61%). Per MoE layer vLLM runs top-k gating (8.0 us), SiLU (4.5), moe_sum (4.5), two norms (4.2 each), the cache write (5.0), plus a copyBuffer and a fill kernel that do no model work. The fixed cost of small kernels is the ceiling fusion can recover, and it is largest for MoE; recovering it needs hand-offs cheaper than a kernel boundary, which ETX has only inside an XCD today (0.96 us same-XCD, 5.5-7.8 us device-wide).
 
+### 15.14 Event counters on their own cache lines (2026-09-27, fourth and fifth sessions)
+
+The operation-level model (`docs/MODEL-dsv2.md`, `docs/OPS-dsv2.md`) was calibrated with `bench/hw/hw_bench.hip` and
+in-situ phase benchmarks (`ETX_DSV2_ISOLATE`). Its hand-off replica found that ETX's XCD-local hand-offs cost 3.3 us because
+the 8 XCD coordinates of an event are adjacent words in one cache line (296 workgroups arrive on and poll the same line);
+padded to one line per counter the same hand-off is 1.0 us. `ETX_EV_STRIDE` places counter w at word w * stride; the gfx942
+machine model sets 32 (`event_stride_words`). DeepSeek-V2-Lite, alternated on one GPU, every run 32/32 tokens and 27/27 layers:
+
+| | stride 1 | stride 32 |
+|---|---|---|
+| one request, ms/token | 3.723 / 3.716 | **3.474 / 3.473** (fleet 3.55) |
+| two requests, tokens/s | 362 / 369 | **416 / 416** (vLLM batch 2: 376) |
+
 ### 15.3 Phases of the general architecture (after M3)
 
 | Phase | Deliverable | Completion criterion |

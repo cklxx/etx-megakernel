@@ -1,0 +1,23 @@
+# job hw_pair gpu=0 cwd=/home/hotaisle/etx
+# stdbuf -oL $HOME/sess/hw_bench pair
+device gfx942:sramecc+:xnack-, 304 CUs, clockRate 2100000 kHz
+RESULT pair fg stream bg idle  : fg median     9.84 us  x1.00 of alone
+RESULT pair fg stream bg stream: fg median    17.72 us  x1.80 of alone
+RESULT pair fg stream bg chain : fg median     9.00 us  x0.91 of alone
+RESULT pair fg stream bg alu   : fg median     8.84 us  x0.90 of alone
+RESULT pair fg stream bg lds   : fg median     8.92 us  x0.91 of alone
+RESULT pair fg chain  bg idle  : fg median     3.88 us  x1.00 of alone
+RESULT pair fg chain  bg stream: fg median     4.44 us  x1.14 of alone
+RESULT pair fg chain  bg chain : fg median     5.24 us  x1.35 of alone
+RESULT pair fg chain  bg alu   : fg median     3.96 us  x1.02 of alone
+RESULT pair fg chain  bg lds   : fg median     3.92 us  x1.01 of alone
+RESULT pair fg alu    bg idle  : fg median    17.04 us  x1.00 of alone
+RESULT pair fg alu    bg stream: fg median    29.60 us  x1.74 of alone
+RESULT pair fg alu    bg chain : fg median    20.48 us  x1.20 of alone
+RESULT pair fg alu    bg alu   : fg median    17.36 us  x1.02 of alone
+RESULT pair fg alu    bg lds   : fg median    18.24 us  x1.07 of alone
+RESULT pair fg lds    bg idle  : fg median    31.12 us  x1.00 of alone
+RESULT pair fg lds    bg stream: fg median    37.32 us  x1.20 of alone
+RESULT pair fg lds    bg chain : fg median    34.56 us  x1.11 of alone
+RESULT pair fg lds    bg alu   : fg median    32.04 us  x1.03 of alone
+RESULT pair fg lds    bg lds   : fg median    31.64 us  x1.02 of alone

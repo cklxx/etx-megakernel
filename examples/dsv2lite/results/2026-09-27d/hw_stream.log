@@ -1,0 +1,19 @@
+# job hw_stream gpu=0 cwd=/home/hotaisle/etx
+# stdbuf -oL $HOME/sess/hw_bench stream
+device gfx942:sramecc+:xnack-, 304 CUs, clockRate 2100000 kHz
+RESULT stream router       contig 296 WGs x     896 B: phase span    3.42 us  WG median    3.00 us  p90    3.12  -> 0.08 TB/s
+RESULT stream merge        contig 256 WGs x    8192 B: phase span    4.08 us  WG median    3.64 us  p90    3.88  -> 0.51 TB/s
+RESULT stream o_proj       contig 296 WGs x   28672 B: phase span    7.06 us  WG median    6.48 us  p90    6.80  -> 1.20 TB/s
+RESULT stream q/kv_a       contig 296 WGs x   51200 B: phase span   10.18 us  WG median    7.16 us  p90    9.80  -> 1.49 TB/s
+RESULT stream down         contig 296 WGs x  159744 B: phase span   17.06 us  WG median   13.40 us  p90   22.96  -> 2.77 TB/s
+RESULT stream gate_up      contig 296 WGs x  319488 B: phase span   35.56 us  WG median   24.04 us  p90   25.88  -> 2.66 TB/s
+RESULT stream 1 MB         contig 296 WGs x 1048576 B: phase span   93.04 us  WG median   73.12 us  p90   85.56  -> 3.34 TB/s
+RESULT stream gate_up x8   contig   8 WGs x  319488 B: phase span   12.24 us  WG median   11.16 us  p90   12.04  -> 0.21 TB/s
+RESULT stream router       rows   296 WGs x     896 B: phase span    3.26 us  WG median    3.00 us  p90    3.08  -> 0.08 TB/s
+RESULT stream merge        rows   256 WGs x    8192 B: phase span    3.42 us  WG median    3.12 us  p90    3.24  -> 0.61 TB/s
+RESULT stream o_proj       rows   296 WGs x   28672 B: phase span    4.96 us  WG median    4.48 us  p90    4.68  -> 1.71 TB/s
+RESULT stream q/kv_a       rows   296 WGs x   51200 B: phase span    6.12 us  WG median    5.36 us  p90    5.84  -> 2.48 TB/s
+RESULT stream down         rows   296 WGs x  159744 B: phase span   16.10 us  WG median   12.00 us  p90   12.84  -> 2.94 TB/s
+RESULT stream gate_up      rows   296 WGs x  319488 B: phase span   33.14 us  WG median   22.72 us  p90   24.68  -> 2.85 TB/s
+RESULT stream 1 MB         rows   296 WGs x 1048576 B: phase span   88.38 us  WG median   70.84 us  p90   82.04  -> 3.51 TB/s
+RESULT stream gate_up x8   rows     8 WGs x  319488 B: phase span   11.80 us  WG median   10.28 us  p90   11.36  -> 0.22 TB/s

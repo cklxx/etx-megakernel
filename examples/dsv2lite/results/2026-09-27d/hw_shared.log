@@ -1,0 +1,11 @@
+# job hw_shared gpu=0 cwd=/home/hotaisle/etx
+# stdbuf -oL $HOME/sess/hw_bench shared
+device gfx942:sramecc+:xnack-, 304 CUs, clockRate 2100000 kHz
+RESULT shared local  (own XCD wrote)              readers   1 (64 KB each): median   6.28 us  p90   8.00  last   6.28
+RESULT shared local  (own XCD wrote)              readers   8 (64 KB each): median   5.20 us  p90   5.36  last   5.24
+RESULT shared local  (own XCD wrote)              readers  19 (64 KB each): median   5.24 us  p90   6.52  last   5.28
+RESULT shared local  (own XCD wrote)              readers  37 (64 KB each): median   6.00 us  p90   6.04  last   6.08
+RESULT shared remote (8 XCDs wrote, wbl2 + inv sc1) readers   8 (64 KB each): median   4.76 us  p90   5.24  last   5.24
+RESULT shared remote (8 XCDs wrote, wbl2 + inv sc1) readers  64 (64 KB each): median   5.84 us  p90   6.68  last   6.84
+RESULT shared remote (8 XCDs wrote, wbl2 + inv sc1) readers 152 (64 KB each): median   5.84 us  p90   8.12  last  10.44
+RESULT shared remote (8 XCDs wrote, wbl2 + inv sc1) readers 296 (64 KB each): median   6.04 us  p90   6.08  last   6.12

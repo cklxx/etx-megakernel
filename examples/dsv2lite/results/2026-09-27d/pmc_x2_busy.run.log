@@ -1,0 +1,27 @@
+W20260927 08:27:44.696514 128188231123712 simple_timer.cpp:55] [rocprofv3] tool initialization ::     0.174249 sec
+W20260927 08:27:44.697028 128188231123712 simple_timer.cpp:55] [rocprofv3] '/home/hotaisle/sess/b_x2/run --tokens 4 --context 1024 --r1-dir build_r1' ::     0.000000 sec
+W20260927 08:27:44.739874 128188231123712 tool.cpp:2422] HSA version 8.20.4 initialized (instance=0)
+W20260927 08:27:50.969132 128188231123712 simple_timer.cpp:55] [rocprofv3] '/home/hotaisle/sess/b_x2/run --tokens 4 --context 1024 --r1-dir build_r1' ::     6.272105 sec
+E20260927 08:27:50.977723 128188231123712 output_stream.cpp:111] Opened result file: /home/hotaisle/sess/pmc_x2_busy/pmc_counter_collection.csv
+E20260927 08:27:50.986939 128188231123712 output_stream.cpp:111] Opened result file: /home/hotaisle/sess/pmc_x2_busy/pmc_agent_info.csv
+W20260927 08:27:50.988743 128188231123712 simple_timer.cpp:55] [rocprofv3] output generation ::     0.018666 sec
+W20260927 08:27:50.988787 128188231123712 simple_timer.cpp:55] [rocprofv3] tool finalization ::     0.018717 sec
+*** Aborted at 1790497671 (unix time) try "date -d @1790497671" if you are using GNU date ***
+PC: @     0x74961c06a90d (unknown)
+*** SIGSEGV (@0x74961b574550) received by PID 6292 (TID 0x749625fb0300) from PID 458704208; stack trace: ***
+    @     0x7496260a1ed3 (unknown)
+    @     0x74962900aa00 (unknown)
+    @     0x749626045330 (unknown)
+    @     0x74961c06a90d (unknown)
+    @     0x74961c059913 (unknown)
+    @     0x74961c059ded (unknown)
+    @     0x74961c04962c (unknown)
+    @     0x74961c0498bd (unknown)
+    @     0x74961c090dc6 (unknown)
+    @     0x74961c095ca5 (unknown)
+    @     0x74961c095f4e (unknown)
+    @     0x74961c067f77 (unknown)
+    @     0x749626c461ca (unknown)
+    @     0x749626c4629e (unknown)
+    @     0x749626047382 __cxa_finalize
+    @     0x74962685c027 (unknown)

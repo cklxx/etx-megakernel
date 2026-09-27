@@ -1,0 +1,27 @@
+# job hw_handoff gpu=0 cwd=/home/hotaisle/etx
+# stdbuf -oL $HOME/sess/hw_bench handoff
+device gfx942:sramecc+:xnack-, 304 CUs, clockRate 2100000 kHz
+RESULT handoff xcd    shared-line sleep  0 acquire sc0 dirty  0 KB: last arrival -> first  4.40  median  4.44  last  4.44 us
+RESULT handoff xcd    shared-line sleep  0 acquire sc1 dirty  0 KB: last arrival -> first  3.24  median  3.24  last  3.28 us
+RESULT handoff xcd    shared-line sleep  1 acquire sc0 dirty  0 KB: last arrival -> first  3.28  median  3.32  last  3.32 us
+RESULT handoff xcd    shared-line sleep  1 acquire sc1 dirty  0 KB: last arrival -> first  3.24  median  3.24  last  3.24 us
+RESULT handoff xcd    shared-line sleep  8 acquire sc0 dirty  0 KB: last arrival -> first  3.28  median  3.28  last  3.32 us
+RESULT handoff xcd    shared-line sleep  8 acquire sc0 dirty 64 KB: last arrival -> first  5.12  median  5.28  last  5.36 us
+RESULT handoff xcd    shared-line sleep  8 acquire sc1 dirty  0 KB: last arrival -> first  3.28  median  3.32  last  3.32 us
+RESULT handoff xcd    shared-line sleep  8 acquire sc1 dirty 64 KB: last arrival -> first  4.92  median  5.08  last  5.24 us
+RESULT handoff xcd    shared-line sleep 32 acquire sc0 dirty  0 KB: last arrival -> first  3.28  median  3.32  last  3.32 us
+RESULT handoff xcd    shared-line sleep 32 acquire sc1 dirty  0 KB: last arrival -> first  3.24  median  3.28  last  3.28 us
+RESULT handoff device shared-line sleep  0 acquire sc0 dirty  0 KB: last arrival -> first  1.04  median  1.16  last  1.36 us
+RESULT handoff device shared-line sleep  0 acquire sc1 dirty  0 KB: last arrival -> first  1.04  median  1.17  last  1.33 us
+RESULT handoff device shared-line sleep  1 acquire sc0 dirty  0 KB: last arrival -> first  1.04  median  1.13  last  1.28 us
+RESULT handoff device shared-line sleep  1 acquire sc1 dirty  0 KB: last arrival -> first  1.05  median  1.16  last  1.36 us
+RESULT handoff device shared-line sleep  8 acquire sc0 dirty  0 KB: last arrival -> first  1.15  median  1.29  last  1.48 us
+RESULT handoff device shared-line sleep  8 acquire sc0 dirty 64 KB: last arrival -> first  0.67  median  0.78  last  1.03 us
+RESULT handoff device shared-line sleep  8 acquire sc1 dirty  0 KB: last arrival -> first  1.11  median  1.25  last  1.82 us
+RESULT handoff device shared-line sleep  8 acquire sc1 dirty 64 KB: last arrival -> first  0.67  median  0.76  last  1.39 us
+RESULT handoff device shared-line sleep 32 acquire sc0 dirty  0 KB: last arrival -> first  0.81  median  0.96  last  1.84 us
+RESULT handoff device shared-line sleep 32 acquire sc1 dirty  0 KB: last arrival -> first  0.84  median  1.01  last  3.34 us
+RESULT handoff xcd    padded     sleep  8 acquire sc0 dirty  0 KB: last arrival -> first  0.76  median  1.00  last  1.04 us
+RESULT handoff xcd    padded     sleep  8 acquire sc0 dirty 64 KB: last arrival -> first  1.16  median  1.40  last  1.44 us
+RESULT handoff device padded     sleep  8 acquire sc0 dirty  0 KB: last arrival -> first  1.25  median  1.39  last  1.56 us
+RESULT handoff device padded     sleep  8 acquire sc0 dirty 64 KB: last arrival -> first  0.95  median  1.06  last  1.30 us

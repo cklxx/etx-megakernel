@@ -1,0 +1,24 @@
+# job pmc_x2_icache gpu=1 cwd=/home/hotaisle/fleet-mi300x
+# rocprofv3 --pmc SQC_ICACHE_HITS SQC_ICACHE_MISSES SQC_DCACHE_HITS SQC_DCACHE_MISSES -d $HOME/sess/pmc_x2_icache -o pmc --output-format csv -- $HOME/sess/b_x2/run --tokens 4 --context 1024 --r1-dir build_r1 > $HOME/sess/pmc_x2_icache.run.log 2>&1; find $HOME/sess/pmc_x2_icache -name '*counter_collection.csv' | head -1 | xargs -r cat | cut -c1-400 | head -20
+bash: line 1:  6401 Segmentation fault      (core dumped) rocprofv3 --pmc SQC_ICACHE_HITS SQC_ICACHE_MISSES SQC_DCACHE_HITS SQC_DCACHE_MISSES -d $HOME/sess/pmc_x2_icache -o pmc --output-format csv -- $HOME/sess/b_x2/run --tokens 4 --context 1024 --r1-dir build_r1 > $HOME/sess/pmc_x2_icache.run.log 2>&1
+"Correlation_Id","Dispatch_Id","Agent_Id","Queue_Id","Process_Id","Thread_Id","Grid_Size","Kernel_Id","Kernel_Name","Workgroup_Size","LDS_Block_Size","Scratch_Size","VGPR_Count","Accum_VGPR_Count","SGPR_Count","Counter_Name","Counter_Value","Start_Timestamp","End_Timestamp"
+1,1,"Agent 3",1,6401,6401,256,10,"__amd_rocclr_fillBufferAligned",256,0,0,12,4,48,"SQC_DCACHE_HITS",0.00000000e+00,2751548058153,2751548060999
+1,1,"Agent 3",1,6401,6401,256,10,"__amd_rocclr_fillBufferAligned",256,0,0,12,4,48,"SQC_DCACHE_MISSES",1.000000,2751548058153,2751548060999
+1,1,"Agent 3",1,6401,6401,256,10,"__amd_rocclr_fillBufferAligned",256,0,0,12,4,48,"SQC_ICACHE_HITS",43.000000,2751548058153,2751548060999
+1,1,"Agent 3",1,6401,6401,256,10,"__amd_rocclr_fillBufferAligned",256,0,0,12,4,48,"SQC_ICACHE_MISSES",1.000000,2751548058153,2751548060999
+2,2,"Agent 3",1,6401,6401,256,10,"__amd_rocclr_fillBufferAligned",256,0,0,12,4,48,"SQC_DCACHE_HITS",0.00000000e+00,2751549251826,2751549253630
+2,2,"Agent 3",1,6401,6401,256,10,"__amd_rocclr_fillBufferAligned",256,0,0,12,4,48,"SQC_DCACHE_MISSES",0.00000000e+00,2751549251826,2751549253630
+2,2,"Agent 3",1,6401,6401,256,10,"__amd_rocclr_fillBufferAligned",256,0,0,12,4,48,"SQC_ICACHE_HITS",34.000000,2751549251826,2751549253630
+2,2,"Agent 3",1,6401,6401,256,10,"__amd_rocclr_fillBufferAligned",256,0,0,12,4,48,"SQC_ICACHE_MISSES",1.000000,2751549251826,2751549253630
+3,3,"Agent 3",1,6401,6401,512,7,"__amd_rocclr_copyBuffer",512,0,0,16,0,32,"SQC_DCACHE_HITS",0.00000000e+00,2751549336698,2751549340988
+3,3,"Agent 3",1,6401,6401,512,7,"__amd_rocclr_copyBuffer",512,0,0,16,0,32,"SQC_DCACHE_MISSES",0.00000000e+00,2751549336698,2751549340988
+3,3,"Agent 3",1,6401,6401,512,7,"__amd_rocclr_copyBuffer",512,0,0,16,0,32,"SQC_ICACHE_HITS",65.000000,2751549336698,2751549340988
+3,3,"Agent 3",1,6401,6401,512,7,"__amd_rocclr_copyBuffer",512,0,0,16,0,32,"SQC_ICACHE_MISSES",1.000000,2751549336698,2751549340988
+4,4,"Agent 3",1,6401,6401,256,10,"__amd_rocclr_fillBufferAligned",256,0,0,12,4,48,"SQC_DCACHE_HITS",0.00000000e+00,2751549410386,2751549412030
+4,4,"Agent 3",1,6401,6401,256,10,"__amd_rocclr_fillBufferAligned",256,0,0,12,4,48,"SQC_DCACHE_MISSES",1.000000,2751549410386,2751549412030
+4,4,"Agent 3",1,6401,6401,256,10,"__amd_rocclr_fillBufferAligned",256,0,0,12,4,48,"SQC_ICACHE_HITS",43.000000,2751549410386,2751549412030
+4,4,"Agent 3",1,6401,6401,256,10,"__amd_rocclr_fillBufferAligned",256,0,0,12,4,48,"SQC_ICACHE_MISSES",1.000000,2751549410386,2751549412030
+5,5,"Agent 3",1,6401,6401,256,10,"__amd_rocclr_fillBufferAligned",256,0,0,12,4,48,"SQC_DCACHE_HITS",0.00000000e+00,2751549512217,2751549513901
+5,5,"Agent 3",1,6401,6401,256,10,"__amd_rocclr_fillBufferAligned",256,0,0,12,4,48,"SQC_DCACHE_MISSES",0.00000000e+00,2751549512217,2751549513901
+5,5,"Agent 3",1,6401,6401,256,10,"__amd_rocclr_fillBufferAligned",256,0,0,12,4,48,"SQC_ICACHE_HITS",34.000000,2751549512217,2751549513901
+xargs: cat: terminated by signal 13

@@ -126,7 +126,34 @@ which is the only way to separate "the phase is slow" from "the phase is slow he
 **Counters** (rocprofv3 --pmc on one-token runs; one value per dispatch, so for whole tokens only): clock, VALU / LDS / VMEM
 instruction counts, L2 hit rate, TLB and instruction-cache misses where the counters exist on gfx942.
 
-## 5. Reconciliation table (filled after the session)
+## 5. Reconciliation (2026-09-27, sessions ds_model and ds_evstride; logs examples/dsv2lite/results/2026-09-27d)
 
-Per MoE layer, per phase: measured ledger category, model prediction, residual, and which alternative the discriminating
-measurement selected.
+Measured parameters: H2 (stream replica) at the phases' bytes per task, rows layout: router 3.2, merge 3.4, o_proj 4.9,
+q/kv_a (51 KB) 6.1, down (160 KB) 16.4, gate_up (320 KB) 32.7 us phase span (contiguous per-WG layout is slower: q/kv_a
+10.1). H5: a 64 KB vector read right after another XCD wrote and wrote it back: 1 reader 3.9 us, 296 readers 6.0 us.
+H6/H8: XCD-local hand-off 3.28 us with the 8 XCDs' counters in one cache line, **1.00 us padded**; 5.3 -> 1.4 us with 64 KB
+dirty per producer; device-wide 1.2-1.4 us; s_sleep 0/1/8/32 and acquire sc0/sc1 do not change it. H10: `__syncthreads`
+77 ns, one bpermute ~56 ns (6-step reduce 337 ns), 8 KB LDS write+read 613 ns. H13: 1.99 GHz under a full FMA load.
+Counters (one token): instruction-cache miss rate 0.2%, UTCL1 translation miss rate 0.1%.
+
+In situ, the real tiles, each phase of layer 5 alone (us): q/kv_a 20.1, q_absorb 2.9, attention 14.1, merge 9.9, o_proj 8.8,
+router 10.4, gate_up 34.0, down 20.5: 117.8 in sum against 136.3 per layer inside the token, so 18.5 us per layer are
+hand-offs.
+
+| category (per MoE layer) | prediction / question | result | verdict |
+|---|---|---|---|
+| handoff + ramp (ETX 5.1 + 11.6 us, fleet -3.0 + 6.9) | C1-C6 | none of C1-C5 explains it (sleep and acquire do not matter); the hand-off replica with the counters padded took 1.0 us where packed took 3.3 us: **C7, false sharing of the event counters, not in the pre-registered list**, found because the XCD-local and device replicas disagreed | fixed: `ETX_EV_STRIDE` 32 (machine model default on gfx942). One request 3.72 -> 3.47 ms/token (fleet 3.55); ledger handoff + ramp 16.7 -> 9.3 us per layer, layer 136.3 -> 124.6 us |
+| stream excess of q/kv_a (ETX 11.1 us above the 3.5 us floor) | A1-A7 | issued bytes, not rate: every XCD computes all 576 kv_a rows (no `FLAG_KVA_SHARED`) and each wave over-issues one group, 180 KB per task where 50 KB are unique; the replica at 160-180 KB per task gives 12-16 us, the stamped stream is 14.6 | explained (A1 generalised to "issued bytes"); A4 TLB and A7 i-cache rejected by counters |
+| stream excess of gate_up / down | A1-A7 | replica at 344 KB / 180 KB issued per task: 22.7-32.7 / 12.1-16.4 us; measured 26.5 / 16.3 | explained |
+| staging (fleet 20.4, ETX 14.0 us per layer) | B1-B4 | a fresh remote 64 KB costs 3.9 us to one reader, 6.0 us to 296: the source (written back by another XCD) dominates (B2), reader count adds ~50% (B1); ETX's readers start spread (ramp), so they see fewer concurrent readers (B4) | explained within 1 us per phase |
+| prologue: norm ~2.5 us, gate_up routing 4.7 us | from the inventory | rms_norm = 10-level LDS tree with a barrier each (~1.5 us) + a gamma round trip (~1 us); routing = 84 serial bpermutes x 56 ns = 4.7 us, exactly fleet's own stamp | explained |
+| tail (~10 us) | D1-D3 | rows per worker differ by one (e.g. q/kv_a 16 vs 15 kv_a rows); consistent with D1; D2 / D3 not separated | partly |
+| two requests x1.4 (H12) | E1-E6 | pairs: a compute-bound workgroup slows x1.74 beside a stream, a latency chain x1.14, stream beside stream x1.8; in situ: q/kv_a x1.76, attention x1.94, router x1.39 beside gate_up, gate_up x1.08-1.26 beside them, same-phase pairs x1.35-1.55; SQ_WAIT_INST_ANY 11x with two requests; any pairing saves only 16-30% over running the two phases one after the other, which bounds two requests at ~1.3-1.4x | E1 (issue contention of compute-heavy phases) confirmed; E4 (L2) and E6 (i-cache) rejected by counters |
+
+With the counter fix the two-request build runs 4.81 ms per step, **416 tokens/s**: 1.47x fleet at batch 1 and 10.6% above
+vLLM at batch 2 (376 tokens/s, same prompts, measured 2026-09-27); per-request latency 4.76 ms against vLLM's 5.32.
+
+Still open: (1) a streaming workgroup runs ~10% faster beside a compute-bound one than beside an idle one (pair test, with
+the Infinity Cache evicted between configurations): H13 under pure streaming (a clock drop when the SIMDs idle) is the
+first candidate, to be measured with s_memtime inside the stream. (2) The ETX_EV_STRIDE default also applies to the Qwen
+(vLLM-kernel) builds, which have not been re-measured with it.
