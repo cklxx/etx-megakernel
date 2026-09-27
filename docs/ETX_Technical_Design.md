@@ -948,6 +948,18 @@ Where ETX loses to fleet (MoE layers 1-26, mean phase start/end relative to the 
 
 The best interleave gives 1.30x fleet's and 1.37x ETX's single-request throughput and stays 3% below vLLM at batch 2 (per-request latency 5.45 vs 5.32 ms). The estimate (1.72-1.78x) did not hold. The trace of the uncoupled build shows why: the two requests fall into lockstep (layer 5: both qkv tasks ready at 0 us, both gate_up at 104.7 us, 195 us for the pair against 130 for one request), so the latency-bound phases do not hide behind the other request's expert stream; they run side by side and slow down (q/kv_a 29-31 us per task against 21; gate_up 46-50 against 32). Forcing the offset costs more than it saves: with `router` coupling each request waits out the other's latency phases, with `experts` the streams alternate but the latency phases stay serial. Two requests in one megakernel work and are correct; beating vLLM's batching needs the latency phases to share work (one q/kv_a, o_proj, attention prologue for both tokens) rather than overlap.
 
+**Analysis of the three traces** (`examples/dsv2lite/phase_compare.py`; MoE layers 2-25, us, relative to each request's layer start):
+
+| | latency phases (qkv start to router end) | expert phases | layer period | r1 start minus r0 start |
+|---|---|---|---|---|
+| one request | 76 | 58 | 136 | - |
+| two requests, no coupling | 102 | 90 | 194 | 3.5 |
+| two requests, `router` coupling | 111 | 81 | 227 | 113 |
+
+The offset works (113 us, half a period), but a request's latency phases slow by 1.46x while the other request streams its experts on the same CUs (attention body 23 us against 13.4, qkv 30 against 21.5), and the expert stream slows by 1.4x beside them (gate_up 40 against 32). The overlap microbenchmark's fold (x1.00-1.04) was a pure memory round trip; the real latency phases also issue ALU, LDS and weight-stream work that competes with a co-resident GEMV. Uncoupled, the two requests run the same phase together and the two expert streams reach 3.07 TB/s where one reaches 2.4, which is why lockstep beats the offset.
+
+**vLLM's kernels at batch 1** (rocprofv3 traces; kernel times, not the inflated span): Qwen3-30B-A3B runs 843 kernels per token, 724 of them under 8 us (median 4.4 us) taking 3.63 ms of 5.27 ms busy (69%); only `fused_moe_kernel` (96 launches, 14.6 us each, about 3.4 TB/s) does heavy work. Qwen3-8B: 310 of 455 kernels small, 1.39 ms of 5.06 (27%); Qwen2.5-1.5B: 273 of 331, 1.21 ms of 1.99 (61%). Per MoE layer vLLM runs top-k gating (8.0 us), SiLU (4.5), moe_sum (4.5), two norms (4.2 each), the cache write (5.0), plus a copyBuffer and a fill kernel that do no model work. The fixed cost of small kernels is the ceiling fusion can recover, and it is largest for MoE; recovering it needs hand-offs cheaper than a kernel boundary, which ETX has only inside an XCD today (0.96 us same-XCD, 5.5-7.8 us device-wide).
+
 ### 15.3 Phases of the general architecture (after M3)
 
 | Phase | Deliverable | Completion criterion |
