@@ -75,11 +75,12 @@ job(name="build_fleet", lane="cpu", after="fleet_env", timeout=1200, cwd=FLEET,
 # ---------------------------------------------------------------- references: both GPUs at once
 job(name="ds_prep", gpu=1, after=["fleet_env", "dl_ds"], timeout=2400, cwd=FLEET,
     cmd=". .venv/bin/activate && mkdir -p build && "
-        "python3 src/host/reference_run.py --model $HOME/models/dsv2-lite-base --out build/golden.npz && "
+        "{ test -f build/fleet_cache.bin -a -f build/golden_tokens.txt -a -f build/golden_hidden.bin || "
+        "python3 src/host/reference_run.py --model $HOME/models/dsv2-lite-base --out build/golden.npz; } && "
         "python3 src/host/pack_weights.py --model $HOME/models/dsv2-lite-base --out build/weights.bin",
     summary=[r"smallest top-2 margin|wrote build/|expert stride"])
 job(name="ref_r1", gpu=0, after=["fleet_env", "dl_ds"], timeout=2400,
-    cmd="~/fleet-mi300x/.venv/bin/python examples/dsv2lite/reference_rotated.py --fleet ~/fleet-mi300x --rotate 97 -- "
+    cmd="test -f ~/fleet-mi300x/build_r1/fleet_cache.bin || ~/fleet-mi300x/.venv/bin/python examples/dsv2lite/reference_rotated.py --fleet ~/fleet-mi300x --rotate 97 -- "
         "--model $HOME/models/dsv2-lite-base --out $HOME/fleet-mi300x/build_r1/golden.npz && ls -la ~/fleet-mi300x/build_r1",
     summary=[r"prompt rotated|smallest top-2 margin|wrote .*golden_tokens"])
 

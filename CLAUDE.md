@@ -16,6 +16,8 @@ These rules come from what went wrong in 2026-09 (weeks spent tuning our own til
 
 4. **Check what was already measured.** Before proposing a lever, search `~/code/fleet-mi300x/docs/STATUS.md` and `results/` (the DeepSeek megakernel on the same GPU, sessions 1-9) and this repo's section 15: occupancy, uncached activations, prefetch, split worker groups, last-arriver folds and more were measured there. Missing this cost a plan its main lever on 2026-09-27.
 
+5. **Reuse what is measured.** `docs/DATA.md` lists every measured data set (with checksums), what it answers and what uses it. A GPU run is for a new condition or to validate a prediction, never to regenerate data already there; keep reusable artefacts (fleet reference outputs, goldens) between sessions.
+
 ## 3. Correctness gates
 
 - No performance number without correctness: every imported launch byte-identical to the original (`host --check`), the full model 32/32 tokens equal to HF greedy.
