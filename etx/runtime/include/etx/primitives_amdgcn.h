@@ -14,6 +14,16 @@ static __device__ __forceinline__ uint32_t etx_amdgcn_xcc_id() {
 #endif
 }
 
+// This CU's key within its XCC: HW_ID (hwreg 4) CU_ID [11:8], SH_ID [12], SE_ID [15:13]. Unique per CU on MI300X
+// (bench/overlap/overlap_bench.hip placement "same": 304 CUs, one pair each). Used by ETX_SLOT_BY_CU.
+static __device__ __forceinline__ uint32_t etx_amdgcn_cu_key() {
+#if defined(__gfx940__) || defined(__gfx941__) || defined(__gfx942__) || defined(__gfx950__)
+  return (__builtin_amdgcn_s_getreg((31 << 11) | (0 << 6) | 4) >> 8) & 0xFF;
+#else
+  return 0u;
+#endif
+}
+
 // Counter poll through L2: drop the per-CU L1 (buffer_inv sc0), then a plain
 // load. Measured on MI300X 2026-09-22 (bench/calib/atomic_pingpong): observes
 // agent-scope RMWs from any XCD, one-way 642 ns same-XCD / 742 ns cross-XCD vs

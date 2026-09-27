@@ -46,7 +46,7 @@ def spec(context: int = 1024, workers_per_xcd: int = W) -> dict[str, float]:
     tasks = dict(TASKS)
     for k in ("qkv", "oproj", "router", "gate_up", "down", "dense_gu", "dense_dn", "lm_head"):
         tasks[k] = XCDS * workers_per_xcd
-    return {rf"^{k}(_-?\d+)?$": v / tasks[k] for k, v in per_layer(context).items()}
+    return {rf"^(r\d+_)?{k}(_-?\d+)?$": v / tasks[k] for k, v in per_layer(context).items()}   # r<i>_: the interleaved graph
 
 
 def main() -> None:

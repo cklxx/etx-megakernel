@@ -17,6 +17,8 @@
 
 #define ETX_CHECK(x) do { hipError_t _e = (x); if (_e != hipSuccess) { fprintf(stderr, "HIP error %s at %s:%d: %s\n", #x, __FILE__, __LINE__, hipGetErrorString(_e)); exit(1); } } while (0)
 
+#define ETX_SLOT_WORDS (ETX_N_DOMAINS * (2 + 2 * 256))
+
 struct etx_host {
   int device = 0;
   const void* kernel = nullptr;            // etx_megakernel_d<device>, set by the example host
@@ -109,7 +111,8 @@ struct etx_host {
     p.global_queue = etx_queue{d_gq_slots, gcap, gq_ht, gq_ht + 1};
     ETX_CHECK(hipExtMallocWithFlags((void**)&d_ctrl, 64, hipDeviceMallocFinegrained));
     p.ctrl_abort = d_ctrl; p.ctrl_done = d_ctrl + 1;
-    ETX_CHECK(hipMalloc(&d_slots, ETX_N_DOMAINS * sizeof(int32_t)));
+    // domain slots, then (ETX_SLOT_BY_CU) per-domain CU count, per-(domain, CU key) arrival count and CU key -> dense index
+    ETX_CHECK(hipMalloc(&d_slots, ETX_SLOT_WORDS * sizeof(int32_t)));
     p.domain_slots = d_slots;
     p.worker_domain = nullptr;
     ETX_CHECK(hipMalloc(&d_trace, ETX_N_TASKS * sizeof(int32_t)));
@@ -155,7 +158,8 @@ struct etx_host {
     ETX_CHECK(hipSetDevice(device));
     if (owns_events) ETX_CHECK(hipMemcpy(d_events, etx_ev_counts, ETX_EVENT_WORDS * sizeof(int32_t), hipMemcpyHostToDevice));
     ETX_CHECK(hipMemset(d_ctrl, 0, 64));
-    ETX_CHECK(hipMemset(d_slots, 0, ETX_N_DOMAINS * sizeof(int32_t)));
+    ETX_CHECK(hipMemset(d_slots, 0, (ETX_N_DOMAINS * 2 + ETX_N_DOMAINS * 256) * sizeof(int32_t)));
+    ETX_CHECK(hipMemset(d_slots + ETX_N_DOMAINS * 2 + ETX_N_DOMAINS * 256, 0xFF, ETX_N_DOMAINS * 256 * sizeof(int32_t)));
     ETX_CHECK(hipMemset(d_trace, 0, ETX_N_TASKS * sizeof(int32_t)));
     ETX_CHECK(hipMemcpy(d_remaining, etx_task_remaining, ETX_N_TASKS * sizeof(int32_t), hipMemcpyHostToDevice));
     ETX_CHECK(hipMemset(d_ev_sub, 0, (size_t)ETX_N_DOMAINS * ETX_EVENT_WORDS * sizeof(int32_t)));

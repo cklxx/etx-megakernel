@@ -59,16 +59,27 @@ static __device__ __forceinline__ void pro_end(const FleetParams* fp, const flee
 #ifndef FLEET_CONST_PARAMS
 #define FLEET_CONST_PARAMS 1
 #endif
+// ETX_DS_REQUESTS (graph ETX_DSV2_REQUESTS): requests decoded together, one FleetParams each; a task's request is its
+// grid's second constant (graph.py consts=(L, r)), 0 in the single-request graph
+#ifndef ETX_DS_REQUESTS
+#define ETX_DS_REQUESTS 1
+#endif
+#define REQ(c) ((c)->cst[1])
 #if FLEET_CONST_PARAMS
-__constant__ FleetParams etx_fleet_const;
-#define FP(c) (&etx_fleet_const)
-extern "C" void fleet_set_params(const void* host_fp, hipStream_t s) {
-  (void)hipMemcpyToSymbolAsync(HIP_SYMBOL(etx_fleet_const), host_fp, sizeof(FleetParams), 0, hipMemcpyHostToDevice, s);
+__constant__ FleetParams etx_fleet_const[ETX_DS_REQUESTS];
+#if ETX_DS_REQUESTS == 1
+#define FP(c) (&etx_fleet_const[0])              // the single-request build compiles exactly as before (286 registers)
+#else
+#define FP(c) (&etx_fleet_const[REQ(c)])
+#endif
+extern "C" void fleet_set_params(const void* host_fp, hipStream_t s, int r) {
+  (void)hipMemcpyToSymbolAsync(HIP_SYMBOL(etx_fleet_const), host_fp, sizeof(FleetParams), (size_t)r * sizeof(FleetParams),
+                               hipMemcpyHostToDevice, s);
   (void)hipStreamSynchronize(s);
 }
 #else
 #define FP(c) ((const FleetParams*)(c)->args[0])
-extern "C" void fleet_set_params(const void*, hipStream_t) {}
+extern "C" void fleet_set_params(const void*, hipStream_t, int) {}
 #endif
 // the layer index is a per-grid constant (graph.py consts=(L,)): an immediate in ctx.cst, not a load
 #define LAYER(c) ((c)->cst[0])

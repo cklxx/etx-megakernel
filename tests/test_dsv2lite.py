@@ -34,3 +34,25 @@ def test_simulator_prediction_is_in_fleets_range():
     per_layer = r.makespan_us / 3
     # fleet measures 133 us per MoE layer (3.6 ms / 27); the model should be the same order
     assert 80 < per_layer < 300, per_layer
+
+
+def test_two_request_interleave_graph(monkeypatch):
+    """Two requests: two workgroups per CU (76 workers per XCD without the relay), every task on its request's half of
+    the slots (r * 38 + w), and each coupling mode simulates without deadlock."""
+    from etx.codegen import emit_kernel
+    from etx.passes import PassOptions
+    for couple in ("router", "experts", "none"):
+        monkeypatch.setenv("ETX_DSV2_COUPLE", couple)
+        plan = compile_graph(dsv.build(layers=3, requests=2), "gfx942", {}, {}, PassOptions(relay="off"))
+        assert plan.wg_per_cu == 2 and plan.workers_per_domain == 76
+        for t in plan.tasks:
+            r = 1 if t.grid.startswith("r1_") else 0
+            assert r * 38 <= t.worker - t.domain * 76 < r * 38 + 38, (t.grid, t.worker)
+        res = simulate(plan, seed=0)
+        assert not res.deadlock, (couple, res.blocked[:3])
+    src = emit_kernel(plan, 0)
+    assert "#ifdef ETX_SLOT_BY_CU" in src and "etx_amdgcn_cu_key()" in src and "k < 2" in src
+    # the cross-request edge of the default coupling: r1's layer 1 waits on r0's router of layer 1
+    monkeypatch.setenv("ETX_DSV2_COUPLE", "router")
+    g = dsv.build(layers=3, requests=2)
+    assert "r0_E_norm_1" in g.grid("r1_qkv_1").in_edges and "r1_E_norm_0" in g.grid("r0_qkv_1").in_edges
