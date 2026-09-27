@@ -40,6 +40,11 @@ def emit_lowering_header(m: MachineModel) -> str:
         out.append(f"#define ETX_ACQUIRE_{name}() do {{ {acq} }} while (0)")
         out.append(f"#define ETX_POLL_{name}(ptr) ({v.poll.format(ptr='(ptr)')})")
         out.append(f"#define ETX_ARRIVE_{name}(ptr) ({v.arrive.format(ptr='(ptr)')})")
+        if v.acquire_relaxed is not None:
+            out.append(f"#ifdef ETX_ACQUIRE_{name}_RELAXED   // opt-in, correct only under the condition in the machine yaml")
+            out.append(f"#undef ETX_ACQUIRE_{name}")
+            out.append(f"#define ETX_ACQUIRE_{name}() do {{ {' '.join(v.acquire_relaxed) or '/* none */;'} }} while (0)")
+            out.append("#endif")
         out.append("")
     # ETX_COHERENT_DEVICE_DATA: the host allocated every tensor a DEVICE event protects in memory that bypasses the
     # per-domain caches (MTYPE UC on gfx942), so a DEVICE hand-off needs only the DOMAIN fences: drain the stores,

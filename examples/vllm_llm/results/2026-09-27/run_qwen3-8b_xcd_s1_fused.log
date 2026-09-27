@@ -1,0 +1,6 @@
+etx: 47582 tasks, 1127 event words, 304 workers (8 domains x 38), 470 grid instances, 176064 B of argument blocks
+run 0: 32/32 generated tokens match HF greedy
+run 1: 32/32 generated tokens match HF greedy
+per-token latency on device (prologue -> argmax): median 7.645 ms  min 7.636  max 7.666; host wall per step median 7.877 ms
+mode: ETX megakernel (vLLM kernels imported)
+RESULT model=/home/hotaisle/llm/qwen3-8b matched=32 gen=32 median_ms=7.645 wall_ms=7.877

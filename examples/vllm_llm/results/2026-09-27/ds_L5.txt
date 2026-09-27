@@ -1,0 +1,55 @@
+window 661.0 .. 791.0 us (span 130.0 us), 2024 tasks, 8 XCDs x 37 workers
+
+per type (us, relative to the window start)
+  type                      tasks    wait    body  1st ready  last ready  last done       MB
+  qkv_5                       296    2.32   21.22        0.0         2.7       22.2    14.94
+  attn_5                      256    1.57   13.13       22.9        26.3       38.9     1.18
+  qabs_5                       32    1.60    2.95       23.0        25.8       28.7     2.10
+  merge_5                     256    2.84    8.44       39.0        42.6       51.1     2.10
+  oproj_5                     296    2.94    6.14       51.8        54.8       60.7     8.39
+  router_5                    296    2.22   10.70       62.6        65.4       74.3     0.26
+  gate_up_5                   296    1.15   31.62       75.2        77.4      109.7    92.27
+  down_5                      296    1.99   16.12      109.5       113.8      130.0    46.14
+
+per XCD: share of worker time in bodies / waiting for events / idle (no task taken)
+  XCD 0   37 workers  body  81.3%  wait   8.0%  idle  10.7%      20.9 MB
+  XCD 1   37 workers  body  82.1%  wait   8.1%  idle   9.8%      20.9 MB
+  XCD 2   37 workers  body  81.0%  wait   8.4%  idle  10.5%      20.9 MB
+  XCD 3   37 workers  body  80.7%  wait   9.5%  idle   9.8%      20.9 MB
+  XCD 4   37 workers  body  79.5%  wait  11.6%  idle   8.9%      20.9 MB
+  XCD 5   37 workers  body  78.9%  wait  12.8%  idle   8.2%      20.9 MB
+  XCD 6   37 workers  body  81.2%  wait   8.1%  idle  10.7%      20.9 MB
+  XCD 7   37 workers  body  80.2%  wait   9.9%  idle   9.9%      20.9 MB
+
+XCD finish skew per type (last XCD done - first XCD done)
+  qkv_5                      0.93 us  (first XCD 5, last XCD 0, 8 XCDs)
+  attn_5                     2.55 us  (first XCD 6, last XCD 4, 8 XCDs)
+  qabs_5                     2.51 us  (first XCD 6, last XCD 4, 8 XCDs)
+  merge_5                    2.20 us  (first XCD 5, last XCD 6, 8 XCDs)
+  oproj_5                    1.59 us  (first XCD 0, last XCD 6, 8 XCDs)
+  router_5                   1.42 us  (first XCD 4, last XCD 0, 8 XCDs)
+  gate_up_5                  2.10 us  (first XCD 4, last XCD 0, 8 XCDs)
+  down_5                     3.46 us  (first XCD 2, last XCD 5, 8 XCDs)
+
+critical path: 7 tasks, 109.2 us in bodies + 20.8 us in gaps = 130.0 us (span 130.0)
+  type                      tasks     body  dep gap  queue gap
+  qkv_5                         1    21.04     0.36       0.00
+  attn_5                        1    11.60     3.28       0.00
+  merge_5                       1    11.52     3.28       0.00
+  oproj_5                       1     5.84     3.76       0.00
+  router_5                      1    10.92     2.20       0.00
+  gate_up_5                     1    32.04     2.16       0.00
+  down_5                        1    16.24     5.72       0.00
+
+memory: 167.4 MB in the window, floor 38.9 us at 4.3 TB/s (30% of the span); mean demand 30% of the bandwidth
+  below 25% of the bandwidth for 74.0 us (57% of the span); running then (by task kind, all layers):
+    qkv                         22.5 us  (30.4%)
+    attn                        16.5 us  (22.3%)
+    merge                       12.5 us  (16.9%)
+    router                      12.0 us  (16.2%)
+    oproj                        3.5 us  ( 4.7%)
+    down                         3.0 us  ( 4.1%)
+    (no task)                    2.0 us  ( 2.7%)
+    gate_up                      2.0 us  ( 2.7%)
+
+wrote /home/hotaisle/vlnext/ds_L5.html

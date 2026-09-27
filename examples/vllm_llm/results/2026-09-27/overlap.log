@@ -1,0 +1,20 @@
+device gfx942:sramecc+:xnack-, 304 CUs; wall_clock64 at 100 MHz
+RESULT stream   10.0 MB  cold 1.59 TB/s  warm 1.16 TB/s  mall 1.17 TB/s  (median of 5; mall pass: 0 of 304 neighbours share an XCD)
+RESULT stream   17.3 MB  cold 2.32 TB/s  warm 2.11 TB/s  mall 1.72 TB/s  (median of 5; mall pass: 0 of 304 neighbours share an XCD)
+RESULT stream   34.6 MB  cold 3.03 TB/s  warm 3.78 TB/s  mall 2.45 TB/s  (median of 5; mall pass: 0 of 304 neighbours share an XCD)
+RESULT stream   64.0 MB  cold 3.30 TB/s  warm 3.27 TB/s  mall 3.20 TB/s  (median of 5; mall pass: 0 of 304 neighbours share an XCD)
+RESULT stream  104.0 MB  cold 3.43 TB/s  warm 3.66 TB/s  mall 3.74 TB/s  (median of 5; mall pass: 0 of 304 neighbours share an XCD)
+RESULT stream  128.0 MB  cold 3.81 TB/s  warm 3.77 TB/s  mall 3.80 TB/s  (median of 5; mall pass: 0 of 304 neighbours share an XCD)
+RESULT stream  192.0 MB  cold 3.61 TB/s  warm 4.23 TB/s  mall 4.23 TB/s  (median of 5; mall pass: 0 of 304 neighbours share an XCD)
+RESULT fold place=solo                 bg depth 0: fold median   1.12 us  p90   1.16 us  |   8 fg    0 bg workgroups, bg 0.00 TB/s
+RESULT fold place=same                 bg depth 0: fold median   3.24 us  p90   3.52 us  | 304 fg    0 bg workgroups, bg 0.00 TB/s
+RESULT fold place=same                 bg depth 1: fold median   3.32 us  p90   3.56 us  | 304 fg  304 bg workgroups, bg 0.67 TB/s
+RESULT fold place=same                 bg depth 2: fold median   3.36 us  p90   3.60 us  | 304 fg  304 bg workgroups, bg 1.23 TB/s
+RESULT fold place=same                 bg depth 4: fold median   3.32 us  p90   3.68 us  | 304 fg  304 bg workgroups, bg 1.71 TB/s
+RESULT fold place=same                 bg depth 8: fold median   3.24 us  p90   3.92 us  | 304 fg  304 bg workgroups, bg 3.34 TB/s
+RESULT fold place=split fg 8 CUs/XCD   bg depth 0: fold median   1.52 us  p90   1.52 us  |  64 fg    0 bg workgroups, bg 0.00 TB/s
+RESULT fold place=split fg 8 CUs/XCD   bg depth 8: fold median   3.08 us  p90   3.52 us  |  64 fg  240 bg workgroups, bg 4.31 TB/s
+RESULT fold place=split fg 19 CUs/XCD  bg depth 0: fold median   1.88 us  p90   2.04 us  | 152 fg    0 bg workgroups, bg 0.00 TB/s
+RESULT fold place=split fg 19 CUs/XCD  bg depth 8: fold median   2.20 us  p90   2.44 us  | 152 fg  152 bg workgroups, bg 3.63 TB/s
+RESULT fold place=split fg 30 CUs/XCD  bg depth 0: fold median   2.68 us  p90   2.84 us  | 240 fg    0 bg workgroups, bg 0.00 TB/s
+RESULT fold place=split fg 30 CUs/XCD  bg depth 8: fold median   2.76 us  p90   2.96 us  | 240 fg   64 bg workgroups, bg 1.42 TB/s

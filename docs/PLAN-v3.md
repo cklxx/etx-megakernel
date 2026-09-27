@@ -14,6 +14,8 @@
 - **之后：** 在 MoE 模型上重复同样的比较，这是融合收益最大的场景；再扩展到小 batch 和多 GPU。
 - **资源：** 单卡 MI300X 约 15 小时加 8 卡节点约 8 小时，前提是 GPU 随时可用，大约一周做完。当前余额 $1.78。
 
+**2026-09-27 上机后的更新（详见第 8 节）：** dense 模型 batch 1 的融合作为负面结论收尾：vLLM 的 kernel 之间几乎没有空隙，而最便宜的正确全卡屏障（5.5 µs）仍是 kernel 边界（1.6 µs）的 3.4 倍。主线转到 MoE 的多请求：同一 CU 上的后台读取几乎不拖慢前台（1.00–1.04 倍），两个请求交错估计比 vLLM batch 2 的吞吐高约 30%。
+
 ## 1. 目标与验收标准
 
 | 层级 | 标准 |
@@ -149,3 +151,24 @@ vLLM 在这个模型上只用到 26% 的带宽，是融合收益最大的地方�
 - 调度检测：`python -m etx.tools.timeline`（每个 XCD 的忙闲、关键路径、显存需求曲线、HTML 时间线；也能分析模拟出的排布）。
 - 调研：`docs/RESEARCH-sync-hardware.md`（同步的硬件手段）、`docs/RESEARCH-moe-import.md`（MoE 导入路线）。
 - 设计文档：`docs/ETX_Technical_Design.md` 15.8–15.10 节（导入方法与实测）。
+
+## 8. 2026-09-27 上机结果与下一步
+
+双卡 MI300X VM，约 50 分钟，花费 $5.98（1 小时最低收费），余额 $45.75。所有模型运行 32/32 token 正确；DeepSeek 另有 27/27 层通过。数据在 `examples/vllm_llm/results/2026-09-27/`，设计文档 15.11 节。
+
+| 问题 | 实测 | 结论 |
+|---|---|---|
+| ETX 同步能否比 kernel 边界便宜 | kernel 边界 1.6 µs；全卡屏障 7.8 µs；uncached + 正确 acquire 5.5 µs | 不能。dense batch 1 融合收尾 |
+| vLLM kernel 之间有多少空隙 | 8B：kernel 忙碌 5.08 ms，实测 5.04 ms/token | 几乎为零，只剩小 kernel 自身约 4 µs 的固定开销 |
+| 融合各变体（ms/token） | 1.5B 最好 2.248（逐个 launch 2.073，vLLM 1.937）；8B 最好 5.864（5.677，5.039） | 仍慢 3–8%，比 vLLM 慢 16% |
+| 同 CU 后台读取拖慢前台多少 | 1.00–1.04 倍 | 交错划算 |
+| Infinity Cache 比显存快吗 | 不快 | 不做预取 |
+| DeepSeek：fleet / ETX / vLLM | 3.56 / 3.74–3.79 / 4.195 ms；vLLM batch 2、4 为 376、688 tok/s | ETX 慢 fleet 5%，原因未完全定位 |
+
+**发现并修复的正确性问题：** `buffer_inv sc0` 不作废 L1。ETX 的 XCD 内事件和 fleet 都用了它，靠 L1 被权重冲掉才没出错。ETX 默认改为 `buffer_inv sc1`（8B 无代价，DeepSeek 慢 7%），旧写法保留为 `-DETX_ACQUIRE_DOMAIN_RELAXED`。
+
+**下一步（按事先定好的门槛）：**
+1. DeepSeek 两个请求交错：前提是 megakernel 每条 lane 不超过 256 个寄存器（现在 286，来自 fleet GEMV 的双缓冲）。先在本地把 GEMV 调到 256 以内并确认零溢出，再做 host 端两路请求。估计吞吐约 490 tok/s，对照 vLLM batch 2 的 376。
+2. 同时评估"两个 token 合读一次权重"（估计约 440 tok/s，不需要改寄存器），两者取其一。
+3. 找出 ETX 比 fleet 慢的 0.18 ms：用两份全 token trace 逐层对比。
+4. MoE 导入：Triton `fused_moe_kernel` 的 IR 已采集（`results_2026-09-27/vlnext/moe/triton`）。

@@ -30,6 +30,11 @@ visibility:
     # consumer re-reading lines it read before sees its stale L1 copy (64 B and 8 KB payloads stale in almost every
     # round, same XCD or uncached memory); with sc1 0 stale, and the same-XCD one-way hand-off is 0.96 us.
     acquire: ['asm volatile("buffer_inv sc1" ::: "memory");']
+    # -DETX_ACQUIRE_DOMAIN_RELAXED: the old sc0 acquire. Correct only if no consumer re-reads a protected line that is
+    # still in its L1 (true when a task streams MBs through L1 between reuses, as fleet's tiles do: 32/32 tokens and
+    # 27/27 layers every run), but not guaranteed. Measured 2026-09-27 on DeepSeek-V2-Lite (48 domain events/layer):
+    # 3.78 ms/token relaxed vs 4.04 with sc1; Qwen3-8B 6.14 vs 6.15.
+    acquire_relaxed: ['asm volatile("buffer_inv sc0" ::: "memory");']
     poll: '__hip_atomic_load({ptr}, __ATOMIC_RELAXED, __HIP_MEMORY_SCOPE_AGENT)'
     arrive: '__hip_atomic_fetch_sub({ptr}, 1, __ATOMIC_RELAXED, __HIP_MEMORY_SCOPE_AGENT)'
     memory: any

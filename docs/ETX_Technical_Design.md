@@ -882,6 +882,39 @@ Every imported launch of the first two layers was run against vLLM's original ke
 
 With the kernels vLLM uses, fusion as built today loses: the megakernel is 16% (1.5B) and 7% (8B) slower than the same code launched kernel by kernel, because each token crosses 310-472 device-wide barriers and an ETX barrier costs more than a kernel boundary. Pinning the small launches to one XCD recovers little (2.58). ETX's own unfused path is also 0.3-0.7 ms behind vLLM with the same kernels; candidates are the ETX prologue/argmax tiles and the workgroup shape of the small kernels (several blocks per 1024-thread workgroup instead of separate workgroups), not yet separated because the vLLM kernel trace failed in this session. The import itself is sound; what remains is making the barrier cheaper than a kernel boundary (XCD-local replication of the one-block launches, fewer device-wide handoffs) and finding the unfused gap.
 
+### 15.11 Synchronisation, overlap and DeepSeek schedule measurements (2026-09-27, 2x MI300X VM, GPU 0 unless noted)
+
+Logs: `examples/vllm_llm/results/2026-09-27/` (`gpu1_*` files ran on the second GPU at the same time). Every model run below decodes 32/32 tokens equal to HF greedy; DeepSeek runs also pass 27/27 layer boundaries.
+
+**Synchronisation (`bench/sync/sync_bench.hip`).**
+
+| | measured |
+|---|---|
+| kernel boundary inside a HIP graph (1 or 304 workgroups) | 1.57-1.63 us |
+| ETX device-scope whole-GPU barrier, 304 workgroups, idle / with 64 KB dirty + 128 KB clean per workgroup | 7.62-7.79 / 21.3-21.5 us |
+| same barrier, uncached payload, acquire `buffer_inv sc1` (`uc1`) | 5.47 / 18.3 us, 0 stale |
+| same, acquire `buffer_inv sc0` (`uc`) | 2.8 / 15.9 us, stale |
+| same-XCD hand-off with `buffer_inv sc1` (`xcd1`), 64 B / 8 KB | 0.96 / 1.34 us one-way, 0 stale |
+| GWS barrier | hung (not available on this queue) |
+
+`buffer_inv sc0` does not invalidate the vector L1 here: a consumer re-reading lines it read before gets its own stale copy (64 B and 8 KB payloads stale in nearly every round, same XCD or uncached memory; 64 KB clean because it overflows L1). ETX's DOMAIN acquire and fleet's XCD-local acquire both used it; outputs stayed exact because tile bodies stream megabytes through L1 between reuses. The DOMAIN acquire is now `buffer_inv sc1` (cost: Qwen3-8B 6.14 vs 6.15 ms, none; DeepSeek-V2-Lite 3.78 vs 4.04 ms, 7%); `-DETX_ACQUIRE_DOMAIN_RELAXED` restores sc0 under the stated eviction condition. Even the cheapest correct whole-GPU barrier (5.5 us) costs 3.4 kernel boundaries.
+
+**vLLM kernels fused (Qwen, ms/token).**
+
+| | Qwen2.5-1.5B | Qwen3-8B |
+|---|---|---|
+| vLLM default / `custom_ops=all` (2026-09-26) | 1.862 / 1.937 | 4.906 / 5.039 |
+| ETX unfused, base / small launches one block per slot | 2.190 / 2.073 | 5.677 / 7.415 |
+| ETX megakernel base / chain / xcd / xcd + one block per slot | 2.568 / 2.564 / 2.410 / 2.248 | 6.088 / 6.013 / 5.864 / 7.645 |
+
+The best megakernel is still 8% (1.5B) and 3% (8B) slower than the same code unfused and 16% slower than vLLM. vLLM's kernel trace (rocprofv3; the trace inflates the span, not the kernel times) gives busy kernel time per token of 2.02 ms (1.5B) and 5.08 ms (8B) against 1.94 / 5.04 ms measured without the tracer: vLLM leaves essentially no idle time between kernels at batch 1, so fusion can only recover the fixed cost inside the ~4 us small kernels (about 1.4 ms of the 8B token, next to 3.67 ms of wvSplitK GEMV at the bandwidth floor). With a whole-GPU barrier five times a kernel boundary that is not reachable; dense batch-1 fusion of vLLM's kernels is closed as a negative result. (`custom_ops=all` still runs Inductor's fused_add_rms_norm.)
+
+**Overlap (`bench/overlap/overlap_bench.hip`).** A 64 KB fold read by 8 workgroups takes 1.12 us; by all 304 at once 3.24 us (self-contention: this, not background traffic, is most of fleet's 5 us prologues). A second workgroup per CU streaming HBM at up to 3.34 TB/s leaves the fold at 3.24-3.36 us (x1.00-1.04). Streaming on the other CUs of an XCD instead doubles a small fold group (1.52 -> 3.08 us at 4.31 TB/s). The Infinity Cache is not faster than HBM for any expert-sized stream (10-192 MB), so prefetching weights into it buys nothing.
+
+**DeepSeek-V2-Lite (fleet's tiles).** Same VM: fleet 3.56 ms, ETX 3.74-3.79 ms (sc0; 4.04 with sc1). ETX layer 5 is 130.0 us vs fleet 127.6 us with the same phase boundaries (hand-offs about 1 us in both); the rest of the 0.18 ms is not yet located. `etx.tools.timeline` on the ETX trace: 57% of the layer below a quarter of the bandwidth (q/kv_a, attention, merge, router), critical path 109 us of bodies + 21 us of dependency gaps (the gaps include XCD skew, so they are not comparable with fleet's phase-to-phase figure). vLLM (AITER on; off is 6.39 ms): batch 1 / 2 / 4 = 4.195 / 5.318 / 5.811 ms per step = 238 / 376 / 688 tokens/s. Qwen3-30B-A3B (AITER off): 4.898 / 5.724 / 7.100 ms = 204 / 349 / 563 tokens/s.
+
+`examples/dsv2lite/whatif.py` with the measured fold slowdown: re-laying out batch 1 (shared experts into the router window) gains at most 5%; two requests interleaved one workgroup per CU give an estimated 1.72-1.78x fleet's throughput (about 490 tokens/s against vLLM's 376 at batch 2) and two tokens per weight read an estimated 1.57x (about 440). Interleaving needs the megakernel at <= 256 registers per lane (today 286; fleet's GEMV path takes 262 from its double-buffered rows x depth).
+
 ### 15.3 Phases of the general architecture (after M3)
 
 | Phase | Deliverable | Completion criterion |

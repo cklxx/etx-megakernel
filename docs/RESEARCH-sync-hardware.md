@@ -42,7 +42,7 @@ AMDGPUUsage: "PCIe access from the GPU to the CPU can be kept coherent by using 
 | `--coherent-acts` (L2-bypassing activations, consumer L2 invalidate dropped, producer writeback kept) in the full decode | correct, 1.5-2% faster before the prologue loads were vectorised, within noise after |
 | (e) cross-XCD event round trip while 302 workgroups stream HBM | 6.16 us (1.40 idle): under load the cost is memory contention, not the fence |
 
-(d'') did not invalidate the consumer's L1, so it does not refute the protocol above (`bench/sync/sync_bench.hip` mode `uc` does invalidate L1 and counts stale words). But (a), `--coherent-acts` and (e) say the same thing: in a loaded persistent kernel the fences are a small part of an event's cost. Expect little from 2.1; the gate in `vm_next.sh` measures it before anything depends on it.
+**Measured 2026-09-27:** `buffer_inv sc0` does not invalidate the vector L1 (outside threadgroup-split mode), so the protocol above read stale data too (`sync_bench` mode `uc`); with `buffer_inv sc1` (`uc1`) it is clean and the whole-GPU barrier costs 5.47 us against 7.62 us cached, still 3.4 kernel boundaries (1.6 us). Design doc 15.11. (d'') did not invalidate the consumer's L1 either, so it does not refute the protocol above (`bench/sync/sync_bench.hip` mode `uc` does invalidate L1 and counts stale words). But (a), `--coherent-acts` and (e) say the same thing: in a loaded persistent kernel the fences are a small part of an event's cost. Expect little from 2.1; the gate in `vm_next.sh` measures it before anything depends on it.
 
 ### 2.2 Stay inside one XCD (built, not measured)
 

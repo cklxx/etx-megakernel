@@ -1,0 +1,8 @@
+device gfx942:sramecc+:xnack-, 304 CUs, clock tick 100 MHz for wall_clock64
+workgroup 0 on XCD 6; cross partner 1 (XCD 7), same partner 8
+RESULT barrier  mode=dev   relay=0 L2 load   0 KB dirty +   0 KB clean per WG: 7.79 us per barrier  stale 0
+RESULT barrier  mode=dev   relay=0 L2 load  64 KB dirty + 128 KB clean per WG: 21.47 us per barrier  stale 0
+RESULT barrier  mode=uc    relay=0 L2 load   0 KB dirty +   0 KB clean per WG: 2.81 us per barrier  stale 2427136
+RESULT barrier  mode=uc    relay=0 L2 load  64 KB dirty + 128 KB clean per WG: 15.88 us per barrier  stale 0
+RESULT barrier  mode=uc    relay=1 L2 load   0 KB dirty +   0 KB clean per WG: 2.91 us per barrier  stale 2427072
+RESULT barrier  mode=uc    relay=1 L2 load  64 KB dirty + 128 KB clean per WG: 16.13 us per barrier  stale 0

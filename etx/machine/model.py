@@ -34,6 +34,9 @@ class Visibility:
     poll: str                   # C expression template reading a counter: uses {ptr}
     arrive: str                 # C expression template atomically decrementing: uses {ptr}
     memory: str                 # any | uncached | fine_grained
+    # a cheaper acquire that is correct only under a stated condition (the yaml says which); used when the build
+    # defines ETX_ACQUIRE_<SCOPE>_RELAXED, never by default
+    acquire_relaxed: list[str] | None = None
 
 
 @dataclass
@@ -135,7 +138,8 @@ def _load_visibility(raw: dict[str, Any]) -> dict[Scope, Visibility]:
     for k, v in raw.items():
         out[Scope[k.upper()]] = Visibility(
             release=list(v.get("release", [])), acquire=list(v.get("acquire", [])),
-            poll=v["poll"], arrive=v["arrive"], memory=v.get("memory", "any"))
+            poll=v["poll"], arrive=v["arrive"], memory=v.get("memory", "any"),
+            acquire_relaxed=list(v["acquire_relaxed"]) if "acquire_relaxed" in v else None)
     return out
 
 

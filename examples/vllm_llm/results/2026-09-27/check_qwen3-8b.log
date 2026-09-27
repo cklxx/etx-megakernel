@@ -1,0 +1,41 @@
+etx: 44875 tasks, 472 event words, 304 workers (8 domains x 38), 470 grid instances, 43392 B of argument blocks
+  in_norm    L0   rms_norm_2d          identical  original  828.0 us  imported   14.2 us
+  qkv        L0   wvsplitk_y2          identical  original   35.5 us  imported   15.6 us
+  q_norm     L0   rms_norm_3d          identical  original    6.9 us  imported   10.1 us
+  k_norm     L0   rms_norm_3d          identical  original    6.8 us  imported    9.1 us
+  rope       L0   rope_neox            identical  original   24.7 us  imported    9.2 us
+  cache      L0   reshape_and_cache    identical  original   27.4 us  imported   10.6 us
+  attn       L0   attn_mfma4_g4        identical  original   27.3 us  imported   10.2 us
+  reduce     L0   attn_reduce          identical  original    6.9 us  imported   10.5 us
+  o_proj     L0   wvsplitk_y2          identical  original   12.0 us  imported   11.1 us
+  post_norm  L0   fused_add_rms_norm   identical  original    6.7 us  imported    8.1 us
+  gate_up    L0   wvsplitk_y2          identical  original   46.0 us  imported   46.5 us
+  act        L0   silu_and_mul         identical  original   30.2 us  imported   10.7 us
+  down       L0   wvsplitk_y2          identical  original   26.1 us  imported   26.0 us
+  in_norm    L1   fused_add_rms_norm   identical  original    6.7 us  imported   11.3 us
+  qkv        L1   wvsplitk_y2          identical  original   15.8 us  imported   15.6 us
+  q_norm     L1   rms_norm_3d          identical  original    6.9 us  imported    9.7 us
+  k_norm     L1   rms_norm_3d          identical  original    6.8 us  imported   13.1 us
+  rope       L1   rope_neox            identical  original    6.7 us  imported    9.0 us
+  cache      L1   reshape_and_cache    identical  original    6.8 us  imported   10.7 us
+  attn       L1   attn_mfma4_g4        identical  original    6.9 us  imported   10.1 us
+  reduce     L1   attn_reduce          identical  original    6.9 us  imported   10.8 us
+  o_proj     L1   wvsplitk_y2          identical  original   11.9 us  imported   10.8 us
+  post_norm  L1   fused_add_rms_norm   identical  original    6.6 us  imported    8.5 us
+  gate_up    L1   wvsplitk_y2          identical  original   47.2 us  imported   46.4 us
+  act        L1   silu_and_mul         identical  original    6.9 us  imported   15.0 us
+  down       L1   wvsplitk_y2          identical  original   26.1 us  imported   25.9 us
+  prologue (ETX)       imported    8.9 us  (1 task(s))
+  argmax (ETX)         imported   14.4 us  (1 task(s))
+kernel time, summed over the checked launches (GPU events, one launch each):
+  attn_mfma4_g4        original     34.2 us  imported     20.3 us  (-41%)
+  attn_reduce          original     13.8 us  imported     21.4 us  (+55%)
+  fused_add_rms_norm   original     20.0 us  imported     27.9 us  (+40%)
+  reshape_and_cache    original     34.2 us  imported     21.3 us  (-38%)
+  rms_norm_2d          original    828.0 us  imported     14.2 us  (-98%)
+  rms_norm_3d          original     27.3 us  imported     42.1 us  (+54%)
+  rope_neox            original     31.4 us  imported     18.2 us  (-42%)
+  silu_and_mul         original     37.1 us  imported     25.6 us  (-31%)
+  wvsplitk_y2          original    220.6 us  imported    197.9 us  (-10%)
+  total                original   1246.5 us  imported    388.9 us
+CHECK OK: 0 launch(es) differ

@@ -1,0 +1,4 @@
+device gfx942:sramecc+:xnack-, 304 CUs, clock tick 100 MHz for wall_clock64
+workgroup 0 on XCD 6; cross partner 1 (XCD 7), same partner 8
+RESULT boundary 400 kernels of 1 x 1024 threads in one HIP graph: 1.57 us per kernel
+RESULT boundary 400 kernels of 304 x 1024 threads in one HIP graph: 1.63 us per kernel

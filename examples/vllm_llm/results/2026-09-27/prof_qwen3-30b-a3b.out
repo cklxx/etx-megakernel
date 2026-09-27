@@ -1,0 +1,30 @@
+W0927 05:49:30.185767       7 simple_timer.cpp:55] [rocprofv3] output generation ::     0.399075 sec
+W0927 05:49:30.193289       7 simple_timer.cpp:55] [rocprofv3] tool finalization ::     0.406689 sec
+bursts 179; last two: 939 and 27915 kernels
+per decode token: GPU span 254.683 ms, kernels busy 5.313 ms, gaps 249.371 ms (97.9%), 843.0 kernels
+per token, by kernel (us, launches):
+     1328.7 us    96.0  fused_moe_kernel
+      814.8 us    97.0  void wvSplitK_hf_sml_<__hip_bfloat16, 64, 2, 16, 8, 2, 1>(int, int, int, int, int, int, __hip_bfloat16 const*,
+      385.1 us    48.0  void vllm::moe::topkGating<8, 128, 4, 16, 64, int, __hip_bfloat16, (vllm::moe::ScoringFunc)0>(__hip_bfloat16 c
+      362.1 us    48.0  void paged_attention_ll4mi_QKV_mfma16_kernel<__hip_bfloat16, __hip_bfloat16, (vllm::Fp8KVCacheDataType)0, __hi
+      259.5 us    59.0  __amd_rocclr_copyBuffer
+      238.4 us    48.0  void vllm::reshape_and_cache_kernel<__hip_bfloat16, __hip_bfloat16, (vllm::Fp8KVCacheDataType)0>(__hip_bfloat1
+      218.1 us    49.0  void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<int>, std::array<char*, 1ul> >(int, 
+      217.7 us    48.0  _ZN4vllm18act_and_mul_kernelIN3c108BFloat16E15__hip_bfloat162TnPFT_RKS4_fEXadL_ZNS_11silu_kernelIS2_EES4_S6_fE
+      213.2 us    48.0  void vllm::moe::moe_sum_vec_kernel<c10::BFloat16, int, 8, false>(c10::BFloat16*, c10::BFloat16 const*, long, i
+      206.6 us    47.0  triton_red_fused_2
+      206.6 us    47.0  triton_poi_fused_3
+      203.1 us    48.0  triton_red_fused_fused_add_rms_norm_1
+      200.9 us    48.0  triton_red_fused_fused_add_rms_norm_moe_forward_0
+      197.6 us    48.0  void wvSplitK_hf_sml_<__hip_bfloat16, 64, 1, 16, 8, 4, 1>(int, int, int, int, int, int, __hip_bfloat16 const*,
+      196.4 us    48.0  void paged_attention_ll4mi_reduce_kernel<__hip_bfloat16, __hip_bfloat16, 128, 128, 256, 1>(__hip_bfloat16*, fl
+       11.1 us     1.0  void at::native::reduce_kernel<512, 1, at::native::ReduceOp<float, at::native::ArgMaxOps<float>, unsigned int,
+       10.5 us     2.0  void at::native::elementwise_kernel_manual_unroll<128, 4, at::native::gpu_kernel_impl<at::native::direct_copy_
+        6.7 us     1.0  void at::native::index_elementwise_kernel<128, 4, at::native::gpu_index_kernel<at::native::index_kernel_impl<a
+        6.3 us     1.0  void at::native::elementwise_kernel_manual_unroll<128, 4, at::native::gpu_kernel_impl<at::native::direct_copy_
+        6.2 us     1.0  triton_poi_fused_2
+        5.0 us     1.0  triton_red_fused__to_copy_embedding_rms_norm_0
+        4.3 us     1.0  _compute_slot_mapping_kernel
+        4.3 us     1.0  triton_red_fused_1
+        3.8 us     1.0  void at::native::index_elementwise_kernel<128, 4, at::native::gpu_index_kernel<at::native::index_kernel_impl<a
+        3.0 us     1.0  void at::native::vectorized_elementwise_kernel<4, at::native::bfloat16tofloat32_copy_kernel_cuda(at::TensorIte

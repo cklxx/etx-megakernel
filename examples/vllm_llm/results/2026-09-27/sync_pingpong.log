@@ -1,0 +1,14 @@
+device gfx942:sramecc+:xnack-, 304 CUs, clock tick 100 MHz for wall_clock64
+workgroup 0 on XCD 6; cross partner 1 (XCD 7), same partner 8
+RESULT pingpong mode=dev   bytes=64     one-way 1.347 us  stale words 0  (XCDs 5 -> 6)
+RESULT pingpong mode=dev   bytes=8192   one-way 2.090 us  stale words 0  (XCDs 5 -> 6)
+RESULT pingpong mode=dev   bytes=65536  one-way 6.297 us  stale words 0  (XCDs 5 -> 6)
+RESULT pingpong mode=uc    bytes=64     one-way 1.698 us  stale words 63968  (XCDs 5 -> 6)
+RESULT pingpong mode=uc    bytes=8192   one-way 5.052 us  stale words 6141440  (XCDs 5 -> 6)
+RESULT pingpong mode=uc    bytes=65536  one-way 6.131 us  stale words 0  (XCDs 5 -> 6)
+RESULT pingpong mode=light bytes=64     one-way 1.399 us  stale words 64000  (XCDs 5 -> 6)
+RESULT pingpong mode=light bytes=8192   one-way 4.724 us  stale words 8191488  (XCDs 5 -> 6)
+RESULT pingpong mode=light bytes=65536  one-way 7.235 us  stale words 65519792  (XCDs 5 -> 6)
+RESULT pingpong mode=xcd   bytes=64     one-way 1.434 us  stale words 63968  (XCDs 5 -> 5)
+RESULT pingpong mode=xcd   bytes=8192   one-way 4.532 us  stale words 6141440  (XCDs 5 -> 5)
+RESULT pingpong mode=xcd   bytes=65536  one-way 3.725 us  stale words 0  (XCDs 5 -> 5)
