@@ -108,7 +108,7 @@ The hand-off microbenchmark says h should be 1.0 (XCD-local, padded counters) to
 | G1 | dense 1.5B and 8B, fused, stride 32 vs `-DETX_EV_STRIDE=1`, base and xcd builds, alternated | H1: 1.5B xcd_s1 1.95-2.25 ms (was 2.248); 8B xcd 5.35-5.86 (was 5.864); base builds gain 0.3-0.7 ms |
 | G2 | ETX_TRACE of 1.5B xcd_s1 fused, stride 32; per hand-off: last producer end -> first consumer start, spread, body vs vLLM b_k | h, and H2-H4 by signature |
 | G3 | rocprofv3 kernel trace of ETX unfused 1.5B, per kernel against vLLM's trace of the same kernel (have) | p, and P2-P4 by where it sits |
-| G4 | P1 fix (argument block loaded before the wait), fused, stride 32 | P1: gain = N x (0.3-0.8 us) |
+| G4 | P1 fix (argument block loaded before the wait), fused, stride 32 | P1: gain = N x (0.3-0.8 us). **Not in this session**: built only if G3 puts p in the argument round trips (the scalar-cache route is not certain to survive the acquire) |
 
 **Gate:** with h and p from G2-G4, `moe_predict.py` must give the MoE build below 4.65 ms (5% under vLLM). If it does,
 the MoE imports (section 5) are validated and timed in the same session. If not, the session stops after the dense
