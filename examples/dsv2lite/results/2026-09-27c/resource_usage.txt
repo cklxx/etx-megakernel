@@ -1,5 +1,6 @@
-
-
-
-
-
+etx_megakernel_d0, hipcc (ROCm) -Rpass-analysis=kernel-resource-usage, 2026-09-27 third session
+x1:         VGPRs 256; AGPRs 52; scratch 0 B/lane;   occupancy 1 wave/SIMD
+x1cap:      VGPRs 256; AGPRs 4;  scratch 144 B/lane; occupancy 1 wave/SIMD  (gemv_noinline + ETX_MIN_WG_PER_CU=2: did NOT reach 2)
+x2_router:  VGPRs 248; AGPRs 4;  scratch 32 B/lane;  occupancy 2 waves/SIMD
+x2_experts: VGPRs 248; AGPRs 4;  scratch 32 B/lane;  occupancy 2 waves/SIMD
+x2_none:    VGPRs 248; AGPRs 4;  scratch 32 B/lane;  occupancy 2 waves/SIMD
