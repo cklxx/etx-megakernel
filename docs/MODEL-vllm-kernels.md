@@ -149,10 +149,12 @@ With the 12% the simulation is optimistic by, both fixes land at about 4.1-4.6 m
 | device hand-off 1.5-2.1 us vs 1.3 | ~4 us per layer | first read of remote-written data (staging) | trace: split ready -> first load |
 | vLLM attention 7.0 vs 5.7 us | 1.3 us | the model's attention chain (KV loads at 1024 tokens) | from vLLM's trace at shorter contexts (no GPU needed if the traces exist) |
 
-Correctness risk found by the inventory (not performance): imported kernels read the per-step scalars (positions,
-seq_lens, slot_mapping) with scalar loads; ETX's acquires invalidate the vector caches but not the scalar cache, so a
-persistent megakernel could read a previous step's value. Every run so far matched 32/32; the fix is an `s_dcache_inv`
-in the acquire of tasks that read per-step data, to be added before the next session.
+Correctness question raised by the inventory: imported kernels read the per-step scalars (positions, seq_lens,
+slot_mapping) with scalar loads, and ETX's acquires invalidate the vector caches, not the scalar cache. Not a bug in the
+current host: every step is its own megakernel launch (the kernel start invalidates the scalar cache), and within a launch
+every reader waits (transitively) on the prologue that writes them, so a CU's first read of them in a launch comes after
+the write. Evidence: every run decodes 1055 steps with a new position each and matches 32/32; a stale position would
+write the KV cache at the wrong slot. It would become a bug if one launch ran several steps.
 
 ## 8. What each lever is worth (examples/vllm_llm/whatif_sim.py, simulated; ~12% optimistic today)
 
@@ -182,3 +184,35 @@ lands at vLLM's latency (4.1 simulated, ~4.6 with the simulation's bias) and two
 batch 2 with lower latency per request, inside the simulation's error. Even with free arguments and free hand-offs these
 kernels take 2.95 ms at batch 1 (their own dependent round trips and synchronisation; floor 1.44): going further takes
 different kernels or more work per step (more requests, speculative decoding), not scheduling.
+
+## 9. The fixes as built (2026-09-28, local; session examples/sessions/moe_fix.py)
+
+- **Hardware barriers in rounds** (etx/runtime/include/etx/import.h, etx/importer/adapter.py): an imported kernel's
+  __syncthreads is the workgroup's `s_barrier`; around the blocks of one launch every wave runs a round protocol: count
+  itself done after its block (or at once if it has none), then repeat `s_barrier` until all 16 waves are done. Blocks of
+  one kernel reach the same barriers in the same order, so each round is every unfinished wave's next barrier; an early
+  `return` inside a kernel joins the rounds, as a terminated wave leaves the hardware barrier count. `-DETX_IMP_SW_BARRIER`
+  restores the software slot barrier.
+- **Argument path** (import.h `etx_imp_argblock`, codegen `pre_wait` hook): the argument-block pointer is made
+  wave-uniform, so the kernel's parameter reads compile to scalar loads (megakernel: 95 -> 2644 `s_load`, i.e. they had
+  been vector loads through the L1/L2 every acquire invalidates), and wave 0 touches the task's argument block (every part
+  of a chained task) into the scalar cache before it waits for the task's events. `-DETX_IMP_VECTOR_ARGS` and
+  `-DETX_NO_PRE_WAIT` restore the old path and remove the touch.
+- **Two requests** (`ETX_VL_REQUESTS=2`, model.py / host.hip / vl_tiles.hip): every launch twice, alternating in the graph
+  and so in every worker's queue; per-request buffers, KV caches, argument blocks and step parameters; request 1 decodes
+  the 1024-token prompt rotated by 97 tokens (`examples/llm/prep.py --rotate 97 --golden-only`, HF greedy on the VM).
+- ROCm 7.2.4 builds: MoE base 0 spills, xcd 3, xcd two requests 4, xcd one block per slot 0; Qwen2.5-1.5B base 0.
+
+Pre-registered, xcd schedule, ms per token (simulation x 1.135, its bias against today's measurement):
+
+| build | predicted |
+|---|---|
+| old (all three switches) | 6.63 (today; otherwise compare ratios) |
+| hardware barriers only | 6.03 |
+| argument path only, front 0.3 / 1.0 / 1.5 us | 5.05 / 5.67 / 6.10 |
+| both | 4.45 / 5.07 / 5.51 |
+| two requests, both | 347 / 304 / 278 tokens/s (vLLM batch 2: 349) |
+| fused_moe gate_up task body (trace) | 21.9 -> ~15 us |
+
+The trace of the new build measures the front directly; that number decides which column applies. Beating vLLM at batch
+1 (4.90) needs the front at about 0.5 us or less.

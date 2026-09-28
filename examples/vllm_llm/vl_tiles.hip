@@ -2,7 +2,8 @@
 //   vl_prologue  one step's inputs: the token's embedding row (= the layer-0 residual) and the scalars
 //                vLLM's attention metadata carries (positions, seq_lens, slot_mapping), from the step's pos
 //   vl_argmax    greedy sampling over the bf16 logits (first maximum, like torch.argmax on float32 logits)
-// Both take the step from __constant__ VlParams (host.hip updates it before each step).
+// Both take the step from __constant__ VlParams (host.hip updates it before each step); with ETX_VL_REQUESTS > 1 one
+// VlParams per request, the task's cst[0] naming its request.
 #pragma once
 #include <hip/hip_runtime.h>
 #include <hip/hip_bf16.h>
@@ -21,11 +22,14 @@ struct VlParams {
   int32_t* token_out;                  // [steps + 1]
   uint64_t* token_time;                // [2 * (steps + 1)] start / end, 100 MHz ticks
 };
-__constant__ VlParams VP;
+#ifndef ETX_VL_REQUESTS
+#define ETX_VL_REQUESTS 1
+#endif
+__constant__ VlParams VPS[ETX_VL_REQUESTS];
 extern "C" int vl_params_bytes() { return (int)sizeof(VlParams); }
 
 extern "C" __device__ __attribute__((always_inline)) void vl_prologue(const etx_ctx* c) {
-  (void)c;
+  const VlParams& VP = VPS[c->cst[0]];
   const int t = VP.tok;
   if (threadIdx.x == 0) {
     VP.token_time[2 * t] = wall_clock64();
@@ -39,6 +43,7 @@ extern "C" __device__ __attribute__((always_inline)) void vl_prologue(const etx_
 }
 
 extern "C" __device__ __attribute__((always_inline)) void vl_argmax(const etx_ctx* c) {
+  const VlParams& VP = VPS[c->cst[0]];
   float* sv = (float*)c->lds; int* si = (int*)(sv + blockDim.x);
   float bv = -INFINITY; int bi = 0x7fffffff;
   // 16-byte loads (8 logits), four in flight per thread: ~19 loads per thread for V = 151936 instead of ~150
@@ -84,6 +89,7 @@ extern "C" __device__ __attribute__((always_inline)) void vl_argmax(const etx_ct
 }
 
 // host side (compiled in the megakernel's translation unit, called from host.hip)
-void vl_set_params(const VlParams* p, hipStream_t s) {
-  if (hipMemcpyToSymbolAsync(HIP_SYMBOL(VP), p, sizeof(VlParams), 0, hipMemcpyHostToDevice, s) != hipSuccess) abort();
+void vl_set_params(const VlParams* p, int n, hipStream_t s) {
+  if (n > ETX_VL_REQUESTS) abort();
+  if (hipMemcpyToSymbolAsync(HIP_SYMBOL(VPS), p, n * sizeof(VlParams), 0, hipMemcpyHostToDevice, s) != hipSuccess) abort();
 }

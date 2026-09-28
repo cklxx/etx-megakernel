@@ -78,6 +78,8 @@ class TileBody:
     symbol: str                     # exported device function (link) or jit fn (triton)
     source: str | None = None       # path to source file
     prefetch: str | None = None     # optional device function that warms this tile's weights (Pass 7 hook)
+    pre_wait: str | None = None     # optional device function run by the waiting wave before its event wait: work that
+                                    # does not depend on the event (an imported tile's argument block into the K$)
 
 
 @dataclass

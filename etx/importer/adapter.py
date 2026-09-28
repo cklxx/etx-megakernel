@@ -21,33 +21,50 @@ def emit_adapters(imports: dict) -> str:
            '#include "etx/abi.h"', '#include "etx/import.h"', ""]
     for e, i in imports.items():
         st, k, g = i["slot_threads"], i["slots"], i["grid_offset"]
-        out += [f"// {i.get('spec', i['kernel'])}  block {tuple(i['block'])}, {k} slot(s) of {st} threads, {i['lds_bytes']} B LDS",
+        # a kernel whose block is smaller than the workgroup has slot barriers: with hardware barrier rounds every wave
+        # runs the round protocol around its block (etx/import.h); otherwise idle waves may leave at once
+        rounds = bool(i.get("slot_barrier")) and i.get("barriers", 0) > 0
+        nbytes = (g + 16 + 63) // 64 * 64                    # the argument block and its grid words
+        begin = "  etx_imp_rounds_begin();" if rounds else ""
+        end_ = "  etx_imp_rounds_end();" if rounds else ""
+        leave = "" if rounds else f"  if (slot >= {k}) return;"
+        guard = f"slot < {k} && blk < nblk" if rounds else "blk < nblk"
+        out += [f"// {i.get('spec', i['kernel'])}  block {tuple(i['block'])}, {k} slot(s) of {st} threads, {i['lds_bytes']} B LDS"
+                + (", barriers in rounds" if rounds else ""),
                 f'extern "C" __device__ void etx_imp_{e}(const void* args, int blk, int tid, int slot);',
                 f'extern "C" __device__ __attribute__((always_inline)) void etx_tile_{e}(const etx_ctx* c) {{',
                 "  int tx; asm volatile(\"v_mov_b32 %0, %1\" : \"=v\"(tx) : \"v\"((int)threadIdx.x));   // opaque per task: see below",
                 f"  const int slot = tx / {st}, tid = tx - slot * {st};",
-                f"  if (slot >= {k}) return;",
-                "  const unsigned char* a = (const unsigned char*)c->args[0] + c->cst[0];",
+                leave,
+                "  const unsigned char* a = etx_imp_argblock(c->args, c->cst[0]);",
                 f"  const int nblk = *(const int*)(a + {g + 12});",
                 f"  const int blk = c->coord[0] * {k} + slot;",
-                f"  if (blk < nblk) etx_imp_{e}(a, blk, tid, slot);",
+                begin,
+                f"  if ({guard}) etx_imp_{e}(a, blk, tid, slot);",
+                end_,
                 "}",
+                f"// before the task's event wait (wave 0): its argument block into the scalar cache",
+                f'extern "C" __device__ __attribute__((always_inline)) void etx_pre_{e}(const etx_ctx* c) {{ etx_imp_touch(etx_imp_argblock(c->args, c->cst[0]), {nbytes}); }}',
+                f'static __device__ __attribute__((always_inline)) void etx_pre_{e}_at(const etx_ctx* c, int off) {{ etx_imp_touch(etx_imp_argblock(c->args, off), {nbytes}); }}',
+                f'extern "C" __device__ __attribute__((always_inline)) void etx_pre_x_{e}(const etx_ctx* c) {{ '
+                f'etx_imp_touch(etx_imp_argblock(c->args, c->cst[0] + c->coord[0] * c->cst[1]), {nbytes}); }}',
                 f"// every block of one launch on this workgroup, {k} at a time (chained tasks, see examples/vllm_llm ETX_VL_CHAIN);",
-                "// waves past the last slot skip the calls but take every __syncthreads",
+                "// waves past the last slot skip the calls but take every barrier",
                 f"static __device__ __attribute__((always_inline)) void etx_all_blocks_{e}(const unsigned char* a) {{",
                 "  int tx; asm volatile(\"v_mov_b32 %0, %1\" : \"=v\"(tx) : \"v\"((int)threadIdx.x));",
                 f"  const int slot = tx / {st}, tid = tx - slot * {st};",
                 f"  const int nblk = *(const int*)(a + {g + 12});",
                 f"  for (int first = 0; first < nblk; first += {k}) {{",
                 f"    const int blk = first + slot;",
+                "  " + begin if rounds else "",
                 f"    if (slot < {k} && blk < nblk) etx_imp_{e}(a, blk, tid, slot);",
-                "    __syncthreads();",
+                "  " + end_ if rounds else "    __syncthreads();",
                 "  }",
                 "}",
                 "// XCD replica r (= the task's coordinate, pinned to XCD r): optionally copy src -> dst first (an in-place",
                 "// kernel then works on its XCD's own copy), then every block of launch r; cst = {block 0, stride, copies or -1}",
                 f'extern "C" __device__ __attribute__((always_inline)) void etx_tile_rep_{e}(const etx_ctx* c) {{',
-                "  const unsigned char* base = (const unsigned char*)c->args[0];",
+                "  const unsigned char* base = etx_imp_argblock(c->args, 0);",
                 "  const int r = c->coord[0];",
                 "  if (c->cst[2] >= 0) {",
                 "    const unsigned long long* d = (const unsigned long long*)(base + c->cst[2] + r * 32);   // src, dst, bytes",
@@ -61,13 +78,15 @@ def emit_adapters(imports: dict) -> str:
                 f'extern "C" __device__ __attribute__((always_inline)) void etx_tile_x_{e}(const etx_ctx* c) {{',
                 "  int tx; asm volatile(\"v_mov_b32 %0, %1\" : \"=v\"(tx) : \"v\"((int)threadIdx.x));",
                 f"  const int slot = tx / {st}, tid = tx - slot * {st};",
-                f"  if (slot >= {k}) return;",
-                "  const unsigned char* a = (const unsigned char*)c->args[0] + c->cst[0] + c->coord[0] * c->cst[1];",
+                leave,
+                "  const unsigned char* a = etx_imp_argblock(c->args, c->cst[0] + c->coord[0] * c->cst[1]);",
                 f"  const int nblk = *(const int*)(a + {g + 12});",
                 f"  const int blk = (c->coord[0] * c->cst[2] + c->coord[1]) * {k} + slot;",
-                f"  if (blk < nblk) etx_imp_{e}(a, blk, tid, slot);",
+                begin,
+                f"  if ({guard}) etx_imp_{e}(a, blk, tid, slot);",
+                end_,
                 "}", ""]
-    return "\n".join(out)
+    return "\n".join(x for x in out if x != "")
 
 
 def ntasks(info: dict, grid: tuple[int, int, int]) -> int:

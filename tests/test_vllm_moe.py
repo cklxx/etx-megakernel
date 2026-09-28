@@ -84,3 +84,45 @@ def test_xcd_simulation_runs_the_plan_and_obeys_littles_law(tmp_path, monkeypatc
     assert abs(sum(_rates(full, Hw(bw_max=5e6, lat_us=0.2)).values()) - 5e6) < 1.0      # bandwidth-bound
     few = {i: [1e5, 0, 0, 16e3, 0.0] for i in range(4)}
     assert abs(_rates(few, Hw(bw_max=5e6, lat_us=0.2))[0] - 16e3 / 0.2) < 1e-6            # latency-bound
+
+
+def test_two_requests_interleave_and_stay_independent(tmp_path, monkeypatch):
+    """ETX_VL_REQUESTS=2: every launch twice, the requests alternate in the graph (so in every worker's queue), no event
+    crosses requests, and the XCD simulation runs both to the end."""
+    from etx.codegen.kernel import emit_plan_json
+    from etx.sim.xcd import Cost, Hw, simulate
+    monkeypatch.setenv("ETX_VL_REQUESTS", "2")
+    vm, g = _graph(tmp_path, monkeypatch, xcd=True, layers=2)
+    assert vm.REQUESTS == 2
+    names = [gr.name for gr in g.grids]
+    assert names[:2] == ["r0_prologue", "r1_prologue"] and names[-2:] == ["r0_argmax", "r1_argmax"]
+    body = names[2:-2]
+    assert all(a.startswith("r0_") and b.startswith("r1_") and a[3:] == b[3:] for a, b in zip(body[0::2], body[1::2]))
+    for gr in g.grids:
+        r = gr.name[:3]
+        assert all(ev.startswith(r) for ev in list(gr.in_edges) + list(gr.out_edges)), gr.name
+    plan = compile_graph(g, "gfx942", {}, {})
+    assert verify_plan(plan) == []
+    pj = json.loads(emit_plan_json(plan))
+    rows, st = simulate(pj, lambda n, d: Cost(front_us=0.5, chain_us=1.0), Hw())
+    assert st["unfinished"] == 0
+    rows_ = [ln.split() for ln in (tmp_path / "vl_plan.txt").read_text().splitlines()[2:]]
+    assert {r[-1] for r in rows_} == {"0", "1"} and rows_[0][-1] == "0" and rows_[1][-1] == "1"
+
+
+def test_adapter_rounds_and_pre_wait():
+    """Kernels with slot barriers run the hardware-barrier round protocol around their block; every tile form has a
+    pre-wait function that touches its argument block; kernels without slot barriers keep the early exit."""
+    from etx.importer.adapter import emit_adapters
+    imp = {"reduce": {"kernel": "k", "block": [128, 1, 1], "slot_threads": 128, "slots": 8, "grid_offset": 64, "lds_bytes": 0,
+                      "slot_barrier": True, "barriers": 1},
+           "gemv": {"kernel": "g", "block": [64, 16, 1], "slot_threads": 1024, "slots": 1, "grid_offset": 64, "lds_bytes": 0,
+                    "slot_barrier": False, "barriers": 1}}
+    src = emit_adapters(imp)
+    red = src[src.index("void etx_tile_reduce("):src.index("void etx_pre_reduce(")]
+    assert "etx_imp_rounds_begin();" in red and "etx_imp_rounds_end();" in red and "return;" not in red
+    gem = src[src.index("void etx_tile_gemv("):src.index("void etx_pre_gemv(")]
+    assert "rounds" not in gem and "if (slot >= 1) return;" in gem
+    for f in ("etx_pre_reduce(", "etx_pre_x_reduce(", "etx_pre_reduce_at(", "etx_pre_gemv("):
+        assert f in src
+    assert "etx_imp_argblock(c->args, c->cst[0])" in src

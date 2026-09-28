@@ -31,13 +31,16 @@ def context_prompt_ids(tok, n: int) -> list[int]:
     return ids[:n]
 
 
-def reference(src: Path, prompt: str, gen: int, context: int = 0):
+def reference(src: Path, prompt: str, gen: int, context: int = 0, rotate: int = 0):
     from transformers import AutoModelForCausalLM, AutoTokenizer
     tok = AutoTokenizer.from_pretrained(src)
     model = AutoModelForCausalLM.from_pretrained(src, dtype=torch.bfloat16, device_map="cuda")
     model.eval()
     if context:
-        ids = torch.tensor([context_prompt_ids(tok, context)], device="cuda")
+        pid = context_prompt_ids(tok, context)
+        if rotate:                                  # a second request of the same length: the prompt rotated by `rotate`
+            pid = pid[rotate:] + pid[:rotate]
+        ids = torch.tensor([pid], device="cuda")
     else:
         ids = tok(prompt, return_tensors="pt").input_ids.cuda()
     with torch.no_grad():
@@ -190,7 +193,11 @@ def main():
     ap.add_argument("--src", default=None, help="local snapshot dir (default: download to <out>/hf)")
     ap.add_argument("--context", type=int, default=0, help="use fleet's benchmark prompt of this many tokens; writes golden_c<N>.txt")
     ap.add_argument("--sliced", action="store_true", help="also pack the per-XCD slices (sliced.bin / sliced.manifest)")
+    ap.add_argument("--rotate", type=int, default=0, help="rotate the --context prompt by N tokens (a second request); golden_c<N>_r<rot>.txt")
+    ap.add_argument("--golden-only", action="store_true", help="write the golden file only (no packing)")
     a = ap.parse_args()
+    if a.rotate and not a.context:
+        raise SystemExit("--rotate rotates the --context prompt: give --context too")
     out = Path(os.path.expanduser(a.out)); out.mkdir(parents=True, exist_ok=True)
     src = Path(a.src) if a.src else out / "hf"
     if not a.src:                                   # idempotent: completes a partial snapshot
@@ -201,12 +208,14 @@ def main():
     d = M.load_dims(str(out / "config.json"))
     part = M.partition(d)
 
-    gname = f"golden_c{a.context}.txt" if a.context else "golden.txt"
+    gname = (f"golden_c{a.context}" + (f"_r{a.rotate}" if a.rotate else "") + ".txt") if a.context else "golden.txt"
     if not (out / gname).exists():
-        pids, gids, margins, text = reference(src, a.prompt, a.gen, a.context)
+        pids, gids, margins, text = reference(src, a.prompt, a.gen, a.context, a.rotate)
         (out / gname).write_text("prompt: " + " ".join(map(str, pids)) + "\n" + "gen: " + " ".join(map(str, gids)) + "\n"
                                         + "margin: " + " ".join(f"{m:.4f}" for m in margins) + "\n")
         print("HF greedy:", repr(text))
+    if a.golden_only:
+        return
     man = out / "llm.manifest"
     if man.exists() and "cfg layout 2" not in man.read_text():
         print("repacking: manifest is layout 1"); man.unlink(); (out / "sliced.manifest").unlink(missing_ok=True)

@@ -73,6 +73,11 @@ XGEMV_AFTER = {"qkv": "in_norm", "gate_up": "post_norm", "down": "act", "lm_head
 # of down, each waiting only on its own XCD's part of the previous launch; moe_sum runs once per XCD again. The kernels
 # and their blocks are vLLM's; only which XCD runs which block, and what each block waits for, is ETX's.
 XAFF_ROLES = {"moe_up", "moe_act", "moe_down"}
+# ETX_VL_REQUESTS=2: two requests in one megakernel, one workgroup per CU. Their launches alternate in the graph (request
+# 0's launch n, request 1's launch n, ...), so every worker's static queue interleaves them and a CU request 0 leaves
+# idle (its 1-8-task launches, the attention block) runs request 1's tasks. Buffers, KV caches and argument blocks are
+# per request; weights are shared. (docs/MODEL-vllm-kernels.md section 8)
+REQUESTS = int(os.environ.get("ETX_VL_REQUESTS", "1"))
 
 
 def imports() -> dict:
@@ -139,10 +144,10 @@ def instances(d) -> list[dict]:
     return out
 
 
-def plan_offsets(insts: list[dict], imp: dict) -> int:
+def plan_offsets(insts: list[dict], imp: dict, start: int = 0) -> int:
     """Byte offsets of every argument block; replicated launches (ETX_VL_XCD) get one block per XCD at `stride`,
     and copies (src, dst, bytes: 32 B per XCD) when the kernel works in place on its XCD's copy."""
-    off = 0
+    off = start
     for n, i in enumerate(insts):
         info = imp[i["export"]]
         i["tasks"] = math.ceil(i["grid"][0] * i["grid"][1] * i["grid"][2] / info["slots"])
@@ -167,47 +172,65 @@ def plan_offsets(insts: list[dict], imp: dict) -> int:
 def build() -> Graph:
     d = load_dims()
     imp = imports()
-    insts = instances(d)
+    base = instances(d)
     skip = set(filter(None, os.environ.get("ETX_VL_SKIP", "").split(",")))    # register analysis only: drop roles
     if skip:
-        if XCD:
-            raise SystemExit("ETX_VL_SKIP cannot be combined with ETX_VL_XCD (a replica or its GEMV could be dropped alone)")
-        insts = [i for i in insts if i["role"] not in skip]
-    total = plan_offsets(insts, imp)
+        if XCD or REQUESTS > 1:
+            raise SystemExit("ETX_VL_SKIP cannot be combined with ETX_VL_XCD or ETX_VL_REQUESTS (a replica or its GEMV could be dropped alone)")
+        base = [i for i in base if i["role"] not in skip]
+    per_req, total = [], 0
+    for r in range(REQUESTS):                                  # each request its own argument blocks
+        ins = [dict(i, req=r) for i in base]
+        total = plan_offsets(ins, imp, total)
+        per_req.append(ins)
     # the imported tiles use the import arena of etx/import.h (sized by the adapter); lds_bytes here is only
     # the ETX tiles' own LDS (argmax: one value and one index per thread)
     res = Resource(threads=THREADS, vgpr=128, agpr=0, lds_bytes=8 * THREADS + 256)
-    g = Graph(f"vl_{d.name}")
+    g = Graph(f"vl_{d.name}" + (f"_r{REQUESTS}" if REQUESTS > 1 else ""))
     g.tensor("impargs", (total,), role="weight", bytes_per_elem=1)
     g.tensor("vl", (1,), role="weight", bytes_per_elem=8)         # placeholder: the native tiles read __constant__ params
     adapters = os.environ.get("ETX_VL_ADAPTERS", str(HERE / "build" / "imp_tiles.hip"))
     native = str(HERE / "vl_tiles.hip")
+    pre = (lambda r: f"r{r}_") if REQUESTS > 1 else (lambda r: "")
 
-    g.etensor("E_pro", (1,), wait_count=1)
-    g.call_device("prologue", (1,), hip_link(native, "vl_prologue"), resource=res, args=["vl"],
-                  out_edges={"E_pro": "i->i"}, duration_us=2.0)
-    prev = "E_pro"
+    prev = {}
+    for r in range(REQUESTS):
+        g.etensor(f"{pre(r)}E_pro", (1,), wait_count=1)
+        g.call_device(f"{pre(r)}prologue", (1,), hip_link(native, "vl_prologue"), resource=res, args=["vl"], consts=(r,),
+                      out_edges={f"{pre(r)}E_pro": "i->i"}, duration_us=2.0)
+        prev[r] = f"{pre(r)}E_pro"
     # ETX_VL_CHAIN: runs of CHAIN_ROLES within one layer become one grid of one task (at most 4, the consts)
-    groups, cur = [], []
-    for i in insts:
-        chainable = CHAIN and i["role"] in CHAIN_ROLES
-        if cur and (not chainable or cur[-1]["layer"] != i["layer"] or len(cur) == 4):
-            groups.append(cur); cur = []
-        if chainable:
-            cur.append(i)
-        else:
-            groups.append([i])
-    if cur:
-        groups.append(cur)
+    groups_r = []
+    for ins in per_req:
+        groups, cur = [], []
+        for i in ins:
+            chainable = CHAIN and i["role"] in CHAIN_ROLES
+            if cur and (not chainable or cur[-1]["layer"] != i["layer"] or len(cur) == 4):
+                groups.append(cur); cur = []
+            if chainable:
+                cur.append(i)
+            else:
+                groups.append([i])
+        if cur:
+            groups.append(cur)
+        groups_r.append(groups)
     chains = {}
-    for n, grp in enumerate(groups):
-        ev = f"E_{n}"
+    order = []                                                 # graph (and plan-file) order: requests alternate
+    for n in range(len(groups_r[0])):
+        for r in range(REQUESTS):
+            order.append((r, n))
+    for r, n in order:
+        groups = groups_r[r]
+        grp = groups[n]
+        P = pre(r)
+        ev = f"{P}E_{n}"
         if len(grp) == 1 and grp[0]["rep"] > 1 and grp[0]["role"] in REP_ROLES:
             i = grp[0]
             g.etensor(ev, (NX,), wait_count=1)
-            name = f"{i['role']}_{i['layer']}_x" if i["layer"] >= 0 else f"{i['role']}_x"
-            g.call_device(name, (NX,), hip_link(adapters, f"etx_tile_rep_{i['export']}"), resource=res, args=["impargs"],
-                          consts=(i["offset"], i["stride"], i["copyoff"]), in_edges={prev: "x->(0)"}, out_edges={ev: "x->x"},
+            name = P + (f"{i['role']}_{i['layer']}_x" if i["layer"] >= 0 else f"{i['role']}_x")
+            g.call_device(name, (NX,), hip_link(adapters, f"etx_tile_rep_{i['export']}", pre_wait=f"etx_pre_x_{i['export']}"),
+                          resource=res, args=["impargs"],
+                          consts=(i["offset"], i["stride"], i["copyoff"]), in_edges={prev[r]: "x->(0)"}, out_edges={ev: "x->x"},
                           domain_map="x->x", duration_us=3.0)
         elif len(grp) == 1 and grp[0]["rep"] > 1:
             # a grid split over the XCDs, (XCDs, tasks per XCD) pinned xw->x, each part waiting on its XCD's part of the
@@ -224,51 +247,59 @@ def build() -> Graph:
             else:
                 g.etensor(ev, (1,), wait_count=i["tasks"])
                 out = {ev: "xw->(0)"}
-            name = f"{i['role']}_{i['layer']}" if i["layer"] >= 0 else i["role"]
+            name = P + (f"{i['role']}_{i['layer']}" if i["layer"] >= 0 else i["role"])
             dur = max(2.0, i["M"] * i["K"] * 2 / 4.0e12 * 1e6) if i["export"].startswith("wvsplitk") else 3.0
-            g.call_device(name, (NX, per), hip_link(adapters, f"etx_tile_x_{i['export']}"), resource=res, args=["impargs"],
-                          consts=(i["offset"], i["stride"], per), in_edges={prev: "xw->x"}, out_edges=out,
+            g.call_device(name, (NX, per), hip_link(adapters, f"etx_tile_x_{i['export']}", pre_wait=f"etx_pre_x_{i['export']}"),
+                          resource=res, args=["impargs"],
+                          consts=(i["offset"], i["stride"], per), in_edges={prev[r]: "xw->x"}, out_edges=out,
                           domain_map="xw->x", duration_us=dur)
         elif len(grp) == 1:
             i = grp[0]
             g.etensor(ev, (1,), wait_count=i["tasks"])
-            name = f"{i['role']}_{i['layer']}" if i["layer"] >= 0 else i["role"]
+            name = P + (f"{i['role']}_{i['layer']}" if i["layer"] >= 0 else i["role"])
             pin = {"domain_map": "i->(0)"} if i["role"] in PIN_ROLES else {}
-            g.call_device(name, (i["tasks"],), hip_link(adapters, f"etx_tile_{i['export']}"), resource=res, args=["impargs"],
-                          consts=(i["offset"],), in_edges={prev: "i->(0)"}, out_edges={ev: "i->(0)"}, **pin,
+            g.call_device(name, (i["tasks"],), hip_link(adapters, f"etx_tile_{i['export']}", pre_wait=f"etx_pre_{i['export']}"),
+                          resource=res, args=["impargs"],
+                          consts=(i["offset"],), in_edges={prev[r]: "i->(0)"}, out_edges={ev: "i->(0)"}, **pin,
                           duration_us=2.0 if not i["export"].startswith("wvsplitk") else max(2.0, i["M"] * i["K"] * 2 / 4.0e12 * 1e6))
         else:
             sig = "__".join(x["export"] for x in grp)
             chains[sig] = [x["export"] for x in grp]
             g.etensor(ev, (1,), wait_count=1)
-            name = "chain_" + "_".join(x["role"] for x in grp) + f"_{grp[0]['layer']}"
+            name = P + "chain_" + "_".join(x["role"] for x in grp) + f"_{grp[0]['layer']}"
             pin = {"domain_map": "i->(0)"} if any(x["role"] in PIN_ROLES for x in grp) else {}
-            g.call_device(name, (1,), hip_link(CHAIN_FILE, f"etx_chain_{sig}"), resource=res, args=["impargs"],
-                          consts=tuple(x["offset"] for x in grp), in_edges={prev: "i->(0)"}, out_edges={ev: "i->(0)"},
+            g.call_device(name, (1,), hip_link(CHAIN_FILE, f"etx_chain_{sig}", pre_wait=f"etx_pre_chain_{sig}"), resource=res, args=["impargs"],
+                          consts=tuple(x["offset"] for x in grp), in_edges={prev[r]: "i->(0)"}, out_edges={ev: "i->(0)"},
                           duration_us=2.0 * len(grp), **pin)
-        prev = ev
+        prev[r] = ev
     if chains:
         with open(CHAIN_FILE, "w") as f:
             f.write("// generated by examples/vllm_llm/model.py (ETX_VL_CHAIN=1): chained launches, one task each\n#pragma once\n")
             f.write(f'#include "{adapters}"\n')
             for sig, exps in chains.items():
                 f.write(f'extern "C" __device__ __attribute__((always_inline)) void etx_chain_{sig}(const etx_ctx* c) {{\n')
-                f.write("  const unsigned char* base = (const unsigned char*)c->args[0];\n")
+                f.write("  const unsigned char* base = etx_imp_argblock(c->args, 0);\n")
                 f.write("".join(f"  etx_all_blocks_{e}(base + c->cst[{k}]);\n" for k, e in enumerate(exps)))
                 f.write("}\n")
-    g.etensor("E_argmax", (1,), wait_count=1)
-    g.call_device("argmax", (1,), hip_link(native, "vl_argmax"), resource=res, args=["vl"],
-                  in_edges={prev: "i->(0)"}, out_edges={"E_argmax": "i->i"}, duration_us=3.0)
+                # before the wait: every part's argument block into the scalar cache
+                f.write(f'extern "C" __device__ __attribute__((always_inline)) void etx_pre_chain_{sig}(const etx_ctx* c) {{\n')
+                f.write("".join(f"  etx_pre_{e}_at(c, c->cst[{k}]);\n" for k, e in enumerate(exps)))
+                f.write("}\n")
+    for r in range(REQUESTS):
+        g.etensor(f"{pre(r)}E_argmax", (1,), wait_count=1)
+        g.call_device(f"{pre(r)}argmax", (1,), hip_link(native, "vl_argmax"), resource=res, args=["vl"], consts=(r,),
+                      in_edges={prev[r]: "i->(0)"}, out_edges={f"{pre(r)}E_argmax": "i->i"}, duration_us=3.0)
 
     plan = os.environ.get("ETX_VL_PLAN")
     if plan:
+        insts = [i for r, n in order for i in groups_r[r][n]]
         with open(plan, "w") as f:
-            f.write(f"# vl plan {d.name}: instance export layer role gx gy gz offset tasks M K wvprgrp rep stride copyoff; total {total} bytes\n")
-            f.write(f"total {total} parts {math.ceil(MAXLEN / PART)} maxlen {MAXLEN}\n")
+            f.write(f"# vl plan {d.name}: instance export layer role gx gy gz offset tasks M K wvprgrp rep stride copyoff req; total {total} bytes\n")
+            f.write(f"total {total} parts {math.ceil(MAXLEN / PART)} maxlen {MAXLEN} requests {REQUESTS}\n")
             for n, i in enumerate(insts):
                 gx, gy, gz = i["grid"]
                 f.write(f"{n} {i['export']} {i['layer']} {i['role']} {gx} {gy} {gz} {i['offset']} {i['tasks']} "
-                        f"{i.get('M', 0)} {i.get('K', 0)} {i.get('wvprgrp', 0)} {i['rep']} {i['stride']} {i['copyoff']}\n")
+                        f"{i.get('M', 0)} {i.get('K', 0)} {i.get('wvprgrp', 0)} {i['rep']} {i['stride']} {i['copyoff']} {i['req']}\n")
     return g
 
 

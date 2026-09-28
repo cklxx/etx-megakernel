@@ -28,7 +28,7 @@ struct VlParams {                        // must match vl_tiles.hip
 };
 extern "C" __global__ void etx_megakernel_d0(etx_params);
 extern "C" __global__ void etx_unfused_d0(etx_params, int32_t);
-void vl_set_params(const VlParams* p, hipStream_t s);
+void vl_set_params(const VlParams* p, int n, hipStream_t s);
 extern "C" int vl_params_bytes();
 #ifdef ETX_VL_CHECK
 extern "C" const void* etx_orig_find(const char* name);    // orig_table.hip: vLLM's kernels compiled as vLLM compiles them
@@ -83,7 +83,7 @@ static std::vector<int> read_ints(std::istream& in) {
   std::vector<int> v; int x; while (s >> x) v.push_back(x); return v;
 }
 
-struct Inst { int n; std::string exp; int layer; std::string role; int gx, gy, gz; size_t off; int tasks; int M, K, wv; int rep = 1; size_t stride = 0; long long copyoff = -1; };
+struct Inst { int n; std::string exp; int layer; std::string role; int gx, gy, gz; size_t off; int tasks; int M, K, wv; int rep = 1; size_t stride = 0; long long copyoff = -1; int req = 0; };
 
 // fills one argument block in declaration order, checking every value's type against the import's layout
 struct Args {
@@ -106,7 +106,7 @@ struct Args {
 int main(int argc, char** argv) {
   if (argc < 3) die("usage: run <packed-dir> <plan.txt> [--golden F] [--gen N] [--repeat R] [--teacher] [--unfused]");
   const std::string dir = argv[1], plan_path = argv[2];
-  int gen = -1, repeat = 2, check_layers = 0, max_steps = 0; bool teacher = false, unfused = false; std::string golden_name = "golden_c1024.txt";
+  int gen = -1, repeat = 2, check_layers = 0, max_steps = 0; bool teacher = false, unfused = false; std::string golden_name = "golden_c1024.txt", golden1_name;
   for (int i = 3; i < argc; ++i) {
     const std::string a = argv[i];
     if (a == "--gen" && i + 1 < argc) gen = atoi(argv[++i]);
@@ -114,6 +114,7 @@ int main(int argc, char** argv) {
     else if (a == "--teacher") teacher = true;
     else if (a == "--unfused") unfused = true;
     else if (a == "--golden" && i + 1 < argc) golden_name = argv[++i];
+    else if (a == "--golden1" && i + 1 < argc) golden1_name = argv[++i];   // ETX_VL_REQUESTS=2: request 1's prompt and HF greedy tokens
     else if (a == "--max-steps" && i + 1 < argc) max_steps = atoi(argv[++i]);   // traces: stop after N steps (no token check)
     else if (a == "--check" && i + 1 < argc) check_layers = atoi(argv[++i]);   // compare each imported launch with vLLM's original, layers < N
   }
@@ -128,25 +129,39 @@ int main(int argc, char** argv) {
   const int BS = 16, X = 8, MAXBLK = (MAXLEN + BS - 1) / BS;
 
   // ---- plan
-  std::vector<Inst> insts; size_t total = 0; int parts = 0;
+  std::vector<Inst> insts; size_t total = 0; int parts = 0, nreq = 1;
   {
     std::ifstream f(plan_path); if (!f) die("cannot open " + plan_path);
     std::string line;
     while (std::getline(f, line)) {
       if (line.empty() || line[0] == '#') continue;
       std::istringstream s(line);
-      if (line.rfind("total", 0) == 0) { std::string k; int ml; s >> k >> total >> k >> parts >> k >> ml; if (ml != MAXLEN) die("plan maxlen differs from the packed model's"); continue; }
+      if (line.rfind("total", 0) == 0) {
+        std::string k; int ml; s >> k >> total >> k >> parts >> k >> ml; if (ml != MAXLEN) die("plan maxlen differs from the packed model's");
+        if (s >> k) { if (k != "requests" || !(s >> nreq) || nreq < 1) die("plan header: expected requests <n >= 1>"); }
+        continue;
+      }
       Inst x; s >> x.n >> x.exp >> x.layer >> x.role >> x.gx >> x.gy >> x.gz >> x.off >> x.tasks >> x.M >> x.K >> x.wv;
       if (!(s >> x.rep >> x.stride >> x.copyoff)) { x.rep = 1; x.stride = 0; x.copyoff = -1; }
+      else if (!(s >> x.req)) x.req = 0;
       insts.push_back(x);
     }
   }
 
-  // ---- golden
-  std::ifstream gf(dir + "/" + golden_name); if (!gf) die("cannot open " + dir + "/" + golden_name);
-  const std::vector<int> prompt = read_ints(gf), golden_all = read_ints(gf);
-  if (gen < 0 || gen > (int)golden_all.size()) gen = (int)golden_all.size();
-  const std::vector<int> golden(golden_all.begin(), golden_all.begin() + gen);
+  // ---- golden: request 0 from --golden, request 1 (ETX_VL_REQUESTS=2) from --golden1; the prompts have one length
+  std::vector<std::vector<int>> prompts, goldens;
+  for (int r = 0; r < nreq; ++r) {
+    const std::string gname = r == 0 ? golden_name : golden1_name;
+    if (gname.empty()) die("a two-request plan needs --golden1 (request 1's golden file)");
+    std::ifstream gf(dir + "/" + gname); if (!gf) die("cannot open " + dir + "/" + gname);
+    std::vector<int> pr = read_ints(gf), ga = read_ints(gf);
+    if (gen < 0 || gen > (int)ga.size()) gen = (int)ga.size();
+    prompts.push_back(pr); goldens.push_back(ga);
+  }
+  for (int r = 1; r < nreq; ++r) if (prompts[r].size() != prompts[0].size()) die("the requests' prompts differ in length");
+  for (auto& gv : goldens) gv.resize(gen);
+  const std::vector<int>& prompt = prompts[0];
+  const std::vector<int>& golden = goldens[0];
   const int steps = (int)prompt.size() + gen - 1;
   if (steps + 1 > MAXLEN) die("prompt + generation exceeds maxlen");
 
@@ -173,30 +188,52 @@ int main(int argc, char** argv) {
   // ETX_VL_XCD plans replicate the one-block launches per XCD: residual, normed input, o and activation then
   // have one copy per XCD (NR = 8); everything else is shared
   int NR = 1; for (const Inst& x : insts) NR = std::max(NR, x.rep);
-  bf *resid = ualloc<bf>((size_t)NR * H), *hn = ualloc<bf>((size_t)NR * H), *qkv = ualloc<bf>(NQKV), *qn = ualloc<bf>(NH * HD), *kn = ualloc<bf>(NKV * HD);
-  bf *dx = ualloc<bf>((size_t)NR * H), *ox = ualloc<bf>((size_t)NR * H), *actx = ualloc<bf>((size_t)NR * I);
-  bf *attn_out = ualloc<bf>(NH * HD), *o = ualloc<bf>(H), *gu = ualloc<bf>(2 * I), *act = ualloc<bf>(I), *dn = ualloc<bf>(H), *logits = ualloc<bf>(V);
-  float *exp_sums = ualloc<float>(NH * parts), *max_logits = ualloc<float>(NH * parts); bf* tmp_out = ualloc<bf>((size_t)NH * parts * HD);
-  int64_t *positions = ualloc<int64_t>(1), *slot_mapping = ualloc<int64_t>(1); int32_t* seq_lens = ualloc<int32_t>(1);
   std::vector<int32_t> bt(MAXBLK); for (int i = 0; i < MAXBLK; ++i) bt[i] = i;
   int32_t* block_tables = etx_host::upload(bt.data(), bt.size());
   const float one = 1.0f; float* kv_scale = etx_host::upload(&one, 1);
-  std::vector<bf*> kc(L), vc(L);
   const size_t cache_elems = (size_t)MAXBLK * NKV * HD * BS;        // [blocks][NKV][HD/x][BS][x] and [blocks][NKV][HD][BS]
-  for (int l = 0; l < L; ++l) { kc[l] = dalloc<bf>(cache_elems); vc[l] = dalloc<bf>(cache_elems); }
-  int32_t *token_in = ualloc<int32_t>(steps + 2), *token_out = ualloc<int32_t>(steps + 1); uint64_t* token_time = dalloc<uint64_t>(2 * (steps + 1));
   // MoE (fused_experts at batch 1): router logits, top-k weights / ids / token_expert_indices, num_tokens_post_padded
   // (vLLM's torch.full: TOPK * BLOCK_SIZE_M, a constant, written here once), intermediate caches 1-3 (vLLM aliases 1
-  // and 3 in one buffer; separate here, same values)
-  // with ETX_VL_XCD the top-k outputs have one copy per XCD (top-k runs as a replica on each)
-  bf* rlog = ualloc<bf>(std::max(E, 1)); float* topk_w = ualloc<float>((size_t)NR * std::max(TOPK, 1));
-  int32_t *topk_ids = ualloc<int32_t>((size_t)NR * std::max(TOPK, 1)), *tei = ualloc<int32_t>((size_t)NR * std::max(TOPK, 1));
+  // and 3 in one buffer; separate here, same values); with ETX_VL_XCD the top-k outputs have one copy per XCD
   const int32_t ntpp_val = TOPK * MOE_BM; int32_t* ntpp = etx_host::upload(&ntpp_val, 1);
-  bf *mc1 = ualloc<bf>((size_t)std::max(TOPK, 1) * 2 * MI), *mc2 = ualloc<bf>((size_t)std::max(TOPK, 1) * MI), *mc3 = ualloc<bf>((size_t)std::max(TOPK, 1) * H);
+  // everything a request owns (ETX_VL_REQUESTS: one set each; the weights are shared)
+  struct Req {
+    bf *resid, *hn, *qkv, *qn, *kn, *dx, *ox, *actx, *attn_out, *o, *gu, *act, *dn, *logits, *tmp_out, *rlog, *mc1, *mc2, *mc3;
+    float *exp_sums, *max_logits, *topk_w; int64_t *positions, *slot_mapping; int32_t *seq_lens, *token_in, *token_out, *topk_ids, *tei;
+    uint64_t* token_time; std::vector<bf*> kc, vc;
+  };
+  std::vector<Req> reqs(nreq);
+  for (Req& q : reqs) {
+    q.resid = ualloc<bf>((size_t)NR * H); q.hn = ualloc<bf>((size_t)NR * H); q.qkv = ualloc<bf>(NQKV); q.qn = ualloc<bf>(NH * HD); q.kn = ualloc<bf>(NKV * HD);
+    q.dx = ualloc<bf>((size_t)NR * H); q.ox = ualloc<bf>((size_t)NR * H); q.actx = ualloc<bf>((size_t)NR * I);
+    q.attn_out = ualloc<bf>(NH * HD); q.o = ualloc<bf>(H); q.gu = ualloc<bf>(2 * I); q.act = ualloc<bf>(I); q.dn = ualloc<bf>(H); q.logits = ualloc<bf>(V);
+    q.exp_sums = ualloc<float>(NH * parts); q.max_logits = ualloc<float>(NH * parts); q.tmp_out = ualloc<bf>((size_t)NH * parts * HD);
+    q.positions = ualloc<int64_t>(1); q.slot_mapping = ualloc<int64_t>(1); q.seq_lens = ualloc<int32_t>(1);
+    q.kc.resize(L); q.vc.resize(L);
+    for (int l = 0; l < L; ++l) { q.kc[l] = dalloc<bf>(cache_elems); q.vc[l] = dalloc<bf>(cache_elems); }
+    q.token_in = ualloc<int32_t>(steps + 2); q.token_out = ualloc<int32_t>(steps + 1); q.token_time = dalloc<uint64_t>(2 * (steps + 1));
+    q.rlog = ualloc<bf>(std::max(E, 1)); q.topk_w = ualloc<float>((size_t)NR * std::max(TOPK, 1));
+    q.topk_ids = ualloc<int32_t>((size_t)NR * std::max(TOPK, 1)); q.tei = ualloc<int32_t>((size_t)NR * std::max(TOPK, 1));
+    q.mc1 = ualloc<bf>((size_t)std::max(TOPK, 1) * 2 * MI); q.mc2 = ualloc<bf>((size_t)std::max(TOPK, 1) * MI); q.mc3 = ualloc<bf>((size_t)std::max(TOPK, 1) * H);
+  }
+#define ETX_VL_BIND(Q)                                                                                                    \
+  bf *resid = (Q).resid, *hn = (Q).hn, *qkv = (Q).qkv, *qn = (Q).qn, *kn = (Q).kn, *dx = (Q).dx, *ox = (Q).ox, *actx = (Q).actx;  \
+  bf *attn_out = (Q).attn_out, *o = (Q).o, *gu = (Q).gu, *act = (Q).act, *dn = (Q).dn, *logits = (Q).logits, *tmp_out = (Q).tmp_out; \
+  bf *rlog = (Q).rlog, *mc1 = (Q).mc1, *mc2 = (Q).mc2, *mc3 = (Q).mc3;                                                    \
+  float *exp_sums = (Q).exp_sums, *max_logits = (Q).max_logits, *topk_w = (Q).topk_w;                                    \
+  int64_t *positions = (Q).positions, *slot_mapping = (Q).slot_mapping; int32_t *seq_lens = (Q).seq_lens;                \
+  int32_t *token_in = (Q).token_in, *token_out = (Q).token_out, *topk_ids = (Q).topk_ids, *tei = (Q).tei;                \
+  uint64_t* token_time = (Q).token_time; const std::vector<bf*>& kc = (Q).kc; const std::vector<bf*>& vc = (Q).vc;        \
+  (void)resid; (void)hn; (void)qkv; (void)qn; (void)kn; (void)dx; (void)ox; (void)actx; (void)attn_out; (void)o; (void)gu;  \
+  (void)act; (void)dn; (void)logits; (void)tmp_out; (void)rlog; (void)mc1; (void)mc2; (void)mc3; (void)exp_sums;         \
+  (void)max_logits; (void)topk_w; (void)positions; (void)slot_mapping; (void)seq_lens; (void)token_in; (void)token_out;  \
+  (void)topk_ids; (void)tei; (void)token_time; (void)kc; (void)vc;
 
   // ---- argument blocks, instance by instance (see model.py for the vLLM call each role mirrors)
   std::vector<uint8_t> ab(total, 0);
   for (const Inst& x : insts) for (int rr = 0; rr < x.rep; ++rr) {
+    if (x.req >= nreq) die("plan instance of a request the plan header does not declare");
+    ETX_VL_BIND(reqs[x.req])
     Args a(x.exp.c_str(), ab.data() + x.off + rr * x.stride);
     const std::string r = x.role; const std::string pl = "L" + std::to_string(x.layer) + ".";
     const bool per_xcd = NR > 1;                                          // replicas read / write their XCD's copies
@@ -272,11 +309,18 @@ int main(int argc, char** argv) {
   if (vl_params_bytes() != (int)sizeof(VlParams)) die("VlParams layout differs between host and device");
   if (!hst.check_residency()) die("the persistent grid does not fit");
 
-  VlParams vp{}; vp.H = H; vp.V = V; vp.pad = NR; vp.embed = W("embed"); vp.resid = resid; vp.positions = positions; vp.seq_lens = seq_lens;
-  vp.slot_mapping = slot_mapping; vp.logits = logits; vp.token_in = token_in; vp.token_out = token_out; vp.token_time = token_time;
+  std::vector<VlParams> vps(nreq);
+  for (int r = 0; r < nreq; ++r) {
+    VlParams& v = vps[r]; const Req& q = reqs[r];
+    v = VlParams{}; v.H = H; v.V = V; v.pad = NR; v.embed = W("embed"); v.resid = q.resid; v.positions = q.positions; v.seq_lens = q.seq_lens;
+    v.slot_mapping = q.slot_mapping; v.logits = q.logits; v.token_in = q.token_in; v.token_out = q.token_out; v.token_time = q.token_time;
+  }
+  VlParams& vp = vps[0];
 
   if (check_layers > 0 && NR > 1) die("--check needs a plan without per-XCD replicas (build without ETX_VL_XCD)");
+  if (check_layers > 0 && nreq > 1) die("--check needs a one-request plan (build without ETX_VL_REQUESTS)");
   if (check_layers > 0) {
+    ETX_VL_BIND(reqs[0])
 #ifndef ETX_VL_CHECK
     die("--check needs a build with ETX_VL_CHECK=1 (the original kernels linked in)");
 #else
@@ -295,7 +339,7 @@ int main(int argc, char** argv) {
     for (size_t b = 0; b < bufs.size(); ++b) { save[b] = dalloc<char>(bufs[b].second); ref[b] = dalloc<char>(bufs[b].second); }
     std::vector<int32_t> tin(steps + 2, 0); for (size_t i = 0; i < prompt.size(); ++i) tin[i] = prompt[i];
     ETX_CHECK(hipMemcpy(token_in, tin.data(), tin.size() * 4, hipMemcpyHostToDevice));
-    vp.tok = 0; vp.pos = 0; vp.write_next = 0; vl_set_params(&vp, hst.stream);
+    vp.tok = 0; vp.pos = 0; vp.write_next = 0; vl_set_params(&vp, 1, hst.stream);
     auto launch_imported = [&](int li) {
       int32_t first = etx_launch_first[li]; void* kargs[] = {&hst.p, &first};
       ETX_CHECK(hipLaunchKernel(hst.unfused_kernel, dim3(etx_launch_count[li]), dim3(ETX_THREADS), kargs, 0, hst.stream));
@@ -364,22 +408,25 @@ int main(int argc, char** argv) {
     return bad ? 4 : 0;
 #endif
   }
-  std::vector<int32_t> seq(prompt); seq.insert(seq.end(), golden.begin(), golden.end());
+  std::vector<std::vector<int32_t>> seqs(nreq);
+  for (int r = 0; r < nreq; ++r) { seqs[r] = prompts[r]; seqs[r].insert(seqs[r].end(), goldens[r].begin(), goldens[r].end()); }
   std::vector<int32_t> out(steps + 1); std::vector<uint64_t> tt(2 * (steps + 1));
   std::vector<double> step_ms, wall_ms;
   const int progress = getenv("ETX_VL_PROGRESS") ? atoi(getenv("ETX_VL_PROGRESS")) : 0;   // print every N-th step's wall time
   setvbuf(stdout, nullptr, _IOLBF, 0);
-  int matched = 0, first_div = -1;
+  std::vector<int> matched(nreq, 0);
   for (int run = 0; run < repeat; ++run) {
-    std::vector<int32_t> tin(steps + 2, 0);
-    for (int i = 0; i < (int)(teacher ? seq.size() : prompt.size()); ++i) tin[i] = seq[i];
-    ETX_CHECK(hipMemcpy(token_in, tin.data(), tin.size() * 4, hipMemcpyHostToDevice));
+    for (int r = 0; r < nreq; ++r) {
+      std::vector<int32_t> tin(steps + 2, 0);
+      for (int i = 0; i < (int)(teacher ? seqs[r].size() : prompts[r].size()); ++i) tin[i] = seqs[r][i];
+      ETX_CHECK(hipMemcpy(reqs[r].token_in, tin.data(), tin.size() * 4, hipMemcpyHostToDevice));
+    }
     wall_ms.clear();
     const int nsteps = max_steps > 0 ? std::min(steps, max_steps) : steps;
     for (int t = 0; t < nsteps; ++t) {
-      vp.tok = t; vp.pos = t; vp.write_next = (!teacher && t + 1 >= (int)prompt.size()) ? 1 : 0;
+      for (VlParams& v : vps) { v.tok = t; v.pos = t; v.write_next = (!teacher && t + 1 >= (int)prompt.size()) ? 1 : 0; }
       const auto w0 = std::chrono::steady_clock::now();
-      vl_set_params(&vp, hst.stream);
+      vl_set_params(vps.data(), nreq, hst.stream);
       if (unfused) { if (!hst.run_unfused()) { printf("step %d: unfused step failed\n", t); return 2; } }
       else if (!hst.run(60.0)) { printf("step %d: ETX step failed\n", t); return 2; }
       const double wms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - w0).count();
@@ -387,17 +434,24 @@ int main(int argc, char** argv) {
       if (progress && (t % progress == 0 || t < 3)) { printf("  step %d: %.3f ms wall\n", t, wms); fflush(stdout); }
     }
     if (nsteps < steps) { printf("run %d: stopped after %d of %d steps (--max-steps): no token check\n", run, nsteps, steps); continue; }
-    ETX_CHECK(hipMemcpy(out.data(), token_out, steps * 4, hipMemcpyDeviceToHost));
-    ETX_CHECK(hipMemcpy(tt.data(), token_time, 2 * steps * 8, hipMemcpyDeviceToHost));
-    matched = 0; first_div = -1; step_ms.clear();
-    for (int i = 0; i < gen; ++i) {
-      const int t = (int)prompt.size() - 1 + i;
-      if (out[t] == golden[i]) ++matched; else if (first_div < 0) first_div = i;
-      step_ms.push_back((tt[2 * t + 1] - tt[2 * t]) * 1e-5);
+    // a step starts at the first request's prologue and ends at the last request's argmax
+    std::vector<uint64_t> t0(steps, ~0ull), t1(steps, 0);
+    for (int r = 0; r < nreq; ++r) {
+      ETX_CHECK(hipMemcpy(out.data(), reqs[r].token_out, steps * 4, hipMemcpyDeviceToHost));
+      ETX_CHECK(hipMemcpy(tt.data(), reqs[r].token_time, 2 * steps * 8, hipMemcpyDeviceToHost));
+      int first_div = -1; matched[r] = 0;
+      for (int i = 0; i < gen; ++i) {
+        const int t = (int)prompt.size() - 1 + i;
+        if (out[t] == goldens[r][i]) ++matched[r]; else if (first_div < 0) first_div = i;
+      }
+      for (int t = 0; t < steps; ++t) { t0[t] = std::min(t0[t], tt[2 * t]); t1[t] = std::max(t1[t], tt[2 * t + 1]); }
+      printf("run %d%s: %d/%d generated tokens match HF greedy%s", run, nreq > 1 ? (" request " + std::to_string(r)).c_str() : "",
+             matched[r], gen, teacher ? " (teacher-forced argmax)" : "");
+      if (first_div >= 0) printf("; first divergence at %d (ours %d, HF %d)", first_div, out[(int)prompt.size() - 1 + first_div], goldens[r][first_div]);
+      printf("\n");
     }
-    printf("run %d: %d/%d generated tokens match HF greedy%s", run, matched, gen, teacher ? " (teacher-forced argmax)" : "");
-    if (first_div >= 0) printf("; first divergence at %d (ours %d, HF %d)", first_div, out[(int)prompt.size() - 1 + first_div], golden[first_div]);
-    printf("\n");
+    step_ms.clear();
+    for (int i = 0; i < gen; ++i) { const int t = (int)prompt.size() - 1 + i; step_ms.push_back((t1[t] - t0[t]) * 1e-5); }
   }
   // ETX_TRACE=1: per-type wait / body / span of the last step, and the raw per-task stamps (ETX_TRACE_RAW=<file>)
   if (getenv("ETX_TRACE") && !unfused) hst.report_phases(etx_type_names, ETX_N_TYPES);
@@ -406,6 +460,9 @@ int main(int argc, char** argv) {
   printf("per-token latency on device (prologue -> argmax): median %.3f ms  min %.3f  max %.3f; host wall per step median %.3f ms\n",
          med, s.empty() ? 0 : s.front(), s.empty() ? 0 : s.back(), wmed);
   printf("mode: %s\n", unfused ? "unfused (same imported kernels, one launch per grid, HIP graph)" : "ETX megakernel (vLLM kernels imported)");
-  printf("RESULT model=%s matched=%d gen=%d median_ms=%.3f wall_ms=%.3f\n", dir.c_str(), matched, gen, med, wmed);
+  int mall = matched[0]; std::string ms = std::to_string(matched[0]);
+  for (int r = 1; r < nreq; ++r) { mall = std::min(mall, matched[r]); ms += "," + std::to_string(matched[r]); }
+  printf("RESULT model=%s requests=%d matched=%d gen=%d median_ms=%.3f wall_ms=%.3f tokens_per_s=%.0f matched_each=%s\n", dir.c_str(), nreq, mall, gen,
+         med, wmed, med > 0 ? nreq * 1e3 / med : 0.0, ms.c_str());
   return 0;
 }

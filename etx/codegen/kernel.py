@@ -171,6 +171,8 @@ def emit_kernel(plan: Plan, device: int = 0) -> str:
             out.append(f"extern \"C\" __device__ void {g.body.symbol}(const etx_ctx*);")
             if g.body.prefetch:
                 out.append(f"extern \"C\" __device__ void {g.body.prefetch}(const etx_ctx*);")
+            if g.body.pre_wait:
+                out.append(f"extern \"C\" __device__ void {g.body.pre_wait}(const etx_ctx*);")
         for name, ig in plan.inlined.items():
             out.append(f"extern \"C\" __device__ void {ig.body.symbol}(const etx_ctx*);   // inlined producer {name}")
     for g in grids:
@@ -238,6 +240,10 @@ def emit_kernel(plan: Plan, device: int = 0) -> str:
         out.extend(_setup_consts(g))
         if g.body.prefetch and plan.options.prefetch and plan.machine.capabilities.get("async_copy_to_lds", "none") != "none":
             out.append(f"      {g.body.prefetch}(&ctx);   // lever 3: weights do not depend on events; warm them before waiting")
+        if g.body.pre_wait and g.in_edges:
+            out.append("#ifndef ETX_NO_PRE_WAIT")
+            out.append(f"      if (threadIdx.x < 64) {g.body.pre_wait}(&ctx);   // before the wait: does not depend on the event")
+            out.append("#endif")
         if g.in_edges:
             out.append("      if (threadIdx.x == 0) {")
             out.append(_wait_code(plan, g))

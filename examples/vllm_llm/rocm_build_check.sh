@@ -11,7 +11,10 @@
 set -euo pipefail
 M=${1:?model}; V=${2:-base}; OUT=${3:-$HOME/code/etx/build/rocm22/${M}_$V}
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-case $V in base) E="";; chain) E="ETX_VL_CHAIN=1";; xcd) E="ETX_VL_XCD=1 ETX_VL_CHAIN=1";; *) echo "variant $V"; exit 1;; esac
+case $V in base) E="";; chain) E="ETX_VL_CHAIN=1";; xcd) E="ETX_VL_XCD=1 ETX_VL_CHAIN=1";;
+  xcd2) E="ETX_VL_XCD=1 ETX_VL_CHAIN=1 ETX_VL_REQUESTS=2"; ETX_CFLAGS="${ETX_CFLAGS:-} -DETX_VL_REQUESTS=2";;
+  xcd_s1) E="ETX_VL_XCD=1 ETX_VL_CHAIN=1 ETX_VL_SLOTS=attn_mfma16_g8=1,attn_mfma16_g6=1,attn_mfma4_g4=1,attn_reduce=1,rms_norm_3d=1,reshape_and_cache=1";;
+  *) echo "variant $V"; exit 1;; esac
 mkdir -p "$OUT"
 # paths as the container sees them: $HOME/code -> /code
 C_ROOT=/code/${ROOT#$HOME/code/}; C_OUT=/code/${OUT#$HOME/code/}
@@ -38,6 +41,7 @@ if [ "$(cfg num_experts)" != 0 ]; then
   BLK+=(--block silu_and_mul=$(( $(cfg moe_intermediate_size) / 8 ))); SL="fused_moe_up=1,fused_moe_down=1,silu_and_mul=1"
 fi
 echo "== import ($EXP)"
+XS=$(echo "$E" | tr " " "\n" | sed -n "s/^ETX_VL_SLOTS=//p"); SL="${XS:+$XS,}$SL"; SL="${SL%,}"
 python3 -m etx.importer.vllm_kernels --vllm /code/vllm --out $OUT/imp --compiler hipcc --only "$EXP" --slots "$SL" "${BLK[@]}"
 python3 -m etx.importer.adapter $OUT/imp/imports.json --tiles $OUT/imp_tiles.hip --header $OUT/imports.h
 python3 -m etx.importer.bundle --imports $OUT/imp --exports "$EXP" --devlibs $DL -o $OUT/imports.bc
