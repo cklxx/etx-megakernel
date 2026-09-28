@@ -248,3 +248,33 @@ with microbenchmark values only.
 
 Rule from here: the model runs on microbenchmark values; a term whose microbenchmark-only prediction misses the trace
 by more than 15% is re-examined structurally (what it counts, what overlaps), not refitted.
+
+## 11. vLLM's fused q/k norm + rope (ETX_VL_QKNR, pre-registered 2026-09-28)
+
+What it replaces: the attention block's preparation (q_norm 32 blocks, k_norm 4, rope, cache) ran as one chained task
+on one CU for 19 us of the 40 us block (trace, layer 5): four argument paths and about 20 dependent round trips in
+series. (Why it is serial: model.py links every launch to the previous one in vLLM's order, so q_norm and k_norm,
+which write different buffers, do not overlap either; splitting the chain into tasks only adds hand-offs, simulated
+6.05 against 5.84 ms.) vLLM ships `tensorrt_llm::kernels::fusedQKNormRopeKernel` (csrc/libtorch_stable/
+fused_qknorm_rope_kernel.cu, ROCm paths included), enabled by compilation_config pass_config
+enable_qk_norm_rope_fusion (off by default; it adds +rotary_embedding). One 32-lane warp per head, 8 per 256-thread
+block, 5 blocks for 32 + 4 heads, in place on qkv; per warp: the qkv and position loads, a 5-step reduce, cos/sin
+after the position, the store (2 dependent round trips, from the source; the kernel model's `qknr` entry). Imported:
+80 B of arguments, no LDS, no barrier, 4 slots per workgroup; the megakernel's registers are unchanged (VGPR 128, the
+xcd build's 2 spills). The cache write (9 serial round trips) stays.
+
+Simulated (fitted parameters, ms per token; the fitted set is ~12% optimistic):
+
+| build | today's protocol | with both fixes |
+|---|---|---|
+| xcd (four launches chained) | 5.840 | 4.078 |
+| QKNR=1: fused launch chained with the cache (2 rounds of 4 slots on one CU) | 5.593 | 3.942 |
+| QKNR=grid: fused launch on 2 CUs, then the cache | 5.511 | 3.937 |
+| QKNR=grid, slots 1 (5 CUs) | 5.529 | 3.955 |
+
+Predictions for the session (moe_xcd_qknr_new = grid, moe_xcd_qknrc_new = chained, both with the fixes): each 3.3-3.5%
+faster than moe_xcd_new, grid and chained within 1% of each other; the preparation span in the trace 19 -> 8-11 us.
+Correctness: moe_base_qknr --check byte-identical against the original fused kernel, 32/32 tokens (the fused kernel
+rounds once where rms_norm + rotary rounded twice, so a token flip is possible; if it happens it is reported, not
+hidden). Baseline: vLLM with the same pass on, same image, same VM, beside the default; the rocprof trace must show
+fusedQKNormRope launches (48 per step) or the vLLM number does not count as "the same kernels".
