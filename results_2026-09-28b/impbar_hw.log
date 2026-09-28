@@ -1,0 +1,16 @@
+# job impbar_hw gpu=0 cwd=/home/hotaisle/etx
+# stdbuf -oL $HOME/sess/imp_bench_hw
+device gfx942:sramecc+:xnack-, 304 CUs, protocol rounds
+RESULT impbar rounds __syncthreads (1024 threads):   61.2 ns per barrier
+RESULT impbar rounds fused_moe (1 x 256, 12 idle waves)   R  0: block   0.311 us (the exit protocol alone)
+RESULT impbar rounds fused_moe (1 x 256, 12 idle waves)   R  1: block   0.531 us, per barrier  220.4 ns
+RESULT impbar rounds fused_moe (1 x 256, 12 idle waves)   R  8: block   1.247 us, per barrier  117.0 ns
+RESULT impbar rounds fused_moe (1 x 256, 12 idle waves)   R 32: block   3.699 us, per barrier  105.9 ns
+RESULT impbar rounds topk (4 x 256)                       R  0: block   0.311 us (the exit protocol alone)
+RESULT impbar rounds topk (4 x 256)                       R  1: block   0.459 us, per barrier  147.8 ns
+RESULT impbar rounds topk (4 x 256)                       R  8: block   1.337 us, per barrier  128.2 ns
+RESULT impbar rounds topk (4 x 256)                       R 32: block   4.350 us, per barrier  126.2 ns
+RESULT impbar rounds wvSplitK (1 x 1024)                  R  0: block   0.311 us (the exit protocol alone)
+RESULT impbar rounds wvSplitK (1 x 1024)                  R  1: block   0.459 us, per barrier  148.2 ns
+RESULT impbar rounds wvSplitK (1 x 1024)                  R  8: block   1.337 us, per barrier  128.3 ns
+RESULT impbar rounds wvSplitK (1 x 1024)                  R 32: block   4.351 us, per barrier  126.3 ns

@@ -278,3 +278,35 @@ Correctness: moe_base_qknr --check byte-identical against the original fused ker
 rounds once where rms_norm + rotary rounded twice, so a token flip is possible; if it happens it is reported, not
 hidden). Baseline: vLLM with the same pass on, same image, same VM, beside the default; the rocprof trace must show
 fusedQKNormRope launches (48 per step) or the vLLM number does not count as "the same kernels".
+
+### 10.1 Measured (results_2026-09-28b, 1x MI300X enc1-gpuvm002, 16:13 UTC, before any timed run of the session)
+
+| measurement | predicted | measured | |
+|---|---|---|---|
+| vector round trip L1 / L2 / MALL / HBM, idle | 0.05-0.15 / 0.1-0.3 / 0.25-0.5 / 0.3-0.8 | 0.103 / 0.143 / 0.261 / 0.412 us | in range |
+| the same, loaded (303 CUs streaming) | x1.5-3 | 0.73 / 0.71 / 0.69 us (L2 / MALL / HBM) | queueing sets it, not the level |
+| scalar K$ hit, and after inv sc1 | < 0.1 | 0.113, 0.119 us | the K$ survives ETX's acquire |
+| buffer_inv sc1 alone, idle / loaded | - | 0.19 / 0.63 us | every DEVICE acquire under load pays 0.6 us |
+| vector hop after inv sc1, loaded | - | 1.14 us | |
+| lf highest rate | 4.0-4.5 TB/s | 3.93 TB/s (18.5 MB in flight) | the fitted 5.2 is not physical |
+| lf 192 WGs x 16 KB (fused_moe) | 2.5-3.5 | 3.56 TB/s | |
+| kernel boundary, empty / + first load | 1.5-1.8 / +0.3-0.8 | 1.61 / +0.26 us | the fitted F 2.5 absorbed other terms |
+| software slot barrier (fused_moe shape) | 0.2-0.3 | 0.282 us | |
+| round barrier / exit protocol per task | 0.08-0.12 / < 0.5 | 0.106 / 0.311 us | |
+| wait on a complete event (acquire + barrier) | 0.1-0.4 | 0.52 us | a per-task term the simulator lacks |
+| evx XCD P 37 C 37 / device 296 / 296 | 0.3-0.6 / 1.3-2.1 | 2.20 / 3.91 us | NOT the trace's hand-off: unexplained, not used |
+
+Derived (examples/vllm_llm/bench_params.py): the argument path under load, vector build = one invalidate (0.63) + two
+hops that miss it (2 x 0.51) = 1.65 us (fitted A_task 2.1); scalar build = 0.63 + two K$ hits = 0.86 us. So the
+argument fix saves ~0.8 us per imported task, not the 1.6-1.8 the section 9 table's best column assumed.
+
+The simulation with microbenchmark values only (t_v, t_s, F, BW, t_swbar, the round barrier, A_task; hand-offs from
+the trace, 0.4 / 1.8 us): **today's build 6.661 ms against the measured 6.63 (0.5%)**, where the fitted set said
+5.84. Its predictions for this session's builds, written before they run:
+
+| build | microbenchmark-only prediction | (fitted x 1.135, section 9) |
+|---|---|---|
+| old (moe_xcd_old) | 6.66 | 6.63 |
+| hardware barriers only (moe_xcd_hw) | 6.15 | 6.03 |
+| argument path only (moe_xcd_args) | 6.05 | 5.05-6.10 |
+| both (moe_xcd_new) | 5.54 | 4.45-5.51 |

@@ -453,7 +453,8 @@ __device__ __forceinline__ int evx_arrive(int* p, int n) { return __hip_atomic_f
 // A workgroup can be both: it arrives, then waits (a task's end, then the next task's wait). late: consumers start their
 // wait `late_ticks` after the producers' latest possible arrival (the event is already complete: the cost of a ready wait).
 __global__ void __launch_bounds__(kT) k_evx(int* words, int* subs, int stride, int P, int C, int scope, int dirty_kb, int skew_ticks,
-                                            int late_ticks, int iters, Ctl* ctl, float* scratch, uint64_t* t_arr, uint64_t* t_w0, uint64_t* t_wake) {
+                                            int late_ticks, int iters, Ctl* ctl, float* scratch, uint64_t* t_arr, uint64_t* t_w0, uint64_t* t_wake,
+                                            int ts_after) {
   __shared__ int s_slot;
   if (threadIdx.x == 0) s_slot = claim_xslot(ctl);
   __syncthreads();
@@ -473,10 +474,14 @@ __global__ void __launch_bounds__(kT) k_evx(int* words, int* subs, int stride, i
       if (threadIdx.x == 0) {
         const uint64_t until = tb + (uint64_t)((slot * 7919 + x * 131) % (skew_ticks + 1));
         while (now() < until) {}
-        t_arr[(size_t)it * 304 + wid] = now();
+        // ts_after: the arrival time stays in a register until the arrive is issued (the store of a timestamp before
+        // the release would be drained by it: a cost of the measurement, not of the protocol)
+        const uint64_t ta = now();
+        if (!ts_after) t_arr[(size_t)it * 304 + wid] = ta;
         if (scope == 0) { evx_rel_domain(); evx_arrive(word, 1); }
         else if (share <= 1) { evx_rel_device(); evx_arrive(word, 1); }
         else { evx_rel_domain(); if (atomicAdd(sub, 1) + 1 == share) { evx_rel_device(); evx_arrive(word, share); } }
+        if (ts_after) t_arr[(size_t)it * 304 + wid] = ta;
       }
     }
     if (cons) {
@@ -729,12 +734,12 @@ int main(int argc, char** argv) {
     const std::vector<E> es = {{0, 1, 1, 0, 0}, {0, 1, 8, 0, 0}, {0, 1, 37, 0, 0}, {0, 8, 8, 0, 0}, {0, 37, 1, 0, 0}, {0, 37, 37, 0, 0},
                                {0, 37, 37, 64, 0}, {0, 1, 1, 0, 500}, {1, 8, 8, 0, 0}, {1, 8, 296, 0, 0}, {1, 64, 64, 0, 0},
                                {1, 296, 8, 0, 0}, {1, 296, 296, 0, 0}, {1, 296, 296, 64, 0}, {1, 8, 8, 0, 500}};
-    for (const E& e : es) {
+    for (int tsa = 0; tsa < 2; ++tsa) for (const E& e : es) {
       std::vector<int> hw((size_t)iters * 16 * stride, 0);
       for (int it = 0; it < iters; ++it) for (int k = 0; k < 9; ++k) hw[((size_t)it * 16 + k) * stride] = e.P;   // DOMAIN words: P each; DEVICE: P
       CHECK(hipMemcpy(words, hw.data(), hw.size() * 4, hipMemcpyHostToDevice)); CHECK(hipMemset(subs, 0, (size_t)iters * 8 * stride * 4));
       reset(); CHECK(hipMemset(ta, 0, (size_t)iters * 304 * 8)); CHECK(hipMemset(t0, 0, (size_t)iters * 304 * 8)); CHECK(hipMemset(tw, 0, (size_t)iters * 304 * 8));
-      hipLaunchKernelGGL(k_evx, dim3(ncu), dim3(kT), lds1, st, words, subs, stride, e.P, e.C, e.scope, e.dirty, 100, e.late, iters, ctl, scratch, ta, t0, tw);
+      hipLaunchKernelGGL(k_evx, dim3(ncu), dim3(kT), lds1, st, words, subs, stride, e.P, e.C, e.scope, e.dirty, 100, e.late, iters, ctl, scratch, ta, t0, tw, tsa);
       if (!wait_stream(st, 30)) { printf("RESULT evx HUNG\n"); return 3; }
       std::vector<uint64_t> a((size_t)iters * 304), b((size_t)iters * 304), c((size_t)iters * 304);
       CHECK(hipMemcpy(a.data(), ta, a.size() * 8, hipMemcpyDeviceToHost)); CHECK(hipMemcpy(b.data(), tw, b.size() * 8, hipMemcpyDeviceToHost));
@@ -748,8 +753,8 @@ int main(int argc, char** argv) {
         if (wk.empty() || !arr) continue;
         std::sort(wk.begin(), wk.end()); first.push_back(wk.front()); med.push_back(wk[wk.size() / 2]); last.push_back(wk.back());
       }
-      printf("RESULT evx %-6s P %3d C %3d dirty %2d KB%s: last arrival -> first %5.2f  median %5.2f  last %5.2f us; wait start -> wake median %5.2f us\n",
-             e.scope ? "device" : "xcd", e.P, e.C, e.dirty, e.late ? " late " : "      ", pct(first, 0.5), pct(med, 0.5), pct(last, 0.5), pct(ready, 0.5));
+      printf("RESULT evx%s %-6s P %3d C %3d dirty %2d KB%s: last arrival -> first %5.2f  median %5.2f  last %5.2f us; wait start -> wake median %5.2f us\n",
+             tsa ? "" : "-tsbefore", e.scope ? "device" : "xcd", e.P, e.C, e.dirty, e.late ? " late " : "      ", pct(first, 0.5), pct(med, 0.5), pct(last, 0.5), pct(ready, 0.5));
     }
   }
   return 0;

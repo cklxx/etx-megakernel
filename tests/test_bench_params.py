@@ -34,12 +34,15 @@ def sample():
         fmt(hw, "RESULT lat", "vector", "L2", "inv sc1", "idle  ", 900.0, 1800, 880.0),
         fmt(hw, "RESULT lat", "scalar", "L1/K$", "inv sc1", "loaded", 150.0, 300, 140.0),
         fmt(hw, "RESULT lat", "scalar", "L1/K$", "inv sc1", "idle  ", 120.0, 240, 110.0),
+        fmt(hw, "RESULT lat", "scalar", "L1/K$", "-      ", "idle  ", 100.0, 200, 100.0),
+        fmt(hw, "RESULT lat", "vector", "L2", "inv sc1", "loaded", 1100.0, 2000, 1000.0),
+        fmt(hw, "RESULT lat", "inv-only", "L1/K$", "inv sc1", "loaded", 600.0, 1200, 590.0),
         fmt(hw, "RESULT lf", 262144, 192, 16, 3.0, 60.0, 62.0, 0.9, 0.84, 0.81),
         fmt(hw, "RESULT lf", 262144, 296, 32, 9.25, 20.0, 22.0, 0.6, 3.88, 3.5),
         fmt(hw, "RESULT launch", 304, 1024, -1, 1.62, 1.55),
-        fmt(hw, "RESULT evx", "xcd", 37, 37, 0, "      ", 0.3, 0.42, 0.6, 1.2),
-        fmt(hw, "RESULT evx", "device", 296, 296, 0, "      ", 1.1, 1.4, 1.9, 2.0),
-        fmt(hw, "RESULT evx", "xcd", 1, 1, 0, " late ", 0.0, 0.0, 0.0, 0.25),
+        fmt(hw, "RESULT evx", "", "xcd", 37, 37, 0, "      ", 0.3, 0.42, 0.6, 1.2),
+        fmt(hw, "RESULT evx", "", "device", 296, 296, 0, "      ", 1.1, 1.4, 1.9, 2.0),
+        fmt(hw, "RESULT evx", "", "xcd", 1, 1, 0, " late ", 0.0, 0.0, 0.0, 0.25),
         fmt(imp, "RESULT impbar %s __sync", "rounds", 77.0),
     ]
     for proto, per in (("sw    ", 260.0), ("rounds", 95.0)):
@@ -66,8 +69,8 @@ def test_derive():
     assert abs(d["t_v"][0] - 0.8123) < 1e-9 and abs(d["t_s"][0] - 0.7) < 1e-9
     assert d["F"][0] == 1.62 and d["bw"][0] == 3.88e6
     assert abs(d["t_swbar"][0] - 0.26) < 1e-9 and abs(d["t_round"][0] - 0.095) < 1e-9
-    assert abs(d["A_task_vector"][0] - 1.8) < 1e-9 and abs(d["A_task_scalar"][0] - 0.24) < 1e-9
-    assert d["handoff_domain"][0] == 0.42 and d["handoff_device"][0] == 1.4
+    assert abs(d["A_task_vector"][0] - (0.6 + 2 * 0.5)) < 1e-9 and abs(d["A_task_scalar"][0] - (0.6 + 2 * 0.1)) < 1e-9
+    assert d["ready_wait"][0] == 0.25
 
 
 def test_main_runs(tmp_path):
