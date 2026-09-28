@@ -23,6 +23,7 @@ Restore: `gh release download data-2026-09-27 --repo cklxx/etx-data && shasum -a
 | `results_2026-09-27b` | `examples/sessions/ds_gap.py` (3d0083f) | 39 / 40 MB | 120d600b5059f706 | DeepSeek A/B runs (fleet, sc0, sc1, 2 WG/CU bounds, params, relay); ETX trace + **prologue stamps** + plan; fleet trace + task graph; routing overlap (4 prompts, 32 steps, per layer) | `compare_fleet.py`, `ledger.py`, `whatif.py --routing`, design 15.12 |
 | `results_2026-09-27c` | `examples/sessions/ds_interleave.py` (8f04931) | 38 / 57 MB | 16201211b2822240 | two-request builds (router / experts / none) runs; traces + plans of the router and uncoupled builds | `phase_compare.py`, `ledger.py`, design 15.13 |
 | `results_2026-09-27d` | `examples/sessions/ds_model.py` (b610466) and `ds_evstride.py` (e6c0249) | 84 / 72 MB | 5e4ce2e5e8a2fa39 | hw_bench (stream, shared, handoff incl. padded counters, wg, clock, pair); in-situ phases (one request alone, two-request pairs); hardware counters of whole tokens (x1, x2); the ETX_EV_STRIDE A/B and a stride-32 trace | `isolate_report.py`, `ledger.py`, `docs/MODEL-dsv2.md` section 5, design 15.14 |
+| `results_2026-09-28` | `examples/sessions/moe_gate.py` (eb7a20d + be6dfb7), 1x MI300X | 112 / 107 MB | f95453fa252c5859 | dense stride 32 / 1 and unfused runs (1.5B, 8B), MoE (Qwen3-30B-A3B) --check and fused / unfused runs, ETX_TRACE of 1.5B xcd_s1 and MoE xcd, rocprofv3 kernel traces of the 1.5B and MoE unfused builds, plans; `try1/` the first start (build failure) | `examples/vllm_llm/compare.py`, docs/MODEL-moe.md section 7 |
 
 Earlier sets (2026-09-22 .. 26) are summarized in the design document (section 15) and `examples/*/results/`; their raw
 traces were not kept.
@@ -44,3 +45,4 @@ traces were not kept.
 - Hardware: kernel boundary 1.6 us; device barrier 7.6-7.8 us; hand-offs packed / padded; stream rates at the real bytes
   per task; staging costs; workgroup primitives; clock under FMA load; co-residency pair factors; counters (i-cache, TLB).
 - Routing overlap of concurrent requests (uniform: 11.38 of 11.44 experts for two).
+- ETX_EV_STRIDE 32 vs 1 on the vLLM-kernel Qwen graphs (0.5-3%), the imported MoE kernels' per-launch cost against vLLM (2026-09-28).

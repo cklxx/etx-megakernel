@@ -147,3 +147,39 @@ wrote (`results_2026-09-27/vlnext/moe/triton`, LLVM 23 IR). Inside the megakerne
   (row x) and of down (32 of 256), each waiting only on its own XCD's part of the previous launch. Per layer that makes
   6 XCD-local and 7 device-wide hand-offs (`tests/test_vllm_moe.py` checks the placement and the event scopes).
 - **Session:** `examples/sessions/moe_gate.py` (G1-G3 of section 4, the MoE check, fused and unfused timing).
+
+## 7. Reconciliation (2026-09-28, session moe_gate, 1x MI300X enc1-gpuvm002; results_2026-09-28)
+
+Every timed run 32/32 tokens equal to HF greedy; every MoE launch of layers 0-1 byte-identical to vLLM's kernel,
+the two Triton fused_moe launches against vLLM's own code object (`CHECK OK: 0 launch(es) differ`). ms/token, two
+alternated rounds on one GPU:
+
+| | stride 32 | stride 1 | unfused |
+|---|---|---|---|
+| Qwen2.5-1.5B base | 2.555 / 2.562 | 2.567 / 2.568 | 2.202 / 2.211 |
+| Qwen2.5-1.5B xcd_s1 | 2.410 / 2.420 | 2.491 / 2.464 | |
+| Qwen3-8B base | 6.094 / 6.112 | 6.134 / 6.166 | 5.737 / 5.734 |
+| Qwen3-8B xcd | 6.085 / 6.099 | 6.127 / 6.135 | |
+| Qwen3-30B-A3B base | 6.755 / 6.772 | | 6.209 / 6.233 |
+| Qwen3-30B-A3B xcd | 6.633 / 6.659 | | |
+
+vLLM (2026-09-27, another VM of the same type): 1.937 / 5.039 (custom_ops=all), 4.898 (MoE). The unfused builds
+reproduce the previous VM within 1% (1.5B 2.19, 8B 5.68), so the vLLM numbers are comparable; the fused 1.5B xcd_s1 is
+slower here (2.49 at stride 1 against 2.248), not explained.
+
+| prediction | result | verdict |
+|---|---|---|
+| G1 / H1: stride 32 gains 0.3-0.7 ms on the base builds; 1.5B xcd_s1 1.95-2.25, 8B xcd 5.35-5.86 | base 0.5-0.8%, xcd 0.6-3% | **H1 refuted** for the vLLM-kernel graphs |
+| MoE below 4.65 ms | 6.63 ms (xcd), 35% above vLLM | **gate failed** |
+| G2: h is 2.2-2.8 us | `compare.py ledger`, MoE xcd layer: 13.7 us of hand-offs for 13 hand-offs (XCD-local 0.3-0.5, device-wide 1.5-2.1), ramp 4.5, tail 10.7, **bodies 102 us** | h is ~1 us: not the problem |
+| G3: p 0.5-1.35 us per launch | `compare.py unfused`, per launch vs vLLM: MoE +42 us per layer (fused_moe gate_up +8.2, down +3.7, reduce +3.2, topk +2.6, qkv / o_proj / cache / attn +1.4-1.8); 1.5B +9.8 us (reduce +2.2, down / gate_up +1.7, attn +1.5) | **p is the problem**, and larger for MoE |
+
+**Where p comes from, first part (found, fix not measured):** the imported fused_moe runs one program (4 waves) in a
+16-wave workgroup, so its `s_barrier`s become `etx_imp_slot_barrier` (LDS counter + polling). Triton's K loop has 4
+barriers per iteration: about 69 barriers for gate_up (K 2048) and 29 for down (K 768). The excess over vLLM's fastest
+launch (gate_up 23.1 vs 14.2 us, down 12.1 vs 9.5) is 0.13 and 0.09 us per barrier, consistent between the two kernels.
+Fix: hardware barriers in rounds (a wave that has finished its block, or has none, keeps executing `s_barrier` until
+every active wave of the workgroup has finished), valid because the waves of one block reach the same barriers.
+Predicted: fused_moe back to vLLM's time, about -11 us per layer, -0.5 ms per token; the other slot-barrier imports
+(attention, reduce, rms_norm, q/k norm) gain too. What remains after it (topk, cache, reduce, the GEMV +1.4 us) is the next
+measurement.
