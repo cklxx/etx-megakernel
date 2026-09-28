@@ -31,7 +31,8 @@ def run(a):
     from vllm.inputs import TokensPrompt
     lines = Path(a.golden).read_text().splitlines()
     prompt = [int(x) for x in lines[0].split()[1:]]
-    kw = {"compilation_config": {"custom_ops": [a.custom_ops]}} if a.custom_ops else {}
+    cc = ({"custom_ops": [a.custom_ops]} if a.custom_ops else {}) | ({"pass_config": json.loads(a.pass_config)} if a.pass_config else {})
+    kw = {"compilation_config": cc} if cc else {}
     llm = LLM(model=a.model, dtype="bfloat16", max_model_len=len(prompt) + a.tokens + 16, gpu_memory_utilization=0.85, **kw)
     p = TokensPrompt(prompt_token_ids=prompt)
 
@@ -110,6 +111,7 @@ def main():
     sp = ap.add_subparsers(dest="cmd", required=True)
     r = sp.add_parser("run"); r.add_argument("--model", required=True); r.add_argument("--golden", required=True)
     r.add_argument("--tokens", type=int, default=32); r.add_argument("--custom-ops", default=None)
+    r.add_argument("--pass-config", default=None)
     z = sp.add_parser("analyze"); z.add_argument("dir"); z.add_argument("--tokens", type=int, default=32); z.add_argument("--json", default=None)
     a = ap.parse_args()
     run(a) if a.cmd == "run" else analyze(a)

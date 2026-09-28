@@ -39,9 +39,12 @@ def cost_fn(model: str, p: km.Params, variant: dict | None = None):
             return cache[name]
         r = role_of(name)
         if name.startswith("chain_"):                     # q/k norm + rope + cache run back to back in one task
-            parts = [kern[x] for x in ("q_norm", "k_norm", "rope", "cache") if x in kern]
-            # every part reads its own arguments: each pays the argument path (measured: 18.6 us for the four)
-            ch = sum(km.terms(k, p, "etx_task")["total"] for k in parts) - p.A_task
+            roles = re.match(r"chain_(.+)_\d+$", name).group(1).split("_")
+            roles = [x if x in kern else f"{x}_{y}" for x, y in zip(roles, roles[1:] + [""]) if x in kern or f"{x}_{y}" in kern]
+            parts = [kern[x] for x in roles]
+            # every part reads its own arguments: each pays the argument path (measured: 18.6 us for the four);
+            # a part whose blocks exceed the workgroup's slots runs in rounds
+            ch = sum(km.terms(k, p, "etx_task")["total"] * k.chain_rounds for k in parts) - p.A_task
             c = Cost(front_us=p.A_task, chain_us=ch)
         elif r in kern:
             k = kern[r]

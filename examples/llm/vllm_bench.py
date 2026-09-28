@@ -38,6 +38,7 @@ def main() -> None:
     ap.add_argument("--json", type=Path, default=None)
     ap.add_argument("--batch", type=int, default=1, help="sequences decoded together (distinct prompts of equal length)")
     ap.add_argument("--custom-ops", default=None, help="'all': vLLM's own HIP ops instead of Inductor-generated ones (the kernels ETX imports)")
+    ap.add_argument("--pass-config", default=None, help='compilation_config pass_config as JSON, e.g. {"enable_qk_norm_rope_fusion": true}')
     a = ap.parse_args()
 
     import vllm
@@ -45,7 +46,8 @@ def main() -> None:
     from vllm.inputs import TokensPrompt
 
     prompt_ids, golden = read_golden(a.golden)
-    kw = {"compilation_config": {"custom_ops": [a.custom_ops]}} if a.custom_ops else {}
+    cc = ({"custom_ops": [a.custom_ops]} if a.custom_ops else {}) | ({"pass_config": json.loads(a.pass_config)} if a.pass_config else {})
+    kw = {"compilation_config": cc} if cc else {}
     llm = LLM(model=a.model, dtype="bfloat16", trust_remote_code=True,
               max_model_len=len(prompt_ids) + a.tokens + 16, gpu_memory_utilization=0.85, enforce_eager=False, **kw)
     plen = len(prompt_ids)

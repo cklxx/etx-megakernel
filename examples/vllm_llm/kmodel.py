@@ -54,6 +54,7 @@ class Kern:
     dpp: float = 0
     instr: float = 200
     etx_extra_V: float = 0  # ETX form only: extra dependent vector round trips (fused_moe prologue)
+    chain_rounds: int = 1   # rounds of blocks when the whole launch runs on one workgroup (a chain part)
     note: str = ""
 
 
@@ -66,6 +67,9 @@ MOE = [
     Kern("k_norm", S=4, V=2, bar=2, sw_etx=2, shfl=10, instr=350, note="rms_norm_3d 4 heads"),
     Kern("rope", S=3, V=5, instr=400, note="rotary neox, 2 B scalar loads, 4 passes over q + 1 over k"),
     Kern("cache", S=3, V=9, instr=350, note="reshape_and_cache, V copy 8 serial 2 B load/store rounds"),
+    Kern("qknr", S=2, V=2, shfl=9, instr=250, chain_rounds=2,
+         note="fused_qk_norm_rope (ETX_VL_QKNR): from the source, not yet the ISA: qkv and position loads in parallel, "
+              "cos/sin after the position; 5-step 32-lane reduce + 4 rope exchanges; 5 blocks = 2 rounds of 4 slots"),
     Kern("attn", S=4, V=7, bar=7, sw_etx=7, shfl=4, instr=720, note="ll4mi mfma16 GQA 8, 4 of 5 partitions, 2 scratch reloads"),
     Kern("reduce", S=3, V=1, bar=1, sw_etx=1, shfl=12, instr=430, note="attention reduce, 32 heads"),
     Kern("o_proj", S=4, V=1, bytes_block=65.5e3, inflight=16e3, active=256, bar=1, dpp=16, instr=350, note="wvSplitK 2048x4096, 4 waves stream"),

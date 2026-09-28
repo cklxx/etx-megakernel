@@ -14,10 +14,10 @@ ROOT = Path(__file__).resolve().parents[1]
 IMPORTS = {"wvsplitk_y2": (1, 80), "wvsplitk_y1": (1, 80), "attn_mfma16_g8": (4, 160), "attn_reduce": (8, 80),
            "rms_norm_2d": (4, 100), "rms_norm_3d": (16, 100), "fused_add_rms_norm": (1, 72), "rope_neox": (2, 108),
            "reshape_and_cache": (16, 96), "silu_and_mul": (1, 48), "topk_softmax_e128": (4, 104), "moe_sum_k8": (4, 96),
-           "fused_moe_up": (1, 136), "fused_moe_down": (1, 144)}
+           "fused_moe_up": (1, 136), "fused_moe_down": (1, 144), "qknorm_rope": (4, 80)}
 
 
-def _graph(tmp_path, monkeypatch, xcd: bool, layers: int = 3):
+def _graph(tmp_path, monkeypatch, xcd: bool, layers: int = 3, qknr: str = "0"):
     imp = tmp_path / "imports.json"
     imp.write_text(json.dumps({e: {"slots": s, "arg_bytes": a} for e, (s, a) in IMPORTS.items()}))
     monkeypatch.setenv("ETX_VL_IMPORTS", str(imp))
@@ -27,6 +27,7 @@ def _graph(tmp_path, monkeypatch, xcd: bool, layers: int = 3):
     monkeypatch.setenv("ETX_VL_CHAIN", "1" if xcd else "0")
     monkeypatch.setenv("ETX_VL_PLAN", str(tmp_path / "vl_plan.txt"))
     monkeypatch.setenv("ETX_VL_CHAINS", str(tmp_path / "chain_tiles.hip"))
+    monkeypatch.setenv("ETX_VL_QKNR", qknr)
     import examples.vllm_llm.model as vm
     vm = importlib.reload(vm)
     return vm, vm.build()
@@ -126,3 +127,27 @@ def test_adapter_rounds_and_pre_wait():
     for f in ("etx_pre_reduce(", "etx_pre_x_reduce(", "etx_pre_reduce_at(", "etx_pre_gemv("):
         assert f in src
     assert "etx_imp_argblock(c->args, c->cst[0])" in src
+
+
+def test_qknr_replaces_qk_norm_and_rope(tmp_path, monkeypatch):
+    """ETX_VL_QKNR: vLLM's fused_qk_norm_rope (grid ceil((32 + 4) / 8) = 5, block 256) in place of rms_norm_3d x2 +
+    rotary; =1 chains it with the cache write (one task), =grid keeps it a grid of its own (its blocks on 2 CUs)."""
+    from etx.codegen.kernel import emit_plan_json
+    from examples.vllm_llm import kmodel as km
+    from examples.vllm_llm.xcd_run import cost_fn
+    vm, g = _graph(tmp_path, monkeypatch, xcd=False, qknr="1")
+    rows = [ln.split() for ln in (tmp_path / "vl_plan.txt").read_text().splitlines()[2:]]
+    layer1 = [(r[1], r[3], int(r[4]), int(r[8])) for r in rows if r[2] == "1"]
+    assert [x[1] for x in layer1][:5] == ["in_norm", "qkv", "qknr", "cache", "attn"]
+    assert [x for x in layer1 if x[1] == "qknr"] == [("qknorm_rope", "qknr", 5, 2)]
+    vm, g = _graph(tmp_path, monkeypatch, xcd=True, layers=2, qknr="1")
+    names = json.loads(emit_plan_json(compile_graph(g, "gfx942", {}, {})))["types"]
+    assert "chain_qknr_cache_1" in names and not any(n.startswith("qknr_") for n in names)
+    p = km.Params()
+    cost = cost_fn("qwen3-30b-a3b", p)("chain_qknr_cache_1", {})
+    kern = {k.role: k for k in km.MOE}
+    want = 2 * km.terms(kern["qknr"], p, "etx_task")["total"] + km.terms(kern["cache"], p, "etx_task")["total"]
+    assert abs(cost.front_us + cost.chain_us - want) < 1e-9          # the fused part in 2 rounds of 4 slots, then the cache
+    vm, g = _graph(tmp_path, monkeypatch, xcd=True, layers=2, qknr="grid")
+    names = json.loads(emit_plan_json(compile_graph(g, "gfx942", {}, {})))["types"]
+    assert "qknr_1" in names and "cache_1" in names and not any(n.startswith("chain_") for n in names)

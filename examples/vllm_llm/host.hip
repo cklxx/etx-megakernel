@@ -147,6 +147,8 @@ int main(int argc, char** argv) {
       insts.push_back(x);
     }
   }
+  bool qknr = false;                                                        // the plan runs the fused q/k norm + rope
+  for (const Inst& x : insts) qknr = qknr || x.role == "qknr";
 
   // ---- golden: request 0 from --golden, request 1 (ETX_VL_REQUESTS=2) from --golden1; the prompts have one length
   std::vector<std::vector<int>> prompts, goldens;
@@ -244,8 +246,11 @@ int main(int argc, char** argv) {
     bf* act_out = per_xcd ? act_r : act;
     bf* qkv_in = x.layer == 0 ? hn_r : d_norm;                            // the normed hidden state entering qkv
     float* tw_r = topk_w + (size_t)rr * TOPK; int32_t* ti_r = topk_ids + (size_t)rr * TOPK;   // this XCD's top-k copy
-    bf* qbuf = qk_norm ? qn : qkv; bf* kbuf = qk_norm ? kn : qkv + NH * HD;
-    const long long qstr = qk_norm ? NH * HD : NQKV, kstr = qk_norm ? NKV * HD : NQKV;
+    // q / k after the norm: separate buffers (rms_norm_3d writes out of place), or qkv itself (no q/k norm, or the fused
+    // q/k norm + rope, in place)
+    const bool qn_sep = qk_norm && !qknr;
+    bf* qbuf = qn_sep ? qn : qkv; bf* kbuf = qn_sep ? kn : qkv + NH * HD;
+    const long long qstr = qn_sep ? NH * HD : NQKV, kstr = qn_sep ? NKV * HD : NQKV;
     auto gemv = [&](const void* w, const void* in, void* out, const void* b) {   // ops.wvSplitK(weight, x, cu_count, bias)
       a.i32(x.K).i32(x.K).i32(x.K).i32(x.M).i32(b ? x.M : 1).i32(1).ptr(w).ptr(in).ptr(b).ptr(out).i32(x.wv).i32(304);
     };
@@ -260,6 +265,9 @@ int main(int argc, char** argv) {
     else if (r == "qkv") gemv(W(pl + "wqkv"), qkv_in, qkv, bias ? W(pl + "bqkv") : nullptr);
     else if (r == "q_norm") a.ptr(qn).ptr(qkv).i64(HD).i64(NQKV).i64(0).i64(NH).i64(0).ptr(W(pl + "qn")).i64(0).f32(eps).i32(NH).i32(HD);
     else if (r == "k_norm") a.ptr(kn).ptr(qkv + NH * HD).i64(HD).i64(NQKV).i64(0).i64(NKV).i64(0).ptr(W(pl + "kn")).i64(0).f32(eps).i32(NKV).i32(HD);
+    // fused_qk_norm_rope(qkv, nq, nk, nv, head_dim, eps, q_weight, k_weight, cos_sin_cache, is_neox, positions): kernel
+    // arguments (qkv, nq, nk, nv, eps, q_w, k_w, cos_sin, positions, num_tokens, rotary_dim = cos_sin.size(1) = HD)
+    else if (r == "qknr") a.ptr(qkv).i32(NH).i32(NKV).i32(NKV).f32(eps).ptr(W(pl + "qn")).ptr(W(pl + "kn")).ptr(W("cos_sin")).ptr(positions).i32(1).i32(HD);
     else if (r == "rope") a.ptr(positions).ptr(qbuf).ptr(kbuf).ptr(W("cos_sin")).i32(HD).i64(qstr).i64(kstr).i64(HD).i32(NH).i32(NKV).i32(HD).i64(0).b8(false);
     else if (r == "cache") a.ptr(kbuf).ptr(qkv + (NH + NKV) * HD).ptr(kc[x.layer]).ptr(vc[x.layer]).ptr(slot_mapping).i32((int)kstr).i32(NQKV).i32(NKV).i32(HD).i32(BS).i32(X).ptr(kv_scale).ptr(kv_scale);
     else if (r == "attn") a.ptr(qbuf).ptr(kc[x.layer]).ptr(vc[x.layer]).i32(NKV).f32(scale).ptr(block_tables).ptr(seq_lens).ptr(nullptr).i32(MAXBLK).ptr(nullptr)

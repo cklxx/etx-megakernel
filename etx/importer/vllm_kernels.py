@@ -88,6 +88,14 @@ SOURCES = [
         Kernel("rope_neox", "rotary_embedding_kernelIN3c108BFloat16ES2_Lb1E", f"vllm::rotary_embedding_kernel<{CB}, {CB}, true>", (512, 1, 1),
                note="block min(NH*64, 512): 512 for every model here"),
     ]),
+    Source("csrc/libtorch_stable/fused_qknorm_rope_kernel.cu", kernels=[
+        # fused_qk_norm_rope (vLLM's QKNormRoPEFusionPass, compilation_config enable_qk_norm_rope_fusion): batch 1 ->
+        # token_heads_per_warp 1 (auto-select only raises it on SM 9.0) -> launchFusedQKNormRope: block 256 (8 warps of
+        # 32 lanes), grid ceil((NH + NKV) / 8), one warp per head; bf16 qkv and cos/sin cache, neox -> interleave false
+        Kernel("qknorm_rope", "fusedQKNormRopeKernelIN3c108BFloat16E",
+               f"tensorrt_llm::kernels::fusedQKNormRopeKernel<{CB}, {CB}, 128, false>", (256, 1, 1),
+               note="head_dim 128 (Qwen3); grid 5 for 32 + 4 heads"),
+    ]),
     Source("csrc/libtorch_stable/cache_kernels.cu", defines=["ENABLE_FP8"], kernels=[
         # reshape_and_cache: grid num_tokens, block min(num_kv_heads * head_size / x, 512), x = 16 / 2
         Kernel("reshape_and_cache", "reshape_and_cache_kernelI14__hip_bfloat16S1_LNS_18Fp8KVCacheDataTypeE0E",

@@ -54,11 +54,18 @@ MOE_BN = 64                   # fused_moe_kernel BLOCK_SIZE_N of vLLM's default 
 MAXLEN = int(os.environ.get("ETX_VL_MAXLEN", "1072"))    # vLLM's max_model_len for the benchmark (prompt + 32 + 16)
 # ETX_VL_PIN=1: the small launches between qkv and o_proj (q/k norm, rope, cache, attention, reduce) all run on
 # XCD 0, so the events between them are XCD-local (a wait on L2 of one XCD) instead of device-wide
-PIN_ROLES = {"q_norm", "k_norm", "rope", "cache", "attn", "reduce"} if os.environ.get("ETX_VL_PIN", "0") == "1" else set()
+PIN_ROLES = {"q_norm", "k_norm", "rope", "qknr", "cache", "attn", "reduce"} if os.environ.get("ETX_VL_PIN", "0") == "1" else set()
 # ETX_VL_CHAIN=1: consecutive launches that each fit on one workgroup run as ONE task, back to back with a
 # __syncthreads between them instead of an event (q/k norm, rope and the cache write; at most 4 per task)
-CHAIN_ROLES = ("q_norm", "k_norm", "rope", "cache")
+CHAIN_ROLES = ("q_norm", "k_norm", "rope", "qknr", "cache")
 CHAIN = os.environ.get("ETX_VL_CHAIN", "0") == "1"
+# ETX_VL_QKNR=1: q/k norm + rope as ONE launch of vLLM's fused_qk_norm_rope (tensorrt_llm::kernels::fusedQKNormRopeKernel,
+# what vLLM runs with compilation_config pass_config enable_qk_norm_rope_fusion): one 32-lane warp per head, 8 per
+# 256-thread block, in place on qkv; replaces rms_norm_3d x2 + rotary_embedding
+# ETX_VL_QKNR=grid: the fused launch as its own grid (its blocks on several CUs), not chained with the cache write
+QKNR = os.environ.get("ETX_VL_QKNR", "0") in ("1", "grid")
+if os.environ.get("ETX_VL_QKNR", "0") == "grid":
+    CHAIN_ROLES = tuple(r for r in CHAIN_ROLES if r != "qknr")
 CHAIN_FILE = os.environ.get("ETX_VL_CHAINS", str(HERE / "build" / "chain_tiles.hip"))
 # ETX_VL_XCD=1: the one-block launches between the GEMVs (in/post/final norm, silu_and_mul) run once per XCD on
 # that XCD's own copies (residual, normed input, activation), and the GEMV that follows is a grid of
@@ -119,10 +126,13 @@ def instances(d) -> list[dict]:
     for L in range(d.L):
         add("rms_norm_2d" if L == 0 else "fused_add_rms_norm", L, "in_norm", (1, 1, 1))
         gemv(L, "qkv", d.NQKV, d.H)
-        if d.qk_norm:
-            add("rms_norm_3d", L, "q_norm", (d.NH, 1, 1))
-            add("rms_norm_3d", L, "k_norm", (d.NKV, 1, 1))
-        add("rope_neox", L, "rope", (1, 1, 1))
+        if d.qk_norm and QKNR:
+            add("qknorm_rope", L, "qknr", (math.ceil((d.NH + d.NKV) / 8), 1, 1))
+        else:
+            if d.qk_norm:
+                add("rms_norm_3d", L, "q_norm", (d.NH, 1, 1))
+                add("rms_norm_3d", L, "k_norm", (d.NKV, 1, 1))
+            add("rope_neox", L, "rope", (1, 1, 1))
         add("reshape_and_cache", L, "cache", (1, 1, 1))
         add(attn, L, "attn", (1, parts, d.NKV))
         add("attn_reduce", L, "reduce", (d.NH, 1, 1))

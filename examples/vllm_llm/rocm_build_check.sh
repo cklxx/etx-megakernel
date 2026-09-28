@@ -14,6 +14,9 @@ ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 case $V in base) E="";; chain) E="ETX_VL_CHAIN=1";; xcd) E="ETX_VL_XCD=1 ETX_VL_CHAIN=1";;
   xcd2) E="ETX_VL_XCD=1 ETX_VL_CHAIN=1 ETX_VL_REQUESTS=2"; ETX_CFLAGS="${ETX_CFLAGS:-} -DETX_VL_REQUESTS=2";;
   xcd_s1) E="ETX_VL_XCD=1 ETX_VL_CHAIN=1 ETX_VL_SLOTS=attn_mfma16_g8=1,attn_mfma16_g6=1,attn_mfma4_g4=1,attn_reduce=1,rms_norm_3d=1,reshape_and_cache=1";;
+  xcd_qknr) E="ETX_VL_XCD=1 ETX_VL_CHAIN=1 ETX_VL_QKNR=1";;
+  xcd_qknr_s1) E="ETX_VL_XCD=1 ETX_VL_CHAIN=1 ETX_VL_QKNR=1 ETX_VL_SLOTS=qknorm_rope=1,attn_mfma16_g8=1,attn_reduce=1";;
+  base_qknr) E="ETX_VL_QKNR=1";;
   *) echo "variant $V"; exit 1;; esac
 mkdir -p "$OUT"
 # paths as the container sees them: $HOME/code -> /code
@@ -35,6 +38,7 @@ H=$(cfg hidden_size); NKV=$(cfg num_key_value_heads); NH=$(cfg num_attention_hea
 G=$((NH / NKV)); case $G in 4) ATTN=attn_mfma4_g4;; 6) ATTN=attn_mfma16_g6;; 8) ATTN=attn_mfma16_g8;; esac
 EXP="wvsplitk_y2,$ATTN,attn_reduce,rms_norm_2d,fused_add_rms_norm,rope_neox,reshape_and_cache,silu_and_mul"
 case $M in qwen3*) EXP="$EXP,rms_norm_3d";; esac
+case " $E " in *ETX_VL_QKNR=1*) EXP="$EXP,qknorm_rope";; esac
 BLK=(--block rms_norm_2d=$((H / 8)) --block reshape_and_cache=$((NKV * HD / 8))); SL=""
 if [ "$(cfg num_experts)" != 0 ]; then
   EXP="$EXP,wvsplitk_y1,topk_softmax_e128,moe_sum_k8,fused_moe_up,fused_moe_down"

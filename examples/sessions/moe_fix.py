@@ -90,6 +90,10 @@ BUILDS = {   # name -> (model, env, hipcc flags)
     "moe_xcd_new": ("qwen3-30b-a3b", XCD, ""),
     "moe_xcds1_new": ("qwen3-30b-a3b", f"{XCD} {S1}", ""),
     "moe_xcd2_new": ("qwen3-30b-a3b", f"{XCD} ETX_VL_REQUESTS=2", ""),
+    # vLLM's fused_qk_norm_rope in place of rms_norm_3d x2 + rotary (docs/MODEL-vllm-kernels.md section 11)
+    "moe_base_qknr": ("qwen3-30b-a3b", "ETX_VL_CHECK=1 ETX_VL_QKNR=1", ""),
+    "moe_xcd_qknr_new": ("qwen3-30b-a3b", f"{XCD} ETX_VL_QKNR=grid", ""),
+    "moe_xcd_qknrc_new": ("qwen3-30b-a3b", f"{XCD} ETX_VL_QKNR=1", ""),
     "q15_base_new": ("qwen2.5-1.5b", "ETX_VL_CHECK=1", ""),
     "q15_xs1_old": ("qwen2.5-1.5b", f"{XCD} {S1}", OLD),
     "q15_xs1_new": ("qwen2.5-1.5b", f"{XCD} {S1}", ""),
@@ -109,20 +113,22 @@ def run(b, extra=""):
 
 
 # ---------------------------------------------------------------- correctness first: the new barrier protocol, byte for byte
-for b, m in (("q15_base_new", "qwen2.5-1.5b"), ("moe_base_new", "qwen3-30b-a3b")):
+for b, m in (("q15_base_new", "qwen2.5-1.5b"), ("moe_base_new", "qwen3-30b-a3b"), ("moe_base_qknr", "qwen3-30b-a3b")):
     job(name=f"check_{b}", gpu=0, after=[f"build_{b}", f"prep_{m}"], timeout=600,
         cmd=f"stdbuf -oL {run(b, '--check 2')}", summary=[r"^CHECK|DIFFERS|HANG|  total"])
 
 # ---------------------------------------------------------------- timing, alternated over two rounds (GPU 0)
 T = [("q15_xs1_old", ""), ("q15_xs1_new", ""), ("q15_base_new", "--unfused"),
      ("moe_xcd_old", ""), ("moe_xcd_hw", ""), ("moe_xcd_args", ""), ("moe_xcd_nopre", ""), ("moe_xcd_new", ""),
-     ("moe_xcds1_new", ""), ("moe_base_new", ""), ("moe_base_new", "--unfused")]
+     ("moe_xcds1_new", ""), ("moe_base_new", ""), ("moe_base_new", "--unfused"),
+     ("moe_xcd_qknr_new", ""), ("moe_xcd_qknrc_new", ""), ("moe_base_qknr", "--unfused")]
 prev = "check_moe_base_new"
 for rnd in (1, 2):
     for b, extra in T:
         m = BUILDS[b][0]
         name = f"t{rnd}_{b}{'_unf' if extra else ''}"
         chk = "check_moe_base_new" if m == "qwen3-30b-a3b" else "check_q15_base_new"
+        chk = "check_moe_base_qknr" if "qknr" in b else chk
         job(name=name, gpu=0, after=[f"build_{b}", f"prep_{m}", chk], after_any=[prev], timeout=900,
             cmd=f"stdbuf -oL {run(b, extra)}", summary=[RES])
         prev = name
@@ -141,8 +147,43 @@ for rnd in (1, 2):
             timeout=900, cmd=f"stdbuf -oL {run(b, extra)}", summary=[RES])
         prev2 = name
 
+# ---------------------------------------------------------------- vLLM, same session, with and without its q/k norm + rope fusion
+# the baseline for the ETX_VL_QKNR builds is vLLM running the same kernel (pass_config enable_qk_norm_rope_fusion, which
+# also turns on the +rotary_embedding custom op); the default is re-measured beside it (same image, same VM). The trace
+# checks the fused kernel actually ran (a pass that does not match leaves the unfused kernels).
+IMG = "rocm/vllm:latest"
+DOCKER = ("sudo docker run --rm --device=/dev/kfd --device=/dev/dri --group-add video --ipc=host --shm-size 16g "
+          "--security-opt seccomp=unconfined -e HIP_VISIBLE_DEVICES=0 -v $HOME:$HOME -w $HOME/etx")
+QKNR_PC = """'{"enable_qk_norm_rope_fusion": true}'"""
+QKNR_PC_IN = """'{\\"enable_qk_norm_rope_fusion\\": true}'"""          # inside bash -c "..."
+job(name="docker_pull", lane="cpu", after="apt", timeout=2400,
+    cmd=f"sudo docker pull -q {IMG} && sudo docker run --rm {IMG} python3 -c 'import vllm; print(\"vllm\", vllm.__version__)'",
+    summary=[r"^vllm "])
+GOLD = f"{LLM}/qwen3-30b-a3b/golden_c1024.txt"
+prev3 = prev2
+for rnd in (1, 2):
+    for B in (1, 2):
+        for tag, pc in (("default", ""), ("qknr", f"--pass-config {QKNR_PC}")):
+            name = f"vllm{rnd}_b{B}_{tag}"
+            job(name=name, gpu=0, after=["docker_pull", "prep_qwen3-30b-a3b"], after_any=[prev3], timeout=1200,
+                cmd=f"{DOCKER} {IMG} python3 examples/llm/vllm_bench.py --model {LLM}/qwen3-30b-a3b/hf --golden {GOLD} "
+                    f"--label qwen3-30b-a3b_{tag} --batch {B} {pc} --json $HOME/sess/{name}.json",
+                summary=[r"^VLLM|median_ms|rror"])
+            prev3 = name
+job(name="vllm_prof_qknr", gpu=0, after=["docker_pull", "prep_qwen3-30b-a3b"], after_any=[prev3], timeout=1500,
+    cmd=f"mkdir -p $HOME/sess/vprof_qknr && chmod 777 $HOME/sess/vprof_qknr && {DOCKER} {IMG} bash -c \"rocprofv3 --kernel-trace "
+        f"--output-format csv -d $HOME/sess/vprof_qknr -- python3 examples/vllm_llm/vllm_profile.py run --model {LLM}/qwen3-30b-a3b/hf "
+        f"--golden {GOLD} --pass-config {QKNR_PC_IN} > $HOME/sess/vprof_qknr/run.log 2>&1\"; sudo chown -R $USER $HOME/sess/vprof_qknr; "
+        f"tail -2 $HOME/sess/vprof_qknr/run.log; f=$(find $HOME/sess/vprof_qknr -name '*kernel_trace.csv' | head -1); "
+        f"echo \"fusedQKNormRope launches: $(grep -c fusedQKNormRope $f)  rms_norm launches: $(grep -c rms_norm_kernel $f)  "
+        f"rotary launches: $(grep -c rotary_embedding_kernel $f)\"", summary=[r"launches"])
+prev2 = "vllm_prof_qknr"
+
 # ---------------------------------------------------------------- traces and counters, last (analysed off the machine)
-job(name="trace_moe_xcd_new", gpu=0, after=["build_moe_xcd_new", "prep_qwen3-30b-a3b", "check_moe_base_new"], after_any=[prev2],
+job(name="trace_moe_xcd_qknr_new", gpu=0, after=["build_moe_xcd_qknr_new", "prep_qwen3-30b-a3b", "check_moe_base_qknr"], after_any=[prev2],
+    timeout=900, cmd=f"ETX_TRACE=1 ETX_TRACE_RAW=$HOME/sess/trace_moe_xcd_qknr_new.bin stdbuf -oL {run('moe_xcd_qknr_new', '--max-steps 8 --repeat 1')}",
+    summary=[RES])
+job(name="trace_moe_xcd_new", gpu=0, after=["build_moe_xcd_new", "prep_qwen3-30b-a3b", "check_moe_base_new"], after_any=["trace_moe_xcd_qknr_new"],
     timeout=900, cmd=f"ETX_TRACE=1 ETX_TRACE_RAW=$HOME/sess/trace_moe_xcd_new.bin stdbuf -oL {run('moe_xcd_new', '--max-steps 8 --repeat 1')}",
     summary=[RES])
 job(name="trace_moe_xcd2_new", gpu=0, after=["build_moe_xcd2_new", "golden_r97"], after_any=["trace_moe_xcd_new"], timeout=900,
