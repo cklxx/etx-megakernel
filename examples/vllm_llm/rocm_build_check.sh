@@ -50,5 +50,9 @@ $RL/bin/clang++ -x hip --cuda-device-only --offload-arch=gfx942 -O3 -std=c++17 -
   -isystem $R/inc -include __clang_hip_runtime_wrapper.h -D__HIP_PLATFORM_AMD__ -Ietx/runtime/include -I $OUT -I . \
   $CFLAGS -Xclang -mlink-builtin-bitcode -Xclang $OUT/imports.bc -Rpass-analysis=kernel-resource-usage -S $OUT/megakernel_d0.hip -o $OUT/mk.s 2> $OUT/resource.log \
   || { grep -m5 error $OUT/resource.log; exit 1; }
+echo "== host.hip, device pass (etx/host.h is compiled in both passes)"
+$RL/bin/clang++ -x hip --cuda-device-only --offload-arch=gfx942 -O3 -std=c++17 -nogpuinc --rocm-device-lib-path=$DL \
+  -isystem $R/inc -include __clang_hip_runtime_wrapper.h -D__HIP_PLATFORM_AMD__ $CFLAGS -DETX_VL_CHECK -Ietx/runtime/include -I $OUT -I . \
+  -S examples/vllm_llm/host.hip -o /tmp/host_dev.s 2> $OUT/host_dev.log && echo "host.hip device pass ok" || { grep -m5 error $OUT/host_dev.log; exit 1; }
 grep -E "Function Name|VGPRs:|AGPRs:|ScratchSize|VGPRs Spill|LDS Size|Occupancy" $OUT/resource.log | sed -E "s/.*remark: +//; s/ \[-Rpass.*//" | paste - - - - - - -
 '
