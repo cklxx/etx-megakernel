@@ -153,3 +153,32 @@ Correctness risk found by the inventory (not performance): imported kernels read
 seq_lens, slot_mapping) with scalar loads; ETX's acquires invalidate the vector caches but not the scalar cache, so a
 persistent megakernel could read a previous step's value. Every run so far matched 32/32; the fix is an `s_dcache_inv`
 in the acquire of tasks that read per-step data, to be added before the next session.
+
+## 8. What each lever is worth (examples/vllm_llm/whatif_sim.py, simulated; ~12% optimistic today)
+
+The CU time of a measured layer (layer 5, 304 CUs x 130.7 us): 32% in tasks, 51% on CUs the launch has no task for
+(1-8-task launches: norms, top-k, moe_sum, the attention block; 192 / 256 of 304 CUs in the expert launches), 10% in
+hand-offs between launches, 7% in ramps and tails. Weight streaming is 31% of the CU time; the layer's 116 MB would take
+27 us at 4.3 TB/s. The empty CUs are waiting on the dependency chain, not moving data.
+
+| one request | ms per token | tokens/s |
+|---|---|---|
+| today | 5.84 | 171 |
+| hardware barriers for imports | 5.31 | 188 |
+| argument path 2.1 -> 0.5 us | 4.61 | 217 |
+| both | 4.08 | 245 |
+| both + hand-offs halved | 3.71 | 270 |
+| no argument path, no hand-off (bound for these kernels) | 2.95 | 339 |
+| vLLM, measured | 4.90 | 204 |
+
+| two requests interleaved, one workgroup per CU (request 1 fills the CUs request 0 leaves idle) | ms per step | tokens/s |
+|---|---|---|
+| today | 7.38-7.91 | 253-271 (x1.48-1.58) |
+| both fixes | 5.28 | 379 (x1.54) |
+| vLLM batch 2, measured | 5.72 | 349 |
+
+Reading: the argument path is the largest single lever (1.2 ms), the barriers second (0.5 ms). With both, one request
+lands at vLLM's latency (4.1 simulated, ~4.6 with the simulation's bias) and two interleaved requests at +9% over vLLM's
+batch 2 with lower latency per request, inside the simulation's error. Even with free arguments and free hand-offs these
+kernels take 2.95 ms at batch 1 (their own dependent round trips and synchronisation; floor 1.44): going further takes
+different kernels or more work per step (more requests, speculative decoding), not scheduling.
