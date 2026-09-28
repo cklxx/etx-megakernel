@@ -19,6 +19,18 @@
 //   hw_bench pair      two workgroups per CU: a foreground body X timed beside a background body Y on the same CU, for
 //                      X, Y in {stream, chain (fold-like: 64 KB shared read + LDS reduce + 2 barriers + a 2 KB norm), alu,
 //                      lds, idle}. Reports X's time with Y / X's time alone.
+// Added 2026-09-28 for the vLLM-kernel model (docs/MODEL-vllm-kernels.md: every parameter the simulator used to fit):
+//   hw_bench lat       dependent round trip (pointer chase, one wave, 2000 hops over distinct 128 B lines in random order),
+//                      vector (global_load) and scalar (s_load) loads, the line in L1 / K$, L2, MALL or HBM, optionally a
+//                      buffer_inv sc0 / sc1 before every hop (the state after an ETX acquire), with the other 303 CUs idle
+//                      or streaming at full rate (loaded latency). Replaces the fitted t_v, t_s and the argument path.
+//   hw_bench lf        Little's law: A workgroups (256 threads) each stream B bytes with D x 16 B per lane in flight
+//                      (D = 1..16: 4-64 KB per workgroup); rate against bytes in flight. Replaces the fitted bandwidth.
+//   hw_bench launch    the kernel boundary with work: 200 kernels in one HIP graph, each reads the previous kernel's output
+//                      and chases H dependent loads (H = -1: an empty kernel). Splits the fitted F into boundary + hops.
+//   hw_bench evx       ETX's own event protocol (the gfx942 lowering: fetch_sub arrive, poll = buffer_inv sc0 + load with
+//                      s_sleep 1, acquire sc0 / sc1, the last-arriver flush for DEVICE scope) with P producers and C
+//                      consumers, as the plan's events are shaped; also the wait on an event already complete.
 #include <hip/hip_runtime.h>
 #include <algorithm>
 #include <chrono>
@@ -300,6 +312,186 @@ __global__ void __launch_bounds__(kT, 2) k_pair(const u4* w, size_t buf_u4, cons
   if (acc == 0x12345u) sink[blockIdx.x] = acc;
 }
 
+
+// ------------------------------------------------------------------ lat (dependent round trips)
+// one node per 128 B line: its first 8 bytes hold the next node's address
+__device__ __forceinline__ uint64_t ld_v(uint64_t p) {
+  uint64_t r;
+  asm volatile("global_load_dwordx2 %0, %1, off\n\ts_waitcnt vmcnt(0)" : "=v"(r) : "v"(p) : "memory");
+  return r;
+}
+__device__ __forceinline__ uint64_t ld_s(uint64_t p) {
+  uint64_t r;
+  asm volatile("s_load_dwordx2 %0, %1, 0x0\n\ts_waitcnt lgkmcnt(0)" : "=s"(r) : "s"(p) : "memory");
+  return r;
+}
+__device__ __forceinline__ void inv_hop(int inv) {
+  if (inv == 1) asm volatile("buffer_inv sc0" ::: "memory");
+  else if (inv == 2) asm volatile("buffer_inv sc1" ::: "memory");
+}
+__global__ void k_nodes(uint64_t* base, const int64_t* offs, int n) {       // node i -> node i + 1 (a cycle)
+  const int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i < n) base[offs[i] / 8] = (uint64_t)base + (uint64_t)offs[(i + 1) % n];
+}
+// the chaser: the workgroup with XCD slot 0 on XCD 0; wave 0 chases, the workgroup evicts its L2 first when asked.
+// loaded: every other workgroup streams (8 x 16 B per lane in flight) until the chaser is done
+__global__ void __launch_bounds__(kT) k_lat(uint64_t start, int kind, int inv, int hops, int nwarm, int64_t evict_bytes,
+                                            const u4* w, size_t buf_u4, int loaded, Ctl* ctl, int* done, uint64_t* out, uint32_t* sink) {
+  __shared__ int s_slot;
+  if (threadIdx.x == 0) s_slot = claim_xslot(ctl);
+  __syncthreads();
+  const bool chaser = s_slot == 0 && xcc_id() == 0;
+  uint32_t acc = 0;
+  if (chaser) {
+    // warm: one pass over the whole cycle (nwarm = its length), so the timed pass (from the start again) hits
+    if (threadIdx.x < 64 && nwarm) {
+      uint64_t q = start;
+      if (kind == 1) for (int h = 0; h < nwarm; ++h) q = ld_s(q);
+      else for (int h = 0; h < nwarm; ++h) q = ld_v(q);
+      acc ^= (uint32_t)q;
+    }
+    __syncthreads();
+    for (int64_t i = threadIdx.x; i < evict_bytes / 16; i += kT * 8) {      // evict this XCD's L2 (4 MB) with other lines
+      u4 v[8];
+#pragma unroll
+      for (int d = 0; d < 8; ++d) v[d] = w[(buf_u4 / 2) + i + d * kT];
+      live8(v);
+#pragma unroll
+      for (int d = 0; d < 8; ++d) acc ^= xs(v[d]);
+    }
+    __syncthreads();
+    if (threadIdx.x < 64) {
+      uint64_t t0, t1, c0, c1, r = 0;
+      if (kind == 0) { uint64_t q = start; t0 = now(); c0 = __builtin_readcyclecounter();
+        for (int h = 0; h < hops; ++h) { inv_hop(inv); q = ld_v(q); }
+        t1 = now(); c1 = __builtin_readcyclecounter(); r = q; }
+      else if (kind == 1) { uint64_t q = start; t0 = now(); c0 = __builtin_readcyclecounter();
+        for (int h = 0; h < hops; ++h) { inv_hop(inv); q = ld_s(q); }
+        t1 = now(); c1 = __builtin_readcyclecounter(); r = q; }
+      else { t0 = now(); c0 = __builtin_readcyclecounter();                  // the invalidate alone
+        for (int h = 0; h < hops; ++h) { inv_hop(inv); asm volatile("s_waitcnt vmcnt(0)" ::: "memory"); }
+        t1 = now(); c1 = __builtin_readcyclecounter(); }
+      if (threadIdx.x == 0) { out[0] = t1 - t0; out[1] = c1 - c0; out[2] = r; __hip_atomic_store(done, 1, __ATOMIC_RELAXED, __HIP_MEMORY_SCOPE_AGENT); }
+    }
+  } else if (loaded) {
+    __shared__ int s_stop;
+    for (int r = 0;; ++r) {
+      if (threadIdx.x == 0) s_stop = ld_agent(done);
+      __syncthreads();
+      if (s_stop || r > 100000) break;
+      const u4* p = w + ((size_t)(r * 304 + blockIdx.x) * 8192) % (buf_u4 / 2 - 8192);
+      for (int i = threadIdx.x; i < 8192; i += kT * 8) {
+        u4 v[8];
+#pragma unroll
+        for (int d = 0; d < 8; ++d) v[d] = p[i + d * kT];
+        live8(v);
+#pragma unroll
+        for (int d = 0; d < 8; ++d) acc ^= xs(v[d]);
+      }
+      __syncthreads();
+    }
+  }
+  if (acc == 0x12345u) sink[blockIdx.x] = acc;
+}
+__global__ void __launch_bounds__(kT) k_evict(const u4* w, size_t n16, uint32_t* sink) {   // every CU streams w[0, n16)
+  uint32_t acc = 0;
+  for (size_t i = (size_t)blockIdx.x * kT + threadIdx.x; i < n16; i += (size_t)gridDim.x * kT) acc ^= xs(w[i]);
+  if (acc == 0x12345u) sink[blockIdx.x] = acc;
+}
+
+// ------------------------------------------------------------------ lf (bytes in flight -> rate)
+template <int D>
+__global__ void __launch_bounds__(kT) k_lf(const u4* __restrict__ w, size_t buf_u4, int active, int64_t bytes, int iters, Ctl* ctl,
+                                           uint64_t* t_start, uint64_t* t_end, uint32_t* sink) {
+  __shared__ int s_slot;
+  if (threadIdx.x == 0) s_slot = claim_xslot(ctl);
+  __syncthreads();
+  const int per_x = active / 8, slot = s_slot, wid = (int)xcc_id() * per_x + slot;
+  const bool on = slot < per_x;
+  uint32_t acc = 0;
+  for (int it = 0; it < iters; ++it) {
+    grid_barrier(ctl, it + 1);
+    if (!on) continue;
+    const uint64_t t0 = now();
+    const size_t region = ((size_t)it * (size_t)active * (size_t)bytes / 16) % (buf_u4 / 2);
+    const int64_t n16 = bytes / 16;
+    const u4* p = w + region + (size_t)wid * n16;
+    for (int64_t i = threadIdx.x; i < n16; i += kT * D) {
+      u4 v[D];
+#pragma unroll
+      for (int d = 0; d < D; ++d) v[d] = (i + d * kT < n16) ? p[i + d * kT] : u4{0, 0, 0, 0};
+#pragma unroll
+      for (int d = 0; d < D; ++d) asm volatile("" : "+v"(v[d]));
+#pragma unroll
+      for (int d = 0; d < D; ++d) acc ^= xs(v[d]);
+    }
+    __syncthreads();
+    if (threadIdx.x == 0) { t_start[(size_t)it * active + wid] = t0; t_end[(size_t)it * active + wid] = now(); }
+  }
+  if (acc == 0x12345u) sink[blockIdx.x] = acc;
+}
+
+// ------------------------------------------------------------------ launch (kernel boundary with work)
+__global__ void k_tiny(const uint64_t* in, uint64_t* out, int hops) {
+  if (hops < 0) return;
+  if (threadIdx.x == 0) {
+    uint64_t p = ld_v((uint64_t)(in + blockIdx.x));                         // the previous kernel's output
+    for (int h = 0; h < hops; ++h) p = ld_v(p);
+    out[blockIdx.x] = p;
+  }
+}
+
+// ------------------------------------------------------------------ evx (ETX's event protocol, gfx942 lowering)
+// the macros of the generated etx_lowering.h for gfx942 (etx/machines, build/*/etx_lowering.h), spelled out
+__device__ __forceinline__ int evx_poll(const int* p) { asm volatile("buffer_inv sc0" ::: "memory"); return *(volatile const int*)p; }
+__device__ __forceinline__ void evx_rel_domain() { asm volatile("s_waitcnt vmcnt(0)" ::: "memory"); }
+__device__ __forceinline__ void evx_rel_device() { asm volatile("buffer_wbl2 sc1\n\ts_waitcnt vmcnt(0)" ::: "memory"); }
+__device__ __forceinline__ int evx_arrive(int* p, int n) { return __hip_atomic_fetch_sub(p, n, __ATOMIC_RELAXED, __HIP_MEMORY_SCOPE_AGENT); }
+// scope 0 (DOMAIN): per XCD, slots < P produce and slots < C consume one event (all 8 XCDs at once, one event each).
+// scope 1 (DEVICE): P / 8 producers and C / 8 consumers per XCD on one device event; every producer drains and bumps its
+// XCD's sub-counter, the XCD's last one writes back L2 and subtracts the XCD's share (etx_arrive_flush_DEVICE_s).
+// A workgroup can be both: it arrives, then waits (a task's end, then the next task's wait). late: consumers start their
+// wait `late_ticks` after the producers' latest possible arrival (the event is already complete: the cost of a ready wait).
+__global__ void __launch_bounds__(kT) k_evx(int* words, int* subs, int stride, int P, int C, int scope, int dirty_kb, int skew_ticks,
+                                            int late_ticks, int iters, Ctl* ctl, float* scratch, uint64_t* t_arr, uint64_t* t_w0, uint64_t* t_wake) {
+  __shared__ int s_slot;
+  if (threadIdx.x == 0) s_slot = claim_xslot(ctl);
+  __syncthreads();
+  const int x = (int)xcc_id(), slot = s_slot, wid = x * 38 + slot;
+  const bool prod = scope == 0 ? slot < P : slot < P / 8;
+  const bool cons = scope == 0 ? slot < C : slot < C / 8;
+  const int share = P / 8;
+  for (int it = 0; it < iters; ++it) {
+    grid_barrier(ctl, it + 1);
+    const uint64_t tb = now();
+    int* word = words + ((size_t)it * 16 + (scope == 0 ? x : 8)) * stride;
+    int* sub = subs + ((size_t)it * 8 + x) * stride;
+    if (prod) {
+      float* my = scratch + (size_t)wid * 16384;
+      for (int i = threadIdx.x; i < dirty_kb * 256; i += kT) my[i] = (float)(it + i);
+      __syncthreads();
+      if (threadIdx.x == 0) {
+        const uint64_t until = tb + (uint64_t)((slot * 7919 + x * 131) % (skew_ticks + 1));
+        while (now() < until) {}
+        t_arr[(size_t)it * 304 + wid] = now();
+        if (scope == 0) { evx_rel_domain(); evx_arrive(word, 1); }
+        else if (share <= 1) { evx_rel_device(); evx_arrive(word, 1); }
+        else { evx_rel_domain(); if (atomicAdd(sub, 1) + 1 == share) { evx_rel_device(); evx_arrive(word, share); } }
+      }
+    }
+    if (cons) {
+      if (threadIdx.x == 0) {
+        if (late_ticks) { const uint64_t until = tb + skew_ticks + late_ticks; while (now() < until) {} }
+        t_w0[(size_t)it * 304 + wid] = now();
+        while (evx_poll(word) > 0) __builtin_amdgcn_s_sleep(1);
+        if (scope == 0) asm volatile("buffer_inv sc0" ::: "memory"); else asm volatile("buffer_inv sc1" ::: "memory");
+      }
+      __syncthreads();
+      if (threadIdx.x == 0) t_wake[(size_t)it * 304 + wid] = now();
+    }
+  }
+}
+
 // ------------------------------------------------------------------ host
 int main(int argc, char** argv) {
   setvbuf(stdout, nullptr, _IOLBF, 0);
@@ -425,6 +617,139 @@ int main(int argc, char** argv) {
       const double m = pct(us, 0.5);
       if (bg == B_IDLE) base[fg] = {m};
       printf("RESULT pair fg %-6s bg %-6s: fg median %8.2f us  x%.2f of alone\n", body_name[fg], body_name[bg], m, base[fg].empty() ? 1.0 : m / base[fg][0]);
+    }
+  }
+
+  if (what == "all" || what == "lat") {
+    // node lists: n distinct 128 B lines of a span, in random order; states as the ETX / vLLM round trips see them
+    const size_t nb = 1ull << 30;
+    uint64_t* nodes; CHECK(hipMalloc(&nodes, nb)); CHECK(hipMemset(nodes, 0, nb));
+    int* done; CHECK(hipMalloc(&done, 4)); uint64_t* o; CHECK(hipMalloc(&o, 32));
+    int64_t* doffs; CHECK(hipMalloc(&doffs, 4096 * 8));
+    struct S { const char* state; int n; int64_t span; int warm; int64_t evict; int cold; };
+    const std::vector<S> states = {{"L1/K$", 64, 8192, 1, 0, 0}, {"L2", 4096, 2 << 20, 1, 0, 0},
+                                   {"MALL", 4096, 64 << 20, 1, 16 << 20, 0}, {"HBM", 4096, 1 << 30, 0, 0, 1}};
+    const char* kinds[] = {"vector", "scalar", "inv-only"};
+    const char* invs[] = {"-      ", "inv sc0", "inv sc1"};
+    const int hops = 2000;
+    uint64_t seed = 88172645463325252ull;
+    auto rnd = [&]() { seed ^= seed << 13; seed ^= seed >> 7; seed ^= seed << 17; return seed; };
+    for (const S& sv : states) {
+      const int64_t lines = sv.span / 128;
+      std::vector<int64_t> offs; std::vector<char> used(lines, 0);
+      if (sv.n == lines) { for (int64_t i = 0; i < lines; ++i) offs.push_back(i * 128); for (int64_t i = lines - 1; i > 0; --i) std::swap(offs[i], offs[rnd() % (i + 1)]); }
+      else while ((int)offs.size() < sv.n) { const int64_t l = rnd() % lines; if (!used[l]) { used[l] = 1; offs.push_back(l * 128); } }
+      CHECK(hipMemcpy(doffs, offs.data(), offs.size() * 8, hipMemcpyHostToDevice));
+      hipLaunchKernelGGL(k_nodes, dim3((sv.n + 255) / 256), dim3(256), 0, st, nodes, doffs, sv.n); CHECK(hipStreamSynchronize(st));
+      const uint64_t start = (uint64_t)nodes + (uint64_t)offs[0];
+      for (int kind = 0; kind < 3; ++kind) for (int inv = 0; inv < 3; ++inv) for (int loaded = 0; loaded < 2; ++loaded) {
+        if (kind == 2 && (inv == 0 || sv.n != 64)) continue;              // the invalidate alone: once
+        if (inv && sv.n != 64 && sv.span != (2 << 20)) continue;          // invalidates: on the L1 / K$ and L2 lists only
+        std::vector<double> ns, cyc;
+        for (int rep = 0; rep < 3; ++rep) {
+          if (sv.cold) { hipLaunchKernelGGL(k_evict, dim3(ncu), dim3(kT), 0, st, w, buf_u4 / 2, sink); }   // 1 GB through MALL
+          reset(); CHECK(hipMemset(done, 0, 4));
+          hipLaunchKernelGGL(k_lat, dim3(ncu), dim3(kT), lds1, st, start, kind, inv, hops, sv.warm ? sv.n : 0, sv.evict, w, buf_u4, loaded, ctl, done, o, sink);
+          if (!wait_stream(st, 30)) { printf("RESULT lat HUNG\n"); return 3; }
+          uint64_t h[3]; CHECK(hipMemcpy(h, o, 24, hipMemcpyDeviceToHost));
+          ns.push_back(h[0] * 10.0 / hops); cyc.push_back((double)h[1] / hops);
+        }
+        printf("RESULT lat %-8s %-6s %s %s: %7.1f ns per hop (%5.0f cycles; min %7.1f)\n", kinds[kind], sv.state, invs[inv],
+               loaded ? "loaded" : "idle  ", pct(ns, 0.5), pct(cyc, 0.5), pct(ns, 0.0));
+      }
+    }
+  }
+
+  if (what == "all" || what == "lf") {
+    const int iters = 10;
+    uint64_t *ts, *te; CHECK(hipMalloc(&ts, (size_t)iters * 304 * 8)); CHECK(hipMalloc(&te, (size_t)iters * 304 * 8));
+    for (int64_t bytes : {98304LL, 262144LL}) for (int active : {64, 128, 192, 256, 296}) for (int D : {1, 2, 4, 8, 16}) {
+      reset(); CHECK(hipMemset(ts, 0, (size_t)iters * 304 * 8)); CHECK(hipMemset(te, 0, (size_t)iters * 304 * 8));
+      switch (D) {
+        case 1: hipLaunchKernelGGL(k_lf<1>, dim3(ncu), dim3(kT), lds1, st, w, buf_u4, active, bytes, iters, ctl, ts, te, sink); break;
+        case 2: hipLaunchKernelGGL(k_lf<2>, dim3(ncu), dim3(kT), lds1, st, w, buf_u4, active, bytes, iters, ctl, ts, te, sink); break;
+        case 4: hipLaunchKernelGGL(k_lf<4>, dim3(ncu), dim3(kT), lds1, st, w, buf_u4, active, bytes, iters, ctl, ts, te, sink); break;
+        case 8: hipLaunchKernelGGL(k_lf<8>, dim3(ncu), dim3(kT), lds1, st, w, buf_u4, active, bytes, iters, ctl, ts, te, sink); break;
+        default: hipLaunchKernelGGL(k_lf<16>, dim3(ncu), dim3(kT), lds1, st, w, buf_u4, active, bytes, iters, ctl, ts, te, sink); break;
+      }
+      if (!wait_stream(st, 30)) { printf("RESULT lf HUNG\n"); return 3; }
+      std::vector<uint64_t> hs((size_t)iters * 304), he((size_t)iters * 304);
+      CHECK(hipMemcpy(hs.data(), ts, hs.size() * 8, hipMemcpyDeviceToHost)); CHECK(hipMemcpy(he.data(), te, he.size() * 8, hipMemcpyDeviceToHost));
+      std::vector<double> spans, wg;
+      for (int it = 2; it < iters; ++it) {
+        uint64_t lo = ~0ull, hi = 0;
+        for (int k = 0; k < active; ++k) { const uint64_t a = hs[(size_t)it * active + k], b = he[(size_t)it * active + k];
+          if (!a) continue; lo = std::min(lo, a); hi = std::max(hi, b); wg.push_back((b - a) * 0.01); }
+        if (hi > lo) spans.push_back((hi - lo) * 0.01);
+      }
+      const double med = pct(wg, 0.5), trips = (double)bytes / (D * 16.0 * kT);
+      printf("RESULT lf bytes %6lld active %3d inflight %2d KB/WG (%5.2f MB total): WG median %7.2f us  span %7.2f  per trip %5.3f us  "
+             "-> %.2f TB/s (WG median), %.2f TB/s (span)\n", (long long)bytes, active, D * 4, active * D * 4 / 1024.0, med, pct(spans, 0.5),
+             med / trips, active * (double)bytes / (med * 1e-6) / 1e12, active * (double)bytes / (pct(spans, 0.5) * 1e-6) / 1e12);
+    }
+  }
+
+  if (what == "all" || what == "launch") {
+    // kernel k + 1 reads what kernel k wrote (ping-pong), then H dependent hops over a 4096-node list (L2-sized span)
+    const int K = 200;
+    uint64_t* nodes; CHECK(hipMalloc(&nodes, 2 << 20)); CHECK(hipMemset(nodes, 0, 2 << 20));
+    int64_t* doffs; CHECK(hipMalloc(&doffs, 4096 * 8));
+    std::vector<int64_t> offs(4096); for (int i = 0; i < 4096; ++i) offs[i] = (int64_t)((i * 2654435761u) % 16384) * 128;
+    std::sort(offs.begin(), offs.end()); offs.erase(std::unique(offs.begin(), offs.end()), offs.end());
+    for (size_t i = offs.size() - 1; i > 0; --i) std::swap(offs[i], offs[(i * 7919) % (i + 1)]);
+    const int n = (int)offs.size();
+    CHECK(hipMemcpy(doffs, offs.data(), n * 8, hipMemcpyHostToDevice));
+    hipLaunchKernelGGL(k_nodes, dim3((n + 255) / 256), dim3(256), 0, st, nodes, doffs, n);
+    uint64_t *bufa, *bufb; CHECK(hipMalloc(&bufa, 4096 * 8)); CHECK(hipMalloc(&bufb, 4096 * 8));
+    std::vector<uint64_t> init(4096); for (int i = 0; i < 4096; ++i) init[i] = (uint64_t)nodes + (uint64_t)offs[i % n];
+    for (int grid : {1, 304}) for (int thr : {256, 1024}) for (int hops : {-1, 0, 1, 4}) {
+      CHECK(hipMemcpy(bufa, init.data(), 4096 * 8, hipMemcpyHostToDevice)); CHECK(hipMemcpy(bufb, init.data(), 4096 * 8, hipMemcpyHostToDevice));
+      hipGraph_t g; hipGraphExec_t ge;
+      CHECK(hipStreamBeginCapture(st, hipStreamCaptureModeGlobal));
+      for (int k = 0; k < K; ++k) hipLaunchKernelGGL(k_tiny, dim3(grid), dim3(thr), 0, st, (k & 1) ? bufb : bufa, (k & 1) ? bufa : bufb, hops);
+      CHECK(hipStreamEndCapture(st, &g)); CHECK(hipGraphInstantiate(&ge, g, nullptr, nullptr, 0));
+      hipEvent_t e0, e1; CHECK(hipEventCreate(&e0)); CHECK(hipEventCreate(&e1));
+      std::vector<double> us;
+      for (int rep = 0; rep < 6; ++rep) {
+        CHECK(hipEventRecord(e0, st)); CHECK(hipGraphLaunch(ge, st)); CHECK(hipEventRecord(e1, st));
+        if (!wait_stream(st, 30)) { printf("RESULT launch HUNG\n"); return 3; }
+        float ms; CHECK(hipEventElapsedTime(&ms, e0, e1)); if (rep) us.push_back(ms * 1e3 / K);
+      }
+      printf("RESULT launch grid %3d threads %4d hops %2d: %6.2f us per kernel (min %6.2f)\n", grid, thr, hops, pct(us, 0.5), pct(us, 0.0));
+      CHECK(hipGraphExecDestroy(ge)); CHECK(hipGraphDestroy(g));
+    }
+  }
+
+  if (what == "all" || what == "evx") {
+    const int iters = 24, stride = 32;                        // ETX_EV_STRIDE 32: every event word in its own 128 B line
+    int *words, *subs; CHECK(hipMalloc(&words, (size_t)iters * 16 * stride * 4)); CHECK(hipMalloc(&subs, (size_t)iters * 8 * stride * 4));
+    float* scratch; CHECK(hipMalloc(&scratch, (size_t)304 * 16384 * 4));
+    uint64_t *ta, *t0, *tw; CHECK(hipMalloc(&ta, (size_t)iters * 304 * 8)); CHECK(hipMalloc(&t0, (size_t)iters * 304 * 8)); CHECK(hipMalloc(&tw, (size_t)iters * 304 * 8));
+    struct E { int scope, P, C, dirty, late; };
+    const std::vector<E> es = {{0, 1, 1, 0, 0}, {0, 1, 8, 0, 0}, {0, 1, 37, 0, 0}, {0, 8, 8, 0, 0}, {0, 37, 1, 0, 0}, {0, 37, 37, 0, 0},
+                               {0, 37, 37, 64, 0}, {0, 1, 1, 0, 500}, {1, 8, 8, 0, 0}, {1, 8, 296, 0, 0}, {1, 64, 64, 0, 0},
+                               {1, 296, 8, 0, 0}, {1, 296, 296, 0, 0}, {1, 296, 296, 64, 0}, {1, 8, 8, 0, 500}};
+    for (const E& e : es) {
+      std::vector<int> hw((size_t)iters * 16 * stride, 0);
+      for (int it = 0; it < iters; ++it) for (int k = 0; k < 9; ++k) hw[((size_t)it * 16 + k) * stride] = e.P;   // DOMAIN words: P each; DEVICE: P
+      CHECK(hipMemcpy(words, hw.data(), hw.size() * 4, hipMemcpyHostToDevice)); CHECK(hipMemset(subs, 0, (size_t)iters * 8 * stride * 4));
+      reset(); CHECK(hipMemset(ta, 0, (size_t)iters * 304 * 8)); CHECK(hipMemset(t0, 0, (size_t)iters * 304 * 8)); CHECK(hipMemset(tw, 0, (size_t)iters * 304 * 8));
+      hipLaunchKernelGGL(k_evx, dim3(ncu), dim3(kT), lds1, st, words, subs, stride, e.P, e.C, e.scope, e.dirty, 100, e.late, iters, ctl, scratch, ta, t0, tw);
+      if (!wait_stream(st, 30)) { printf("RESULT evx HUNG\n"); return 3; }
+      std::vector<uint64_t> a((size_t)iters * 304), b((size_t)iters * 304), c((size_t)iters * 304);
+      CHECK(hipMemcpy(a.data(), ta, a.size() * 8, hipMemcpyDeviceToHost)); CHECK(hipMemcpy(b.data(), tw, b.size() * 8, hipMemcpyDeviceToHost));
+      CHECK(hipMemcpy(c.data(), t0, c.size() * 8, hipMemcpyDeviceToHost));
+      std::vector<double> first, med, last, ready;
+      for (int it = 2; it < iters; ++it) for (int x = 0; x < (e.scope ? 1 : 8); ++x) {
+        uint64_t arr = 0; std::vector<double> wk;
+        for (int k = 0; k < 304; ++k) { const size_t i = (size_t)it * 304 + k; if (e.scope == 0 && k / 38 != x) continue; arr = std::max(arr, a[i]); }
+        for (int k = 0; k < 304; ++k) { const size_t i = (size_t)it * 304 + k; if (e.scope == 0 && k / 38 != x) continue;
+          if (b[i]) { wk.push_back(((double)b[i] - (double)arr) * 0.01); ready.push_back(((double)b[i] - (double)c[i]) * 0.01); } }
+        if (wk.empty() || !arr) continue;
+        std::sort(wk.begin(), wk.end()); first.push_back(wk.front()); med.push_back(wk[wk.size() / 2]); last.push_back(wk.back());
+      }
+      printf("RESULT evx %-6s P %3d C %3d dirty %2d KB%s: last arrival -> first %5.2f  median %5.2f  last %5.2f us; wait start -> wake median %5.2f us\n",
+             e.scope ? "device" : "xcd", e.P, e.C, e.dirty, e.late ? " late " : "      ", pct(first, 0.5), pct(med, 0.5), pct(last, 0.5), pct(ready, 0.5));
     }
   }
   return 0;

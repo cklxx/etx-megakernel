@@ -14,6 +14,8 @@ Pre-registered (xcd schedule, ms per token; the simulation x 1.135, its bias aga
   fused_moe gate_up task body         21.9 -> ~15 us with hardware barriers (trace)
 Correctness first: the base build's --check (every launch of layers 0-1 byte-identical, the new barrier protocol in the
 imported kernels) and every timed run 32/32 (both requests for the two-request build), or the number does not count.
+Microbenchmarks first, on GPU 0 while the models download (bench/hw/hw_bench.hip lat / lf / launch / evx,
+bench/hw/imp_bench.hip in both protocols); their predictions are in docs/MODEL-vllm-kernels.md section 10.
 Also: instruction-cache counters per launch during --check (vLLM's original next to the imported form: the hypothesis for
 the unexplained unfused excess), and one ETX_TRACE of the new xcd build (its front and bodies against the model).
 
@@ -55,6 +57,26 @@ for n, hf in MODELS.items():
         cmd=f"{PY} examples/vllm_llm/prep.py --src {LLM}/{n}/hf --out {LLM}/{n} --maxlen 1072 && "
             f"cp examples/llm/results/golden_c1024_{n}.txt {LLM}/{n}/golden_c1024.txt && ls -la {LLM}/{n}/vl.bin",
         summary=[r"wrote .*vl.bin"])
+
+# ---------------------------------------------------------------- microbenchmarks first (GPU 0, while the models download)
+# every parameter the XCD simulation used to fit or estimate (docs/MODEL-vllm-kernels.md section 10), measured directly:
+# dependent round trips by cache level and after ETX's invalidates (t_v, t_s, the argument path), bytes in flight -> rate
+# (the bandwidth), the kernel boundary with dependent loads (F), ETX's own event protocol in the plan's shapes (hand-offs),
+# and the imported barrier protocols from etx/import.h itself (t_swbar, the round barrier)
+HB = "hipcc -O3 -std=c++17 --offload-arch=gfx942"
+job(name="build_bench", lane="cpu", after="apt", timeout=900,
+    cmd=f"mkdir -p $HOME/sess && {HB} bench/hw/hw_bench.hip -o $HOME/sess/hw_bench && "
+        f"{HB} -Ietx/runtime/include bench/hw/imp_bench.hip -o $HOME/sess/imp_bench_hw && "
+        f"{HB} -Ietx/runtime/include -DETX_IMP_SW_BARRIER bench/hw/imp_bench.hip -o $HOME/sess/imp_bench_sw && ls -la $HOME/sess/hw_bench $HOME/sess/imp_bench_*")
+MB_PREV = None
+for mode in ("lat", "lf", "launch", "evx"):
+    job(name=f"hw_{mode}", gpu=0, after="build_bench", after_any=[MB_PREV] if MB_PREV else [], timeout=300,
+        cmd=f"stdbuf -oL $HOME/sess/hw_bench {mode}", summary=[r"^RESULT"])
+    MB_PREV = f"hw_{mode}"
+for v in ("hw", "sw"):
+    job(name=f"impbar_{v}", gpu=0, after="build_bench", after_any=[MB_PREV], timeout=180,
+        cmd=f"stdbuf -oL $HOME/sess/imp_bench_{v}", summary=[r"^RESULT"])
+    MB_PREV = f"impbar_{v}"
 
 # ---------------------------------------------------------------- builds (cpu lane, parallel)
 S1 = "ETX_VL_SLOTS=attn_mfma16_g8=1,attn_mfma16_g6=1,attn_reduce=1,rms_norm_3d=1,reshape_and_cache=1"

@@ -216,3 +216,35 @@ Pre-registered, xcd schedule, ms per token (simulation x 1.135, its bias against
 
 The trace of the new build measures the front directly; that number decides which column applies. Beating vLLM at batch
 1 (4.90) needs the front at about 0.5 us or less.
+
+## 10. Every parameter from a microbenchmark (pre-registered 2026-09-28, before the session)
+
+Sections 4-9 fit six numbers to launch times (F, t_s, t_v, t_i, BW, A_task) and assume three more (t_swbar from an
+instruction count, the hand-offs from a benchmark whose protocol is not ETX's). Fitted values can absorb a wrong
+structure: t_v = 0.2 us and t_s = 0 are below any physical round trip on MI300X, so the fit has most likely traded
+them against F (2.5 us against a measured 1.6 us kernel boundary) and against round-trip counts that overlap in
+reality. The session measures each one directly, first, on GPU 0 (`bench/hw/hw_bench.hip` lat / lf / launch / evx,
+`bench/hw/imp_bench.hip` in both barrier protocols, with `etx/import.h` itself), and
+`examples/vllm_llm/bench_params.py` maps them onto the model (the mapping is in its docstring) and simulates the step
+with microbenchmark values only.
+
+| measurement | stands for | fitted / assumed | predicted range | if outside |
+|---|---|---|---|---|
+| lat vector MALL idle | t_v | 0.2 | 0.25-0.5 us | above 0.3: the V counts of section 3 overcount dependent trips; recount from the ISA, do not refit |
+| lat vector L1, L2, HBM idle | levels | - | 0.05-0.15, 0.1-0.3, 0.3-0.8 us | |
+| loaded / idle, same level | Little's-law latency | - | x1.5-3 at full rate | |
+| lat scalar K$ after inv sc1 | the K$ survives ETX's acquire | assumed | < 0.1 us (a K$ hit) | the argument fix of section 9 has no effect: the scalar path is also invalidated |
+| lat vector L2 after inv sc1, x2 | A_task, vector build | 2.1 | 0.6-1.2 us | below 1.0: A_task holds more than the argument path (other loads of the adapter) |
+| lf, highest rate | BW | 5.2 TB/s | 4.0-4.5 TB/s at >= 4 MB in flight | 5.2 is not physical (it absorbed a missing term) |
+| lf 192 WGs x 16 KB (fused_moe) | fused_moe stream rate | 3.2 TB/s (model) | 2.5-3.5 TB/s | the gate_up body cannot reach 15 us |
+| launch empty, 304 x 1024 | F | 2.5 | 1.5-1.8 us (sync_bench: 1.6) | |
+| launch hops 0 - empty | first load after a boundary | - | 0.3-0.8 us | |
+| evx xcd P 37 C 37 median | DOMAIN hand-off | 1.0 | 0.3-0.6 us (the trace's 0.3-0.5) | ETX's poll is not what the trace saw |
+| evx device P 296 C 296 median | DEVICE hand-off | 1.3 | 1.3-2.1 us (the trace's 1.5-2.1) | |
+| evx late (event already complete) | per-task wait cost | 0 | 0.1-0.4 us | a term the simulator lacks |
+| impbar sw, fused_moe | t_swbar | 0.26 | 0.2-0.3 us | |
+| impbar rounds, fused_moe | the round barrier | 0.077 (bare s_barrier) | 0.08-0.12 us | above 0.15: the hardware-barrier gain of section 9 shrinks |
+| impbar rounds R 0 | exit protocol per imported task | 0 | < 0.5 us | a per-task cost of the round protocol |
+
+Rule from here: the model runs on microbenchmark values; a term whose microbenchmark-only prediction misses the trace
+by more than 15% is re-examined structurally (what it counts, what overlaps), not refitted.

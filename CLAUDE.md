@@ -40,7 +40,7 @@ These rules come from what went wrong in 2026-09 (weeks spent tuning our own til
 
 ## 6. Where things are
 
-- `etx/importer/`: kernel import (slice, IR import, adapters, bundle, vLLM manifest). `examples/vllm_llm/`: Qwen with vLLM's kernels; `vm_next.sh` is the prepared next session (microbenchmarks and gate first). `bench/sync/sync_bench.hip`: the synchronisation microbenchmarks.
+- `etx/importer/`: kernel import (slice, IR import, adapters, bundle, vLLM manifest). `examples/vllm_llm/`: Qwen with vLLM's kernels; `vm_next.sh` is the prepared next session (microbenchmarks and gate first). `bench/sync/sync_bench.hip`: the synchronisation microbenchmarks. `bench/hw/hw_bench.hip` (lat / lf / launch / evx) and `bench/hw/imp_bench.hip`: every kernel-model parameter measured directly; `examples/vllm_llm/bench_params.py` maps them onto the model (docs/MODEL-vllm-kernels.md section 10).
 - Schedule inspection: `python -m etx.tools.timeline <plan.json> <ETX_TRACE_RAW file> --bytes <spec> --grids <regex> --html out.html` (per-XCD occupancy, critical path, memory demand; also runs on a simulated schedule). DeepSeek-V2-Lite (fleet's tiles under ETX): `examples/dsv2lite/` (`bytes.py` per-task bytes, `whatif.py` layout estimates from measured phases). `bench/overlap/overlap_bench.hip`: Infinity Cache read rate and latency under a co-running stream.
 - Plans and research: `docs/PLAN-v3.md`, `docs/RESEARCH-sync-hardware.md`, `docs/RESEARCH-moe-import.md`; results in `docs/ETX_Technical_Design.md` section 15.
 - Tests: `.venv/bin/python -m pytest -q`. Local toolchain: `/opt/homebrew/opt/llvm/bin` (LLVM 23) with the ROCm 7.2.4 headers and device libraries in `~/code/rocm-headers`.
