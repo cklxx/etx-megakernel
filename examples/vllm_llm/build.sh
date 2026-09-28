@@ -23,7 +23,7 @@ case $G in 4) ATTN=attn_mfma4_g4;; 6) ATTN=attn_mfma16_g6;; 8) ATTN=attn_mfma16_
 EXPORTS="wvsplitk_y2,$ATTN,attn_reduce,rms_norm_2d,fused_add_rms_norm,rope_neox,reshape_and_cache,silu_and_mul"
 [ "$QKN" = 1 ] && EXPORTS="$EXPORTS,rms_norm_3d"
 # ETX_VL_QKNR=1: q/k norm + rope as vLLM's fused_qk_norm_rope (its enable_qk_norm_rope_fusion pass), one launch
-[ "$QKN" = 1 ] && [ "${ETX_VL_QKNR:-0}" = 1 ] && EXPORTS="$EXPORTS,qknorm_rope"
+[ "$QKN" = 1 ] && [ "${ETX_VL_QKNR:-0}" != 0 ] && EXPORTS="$EXPORTS,qknorm_rope"
 # MoE (Qwen3-30B-A3B): router GEMV (YTILE 1), top-k, the two Triton fused_moe launches, moe_sum; silu over the 8 expert
 # rows runs with block MI / 8, one row per task (as vLLM: 8 workgroups); one fused_moe program per workgroup (4 would
 # need 80 KB of LDS and put 192 programs on 48 CUs)
