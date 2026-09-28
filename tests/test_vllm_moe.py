@@ -65,3 +65,22 @@ def test_moe_xcd_expert_path_is_xcd_local(tmp_path, monkeypatch):
         waits[n] = plan.events[ev].scope
     assert waits["moe_up_1"] == waits["moe_act_1"] == waits["moe_down_1"] == waits["router_1"] == Scope.DOMAIN
     assert waits["topk_1_x"] == waits["moe_sum_1_x"] == Scope.DEVICE
+
+
+def test_xcd_simulation_runs_the_plan_and_obeys_littles_law(tmp_path, monkeypatch):
+    """etx.sim.xcd on the compiled MoE xcd plan: every task runs, and streams are limited by bandwidth when the GPU
+    is full and by latency when few CUs stream."""
+    from etx.codegen.kernel import emit_plan_json
+    from etx.sim.xcd import Cost, Hw, _rates, simulate
+    vm, g = _graph(tmp_path, monkeypatch, xcd=True, layers=2)
+    plan = json.loads(emit_plan_json(compile_graph(g, "gfx942", {}, {})))
+
+    def cost(name, d):
+        return Cost(front_us=0.5, chain_us=1.0, stream_bytes=64e3 if name.startswith(("qkv", "moe_", "o_proj", "router")) else 0,
+                    inflight=16e3, exposed_us=0.3)
+    rows, st = simulate(plan, cost, Hw(bw_max=5e6, lat_us=0.2))
+    assert st["unfinished"] == 0 and len(rows) == len(plan["descs"]) and st["makespan_us"] > 0
+    full = {i: [1e5, 0, 0, 16e3, 0.0] for i in range(304)}
+    assert abs(sum(_rates(full, Hw(bw_max=5e6, lat_us=0.2)).values()) - 5e6) < 1.0      # bandwidth-bound
+    few = {i: [1e5, 0, 0, 16e3, 0.0] for i in range(4)}
+    assert abs(_rates(few, Hw(bw_max=5e6, lat_us=0.2))[0] - 16e3 / 0.2) < 1e-6            # latency-bound

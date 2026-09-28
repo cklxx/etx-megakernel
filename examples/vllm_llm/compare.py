@@ -15,7 +15,7 @@ the same kernel (docs/MODEL-moe.md: h = hand-off, p = what the imported form add
 
 Roles are averaged over the middle layers (first and last two dropped). vLLM's per-role durations come from its own
 trace (results_2026-09-27: prof_qwen2.5-1.5b / prof_qwen3-8b with custom_ops=all, the same kernels; vlnext/moe/prof,
-vLLM's default configuration, whose norms and rope are Inductor kernels) scaled by untraced / traced time per token.
+vLLM's default configuration, whose norms and rope are Inductor kernels), less the tracer's per-launch overhead.
 """
 from __future__ import annotations
 
@@ -27,8 +27,10 @@ from collections import defaultdict
 from pathlib import Path
 from statistics import mean, median
 
-# vLLM traced -> untraced scale per token (vllm_profile.py analyze busy time against the untraced benchmark)
-SCALE = {"qwen2.5-1.5b": 1.937 / 2.02, "qwen3-8b": 5.039 / 5.08, "qwen3-30b-a3b": 4.898 / 5.313}
+# vLLM traced -> untraced: the tracer adds about the same time to every launch, so subtract (busy time per token
+# traced - untraced token time) / launches per token (vllm_profile.py analyze): 1.5B 0.083 ms / 331, 8B 0.041 / 455,
+# 30B-A3B 0.415 / 843
+OFFSET = {"qwen2.5-1.5b": (2.02 - 1.937) * 1e3 / 331, "qwen3-8b": (5.08 - 5.039) * 1e3 / 455, "qwen3-30b-a3b": (5.313 - 4.898) * 1e3 / 843}
 # the 17 launches of one vLLM MoE layer (layer_trace.py), starting at the post-attention norm, and the ETX role of each
 MOE_VLLM = ["post_norm", "router", "topk", "(fill)", "moe_up", "moe_act", "moe_down", "moe_sum", "(copy)", "in_norm", "qkv",
             "(qk_norm)", "(rope)", "cache", "attn", "reduce", "o_proj"]
@@ -55,7 +57,7 @@ def kernels(d):
 def vllm_roles(d, kind, roles_in_layer, model):
     """{role: mean untraced us} for vLLM's launches of one decode layer."""
     ks = kernels(d)[-40000:]
-    sc = SCALE.get(model, 1.0)
+    off = OFFSET.get(model, 0.0)
     out = defaultdict(list)
     if kind == "moe":
         anchor = [i for i, (n, _) in enumerate(ks) if "fused_add_rms_norm_moe_forward" in n]
@@ -64,7 +66,7 @@ def vllm_roles(d, kind, roles_in_layer, model):
             if len(seq) != len(MOE_VLLM):
                 continue
             for role, (_, us) in zip(MOE_VLLM, seq):
-                out[role].append(us * sc)
+                out[role].append(us - off)
         # Inductor runs q/k norm and rope as two kernels where ETX runs vLLM's three custom ops: compare the sums
         out["(qk_norm+rope)"] = [a + b for a, b in zip(out.pop("(qk_norm)", []), out.pop("(rope)", []))]
     else:
@@ -77,7 +79,7 @@ def vllm_roles(d, kind, roles_in_layer, model):
             if len(seq) != len(order):
                 continue
             for role, (_, us) in zip(order, seq):
-                out[role].append(us * sc)
+                out[role].append(us - off)
     return {r: median(v) for r, v in out.items() if v}      # median: warm-up bursts carry outliers
 
 
