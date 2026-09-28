@@ -3,7 +3,10 @@
 Question: is ETX's hand-off (h) plus what the imported form adds per task (p) now small enough that fusing vLLM's own
 kernels beats vLLM (MoE break-even: 12 h + 15 p < 32.4 us per layer), and does the MoE build do it?
 
-GPU 0 (timing, alternated over two rounds, every run 32/32 tokens or it does not count):
+Two GPUs, each busy with its own model family from the start (on a one-GPU VM everything folds onto GPU 0):
+GPU 0 = dense: packs Qwen2.5-1.5B / Qwen3-8B, then G1, then the 1.5B trace and kernel trace.
+GPU 1 = MoE: packs Qwen3-30B-A3B, the --check, the MoE timing, then its trace and kernel trace.
+Each A/B comparison runs on one GPU, alternated over two rounds; every run 32/32 tokens or it does not count.
   G1  dense, stride 32 (the gfx942 default) vs -DETX_EV_STRIDE=1: Qwen2.5-1.5B base / xcd_s1, Qwen3-8B base / xcd, and the
       unfused builds. Pre-registered: 1.5B xcd_s1 1.95-2.25 ms (was 2.248), 8B xcd 5.35-5.86 (was 5.864), base builds
       gain 0.3-0.7 ms; if stride 32 gains nothing, H1 (false sharing of consecutive event words) is wrong.
@@ -49,7 +52,7 @@ for n, hf in MODELS.items():
             f"snapshot_download('{hf}', local_dir='{LLM}/{n}/hf', allow_patterns=['*.json', '*.safetensors', 'tokenizer*', '*.txt', '*.model'], "
             f"max_workers=16); print('DL-DONE')\" && du -sh {LLM}/{n}/hf && test -f {LLM}/{n}/hf/config.json")
     # the goldens are kept in the repo (HF greedy, 1024-token context): no reference run
-    job(name=f"prep_{n}", gpu=1, after=[f"dl_{n}", "etx_env"], timeout=2400,
+    job(name=f"prep_{n}", gpu=1 if n == "qwen3-30b-a3b" else 0, after=[f"dl_{n}", "etx_env"], timeout=2400,
         cmd=f"{PY} examples/vllm_llm/prep.py --src {LLM}/{n}/hf --out {LLM}/{n} --maxlen 1072 && "
             f"cp examples/llm/results/golden_c1024_{n}.txt {LLM}/{n}/golden_c1024.txt && ls -la {LLM}/{n}/vl.bin",
         summary=[r"wrote .*vl.bin"])
@@ -86,31 +89,36 @@ def run(b, extra=""):
 job(name="moe_check", gpu=1, after=["build_moe_base", "prep_qwen3-30b-a3b"], timeout=1200,
     cmd=f"stdbuf -oL {run('moe_base', '--check 2')}", summary=[r"^CHECK|DIFFERS|HANG|  total|fused_moe|topk|moe_sum"])
 
-# ---------------------------------------------------------------- timing, alternated (GPU 0)
-T = [("q15_base", ""), ("q15_base_s1", ""), ("q15_xs1", ""), ("q15_xs1_s1", ""), ("q15_base", "--unfused"),
-     ("q8_base", ""), ("q8_base_s1", ""), ("q8_xcd", ""), ("q8_xcd_s1", ""), ("q8_base", "--unfused"),
-     ("moe_base", ""), ("moe_xcd", ""), ("moe_base", "--unfused")]
-prev = None
-for rnd in (1, 2):
-    for b, extra in T:
-        m = BUILDS[b][0]
-        name = f"t{rnd}_{b}{'_unf' if extra else ''}"
-        deps = [f"build_{b}", f"prep_{m}"] + (["moe_check"] if m == "qwen3-30b-a3b" else [])
-        job(name=name, gpu=0, after=deps, after_any=[prev] if prev else [], timeout=900,
-            cmd=f"stdbuf -oL {run(b, extra)}", summary=[RES])
-        prev = name
+# ---------------------------------------------------------------- timing, alternated: dense on GPU 0, MoE on GPU 1
+DENSE = [("q15_base", ""), ("q15_base_s1", ""), ("q15_xs1", ""), ("q15_xs1_s1", ""), ("q15_base", "--unfused"),
+         ("q8_base", ""), ("q8_base_s1", ""), ("q8_xcd", ""), ("q8_xcd_s1", ""), ("q8_base", "--unfused")]
+MOE = [("moe_base", ""), ("moe_xcd", ""), ("moe_base", "--unfused")]
+LAST = {}
+for gpu, T in ((0, DENSE), (1, MOE)):
+    prev = "moe_check" if gpu == 1 else None
+    for rnd in (1, 2):
+        for b, extra in T:
+            m = BUILDS[b][0]
+            name = f"t{rnd}_{b}{'_unf' if extra else ''}"
+            deps = [f"build_{b}", f"prep_{m}"] + (["moe_check"] if m == "qwen3-30b-a3b" else [])
+            job(name=name, gpu=gpu, after=deps, after_any=[prev] if prev else [], timeout=900,
+                cmd=f"stdbuf -oL {run(b, extra)}", summary=[RES])
+            prev = name
+    LAST[gpu] = prev
 
-# ---------------------------------------------------------------- traces (GPU 1), analysed off the machine
+# ---------------------------------------------------------------- traces, after each GPU's timing (analysed off the machine)
 for b in ("q15_xs1", "moe_xcd"):
     m = BUILDS[b][0]
-    job(name=f"trace_{b}", gpu=1, after=[f"build_{b}", f"prep_{m}"] + (["moe_check"] if m == "qwen3-30b-a3b" else []),
-        after_any=["moe_check"], timeout=900,
+    g = 1 if m == "qwen3-30b-a3b" else 0
+    job(name=f"trace_{b}", gpu=g, after=[f"build_{b}", f"prep_{m}"] + (["moe_check"] if g == 1 else []),
+        after_any=[LAST[g]], timeout=900,
         cmd=f"ETX_TRACE=1 ETX_TRACE_RAW=$HOME/sess/trace_{b}.bin stdbuf -oL {run(b, '--max-steps 8 --repeat 1')}; "
             f"cp $HOME/sess/b_{b}/plan.json $HOME/sess/plan_{b}.json; cp $HOME/sess/b_{b}/vl_plan.txt $HOME/sess/vlplan_{b}.txt",
         summary=[RES])
 for b in ("q15_base", "moe_base"):
     m = BUILDS[b][0]
-    job(name=f"rocprof_{b}", gpu=1, after=[f"build_{b}", f"prep_{m}"], after_any=["trace_moe_xcd", "trace_q15_xs1"], timeout=1200,
+    g = 1 if m == "qwen3-30b-a3b" else 0
+    job(name=f"rocprof_{b}", gpu=g, after=[f"build_{b}", f"prep_{m}"], after_any=["trace_moe_xcd" if g == 1 else "trace_q15_xs1"], timeout=1200,
         cmd=f"rocprofv3 --kernel-trace --output-format csv -d $HOME/sess/rocprof_{b} -o kt -- {run(b, '--unfused --max-steps 8 --repeat 1')} "
             f"> $HOME/sess/rocprof_{b}.run.log 2>&1; tail -3 $HOME/sess/rocprof_{b}.run.log; cp $HOME/sess/b_{b}/vl_plan.txt $HOME/sess/vlplan_{b}.txt; "
             f"find $HOME/sess/rocprof_{b} -name '*kernel_trace.csv' | head -1 | xargs -r wc -l",
