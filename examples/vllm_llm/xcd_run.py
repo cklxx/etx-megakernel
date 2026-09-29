@@ -24,8 +24,11 @@ from etx.sim.xcd import Cost, Hw, simulate
 from examples.vllm_llm import kmodel as km
 
 
-def cost_fn(model: str, p: km.Params, variant: dict | None = None):
-    kern = {k.role: k for k in km.MODELS[model]}
+def cost_fn(model: str, p: km.Params, variant: dict | None = None, plan: dict | None = None):
+    """model "auto" with `plan`: every task's entry from the tile its type links (km.kern_for_symbol)"""
+    base = km.MODELS["qwen3-30b-a3b" if model == "auto" else model]
+    kern = {k.role: k for k in base}
+    symbols = {n: t["symbol"] for n, t in plan["types"].items()} if (plan and model == "auto") else {}
     variant = variant or {}
 
     def role_of(name: str) -> str | None:
@@ -38,16 +41,22 @@ def cost_fn(model: str, p: km.Params, variant: dict | None = None):
         if name in cache:
             return cache[name]
         r = role_of(name)
+        kk = kern
+        if symbols and r is not None and not name.startswith("chain_"):
+            k = km.kern_for_symbol(symbols[name], r, base)
+            kk = dict(kern)
+            if k is None: kk.pop(r, None)
+            else: kk[r] = k
         if name.startswith("chain_"):                     # q/k norm + rope + cache run back to back in one task
             roles = re.match(r"chain_(.+)_\d+$", name).group(1).split("_")
-            roles = [x if x in kern else f"{x}_{y}" for x, y in zip(roles, roles[1:] + [""]) if x in kern or f"{x}_{y}" in kern]
-            parts = [kern[x] for x in roles]
+            roles = [x if x in kk else f"{x}_{y}" for x, y in zip(roles, roles[1:] + [""]) if x in kk or f"{x}_{y}" in kk]
+            parts = [kk[x] for x in roles]
             # every part reads its own arguments: each pays the argument path (measured: 18.6 us for the four);
             # a part whose blocks exceed the workgroup's slots runs in rounds
             ch = sum(km.terms(k, p, "etx_task")["total"] * k.chain_rounds for k in parts) - p.A_task
             c = Cost(front_us=p.A_task, chain_us=ch)
-        elif r in kern:
-            k = kern[r]
+        elif r in kk:
+            k = kk[r]
             t = km.terms(k, p, "etx_task")
             chain = t["scalar"] + t["chain"] + t["sync"] + t["issue"]
             if k.bytes_block:

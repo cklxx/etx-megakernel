@@ -373,3 +373,13 @@ and the trace (per-task bodies of qkv / o_proj / moe_up / moe_down against 5.3 /
 What these do not cover: the hardware's memory model beyond "release makes the domain's L2 hold the data, write-back
 makes it visible" (the K$ and vector-L1 behaviour was measured, section 10), the fp32 summation order of the GEMV (the
 host's --check-dsl tolerance), and the imported kernels themselves (their byte-identity is the --check gate).
+
+## 15. The configuration search (2026-09-29, `examples/vllm_llm/autoconf.py`)
+
+The build switches of model.py (chain, fused q/k norm + rope, DSL GEMVs, DSL top-k, the attention block by kv head) are
+searched, not set: every combination is compiled to a plan, every task is costed from the tile its type links
+(`kmodel.kern_for_symbol`, so imported kernels and DSL ops mix without a hand-picked model name) and the step is
+simulated with the microbenchmark parameters. Of 32 configurations the best is build 2 (4.01 ms simulated; the same
+whether the chain switch is on: with the head block there is nothing left to chain), then build 2 without the DSL top-k
+(4.17), then the fused-q/k-norm builds with the DSL GEMVs (4.42-4.45). The search is what turns "the user sets six
+environment variables" into "the compiler chooses"; slots per import and rows per DSL task are the next dimensions.

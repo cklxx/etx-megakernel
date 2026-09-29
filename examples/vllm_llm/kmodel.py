@@ -32,6 +32,7 @@ from __future__ import annotations
 import argparse
 import itertools
 import json
+import re
 from dataclasses import dataclass, field, replace
 
 BW0 = 4.2e6         # bytes/us, achievable HBM rate of many streaming CUs (hw_bench stream, WG medians); refitted
@@ -125,6 +126,18 @@ BUILD1 = [k for k in GEMV_ONLY if k.role != "topk"] + [k for k in DSL_MOE if k.r
 # + ETX_VL_DSL_ATTN=head: etx.ops.attnprep per kv head (9 waves: row load, cos/sin after the position, stores), vLLM's
 # attention and reduce as they are
 BUILD2 = [k for k in BUILD1 if k.role not in ("qknr", "cache")] + [Kern("prep", S=4, V=3, shfl=8, instr=300, note="DSL attention prep of one kv head")]
+# the cost entry of a task from what its type links (plan.json "symbol"), so any mix of imported kernels and DSL ops
+# costs itself without a hand-picked model name (etx_tile_[rep_|x_]<export>): DSL exports map to their entries, the
+# fused q/k norm + rope to "qknr", everything else to the vLLM entry of the role
+def kern_for_symbol(symbol: str, role: str, base: list) -> "Kern | None":
+    exp = re.sub(r"^etx_tile_(rep_|x_)?", "", symbol)
+    dsl = {"dsl_gemv": {k.role: k for k in DSL_GEMV}, "dsl_moe_up": {k.role: k for k in DSL_GEMV}, "dsl_moe_down": {k.role: k for k in DSL_GEMV},
+           "dsl_topk": {k.role: k for k in DSL_MOE}, "dsl_attnprep": {k.role: k for k in BUILD2}, "dsl_attn": {k.role: k for k in DSL_MOE}}
+    if exp in dsl:
+        return dsl[exp].get(role)
+    return {k.role: k for k in base}.get(role)
+
+
 MODELS = {"qwen3-30b-a3b": MOE, "qwen2.5-1.5b": Q15, "qwen3-30b-a3b-dsl": DSL_MOE, "qwen3-30b-a3b-dslgemv": DSL_GEMV,
           "qwen3-30b-a3b-dslp1": DSL_P1, "qwen3-30b-a3b-gemvonly": GEMV_ONLY, "qwen3-30b-a3b-build1": BUILD1,
           "qwen3-30b-a3b-build2": BUILD2}
