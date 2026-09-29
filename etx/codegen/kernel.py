@@ -173,6 +173,8 @@ def emit_kernel(plan: Plan, device: int = 0) -> str:
                 out.append(f"extern \"C\" __device__ void {g.body.prefetch}(const etx_ctx*);")
             if g.body.pre_wait:
                 out.append(f"extern \"C\" __device__ void {g.body.pre_wait}(const etx_ctx*);")
+            if g.body.touch:
+                out.append(f"extern \"C\" __device__ void {g.body.touch}(const etx_ctx*);")
         for name, ig in plan.inlined.items():
             out.append(f"extern \"C\" __device__ void {ig.body.symbol}(const etx_ctx*);   // inlined producer {name}")
     for g in grids:
@@ -243,6 +245,13 @@ def emit_kernel(plan: Plan, device: int = 0) -> str:
         if g.body.pre_wait and g.in_edges:
             out.append("#ifndef ETX_NO_PRE_WAIT")
             out.append(f"      if (threadIdx.x < 64) {g.body.pre_wait}(&ctx);   // before the wait: does not depend on the event")
+            out.append("#endif")
+        if g.body.touch and g.in_edges:
+            # the waves that are not waiting are idle until the barrier after this switch: they pull the task's first
+            # weight trips into L2 meanwhile (the weights depend on no event; the loads complete at that barrier, which
+            # wave 0 reaches after its wait, so their latency overlaps the wait, not the arrive or the body)
+            out.append("#ifndef ETX_NO_TOUCH")
+            out.append(f"      if (threadIdx.x >= 64) {g.body.touch}(&ctx);   // waves 1..: this task's first weight trips into L2 while wave 0 waits")
             out.append("#endif")
         if g.in_edges:
             out.append("      if (threadIdx.x == 0) {")
@@ -441,7 +450,8 @@ def emit_plan_json(plan: Plan) -> str:
         "threads": max([g.resource.threads for g in plan.graph.grids] + [64]),
         "args": args,
         "types": {g.name: {"id": plan.type_ids[g.name], "symbol": g.body.symbol, "mode": plan.modes.get(g.name),
-                           "grid": list(plan.inst.grid_shapes[g.name]), "prologue": [list(x) for x in g.prologue], "device": g.device}
+                           "grid": list(plan.inst.grid_shapes[g.name]), "prologue": [list(x) for x in g.prologue], "device": g.device,
+                           "touch": g.body.touch}
                   for g in plan.graph.grids},
         "events": [{"name": e.name, "id": i, "offset": e.offset, "shape": list(e.shape), "scope": e.scope.name,
                     "memory": e.memory, "counts": e.counts, "runtime_init": e.runtime_init}

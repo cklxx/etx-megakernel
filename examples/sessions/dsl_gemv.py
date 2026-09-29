@@ -4,8 +4,10 @@ kv head (etx.ops.attnprep on XCD h, vLLM's attention and reduce on XCD h) + the 
 into the qkv / router / lm_head prologues, the top-k into the expert tasks; no moe_sum). Build 2 (no folds) as the
 fallback and the measurement of the fold alone. Gates: 32/32 tokens against HF greedy and --check-dsl (the last layer's
 DSL ops within 2 bf16 ulps of a CPU reference). Numbers: the fused step, the same tiles launched one by one (--unfused),
-two interleaved requests. Pre-registered (sim x 1.11): build 3 3.55 -> ~3.94 ms (vLLM 4.67), two requests ~2.63 ms per
-token (380 tok/s; vLLM batch 2: 360); build 2 4.01 -> ~4.45.
+two interleaved requests. Build 3 carries the touch hook (ETX_VL_TOUCH=1, section 18: the dense GEMVs' first weight
+trip pulled into L2 by the idle waves during the event wait). Pre-registered (sim x 1.11): build 3 + touch 3.20 ->
+~3.56 ms (vLLM 4.67; without the hook 3.54 -> ~3.93), two requests 2.18 -> ~2.42 ms per token (413 tok/s; vLLM
+batch 2: 360; without the hook ~2.53); build 2 (no folds, no touch) 4.01 -> ~4.45.
 
   tools/session.sh push <ip>; tools/session.sh start <ip> examples/sessions/dsl_gemv.py
 """
@@ -42,7 +44,7 @@ job(name="prep", gpu=0, after=["dl", "etx_env"], timeout=2400,
 B = "moe_dsl3"
 DSL = "ETX_VL_XCD=1 ETX_VL_CHAIN=1 ETX_VL_DSL_GEMV=1 ETX_VL_DSL_TOPK=1 ETX_VL_DSL_ATTN=head"
 job(name=f"build_{B}", lane="cpu", after=["etx_env", "dl"], timeout=2400,
-    cmd=f"{V} {DSL} ETX_VL_DSL_FOLD=1 ETX_OUT=$HOME/sess/b_{B} bash examples/vllm_llm/build.sh {LLM}/{M} "
+    cmd=f"{V} {DSL} ETX_VL_DSL_FOLD=1 ETX_VL_TOUCH=1 ETX_OUT=$HOME/sess/b_{B} bash examples/vllm_llm/build.sh {LLM}/{M} "
         f"> $HOME/sess/b_{B}.buildlog 2>&1; grep -E 'tasks=|Function Name|VGPRs|error' $HOME/sess/b_{B}.buildlog | tail -4; "
         f"cp $HOME/sess/b_{B}.buildlog $HOME/sess/buildlog_{B}.txt; cp $HOME/sess/b_{B}/vl_plan.txt $HOME/sess/vlplan_{B}.txt; "
         f"cp $HOME/sess/b_{B}/plan.json $HOME/sess/plan_{B}.json; cp $HOME/sess/b_{B}/dsl_tiles.hip $HOME/sess/; test -x $HOME/sess/b_{B}/run",
@@ -61,7 +63,7 @@ job(name=f"build_{BF}", lane="cpu", after=["etx_env", "dl"], timeout=2400,
         f"cp $HOME/sess/b_{BF}/plan.json $HOME/sess/plan_{BF}.json; test -x $HOME/sess/b_{BF}/run", summary=[r"tasks=|VGPRs Spill"])
 job(name="run_fused_b2", gpu=0, after=[f"build_{BF}", "prep"], after_any=["trace_fused"], timeout=900,
     cmd=f"stdbuf -oL $HOME/sess/b_{BF}/run {LLM}/{M} $HOME/sess/b_{BF}/vl_plan.txt --repeat 1 --check-dsl", summary=[RES])
-# two interleaved requests on the same structure (predicted 5.20 ms per step of two tokens: 2.89 ms per token, 347 tok/s;
+# two interleaved requests on the same structure (predicted 4.84 ms per step of two tokens: 2.42 ms per token, 413 tok/s;
 # vLLM batch 2: 360): request 1 = the prompt rotated by 97 tokens, its golden from HF greedy
 B2 = "moe_dsl3x2"
 job(name="llm_env_tf", lane="cpu", after="llm_env", timeout=1800,
@@ -70,7 +72,7 @@ job(name="golden_r97", gpu=0, after=["llm_env_tf", "dl"], after_any=["run_fused_
     cmd=f"{PY} examples/llm/prep.py --model {HF} --src {LLM}/{M}/hf --out {LLM}/{M} --context 1024 --rotate 97 --golden-only && "
         f"head -c 200 {LLM}/{M}/golden_c1024_r97.txt", summary=[r"HF greedy|gen:"])
 job(name=f"build_{B2}", lane="cpu", after=["etx_env", "dl"], timeout=2400,
-    cmd=f"{V} {DSL} ETX_VL_DSL_FOLD=1 ETX_VL_REQUESTS=2 ETX_OUT=$HOME/sess/b_{B2} "
+    cmd=f"{V} {DSL} ETX_VL_DSL_FOLD=1 ETX_VL_TOUCH=1 ETX_VL_REQUESTS=2 ETX_OUT=$HOME/sess/b_{B2} "
         f"bash examples/vllm_llm/build.sh {LLM}/{M} > $HOME/sess/b_{B2}.buildlog 2>&1; grep -E 'tasks=|Function Name|VGPRs|error' $HOME/sess/b_{B2}.buildlog | tail -4; "
         f"cp $HOME/sess/b_{B2}.buildlog $HOME/sess/buildlog_{B2}.txt; cp $HOME/sess/b_{B2}/vl_plan.txt $HOME/sess/vlplan_{B2}.txt; "
         f"cp $HOME/sess/b_{B2}/plan.json $HOME/sess/plan_{B2}.json; test -x $HOME/sess/b_{B2}/run", summary=[r"tasks=|megakernel|VGPRs Spill"])

@@ -452,3 +452,48 @@ pipeline at every f and every S: the pipeline streams the dense weights once per
 and only saves the device-wide hand-off premium; per-token latency grows with S. Even f = 1 (a stage pulls its full
 share of the bandwidth) does not close it. Pipelining is for the multi-GPU case; on one MI300X the order is batching
 (B <= 8: 779 tok/s at 10.3 ms), then the tax. The lfx number settles f; it does not change the ranking.
+
+## 18. The touch hook: the dense GEMVs' first weight trip during the wait (2026-09-29, pre-registered; ETX_VL_TOUCH=1)
+
+What every megakernel that beats its launch-boundary baseline does (docs/SURVEY-2026-09-29.md: Hazy's instruction gap
+10.2 -> 3.4 us from cross-instruction pipelining alone, Cohere's weights prefetched before the activation dependency,
+MPK's descriptor prefetch): the weights depend on no event, so their first round trip need not wait for the acquire.
+
+Mechanism (`TileBody.touch`, `etx/codegen/kernel.py`): a task type may name a `touch` device function. In phase 1 of
+`etx_run_task`, the waves that are not waiting (threadIdx >= 64; wave 0 polls the event) call it before wave 0's wait,
+so its loads complete at the barrier after the switch, which wave 0 reaches after its wait: the loads' latency overlaps
+the wait, not the arrive or the body. (Issuing them during the arrive of the previous task, as first planned, would not
+overlap the wait: the `__syncthreads` at the end of the loop and at the top of the next iteration fence every
+outstanding load, so they would be waited for before the next wait began.) `-DETX_NO_TOUCH` removes it; the unfused
+kernel has no wait and no touch.
+
+`etx/ops/gemv.py` (`dsl_touch_plain`): for the dense forms (dsl_gemv, dsl_gemv_fold; not the expert forms, whose rows
+depend on the top-k, i.e. on the event), waves 1..15 load the first U vectors of their own segment range of the task's
+first DSL_RCH-row pass, exactly what `dsl_gemv_rows` loads first: 15 x 64 lanes x 4 x 16 B = 60 KB per workgroup, one
+trip, since 38 workgroups x 64 KB already take most of an XCD's 4 MB L2. `asm volatile` keeps the loads. The arg block
+comes through the K$ as the tile's does. `ETX_VL_TOUCH=1` in model.py sets the hook on those grids (qkv, o_proj,
+router, lm_head, plain and x forms).
+
+Simulation (`etx/sim/xcd.py` `Cost.touch_bytes`, `xcd_run.cost_fn`): the touched bytes (one inflight, 64 KB) stream
+from the moment the worker takes the task, before its events fire, sharing the bandwidth with every other stream
+(Little's law as before); the body's stream of the rest starts when both the touch and front + chain are done, plus one
+L2 round trip (0.143 us) to re-read the touched trip. What the model does not capture: L2 eviction of the touched
+lines by the previous task's own stream passing through L2 (38 x 64 KB = 2.4 MB of 4 MB), and a wait shorter than the
+touch's own round trip (then the touch delays the barrier by what the body would have paid anyway, +0.143). A first
+version that simply dropped the trip from the stream (no bandwidth for the touched bytes) gave 3.13 / 3.47; it is
+wrong because the touch of 304 workgroups is 19 MB, 5.5 us of bandwidth, longer than the wait it hides in.
+
+`examples/vllm_llm/sensitivity.py`, build 3 (x1.11 = realistic):
+
+| build 3 | R=1 sim | x1.11 | R=2 per token | x1.11 |
+|---|---|---|---|---|
+| baseline (section 17) | 3.54 | 3.93 | 2.28 | 2.53 |
+| + touch | 3.20 | **3.56** | 2.18 | **2.42** |
+| + touch, hand-offs = evx 2.2 / 3.9 | 3.97 | 4.41 | 2.39 | 2.65 |
+
+Pre-registered: build 3 with the touch hook ~3.56 ms per token (vLLM 4.67), two requests ~2.42 ms per token (413
+tok/s). An analytic bound agrees on the order: per dense GEMV launch the touch fills the idle bandwidth of the wait
+(hand-off 1.8 + wake ~0.6 us of a 6 us qkv stream), ~2 us per launch, 48 layers x 2 launches + lm_head ~0.2-0.35 ms.
+Container build (`rocm_build_check.sh qwen3-30b-a3b xcd_dsl3_touch`, and `xcd_dsl3x2_touch`): 10 VGPR spills, 36 B
+scratch per lane, as without the hook. The session (`examples/sessions/dsl_gemv.py`) builds build 3 and its
+two-request form with ETX_VL_TOUCH=1; build 2 stays the fallback without it.

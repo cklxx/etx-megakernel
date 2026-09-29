@@ -5,7 +5,8 @@ section 17), so a measurement that misses the prediction points at a parameter r
   python3 -m examples.vllm_llm.sensitivity [--bench results_2026-09-28b] [--requests 1,2]
 Variants: hand-offs from the trace (0.4 / 1.8 us) or from the evx microbenchmark (2.2 / 3.9); the argument path
 (A_task) and the wake-up spread at 0.5x / 1.5x; the prologue round trip t_v idle MALL (0.26) / idle HBM (0.41) /
-loaded (0.7). Prints the simulated ms per token and x1.11 (the realistic factor of the measured builds).
+loaded (0.7). Prints the simulated ms per token and x1.11 (the realistic factor of the measured builds); then the
+same build with the touch hook (ETX_VL_TOUCH=1, section 18) under the first two variants.
 """
 from __future__ import annotations
 
@@ -58,6 +59,15 @@ def main():
         for r in reqs:
             h = Hw(bw_max=p.bw, n_half=0.0, handoff_us=hw["handoff"], wake_us=hw["wake"], rate_cv=0.03, lat_us=p.t_v)
             ms = simulate(plans[r], cost_fn("auto", p, plan=plans[r]), h)[1]["makespan_us"] / 1e3 / r
+            line += f"{ms:12.3f}{ms * 1.11:8.2f}"
+        print(line)
+    # the touch hook (ETX_VL_TOUCH=1, section 18): the dense GEMVs' first weight trip pulled into L2 during the wait
+    tplans = {r: dc.make_plan(dict(BUILD3, ETX_VL_REQUESTS=str(r), ETX_VL_TOUCH="1"), tmp / "imports.json", tmp) for r in reqs}
+    for name, p, hw in list(variants(p0))[:2]:
+        line = f"  {'+ touch, ' + name[:36]:46s}"
+        for r in reqs:
+            h = Hw(bw_max=p.bw, n_half=0.0, handoff_us=hw["handoff"], wake_us=hw["wake"], rate_cv=0.03, lat_us=p.t_v)
+            ms = simulate(tplans[r], cost_fn("auto", p, plan=tplans[r]), h)[1]["makespan_us"] / 1e3 / r
             line += f"{ms:12.3f}{ms * 1.11:8.2f}"
         print(line)
 

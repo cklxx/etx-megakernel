@@ -80,6 +80,9 @@ class TileBody:
     prefetch: str | None = None     # optional device function that warms this tile's weights (Pass 7 hook)
     pre_wait: str | None = None     # optional device function run by the waiting wave before its event wait: work that
                                     # does not depend on the event (an imported tile's argument block into the K$)
+    touch: str | None = None        # optional device function the other waves (threadIdx >= 64) run while wave 0 waits: the
+                                    # task's first weight trips into this XCD's L2 (weights depend on no event), so the
+                                    # stream's first round trip after the acquire is an L2 hit (ETX_NO_TOUCH disables)
 
 
 @dataclass

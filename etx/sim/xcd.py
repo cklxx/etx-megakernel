@@ -38,6 +38,9 @@ class Cost:
     end_us: float = 0.0          # stores and the release after the stream
     inflight: float = 0.0        # bytes this task keeps in flight; with it the rate follows Little's law:
     exposed_us: float = 0.0      # rate = inflight / (loaded latency + exposed work per trip)
+    touch_bytes: float = 0.0     # the touch hook: this many of stream_bytes are pulled (same inflight, same bandwidth
+                                 # sharing) from the moment the worker takes the task, before its events fire; the body's
+                                 # stream of the rest starts when both the touch and front + chain are done
 
 
 @dataclass
@@ -145,20 +148,36 @@ def simulate(plan: dict, cost_of: Callable[[str, dict], Cost], hw: Hw, max_tasks
         heapq.heappush(evq, (time, seq, kind, payload))
         seq += 1
 
+    touch_done = {}                                           # task -> time its touch stream finished (None while in flight)
+    stream_pending = set()                                    # tasks whose body stream waits for their touch
+
     def try_start(w, now):
         if pos[w] >= len(queues[w]):
             return
         t = queues[w][pos[w]]
         if ready[t] is not None:
             return                                            # already scheduled
+        if t not in cost:
+            cost[t] = cost_of(names[descs[t]["type"]], descs[t])
+        c = cost[t]
+        if c.touch_bytes > 0 and t not in touch_done:         # the touch hook streams from the moment the worker is free
+            touch_done[t] = None
+            active[("touch", t)] = [min(c.touch_bytes, c.stream_bytes), c.cu_rate, descs[t]["domain"], c.inflight, c.exposed_us]
         r = ready_time(t)
         if r is None:
             return                                            # woken when its last event fires
         taken[t] = worker_free[w]
         ready[t] = max(r, worker_free[w])
-        c = cost_of(names[descs[t]["type"]], descs[t])
-        cost[t] = c
         push(ready[t] + c.front_us + c.chain_us, "stream", t)
+
+    def start_stream(t, now):
+        c = cost[t]
+        left = c.stream_bytes - (min(c.touch_bytes, c.stream_bytes) if t in touch_done else 0.0)
+        if left > 0:
+            f = max(0.3, rng.gauss(1.0, hw.rate_cv)) if hw.rate_cv else 1.0
+            active[t] = [left, c.cu_rate * f, descs[t]["domain"], c.inflight * f, c.exposed_us]
+        else:
+            push(now + c.end_us, "done", t)
 
     active = {}                                               # task -> [bytes left, cap, domain, inflight, exposed]
     last = 0.0
@@ -183,15 +202,20 @@ def simulate(plan: dict, cost_of: Callable[[str, dict], Cost], hw: Hw, max_tasks
             v[0] -= rates.get(k, 0.0) * (now - last)
         last = now
         if kind == "stream":
-            c = cost[t]
-            if c.stream_bytes > 0:
-                f = max(0.3, rng.gauss(1.0, hw.rate_cv)) if hw.rate_cv else 1.0
-                active[t] = [c.stream_bytes, c.cu_rate * f, descs[t]["domain"], c.inflight * f, c.exposed_us]
+            if t in touch_done and touch_done[t] is None:
+                stream_pending.add(t)                         # the touch loads complete at the barrier before the body
             else:
-                push(now + c.end_us, "done", t)
+                start_stream(t, now)
         elif kind == "stream_done":
             del active[t]
-            push(now + cost[t].end_us, "done", t)
+            if isinstance(t, tuple):                          # ("touch", task)
+                t = t[1]
+                touch_done[t] = now
+                if t in stream_pending:
+                    stream_pending.discard(t)
+                    start_stream(t, now)
+            else:
+                push(now + cost[t].end_us, "done", t)
         elif kind == "done":
             done[t] = now
             w = owner[t]

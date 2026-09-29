@@ -202,7 +202,37 @@ static __device__ __forceinline__ void dsl_topk_lds(const __hip_bfloat16* logits
   }
   __syncthreads();
 }
+// ---- touch (the megakernel's touch hook, ETX_VL_TOUCH=1): while wave 0 waits for the task's event, waves 1.. load
+// the first U vectors of their own segment range of the task's first DSL_RCH-row pass, exactly what dsl_gemv_rows
+// loads first, so that trip hits L2 after the acquire (the weights depend on no event). 15 waves x 64 lanes x U x 16 B
+// = 60 KB per workgroup: one trip, since 38 workgroups x 64 KB already fill most of an XCD's 4 MB L2.
+template <int EPL, int U>
+static __device__ __forceinline__ void dsl_touch_rows(const __hip_bfloat16* __restrict__ W, int K, int r0, int r1) {
+  typedef typename dsl_wvec<EPL>::T V;
+  constexpr int SEG = ETX_WAVE_SIZE * EPL;
+  const int lane = etx_lane(), wv = etx_wave(), nw = etx_nwaves(), nrt = r1 - r0;
+  const int spr = K / SEG, S = nrt * spr;
+  const int per = (S + nw - 1) / nw, sb = wv * per, se = min(S, sb + per);
+  const DSL_G V* base = (const DSL_G V*)(W + (size_t)r0 * K) + lane;
+  unsigned acc = 0;
+  V w[U];
+#pragma unroll
+  for (int u = 0; u < U; ++u) if (sb + u < se) w[u] = base[(size_t)(sb + u) * ETX_WAVE_SIZE];
+#pragma unroll
+  for (int u = 0; u < U; ++u) if (sb + u < se) acc ^= w[u][0];
+  asm volatile("" :: "v"(acc));                     // the loads are kept (and complete here: these waves idle until the barrier anyway)
+}
+static __device__ __forceinline__ void dsl_touch_plain(const unsigned char* a, int blk) {
+  const int nblk = *(const int*)(a + 120 + 12);
+  if (blk >= nblk) return;
+  const DslArgs d = dsl_args(a);
+  const int r0 = blk * d.rpt, r1 = min(d.M, min(r0 + d.rpt, r0 + DSL_RCH));   // the first pass of dsl_gemv_chunked
+  if (r0 >= r1) return;
+  if (d.K % (ETX_WAVE_SIZE * 8) == 0) dsl_touch_rows<8, 4>(d.W, d.K, r0, r1); else dsl_touch_rows<4, 8>(d.W, d.K, r0, r1);
+}
 '''
+
+TOUCH_FORMS = ("plain",)     # the dense GEMVs: an expert task's rows are not known before its own wait (top-k)
 
 BODIES = {
     "plain": '''
@@ -258,6 +288,9 @@ def emit_tiles(lds_floats: int = 8192) -> str:
         out.append(f"  dsl_run_{e}(etx_imp_argblock(c->args, c->cst[0] + c->coord[0] * c->cst[1]), c->coord[0] * c->cst[2] + c->coord[1]);\n}}")
         out.append(f'extern "C" __device__ __attribute__((always_inline)) void etx_pre_{e}(const etx_ctx* c) {{ etx_imp_touch(etx_imp_argblock(c->args, c->cst[0]), {ARG_BYTES}); }}')
         out.append(f'extern "C" __device__ __attribute__((always_inline)) void etx_pre_x_{e}(const etx_ctx* c) {{ etx_imp_touch(etx_imp_argblock(c->args, c->cst[0] + c->coord[0] * c->cst[1]), {ARG_BYTES}); }}')
+        if form in TOUCH_FORMS:
+            out.append(f'extern "C" __device__ __attribute__((always_inline)) void etx_touch_{e}(const etx_ctx* c) {{ dsl_touch_plain(etx_imp_argblock(c->args, c->cst[0]), c->coord[0]); }}')
+            out.append(f'extern "C" __device__ __attribute__((always_inline)) void etx_touch_x_{e}(const etx_ctx* c) {{ dsl_touch_plain(etx_imp_argblock(c->args, c->cst[0] + c->coord[0] * c->cst[1]), c->coord[0] * c->cst[2] + c->coord[1]); }}')
         out.append("")
     return "\n".join(out) + "\n"
 

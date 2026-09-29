@@ -29,7 +29,9 @@ def cost_fn(model: str, p: km.Params, variant: dict | None = None, plan: dict | 
     base = km.MODELS["qwen3-30b-a3b" if model == "auto" else model]
     kern = {k.role: k for k in base}
     symbols = {n: t["symbol"] for n, t in plan["types"].items()} if (plan and model == "auto") else {}
+    touched = {n for n, t in plan["types"].items() if t.get("touch")} if plan else set()
     variant = variant or {}
+    t_l2 = p.hw.get("t_l2", 0.143)                    # the L2 round trip (hw_bench lat vector L2 idle)
 
     def role_of(name: str) -> str | None:
         m = re.match(r"(?:r\d+_)?(?:chain_)?(.+?)_(\d+)(_x)?$", name)   # r<k>_: request k of ETX_VL_REQUESTS > 1
@@ -66,6 +68,9 @@ def cost_fn(model: str, p: km.Params, variant: dict | None = None, plan: dict | 
                 c = Cost(front_us=t["etx_args"], chain_us=chain)
         else:                                              # prologue, argmax, lm_head, final norm: fixed guesses
             c = Cost(front_us=p.A_task, chain_us=2.0)
+        if name in touched and c.stream_bytes > 0:         # touch hook (section 18): the first trip (one inflight of bytes)
+            c = Cost(**{**c.__dict__, "touch_bytes": min(c.inflight, c.stream_bytes),   # streams before the events fire,
+                        "chain_us": c.chain_us + t_l2})   # sharing the bandwidth; re-reading it after the acquire is an L2 trip
         for key, f in variant.items():                     # what-if: scale a term, e.g. {"front_us": 0.0}
             if isinstance(f, (int, float)):
                 c = Cost(**{**c.__dict__, key: f})
