@@ -28,6 +28,8 @@
 //                      (D = 1..16: 4-64 KB per workgroup); rate against bytes in flight. Replaces the fitted bandwidth.
 //   hw_bench lfx       the lf stream on the first nx XCDs only (nx = 1, 2, 4, 8; 37 x 64 KB per XCD): the bandwidth one
 //                      pipeline stage of nx XCDs can pull; decides whether layer pipelining across XCDs can pay.
+//   hw_bench sdat      the data as the signal (Kog): producers store a 4 KB vector with coherent stores (or plain stores +
+//                      wbl2), consumers poll the vector until no sentinel remains; the same P / C shapes as evx device.
 //   hw_bench launch    the kernel boundary with work: 200 kernels in one HIP graph, each reads the previous kernel's output
 //                      and chases H dependent loads (H = -1: an empty kernel). Splits the fitted F into boundary + hops.
 //   hw_bench evx       ETX's own event protocol (the gfx942 lowering: fetch_sub arrive, poll = buffer_inv sc0 + load with
@@ -499,6 +501,62 @@ __global__ void __launch_bounds__(kT) k_evx(int* words, int* subs, int stride, i
   }
 }
 
+
+// ------------------------------------------------------------------ sdat (the data as the signal: no counter, no fence)
+// Kog's hand-off: producers pre-fill nothing and store their slice of a 4 KB vector with device-coherent stores (sc0 sc1:
+// write-through past L2); consumers poll the vector itself with coherent loads until no word is the sentinel. mode 0:
+// coherent stores; mode 1: plain stores + the producer's own buffer_wbl2 sc1 (an imported kernel's stores, then a flush)
+// then coherent loads; mode 2: plain stores, no flush, consumer buffer_inv sc1 + plain loads (the wrong answer: a
+// stale-L2 check, may HANG on a real cross-XCD miss, so it polls with a bound). P producers write words
+// [k * W / P, (k + 1) * W / P) of vector `it`; C consumers (P / 8 and C / 8 per XCD, device shape) poll the whole vector.
+__device__ __forceinline__ void sdat_store(uint32_t* p, uint32_t v) { asm volatile("global_store_dword %0, %1, off sc0 sc1" :: "v"(p), "v"(v) : "memory"); }
+__device__ __forceinline__ uint32_t sdat_load(const uint32_t* p) { uint32_t v; asm volatile("global_load_dword %0, %1, off sc0 sc1\n\ts_waitcnt vmcnt(0)" : "=v"(v) : "v"(p) : "memory"); return v; }
+__global__ void __launch_bounds__(kT) k_sdat(uint32_t* vec, int W, int P, int C, int mode, int skew_ticks, int iters, Ctl* ctl,
+                                             uint64_t* t_arr, uint64_t* t_wake, uint32_t* sink) {
+  __shared__ int s_slot, s_any;
+  if (threadIdx.x == 0) s_slot = claim_xslot(ctl);
+  __syncthreads();
+  const int x = (int)xcc_id(), slot = s_slot, wid = x * 38 + slot;
+  const int pp = P / 8, cp = C / 8;
+  const bool prod = slot < pp, cons = slot < cp;
+  const int k = x * pp + slot;                                      // producer index 0..P-1
+  uint32_t acc = 0;
+  for (int it = 0; it < iters; ++it) {
+    grid_barrier(ctl, it + 1);
+    const uint64_t tb = now();
+    uint32_t* v = vec + (size_t)it * W;
+    if (prod) {
+      if (threadIdx.x == 0) { const uint64_t until = tb + (uint64_t)((slot * 7919 + x * 131) % (skew_ticks + 1)); while (now() < until) {} }
+      __syncthreads();
+      const int lo = k * W / P, hi = (k + 1) * W / P;
+      const uint64_t ta = now();
+      for (int i = lo + threadIdx.x; i < hi; i += kT) {
+        if (mode == 0) sdat_store(v + i, (uint32_t)(it + 1)); else v[i] = (uint32_t)(it + 1);
+      }
+      if (mode == 1) asm volatile("s_waitcnt vmcnt(0)\n\tbuffer_wbl2 sc1\n\ts_waitcnt vmcnt(0)" ::: "memory");
+      else asm volatile("s_waitcnt vmcnt(0)" ::: "memory");
+      __syncthreads();
+      if (threadIdx.x == 0) t_arr[(size_t)it * 304 + wid] = ta;
+    }
+    if (cons) {
+      int rounds = 0;
+      for (;;) {
+        if (mode == 2) asm volatile("buffer_inv sc1" ::: "memory");
+        int any = 0;
+        for (int i = threadIdx.x; i < W; i += kT) { const uint32_t u = mode == 2 ? *(volatile const uint32_t*)(v + i) : sdat_load(v + i); any |= (u == 0xFFFFFFFFu); acc ^= u; }
+        if (threadIdx.x == 0) s_any = 0;
+        __syncthreads();
+        if (any) atomicOr(&s_any, 1);
+        __syncthreads();
+        if (!s_any || ++rounds > 200000) break;
+        __builtin_amdgcn_s_sleep(1);
+      }
+      if (threadIdx.x == 0) t_wake[(size_t)it * 304 + wid] = rounds > 200000 ? 0 : now();
+    }
+  }
+  if (acc == 0x12345u) sink[blockIdx.x] = acc;
+}
+
 // ------------------------------------------------------------------ host
 int main(int argc, char** argv) {
   setvbuf(stdout, nullptr, _IOLBF, 0);
@@ -784,6 +842,32 @@ int main(int argc, char** argv) {
       }
       printf("RESULT evx%s %-6s P %3d C %3d dirty %2d KB%s: last arrival -> first %5.2f  median %5.2f  last %5.2f us; wait start -> wake median %5.2f us\n",
              tsa ? "" : "-tsbefore", e.scope ? "device" : "xcd", e.P, e.C, e.dirty, e.late ? " late " : "      ", pct(first, 0.5), pct(med, 0.5), pct(last, 0.5), pct(ready, 0.5));
+    }
+  }
+  if (what == "all" || what == "sdat") {
+    const int iters = 24, W = 1024;                            // a 4 KB vector (2048 bf16) per iteration
+    uint32_t* vec; CHECK(hipMalloc(&vec, (size_t)iters * W * 4));
+    uint64_t *ta, *tw; CHECK(hipMalloc(&ta, (size_t)iters * 304 * 8)); CHECK(hipMalloc(&tw, (size_t)iters * 304 * 8));
+    struct E { int mode, P, C; };
+    const std::vector<E> es = {{0, 8, 8}, {0, 8, 296}, {0, 64, 64}, {0, 296, 8}, {0, 296, 296}, {1, 8, 8}, {1, 8, 296}, {1, 296, 296}, {2, 8, 8}, {2, 296, 296}};
+    for (const E& e : es) {
+      CHECK(hipMemset(vec, 0xFF, (size_t)iters * W * 4));
+      reset(); CHECK(hipMemset(ta, 0, (size_t)iters * 304 * 8)); CHECK(hipMemset(tw, 0, (size_t)iters * 304 * 8));
+      hipLaunchKernelGGL(k_sdat, dim3(ncu), dim3(kT), lds1, st, vec, W, e.P, e.C, e.mode, 100, iters, ctl, ta, tw, sink);
+      if (!wait_stream(st, 60)) { printf("RESULT sdat HUNG\n"); return 3; }
+      std::vector<uint64_t> a((size_t)iters * 304), b((size_t)iters * 304);
+      CHECK(hipMemcpy(a.data(), ta, a.size() * 8, hipMemcpyDeviceToHost)); CHECK(hipMemcpy(b.data(), tw, b.size() * 8, hipMemcpyDeviceToHost));
+      std::vector<double> first, med, last; int stuck = 0;
+      for (int it = 2; it < iters; ++it) {
+        uint64_t arr = 0; std::vector<double> wk;
+        for (int k = 0; k < 304; ++k) arr = std::max(arr, a[(size_t)it * 304 + k]);
+        for (int k = 0; k < 304; ++k) { const size_t i = (size_t)it * 304 + k; if (k % 38 < e.C / 8) { if (b[i]) wk.push_back(((double)b[i] - (double)arr) * 0.01); else ++stuck; } }
+        if (wk.empty() || !arr) continue;
+        std::sort(wk.begin(), wk.end()); first.push_back(wk.front()); med.push_back(wk[wk.size() / 2]); last.push_back(wk.back());
+      }
+      static const char* modes[] = {"coherent-st", "plain+wbl2 ", "plain+inv  "};
+      printf("RESULT sdat %s P %3d C %3d: last store -> first %5.2f  median %5.2f  last %5.2f us; stuck %d\n",
+             modes[e.mode], e.P, e.C, pct(first, 0.5), pct(med, 0.5), pct(last, 0.5), stuck);
     }
   }
   return 0;
