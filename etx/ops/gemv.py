@@ -159,7 +159,7 @@ static __device__ __forceinline__ void dsl_stage_norm(const DslArgs& d, float* x
     const float in = d.R > 1 ? dsl_bfr(acc) : acc;                                   // moe_sum rounds its fp32 sum once
     const float z = dsl_bfr(in + __bfloat162float(d.resid_in[i]));                   // the bf16 add of fused_add_rms_norm
     xs[i] = z; ss += z * z;
-    if (store) d.resid_out[i] = __float2bfloat16(z);
+    if (store && d.resid_out != nullptr) d.resid_out[i] = __float2bfloat16(z);
   }
   ss = etx_block_sum(ss, red);
   const float sv = rsqrtf(ss / (float)K + d.eps);

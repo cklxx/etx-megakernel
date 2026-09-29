@@ -190,7 +190,8 @@ def instances(d) -> list[dict]:
         gemv(L, "gate_up", 2 * d.INTER, d.H)
         add("silu_and_mul", L, "act", (1, 1, 1))
         gemv(L, "down", d.H, d.INTER)
-    add("fused_add_rms_norm", -1, "final_norm", (1, 1, 1))
+    if not DSL_FOLD:
+        add("fused_add_rms_norm", -1, "final_norm", (1, 1, 1))
     gemv(-1, "lm_head", d.V, d.H)
     return out
 

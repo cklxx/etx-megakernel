@@ -301,6 +301,8 @@ int main(int argc, char** argv) {
        .ptr(rows).ptr(rin).ptr(rout).ptr(ln).i32(R).f32(eps).i32(1).i32(0).ptr(nullptr);
     }
     // top-k fold (mode 2 / 3 = renormalised): the expert tasks recompute the top-k from the router logits
+    else if ((x.exp == "dsl_moe_up_fold" || x.exp == "dsl_moe_down_fold") && (MI % 32 || H > 4096 || H % 256 || H % 64 || MI > 4096 || MI % 256 || E > 128))
+      die("dsl_moe_*_fold: needs MI % 32 == 0, H % 256 == 0, MI % 256 == 0, H and MI <= 4096, E <= 128");
     else if (x.exp == "dsl_moe_up_fold") a.ptr(W(pl + "w13")).ptr(ox).ptr(mc2).ptr(nullptr).ptr(nullptr).i64((long long)2 * MI * H).i32(MI).i32(H).i32(32).i32(MI / 32)
                                            .ptr(nullptr).ptr(nullptr).ptr(nullptr).ptr(nullptr).i32(TOPK).f32(0.f).i32(norm_topk ? 3 : 2).i32(E).ptr(rlog);
     else if (x.exp == "dsl_moe_down_fold") a.ptr(W(pl + "w2")).ptr(mc2).ptr(mc3).ptr(nullptr).ptr(nullptr).i64((long long)H * MI).i32(H).i32(MI).i32(64).i32(H / 64)
