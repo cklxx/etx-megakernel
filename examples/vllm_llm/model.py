@@ -157,6 +157,8 @@ def instances(d) -> list[dict]:
         if d.moe:
             gemv(L, "router", d.E, d.H)
             add("dsl_topk" if (DSL or DSL_TOPK) else "topk_softmax_e128", L, "topk", (1, 1, 1))
+            if XCD and d.TOPK != NX:                          # the XCD-affine expert path puts slot s on XCD s
+                raise SystemExit(f"ETX_VL_XCD needs TOPK == {NX} (top-k slot per XCD), model has {d.TOPK}")
             if DSL_GEMV:                                      # 32 gate + 32 up rows (256 KB) per task; 64 down rows (96 KB)
                 add("dsl_moe_up", L, "moe_up", (d.TOPK * (d.MI // 32), 1, 1), M=d.MI, K=d.H)
                 add("dsl_moe_down", L, "moe_down", (d.TOPK * (d.H // 64), 1, 1), M=d.H, K=d.MI)

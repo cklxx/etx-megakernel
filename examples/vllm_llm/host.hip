@@ -264,7 +264,7 @@ int main(int argc, char** argv) {
     // the DSL GEMVs (etx.ops.gemv): W, x, out, ids, wts, expert stride, M, K, rows per task, tasks per expert
     if (x.exp == "dsl_gemv") {
       const int nblk = x.gx * x.gy * x.gz, rpt = (x.M + nblk - 1) / nblk;
-      if (x.K > 4096) die("dsl_gemv: K > 4096 does not fit the tile's LDS (etx/ops/gemv.py K_MAX)");
+      if (x.K > 4096 || x.K % 256) die("dsl_gemv: K must be a multiple of 256 and <= 4096 (etx/ops/gemv.py)");
       const void* w; const void* in; void* out;
       if (r == "qkv") { if (bias) die("dsl_gemv: qkv bias not supported"); w = W(pl + "wqkv"); in = qkv_in; out = qkv; }
       else if (r == "o_proj") { w = W(pl + "wo"); in = attn_out; out = o; }
@@ -275,9 +275,10 @@ int main(int argc, char** argv) {
       else die("dsl_gemv: role " + r);
       a.ptr(w).ptr(in).ptr(out).ptr(nullptr).ptr(nullptr).i64(0).i32(x.M).i32(x.K).i32(rpt).i32(0);
     }
+    else if (x.exp == "dsl_topk" && E > 128) die("dsl_topk: E > 128 (etx/ops/topk.py: one wave, 2 logits per lane)");
     else if (x.exp == "dsl_topk") a.ptr(rlog).ptr(tw_r).ptr(ti_r).ptr(tei + (size_t)rr * TOPK).i32(E).i32(TOPK).i32(norm_topk ? 1 : 0);
-    else if (x.exp == "dsl_moe_up" && (MI % 32 || H > 4096)) die("dsl_moe_up: MI % 32 or H > 4096 (etx/ops/gemv.py K_MAX, RCH)");
-    else if (x.exp == "dsl_moe_down" && (H % 64 || MI > 4096)) die("dsl_moe_down: H % 64 or MI > 4096");
+    else if (x.exp == "dsl_moe_up" && (MI % 32 || H > 4096 || H % 256)) die("dsl_moe_up: MI % 32 or H > 4096 (etx/ops/gemv.py K_MAX, RCH)");
+    else if (x.exp == "dsl_moe_down" && (H % 64 || MI > 4096 || MI % 256)) die("dsl_moe_down: H % 64 or MI > 4096");
     else if (x.exp == "dsl_moe_up") a.ptr(W(pl + "w13")).ptr(o_norm).ptr(mc2).ptr(ti_r).ptr(nullptr).i64((long long)2 * MI * H).i32(MI).i32(H).i32(32).i32(MI / 32);
     else if (x.exp == "dsl_moe_down") a.ptr(W(pl + "w2")).ptr(mc2).ptr(mc3).ptr(ti_r).ptr(tw_r).i64((long long)H * MI).i32(H).i32(MI).i32(64).i32(H / 64);
     else if (r == "in_norm" && x.layer == 0) a.ptr(hn_r).ptr(res_r).i64(H).i64(0).i64(0).i64(0).i64(0).ptr(W(pl + "ln1")).i64(0).f32(eps).i32(1).i32(H);
@@ -484,6 +485,7 @@ int main(int argc, char** argv) {
   // --check-dsl: the last layer's DSL GEMVs against a CPU reference from the same device inputs and the packed weights.
   // The tiles accumulate in fp32 in a different order than vLLM's kernels (and than this loop): a bf16 output may differ
   // by an ulp; the gate is "no output beyond 2 bf16 ulps of the reference", plus the token match above.
+  if (check_dsl && nreq > 1) die("--check-dsl needs a one-request plan");
   if (check_dsl) {
     ETX_VL_BIND(reqs[0])
     const int Lc = L - 1; const std::string pl = "L" + std::to_string(Lc) + ".";
@@ -502,7 +504,8 @@ int main(int argc, char** argv) {
     auto relaunch = [&](const char* role, const char* exp) {
       for (const Inst& x : insts) if (x.layer == Lc && x.role == role && x.req == 0) {
         if (x.exp != exp) die(std::string("--check-dsl: ") + role + " is " + x.exp + ", not " + exp);
-        int32_t first = etx_launch_first[x.n + 1]; void* kargs[] = {&hst.p, &first};
+        if (etx_launch_count[x.n + 1] != x.tasks) die(std::string("--check-dsl: launch ") + std::to_string(x.n + 1) + " is not " + role);
+        int32_t first = etx_launch_first[x.n + 1]; void* kargs[] = {&hst.p, &first};   // launch 0 is the (one) prologue
         ETX_CHECK(hipLaunchKernel(hst.unfused_kernel, dim3(etx_launch_count[x.n + 1]), dim3(ETX_THREADS), kargs, 0, hst.stream));
         if (!wait_stream(hst.stream, 5.0)) die(std::string("--check-dsl: ") + role + " hung");
         return;
@@ -510,15 +513,17 @@ int main(int argc, char** argv) {
       die(std::string("--check-dsl: no ") + role + " launch in layer " + std::to_string(Lc));
     };
     auto cmp = [&](const char* what, const std::vector<uint16_t>& got, const std::vector<float>& ref) {
-      int bad = 0; double worst = 0;
+      int bad = 0; double worst = 0, worst_abs = 0; float scale = 0.f;
+      for (float v : ref) scale = std::max(scale, fabsf(v));
+      const float floor_tol = scale / 4096.0f;                     // fp32 accumulation-order noise near zero, relative to the vector
       for (size_t i = 0; i < ref.size(); ++i) {
         const float g = b2f(got[i]), r = b2f(f2b(ref[i]));
-        const float tol = 2.0f * std::max(fabsf(r), 1e-6f) / 128.0f;               // 2 bf16 ulps of the rounded reference
-        const double d = fabs((double)g - r); worst = std::max(worst, d / std::max((double)fabsf(r), 1e-6));
+        const float tol = std::max(2.0f * fabsf(r) / 128.0f, floor_tol);        // 2 bf16 ulps of the rounded reference
+        const double d = fabs((double)g - r); worst = std::max(worst, d / std::max((double)fabsf(r), 1e-6)); worst_abs = std::max(worst_abs, d);
         if (d > tol) ++bad;
       }
       bad_total += bad;
-      printf("  %-9s %7zu values: %d beyond 2 ulps, worst relative difference %.2e\n", what, ref.size(), bad, worst);
+      printf("  %-9s %7zu values: %d beyond 2 ulps (floor %.1e), worst relative %.2e, worst absolute %.2e, scale %.2e\n", what, ref.size(), bad, floor_tol, worst, worst_abs, scale);
     };
     // qkv: W [NQKV][H] . normed input (replica 0's copy)
     { const bf* in = Lc == 0 ? hn : (NR > 1 ? dx : dn); std::vector<float> x = tof(dev(in, H)); auto Wm = host_w(pl + "wqkv", 0, (size_t)NQKV * H);
