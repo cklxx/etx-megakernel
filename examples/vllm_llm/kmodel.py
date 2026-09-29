@@ -121,8 +121,9 @@ DSL_P1 = [k for k in DSL_GEMV if k.role != "attn"] + [k for k in MOE if k.role i
 # ETX_VL_DSL_GEMV=1 alone (the first build): vLLM's small kernels as today, the DSL GEMVs, no moe_act
 GEMV_ONLY = [k for k in MOE if k.role not in ("qkv", "o_proj", "router", "moe_up", "moe_down", "moe_act")] + \
             [k for k in DSL_GEMV if k.role in ("qkv", "o_proj", "router", "moe_up", "moe_down")]
+BUILD1 = [k for k in GEMV_ONLY if k.role != "topk"] + [k for k in DSL_MOE if k.role == "topk"]   # + etx.ops.topk
 MODELS = {"qwen3-30b-a3b": MOE, "qwen2.5-1.5b": Q15, "qwen3-30b-a3b-dsl": DSL_MOE, "qwen3-30b-a3b-dslgemv": DSL_GEMV,
-          "qwen3-30b-a3b-dslp1": DSL_P1, "qwen3-30b-a3b-gemvonly": GEMV_ONLY}
+          "qwen3-30b-a3b-dslp1": DSL_P1, "qwen3-30b-a3b-gemvonly": GEMV_ONLY, "qwen3-30b-a3b-build1": BUILD1}
 
 
 @dataclass

@@ -22,7 +22,7 @@ from etx.sim.xcd import Hw, simulate
 from examples.vllm_llm import kmodel as km
 from examples.vllm_llm.bench_params import derive, read_dir
 from examples.vllm_llm.xcd_run import cost_fn
-from etx.ops import gemv as gemv_op
+from etx.ops import gemv as gemv_op, topk as topk_op
 
 ROOT = Path(__file__).resolve().parents[2]
 DSL_IMPORTS = {"dsl_attn": {"slots": 1, "arg_bytes": 160}, "dsl_topk": {"slots": 4, "arg_bytes": 104}}
@@ -70,10 +70,10 @@ def main():
     ap.add_argument("--layers", default=None, help="fewer layers for a quick look (ETX_LLM_LAYERS)")
     a = ap.parse_args()
     bench = derive(read_dir(a.bench))
-    imp = json.load(open(a.imports)) | DSL_IMPORTS | gemv_op.import_entries()
+    imp = json.load(open(a.imports)) | DSL_IMPORTS | gemv_op.import_entries() | topk_op.import_entries()
     tmp = Path(tempfile.mkdtemp())
     (tmp / "imports.json").write_text(json.dumps(imp))
-    base_env = {"ETX_VL_XCD": "1", "ETX_VL_CHAIN": "1", "ETX_VL_QKNR": "0", "ETX_VL_DSL": "0", "ETX_VL_REQUESTS": "1", "ETX_VL_DSL_GEMV": "0"}
+    base_env = {"ETX_VL_XCD": "1", "ETX_VL_CHAIN": "1", "ETX_VL_QKNR": "0", "ETX_VL_DSL": "0", "ETX_VL_REQUESTS": "1", "ETX_VL_DSL_GEMV": "0", "ETX_VL_DSL_TOPK": "0"}
     if a.layers:
         base_env["ETX_LLM_CONFIG_LAYERS"] = a.layers
         os.environ["ETX_LLM_LAYERS"] = a.layers
@@ -84,6 +84,7 @@ def main():
         "DSL + DSL streaming GEMVs": (dict(base_env, ETX_VL_DSL="1"), "qwen3-30b-a3b-dslgemv", "new"),
         "phase 1: DSL GEMVs + top-k + fold": (dict(base_env, ETX_VL_DSL="2"), "qwen3-30b-a3b-dslp1", "new"),
         "build 1: qknr grid + DSL GEMVs only": (dict(base_env, ETX_VL_QKNR="grid", ETX_VL_DSL_GEMV="1"), "qwen3-30b-a3b-gemvonly", "new"),
+        "build 1 + DSL top-k (the session)": (dict(base_env, ETX_VL_QKNR="grid", ETX_VL_DSL_GEMV="1", ETX_VL_DSL_TOPK="1"), "qwen3-30b-a3b-build1", "new"),
     }
     measured = {"xcd (four small launches chained)": 6.31, "xcd + fused q/k norm + rope (grid)": 5.86}
     print("simulated ms per token (microbenchmark parameters, trace hand-offs 0.4 / 1.8 us); measured where it exists")

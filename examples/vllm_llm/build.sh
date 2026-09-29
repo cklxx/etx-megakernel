@@ -43,7 +43,9 @@ SLOTS="${ETX_VL_SLOTS:-}"; [ -n "$MOESLOTS" ] && SLOTS="${SLOTS:+$SLOTS,}$MOESLO
 "$PY" -m etx.importer.vllm_kernels --vllm "$VLLM" --out "$OUT/imp" --compiler hipcc --only "$EXPORTS" "${ORIG[@]}" --slots "$SLOTS" \
   --block rms_norm_2d=$((H / 8)) --block reshape_and_cache=$((NKV * HD / 8)) "${MOEBLK[@]}"
 # ETX_VL_DSL_GEMV=1: the streaming GEMVs as ETX ops (etx.ops.gemv): their tiles and argument layouts join imports.json
-DSLT=(); if [ "${ETX_VL_DSL_GEMV:-0}" = 1 ]; then "$PY" -m etx.ops.gemv "$OUT/imp/imports.json" --tiles "$OUT/dsl_tiles.hip"; DSLT=(ETX_VL_DSL_TILES="$OUT/dsl_tiles.hip"); fi
+# ETX_VL_DSL_TOPK=1: the router's softmax + top-k as etx.ops.topk
+DSLOPS=""; [ "${ETX_VL_DSL_GEMV:-0}" = 1 ] && DSLOPS="gemv"; [ "${ETX_VL_DSL_TOPK:-0}" = 1 ] && DSLOPS="${DSLOPS:+$DSLOPS,}topk"
+DSLT=(); if [ -n "$DSLOPS" ]; then "$PY" -m etx.ops.emit "$OUT/imp/imports.json" --tiles "$OUT/dsl_tiles.hip" --ops "$DSLOPS"; DSLT=(ETX_VL_DSL_TILES="$OUT/dsl_tiles.hip"); fi
 "$PY" -m etx.importer.adapter "$OUT/imp/imports.json" --tiles "$OUT/imp_tiles.hip" --header "$OUT/imports.h"
 "$PY" -m etx.importer.bundle --imports "$OUT/imp" --exports "$EXPORTS" --devlibs "$DEVLIBS" -o "$OUT/imports.bc"
 # ETX_VL_UC=1: cross-XCD tensors in uncached memory and DOMAIN fences for DEVICE events (ETX_COHERENT_DEVICE_DATA);

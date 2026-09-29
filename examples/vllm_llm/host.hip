@@ -274,6 +274,7 @@ int main(int argc, char** argv) {
       else die("dsl_gemv: role " + r);
       a.ptr(w).ptr(in).ptr(out).ptr(nullptr).ptr(nullptr).i64(0).i32(x.M).i32(x.K).i32(rpt).i32(0);
     }
+    else if (x.exp == "dsl_topk") a.ptr(rlog).ptr(tw_r).ptr(ti_r).ptr(tei + (size_t)rr * TOPK).i32(E).i32(TOPK).i32(norm_topk ? 1 : 0);
     else if (x.exp == "dsl_moe_up") a.ptr(W(pl + "w13")).ptr(o_norm).ptr(mc2).ptr(ti_r).ptr(nullptr).i64((long long)2 * MI * H).i32(MI).i32(H).i32(32).i32(MI / 32);
     else if (x.exp == "dsl_moe_down") a.ptr(W(pl + "w2")).ptr(mc2).ptr(mc3).ptr(ti_r).ptr(tw_r).i64((long long)H * MI).i32(H).i32(MI).i32(64).i32(H / 64);
     else if (r == "in_norm" && x.layer == 0) a.ptr(hn_r).ptr(res_r).i64(H).i64(0).i64(0).i64(0).i64(0).ptr(W(pl + "ln1")).i64(0).f32(eps).i32(1).i32(H);
@@ -514,6 +515,15 @@ int main(int argc, char** argv) {
       { auto Wm = host_w(pl + "wr", 0, (size_t)E * H); std::vector<float> ref(E); for (int r = 0; r < E; ++r) ref[r] = dot(Wm.data() + (size_t)r * H, x, H); cmp("router", dev(rlog, E), ref); }
       std::vector<int32_t> ids(TOPK); std::vector<float> wts(TOPK);
       ETX_CHECK(hipMemcpy(ids.data(), topk_ids, TOPK * 4, hipMemcpyDeviceToHost)); ETX_CHECK(hipMemcpy(wts.data(), topk_w, TOPK * 4, hipMemcpyDeviceToHost));
+      { std::vector<float> lg = tof(dev(rlog, E)); float mx = -INFINITY; for (float v : lg) mx = std::max(mx, v);
+        std::vector<float> pr(E); double sum = 0; for (int e = 0; e < E; ++e) { pr[e] = expf(lg[e] - mx); sum += pr[e]; }
+        for (int e = 0; e < E; ++e) pr[e] = (float)(pr[e] / sum);
+        std::vector<int> ref_ids; std::vector<float> ref_w; std::vector<bool> used(E, false); double sel = 0;
+        for (int t = 0; t < TOPK; ++t) { int b = -1; for (int e = 0; e < E; ++e) if (!used[e] && (b < 0 || pr[e] > pr[b])) b = e; used[b] = true; ref_ids.push_back(b); ref_w.push_back(pr[b]); sel += pr[b]; }
+        int bad = 0; double worst = 0;
+        for (int t = 0; t < TOPK; ++t) { const float rw = norm_topk ? (float)(ref_w[t] / sel) : ref_w[t]; if (ids[t] != ref_ids[t]) ++bad;
+          worst = std::max(worst, fabs((double)wts[t] - rw) / std::max((double)rw, 1e-9)); if (fabs((double)wts[t] - rw) > 1e-4 * rw) ++bad; }
+        bad_total += bad; printf("  %-9s %7d values: %d wrong (ids exact, weights within 1e-4), worst relative difference %.2e\n", "topk", TOPK, bad, worst); }
       std::vector<float> act_ref((size_t)TOPK * MI), down_ref((size_t)TOPK * H);
       auto act_got = dev(mc2, (size_t)TOPK * MI);
       for (int s2 = 0; s2 < TOPK; ++s2) {

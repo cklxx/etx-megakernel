@@ -347,10 +347,11 @@ Simulated (microbenchmark parameters), ms per token:
 | plan | simulated | realistic (x1.11) |
 |---|---|---|
 | today's best (xcd + fused q/k norm + rope, grid) | 5.26 | measured 5.86 |
-| build 1: + DSL GEMVs (this session, examples/sessions/dsl_gemv.py) | 4.58 | ~5.1 |
+| build 1: + DSL GEMVs | 4.58 | ~5.1 |
+| build 1 + DSL top-k (etx/ops/topk.py; this session, examples/sessions/dsl_gemv.py) | 4.42 | ~4.9 |
 | + DSL top-k and the moe_sum fold (phase 1) | 4.36 | ~4.85 |
 | + attention with its preparation in one task (all of A) | 4.00 | ~4.45 (vLLM 4.67) |
 
-Build 1 alone is predicted to land at 5.0-5.2 ms: faster than today's 5.86, still behind vLLM; the win needs the
-rest of A. Gates: 32/32 tokens, CHECK-DSL OK. If build 1 measures above 5.4 ms the GEMV tiles are not at the lf rate
+The session's build (GEMVs + top-k) is predicted to land at 4.8-5.0 ms: faster than today's 5.86, still behind vLLM;
+the win needs the rest of A (the moe_sum fold, attention with its preparation). Gates: 32/32 tokens, CHECK-DSL OK. If build 1 measures above 5.4 ms the GEMV tiles are not at the lf rate
 and the trace (per-task bodies of qkv / o_proj / moe_up / moe_down against 5.3 / 4.3 / 12.8 / 6.4 us) says which.
