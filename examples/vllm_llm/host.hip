@@ -276,7 +276,8 @@ int main(int argc, char** argv) {
       a.ptr(w).ptr(in).ptr(out).ptr(nullptr).ptr(nullptr).i64(0).i32(x.M).i32(x.K).i32(rpt).i32(0);
     }
     // dsl_attnprep (etx/ops/attnprep.py): q/k norm + rope of one kv head in place on qkv, its k / v rows into the cache
-    else if (x.exp == "dsl_attnprep" && (HD != 128 || NH % NKV)) die("dsl_attnprep: HD must be 128 and NH % NKV == 0");
+    else if (x.exp == "dsl_attnprep" && (HD != 128 || NH % NKV || NH / NKV + 2 > ETX_THREADS / 64 || !qk_norm))
+      die("dsl_attnprep: needs HD 128, NH % NKV == 0, G + 2 <= waves per workgroup (G + 1 head waves + the v wave) and q/k norm");
     else if (x.exp == "dsl_attnprep") a.ptr(qkv).ptr(W(pl + "qn")).ptr(W(pl + "kn")).ptr(W("cos_sin")).ptr(positions).ptr(kc[x.layer]).ptr(vc[x.layer])
                                        .ptr(slot_mapping).i32(NH).i32(NKV).i32(HD).f32(eps).i32(BS).i32(X);
     else if (x.exp == "dsl_topk" && E > 128) die("dsl_topk: E > 128 (etx/ops/topk.py: one wave, 2 logits per lane)");

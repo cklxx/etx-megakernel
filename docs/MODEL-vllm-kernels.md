@@ -350,6 +350,7 @@ Simulated (microbenchmark parameters), ms per token:
 | build 1: + DSL GEMVs | 4.58 | ~5.1 |
 | build 1 + DSL top-k (etx/ops/topk.py) | 4.42 | ~4.9 |
 | build 2: + the attention block by kv head (etx/ops/attnprep.py on XCD h; vLLM's attention at one block per task and its reduce on XCD h; the session, examples/sessions/dsl_gemv.py) | 4.01 | ~4.45 |
+| build 2, two interleaved requests (ETX_VL_REQUESTS=2; the session's run_two) | 5.20 ms / step | ~2.89 ms per token, 347 tok/s (vLLM batch 2: 360) |
 | + DSL top-k and the moe_sum fold (phase 1) | 4.36 | ~4.85 |
 | + attention with its preparation in one task (all of A) | 4.00 | ~4.45 (vLLM 4.67) |
 

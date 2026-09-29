@@ -50,3 +50,18 @@ job(name="run_fused", gpu=0, after=[f"build_{B}", "prep"], timeout=900, cmd=f"st
 job(name="run_unfused", gpu=0, after=[f"build_{B}", "prep"], after_any=["run_fused"], timeout=900, cmd=f"stdbuf -oL {RUN} --repeat 1 --unfused", summary=[RES])
 job(name="trace_fused", gpu=0, after=[f"build_{B}", "prep"], after_any=["run_unfused"], timeout=900,
     cmd=f"ETX_TRACE=1 ETX_TRACE_RAW=$HOME/sess/trace_{B}.bin stdbuf -oL {RUN} --max-steps 8 --repeat 1", summary=[RES])
+# two interleaved requests on the same structure (predicted 5.20 ms per step of two tokens: 2.89 ms per token, 347 tok/s;
+# vLLM batch 2: 360): request 1 = the prompt rotated by 97 tokens, its golden from HF greedy
+B2 = "moe_dsl2x2"
+job(name="llm_env_tf", lane="cpu", after="llm_env", timeout=1800,
+    cmd=". ~/llmenv/bin/activate && pip install -q 'transformers>=4.51,<5' accelerate && python3 -c 'import transformers; print(transformers.__version__)'")
+job(name="golden_r97", gpu=0, after=["llm_env_tf", "dl"], after_any=["trace_fused"], timeout=2400,
+    cmd=f"{PY} examples/llm/prep.py --model {HF} --src {LLM}/{M}/hf --out {LLM}/{M} --context 1024 --rotate 97 --golden-only && "
+        f"head -c 200 {LLM}/{M}/golden_c1024_r97.txt", summary=[r"HF greedy|gen:"])
+job(name=f"build_{B2}", lane="cpu", after=["etx_env", "dl"], timeout=2400,
+    cmd=f"{V} ETX_VL_XCD=1 ETX_VL_CHAIN=1 ETX_VL_DSL_GEMV=1 ETX_VL_DSL_TOPK=1 ETX_VL_DSL_ATTN=head ETX_VL_REQUESTS=2 ETX_OUT=$HOME/sess/b_{B2} "
+        f"bash examples/vllm_llm/build.sh {LLM}/{M} > $HOME/sess/b_{B2}.buildlog 2>&1; grep -E 'tasks=|Function Name|VGPRs|error' $HOME/sess/b_{B2}.buildlog | tail -4; "
+        f"cp $HOME/sess/b_{B2}.buildlog $HOME/sess/buildlog_{B2}.txt; cp $HOME/sess/b_{B2}/vl_plan.txt $HOME/sess/vlplan_{B2}.txt; "
+        f"cp $HOME/sess/b_{B2}/plan.json $HOME/sess/plan_{B2}.json; test -x $HOME/sess/b_{B2}/run", summary=[r"tasks=|megakernel|VGPRs Spill"])
+job(name="run_two", gpu=0, after=[f"build_{B2}", "prep", "golden_r97"], timeout=900,
+    cmd=f"stdbuf -oL $HOME/sess/b_{B2}/run {LLM}/{M} $HOME/sess/b_{B2}/vl_plan.txt --repeat 1 --golden1 golden_c1024_r97.txt", summary=[RES])

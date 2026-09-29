@@ -146,6 +146,8 @@ def instances(d) -> list[dict]:
         if DSL_ATTN:
             add("dsl_attn", L, "attn", (1, parts, d.NKV))          # prep + cache + attention, one block per (partition, kv head)
         elif DSL_ATTNHEAD:
+            if not d.qk_norm or d.G + 2 > THREADS // 64:
+                raise SystemExit("ETX_VL_DSL_ATTN=head needs q/k norm and G + 2 waves per workgroup (etx/ops/attnprep.py)")
             add("dsl_attnprep", L, "prep", (d.NKV, 1, 1), G=d.G, parts=parts)
         elif d.qk_norm and (QKNR or DSL):
             add("qknorm_rope", L, "qknr", (math.ceil((d.NH + d.NKV) / 8), 1, 1))
