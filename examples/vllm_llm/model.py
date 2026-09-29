@@ -64,6 +64,10 @@ CHAIN = os.environ.get("ETX_VL_CHAIN", "0") == "1"
 # 256-thread block, in place on qkv; replaces rms_norm_3d x2 + rotary_embedding
 # ETX_VL_QKNR=grid: the fused launch as its own grid (its blocks on several CUs), not chained with the cache write
 QKNR = os.environ.get("ETX_VL_QKNR", "0") in ("1", "grid")
+# ETX_VL_DSL=1 (simulation only, docs/MODEL-vllm-kernels.md section 12): the latency-bound small ops as ETX tile ops with
+# their chains fused: q/k norm + rope + cache write + attention in one task per (partition, kv head); top-k as one tile;
+# moe_sum folded into the next layer's in_norm. The streaming ops (GEMVs, fused_moe) stay vLLM's.
+DSL = os.environ.get("ETX_VL_DSL", "0") == "1"
 if os.environ.get("ETX_VL_QKNR", "0") == "grid":
     CHAIN_ROLES = tuple(r for r in CHAIN_ROLES if r != "qknr")
 CHAIN_FILE = os.environ.get("ETX_VL_CHAINS", str(HERE / "build" / "chain_tiles.hip"))
@@ -126,25 +130,29 @@ def instances(d) -> list[dict]:
     for L in range(d.L):
         add("rms_norm_2d" if L == 0 else "fused_add_rms_norm", L, "in_norm", (1, 1, 1))
         gemv(L, "qkv", d.NQKV, d.H)
-        if d.qk_norm and QKNR:
+        if DSL:
+            add("dsl_attn", L, "attn", (1, parts, d.NKV))          # prep + cache + attention, one block per (partition, kv head)
+        elif d.qk_norm and QKNR:
             add("qknorm_rope", L, "qknr", (math.ceil((d.NH + d.NKV) / 8), 1, 1))
         else:
             if d.qk_norm:
                 add("rms_norm_3d", L, "q_norm", (d.NH, 1, 1))
                 add("rms_norm_3d", L, "k_norm", (d.NKV, 1, 1))
             add("rope_neox", L, "rope", (1, 1, 1))
-        add("reshape_and_cache", L, "cache", (1, 1, 1))
-        add(attn, L, "attn", (1, parts, d.NKV))
+        if not DSL:
+            add("reshape_and_cache", L, "cache", (1, 1, 1))
+            add(attn, L, "attn", (1, parts, d.NKV))
         add("attn_reduce", L, "reduce", (d.NH, 1, 1))
         gemv(L, "o_proj", d.H, d.NH * d.HD)
         add("fused_add_rms_norm", L, "post_norm", (1, 1, 1))
         if d.moe:
             gemv(L, "router", d.E, d.H)
-            add("topk_softmax_e128", L, "topk", (1, 1, 1))
+            add("dsl_topk" if DSL else "topk_softmax_e128", L, "topk", (1, 1, 1))
             add("fused_moe_up", L, "moe_up", (d.TOPK * math.ceil(2 * d.MI / MOE_BN), 1, 1))
             add("silu_and_mul", L, "moe_act", (d.TOPK, 1, 1))
             add("fused_moe_down", L, "moe_down", (d.TOPK * math.ceil(d.H / MOE_BN), 1, 1))
-            add("moe_sum_k8", L, "moe_sum", (1, 1, 1))
+            if not DSL:                                            # DSL: the next in_norm reads the 8 expert rows itself
+                add("moe_sum_k8", L, "moe_sum", (1, 1, 1))
             continue
         gemv(L, "gate_up", 2 * d.INTER, d.H)
         add("silu_and_mul", L, "act", (1, 1, 1))

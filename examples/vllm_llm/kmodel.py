@@ -96,7 +96,17 @@ Q15 = [
     Kern("act", S=2, V=2, instr=340),
     Kern("down", S=4, V=2, bytes_block=143e3, inflight=16e3, active=192, bar=1, dpp=16, instr=620),
 ]
-MODELS = {"qwen3-30b-a3b": MOE, "qwen2.5-1.5b": Q15}
+# ETX_VL_DSL (section 12, estimates from the chains, not from ISA): the fused attention task = the fused q/k norm + rope
+# chain (2 V: qkv || position, then cos/sin) + the cache write of its k/v rows (1 V, no serial 2 B copy) + paged attention
+# over one partition (7 V, 7 hardware barriers); top-k = one 128-logit softmax + 8 argmax rounds over 64 lanes; in_norm
+# reads the 8 expert rows (+1 V) instead of a separate moe_sum
+DSL_MOE = [replace(k) for k in MOE if k.role not in ("q_norm", "k_norm", "rope", "cache", "attn", "topk", "moe_sum", "in_norm")] + [
+    Kern("in_norm", S=2, V=3, bar=2, shfl=10, instr=300, note="fused_add_rms_norm reading the 8 expert rows (moe_sum folded in)"),
+    Kern("attn", S=3, V=10, bytes_block=128e3, inflight=16e3, active=20, bar=9, shfl=13, instr=1100,
+         note="DSL: q/k norm + rope + cache + attention of one (partition, kv head)"),
+    Kern("topk", S=2, V=2, shfl=24, instr=400, note="DSL: softmax + top-8 over 128 logits, 64 lanes"),
+]
+MODELS = {"qwen3-30b-a3b": MOE, "qwen2.5-1.5b": Q15, "qwen3-30b-a3b-dsl": DSL_MOE}
 
 
 @dataclass

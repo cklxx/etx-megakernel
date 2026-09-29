@@ -310,3 +310,23 @@ the trace, 0.4 / 1.8 us): **today's build 6.661 ms against the measured 6.63 (0.
 | hardware barriers only (moe_xcd_hw) | 6.15 | 6.03 |
 | argument path only (moe_xcd_args) | 6.05 | 5.05-6.10 |
 | both (moe_xcd_new) | 5.54 | 4.45-5.51 |
+
+## 12. The DSL structure for the small ops, simulated before building (2026-09-29, local)
+
+ETX_VL_DSL=1 in model.py (simulation only): q/k norm + rope + cache + attention as one tile task per (partition, kv
+head), top-k as one tile, moe_sum folded into the next in_norm; the streaming ops stay vLLM's. Costs: kmodel DSL_MOE
+(estimated from the chains); parameters from the microbenchmarks, hand-offs from the trace; examples/vllm_llm/dsl_ceiling.py.
+
+| plan | simulated | measured | realistic (sim x 1.12) |
+|---|---|---|---|
+| xcd, four small launches chained | 5.54 | 6.31 | |
+| xcd + fused q/k norm + rope (grid) | 5.26 | 5.86 | |
+| DSL: fused small ops | 4.55 | - | ~5.1 (vLLM 4.67) |
+| DSL, two interleaved requests | 6.16 ms/step, 325 tok/s | - | ~290 tok/s (vLLM batch 2: 360) |
+
+Layer 5: 113 -> 108 -> 92.5 us; the small-op savings are 15 us per layer, not the 39 estimated by hand. The go/no-go
+threshold of 4.4 ms is not met. What is left in a layer at 92.5 us: 29.5 us of bytes at 3.93 TB/s, ~28 us of
+latency-bound tasks, ~15 us of hand-offs, and ~20 us of streaming excess inside vLLM's own kernels (fused_moe gate_up
+21.6 us per task against 12.8 at full rate: 16 KB in flight per program and a 0.33 us gap per trip; down 11.6 vs 6.4;
+qkv 7.9 vs 5.3; o_proj 7.0 vs 4.3). That excess (~14 us/layer, ~0.65 ms/token) is the only lever that reaches vLLM at
+batch 1, and it means generating the streaming GEMVs in the DSL instead of importing them.
