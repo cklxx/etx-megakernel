@@ -84,3 +84,8 @@ job(name="build_bench", lane="cpu", after="apt", timeout=900,
     cmd="mkdir -p $HOME/sess && hipcc -O3 -std=c++17 --offload-arch=gfx942 bench/hw/hw_bench.hip -o $HOME/sess/hw_bench && ls -la $HOME/sess/hw_bench")
 job(name="hw_lfx", gpu=0, after=["build_bench"], after_any=["run_two"], timeout=300,
     cmd="stdbuf -oL $HOME/sess/hw_bench lfx", summary=[r"^RESULT"])
+# and the hand-off with the data as the signal (hw_bench sdat: coherent stores / plain + wbl2 polled by coherent loads,
+# evx's device shapes): the number that decides whether the sentinel hand-off (docs/SURVEY-2026-09-29.md section 2) is
+# worth building against the measured evx / trace hand-offs
+job(name="hw_sdat", gpu=0, after=["build_bench"], after_any=["hw_lfx"], timeout=300,
+    cmd="stdbuf -oL $HOME/sess/hw_bench sdat", summary=[r"^RESULT"])
