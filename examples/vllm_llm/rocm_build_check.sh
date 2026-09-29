@@ -18,6 +18,7 @@ case $V in base) E="";; chain) E="ETX_VL_CHAIN=1";; xcd) E="ETX_VL_XCD=1 ETX_VL_
   xcd_qknr_s1) E="ETX_VL_XCD=1 ETX_VL_CHAIN=1 ETX_VL_QKNR=1 ETX_VL_SLOTS=qknorm_rope=1,attn_mfma16_g8=1,attn_reduce=1";;
   base_qknr) E="ETX_VL_QKNR=1";;
   xcd_qknr_grid) E="ETX_VL_XCD=1 ETX_VL_CHAIN=1 ETX_VL_QKNR=grid";;
+  xcd_dslgemv) E="ETX_VL_XCD=1 ETX_VL_CHAIN=1 ETX_VL_QKNR=grid ETX_VL_DSL_GEMV=1";;
   *) echo "variant $V"; exit 1;; esac
 mkdir -p "$OUT"
 # paths as the container sees them: $HOME/code -> /code
@@ -48,10 +49,11 @@ fi
 echo "== import ($EXP)"
 XS=$(echo "$E" | tr " " "\n" | sed -n "s/^ETX_VL_SLOTS=//p"); SL="${XS:+$XS,}$SL"; SL="${SL%,}"
 python3 -m etx.importer.vllm_kernels --vllm /code/vllm --out $OUT/imp --compiler hipcc --only "$EXP" --slots "$SL" "${BLK[@]}"
+DSLT=""; case " $E " in *ETX_VL_DSL_GEMV=1*) python3 -m etx.ops.gemv $OUT/imp/imports.json --tiles $OUT/dsl_tiles.hip; DSLT="ETX_VL_DSL_TILES=$OUT/dsl_tiles.hip";; esac
 python3 -m etx.importer.adapter $OUT/imp/imports.json --tiles $OUT/imp_tiles.hip --header $OUT/imports.h
 python3 -m etx.importer.bundle --imports $OUT/imp --exports "$EXP" --devlibs $DL -o $OUT/imports.bc
 echo "== plan"
-env $E ETX_VL_IMPORTS=$OUT/imp/imports.json ETX_VL_ADAPTERS=$OUT/imp_tiles.hip ETX_VL_PLAN=$OUT/vl_plan.txt ETX_VL_CHAINS=$OUT/chain_tiles.hip ETX_LLM_CONFIG=$CFG \
+env $E $DSLT ETX_VL_IMPORTS=$OUT/imp/imports.json ETX_VL_ADAPTERS=$OUT/imp_tiles.hip ETX_VL_PLAN=$OUT/vl_plan.txt ETX_VL_CHAINS=$OUT/chain_tiles.hip ETX_LLM_CONFIG=$CFG \
   python3 -m etx compile examples/vllm_llm/model.py --arch gfx942 --out $OUT --inline-tiles > $OUT/compile.log 2>&1 || { tail -20 $OUT/compile.log; exit 1; }
 grep -E "tasks=" $OUT/compile.log | head -2
 echo "== device code (ROCm clang 22)"

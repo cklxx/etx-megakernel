@@ -20,6 +20,8 @@ def emit_adapters(imports: dict) -> str:
            f"#define ETX_IMPORT_SLOTS {max([i['slots'] for i in imports.values()] + [1])}   // one set of slot-barrier words per slot",
            '#include "etx/abi.h"', '#include "etx/import.h"', ""]
     for e, i in imports.items():
+        if i.get("dsl"):                                     # an ETX op (etx.ops): its tiles come from its own generator
+            continue
         st, k, g = i["slot_threads"], i["slots"], i["grid_offset"]
         # a kernel whose block is smaller than the workgroup has slot barriers: with hardware barrier rounds every wave
         # runs the round protocol around its block (etx/import.h); otherwise idle waves may leave at once

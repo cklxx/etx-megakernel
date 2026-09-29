@@ -42,6 +42,8 @@ ORIG=(); CHK=(); [ "${ETX_VL_CHECK:-0}" = 1 ] && ORIG=(--orig) && CHK=(-DETX_VL_
 SLOTS="${ETX_VL_SLOTS:-}"; [ -n "$MOESLOTS" ] && SLOTS="${SLOTS:+$SLOTS,}$MOESLOTS"
 "$PY" -m etx.importer.vllm_kernels --vllm "$VLLM" --out "$OUT/imp" --compiler hipcc --only "$EXPORTS" "${ORIG[@]}" --slots "$SLOTS" \
   --block rms_norm_2d=$((H / 8)) --block reshape_and_cache=$((NKV * HD / 8)) "${MOEBLK[@]}"
+# ETX_VL_DSL_GEMV=1: the streaming GEMVs as ETX ops (etx.ops.gemv): their tiles and argument layouts join imports.json
+DSLT=(); if [ "${ETX_VL_DSL_GEMV:-0}" = 1 ]; then "$PY" -m etx.ops.gemv "$OUT/imp/imports.json" --tiles "$OUT/dsl_tiles.hip"; DSLT=(ETX_VL_DSL_TILES="$OUT/dsl_tiles.hip"); fi
 "$PY" -m etx.importer.adapter "$OUT/imp/imports.json" --tiles "$OUT/imp_tiles.hip" --header "$OUT/imports.h"
 "$PY" -m etx.importer.bundle --imports "$OUT/imp" --exports "$EXPORTS" --devlibs "$DEVLIBS" -o "$OUT/imports.bc"
 # ETX_VL_UC=1: cross-XCD tensors in uncached memory and DOMAIN fences for DEVICE events (ETX_COHERENT_DEVICE_DATA);
@@ -49,7 +51,7 @@ SLOTS="${ETX_VL_SLOTS:-}"; [ -n "$MOESLOTS" ] && SLOTS="${SLOTS:+$SLOTS,}$MOESLO
 UCF=()
 if [ "${ETX_VL_UC:-0}" = 1 ]; then export ETX_VL_PIN=1; UCF=(-DETX_VL_UC -DETX_COHERENT_DEVICE_DATA); fi
 echo "== plan"
-ETX_VL_IMPORTS="$OUT/imp/imports.json" ETX_VL_ADAPTERS="$OUT/imp_tiles.hip" ETX_VL_PLAN="$OUT/vl_plan.txt" ETX_LLM_CONFIG="$CONFIG" ETX_VL_CHAINS="$OUT/chain_tiles.hip" \
+env "${DSLT[@]}" ETX_VL_IMPORTS="$OUT/imp/imports.json" ETX_VL_ADAPTERS="$OUT/imp_tiles.hip" ETX_VL_PLAN="$OUT/vl_plan.txt" ETX_LLM_CONFIG="$CONFIG" ETX_VL_CHAINS="$OUT/chain_tiles.hip" \
   "$PY" -m etx compile examples/vllm_llm/model.py --arch gfx942 --out "$OUT" --inline-tiles > "$OUT/compile.log" 2>&1 || { tail -20 "$OUT/compile.log"; exit 1; }
 grep -E "tasks=|workers/domain" "$OUT/compile.log" || true
 if [ "${ETX_VL_UC:-0}" = 1 ]; then "$PY" "$ROOT/examples/vllm_llm/check_uc_plan.py" "$OUT/plan.json" || exit 1; fi

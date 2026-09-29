@@ -106,7 +106,7 @@ struct Args {
 int main(int argc, char** argv) {
   if (argc < 3) die("usage: run <packed-dir> <plan.txt> [--golden F] [--gen N] [--repeat R] [--teacher] [--unfused]");
   const std::string dir = argv[1], plan_path = argv[2];
-  int gen = -1, repeat = 2, check_layers = 0, max_steps = 0; bool teacher = false, unfused = false; std::string golden_name = "golden_c1024.txt", golden1_name;
+  int gen = -1, repeat = 2, check_layers = 0, max_steps = 0; bool teacher = false, unfused = false, check_dsl = false; std::string golden_name = "golden_c1024.txt", golden1_name;
   for (int i = 3; i < argc; ++i) {
     const std::string a = argv[i];
     if (a == "--gen" && i + 1 < argc) gen = atoi(argv[++i]);
@@ -115,7 +115,8 @@ int main(int argc, char** argv) {
     else if (a == "--unfused") unfused = true;
     else if (a == "--golden" && i + 1 < argc) golden_name = argv[++i];
     else if (a == "--golden1" && i + 1 < argc) golden1_name = argv[++i];   // ETX_VL_REQUESTS=2: request 1's prompt and HF greedy tokens
-    else if (a == "--max-steps" && i + 1 < argc) max_steps = atoi(argv[++i]);   // traces: stop after N steps (no token check)
+    else if (a == "--max-steps" && i + 1 < argc) max_steps = atoi(argv[++i]);
+    else if (a == "--check-dsl") check_dsl = true;   // the DSL GEMVs of the last layer against a CPU reference (bf16 tolerance)   // traces: stop after N steps (no token check)
     else if (a == "--check" && i + 1 < argc) check_layers = atoi(argv[++i]);   // compare each imported launch with vLLM's original, layers < N
   }
   const Manifest m = read_manifest(dir + "/vl.manifest");
@@ -260,7 +261,22 @@ int main(int argc, char** argv) {
       memcpy(ab.data() + x.copyoff + rr * 32, c3, 32);
     };
     auto fused_add = [&](bf* in, const void* w) { a.ptr(in).i64(H).ptr(res_r).ptr(w).f32(eps).i32(1).i32(H).i64(H); };
-    if (r == "in_norm" && x.layer == 0) a.ptr(hn_r).ptr(res_r).i64(H).i64(0).i64(0).i64(0).i64(0).ptr(W(pl + "ln1")).i64(0).f32(eps).i32(1).i32(H);
+    // the DSL GEMVs (etx.ops.gemv): W, x, out, ids, wts, expert stride, M, K, rows per task, tasks per expert
+    if (x.exp == "dsl_gemv") {
+      const int nblk = x.gx * x.gy * x.gz, rpt = (x.M + nblk - 1) / nblk;
+      const void* w; const void* in; void* out;
+      if (r == "qkv") { if (bias) die("dsl_gemv: qkv bias not supported"); w = W(pl + "wqkv"); in = qkv_in; out = qkv; }
+      else if (r == "o_proj") { w = W(pl + "wo"); in = attn_out; out = o; }
+      else if (r == "router") { w = W(pl + "wr"); in = o_norm; out = rlog; }
+      else if (r == "gate_up") { w = W(pl + "wgu"); in = o_norm; out = gu; }
+      else if (r == "down") { w = W(pl + "wd"); in = act_out; out = dn; }
+      else if (r == "lm_head") { w = tie ? W("embed") : W("lm_head"); in = d_norm; out = logits; }
+      else die("dsl_gemv: role " + r);
+      a.ptr(w).ptr(in).ptr(out).ptr(nullptr).ptr(nullptr).i64(0).i32(x.M).i32(x.K).i32(rpt).i32(0);
+    }
+    else if (x.exp == "dsl_moe_up") a.ptr(W(pl + "w13")).ptr(o_norm).ptr(mc2).ptr(ti_r).ptr(nullptr).i64((long long)2 * MI * H).i32(MI).i32(H).i32(32).i32(MI / 32);
+    else if (x.exp == "dsl_moe_down") a.ptr(W(pl + "w2")).ptr(mc2).ptr(mc3).ptr(ti_r).ptr(tw_r).i64((long long)H * MI).i32(H).i32(MI).i32(64).i32(H / 64);
+    else if (r == "in_norm" && x.layer == 0) a.ptr(hn_r).ptr(res_r).i64(H).i64(0).i64(0).i64(0).i64(0).ptr(W(pl + "ln1")).i64(0).f32(eps).i32(1).i32(H);
     else if (r == "in_norm") { copy(dn, d_norm, H * 2); fused_add(d_norm, W(pl + "ln1")); }
     else if (r == "qkv") gemv(W(pl + "wqkv"), qkv_in, qkv, bias ? W(pl + "bqkv") : nullptr);
     else if (r == "q_norm") a.ptr(qn).ptr(qkv).i64(HD).i64(NQKV).i64(0).i64(NH).i64(0).ptr(W(pl + "qn")).i64(0).f32(eps).i32(NH).i32(HD);
@@ -460,6 +476,57 @@ int main(int argc, char** argv) {
     }
     step_ms.clear();
     for (int i = 0; i < gen; ++i) { const int t = (int)prompt.size() - 1 + i; step_ms.push_back((t1[t] - t0[t]) * 1e-5); }
+  }
+  // --check-dsl: the last layer's DSL GEMVs against a CPU reference from the same device inputs and the packed weights.
+  // The tiles accumulate in fp32 in a different order than vLLM's kernels (and than this loop): a bf16 output may differ
+  // by an ulp; the gate is "no output beyond 2 bf16 ulps of the reference", plus the token match above.
+  if (check_dsl) {
+    ETX_VL_BIND(reqs[0])
+    const int Lc = L - 1; const std::string pl = "L" + std::to_string(Lc) + ".";
+    auto b2f = [](uint16_t b) { uint32_t u = (uint32_t)b << 16; float f; memcpy(&f, &u, 4); return f; };
+    auto f2b = [](float f) { uint32_t u; memcpy(&u, &f, 4); const uint32_t r = ((u >> 16) & 1u) + 0x7fffu; return (uint16_t)((u + r) >> 16); };
+    auto host_w = [&](const std::string& n, size_t off_elems, size_t elems) {
+      auto it = m.t.find(n); if (it == m.t.end()) die("manifest lacks " + n);
+      std::vector<uint16_t> v(elems); wf.clear(); wf.seekg((std::streamoff)(it->second.first + off_elems * 2)); wf.read((char*)v.data(), elems * 2);
+      if ((size_t)wf.gcount() != elems * 2) die("short read of " + n); return v; };
+    auto dev = [&](const void* p, size_t elems) { std::vector<uint16_t> v(elems); ETX_CHECK(hipMemcpy(v.data(), p, elems * 2, hipMemcpyDeviceToHost)); return v; };
+    auto dot = [&](const uint16_t* wr, const std::vector<float>& x, int K) { double s = 0; for (int k = 0; k < K; ++k) s += (double)b2f(wr[k]) * x[k]; return (float)s; };
+    auto tof = [&](const std::vector<uint16_t>& v) { std::vector<float> f(v.size()); for (size_t i = 0; i < v.size(); ++i) f[i] = b2f(v[i]); return f; };
+    int bad_total = 0;
+    auto cmp = [&](const char* what, const std::vector<uint16_t>& got, const std::vector<float>& ref) {
+      int bad = 0; double worst = 0;
+      for (size_t i = 0; i < ref.size(); ++i) {
+        const float g = b2f(got[i]), r = b2f(f2b(ref[i]));
+        const float tol = 2.0f * std::max(fabsf(r), 1e-6f) / 128.0f;               // 2 bf16 ulps of the rounded reference
+        const double d = fabs((double)g - r); worst = std::max(worst, d / std::max((double)fabsf(r), 1e-6));
+        if (d > tol) ++bad;
+      }
+      bad_total += bad;
+      printf("  %-9s %7zu values: %d beyond 2 ulps, worst relative difference %.2e\n", what, ref.size(), bad, worst);
+    };
+    // qkv: W [NQKV][H] . normed input (replica 0's copy)
+    { const bf* in = Lc == 0 ? hn : (NR > 1 ? dx : dn); std::vector<float> x = tof(dev(in, H)); auto Wm = host_w(pl + "wqkv", 0, (size_t)NQKV * H);
+      std::vector<float> ref(NQKV); for (int r = 0; r < NQKV; ++r) ref[r] = dot(Wm.data() + (size_t)r * H, x, H); cmp("qkv", dev(qkv, NQKV), ref); }
+    { std::vector<float> x = tof(dev(attn_out, (size_t)NH * HD)); auto Wm = host_w(pl + "wo", 0, (size_t)H * NH * HD);
+      std::vector<float> ref(H); for (int r = 0; r < H; ++r) ref[r] = dot(Wm.data() + (size_t)r * NH * HD, x, NH * HD); cmp("o_proj", dev(o, H), ref); }
+    if (E > 0) {
+      const bf* on = NR > 1 ? ox : o; std::vector<float> x = tof(dev(on, H));
+      { auto Wm = host_w(pl + "wr", 0, (size_t)E * H); std::vector<float> ref(E); for (int r = 0; r < E; ++r) ref[r] = dot(Wm.data() + (size_t)r * H, x, H); cmp("router", dev(rlog, E), ref); }
+      std::vector<int32_t> ids(TOPK); std::vector<float> wts(TOPK);
+      ETX_CHECK(hipMemcpy(ids.data(), topk_ids, TOPK * 4, hipMemcpyDeviceToHost)); ETX_CHECK(hipMemcpy(wts.data(), topk_w, TOPK * 4, hipMemcpyDeviceToHost));
+      std::vector<float> act_ref((size_t)TOPK * MI), down_ref((size_t)TOPK * H);
+      auto act_got = dev(mc2, (size_t)TOPK * MI);
+      for (int s2 = 0; s2 < TOPK; ++s2) {
+        auto We = host_w(pl + "w13", (size_t)ids[s2] * 2 * MI * H, (size_t)2 * MI * H);
+        for (int r = 0; r < MI; ++r) { const float g = b2f(f2b(dot(We.data() + (size_t)r * H, x, H))), u = b2f(f2b(dot(We.data() + (size_t)(MI + r) * H, x, H)));
+          act_ref[(size_t)s2 * MI + r] = g / (1.f + expf(-g)) * u; }
+        std::vector<float> xs(MI); for (int k = 0; k < MI; ++k) xs[k] = b2f(act_got[(size_t)s2 * MI + k]);    // the device's own activation
+        auto Wd = host_w(pl + "w2", (size_t)ids[s2] * H * MI, (size_t)H * MI);
+        for (int r = 0; r < H; ++r) down_ref[(size_t)s2 * H + r] = dot(Wd.data() + (size_t)r * MI, xs, MI) * wts[s2];
+      }
+      cmp("moe_up", act_got, act_ref); cmp("moe_down", dev(mc3, (size_t)TOPK * H), down_ref);
+    }
+    printf("CHECK-DSL %s: %d values beyond 2 bf16 ulps of the CPU reference (layer %d)\n", bad_total ? "FAILED" : "OK", bad_total, Lc);
   }
   // ETX_TRACE=1: per-type wait / body / span of the last step, and the raw per-task stamps (ETX_TRACE_RAW=<file>)
   if (getenv("ETX_TRACE") && !unfused) hst.report_phases(etx_type_names, ETX_N_TYPES);
