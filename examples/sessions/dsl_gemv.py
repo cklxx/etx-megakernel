@@ -1,9 +1,11 @@
-"""GPU session: the DSL build (all of direction A), one run (docs/MODEL-vllm-kernels.md section 13). Build: xcd + chain
-+ the DSL streaming GEMVs (etx.ops.gemv, silu fused into gate_up) + the DSL top-k (etx.ops.topk) + the attention block
-by kv head (etx.ops.attnprep on XCD h, vLLM's attention and reduce on XCD h). Gates: 32/32 tokens against HF greedy
-and --check-dsl (the last layer's DSL ops within 2 bf16 ulps of a CPU reference). Numbers: the fused step, and the same
-tiles launched one by one (--unfused). Pre-registered: simulated 4.01 ms; realistic ~4.45 (x1.11); today's best fused
-5.86, vLLM (same fusion) 4.67.
+"""GPU session: the DSL builds, one run each (docs/MODEL-vllm-kernels.md sections 13, 16). Build 3 (the best by the
+configuration search): xcd + the DSL streaming GEMVs (etx.ops.gemv, silu fused into gate_up) + the attention block by
+kv head (etx.ops.attnprep on XCD h, vLLM's attention and reduce on XCD h) + the folds (in_norm / post_norm / final_norm
+into the qkv / router / lm_head prologues, the top-k into the expert tasks; no moe_sum). Build 2 (no folds) as the
+fallback and the measurement of the fold alone. Gates: 32/32 tokens against HF greedy and --check-dsl (the last layer's
+DSL ops within 2 bf16 ulps of a CPU reference). Numbers: the fused step, the same tiles launched one by one (--unfused),
+two interleaved requests. Pre-registered (sim x 1.11): build 3 3.55 -> ~3.94 ms (vLLM 4.67), two requests ~2.63 ms per
+token (380 tok/s; vLLM batch 2: 360); build 2 4.01 -> ~4.45.
 
   tools/session.sh push <ip>; tools/session.sh start <ip> examples/sessions/dsl_gemv.py
 """
@@ -37,9 +39,10 @@ job(name="dl", lane="cpu", after="llm_env", timeout=2400,
 job(name="prep", gpu=0, after=["dl", "etx_env"], timeout=2400,
     cmd=f"{PY} examples/vllm_llm/prep.py --src {LLM}/{M}/hf --out {LLM}/{M} --maxlen 1072 && "
         f"cp examples/llm/results/golden_c1024_{M}.txt {LLM}/{M}/golden_c1024.txt && ls -la {LLM}/{M}/vl.bin", summary=[r"wrote .*vl.bin"])
-B = "moe_dsl2"
+B = "moe_dsl3"
+DSL = "ETX_VL_XCD=1 ETX_VL_CHAIN=1 ETX_VL_DSL_GEMV=1 ETX_VL_DSL_TOPK=1 ETX_VL_DSL_ATTN=head"
 job(name=f"build_{B}", lane="cpu", after=["etx_env", "dl"], timeout=2400,
-    cmd=f"{V} ETX_VL_XCD=1 ETX_VL_CHAIN=1 ETX_VL_DSL_GEMV=1 ETX_VL_DSL_TOPK=1 ETX_VL_DSL_ATTN=head ETX_OUT=$HOME/sess/b_{B} bash examples/vllm_llm/build.sh {LLM}/{M} "
+    cmd=f"{V} {DSL} ETX_VL_DSL_FOLD=1 ETX_OUT=$HOME/sess/b_{B} bash examples/vllm_llm/build.sh {LLM}/{M} "
         f"> $HOME/sess/b_{B}.buildlog 2>&1; grep -E 'tasks=|Function Name|VGPRs|error' $HOME/sess/b_{B}.buildlog | tail -4; "
         f"cp $HOME/sess/b_{B}.buildlog $HOME/sess/buildlog_{B}.txt; cp $HOME/sess/b_{B}/vl_plan.txt $HOME/sess/vlplan_{B}.txt; "
         f"cp $HOME/sess/b_{B}/plan.json $HOME/sess/plan_{B}.json; cp $HOME/sess/b_{B}/dsl_tiles.hip $HOME/sess/; test -x $HOME/sess/b_{B}/run",
@@ -50,16 +53,24 @@ job(name="run_fused", gpu=0, after=[f"build_{B}", "prep"], timeout=900, cmd=f"st
 job(name="run_unfused", gpu=0, after=[f"build_{B}", "prep"], after_any=["run_fused"], timeout=900, cmd=f"stdbuf -oL {RUN} --repeat 1 --unfused", summary=[RES])
 job(name="trace_fused", gpu=0, after=[f"build_{B}", "prep"], after_any=["run_unfused"], timeout=900,
     cmd=f"ETX_TRACE=1 ETX_TRACE_RAW=$HOME/sess/trace_{B}.bin stdbuf -oL {RUN} --max-steps 8 --repeat 1", summary=[RES])
+# build 2 (no folds): the fallback if build 3 fails a gate, and the fold's own measurement
+BF = "moe_dsl2"
+job(name=f"build_{BF}", lane="cpu", after=["etx_env", "dl"], timeout=2400,
+    cmd=f"{V} {DSL} ETX_OUT=$HOME/sess/b_{BF} bash examples/vllm_llm/build.sh {LLM}/{M} > $HOME/sess/b_{BF}.buildlog 2>&1; "
+        f"grep -E 'tasks=|VGPRs Spill|error' $HOME/sess/b_{BF}.buildlog | tail -3; cp $HOME/sess/b_{BF}/vl_plan.txt $HOME/sess/vlplan_{BF}.txt; "
+        f"cp $HOME/sess/b_{BF}/plan.json $HOME/sess/plan_{BF}.json; test -x $HOME/sess/b_{BF}/run", summary=[r"tasks=|VGPRs Spill"])
+job(name="run_fused_b2", gpu=0, after=[f"build_{BF}", "prep"], after_any=["trace_fused"], timeout=900,
+    cmd=f"stdbuf -oL $HOME/sess/b_{BF}/run {LLM}/{M} $HOME/sess/b_{BF}/vl_plan.txt --repeat 1 --check-dsl", summary=[RES])
 # two interleaved requests on the same structure (predicted 5.20 ms per step of two tokens: 2.89 ms per token, 347 tok/s;
 # vLLM batch 2: 360): request 1 = the prompt rotated by 97 tokens, its golden from HF greedy
-B2 = "moe_dsl2x2"
+B2 = "moe_dsl3x2"
 job(name="llm_env_tf", lane="cpu", after="llm_env", timeout=1800,
     cmd=". ~/llmenv/bin/activate && pip install -q 'transformers>=4.51,<5' accelerate && python3 -c 'import transformers; print(transformers.__version__)'")
-job(name="golden_r97", gpu=0, after=["llm_env_tf", "dl"], after_any=["trace_fused"], timeout=2400,
+job(name="golden_r97", gpu=0, after=["llm_env_tf", "dl"], after_any=["run_fused_b2"], timeout=2400,
     cmd=f"{PY} examples/llm/prep.py --model {HF} --src {LLM}/{M}/hf --out {LLM}/{M} --context 1024 --rotate 97 --golden-only && "
         f"head -c 200 {LLM}/{M}/golden_c1024_r97.txt", summary=[r"HF greedy|gen:"])
 job(name=f"build_{B2}", lane="cpu", after=["etx_env", "dl"], timeout=2400,
-    cmd=f"{V} ETX_VL_XCD=1 ETX_VL_CHAIN=1 ETX_VL_DSL_GEMV=1 ETX_VL_DSL_TOPK=1 ETX_VL_DSL_ATTN=head ETX_VL_REQUESTS=2 ETX_OUT=$HOME/sess/b_{B2} "
+    cmd=f"{V} {DSL} ETX_VL_DSL_FOLD=1 ETX_VL_REQUESTS=2 ETX_OUT=$HOME/sess/b_{B2} "
         f"bash examples/vllm_llm/build.sh {LLM}/{M} > $HOME/sess/b_{B2}.buildlog 2>&1; grep -E 'tasks=|Function Name|VGPRs|error' $HOME/sess/b_{B2}.buildlog | tail -4; "
         f"cp $HOME/sess/b_{B2}.buildlog $HOME/sess/buildlog_{B2}.txt; cp $HOME/sess/b_{B2}/vl_plan.txt $HOME/sess/vlplan_{B2}.txt; "
         f"cp $HOME/sess/b_{B2}/plan.json $HOME/sess/plan_{B2}.json; test -x $HOME/sess/b_{B2}/run", summary=[r"tasks=|megakernel|VGPRs Spill"])

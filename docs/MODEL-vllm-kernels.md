@@ -383,3 +383,26 @@ simulated with the microbenchmark parameters. Of 32 configurations the best is b
 whether the chain switch is on: with the head block there is nothing left to chain), then build 2 without the DSL top-k
 (4.17), then the fused-q/k-norm builds with the DSL GEMVs (4.42-4.45). The search is what turns "the user sets six
 environment variables" into "the compiler chooses"; slots per import and rows per DSL task are the next dimensions.
+
+## 16. Build 3: the folds (2026-09-29, pre-registered; ETX_VL_DSL_FOLD=1)
+
+The one-block launches between the GEMVs become prologues of their consumers (the design's rematerialisation, section
+7.4 of the technical design: redundant parallel work in place of a serial event): every qkv task of layer L > 0 sums the
+8 expert rows + the residual and norms them (ln1) itself, task 0 storing the new residual; every router task norms
+o + residual (ln2), task 0 storing the residual and the normed vector; lm_head does the same with final_norm; every
+expert task recomputes the softmax top-k from the logits (deterministic, lower index on ties) and takes its slot's
+expert and weight. Gone per layer: in_norm, post_norm, top-k, moe_sum (4 launches, 4 hand-offs, 4 fronts, 3 device-wide
+events); the residual alternates between two buffers so readers and the one writer never touch the same one in a step.
+Numerics follow vLLM's moe_sum + fused_add_rms_norm (the sum rounded, the add rounded per element, the variance over the
+rounded values, out = bf16(z * rsqrt * w)) and topkGating; only the reduction orders differ.
+
+| plan | simulated | realistic (x1.11) | two requests |
+|---|---|---|---|
+| build 2 | 4.01 | ~4.45 | 2.89 ms / token, 347 tok/s |
+| build 3 (this session) | 3.55 | ~3.94 (vLLM 4.67: -16%) | 2.63 ms / token, 380 tok/s (vLLM batch 2: 360) |
+
+Layer 5 in build 3: qkv 9.7, prep 4, attention 6.5, reduce 3.7, o_proj 6.7, router 5.3, gate_up 18.5, down 9.4 us of a
+71.6 us layer (build 2: 81.3, today's measured best 108). Batch, extrapolated on the same layer (expert bytes grow with
+the distinct experts of B tokens, per-token tasks run in parallel): B = 2: 2.58 ms per token (387 tok/s; vLLM 360),
+B = 4: 1.73 (579; vLLM 563), B = 8: 1.22 (818): the margin shrinks with the batch, so batching is not where ETX wins.
+Gates as before; ROCm 7.2.4 build: 4 spills (two requests: see the build log).

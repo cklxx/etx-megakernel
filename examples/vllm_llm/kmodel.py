@@ -126,11 +126,21 @@ BUILD1 = [k for k in GEMV_ONLY if k.role != "topk"] + [k for k in DSL_MOE if k.r
 # + ETX_VL_DSL_ATTN=head: etx.ops.attnprep per kv head (9 waves: row load, cos/sin after the position, stores), vLLM's
 # attention and reduce as they are
 BUILD2 = [k for k in BUILD1 if k.role not in ("qknr", "cache")] + [Kern("prep", S=4, V=3, shfl=8, instr=300, note="DSL attention prep of one kv head")]
+# + ETX_VL_DSL_FOLD: the consumers' prologues: qkv reads 8 expert rows + residual and norms (+3 V, 2 barriers, 10 shfl),
+# router norms o + residual (+2 V), moe_up computes the top-k from the logits (+2 V, 24 shfl)
+_b2 = {k.role: k for k in BUILD2}
+BUILD3 = [k for k in BUILD2 if k.role not in ("qkv", "router", "moe_up", "in_norm", "post_norm", "topk", "moe_sum")] + [
+    replace(_b2["qkv"], V=_b2["qkv"].V + 3, bar=_b2["qkv"].bar + 2, shfl=_b2["qkv"].shfl + 10, instr=_b2["qkv"].instr + 250, note="DSL GEMV + folded in_norm"),
+    replace(_b2["router"], V=_b2["router"].V + 2, bar=_b2["router"].bar + 2, shfl=_b2["router"].shfl + 10, instr=_b2["router"].instr + 250, note="DSL GEMV + folded post_norm"),
+    replace(_b2["moe_up"], V=_b2["moe_up"].V + 2, shfl=_b2["moe_up"].shfl + 24, instr=_b2["moe_up"].instr + 400, note="DSL expert GEMV + folded top-k"),
+    _b2["in_norm"]]
 # the cost entry of a task from what its type links (plan.json "symbol"), so any mix of imported kernels and DSL ops
 # costs itself without a hand-picked model name (etx_tile_[rep_|x_]<export>): DSL exports map to their entries, the
 # fused q/k norm + rope to "qknr", everything else to the vLLM entry of the role
 def kern_for_symbol(symbol: str, role: str, base: list) -> "Kern | None":
     exp = re.sub(r"^etx_tile_(rep_|x_)?", "", symbol)
+    if symbol.endswith("_fold"):
+        return {k.role: k for k in BUILD3}.get(role)
     dsl = {"dsl_gemv": {k.role: k for k in DSL_GEMV}, "dsl_moe_up": {k.role: k for k in DSL_GEMV}, "dsl_moe_down": {k.role: k for k in DSL_GEMV},
            "dsl_topk": {k.role: k for k in DSL_MOE}, "dsl_attnprep": {k.role: k for k in BUILD2}, "dsl_attn": {k.role: k for k in DSL_MOE}}
     if exp in dsl:
@@ -140,7 +150,7 @@ def kern_for_symbol(symbol: str, role: str, base: list) -> "Kern | None":
 
 MODELS = {"qwen3-30b-a3b": MOE, "qwen2.5-1.5b": Q15, "qwen3-30b-a3b-dsl": DSL_MOE, "qwen3-30b-a3b-dslgemv": DSL_GEMV,
           "qwen3-30b-a3b-dslp1": DSL_P1, "qwen3-30b-a3b-gemvonly": GEMV_ONLY, "qwen3-30b-a3b-build1": BUILD1,
-          "qwen3-30b-a3b-build2": BUILD2}
+          "qwen3-30b-a3b-build2": BUILD2, "qwen3-30b-a3b-build3": BUILD3}
 
 
 @dataclass

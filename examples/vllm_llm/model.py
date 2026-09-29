@@ -76,6 +76,11 @@ DSL_TOPK = os.environ.get("ETX_VL_DSL_TOPK", "0") == "1"       # the router's so
 # XCD h, the head's attention partitions and its reduce on XCD h too, so those two hand-offs are XCD-local; attention
 # and reduce stay vLLM's kernels (attention at one block per task, ETX_VL_SLOTS=<attn>=1; reduce's slots must equal G)
 DSL_ATTNHEAD = os.environ.get("ETX_VL_DSL_ATTN", "0") == "head"
+# ETX_VL_DSL_FOLD=1 (simulation so far): the one-block producers folded into their consumers' prologues: every qkv task
+# sums the 8 expert rows + residual and norms them itself, every router task norms o + residual, every moe_up task
+# recomputes the top-k from the logits (deterministic), the next layer reads the expert rows: no in_norm (L > 0),
+# post_norm, topk or moe_sum launches (the design's rematerialisation: redundant parallel work for a serial event)
+DSL_FOLD = os.environ.get("ETX_VL_DSL_FOLD", "0") == "1"
 DSL_FILE = os.environ.get("ETX_VL_DSL_TILES", str(HERE / "build" / "dsl_tiles.hip"))
 DSL_ATTN = os.environ.get("ETX_VL_DSL", "0") == "1"       # =2: attention stays vLLM's (fused q/k norm + rope grid, cache, attn)
 if os.environ.get("ETX_VL_QKNR", "0") == "grid" or os.environ.get("ETX_VL_DSL", "0") == "2":
@@ -134,14 +139,16 @@ def instances(d) -> list[dict]:
 
     def gemv(layer, role, m, k):
         if DSL_GEMV:                                          # rows per task = ceil(M / 304): 17 (qkv), 7 (o_proj), 1 (router)
-            add("dsl_gemv", layer, role, (CU, 1, 1), M=m, K=k, wvprgrp=0)
+            fold = DSL_FOLD and (role in ("router", "lm_head") or (role == "qkv" and layer > 0))
+            add("dsl_gemv_fold" if fold else "dsl_gemv", layer, role, (CU, 1, 1), M=m, K=k, wvprgrp=0)
             return
         y = wvsplitk_ytile(m)
         add(f"wvsplitk_y{y}", layer, role, (CU, 1, 1), M=m, K=k, wvprgrp=mindiv(m, CU * y, 16))
 
     attn = {4: "attn_mfma4_g4", 6: "attn_mfma16_g6", 8: "attn_mfma16_g8"}[d.G]
     for L in range(d.L):
-        add("rms_norm_2d" if L == 0 else "fused_add_rms_norm", L, "in_norm", (1, 1, 1))
+        if not (DSL_FOLD and L > 0):
+            add("rms_norm_2d" if L == 0 else "fused_add_rms_norm", L, "in_norm", (1, 1, 1))
         gemv(L, "qkv", d.NQKV, d.H)
         if DSL_ATTN:
             add("dsl_attn", L, "attn", (1, parts, d.NKV))          # prep + cache + attention, one block per (partition, kv head)
@@ -162,20 +169,22 @@ def instances(d) -> list[dict]:
             add(attn, L, "attn", (1, parts, d.NKV), parts=parts)
         add("attn_reduce", L, "reduce", (d.NH, 1, 1), G=d.G)
         gemv(L, "o_proj", d.H, d.NH * d.HD)
-        add("fused_add_rms_norm", L, "post_norm", (1, 1, 1))
+        if not DSL_FOLD:
+            add("fused_add_rms_norm", L, "post_norm", (1, 1, 1))
         if d.moe:
             gemv(L, "router", d.E, d.H)
-            add("dsl_topk" if (DSL or DSL_TOPK) else "topk_softmax_e128", L, "topk", (1, 1, 1))
+            if not DSL_FOLD:
+                add("dsl_topk" if (DSL or DSL_TOPK) else "topk_softmax_e128", L, "topk", (1, 1, 1))
             if XCD and d.TOPK != NX:                          # the XCD-affine expert path puts slot s on XCD s
                 raise SystemExit(f"ETX_VL_XCD needs TOPK == {NX} (top-k slot per XCD), model has {d.TOPK}")
             if DSL_GEMV:                                      # 32 gate + 32 up rows (256 KB) per task; 64 down rows (96 KB)
-                add("dsl_moe_up", L, "moe_up", (d.TOPK * (d.MI // 32), 1, 1), M=d.MI, K=d.H)
-                add("dsl_moe_down", L, "moe_down", (d.TOPK * (d.H // 64), 1, 1), M=d.H, K=d.MI)
+                add("dsl_moe_up_fold" if DSL_FOLD else "dsl_moe_up", L, "moe_up", (d.TOPK * (d.MI // 32), 1, 1), M=d.MI, K=d.H)
+                add("dsl_moe_down_fold" if DSL_FOLD else "dsl_moe_down", L, "moe_down", (d.TOPK * (d.H // 64), 1, 1), M=d.H, K=d.MI)
             else:
                 add("fused_moe_up", L, "moe_up", (d.TOPK * math.ceil(2 * d.MI / MOE_BN), 1, 1))
                 add("silu_and_mul", L, "moe_act", (d.TOPK, 1, 1))
                 add("fused_moe_down", L, "moe_down", (d.TOPK * math.ceil(d.H / MOE_BN), 1, 1))
-            if not DSL:                                            # DSL: the next in_norm reads the 8 expert rows itself
+            if not DSL and not DSL_FOLD:                           # DSL: the next in_norm reads the 8 expert rows itself
                 add("moe_sum_k8", L, "moe_sum", (1, 1, 1))
             continue
         gemv(L, "gate_up", 2 * d.INTER, d.H)
@@ -239,11 +248,12 @@ def build() -> Graph:
     pre = (lambda r: f"r{r}_") if REQUESTS > 1 else (lambda r: "")
 
     prev = {}
+    prev_x = {}                                                # the previous event is per XCD ((NX,) shape)
     for r in range(REQUESTS):
         g.etensor(f"{pre(r)}E_pro", (1,), wait_count=1)
         g.call_device(f"{pre(r)}prologue", (1,), hip_link(native, "vl_prologue"), resource=res, args=["vl"], consts=(r,),
                       out_edges={f"{pre(r)}E_pro": "i->i"}, duration_us=2.0)
-        prev[r] = f"{pre(r)}E_pro"
+        prev[r] = f"{pre(r)}E_pro"; prev_x[r] = False
     # ETX_VL_CHAIN: runs of CHAIN_ROLES within one layer become one grid of one task (at most 4, the consts)
     groups_r = []
     for ins in per_req:
@@ -277,6 +287,7 @@ def build() -> Graph:
                           resource=res, args=["impargs"],
                           consts=(i["offset"], i["stride"], i["copyoff"]), in_edges={prev[r]: "x->(0)"}, out_edges={ev: "x->x"},
                           domain_map="x->x", duration_us=3.0)
+            prev_x[r] = True
         elif len(grp) == 1 and grp[0]["rep"] > 1:
             # a grid split over the XCDs, (XCDs, tasks per XCD) pinned xw->x, each part waiting on its XCD's part of the
             # previous launch: the GEMV after a replica (38 per XCD) or an XCD-affine MoE launch (one expert slot per XCD)
@@ -288,16 +299,17 @@ def build() -> Graph:
             local_next = nxt is not None and len(groups[n + 1]) == 1 and nxt["role"] in XAFF_ROLES and nxt["rep"] > 1
             if local_next:        # the next launch's part on this XCD waits for this XCD's part only
                 g.etensor(ev, (NX,), wait_count=per)
-                out = {ev: "xw->x"}
+                out = {ev: "xw->x"}; this_x = True
             else:
                 g.etensor(ev, (1,), wait_count=i["tasks"])
-                out = {ev: "xw->(0)"}
+                out = {ev: "xw->(0)"}; this_x = False
             name = P + (f"{i['role']}_{i['layer']}" if i["layer"] >= 0 else i["role"])
             dur = max(2.0, i["M"] * i["K"] * 2 / 4.0e12 * 1e6) if i["export"].startswith("wvsplitk") else 3.0
             g.call_device(name, (NX, per), hip_link(src_of(i), f"etx_tile_x_{i['export']}", pre_wait=f"etx_pre_x_{i['export']}"),
                           resource=res, args=["impargs"],
-                          consts=(i["offset"], i["stride"], per), in_edges={prev[r]: "xw->x"}, out_edges=out,
+                          consts=(i["offset"], i["stride"], per), in_edges={prev[r]: "xw->x" if prev_x[r] else "xw->(0)"}, out_edges=out,
                           domain_map="xw->x", duration_us=dur)
+            prev_x[r] = this_x
         elif len(grp) == 1 and DSL_ATTNHEAD and grp[0]["role"] in ("prep", "attn", "reduce"):
             # the attention block by kv head: prep h -> attention (partition p, head h) -> reduce h, all on XCD h
             i = grp[0]
@@ -341,6 +353,8 @@ def build() -> Graph:
                           consts=tuple(x["offset"] for x in grp), in_edges={prev[r]: "i->(0)"}, out_edges={ev: "i->(0)"},
                           duration_us=2.0 * len(grp), **pin)
         prev[r] = ev
+        if not (len(grp) == 1 and grp[0]["rep"] > 1):
+            prev_x[r] = False
     if chains:
         with open(CHAIN_FILE, "w") as f:
             f.write("// generated by examples/vllm_llm/model.py (ETX_VL_CHAIN=1): chained launches, one task each\n#pragma once\n")

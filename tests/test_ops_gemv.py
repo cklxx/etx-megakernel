@@ -28,4 +28,4 @@ def test_adapter_skips_dsl_but_host_header_includes_it():
     tiles = emit_adapters(imp)
     assert "etx_tile_dsl_gemv" not in tiles and "etx_imp_dsl" not in tiles
     hdr = emit_host_header(imp)
-    assert '"dsl_gemv", 10, 80, 64' in hdr and '"pppppliiii"' in hdr
+    assert '"dsl_gemv", 19, 136, 120' in hdr and '"pppppliiiippppifiip"' in hdr

@@ -201,13 +201,13 @@ int main(int argc, char** argv) {
   const int32_t ntpp_val = TOPK * MOE_BM; int32_t* ntpp = etx_host::upload(&ntpp_val, 1);
   // everything a request owns (ETX_VL_REQUESTS: one set each; the weights are shared)
   struct Req {
-    bf *resid, *hn, *qkv, *qn, *kn, *dx, *ox, *actx, *attn_out, *o, *gu, *act, *dn, *logits, *tmp_out, *rlog, *mc1, *mc2, *mc3;
+    bf *resid, *resid2, *hn, *qkv, *qn, *kn, *dx, *ox, *actx, *attn_out, *o, *gu, *act, *dn, *logits, *tmp_out, *rlog, *mc1, *mc2, *mc3;
     float *exp_sums, *max_logits, *topk_w; int64_t *positions, *slot_mapping; int32_t *seq_lens, *token_in, *token_out, *topk_ids, *tei;
     uint64_t* token_time; std::vector<bf*> kc, vc;
   };
   std::vector<Req> reqs(nreq);
   for (Req& q : reqs) {
-    q.resid = ualloc<bf>((size_t)NR * H); q.hn = ualloc<bf>((size_t)NR * H); q.qkv = ualloc<bf>(NQKV); q.qn = ualloc<bf>(NH * HD); q.kn = ualloc<bf>(NKV * HD);
+    q.resid = ualloc<bf>((size_t)NR * H); q.resid2 = ualloc<bf>(H); q.hn = ualloc<bf>((size_t)NR * H); q.qkv = ualloc<bf>(NQKV); q.qn = ualloc<bf>(NH * HD); q.kn = ualloc<bf>(NKV * HD);
     q.dx = ualloc<bf>((size_t)NR * H); q.ox = ualloc<bf>((size_t)NR * H); q.actx = ualloc<bf>((size_t)NR * I);
     q.attn_out = ualloc<bf>(NH * HD); q.o = ualloc<bf>(H); q.gu = ualloc<bf>(2 * I); q.act = ualloc<bf>(I); q.dn = ualloc<bf>(H); q.logits = ualloc<bf>(V);
     q.exp_sums = ualloc<float>(NH * parts); q.max_logits = ualloc<float>(NH * parts); q.tmp_out = ualloc<bf>((size_t)NH * parts * HD);
@@ -220,14 +220,14 @@ int main(int argc, char** argv) {
     q.mc1 = ualloc<bf>((size_t)std::max(TOPK, 1) * 2 * MI); q.mc2 = ualloc<bf>((size_t)std::max(TOPK, 1) * MI); q.mc3 = ualloc<bf>((size_t)std::max(TOPK, 1) * H);
   }
 #define ETX_VL_BIND(Q)                                                                                                    \
-  bf *resid = (Q).resid, *hn = (Q).hn, *qkv = (Q).qkv, *qn = (Q).qn, *kn = (Q).kn, *dx = (Q).dx, *ox = (Q).ox, *actx = (Q).actx;  \
+  bf *resid = (Q).resid, *resid2 = (Q).resid2, *hn = (Q).hn, *qkv = (Q).qkv, *qn = (Q).qn, *kn = (Q).kn, *dx = (Q).dx, *ox = (Q).ox, *actx = (Q).actx;  \
   bf *attn_out = (Q).attn_out, *o = (Q).o, *gu = (Q).gu, *act = (Q).act, *dn = (Q).dn, *logits = (Q).logits, *tmp_out = (Q).tmp_out; \
   bf *rlog = (Q).rlog, *mc1 = (Q).mc1, *mc2 = (Q).mc2, *mc3 = (Q).mc3;                                                    \
   float *exp_sums = (Q).exp_sums, *max_logits = (Q).max_logits, *topk_w = (Q).topk_w;                                    \
   int64_t *positions = (Q).positions, *slot_mapping = (Q).slot_mapping; int32_t *seq_lens = (Q).seq_lens;                \
   int32_t *token_in = (Q).token_in, *token_out = (Q).token_out, *topk_ids = (Q).topk_ids, *tei = (Q).tei;                \
   uint64_t* token_time = (Q).token_time; const std::vector<bf*>& kc = (Q).kc; const std::vector<bf*>& vc = (Q).vc;        \
-  (void)resid; (void)hn; (void)qkv; (void)qn; (void)kn; (void)dx; (void)ox; (void)actx; (void)attn_out; (void)o; (void)gu;  \
+  (void)resid; (void)resid2; (void)hn; (void)qkv; (void)qn; (void)kn; (void)dx; (void)ox; (void)actx; (void)attn_out; (void)o; (void)gu;  \
   (void)act; (void)dn; (void)logits; (void)tmp_out; (void)rlog; (void)mc1; (void)mc2; (void)mc3; (void)exp_sums;         \
   (void)max_logits; (void)topk_w; (void)positions; (void)slot_mapping; (void)seq_lens; (void)token_in; (void)token_out;  \
   (void)topk_ids; (void)tei; (void)token_time; (void)kc; (void)vc;
@@ -273,7 +273,8 @@ int main(int argc, char** argv) {
       else if (r == "down") { w = W(pl + "wd"); in = act_out; out = dn; }
       else if (r == "lm_head") { w = tie ? W("embed") : W("lm_head"); in = d_norm; out = logits; }
       else die("dsl_gemv: role " + r);
-      a.ptr(w).ptr(in).ptr(out).ptr(nullptr).ptr(nullptr).i64(0).i32(x.M).i32(x.K).i32(rpt).i32(0);
+      a.ptr(w).ptr(in).ptr(out).ptr(nullptr).ptr(nullptr).i64(0).i32(x.M).i32(x.K).i32(rpt).i32(0)
+       .ptr(nullptr).ptr(nullptr).ptr(nullptr).ptr(nullptr).i32(0).f32(0.f).i32(0).i32(0).ptr(nullptr);
     }
     // dsl_attnprep (etx/ops/attnprep.py): q/k norm + rope of one kv head in place on qkv, its k / v rows into the cache
     else if (x.exp == "dsl_attnprep" && (HD != 128 || NH % NKV || NH / NKV + 2 > ETX_THREADS / 64 || !qk_norm))
@@ -282,10 +283,31 @@ int main(int argc, char** argv) {
                                        .ptr(slot_mapping).i32(NH).i32(NKV).i32(HD).f32(eps).i32(BS).i32(X);
     else if (x.exp == "dsl_topk" && E > 128) die("dsl_topk: E > 128 (etx/ops/topk.py: one wave, 2 logits per lane)");
     else if (x.exp == "dsl_topk") a.ptr(rlog).ptr(tw_r).ptr(ti_r).ptr(tei + (size_t)rr * TOPK).i32(E).i32(TOPK).i32(norm_topk ? 1 : 0);
+    else if (x.exp == "dsl_gemv_fold") {
+      // norm fold (mode 1): qkv (L > 0) = norm(resid + sum of the 8 expert rows) with ln1, stores resid2; router = norm(resid2 + o)
+      // with ln2, stores resid (copy 0); lm_head = norm(resid + the last layer's expert rows) with final_norm
+      const int nblk = x.gx * x.gy * x.gz, rpt = (x.M + nblk - 1) / nblk;
+      if (x.K > 4096 || x.K % 256) die("dsl_gemv_fold: K must be a multiple of 256 and <= 4096");
+      if (E == 0) die("dsl_gemv_fold: the fold is written for the MoE model (expert rows)");
+      const void* w; void* out; const bf* rows; const bf* rin; bf* rout; const void* ln; int R; bf* xout = nullptr;
+      if (r == "qkv") { w = W(pl + "wqkv"); out = qkv; rows = mc3; rin = resid; rout = resid2; ln = W(pl + "ln1"); R = TOPK; }
+      else if (r == "router") { w = W(pl + "wr"); out = rlog; rows = o; rin = resid2; rout = resid; ln = W(pl + "ln2"); R = 1; xout = ox; }   // ox: what moe_up reads
+      else if (r == "lm_head") { w = tie ? W("embed") : W("lm_head"); out = logits; rows = mc3; rin = resid; rout = nullptr; ln = W("final_norm"); R = TOPK; }
+      else die("dsl_gemv_fold: role " + r);
+      a.ptr(w).ptr(xout).ptr(out).ptr(nullptr).ptr(nullptr).i64(0).i32(x.M).i32(x.K).i32(rpt).i32(0)
+       .ptr(rows).ptr(rin).ptr(rout).ptr(ln).i32(R).f32(eps).i32(1).i32(0).ptr(nullptr);
+    }
+    // top-k fold (mode 2 / 3 = renormalised): the expert tasks recompute the top-k from the router logits
+    else if (x.exp == "dsl_moe_up_fold") a.ptr(W(pl + "w13")).ptr(ox).ptr(mc2).ptr(nullptr).ptr(nullptr).i64((long long)2 * MI * H).i32(MI).i32(H).i32(32).i32(MI / 32)
+                                           .ptr(nullptr).ptr(nullptr).ptr(nullptr).ptr(nullptr).i32(TOPK).f32(0.f).i32(norm_topk ? 3 : 2).i32(E).ptr(rlog);
+    else if (x.exp == "dsl_moe_down_fold") a.ptr(W(pl + "w2")).ptr(mc2).ptr(mc3).ptr(nullptr).ptr(nullptr).i64((long long)H * MI).i32(H).i32(MI).i32(64).i32(H / 64)
+                                             .ptr(nullptr).ptr(nullptr).ptr(nullptr).ptr(nullptr).i32(TOPK).f32(0.f).i32(norm_topk ? 3 : 2).i32(E).ptr(rlog);
     else if (x.exp == "dsl_moe_up" && (MI % 32 || H > 4096 || H % 256)) die("dsl_moe_up: MI % 32 or H > 4096 (etx/ops/gemv.py K_MAX, RCH)");
     else if (x.exp == "dsl_moe_down" && (H % 64 || MI > 4096 || MI % 256)) die("dsl_moe_down: H % 64 or MI > 4096");
-    else if (x.exp == "dsl_moe_up") a.ptr(W(pl + "w13")).ptr(o_norm).ptr(mc2).ptr(ti_r).ptr(nullptr).i64((long long)2 * MI * H).i32(MI).i32(H).i32(32).i32(MI / 32);
-    else if (x.exp == "dsl_moe_down") a.ptr(W(pl + "w2")).ptr(mc2).ptr(mc3).ptr(ti_r).ptr(tw_r).i64((long long)H * MI).i32(H).i32(MI).i32(64).i32(H / 64);
+    else if (x.exp == "dsl_moe_up") a.ptr(W(pl + "w13")).ptr(o_norm).ptr(mc2).ptr(ti_r).ptr(nullptr).i64((long long)2 * MI * H).i32(MI).i32(H).i32(32).i32(MI / 32)
+                                      .ptr(nullptr).ptr(nullptr).ptr(nullptr).ptr(nullptr).i32(0).f32(0.f).i32(0).i32(0).ptr(nullptr);
+    else if (x.exp == "dsl_moe_down") a.ptr(W(pl + "w2")).ptr(mc2).ptr(mc3).ptr(ti_r).ptr(tw_r).i64((long long)H * MI).i32(H).i32(MI).i32(64).i32(H / 64)
+                                        .ptr(nullptr).ptr(nullptr).ptr(nullptr).ptr(nullptr).i32(0).f32(0.f).i32(0).i32(0).ptr(nullptr);
     else if (r == "in_norm" && x.layer == 0) a.ptr(hn_r).ptr(res_r).i64(H).i64(0).i64(0).i64(0).i64(0).ptr(W(pl + "ln1")).i64(0).f32(eps).i32(1).i32(H);
     else if (r == "in_norm") { copy(dn, d_norm, H * 2); fused_add(d_norm, W(pl + "ln1")); }
     else if (r == "qkv") gemv(W(pl + "wqkv"), qkv_in, qkv, bias ? W(pl + "bqkv") : nullptr);
@@ -506,9 +528,19 @@ int main(int argc, char** argv) {
     int bad_total = 0;
     // run one launch of the step alone (the unfused kernel) so its output is compared before any in-place successor
     // (q/k norm + rope on qkv, final_norm on the normed input, post_norm on o) rewrites it
+    auto is_fold = [&](const char* role) { for (const Inst& x : insts) if (x.layer == Lc && x.role == role && x.req == 0) return x.exp.size() > 5 && x.exp.compare(x.exp.size() - 5, 5, "_fold") == 0; return false; };
+    // the CPU side of the norm fold: z = bf16(bf16(sum of R rows) + rin), x = bf16(z * rsqrt(mean z^2 + eps) * ln)
+    auto norm_fold = [&](const std::vector<uint16_t>& rows_b, int R, const std::vector<uint16_t>& rin, const std::vector<uint16_t>& ln) {
+      std::vector<float> xv(H); double ss = 0;
+      for (int i = 0; i < H; ++i) { float acc = 0.f; for (int s2 = 0; s2 < R; ++s2) acc += b2f(rows_b[(size_t)s2 * H + i]);
+        const float inv = R > 1 ? b2f(f2b(acc)) : acc; const float z = b2f(f2b(inv + b2f(rin[i]))); xv[i] = z; ss += (double)z * z; }
+      const float sv = 1.0f / sqrtf((float)(ss / H) + eps);
+      for (int i = 0; i < H; ++i) xv[i] = b2f(f2b(xv[i] * sv * b2f(ln[i])));
+      return xv; };
     auto relaunch = [&](const char* role, const char* exp) {
       for (const Inst& x : insts) if (x.layer == Lc && x.role == role && x.req == 0) {
-        if (x.exp != exp) die(std::string("--check-dsl: ") + role + " is " + x.exp + ", not " + exp);
+        const std::string want = is_fold(role) ? std::string(exp) + "_fold" : std::string(exp);
+        if (x.exp != want) die(std::string("--check-dsl: ") + role + " is " + x.exp + ", not " + want);
         if (etx_launch_count[x.n + 1] != x.tasks) die(std::string("--check-dsl: launch ") + std::to_string(x.n + 1) + " is not " + role);
         int32_t first = etx_launch_first[x.n + 1]; void* kargs[] = {&hst.p, &first};   // launch 0 is the (one) prologue
         ETX_CHECK(hipLaunchKernel(hst.unfused_kernel, dim3(etx_launch_count[x.n + 1]), dim3(ETX_THREADS), kargs, 0, hst.stream));
@@ -532,6 +564,7 @@ int main(int argc, char** argv) {
     };
     // qkv: W [NQKV][H] . normed input (replica 0's copy)
     { const bf* in = Lc == 0 ? hn : (NR > 1 ? dx : dn); std::vector<float> x = tof(dev(in, H)); auto Wm = host_w(pl + "wqkv", 0, (size_t)NQKV * H);
+      if (is_fold("qkv")) x = norm_fold(dev(mc3, (size_t)TOPK * H), TOPK, dev(resid, H), host_w(pl + "ln1", 0, H));
       relaunch("qkv", "dsl_gemv");
       std::vector<float> ref(NQKV); for (int r = 0; r < NQKV; ++r) ref[r] = dot(Wm.data() + (size_t)r * H, x, H); cmp("qkv", dev(qkv, NQKV), ref); }
     for (const Inst& x2 : insts) if (x2.layer == Lc && x2.role == "prep" && x2.exp == "dsl_attnprep" && x2.req == 0) {
@@ -565,12 +598,22 @@ int main(int argc, char** argv) {
       std::vector<float> ref(H); for (int r = 0; r < H; ++r) ref[r] = dot(Wm.data() + (size_t)r * NH * HD, x, NH * HD); cmp("o_proj", dev(o, H), ref); }
     if (E > 0) {
       const bf* on = NR > 1 ? ox : o; std::vector<float> x = tof(dev(on, H));
+      if (is_fold("router")) x = norm_fold(dev(o, H), 1, dev(resid2, H), host_w(pl + "ln2", 0, H));
       { auto Wm = host_w(pl + "wr", 0, (size_t)E * H); relaunch("router", "dsl_gemv");
         std::vector<float> ref(E); for (int r = 0; r < E; ++r) ref[r] = dot(Wm.data() + (size_t)r * H, x, H); cmp("router", dev(rlog, E), ref); }
       for (const Inst& x2 : insts) if (x2.layer == Lc && x2.role == "topk" && x2.exp == "dsl_topk") { relaunch("topk", "dsl_topk"); break; }
       std::vector<int32_t> ids(TOPK); std::vector<float> wts(TOPK);
       ETX_CHECK(hipMemcpy(ids.data(), topk_ids, TOPK * 4, hipMemcpyDeviceToHost)); ETX_CHECK(hipMemcpy(wts.data(), topk_w, TOPK * 4, hipMemcpyDeviceToHost));
-      { std::vector<float> lg = tof(dev(rlog, E)); float mx = -INFINITY; for (float v : lg) mx = std::max(mx, v);
+      if (is_fold("moe_up")) {                                     // no top-k buffers: the CPU top-k of the logits stands in
+        std::vector<float> lg = tof(dev(rlog, E)); float mx = -INFINITY; for (float v : lg) mx = std::max(mx, v);
+        std::vector<float> pr(E); double sum = 0; for (int e = 0; e < E; ++e) { pr[e] = expf(lg[e] - mx); sum += pr[e]; }
+        for (int e = 0; e < E; ++e) pr[e] = (float)(pr[e] / sum);
+        std::vector<bool> used(E, false); double sel = 0;
+        for (int t = 0; t < TOPK; ++t) { int b = -1; for (int e = 0; e < E; ++e) if (!used[e] && (b < 0 || pr[e] > pr[b])) b = e; used[b] = true; ids[t] = b; wts[t] = pr[b]; sel += pr[b]; }
+        if (norm_topk) for (int t = 0; t < TOPK; ++t) wts[t] = (float)(wts[t] / sel);
+        x = tof(dev(ox, H));                                       // the router's stored normed vector
+      }
+      if (!is_fold("moe_up")) { std::vector<float> lg = tof(dev(rlog, E)); float mx = -INFINITY; for (float v : lg) mx = std::max(mx, v);
         std::vector<float> pr(E); double sum = 0; for (int e = 0; e < E; ++e) { pr[e] = expf(lg[e] - mx); sum += pr[e]; }
         for (int e = 0; e < E; ++e) pr[e] = (float)(pr[e] / sum);
         std::vector<int> ref_ids; std::vector<float> ref_w; std::vector<bool> used(E, false); double sel = 0;

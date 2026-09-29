@@ -21,13 +21,22 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-ARG_BYTES, GRID_OFF = 80, 64
+ARG_BYTES, GRID_OFF = 136, 120
+# the "_fold" forms carry a prologue (docs/MODEL-vllm-kernels.md section 16): norm fold (mode 1): x = rms_norm(bf16(bf16(sum
+# of R rows) + resid_in)) with weight ln (vLLM's moe_sum + fused_add_rms_norm numerics: the sum rounded, the add rounded
+# per element, the variance over the rounded values, out = bf16(z * rsqrt * w)); task 0 stores the new residual to
+# resid_out. top-k fold (mode 2): every expert task recomputes the softmax top-k from the logits (deterministic) and
+# takes its slot's expert and weight; no top-k launch, no ids / wts buffers.
 PARAMS = [("W", "ptr addrspace(1)", 0, 8), ("x", "ptr addrspace(1)", 8, 8), ("out", "ptr addrspace(1)", 16, 8),
           ("ids", "ptr addrspace(1)", 24, 8), ("wts", "ptr addrspace(1)", 32, 8), ("estride", "i64", 40, 8),
-          ("M", "i32", 48, 4), ("K", "i32", 52, 4), ("rpt", "i32", 56, 4), ("tpe", "i32", 60, 4)]
-FORMS = {"dsl_gemv": "plain", "dsl_moe_up": "silu_mul", "dsl_moe_down": "scale"}
+          ("M", "i32", 48, 4), ("K", "i32", 52, 4), ("rpt", "i32", 56, 4), ("tpe", "i32", 60, 4),
+          ("rows", "ptr addrspace(1)", 64, 8), ("resid_in", "ptr addrspace(1)", 72, 8), ("resid_out", "ptr addrspace(1)", 80, 8),
+          ("ln", "ptr addrspace(1)", 88, 8), ("R", "i32", 96, 4), ("eps", "float", 100, 4), ("mode", "i32", 104, 4),
+          ("E", "i32", 108, 4), ("logits", "ptr addrspace(1)", 112, 8)]
+FORMS = {"dsl_gemv": "plain", "dsl_moe_up": "silu_mul", "dsl_moe_down": "scale",
+         "dsl_gemv_fold": "plain", "dsl_moe_up_fold": "silu_mul", "dsl_moe_down_fold": "scale"}
 K_MAX, RCH, THREADS = 4096, 64, 1024                              # x (K floats) + 2 x RCH (moe_up's g) + 16 waves x RCH partials
-LDS_BYTES = 4 * (K_MAX + 2 * RCH + (THREADS // 64) * RCH)          # 20992 B; the host refuses K > K_MAX and rpt > RCH
+LDS_BYTES = 4 * (K_MAX + 2 * RCH + (THREADS // 64) * RCH + 32)     # 21120 B (+ the top-k ids / weights); host-checked K, rpt
 
 
 def import_entries(threads: int = 1024) -> dict:
@@ -127,13 +136,71 @@ template <class Epi>
 static __device__ __forceinline__ void dsl_gemv_chunked(const __hip_bfloat16* __restrict__ W, int K, const float* xs, int r0, int r1, float* part, Epi epi) {
   for (int r = r0; r < r1; r += DSL_RCH) dsl_gemv(W, K, xs, r, min(r1, r + DSL_RCH), part, epi);
 }
-struct DslArgs { const __hip_bfloat16* W; const __hip_bfloat16* x; __hip_bfloat16* out; const int* ids; const float* wts; long long estride; int M, K, rpt, tpe; };
+struct DslArgs { const __hip_bfloat16* W; const __hip_bfloat16* x; __hip_bfloat16* out; const int* ids; const float* wts; long long estride; int M, K, rpt, tpe;
+                 const __hip_bfloat16* rows; const __hip_bfloat16* resid_in; __hip_bfloat16* resid_out; const __hip_bfloat16* ln; int R; float eps; int mode, E;
+                 const __hip_bfloat16* logits; };
 static __device__ __forceinline__ DslArgs dsl_args(const unsigned char* a) {
   DslArgs d;
   d.W = *(const __hip_bfloat16* const*)(a + 0); d.x = *(const __hip_bfloat16* const*)(a + 8); d.out = *(__hip_bfloat16* const*)(a + 16);
   d.ids = *(const int* const*)(a + 24); d.wts = *(const float* const*)(a + 32); d.estride = *(const long long*)(a + 40);
   d.M = *(const int*)(a + 48); d.K = *(const int*)(a + 52); d.rpt = *(const int*)(a + 56); d.tpe = *(const int*)(a + 60);
+  d.rows = *(const __hip_bfloat16* const*)(a + 64); d.resid_in = *(const __hip_bfloat16* const*)(a + 72); d.resid_out = *(__hip_bfloat16* const*)(a + 80);
+  d.ln = *(const __hip_bfloat16* const*)(a + 88); d.R = *(const int*)(a + 96); d.eps = *(const float*)(a + 100); d.mode = *(const int*)(a + 104);
+  d.E = *(const int*)(a + 108); d.logits = *(const __hip_bfloat16* const*)(a + 112);
   return d;
+}
+// norm fold: xs = bf16(rms_norm(z)) as floats, z = bf16(bf16(sum of R rows) + resid_in) per element; task 0 stores z
+static __device__ __forceinline__ void dsl_stage_norm(const DslArgs& d, float* xs, float* red, bool store) {
+  const int K = d.K;
+  float ss = 0.f;
+  for (int i = (int)threadIdx.x; i < K; i += blockDim.x) {
+    float acc = 0.f;
+    for (int s = 0; s < d.R; ++s) acc += __bfloat162float(d.rows[(size_t)s * K + i]);
+    const float in = d.R > 1 ? dsl_bfr(acc) : acc;                                   // moe_sum rounds its fp32 sum once
+    const float z = dsl_bfr(in + __bfloat162float(d.resid_in[i]));                   // the bf16 add of fused_add_rms_norm
+    xs[i] = z; ss += z * z;
+    if (store) d.resid_out[i] = __float2bfloat16(z);
+  }
+  ss = etx_block_sum(ss, red);
+  const float sv = rsqrtf(ss / (float)K + d.eps);
+  for (int i = (int)threadIdx.x; i < K; i += blockDim.x) {
+    xs[i] = dsl_bfr(xs[i] * sv * __bfloat162float(d.ln[i]));
+    if (store && d.x != nullptr) ((__hip_bfloat16*)d.x)[i] = __float2bfloat16(xs[i]);   // the normed vector, for later consumers
+  }
+  __syncthreads();
+}
+// top-k fold: wave 0 computes the softmax top-k of the logits (etx/ops/topk.py's arithmetic) into LDS
+static __device__ __forceinline__ void dsl_topk_lds(const __hip_bfloat16* logits, int E, int K, int renorm, int* ids, float* wts) {
+  if (etx_wave() == 0) {
+    const int lane = etx_lane();
+    float p[2]; bool taken[2]; float m = -INFINITY;
+#pragma unroll
+    for (int k = 0; k < 2; ++k) { const int e = lane + k * ETX_WAVE_SIZE; p[k] = e < E ? __bfloat162float(logits[e]) : -INFINITY; taken[k] = e >= E; m = fmaxf(m, p[k]); }
+    m = etx_wave_max(m);
+    float s = 0.f;
+#pragma unroll
+    for (int k = 0; k < 2; ++k) { p[k] = taken[k] ? 0.f : expf(p[k] - m); s += p[k]; }
+    s = etx_wave_sum(s);
+    const float inv = 1.f / s;
+#pragma unroll
+    for (int k = 0; k < 2; ++k) p[k] = taken[k] ? 0.f : p[k] * inv;
+    float sel = 0.f;
+    for (int t = 0; t < K; ++t) {
+      float bv = -1.f; int bi = 0x7fffffff;
+#pragma unroll
+      for (int k = 0; k < 2; ++k) { const int e = lane + k * ETX_WAVE_SIZE; if (!taken[k] && p[k] > bv) { bv = p[k]; bi = e; } }
+      for (int off = ETX_WAVE_SIZE / 2; off > 0; off >>= 1) {
+        const float ov = __shfl_xor(bv, off, ETX_WAVE_SIZE); const int oi = __shfl_xor(bi, off, ETX_WAVE_SIZE);
+        if (ov > bv || (ov == bv && oi < bi)) { bv = ov; bi = oi; }
+      }
+#pragma unroll
+      for (int k = 0; k < 2; ++k) if (lane + k * ETX_WAVE_SIZE == bi) taken[k] = true;
+      if (lane == 0) { ids[t] = bi; wts[t] = bv; }
+      sel += bv;
+    }
+    if (renorm && lane == 0) for (int t = 0; t < K; ++t) wts[t] = wts[t] / sel;
+  }
+  __syncthreads();
 }
 '''
 
@@ -141,15 +208,17 @@ BODIES = {
     "plain": '''
   const int r0 = blk * d.rpt, r1 = min(d.M, r0 + d.rpt);
   if (r0 >= r1) return;
-  dsl_stage(d.x, d.K, xs);
+  if (d.mode == 1) dsl_stage_norm(d, xs, xs + d.K + 16 * DSL_RCH, blk == 0); else dsl_stage(d.x, d.K, xs);
   __hip_bfloat16* out = d.out;
   dsl_gemv_chunked(d.W, d.K, xs, r0, r1, xs + d.K, [&](int r, float v) { out[r] = __float2bfloat16(v); });''',
     "silu_mul": '''
   const int s = blk / d.tpe, j = blk - s * d.tpe;
   const int r0 = j * d.rpt, r1 = min(d.M, r0 + d.rpt);
   if (r0 >= r1) return;
-  const __hip_bfloat16* We = d.W + (size_t)d.ids[s] * d.estride;
-  float* g = xs + d.K; float* part = g + 2 * d.rpt;                  // g: 2 x rpt floats (rpt <= DSL_RCH, host-checked)
+  float* g = xs + d.K; float* part = g + 2 * d.rpt;
+  int* lids = (int*)(part + 16 * DSL_RCH); float* lwts = (float*)(lids + 16);   // top-k fold: R = k, mode 3 = renormalised
+  if (d.mode >= 2) dsl_topk_lds(d.logits, d.E, d.R, d.mode == 3 ? 1 : 0, lids, lwts);
+  const __hip_bfloat16* We = d.W + (size_t)(d.mode >= 2 ? lids[s] : d.ids[s]) * d.estride;                  // g: 2 x rpt floats (rpt <= DSL_RCH, host-checked)
   dsl_stage(d.x, d.K, xs);
   dsl_gemv_chunked(We, d.K, xs, r0, r1, part, [&](int r, float v) { g[r - r0] = dsl_bfr(v); });
   dsl_gemv_chunked(We + (size_t)d.M * d.K, d.K, xs, r0, r1, part, [&](int r, float v) { g[d.rpt + r - r0] = dsl_bfr(v); });
@@ -159,10 +228,12 @@ BODIES = {
   const int s = blk / d.tpe, j = blk - s * d.tpe;
   const int r0 = j * d.rpt, r1 = min(d.M, r0 + d.rpt);
   if (r0 >= r1) return;
-  const __hip_bfloat16* We = d.W + (size_t)d.ids[s] * d.estride;
+  int* lids = (int*)(xs + d.K + 16 * DSL_RCH); float* lwts = (float*)(lids + 16);
+  if (d.mode >= 2) dsl_topk_lds(d.logits, d.E, d.R, d.mode == 3 ? 1 : 0, lids, lwts);
+  const __hip_bfloat16* We = d.W + (size_t)(d.mode >= 2 ? lids[s] : d.ids[s]) * d.estride;
   dsl_stage(d.x + (size_t)s * d.K, d.K, xs);
   __hip_bfloat16* out = d.out + (size_t)s * d.M;
-  const float ws = d.wts[s];
+  const float ws = d.mode >= 2 ? lwts[s] : d.wts[s];
   dsl_gemv_chunked(We, d.K, xs, r0, r1, xs + d.K, [&](int r, float v) { out[r] = __float2bfloat16(v * ws); });''',
 }
 
