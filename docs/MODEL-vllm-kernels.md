@@ -355,3 +355,16 @@ Simulated (microbenchmark parameters), ms per token:
 The session's build (GEMVs + top-k) is predicted to land at 4.8-5.0 ms: faster than today's 5.86, still behind vLLM;
 the win needs the rest of A (the moe_sum fold, attention with its preparation). Gates: 32/32 tokens, CHECK-DSL OK. If build 1 measures above 5.4 ms the GEMV tiles are not at the lf rate
 and the trace (per-task bodies of qkv / o_proj / moe_up / moe_down against 5.3 / 4.3 / 12.8 / 6.4 us) says which.
+
+## 14. Formal checks (2026-09-29, `formal/`, `bash formal/check.sh [old]`)
+
+| what | tool | claim | result |
+|---|---|---|---|
+| the DSL GEMV stream loop (etx/ops/gemv.py: segments in contiguous per-wave runs, flush on row change, per-wave partials summed) | Lean 4 (core, no Mathlib), `formal/Gemv.lean` | `gemv_correct`: for every row, the sum over waves of the partials equals the sum of the row's segment values, for any spr, S, per >= 1 and any wave count covering S (so the flush bookkeeping and the tail path lose or duplicate nothing) | proved; axioms `propext`, `Quot.sound` only |
+| the imported-kernel barrier protocol (import.h: counted s_barrier in rounds, exit by round number) | TLA+ / TLC, `formal/ImportRounds.tla` | no deadlock; every wave of a use has taken the same number of barriers when it leaves (SameNbarAtBoundary); no wave leaves while another still has block barriers to take (NoOrphanBarrier); termination under weak fairness; shared-memory steps interleave freely | NW 3, 2 uses, 0-2 barriers per wave: 271,503 states, no error; NW 4: 9,397,101 states, no error |
+| the first version of that protocol (leave when done = NW, reset at the next begin: the race the 2026-09-28 review found) | `formal/ImportRoundsOld.tla` | the same claims | TypeOK violated (done exceeds NW: a wave of the next use increments before the reset): the model discriminates |
+| the DEVICE event with the last-arriver flush (primitives.h: per-domain sub-counter, the domain's last producer writes back and subtracts the share; consumers poll <= 0 then acquire) | `formal/EventFlush.tla` | the word never goes negative; it reaches 0 only when every producer's output is visible device-wide; a consumer past its wait reads every output (no stale read); one flush per domain; termination | 3 domains x 2 producers, 2 consumers: 1,848 states, no error |
+
+What these do not cover: the hardware's memory model beyond "release makes the domain's L2 hold the data, write-back
+makes it visible" (the K$ and vector-L1 behaviour was measured, section 10), the fp32 summation order of the GEMV (the
+host's --check-dsl tolerance), and the imported kernels themselves (their byte-identity is the --check gate).
