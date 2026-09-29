@@ -76,3 +76,9 @@ job(name=f"build_{B2}", lane="cpu", after=["etx_env", "dl"], timeout=2400,
         f"cp $HOME/sess/b_{B2}/plan.json $HOME/sess/plan_{B2}.json; test -x $HOME/sess/b_{B2}/run", summary=[r"tasks=|megakernel|VGPRs Spill"])
 job(name="run_two", gpu=0, after=[f"build_{B2}", "prep", "golden_r97"], timeout=900,
     cmd=f"stdbuf -oL $HOME/sess/b_{B2}/run {LLM}/{M} $HOME/sess/b_{B2}/vl_plan.txt --repeat 1 --golden1 golden_c1024_r97.txt", summary=[RES])
+# after the experiment, one 20 s probe (does not touch the builds): the streaming bandwidth of 1 / 2 / 4 / 8 XCDs
+# (hw_bench lfx), the number that decides whether layer pipelining across XCDs is worth building (added 2026-09-29)
+job(name="build_bench", lane="cpu", after="apt", timeout=900,
+    cmd="mkdir -p $HOME/sess && hipcc -O3 -std=c++17 --offload-arch=gfx942 bench/hw/hw_bench.hip -o $HOME/sess/hw_bench && ls -la $HOME/sess/hw_bench")
+job(name="hw_lfx", gpu=0, after=["build_bench"], after_any=["run_two"], timeout=300,
+    cmd="stdbuf -oL $HOME/sess/hw_bench lfx", summary=[r"^RESULT"])

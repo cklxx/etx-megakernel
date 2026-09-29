@@ -26,6 +26,8 @@
 //                      or streaming at full rate (loaded latency). Replaces the fitted t_v, t_s and the argument path.
 //   hw_bench lf        Little's law: A workgroups (256 threads) each stream B bytes with D x 16 B per lane in flight
 //                      (D = 1..16: 4-64 KB per workgroup); rate against bytes in flight. Replaces the fitted bandwidth.
+//   hw_bench lfx       the lf stream on the first nx XCDs only (nx = 1, 2, 4, 8; 37 x 64 KB per XCD): the bandwidth one
+//                      pipeline stage of nx XCDs can pull; decides whether layer pipelining across XCDs can pay.
 //   hw_bench launch    the kernel boundary with work: 200 kernels in one HIP graph, each reads the previous kernel's output
 //                      and chases H dependent loads (H = -1: an empty kernel). Splits the fitted F into boundary + hops.
 //   hw_bench evx       ETX's own event protocol (the gfx942 lowering: fetch_sub arrive, poll = buffer_inv sc0 + load with
@@ -402,12 +404,12 @@ __global__ void __launch_bounds__(kT) k_evict(const u4* w, size_t n16, uint32_t*
 // ------------------------------------------------------------------ lf (bytes in flight -> rate)
 template <int D>
 __global__ void __launch_bounds__(kT) k_lf(const u4* __restrict__ w, size_t buf_u4, int active, int64_t bytes, int iters, Ctl* ctl,
-                                           uint64_t* t_start, uint64_t* t_end, uint32_t* sink) {
+                                           uint64_t* t_start, uint64_t* t_end, uint32_t* sink, int nx = 8) {
   __shared__ int s_slot;
   if (threadIdx.x == 0) s_slot = claim_xslot(ctl);
   __syncthreads();
-  const int per_x = active / 8, slot = s_slot, wid = (int)xcc_id() * per_x + slot;
-  const bool on = slot < per_x;
+  const int per_x = active / nx, slot = s_slot, wid = (int)xcc_id() * per_x + slot;   // active workgroups on the first nx XCDs
+  const bool on = (int)xcc_id() < nx && slot < per_x;
   uint32_t acc = 0;
   for (int it = 0; it < iters; ++it) {
     grid_barrier(ctl, it + 1);
@@ -691,6 +693,33 @@ int main(int argc, char** argv) {
       printf("RESULT lf bytes %6lld active %3d inflight %2d KB/WG (%5.2f MB total): WG median %7.2f us  span %7.2f  per trip %5.3f us  "
              "-> %.2f TB/s (WG median), %.2f TB/s (span)\n", (long long)bytes, active, D * 4, active * D * 4 / 1024.0, med, pct(spans, 0.5),
              med / trips, active * (double)bytes / (med * 1e-6) / 1e12, active * (double)bytes / (pct(spans, 0.5) * 1e-6) / 1e12);
+    }
+  }
+
+  if (what == "all" || what == "lfx") {
+    // the same stream on the first nx XCDs only (37 workgroups per XCD, 64 KB in flight each): what one pipeline stage
+    // of nx XCDs can pull from HBM; the 8-XCD row repeats lf's 296 x 64 KB point
+    const int iters = 10;
+    uint64_t *ts, *te; CHECK(hipMalloc(&ts, (size_t)iters * 304 * 8)); CHECK(hipMalloc(&te, (size_t)iters * 304 * 8));
+    const int64_t bytes = 262144;
+    for (int nx : {1, 2, 4, 8}) for (int D : {8, 16}) {
+      const int active = 37 * nx;
+      reset(); CHECK(hipMemset(ts, 0, (size_t)iters * 304 * 8)); CHECK(hipMemset(te, 0, (size_t)iters * 304 * 8));
+      if (D == 8) hipLaunchKernelGGL(k_lf<8>, dim3(ncu), dim3(kT), lds1, st, w, buf_u4, active, bytes, iters, ctl, ts, te, sink, nx);
+      else hipLaunchKernelGGL(k_lf<16>, dim3(ncu), dim3(kT), lds1, st, w, buf_u4, active, bytes, iters, ctl, ts, te, sink, nx);
+      if (!wait_stream(st, 30)) { printf("RESULT lfx HUNG\n"); return 3; }
+      std::vector<uint64_t> hs((size_t)iters * 304), he((size_t)iters * 304);
+      CHECK(hipMemcpy(hs.data(), ts, hs.size() * 8, hipMemcpyDeviceToHost)); CHECK(hipMemcpy(he.data(), te, he.size() * 8, hipMemcpyDeviceToHost));
+      std::vector<double> spans, wg;
+      for (int it = 2; it < iters; ++it) {
+        uint64_t lo = ~0ull, hi = 0;
+        for (int k = 0; k < active; ++k) { const uint64_t a = hs[(size_t)it * active + k], b = he[(size_t)it * active + k];
+          if (!a) continue; lo = std::min(lo, a); hi = std::max(hi, b); wg.push_back((b - a) * 0.01); }
+        if (hi > lo) spans.push_back((hi - lo) * 0.01);
+      }
+      const double med = pct(wg, 0.5), sp = pct(spans, 0.5), tb = active * (double)bytes / (sp * 1e-6) / 1e12;
+      printf("RESULT lfx xcds %d active %3d inflight %2d KB/WG: WG median %7.2f us  span %7.2f  -> %.2f TB/s (span), %.3f TB/s per XCD\n",
+             nx, active, D * 4, med, sp, tb, tb / nx);
     }
   }
 
