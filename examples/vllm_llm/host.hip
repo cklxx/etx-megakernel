@@ -264,6 +264,7 @@ int main(int argc, char** argv) {
     // the DSL GEMVs (etx.ops.gemv): W, x, out, ids, wts, expert stride, M, K, rows per task, tasks per expert
     if (x.exp == "dsl_gemv") {
       const int nblk = x.gx * x.gy * x.gz, rpt = (x.M + nblk - 1) / nblk;
+      if (x.K > 4096) die("dsl_gemv: K > 4096 does not fit the tile's LDS (etx/ops/gemv.py K_MAX)");
       const void* w; const void* in; void* out;
       if (r == "qkv") { if (bias) die("dsl_gemv: qkv bias not supported"); w = W(pl + "wqkv"); in = qkv_in; out = qkv; }
       else if (r == "o_proj") { w = W(pl + "wo"); in = attn_out; out = o; }
@@ -275,6 +276,8 @@ int main(int argc, char** argv) {
       a.ptr(w).ptr(in).ptr(out).ptr(nullptr).ptr(nullptr).i64(0).i32(x.M).i32(x.K).i32(rpt).i32(0);
     }
     else if (x.exp == "dsl_topk") a.ptr(rlog).ptr(tw_r).ptr(ti_r).ptr(tei + (size_t)rr * TOPK).i32(E).i32(TOPK).i32(norm_topk ? 1 : 0);
+    else if (x.exp == "dsl_moe_up" && (MI % 32 || H > 4096)) die("dsl_moe_up: MI % 32 or H > 4096 (etx/ops/gemv.py K_MAX, RCH)");
+    else if (x.exp == "dsl_moe_down" && (H % 64 || MI > 4096)) die("dsl_moe_down: H % 64 or MI > 4096");
     else if (x.exp == "dsl_moe_up") a.ptr(W(pl + "w13")).ptr(o_norm).ptr(mc2).ptr(ti_r).ptr(nullptr).i64((long long)2 * MI * H).i32(MI).i32(H).i32(32).i32(MI / 32);
     else if (x.exp == "dsl_moe_down") a.ptr(W(pl + "w2")).ptr(mc2).ptr(mc3).ptr(ti_r).ptr(tw_r).i64((long long)H * MI).i32(H).i32(MI).i32(64).i32(H / 64);
     else if (r == "in_norm" && x.layer == 0) a.ptr(hn_r).ptr(res_r).i64(H).i64(0).i64(0).i64(0).i64(0).ptr(W(pl + "ln1")).i64(0).f32(eps).i32(1).i32(H);
@@ -494,6 +497,18 @@ int main(int argc, char** argv) {
     auto dot = [&](const uint16_t* wr, const std::vector<float>& x, int K) { double s = 0; for (int k = 0; k < K; ++k) s += (double)b2f(wr[k]) * x[k]; return (float)s; };
     auto tof = [&](const std::vector<uint16_t>& v) { std::vector<float> f(v.size()); for (size_t i = 0; i < v.size(); ++i) f[i] = b2f(v[i]); return f; };
     int bad_total = 0;
+    // run one launch of the step alone (the unfused kernel) so its output is compared before any in-place successor
+    // (q/k norm + rope on qkv, final_norm on the normed input, post_norm on o) rewrites it
+    auto relaunch = [&](const char* role, const char* exp) {
+      for (const Inst& x : insts) if (x.layer == Lc && x.role == role && x.req == 0) {
+        if (x.exp != exp) die(std::string("--check-dsl: ") + role + " is " + x.exp + ", not " + exp);
+        int32_t first = etx_launch_first[x.n + 1]; void* kargs[] = {&hst.p, &first};
+        ETX_CHECK(hipLaunchKernel(hst.unfused_kernel, dim3(etx_launch_count[x.n + 1]), dim3(ETX_THREADS), kargs, 0, hst.stream));
+        if (!wait_stream(hst.stream, 5.0)) die(std::string("--check-dsl: ") + role + " hung");
+        return;
+      }
+      die(std::string("--check-dsl: no ") + role + " launch in layer " + std::to_string(Lc));
+    };
     auto cmp = [&](const char* what, const std::vector<uint16_t>& got, const std::vector<float>& ref) {
       int bad = 0; double worst = 0;
       for (size_t i = 0; i < ref.size(); ++i) {
@@ -507,12 +522,16 @@ int main(int argc, char** argv) {
     };
     // qkv: W [NQKV][H] . normed input (replica 0's copy)
     { const bf* in = Lc == 0 ? hn : (NR > 1 ? dx : dn); std::vector<float> x = tof(dev(in, H)); auto Wm = host_w(pl + "wqkv", 0, (size_t)NQKV * H);
+      relaunch("qkv", "dsl_gemv");
       std::vector<float> ref(NQKV); for (int r = 0; r < NQKV; ++r) ref[r] = dot(Wm.data() + (size_t)r * H, x, H); cmp("qkv", dev(qkv, NQKV), ref); }
     { std::vector<float> x = tof(dev(attn_out, (size_t)NH * HD)); auto Wm = host_w(pl + "wo", 0, (size_t)H * NH * HD);
+      relaunch("o_proj", "dsl_gemv");
       std::vector<float> ref(H); for (int r = 0; r < H; ++r) ref[r] = dot(Wm.data() + (size_t)r * NH * HD, x, NH * HD); cmp("o_proj", dev(o, H), ref); }
     if (E > 0) {
       const bf* on = NR > 1 ? ox : o; std::vector<float> x = tof(dev(on, H));
-      { auto Wm = host_w(pl + "wr", 0, (size_t)E * H); std::vector<float> ref(E); for (int r = 0; r < E; ++r) ref[r] = dot(Wm.data() + (size_t)r * H, x, H); cmp("router", dev(rlog, E), ref); }
+      { auto Wm = host_w(pl + "wr", 0, (size_t)E * H); relaunch("router", "dsl_gemv");
+        std::vector<float> ref(E); for (int r = 0; r < E; ++r) ref[r] = dot(Wm.data() + (size_t)r * H, x, H); cmp("router", dev(rlog, E), ref); }
+      for (const Inst& x2 : insts) if (x2.layer == Lc && x2.role == "topk" && x2.exp == "dsl_topk") { relaunch("topk", "dsl_topk"); break; }
       std::vector<int32_t> ids(TOPK); std::vector<float> wts(TOPK);
       ETX_CHECK(hipMemcpy(ids.data(), topk_ids, TOPK * 4, hipMemcpyDeviceToHost)); ETX_CHECK(hipMemcpy(wts.data(), topk_w, TOPK * 4, hipMemcpyDeviceToHost));
       { std::vector<float> lg = tof(dev(rlog, E)); float mx = -INFINITY; for (float v : lg) mx = std::max(mx, v);
@@ -525,6 +544,7 @@ int main(int argc, char** argv) {
           worst = std::max(worst, fabs((double)wts[t] - rw) / std::max((double)rw, 1e-9)); if (fabs((double)wts[t] - rw) > 1e-4 * rw) ++bad; }
         bad_total += bad; printf("  %-9s %7d values: %d wrong (ids exact, weights within 1e-4), worst relative difference %.2e\n", "topk", TOPK, bad, worst); }
       std::vector<float> act_ref((size_t)TOPK * MI), down_ref((size_t)TOPK * H);
+      relaunch("moe_up", "dsl_moe_up"); relaunch("moe_down", "dsl_moe_down");
       auto act_got = dev(mc2, (size_t)TOPK * MI);
       for (int s2 = 0; s2 < TOPK; ++s2) {
         auto We = host_w(pl + "w13", (size_t)ids[s2] * 2 * MI * H, (size_t)2 * MI * H);

@@ -26,14 +26,16 @@ PARAMS = [("W", "ptr addrspace(1)", 0, 8), ("x", "ptr addrspace(1)", 8, 8), ("ou
           ("ids", "ptr addrspace(1)", 24, 8), ("wts", "ptr addrspace(1)", 32, 8), ("estride", "i64", 40, 8),
           ("M", "i32", 48, 4), ("K", "i32", 52, 4), ("rpt", "i32", 56, 4), ("tpe", "i32", 60, 4)]
 FORMS = {"dsl_gemv": "plain", "dsl_moe_up": "silu_mul", "dsl_moe_down": "scale"}
+K_MAX, RCH, THREADS = 4096, 64, 1024                              # x (K floats) + 2 x RCH (moe_up's g) + 16 waves x RCH partials
+LDS_BYTES = 4 * (K_MAX + 2 * RCH + (THREADS // 64) * RCH)          # 20992 B; the host refuses K > K_MAX and rpt > RCH
 
 
 def import_entries(threads: int = 1024) -> dict:
     """imports.json entries for the three forms (what the adapter's host header and model.py read)."""
     ps = [{"ty": ty, "name": f"%{n}", "size": sz, "align": min(sz, 8), "offset": off} for n, (_, ty, off, sz) in enumerate(PARAMS)]
     return {e: {"dsl": form, "export": f"etx_tile_{e}", "kernel": e, "block": [threads, 1, 1], "threads": threads, "slots": 1,
-                "slot_threads": threads, "params": ps, "grid_offset": GRID_OFF, "arg_bytes": ARG_BYTES, "lds_bytes_per_slot": 20480,
-                "lds_bytes": 20480, "barriers": 0, "slot_barrier": False, "spec": f"ETX DSL GEMV ({form})"} for e, form in FORMS.items()}
+                "slot_threads": threads, "params": ps, "grid_offset": GRID_OFF, "arg_bytes": ARG_BYTES, "lds_bytes_per_slot": LDS_BYTES,
+                "lds_bytes": LDS_BYTES, "barriers": 0, "slot_barrier": False, "spec": f"ETX DSL GEMV ({form})"} for e, form in FORMS.items()}
 
 
 STREAM = r'''
@@ -118,6 +120,13 @@ static __device__ __forceinline__ void dsl_stage(const __hip_bfloat16* __restric
   }
   __syncthreads();
 }
+// rows per pass of the stream loop: the partials take nwaves x DSL_RCH floats of LDS whatever the task's row count
+// (lm_head tasks hold 500 rows; unbounded partials overran the 32 KB arena into the barrier words, review 2026-09-29)
+#define DSL_RCH 64
+template <class Epi>
+static __device__ __forceinline__ void dsl_gemv_chunked(const __hip_bfloat16* __restrict__ W, int K, const float* xs, int r0, int r1, float* part, Epi epi) {
+  for (int r = r0; r < r1; r += DSL_RCH) dsl_gemv(W, K, xs, r, min(r1, r + DSL_RCH), part, epi);
+}
 struct DslArgs { const __hip_bfloat16* W; const __hip_bfloat16* x; __hip_bfloat16* out; const int* ids; const float* wts; long long estride; int M, K, rpt, tpe; };
 static __device__ __forceinline__ DslArgs dsl_args(const unsigned char* a) {
   DslArgs d;
@@ -134,16 +143,16 @@ BODIES = {
   if (r0 >= r1) return;
   dsl_stage(d.x, d.K, xs);
   __hip_bfloat16* out = d.out;
-  dsl_gemv(d.W, d.K, xs, r0, r1, xs + d.K, [&](int r, float v) { out[r] = __float2bfloat16(v); });''',
+  dsl_gemv_chunked(d.W, d.K, xs, r0, r1, xs + d.K, [&](int r, float v) { out[r] = __float2bfloat16(v); });''',
     "silu_mul": '''
   const int s = blk / d.tpe, j = blk - s * d.tpe;
   const int r0 = j * d.rpt, r1 = min(d.M, r0 + d.rpt);
   if (r0 >= r1) return;
   const __hip_bfloat16* We = d.W + (size_t)d.ids[s] * d.estride;
-  float* g = xs + d.K; float* part = g + 2 * d.rpt;
+  float* g = xs + d.K; float* part = g + 2 * d.rpt;                  // g: 2 x rpt floats (rpt <= DSL_RCH, host-checked)
   dsl_stage(d.x, d.K, xs);
-  dsl_gemv(We, d.K, xs, r0, r1, part, [&](int r, float v) { g[r - r0] = dsl_bfr(v); });
-  dsl_gemv(We + (size_t)d.M * d.K, d.K, xs, r0, r1, part, [&](int r, float v) { g[d.rpt + r - r0] = dsl_bfr(v); });
+  dsl_gemv_chunked(We, d.K, xs, r0, r1, part, [&](int r, float v) { g[r - r0] = dsl_bfr(v); });
+  dsl_gemv_chunked(We + (size_t)d.M * d.K, d.K, xs, r0, r1, part, [&](int r, float v) { g[d.rpt + r - r0] = dsl_bfr(v); });
   __hip_bfloat16* act = d.out + (size_t)s * d.M;
   for (int r = r0 + (int)threadIdx.x; r < r1; r += blockDim.x) act[r] = __float2bfloat16(dsl_silu(g[r - r0]) * g[d.rpt + r - r0]);''',
     "scale": '''
@@ -154,7 +163,7 @@ BODIES = {
   dsl_stage(d.x + (size_t)s * d.K, d.K, xs);
   __hip_bfloat16* out = d.out + (size_t)s * d.M;
   const float ws = d.wts[s];
-  dsl_gemv(We, d.K, xs, r0, r1, xs + d.K, [&](int r, float v) { out[r] = __float2bfloat16(v * ws); });''',
+  dsl_gemv_chunked(We, d.K, xs, r0, r1, xs + d.K, [&](int r, float v) { out[r] = __float2bfloat16(v * ws); });''',
 }
 
 
