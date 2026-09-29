@@ -407,3 +407,48 @@ Layer 5 in build 3: qkv 9.7, prep 4, attention 6.5, reduce 3.7, o_proj 6.7, rout
 the distinct experts of B tokens, per-token tasks run in parallel): B = 2: 2.58 ms per token (387 tok/s; vLLM 360),
 B = 4: 1.73 (579; vLLM 563), B = 8: 1.22 (818): the margin shrinks with the batch, so batching is not where ETX wins.
 Gates as before; ROCm 7.2.4 build: 4 spills (two requests: see the build log).
+
+## 17. Sensitivity of the build-3 prediction; batching against pipelining (2026-09-29, before the measurement)
+
+`examples/vllm_llm/sensitivity.py` reruns build 3 (one and two requests) with the parameters the microbenchmarks left
+uncertain, so a miss points at a parameter. Simulated ms per token; the realistic figure is x1.11.
+
+| variant | R = 1 sim | x1.11 | R = 2 sim / token | x1.11 |
+|---|---|---|---|---|
+| baseline: trace hand-offs 0.4 / 1.8, A_task 0.86, wake 0.6, t_v 0.26 (pre-registered) | 3.54 | 3.93 | 2.28 | 2.53 |
+| hand-offs = evx microbenchmark 2.2 / 3.9 | 4.31 | 4.79 | 2.56 | 2.84 |
+| hand-offs 0 (a perfect event) | 2.98 | 3.30 | 2.42 | 2.68 |
+| argument path A_task x 0.5 / x 1.5 | 3.38 / 3.71 | 3.75 / 4.12 | 2.17 / 2.40 | 2.41 / 2.66 |
+| wake-up spread 0.3 / 0.9 us | 3.51 / 3.58 | 3.89 / 3.97 | 2.29 / 2.28 | 2.54 / 2.53 |
+| prologue round trip t_v 0.41 (idle HBM) / 0.70 (loaded) | 3.73 / 4.09 | 4.14 / 4.54 | 2.44 / 2.75 | 2.71 / 3.05 |
+| everything pessimistic (evx, A x 1.5, t_v 0.7, wake 0.9) | 5.07 | 5.63 | 3.04 | 3.38 |
+
+Reading a miss: 3.9-4.2 ms is the prediction; ~4.5 says the prologue loads see the loaded latency (the GEMV prologues
+run while other tasks stream: plausible, and the fix is to issue them before the acquire); ~4.8 says the hand-offs are
+what evx measured, not what the trace showed; 5.6 says all three. Two requests are less sensitive to everything (the
+second request's tasks fill the waits): 2.5-2.7 ms per token in every single-parameter variant, 3.4 at worst. The
+two-request figure of section 16 (2.63) came from a cost table that did not parse the `r<k>_` task prefix (fixed in
+`xcd_run.cost_fn`; every two-request task had been costed as a fixed small task): 2.53 replaces it as the
+pre-registered number. The "hand-offs 0" row is slower than the baseline for two requests: the simulator's static
+queue order, not a property of the hardware.
+
+`examples/vllm_llm/batch_pp.py`: batching against a layer pipeline across XCDs, analytic, on the build-3 structure.
+Bytes per token 6.08 GB (dense 1.84, 8 experts 3.62, lm_head 0.62): 1.71 ms at the 3.56 TB/s streaming rate; the
+step's tax (sim 3.54 - floor 1.55 at 3.93) 1.99 ms. Batch of B on the whole GPU: tax + bytes(B) / BW, the experts the
+union of B independent top-8 draws. Pipeline of S stages (8/S XCDs each, 48/S layers, micro-batch m = B/S, S x m
+requests in flight): stage step = (tax - 0.4 ms device-wide hand-off premium) / S + bytes(m) / S at f x (8/S)/8 of the
+GPU's bandwidth, **f assumed** (1.0 / 0.8 / 0.6) until `hw_bench lfx` measures what 1 / 2 / 4 XCDs pull. All x1.11.
+
+| B | batch: ms, tok/s | PP S=8 f=1.0 | PP S=8 f=0.6 | PP S=4 f=1.0 | PP S=2 f=1.0 | PP S=2 f=0.6 |
+|---|---|---|---|---|---|---|
+| 1 | 4.11, 244 | - | - | - | - | - |
+| 2 | 5.16, 387 | - | - | - | 5.56, 360 | 8.09, 247 |
+| 4 | 7.09, 564 | - | - | 9.35, 428 | 7.68, 521 | 11.62, 344 |
+| 8 | 10.27, 779 | 16.94, 472 | 27.06, 296 | 13.59, 589 | 11.53, 694 | 18.03, 444 |
+| 16 | 14.62, 1095 | 25.41, 630 | 41.18, 389 | 21.29, 752 | 17.88, 895 | 28.62, 559 |
+
+(PP columns: latency per token = S x stage step, then tok/s.) With the same requests in flight, batching beats the
+pipeline at every f and every S: the pipeline streams the dense weights once per micro-batch instead of once per batch
+and only saves the device-wide hand-off premium; per-token latency grows with S. Even f = 1 (a stage pulls its full
+share of the bandwidth) does not close it. Pipelining is for the multi-GPU case; on one MI300X the order is batching
+(B <= 8: 779 tok/s at 10.3 ms), then the tax. The lfx number settles f; it does not change the ranking.

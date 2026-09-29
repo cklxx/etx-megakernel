@@ -32,7 +32,7 @@ def cost_fn(model: str, p: km.Params, variant: dict | None = None, plan: dict | 
     variant = variant or {}
 
     def role_of(name: str) -> str | None:
-        m = re.match(r"(?:chain_)?(.+?)_(\d+)(_x)?$", name)
+        m = re.match(r"(?:r\d+_)?(?:chain_)?(.+?)_(\d+)(_x)?$", name)   # r<k>_: request k of ETX_VL_REQUESTS > 1
         return m.group(1) if m else None
 
     cache = {}
