@@ -284,15 +284,18 @@ int main(int argc, char** argv) {
     else if (x.exp == "dsl_topk" && E > 128) die("dsl_topk: E > 128 (etx/ops/topk.py: one wave, 2 logits per lane)");
     else if (x.exp == "dsl_topk") a.ptr(rlog).ptr(tw_r).ptr(ti_r).ptr(tei + (size_t)rr * TOPK).i32(E).i32(TOPK).i32(norm_topk ? 1 : 0);
     else if (x.exp == "dsl_gemv_fold") {
-      // norm fold (mode 1): qkv (L > 0) = norm(resid + sum of the 8 expert rows) with ln1, stores resid2; router = norm(resid2 + o)
-      // with ln2, stores resid (copy 0); lm_head = norm(resid + the last layer's expert rows) with final_norm
+      // norm fold (mode 1): qkv (L > 0) = norm(residual + the 8 expert rows) with ln1; router = norm(residual + o) with ln2;
+      // lm_head = norm(residual + the last layer's expert rows) with final_norm
       const int nblk = x.gx * x.gy * x.gz, rpt = (x.M + nblk - 1) / nblk;
       if (x.K > 4096 || x.K % 256) die("dsl_gemv_fold: K must be a multiple of 256 and <= 4096");
       if (E == 0) die("dsl_gemv_fold: the fold is written for the MoE model (expert rows)");
       const void* w; void* out; const bf* rows; const bf* rin; bf* rout; const void* ln; int R; bf* xout = nullptr;
-      if (r == "qkv") { w = W(pl + "wqkv"); out = qkv; rows = mc3; rin = resid; rout = resid2; ln = W(pl + "ln1"); R = TOPK; }
-      else if (r == "router") { w = W(pl + "wr"); out = rlog; rows = o; rin = resid2; rout = resid; ln = W(pl + "ln2"); R = 1; xout = ox; }   // ox: what moe_up reads
-      else if (r == "lm_head") { w = tie ? W("embed") : W("lm_head"); out = logits; rows = mc3; rin = resid; rout = nullptr; ln = W("final_norm"); R = TOPK; }
+      // the residual alternates: X = resid (copy 0; the prologue's embedding row, what layer 0's in_norm reads) and Y = resid2.
+      // router(L) reads X, writes Y = X + o; qkv(L >= 1) reads Y, writes X = Y + the expert rows; lm_head reads Y + the last
+      // expert rows. Readers and the one writer of a grid never share a buffer; layer 0 has no qkv fold (imported in_norm)
+      if (r == "qkv") { w = W(pl + "wqkv"); out = qkv; rows = mc3; rin = resid2; rout = resid; ln = W(pl + "ln1"); R = TOPK; }
+      else if (r == "router") { w = W(pl + "wr"); out = rlog; rows = o; rin = resid; rout = resid2; ln = W(pl + "ln2"); R = 1; xout = ox; }   // ox: what moe_up reads
+      else if (r == "lm_head") { w = tie ? W("embed") : W("lm_head"); out = logits; rows = mc3; rin = resid2; rout = nullptr; ln = W("final_norm"); R = TOPK; }
       else die("dsl_gemv_fold: role " + r);
       a.ptr(w).ptr(xout).ptr(out).ptr(nullptr).ptr(nullptr).i64(0).i32(x.M).i32(x.K).i32(rpt).i32(0)
        .ptr(rows).ptr(rin).ptr(rout).ptr(ln).i32(R).f32(eps).i32(1).i32(0).ptr(nullptr);
@@ -564,7 +567,7 @@ int main(int argc, char** argv) {
     };
     // qkv: W [NQKV][H] . normed input (replica 0's copy)
     { const bf* in = Lc == 0 ? hn : (NR > 1 ? dx : dn); std::vector<float> x = tof(dev(in, H)); auto Wm = host_w(pl + "wqkv", 0, (size_t)NQKV * H);
-      if (is_fold("qkv")) x = norm_fold(dev(mc3, (size_t)TOPK * H), TOPK, dev(resid, H), host_w(pl + "ln1", 0, H));
+      if (is_fold("qkv")) x = norm_fold(dev(mc3, (size_t)TOPK * H), TOPK, dev(resid2, H), host_w(pl + "ln1", 0, H));
       relaunch("qkv", "dsl_gemv");
       std::vector<float> ref(NQKV); for (int r = 0; r < NQKV; ++r) ref[r] = dot(Wm.data() + (size_t)r * H, x, H); cmp("qkv", dev(qkv, NQKV), ref); }
     for (const Inst& x2 : insts) if (x2.layer == Lc && x2.role == "prep" && x2.exp == "dsl_attnprep" && x2.req == 0) {
@@ -598,7 +601,7 @@ int main(int argc, char** argv) {
       std::vector<float> ref(H); for (int r = 0; r < H; ++r) ref[r] = dot(Wm.data() + (size_t)r * NH * HD, x, NH * HD); cmp("o_proj", dev(o, H), ref); }
     if (E > 0) {
       const bf* on = NR > 1 ? ox : o; std::vector<float> x = tof(dev(on, H));
-      if (is_fold("router")) x = norm_fold(dev(o, H), 1, dev(resid2, H), host_w(pl + "ln2", 0, H));
+      if (is_fold("router")) x = norm_fold(dev(o, H), 1, dev(resid, H), host_w(pl + "ln2", 0, H));
       { auto Wm = host_w(pl + "wr", 0, (size_t)E * H); relaunch("router", "dsl_gemv");
         std::vector<float> ref(E); for (int r = 0; r < E; ++r) ref[r] = dot(Wm.data() + (size_t)r * H, x, H); cmp("router", dev(rlog, E), ref); }
       for (const Inst& x2 : insts) if (x2.layer == Lc && x2.role == "topk" && x2.exp == "dsl_topk") { relaunch("topk", "dsl_topk"); break; }

@@ -392,7 +392,8 @@ The one-block launches between the GEMVs become prologues of their consumers (th
 o + residual (ln2), task 0 storing the residual and the normed vector; lm_head does the same with final_norm; every
 expert task recomputes the softmax top-k from the logits (deterministic, lower index on ties) and takes its slot's
 expert and weight. Gone per layer: in_norm, post_norm, top-k, moe_sum (4 launches, 4 hand-offs, 4 fronts, 3 device-wide
-events); the residual alternates between two buffers so readers and the one writer never touch the same one in a step.
+events); the residual alternates between two buffers (router reads X writes Y, qkv of the next layer reads Y writes X, lm_head
+reads Y; layer 0 keeps its imported in_norm on X) so readers and the one writer never touch the same one in a step.
 Numerics follow vLLM's moe_sum + fused_add_rms_norm (the sum rounded, the add rounded per element, the variance over the
 rounded values, out = bf16(z * rsqrt * w)) and topkGating; only the reduction orders differ.
 
