@@ -72,6 +72,10 @@ DSL = os.environ.get("ETX_VL_DSL", "0") in ("1", "2")
 # Triton fused_moe launches; silu fused into the expert gate_up epilogue (no moe_act launch). Tiles: ETX_VL_DSL_TILES.
 DSL_GEMV = os.environ.get("ETX_VL_DSL_GEMV", "0") == "1"
 DSL_TOPK = os.environ.get("ETX_VL_DSL_TOPK", "0") == "1"       # the router's softmax + top-k as etx.ops.topk
+# ETX_VL_DSL_ATTN=head: the attention block by kv head: etx.ops.attnprep (q/k norm + rope + cache write of one head) on
+# XCD h, the head's attention partitions and its reduce on XCD h too, so those two hand-offs are XCD-local; attention
+# and reduce stay vLLM's kernels (attention at one block per task, ETX_VL_SLOTS=<attn>=1; reduce's slots must equal G)
+DSL_ATTNHEAD = os.environ.get("ETX_VL_DSL_ATTN", "0") == "head"
 DSL_FILE = os.environ.get("ETX_VL_DSL_TILES", str(HERE / "build" / "dsl_tiles.hip"))
 DSL_ATTN = os.environ.get("ETX_VL_DSL", "0") == "1"       # =2: attention stays vLLM's (fused q/k norm + rope grid, cache, attn)
 if os.environ.get("ETX_VL_QKNR", "0") == "grid" or os.environ.get("ETX_VL_DSL", "0") == "2":
@@ -141,6 +145,8 @@ def instances(d) -> list[dict]:
         gemv(L, "qkv", d.NQKV, d.H)
         if DSL_ATTN:
             add("dsl_attn", L, "attn", (1, parts, d.NKV))          # prep + cache + attention, one block per (partition, kv head)
+        elif DSL_ATTNHEAD:
+            add("dsl_attnprep", L, "prep", (d.NKV, 1, 1), G=d.G, parts=parts)
         elif d.qk_norm and (QKNR or DSL):
             add("qknorm_rope", L, "qknr", (math.ceil((d.NH + d.NKV) / 8), 1, 1))
         else:
@@ -148,10 +154,11 @@ def instances(d) -> list[dict]:
                 add("rms_norm_3d", L, "q_norm", (d.NH, 1, 1))
                 add("rms_norm_3d", L, "k_norm", (d.NKV, 1, 1))
             add("rope_neox", L, "rope", (1, 1, 1))
-        if not DSL_ATTN:
+        if not DSL_ATTN and not DSL_ATTNHEAD:
             add("reshape_and_cache", L, "cache", (1, 1, 1))
-            add(attn, L, "attn", (1, parts, d.NKV))
-        add("attn_reduce", L, "reduce", (d.NH, 1, 1))
+        if not DSL_ATTN:
+            add(attn, L, "attn", (1, parts, d.NKV), parts=parts)
+        add("attn_reduce", L, "reduce", (d.NH, 1, 1), G=d.G)
         gemv(L, "o_proj", d.H, d.NH * d.HD)
         add("fused_add_rms_norm", L, "post_norm", (1, 1, 1))
         if d.moe:
@@ -289,6 +296,30 @@ def build() -> Graph:
                           resource=res, args=["impargs"],
                           consts=(i["offset"], i["stride"], per), in_edges={prev[r]: "xw->x"}, out_edges=out,
                           domain_map="xw->x", duration_us=dur)
+        elif len(grp) == 1 and DSL_ATTNHEAD and grp[0]["role"] in ("prep", "attn", "reduce"):
+            # the attention block by kv head: prep h -> attention (partition p, head h) -> reduce h, all on XCD h
+            i = grp[0]
+            name = P + f"{i['role']}_{i['layer']}"
+            link = hip_link(src_of(i), f"etx_tile_{i['export']}", pre_wait=f"etx_pre_{i['export']}")
+            if i["role"] == "prep":
+                nkv = i["tasks"]
+                g.etensor(ev, (nkv,), wait_count=1)
+                g.call_device(name, (nkv,), link, resource=res, args=["impargs"], consts=(i["offset"],),
+                              in_edges={prev[r]: "i->(0)"}, out_edges={ev: "i->i"}, domain_map="i->i", duration_us=3.0)
+            elif i["role"] == "attn":
+                parts = i["parts"]; nkv = i["tasks"] // parts
+                if nkv * parts != i["tasks"]:
+                    raise SystemExit(f"ETX_VL_DSL_ATTN=head needs one attention block per task (ETX_VL_SLOTS={i['export']}=1)")
+                g.etensor(ev, (nkv,), wait_count=parts)
+                g.call_device(name, (i["tasks"],), link, resource=res, args=["impargs"], consts=(i["offset"],),
+                              in_edges={prev[r]: f"i->(i/{parts})"}, out_edges={ev: f"i->(i/{parts})"}, domain_map=f"i->(i/{parts})", duration_us=8.0)
+            else:
+                nkv = i["tasks"]
+                if i["grid"][0] != nkv * i["G"]:
+                    raise SystemExit(f"ETX_VL_DSL_ATTN=head needs the reduce's slots to equal G = {i['G']} (one kv head per task)")
+                g.etensor(ev, (1,), wait_count=nkv)
+                g.call_device(name, (nkv,), link, resource=res, args=["impargs"], consts=(i["offset"],),
+                              in_edges={prev[r]: "i->i"}, out_edges={ev: "i->(0)"}, domain_map="i->i", duration_us=4.0)
         elif len(grp) == 1:
             i = grp[0]
             g.etensor(ev, (1,), wait_count=i["tasks"])

@@ -20,6 +20,7 @@ case $V in base) E="";; chain) E="ETX_VL_CHAIN=1";; xcd) E="ETX_VL_XCD=1 ETX_VL_
   xcd_qknr_grid) E="ETX_VL_XCD=1 ETX_VL_CHAIN=1 ETX_VL_QKNR=grid";;
   xcd_dslgemv) E="ETX_VL_XCD=1 ETX_VL_CHAIN=1 ETX_VL_QKNR=grid ETX_VL_DSL_GEMV=1";;
   xcd_dsl) E="ETX_VL_XCD=1 ETX_VL_CHAIN=1 ETX_VL_QKNR=grid ETX_VL_DSL_GEMV=1 ETX_VL_DSL_TOPK=1";;
+  xcd_dsl2) E="ETX_VL_XCD=1 ETX_VL_CHAIN=1 ETX_VL_DSL_GEMV=1 ETX_VL_DSL_TOPK=1 ETX_VL_DSL_ATTN=head ETX_VL_SLOTS=attn_mfma16_g8=1";;
   *) echo "variant $V"; exit 1;; esac
 mkdir -p "$OUT"
 # paths as the container sees them: $HOME/code -> /code
@@ -50,7 +51,7 @@ fi
 echo "== import ($EXP)"
 XS=$(echo "$E" | tr " " "\n" | sed -n "s/^ETX_VL_SLOTS=//p"); SL="${XS:+$XS,}$SL"; SL="${SL%,}"
 python3 -m etx.importer.vllm_kernels --vllm /code/vllm --out $OUT/imp --compiler hipcc --only "$EXP" --slots "$SL" "${BLK[@]}"
-DSLOPS=""; case " $E " in *ETX_VL_DSL_GEMV=1*) DSLOPS="gemv";; esac; case " $E " in *ETX_VL_DSL_TOPK=1*) DSLOPS="${DSLOPS:+$DSLOPS,}topk";; esac
+DSLOPS=""; case " $E " in *ETX_VL_DSL_GEMV=1*) DSLOPS="gemv";; esac; case " $E " in *ETX_VL_DSL_TOPK=1*) DSLOPS="${DSLOPS:+$DSLOPS,}topk";; esac; case " $E " in *ETX_VL_DSL_ATTN=head*) DSLOPS="${DSLOPS:+$DSLOPS,}attnprep";; esac
 DSLT=""; if [ -n "$DSLOPS" ]; then python3 -m etx.ops.emit $OUT/imp/imports.json --tiles $OUT/dsl_tiles.hip --ops $DSLOPS; DSLT="ETX_VL_DSL_TILES=$OUT/dsl_tiles.hip"; fi
 python3 -m etx.importer.adapter $OUT/imp/imports.json --tiles $OUT/imp_tiles.hip --header $OUT/imports.h
 python3 -m etx.importer.bundle --imports $OUT/imp --exports "$EXP" --devlibs $DL -o $OUT/imports.bc

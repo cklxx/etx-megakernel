@@ -14,12 +14,16 @@ ROOT = Path(__file__).resolve().parents[1]
 IMPORTS = {"wvsplitk_y2": (1, 80), "wvsplitk_y1": (1, 80), "attn_mfma16_g8": (4, 160), "attn_reduce": (8, 80),
            "rms_norm_2d": (4, 100), "rms_norm_3d": (16, 100), "fused_add_rms_norm": (1, 72), "rope_neox": (2, 108),
            "reshape_and_cache": (16, 96), "silu_and_mul": (1, 48), "topk_softmax_e128": (4, 104), "moe_sum_k8": (4, 96),
-           "fused_moe_up": (1, 136), "fused_moe_down": (1, 144), "qknorm_rope": (4, 80)}
+           "fused_moe_up": (1, 136), "fused_moe_down": (1, 144), "qknorm_rope": (4, 80), "dsl_attnprep": (1, 112)}
 
 
-def _graph(tmp_path, monkeypatch, xcd: bool, layers: int = 3, qknr: str = "0"):
+def _graph(tmp_path, monkeypatch, xcd: bool, layers: int = 3, qknr: str = "0", attn_head: bool = False):
     imp = tmp_path / "imports.json"
-    imp.write_text(json.dumps({e: {"slots": s, "arg_bytes": a} for e, (s, a) in IMPORTS.items()}))
+    imports = {e: {"slots": s, "arg_bytes": a} for e, (s, a) in IMPORTS.items()}
+    if attn_head:
+        imports["attn_mfma16_g8"]["slots"] = 1                        # ETX_VL_SLOTS=attn_mfma16_g8=1
+    imp.write_text(json.dumps(imports))
+    monkeypatch.setenv("ETX_VL_DSL_ATTN", "head" if attn_head else "0")
     monkeypatch.setenv("ETX_VL_IMPORTS", str(imp))
     monkeypatch.setenv("ETX_LLM_CONFIG", str(ROOT / "examples/llm/configs/qwen3-30b-a3b.json"))
     monkeypatch.setenv("ETX_LLM_LAYERS", str(layers))
@@ -151,3 +155,21 @@ def test_qknr_replaces_qk_norm_and_rope(tmp_path, monkeypatch):
     vm, g = _graph(tmp_path, monkeypatch, xcd=True, layers=2, qknr="grid")
     names = json.loads(emit_plan_json(compile_graph(g, "gfx942", {}, {})))["types"]
     assert "qknr_1" in names and "cache_1" in names and not any(n.startswith("chain_") for n in names)
+
+
+def test_attention_block_by_kv_head(tmp_path, monkeypatch):
+    """ETX_VL_DSL_ATTN=head: prep h -> attention (p, h) -> reduce h stay on XCD h (DOMAIN-scope events with per-head
+    shape); the qkv -> prep and reduce -> o_proj hand-offs stay device-wide."""
+    from etx.codegen.kernel import emit_plan_json
+    vm, g = _graph(tmp_path, monkeypatch, xcd=True, layers=2, attn_head=True)
+    plan = compile_graph(g, "gfx942", {}, {})
+    assert verify_plan(plan) == []
+    pj = json.loads(emit_plan_json(plan))
+    names = {v["id"]: k for k, v in pj["types"].items()}
+    by = {}
+    for d in pj["descs"]:
+        by.setdefault(names[d["type"]], []).append(d)
+    assert len(by["prep_1"]) == 4 and len(by["attn_1"]) == 20 and len(by["reduce_1"]) == 4
+    assert [d["domain"] for d in by["prep_1"]] == [0, 1, 2, 3]
+    assert all(d["domain"] == d["coord"][0] // 5 for d in by["attn_1"])          # partition p of head h on XCD h
+    assert [d["domain"] for d in by["reduce_1"]] == [0, 1, 2, 3]

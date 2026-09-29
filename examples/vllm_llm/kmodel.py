@@ -122,8 +122,12 @@ DSL_P1 = [k for k in DSL_GEMV if k.role != "attn"] + [k for k in MOE if k.role i
 GEMV_ONLY = [k for k in MOE if k.role not in ("qkv", "o_proj", "router", "moe_up", "moe_down", "moe_act")] + \
             [k for k in DSL_GEMV if k.role in ("qkv", "o_proj", "router", "moe_up", "moe_down")]
 BUILD1 = [k for k in GEMV_ONLY if k.role != "topk"] + [k for k in DSL_MOE if k.role == "topk"]   # + etx.ops.topk
+# + ETX_VL_DSL_ATTN=head: etx.ops.attnprep per kv head (9 waves: row load, cos/sin after the position, stores), vLLM's
+# attention and reduce as they are
+BUILD2 = [k for k in BUILD1 if k.role not in ("qknr", "cache")] + [Kern("prep", S=4, V=3, shfl=8, instr=300, note="DSL attention prep of one kv head")]
 MODELS = {"qwen3-30b-a3b": MOE, "qwen2.5-1.5b": Q15, "qwen3-30b-a3b-dsl": DSL_MOE, "qwen3-30b-a3b-dslgemv": DSL_GEMV,
-          "qwen3-30b-a3b-dslp1": DSL_P1, "qwen3-30b-a3b-gemvonly": GEMV_ONLY, "qwen3-30b-a3b-build1": BUILD1}
+          "qwen3-30b-a3b-dslp1": DSL_P1, "qwen3-30b-a3b-gemvonly": GEMV_ONLY, "qwen3-30b-a3b-build1": BUILD1,
+          "qwen3-30b-a3b-build2": BUILD2}
 
 
 @dataclass

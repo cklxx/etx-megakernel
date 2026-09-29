@@ -148,8 +148,8 @@ int main(int argc, char** argv) {
       insts.push_back(x);
     }
   }
-  bool qknr = false;                                                        // the plan runs the fused q/k norm + rope
-  for (const Inst& x : insts) qknr = qknr || x.role == "qknr";
+  bool qknr = false;                                                        // the plan runs the fused q/k norm + rope (in place)
+  for (const Inst& x : insts) qknr = qknr || x.role == "qknr" || x.role == "prep";
 
   // ---- golden: request 0 from --golden, request 1 (ETX_VL_REQUESTS=2) from --golden1; the prompts have one length
   std::vector<std::vector<int>> prompts, goldens;
@@ -275,6 +275,10 @@ int main(int argc, char** argv) {
       else die("dsl_gemv: role " + r);
       a.ptr(w).ptr(in).ptr(out).ptr(nullptr).ptr(nullptr).i64(0).i32(x.M).i32(x.K).i32(rpt).i32(0);
     }
+    // dsl_attnprep (etx/ops/attnprep.py): q/k norm + rope of one kv head in place on qkv, its k / v rows into the cache
+    else if (x.exp == "dsl_attnprep" && (HD != 128 || NH % NKV)) die("dsl_attnprep: HD must be 128 and NH % NKV == 0");
+    else if (x.exp == "dsl_attnprep") a.ptr(qkv).ptr(W(pl + "qn")).ptr(W(pl + "kn")).ptr(W("cos_sin")).ptr(positions).ptr(kc[x.layer]).ptr(vc[x.layer])
+                                       .ptr(slot_mapping).i32(NH).i32(NKV).i32(HD).f32(eps).i32(BS).i32(X);
     else if (x.exp == "dsl_topk" && E > 128) die("dsl_topk: E > 128 (etx/ops/topk.py: one wave, 2 logits per lane)");
     else if (x.exp == "dsl_topk") a.ptr(rlog).ptr(tw_r).ptr(ti_r).ptr(tei + (size_t)rr * TOPK).i32(E).i32(TOPK).i32(norm_topk ? 1 : 0);
     else if (x.exp == "dsl_moe_up" && (MI % 32 || H > 4096 || H % 256)) die("dsl_moe_up: MI % 32 or H > 4096 (etx/ops/gemv.py K_MAX, RCH)");
@@ -529,6 +533,32 @@ int main(int argc, char** argv) {
     { const bf* in = Lc == 0 ? hn : (NR > 1 ? dx : dn); std::vector<float> x = tof(dev(in, H)); auto Wm = host_w(pl + "wqkv", 0, (size_t)NQKV * H);
       relaunch("qkv", "dsl_gemv");
       std::vector<float> ref(NQKV); for (int r = 0; r < NQKV; ++r) ref[r] = dot(Wm.data() + (size_t)r * H, x, H); cmp("qkv", dev(qkv, NQKV), ref); }
+    for (const Inst& x2 : insts) if (x2.layer == Lc && x2.role == "prep" && x2.exp == "dsl_attnprep" && x2.req == 0) {
+      std::vector<float> in = tof(dev(qkv, NQKV));
+      long long pos = 0, slot = 0; ETX_CHECK(hipMemcpy(&pos, positions, 8, hipMemcpyDeviceToHost)); ETX_CHECK(hipMemcpy(&slot, slot_mapping, 8, hipMemcpyDeviceToHost));
+      auto qn = host_w(pl + "qn", 0, HD), kn = host_w(pl + "kn", 0, HD), cs = host_w("cos_sin", (size_t)pos * HD, HD);
+      std::vector<float> ref((size_t)(NH + NKV) * HD);
+      for (int hh = 0; hh < NH + NKV; ++hh) {
+        const float* e = in.data() + (size_t)hh * HD; const std::vector<uint16_t>& w = hh < NH ? qn : kn;
+        double ss = 0; for (int d = 0; d < HD; ++d) ss += (double)e[d] * e[d];
+        const float rr = 1.0f / sqrtf((float)(ss / HD) + eps);
+        std::vector<float> n(HD); for (int d = 0; d < HD; ++d) n[d] = e[d] * (rr * b2f(w[d]));
+        for (int d = 0; d < HD; ++d) { const int half = HD / 2, dd = d % half; const float c = b2f(cs[dd]), sn = b2f(cs[half + dd]);
+          const float partner = d < half ? -n[d + half] : n[d - half]; ref[(size_t)hh * HD + d] = n[d] * c + partner * sn; }
+      }
+      relaunch("prep", "dsl_attnprep");
+      cmp("prep q/k", dev(qkv, (size_t)(NH + NKV) * HD), ref);
+      // the cache slot of every kv head: key [block][h][d / X][off][d % X], value [block][h][d][off]
+      const long long blk = slot / BS, off = slot % BS; std::vector<float> kref((size_t)NKV * HD), vref((size_t)NKV * HD); std::vector<uint16_t> kgot((size_t)NKV * HD), vgot((size_t)NKV * HD);
+      auto kc_h = dev(kc[Lc], cache_elems), vc_h = dev(vc[Lc], cache_elems);
+      for (int hh = 0; hh < NKV; ++hh) for (int d = 0; d < HD; ++d) {
+        kref[(size_t)hh * HD + d] = ref[(size_t)(NH + hh) * HD + d]; vref[(size_t)hh * HD + d] = in[(size_t)(NH + NKV + hh) * HD + d];
+        kgot[(size_t)hh * HD + d] = kc_h[((((size_t)blk * NKV + hh) * (HD / X) + d / X) * BS + off) * X + d % X];
+        vgot[(size_t)hh * HD + d] = vc_h[(((size_t)blk * NKV + hh) * HD + d) * BS + off];
+      }
+      cmp("prep kc", kgot, kref); cmp("prep vc", vgot, vref);
+      break;
+    }
     { std::vector<float> x = tof(dev(attn_out, (size_t)NH * HD)); auto Wm = host_w(pl + "wo", 0, (size_t)H * NH * HD);
       relaunch("o_proj", "dsl_gemv");
       std::vector<float> ref(H); for (int r = 0; r < H; ++r) ref[r] = dot(Wm.data() + (size_t)r * NH * HD, x, NH * HD); cmp("o_proj", dev(o, H), ref); }
