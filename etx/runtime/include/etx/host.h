@@ -26,6 +26,7 @@ struct etx_host {
   etx_params p{};
   std::vector<int32_t> ev_strided;   // initial counts at their strided positions (ETX_EV_STRIDE > 1)
   int32_t *d_events = nullptr, *d_ctrl = nullptr, *d_slots = nullptr, *d_trace = nullptr, *d_remaining = nullptr;
+  bool exec_count = false;          // ETX_EXEC_COUNT / ETX_TRACE: per-task execution counter (fused path only)
   uint64_t* d_trace_time = nullptr;
   int32_t* d_ev_sub = nullptr;
   int32_t* d_mirror = nullptr;             // relay mirrors [n_domains][event words]
@@ -117,8 +118,13 @@ struct etx_host {
     ETX_CHECK(hipMalloc(&d_slots, ETX_SLOT_WORDS * sizeof(int32_t)));
     p.domain_slots = d_slots;
     p.worker_domain = nullptr;
+    // Per-task execution counter: one device-scope atomic per task, on the FUSED path only (the unfused baseline
+    // has none), and 32 task counters share a 128 B line while their tasks run concurrently on different XCDs -- so
+    // it is instrumentation that taxes only one side of the comparison. Opt in with ETX_EXEC_COUNT=1 (the run then
+    // verifies every task ran exactly once); off, correctness still rests on --check / --check-dsl and 32/32 tokens.
     ETX_CHECK(hipMalloc(&d_trace, ETX_N_TASKS * sizeof(int32_t)));
-    p.trace_exec = d_trace;
+    exec_count = getenv("ETX_EXEC_COUNT") != nullptr || getenv("ETX_TRACE") != nullptr;
+    p.trace_exec = exec_count ? d_trace : nullptr;
     ETX_CHECK(hipMalloc(&d_remaining, ETX_N_TASKS * sizeof(int32_t)));
     p.task_remaining = d_remaining;
     p.trace_time = nullptr;
@@ -235,6 +241,7 @@ struct etx_host {
     if (ctrl[0] & 2) { fprintf(stderr, "device %d: kernel hit spin limit (abort=%d, done=%d/%d)\n", device, ctrl[0], ctrl[1], p.n_tasks); dump_events(); return false; }
     if (ctrl[1] != p.n_dynamic) { fprintf(stderr, "device %d: dynamic done=%d of %d\n", device, ctrl[1], p.n_dynamic); dump_events(); return false; }
     // static tasks are not counted on the device; the trace (one increment per executed task) verifies them
+    if (!exec_count) return true;                     // ETX_EXEC_COUNT=0: the counter's atomics are off, nothing to verify
     std::vector<int32_t> tr(ETX_N_TASKS);
     ETX_CHECK(hipMemcpy(tr.data(), d_trace, ETX_N_TASKS * sizeof(int32_t), hipMemcpyDeviceToHost));
     int executed = 0;
@@ -337,6 +344,7 @@ struct etx_host {
   }
   void dump_trace() {
     ETX_CHECK(hipSetDevice(device));
+    if (!exec_count) { fprintf(stderr, "  device %d exec counts: off (set ETX_EXEC_COUNT=1)\n", device); return; }
     std::vector<int32_t> tr(ETX_N_TASKS);
     ETX_CHECK(hipMemcpy(tr.data(), d_trace, ETX_N_TASKS * sizeof(int32_t), hipMemcpyDeviceToHost));
     int hist[4] = {0, 0, 0, 0}; int first_dup = -1;
