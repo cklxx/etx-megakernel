@@ -19,6 +19,7 @@
 #include <fstream>
 #include <map>
 #include <sstream>
+#include <cctype>
 #include <string>
 
 struct VlParams {                        // must match vl_tiles.hip
@@ -106,7 +107,7 @@ struct Args {
 int main(int argc, char** argv) {
   if (argc < 3) die("usage: run <packed-dir> <plan.txt> [--golden F] [--gen N] [--repeat R] [--teacher] [--unfused]");
   const std::string dir = argv[1], plan_path = argv[2];
-  int gen = -1, repeat = 2, check_layers = 0, max_steps = 0; bool teacher = false, unfused = false, check_dsl = false; std::string golden_name = "golden_c1024.txt", golden1_name;
+  int gen = -1, repeat = 2, check_layers = 0, max_steps = 0; bool teacher = false, unfused = false, check_dsl = false; std::string golden_name = "golden_c1024.txt"; std::vector<std::string> extra_goldens;
   for (int i = 3; i < argc; ++i) {
     const std::string a = argv[i];
     if (a == "--gen" && i + 1 < argc) gen = atoi(argv[++i]);
@@ -114,7 +115,14 @@ int main(int argc, char** argv) {
     else if (a == "--teacher") teacher = true;
     else if (a == "--unfused") unfused = true;
     else if (a == "--golden" && i + 1 < argc) golden_name = argv[++i];
-    else if (a == "--golden1" && i + 1 < argc) golden1_name = argv[++i];   // ETX_VL_REQUESTS=2: request 1's prompt and HF greedy tokens
+    // ETX_VL_REQUESTS>1: request r's prompt and HF greedy tokens. --golden1 F [--golden2 F ...], one per extra request;
+    // each must be a DIFFERENT prompt (the same one in every request would make the experts identical and flatter the MoE)
+    else if (a.rfind("--golden", 0) == 0 && a.size() > 8 && isdigit((unsigned char)a[8]) && i + 1 < argc) {
+      const size_t r = (size_t)atoi(a.c_str() + 8);
+      if (r < 1) die("--golden<r> needs r >= 1");
+      if (extra_goldens.size() < r) extra_goldens.resize(r);
+      extra_goldens[r - 1] = argv[++i];
+    }
     else if (a == "--max-steps" && i + 1 < argc) max_steps = atoi(argv[++i]);
     else if (a == "--check-dsl") check_dsl = true;   // the DSL GEMVs of the last layer against a CPU reference (bf16 tolerance)   // traces: stop after N steps (no token check)
     else if (a == "--check" && i + 1 < argc) check_layers = atoi(argv[++i]);   // compare each imported launch with vLLM's original, layers < N
@@ -151,11 +159,11 @@ int main(int argc, char** argv) {
   bool qknr = false;                                                        // the plan runs the fused q/k norm + rope (in place)
   for (const Inst& x : insts) qknr = qknr || x.role == "qknr" || x.role == "prep";
 
-  // ---- golden: request 0 from --golden, request 1 (ETX_VL_REQUESTS=2) from --golden1; the prompts have one length
+  // ---- golden: request 0 from --golden, request r from --golden<r>; the prompts have one length
   std::vector<std::vector<int>> prompts, goldens;
   for (int r = 0; r < nreq; ++r) {
-    const std::string gname = r == 0 ? golden_name : golden1_name;
-    if (gname.empty()) die("a two-request plan needs --golden1 (request 1's golden file)");
+    const std::string gname = r == 0 ? golden_name : ((size_t)r <= extra_goldens.size() ? extra_goldens[r - 1] : std::string());
+    if (gname.empty()) die("a " + std::to_string(nreq) + "-request plan needs --golden" + std::to_string(r) + " (request " + std::to_string(r) + "'s golden file)");
     std::ifstream gf(dir + "/" + gname); if (!gf) die("cannot open " + dir + "/" + gname);
     std::vector<int> pr = read_ints(gf), ga = read_ints(gf);
     if (gen < 0 || gen > (int)ga.size()) gen = (int)ga.size();
