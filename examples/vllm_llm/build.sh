@@ -20,8 +20,15 @@ v = {'H': d.H, 'NH': d.NH, 'NKV': d.NKV, 'HD': d.HD, 'qk_norm': int(d.qk_norm), 
 fi
 H=$(cfg H); NH=$(cfg NH); NKV=$(cfg NKV); HD=$(cfg HD); QKN=$(cfg qk_norm); G=$((NH / NKV))
 case $G in 4) ATTN=attn_mfma4_g4;; 6) ATTN=attn_mfma16_g6;; 8) ATTN=attn_mfma16_g8;; *) echo "no attention import for GQA $G"; exit 1;; esac
-EXPORTS="wvsplitk_y2,$ATTN,attn_reduce,rms_norm_2d,fused_add_rms_norm,rope_neox,reshape_and_cache,silu_and_mul"
-[ "$QKN" = 1 ] && EXPORTS="$EXPORTS,rms_norm_3d"
+# Import only what the plan will actually instantiate: ETX_IMPORT_LDS is the MAX over every imported kernel's LDS, and
+# the megakernel's workgroup carries that arena whether or not a task uses it. wvsplitk_y1/y2 declare 32768 B each --
+# the largest of any tile -- and ETX_VL_DSL_GEMV=1 replaces them with etx.ops.gemv (21120 B), so importing them anyway
+# cost 11648 B of LDS in every phase and capped occupancy at 1 workgroup per CU (measured 2026-10-01, round 16).
+EXPORTS="$ATTN,attn_reduce,rms_norm_2d"
+[ "${ETX_VL_DSL_GEMV:-0}" != 1 ] && EXPORTS="wvsplitk_y2,$EXPORTS"
+[ "${ETX_VL_DSL_ATTN:-0}" != head ] && EXPORTS="$EXPORTS,fused_add_rms_norm,rope_neox,reshape_and_cache"
+EXPORTS="$EXPORTS,silu_and_mul"
+[ "$QKN" = 1 ] && [ "${ETX_VL_DSL_ATTN:-0}" != head ] && EXPORTS="$EXPORTS,rms_norm_3d"
 # ETX_VL_QKNR=1: q/k norm + rope as vLLM's fused_qk_norm_rope (its enable_qk_norm_rope_fusion pass), one launch
 [ "$QKN" = 1 ] && [ "${ETX_VL_QKNR:-0}" != 0 ] && EXPORTS="$EXPORTS,qknorm_rope"
 # MoE (Qwen3-30B-A3B): router GEMV (YTILE 1), top-k, the two Triton fused_moe launches, moe_sum; silu over the 8 expert
@@ -29,7 +36,9 @@ EXPORTS="wvsplitk_y2,$ATTN,attn_reduce,rms_norm_2d,fused_add_rms_norm,rope_neox,
 # need 80 KB of LDS and put 192 programs on 48 CUs)
 MOEBLK=(); MOESLOTS=""
 if [ "$(cfg moe)" = 1 ]; then
-  EXPORTS="$EXPORTS,wvsplitk_y1,topk_softmax_e128,moe_sum_k8,fused_moe_up,fused_moe_down"
+  [ "${ETX_VL_DSL_GEMV:-0}" != 1 ] && EXPORTS="$EXPORTS,wvsplitk_y1,fused_moe_up,fused_moe_down"
+  [ "${ETX_VL_DSL_TOPK:-0}" != 1 ] && EXPORTS="$EXPORTS,topk_softmax_e128"
+  [ "${ETX_VL_DSL_FOLD:-0}" != 1 ] && EXPORTS="$EXPORTS,moe_sum_k8"
   MOEBLK=(--block silu_and_mul=$(( $(cfg MI) / 8 ))); MOESLOTS="fused_moe_up=1,fused_moe_down=1,silu_and_mul=1"
 fi
 # The device bitcode moves between ROCm layouts (7.2: lib/llvm/lib/clang/<v>/lib/amdgcn/bitcode; 7.14:
@@ -73,8 +82,10 @@ UCF=()
 if [ "${ETX_VL_UC:-0}" = 1 ]; then export ETX_VL_PIN=1; UCF=(-DETX_VL_UC -DETX_COHERENT_DEVICE_DATA); fi
 # ETX_VL_COH=1: the DSL tiles' activation accesses are device-coherent (etx.ops.coh) and the plan drops their acquire
 # invalidates (model.py coh_of); untested together with ETX_VL_UC's downgraded DEVICE fences, so the pair is refused
-# ETX_VL_NT=1: weight loads in the DSL GEMV marked non-temporal (etx/ops/gemv.py dsl_wload)
-NTF=(); [ "${ETX_VL_NT:-0}" = 1 ] && NTF=(-DETX_DSL_NT)
+# ETX_VL_NT: weight loads in the DSL GEMV marked non-temporal (etx/ops/gemv.py dsl_wload). ON by default since
+# 2026-10-01 round 16: weights are read once per token and have no reuse, so caching them evicts the MALL-resident
+# KV cache and the activations. Measured -0.106 ms/token with L2 hit rate 31.9% -> 34.6%; ETX_VL_NT=0 restores it.
+NTF=(); [ "${ETX_VL_NT:-1}" = 1 ] && NTF=(-DETX_DSL_NT)
 COHF=()
 if [ "${ETX_VL_COH:-0}" = 1 ]; then
   [ "${ETX_VL_UC:-0}" = 1 ] && { echo "ETX_VL_COH=1 with ETX_VL_UC=1 is untested; pick one" >&2; exit 1; }
