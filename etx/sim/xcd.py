@@ -4,9 +4,15 @@ Where etx.sim.protocol gives every task a fixed duration, this one gives it a co
 the same time share the memory system, so what one XCD does changes what another gets:
 
   task = wait (its input events, each fired at its last producer's end + the release, seen after the hand-off of the
-         event's scope) -> front (fixed: descriptor and argument round trips) -> chain (fixed: the kernel's dependent
-         global round trips, barriers, reductions, arithmetic) -> stream (bytes, fluid: rate-limited per CU and sharing
-         the GPU's bandwidth) -> end (fixed: stores, release)
+         event's scope) -> front + floor + etx (fixed: the hardware minimum a workgroup pays before its bytes, plus
+         ETX's own acquire / argument / release cost) -> chain (fixed: the kernel's dependent global round trips,
+         barriers, reductions) -> stream (bytes, fluid: rate-limited per CU and sharing the GPU's bandwidth) -> end
+
+Since 2026-09-30 the fixed part is dominated by `floor_us` and `etx_us`, measured per phase rather than derived from
+an instruction count: hw_bench stream shows 296 workgroups cost about 3 us even when they read 896 B each, and the
+measured builds put ETX's own share on top of that (docs/MODEL-vllm-kernels.md section 19). The earlier model
+charged a per-task tax of about 2 us and counted events, and predicted gains from folding that the hardware did not
+pay: build 2 5.934 ms -> build 3 5.895 ms, against a predicted 0.9 ms.
 
 Streams follow Little's law: all of them see one loaded latency L = max(idle round trip, bytes in flight on the GPU /
 bandwidth), and each pulls its bytes in flight / (L + the work of a trip that is not overlapped with memory). So a GPU
@@ -33,14 +39,27 @@ TICK_US = 0.01
 class Cost:
     front_us: float = 0.0        # before the kernel's own work: descriptor / argument round trips
     chain_us: float = 0.0        # the kernel's fixed latency: dependent round trips, barriers, reductions, arithmetic
+    floor_us: float = 0.0        # the hardware minimum any workgroup of a full-device phase pays before its bytes
+                                 # (etx.sim.phase.FLOOR_US, measured with no events and no ETX); it does not overlap
+                                 # with the stream, and it is what makes a phase, not a task, the unit of cost
+    etx_us: float = 0.0          # ETX's own per-task cost on top of the floor: acquire, argument path, release, wave
+                                 # start. Fitted to the measured builds, not to an instruction count
     stream_bytes: float = 0.0    # bytes this task streams from HBM (weights, KV)
-    cu_rate: float = 30e3        # bytes/us one CU of this task can pull, when inflight is 0 (a fixed cap)
+    cu_rate: float = 30e3        # bytes/us one CU of this task can pull alone, when inflight is 0 (a fixed cap); the
+                                 # new model takes it from etx.sim.phase.cu_rate(row mapping)
+    agg_bw: float = 0.0          # bytes/us the whole device sustains for streams of this shape (0: hw.bw_max). It is
+                                 # not one number: a workgroup reading 28 KB keeps a shallower queue than one reading
+                                 # 1 MB and the device only reaches 3.5 TB/s at the deep end (etx.sim.phase.agg_bw)
     end_us: float = 0.0          # stores and the release after the stream
     inflight: float = 0.0        # bytes this task keeps in flight; with it the rate follows Little's law:
     exposed_us: float = 0.0      # rate = inflight / (loaded latency + exposed work per trip)
     touch_bytes: float = 0.0     # the touch hook: this many of stream_bytes are pulled (same inflight, same bandwidth
                                  # sharing) from the moment the worker takes the task, before its events fire; the body's
                                  # stream of the rest starts when both the touch and front + chain are done
+
+    @property
+    def fixed_us(self) -> float:
+        return self.front_us + self.chain_us + self.floor_us + self.etx_us
 
 
 @dataclass
@@ -75,7 +94,11 @@ def _rates(active: dict[int, list], hw: Hw) -> dict[int, float]:
             rate[k] = v[3] / (L + v[4])
     fixed = {k: v for k, v in active.items() if v[3] <= 0}
     if fixed:
-        left = max(0.0, hw.total_bw(len(active)) - sum(rate.values()))
+        # the device's own limit for the shapes streaming right now: the smallest transfer sets it, since it is the
+        # one whose queue is shallowest (etx.sim.phase.agg_bw)
+        caps = [v[5] for v in active.values() if len(v) > 5 and v[5] > 0]
+        total = min(caps) if caps else hw.total_bw(len(active))
+        left = max(0.0, total - sum(rate.values()))
         todo = {k: v[1] for k, v in fixed.items()}
         while todo:
             share = left / len(todo)
@@ -162,24 +185,24 @@ def simulate(plan: dict, cost_of: Callable[[str, dict], Cost], hw: Hw, max_tasks
         c = cost[t]
         if c.touch_bytes > 0 and t not in touch_done:         # the touch hook streams from the moment the worker is free
             touch_done[t] = None
-            active[("touch", t)] = [min(c.touch_bytes, c.stream_bytes), c.cu_rate, descs[t]["domain"], c.inflight, c.exposed_us]
+            active[("touch", t)] = [min(c.touch_bytes, c.stream_bytes), c.cu_rate, descs[t]["domain"], c.inflight, c.exposed_us, c.agg_bw]
         r = ready_time(t)
         if r is None:
             return                                            # woken when its last event fires
         taken[t] = worker_free[w]
         ready[t] = max(r, worker_free[w])
-        push(ready[t] + c.front_us + c.chain_us, "stream", t)
+        push(ready[t] + c.fixed_us, "stream", t)
 
     def start_stream(t, now):
         c = cost[t]
         left = c.stream_bytes - (min(c.touch_bytes, c.stream_bytes) if t in touch_done else 0.0)
         if left > 0:
             f = max(0.3, rng.gauss(1.0, hw.rate_cv)) if hw.rate_cv else 1.0
-            active[t] = [left, c.cu_rate * f, descs[t]["domain"], c.inflight * f, c.exposed_us]
+            active[t] = [left, c.cu_rate * f, descs[t]["domain"], c.inflight * f, c.exposed_us, c.agg_bw]
         else:
             push(now + c.end_us, "done", t)
 
-    active = {}                                               # task -> [bytes left, cap, domain, inflight, exposed]
+    active = {}                                               # task -> [bytes left, cap, domain, inflight, exposed, agg_bw]
     last = 0.0
     rates = {}
     for w in queues:

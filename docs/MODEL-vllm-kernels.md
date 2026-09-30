@@ -497,3 +497,96 @@ tok/s). An analytic bound agrees on the order: per dense GEMV launch the touch f
 Container build (`rocm_build_check.sh qwen3-30b-a3b xcd_dsl3_touch`, and `xcd_dsl3x2_touch`): 10 VGPR spills, 36 B
 scratch per lane, as without the hook. The session (`examples/sessions/dsl_gemv.py`) builds build 3 and its
 two-request form with ETX_VL_TOUCH=1; build 2 stays the fallback without it.
+
+## 19. The model was wrong in kind; what replaced it (2026-09-30, after the measurement)
+
+Sections 10-18 costed a task as a per-task tax plus dependent round trips, and counted events. On that model,
+folding operations away and cutting the event count predicted large gains. The hardware paid 0.7% of them.
+
+| build | predicted (section 17-18) | measured |
+|---|---|---|
+| build 3 (DSL GEMV + head attention + fold + touch), fused | 3.56 | **5.895** |
+| build 2 (no fold, no touch), fused | 4.45 | **5.934** |
+| build 3, two requests, per token | 2.42 | **4.49** |
+
+Both correctness gates passed and the event count did fall from 580 to 388, so the structure was built as
+designed; the cost model was measuring the wrong thing. Two measurements say what the right thing is.
+
+**A phase has a floor, and it does not depend on the bytes.** `hw_bench stream`, no events and no ETX, just N
+workgroups reading B bytes each: 296 workgroups reading 896 B still take 3.2 us. Spans at 296 workgroups,
+averaged over two runs, `contig` = one contiguous block per workgroup (what `dsl_gemv_rows` does), `rows` = row r
+to worker r % W:
+
+| bytes per workgroup | contig us | rows us | aggregate contig | aggregate rows |
+|---|---|---|---|---|
+| 896 | 3.30 | 3.16 | 0.87 TB/s | 1.66 |
+| 28 672 | 7.05 | 4.86 | 2.10 | 4.56 |
+| 51 200 | 10.09 | 6.16 | 2.14 | 4.80 |
+| 159 744 | 17.84 | 16.64 | 3.19 | 3.47 |
+| 319 488 | 34.43 | 32.16 | 3.01 | 3.24 |
+| 1 048 576 | 91.32 | 87.93 | 3.51 | 3.65 |
+| 319 488, 8 workgroups | 12.10 | 11.74 | 0.21 | 0.22 |
+
+Two things follow. Achievable bandwidth is not one number: a workgroup reading 28 KB keeps a shallower queue than
+one reading 1 MB, and the device only reaches 3.5 TB/s at the deep end. And the `rows` rows below 50 KB per
+workgroup imply 4.6-5.8 TB/s, above anything HBM can deliver -- those phases total 8-15 MB and fit in the 256 MB
+Infinity Cache. A weight stream (6.2 GB per token) never does, so `etx.sim.phase.agg_bw` clamps to 3.55 TB/s and
+the model does not inherit them. **The 30-60% row-mapping gain reported from the raw table is largely a MALL
+artifact; between HBM-resident points it is 4-7%.**
+
+**Cost follows how wide a phase is, not how many phases there are.** Build 3 runs 8 phases per layer and the qknr
+build runs 13, and they measure 5.895 and 5.875 ms. The five extra narrow phases (8 tasks each) cost nothing,
+while a 304-task phase costs about 10 us however few bytes it moves -- `router` spreads 0.5 MB over 304 tasks and
+takes 11.7 us a layer, 0.56 ms a token. So a task of an n-task phase is charged `(floor + etx) * min(1, n/296)`.
+
+### The model (`etx/sim/phase.py`, `examples/vllm_llm/pmodel.py`)
+
+    task = (floor_us + etx_us + fused_us) * min(1, n_tasks / 296)      fixed, paid in parallel across the phase
+         + chain_us                                                     known dependent work (attention partitions)
+         + bytes_per_task / min(cu_rate, agg_bw(bytes_per_task) / n)    measured rates, HBM-clamped
+
+`floor_us` 3.0 us is hardware. `etx_us` 7.5 us and `fused_us` 1.8 us are the only fitted constants, fitted to the
+eight measured builds. `fused_us` applies to the megakernel alone and is **positive**: build 3 measures 5.895 ms
+fused and 5.660 unfused, and the qknr build 5.875 / 5.623, although an unfused launch also pays a 1.61 us kernel
+boundary per phase. Fusing costs about 2 us per phase more than launching the same tile separately, which is the
+opposite of what ETX was built to buy, and is the number to attack next.
+
+### Validation (`python3 -m examples.vllm_llm.validate`)
+
+| build | predicted | measured | error | gate |
+|---|---|---|---|---|
+| build 3 fused | 5.722 | 5.895 | -2.9% | 10% |
+| build 2 fused | 5.929 | 5.934 | -0.1% | 10% |
+| build 3 unfused | 5.451 | 5.660 | -3.7% | 10% |
+| build 3, two requests (per step) | 9.807 | 8.988 | +9.1% | 10% |
+| qknr fused | 6.493 | 5.875 | +10.5% | 15% |
+| qknr unfused | 6.338 | 5.623 | +12.7% | 15% |
+| moe new | 6.493 | 6.313 | +2.9% | 15% |
+| moe old | 6.493 | 6.556 | -1.0% | 15% |
+
+What it does not fit, stated plainly. The three 2026-09-28b builds are structurally identical to this model -- same
+phases, same widths -- so it predicts one number for all three, while they measured 5.875 / 6.313 / 6.556. That
+spread (0.68 ms) came from the argument-path implementation, which the new model has no term for; it is inside the
+15% tolerance only because the tolerance is wide. The two-request build is the worst fit at +9.1%.
+
+### What the corrected model chooses
+
+`autoconf` over the build switches now ranks every one of the 32 configurations between 5.93 and 6.40 ms: chain,
+the fused q/k norm + rope, the DSL GEMVs, the DSL top-k and the head attention block all move the step by less than
+0.5 ms, and the best is what build 2 and build 3 already are. **The switch space is exhausted.** The lever the
+model points at is phase width, which is not a switch today (`examples/vllm_llm/pmodel.py width_sweep`):
+
+| phase | MB per layer | tasks now | us now | best tasks | us | ms per token |
+|---|---|---|---|---|---|---|
+| qkv | 20.97 | 304 | 21.38 | 88 | 10.44 | 0.525 |
+| o_proj | 16.78 | 304 | 20.01 | 90 | 9.05 | 0.526 |
+| router | 0.52 | 304 | 12.82 | 19 | 1.58 | 0.540 |
+| moe_up | 50.33 | 192 | 24.36 | 91 | 19.65 | 0.226 |
+| moe_down | 25.17 | 256 | 20.34 | 87 | 11.89 | 0.406 |
+| | | | | | | **2.22** |
+
+Narrowing every wide phase to about 90 tasks is worth about 2.2 ms per token under this model -- far more than any
+switch, and the direct consequence of the old cost model having searched with the wrong objective.
+
+The interleaved row mapping (replacing the contiguous `[r0, r1)` of `dsl_gemv_rows`) is worth 0.434 ms on build 3
+(5.722 -> 5.288 with everything else equal, 7.4%), not the 30-60% the raw table suggested. Not implemented.
