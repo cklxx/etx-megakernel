@@ -41,6 +41,20 @@ FUSED_US = 1.8          # fitted: what the megakernel costs on top of that, over
                         # kernel with 388 task types, 128 VGPRs and 10 spills is not free to dispatch into.
 ROOT = Path(__file__).resolve().parents[2]
 
+# ETX_VL_COH (docs/MODEL-vllm-kernels.md section 20): DSL tiles read activations coherently and their acquire no
+# longer invalidates the XCD's L2. What that removes from the fitted per-phase constants cannot be derived from
+# first principles -- the fit bundles acquire, argument path, release and wave start -- so the model carries it as
+# a RANGE, not a point: the measured pieces bound the inv + write-back share of (etx_us + fused_us) at roughly
+# 0.5 us (idle inv 0.19 + fence 0.18, little contention) to 1.5 us (loaded inv 0.63 + the wbl2 arrive on a loaded
+# device, both ways). The second, separately switchable effect is the touch hook finally surviving into the body:
+# without COH the acquire's buffer_inv sc1 threw the touched lines away (why section 18 delivered ~0 of its
+# predicted 0.34 ms); with COH the dense GEMV phases' touched first trips overlap their wait.
+COH_SAVE_LO, COH_SAVE_HI = 0.5, 1.5
+COH_ROLES = {"qkv", "o_proj", "router", "moe_up", "moe_down", "prep", "lm_head",
+             "in_norm", "post_norm", "topk", "moe_sum"}          # DSL tiles; attn / reduce / chains stay imported
+TOUCH_ROLES = {"qkv", "o_proj", "router", "lm_head"}             # dense dsl_gemv{,_fold}: the only forms with a touch
+TOUCH_BYTES = 60 * 1024                                          # per workgroup, one 64-row first trip (section 18)
+
 
 def role_bytes(cfg: dict, ctx: int = 1024) -> dict:
     """Bytes one layer's phase reads, from the model's shapes (bf16). lm_head and embed are per step."""
@@ -69,7 +83,8 @@ def _role(name: str) -> str:
 
 
 def cost_fn(plan: dict, cfg: dict, mapping: str = "contig", etx_us: float = ETX_US, ctx: int = 1024,
-            variant: dict | None = None, fused: bool = True, fused_us: float = FUSED_US):
+            variant: dict | None = None, fused: bool = True, fused_us: float = FUSED_US,
+            coh_save_us: float = 0.0, coh_touch: bool = False):
     """Cost of every task of `plan`: the phase floor, ETX's per-task cost, and the bytes this task's phase moves
     divided by the tasks the plan gives it."""
     names = {t["id"]: n for n, t in plan["types"].items()}
@@ -98,8 +113,13 @@ def cost_fn(plan: dict, cfg: dict, mapping: str = "contig", etx_us: float = ETX_
         # the five extra narrow phases cost nothing, while a 304-task phase costs about 10 us however few bytes it
         # moves. So a task of an n-task phase pays (floor + etx) * n / 296.
         w = min(1.0, nt / phase.N_REF)
-        c = Cost(floor_us=phase.FLOOR_US * w, etx_us=(etx_us + (fused_us if fused else 0.0)) * w, stream_bytes=per,
+        e = etx_us + (fused_us if fused else 0.0)
+        if coh_save_us > 0.0 and fused and r in COH_ROLES:      # ETX_VL_COH: the acquire inv and (for all-coherent
+            e = max(e - coh_save_us, 0.0)                        # producers) the wbl2 arrive are gone
+        c = Cost(floor_us=phase.FLOOR_US * w, etx_us=e * w, stream_bytes=per,
                  cu_rate=phase.cu_rate(mapping), agg_bw=phase.agg_bw(per, mapping) if per > 0 else 0.0)
+        if coh_touch and fused and r in TOUCH_ROLES and per > 0:  # the touch survives only without the inv
+            c = Cost(**{**c.__dict__, "touch_bytes": min(TOUCH_BYTES, per)})
         if r == "attn":                       # the attention partitions carry their own dependent chain
             c = Cost(**{**c.__dict__, "chain_us": 1.9})
         for key, f in variant.items():
@@ -116,10 +136,23 @@ def hw(handoff_domain: float = 0.4, handoff_device: float = 1.8) -> Hw:
 
 
 def step_us(plan_path: str | Path, cfg: dict, mapping: str = "contig", etx_us: float = ETX_US,
-            variant: dict | None = None, fused: bool = True, **kw) -> float:
+            variant: dict | None = None, fused: bool = True, coh_save_us: float = 0.0, coh_touch: bool = False,
+            **kw) -> float:
     plan = json.load(open(plan_path))
-    rows, st = simulate(plan, cost_fn(plan, cfg, mapping, etx_us, variant=variant, fused=fused), hw(**kw))
+    rows, st = simulate(plan, cost_fn(plan, cfg, mapping, etx_us, variant=variant, fused=fused,
+                                      coh_save_us=coh_save_us, coh_touch=coh_touch), hw(**kw))
     return st["makespan_us"] / 1e3
+
+
+def predict_coh(plan_path: str | Path, cfg: dict, mapping: str = "contig") -> dict:
+    """The build-4 (ETX_VL_COH) prediction as a range (docs/MODEL-vllm-kernels.md section 20): the overhead share
+    alone at its low and high estimates, then with the touch landing."""
+    out = {"base": step_us(plan_path, cfg, mapping)}
+    out["coh_lo"] = step_us(plan_path, cfg, mapping, coh_save_us=COH_SAVE_LO)
+    out["coh_hi"] = step_us(plan_path, cfg, mapping, coh_save_us=COH_SAVE_HI)
+    out["coh_touch_lo"] = step_us(plan_path, cfg, mapping, coh_save_us=COH_SAVE_LO, coh_touch=True)
+    out["coh_touch_hi"] = step_us(plan_path, cfg, mapping, coh_save_us=COH_SAVE_HI, coh_touch=True)
+    return out
 
 
 def width_sweep(cfg: dict, mapping: str = "contig", etx_us: float = ETX_US, fused_us: float = FUSED_US,
@@ -148,8 +181,14 @@ def main():
     ap.add_argument("--config", default=str(ROOT / "examples/llm/configs/qwen3-30b-a3b.json"))
     ap.add_argument("--mapping", default="contig", choices=["contig", "rows"])
     ap.add_argument("--etx-us", type=float, default=ETX_US)
+    ap.add_argument("--coh", action="store_true", help="the ETX_VL_COH range (section 20)")
     a = ap.parse_args()
     cfg = json.load(open(a.config))
+    if a.coh:
+        r = predict_coh(a.plan, cfg, a.mapping)
+        print(f"base {r['base']:.3f} ms; coh overhead only {r['coh_hi']:.3f}-{r['coh_lo']:.3f}; "
+              f"with touch {r['coh_touch_hi']:.3f}-{r['coh_touch_lo']:.3f}   (save {COH_SAVE_LO}-{COH_SAVE_HI} us)")
+        return
     print(f"{step_us(a.plan, cfg, a.mapping, a.etx_us):.3f} ms   (mapping {a.mapping}, etx {a.etx_us} us, "
           f"floor {phase.FLOOR_US} us, HBM {phase.BW_HBM / 1e6:.2f} TB/s)")
 

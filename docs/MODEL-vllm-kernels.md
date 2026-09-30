@@ -592,3 +592,37 @@ The interleaved row mapping (replacing the contiguous `[r0, r1)` of `dsl_gemv_ro
 (5.722 -> 5.221 with everything else equal, 8.8%), not the 30-60% the raw table suggested, and it is the one lever
 whose size the model can only bound: the rows points that would settle it below 50 KB per workgroup were the ones
 the Infinity Cache contaminated. Not implemented.
+
+## 20. ETX_VL_COH: the acquire stops destroying the cache (2026-09-30, pre-registered)
+
+Section 19's `fused_us` is positive: an in-kernel phase boundary costs more than a kernel launch. The mechanism
+found in the lowering: every task's acquire is `buffer_inv sc1` (gfx942.yaml), which invalidates the XCD's whole
+L2 -- every phase starts as cold as a fresh kernel, and the touch hook of section 18 was nullified outright (waves
+1-15 pull weights into L2 during the wait; thread 0's acquire throws them away before the body). The megakernel's
+one structural advantage, cache continuity across phases, was disabled by its own memory ordering.
+
+The redesign (`ETX_VL_COH=1`, commit dc9105d) splits by data class: DSL tiles read and write ACTIVATIONS with
+coherent `sc0 sc1` accesses (weights stay plain cached loads) and skip the acquire inv entirely; imported kernels
+(attn, reduce) keep `buffer_inv sc1`; an imported producer feeding a coherent consumer keeps a `buffer_wbl2 sc1`
+release (the reduce -> o_proj stale-L2 trap); events whose producers are all coherent arrive without the L2
+write-back. TLA+ (`formal/DataVis.tla`): fresh-data guarantee holds for every class x placement combination, and
+dropping the write-back on an imported->coherent edge is caught (negative test). Container build: spill 9 (was 10).
+
+**What the model can and cannot say.** The fitted `etx_us + fused_us` (9.3 us per phase width) bundles acquire,
+argument path, release and wave start; the inv + write-back share is bounded by measured pieces only: 0.5 us
+(idle inv 0.19 + fence 0.18) to 1.5 us (loaded inv 0.63 + a loaded wbl2 arrive). The touch's value under COH is
+the sim's overlap of the dense first trips with the wait, which was optimistic once already (section 18), so the
+low end is capped. `python3 -m examples.vllm_llm.pmodel <plan> --coh`:
+
+| build 4 = build 3 + COH | model (base 5.722) | anchored to the 5.895 measurement |
+|---|---|---|
+| overhead share alone | 5.39-5.61 | 5.57-5.79 |
+| touch also landing | 4.69-4.91 | **4.9-5.3** (touch capped at 0.3-0.7 ms) |
+| two requests, per step | 7.81-9.61 | 7.4-8.8 |
+
+**Readings, pre-registered.** ~5.9: the inv was never the cost; the overhead lives in the argument path or the
+scheduling loop (cohload will show coherent ~ inv + plain). 5.6-5.8: the overhead share moved, the touch still
+does not land (the trace's dense waits stay exposed; restart says how much was left). 4.9-5.3: both landed.
+Below 4.9: the model was conservative; restart and cohload say why. Independent of the number: fused < unfused
+flips the fusion penalty, which is the claim ETX is built on; a --check-dsl or token-match failure means the
+implementation diverges from the TLA-checked design (the design itself holds). vLLM stands at 4.67.

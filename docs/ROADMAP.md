@@ -29,16 +29,19 @@ One run each, best configuration first, decisions pre-registered:
 2. hw_bench sdat against evx: the value of the sentinel hand-off before it is built.
 3. hw_bench lfx: one XCD's bandwidth; closes the pipelining question (section 17 says batching wins at every f).
 
-## Mid term (1-2 months): the tax under 1 us, then batching
+## Mid term (1-2 months): kill the fusion penalty, then batching
 
-1. Signalling. The data as the signal (Kog: 0.8 us against 7.6 us for counter + fence) on the GEMV chain: producers
-   store with sc0 sc1, consumers poll the vector in their staging loop, no event, no wbl2, no inv. Edges whose producer
-   is an imported vLLM kernel keep plain stores + one wbl2 (sdat mode 1). NaN pre-fill by the first task of the step.
-   Every protocol change goes through TLA+ first (formal/).
-2. Prefetch to the experts. The expert ids are known when the router's event fires; the down projection's weights can
-   stream while the up projection runs. Experts are 60% of the bytes per token; this is larger than the dense touch.
-3. Coarser tasks. Fleet's chiplet task: one GEMM shard per XCD, the small ops merged into prologues and epilogues.
-   Half the tasks, half the tax.
+1. Coherence (built, queued: examples/sessions/coh.py, section 20). The acquire's `buffer_inv sc1` made every
+   phase start cold and nullified the touch; ETX_VL_COH gives DSL tiles coherent activation access and no inv.
+   TLA-checked, container-built (spill 9). Pre-registered: 4.9-5.8 against build 3's 5.895; fused < unfused
+   (5.660) is the reading that matters -- the 0.235 ms fusion penalty is the number this exists to kill.
+   The sentinel hand-off (Kog) measured SLOWER than our events (sdat, 2026-09-30) and is dead.
+2. Phase width. The model says spreading router's 0.5 MB over 304 tasks costs 0.56 ms/token and the right widths
+   save 2.22 ms -- but that extrapolates a 296-workgroup bandwidth table down to 88 workgroups on one narrow data
+   point. The fixed width sweep (hw_bench stream, in the queued session) decides it before any implementation.
+3. Prefetch to the experts. The expert ids are known when the router's event fires; the down projection's weights
+   can stream while the up projection runs. Experts are 60% of the bytes per token; larger than the dense touch,
+   and only worth building once COH proves the touched lines survive.
 4. Batching B <= 8 with dynamic expert scheduling (the union of the requests' experts per layer). Target about 800 tok/s
    at B = 8 (analytic: 779) against vLLM's 560-600. Batch 1 can win by 20-30%; batching is where the gap opens.
 5. Generality. Build 3 is a set of ETX_VL_* switches assembled by hand. The compiler must derive the streaming GEMV
