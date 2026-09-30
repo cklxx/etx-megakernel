@@ -113,6 +113,66 @@ static __device__ __forceinline__ void dsl_gemv_rows(const __hip_bfloat16* __res
   }
   __syncthreads();
 }
+// DSL_SPLIT_TAIL: the same stream loop with the row stride (ld) separated from the segment span (kcols), so a row can
+// be swept in pieces. dsl_gemv_rows' flat `base[sg * 64]` indexing only works when the row stride equals spr * SEG;
+// here the (row, segment) pair is tracked incrementally instead, which costs one add and one compare per load and no
+// division. Accumulates into the caller's partials; the caller zeroes and reduces them.
+// MEASURED 2026-10-01 and NOT worth enabling: moe_down (K = 768) on 512 wide + 256 narrow instead of three 256-wide
+// segments made its body 12.01 -> 14.71 us/layer, the step 5.056 -> 5.200 ms/token (3 runs each, spread 0.006), while
+// every other phase was unchanged. Round 7's ablation bounded the win at 0.021 ms/token; the per-load address tracking
+// and the second per-row wave reduction cost more than the wider loads save. Correct (32/32 + CHECK-DSL) but slower.
+template <int EPL, int U>
+static __device__ __forceinline__ void dsl_gemv_accum(const __hip_bfloat16* __restrict__ W, int ld, int kcols, int k0,
+                                                      const float* xs, int r0, int r1, float* part) {
+  typedef typename dsl_wvec<EPL>::T V;
+  constexpr int SEG = ETX_WAVE_SIZE * EPL;
+  const dsl_lds_f* xl = (const dsl_lds_f*)xs;
+  dsl_lds_fw* pl = (dsl_lds_fw*)part;
+  const int lane = etx_lane(), wv = etx_wave(), nw = etx_nwaves(), nrt = r1 - r0;
+  const int spr = kcols / SEG, S = nrt * spr;
+  const int per = (S + nw - 1) / nw, sb = wv * per, se = min(S, sb + per);
+  if (sb >= se) return;                                  // wave-uniform: spr, sb, se come from wv only
+  int row = sb / spr, sw = sb - row * spr, cur = row;    // the only division, once per wave
+  const __hip_bfloat16* Wr = W + (size_t)(r0 + row) * (size_t)ld + k0 + lane * EPL;
+  float acc = 0.f;
+  for (int s0 = sb; s0 < se; ) {
+    const int n = min(U, se - s0);
+    V w[U];
+    int lr = row, ls = sw; const __hip_bfloat16* lw = Wr;   // walk ahead to issue n loads, then walk again to consume
+#pragma unroll
+    for (int u = 0; u < U; ++u) if (u < n) {
+      w[u] = *(const DSL_G V*)(lw + ls * SEG);
+      if (++ls == spr) { ls = 0; ++lr; lw += ld; }
+    }
+#pragma unroll
+    for (int u = 0; u < U; ++u) if (u < n) {
+      if (row != cur) { const float v = etx_wave_sum(acc); if (lane == 0) pl[wv * nrt + cur] += v; acc = 0.f; cur = row; }
+      acc += dsl_dot(w[u], xl + k0 + sw * SEG + lane * EPL);
+      if (++sw == spr) { sw = 0; ++row; Wr += ld; }
+    }
+    s0 += n;
+  }
+  const float v = etx_wave_sum(acc); if (lane == 0) pl[wv * nrt + cur] += v;
+}
+// K = q * 512 + 256 (moe_down: 768): the first q * 512 columns on the 16 B path, the 256-column tail on the 8 B one,
+// both accumulating into the same per-(wave, row) partials. Deterministic: fixed pass order, partials summed in wave order.
+template <class Epi>
+static __device__ __forceinline__ void dsl_gemv_split(const __hip_bfloat16* __restrict__ W, int K, const float* xs, int r0, int r1, float* part, Epi epi) {
+  constexpr int WIDE = ETX_WAVE_SIZE * 8;
+  const int nw = etx_nwaves(), nrt = r1 - r0, KW = (K / WIDE) * WIDE;
+  dsl_lds_fw* pl = (dsl_lds_fw*)part;
+  for (int i = (int)threadIdx.x; i < nw * nrt; i += blockDim.x) pl[i] = 0.f;
+  __syncthreads();
+  dsl_gemv_accum<8, 4>(W, K, KW, 0, xs, r0, r1, part);
+  dsl_gemv_accum<4, 4>(W, K, K - KW, KW, xs, r0, r1, part);
+  __syncthreads();
+  for (int r = (int)threadIdx.x; r < nrt; r += blockDim.x) {
+    float v = 0.f;
+    for (int w2 = 0; w2 < nw; ++w2) v += pl[w2 * nrt + r];
+    epi(r0 + r, v);
+  }
+  __syncthreads();
+}
 // K % 512 == 0: 16 B loads, 4 in flight per lane; K % 256 == 0: 8 B loads, 8 in flight: 64 KB per workgroup of 16 waves
 // (the megakernel's 1024 threads; 16 per lane as examples/llm/gemv.h's 4-wave tiles spilled 359 VGPRs at 128 per lane)
 template <class Epi>
@@ -121,6 +181,9 @@ static __device__ __forceinline__ void dsl_gemv(const __hip_bfloat16* __restrict
   dsl_gemv_rows<4, 8>(W, K, xs, r0, r1, part, epi);      // since K = 768 is not a multiple of 512) -- output stays correct
 #else
   if (K % (ETX_WAVE_SIZE * 8) == 0) dsl_gemv_rows<8, 4>(W, K, xs, r0, r1, part, epi);
+#ifdef DSL_SPLIT_TAIL                                    // moe_down (K = 768): 512 columns wide, 256 narrow
+  else if (K >= ETX_WAVE_SIZE * 8 && K % (ETX_WAVE_SIZE * 4) == 0) dsl_gemv_split(W, K, xs, r0, r1, part, epi);
+#endif
   else dsl_gemv_rows<4, 8>(W, K, xs, r0, r1, part, epi);
 #endif
 }
