@@ -80,7 +80,11 @@ def test_dsl_tiles_use_the_coherent_accessors():
     # positions / slot_mapping are wave-uniform scalars: one coherent load per wave, broadcast (dsl_a_ldll_u)
     assert "dsl_a_ldll_u(positions)" in attnprep.emit_tiles()
     assert "dsl_a_ldll_u(slot_mapping)" in attnprep.emit_tiles()
-    # weights stay plain: the stream loop's loads are untouched
-    assert "base[(size_t)(s0 + u) * ETX_WAVE_SIZE]" in g
+    # weights never go through the coherent accessors: the stream loop loads them with dsl_wload, which is a plain
+    # load (or a non-temporal one under ETX_DSL_NT -- weights are read once per token and have no reuse to keep)
+    assert "dsl_wload(base + (size_t)(s0 + u) * ETX_WAVE_SIZE)" in g
+    assert "__builtin_nontemporal_load" in g and "#ifdef ETX_DSL_NT" in g
+    for bad in ("dsl_a_ld", "dsl_a_st"):
+        assert bad not in g.split("dsl_wload")[1].split("consume(")[0], bad
     # without the build flag the helpers are the plain accesses (the acquire-based builds are unchanged)
     assert "#else" in coh.HELPERS and "return *p;" in coh.HELPERS

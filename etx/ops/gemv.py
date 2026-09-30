@@ -77,6 +77,16 @@ template <int EPL> struct dsl_wvec;
 template <> struct dsl_wvec<8> { typedef dsl_u32x4 T; };
 template <> struct dsl_wvec<4> { typedef dsl_u32x2 T; };
 #define DSL_G __attribute__((address_space(1)))          // global loads, not flat (flat waits on the LDS counter too)
+// ETX_DSL_NT: weight loads marked non-temporal. Weights are read exactly once per token (6.08 GB), so they have no
+// reuse to preserve, yet they pass through the XCD's 4 MB L2 and the 256 MB MALL and evict what does have reuse (the
+// 104 MB KV cache, the activations). Measured L2 hit rate without it: 31.9 % (rocprofv3 TCC_HIT_sum / (HIT+MISS)).
+template <class T> static __device__ __forceinline__ T dsl_wload(const DSL_G T* p) {
+#ifdef ETX_DSL_NT
+  return __builtin_nontemporal_load(p);
+#else
+  return *p;
+#endif
+}
 typedef __attribute__((address_space(3))) const float dsl_lds_f;
 typedef __attribute__((address_space(3))) float dsl_lds_fw;
 static __device__ __forceinline__ float dsl_dot(dsl_u32x4 w, const dsl_lds_f* x) {
@@ -126,13 +136,13 @@ static __device__ __forceinline__ void dsl_gemv_rows_nb(const __hip_bfloat16* __
   V w[U];
   for (; s0 + U <= se; s0 += U) {
 #pragma unroll
-    for (int u = 0; u < U; ++u) w[u] = base[(size_t)(s0 + u) * ETX_WAVE_SIZE];
+    for (int u = 0; u < U; ++u) w[u] = dsl_wload(base + (size_t)(s0 + u) * ETX_WAVE_SIZE);
 #pragma unroll
     for (int u = 0; u < U; ++u) consume(s0 + u, w[u]);
   }
   if (s0 < se) {
 #pragma unroll
-    for (int u = 0; u < U; ++u) if (s0 + u < se) w[u] = base[(size_t)(s0 + u) * ETX_WAVE_SIZE];
+    for (int u = 0; u < U; ++u) if (s0 + u < se) w[u] = dsl_wload(base + (size_t)(s0 + u) * ETX_WAVE_SIZE);
 #pragma unroll
     for (int u = 0; u < U; ++u) if (s0 + u < se) consume(s0 + u, w[u]);
   }
@@ -181,7 +191,7 @@ static __device__ __forceinline__ void dsl_gemv_accum(const __hip_bfloat16* __re
     int lr = row, ls = sw; const __hip_bfloat16* lw = Wr;   // walk ahead to issue n loads, then walk again to consume
 #pragma unroll
     for (int u = 0; u < U; ++u) if (u < n) {
-      w[u] = *(const DSL_G V*)(lw + ls * SEG);
+      w[u] = dsl_wload((const DSL_G V*)(lw + ls * SEG));
       if (++ls == spr) { ls = 0; ++lr; lw += ld; }
     }
 #pragma unroll
