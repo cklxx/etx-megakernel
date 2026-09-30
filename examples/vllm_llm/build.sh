@@ -32,8 +32,18 @@ if [ "$(cfg moe)" = 1 ]; then
   EXPORTS="$EXPORTS,wvsplitk_y1,topk_softmax_e128,moe_sum_k8,fused_moe_up,fused_moe_down"
   MOEBLK=(--block silu_and_mul=$(( $(cfg MI) / 8 ))); MOESLOTS="fused_moe_up=1,fused_moe_down=1,silu_and_mul=1"
 fi
-DEVLIBS="${ETX_DEVLIBS:-$(ls -d /opt/rocm/lib/llvm/lib/clang/*/lib/amdgcn/bitcode 2>/dev/null | head -1)}"
-[ -d "$DEVLIBS" ] || DEVLIBS=/opt/rocm/amdgcn/bitcode
+# The device bitcode moves between ROCm layouts (7.2: lib/llvm/lib/clang/<v>/lib/amdgcn/bitcode; 7.14:
+# core-<v>/lib/llvm/amdgcn/bitcode), so search instead of assuming, and never let a failing `ls` kill the script
+# (set -e + pipefail made the old one-liner exit 2 on any box without that exact path).
+DEVLIBS="${ETX_DEVLIBS:-}"
+if [ -z "$DEVLIBS" ]; then
+  for d in /opt/rocm*/lib/llvm/lib/clang/*/lib/amdgcn/bitcode /opt/rocm*/lib/llvm/amdgcn/bitcode \
+           /opt/rocm*/core-*/lib/llvm/amdgcn/bitcode /opt/rocm*/amdgcn/bitcode; do
+    [ -f "$d/ocml.bc" ] && { DEVLIBS=$d; break; }
+  done
+fi
+[ -f "$DEVLIBS/ocml.bc" ] || { echo "no ROCm device bitcode found (set ETX_DEVLIBS); looked under /opt/rocm*" >&2; exit 1; }
+echo "devlibs: $DEVLIBS"
 CONFIG="$DIR/hf/config.json"; [ -f "$CONFIG" ] || CONFIG="$DIR/config.json"
 
 echo "== import ($EXPORTS)"
