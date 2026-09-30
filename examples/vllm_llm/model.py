@@ -46,7 +46,11 @@ from etx.frontends import hip_link  # noqa: E402
 from etx.ir import Graph, Resource  # noqa: E402
 from examples.llm.model import load_dims  # noqa: E402
 
-CU = 304                      # MI300X compute units (vLLM passes cu_count to wvSplitK)
+# ETX_VL_CU: workgroups a DSL dense phase spreads over (one task per workgroup). 304 = every CU, which is what
+# vLLM's wvSplitK uses, but hw_bench stream (2026-10-01) shows 304 is oversubscribed: at the gate_up shape the
+# per-workgroup rate collapses from ~31 KB/us (<= 74 workgroups) to 8.9 KB/us at 296, and the aggregate optimum
+# sits near 192. Must be a multiple of NX (8) so each XCD gets the same number of workers.
+CU = int(os.environ.get("ETX_VL_CU", "304"))    # MI300X has 304 compute units
 BS = 16                       # KV block size (vLLM default on ROCm)
 PART = 256                    # paged attention partition size (fixed in paged_attention_custom_launcher)
 THREADS = 1024                # megakernel workgroup = the largest imported block (wvSplitK 64 x 16)
@@ -102,7 +106,10 @@ CHAIN_FILE = os.environ.get("ETX_VL_CHAINS", str(HERE / "build" / "chain_tiles.h
 # (8 XCDs x 38) tasks each reading its XCD's copy: a device-wide handoff with 304 waiters becomes one with 8
 # waiters plus an XCD-local one. The kernels are unchanged; only argument blocks and buffers are per XCD.
 XCD = os.environ.get("ETX_VL_XCD", "0") == "1"
-NX, WPX = 8, 38
+NX = 8
+if CU % NX:
+    raise SystemExit(f"ETX_VL_CU={CU} must be a multiple of {NX} (one worker count per XCD)")
+WPX = CU // NX                # workers per XCD of an XCD-affine dense phase (304 -> 38, 192 -> 24)
 REP_ROLES = {"in_norm", "post_norm", "act", "final_norm", "topk", "moe_sum"}
 XGEMV_AFTER = {"qkv": "in_norm", "gate_up": "post_norm", "down": "act", "lm_head": "final_norm", "router": "post_norm"}
 # MoE with ETX_VL_XCD: the expert path stays on one XCD per selected expert. top-k runs once per XCD (a replica); XCD x
@@ -149,7 +156,7 @@ def instances(d) -> list[dict]:
         out.append({"export": export, "layer": layer, "role": role, "grid": grid, **kw})
 
     def gemv(layer, role, m, k):
-        if DSL_GEMV:                                          # rows per task = ceil(M / 304): 17 (qkv), 7 (o_proj), 1 (router)
+        if DSL_GEMV:                                          # rows per task = ceil(M / CU): at 304, 17 (qkv), 7 (o_proj), 1 (router)
             fold = DSL_FOLD and (role in ("router", "lm_head") or (role == "qkv" and layer > 0))
             add("dsl_gemv_fold" if fold else "dsl_gemv", layer, role, (CU, 1, 1), M=m, K=k, wvprgrp=0)
             return
