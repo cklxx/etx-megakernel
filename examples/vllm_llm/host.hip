@@ -84,7 +84,7 @@ static std::vector<int> read_ints(std::istream& in) {
   std::vector<int> v; int x; while (s >> x) v.push_back(x); return v;
 }
 
-struct Inst { int n; std::string exp; int layer; std::string role; int gx, gy, gz; size_t off; int tasks; int M, K, wv; int rep = 1; size_t stride = 0; long long copyoff = -1; int req = 0; };
+struct Inst { int n; std::string exp; int layer; std::string role; int gx, gy, gz; size_t off; int tasks; int M, K, wv; int rep = 1; size_t stride = 0; long long copyoff = -1; int req = 0; int nb = 1; };
 
 // fills one argument block in declaration order, checking every value's type against the import's layout
 struct Args {
@@ -153,6 +153,13 @@ int main(int argc, char** argv) {
       Inst x; s >> x.n >> x.exp >> x.layer >> x.role >> x.gx >> x.gy >> x.gz >> x.off >> x.tasks >> x.M >> x.K >> x.wv;
       if (!(s >> x.rep >> x.stride >> x.copyoff)) { x.rep = 1; x.stride = 0; x.copyoff = -1; }
       else if (!(s >> x.req)) x.req = 0;
+      if (!(s >> x.nb)) x.nb = 1;                      // ETX_VL_BATCH: activation columns this instance serves
+#ifndef ETX_VL_NB
+#define ETX_VL_NB 1
+#endif
+      // the tile is emitted for a fixed column count (etx/ops/gemv.py DSL_NB); a plan that asks for more would have
+      // the extra requests silently read column 0 -- refuse instead (ETX_VL_BATCH sets both from ETX_VL_REQUESTS)
+      if (x.nb > ETX_VL_NB) die("plan instance nb=" + std::to_string(x.nb) + " but the tiles were built with ETX_VL_NB=" + std::to_string(ETX_VL_NB));
       insts.push_back(x);
     }
   }
@@ -214,19 +221,32 @@ int main(int argc, char** argv) {
     uint64_t* token_time; std::vector<bf*> kc, vc;
   };
   std::vector<Req> reqs(nreq);
+  // ETX_VL_BATCH: a batched dense task reads request b's vector at `ptr + b * stride`, so every per-request tensor is
+  // ONE allocation across the requests and request r's pointer is base + r * (its element count). The element counts
+  // below are also the strides the dense argument blocks carry (n_* used again at the dsl_gemv call sites).
+  const size_t n_resid = (size_t)NR * H, n_resid2 = H, n_hn = (size_t)NR * H, n_qkv = NQKV, n_qn = (size_t)NH * HD, n_kn = (size_t)NKV * HD;
+  const size_t n_dx = (size_t)NR * H, n_ox = (size_t)NR * H, n_actx = (size_t)NR * I;
+  const size_t n_attn_out = (size_t)NH * HD, n_o = H, n_gu = (size_t)2 * I, n_act = I, n_dn = H, n_logits = V;
+  const size_t n_es = (size_t)NH * parts, n_ml = (size_t)NH * parts, n_tmp = (size_t)NH * parts * HD;
+  const size_t n_rlog = std::max(E, 1), n_tk = (size_t)NR * std::max(TOPK, 1);
+  const size_t n_mc1 = (size_t)std::max(TOPK, 1) * 2 * MI, n_mc2 = (size_t)std::max(TOPK, 1) * MI, n_mc3 = (size_t)std::max(TOPK, 1) * H;
+#define ETX_VL_SLICE(F, N, T) { T* base_ = ualloc<T>((size_t)nreq * (N)); for (int r_ = 0; r_ < nreq; ++r_) reqs[r_].F = base_ + (size_t)r_ * (N); }
+  ETX_VL_SLICE(resid, n_resid, bf) ETX_VL_SLICE(resid2, n_resid2, bf) ETX_VL_SLICE(hn, n_hn, bf) ETX_VL_SLICE(qkv, n_qkv, bf)
+  ETX_VL_SLICE(qn, n_qn, bf) ETX_VL_SLICE(kn, n_kn, bf) ETX_VL_SLICE(dx, n_dx, bf) ETX_VL_SLICE(ox, n_ox, bf) ETX_VL_SLICE(actx, n_actx, bf)
+  ETX_VL_SLICE(attn_out, n_attn_out, bf) ETX_VL_SLICE(o, n_o, bf) ETX_VL_SLICE(gu, n_gu, bf) ETX_VL_SLICE(act, n_act, bf)
+  ETX_VL_SLICE(dn, n_dn, bf) ETX_VL_SLICE(logits, n_logits, bf) ETX_VL_SLICE(tmp_out, n_tmp, bf) ETX_VL_SLICE(rlog, n_rlog, bf)
+  ETX_VL_SLICE(mc1, n_mc1, bf) ETX_VL_SLICE(mc2, n_mc2, bf) ETX_VL_SLICE(mc3, n_mc3, bf)
+  ETX_VL_SLICE(exp_sums, n_es, float) ETX_VL_SLICE(max_logits, n_ml, float) ETX_VL_SLICE(topk_w, n_tk, float)
+  ETX_VL_SLICE(positions, 1, int64_t) ETX_VL_SLICE(slot_mapping, 1, int64_t) ETX_VL_SLICE(seq_lens, 1, int32_t)
+  ETX_VL_SLICE(topk_ids, n_tk, int32_t) ETX_VL_SLICE(tei, n_tk, int32_t)
+#undef ETX_VL_SLICE
   for (Req& q : reqs) {
-    q.resid = ualloc<bf>((size_t)NR * H); q.resid2 = ualloc<bf>(H); q.hn = ualloc<bf>((size_t)NR * H); q.qkv = ualloc<bf>(NQKV); q.qn = ualloc<bf>(NH * HD); q.kn = ualloc<bf>(NKV * HD);
-    q.dx = ualloc<bf>((size_t)NR * H); q.ox = ualloc<bf>((size_t)NR * H); q.actx = ualloc<bf>((size_t)NR * I);
-    q.attn_out = ualloc<bf>(NH * HD); q.o = ualloc<bf>(H); q.gu = ualloc<bf>(2 * I); q.act = ualloc<bf>(I); q.dn = ualloc<bf>(H); q.logits = ualloc<bf>(V);
-    q.exp_sums = ualloc<float>(NH * parts); q.max_logits = ualloc<float>(NH * parts); q.tmp_out = ualloc<bf>((size_t)NH * parts * HD);
-    q.positions = ualloc<int64_t>(1); q.slot_mapping = ualloc<int64_t>(1); q.seq_lens = ualloc<int32_t>(1);
     q.kc.resize(L); q.vc.resize(L);
     for (int l = 0; l < L; ++l) { q.kc[l] = dalloc<bf>(cache_elems); q.vc[l] = dalloc<bf>(cache_elems); }
     q.token_in = ualloc<int32_t>(steps + 2); q.token_out = ualloc<int32_t>(steps + 1); q.token_time = dalloc<uint64_t>(2 * (steps + 1));
-    q.rlog = ualloc<bf>(std::max(E, 1)); q.topk_w = ualloc<float>((size_t)NR * std::max(TOPK, 1));
-    q.topk_ids = ualloc<int32_t>((size_t)NR * std::max(TOPK, 1)); q.tei = ualloc<int32_t>((size_t)NR * std::max(TOPK, 1));
-    q.mc1 = ualloc<bf>((size_t)std::max(TOPK, 1) * 2 * MI); q.mc2 = ualloc<bf>((size_t)std::max(TOPK, 1) * MI); q.mc3 = ualloc<bf>((size_t)std::max(TOPK, 1) * H);
   }
+// ETX_VL_BATCH: the last six argument words are nb + the per-column strides; a tile that does not batch takes nb = 1
+#define ETX_VL_NOBATCH .i32(1).i32(0).i32(0).i32(0).i32(0).i32(0)
 #define ETX_VL_BIND(Q)                                                                                                    \
   bf *resid = (Q).resid, *resid2 = (Q).resid2, *hn = (Q).hn, *qkv = (Q).qkv, *qn = (Q).qn, *kn = (Q).kn, *dx = (Q).dx, *ox = (Q).ox, *actx = (Q).actx;  \
   bf *attn_out = (Q).attn_out, *o = (Q).o, *gu = (Q).gu, *act = (Q).act, *dn = (Q).dn, *logits = (Q).logits, *tmp_out = (Q).tmp_out; \
@@ -273,16 +293,17 @@ int main(int argc, char** argv) {
     if (x.exp == "dsl_gemv") {
       const int nblk = x.gx * x.gy * x.gz, rpt = (x.M + nblk - 1) / nblk;
       if (x.K > 4096 || x.K % 256) die("dsl_gemv: K must be a multiple of 256 and <= 4096 (etx/ops/gemv.py)");
-      const void* w; const void* in; void* out;
-      if (r == "qkv") { if (bias) die("dsl_gemv: qkv bias not supported"); w = W(pl + "wqkv"); in = qkv_in; out = qkv; }
-      else if (r == "o_proj") { w = W(pl + "wo"); in = attn_out; out = o; }
-      else if (r == "router") { w = W(pl + "wr"); in = o_norm; out = rlog; }
-      else if (r == "gate_up") { w = W(pl + "wgu"); in = o_norm; out = gu; }
-      else if (r == "down") { w = W(pl + "wd"); in = act_out; out = dn; }
-      else if (r == "lm_head") { w = tie ? W("embed") : W("lm_head"); in = d_norm; out = logits; }
+      const void* w; const void* in; void* out; size_t sx = 0, sout = 0;   // sx / sout: the request stride of in / out
+      if (r == "qkv") { if (bias) die("dsl_gemv: qkv bias not supported"); w = W(pl + "wqkv"); in = qkv_in; out = qkv; sx = x.layer == 0 ? n_hn : n_dx; sout = n_qkv; }
+      else if (r == "o_proj") { w = W(pl + "wo"); in = attn_out; out = o; sx = n_attn_out; sout = n_o; }
+      else if (r == "router") { w = W(pl + "wr"); in = o_norm; out = rlog; sx = n_ox; sout = n_rlog; }
+      else if (r == "gate_up") { w = W(pl + "wgu"); in = o_norm; out = gu; sx = n_ox; sout = n_gu; }
+      else if (r == "down") { w = W(pl + "wd"); in = act_out; out = dn; sx = n_actx; sout = n_dn; }
+      else if (r == "lm_head") { w = tie ? W("embed") : W("lm_head"); in = d_norm; out = logits; sx = n_dx; sout = n_logits; }
       else die("dsl_gemv: role " + r);
       a.ptr(w).ptr(in).ptr(out).ptr(nullptr).ptr(nullptr).i64(0).i32(x.M).i32(x.K).i32(rpt).i32(0)
-       .ptr(nullptr).ptr(nullptr).ptr(nullptr).ptr(nullptr).i32(0).f32(0.f).i32(0).i32(0).ptr(nullptr);
+       .ptr(nullptr).ptr(nullptr).ptr(nullptr).ptr(nullptr).i32(0).f32(0.f).i32(0).i32(0).ptr(nullptr)
+       .i32(x.nb).i32((int)sx).i32((int)sout).i32(0).i32(0).i32(0);
     }
     // dsl_attnprep (etx/ops/attnprep.py): q/k norm + rope of one kv head in place on qkv, its k / v rows into the cache
     else if (x.exp == "dsl_attnprep" && (HD != 128 || NH % NKV || NH / NKV + 2 > ETX_THREADS / 64 || !qk_norm))
@@ -301,12 +322,17 @@ int main(int argc, char** argv) {
       // the residual alternates: X = resid (copy 0; the prologue's embedding row, what layer 0's in_norm reads) and Y = resid2.
       // router(L) reads X, writes Y = X + o; qkv(L >= 1) reads Y, writes X = Y + the expert rows; lm_head reads Y + the last
       // expert rows. Readers and the one writer of a grid never share a buffer; layer 0 has no qkv fold (imported in_norm)
-      if (r == "qkv") { w = W(pl + "wqkv"); out = qkv; rows = mc3; rin = resid2; rout = resid; ln = W(pl + "ln1"); R = TOPK; }
-      else if (r == "router") { w = W(pl + "wr"); out = rlog; rows = o; rin = resid; rout = resid2; ln = W(pl + "ln2"); R = 1; xout = ox; }   // ox: what moe_up reads
-      else if (r == "lm_head") { w = tie ? W("embed") : W("lm_head"); out = logits; rows = mc3; rin = resid2; rout = nullptr; ln = W("final_norm"); R = TOPK; }
+      size_t sx = 0, sout = 0, srows = 0, srin = 0, srout = 0;              // the request strides of xout / out / rows / rin / rout
+      if (r == "qkv") { w = W(pl + "wqkv"); out = qkv; rows = mc3; rin = resid2; rout = resid; ln = W(pl + "ln1"); R = TOPK;
+                        sout = n_qkv; srows = n_mc3; srin = n_resid2; srout = n_resid; }
+      else if (r == "router") { w = W(pl + "wr"); out = rlog; rows = o; rin = resid; rout = resid2; ln = W(pl + "ln2"); R = 1; xout = ox;   // ox: what moe_up reads
+                        sx = n_ox; sout = n_rlog; srows = n_o; srin = n_resid; srout = n_resid2; }
+      else if (r == "lm_head") { w = tie ? W("embed") : W("lm_head"); out = logits; rows = mc3; rin = resid2; rout = nullptr; ln = W("final_norm"); R = TOPK;
+                        sout = n_logits; srows = n_mc3; srin = n_resid2; }
       else die("dsl_gemv_fold: role " + r);
       a.ptr(w).ptr(xout).ptr(out).ptr(nullptr).ptr(nullptr).i64(0).i32(x.M).i32(x.K).i32(rpt).i32(0)
-       .ptr(rows).ptr(rin).ptr(rout).ptr(ln).i32(R).f32(eps).i32(1).i32(0).ptr(nullptr);
+       .ptr(rows).ptr(rin).ptr(rout).ptr(ln).i32(R).f32(eps).i32(1).i32(0).ptr(nullptr)
+       .i32(x.nb).i32((int)sx).i32((int)sout).i32((int)srows).i32((int)srin).i32((int)srout);
     }
     // top-k fold (mode 2 / 3 = renormalised): the expert tasks recompute the top-k from the router logits
     else if ((x.exp == "dsl_moe_up_fold" || x.exp == "dsl_moe_down_fold") && (MI % 32 || H > 4096 || H % 256 || H % 64 || MI > 4096 || MI % 256 || E > 128))
@@ -315,21 +341,21 @@ int main(int argc, char** argv) {
 // (ids / weights from the restored dsl_topk launch, mode 0) instead of each recomputing it -- 0.676 ms/token, round 7
 #ifdef ETX_VL_NO_TOPK_FOLD
     else if (x.exp == "dsl_moe_up_fold") a.ptr(W(pl + "w13")).ptr(ox).ptr(mc2).ptr(ti_r).ptr(nullptr).i64((long long)2 * MI * H).i32(MI).i32(H).i32(32).i32(MI / 32)
-                                           .ptr(nullptr).ptr(nullptr).ptr(nullptr).ptr(nullptr).i32(TOPK).f32(0.f).i32(0).i32(E).ptr(rlog);
+                                           .ptr(nullptr).ptr(nullptr).ptr(nullptr).ptr(nullptr).i32(TOPK).f32(0.f).i32(0).i32(E).ptr(rlog) ETX_VL_NOBATCH;
     else if (x.exp == "dsl_moe_down_fold") a.ptr(W(pl + "w2")).ptr(mc2).ptr(mc3).ptr(ti_r).ptr(tw_r).i64((long long)H * MI).i32(H).i32(MI).i32(64).i32(H / 64)
-                                             .ptr(nullptr).ptr(nullptr).ptr(nullptr).ptr(nullptr).i32(TOPK).f32(0.f).i32(0).i32(E).ptr(rlog);
+                                             .ptr(nullptr).ptr(nullptr).ptr(nullptr).ptr(nullptr).i32(TOPK).f32(0.f).i32(0).i32(E).ptr(rlog) ETX_VL_NOBATCH;
 #else
     else if (x.exp == "dsl_moe_up_fold") a.ptr(W(pl + "w13")).ptr(ox).ptr(mc2).ptr(nullptr).ptr(nullptr).i64((long long)2 * MI * H).i32(MI).i32(H).i32(32).i32(MI / 32)
-                                           .ptr(nullptr).ptr(nullptr).ptr(nullptr).ptr(nullptr).i32(TOPK).f32(0.f).i32(norm_topk ? 3 : 2).i32(E).ptr(rlog);
+                                           .ptr(nullptr).ptr(nullptr).ptr(nullptr).ptr(nullptr).i32(TOPK).f32(0.f).i32(norm_topk ? 3 : 2).i32(E).ptr(rlog) ETX_VL_NOBATCH;
     else if (x.exp == "dsl_moe_down_fold") a.ptr(W(pl + "w2")).ptr(mc2).ptr(mc3).ptr(nullptr).ptr(nullptr).i64((long long)H * MI).i32(H).i32(MI).i32(64).i32(H / 64)
-                                             .ptr(nullptr).ptr(nullptr).ptr(nullptr).ptr(nullptr).i32(TOPK).f32(0.f).i32(norm_topk ? 3 : 2).i32(E).ptr(rlog);
+                                             .ptr(nullptr).ptr(nullptr).ptr(nullptr).ptr(nullptr).i32(TOPK).f32(0.f).i32(norm_topk ? 3 : 2).i32(E).ptr(rlog) ETX_VL_NOBATCH;
 #endif
     else if (x.exp == "dsl_moe_up" && (MI % 32 || H > 4096 || H % 256)) die("dsl_moe_up: MI % 32 or H > 4096 (etx/ops/gemv.py K_MAX, RCH)");
     else if (x.exp == "dsl_moe_down" && (H % 64 || MI > 4096 || MI % 256)) die("dsl_moe_down: H % 64 or MI > 4096");
     else if (x.exp == "dsl_moe_up") a.ptr(W(pl + "w13")).ptr(o_norm).ptr(mc2).ptr(ti_r).ptr(nullptr).i64((long long)2 * MI * H).i32(MI).i32(H).i32(32).i32(MI / 32)
-                                      .ptr(nullptr).ptr(nullptr).ptr(nullptr).ptr(nullptr).i32(0).f32(0.f).i32(0).i32(0).ptr(nullptr);
+                                      .ptr(nullptr).ptr(nullptr).ptr(nullptr).ptr(nullptr).i32(0).f32(0.f).i32(0).i32(0).ptr(nullptr) ETX_VL_NOBATCH;
     else if (x.exp == "dsl_moe_down") a.ptr(W(pl + "w2")).ptr(mc2).ptr(mc3).ptr(ti_r).ptr(tw_r).i64((long long)H * MI).i32(H).i32(MI).i32(64).i32(H / 64)
-                                        .ptr(nullptr).ptr(nullptr).ptr(nullptr).ptr(nullptr).i32(0).f32(0.f).i32(0).i32(0).ptr(nullptr);
+                                        .ptr(nullptr).ptr(nullptr).ptr(nullptr).ptr(nullptr).i32(0).f32(0.f).i32(0).i32(0).ptr(nullptr) ETX_VL_NOBATCH;
     else if (r == "in_norm" && x.layer == 0) a.ptr(hn_r).ptr(res_r).i64(H).i64(0).i64(0).i64(0).i64(0).ptr(W(pl + "ln1")).i64(0).f32(eps).i32(1).i32(H);
     else if (r == "in_norm") { copy(dn, d_norm, H * 2); fused_add(d_norm, W(pl + "ln1")); }
     else if (r == "qkv") gemv(W(pl + "wqkv"), qkv_in, qkv, bias ? W(pl + "bqkv") : nullptr);

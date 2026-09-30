@@ -21,7 +21,26 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-ARG_BYTES, GRID_OFF = 136, 120
+import os as _os
+
+# ETX_VL_BATCH: the dense GEMV serves NB activation columns from one weight read (a skinny GEMM). The columns are
+# request 0..NB-1 of the same step; the host allocates each batched tensor contiguously across requests, so column b
+# is at `ptr + b * stride` -- five strides (x, out, rows, resid_in, resid_out), element counts, not bytes.
+#
+# MEASURED 2026-10-01, correct but NOT worth enabling at NB = 2 (both requests 32/32 + CHECK-DSL):
+#   B=2 batched 7.104 ms/step vs B=2 replicated 6.811 (same build generation) -- batching is 0.29 ms SLOWER.
+# Two causes, both from the layer-11 traces:
+#   1. the shared weight read buys little. qkv body 12.02 us at NB=1 -> 22.84 at NB=2: the second column costs 90% of
+#      the first, because it doubles the LDS reads and the FMAs while saving only the weight stream. Dense bodies over
+#      a layer: 37.88 us batched vs 40.78 replicated -- 2.9 us/layer, 7%, not the ~12 us a bandwidth argument predicts.
+#   2. the join costs more than that. A batched phase waits for EVERY request's previous event, so it cannot start
+#      until the slowest request's attention is done: o_proj wait 24.04 us batched vs 12.20 / 6.03 replicated. The
+#      replicated graph overlaps request 0's compute with request 1's stalls; batching removes that slack at every
+#      dense phase (9 joins per layer).
+# So batching pays only if the WHOLE layer batches -- MoE included, with the expert union -- leaving no per-phase join.
+# Kept behind the switch (default off) because that second half is the only thing that can change the verdict.
+DSL_NB = max(1, int(_os.environ.get("ETX_VL_NB", "1")))
+ARG_BYTES, GRID_OFF = 160, 144
 # the "_fold" forms carry a prologue (docs/MODEL-vllm-kernels.md section 16): norm fold (mode 1): x = rms_norm(bf16(bf16(sum
 # of R rows) + resid_in)) with weight ln (vLLM's moe_sum + fused_add_rms_norm numerics: the sum rounded, the add rounded
 # per element, the variance over the rounded values, out = bf16(z * rsqrt * w)); task 0 stores the new residual to
@@ -32,11 +51,14 @@ PARAMS = [("W", "ptr addrspace(1)", 0, 8), ("x", "ptr addrspace(1)", 8, 8), ("ou
           ("M", "i32", 48, 4), ("K", "i32", 52, 4), ("rpt", "i32", 56, 4), ("tpe", "i32", 60, 4),
           ("rows", "ptr addrspace(1)", 64, 8), ("resid_in", "ptr addrspace(1)", 72, 8), ("resid_out", "ptr addrspace(1)", 80, 8),
           ("ln", "ptr addrspace(1)", 88, 8), ("R", "i32", 96, 4), ("eps", "float", 100, 4), ("mode", "i32", 104, 4),
-          ("E", "i32", 108, 4), ("logits", "ptr addrspace(1)", 112, 8)]
+          ("E", "i32", 108, 4), ("logits", "ptr addrspace(1)", 112, 8),
+          ("nb", "i32", 120, 4), ("sx", "i32", 124, 4), ("sout", "i32", 128, 4), ("srows", "i32", 132, 4),
+          ("srin", "i32", 136, 4), ("srout", "i32", 140, 4)]
 FORMS = {"dsl_gemv": "plain", "dsl_moe_up": "silu_mul", "dsl_moe_down": "scale",
          "dsl_gemv_fold": "plain", "dsl_moe_up_fold": "silu_mul", "dsl_moe_down_fold": "scale"}
 K_MAX, RCH, THREADS = 4096, 64, 1024                              # x (K floats) + 2 x RCH (moe_up's g) + 16 waves x RCH partials
-LDS_BYTES = 4 * (K_MAX + 2 * RCH + (THREADS // 64) * RCH + 32)     # 21120 B (+ the top-k ids / weights); host-checked K, rpt
+# NB columns scale x and the partials: B=1 21120 B, B=2 41600 B (megakernel 61928 of 65536), B=4 82560 -- over the limit.
+LDS_BYTES = 4 * (DSL_NB * K_MAX + 2 * RCH + DSL_NB * (THREADS // 64) * RCH + 32)
 
 
 def import_entries(threads: int = 1024) -> dict:
@@ -71,8 +93,10 @@ static __device__ __forceinline__ float dsl_bfr(float v) { return __bfloat162flo
 static __device__ __forceinline__ float dsl_silu(float g) { return g / (1.f + __expf(-g)); }
 // rows [r0, r1) of W (row-major bf16, K columns) times xs (fp32 in LDS); part: LDS, >= nwaves * (r1 - r0) floats;
 // epi(row, dot) once per row by one thread. Deterministic: per-wave partials are summed in wave order.
-template <int EPL, int U, class Epi>
-static __device__ __forceinline__ void dsl_gemv_rows(const __hip_bfloat16* __restrict__ W, int K, const float* xs, int r0, int r1, float* part, Epi epi) {
+// NB columns: the weight vector is loaded ONCE and dotted with NB staged activation vectors (column b at xs + b * KS),
+// giving NB partials per (wave, row). NB = 1 is the batch-1 GEMV and collapses to the original indexing.
+template <int EPL, int U, int NB, class Epi>
+static __device__ __forceinline__ void dsl_gemv_rows_nb(const __hip_bfloat16* __restrict__ W, int K, int KS, const float* xs, int r0, int r1, float* part, Epi epi) {
   typedef typename dsl_wvec<EPL>::T V;
   constexpr int SEG = ETX_WAVE_SIZE * EPL;
   const dsl_lds_f* xl = (const dsl_lds_f*)xs;
@@ -80,15 +104,23 @@ static __device__ __forceinline__ void dsl_gemv_rows(const __hip_bfloat16* __res
   const int lane = etx_lane(), wv = etx_wave(), nw = etx_nwaves(), nrt = r1 - r0;
   const int spr = K / SEG, S = nrt * spr;
   const int per = (S + nw - 1) / nw, sb = wv * per, se = min(S, sb + per);
-  for (int i = (int)threadIdx.x; i < nw * nrt; i += blockDim.x) pl[i] = 0.f;
+  for (int i = (int)threadIdx.x; i < nw * nrt * NB; i += blockDim.x) pl[i] = 0.f;
   __syncthreads();
   const DSL_G V* base = (const DSL_G V*)(W + (size_t)r0 * K) + lane;
   int cur = sb / spr;
-  float acc = 0.f;
+  float acc[NB];
+#pragma unroll
+  for (int b = 0; b < NB; ++b) acc[b] = 0.f;
+  auto flush = [&]() {
+#pragma unroll
+    for (int b = 0; b < NB; ++b) { const float v = etx_wave_sum(acc[b]); if (lane == 0) pl[(wv * nrt + cur) * NB + b] += v; acc[b] = 0.f; }
+  };
   auto consume = [&](int sg, V w) {
     const int row = sg / spr;
-    if (row != cur) { const float v = etx_wave_sum(acc); if (lane == 0) pl[wv * nrt + cur] += v; acc = 0.f; cur = row; }
-    acc += dsl_dot(w, xl + (sg - row * spr) * SEG + lane * EPL);
+    if (row != cur) { flush(); cur = row; }
+    const int off = (sg - row * spr) * SEG + lane * EPL;
+#pragma unroll
+    for (int b = 0; b < NB; ++b) acc[b] += dsl_dot(w, xl + b * KS + off);   // one load, NB dots: the point of the batch
   };
   int s0 = sb;
   V w[U];
@@ -104,14 +136,22 @@ static __device__ __forceinline__ void dsl_gemv_rows(const __hip_bfloat16* __res
 #pragma unroll
     for (int u = 0; u < U; ++u) if (s0 + u < se) consume(s0 + u, w[u]);
   }
-  if (sb < se) { const float v = etx_wave_sum(acc); if (lane == 0) pl[wv * nrt + cur] += v; }
+  if (sb < se) flush();
   __syncthreads();
   for (int r = (int)threadIdx.x; r < nrt; r += blockDim.x) {
-    float v = 0.f;
-    for (int w2 = 0; w2 < nw; ++w2) v += pl[w2 * nrt + r];
+    float v[NB];
+#pragma unroll
+    for (int b = 0; b < NB; ++b) v[b] = 0.f;
+    for (int w2 = 0; w2 < nw; ++w2)
+#pragma unroll
+      for (int b = 0; b < NB; ++b) v[b] += pl[(w2 * nrt + r) * NB + b];
     epi(r0 + r, v);
   }
   __syncthreads();
+}
+template <int EPL, int U, class Epi>
+static __device__ __forceinline__ void dsl_gemv_rows(const __hip_bfloat16* __restrict__ W, int K, const float* xs, int r0, int r1, float* part, Epi epi) {
+  dsl_gemv_rows_nb<EPL, U, 1>(W, K, 0, xs, r0, r1, part, [&](int r, const float* v) { epi(r, v[0]); });
 }
 // DSL_SPLIT_TAIL: the same stream loop with the row stride (ld) separated from the segment span (kcols), so a row can
 // be swept in pieces. dsl_gemv_rows' flat `base[sg * 64]` indexing only works when the row stride equals spr * SEG;
@@ -187,6 +227,20 @@ static __device__ __forceinline__ void dsl_gemv(const __hip_bfloat16* __restrict
   else dsl_gemv_rows<4, 8>(W, K, xs, r0, r1, part, epi);
 #endif
 }
+// rows per pass of the stream loop: the partials take nwaves x DSL_RCH floats of LDS whatever the task's row count
+// (lm_head tasks hold 500 rows; unbounded partials overran the 32 KB arena into the barrier words, review 2026-09-29)
+#define DSL_RCH 64
+template <int NB, class Epi>
+static __device__ __forceinline__ void dsl_gemv_nb(const __hip_bfloat16* __restrict__ W, int K, int KS, const float* xs, int r0, int r1, float* part, Epi epi) {
+  if (K % (ETX_WAVE_SIZE * 8) == 0) dsl_gemv_rows_nb<8, 4, NB>(W, K, KS, xs, r0, r1, part, epi);
+  else dsl_gemv_rows_nb<4, 8, NB>(W, K, KS, xs, r0, r1, part, epi);
+}
+template <int NB, class Epi>
+static __device__ __forceinline__ void dsl_gemv_chunked_nb(const __hip_bfloat16* __restrict__ W, int K, int KS, const float* xs, int r0, int r1, float* part, Epi epi) {
+  for (int r = r0; r < r1; r += DSL_RCH) dsl_gemv_nb<NB>(W, K, KS, xs, r, min(r1, r + DSL_RCH), part, epi);
+}
+// NB activation vectors into LDS, column b at xs + b * KS (KS = the staged stride, K rounded to the LDS layout)
+static __device__ __forceinline__ void dsl_stage_nb(const __hip_bfloat16* __restrict__ x, int K, int sx, int nb, int KS, float* xs);
 static __device__ __forceinline__ void dsl_stage(const __hip_bfloat16* __restrict__ x, int K, float* xs) {   // bf16 -> fp32 LDS, 16 B per thread
 #ifdef DSL_ABLATE_STAGE
   __syncthreads(); return;          // ablation: the barrier without the fill (the dot then reads stale LDS: WRONG output)
@@ -207,16 +261,16 @@ static __device__ __forceinline__ void dsl_stage(const __hip_bfloat16* __restric
   }
   __syncthreads();
 }
-// rows per pass of the stream loop: the partials take nwaves x DSL_RCH floats of LDS whatever the task's row count
-// (lm_head tasks hold 500 rows; unbounded partials overran the 32 KB arena into the barrier words, review 2026-09-29)
-#define DSL_RCH 64
+static __device__ __forceinline__ void dsl_stage_nb(const __hip_bfloat16* __restrict__ x, int K, int sx, int nb, int KS, float* xs) {
+  for (int b = 0; b < nb; ++b) dsl_stage(x + (size_t)b * sx, K, xs + b * KS);   // each ends in a barrier: all waves fill every column
+}
 template <class Epi>
 static __device__ __forceinline__ void dsl_gemv_chunked(const __hip_bfloat16* __restrict__ W, int K, const float* xs, int r0, int r1, float* part, Epi epi) {
   for (int r = r0; r < r1; r += DSL_RCH) dsl_gemv(W, K, xs, r, min(r1, r + DSL_RCH), part, epi);
 }
 struct DslArgs { const __hip_bfloat16* W; const __hip_bfloat16* x; __hip_bfloat16* out; const int* ids; const float* wts; long long estride; int M, K, rpt, tpe;
                  const __hip_bfloat16* rows; const __hip_bfloat16* resid_in; __hip_bfloat16* resid_out; const __hip_bfloat16* ln; int R; float eps; int mode, E;
-                 const __hip_bfloat16* logits; };
+                 const __hip_bfloat16* logits; int nb, sx, sout, srows, srin, srout; };
 static __device__ __forceinline__ DslArgs dsl_args(const unsigned char* a) {
   DslArgs d;
   d.W = *(const __hip_bfloat16* const*)(a + 0); d.x = *(const __hip_bfloat16* const*)(a + 8); d.out = *(__hip_bfloat16* const*)(a + 16);
@@ -225,27 +279,40 @@ static __device__ __forceinline__ DslArgs dsl_args(const unsigned char* a) {
   d.rows = *(const __hip_bfloat16* const*)(a + 64); d.resid_in = *(const __hip_bfloat16* const*)(a + 72); d.resid_out = *(__hip_bfloat16* const*)(a + 80);
   d.ln = *(const __hip_bfloat16* const*)(a + 88); d.R = *(const int*)(a + 96); d.eps = *(const float*)(a + 100); d.mode = *(const int*)(a + 104);
   d.E = *(const int*)(a + 108); d.logits = *(const __hip_bfloat16* const*)(a + 112);
+  d.nb = *(const int*)(a + 120); d.sx = *(const int*)(a + 124); d.sout = *(const int*)(a + 128);
+  d.srows = *(const int*)(a + 132); d.srin = *(const int*)(a + 136); d.srout = *(const int*)(a + 140);
   return d;
 }
 // norm fold: xs = bf16(rms_norm(z)) as floats, z = bf16(bf16(sum of R rows) + resid_in) per element; task 0 stores z
-static __device__ __forceinline__ void dsl_stage_norm(const DslArgs& d, float* xs, float* red, bool store) {
+static __device__ __forceinline__ void dsl_stage_norm_at(const DslArgs& d, const __hip_bfloat16* rows, const __hip_bfloat16* rin,
+                                                        __hip_bfloat16* rout, __hip_bfloat16* xout, float* xs, float* red, bool store) {
   const int K = d.K;
   float ss = 0.f;
   for (int i = (int)threadIdx.x; i < K; i += blockDim.x) {
     float acc = 0.f;
-    for (int s = 0; s < d.R; ++s) acc += dsl_a_ldbf(d.rows + (size_t)s * K + i);
+    for (int s = 0; s < d.R; ++s) acc += dsl_a_ldbf(rows + (size_t)s * K + i);
     const float in = d.R > 1 ? dsl_bfr(acc) : acc;                                   // moe_sum rounds its fp32 sum once
-    const float z = dsl_bfr(in + dsl_a_ldbf(d.resid_in + i));                        // the bf16 add of fused_add_rms_norm
+    const float z = dsl_bfr(in + dsl_a_ldbf(rin + i));                        // the bf16 add of fused_add_rms_norm
     xs[i] = z; ss += z * z;
-    if (store && d.resid_out != nullptr) dsl_a_stbf(d.resid_out + i, __float2bfloat16(z));
+    if (store && rout != nullptr) dsl_a_stbf(rout + i, __float2bfloat16(z));
   }
   ss = etx_block_sum(ss, red);
   const float sv = rsqrtf(ss / (float)K + d.eps);
   for (int i = (int)threadIdx.x; i < K; i += blockDim.x) {
     xs[i] = dsl_bfr(xs[i] * sv * __bfloat162float(d.ln[i]));
-    if (store && d.x != nullptr) dsl_a_stbf((__hip_bfloat16*)d.x + i, __float2bfloat16(xs[i]));   // the normed vector, for later consumers
+    if (store && xout != nullptr) dsl_a_stbf(xout + i, __float2bfloat16(xs[i]));   // the normed vector, for later consumers
   }
   __syncthreads();
+}
+static __device__ __forceinline__ void dsl_stage_norm(const DslArgs& d, float* xs, float* red, bool store) {
+  dsl_stage_norm_at(d, d.rows, d.resid_in, d.resid_out, (__hip_bfloat16*)d.x, xs, red, store);
+}
+// NB columns of the norm fold: column b takes request b's rows / residual and writes its own normed vector
+static __device__ __forceinline__ void dsl_stage_norm_nb(const DslArgs& d, int nb, int KS, float* xs, float* red, bool store) {
+  for (int b = 0; b < nb; ++b)
+    dsl_stage_norm_at(d, d.rows + (size_t)b * d.srows, d.resid_in + (size_t)b * d.srin,
+                      d.resid_out ? d.resid_out + (size_t)b * d.srout : nullptr,
+                      d.x ? (__hip_bfloat16*)d.x + (size_t)b * d.sx : nullptr, xs + b * KS, red, store);
 }
 // top-k fold: wave 0 computes the softmax top-k of the logits (etx/ops/topk.py's arithmetic) into LDS
 static __device__ __forceinline__ void dsl_topk_lds(const __hip_bfloat16* logits, int E, int K, int renorm, int* ids, float* wts) {
@@ -301,7 +368,7 @@ static __device__ __forceinline__ void dsl_touch_rows(const __hip_bfloat16* __re
   asm volatile("" :: "v"(acc));                     // the loads are kept (and complete here: these waves idle until the barrier anyway)
 }
 static __device__ __forceinline__ void dsl_touch_plain(const unsigned char* a, int blk) {
-  const int nblk = *(const int*)(a + 120 + 12);
+  const int nblk = *(const int*)(a + DSL_GRID_OFF + 12);
   if (blk >= nblk) return;
   const DslArgs d = dsl_args(a);
   const int r0 = blk * d.rpt, r1 = min(d.M, min(r0 + d.rpt, r0 + DSL_RCH));   // the first pass of dsl_gemv_chunked
@@ -316,9 +383,15 @@ BODIES = {
     "plain": '''
   const int r0 = blk * d.rpt, r1 = min(d.M, r0 + d.rpt);
   if (r0 >= r1) return;
-  if (d.mode == 1) dsl_stage_norm(d, xs, xs + d.K + 16 * DSL_RCH, blk == 0); else dsl_stage(d.x, d.K, xs);
-  __hip_bfloat16* out = d.out;
-  dsl_gemv_chunked(d.W, d.K, xs, r0, r1, xs + d.K, [&](int r, float v) { dsl_a_stbf(out + r, __float2bfloat16(v)); });''',
+  const int KS = DSL_K_MAX;                                    // columns are DSL_K_MAX floats apart in LDS
+  float* part = xs + DSL_NB * KS;
+  if (d.mode == 1) dsl_stage_norm_nb(d, DSL_NB, KS, xs, part + DSL_NB * 16 * DSL_RCH, blk == 0);
+  else dsl_stage_nb(d.x, d.K, d.sx, DSL_NB, KS, xs);
+  __hip_bfloat16* out = d.out; const int sout = d.sout;
+  dsl_gemv_chunked_nb<DSL_NB>(d.W, d.K, KS, xs, r0, r1, part, [&](int r, const float* v) {
+#pragma unroll
+    for (int b = 0; b < DSL_NB; ++b) dsl_a_stbf(out + (size_t)b * sout + r, __float2bfloat16(v[b]));
+  });''',
     "silu_mul": '''
   const int s = blk / d.tpe, j = blk - s * d.tpe;
   const int r0 = j * d.rpt, r1 = min(d.M, r0 + d.rpt);
@@ -371,7 +444,13 @@ def emit_tiles(lds_floats: int = 8192) -> str:
     (examples/vllm_llm/model.py), reading the argument block like an imported tile; LDS from the import arena."""
     from etx.ops import coh
     out = ["// generated by etx.ops.gemv: the DSL streaming GEMVs", "#pragma once",
-           '#include "etx/abi.h"', '#include "etx/import.h"', '#include "etx/tile_util.h"', coh.HELPERS, STREAM]
+           '#include "etx/abi.h"', '#include "etx/import.h"', '#include "etx/tile_util.h"',
+           f"#define DSL_NB {DSL_NB}            // activation columns per weight read (ETX_VL_NB)",
+           f"#define DSL_K_MAX {K_MAX}          // the staged-column stride in LDS floats",
+           f"#define DSL_GRID_OFF {GRID_OFF}",
+           "#ifdef ETX_IMPORT_LDS   // the staged columns and partials must fit the shared import arena",
+           f"_Static_assert({LDS_BYTES} <= ETX_IMPORT_LDS, \"etx.ops.gemv: LDS_BYTES exceeds ETX_IMPORT_LDS"
+           " (raise the arena or lower ETX_VL_NB)\");", "#endif", coh.HELPERS, STREAM]
     for e, form in FORMS.items():
         out.append(f"// ---- {e}: {form}")
         out.append(f"static __device__ __attribute__((always_inline)) void dsl_run_{e}(const unsigned char* a, int blk) {{")

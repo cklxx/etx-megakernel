@@ -112,7 +112,7 @@ def test_two_requests_interleave_and_stay_independent(tmp_path, monkeypatch):
     rows, st = simulate(pj, lambda n, d: Cost(front_us=0.5, chain_us=1.0), Hw())
     assert st["unfinished"] == 0
     rows_ = [ln.split() for ln in (tmp_path / "vl_plan.txt").read_text().splitlines()[2:]]
-    assert {r[-1] for r in rows_} == {"0", "1"} and rows_[0][-1] == "0" and rows_[1][-1] == "1"
+    assert {r[-2] for r in rows_} == {"0", "1"} and rows_[0][-2] == "0" and rows_[1][-2] == "1"   # req, then nb
 
 
 def test_adapter_rounds_and_pre_wait():

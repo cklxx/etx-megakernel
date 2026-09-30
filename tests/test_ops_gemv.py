@@ -28,7 +28,8 @@ def test_adapter_skips_dsl_but_host_header_includes_it():
     tiles = emit_adapters(imp)
     assert "etx_tile_dsl_gemv" not in tiles and "etx_imp_dsl" not in tiles
     hdr = emit_host_header(imp)
-    assert '"dsl_gemv", 19, 136, 120' in hdr and '"pppppliiiippppifiip"' in hdr
+    # 25 params, 160 B block, grid words at 144: the last six are the batch fields (nb + five per-column strides)
+    assert '"dsl_gemv", 25, 160, 144' in hdr and '"pppppliiiippppifiipiiiiii"' in hdr
 
 
 def test_touch_hook_dense_forms_only():

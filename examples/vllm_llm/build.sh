@@ -52,6 +52,12 @@ ORIG=(); CHK=(); [ "${ETX_VL_CHECK:-0}" = 1 ] && ORIG=(--orig) && CHK=(-DETX_VL_
 SLOTS="${ETX_VL_SLOTS:-}"; [ -n "$MOESLOTS" ] && SLOTS="${SLOTS:+$SLOTS,}$MOESLOTS"
 # ETX_VL_DSL_GEMV=1: the streaming GEMVs as ETX ops (etx.ops.gemv): their tiles and argument layouts join imports.json
 # ETX_VL_DSL_TOPK=1: the router's softmax + top-k as etx.ops.topk
+# ETX_VL_BATCH=1: the dense GEMV serves ETX_VL_REQUESTS activation columns per weight read; the tile emitter and the
+# model both read ETX_VL_NB, so set it once here and export it to every step of the build.
+if [ "${ETX_VL_BATCH:-0}" = 1 ]; then
+  [ "${ETX_VL_REQUESTS:-1}" -gt 1 ] || { echo "ETX_VL_BATCH=1 needs ETX_VL_REQUESTS > 1" >&2; exit 1; }
+  export ETX_VL_NB="${ETX_VL_REQUESTS}"
+fi
 DSLOPS=""; [ "${ETX_VL_DSL_GEMV:-0}" = 1 ] && DSLOPS="gemv"; [ "${ETX_VL_DSL_TOPK:-0}" = 1 ] && DSLOPS="${DSLOPS:+$DSLOPS,}topk"
 # ETX_VL_DSL_ATTN=head: the attention block by kv head (etx.ops.attnprep; attention at one block per task)
 if [ "${ETX_VL_DSL_ATTN:-0}" = head ]; then DSLOPS="${DSLOPS:+$DSLOPS,}attnprep"; SLOTS="${SLOTS:+$SLOTS,}$ATTN=1"; fi
@@ -80,12 +86,13 @@ if [ "${ETX_VL_UC:-0}" = 1 ]; then "$PY" "$ROOT/examples/vllm_llm/check_uc_plan.
 echo "== hipcc"
 # ETX_ROCM_HEADERS: a HIP include tree for ROCm installs that ship no headers (see etx/importer/vllm_kernels.py)
 ROCMINC=(); [ -n "${ETX_ROCM_HEADERS:-}" ] && ROCMINC=(-isystem "$ETX_ROCM_HEADERS")
+NBF=(-DETX_VL_NB="${ETX_VL_NB:-1}")      # the host refuses a plan whose nb exceeds what the tile was emitted for
 # ETX_VL_ABLATE=<name>: a timing-only build with a piece of the DSL MoE tile removed (etx/ops/gemv.py's DSL_ABLATE_*).
 # Every ablation but EPL4 produces WRONG output on purpose and must never ship; the correctness gates will fail.
 ABL=(); [ -n "${ETX_VL_ABLATE:-}" ] && ABL=(-DDSL_ABLATE_$(echo "$ETX_VL_ABLATE" | tr '[:lower:]' '[:upper:]'))
 # ETX_VL_FOLD_TOPK=0: keep the norm folds, restore the single top-k launch per layer (model.py FOLD_TOPK)
 [ "${ETX_VL_FOLD_TOPK:-1}" = 0 ] && ABL+=(-DETX_VL_NO_TOPK_FOLD)
-hipcc -O3 -std=c++17 --offload-arch=gfx942 "${ROCMINC[@]}" -I "$ROOT/etx/runtime/include" -I "$OUT" -I "$ROOT" \
+hipcc -O3 -std=c++17 --offload-arch=gfx942 "${ROCMINC[@]}" "${NBF[@]}" -I "$ROOT/etx/runtime/include" -I "$OUT" -I "$ROOT" \
   -Xclang -mlink-builtin-bitcode -Xclang "$OUT/imports.bc" -Rpass-analysis=kernel-resource-usage \
   "${CHK[@]}" "${UCF[@]}" "${COHF[@]}" "${ABL[@]}" -DETX_VL_REQUESTS=${ETX_VL_REQUESTS:-1} ${ETX_HIPCC_FLAGS:-} "$OUT/megakernel_d0.hip" "$ROOT/examples/vllm_llm/host.hip" $([ "${ETX_VL_CHECK:-0}" = 1 ] && echo "$OUT/imp/orig_table.hip -x none $OUT/imp/orig_*.o") -o "$OUT/run" 2>&1 \
   | grep -E "Function Name|VGPRs:|ScratchSize|VGPRs Spill|LDS Size|error" | sed -E "s/.*remark: +//; s/ \[-Rpass.*//" | paste - - - - - || true
