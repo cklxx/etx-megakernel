@@ -54,9 +54,14 @@ def test_bar2_two_barriers_per_task():
     assert loop.count("__syncthreads()") == 1            # the preamble broadcast only
     rt = _run_task(src)
     assert rt.count("__syncthreads();") == 2
-    # the queue is advanced into the other parity slot BEFORE the post-drain barrier
-    fetch = rt.index("s_tid2[par ^ 1] = p.static_queue[cursor]")
-    assert rt.index("ETX_RELEASE_DOMAIN();   // every wave drains") < fetch < rt.rindex("__syncthreads();")
+    # the next head is READ before the body (its latency hides there) and only PUBLISHED, from registers, between
+    # the drain and the post-drain barrier: a global load on the publication path measured +0.117 ms (2026-10-01)
+    read = rt.index("nx_tid = p.static_queue[cursor]")
+    publish = rt.index("s_tid2[par ^ 1] = nx_tid")
+    drain = rt.index("ETX_RELEASE_DOMAIN();   // every wave drains")
+    assert read < rt.index("etx_call_body(sym, &ctx)") < drain < publish < rt.rindex("__syncthreads();")
+    between = rt[drain:rt.rindex("__syncthreads();")]
+    assert "p.static_queue[" not in between and "p.static_descs[" not in between
     assert "etx_run_task(p, cur, worker, domain, tid, cursor, cend, s_tid2, s_task2, par);" in loop
 
 

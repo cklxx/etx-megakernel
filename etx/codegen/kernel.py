@@ -307,6 +307,12 @@ def emit_kernel(plan: Plan, device: int = 0) -> str:
     out.append("  }")
     out.append("  __syncthreads();")
     out.append("  if (tr && threadIdx.x == 0) tr[1] = (uint64_t)ETX_TIMER();")
+    if bar2:
+        # BAR2: read the next head HERE, before the body, and keep it in registers. Issuing these two global loads
+        # after the drain (where they first sat) put an HBM round trip on the publication path -- every dependent
+        # worker waited for it, which measured +0.117 ms on 2026-10-01. Behind the body they cost nothing.
+        out.append("  int32_t nx_tid = -1; etx_task nx_task;")
+        out.append("  if (threadIdx.x == 0 && cursor < cend) { nx_tid = p.static_queue[cursor]; nx_task = p.static_descs[cursor]; ++cursor; }")
     if max_pro:
         out.append(f"  for (int j = 0; j < {max_pro}; ++j) if (psym[j] >= 0) {{ etx_call_body(psym[j], &pctx[j]); __syncthreads(); }}")
     out.append("  etx_call_body(sym, &ctx);   // phase 2: the only call site of each body")
@@ -314,11 +320,10 @@ def emit_kernel(plan: Plan, device: int = 0) -> str:
     out.append("  ETX_RELEASE_DOMAIN();   // every wave drains its own stores before the barrier: thread 0's release only covers wave 0")
     out.append("#endif")
     if bar2:
-        out.append("  // BAR2: the next head into the other parity slot BEFORE the barrier (write-after-read safe: the")
-        out.append("  // running task reads slot par, the fetch writes par ^ 1); the barrier then broadcasts it for free")
-        out.append("  if (threadIdx.x == 0) {")
-        out.append("    if (cursor < cend) { s_tid2[par ^ 1] = p.static_queue[cursor]; s_task2[par ^ 1] = p.static_descs[cursor]; ++cursor; } else s_tid2[par ^ 1] = -1;")
-        out.append("  }")
+        out.append("  // BAR2: publish the head fetched before the body into the other parity slot (write-after-read safe:")
+        out.append("  // the running task reads slot par, this writes par ^ 1); the barrier below broadcasts it for free.")
+        out.append("  // Registers only -- no global load between the drain and the barrier, which is the publication path.")
+        out.append("  if (threadIdx.x == 0) { s_tid2[par ^ 1] = nx_tid; if (nx_tid >= 0) s_task2[par ^ 1] = nx_task; }")
     out.append("  __syncthreads();")
     out.append("  if (tr && threadIdx.x == 0) { tr[2] = (uint64_t)ETX_TIMER(); tr[3] = worker; }")
     out.append("  if (threadIdx.x != 0) return;")
