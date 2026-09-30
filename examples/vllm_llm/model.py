@@ -85,6 +85,11 @@ DSL_ATTNHEAD = os.environ.get("ETX_VL_DSL_ATTN", "0") == "head"
 # recomputes the top-k from the logits (deterministic), the next layer reads the expert rows: no in_norm (L > 0),
 # post_norm, topk or moe_sum launches (the design's rematerialisation: redundant parallel work for a serial event)
 DSL_FOLD = os.environ.get("ETX_VL_DSL_FOLD", "0") == "1"
+# ETX_VL_FOLD_TOPK=0 keeps the norm folds but restores the one top-k launch per layer: the fold made all 448 expert
+# tasks of a layer recompute the same 128-logit softmax + top-8 on wave 0 while 15 waves waited at the barrier, and
+# the ablation measured that at 14.1 us/layer = 0.676 ms/token (results_2026-10-01/round7). One launch costs the
+# phase floor plus a hand-off, about 4.4 us/layer.
+FOLD_TOPK = os.environ.get("ETX_VL_FOLD_TOPK", "1") == "1"
 # ETX_VL_TOUCH=1: the dense DSL GEMVs get the megakernel's touch hook (etx.ops.gemv dsl_touch_plain): while wave 0 waits
 # for the task's event, the other waves pull the task's first weight trip into L2 (docs/MODEL-vllm-kernels.md section 18)
 TOUCH = os.environ.get("ETX_VL_TOUCH", "0") == "1"
@@ -195,7 +200,7 @@ def instances(d) -> list[dict]:
             add("fused_add_rms_norm", L, "post_norm", (1, 1, 1))
         if d.moe:
             gemv(L, "router", d.E, d.H)
-            if not DSL_FOLD:
+            if not DSL_FOLD or not FOLD_TOPK:
                 add("dsl_topk" if (DSL or DSL_TOPK) else "topk_softmax_e128", L, "topk", (1, 1, 1))
             if XCD and d.TOPK != NX:                          # the XCD-affine expert path puts slot s on XCD s
                 raise SystemExit(f"ETX_VL_XCD needs TOPK == {NX} (top-k slot per XCD), model has {d.TOPK}")

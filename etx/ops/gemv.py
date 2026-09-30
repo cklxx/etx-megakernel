@@ -117,10 +117,17 @@ static __device__ __forceinline__ void dsl_gemv_rows(const __hip_bfloat16* __res
 // (the megakernel's 1024 threads; 16 per lane as examples/llm/gemv.h's 4-wave tiles spilled 359 VGPRs at 128 per lane)
 template <class Epi>
 static __device__ __forceinline__ void dsl_gemv(const __hip_bfloat16* __restrict__ W, int K, const float* xs, int r0, int r1, float* part, Epi epi) {
+#ifdef DSL_ABLATE_EPL4                                   // ablation: force the 8 B load path everywhere (moe_down's,
+  dsl_gemv_rows<4, 8>(W, K, xs, r0, r1, part, epi);      // since K = 768 is not a multiple of 512) -- output stays correct
+#else
   if (K % (ETX_WAVE_SIZE * 8) == 0) dsl_gemv_rows<8, 4>(W, K, xs, r0, r1, part, epi);
   else dsl_gemv_rows<4, 8>(W, K, xs, r0, r1, part, epi);
+#endif
 }
 static __device__ __forceinline__ void dsl_stage(const __hip_bfloat16* __restrict__ x, int K, float* xs) {   // bf16 -> fp32 LDS, 16 B per thread
+#ifdef DSL_ABLATE_STAGE
+  __syncthreads(); return;          // ablation: the barrier without the fill (the dot then reads stale LDS: WRONG output)
+#endif
 #ifdef ETX_DSL_COH
   for (int i = (int)threadIdx.x; i < K / 8; i += blockDim.x) {
     // activation: two device-coherent 8 B loads (both stay in flight; the compiler places the waits)
@@ -255,24 +262,44 @@ BODIES = {
   if (r0 >= r1) return;
   float* g = xs + d.K; float* part = g + 2 * d.rpt;
   int* lids = (int*)(part + 16 * DSL_RCH); float* lwts = (float*)(lids + 16);   // top-k fold: R = k, mode 3 = renormalised
+#ifdef DSL_ABLATE_TOPK
+  if (etx_wave() == 0 && etx_lane() == 0) { lids[s] = s; lwts[s] = 1.f; }       // ablation: slot s -> expert s (WRONG output)
+  __syncthreads();
+#else
   if (d.mode >= 2) dsl_topk_lds(d.logits, d.E, d.R, d.mode == 3 ? 1 : 0, lids, lwts);
+#endif
   const __hip_bfloat16* We = d.W + (size_t)(d.mode >= 2 ? lids[s] : dsl_a_ldi(d.ids + s)) * d.estride;     // g: 2 x rpt floats (rpt <= DSL_RCH, host-checked)
   dsl_stage(d.x, d.K, xs);
   dsl_gemv_chunked(We, d.K, xs, r0, r1, part, [&](int r, float v) { g[r - r0] = dsl_bfr(v); });
+#ifndef DSL_ABLATE_ONEPASS                                                      // ablation: gate only, no up pass (WRONG output)
   dsl_gemv_chunked(We + (size_t)d.M * d.K, d.K, xs, r0, r1, part, [&](int r, float v) { g[d.rpt + r - r0] = dsl_bfr(v); });
+#endif
   __hip_bfloat16* act = d.out + (size_t)s * d.M;
-  for (int r = r0 + (int)threadIdx.x; r < r1; r += blockDim.x) dsl_a_stbf(act + r, __float2bfloat16(dsl_silu(g[r - r0]) * g[d.rpt + r - r0]));''',
+#ifdef DSL_ABLATE_EPI                                                           // ablation: no silu, no multiply (WRONG output)
+  for (int r = r0 + (int)threadIdx.x; r < r1; r += blockDim.x) dsl_a_stbf(act + r, __float2bfloat16(g[r - r0]));
+#else
+  for (int r = r0 + (int)threadIdx.x; r < r1; r += blockDim.x) dsl_a_stbf(act + r, __float2bfloat16(dsl_silu(g[r - r0]) * g[d.rpt + r - r0]));
+#endif''',
     "scale": '''
   const int s = blk / d.tpe, j = blk - s * d.tpe;
   const int r0 = j * d.rpt, r1 = min(d.M, r0 + d.rpt);
   if (r0 >= r1) return;
   int* lids = (int*)(xs + d.K + 16 * DSL_RCH); float* lwts = (float*)(lids + 16);
+#ifdef DSL_ABLATE_TOPK
+  if (etx_wave() == 0 && etx_lane() == 0) { lids[s] = s; lwts[s] = 1.f; }       // ablation: slot s -> expert s (WRONG output)
+  __syncthreads();
+#else
   if (d.mode >= 2) dsl_topk_lds(d.logits, d.E, d.R, d.mode == 3 ? 1 : 0, lids, lwts);
+#endif
   const __hip_bfloat16* We = d.W + (size_t)(d.mode >= 2 ? lids[s] : dsl_a_ldi(d.ids + s)) * d.estride;
   dsl_stage(d.x + (size_t)s * d.K, d.K, xs);
   __hip_bfloat16* out = d.out + (size_t)s * d.M;
+#ifdef DSL_ABLATE_EPI                                                           // ablation: no routing-weight multiply (WRONG output)
+  dsl_gemv_chunked(We, d.K, xs, r0, r1, xs + d.K, [&](int r, float v) { dsl_a_stbf(out + r, __float2bfloat16(v)); });
+#else
   const float ws = d.mode >= 2 ? lwts[s] : dsl_a_ldf(d.wts + s);
-  dsl_gemv_chunked(We, d.K, xs, r0, r1, xs + d.K, [&](int r, float v) { dsl_a_stbf(out + r, __float2bfloat16(v * ws)); });''',
+  dsl_gemv_chunked(We, d.K, xs, r0, r1, xs + d.K, [&](int r, float v) { dsl_a_stbf(out + r, __float2bfloat16(v * ws)); });
+#endif''',
 }
 
 
