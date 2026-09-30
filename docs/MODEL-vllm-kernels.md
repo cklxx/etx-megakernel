@@ -588,5 +588,7 @@ model points at is phase width, which is not a switch today (`examples/vllm_llm/
 Narrowing every wide phase to about 90 tasks is worth about 2.2 ms per token under this model -- far more than any
 switch, and the direct consequence of the old cost model having searched with the wrong objective.
 
-The interleaved row mapping (replacing the contiguous `[r0, r1)` of `dsl_gemv_rows`) is worth 0.434 ms on build 3
-(5.722 -> 5.288 with everything else equal, 7.4%), not the 30-60% the raw table suggested. Not implemented.
+The interleaved row mapping (replacing the contiguous `[r0, r1)` of `dsl_gemv_rows`) is worth 0.50 ms on build 3
+(5.722 -> 5.221 with everything else equal, 8.8%), not the 30-60% the raw table suggested, and it is the one lever
+whose size the model can only bound: the rows points that would settle it below 50 KB per workgroup were the ones
+the Infinity Cache contaminated. Not implemented.
