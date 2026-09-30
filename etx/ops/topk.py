@@ -25,10 +25,20 @@ static __device__ __attribute__((always_inline)) void dsl_run_dsl_topk(const uns
   float* wts = *(float* const*)(a + 8); int* ids = *(int* const*)(a + 16); int* tei = *(int* const*)(a + 24);
   const int E = *(const int*)(a + 32), K = *(const int*)(a + 36), renorm = *(const int*)(a + 40);
   const int lane = etx_lane();
+#ifdef ETX_ABL_TOPK_SKIP     // timing-only: no load, no scan; fixed ids and weights (WRONG OUTPUT)
+  if (lane == 0) for (int t = 0; t < K; ++t) { dsl_a_sti(ids + t, t); dsl_a_sti(tei + t, t); dsl_a_stf(wts + t, 1.f / (float)K); }
+  return;
+#endif
   float p[2]; bool taken[2];
   float m = -INFINITY;
 #pragma unroll
-  for (int k = 0; k < 2; ++k) { const int e = lane + k * ETX_WAVE_SIZE; p[k] = e < E ? dsl_a_ldbf(logits + e) : -INFINITY; taken[k] = e >= E; m = fmaxf(m, p[k]); }
+  for (int k = 0; k < 2; ++k) { const int e = lane + k * ETX_WAVE_SIZE; p[k] = e < E ?
+#ifdef ETX_ABL_TOPK_NOLOAD   // timing-only: synthetic logits, the two coherent loads removed (WRONG OUTPUT)
+    (float)((e * 37) & 127) * 0.01f
+#else
+    dsl_a_ldbf(logits + e)
+#endif
+    : -INFINITY; taken[k] = e >= E; m = fmaxf(m, p[k]); }
   m = etx_wave_max(m);
   float s = 0.f;
 #pragma unroll
@@ -48,10 +58,25 @@ static __device__ __attribute__((always_inline)) void dsl_run_dsl_topk(const uns
     }
 #pragma unroll
     for (int k = 0; k < 2; ++k) if (lane + k * ETX_WAVE_SIZE == bi) taken[k] = true;
-    if (lane == 0) { dsl_a_sti(ids + t, bi); dsl_a_sti(tei + t, t); if (t < 16) lw[t] = bv; }
+    // `tei` (vLLM's token_expert_indices) is written for signature parity; nothing in the megakernel reads it
+    // (host.hip:241 voids it, the MoE tiles take only ids/weights). ETX_ABL_TOPK_NOTEI sizes those 8 stores.
+    if (lane == 0) {
+#ifndef ETX_ABL_TOPK_NOSTORE
+      dsl_a_sti(ids + t, bi);
+#ifndef ETX_ABL_TOPK_NOTEI
+      dsl_a_sti(tei + t, t);
+#endif
+#else
+      asm volatile("" :: "v"(bi) : "memory");
+#endif
+      if (t < 16) lw[t] = bv; }
     sel += bv;
   }
+#ifdef ETX_ABL_TOPK_NOSTORE  // timing-only: the scan runs, the 24 coherent stores do not (WRONG OUTPUT)
+  if (lane == 0) for (int t = 0; t < K && t < 16; ++t) { const float v = renorm ? lw[t] / sel : lw[t]; asm volatile("" :: "v"(v)); }
+#else
   if (lane == 0) for (int t = 0; t < K && t < 16; ++t) dsl_a_stf(wts + t, renorm ? lw[t] / sel : lw[t]);
+#endif
 }
 extern "C" __device__ __attribute__((always_inline)) void etx_tile_dsl_topk(const etx_ctx* c) {
   dsl_run_dsl_topk(etx_imp_argblock(c->args, c->cst[0]));
