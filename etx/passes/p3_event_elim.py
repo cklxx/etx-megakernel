@@ -50,6 +50,16 @@ def run(plan: Plan) -> bool:
         p = prods[0]
         if not p.pure or p.out_to_in is None:
             continue
+        # Purity is only honoured where it can be checked. TaskGrid.__post_init__ rejects pure with writes that
+        # alias reads; re-check here in case `pure` was set after construction, and refuse a producer that declares
+        # no writes at all -- then its dataflow is opaque (the vllm_llm grids pass one argument-block tensor) and
+        # in-placeness is unprovable. Recomputing an in-place tile per consumer applies its transform twice.
+        if not p.writes:
+            plan.say(f"P3: keep {name}: {p.name} is pure but declares no writes, so in-placeness is unprovable")
+            continue
+        if set(p.writes) & set(p.reads):
+            plan.say(f"P3: keep {name}: {p.name} writes tensors it also reads, so recomputation is not idempotent")
+            continue
         if any(c.device != p.device for c in cons):
             plan.say(f"P3: keep {name}: consumers span devices")
             continue

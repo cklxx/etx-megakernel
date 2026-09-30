@@ -88,3 +88,29 @@ def test_relay_off_for_small_fanout():
     m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
     plan = compile_graph(m.build(), "gfx942", m.bindings(), options=__import__("etx.passes.plan", fromlist=["PassOptions"]).PassOptions(relay="auto"))
     assert not plan.relay
+
+
+def test_pure_in_place_grid_is_rejected_at_construction():
+    """`pure` licenses Pass 3 to recompute a grid once per consumer, so an in-place tile (etx.ops.attnprep norms
+    and ropes qkv in place) must not be declarable as pure: recomputing it applies its transform twice."""
+    from etx.ir.types import TaskGrid, TileBody
+    with pytest.raises(ValueError, match="pure=True but writes"):
+        TaskGrid(name="prep", grid=(4,), body=TileBody(kind="hip_link", symbol="etx_tile_prep"),
+                 args=["qkv"], reads=["qkv"], writes=["qkv"], pure=True, out_to_in="i->i")
+    TaskGrid(name="prep", grid=(4,), body=TileBody(kind="hip_link", symbol="etx_tile_prep"),      # not pure: in place is fine
+             args=["qkv"], reads=["qkv"], writes=["qkv"])
+
+
+def test_p3_keeps_events_whose_producer_purity_is_unprovable():
+    """Pass 3 honours purity only where it can check it: a pure producer that declares no writes (the vllm_llm
+    grids hand over one opaque argument block) keeps its event, and a genuinely pure one is still eliminated."""
+    b = moe_layer.bindings()
+    g = moe_layer.build()
+    norm = g.grid("norm")
+    assert norm.pure and norm.writes == ["x_n"] and not set(norm.writes) & set(norm.reads)
+    norm.writes = []                                    # dataflow no longer declared
+    plan = compile_graph(g, "gfx942", b, moe_layer.runtime(b))
+    assert "E_norm" not in plan.eliminated_events
+    assert any("is pure but declares no writes" in line for line in plan.log)
+    kept = compile_graph(moe_layer.build(), "gfx942", b, moe_layer.runtime(b))   # unmodified: still eliminated
+    assert "E_norm" in kept.eliminated_events

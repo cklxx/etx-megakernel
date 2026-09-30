@@ -119,6 +119,14 @@ class TaskGrid:
     def __post_init__(self) -> None:
         if len(self.consts) > 4 or not all(isinstance(c, int) for c in self.consts):
             raise ValueError(f"{self.name}: consts must be at most 4 ints, got {self.consts!r}")
+        # `pure` licenses Pass 3 to recompute this grid once per consumer, so it must be idempotent. A tile that
+        # writes a tensor it also reads is not: running it twice applies its transform twice (etx.ops.attnprep
+        # norms and ropes qkv rows in place). Caught here rather than in the pass, so no construction path can
+        # declare it. Pass 3 additionally refuses a pure grid with no declared writes, where this is unprovable.
+        alias = sorted(set(self.writes) & set(self.reads))
+        if self.pure and alias:
+            raise ValueError(f"{self.name}: pure=True but writes {alias} it also reads (in-place tiles are not "
+                             f"idempotent, and Pass 3 would recompute this grid in every consumer)")
 
     @property
     def has_runtime_edges(self) -> bool:
