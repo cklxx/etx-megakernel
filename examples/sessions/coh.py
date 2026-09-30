@@ -25,7 +25,8 @@ def job(**kw):
 
 LLM = "$HOME/llm"
 PY = "~/llmenv/bin/python"
-V = "VLLM=$HOME/vllm ETX_TORCH_HEADERS=$HOME/rocm-headers/pytorch"
+# ETX_ROCM_HEADERS: ROCm installs that ship compiler + device libs but no HIP headers (rsync rocm-headers/inc there)
+V = "VLLM=$HOME/vllm ETX_TORCH_HEADERS=$HOME/rocm-headers/pytorch ETX_ROCM_HEADERS=$HOME/rocm-headers/inc"
 RES = r"^RESULT|generated tokens match|per-token latency|CHECK-DSL|beyond 2 ulps|wrong \("
 M, HF = "qwen3-30b-a3b", "Qwen/Qwen3-30B-A3B"
 
