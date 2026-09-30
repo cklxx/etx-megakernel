@@ -7,7 +7,8 @@
 #   tools/session.sh status <ip>                     runner alive?, last 25 lines of its log
 #   tools/session.sh fetch  <ip> <dest>              pull ~/sess (small files; *.bin traces too) into <dest>
 set -uo pipefail
-CMD=${1:?push|start|status|fetch}; IP=${2:?ip}; H=hotaisle@$IP
+# ETX_SESS_USER overrides the login (Hot Aisle VMs use hotaisle; other providers may give root)
+CMD=${1:?push|start|status|fetch}; IP=${2:?ip}; H=${ETX_SESS_USER:-hotaisle}@$IP
 SSH="ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new $H"
 case $CMD in
   push)
