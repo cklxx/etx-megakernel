@@ -52,7 +52,12 @@ from examples.llm.model import load_dims  # noqa: E402
 # sits near 192. Must be a multiple of NX (8) so each XCD gets the same number of workers.
 CU = int(os.environ.get("ETX_VL_CU", "304"))    # MI300X has 304 compute units
 BS = 16                       # KV block size (vLLM default on ROCm)
-PART = 256                    # paged attention partition size (fixed in paged_attention_custom_launcher)
+PART = 256                    # paged attention partition size (fixed in paged_attention_custom_launcher).
+# Sets only parts = ceil(MAXLEN / PART) = gridDim.y; the partition SIZE is a hardcoded T_PAR_SIZE = 256 in the
+# kernel (vllm/csrc/rocm/attention.cu:362), and a partition past the sequence early-exits (:366-369). So parts
+# * 256 must cover seq_len or the tail is never attended and reduce reads unwritten partials: 256 is the minimum
+# correct value at MAXLEN 1072, 128 only adds early-exiting tasks, 512 is incorrect. Not a tuning knob
+# (results_2026-10-01/round11/FINDING.md).
 THREADS = 1024                # megakernel workgroup = the largest imported block (wvSplitK 64 x 16)
 MOE_BN = 64                   # fused_moe_kernel BLOCK_SIZE_N of vLLM's default config at batch 1 (examples/vllm_llm/triton)
 MAXLEN = int(os.environ.get("ETX_VL_MAXLEN", "1072"))    # vLLM's max_model_len for the benchmark (prompt + 32 + 16)
