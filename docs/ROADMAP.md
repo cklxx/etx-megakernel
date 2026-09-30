@@ -19,15 +19,17 @@ per token, about 2 ms. Nobody has published more than 36% at batch 1 on gfx942 (
 XCD-affine placement by reading XCC_ID, two-level event scope (the last worker per XCD flushes), AOT static per-worker
 queues, a simulator calibrated to 11%, Lean and TLA+ on the GEMV loop and the event protocols.
 
-## Near term: the queued session (examples/sessions/dsl_gemv.py)
+## Near term: the queued session (examples/sessions/coh.py)
 
-One run each, best configuration first, decisions pre-registered:
+Ran 2026-09-30 (docs/RESULTS-2026-09-30.md): the dsl_gemv session measured build 3 at 5.895 (predicted 3.56),
+fold + touch worth 0.7%, and the diagnosis that replaced the model: a per-phase floor, the acquire's cache
+invalidate, and the row mapping. The next session is queued, one run per number:
 
-1. build 3 + touch: read the number against the sensitivity table (section 17). About 3.6: the model holds. About
-   4.5: the prologue loads see loaded latency. About 4.8: the hand-offs are what evx measured, not the trace. Two
-   requests: 2.42 ms per token predicted (413 tok/s; vLLM batch 2: 360).
-2. hw_bench sdat against evx: the value of the sentinel hand-off before it is built.
-3. hw_bench lfx: one XCD's bandwidth; closes the pipelining question (section 17 says batching wins at every f).
+1. Microbenchmarks first: hw_bench restart (the inv's cost to a warm phase), cohload, the fixed width sweep,
+   lfx. These are the diagnosis whatever the build does.
+2. build 4 = build 3 + ETX_VL_COH. Readings (section 20): ~5.9 means the inv was never the cost; 5.6-5.8 means
+   the overhead moved but touch is still dead; 4.9-5.3 means both landed. Independent of the number: fused <
+   unfused (5.660) flips the 0.235 ms fusion penalty, the reading that matters.
 
 ## Mid term (1-2 months): kill the fusion penalty, then batching
 
