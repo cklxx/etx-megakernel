@@ -178,7 +178,22 @@ def instances(d) -> list[dict]:
             add("rms_norm_2d" if L == 0 else "fused_add_rms_norm", L, "in_norm", (1, 1, 1))
         gemv(L, "qkv", d.NQKV, d.H)
         if DSL_ATTN:
-            add("dsl_attn", L, "attn", (1, parts, d.NKV))          # prep + cache + attention, one block per (partition, kv head)
+            # prep + cache + attention in one block per (partition, kv head). NOTE (round 9, 2026-10-01): this shape
+            # cannot be built correctly as written, and it is not the way to shorten the attention block.
+            #  * dsl_attnprep transforms qkv IN PLACE (reads row, rms-norms + ropes it, writes the same row), so it is
+            #    not idempotent: any decomposition that runs it in more than one task per kv head applies norm+rope
+            #    twice and is simply wrong. That also rules out Pass 3's prologue recomputation (p3_event_elim, which
+            #    gates on grid.pure -- prep is not marked pure, so P3 never fires on it today; marking it pure would
+            #    silently miscompile, since P3 checks purity by declaration, not by inspecting in-place writes).
+            #  * Making it idempotent (Q to a separate buffer) costs parts x prep per head -- 5 x 6.06 = 30 us/layer
+            #    here -- to delete one ~1.2 us hand-off: round 7's folded-top-k mistake at 25x the ratio.
+            #  * Letting only partition 0 do the prep does not remove the edge, it relabels it: partitions 1..parts-1
+            #    would wait on task (0, h), whose event is published after its WHOLE body, so they wait prep + attn
+            #    (6.06 + 1.91) instead of prep (6.06). Strictly worse by attn's body.
+            # The serialization is semantic: attn(p, h) needs all G q rows plus the k/v cache rows of head h, and those
+            # are a function of this step's qkv. Shortening the block means shortening prep's own dependent chain
+            # (8.8 hops measured, ~3-4 necessary), not re-drawing the task boundaries.
+            add("dsl_attn", L, "attn", (1, parts, d.NKV))
         elif DSL_ATTNHEAD:
             if not d.qk_norm or d.G + 2 > THREADS // 64:
                 raise SystemExit("ETX_VL_DSL_ATTN=head needs q/k norm and G + 2 waves per workgroup (etx/ops/attnprep.py)")
