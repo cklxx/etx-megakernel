@@ -67,8 +67,14 @@ job(name=f"build_{B}", lane="cpu", after=["etx_env", "dl"], timeout=2400,
         f"cp $HOME/sess/b_{B}/plan.json $HOME/sess/plan_{B}.json; cp $HOME/sess/b_{B}/dsl_tiles.hip $HOME/sess/; test -x $HOME/sess/b_{B}/run",
     summary=[r"tasks=|megakernel|VGPRs Spill"])
 RUN = f"$HOME/sess/b_{B}/run {LLM}/{M} $HOME/sess/b_{B}/vl_plan.txt"
+# the timed fused number, with the per-task execution counter OFF (it is ~67k device atomics per token on the fused
+# path only -- see etx/runtime/include/etx/host.h; correctness here rests on --check-dsl and 32/32 tokens)
 job(name="run_fused", gpu=0, after=[f"build_{B}", "prep"], timeout=900, cmd=f"stdbuf -oL {RUN} --repeat 1 --check-dsl", summary=[RES])
-job(name="run_unfused", gpu=0, after=[f"build_{B}", "prep"], after_any=["run_fused"], timeout=900, cmd=f"stdbuf -oL {RUN} --repeat 1 --unfused", summary=[RES])
+# the same build with the counter ON: the difference is exactly what our own instrumentation cost every fused
+# number we have ever measured (build 3 5.895 carried it; every unfused number did not)
+job(name="run_fused_cnt", gpu=0, after=[f"build_{B}", "prep"], after_any=["run_fused"], timeout=900,
+    cmd=f"ETX_EXEC_COUNT=1 stdbuf -oL {RUN} --repeat 1", summary=[RES])
+job(name="run_unfused", gpu=0, after=[f"build_{B}", "prep"], after_any=["run_fused_cnt"], timeout=900, cmd=f"stdbuf -oL {RUN} --repeat 1 --unfused", summary=[RES])
 job(name="trace_fused", gpu=0, after=[f"build_{B}", "prep"], after_any=["run_unfused"], timeout=900,
     cmd=f"ETX_TRACE=1 ETX_TRACE_RAW=$HOME/sess/trace_{B}.bin stdbuf -oL {RUN} --max-steps 8 --repeat 1", summary=[RES])
 
