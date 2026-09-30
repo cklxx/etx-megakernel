@@ -34,6 +34,8 @@
 //                      each pass (the megakernel's per-task acquire): the warm-pass gap is what one acquire costs a phase.
 //   hw_bench cohload   a fresh cross-XCD 4 KB x-vector read via inv sc1 + plain loads vs sc0 sc1 loads with no invalidate,
 //                      each followed by a warm 28 KB weight stream: what coherent activation loads (no inv) buy a phase.
+//   hw_bench moegather the MoE expert gather (2 x 128 KB halves 3.15 MB apart, experts 6.29 MB apart over 805 MB)
+//                      against one contiguous sweep of the same 50.3 MB at the same width; + the tile's LDS stage.
 //   hw_bench launch    the kernel boundary with work: 200 kernels in one HIP graph, each reads the previous kernel's output
 //                      and chases H dependent loads (H = -1: an empty kernel). Splits the fitted F into boundary + hops.
 //   hw_bench evx       ETX's own event protocol (the gfx942 lowering: fetch_sub arrive, poll = buffer_inv sc0 + load with
@@ -671,6 +673,65 @@ __global__ void __launch_bounds__(kT) k_cohload(uint32_t* vec, const u4* __restr
   if (acc == 0x12345u) sink[blockIdx.x] = acc;
 }
 
+// ------------------------------------------------------------------ moegather (the MoE expert gather vs one sweep)
+// Qwen3-30B-A3B's moe_up phase, exactly: 192 workgroups, task w = (s = w / 24, j = w % 24); expert s reads rows
+// j * 32 .. j * 32 + 32 of gate (128 KB contiguous) and the same rows of up, which sit estride/2 = 3.15 MB later;
+// experts are 6.29 MB apart inside the 128-expert, 805 MB gate_up block. Same total bytes (50.3 MB) and the same
+// width in every mode, so the spans are directly comparable:
+//   0 sweep    one contiguous 256 KB per workgroup (what o_proj does, which reaches 99% of achievable)
+//   1 split    the 2 x 128 KB halves 3.15 MB apart, experts adjacent (s) -- isolates the gate/up split alone
+//   2 gather   the halves plus experts scattered over all 128, rotating per pass -- the real top-k pattern
+//   3 gather+  as 2, plus the tile's per-task LDS stage of x (2048 floats) and a 128-entry top-k-like scan
+__device__ __forceinline__ void mg_read(const u4* __restrict__ p, int64_t n16, uint32_t& acc) {
+  for (int64_t i = threadIdx.x; i < n16; i += kT * 8) {
+    u4 v[8];
+#pragma unroll
+    for (int d = 0; d < 8; ++d) v[d] = (i + d * kT < n16) ? p[i + d * kT] : u4{0, 0, 0, 0};
+    live8(v);
+#pragma unroll
+    for (int d = 0; d < 8; ++d) acc ^= xs(v[d]);
+  }
+}
+__global__ void __launch_bounds__(kT) k_moegather(const u4* __restrict__ w, int active, int tpe, int64_t chunk,
+                                                  int64_t estride, int64_t half, int nexp, int mode, int iters,
+                                                  Ctl* ctl, uint64_t* t_start, uint64_t* t_end, uint32_t* sink) {
+  extern __shared__ float s_lds[];
+  __shared__ int s_slot;
+  if (threadIdx.x == 0) s_slot = claim_xslot(ctl);
+  __syncthreads();
+  const int x = (int)xcc_id(), pbase = active / 8, rem = active % 8;
+  const int slot = s_slot, wid = x * pbase + (x < rem ? x : rem) + slot;
+  const bool on = slot < pbase + (x < rem ? 1 : 0);
+  const int64_t n16 = chunk / 16;
+  uint32_t acc = 0;
+  for (int it = 0; it < iters; ++it) {
+    grid_barrier(ctl, it + 1);
+    if (!on) continue;
+    const uint64_t t0 = now();
+    const int s = wid / tpe, j = wid - s * tpe;
+    size_t o0, o1;
+    if (mode == 0) { o0 = (size_t)wid * 2 * n16; o1 = o0 + n16; }          // one contiguous 256 KB
+    else {
+      const int e = (mode == 1) ? s : (int)((s * 37 + 11 + it * 13) % nexp);
+      o0 = (size_t)e * (estride / 16) + (size_t)j * n16;                   // gate rows
+      o1 = o0 + (size_t)(half / 16);                                       // up rows, estride / 2 later
+    }
+    if (mode == 3) {                                                       // the tile's own per-task work
+      for (int i = threadIdx.x; i < 2048; i += kT) s_lds[i] = (float)(i + it);
+      __syncthreads();
+      if (threadIdx.x < 64) { float m = -1e30f;                            // a top-k-like scan over 128 logits
+        for (int i = threadIdx.x; i < 128; i += 64) m = fmaxf(m, s_lds[i]);
+        s_lds[2048 + threadIdx.x] = m; }
+      __syncthreads();
+    }
+    mg_read(w + o0, n16, acc);
+    mg_read(w + o1, n16, acc);
+    __syncthreads();
+    if (threadIdx.x == 0) { t_start[(size_t)it * active + wid] = t0; t_end[(size_t)it * active + wid] = now(); }
+  }
+  if (acc == 0x12345u) sink[blockIdx.x] = acc;
+}
+
 // ------------------------------------------------------------------ host
 int main(int argc, char** argv) {
   setvbuf(stdout, nullptr, _IOLBF, 0);
@@ -1039,5 +1100,31 @@ int main(int argc, char** argv) {
     }
   }
 
+  if (what == "all" || what == "moegather") {
+    // Qwen3-30B-A3B moe_up: E = 128, H = 2048, MI = 768, top-k 8; gate_up per expert 2 * MI * H * 2 B = 6.29 MB,
+    // the up half 3.15 MB after the gate half; 192 tasks = 8 experts x 24 row chunks of 32 rows x 2048 bf16 = 128 KB
+    const int iters = 12, active = 192, tpe = 24, nexp = 128;
+    const int64_t chunk = 32LL * 2048 * 2, half = 768LL * 2048 * 2, estride = 2 * half;
+    uint64_t *ts, *te; CHECK(hipMalloc(&ts, (size_t)iters * 304 * 8)); CHECK(hipMalloc(&te, (size_t)iters * 304 * 8));
+    static const char* modes[] = {"sweep   ", "split   ", "gather  ", "gather+ "};
+    for (int mode = 0; mode < 4; ++mode) {
+      reset(); CHECK(hipMemset(ts, 0, (size_t)iters * 304 * 8)); CHECK(hipMemset(te, 0, (size_t)iters * 304 * 8));
+      hipLaunchKernelGGL(k_moegather, dim3(ncu), dim3(kT), lds1, st, w, active, tpe, chunk, estride, half, nexp,
+                         mode, iters, ctl, ts, te, sink);
+      if (!wait_stream(st, 30)) { printf("RESULT moegather HUNG\n"); return 3; }
+      std::vector<uint64_t> hs((size_t)iters * 304), he((size_t)iters * 304);
+      CHECK(hipMemcpy(hs.data(), ts, hs.size() * 8, hipMemcpyDeviceToHost)); CHECK(hipMemcpy(he.data(), te, he.size() * 8, hipMemcpyDeviceToHost));
+      std::vector<double> spans, wg;
+      for (int it = 2; it < iters; ++it) {
+        uint64_t lo = ~0ull, hi = 0;
+        for (int k = 0; k < active; ++k) { const size_t i = (size_t)it * active + k; if (!hs[i]) continue;
+          lo = std::min(lo, hs[i]); hi = std::max(hi, he[i]); wg.push_back((he[i] - hs[i]) * 0.01); }
+        if (hi > lo) spans.push_back((hi - lo) * 0.01);
+      }
+      const double sp = pct(spans, 0.5), total = (double)active * 2 * chunk;
+      printf("RESULT moegather %s active %3d x %3lld KB (%4.1f MB): span %7.2f us  WG median %7.2f  -> %.2f TB/s\n",
+             modes[mode], active, (long long)(2 * chunk / 1024), total / 1048576.0, sp, pct(wg, 0.5), total / (sp * 1e-6) / 1e12);
+    }
+  }
   return 0;
 }
