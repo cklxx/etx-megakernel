@@ -423,7 +423,8 @@ int main(int argc, char** argv) {
         if (!mods.count(x.exp)) { hipModule_t mod; ETX_CHECK(hipModuleLoad(&mod, tri_path)); ETX_CHECK(hipModuleGetFunction(&mods[x.exp], mod, tri_fn)); }
         tri = mods[x.exp];
       }
-      if (etx_launch_count[x.n + 1] != x.tasks) die("launch table does not follow the plan at instance " + std::to_string(x.n));
+      const int xtasks = x.tasks == 1 && x.rep > 1 ? x.rep : x.tasks;         // an x-form instance runs one task per XCD
+      if (etx_launch_count[x.n + 1] != xtasks) die("launch table does not follow the plan at instance " + std::to_string(x.n));
       for (size_t b = 0; b < bufs.size(); ++b) ETX_CHECK(hipMemcpyAsync(save[b], bufs[b].first, bufs[b].second, hipMemcpyDeviceToDevice, hst.stream));
       std::vector<void*> av(d->nparams); for (int k = 0; k < d->nparams; ++k) av[k] = ab.data() + x.off + d->off[k];
       ETX_CHECK(hipEventRecord(e0, hst.stream));
@@ -542,13 +543,28 @@ int main(int argc, char** argv) {
       const float sv = 1.0f / sqrtf((float)(ss / H) + eps);
       for (int i = 0; i < H; ++i) xv[i] = b2f(f2b(xv[i] * sv * b2f(ln[i])));
       return xv; };
+    // an instance's launch: usually launch x.n + 1 (launch 0 is the one prologue, then one launch per instance), but
+    // located by the launch's type name ("role_layer", or "role_layer_x" for a per-XCD replica form) so the check does
+    // not depend on that arithmetic. An x-form instance (tasks == 1, rep > 1: one replica per XCD, e.g. the non-fold
+    // top-k) runs rep tasks, not x.tasks.
+    const int n_launch = etx_launch_begin[ETX_N_DEVICES];
+    auto inst_tasks = [](const Inst& x) { return x.tasks == 1 && x.rep > 1 ? x.rep : x.tasks; };
+    auto launch_of = [&](const Inst& x) {
+      const std::string n1 = x.layer >= 0 ? x.role + "_" + std::to_string(x.layer) : x.role, n2 = n1 + "_x";
+      auto named = [&](int li) { const char* tn = etx_type_names[etx_descs[etx_launch_first[li]].type]; return n1 == tn || n2 == tn; };
+      if (x.n + 1 < n_launch && named(x.n + 1)) return x.n + 1;
+      for (int li = 1; li < n_launch; ++li) if (named(li)) return li;                 // the plan order drifted: search
+      die("--check-dsl: no launch of type " + n1 + " (or " + n2 + ")"); return -1;
+    };
     auto relaunch = [&](const char* role, const char* exp) {
       for (const Inst& x : insts) if (x.layer == Lc && x.role == role && x.req == 0) {
         const std::string want = is_fold(role) ? std::string(exp) + "_fold" : std::string(exp);
         if (x.exp != want) die(std::string("--check-dsl: ") + role + " is " + x.exp + ", not " + want);
-        if (etx_launch_count[x.n + 1] != x.tasks) die(std::string("--check-dsl: launch ") + std::to_string(x.n + 1) + " is not " + role);
-        int32_t first = etx_launch_first[x.n + 1]; void* kargs[] = {&hst.p, &first};   // launch 0 is the (one) prologue
-        ETX_CHECK(hipLaunchKernel(hst.unfused_kernel, dim3(etx_launch_count[x.n + 1]), dim3(ETX_THREADS), kargs, 0, hst.stream));
+        const int li = launch_of(x);
+        if (etx_launch_count[li] != inst_tasks(x)) die(std::string("--check-dsl: launch ") + std::to_string(li) + " of " + role + " has " +
+            std::to_string(etx_launch_count[li]) + " tasks, the plan says " + std::to_string(inst_tasks(x)));
+        int32_t first = etx_launch_first[li]; void* kargs[] = {&hst.p, &first};
+        ETX_CHECK(hipLaunchKernel(hst.unfused_kernel, dim3(etx_launch_count[li]), dim3(ETX_THREADS), kargs, 0, hst.stream));
         if (!wait_stream(hst.stream, 5.0)) die(std::string("--check-dsl: ") + role + " hung");
         return;
       }
