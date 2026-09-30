@@ -1,3 +1,4 @@
 states/
 ImportRounds4.tla
 *.old
+*_TTrace_*

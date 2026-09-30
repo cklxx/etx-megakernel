@@ -55,6 +55,13 @@ DSLT=(); if [ -n "$DSLOPS" ]; then "$PY" -m etx.ops.emit "$OUT/imp/imports.json"
 # the KV cache stays cached, so its writer and readers must share an XCD: ETX_VL_PIN is forced on
 UCF=()
 if [ "${ETX_VL_UC:-0}" = 1 ]; then export ETX_VL_PIN=1; UCF=(-DETX_VL_UC -DETX_COHERENT_DEVICE_DATA); fi
+# ETX_VL_COH=1: the DSL tiles' activation accesses are device-coherent (etx.ops.coh) and the plan drops their acquire
+# invalidates (model.py coh_of); untested together with ETX_VL_UC's downgraded DEVICE fences, so the pair is refused
+COHF=()
+if [ "${ETX_VL_COH:-0}" = 1 ]; then
+  [ "${ETX_VL_UC:-0}" = 1 ] && { echo "ETX_VL_COH=1 with ETX_VL_UC=1 is untested; pick one" >&2; exit 1; }
+  COHF=(-DETX_DSL_COH)
+fi
 echo "== plan"
 env "${DSLT[@]}" ETX_VL_IMPORTS="$OUT/imp/imports.json" ETX_VL_ADAPTERS="$OUT/imp_tiles.hip" ETX_VL_PLAN="$OUT/vl_plan.txt" ETX_LLM_CONFIG="$CONFIG" ETX_VL_CHAINS="$OUT/chain_tiles.hip" \
   "$PY" -m etx compile examples/vllm_llm/model.py --arch gfx942 --out "$OUT" --inline-tiles > "$OUT/compile.log" 2>&1 || { tail -20 "$OUT/compile.log"; exit 1; }
@@ -63,7 +70,7 @@ if [ "${ETX_VL_UC:-0}" = 1 ]; then "$PY" "$ROOT/examples/vllm_llm/check_uc_plan.
 echo "== hipcc"
 hipcc -O3 -std=c++17 --offload-arch=gfx942 -I "$ROOT/etx/runtime/include" -I "$OUT" -I "$ROOT" \
   -Xclang -mlink-builtin-bitcode -Xclang "$OUT/imports.bc" -Rpass-analysis=kernel-resource-usage \
-  "${CHK[@]}" "${UCF[@]}" -DETX_VL_REQUESTS=${ETX_VL_REQUESTS:-1} ${ETX_HIPCC_FLAGS:-} "$OUT/megakernel_d0.hip" "$ROOT/examples/vllm_llm/host.hip" $([ "${ETX_VL_CHECK:-0}" = 1 ] && echo "$OUT/imp/orig_table.hip -x none $OUT/imp/orig_*.o") -o "$OUT/run" 2>&1 \
+  "${CHK[@]}" "${UCF[@]}" "${COHF[@]}" -DETX_VL_REQUESTS=${ETX_VL_REQUESTS:-1} ${ETX_HIPCC_FLAGS:-} "$OUT/megakernel_d0.hip" "$ROOT/examples/vllm_llm/host.hip" $([ "${ETX_VL_CHECK:-0}" = 1 ] && echo "$OUT/imp/orig_table.hip -x none $OUT/imp/orig_*.o") -o "$OUT/run" 2>&1 \
   | grep -E "Function Name|VGPRs:|ScratchSize|VGPRs Spill|LDS Size|error" | sed -E "s/.*remark: +//; s/ \[-Rpass.*//" | paste - - - - - || true
 [ -x "$OUT/run" ] || { echo "build failed: no $OUT/run"; exit 1; }
 echo "built $OUT/run (plan $OUT/vl_plan.txt)"

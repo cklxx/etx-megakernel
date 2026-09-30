@@ -121,9 +121,17 @@ static __device__ __forceinline__ void dsl_gemv(const __hip_bfloat16* __restrict
   else dsl_gemv_rows<4, 8>(W, K, xs, r0, r1, part, epi);
 }
 static __device__ __forceinline__ void dsl_stage(const __hip_bfloat16* __restrict__ x, int K, float* xs) {   // bf16 -> fp32 LDS, 16 B per thread
+#ifdef ETX_DSL_COH
+  for (int i = (int)threadIdx.x; i < K / 8; i += blockDim.x) {
+    // activation: two device-coherent 8 B loads (both stay in flight; the compiler places the waits)
+    const unsigned long long lo = dsl_a_ld64((const unsigned long long*)(x + 8 * i));
+    const unsigned long long hi = dsl_a_ld64((const unsigned long long*)(x + 8 * i) + 1);
+    dsl_u32x4 v; v[0] = (unsigned)(lo & 0xffffffffull); v[1] = (unsigned)(lo >> 32); v[2] = (unsigned)(hi & 0xffffffffull); v[3] = (unsigned)(hi >> 32);
+#else
   const DSL_G dsl_u32x4* xv = (const DSL_G dsl_u32x4*)x;
   for (int i = (int)threadIdx.x; i < K / 8; i += blockDim.x) {
     const dsl_u32x4 v = xv[i];
+#endif
 #pragma unroll
     for (int j = 0; j < 4; ++j) { xs[8 * i + 2 * j] = __uint_as_float(v[j] << 16); xs[8 * i + 2 * j + 1] = __uint_as_float(v[j] & 0xffff0000u); }
   }
@@ -155,17 +163,17 @@ static __device__ __forceinline__ void dsl_stage_norm(const DslArgs& d, float* x
   float ss = 0.f;
   for (int i = (int)threadIdx.x; i < K; i += blockDim.x) {
     float acc = 0.f;
-    for (int s = 0; s < d.R; ++s) acc += __bfloat162float(d.rows[(size_t)s * K + i]);
+    for (int s = 0; s < d.R; ++s) acc += dsl_a_ldbf(d.rows + (size_t)s * K + i);
     const float in = d.R > 1 ? dsl_bfr(acc) : acc;                                   // moe_sum rounds its fp32 sum once
-    const float z = dsl_bfr(in + __bfloat162float(d.resid_in[i]));                   // the bf16 add of fused_add_rms_norm
+    const float z = dsl_bfr(in + dsl_a_ldbf(d.resid_in + i));                        // the bf16 add of fused_add_rms_norm
     xs[i] = z; ss += z * z;
-    if (store && d.resid_out != nullptr) d.resid_out[i] = __float2bfloat16(z);
+    if (store && d.resid_out != nullptr) dsl_a_stbf(d.resid_out + i, __float2bfloat16(z));
   }
   ss = etx_block_sum(ss, red);
   const float sv = rsqrtf(ss / (float)K + d.eps);
   for (int i = (int)threadIdx.x; i < K; i += blockDim.x) {
     xs[i] = dsl_bfr(xs[i] * sv * __bfloat162float(d.ln[i]));
-    if (store && d.x != nullptr) ((__hip_bfloat16*)d.x)[i] = __float2bfloat16(xs[i]);   // the normed vector, for later consumers
+    if (store && d.x != nullptr) dsl_a_stbf((__hip_bfloat16*)d.x + i, __float2bfloat16(xs[i]));   // the normed vector, for later consumers
   }
   __syncthreads();
 }
@@ -175,7 +183,7 @@ static __device__ __forceinline__ void dsl_topk_lds(const __hip_bfloat16* logits
     const int lane = etx_lane();
     float p[2]; bool taken[2]; float m = -INFINITY;
 #pragma unroll
-    for (int k = 0; k < 2; ++k) { const int e = lane + k * ETX_WAVE_SIZE; p[k] = e < E ? __bfloat162float(logits[e]) : -INFINITY; taken[k] = e >= E; m = fmaxf(m, p[k]); }
+    for (int k = 0; k < 2; ++k) { const int e = lane + k * ETX_WAVE_SIZE; p[k] = e < E ? dsl_a_ldbf(logits + e) : -INFINITY; taken[k] = e >= E; m = fmaxf(m, p[k]); }
     m = etx_wave_max(m);
     float s = 0.f;
 #pragma unroll
@@ -240,7 +248,7 @@ BODIES = {
   if (r0 >= r1) return;
   if (d.mode == 1) dsl_stage_norm(d, xs, xs + d.K + 16 * DSL_RCH, blk == 0); else dsl_stage(d.x, d.K, xs);
   __hip_bfloat16* out = d.out;
-  dsl_gemv_chunked(d.W, d.K, xs, r0, r1, xs + d.K, [&](int r, float v) { out[r] = __float2bfloat16(v); });''',
+  dsl_gemv_chunked(d.W, d.K, xs, r0, r1, xs + d.K, [&](int r, float v) { dsl_a_stbf(out + r, __float2bfloat16(v)); });''',
     "silu_mul": '''
   const int s = blk / d.tpe, j = blk - s * d.tpe;
   const int r0 = j * d.rpt, r1 = min(d.M, r0 + d.rpt);
@@ -248,31 +256,32 @@ BODIES = {
   float* g = xs + d.K; float* part = g + 2 * d.rpt;
   int* lids = (int*)(part + 16 * DSL_RCH); float* lwts = (float*)(lids + 16);   // top-k fold: R = k, mode 3 = renormalised
   if (d.mode >= 2) dsl_topk_lds(d.logits, d.E, d.R, d.mode == 3 ? 1 : 0, lids, lwts);
-  const __hip_bfloat16* We = d.W + (size_t)(d.mode >= 2 ? lids[s] : d.ids[s]) * d.estride;                  // g: 2 x rpt floats (rpt <= DSL_RCH, host-checked)
+  const __hip_bfloat16* We = d.W + (size_t)(d.mode >= 2 ? lids[s] : dsl_a_ldi(d.ids + s)) * d.estride;     // g: 2 x rpt floats (rpt <= DSL_RCH, host-checked)
   dsl_stage(d.x, d.K, xs);
   dsl_gemv_chunked(We, d.K, xs, r0, r1, part, [&](int r, float v) { g[r - r0] = dsl_bfr(v); });
   dsl_gemv_chunked(We + (size_t)d.M * d.K, d.K, xs, r0, r1, part, [&](int r, float v) { g[d.rpt + r - r0] = dsl_bfr(v); });
   __hip_bfloat16* act = d.out + (size_t)s * d.M;
-  for (int r = r0 + (int)threadIdx.x; r < r1; r += blockDim.x) act[r] = __float2bfloat16(dsl_silu(g[r - r0]) * g[d.rpt + r - r0]);''',
+  for (int r = r0 + (int)threadIdx.x; r < r1; r += blockDim.x) dsl_a_stbf(act + r, __float2bfloat16(dsl_silu(g[r - r0]) * g[d.rpt + r - r0]));''',
     "scale": '''
   const int s = blk / d.tpe, j = blk - s * d.tpe;
   const int r0 = j * d.rpt, r1 = min(d.M, r0 + d.rpt);
   if (r0 >= r1) return;
   int* lids = (int*)(xs + d.K + 16 * DSL_RCH); float* lwts = (float*)(lids + 16);
   if (d.mode >= 2) dsl_topk_lds(d.logits, d.E, d.R, d.mode == 3 ? 1 : 0, lids, lwts);
-  const __hip_bfloat16* We = d.W + (size_t)(d.mode >= 2 ? lids[s] : d.ids[s]) * d.estride;
+  const __hip_bfloat16* We = d.W + (size_t)(d.mode >= 2 ? lids[s] : dsl_a_ldi(d.ids + s)) * d.estride;
   dsl_stage(d.x + (size_t)s * d.K, d.K, xs);
   __hip_bfloat16* out = d.out + (size_t)s * d.M;
-  const float ws = d.mode >= 2 ? lwts[s] : d.wts[s];
-  dsl_gemv_chunked(We, d.K, xs, r0, r1, xs + d.K, [&](int r, float v) { out[r] = __float2bfloat16(v * ws); });''',
+  const float ws = d.mode >= 2 ? lwts[s] : dsl_a_ldf(d.wts + s);
+  dsl_gemv_chunked(We, d.K, xs, r0, r1, xs + d.K, [&](int r, float v) { dsl_a_stbf(out + r, __float2bfloat16(v * ws)); });''',
 }
 
 
 def emit_tiles(lds_floats: int = 8192) -> str:
     """The tile source: for every form the plain, XCD-affine (x) and pre-wait entry points the plan links
     (examples/vllm_llm/model.py), reading the argument block like an imported tile; LDS from the import arena."""
+    from etx.ops import coh
     out = ["// generated by etx.ops.gemv: the DSL streaming GEMVs", "#pragma once",
-           '#include "etx/abi.h"', '#include "etx/import.h"', '#include "etx/tile_util.h"', STREAM]
+           '#include "etx/abi.h"', '#include "etx/import.h"', '#include "etx/tile_util.h"', coh.HELPERS, STREAM]
     for e, form in FORMS.items():
         out.append(f"// ---- {e}: {form}")
         out.append(f"static __device__ __attribute__((always_inline)) void dsl_run_{e}(const unsigned char* a, int blk) {{")

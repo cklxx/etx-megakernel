@@ -58,6 +58,26 @@ static __device__ __forceinline__ int32_t etx_arrive_flush_DEVICE(const etx_para
   return __hip_atomic_fetch_sub(p.events + ETX_EVW(idx), share, __ATOMIC_RELAXED, __HIP_MEMORY_SCOPE_AGENT) - share;
 }
 
+// _nf ("no flush"): the event's producers all store their payload with device-coherent accesses (sc0 sc1), so the
+// data is already past this domain's L2 and the write-back would flush nothing the consumers need. Only the drain
+// (the stores must have left the CU before the counter moves) remains on the arrive path.
+static __device__ __forceinline__ int32_t etx_arrive_flush_DEVICE_s_nf(const etx_params& p, int32_t idx, uint32_t domain, int32_t share) {
+  if (!p.ev_share || share <= 1) { ETX_RELEASE_DOMAIN(); return ETX_ARRIVE_DEVICE(p.events + ETX_EVW(idx)) - 1; }
+  ETX_RELEASE_DOMAIN();
+  const int32_t old = atomicAdd(p.ev_sub + (size_t)domain * p.event_words + idx, 1);
+  if (old + 1 != share) return 1;
+  return __hip_atomic_fetch_sub(p.events + ETX_EVW(idx), share, __ATOMIC_RELAXED, __HIP_MEMORY_SCOPE_AGENT) - share;
+}
+
+static __device__ __forceinline__ int32_t etx_arrive_flush_DEVICE_nf(const etx_params& p, int32_t idx, uint32_t domain) {
+  const int32_t share = p.ev_share ? p.ev_share[(size_t)domain * p.event_words + idx] : 0;
+  if (share <= 1) { ETX_RELEASE_DOMAIN(); return ETX_ARRIVE_DEVICE(p.events + ETX_EVW(idx)) - 1; }
+  ETX_RELEASE_DOMAIN();
+  const int32_t old = atomicAdd(p.ev_sub + (size_t)domain * p.event_words + idx, 1);
+  if (old + 1 != share) return 1;
+  return __hip_atomic_fetch_sub(p.events + ETX_EVW(idx), share, __ATOMIC_RELAXED, __HIP_MEMORY_SCOPE_AGENT) - share;
+}
+
 // Relay (P5, fleet's per-XCD scheduler mirror generalised). One workgroup per domain
 // polls the DEVICE-scope words and copies every change into its domain's mirror, so a
 // global word has n_domains pollers instead of every consumer. Happens-before chain:

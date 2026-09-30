@@ -6,3 +6,4 @@ __pycache__/
 .wrangler/
 *.egg-info/
 results_2026-*/
+.claude/

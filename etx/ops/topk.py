@@ -28,7 +28,7 @@ static __device__ __attribute__((always_inline)) void dsl_run_dsl_topk(const uns
   float p[2]; bool taken[2];
   float m = -INFINITY;
 #pragma unroll
-  for (int k = 0; k < 2; ++k) { const int e = lane + k * ETX_WAVE_SIZE; p[k] = e < E ? __bfloat162float(logits[e]) : -INFINITY; taken[k] = e >= E; m = fmaxf(m, p[k]); }
+  for (int k = 0; k < 2; ++k) { const int e = lane + k * ETX_WAVE_SIZE; p[k] = e < E ? dsl_a_ldbf(logits + e) : -INFINITY; taken[k] = e >= E; m = fmaxf(m, p[k]); }
   m = etx_wave_max(m);
   float s = 0.f;
 #pragma unroll
@@ -37,7 +37,7 @@ static __device__ __attribute__((always_inline)) void dsl_run_dsl_topk(const uns
   const float inv = 1.f / s;
 #pragma unroll
   for (int k = 0; k < 2; ++k) p[k] = taken[k] ? 0.f : p[k] * inv;
-  float sel = 0.f;
+  float sel = 0.f, lw[16];                       // K <= 16 (qwen: 8); selected weights stay in registers until the one coherent store
   for (int t = 0; t < K; ++t) {
     float bv = -1.f; int bi = 0x7fffffff;
 #pragma unroll
@@ -48,10 +48,10 @@ static __device__ __attribute__((always_inline)) void dsl_run_dsl_topk(const uns
     }
 #pragma unroll
     for (int k = 0; k < 2; ++k) if (lane + k * ETX_WAVE_SIZE == bi) taken[k] = true;
-    if (lane == 0) { ids[t] = bi; wts[t] = bv; tei[t] = t; }
+    if (lane == 0) { dsl_a_sti(ids + t, bi); dsl_a_sti(tei + t, t); if (t < 16) lw[t] = bv; }
     sel += bv;
   }
-  if (renorm && lane == 0) for (int t = 0; t < K; ++t) wts[t] = wts[t] / sel;
+  if (lane == 0) for (int t = 0; t < K && t < 16; ++t) dsl_a_stf(wts + t, renorm ? lw[t] / sel : lw[t]);
 }
 extern "C" __device__ __attribute__((always_inline)) void etx_tile_dsl_topk(const etx_ctx* c) {
   dsl_run_dsl_topk(etx_imp_argblock(c->args, c->cst[0]));
@@ -66,4 +66,5 @@ extern "C" __device__ __attribute__((always_inline)) void etx_pre_x_dsl_topk(con
 
 
 def emit_tiles() -> str:
-    return TILE
+    from etx.ops import coh
+    return coh.HELPERS + TILE

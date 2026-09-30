@@ -99,3 +99,14 @@ def run(plan: Plan) -> None:
                 ep.scope = need
                 plan.graph.events[ev].scope = need
                 plan.say(f"P4: event {ev}: scope raised to {need.name} because {g.name} is globally scheduled")
+    # Coherence of each event's endpoints (docs/RESULTS-2026-09-30.md: the acquire's whole-L2 invalidate is why the
+    # megakernel's phases start cold). A "coherent" tile accesses its activations past the XCD caches, so it needs no
+    # acquire invalidate; but a coherent consumer also bypasses a plain producer's L2, so such a producer must write
+    # back (wbl2) on release even inside one XCD. The emitter reads these two bits per event.
+    for ev_name, ep in plan.events.items():
+        prods = [g for g in plan.graph.grids if ev_name in g.out_edges]
+        cons = [g for g in plan.graph.grids if ev_name in g.in_edges]
+        ep.coherent_consumer = any(c.body.coherence == "coherent" for c in cons)
+        ep.producers_coherent = bool(prods) and all(pg.body.coherence == "coherent" for pg in prods)
+        if ep.coherent_consumer and not ep.producers_coherent:
+            plan.say(f"P4: event {ev_name}: plain producer with a coherent consumer -> write-back release")

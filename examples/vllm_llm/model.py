@@ -84,6 +84,9 @@ DSL_FOLD = os.environ.get("ETX_VL_DSL_FOLD", "0") == "1"
 # ETX_VL_TOUCH=1: the dense DSL GEMVs get the megakernel's touch hook (etx.ops.gemv dsl_touch_plain): while wave 0 waits
 # for the task's event, the other waves pull the task's first weight trip into L2 (docs/MODEL-vllm-kernels.md section 18)
 TOUCH = os.environ.get("ETX_VL_TOUCH", "0") == "1"
+# ETX_VL_COH=1: the DSL tiles access their activations device-coherently (etx.ops.coh, built with -DETX_DSL_COH), so
+# the megakernel emits no acquire buffer_inv for them and the caches survive the phase boundary (docs/RESULTS-2026-09-30.md)
+COH = os.environ.get("ETX_VL_COH", "0") == "1"
 DSL_FILE = os.environ.get("ETX_VL_DSL_TILES", str(HERE / "build" / "dsl_tiles.hip"))
 DSL_ATTN = os.environ.get("ETX_VL_DSL", "0") == "1"       # =2: attention stays vLLM's (fused q/k norm + rope grid, cache, attn)
 if os.environ.get("ETX_VL_QKNR", "0") == "grid" or os.environ.get("ETX_VL_DSL", "0") == "2":
@@ -251,6 +254,9 @@ def build() -> Graph:
 
     def touch_of(i, x):                                        # the touch hook of the dense DSL GEMVs (plain or x form)
         return f"etx_touch_{'x_' if x else ''}{i['export']}" if TOUCH and i["export"] in ("dsl_gemv", "dsl_gemv_fold") else None
+
+    def coh_of(i):                                             # the DSL tiles are the coherent ones (their source is ours)
+        return "coherent" if COH and i["export"].startswith("dsl_") else "imported"
     native = str(HERE / "vl_tiles.hip")
     pre = (lambda r: f"r{r}_") if REQUESTS > 1 else (lambda r: "")
 
@@ -290,7 +296,7 @@ def build() -> Graph:
             i = grp[0]
             g.etensor(ev, (NX,), wait_count=1)
             name = P + (f"{i['role']}_{i['layer']}_x" if i["layer"] >= 0 else f"{i['role']}_x")
-            g.call_device(name, (NX,), hip_link(src_of(i), f"etx_tile_rep_{i['export']}", pre_wait=f"etx_pre_x_{i['export']}"),
+            g.call_device(name, (NX,), hip_link(src_of(i), f"etx_tile_rep_{i['export']}", pre_wait=f"etx_pre_x_{i['export']}", coherence=coh_of(i)),
                           resource=res, args=["impargs"],
                           consts=(i["offset"], i["stride"], i["copyoff"]), in_edges={prev[r]: "x->(0)"}, out_edges={ev: "x->x"},
                           domain_map="x->x", duration_us=3.0)
@@ -312,7 +318,7 @@ def build() -> Graph:
                 out = {ev: "xw->(0)"}; this_x = False
             name = P + (f"{i['role']}_{i['layer']}" if i["layer"] >= 0 else i["role"])
             dur = max(2.0, i["M"] * i["K"] * 2 / 4.0e12 * 1e6) if i["export"].startswith("wvsplitk") else 3.0
-            g.call_device(name, (NX, per), hip_link(src_of(i), f"etx_tile_x_{i['export']}", pre_wait=f"etx_pre_x_{i['export']}", touch=touch_of(i, True)),
+            g.call_device(name, (NX, per), hip_link(src_of(i), f"etx_tile_x_{i['export']}", pre_wait=f"etx_pre_x_{i['export']}", touch=touch_of(i, True), coherence=coh_of(i)),
                           resource=res, args=["impargs"],
                           consts=(i["offset"], i["stride"], per), in_edges={prev[r]: "xw->x" if prev_x[r] else "xw->(0)"}, out_edges=out,
                           domain_map="xw->x", duration_us=dur)
@@ -321,7 +327,7 @@ def build() -> Graph:
             # the attention block by kv head: prep h -> attention (partition p, head h) -> reduce h, all on XCD h
             i = grp[0]
             name = P + f"{i['role']}_{i['layer']}"
-            link = hip_link(src_of(i), f"etx_tile_{i['export']}", pre_wait=f"etx_pre_{i['export']}")
+            link = hip_link(src_of(i), f"etx_tile_{i['export']}", pre_wait=f"etx_pre_{i['export']}", coherence=coh_of(i))
             if i["role"] == "prep":
                 nkv = i["tasks"]
                 g.etensor(ev, (nkv,), wait_count=1)
@@ -346,7 +352,7 @@ def build() -> Graph:
             g.etensor(ev, (1,), wait_count=i["tasks"])
             name = P + (f"{i['role']}_{i['layer']}" if i["layer"] >= 0 else i["role"])
             pin = {"domain_map": "i->(0)"} if i["role"] in PIN_ROLES else {}
-            g.call_device(name, (i["tasks"],), hip_link(src_of(i), f"etx_tile_{i['export']}", pre_wait=f"etx_pre_{i['export']}", touch=touch_of(i, False)),
+            g.call_device(name, (i["tasks"],), hip_link(src_of(i), f"etx_tile_{i['export']}", pre_wait=f"etx_pre_{i['export']}", touch=touch_of(i, False), coherence=coh_of(i)),
                           resource=res, args=["impargs"],
                           consts=(i["offset"],), in_edges={prev[r]: "i->(0)"}, out_edges={ev: "i->(0)"}, **pin,
                           duration_us=2.0 if not i["export"].startswith("wvsplitk") else max(2.0, i["M"] * i["K"] * 2 / 4.0e12 * 1e6))

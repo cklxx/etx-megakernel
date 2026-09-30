@@ -47,14 +47,14 @@ static __device__ __attribute__((always_inline)) void dsl_run_dsl_attnprep(const
     __hip_bfloat16* row = qkv + (isq ? (size_t)(G * h + wave) * HD : (size_t)NH * HD + (size_t)h * HD);
     const __hip_bfloat16* w = isq ? qw : kw;
     // 2 elements per lane: d0 = 2 * lane, d1 = 2 * lane + 1 (vLLM: 4 per lane of 32; the sums differ in order only)
-    float e0 = __bfloat162float(row[2 * lane]), e1 = __bfloat162float(row[2 * lane + 1]);
+    float e0 = dsl_a_ldbf(row + 2 * lane), e1 = dsl_a_ldbf(row + 2 * lane + 1);
     float ss = e0 * e0 + e1 * e1;
     ss = etx_wave_sum(ss);
     const float rms_rcp = rsqrtf(ss / (float)HD + eps);
     e0 *= rms_rcp * __bfloat162float(w[2 * lane]);
     e1 *= rms_rcp * __bfloat162float(w[2 * lane + 1]);
     // neox rope over the whole head: partner element d ^ 64 lives on lane ^ 32; sign - for d < 64
-    const long long pos = positions[0];
+    const long long pos = dsl_a_ldll(positions);
     const __hip_bfloat16* cosp = cs + pos * HD;           // [cos (HD/2) | sin (HD/2)]
     const __hip_bfloat16* sinp = cosp + HD / 2;
     const float p0 = __shfl_xor(e0, ETX_WAVE_SIZE / 2, ETX_WAVE_SIZE), p1 = __shfl_xor(e1, ETX_WAVE_SIZE / 2, ETX_WAVE_SIZE);
@@ -65,20 +65,21 @@ static __device__ __attribute__((always_inline)) void dsl_run_dsl_attnprep(const
     e0 = e0 * c0 + sgn * p0 * s0;
     e1 = e1 * c1 + sgn * p1 * s1;
     const __hip_bfloat16 o0 = __float2bfloat16(e0), o1 = __float2bfloat16(e1);
-    row[2 * lane] = o0; row[2 * lane + 1] = o1;
+    dsl_a_stbf(row + 2 * lane, o0); dsl_a_stbf(row + 2 * lane + 1, o1);
     if (!isq) {                                           // the k head into the cache: [block][h][d / X][off][d % X]
-      const long long slot = slot_mapping[0];
+      const long long slot = dsl_a_ldll(slot_mapping);
       const long long block = slot / BS, off = slot % BS;
       __hip_bfloat16* kdst = kc + (((block * NKV + h) * (HD / X)) * BS) * X + off * X;
-      kdst[(2 * lane) / X * BS * X + (2 * lane) % X] = o0;
-      kdst[(2 * lane + 1) / X * BS * X + (2 * lane + 1) % X] = o1;
+      dsl_a_stbf(kdst + (2 * lane) / X * BS * X + (2 * lane) % X, o0);
+      dsl_a_stbf(kdst + (2 * lane + 1) / X * BS * X + (2 * lane + 1) % X, o1);
     }
   } else if (wave == G + 1 && HD == 2 * ETX_WAVE_SIZE) {   // the v head into the cache: [block][h][d][off]
-    const long long slot = slot_mapping[0];
+    const long long slot = dsl_a_ldll(slot_mapping);
     const long long block = slot / BS, off = slot % BS;
     const __hip_bfloat16* vrow = qkv + (size_t)(NH + NKV) * HD + (size_t)h * HD;
     __hip_bfloat16* vdst = vc + ((block * NKV + h) * HD) * BS + off;
-    vdst[(2 * lane) * BS] = vrow[2 * lane]; vdst[(2 * lane + 1) * BS] = vrow[2 * lane + 1];
+    dsl_a_stbf(vdst + (2 * lane) * BS, __float2bfloat16(dsl_a_ldbf(vrow + 2 * lane)));
+    dsl_a_stbf(vdst + (2 * lane + 1) * BS, __float2bfloat16(dsl_a_ldbf(vrow + 2 * lane + 1)));
   }
 }
 extern "C" __device__ __attribute__((always_inline)) void etx_tile_dsl_attnprep(const etx_ctx* c) {
@@ -89,4 +90,5 @@ extern "C" __device__ __attribute__((always_inline)) void etx_pre_dsl_attnprep(c
 
 
 def emit_tiles() -> str:
-    return TILE
+    from etx.ops import coh
+    return coh.HELPERS + TILE

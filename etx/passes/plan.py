@@ -55,6 +55,8 @@ class EventPlan:
     counts: list[int] = field(default_factory=list)
     runtime_init: bool = False
     share: dict[tuple[int, int], list[int]] = field(default_factory=dict)   # (device, domain) -> producers per linear coordinate
+    coherent_consumer: bool = False   # some consumer tile reads its activations coherently (bypasses the producer's L2)
+    producers_coherent: bool = False  # every producer tile stores its activations coherently (no write-back needed)
 
 
 @dataclass

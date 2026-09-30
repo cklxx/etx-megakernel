@@ -103,10 +103,11 @@ def _arrive_code(plan: Plan, g: TaskGrid, mode: str) -> str:
         has_dynamic_consumers = any(k[0] == ev for k in plan.ev_consumers)
         # DEVICE scope: last-arriver flush per domain (one L2 write-back per domain per coordinate)
         shares = {v for row in ep.share.values() for v in row if v > 0}
+        nf = "_nf" if ep.producers_coherent else ""        # all producers store coherently: the payload is already past L2
         if ep.scope == Scope.DEVICE and not ep.runtime_init and len(shares) == 1:
-            arrive = f"etx_arrive_flush_DEVICE_s(p, {ep.offset} + (idx), domain, {next(iter(shares))})"   # share as an immediate
+            arrive = f"etx_arrive_flush_DEVICE_s{nf}(p, {ep.offset} + (idx), domain, {next(iter(shares))})"   # share as an immediate
         elif ep.scope == Scope.DEVICE:
-            arrive = f"etx_arrive_flush_DEVICE(p, {ep.offset} + (idx), domain)"
+            arrive = f"etx_arrive_flush_DEVICE{nf}(p, {ep.offset} + (idx), domain)"
         else:
             arrive = f"etx_arrive_{sc}(p.events + ETX_EVW({ep.offset} + (idx)))"
         if not has_dynamic_consumers:       # the producer's own mode is irrelevant: a static producer must still push dynamic consumers
@@ -259,13 +260,18 @@ def emit_kernel(plan: Plan, device: int = 0) -> str:
             # the acquire (cache invalidate) is a per-CU operation: issue it once, from the waiting thread,
             # not from all 4 waves (measured on MI300X: 4x the L2 invalidates slowed the phases after
             # DEVICE-scope events); the __syncthreads after the switch orders every other wave's loads after it
-            acq = sorted({_scope_macro(plan, ev) for ev in g.in_edges}, key=lambda s: Scope[s].value)
-            relayed = any(_relayed(plan, plan.events[ev]) for ev in g.in_edges)
-            for sc in acq:
-                if sc == "DEVICE" and relayed:
-                    out.append("        if (etx_lok) ETX_ACQUIRE_DOMAIN(); else ETX_ACQUIRE_DEVICE();   // relay did the domain-level half")
-                else:
-                    out.append(f"        ETX_ACQUIRE_{sc}();")
+            if g.body.coherence == "coherent":
+                # the tile's activation loads are device-coherent (sc0 sc1): nothing cached needs invalidating, and
+                # the weights (and the touch hook's lines) stay in this XCD's L2 across the phase boundary
+                out.append("        // coherent tile: no acquire invalidate (activation loads bypass the XCD caches)")
+            else:
+                acq = sorted({_scope_macro(plan, ev) for ev in g.in_edges}, key=lambda s: Scope[s].value)
+                relayed = any(_relayed(plan, plan.events[ev]) for ev in g.in_edges)
+                for sc in acq:
+                    if sc == "DEVICE" and relayed:
+                        out.append("        if (etx_lok) ETX_ACQUIRE_DOMAIN(); else ETX_ACQUIRE_DEVICE();   // relay did the domain-level half")
+                    else:
+                        out.append(f"        ETX_ACQUIRE_{sc}();")
             out.append("      }")
         out.extend(_setup_body(plan, g, symbols))
         out.append("      break; }")
@@ -293,8 +299,12 @@ def emit_kernel(plan: Plan, device: int = 0) -> str:
                 body.append(f"        for (int i = 0; i < p.ev_shape[{list(plan.events).index(ev_name)}][0]; ++i) "
                             f"p.events[ETX_EVW({ep.offset} + i)] = {expr};   // runtime init of {ev_name}")
         for ev in g.out_edges:
-            if plan.events[ev].scope != Scope.DEVICE:          # DEVICE-scope arrives carry their own (last-arriver) release
-                body.append(f"        ETX_RELEASE_{_scope_macro(plan, ev)}();")
+            ep = plan.events[ev]
+            if ep.scope != Scope.DEVICE:                       # DEVICE-scope arrives carry their own (last-arriver) release
+                if ep.coherent_consumer and g.body.coherence != "coherent":
+                    body.append("        ETX_RELEASE_DEVICE();   // a coherent consumer bypasses this XCD's L2: write it back")
+                else:
+                    body.append(f"        ETX_RELEASE_{_scope_macro(plan, ev)}();")
         if g.out_edges:
             body.append(_arrive_code(plan, g, mode))
         if body:
@@ -451,7 +461,7 @@ def emit_plan_json(plan: Plan) -> str:
         "args": args,
         "types": {g.name: {"id": plan.type_ids[g.name], "symbol": g.body.symbol, "mode": plan.modes.get(g.name),
                            "grid": list(plan.inst.grid_shapes[g.name]), "prologue": [list(x) for x in g.prologue], "device": g.device,
-                           "touch": g.body.touch}
+                           "touch": g.body.touch, "coherence": g.body.coherence}
                   for g in plan.graph.grids},
         "events": [{"name": e.name, "id": i, "offset": e.offset, "shape": list(e.shape), "scope": e.scope.name,
                     "memory": e.memory, "counts": e.counts, "runtime_init": e.runtime_init}

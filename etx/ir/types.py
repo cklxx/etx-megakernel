@@ -83,6 +83,10 @@ class TileBody:
     touch: str | None = None        # optional device function the other waves (threadIdx >= 64) run while wave 0 waits: the
                                     # task's first weight trips into this XCD's L2 (weights depend on no event), so the
                                     # stream's first round trip after the acquire is an L2 hit (ETX_NO_TOUCH disables)
+    coherence: str = "imported"     # "coherent": the tile loads and stores its ACTIVATIONS with device-coherent
+                                    # accesses (sc0 sc1, past the XCD caches), so the megakernel emits no acquire
+                                    # invalidate for it and the caches survive the phase boundary; "imported": the
+                                    # tile uses plain accesses and keeps the buffer_inv acquire (every imported kernel)
 
 
 @dataclass
