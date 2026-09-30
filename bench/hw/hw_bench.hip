@@ -30,6 +30,10 @@
 //                      pipeline stage of nx XCDs can pull; decides whether layer pipelining across XCDs can pay.
 //   hw_bench sdat      the data as the signal (Kog): producers store a 4 KB vector with coherent stores (or plain stores +
 //                      wbl2), consumers poll the vector until no sentinel remains; the same P / C shapes as evx device.
+//   hw_bench restart   the stream re-read from its own warm region with nothing / buffer_inv sc0 / buffer_inv sc1 before
+//                      each pass (the megakernel's per-task acquire): the warm-pass gap is what one acquire costs a phase.
+//   hw_bench cohload   a fresh cross-XCD 4 KB x-vector read via inv sc1 + plain loads vs sc0 sc1 loads with no invalidate,
+//                      each followed by a warm 28 KB weight stream: what coherent activation loads (no inv) buy a phase.
 //   hw_bench launch    the kernel boundary with work: 200 kernels in one HIP graph, each reads the previous kernel's output
 //                      and chases H dependent loads (H = -1: an empty kernel). Splits the fitted F into boundary + hops.
 //   hw_bench evx       ETX's own event protocol (the gfx942 lowering: fetch_sub arrive, poll = buffer_inv sc0 + load with
@@ -81,6 +85,15 @@ __device__ void grid_barrier(Ctl* c, int gen) {           // gen = 1, 2, 3 ...; 
   }
   __syncthreads();
 }
+__device__ void grid_barrier_ni(Ctl* c, int gen) {        // as grid_barrier but with no invalidate: cache warmth survives
+  __syncthreads();
+  if (threadIdx.x == 0) {
+    asm volatile("s_waitcnt vmcnt(0)" ::: "memory");
+    atomicAdd(&c->bar, 1);
+    while (ld_agent(&c->bar) < gen * (int)gridDim.x) __builtin_amdgcn_s_sleep(1);
+  }
+  __syncthreads();
+}
 
 // ------------------------------------------------------------------ stream
 // active workgroup k (per XCD slot s < A/8) streams `bytes` from region base; rows mode: 4 KB rows (K = 2048 bf16), row r of
@@ -90,8 +103,10 @@ __global__ void __launch_bounds__(kT) k_stream(const u4* __restrict__ w, size_t 
   __shared__ int s_slot;
   if (threadIdx.x == 0) s_slot = claim_xslot(ctl);
   __syncthreads();
-  const int per_x = active / 8, slot = s_slot, wid = (int)xcc_id() * per_x + slot;
-  const bool on = slot < per_x;
+  // XCD x runs base + (x < rem) workgroups, so any active count spreads evenly; worker ids stay dense 0..active-1
+  const int x_ = (int)xcc_id(), base_ = active / 8, rem_ = active % 8;
+  const int slot = s_slot, wid = x_ * base_ + (x_ < rem_ ? x_ : rem_) + slot;
+  const bool on = slot < base_ + (x_ < rem_ ? 1 : 0);
   uint32_t acc = 0;
   for (int it = 0; it < iters; ++it) {
     grid_barrier(ctl, it + 1);
@@ -557,6 +572,105 @@ __global__ void __launch_bounds__(kT) k_sdat(uint32_t* vec, int W, int P, int C,
   if (acc == 0x12345u) sink[blockIdx.x] = acc;
 }
 
+
+// ------------------------------------------------------------------ restart (what one buffer_inv costs a phase)
+// 296 workgroups stream the SAME per-workgroup region every pass (37 x 28 KB fits the XCD's 4 MB L2; 37 x 312 KB spills
+// to the MALL). Before each pass thread 0 of every workgroup runs nothing / buffer_inv sc0 / buffer_inv sc1 (the
+// megakernel's per-task acquire). The barrier between passes does not invalidate, so pass 1 is cold and passes 2+ are
+// warm; the warm-pass gap between the variants is what one acquire costs a streaming phase.
+__global__ void __launch_bounds__(kT) k_restart(const u4* __restrict__ w, int active, int64_t bytes, int inv_mode, int iters,
+                                                Ctl* ctl, uint64_t* t_start, uint64_t* t_end, uint32_t* sink) {
+  __shared__ int s_slot;
+  if (threadIdx.x == 0) s_slot = claim_xslot(ctl);
+  __syncthreads();
+  const int x = (int)xcc_id(), base = active / 8, rem = active % 8;
+  const int slot = s_slot, wid = x * base + (x < rem ? x : rem) + slot;
+  const bool on = slot < base + (x < rem ? 1 : 0);
+  const int64_t n16 = bytes / 16;
+  uint32_t acc = 0;
+  for (int it = 0; it < iters; ++it) {
+    grid_barrier_ni(ctl, it + 1);
+    if (!on) continue;
+    if (threadIdx.x == 0) {
+      if (inv_mode == 2) asm volatile("buffer_inv sc1" ::: "memory");
+      else if (inv_mode == 1) asm volatile("buffer_inv sc0" ::: "memory");
+    }
+    __syncthreads();
+    const uint64_t t0 = now();
+    const u4* p = w + (size_t)wid * n16;                  // the same region every pass
+    for (int64_t i = threadIdx.x; i < n16; i += kT * 8) {
+      u4 v[8];
+#pragma unroll
+      for (int d = 0; d < 8; ++d) v[d] = (i + d * kT < n16) ? p[i + d * kT] : u4{0, 0, 0, 0};
+      live8(v);
+#pragma unroll
+      for (int d = 0; d < 8; ++d) acc ^= xs(v[d]);
+    }
+    __syncthreads();
+    if (threadIdx.x == 0) { t_start[(size_t)it * active + wid] = t0; t_end[(size_t)it * active + wid] = now(); }
+  }
+  if (acc == 0x12345u) sink[blockIdx.x] = acc;
+}
+
+// ------------------------------------------------------------------ cohload (fresh activation: inv + plain loads vs coherent loads)
+// Slot 0 of XCD x writes the 4 KB x-vector of XCD (x+1)%8 with coherent stores in the second half of each iteration;
+// in the first half every active workgroup of XCD x reads vector x (written cross-XCD last iteration): mode 0 =
+// thread-0 buffer_inv sc1 then plain loads (the megakernel's acquire today), mode 1 = sc0 sc1 loads, no invalidate.
+// Both then stream 28 KB of plain weight reads from a fixed region, warm unless the invalidate emptied the L2. The
+// weight-phase gap is what the acquire costs the stream; the x-phase gap is what the coherent loads themselves cost.
+// A consumer's thread 0 checks freshness (word 0 == it) and counts misses in ctl->err.
+__global__ void __launch_bounds__(kT) k_cohload(uint32_t* vec, const u4* __restrict__ w, int active, int64_t bytes, int mode,
+                                                int iters, Ctl* ctl, uint64_t* t_start, uint64_t* t_mid, uint64_t* t_end,
+                                                uint32_t* sink) {
+  __shared__ int s_slot;
+  if (threadIdx.x == 0) s_slot = claim_xslot(ctl);
+  __syncthreads();
+  const int x = (int)xcc_id(), base = active / 8, rem = active % 8;
+  const int slot = s_slot, wid = x * base + (x < rem ? x : rem) + slot;
+  const bool on = slot < base + (x < rem ? 1 : 0);
+  const int64_t n16 = bytes / 16;
+  uint32_t acc = 0;
+  for (int it = 0; it < iters; ++it) {
+    grid_barrier_ni(ctl, 2 * it + 1);
+    if (on && it > 0) {                                   // consume the vector written last iteration from another XCD
+      const uint64_t t0 = now();
+      u4 xv;
+      if (mode == 0) {
+        if (threadIdx.x == 0) asm volatile("buffer_inv sc1" ::: "memory");
+        __syncthreads();
+        xv = ((const u4*)(vec + (size_t)x * 1024))[threadIdx.x];
+        asm volatile("s_waitcnt vmcnt(0)" ::: "memory");
+      } else {
+        const u4* p = (const u4*)(vec + (size_t)x * 1024) + threadIdx.x;
+        asm volatile("global_load_dwordx4 %0, %1, off sc0 sc1\n\ts_waitcnt vmcnt(0)" : "=v"(xv) : "v"(p) : "memory");
+      }
+      acc ^= xs(xv);
+      if (threadIdx.x == 0 && xv.x != (uint32_t)it) atomicAdd(&ctl->err, 1);
+      __syncthreads();
+      const uint64_t tm = now();
+      const u4* p = w + (size_t)wid * n16;                // the same warm weight region every iteration
+      for (int64_t i = threadIdx.x; i < n16; i += kT * 8) {
+        u4 v[8];
+#pragma unroll
+        for (int d = 0; d < 8; ++d) v[d] = (i + d * kT < n16) ? p[i + d * kT] : u4{0, 0, 0, 0};
+        live8(v);
+#pragma unroll
+        for (int d = 0; d < 8; ++d) acc ^= xs(v[d]);
+      }
+      __syncthreads();
+      if (threadIdx.x == 0) { t_start[(size_t)it * active + wid] = t0; t_mid[(size_t)it * active + wid] = tm;
+                              t_end[(size_t)it * active + wid] = now(); }
+    }
+    grid_barrier_ni(ctl, 2 * it + 2);
+    if (slot == 0 && it + 1 < iters) {                    // produce the next iteration's vector for XCD (x+1)%8
+      uint32_t* dst = vec + (size_t)((x + 1) % 8) * 1024;
+      for (int i = threadIdx.x; i < 1024; i += kT) sdat_store(dst + i, (uint32_t)(it + 1));
+      asm volatile("s_waitcnt vmcnt(0)" ::: "memory");
+    }
+  }
+  if (acc == 0x12345u) sink[blockIdx.x] = acc;
+}
+
 // ------------------------------------------------------------------ host
 int main(int argc, char** argv) {
   setvbuf(stdout, nullptr, _IOLBF, 0);
@@ -579,9 +693,10 @@ int main(int argc, char** argv) {
     struct P { int active; int64_t bytes; const char* phase; };
     std::vector<P> ps = {{296, 896, "router"}, {256, 8192, "merge"}, {296, 28672, "o_proj"}, {296, 51200, "q/kv_a"},
                          {296, 159744, "down"}, {296, 319488, "gate_up"}, {296, 1 << 20, "1 MB"}, {8, 319488, "gate_up x8"},
-                         {37, 319488, "gate_up x37"}, {74, 319488, "gate_up x74"}, {148, 319488, "gate_up x148"}};
+                         {16, 319488, "gate_up x16"}, {37, 319488, "gate_up x37"}, {74, 319488, "gate_up x74"},
+                         {96, 319488, "gate_up x96"}, {148, 319488, "gate_up x148"}, {192, 319488, "gate_up x192"},
+                         {96, 28672, "o_proj x96"}, {148, 28672, "o_proj x148"}};
     for (int rows = 0; rows < 2; ++rows) for (const P& p : ps) {
-      if (p.active % 8) continue;
       reset(); CHECK(hipMemset(ts, 0, (size_t)iters * 304 * 8)); CHECK(hipMemset(te, 0, (size_t)iters * 304 * 8));
       hipLaunchKernelGGL(k_stream, dim3(ncu), dim3(kT), lds1, st, w, buf_u4, p.active, p.bytes, rows, iters, ctl, ts, te, sink);
       if (!wait_stream(st, 30)) { printf("RESULT stream HUNG\n"); return 3; }
@@ -870,5 +985,59 @@ int main(int argc, char** argv) {
              modes[e.mode], e.P, e.C, pct(first, 0.5), pct(med, 0.5), pct(last, 0.5), stuck);
     }
   }
+  if (what == "all" || what == "restart") {
+    const int iters = 12, active = 296;
+    uint64_t *ts, *te; CHECK(hipMalloc(&ts, (size_t)iters * 304 * 8)); CHECK(hipMalloc(&te, (size_t)iters * 304 * 8));
+    static const char* invs[] = {"none   ", "inv sc0", "inv sc1"};
+    for (int64_t bytes : {28672LL, 319488LL}) for (int inv = 0; inv < 3; ++inv) {
+      reset(); CHECK(hipMemset(ts, 0, (size_t)iters * 304 * 8)); CHECK(hipMemset(te, 0, (size_t)iters * 304 * 8));
+      hipLaunchKernelGGL(k_restart, dim3(ncu), dim3(kT), lds1, st, w, active, bytes, inv, iters, ctl, ts, te, sink);
+      if (!wait_stream(st, 30)) { printf("RESULT restart HUNG\n"); return 3; }
+      std::vector<uint64_t> hs((size_t)iters * 304), he((size_t)iters * 304);
+      CHECK(hipMemcpy(hs.data(), ts, hs.size() * 8, hipMemcpyDeviceToHost)); CHECK(hipMemcpy(he.data(), te, he.size() * 8, hipMemcpyDeviceToHost));
+      double cold = 0; std::vector<double> warm, wg;
+      for (int it = 0; it < iters; ++it) {
+        uint64_t lo = ~0ull, hi = 0;
+        for (int k = 0; k < active; ++k) { const size_t i = (size_t)it * active + k; if (!hs[i]) continue;
+          lo = std::min(lo, hs[i]); hi = std::max(hi, he[i]); if (it >= 2) wg.push_back((he[i] - hs[i]) * 0.01); }
+        if (hi <= lo) continue;
+        if (it == 0) cold = (hi - lo) * 0.01; else if (it >= 2) warm.push_back((hi - lo) * 0.01);
+      }
+      const double wsp = pct(warm, 0.5);
+      printf("RESULT restart %s bytes %6lld: cold span %7.2f us  warm span %7.2f  warm WG median %7.2f  -> warm %.2f TB/s\n",
+             invs[inv], (long long)bytes, cold, wsp, pct(wg, 0.5), active * (double)bytes / (wsp * 1e-6) / 1e12);
+    }
+  }
+
+  if (what == "all" || what == "cohload") {
+    const int iters = 12, active = 296;
+    const int64_t bytes = 28672;
+    uint32_t* vec; CHECK(hipMalloc(&vec, 8 * 1024 * 4)); CHECK(hipMemset(vec, 0, 8 * 1024 * 4));
+    uint64_t *ts, *tm, *te; CHECK(hipMalloc(&ts, (size_t)iters * 304 * 8)); CHECK(hipMalloc(&tm, (size_t)iters * 304 * 8));
+    CHECK(hipMalloc(&te, (size_t)iters * 304 * 8));
+    static const char* modes[] = {"inv+plain ", "coherent  "};
+    for (int mode = 0; mode < 2; ++mode) {
+      reset(); CHECK(hipMemset(vec, 0, 8 * 1024 * 4));
+      CHECK(hipMemset(ts, 0, (size_t)iters * 304 * 8)); CHECK(hipMemset(tm, 0, (size_t)iters * 304 * 8)); CHECK(hipMemset(te, 0, (size_t)iters * 304 * 8));
+      hipLaunchKernelGGL(k_cohload, dim3(ncu), dim3(kT), lds1, st, vec, w, active, bytes, mode, iters, ctl, ts, tm, te, sink);
+      if (!wait_stream(st, 30)) { printf("RESULT cohload HUNG\n"); return 3; }
+      std::vector<uint64_t> hs((size_t)iters * 304), hm((size_t)iters * 304), he((size_t)iters * 304);
+      CHECK(hipMemcpy(hs.data(), ts, hs.size() * 8, hipMemcpyDeviceToHost)); CHECK(hipMemcpy(hm.data(), tm, hm.size() * 8, hipMemcpyDeviceToHost));
+      CHECK(hipMemcpy(he.data(), te, he.size() * 8, hipMemcpyDeviceToHost));
+      Ctl hc; CHECK(hipMemcpy(&hc, ctl, sizeof(Ctl), hipMemcpyDeviceToHost));
+      std::vector<double> xsp, wsp, xwg, wwg;
+      for (int it = 2; it < iters; ++it) {
+        uint64_t lo = ~0ull, mid = 0, hi = 0;
+        for (int k = 0; k < active; ++k) { const size_t i = (size_t)it * active + k; if (!hs[i]) continue;
+          lo = std::min(lo, hs[i]); mid = std::max(mid, hm[i]); hi = std::max(hi, he[i]);
+          xwg.push_back((hm[i] - hs[i]) * 0.01); wwg.push_back((he[i] - hm[i]) * 0.01); }
+        if (hi <= lo) continue;
+        xsp.push_back((mid - lo) * 0.01); wsp.push_back((hi - mid) * 0.01);
+      }
+      printf("RESULT cohload %s: x span %6.2f us (WG median %5.2f)  weights span %6.2f (WG median %5.2f)  stale %d\n",
+             modes[mode], pct(xsp, 0.5), pct(xwg, 0.5), pct(wsp, 0.5), pct(wwg, 0.5), hc.err);
+    }
+  }
+
   return 0;
 }
