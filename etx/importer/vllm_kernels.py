@@ -137,13 +137,22 @@ TRITON = {
 }
 
 
+def _rocm_inc() -> list[str]:
+    """ETX_ROCM_HEADERS: a ROCm include tree (hip/, hipcub/, rocprim/) for boxes whose ROCm install ships the
+    compiler and device libraries but no HIP headers -- rsync ~/code/rocm-headers/inc there and point this at it.
+    Empty when the toolchain finds its own headers, which is the normal case."""
+    d = os.environ.get("ETX_ROCM_HEADERS", "")
+    return ["-isystem", d] if d else []
+
+
 def _flags(vllm: Path, s: Source) -> list[str]:
     th = os.environ.get("ETX_TORCH_HEADERS", str(Path.home() / "rocm-headers/pytorch"))
     inc = []
     for i in s.includes:
         inc += ["-I", str(HERE / i)]
     inc += ["-I", str(vllm / "csrc"), "-I", str(vllm / Path(s.path).parent), "-I", str(vllm / "csrc/libtorch_stable")]
-    return (["-D__HIP_PLATFORM_AMD__", "-DUSE_ROCM", "-DNDEBUG", "-isystem", th, "-include", str(HERE / "shim/etx_cuda2hip.h"), "-I", str(HERE / "shim")]
+    return (["-D__HIP_PLATFORM_AMD__", "-DUSE_ROCM", "-DNDEBUG", "-isystem", th] + _rocm_inc()
+            + ["-include", str(HERE / "shim/etx_cuda2hip.h"), "-I", str(HERE / "shim")]
             + [f"-D{d}" for d in s.defines] + inc)
 
 
@@ -191,7 +200,8 @@ def compile_ir(src_hip: Path, out_ll: Path, vllm: Path, s: Source, compiler: str
     else:   # the VM: ROCm's own hipcc, device only, before the device libraries
         th = os.environ.get("ETX_TORCH_HEADERS", str(Path.home() / "rocm-headers/pytorch"))     # torch/headeronly (sparse pytorch checkout)
         cmd = ["hipcc", "-x", "hip", "--cuda-device-only", "--offload-arch=gfx942", "-nogpulib", "-std=c++17", "-O3", "-S", "-emit-llvm",
-               "-D__HIP_PLATFORM_AMD__", "-DUSE_ROCM", "-DNDEBUG", "-isystem", th, "-include", str(HERE / "shim/etx_cuda2hip.h"), "-I", str(HERE / "shim")] + defs + inc + [str(src_hip), "-o", str(out_ll)]
+               "-D__HIP_PLATFORM_AMD__", "-DUSE_ROCM", "-DNDEBUG", "-isystem", th] + _rocm_inc() + [
+               "-include", str(HERE / "shim/etx_cuda2hip.h"), "-I", str(HERE / "shim")] + defs + inc + [str(src_hip), "-o", str(out_ll)]
     r = subprocess.run(cmd, capture_output=True, text=True)
     if r.returncode:
         raise SystemExit(f"compile {s.path} failed:\n{r.stderr[-4000:]}")
