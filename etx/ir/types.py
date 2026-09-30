@@ -87,6 +87,8 @@ class TileBody:
                                     # accesses (sc0 sc1, past the XCD caches), so the megakernel emits no acquire
                                     # invalidate for it and the caches survive the phase boundary; "imported": the
                                     # tile uses plain accesses and keeps the buffer_inv acquire (every imported kernel)
+    arg_bytes: int = 0              # size of the type's argument block (bytes): lets the megakernel prefetch the
+                                    # NEXT task's block while the current arrive runs (ETX_VL_ARGPF); 0 = unknown, skip
 
 
 @dataclass
@@ -130,6 +132,9 @@ class Graph:
     events: dict[str, ETensor] = field(default_factory=dict)
     grids: list[TaskGrid] = field(default_factory=list)     # program order == topological order
     symbols: list[str] = field(default_factory=list)
+    codegen: dict[str, bool] = field(default_factory=dict)  # kernel-emission switches the model opts into:
+                                                            # "argpf" (next-task argument prefetch), "bar2"
+                                                            # (two-barrier static loop); absent = off = old emission
 
     # builder API -----------------------------------------------------------
     def tensor(self, name: str, shape: tuple[Dim, ...], **kw) -> Tensor:

@@ -1,13 +1,18 @@
-"""GPU session: the coherence redesign measured (docs/MODEL-vllm-kernels.md section 20). Microbenchmarks FIRST --
-they are the diagnosis whatever the build does: hw_bench restart (what one buffer_inv sc1 costs a warm phase, the
-megakernel's per-phase cold start), cohload (inv + plain loads against coherent sc0 sc1 loads for a staged
-activation), stream (the fixed width sweep: gate_up at 8/16/37/74/96/148/192 workgroups decides whether narrow
-phases hold aggregate bandwidth -- the 2.22 ms question), lfx. Then build 4 = build 3 + ETX_VL_COH=1 (DSL tiles
-access activations coherently, no acquire inv; weights survive in L2, the touch finally works), one run each with
-the gates: 32/32 tokens against HF greedy and --check-dsl. Then two interleaved requests on the same build.
-Pre-registered readings (section 20, anchored to build 3's 5.895): ~5.9 the inv was never the cost; 5.6-5.8 the
-overhead share moved, touch still dead; 4.9-5.3 both landed; fused < unfused (5.660) flips the fusion penalty,
-the claim ETX is built on. vLLM 4.67. Two requests: 7.4-8.8 ms per step (build 3 measured 8.988).
+"""GPU session: the software phase boundary rebuilt, measured (docs/MODEL-vllm-kernels.md section 20).
+Microbenchmarks FIRST -- they are the diagnosis whatever the builds do: hw_bench restart (what one buffer_inv sc1
+costs a warm phase, the megakernel's per-phase cold start), cohload (inv + plain loads against coherent sc0 sc1
+loads for a staged activation), stream (the fixed width sweep: gate_up at 8/16/37/74/96/148/192 workgroups decides
+whether narrow phases hold aggregate bandwidth -- the 2.22 ms question), lfx. The primary build is build 5 =
+build 3 + ETX_VL_COH (coherent activation access, no acquire inv: weights survive in L2 and the touch finally
+works) + ETX_VL_ARGPF (wave 1 prefetches the next task's argument block during the arrive) + ETX_VL_BAR2 (two
+__syncthreads per task instead of four), one run each with the gates: 32/32 tokens against HF greedy and
+--check-dsl. Build 4 (COH alone) is the fallback and the layer attribution: one fused run after build 5's runs.
+Then two interleaved requests on build 5. Pre-registered readings (section 20, anchored to build 3's 5.895):
+~5.9 the boundary was never the cost; 5.25-5.7 the overhead share moved, touch still dead; 4.6-5.2 both landed
+(floor 4.6, no promise below); build 5 vs build 4 isolates ARGPF+BAR2 (model bound 0.10-0.35 ms: the measured
+0.24 ms argument-path spread plus one to two dropped barriers x 0.106-0.282 us x 384 phases); fused < unfused
+flips the 0.235 ms fusion penalty, the claim ETX is built on. vLLM 4.67. Two requests: 7.1-8.7 ms per step
+(build 3 measured 8.988).
 
   tools/session.sh push <ip>; tools/session.sh start <ip> examples/sessions/coh.py
 """
@@ -52,11 +57,11 @@ job(name="prep", gpu=0, after=["dl", "etx_env"], after_any=[MB_PREV], timeout=24
     cmd=f"{PY} examples/vllm_llm/prep.py --src {LLM}/{M}/hf --out {LLM}/{M} --maxlen 1072 && "
         f"cp examples/llm/results/golden_c1024_{M}.txt {LLM}/{M}/golden_c1024.txt && ls -la {LLM}/{M}/vl.bin", summary=[r"wrote .*vl.bin"])
 
-# ---------------------------------------------------------------- build 4: build 3 + ETX_VL_COH (one run each)
-B = "moe_coh"
+# ---------------------------------------------------------------- build 5: COH + ARGPF + BAR2 (primary, one run each)
+B = "moe_all"
 DSL = "ETX_VL_XCD=1 ETX_VL_CHAIN=1 ETX_VL_DSL_GEMV=1 ETX_VL_DSL_TOPK=1 ETX_VL_DSL_ATTN=head ETX_VL_DSL_FOLD=1 ETX_VL_TOUCH=1"
 job(name=f"build_{B}", lane="cpu", after=["etx_env", "dl"], timeout=2400,
-    cmd=f"{V} {DSL} ETX_VL_COH=1 ETX_OUT=$HOME/sess/b_{B} bash examples/vllm_llm/build.sh {LLM}/{M} "
+    cmd=f"{V} {DSL} ETX_VL_COH=1 ETX_VL_ARGPF=1 ETX_VL_BAR2=1 ETX_OUT=$HOME/sess/b_{B} bash examples/vllm_llm/build.sh {LLM}/{M} "
         f"> $HOME/sess/b_{B}.buildlog 2>&1; grep -E 'tasks=|Function Name|VGPRs|error' $HOME/sess/b_{B}.buildlog | tail -4; "
         f"cp $HOME/sess/b_{B}.buildlog $HOME/sess/buildlog_{B}.txt; cp $HOME/sess/b_{B}/vl_plan.txt $HOME/sess/vlplan_{B}.txt; "
         f"cp $HOME/sess/b_{B}/plan.json $HOME/sess/plan_{B}.json; cp $HOME/sess/b_{B}/dsl_tiles.hip $HOME/sess/; test -x $HOME/sess/b_{B}/run",
@@ -67,15 +72,24 @@ job(name="run_unfused", gpu=0, after=[f"build_{B}", "prep"], after_any=["run_fus
 job(name="trace_fused", gpu=0, after=[f"build_{B}", "prep"], after_any=["run_unfused"], timeout=900,
     cmd=f"ETX_TRACE=1 ETX_TRACE_RAW=$HOME/sess/trace_{B}.bin stdbuf -oL {RUN} --max-steps 8 --repeat 1", summary=[RES])
 
-# ---------------------------------------------------------------- two interleaved requests on build 4
-B2 = "moe_cohx2"
+# ---------------------------------------------------------------- build 4 (COH alone): the fallback and the ARGPF+BAR2 attribution
+BF = "moe_coh"
+job(name=f"build_{BF}", lane="cpu", after=["etx_env", "dl"], timeout=2400,
+    cmd=f"{V} {DSL} ETX_VL_COH=1 ETX_OUT=$HOME/sess/b_{BF} bash examples/vllm_llm/build.sh {LLM}/{M} > $HOME/sess/b_{BF}.buildlog 2>&1; "
+        f"grep -E 'tasks=|VGPRs Spill|error' $HOME/sess/b_{BF}.buildlog | tail -3; cp $HOME/sess/b_{BF}/vl_plan.txt $HOME/sess/vlplan_{BF}.txt; "
+        f"cp $HOME/sess/b_{BF}/plan.json $HOME/sess/plan_{BF}.json; test -x $HOME/sess/b_{BF}/run", summary=[r"tasks=|VGPRs Spill"])
+job(name="run_fused_b4", gpu=0, after=[f"build_{BF}", "prep"], after_any=["trace_fused"], timeout=900,
+    cmd=f"stdbuf -oL $HOME/sess/b_{BF}/run {LLM}/{M} $HOME/sess/b_{BF}/vl_plan.txt --repeat 1 --check-dsl", summary=[RES])
+
+# ---------------------------------------------------------------- two interleaved requests on build 5
+B2 = "moe_allx2"
 job(name="llm_env_tf", lane="cpu", after="llm_env", timeout=1800,
     cmd=". ~/llmenv/bin/activate && pip install -q 'transformers>=4.51,<5' accelerate && python3 -c 'import transformers; print(transformers.__version__)'")
-job(name="golden_r97", gpu=0, after=["llm_env_tf", "dl"], after_any=["trace_fused"], timeout=2400,
+job(name="golden_r97", gpu=0, after=["llm_env_tf", "dl"], after_any=["run_fused_b4"], timeout=2400,
     cmd=f"{PY} examples/llm/prep.py --model {HF} --src {LLM}/{M}/hf --out {LLM}/{M} --context 1024 --rotate 97 --golden-only && "
         f"head -c 200 {LLM}/{M}/golden_c1024_r97.txt", summary=[r"HF greedy|gen:"])
 job(name=f"build_{B2}", lane="cpu", after=["etx_env", "dl"], timeout=2400,
-    cmd=f"{V} {DSL} ETX_VL_COH=1 ETX_VL_REQUESTS=2 ETX_OUT=$HOME/sess/b_{B2} "
+    cmd=f"{V} {DSL} ETX_VL_COH=1 ETX_VL_ARGPF=1 ETX_VL_BAR2=1 ETX_VL_REQUESTS=2 ETX_OUT=$HOME/sess/b_{B2} "
         f"bash examples/vllm_llm/build.sh {LLM}/{M} > $HOME/sess/b_{B2}.buildlog 2>&1; grep -E 'tasks=|Function Name|VGPRs|error' $HOME/sess/b_{B2}.buildlog | tail -4; "
         f"cp $HOME/sess/b_{B2}.buildlog $HOME/sess/buildlog_{B2}.txt; cp $HOME/sess/b_{B2}/vl_plan.txt $HOME/sess/vlplan_{B2}.txt; "
         f"cp $HOME/sess/b_{B2}/plan.json $HOME/sess/plan_{B2}.json; test -x $HOME/sess/b_{B2}/run", summary=[r"tasks=|megakernel|VGPRs Spill"])

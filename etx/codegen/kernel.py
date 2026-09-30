@@ -198,6 +198,27 @@ def emit_kernel(plan: Plan, device: int = 0) -> str:
         dyn_flags[plan.type_ids[g.name]] = "1" if plan.modes.get(g.name, "static") != "static" else "0"
     out.append(f"static __device__ const unsigned char etx_type_is_dynamic[{max(1, n_types)}] = {{{', '.join(dyn_flags) or '0'}}};")
     out.append("")
+    static_only = all(t.mode == "static" for t in plan.tasks if t.device == device)
+    bar2 = bool(plan.graph.codegen.get("bar2")) and static_only     # the two-barrier loop is a static-loop rewrite
+    argpf = bool(plan.graph.codegen.get("argpf")) and static_only
+    if argpf:
+        # ETX_VL_ARGPF: wave 1 pulls the NEXT static task's argument block through the scalar path while thread 0
+        # runs the current task's arrive (the block depends on no event; with a coherent build no acquire invalidate
+        # follows, so the K$/L2 lines survive into the next task's argument reads). Per-type offset and size; 0 = skip.
+        off, stride, nb = ["0"] * max(1, n_types), ["0"] * max(1, n_types), ["0"] * max(1, n_types)
+        for g in plan.graph.grids:
+            if g.body.arg_bytes and g.args:
+                cs = list(g.consts)
+                off[plan.type_ids[g.name]] = str(cs[0] if cs else 0)
+                # per-domain replicas keep their blocks `stride` apart (cst[1]); the prefetch reads this worker's
+                stride[plan.type_ids[g.name]] = str(cs[1] if len(cs) > 1 else 0)
+                nb[plan.type_ids[g.name]] = str(g.body.arg_bytes)
+        out.append("#ifdef ETX_HAS_IMPORTS   // ETX_VL_ARGPF: next-task argument prefetch (offset into the pool, per-domain stride, bytes)")
+        out.append(f"static __device__ const int32_t etx_argpf_off[{max(1, n_types)}] = {{{', '.join(off)}}};")
+        out.append(f"static __device__ const int32_t etx_argpf_str[{max(1, n_types)}] = {{{', '.join(stride)}}};")
+        out.append(f"static __device__ const int32_t etx_argpf_bytes[{max(1, n_types)}] = {{{', '.join(nb)}}};")
+        out.append("#endif")
+        out.append("")
     # non-blocking readiness probe per task type (same edge maps as the wait code)
     out.append("static __device__ __forceinline__ bool etx_deps_ready(const etx_params& p, int32_t tid) {")
     out.append("  const etx_task t = p.descs[tid];")
@@ -225,7 +246,14 @@ def emit_kernel(plan: Plan, device: int = 0) -> str:
     # 219 call sites per body on the DeepSeek port, so the compiler stopped inlining and paid the call
     # ABI (400 B/lane of scratch, vs fleet's 48 with one call site per body).
     max_pro = max([len(g.prologue) for g in grids] + [0])
-    out.append("static __device__ __forceinline__ void etx_run_task(const etx_params& p, const etx_task t, uint32_t worker, uint32_t domain, int32_t tid) {")
+    if bar2:
+        # BAR2 (two-barrier loop): thread 0 advances the static queue into the OTHER parity slot before the
+        # post-drain barrier, so that barrier doubles as the next task's broadcast and the loop-top barrier
+        # disappears (two __syncthreads per task instead of four)
+        out.append("static __device__ __forceinline__ void etx_run_task(const etx_params& p, const etx_task t, uint32_t worker, uint32_t domain, int32_t tid,")
+        out.append("                                                     int32_t& cursor, const int32_t cend, int32_t* s_tid2, etx_task* s_task2, const int par) {")
+    else:
+        out.append("static __device__ __forceinline__ void etx_run_task(const etx_params& p, const etx_task t, uint32_t worker, uint32_t domain, int32_t tid) {")
     out.append("  __shared__ __align__(16) unsigned char etx_lds[ETX_LDS_USED > 0 ? ETX_LDS_USED : 16];")
     out.append("  uint64_t* tr = p.trace_time ? p.trace_time + (size_t)tid * 4 : nullptr;")
     out.append("  if (tr && threadIdx.x == 0) tr[0] = (uint64_t)ETX_TIMER();")
@@ -285,6 +313,12 @@ def emit_kernel(plan: Plan, device: int = 0) -> str:
     out.append("#ifndef ETX_NO_ALLWAVE_DRAIN")
     out.append("  ETX_RELEASE_DOMAIN();   // every wave drains its own stores before the barrier: thread 0's release only covers wave 0")
     out.append("#endif")
+    if bar2:
+        out.append("  // BAR2: the next head into the other parity slot BEFORE the barrier (write-after-read safe: the")
+        out.append("  // running task reads slot par, the fetch writes par ^ 1); the barrier then broadcasts it for free")
+        out.append("  if (threadIdx.x == 0) {")
+        out.append("    if (cursor < cend) { s_tid2[par ^ 1] = p.static_queue[cursor]; s_task2[par ^ 1] = p.static_descs[cursor]; ++cursor; } else s_tid2[par ^ 1] = -1;")
+        out.append("  }")
     out.append("  __syncthreads();")
     out.append("  if (tr && threadIdx.x == 0) { tr[2] = (uint64_t)ETX_TIMER(); tr[3] = worker; }")
     out.append("  if (threadIdx.x != 0) return;")
@@ -315,7 +349,6 @@ def emit_kernel(plan: Plan, device: int = 0) -> str:
     out.append("  }")
     out.append("}")
     out.append("")
-    static_only = all(t.mode == "static" for t in plan.tasks if t.device == device)
     out.append("#ifndef ETX_MIN_WG_PER_CU   // the plan's residency (P1): tells the register allocator the real occupancy target")
     out.append(f"#define ETX_MIN_WG_PER_CU {plan.wg_per_cu}")
     out.append("#endif")
@@ -362,19 +395,59 @@ def emit_kernel(plan: Plan, device: int = 0) -> str:
     if static_only:
         out.append("  // every task on this device is static: no readiness probe, no queue pops -- take the head and")
         out.append("  // wait on it (the probe was one more poller of the same word and one more round trip per task)")
-        out.append("  __shared__ etx_task s_task;")
-        out.append("  for (;;) {")
-        out.append("    if (threadIdx.x == 0) {")
-        out.append("      if (cursor < cend) { s_tid = p.static_queue[cursor]; s_task = p.static_descs[cursor]; ++cursor; } else s_tid = -1;")
-        out.append("    }")
-        out.append("    __syncthreads();")
-        out.append("    const int32_t tid = s_tid;")
-        out.append("    if (tid < 0) break;")
-        out.append("    const etx_task cur = s_task;")
-        out.append("    if (p.trace_exec && threadIdx.x == 0) atomicAdd(p.trace_exec + tid, 1);")
-        out.append("    etx_run_task(p, cur, worker, domain, tid);")
-        out.append("    __syncthreads();")
-        out.append("  }")
+        if bar2:
+            out.append("  // BAR2: double-buffered head (parity slots); the fetch of slot par ^ 1 happens inside")
+            out.append("  // etx_run_task before its post-drain barrier, so each task costs exactly two __syncthreads")
+            out.append("  __shared__ etx_task s_task2[2]; __shared__ int32_t s_tid2[2];")
+            out.append("  if (threadIdx.x == 0) {   // preamble: the first head into slot 0")
+            out.append("    if (cursor < cend) { s_tid2[0] = p.static_queue[cursor]; s_task2[0] = p.static_descs[cursor]; ++cursor; } else s_tid2[0] = -1;")
+            out.append("  }")
+            out.append("  __syncthreads();")
+            out.append("  int par = 0;")
+            out.append("  for (;;) {")
+            out.append("    const int32_t tid = s_tid2[par];")
+            out.append("    if (tid < 0) break;")
+            out.append("    const etx_task cur = s_task2[par];")
+            out.append("    if (p.trace_exec && threadIdx.x == 0) atomicAdd(p.trace_exec + tid, 1);")
+            out.append("    etx_run_task(p, cur, worker, domain, tid, cursor, cend, s_tid2, s_task2, par);")
+            if argpf:
+                out.append("#ifdef ETX_HAS_IMPORTS   // ETX_VL_ARGPF: wave 1 pulls the NEXT task's argument block while thread 0 arrives")
+                out.append("    if (threadIdx.x - 64u < 64u && s_tid2[par ^ 1] >= 0) {")
+                out.append("      const int32_t ntt = s_task2[par ^ 1].type;")
+                out.append("      if (etx_argpf_bytes[ntt]) etx_imp_touch(etx_imp_argblock(p.type_args + ntt * p.max_args,")
+                out.append("                                                    etx_argpf_off[ntt] + (int32_t)domain * etx_argpf_str[ntt]), etx_argpf_bytes[ntt]);")
+                out.append("    }")
+                out.append("#endif")
+            out.append("    par ^= 1;")
+            out.append("  }")
+        else:
+            out.append("  __shared__ etx_task s_task;")
+            if argpf:
+                out.append("  __shared__ int32_t s_ncur;   // ETX_VL_ARGPF: the queue position of the NEXT head")
+            out.append("  for (;;) {")
+            out.append("    if (threadIdx.x == 0) {")
+            if argpf:
+                out.append("      if (cursor < cend) { s_tid = p.static_queue[cursor]; s_task = p.static_descs[cursor]; ++cursor; } else s_tid = -1;")
+                out.append("      s_ncur = cursor;")
+            else:
+                out.append("      if (cursor < cend) { s_tid = p.static_queue[cursor]; s_task = p.static_descs[cursor]; ++cursor; } else s_tid = -1;")
+            out.append("    }")
+            out.append("    __syncthreads();")
+            out.append("    const int32_t tid = s_tid;")
+            out.append("    if (tid < 0) break;")
+            out.append("    const etx_task cur = s_task;")
+            out.append("    if (p.trace_exec && threadIdx.x == 0) atomicAdd(p.trace_exec + tid, 1);")
+            out.append("    etx_run_task(p, cur, worker, domain, tid);")
+            if argpf:
+                out.append("#ifdef ETX_HAS_IMPORTS   // ETX_VL_ARGPF: wave 1 pulls the NEXT task's argument block while thread 0 arrives")
+                out.append("    if (threadIdx.x - 64u < 64u && s_ncur < cend) {")
+                out.append("      const etx_task nt = p.static_descs[s_ncur];")
+                out.append("      if (etx_argpf_bytes[nt.type]) etx_imp_touch(etx_imp_argblock(p.type_args + nt.type * p.max_args,")
+                out.append("                                                    etx_argpf_off[nt.type] + (int32_t)domain * etx_argpf_str[nt.type]), etx_argpf_bytes[nt.type]);")
+                out.append("    }")
+                out.append("#endif")
+            out.append("    __syncthreads();")
+            out.append("  }")
         out.append("}")
         out.append("")
         out.extend(_emit_unfused(plan, device, grids, symbols, max_pro))

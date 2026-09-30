@@ -50,6 +50,11 @@ ROOT = Path(__file__).resolve().parents[2]
 # without COH the acquire's buffer_inv sc1 threw the touched lines away (why section 18 delivered ~0 of its
 # predicted 0.34 ms); with COH the dense GEMV phases' touched first trips overlap their wait.
 COH_SAVE_LO, COH_SAVE_HI = 0.5, 1.5
+# ETX_VL_ARGPF + ETX_VL_BAR2 on top of COH: the argument path is bounded by the measured 0.24 ms spread between
+# arg-path implementations (2026-09-28b, all-or-nothing per step), the dropped loop barriers by one to two
+# s_swbar (0.106-0.282 us) per phase. Applied as a per-step delta range, clamped at 4.6 ms (section 20).
+ALL_SAVE_LO_MS, ALL_SAVE_HI_MS = 0.10, 0.35
+ALL_FLOOR_MS = 4.6
 COH_ROLES = {"qkv", "o_proj", "router", "moe_up", "moe_down", "prep", "lm_head",
              "in_norm", "post_norm", "topk", "moe_sum"}          # DSL tiles; attn / reduce / chains stay imported
 TOUCH_ROLES = {"qkv", "o_proj", "router", "lm_head"}             # dense dsl_gemv{,_fold}: the only forms with a touch
@@ -155,6 +160,15 @@ def predict_coh(plan_path: str | Path, cfg: dict, mapping: str = "contig") -> di
     return out
 
 
+def predict_all(plan_path: str | Path, cfg: dict, mapping: str = "contig") -> dict:
+    """Build 5 (COH + ARGPF + BAR2): the COH range shifted by the bounded argument-path and barrier savings;
+    never promised below ALL_FLOOR_MS."""
+    r = predict_coh(plan_path, cfg, mapping)
+    for k in ("coh_lo", "coh_hi", "coh_touch_lo", "coh_touch_hi"):
+        r["all_" + k[4:]] = max(ALL_FLOOR_MS, r[k] - (ALL_SAVE_HI_MS if k.endswith("lo") else ALL_SAVE_LO_MS))
+    return r
+
+
 def width_sweep(cfg: dict, mapping: str = "contig", etx_us: float = ETX_US, fused_us: float = FUSED_US,
                 layers: int | None = None) -> list:
     """What each phase would cost at every width, under the fitted model. The plan fixes these widths today; the
@@ -182,8 +196,15 @@ def main():
     ap.add_argument("--mapping", default="contig", choices=["contig", "rows"])
     ap.add_argument("--etx-us", type=float, default=ETX_US)
     ap.add_argument("--coh", action="store_true", help="the ETX_VL_COH range (section 20)")
+    ap.add_argument("--all", dest="all_", action="store_true", help="the COH + ARGPF + BAR2 range (build 5)")
     a = ap.parse_args()
     cfg = json.load(open(a.config))
+    if a.all_:
+        r = predict_all(a.plan, cfg, a.mapping)
+        print(f"base {r['base']:.3f} ms; all overhead only {r['all_hi']:.3f}-{r['all_lo']:.3f}; "
+              f"with touch {r['all_touch_hi']:.3f}-{r['all_touch_lo']:.3f}   (coh save {COH_SAVE_LO}-{COH_SAVE_HI} us, "
+              f"argpf+bar2 {ALL_SAVE_LO_MS}-{ALL_SAVE_HI_MS} ms, floor {ALL_FLOOR_MS})")
+        return
     if a.coh:
         r = predict_coh(a.plan, cfg, a.mapping)
         print(f"base {r['base']:.3f} ms; coh overhead only {r['coh_hi']:.3f}-{r['coh_lo']:.3f}; "

@@ -626,3 +626,32 @@ does not land (the trace's dense waits stay exposed; restart says how much was l
 Below 4.9: the model was conservative; restart and cohload say why. Independent of the number: fused < unfused
 flips the fusion penalty, which is the claim ETX is built on; a --check-dsl or token-match failure means the
 implementation diverges from the TLA-checked design (the design itself holds). vLLM stands at 4.67.
+
+### Build 5: + ETX_VL_ARGPF + ETX_VL_BAR2 (the other two boundary layers, same session)
+
+The remaining decomposition of the software boundary against the 1.61 us hardware launch: the argument path (a
+task fetches its 136 B block through scalar loads at use; the 2026-09-28b builds measured 0.24 ms between
+argument-path implementations, all-or-nothing per step) and the loop's four full-workgroup __syncthreads per
+task. `ETX_VL_ARGPF=1`: wave 1 pulls the NEXT static task's block (per-type offset + this domain's stride) while
+thread 0 runs the arrive; with COH no invalidate follows, so the lines survive into the next task's reads.
+`ETX_VL_BAR2=1`: thread 0 advances the queue into a double-buffered shared slot BEFORE the post-drain barrier,
+which then doubles as the broadcast; the loop-top and loop-end barriers disappear (two barriers per task, not
+four; the write-after-read hazard is closed by the parity slots). Both are emission switches on the graph,
+default off; off = byte-identical emission (tests/test_bar2_argpf.py). Container: spill 9, tasks/events
+unchanged (66938/388).
+
+The model bound for the pair is 0.10-0.35 ms per step: the argument path's measured 0.24 ms as the upper share,
+one to two dropped barriers at the measured s_swbar 0.106-0.282 us over 384 phases for the rest. No floor
+crossing is promised: `pmodel <plan> --all` clamps at 4.6 ms.
+
+| build 5 = build 4 + ARGPF + BAR2 | anchored range |
+|---|---|
+| overhead share alone | 5.25-5.7 |
+| touch also landing | **4.6-5.2** |
+| two requests, per step | 7.1-8.7 |
+
+**Readings.** Build 5 vs build 4 (one extra fused run) isolates ARGPF+BAR2 directly: < 0.05 ms apart means the
+argument path and barriers were already covered (or never exposed); ~0.24 ms apart means the argument path was
+the exposed share, as the 2026-09-28b spread suggested. Build 5 fused < 5.660 (build 3's unfused) flips the
+fusion penalty. A BAR2 hang or token mismatch indicts the two-barrier loop's broadcast fold (the parity-slot
+argument above), not the coherence design.

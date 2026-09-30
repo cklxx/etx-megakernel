@@ -10,13 +10,13 @@ from ..ir.types import TileBody
 
 
 def hip_link(source: str, symbol: str, prefetch: str | None = None, pre_wait: str | None = None, touch: str | None = None,
-             coherence: str = "imported") -> TileBody:
+             coherence: str = "imported", arg_bytes: int = 0) -> TileBody:
     """Link mode: `symbol` is an extern "C" __device__ function with the etx_ctx ABI in `source`.
     `prefetch` names an optional sibling that warms the tile's weights (Pass 7 hook); `pre_wait` one that wave 0 runs
     before it waits for the task's events (anything that does not depend on them); `touch` one the other waves run
     during that wait (the task's first weight trips into L2)."""
     return TileBody(kind="hip_link", symbol=symbol, source=source, prefetch=prefetch, pre_wait=pre_wait, touch=touch,
-                    coherence=coherence)
+                    coherence=coherence, arg_bytes=arg_bytes)
 
 
 def cuda_link(source: str, symbol: str, prefetch: str | None = None) -> TileBody:
