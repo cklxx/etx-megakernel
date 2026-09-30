@@ -77,7 +77,9 @@ def test_dsl_tiles_use_the_coherent_accessors():
     g = gemv.emit_tiles()
     for fn in ("dsl_a_stbf(d.resid_out + i", "dsl_a_ldbf(d.rows +", "dsl_a_ldi(d.ids + s)"):
         assert fn in g, fn
-    assert "dsl_a_ldll(positions)" in attnprep.emit_tiles()
+    # positions / slot_mapping are wave-uniform scalars: one coherent load per wave, broadcast (dsl_a_ldll_u)
+    assert "dsl_a_ldll_u(positions)" in attnprep.emit_tiles()
+    assert "dsl_a_ldll_u(slot_mapping)" in attnprep.emit_tiles()
     # weights stay plain: the stream loop's loads are untouched
     assert "base[(size_t)(s0 + u) * ETX_WAVE_SIZE]" in g
     # without the build flag the helpers are the plain accesses (the acquire-based builds are unchanged)

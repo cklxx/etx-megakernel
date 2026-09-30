@@ -91,6 +91,10 @@ TOUCH = os.environ.get("ETX_VL_TOUCH", "0") == "1"
 # ETX_VL_COH=1: the DSL tiles access their activations device-coherently (etx.ops.coh, built with -DETX_DSL_COH), so
 # the megakernel emits no acquire buffer_inv for them and the caches survive the phase boundary (docs/RESULTS-2026-09-30.md)
 COH = os.environ.get("ETX_VL_COH", "0") == "1"
+# ETX_VL_ATTN_WIDE=1: the attention partitions spread over all NX XCDs instead of sitting on the kv head's own
+# one. With NKV = 4 and 8 XCDs the head-affine block leaves XCDs 4-7 idle; the price is that prep -> attn ->
+# reduce stop being XCD-local, so their events rise to DEVICE scope (p2_affinity derives it).
+ATTN_WIDE = os.environ.get("ETX_VL_ATTN_WIDE", "0") == "1"
 # ETX_VL_ARGPF=1: wave 1 prefetches the NEXT static task's argument block while thread 0 runs the arrive.
 # ETX_VL_BAR2=1: the static loop's broadcast rides the post-drain barrier (two __syncthreads per task, not four).
 # Both are kernel-emission switches (etx/codegen/kernel.py), carried on the graph; default off.
@@ -354,8 +358,9 @@ def build() -> Graph:
                 if nkv * parts != i["tasks"]:
                     raise SystemExit(f"ETX_VL_DSL_ATTN=head needs one attention block per task (ETX_VL_SLOTS={i['export']}=1)")
                 g.etensor(ev, (nkv,), wait_count=parts)
+                dm = f"i->(i%{NX})" if ATTN_WIDE else f"i->(i/{parts})"   # placement only; the edges stay per kv head
                 g.call_device(name, (i["tasks"],), link, resource=res, args=["impargs"], consts=(i["offset"],),
-                              in_edges={prev[r]: f"i->(i/{parts})"}, out_edges={ev: f"i->(i/{parts})"}, domain_map=f"i->(i/{parts})", duration_us=8.0)
+                              in_edges={prev[r]: f"i->(i/{parts})"}, out_edges={ev: f"i->(i/{parts})"}, domain_map=dm, duration_us=8.0)
             else:
                 nkv = i["tasks"]
                 if i["grid"][0] != nkv * i["G"]:

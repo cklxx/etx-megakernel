@@ -32,6 +32,20 @@ static __device__ __forceinline__ float dsl_a_ldf(const float* p) { return __hip
 static __device__ __forceinline__ void dsl_a_stf(float* p, float v) { __hip_atomic_store((DSL_COH_G float*)p, v, __ATOMIC_RELAXED, DSL_COH_SCOPE); }
 static __device__ __forceinline__ long long dsl_a_ldll(const long long* p) { return __hip_atomic_load((const DSL_COH_G long long*)p, __ATOMIC_RELAXED, DSL_COH_SCOPE); }
 static __device__ __forceinline__ unsigned long long dsl_a_ld64(const unsigned long long* p) { return __hip_atomic_load((const DSL_COH_G unsigned long long*)p, __ATOMIC_RELAXED, DSL_COH_SCOPE); }
+// A scalar every lane needs (positions[0], slot_mapping[0]). A coherent load bypasses L1 and L2, so the usual
+// "lane 0 misses, the rest hit" does not happen: each lane's load is its own memory request to the same address.
+// -DETX_DSL_UNIFORM loads it once per wave and broadcasts. Without the flag it is the plain per-lane coherent load.
+#ifdef ETX_DSL_UNIFORM
+static __device__ __forceinline__ long long dsl_a_ldll_u(const long long* p) {
+  long long v = 0;
+  if (etx_lane() == 0) v = dsl_a_ldll(p);
+  const int lo = __shfl((int)((unsigned long long)v & 0xffffffffull), 0, ETX_WAVE_SIZE);
+  const int hi = __shfl((int)((unsigned long long)v >> 32), 0, ETX_WAVE_SIZE);
+  return (long long)(((unsigned long long)(unsigned int)hi << 32) | (unsigned int)lo);
+}
+#else
+static __device__ __forceinline__ long long dsl_a_ldll_u(const long long* p) { return dsl_a_ldll(p); }
+#endif
 #else
 static __device__ __forceinline__ float dsl_a_ldbf(const __hip_bfloat16* p) { return __bfloat162float(*p); }
 static __device__ __forceinline__ void dsl_a_stbf(__hip_bfloat16* p, __hip_bfloat16 v) { *p = v; }
@@ -41,6 +55,7 @@ static __device__ __forceinline__ float dsl_a_ldf(const float* p) { return *p; }
 static __device__ __forceinline__ void dsl_a_stf(float* p, float v) { *p = v; }
 static __device__ __forceinline__ long long dsl_a_ldll(const long long* p) { return *p; }
 static __device__ __forceinline__ unsigned long long dsl_a_ld64(const unsigned long long* p) { return *p; }
+static __device__ __forceinline__ long long dsl_a_ldll_u(const long long* p) { return *p; }
 #endif
 #endif
 '''
