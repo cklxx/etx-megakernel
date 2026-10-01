@@ -33,22 +33,22 @@
 <tr><th>Configuration</th><th class="n">ms/token</th><th class="n">vs vLLM</th></tr>
 <tr><td>vLLM 0.27.1 default</td><td class="n">4.862</td><td class="n">—</td></tr>
 <tr><td>vLLM + AITER</td><td class="n">4.975</td><td class="n">+2.3%</td></tr>
-<tr class="hi"><td>ETX megakernel</td><td class="n">5.042</td><td class="n loss">+3.7%</td></tr>
-<tr><td>ETX unfused — same tiles, HIP-graph replay</td><td class="n">5.145</td><td class="n">+5.8%</td></tr>
+<tr class="hi"><td>ETX megakernel</td><td class="n">4.937</td><td class="n loss">+1.5%</td></tr>
+<tr><td>ETX unfused — same tiles, HIP-graph replay</td><td class="n">4.998</td><td class="n">+2.8%</td></tr>
 </table>
 
 <p class="key"><strong>Fusion pays, and ETX does not yet beat vLLM.</strong> One persistent kernel beats a HIP-graph
-replay of the same tiles by <span class="win">2.0%</span>. The day began with fusion <em>losing</em> by 4.2%; the sign
-changed, and the system improved 14.5% against itself. The remaining 3.7% to vLLM is not in the orchestration.</p>
+replay of the same tiles by <span class="win">1.2%</span>. The day began with fusion <em>losing</em> by 4.2%; the sign
+changed, and the system improved 16.2% against itself. The remaining 1.5% to vLLM is not in the orchestration.</p>
 
 <p class="fine">Wall clock, the basis vLLM's benchmark uses. Three interleaved runs per row, one binary generation,
 all 32/32 tokens against HuggingFace greedy with every DSL operator of the last layer within 2 bf16 ulps of a CPU
-reference. Machine: 1× MI300X VF, ROCm 7.14. Confirmed on bare metal (ROCm 7.2.4): 5.042 / 5.266 / 4.887, fusion
-margin +0.224 against −0.235 on 2026-09-30.</p>
+reference. Machine: 1× MI300X VF, ROCm 7.14. Confirmed on bare metal (ROCm 7.2.4) before the last change: 5.042 / 5.266 /
+4.887, fusion margin +0.224 against −0.235 on 2026-09-30.</p>
 
 <h2>Why fusion now pays</h2>
 
-<p>Four changes account for the 14.5%. The first is the whole story; the rest are the tail.</p>
+<p>Five changes account for the 16.2%. The first is the whole story; the rest are the tail.</p>
 
 <table>
 <tr><th>Change</th><th class="n">ms</th><th>Mechanism</th></tr>
@@ -56,6 +56,7 @@ margin +0.224 against −0.235 on 2026-09-30.</p>
 <tr><td>Unfolding the MoE top-k</td><td class="n win">−0.231</td><td>Our own earlier "optimisation": 448 expert tasks per layer each redid a 128-logit softmax on wave 0 while 15 waves waited. Ablation priced it at 0.676.</td></tr>
 <tr><td>Async per-step host work</td><td class="n win">−0.152</td><td>20 synchronous HIP calls per step, a dead 241 KB memset, a 50 µs poll sleep.</td></tr>
 <tr><td>Non-temporal weight loads</td><td class="n win">−0.106</td><td>6.08 GB read once per token were evicting the MALL-resident KV cache. L2 hit 31.9 → 34.6%.</td></tr>
+<tr><td>Vectorising the coherent norm path</td><td class="n win">−0.105</td><td>A coherent access bypasses L1 and L2, so a 2-byte accessor issues one memory request per lane per element: the folded norm staged 4096 requests per task against <code>o_proj</code>'s 1024 at four times the width. 16-byte accesses cut <code>qkv</code>'s body 11.81 → 9.50 µs. Predicted not to move the MoE phases, which already use the wide path; it did not.</td></tr>
 <tr><td>Phase width, import prune</td><td class="n win">−0.082</td><td>304 → 256 tasks; an unused imported tile was setting the LDS arena.</td></tr>
 </table>
 
@@ -65,7 +66,8 @@ against 103 ns — <strong>10.6×</strong>. Both figures reproduce on both machi
 
 <h2>Why ETX is still behind</h2>
 
-<p>Where the 5.042 ms goes, from a decode trace and hardware counters:</p>
+<p>Where the time goes, from a decode trace and hardware counters taken before the last change (which removed 0.105
+of the tile item):</p>
 
 <table>
 <tr><th>Component</th><th class="n">ms</th><th>Owner</th></tr>
@@ -74,12 +76,12 @@ against 103 ns — <strong>10.6×</strong>. Both figures reproduce on both machi
 <tr><td>Attention kernel fixed cost</td><td class="n">0.301</td><td>imported vLLM kernel, already above the HBM rate</td></tr>
 <tr><td>Hand-off, 9 edges × 1.00 µs</td><td class="n">0.433</td><td>ETX — at the protocol floor</td></tr>
 <tr><td>Per-step host work</td><td class="n">0.135</td><td>ETX</td></tr>
-<tr class="hi"><td>Our own DSL tiles</td><td class="n">1.42</td><td>MoE 0.476 · prep+reduce 0.548 · top-k 0.391</td></tr>
+<tr class="hi"><td>Our own DSL tiles</td><td class="n">1.29</td><td>prep+reduce 0.548 · MoE 0.476 · top-k 0.391, less the folded norm now recovered</td></tr>
 </table>
 
 <p><strong>ETX's orchestration is spent; the tiles are not.</strong> Hand-off sits at its measured floor, start delay is
 below hardware jitter, host work is 0.135 ms, and the instruction cache — named in the literature as a megakernel's
-weakness — hits 99.90%. The gap to vLLM is 0.180 ms; the tile item alone is 1.42. Kernel quality was never ETX's
+weakness — hits 99.90%. The gap to vLLM is 0.075 ms; the tile item alone is 1.29. Kernel quality was never ETX's
 claim, and it is now the whole of the difference.</p>
 
 <p>One hardware limit bounds the tiles: occupancy is <strong>4.000 of 8 waves per SIMD</strong>, capped by 128 VGPRs,
@@ -157,8 +159,8 @@ had charged to ETX there was the hardware floor.</li>
 
 <table>
 <tr><th>Item</th><th class="n">ms</th><th>What it needs</th></tr>
-<tr><td><code>prep</code> + <code>reduce</code></td><td class="n">0.548</td><td>Not chain length — request rate. The coherent accessors are 2-byte per-lane atomics, so a 256-byte head row becomes 128 requests and a task issues ~2300. Vectorising them moves the lane→element mapping the rope shuffle and KV-cache writes depend on.</td></tr>
-<tr><td>MoE tile bodies</td><td class="n">0.476</td><td>~70% of achievable. Bytes-in-flight and the pass structure are excluded by arithmetic; the gather is 7%, the epilogue 5%. Open lead: the tiles appear to realise a quarter of their waves' memory parallelism — the same signature as the 2-byte path above.</td></tr>
+<tr><td><code>prep</code> + <code>reduce</code></td><td class="n">0.548</td><td>The same disease the folded norm had, and the next thing to fix: 2-byte per-lane coherent accessors turn a 256-byte head row into 128 requests, ~2300 per task. Widening them here means re-deriving the lane→element mapping the rope shuffle (<code>lane ^ 32</code>) and the 2-elements-per-lane KV writes depend on — not a widened accessor.</td></tr>
+<tr><td>MoE tile bodies</td><td class="n">0.476</td><td>~70% of achievable. Bytes-in-flight and the pass structure are excluded by arithmetic; the gather is 7%, the epilogue 5%; the request-width explanation was tested and does not apply — the MoE path is already 8 bytes per request. No mechanism identified.</td></tr>
 <tr><td>Top-k tile</td><td class="n">0.391</td><td>At its floor: one write-through round trip behind which every store sits. The only lever reintroduces the invalidate.</td></tr>
 <tr><td>Register pressure</td><td class="n">unknown</td><td>128 → 85 VGPRs would take occupancy to 6 waves/SIMD against 85.9% wave-cycles waiting. Bound unmeasurable until built.</td></tr>
 <tr><td>Batching</td><td class="n">—</td><td>Matrix instructions plus whole-layer batching with no per-phase join.</td></tr>
