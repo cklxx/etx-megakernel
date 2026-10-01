@@ -24,11 +24,20 @@ case $G in 4) ATTN=attn_mfma4_g4;; 6) ATTN=attn_mfma16_g6;; 8) ATTN=attn_mfma16_
 # the megakernel's workgroup carries that arena whether or not a task uses it. wvsplitk_y1/y2 declare 32768 B each --
 # the largest of any tile -- and ETX_VL_DSL_GEMV=1 replaces them with etx.ops.gemv (21120 B), so importing them anyway
 # cost 11648 B of LDS in every phase and capped occupancy at 1 workgroup per CU (measured 2026-10-01, round 16).
+# ETX_VL_IMPORTED=1 restores the all-imported build (round 24's comparison: 6.435 ms against 4.937, and fusion still
+# loses there). Otherwise the DSL tiles are the default, and the attention-prep tile applies only to a model with a
+# q/k norm -- derived here exactly as examples/vllm_llm/model.py's _attn_head() derives it, so the two cannot disagree.
+IMPORTED="${ETX_VL_IMPORTED:-0}"
+D_GEMV="${ETX_VL_DSL_GEMV:-$([ "$IMPORTED" = 1 ] && echo 0 || echo 1)}"
+D_TOPK="${ETX_VL_DSL_TOPK:-$([ "$IMPORTED" = 1 ] && echo 0 || echo 1)}"
+D_FOLD="${ETX_VL_DSL_FOLD:-$([ "$IMPORTED" = 1 ] && echo 0 || echo 1)}"
+D_ATTN="${ETX_VL_DSL_ATTN:-$([ "$IMPORTED" != 1 ] && [ "$QKN" = 1 ] && echo head || echo 0)}"
+export ETX_VL_DSL_GEMV="$D_GEMV" ETX_VL_DSL_TOPK="$D_TOPK" ETX_VL_DSL_FOLD="$D_FOLD" ETX_VL_DSL_ATTN="$D_ATTN"
 EXPORTS="$ATTN,attn_reduce,rms_norm_2d"
-[ "${ETX_VL_DSL_GEMV:-0}" != 1 ] && EXPORTS="wvsplitk_y2,$EXPORTS"
-[ "${ETX_VL_DSL_ATTN:-0}" != head ] && EXPORTS="$EXPORTS,fused_add_rms_norm,rope_neox,reshape_and_cache"
+[ "$D_GEMV" != 1 ] && EXPORTS="wvsplitk_y2,$EXPORTS"
+[ "$D_ATTN" != head ] && EXPORTS="$EXPORTS,fused_add_rms_norm,rope_neox,reshape_and_cache"
 EXPORTS="$EXPORTS,silu_and_mul"
-[ "$QKN" = 1 ] && [ "${ETX_VL_DSL_ATTN:-0}" != head ] && EXPORTS="$EXPORTS,rms_norm_3d"
+[ "$QKN" = 1 ] && [ "$D_ATTN" != head ] && EXPORTS="$EXPORTS,rms_norm_3d"
 # ETX_VL_QKNR=1: q/k norm + rope as vLLM's fused_qk_norm_rope (its enable_qk_norm_rope_fusion pass), one launch
 [ "$QKN" = 1 ] && [ "${ETX_VL_QKNR:-0}" != 0 ] && EXPORTS="$EXPORTS,qknorm_rope"
 # MoE (Qwen3-30B-A3B): router GEMV (YTILE 1), top-k, the two Triton fused_moe launches, moe_sum; silu over the 8 expert
@@ -36,9 +45,9 @@ EXPORTS="$EXPORTS,silu_and_mul"
 # need 80 KB of LDS and put 192 programs on 48 CUs)
 MOEBLK=(); MOESLOTS=""
 if [ "$(cfg moe)" = 1 ]; then
-  [ "${ETX_VL_DSL_GEMV:-0}" != 1 ] && EXPORTS="$EXPORTS,wvsplitk_y1,fused_moe_up,fused_moe_down"
-  [ "${ETX_VL_DSL_TOPK:-0}" != 1 ] && EXPORTS="$EXPORTS,topk_softmax_e128"
-  [ "${ETX_VL_DSL_FOLD:-0}" != 1 ] && EXPORTS="$EXPORTS,moe_sum_k8"
+  [ "$D_GEMV" != 1 ] && EXPORTS="$EXPORTS,wvsplitk_y1,fused_moe_up,fused_moe_down"
+  [ "$D_TOPK" != 1 ] && EXPORTS="$EXPORTS,topk_softmax_e128"
+  [ "$D_FOLD" != 1 ] && EXPORTS="$EXPORTS,moe_sum_k8"
   MOEBLK=(--block silu_and_mul=$(( $(cfg MI) / 8 ))); MOESLOTS="fused_moe_up=1,fused_moe_down=1,silu_and_mul=1"
 fi
 # The device bitcode moves between ROCm layouts (7.2: lib/llvm/lib/clang/<v>/lib/amdgcn/bitcode; 7.14:
@@ -67,9 +76,11 @@ if [ "${ETX_VL_BATCH:-0}" = 1 ]; then
   [ "${ETX_VL_REQUESTS:-1}" -gt 1 ] || { echo "ETX_VL_BATCH=1 needs ETX_VL_REQUESTS > 1" >&2; exit 1; }
   export ETX_VL_NB="${ETX_VL_REQUESTS}"
 fi
-DSLOPS=""; [ "${ETX_VL_DSL_GEMV:-0}" = 1 ] && DSLOPS="gemv"; [ "${ETX_VL_DSL_TOPK:-0}" = 1 ] && DSLOPS="${DSLOPS:+$DSLOPS,}topk"
+DSLOPS=""; [ "$D_GEMV" = 1 ] && DSLOPS="gemv"; [ "$D_TOPK" = 1 ] && DSLOPS="${DSLOPS:+$DSLOPS,}topk"
 # ETX_VL_DSL_ATTN=head: the attention block by kv head (etx.ops.attnprep; attention at one block per task)
-if [ "${ETX_VL_DSL_ATTN:-0}" = head ]; then DSLOPS="${DSLOPS:+$DSLOPS,}attnprep"; SLOTS="${SLOTS:+$SLOTS,}$ATTN=1"; fi
+# attnprep needs the attention at one block per task and the reduce at one block per kv head: slots = G. That G=8
+# happened to equal attn_reduce's own default for Qwen3-30B-A3B, so it was never set; a G=4 model refused to plan.
+if [ "$D_ATTN" = head ]; then DSLOPS="${DSLOPS:+$DSLOPS,}attnprep"; SLOTS="${SLOTS:+$SLOTS,}$ATTN=1,attn_reduce=$G"; fi
 "$PY" -m etx.importer.vllm_kernels --vllm "$VLLM" --out "$OUT/imp" --compiler hipcc --only "$EXPORTS" "${ORIG[@]}" --slots "$SLOTS" \
   --block rms_norm_2d=$((H / 8)) --block reshape_and_cache=$((NKV * HD / 8)) "${MOEBLK[@]}"
 # the DSL ops' tiles and argument layouts join imports.json after the import, before the adapter
@@ -97,7 +108,7 @@ VNF=(); [ "${ETX_VL_VECNORM:-1}" = 1 ] && VNF=(-DETX_DSL_VECNORM)   # ON by defa
 # wave reduction, wave-uniform (one request per wave, not one per lane). Round 22.
 PREPF=(); [ "${ETX_VL_PREP_EARLY:-0}" = 1 ] && PREPF=(-DETX_DSL_PREP_EARLY -DETX_DSL_UNIFORM)
 COHF=()
-if [ "${ETX_VL_COH:-0}" = 1 ]; then
+if [ "${ETX_VL_COH:-$([ "$IMPORTED" = 1 ] && echo 0 || echo 1)}" = 1 ]; then
   [ "${ETX_VL_UC:-0}" = 1 ] && { echo "ETX_VL_COH=1 with ETX_VL_UC=1 is untested; pick one" >&2; exit 1; }
   COHF=(-DETX_DSL_COH)
 fi

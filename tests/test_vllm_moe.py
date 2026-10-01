@@ -23,6 +23,9 @@ def _graph(tmp_path, monkeypatch, xcd: bool, layers: int = 3, qknr: str = "0", a
     if attn_head:
         imports["attn_mfma16_g8"]["slots"] = 1                        # ETX_VL_SLOTS=attn_mfma16_g8=1
     imp.write_text(json.dumps(imports))
+    # These cases exercise the IMPORTED kernels, which stopped being the default on 2026-10-01 when the DSL tiles
+    # became universal rules (docs/OPTIMISATIONS.md); ETX_VL_IMPORTED=1 is the escape that restores that build.
+    monkeypatch.setenv("ETX_VL_IMPORTED", "1")
     monkeypatch.setenv("ETX_VL_DSL_ATTN", "head" if attn_head else "0")
     monkeypatch.setenv("ETX_VL_IMPORTS", str(imp))
     monkeypatch.setenv("ETX_LLM_CONFIG", str(ROOT / "examples/llm/configs/qwen3-30b-a3b.json"))
@@ -46,7 +49,8 @@ def test_moe_layer_is_vllms_sequence(tmp_path, monkeypatch):
     grid = {role: (exp, gx) for exp, role, gx in layer1}
     # vLLM's launch shapes (rocprofv3 trace, results_2026-09-27/vlnext/moe): router 304 WGs, top-k 1, gate_up 192,
     # silu 8, down 256, moe_sum 1
-    assert grid["router"] == ("wvsplitk_y1", 304) and grid["topk"] == ("topk_softmax_e128", 1)
+    # the dense width is a derived choice (ETX_VL_CU, default 256 since 2026-10-01 round 2), so assert the module's
+    assert grid["router"] == ("wvsplitk_y1", vm.CU) and grid["topk"] == ("topk_softmax_e128", 1)
     assert grid["moe_up"] == ("fused_moe_up", 192) and grid["moe_act"] == ("silu_and_mul", 8)
     assert grid["moe_down"] == ("fused_moe_down", 256) and grid["moe_sum"] == ("moe_sum_k8", 1)
     plan = compile_graph(g, "gfx942", {}, {})

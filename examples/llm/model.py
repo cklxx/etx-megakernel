@@ -77,17 +77,31 @@ def load_dims(path: str | None = None) -> Dims:
     c = json.loads(Path(path).read_text())
     mt = c.get("model_type", "")
     H, NH = c["hidden_size"], c["num_attention_heads"]
-    moe = "num_experts" in c and c.get("num_experts", 0) > 0
+    # Expert count: Qwen spells it num_experts, Mixtral num_local_experts, DeepSeek n_routed_experts. Reading only
+    # the first made Mixtral load as a DENSE model with no error and no expert phases -- a silently wrong plan, so
+    # every known spelling is read and an unknown MoE-shaped config is refused rather than assumed dense.
+    _E_KEYS = ("num_experts", "num_local_experts", "n_routed_experts")
+    E = next((int(c[k]) for k in _E_KEYS if c.get(k)), 0)
+    moe = E > 0
+    if not moe and any("expert" in k for k in c):
+        raise ValueError(f"{path}: config mentions experts but none of {_E_KEYS} is set; refusing to plan it as dense")
     if moe and (c.get("mlp_only_layers") or c.get("decoder_sparse_step", 1) != 1):
         raise ValueError("mixed dense / MoE layer layouts are not supported by this example")
+    # q/k norm has no config key, so it is read from the architecture. The list is what has been verified, and an
+    # unrecognised architecture gets False -- which only costs a slower plan, never a wrong one (model.py's
+    # _attn_head() then skips dsl_attnprep), unlike guessing True.
+    qk_norm = mt.startswith("qwen3")
     nl = int(os.environ.get("ETX_LLM_LAYERS", "0")) or c["num_hidden_layers"]      # tests: fewer layers
     return Dims(name=Path(path).parent.name if Path(path).name == "config.json" else Path(path).stem,
                 H=H, NH=NH, NKV=c.get("num_key_value_heads", NH), HD=c.get("head_dim", H // NH),
                 INTER=c.get("intermediate_size", 0), L=min(nl, c["num_hidden_layers"]), V=c["vocab_size"],
                 eps=float(c.get("rms_norm_eps", 1e-6)), theta=float(c.get("rope_theta", 10000.0)),
                 tie=bool(c.get("tie_word_embeddings", False)), bias=mt == "qwen2" or bool(c.get("attention_bias", False)),
-                qk_norm=mt.startswith("qwen3"), moe=moe, E=c.get("num_experts", 0), TOPK=c.get("num_experts_per_tok", 0),
-                MI=c.get("moe_intermediate_size", 0), norm_topk=bool(c.get("norm_topk_prob", False)))
+                qk_norm=qk_norm, moe=moe, E=E, TOPK=c.get("num_experts_per_tok", 0),
+                # Qwen separates moe_intermediate_size from the dense intermediate_size; Mixtral has only the latter
+                # and it IS the expert width. Falling back to 0 gave an MoE plan with zero-sized expert phases.
+                MI=c.get("moe_intermediate_size") or (c.get("intermediate_size", 0) if moe else 0),
+                norm_topk=bool(c.get("norm_topk_prob", False)))
 
 
 def workers(d: "Dims") -> int:
