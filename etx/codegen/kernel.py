@@ -453,6 +453,7 @@ def emit_kernel(plan: Plan, device: int = 0) -> str:
                 out.append("#endif")
             out.append("    __syncthreads();")
             out.append("  }")
+        out.extend(_reset_tail())
         out.append("}")
         out.append("")
         out.extend(_emit_unfused(plan, device, grids, symbols, max_pro))
@@ -487,6 +488,21 @@ def emit_kernel(plan: Plan, device: int = 0) -> str:
     out.append("")
     out.extend(_emit_unfused(plan, device, grids, symbols, max_pro))
     return "\n".join(out)
+
+
+def _reset_tail() -> list[str]:
+    """ETX_DEV_RESET: the grid rewrites the per-step state at the end of the kernel so the host enqueues nothing.
+    The cooperative grid sync is what makes it safe -- every worker has drained its queue and published its last
+    arrive before any state is overwritten. Needs a cooperative launch; the host refuses the pair otherwise."""
+    return ["#ifdef ETX_DEV_RESET",
+            "  if (p.n_reset_ops) {   // last workgroup out rewrites the per-step state; no grid sync, no cooperative",
+            "    __syncthreads();",
+            "    __shared__ int32_t s_last;",
+            "    if (threadIdx.x == 0) s_last = (atomicAdd(p.ctrl_abort + 2, 1) + 1 == (int32_t)gridDim.x);",
+            "    __syncthreads();",
+            "    if (s_last) etx_device_reset(p);",
+            "  }",
+            "#endif"]
 
 
 def _emit_unfused(plan: Plan, device: int, grids, symbols: list[str], max_pro: int) -> list[str]:

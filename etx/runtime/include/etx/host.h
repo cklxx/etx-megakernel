@@ -161,11 +161,72 @@ struct etx_host {
     p.spin_limit = 200000000u;
     const char* lm = getenv("ETX_LAUNCH");                 // "ordinary": plain launch when the grid is known to fit
     cooperative = !(lm && !strcmp(lm, "ordinary"));
+    const char* sm = getenv("ETX_SYNC");
+    sync_block = sm && !strcmp(sm, "block");
+    dev_reset = getenv("ETX_DEV_RESET") != nullptr;
+    if (dev_reset && !cooperative) { fprintf(stderr, "ETX_DEV_RESET needs a cooperative launch (not ETX_LAUNCH=ordinary)\n"); dev_reset = false; }
+    build_reset_ops();
   }
   bool cooperative = true;
+  bool sync_block = false;        // ETX_SYNC=block: hipStreamSynchronize instead of the watchdog poll
+  bool dev_reset = false;         // ETX_DEV_RESET=1: the kernel rewrites its own per-step state (needs cooperative)
+  bool dev_reset_valid = false;   // the device did the reset for the step about to run
+  bool dev_reset_checked = false; // the first step verified that the kernel's tail actually ran
+  etx_reset_op* d_reset_ops = nullptr;
+  int32_t n_reset_ops = 0;
+  // The ops the device can do; the host keeps ctrl (read back after the kernel) and, when the counter is on, d_trace.
+  void build_reset_ops() {
+    if (!dev_reset) return;
+    std::vector<etx_reset_op> ops;
+    auto fill = [&](int32_t* dst, size_t words, int32_t v) { if (words) ops.push_back({dst, nullptr, (int32_t)words, v}); };
+    auto copy = [&](int32_t* dst, const int32_t* host_src, size_t words) {
+      if (!words) return;
+      int32_t* d = nullptr; ETX_CHECK(hipMalloc(&d, words * sizeof(int32_t)));
+      ETX_CHECK(hipMemcpy(d, host_src, words * sizeof(int32_t), hipMemcpyHostToDevice));
+      ops.push_back({dst, d, (int32_t)words, 0});
+    };
+    if (owns_events) {
+      if (ETX_EV_STRIDE == 1) copy((int32_t*)d_events, etx_ev_counts, ETX_EVENT_WORDS);
+      else { if (ev_strided.empty()) { ev_strided.assign((size_t)ETX_EVENT_WORDS * ETX_EV_STRIDE, 0); for (int i = 0; i < ETX_EVENT_WORDS; ++i) ev_strided[(size_t)ETX_EVW(i)] = etx_ev_counts[i]; }
+             copy((int32_t*)d_events, ev_strided.data(), ev_strided.size()); }
+    }
+    fill(d_slots, ETX_N_DOMAINS * 2 + ETX_N_DOMAINS * 256, 0);
+    fill(d_slots + ETX_N_DOMAINS * 2 + ETX_N_DOMAINS * 256, ETX_N_DOMAINS * 256, -1);     // 0xFF bytes
+    copy(d_remaining, etx_task_remaining, ETX_N_TASKS);
+    fill(d_ev_sub, (size_t)ETX_N_DOMAINS * ETX_EVENT_WORDS, 0);
+    if (d_mirror) copy((int32_t*)d_mirror, mirror_init.data(), mirror_init.size());
+    int32_t total = 0; for (int d = 0; d < ETX_N_DOMAINS; ++d) total += etx_local_capacity[device * ETX_N_DOMAINS + d];
+    fill(d_lq_slots, total, -1);
+    if (lq_heads.empty()) { lq_heads.assign(ETX_N_DOMAINS, 0); lq_tails.assign(ETX_N_DOMAINS, 0); }
+    int32_t off = 0, src = 0;
+    for (int dd = 0; dd < device * ETX_N_DOMAINS; ++dd) src += etx_init_local_len[dd];
+    for (int d = 0; d < ETX_N_DOMAINS; ++d) {
+      const int32_t n = etx_init_local_len[device * ETX_N_DOMAINS + d];
+      if (n) copy(d_lq_slots + off, etx_init_local + src, n);
+      lq_tails[d] = n; src += n; off += etx_local_capacity[device * ETX_N_DOMAINS + d];
+    }
+    copy(d_lq_head, lq_heads.data(), ETX_N_DOMAINS);
+    copy(d_lq_tail, lq_tails.data(), ETX_N_DOMAINS);
+    const int32_t gcap = etx_global_capacity[device];
+    fill(d_gq_slots, gcap, -1);
+    int32_t gsrc = 0; for (int dd = 0; dd < device; ++dd) gsrc += etx_init_global_len[dd];
+    const int32_t gn = etx_init_global_len[device];
+    if (gn) copy(d_gq_slots, etx_init_global + gsrc, gn);
+    gq_init[0] = 0; gq_init[1] = gn;
+    copy((int32_t*)p.global_queue.head, gq_init, 2);
+    n_reset_ops = (int32_t)ops.size();
+    ETX_CHECK(hipMalloc(&d_reset_ops, ops.size() * sizeof(etx_reset_op)));
+    ETX_CHECK(hipMemcpy(d_reset_ops, ops.data(), ops.size() * sizeof(etx_reset_op), hipMemcpyHostToDevice));
+    p.reset_ops = d_reset_ops; p.n_reset_ops = n_reset_ops;
+  }
   // reset per-step state (events if owned, queues, ctrl, slots, counters)
   void reset_step() {
     ETX_CHECK(hipSetDevice(device));
+    ETX_CHECK(hipMemsetAsync(d_ctrl, 0, 64, stream));      // never device-side: the host reads ctrl_done after the kernel
+    if (dev_reset && dev_reset_valid) {                    // the kernel rewrote everything else on its way out
+      if (exec_count) ETX_CHECK(hipMemsetAsync(d_trace, 0, ETX_N_TASKS * sizeof(int32_t), stream));
+      return;
+    }
     if (owns_events) {
       if (ETX_EV_STRIDE == 1) ETX_CHECK(hipMemcpyAsync(d_events, etx_ev_counts, ETX_EVENT_WORDS * sizeof(int32_t), hipMemcpyHostToDevice, stream));
       else {                                             // counters at word * ETX_EV_STRIDE (one cache line each)
@@ -173,7 +234,6 @@ struct etx_host {
         ETX_CHECK(hipMemcpyAsync(d_events, ev_strided.data(), ev_strided.size() * sizeof(int32_t), hipMemcpyHostToDevice, stream));
       }
     }
-    ETX_CHECK(hipMemsetAsync(d_ctrl, 0, 64, stream));
     ETX_CHECK(hipMemsetAsync(d_slots, 0, (ETX_N_DOMAINS * 2 + ETX_N_DOMAINS * 256) * sizeof(int32_t), stream));
     ETX_CHECK(hipMemsetAsync(d_slots + ETX_N_DOMAINS * 2 + ETX_N_DOMAINS * 256, 0xFF, ETX_N_DOMAINS * 256 * sizeof(int32_t), stream));
     if (exec_count) ETX_CHECK(hipMemsetAsync(d_trace, 0, ETX_N_TASKS * sizeof(int32_t), stream));   // 241 KB; dead work when the counter is off
@@ -226,6 +286,14 @@ struct etx_host {
   // wait with watchdog; returns false on timeout / spin limit / incomplete
   bool wait(double timeout_s, std::chrono::steady_clock::time_point t0) {
     ETX_CHECK(hipSetDevice(device));
+    // ETX_SYNC=block: block in the driver instead of polling. hipStreamQuery costs microseconds on this driver, so the
+    // poll loop's granularity became ~71 us of overshoot per step against a 5 ms kernel (measured 2026-10-01). The
+    // device's own spin_limit still aborts a hung kernel (ctrl[0] |= 2); what is given up is the host-side watchdog
+    // for a hang the device cannot see, so the poll path stays the default.
+    if (sync_block) {
+      ETX_CHECK(hipStreamSynchronize(stream));
+      return after_wait();
+    }
     while (hipStreamQuery(stream) == hipErrorNotReady) {
       double el = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
       if (el > timeout_s) {
@@ -238,11 +306,31 @@ struct etx_host {
       std::this_thread::yield();   // a 50 us sleep overshot the 5 ms kernel by ~100 us/step (2026-10-01)
     }
     ETX_CHECK(hipStreamSynchronize(stream));
+    return after_wait();
+  }
+  // everything the host checks once the kernel has retired; shared by the polling and blocking waits
+  bool after_wait() {
+    dev_reset_valid = false;          // a failed step leaves the state half-written; the host resets it fully
     float ms = 0.f; ETX_CHECK(hipEventElapsedTime(&ms, ev_start, ev_stop));   // device timestamps: launch to kernel end, no host polling jitter
     last_ms = ms;
     int32_t ctrl[2]; ETX_CHECK(hipMemcpy(ctrl, d_ctrl, 8, hipMemcpyDeviceToHost));
     if (ctrl[0] & 2) { fprintf(stderr, "device %d: kernel hit spin limit (abort=%d, done=%d/%d)\n", device, ctrl[0], ctrl[1], p.n_tasks); dump_events(); return false; }
     if (ctrl[1] != p.n_dynamic) { fprintf(stderr, "device %d: dynamic done=%d of %d\n", device, ctrl[1], p.n_dynamic); dump_events(); return false; }
+    // ETX_DEV_RESET must never be TRUSTED: if the tail did not run (it is behind -DETX_DEV_RESET, which has to reach
+    // the separate device-code compile, not just the final hipcc) the host would skip its own reset and every step
+    // after the first would silently become a no-op -- all workers surplus, 32/32 lost, no diagnostic. So the first
+    // step reads back the exit counter the tail increments and falls back permanently if it is short.
+    if (dev_reset && !dev_reset_checked) {
+      dev_reset_checked = true;
+      int32_t c[4] = {0, 0, 0, 0};
+      ETX_CHECK(hipMemcpy(c, d_ctrl, 16, hipMemcpyDeviceToHost));
+      if (c[2] != ETX_N_LAUNCH) {
+        fprintf(stderr, "ETX_DEV_RESET: the kernel's reset tail did not run (%d of %d workgroups reported); "
+                        "falling back to host resets. Is -DETX_DEV_RESET reaching the device-code compile?\n", c[2], ETX_N_LAUNCH);
+        dev_reset = false;
+      }
+    }
+    dev_reset_valid = dev_reset;      // the kernel retired, so its end-of-kernel reset ran
     // static tasks are not counted on the device; the trace (one increment per executed task) verifies them
     if (!exec_count) return true;                     // ETX_EXEC_COUNT=0: the counter's atomics are off, nothing to verify
     std::vector<int32_t> tr(ETX_N_TASKS);

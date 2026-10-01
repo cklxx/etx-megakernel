@@ -87,6 +87,9 @@ if [ "${ETX_VL_UC:-0}" = 1 ]; then export ETX_VL_PIN=1; UCF=(-DETX_VL_UC -DETX_C
 # KV cache and the activations. Measured -0.106 ms/token with L2 hit rate 31.9% -> 34.6%; ETX_VL_NT=0 restores it.
 NTF=(); [ "${ETX_VL_NT:-1}" = 1 ] && NTF=(-DETX_DSL_NT)
 COHF=()
+# ETX_DEV_RESET=1: the kernel rewrites its own per-step state at the end of the step (a cooperative grid sync, then
+# the grid copies the host-built init images), so the host enqueues only the ctrl memset instead of ~17 calls
+[ "${ETX_DEV_RESET:-0}" = 1 ] && COHF+=(-DETX_DEV_RESET)
 if [ "${ETX_VL_COH:-0}" = 1 ]; then
   [ "${ETX_VL_UC:-0}" = 1 ] && { echo "ETX_VL_COH=1 with ETX_VL_UC=1 is untested; pick one" >&2; exit 1; }
   COHF=(-DETX_DSL_COH)

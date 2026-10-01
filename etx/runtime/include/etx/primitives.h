@@ -220,3 +220,20 @@ static __device__ __forceinline__ uint32_t etx_discover_domain(const etx_params&
   return p.worker_domain ? (uint32_t)p.worker_domain[worker] : 0u;
 #endif
 }
+
+// ETX_DEV_RESET: the LAST workgroup to leave rewrites the per-step state from the host-built op table. The ordering
+// that makes it safe is the exit count itself: a workgroup only increments after its own loop has ended, so when the
+// count reaches gridDim.x every worker has drained its queue and published its last arrive, and nothing reads the
+// state again until the next launch (whose implicit acquire makes these writes visible). One workgroup is enough --
+// the images total a few hundred KB and 1024 threads copy them in well under a microsecond.
+__device__ inline void etx_device_reset(const etx_params& p) {
+  const int32_t stride = (int32_t)blockDim.x, tid = (int32_t)threadIdx.x;
+  for (int32_t o = 0; o < p.n_reset_ops; ++o) {
+    const etx_reset_op op = p.reset_ops[o];
+    if (op.src) for (int32_t i = tid; i < op.words; i += stride) op.dst[i] = op.src[i];
+    else        for (int32_t i = tid; i < op.words; i += stride) op.dst[i] = op.fill;
+    // ops overlap by design -- the queue arrays are filled with -1 and then have their initial slots written over
+    // the front -- so each op must complete for the whole workgroup before the next begins
+    __syncthreads();
+  }
+}

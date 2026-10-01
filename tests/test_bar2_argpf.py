@@ -27,6 +27,12 @@ def _build(argpf: bool = False, bar2: bool = False) -> Graph:
     return g
 
 
+def _no_reset_tail(src: str) -> str:
+    """Drop the ETX_DEV_RESET tail. It runs once per STEP, after the task loop; these tests count the barriers a
+    TASK costs, so leaving it in would make them fail for a reason they are not about."""
+    return re.sub(r"#ifdef ETX_DEV_RESET.*?#endif\n", "", src, flags=re.S)
+
+
 def _static_loop(src: str) -> str:
     m = re.search(r"// every task on this device is static.*?^\}", src, re.S | re.M)
     assert m, "static loop"
@@ -47,7 +53,7 @@ def test_switches_off_is_the_old_emission():
 
 
 def test_bar2_two_barriers_per_task():
-    src = emit_kernel(compile_graph(_build(bar2=True), "gfx942", {}, {}))
+    src = _no_reset_tail(emit_kernel(compile_graph(_build(bar2=True), "gfx942", {}, {})))
     loop = _static_loop(src)
     body = loop.split("for (;;) {", 1)[1]
     assert body.count("__syncthreads()") == 0            # none in the loop body: both live in etx_run_task
@@ -66,14 +72,14 @@ def test_bar2_two_barriers_per_task():
 
 
 def test_default_loop_unchanged_barrier_count():
-    src = emit_kernel(compile_graph(_build(), "gfx942", {}, {}))
+    src = _no_reset_tail(emit_kernel(compile_graph(_build(), "gfx942", {}, {})))
     loop = _static_loop(src)
     assert loop.split("for (;;) {", 1)[1].count("__syncthreads()") == 2   # loop-top + loop-end
     assert _run_task(src).count("__syncthreads();") == 2
 
 
 def test_argpf_tables_and_wave1_prefetch():
-    src = emit_kernel(compile_graph(_build(argpf=True), "gfx942", {}, {}))
+    src = _no_reset_tail(emit_kernel(compile_graph(_build(argpf=True), "gfx942", {}, {})))
     # a: arg_bytes 136, consts (96, 160) -> off 96, stride 160; b: no arg_bytes -> all zero
     assert re.search(r"etx_argpf_off\[2\] = \{96, 0\}|etx_argpf_off\[2\] = \{0, 96\}", src)
     assert re.search(r"etx_argpf_str\[2\] = \{160, 0\}|etx_argpf_str\[2\] = \{0, 160\}", src)
@@ -85,6 +91,6 @@ def test_argpf_tables_and_wave1_prefetch():
 
 
 def test_argpf_with_bar2_reads_the_parity_slot():
-    src = emit_kernel(compile_graph(_build(argpf=True, bar2=True), "gfx942", {}, {}))
+    src = _no_reset_tail(emit_kernel(compile_graph(_build(argpf=True, bar2=True), "gfx942", {}, {})))
     loop = _static_loop(src)
     assert "s_tid2[par ^ 1] >= 0" in loop and "s_task2[par ^ 1].type" in loop

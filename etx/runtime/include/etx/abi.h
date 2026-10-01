@@ -55,6 +55,9 @@ struct etx_ctx {
   int32_t         cst[4];              // per-grid compile-time constants (TaskGrid.consts): immediates, no load after the wait
 };
 
+// one entry of the device-side per-step reset (ETX_DEV_RESET); `src == nullptr` means fill with `fill`
+struct etx_reset_op { int32_t* dst; const int32_t* src; int32_t words; int32_t fill; };
+
 struct etx_params {
   const int32_t*   shape;
   void* const*     args;               // global tensor table (plan order)
@@ -95,4 +98,9 @@ struct etx_params {
   const int32_t*   relay_words;        // this device's mirrored word offsets
   int32_t          n_relay;
   int32_t          relay_local_acquire; // 1: the relay's acquire covers the domain, consumers only drop L1
+  // ETX_DEV_RESET: the per-step state reset, done by the grid at the end of the kernel instead of ~17 host enqueues.
+  // Each op either copies `src` or fills with `fill`; the host builds the table once at setup. ctrl is deliberately
+  // NOT in it -- the host reads ctrl_done after the kernel, so resetting it on the device would race that read.
+  const etx_reset_op* reset_ops;
+  int32_t          n_reset_ops;
 };
