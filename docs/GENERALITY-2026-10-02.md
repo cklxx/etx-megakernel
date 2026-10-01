@@ -78,3 +78,31 @@ harvest, so it is the next round's item — the mechanical harvest this round ow
 
 Zero-compiler-change verdict, updated: the plan, events, placement and every imported kernel generalise to Mixtral
 with no compiler change; the one remaining compiler-side item is the MoE dispatch metadata for top-k ≠ 8.
+
+## Round 40: the top-k≠8 blocker localised to MoE dispatch *values*, not reached to 32/32
+
+The directive was to fix ETX's MoE dispatch metadata for top-k≠8. Diagnosis narrowed it hard but did not close it;
+recording precisely, no code changed this round (so Qwen is untouched; the box plan stays 60362/436).
+
+Ruled out, each with the test:
+- **Kernel fidelity**: `--check 32` launches BOTH vLLM's original and the imported kernel with ETX's *production*
+  argument block (host.hip:493 `av[k] = ab.data()+x.off+d->off[k]`) — 0 of 384 differ. So `--check` proves fidelity
+  but is BLIND to a wrong argument: both kernels process the same wrong value identically. This reframes round 39.
+- **Replica / unpinned wiring** (the round-35 NOREP hint): `ETX_VL_XCD=0`, single domain, rep=1 everywhere — same
+  divergence (6495), so not the per-XCD `rr` addressing.
+- **Config**: my mixtral-8x7b.json matches the HF config field-for-field (sliding_window None, rope_theta 1e6,
+  head_dim 128); nothing ETX derives is wrong.
+- **Argument order**: the harvested up/down `.ttir` and 22-param `.llir` signatures are identical Qwen↔Mixtral, so
+  the Qwen-validated wiring (host.hip:405-409) maps positionally with only TOPK/MI/H substituted.
+
+First divergence: generated token 0, argmax wrong (ours 6495, HF 28711), present from the simplest single-domain
+plan. Since config/order/replicas/kernels are all eliminated, the fault is a dispatch VALUE that is correct at
+TOPK=8 and wrong at TOPK=2 — the candidates are `expert_ids` ordering (ETX passes `topk_ids` in router order;
+vLLM's `moe_align_block_size` sorts tokens by expert id, and the down kernel's `MUL_ROUTED_WEIGHT` pairs
+`topk_weights` with that sorted order) and `num_valid_tokens`/`EM`. `--check` cannot distinguish these because it
+feeds both sides the same values. The deciding experiment, beyond this round's budget: capture vLLM's actual
+`sorted_token_ids`/`expert_ids`/`num_tokens_post_padded` for one Mixtral `fused_moe` call (instrument the container
+run) and diff against ETX's uploaded values at host.hip:216,405-409. That diff names the exact wrong scalar.
+
+Verdict unchanged and now sharper: plan, events, placement and every imported kernel generalise with zero compiler
+change; the one open item is the MoE dispatch *values* (not the layout, not the kernels) for top-k ≠ 8.
