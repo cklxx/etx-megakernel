@@ -35,19 +35,19 @@ operator of the last layer within 2 bf16 ulps of a CPU reference:
 |---|---|---|
 | vLLM 0.27.1 default | 4.862 | — |
 | vLLM + AITER | 4.975 | +2.3% |
-| **ETX megakernel** | **4.937** | **+1.5%** |
+| **ETX megakernel** | **4.865** | **+0.06% — parity** |
 | ETX unfused — same tiles, HIP-graph replay | 4.998 | +2.8% |
 
 **The claim ETX exists to prove now holds: one persistent kernel beats a HIP-graph replay of the same tiles
-by 1.2%.** It lost by 4.2% the day before. The system improved 16.2% against itself, confirmed on a second
+by 1.2%.** It lost by 4.2% the day before. The system improved 17.5% against itself, confirmed on a second
 machine (bare metal, ROCm 7.2.4: fusion margin +0.224 against −0.235 on 2026-09-30).
 
 What flipped it: every task's acquire was `buffer_inv sc1`, a whole-L2 invalidate, so every phase began cold
 (−0.317 ms to fix); unfolding an earlier "optimisation" of ours that had 448 expert tasks per layer each redo a
-128-logit softmax (−0.231); asynchronous per-step host work (−0.152); non-temporal weight loads (−0.106); vectorising a coherent path that
-was issuing one memory request per lane per 2-byte element (−0.105).
+128-logit softmax (−0.231); asynchronous per-step host work (−0.152); non-temporal weight loads (−0.106); vectorising the coherent paths, which were issuing
+one memory request per lane per 2-byte element (−0.105 in the folded norm, −0.074 in the attention prologue).
 
-ETX is still 1.5% behind vLLM, and the budget says where: hand-off sits at the event protocol's floor, workgroup
+ETX is at parity with vLLM (0.003 ms, inside the 0.017 spread), and the budget says where the rest went: hand-off sits at the event protocol's floor, workgroup
 start delay is below the hardware dispatcher's own jitter, host work is 0.135 ms, and the instruction cache hits
 99.90%. **The orchestration is spent; 1.29 ms of the step is our own hand-written tiles** — which was never
 ETX's claim. Full report: [docs/ETX-report-2026-10-01.pdf](docs/ETX-report-2026-10-01.pdf), per-phase budget in

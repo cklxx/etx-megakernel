@@ -33,13 +33,13 @@
 <tr><th>Configuration</th><th class="n">ms/token</th><th class="n">vs vLLM</th></tr>
 <tr><td>vLLM 0.27.1 default</td><td class="n">4.862</td><td class="n">—</td></tr>
 <tr><td>vLLM + AITER</td><td class="n">4.975</td><td class="n">+2.3%</td></tr>
-<tr class="hi"><td>ETX megakernel</td><td class="n">4.937</td><td class="n loss">+1.5%</td></tr>
+<tr class="hi"><td>ETX megakernel</td><td class="n">4.865</td><td class="n win">+0.06%</td></tr>
 <tr><td>ETX unfused — same tiles, HIP-graph replay</td><td class="n">4.998</td><td class="n">+2.8%</td></tr>
 </table>
 
-<p class="key"><strong>Fusion pays, and ETX does not yet beat vLLM.</strong> One persistent kernel beats a HIP-graph
-replay of the same tiles by <span class="win">1.2%</span>. The day began with fusion <em>losing</em> by 4.2%; the sign
-changed, and the system improved 16.2% against itself. The remaining 1.5% to vLLM is not in the orchestration.</p>
+<p class="key"><strong>ETX reaches parity with vLLM, and fusion pays.</strong> 4.865 against 4.862 — 0.003 ms, inside the
+0.017 run-to-run spread, so the two are indistinguishable. A persistent kernel beats a HIP-graph replay of the same
+tiles; the day began with fusion <em>losing</em> by 4.2%. The system improved 17.5% against itself.</p>
 
 <p class="fine">Wall clock, the basis vLLM's benchmark uses. Three interleaved runs per row, one binary generation,
 all 32/32 tokens against HuggingFace greedy with every DSL operator of the last layer within 2 bf16 ulps of a CPU
@@ -48,7 +48,7 @@ reference. Machine: 1× MI300X VF, ROCm 7.14. Confirmed on bare metal (ROCm 7.2.
 
 <h2>Why fusion now pays</h2>
 
-<p>Five changes account for the 16.2%. The first is the whole story; the rest are the tail.</p>
+<p>Six changes account for the 17.5%. The first is the whole story; the rest are the tail.</p>
 
 <table>
 <tr><th>Change</th><th class="n">ms</th><th>Mechanism</th></tr>
@@ -56,6 +56,7 @@ reference. Machine: 1× MI300X VF, ROCm 7.14. Confirmed on bare metal (ROCm 7.2.
 <tr><td>Unfolding the MoE top-k</td><td class="n win">−0.231</td><td>Our own earlier "optimisation": 448 expert tasks per layer each redid a 128-logit softmax on wave 0 while 15 waves waited. Ablation priced it at 0.676.</td></tr>
 <tr><td>Async per-step host work</td><td class="n win">−0.152</td><td>20 synchronous HIP calls per step, a dead 241 KB memset, a 50 µs poll sleep.</td></tr>
 <tr><td>Non-temporal weight loads</td><td class="n win">−0.106</td><td>6.08 GB read once per token were evicting the MALL-resident KV cache. L2 hit 31.9 → 34.6%.</td></tr>
+<tr><td>Vectorising the coherent path in <code>attnprep</code></td><td class="n win">−0.074</td><td>The same disease, in the tile where it was worst: 3400 coherent requests per task became 768. The new lane→element mapping puts the neox rope partner in the same lane's registers, so the shuffle disappears, and register spills fell 16 → 8 — a whole-kernel effect that also moved <code>attn</code> and <code>o_proj</code>.</td></tr>
 <tr><td>Vectorising the coherent norm path</td><td class="n win">−0.105</td><td>A coherent access bypasses L1 and L2, so a 2-byte accessor issues one memory request per lane per element: the folded norm staged 4096 requests per task against <code>o_proj</code>'s 1024 at four times the width. 16-byte accesses cut <code>qkv</code>'s body 11.81 → 9.50 µs. Predicted not to move the MoE phases, which already use the wide path; it did not.</td></tr>
 <tr><td>Phase width, import prune</td><td class="n win">−0.082</td><td>304 → 256 tasks; an unused imported tile was setting the LDS arena.</td></tr>
 </table>
