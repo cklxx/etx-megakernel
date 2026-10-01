@@ -364,6 +364,10 @@ def build() -> Graph:
         g.codegen["bar2"] = True
     if DEV_RESET:
         g.codegen["dev_reset"] = True
+    # The fold decision is DERIVED (fold_topk), so the host must learn it from the plan, never from an env var it
+    # reads independently: build.sh gated the tile's define on ETX_VL_FOLD_TOPK while the plan derived the opposite,
+    # and the expert tiles recomputed a top-k the plan had already given its own phase -- 0.63 ms, measured round 30.
+    g.codegen["fold_topk"] = fold_topk(d)
     g.tensor("impargs", (total,), role="weight", bytes_per_elem=1)
     g.tensor("vl", (1,), role="weight", bytes_per_elem=8)         # placeholder: the native tiles read __constant__ params
     adapters = os.environ.get("ETX_VL_ADAPTERS", str(HERE / "build" / "imp_tiles.hip"))

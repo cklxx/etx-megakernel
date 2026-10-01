@@ -337,9 +337,11 @@ int main(int argc, char** argv) {
     // top-k fold (mode 2 / 3 = renormalised): the expert tasks recompute the top-k from the router logits
     else if ((x.exp == "dsl_moe_up_fold" || x.exp == "dsl_moe_down_fold") && (MI % 32 || H > 4096 || H % 256 || H % 64 || MI > 4096 || MI % 256 || E > 128))
       die("dsl_moe_*_fold: needs MI % 32 == 0, H % 256 == 0, MI % 256 == 0, H and MI <= 4096, E <= 128");
-// ETX_VL_FOLD_TOPK=0 (-DETX_VL_NO_TOPK_FOLD): the norm fold stays, but the expert tasks read one layer-wide top-k
-// (ids / weights from the restored dsl_topk launch, mode 0) instead of each recomputing it -- 0.676 ms/token, round 7
-#ifdef ETX_VL_NO_TOPK_FOLD
+// ETX_EMIT_FOLD_TOPK: did the plan fold the top-k into the expert tasks, or give it its own phase? Derived from the
+// model's shapes (model.py fold_topk) and published through plan_data.h, which the kernel and this file both include,
+// so the two cannot disagree. It was a -D until round 30, where build.sh defaulted it to "fold" while the plan had
+// derived "keep": the expert tiles recomputed a top-k that already had its own phase, 0.63 ms/token for nothing.
+#if !ETX_EMIT_FOLD_TOPK
     else if (x.exp == "dsl_moe_up_fold") a.ptr(W(pl + "w13")).ptr(ox).ptr(mc2).ptr(ti_r).ptr(nullptr).i64((long long)2 * MI * H).i32(MI).i32(H).i32(32).i32(MI / 32)
                                            .ptr(nullptr).ptr(nullptr).ptr(nullptr).ptr(nullptr).i32(TOPK).f32(0.f).i32(0).i32(E).ptr(rlog) ETX_VL_NOBATCH;
     else if (x.exp == "dsl_moe_down_fold") a.ptr(W(pl + "w2")).ptr(mc2).ptr(mc3).ptr(ti_r).ptr(tw_r).i64((long long)H * MI).i32(H).i32(MI).i32(64).i32(H / 64)

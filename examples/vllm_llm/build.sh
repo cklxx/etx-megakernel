@@ -124,8 +124,8 @@ NBF=(-DETX_VL_NB="${ETX_VL_NB:-1}")      # the host refuses a plan whose nb exce
 # ETX_VL_ABLATE=<name>: a timing-only build with a piece of the DSL MoE tile removed (etx/ops/gemv.py's DSL_ABLATE_*).
 # Every ablation but EPL4 produces WRONG output on purpose and must never ship; the correctness gates will fail.
 ABL=(); [ -n "${ETX_VL_ABLATE:-}" ] && ABL=(-DDSL_ABLATE_$(echo "$ETX_VL_ABLATE" | tr '[:lower:]' '[:upper:]'))
-# ETX_VL_FOLD_TOPK=0: keep the norm folds, restore the single top-k launch per layer (model.py FOLD_TOPK)
-[ "${ETX_VL_FOLD_TOPK:-1}" = 0 ] && ABL+=(-DETX_VL_NO_TOPK_FOLD)
+# ETX_VL_FOLD_TOPK forces model.py's derived fold decision; it reaches the tile through plan_data.h's
+# ETX_EMIT_FOLD_TOPK, not a -D here -- the -D defaulted to "fold" and silently contradicted the plan (round 30).
 hipcc -O3 -std=c++17 --offload-arch=gfx942 "${ROCMINC[@]}" "${NBF[@]}" -I "$ROOT/etx/runtime/include" -I "$OUT" -I "$ROOT" \
   -Xclang -mlink-builtin-bitcode -Xclang "$OUT/imports.bc" -Rpass-analysis=kernel-resource-usage \
   "${CHK[@]}" "${UCF[@]}" "${COHF[@]}" "${NTF[@]}" "${VNF[@]}" "${ABL[@]}" "${PREPF[@]}" -DETX_VL_REQUESTS=${ETX_VL_REQUESTS:-1} ${ETX_HIPCC_FLAGS:-} "$OUT/megakernel_d0.hip" "$ROOT/examples/vllm_llm/host.hip" $([ "${ETX_VL_CHECK:-0}" = 1 ] && echo "$OUT/imp/orig_table.hip -x none $OUT/imp/orig_*.o") -o "$OUT/run" 2>&1 \
