@@ -1,0 +1,276 @@
+<title>ETX on MI300X: one day of measurement</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm; }
+  :root { --ink:#1a1a1a; --mute:#5c5c5c; --rule:#d8d4cc; --accent:#8a3324; --panel:#f6f4ef; color-scheme: light; }
+  * { box-sizing: border-box; }
+  body { margin:0; font: 10.5pt/1.55 "Charter","Georgia","Times New Roman",serif; color:var(--ink); background:#fff; }
+  .wrap { max-width: 178mm; margin: 0 auto; padding: 0 2mm; }
+  h1 { font-size: 21pt; line-height:1.2; margin: 0 0 2mm; text-wrap: balance; letter-spacing:-0.01em; }
+  .sub { color:var(--mute); font-size:11pt; margin:0 0 7mm; }
+  h2 { font-size: 13pt; margin: 9mm 0 3mm; padding-bottom:1.5mm; border-bottom:1.5px solid var(--ink); break-after:avoid; }
+  h3 { font-size: 11pt; margin: 6mm 0 2mm; break-after:avoid; }
+  p { margin: 0 0 3mm; }
+  table { border-collapse: collapse; width:100%; margin: 3mm 0 5mm; font-size: 9.2pt; break-inside:avoid; }
+  th, td { text-align:left; padding: 1.5mm 2.5mm; border-bottom: 1px solid var(--rule); }
+  th { font-weight:600; border-bottom: 1.2px solid var(--ink); white-space:nowrap; }
+  td.n, th.n { text-align:right; font-variant-numeric: tabular-nums; white-space:nowrap; }
+  tr.tot td { font-weight:700; border-top:1.2px solid var(--ink); border-bottom:none; }
+  code { font: 9pt/1.4 "SF Mono","Menlo",monospace; background:var(--panel); padding:0.3mm 1mm; border-radius:2px; }
+  .lede { font-size:11pt; border-left:3px solid var(--accent); padding-left:4mm; margin:0 0 6mm; }
+  .note { background:var(--panel); border-left:3px solid var(--mute); padding:3mm 4mm; margin:4mm 0; font-size:9.5pt; break-inside:avoid; }
+  .warn { background:#fdf4f2; border-left:3px solid var(--accent); padding:3mm 4mm; margin:4mm 0; font-size:9.5pt; break-inside:avoid; }
+  .meta { font-size:9pt; color:var(--mute); }
+  .win { color:#1f6b3a; font-weight:600; }
+  .loss { color:var(--accent); font-weight:600; }
+  ul { margin:0 0 3mm; padding-left:5mm; }
+  li { margin-bottom:1.5mm; }
+  .pb { break-before: page; }
+  footer { margin-top:10mm; padding-top:3mm; border-top:1px solid var(--rule); font-size:8.5pt; color:var(--mute); }
+</style>
+<div class="wrap">
+
+<h1>ETX on MI300X: one day of measurement</h1>
+<p class="sub">Qwen3-30B-A3B bf16 decode, batch 1 &middot; 2026-10-01 &middot; 22 measured iterations</p>
+
+<p class="lede">The claim ETX exists to prove — that the kernels production actually runs, fused into one persistent
+kernel, beat the same kernels launched one at a time — was <strong>false</strong> at the start of this day and is
+<strong>true</strong> at the end of it. Fusion went from 0.235&nbsp;ms behind a graph replay of the same tiles to
+0.103&nbsp;ms ahead. Against vLLM the system went from 21% behind to 3.7% behind. Of the eleven changes attempted,
+three paid; of the twenty-two investigations, eleven ended in a measured negative with an explanation, and those
+explanations are what moved the work.</p>
+
+<h2>1. Machine, protocol, and what may be compared</h2>
+
+<p>One box, one protocol, every number re-measured on it. <strong>1&times; AMD Instinct MI300X VF</strong>
+(SR-IOV virtual function), ROCm 7.14, 20 cores, 235&nbsp;GB RAM. Qwen3-30B-A3B bf16, greedy, batch 1, 32 generated
+tokens checked token-for-token against HuggingFace greedy, plus <code>--check-dsl</code>: every DSL operator of the
+last layer within 2 bf16 ulps of a CPU reference. No performance number in this report comes from a run that failed
+either gate.</p>
+
+<div class="warn"><strong>Two cautions that govern every comparison here.</strong><br>
+<em>Across machines.</em> The 4.67&nbsp;ms vLLM figure quoted in earlier reports is from a different, bare-metal
+machine with a different compiler; our megakernel builds to 15 register spills on this box against 9 there. Absolute
+milliseconds are not interchangeable between the two. Ratios and the fusion margin are, and both were confirmed on
+bare metal (&sect;8).<br>
+<em>Across timing bases.</em> vLLM's benchmark times host wall clock; ETX reports a device span. These differ by the
+host work ETX does per step, which was 0.197&nbsp;ms when first measured. <strong>Every headline number in this
+report is wall clock</strong>, the basis vLLM is measured on. Device-span figures are labelled as such.</div>
+
+<h2>2. The result</h2>
+
+<p>Final configuration, same binary generation for all three rows, three interleaved runs each, all matching 32/32:</p>
+
+<table>
+<tr><th>Configuration</th><th class="n">Wall ms/token</th><th class="n">Device ms/token</th><th class="n">vs vLLM</th></tr>
+<tr><td>vLLM 0.27.1, default</td><td class="n">4.862</td><td class="n">&mdash;</td><td class="n">&mdash;</td></tr>
+<tr><td>vLLM 0.27.1 + AITER</td><td class="n">4.975</td><td class="n">&mdash;</td><td class="n">+2.3%</td></tr>
+<tr><td><strong>ETX megakernel</strong></td><td class="n"><strong>5.042</strong></td><td class="n">4.908</td><td class="n loss">+3.7%</td></tr>
+<tr><td>ETX unfused — same tiles, same plan, HIP-graph replay</td><td class="n">5.145</td><td class="n">5.107</td><td class="n">+5.8%</td></tr>
+</table>
+
+<p><strong>Fusion margin: 0.103&nbsp;ms (2.0%).</strong> The unfused baseline is deliberately the strong one. It is not
+eager launching; it captures the whole step into a HIP graph once and replays it, which is what AMD recommends and
+what vLLM itself does. The same tiles, the same task decomposition, the same XCD placement — the only variable is
+whether they run inside one persistent kernel or as graph nodes.</p>
+
+<p>The day began at 5.895&nbsp;ms device span with fusion <em>losing</em> by 0.235&nbsp;ms. Measured on identical
+terms, ETX against ETX, the improvement is <span class="win">&minus;14.5%</span> and the fusion margin changed sign.</p>
+
+<h2>3. What paid, and what it was worth</h2>
+
+<table>
+<tr><th>Change</th><th class="n">ms/token</th><th>Mechanism</th></tr>
+<tr><td><code>ETX_VL_COH</code> — data-class coherence</td><td class="n win">&minus;0.317</td><td>Every task's acquire was <code>buffer_inv sc1</code>, invalidating the XCD's entire L2, so every phase began cold. DSL tiles now access activations with coherent sc0/sc1 operations and skip the acquire; weights stay cached; imported kernels keep their invalidate; a plain producer feeding a coherent consumer releases with a write-back.</td></tr>
+<tr><td>Splitting a fold we had added</td><td class="n win">&minus;0.231</td><td>The MoE top-k had been folded into all 448 expert tasks of a layer, each redoing a 128-logit softmax on wave 0 while fifteen waves waited at a barrier. Ablation priced the redundancy at 0.676&nbsp;ms; restoring the standalone phase costs one hand-off and nets the difference.</td></tr>
+<tr><td>Per-step host work made asynchronous</td><td class="n win">&minus;0.152</td><td>Twenty synchronous HIP calls per step became stream-ordered asynchronous ones, a 241&nbsp;KB memset of a disabled debug counter was removed, and a 50&nbsp;µs poll sleep became a yield.</td></tr>
+<tr><td>Non-temporal weight loads</td><td class="n win">&minus;0.106</td><td>6.08&nbsp;GB of weights are read once per token and have no reuse, yet they evicted what does: the MALL-resident KV cache and the activations. L2 hit rate 31.9% &rarr; 34.6%, DRAM read requests &minus;3.9%.</td></tr>
+<tr><td>Phase width 304 &rarr; 256 tasks</td><td class="n win">&minus;0.067</td><td>Dense phases only; the MoE phases were already at their optimum width, which is why the effect is small.</td></tr>
+<tr><td>Pruning unused kernel imports</td><td class="n win">&minus;0.015</td><td>The megakernel's LDS arena is the maximum over every imported tile, used or not; <code>wvsplitk</code> (32768&nbsp;B) was imported although the DSL GEMV replaces it. Arena 41448 &rarr; 29736&nbsp;B.</td></tr>
+</table>
+
+<h2>4. What was measured and rejected</h2>
+
+<p>Eleven investigations ended in a negative. Each number is recorded in the source beside the code it concerns so
+that it is not retried blind.</p>
+
+<table>
+<tr><th>Idea</th><th class="n">Result</th><th>Why</th></tr>
+<tr><td>Next-task argument prefetch</td><td class="n">&minus;0.003</td><td>Inside the spread. The argument path was not the exposed cost.</td></tr>
+<tr><td>Three barriers per task reduced to two</td><td class="n loss">+0.095</td><td>Keeping the next task's descriptor live across the body cost a tile-sized LDS allocation, 41448 &rarr; 61952&nbsp;B. Even after moving its global load off the publication path it loses.</td></tr>
+<tr><td>16-byte load path for <code>moe_down</code> (K=768)</td><td class="n loss">+0.144</td><td>Correct, and slower: per-load address tracking and a second per-row wave reduction cost more than the wider loads save.</td></tr>
+<tr><td>Attention block spread over 8 XCDs</td><td class="n">+0.008</td><td>It is latency-bound, not parallelism-bound: <code>prep</code> moves 2.5&nbsp;KB per task in a 5.9&nbsp;µs body, 1.5% of one workgroup's streaming rate.</td></tr>
+<tr><td>Batching the top-k tile's stores</td><td class="n">+0.008</td><td>Its body is one write-through round trip that every coherent store sits behind, not 24 separable costs.</td></tr>
+<tr><td>Skinny GEMM for the dense phases, B=2</td><td class="n loss">+0.29</td><td>The second activation column cost 90% of the first — the tile is at the point where compute time equals stream time, so sharing the weight read buys little. A batched phase must also wait on every request's previous event, removing the slack replication provides.</td></tr>
+<tr><td>HIP-graph capture of the per-step host sequence</td><td class="n">0.000</td><td>Once the per-step calls are asynchronous there is nothing left for a graph to collapse.</td></tr>
+<tr><td>Device-side per-step state reset</td><td class="n">&minus;0.008</td><td>Works: host reset 57.8 &rarr; 17.0&nbsp;µs. But 14&nbsp;µs returns as device time and the rest is absorbed by the wait. 0.16% does not earn a reset path, an exit counter, two memory fences and a fallback guard in every build.</td></tr>
+<tr><td>Smaller workgroups for higher occupancy</td><td class="n">not built</td><td>Waves/SIMD = min(512/VGPR, LDS-limited). At 128 VGPRs the register term is 4 whatever the workgroup size.</td></tr>
+<tr><td>Fusing <code>prep</code> into <code>attn</code></td><td class="n">not built</td><td>Impossible as stated: <code>prep</code> reads and writes the same rows, so any shape with more than one task per KV head applies the norm and rope twice — wrong, not merely slow.</td></tr>
+<tr><td>Blocking instead of polling for completion</td><td class="n">&minus;0.002</td><td>The 71&nbsp;µs attributed to the wait strategy is launch-to-start and end-to-return latency.</td></tr>
+</table>
+
+<h2>5. Where the time goes</h2>
+
+<p>From a decode-range trace of the shipped build and <code>rocprofv3</code> counters, with the achievable rate for
+each phase's own bytes and width taken from a streaming benchmark at the tiles' 1024-thread width.</p>
+
+<table>
+<tr><th>Component</th><th class="n">ms/token</th><th>Owner</th></tr>
+<tr><td>Streaming weights at the achievable rate</td><td class="n">1.594</td><td>Hardware — irreducible at this precision</td></tr>
+<tr><td>Workgroup start delay</td><td class="n">0.414</td><td>Hardware dispatch; only 0.048 is ETX's, and ETX's spread is at or below the pure-streaming benchmark's own</td></tr>
+<tr><td>Attention kernel's fixed cost</td><td class="n">0.301</td><td>Imported vLLM kernel; it already runs <em>above</em> the HBM rate because the KV cache is MALL-resident</td></tr>
+<tr><td>Hand-off between phases, 9 edges &times; 1.00&nbsp;µs</td><td class="n">0.433</td><td>ETX — near the event protocol's measured floor</td></tr>
+<tr><td>Per-step host work</td><td class="n">0.135</td><td>ETX</td></tr>
+<tr><td><strong>Our own DSL tiles</strong></td><td class="n"><strong>1.42</strong></td><td>MoE bodies at ~70% of achievable (0.476), <code>prep</code> and <code>reduce</code> dependent chains of 8.5 and 8.1 round trips where 3–4 look necessary (0.548), the top-k tile's single write-through round trip (0.391)</td></tr>
+</table>
+
+<p><strong>ETX's orchestration is no longer the problem.</strong> Hand-off sits at the protocol floor, start delay is
+below the hardware's own dispatch jitter, the attention kernel is at the memory system's limit, and host work is
+0.135&nbsp;ms. The remaining gap to vLLM, 0.180&nbsp;ms, is smaller than the tile-quality item alone — and kernel
+quality was never ETX's claim. What the compiler and runtime own is close to spent; what our hand-written tiles own
+is not.</p>
+
+<h2>6. Mechanism findings</h2>
+
+<h3>The cost of an invalidating acquire, measured two ways</h3>
+<p>The redesign that flipped the fusion margin rests on one hardware behaviour, and it was measured on both machines
+with the same result. On the <em>bandwidth</em> side, a phase whose working set is L2-resident takes 0.76&nbsp;µs
+without an invalidate and 3.14&nbsp;µs with one — <strong>4.1&times;</strong>. On the <em>latency</em> side, never used
+in a design until now, a dependent load chain crossing <code>buffer_inv sc1</code> pays <strong>1107&nbsp;ns per hop
+against 103&nbsp;ns — 10.6&times;</strong> on bare metal and 11.4&times; on the VF. Reading activations coherently
+rather than invalidating and reading cached is 5.8&times; cheaper. For phases that are dependent chains, the latency
+figure is the governing one and it is larger.</p>
+
+<h3>Occupancy: half the machine's wave slots, and the limit is registers</h3>
+<p>Measured occupancy is <strong>4.000 of 8 waves per SIMD</strong>, identical minimum and maximum across all 1055
+dispatches. Both resources bind at once: 512 VGPRs per SIMD divided by 128 per wave is 4, and before the import prune
+the LDS arena gave the same number. <strong>85.9% of wave-cycles are spent waiting</strong> while the memory unit
+reports zero stalls and LDS bank conflicts are negligible — too little memory-level parallelism, not too little
+bandwidth. Reaching 6 waves/SIMD needs VGPR &le;&nbsp;85 and LDS &le;&nbsp;21845&nbsp;B simultaneously; that is a tile
+redesign, not a flag.</p>
+
+<div class="note"><strong>A hypothesis of ours that the counters refuted.</strong> We expected the megakernel to be
+penalised because its register and LDS budgets are the maximum over all tiles, while separate launches each get their
+own. The unfused kernel measures VGPR 104 — also 4 waves/SIMD. Occupancy is not part of the fusion penalty. The
+counters did, however, state the fusion margin directly: mean occupancy per CU is <strong>3.946 fused against 0.974
+unfused</strong>; the megakernel keeps 98.6% of compute units busy, separate launches about a quarter of that.</div>
+
+<h3>Instruction cache</h3>
+<p>The megakernel is one switch over roughly 400 task types, and the literature names instruction-cache thrashing as
+an unaddressed cost of this design. Measured here: <strong>99.90% hit rate</strong>, 6,958 misses against 6.8 million
+requests. Ruled out.</p>
+
+<h2 class="pb">7. Two measurement errors we caught</h2>
+
+<p>Both were ours, both invalidated analysis we had already acted on, and both were found by checking rather than by
+a failure.</p>
+
+<ul>
+<li><strong>Traces taken during the prompt, not decode.</strong> Three rounds of per-phase analysis used traces limited
+to the first eight steps, which are the teacher-forced prompt with sequence lengths of 1 to 8. vLLM's attention kernel
+partitions by a hardcoded 256 tokens and exits immediately past the sequence end, so sixteen of twenty attention tasks
+looked trivial and we concluded the phase had a 4.3&times; work imbalance. Re-traced in the decode range the spread is
+1.17&times;; there is no imbalance. Timing was never affected — the benchmark only records steps after the prompt — but
+the attention block was understated by 0.21&nbsp;ms/token.</li>
+<li><strong>A statistic that charged imbalance to skew.</strong> The budget computed in-phase skew as a phase's span
+minus its <em>mean</em> body. A phase ends when its last task ends, so that quantity silently includes work imbalance.
+Recomputed properly, 0.414&nbsp;ms is start delay and 0.244&nbsp;ms is imbalance, and the router phase's apparent
+4.34&nbsp;µs of skew was 0.68.</li>
+</ul>
+
+<p>A third error was found in the baseline itself: the streaming benchmark used 256-thread workgroups while the tiles
+use 1024, so the achievable-rate column was measured at a quarter of the memory parallelism. Corrected, the MoE
+residual falls from 0.532 to 0.476&nbsp;ms/token and the router's from 0.164 to 0.046 — most of what we had charged to
+ETX there was the hardware floor.</p>
+
+<h2>8. Validation on bare metal</h2>
+
+<p>The same build, same gates, on the Hot Aisle bare-metal MI300X with ROCm 7.2.4 — the machine type every historical
+number in this project came from. The plan is byte-identical (60362 tasks, 436 events); only the register allocator
+differs (9 spills against 15).</p>
+
+<table>
+<tr><th>Configuration</th><th class="n">Device ms/token</th><th class="n">2026-09-30 baseline</th></tr>
+<tr><td>ETX megakernel</td><td class="n">5.042</td><td class="n">5.895</td></tr>
+<tr><td>ETX unfused</td><td class="n">5.266</td><td class="n">5.660</td></tr>
+<tr><td>vLLM default</td><td class="n">4.887</td><td class="n">4.836</td></tr>
+<tr class="tot"><td>Fusion margin</td><td class="n win">+0.224</td><td class="n loss">&minus;0.235</td></tr>
+</table>
+
+<p>The claim ETX exists to prove now holds on the machine where it originally measured negative, and the improvement
+is <span class="win">&minus;14.5%</span> there as well. We are 3.1% behind vLLM on that box against 3.7% on the VF —
+both systems are faster on the VF and ours by less, so the relative position is slightly worse on bare metal. The
+mechanism findings transfer exactly: the invalidate penalty is 4.1&times; on both, and the streaming table agrees
+within a few percent on every row. Wall-clock figures were not captured there before the machine was released, so the
+bare-metal column is device-span only and is optimistic by an unmeasured amount of the same kind.</p>
+
+<h2>9. Batch behaviour, and a premise that was wrong</h2>
+
+<p>We expected a megakernel's advantage to grow with batch size, since a persistent kernel pays its scheduling cost
+once while launch-based systems pay per step. The measurement says the opposite.</p>
+
+<table>
+<tr><th class="n">Batch</th><th class="n">vLLM ms/token</th><th class="n">ETX ms/token</th><th class="n">Ratio</th></tr>
+<tr><td class="n">1</td><td class="n">4.861</td><td class="n">5.267</td><td class="n">1.08&times;</td></tr>
+<tr><td class="n">2</td><td class="n">2.793</td><td class="n">3.598</td><td class="n">1.29&times;</td></tr>
+<tr><td class="n">4</td><td class="n">1.820</td><td class="n">3.466</td><td class="n loss">1.90&times;</td></tr>
+<tr><td class="n">8</td><td class="n">0.941</td><td class="n">&mdash;</td><td class="n">&mdash;</td></tr>
+</table>
+
+<p><strong>ETX does not batch; it replicates.</strong> Task counts are exactly linear in request count — 59,978 /
+119,956 / 239,912 — because each additional request instantiates another copy of the whole task graph, so every
+request streams its own copy of the weights. vLLM reads a weight tile once and multiplies it by a B-column activation
+matrix, which is why its step time barely moves from batch 4 to 8 while its throughput nearly doubles. Interleaving
+does buy something — batch 4 costs 13.9&nbsp;ms, not four times 5.27 — but that is latency hiding, not bandwidth
+sharing, and it cannot beat an approach whose weight traffic is constant in B.</p>
+
+<p>The obvious remedy, a skinny GEMM serving B activation columns from one weight read, was built for the dense
+phases and <strong>lost by 0.29&nbsp;ms at B=2</strong> for two reasons worth recording: the second column costs 90%
+of the first, because the tile sits at the point where compute time equals stream time and adding columns doubles the
+LDS traffic and arithmetic while saving only the weight stream; and a batched phase must wait on every request's
+previous event, removing the slack that replication provides. LDS also caps the design at B=2 — B=4 would need
+82560&nbsp;B against a 65536&nbsp;B hardware limit. Batching ETX properly requires matrix instructions for B&gt;1 and
+whole-layer batching with no per-phase join, including the MoE taking the union of the requests' experts. That is a
+separate project, not a switch.</p>
+
+<h2>10. What vLLM's own fusion is worth</h2>
+
+<p>To place our 2.0% on a scale, the same ladder measured for vLLM on this box:</p>
+
+<table>
+<tr><th>vLLM configuration</th><th class="n">Wall ms/token</th></tr>
+<tr><td>Default — compiled, fused, full CUDA-graph replay</td><td class="n">4.862</td></tr>
+<tr><td>Without Inductor operator fusion</td><td class="n">4.889</td></tr>
+<tr><td>Compiled and fused, graphs disabled</td><td class="n">32.710</td></tr>
+<tr><td>Eager — no compilation, no graphs</td><td class="n">35.134</td></tr>
+</table>
+
+<p>vLLM's graph is worth <strong>6.7&times;</strong>; its operator fusion is worth 0.6%. Host dispatch dominates
+everything, and both systems have already removed essentially all of it — vLLM through graph capture, ETX through the
+persistent kernel. On top of that, ETX's megakernel adds 2.0% and vLLM's operator fusion adds 0.6%: the same order of
+magnitude, and both an order of magnitude below what avoiding per-operator dispatch is worth.</p>
+
+<h2>11. What remains</h2>
+
+<table>
+<tr><th>Item</th><th class="n">ms/token</th><th>What it would take</th></tr>
+<tr><td>MoE tile bodies at ~70% of achievable</td><td class="n">0.476</td><td>Arithmetic has excluded bytes-in-flight and the serialised pass structure; the expert gather is 7% and the epilogue 5%. The remaining lead is that the dense tiles realise roughly a quarter of their waves' memory parallelism — unvalidated, and a four-phase correlation is not a mechanism.</td></tr>
+<tr><td><code>prep</code> and <code>reduce</code> dependent chains</td><td class="n">0.548</td><td>8.5 and 8.1 round trips where 3–4 look necessary. Task boundaries offer no solution: fusing <code>prep</code> into <code>attn</code> is semantically impossible, and spreading it changes nothing. Shortening the chain inside the tile failed once on register pressure.</td></tr>
+<tr><td>Top-k tile</td><td class="n">0.391</td><td>At its floor under the coherence design: the body is one write-through round trip behind which every store sits. The only lever is not publishing coherently, which reintroduces the invalidate the design removed for four times more.</td></tr>
+<tr><td>Register pressure &rarr; occupancy</td><td class="n">unquantified</td><td>85.9% of wave-cycles wait with no memory-unit stalls, so more resident waves should hide latency. Needs VGPR 128 &rarr; 85 with LDS under 21845&nbsp;B. The upper bound is unknown until built.</td></tr>
+<tr><td>Hand-off, host work, start delay</td><td class="n">0.98</td><td>At or below their floors; nothing cheap left.</td></tr>
+</table>
+
+<p>The honest reading is that the compiler and runtime half of this project has reached its measured floor, and the
+remaining difference between ETX and vLLM at batch 1 is the quality of hand-written tiles against kernels AMD has
+tuned. That is worth saying plainly because it is not the thing ETX set out to prove — and because the thing it did
+set out to prove is now measured, on two machines, with the strong baseline rather than the weak one.</p>
+
+<footer>
+Qwen3-30B-A3B bf16, batch 1, greedy, 32 tokens verified against HuggingFace greedy and a CPU reference for every DSL
+operator of the last layer. Primary machine: 1&times; MI300X VF, ROCm 7.14. Validation: 1&times; MI300X bare metal,
+ROCm 7.2.4. vLLM 0.27.1. Measurements, logs, traces and profiler output are archived with checksums in
+<code>docs/DATA.md</code>; per-round findings in <code>results_2026-10-01/</code>; the per-phase budget in
+<code>docs/BUDGET-2026-10-01.md</code>.
+</footer>
+
+</div>
