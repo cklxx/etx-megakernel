@@ -36,6 +36,8 @@
 //                      each followed by a warm 28 KB weight stream: what coherent activation loads (no inv) buy a phase.
 //   hw_bench moegather the MoE expert gather (2 x 128 KB halves 3.15 MB apart, experts 6.29 MB apart over 805 MB)
 //                      against one contiguous sweep of the same 50.3 MB at the same width; + the tile's LDS stage.
+//   hw_bench streamw   the stream shapes at 256 AND 1024 threads per workgroup: the achievable rate in the
+//                      megakernel's own 16-wave regime, which `stream` (256 threads) does not measure.
 //   hw_bench launch    the kernel boundary with work: 200 kernels in one HIP graph, each reads the previous kernel's output
 //                      and chases H dependent loads (H = -1: an empty kernel). Splits the fitted F into boundary + hops.
 //   hw_bench evx       ETX's own event protocol (the gfx942 lowering: fetch_sub arrive, poll = buffer_inv sc0 + load with
@@ -100,7 +102,11 @@ __device__ void grid_barrier_ni(Ctl* c, int gen) {        // as grid_barrier but
 // ------------------------------------------------------------------ stream
 // active workgroup k (per XCD slot s < A/8) streams `bytes` from region base; rows mode: 4 KB rows (K = 2048 bf16), row r of
 // the phase belongs to worker r % W where W = A, so worker w reads rows w, w + A, ... (fleet's distribution)
-__global__ void __launch_bounds__(kT) k_stream(const u4* __restrict__ w, size_t buf_u4, int active, int64_t bytes, int rows_mode,
+// T = threads per workgroup. The default kT = 256 is 4 waves = 1 wave/SIMD at 1 WG/CU; ETX's megakernel runs 1024
+// threads = 16 waves = 4 waves/SIMD, a different latency-hiding regime, so an "achievable rate" measured at 256 is not
+// the ceiling for a 1024-thread tile. The `streamw` mode runs the same shapes at both widths to settle that.
+template <int T>
+__global__ void __launch_bounds__(T) k_stream_t(const u4* __restrict__ w, size_t buf_u4, int active, int64_t bytes, int rows_mode,
                                                int iters, Ctl* ctl, uint64_t* t_start, uint64_t* t_end, uint32_t* sink) {
   __shared__ int s_slot;
   if (threadIdx.x == 0) s_slot = claim_xslot(ctl);
@@ -118,10 +124,10 @@ __global__ void __launch_bounds__(kT) k_stream(const u4* __restrict__ w, size_t 
     const int64_t n16 = bytes / 16;
     if (!rows_mode) {
       const u4* p = w + region + (size_t)wid * n16;
-      for (int64_t i = threadIdx.x; i < n16; i += kT * 8) {
+      for (int64_t i = threadIdx.x; i < n16; i += T * 8) {
         u4 v[8];
 #pragma unroll
-        for (int d = 0; d < 8; ++d) v[d] = (i + d * kT < n16) ? p[i + d * kT] : u4{0, 0, 0, 0};
+        for (int d = 0; d < 8; ++d) v[d] = (i + d * T < n16) ? p[i + d * T] : u4{0, 0, 0, 0};
         live8(v);
 #pragma unroll
         for (int d = 0; d < 8; ++d) acc ^= xs(v[d]);
@@ -759,7 +765,7 @@ int main(int argc, char** argv) {
                          {96, 28672, "o_proj x96"}, {148, 28672, "o_proj x148"}};
     for (int rows = 0; rows < 2; ++rows) for (const P& p : ps) {
       reset(); CHECK(hipMemset(ts, 0, (size_t)iters * 304 * 8)); CHECK(hipMemset(te, 0, (size_t)iters * 304 * 8));
-      hipLaunchKernelGGL(k_stream, dim3(ncu), dim3(kT), lds1, st, w, buf_u4, p.active, p.bytes, rows, iters, ctl, ts, te, sink);
+      hipLaunchKernelGGL(k_stream_t<kT>, dim3(ncu), dim3(kT), lds1, st, w, buf_u4, p.active, p.bytes, rows, iters, ctl, ts, te, sink);
       if (!wait_stream(st, 30)) { printf("RESULT stream HUNG\n"); return 3; }
       std::vector<uint64_t> hs((size_t)iters * 304), he((size_t)iters * 304);
       CHECK(hipMemcpy(hs.data(), ts, hs.size() * 8, hipMemcpyDeviceToHost)); CHECK(hipMemcpy(he.data(), te, he.size() * 8, hipMemcpyDeviceToHost));
@@ -954,6 +960,35 @@ int main(int argc, char** argv) {
       const double med = pct(wg, 0.5), sp = pct(spans, 0.5), tb = active * (double)bytes / (sp * 1e-6) / 1e12;
       printf("RESULT lfx xcds %d active %3d inflight %2d KB/WG: WG median %7.2f us  span %7.2f  -> %.2f TB/s (span), %.3f TB/s per XCD\n",
              nx, active, D * 4, med, sp, tb, tb / nx);
+    }
+  }
+
+  if (what == "all" || what == "streamw") {
+    // The achievable rate at the tile's OWN workgroup width. BUDGET-2026-10-01's "achievable" column came from
+    // `stream`, which runs 256-thread workgroups (4 waves, 1 wave/SIMD at 1 WG/CU); the megakernel's tiles are 1024
+    // threads (16 waves, 4 waves/SIMD). Same shapes, both widths, so the residuals can be recomputed on a like basis.
+    const int iters = 12;
+    uint64_t *ts, *te; CHECK(hipMalloc(&ts, (size_t)iters * 304 * 8)); CHECK(hipMalloc(&te, (size_t)iters * 304 * 8));
+    struct P { int active; int64_t bytes; const char* phase; };          // the real per-task bytes and widths
+    const std::vector<P> ps = {{256, 81920, "qkv"}, {256, 65536, "o_proj"}, {192, 262144, "moe_up"},
+                               {256, 98304, "moe_down"}, {256, 2048, "router"}};
+    for (const P& p : ps) for (int wide = 0; wide < 2; ++wide) {
+      reset(); CHECK(hipMemset(ts, 0, (size_t)iters * 304 * 8)); CHECK(hipMemset(te, 0, (size_t)iters * 304 * 8));
+      if (wide) hipLaunchKernelGGL(k_stream_t<1024>, dim3(ncu), dim3(1024), lds1, st, w, buf_u4, p.active, p.bytes, 0, iters, ctl, ts, te, sink);
+      else      hipLaunchKernelGGL(k_stream_t<256>,  dim3(ncu), dim3(256),  lds1, st, w, buf_u4, p.active, p.bytes, 0, iters, ctl, ts, te, sink);
+      if (!wait_stream(st, 30)) { printf("RESULT streamw HUNG\n"); return 3; }
+      std::vector<uint64_t> hs((size_t)iters * 304), he((size_t)iters * 304);
+      CHECK(hipMemcpy(hs.data(), ts, hs.size() * 8, hipMemcpyDeviceToHost)); CHECK(hipMemcpy(he.data(), te, he.size() * 8, hipMemcpyDeviceToHost));
+      std::vector<double> spans, wg;
+      for (int it = 2; it < iters; ++it) {
+        uint64_t lo = ~0ull, hi = 0;
+        for (int k = 0; k < p.active; ++k) { const uint64_t a = hs[(size_t)it * p.active + k], b = he[(size_t)it * p.active + k];
+          if (!a) continue; lo = std::min(lo, a); hi = std::max(hi, b); wg.push_back((b - a) * 0.01); }
+        if (hi > lo) spans.push_back((hi - lo) * 0.01);
+      }
+      const double sp = pct(spans, 0.5);
+      printf("RESULT streamw %-9s %4d thr %3d WGs x %7lld B: span %7.2f us  WG median %7.2f us  -> %.2f TB/s\n", p.phase,
+             wide ? 1024 : 256, p.active, (long long)p.bytes, sp, pct(wg, 0.5), p.active * (double)p.bytes / (sp * 1e-6) / 1e12);
     }
   }
 
