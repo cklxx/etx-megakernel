@@ -87,12 +87,16 @@ def main():
             put(f"L{L}.qn", get(s + "q_norm.weight"))
             put(f"L{L}.kn", get(s + "k_norm.weight"))
         put(f"L{L}.wo", get(s + "o_proj.weight"))
-        m = p + "mlp."
+        # Qwen spells the MoE block mlp.{gate,experts.N.{gate_proj,up_proj,down_proj}}; Mixtral spells it
+        # block_sparse_moe.{gate,experts.N.{w1,w3,w2}} with w1=gate, w3=up, w2=down (vLLM's FusedMoE maps
+        # w1->shard 0 and w3->shard 1 of w13 for both). Detect by what the checkpoint actually contains.
+        m = p + ("block_sparse_moe." if (p + "block_sparse_moe.gate.weight") in index else "mlp.")
         if d.moe:
+            gk, uk, dk = (("w1", "w3", "w2") if "block_sparse_moe" in m else ("gate_proj", "up_proj", "down_proj"))
             put(f"L{L}.wr", get(m + "gate.weight"))
-            put(f"L{L}.w13", torch.stack([torch.cat([get(f"{m}experts.{e}.gate_proj.weight"), get(f"{m}experts.{e}.up_proj.weight")], 0)
+            put(f"L{L}.w13", torch.stack([torch.cat([get(f"{m}experts.{e}.{gk}.weight"), get(f"{m}experts.{e}.{uk}.weight")], 0)
                                           for e in range(d.E)]))
-            put(f"L{L}.w2", torch.stack([get(f"{m}experts.{e}.down_proj.weight") for e in range(d.E)]))
+            put(f"L{L}.w2", torch.stack([get(f"{m}experts.{e}.{dk}.weight") for e in range(d.E)]))
         else:
             put(f"L{L}.wgu", torch.cat([get(m + "gate_proj.weight"), get(m + "up_proj.weight")], 0))
             put(f"L{L}.wd", get(m + "down_proj.weight"))

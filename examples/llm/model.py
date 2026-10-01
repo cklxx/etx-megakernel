@@ -85,8 +85,11 @@ def load_dims(path: str | None = None) -> Dims:
     moe = E > 0
     if not moe and any("expert" in k for k in c):
         raise ValueError(f"{path}: config mentions experts but none of {_E_KEYS} is set; refusing to plan it as dense")
-    if moe and (c.get("mlp_only_layers") or c.get("decoder_sparse_step", 1) != 1):
-        raise ValueError("mixed dense / MoE layer layouts are not supported by this example")
+    if moe and (c.get("mlp_only_layers") or c.get("decoder_sparse_step", 1) != 1
+                or c.get("first_k_dense_replace", 0) or c.get("n_shared_experts", 0)):
+        # first_k_dense_replace / n_shared_experts are DeepSeek's spellings of a mixed layout and of always-on
+        # shared experts; planning those layers as plain MoE would be silently wrong, so they are refused.
+        raise ValueError("mixed dense / MoE layer layouts (or shared experts) are not supported by this example")
     # q/k norm has no config key, so it is read from the architecture. The list is what has been verified, and an
     # unrecognised architecture gets False -- which only costs a slower plan, never a wrong one (model.py's
     # _attn_head() then skips dsl_attnprep), unlike guessing True.
@@ -101,7 +104,11 @@ def load_dims(path: str | None = None) -> Dims:
                 # Qwen separates moe_intermediate_size from the dense intermediate_size; Mixtral has only the latter
                 # and it IS the expert width. Falling back to 0 gave an MoE plan with zero-sized expert phases.
                 MI=c.get("moe_intermediate_size") or (c.get("intermediate_size", 0) if moe else 0),
-                norm_topk=bool(c.get("norm_topk_prob", False)))
+                # Mixtral has no norm_topk_prob key but ALWAYS renormalises the top-k weights by their sum
+                # (MixtralSparseMoeBlock: softmax over E, top-k, divide by the sum) -- the same order our topk
+                # tile implements for Qwen's norm_topk_prob=true. Reading only the key would silently skip the
+                # renormalisation for Mixtral.
+                norm_topk=bool(c.get("norm_topk_prob", mt == "mixtral")))
 
 
 def workers(d: "Dims") -> int:

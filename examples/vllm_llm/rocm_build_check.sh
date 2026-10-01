@@ -49,11 +49,14 @@ exec $RL/bin/clang++ -nogpuinc -isystem $R/inc -include __clang_hip_runtime_wrap
 EOF
 chmod +x /tmp/bin/hipcc; export PATH=/tmp/bin:$PATH ETX_LLVM=$RL/bin ETX_TORCH_HEADERS=$R/pytorch
 cd $ROOT; CFG=examples/llm/configs/$M.json
-cfg() { python3 -c "import json;c=json.load(open(\"$CFG\"));print(c.get(\"$1\",0))"; }
-H=$(cfg hidden_size); NKV=$(cfg num_key_value_heads); NH=$(cfg num_attention_heads); HD=$(cfg head_dim); [ "$HD" = 0 ] && HD=$((H / NH))
+# Dims via load_dims, the ONE derivation (round 28 fixed num_experts-only detection and the Mixtral expert
+# width there; this script kept its own copy and re-broke both for any non-Qwen MoE -- the round-31 lesson).
+cfg() { PYTHONPATH=. python3 -c "from examples.llm.model import load_dims
+d = load_dims(\"$CFG\"); print(getattr(d, \"$1\"))"; }
+H=$(cfg H); NKV=$(cfg NKV); NH=$(cfg NH); HD=$(cfg HD)
 G=$((NH / NKV)); case $G in 4) ATTN=attn_mfma4_g4;; 6) ATTN=attn_mfma16_g6;; 8) ATTN=attn_mfma16_g8;; esac
 DSLOPS_PRE=""; case " $E " in *ETX_VL_IMPORTED=1*) ;; *ETX_VL_DSL_ATTN=head*) DSLOPS_PRE=attnprep;;
-  *ETX_VL_DSL_ATTN=*) ;; *) [ "$(cfg model_type)" != "qwen2" ] && DSLOPS_PRE=attnprep;; esac
+  *ETX_VL_DSL_ATTN=*) ;; *) [ "$(cfg qk_norm)" = "True" ] && DSLOPS_PRE=attnprep;; esac
 # Import only what the plan instantiates: ETX_IMPORT_LDS is the MAX over every imported kernel and the megakernel
 # carries that arena in every phase, so importing the wvsplitk pair the DSL GEMV replaces cost 11648 B of LDS and
 # capped occupancy (round 16). build.sh prunes them; this check must prune identically or its resource report lies.
@@ -65,11 +68,11 @@ EXP="$ATTN,attn_reduce,rms_norm_2d,silu_and_mul"
 case $M in qwen3*) [ -n "$DSLOPS_PRE" ] || EXP="$EXP,rms_norm_3d";; esac
 case " $E " in *ETX_VL_QKNR=1*|*ETX_VL_QKNR=grid*) EXP="$EXP,qknorm_rope";; esac   # as build.sh: any value but 0
 BLK=(--block rms_norm_2d=$((H / 8)) --block reshape_and_cache=$((NKV * HD / 8))); SL=""
-if [ "$(cfg num_experts)" != 0 ]; then
+if [ "$(cfg moe)" = "True" ]; then
   [ "$DG" = 1 ] || EXP="$EXP,wvsplitk_y1,fused_moe_up,fused_moe_down"
   [ "$DT" = 1 ] || EXP="$EXP,topk_softmax_e128"
   case " $E " in *ETX_VL_IMPORTED=1*|*ETX_VL_DSL_FOLD=0*) EXP="$EXP,moe_sum_k8";; esac
-  BLK+=(--block silu_and_mul=$(( $(cfg moe_intermediate_size) / 8 ))); SL="fused_moe_up=1,fused_moe_down=1,silu_and_mul=1"
+  BLK+=(--block silu_and_mul=$(( $(cfg MI) / 8 > 1024 ? 1024 : $(cfg MI) / 8 ))); SL="fused_moe_up=1,fused_moe_down=1,silu_and_mul=1"
 fi
 echo "== import ($EXP)"
 XS=$(echo "$E" | tr " " "\n" | sed -n "s/^ETX_VL_SLOTS=//p"); SL="${XS:+$XS,}$SL"; SL="${SL%,}"
