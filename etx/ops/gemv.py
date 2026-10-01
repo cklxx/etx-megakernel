@@ -13,6 +13,20 @@ task, tasks per expert; the grid words follow):
   dsl_moe_up    act[s, r] = bf16(silu(bf16(g)) * bf16(u))         expert e = ids[s], g = W_e[r, :] . x, u = W_e[M + r, :] . x
                                                                    (w13: gate rows then up rows; s = blk / tpe, r in chunk blk % tpe)
   dsl_moe_down  out[s, r] = bf16((W_e[r, :] . x_s) * wts[s])      x_s = act[s, :]
+
+MoE residual, measured in-tile (2026-10-02, round 37; traced decode, layer-11 mean bodies, control run twice around
+the ladder at 18.32/18.41 up and 10.82/11.39 down; every DSL_ABLATE_* build is timing-only WRONG output):
+  rung                       moe_up   moe_down     reads as
+  control                     18.37      11.11
+  NOGEMV  (topk+stage only)    1.50       1.43     prologue 8%
+  ONEPASS (gate, no up)       10.45          -     the second pass costs its own stream, consistent
+  NORED   (no wave_sum/epi)   15.45       8.64     reduction + coherent output stores 16% / 22%
+  NOLDS   (const x in dot)    17.81      10.68     the dot's LDS reads 3% -- the 8-float lane stride is NOT a conflict
+  NOVMEM  (one weight vector) 11.55       7.64     the critical path WITHOUT the stream is 63% of the body
+Exposed VMEM (control - NOVMEM) is 6.8 us = 37% for up, 3.5 = 31% for down: the stream hides under the skeleton, so
+the budget's "65-70% of achievable bandwidth" framing was wrong -- the tile is skeleton-bound, not stream-bound, and
+no single rung owns >= 50%. ~6.5 us/task of the skeleton is loop/flush/drain machinery no rung isolates; separating
+it needs in-kernel timestamps, not ablations. Closed as spread at the structural floor of this tile shape.
 x and W are bf16, dots accumulate in fp32 (as vLLM's kernels; the summation order differs, so the outputs are compared
 with a tolerance, host --check-dsl, not byte for byte).
 """
@@ -113,13 +127,23 @@ typedef __attribute__((address_space(3))) const float dsl_lds_f;
 typedef __attribute__((address_space(3))) float dsl_lds_fw;
 static __device__ __forceinline__ float dsl_dot(dsl_u32x4 w, const dsl_lds_f* x) {
   float s = 0.f;
+#ifdef DSL_ABLATE_NOLDS                                  // ablation: constants in place of the staged x (WRONG output) --
+#pragma unroll                                           // isolates the LDS read cost of the dot (lane-strided, 8 floats)
+  for (int i = 0; i < 4; ++i) { s += __uint_as_float(w[i] << 16) * 0.5f; s += __uint_as_float(w[i] & 0xffff0000u) * 0.25f; }
+#else
 #pragma unroll
   for (int i = 0; i < 4; ++i) { s += __uint_as_float(w[i] << 16) * x[2 * i]; s += __uint_as_float(w[i] & 0xffff0000u) * x[2 * i + 1]; }
+#endif
   return s;
 }
 static __device__ __forceinline__ float dsl_dot(dsl_u32x2 w, const dsl_lds_f* x) {
+#ifdef DSL_ABLATE_NOLDS
+  return __uint_as_float(w.x << 16) * 0.5f + __uint_as_float(w.x & 0xffff0000u) * 0.25f
+       + __uint_as_float(w.y << 16) * 0.5f + __uint_as_float(w.y & 0xffff0000u) * 0.25f;
+#else
   return __uint_as_float(w.x << 16) * x[0] + __uint_as_float(w.x & 0xffff0000u) * x[1]
        + __uint_as_float(w.y << 16) * x[2] + __uint_as_float(w.y & 0xffff0000u) * x[3];
+#endif
 }
 static __device__ __forceinline__ float dsl_bfr(float v) { return __bfloat162float(__float2bfloat16(v)); }
 static __device__ __forceinline__ float dsl_silu(float g) { return g / (1.f + __expf(-g)); }
@@ -144,8 +168,10 @@ static __device__ __forceinline__ void dsl_gemv_rows_nb(const __hip_bfloat16* __
 #pragma unroll
   for (int b = 0; b < NB; ++b) acc[b] = 0.f;
   auto flush = [&]() {
+#ifndef DSL_ABLATE_NORED                                 // ablation: no per-row wave_sum, no partial writes (WRONG output)
 #pragma unroll
     for (int b = 0; b < NB; ++b) { const float v = etx_wave_sum(acc[b]); if (lane == 0) pl[(wv * nrt + cur) * NB + b] += v; acc[b] = 0.f; }
+#endif
   };
   auto consume = [&](int sg, V w) {
     const int row = sg / spr;
@@ -156,19 +182,36 @@ static __device__ __forceinline__ void dsl_gemv_rows_nb(const __hip_bfloat16* __
   };
   int s0 = sb;
   V w[U];
+#ifdef DSL_ABLATE_NOVMEM                                 // ablation: ONE weight vector per wave, reused every trip (WRONG
+  const V w00 = sb < se ? dsl_wload(base + (size_t)sb * ETX_WAVE_SIZE) : V{};   // output) -- loop, LDS reads and dots intact
+#endif
   for (; s0 + U <= se; s0 += U) {
 #pragma unroll
+#ifdef DSL_ABLATE_NOVMEM
+    for (int u = 0; u < U; ++u) w[u] = w00;
+#else
     for (int u = 0; u < U; ++u) w[u] = dsl_wload(base + (size_t)(s0 + u) * ETX_WAVE_SIZE);
+#endif
 #pragma unroll
     for (int u = 0; u < U; ++u) consume(s0 + u, w[u]);
   }
   if (s0 < se) {
 #pragma unroll
+#ifdef DSL_ABLATE_NOVMEM
+    for (int u = 0; u < U; ++u) if (s0 + u < se) w[u] = w00;
+#else
     for (int u = 0; u < U; ++u) if (s0 + u < se) w[u] = dsl_wload(base + (size_t)(s0 + u) * ETX_WAVE_SIZE);
+#endif
 #pragma unroll
     for (int u = 0; u < U; ++u) if (s0 + u < se) consume(s0 + u, w[u]);
   }
   if (sb < se) flush();
+#ifdef DSL_ABLATE_NORED
+#pragma unroll
+  for (int b = 0; b < NB; ++b) asm volatile("" :: "v"(acc[b]));   // the dots are kept; the reduction and epi are not
+  __syncthreads();
+  __syncthreads();
+#else
   __syncthreads();
   for (int r = (int)threadIdx.x; r < nrt; r += blockDim.x) {
     float v[NB];
@@ -180,6 +223,7 @@ static __device__ __forceinline__ void dsl_gemv_rows_nb(const __hip_bfloat16* __
     epi(r0 + r, v);
   }
   __syncthreads();
+#endif
 }
 template <int EPL, int U, class Epi>
 static __device__ __forceinline__ void dsl_gemv_rows(const __hip_bfloat16* __restrict__ W, int K, const float* xs, int r0, int r1, float* part, Epi epi) {
@@ -502,6 +546,9 @@ BODIES = {
 #endif
   const __hip_bfloat16* We = d.W + (size_t)(d.mode >= 2 ? lids[s] : dsl_a_ldi(d.ids + (size_t)rq * d.srows + s)) * d.estride;     // g: 2 x rpt floats (rpt <= DSL_RCH, host-checked)
   dsl_stage(d.x + (size_t)rq * d.sx, d.K, xs);
+#ifdef DSL_ABLATE_NOGEMV                                 // ablation: prologue only -- topk + stage, no passes, no stores (WRONG output)
+  asm volatile("" :: "v"((unsigned)(size_t)We)); return;
+#endif
   dsl_gemv_chunked(We, d.K, xs, r0, r1, part, [&](int r, float v) { g[r - r0] = dsl_bfr(v); });
 #ifndef DSL_ABLATE_ONEPASS                                                      // ablation: gate only, no up pass (WRONG output)
   dsl_gemv_chunked(We + (size_t)d.M * d.K, d.K, xs, r0, r1, part, [&](int r, float v) { g[d.rpt + r - r0] = dsl_bfr(v); });
@@ -527,6 +574,9 @@ BODIES = {
 #endif
   const __hip_bfloat16* We = d.W + (size_t)(d.mode >= 2 ? lids[s] : dsl_a_ldi(d.ids + (size_t)rq * d.srows + s)) * d.estride;
   dsl_stage(d.x + (size_t)rq * d.sx + (size_t)s * d.K, d.K, xs);
+#ifdef DSL_ABLATE_NOGEMV
+  asm volatile("" :: "v"((unsigned)(size_t)We)); return;
+#endif
   __hip_bfloat16* out = d.out + (size_t)rq * d.sout + (size_t)s * d.M;
 #if defined(DSL_ABLATE_EPI) || defined(DSL_ABLATE_WTS)   // ablation: no routing-weight multiply (WRONG output). WTS is
   // the down-only form: EPI also drops moe_up's silu, so it cannot price what moe_down does that vLLM's kernel does not
