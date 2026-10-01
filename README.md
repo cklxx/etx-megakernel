@@ -26,7 +26,33 @@ the same kernels fused (ETX), launched one by one (ETX unfused, HIP graph) and i
     VLLM=~/vllm bash examples/vllm_llm/build.sh ~/llm/qwen3-8b            # on the GPU host
     nohup bash examples/vllm_llm/vm_run.sh > ~/vl.log 2>&1 &              # the whole comparison on a fresh VM
 
-## Status: the real model runs (2026-09-23)
+## Status: fusion pays (2026-10-01)
+
+Qwen3-30B-A3B bf16 decode, batch 1, one MI300X, wall clock, 32/32 tokens against HF greedy with every DSL
+operator of the last layer within 2 bf16 ulps of a CPU reference:
+
+| | ms/token | vs vLLM |
+|---|---|---|
+| vLLM 0.27.1 default | 4.862 | — |
+| vLLM + AITER | 4.975 | +2.3% |
+| **ETX megakernel** | **5.042** | **+3.7%** |
+| ETX unfused — same tiles, HIP-graph replay | 5.145 | +5.8% |
+
+**The claim ETX exists to prove now holds: one persistent kernel beats a HIP-graph replay of the same tiles
+by 2.0%.** It lost by 4.2% the day before. The system improved 14.5% against itself, confirmed on a second
+machine (bare metal, ROCm 7.2.4: fusion margin +0.224 against −0.235 on 2026-09-30).
+
+What flipped it: every task's acquire was `buffer_inv sc1`, a whole-L2 invalidate, so every phase began cold
+(−0.317 ms to fix); unfolding an earlier "optimisation" of ours that had 448 expert tasks per layer each redo a
+128-logit softmax (−0.231); asynchronous per-step host work (−0.152); non-temporal weight loads (−0.106).
+
+ETX is still 3.7% behind vLLM, and the budget says where: hand-off sits at the event protocol's floor, workgroup
+start delay is below the hardware dispatcher's own jitter, host work is 0.135 ms, and the instruction cache hits
+99.90%. **The orchestration is spent; 1.42 ms of the 5.042 is our own hand-written tiles** — which was never
+ETX's claim. Full report: [docs/ETX-report-2026-10-01.pdf](docs/ETX-report-2026-10-01.pdf), per-phase budget in
+[docs/BUDGET-2026-10-01.md](docs/BUDGET-2026-10-01.md), measured data index in [docs/DATA.md](docs/DATA.md).
+
+## Earlier: the real model runs (2026-09-23)
 
 `examples/dsv2lite/` is fleet-mi300x's DeepSeek-Coder-V2-Lite decode graph in
 ETX with fleet's own tile bodies linked through a shim. On one MI300X it
@@ -61,7 +87,9 @@ greedy decoding (bf16, 32 tokens), deterministic over three runs:
 The tiles are general, not tuned. On a fresh VM, `bash examples/llm/vm_run.sh` prepares, builds
 and runs all three.
 
-Head-to-head, 1024-token context, batch 1, one MI300X (2026-09-25; `examples/llm/vm_bench.sh`):
+Head-to-head with the **generic, untuned** tiles, 1024-token context, batch 1, one MI300X
+(2026-09-25; `examples/llm/vm_bench.sh`). Superseded for Qwen3-30B-A3B by the 2026-10-01 table above, which
+uses the DSL tiles and the coherence design:
 
 | Model | vLLM, best of default / AITER | ETX tiles, unfused (one kernel per grid, HIP graph) | ETX megakernel | Hand-written fleet |
 |---|---|---|---|---|
