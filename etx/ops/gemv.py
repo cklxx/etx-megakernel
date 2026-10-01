@@ -247,16 +247,30 @@ static __device__ __forceinline__ void dsl_gemv_split(const __hip_bfloat16* __re
 }
 // K % 512 == 0: 16 B loads, 4 in flight per lane; K % 256 == 0: 8 B loads, 8 in flight: 64 KB per workgroup of 16 waves
 // (the megakernel's 1024 threads; 16 per lane as examples/llm/gemv.h's 4-wave tiles spilled 359 VGPRs at 128 per lane)
+// Half in-flight depth (8 dwords per lane) is the DEFAULT since round 34: 4.832 against 4.884 wall ms/token for
+// the full depth (3 interleaved runs each, same box), VGPR/spill/occupancy identical (128/8/4) -- the win is VMEM
+// queue pressure and 1 MB less code, not registers. Round 32's Little's-law headroom at full depth was 4.8x, so
+// half still covers the latency 2.4x over. Occupancy itself CANNOT move here: the persistent kernel launches one
+// 16-wave workgroup per CU, so 4 waves/SIMD is fixed by the grid, not by VGPRs -- forcing VGPR 64 via launch
+// bounds left runtime occupancy at 4.000 and cost 2x in spill traffic (9.39 wall, 1678 spills). -DETX_DSL_U4
+// restores the old depth.
+#ifdef ETX_DSL_U4
+#define DSL_UW 4
+#define DSL_UN 8
+#else
+#define DSL_UW 2
+#define DSL_UN 4
+#endif
 template <class Epi>
 static __device__ __forceinline__ void dsl_gemv(const __hip_bfloat16* __restrict__ W, int K, const float* xs, int r0, int r1, float* part, Epi epi) {
 #ifdef DSL_ABLATE_EPL4                                   // ablation: force the 8 B load path everywhere (moe_down's,
-  dsl_gemv_rows<4, 8>(W, K, xs, r0, r1, part, epi);      // since K = 768 is not a multiple of 512) -- output stays correct
+  dsl_gemv_rows<4, DSL_UN>(W, K, xs, r0, r1, part, epi); // since K = 768 is not a multiple of 512) -- output stays correct
 #else
-  if (K % (ETX_WAVE_SIZE * 8) == 0) dsl_gemv_rows<8, 4>(W, K, xs, r0, r1, part, epi);
+  if (K % (ETX_WAVE_SIZE * 8) == 0) dsl_gemv_rows<8, DSL_UW>(W, K, xs, r0, r1, part, epi);
 #ifdef DSL_SPLIT_TAIL                                    // moe_down (K = 768): 512 columns wide, 256 narrow
   else if (K >= ETX_WAVE_SIZE * 8 && K % (ETX_WAVE_SIZE * 4) == 0) dsl_gemv_split(W, K, xs, r0, r1, part, epi);
 #endif
-  else dsl_gemv_rows<4, 8>(W, K, xs, r0, r1, part, epi);
+  else dsl_gemv_rows<4, DSL_UN>(W, K, xs, r0, r1, part, epi);
 #endif
 }
 // rows per pass of the stream loop: the partials take nwaves x DSL_RCH floats of LDS whatever the task's row count
@@ -264,8 +278,8 @@ static __device__ __forceinline__ void dsl_gemv(const __hip_bfloat16* __restrict
 #define DSL_RCH 64
 template <int NB, class Epi>
 static __device__ __forceinline__ void dsl_gemv_nb(const __hip_bfloat16* __restrict__ W, int K, int KS, const float* xs, int r0, int r1, float* part, Epi epi) {
-  if (K % (ETX_WAVE_SIZE * 8) == 0) dsl_gemv_rows_nb<8, 4, NB>(W, K, KS, xs, r0, r1, part, epi);
-  else dsl_gemv_rows_nb<4, 8, NB>(W, K, KS, xs, r0, r1, part, epi);
+  if (K % (ETX_WAVE_SIZE * 8) == 0) dsl_gemv_rows_nb<8, DSL_UW, NB>(W, K, KS, xs, r0, r1, part, epi);
+  else dsl_gemv_rows_nb<4, DSL_UN, NB>(W, K, KS, xs, r0, r1, part, epi);
 }
 template <int NB, class Epi>
 static __device__ __forceinline__ void dsl_gemv_chunked_nb(const __hip_bfloat16* __restrict__ W, int K, int KS, const float* xs, int r0, int r1, float* part, Epi epi) {
@@ -450,7 +464,7 @@ static __device__ __forceinline__ void dsl_touch_plain(const unsigned char* a, i
   const DslArgs d = dsl_args(a);
   const int r0 = blk * d.rpt, r1 = min(d.M, min(r0 + d.rpt, r0 + DSL_RCH));   // the first pass of dsl_gemv_chunked
   if (r0 >= r1) return;
-  if (d.K % (ETX_WAVE_SIZE * 8) == 0) dsl_touch_rows<8, 4>(d.W, d.K, r0, r1); else dsl_touch_rows<4, 8>(d.W, d.K, r0, r1);
+  if (d.K % (ETX_WAVE_SIZE * 8) == 0) dsl_touch_rows<8, DSL_UW>(d.W, d.K, r0, r1); else dsl_touch_rows<4, DSL_UN>(d.W, d.K, r0, r1);
 }
 '''
 

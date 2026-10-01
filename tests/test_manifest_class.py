@@ -56,7 +56,8 @@ def test_every_macro_the_tiles_test_is_either_published_or_tile_local():
     """The audit that found the fifth: a macro a tile source tests must come from the manifest, or be local to the
     tile with no plan or host counterpart. Anything else is the bug class waiting to happen."""
     tile_local = {"ETX_DSL_NT", "ETX_DSL_VECNORM", "ETX_DSL_UNIFORM", "ETX_DSL_PREP_EARLY", "ETX_IMPORT_LDS",
-                  "ETX_DSL_COH_HELPERS", "DSL_G", "DSL_U32X4_DEFINED", "DSL_SPLIT_TAIL"}
+                  "ETX_DSL_COH_HELPERS", "DSL_G", "DSL_U32X4_DEFINED", "DSL_SPLIT_TAIL",
+                  "ETX_DSL_U4"}   # load depth: only the tile's own instantiation changes (round 34)
     published = {m for m, _, _ in manifest.FEATURES.values()}
     tested = set()
     for f in (ROOT / "etx/ops").glob("*.py"):
