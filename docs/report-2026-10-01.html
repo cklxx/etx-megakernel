@@ -64,6 +64,37 @@ reference. Machine: 1× MI300X VF, ROCm 7.14. Confirmed on bare metal (ROCm 7.2.
 0.76 µs without it and 3.14 µs with it — <strong>4.1×</strong>. A dependent load chain crossing it pays 1107 ns per hop
 against 103 ns — <strong>10.6×</strong>. Both figures reproduce on both machines.</p>
 
+<h2>What ETX is actually worth</h2>
+
+<p>Against the same model with <em>all</em> kernels imported from vLLM instead of our DSL tiles — one build, one
+machine, same day:</p>
+
+<table>
+<tr><th>Build</th><th class="n">fused</th><th class="n">unfused</th><th class="n">fusion margin</th></tr>
+<tr><td>All imported vLLM kernels</td><td class="n">6.435</td><td class="n">6.264</td><td class="n loss">−0.171 — fusion loses</td></tr>
+<tr><td>Imported + vLLM's fused q/k-norm+rope</td><td class="n">6.071</td><td class="n">5.787</td><td class="n loss">−0.284 — fusion loses</td></tr>
+<tr class="hi"><td>Our DSL tiles</td><td class="n">4.937</td><td class="n">4.998</td><td class="n win">+0.061 — fusion wins</td></tr>
+</table>
+
+<p>Pairing every phase and its folds, the 1.50 ms difference decomposes exactly (Δ sums to 31.3 µs/layer × 48 =
+1.50 against a measured 1.497):</p>
+
+<table>
+<tr><th>Source of the difference</th><th class="n">ms</th></tr>
+<tr><td><code>prep</code> as 4 tasks against a one-workgroup q/k-norm+rope+cache chain (16.24 µs)</td><td class="n win">+0.614</td></tr>
+<tr><td>Attention placed by KV head — <em>the same imported kernel</em>, 20 tasks against 5</td><td class="n win">+0.355</td></tr>
+<tr><td>Folds deleting <code>silu_and_mul</code>, <code>moe_sum</code>, <code>post_norm</code> and their hand-offs</td><td class="n win">+0.500</td></tr>
+<tr><td>The acquire and the remainder</td><td class="n win">+0.030</td></tr>
+<tr class="hi"><td>Kernel speed, our tiles against vLLM's, summed like-for-like</td><td class="n">+0.043 — a tie</td></tr>
+</table>
+
+<p class="key"><strong>The two tile sets are equally fast; everything ETX gains is structural.</strong> Our GEMV beats
+<code>wvsplitk</code> on the same 5120×2048 shape with fewer workgroups (6.29 against 6.75) and loses by similar
+margins elsewhere — net 0.043 ms, inside the noise. What cannot be done with imported kernels is restructuring: an
+imported kernel dictates its own launch shape, and its loads come from vLLM's source, so its task must keep the
+<code>buffer_inv sc1</code> acquire that invalidates L2 for everything after it. <strong>ETX's tiles earn their place
+by being editable, not by being faster.</strong></p>
+
 <h2>Why ETX is still behind</h2>
 
 <p>Where the time goes, from a decode trace and hardware counters taken before the last change (which removed 0.105
@@ -82,7 +113,9 @@ of the tile item):</p>
 <p><strong>ETX's orchestration is spent; the tiles are not.</strong> Hand-off sits at its measured floor, start delay is
 below hardware jitter, host work is 0.135 ms, and the instruction cache — named in the literature as a megakernel's
 weakness — hits 99.90%. The gap to vLLM is 0.075 ms; the tile item alone is 1.29. Kernel quality was never ETX's
-claim, and it is now the whole of the difference.</p>
+claim — and the phase-by-phase pairing shows our tiles tie vLLM's on speed. The residual is distance from the
+<em>hardware</em> rate, which vLLM's kernels are equally far from; matching them everywhere would gain 0.119 ms,
+barely passing vLLM, and is a waypoint rather than a ceiling.</p>
 
 <p>One hardware limit bounds the tiles: occupancy is <strong>4.000 of 8 waves per SIMD</strong>, capped by 128 VGPRs,
 with <strong>85.9% of wave-cycles waiting</strong> and zero memory-unit stalls. Latency is unhidden; bandwidth is not
