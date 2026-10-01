@@ -89,3 +89,47 @@ identical on both machines. The achievable-rate table transfers, so the budget's
 `rocm/vllm:latest` has been removed from Docker Hub; the session scripts that reference it
 (`examples/sessions/moe_fix.py`, and the pattern copied into later sessions) will fail on a fresh box. The tag
 used here is the current 0.27.x CDNA image.
+
+## The full machine-parameter suite on bare metal (added after the validation run)
+
+`hw_bench` was run end to end on the bare-metal box before it was released — `lat`, `launch`, `evx`, `lfx`,
+`cohload`, `moegather`, `sdat`, `lf`, 156 RESULT lines in `results_2026-10-01/baremetal/hw_all.log` — so the
+machine parameters the whole budget rests on now exist on both machines. They agree:
+
+| parameter | bare metal (ROCm 7.2.4) | VF box (ROCm 7.14) |
+|---|---|---|
+| dependent hop, L1, loaded | 104.3 ns | 103.3 ns |
+| **dependent hop, L1, after `buffer_inv sc1`, loaded** | **1106.9 ns** | **1174.8 ns** |
+| kernel boundary (`launch`, empty) | 1.61 us | 1.61 us (2026-09-28) |
+| activation read: inv + plain | 2.91 us | 2.89 us |
+| activation read: coherent | 0.55 us | 0.50 us |
+| `moegather` sweep / gather / gather+ (WG median) | 11.04 / 14.20 / 11.88 us | 10.96 / 14.08 / 11.96 us |
+| `lfx` 8 XCDs (WG median) | 19.76 us | 19.80 us |
+| `lfx` 1 XCD, per XCD | 0.623 TB/s | 0.687 TB/s |
+| `evx` device scope, P=8 C=8 | 2.61 us | — |
+
+**The strongest evidence for the COH redesign is this suite's `lat` row, and it was not measured before today.**
+A dependent load chain that crosses a `buffer_inv sc1` pays **1107 ns per hop against 103 ns without it — 10.6x on
+bare metal, 11.4x on the VF box.** The 4.1x figure the redesign was argued from (`restart`, an L2-resident phase
+losing its reuse) is the bandwidth side of the same mechanism; this is the latency side, it is larger, and it bears
+directly on the phases that are dependent chains rather than streams (`prep` 8.5 hops, `reduce` 8.1, `topk` 11.8).
+Both numbers are machine-independent, so neither is an artefact of the virtualised box the day's work was done on.
+
+`rocprofv3` could not be used here: it aborted at startup (SIGABRT, `results_2026-10-01/baremetal/prof_bm.log`),
+a different failure from the VF box where it writes its database and then segfaults at teardown. The occupancy
+figures in `docs/BUDGET-2026-10-01.md` therefore remain VF-only; the VGPR 128 that sets them is 128 on both boxes,
+so the 4 waves/SIMD conclusion carries, but it is derived here rather than measured.
+
+## Timing basis (added after the vLLM ladder)
+
+The ETX and vLLM figures in this document are **not the same basis**, the same mismatch
+`docs/VLLM-LADDER-2026-10-01.md` found on the VF box: ETX's medians are the device span, vLLM's come from
+`vllm_bench.py`'s host wall clock. On the VF box the megakernel carried 0.197 ms/step of host work the device
+timer does not see, which turned "0.8% behind vLLM" into "5.0% behind" and the fusion margin from 3.9% into 0.8%.
+
+**The bare-metal run did not record ETX's wall per step**, and the box was released before this was understood, so
+the correction cannot be applied here. Treat the bare-metal "3.1% behind vLLM" as a device-basis figure that is
+optimistic by an unknown amount of the same kind, and the "+0.224 fusion margin" likewise. What does **not** depend
+on the basis, because both sides are ETX device spans measured the same way: **5.895 -> 5.042 (-14.5%) against the
+2026-09-30 build on this machine type, and the fusion margin changing sign** (-0.235 -> +0.224). Those are the
+claims this validation supports.
