@@ -39,6 +39,12 @@ def main() -> None:
     ap.add_argument("--batch", type=int, default=1, help="sequences decoded together (distinct prompts of equal length)")
     ap.add_argument("--custom-ops", default=None, help="'all': vLLM's own HIP ops instead of Inductor-generated ones (the kernels ETX imports)")
     ap.add_argument("--pass-config", default=None, help='compilation_config pass_config as JSON, e.g. {"enable_qk_norm_rope_fusion": true}')
+    # vLLM's own fusion ladder: --eager drops torch.compile AND the graphs (one launch per op); --cudagraph-mode NONE
+    # keeps the compiled/fused kernels but drops the graph replay; --compile-mode 0 keeps the graphs but drops the
+    # Inductor fusion. They are the analogues of ETX's fused-vs-unfused pair, so all of it lands on one scale.
+    ap.add_argument("--eager", action="store_true", help="enforce_eager: no torch.compile, no cuda graphs")
+    ap.add_argument("--cudagraph-mode", default=None, help="NONE | PIECEWISE | FULL | FULL_DECODE_ONLY | FULL_AND_PIECEWISE")
+    ap.add_argument("--compile-mode", type=int, default=None, help="CompilationMode: 0 NONE, 1 STOCK_TORCH_COMPILE, 2 DYNAMO_TRACE_ONCE, 3 VLLM_COMPILE")
     a = ap.parse_args()
 
     import vllm
@@ -46,10 +52,11 @@ def main() -> None:
     from vllm.inputs import TokensPrompt
 
     prompt_ids, golden = read_golden(a.golden)
-    cc = ({"custom_ops": [a.custom_ops]} if a.custom_ops else {}) | ({"pass_config": json.loads(a.pass_config)} if a.pass_config else {})
+    cc = ({"custom_ops": [a.custom_ops]} if a.custom_ops else {}) | ({"pass_config": json.loads(a.pass_config)} if a.pass_config else {}) \
+         | ({"cudagraph_mode": a.cudagraph_mode} if a.cudagraph_mode else {}) | ({"mode": a.compile_mode} if a.compile_mode is not None else {})
     kw = {"compilation_config": cc} if cc else {}
     llm = LLM(model=a.model, dtype="bfloat16", trust_remote_code=True,
-              max_model_len=len(prompt_ids) + a.tokens + 16, gpu_memory_utilization=0.85, enforce_eager=False, **kw)
+              max_model_len=len(prompt_ids) + a.tokens + 16, gpu_memory_utilization=0.85, enforce_eager=a.eager, **kw)
     plen = len(prompt_ids)
     prompts = [TokensPrompt(prompt_token_ids=prompt_ids[(97 * i) % plen:] + prompt_ids[:(97 * i) % plen]) for i in range(a.batch)]
 
@@ -69,11 +76,13 @@ def main() -> None:
     n = min(len(golden), len(toks))
     match = next((i for i in range(n) if golden[i] != toks[i]), n)
     aiter = os.environ.get("VLLM_ROCM_USE_AITER", "0")
-    print(f"VLLM label={a.label} aiter={aiter} custom_ops={a.custom_ops} batch={a.batch} version={vllm.__version__} "
+    print(f"VLLM label={a.label} aiter={aiter} custom_ops={a.custom_ops} eager={int(a.eager)} cudagraph={a.cudagraph_mode} "
+          f"compile_mode={a.compile_mode} batch={a.batch} version={vllm.__version__} "
           f"context={len(prompt_ids)} median_ms={med:.3f} tokens_per_s={a.batch * 1e3 / med:.0f} "
           f"per_token={[round(x, 3) for x in per_tok]} first_divergence={match}/{n}")
     if a.json:
         a.json.write_text(json.dumps({"label": a.label, "aiter": aiter, "batch": a.batch, "version": vllm.__version__, "context": len(prompt_ids),
+                                      "eager": a.eager, "cudagraph_mode": a.cudagraph_mode, "compile_mode": a.compile_mode, "custom_ops": a.custom_ops,
                                       "median_ms": med, "per_token_ms": per_tok, "full_ms": full, "one_ms": one,
                                       "tokens_out": toks, "golden_prefix_match": match}, indent=1))
 
