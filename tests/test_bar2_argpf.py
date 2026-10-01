@@ -28,9 +28,10 @@ def _build(argpf: bool = False, bar2: bool = False) -> Graph:
 
 
 def _no_reset_tail(src: str) -> str:
-    """Drop the ETX_DEV_RESET tail. It runs once per STEP, after the task loop; these tests count the barriers a
-    TASK costs, so leaving it in would make them fail for a reason they are not about."""
-    return re.sub(r"#ifdef ETX_DEV_RESET.*?#endif\n", "", src, flags=re.S)
+    """Drop the dev_reset tail. It runs once per STEP, after the task loop; these tests count the barriers a TASK
+    costs. Since the tail is emitted only when the plan asks for it, and _build() does not, this is normally a
+    no-op -- it stays so a plan that does ask cannot silently change what these tests measure."""
+    return re.sub(r"  if \(p\.n_reset_ops\) \{.*?\n  \}\n", "", src, flags=re.S)
 
 
 def _static_loop(src: str) -> str:

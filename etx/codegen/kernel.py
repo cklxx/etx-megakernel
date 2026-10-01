@@ -201,6 +201,7 @@ def emit_kernel(plan: Plan, device: int = 0) -> str:
     static_only = all(t.mode == "static" for t in plan.tasks if t.device == device)
     bar2 = bool(plan.graph.codegen.get("bar2")) and static_only     # the two-barrier loop is a static-loop rewrite
     argpf = bool(plan.graph.codegen.get("argpf")) and static_only
+    dev_reset = bool(plan.graph.codegen.get("dev_reset"))           # the kernel resets its own per-step state
     if argpf:
         # ETX_VL_ARGPF: wave 1 pulls the NEXT static task's argument block through the scalar path while thread 0
         # runs the current task's arrive (the block depends on no event; with a coherent build no acquire invalidate
@@ -453,7 +454,8 @@ def emit_kernel(plan: Plan, device: int = 0) -> str:
                 out.append("#endif")
             out.append("    __syncthreads();")
             out.append("  }")
-        out.extend(_reset_tail())
+        if dev_reset:
+            out.extend(_reset_tail())
         out.append("}")
         out.append("")
         out.extend(_emit_unfused(plan, device, grids, symbols, max_pro))
@@ -491,18 +493,28 @@ def emit_kernel(plan: Plan, device: int = 0) -> str:
 
 
 def _reset_tail() -> list[str]:
-    """ETX_DEV_RESET: the grid rewrites the per-step state at the end of the kernel so the host enqueues nothing.
-    The cooperative grid sync is what makes it safe -- every worker has drained its queue and published its last
-    arrive before any state is overwritten. Needs a cooperative launch; the host refuses the pair otherwise."""
-    return ["#ifdef ETX_DEV_RESET",
-            "  if (p.n_reset_ops) {   // last workgroup out rewrites the per-step state; no grid sync, no cooperative",
+    """dev_reset: the last workgroup out rewrites the per-step state so the host enqueues nothing.
+
+    Emitted from plan.graph.codegen, never from a compile define: plan_data.h publishes the same decision as
+    ETX_EMIT_DEV_RESET, so the host cannot believe the tail is present when it is not (see _feature_manifest).
+
+    Ordering. A workgroup increments the exit counter only after its loop has ended, so when the count reaches
+    gridDim.x every worker has run its last arrive. But the arrive and the counter are both RELAXED atomics on
+    different addresses, so the counter reaching gridDim.x does not by itself mean the arrives have landed: a
+    late arrive could decrement an event word the reset had already refreshed, leaving the next step one short.
+    The release fence before the increment and the acquire fence after the full count close exactly that gap --
+    once per workgroup per step, not per task."""
+    return ["  if (p.n_reset_ops) {   // last workgroup out rewrites the per-step state; no grid sync, no cooperative",
             "    __syncthreads();",
             "    __shared__ int32_t s_last;",
-            "    if (threadIdx.x == 0) s_last = (atomicAdd(p.ctrl_abort + 2, 1) + 1 == (int32_t)gridDim.x);",
+            "    if (threadIdx.x == 0) {",
+            "      __threadfence();   // release: this worker's arrives land before its increment is visible",
+            "      s_last = (atomicAdd(p.ctrl_abort + 2, 1) + 1 == (int32_t)gridDim.x);",
+            "      if (s_last) __threadfence();   // acquire: every other worker's arrives are visible before the reset",
+            "    }",
             "    __syncthreads();",
             "    if (s_last) etx_device_reset(p);",
-            "  }",
-            "#endif"]
+            "  }"]
 
 
 def _emit_unfused(plan: Plan, device: int, grids, symbols: list[str], max_pro: int) -> list[str]:

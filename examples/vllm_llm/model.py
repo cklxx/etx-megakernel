@@ -110,6 +110,10 @@ ATTN_WIDE = os.environ.get("ETX_VL_ATTN_WIDE", "0") == "1"
 # Both are kernel-emission switches (etx/codegen/kernel.py), carried on the graph; default off.
 ARGPF = os.environ.get("ETX_VL_ARGPF", "0") == "1"
 BAR2 = os.environ.get("ETX_VL_BAR2", "0") == "1"
+# ETX_DEV_RESET=1: the kernel rewrites its own per-step state at the end of the step, so the host enqueues nothing.
+# Read HERE, at plan time, so the emitter and plan_data.h's ETX_EMIT_DEV_RESET agree by construction; the final
+# hipcc gets no define for it (build.sh used to, and dropped it whenever ETX_VL_COH was also set -- round 19).
+DEV_RESET = os.environ.get("ETX_DEV_RESET", "0") == "1"
 DSL_FILE = os.environ.get("ETX_VL_DSL_TILES", str(HERE / "build" / "dsl_tiles.hip"))
 DSL_ATTN = os.environ.get("ETX_VL_DSL", "0") == "1"       # =2: attention stays vLLM's (fused q/k norm + rope grid, cache, attn)
 if os.environ.get("ETX_VL_QKNR", "0") == "grid" or os.environ.get("ETX_VL_DSL", "0") == "2":
@@ -295,6 +299,8 @@ def build() -> Graph:
         g.codegen["argpf"] = True
     if BAR2:
         g.codegen["bar2"] = True
+    if DEV_RESET:
+        g.codegen["dev_reset"] = True
     g.tensor("impargs", (total,), role="weight", bytes_per_elem=1)
     g.tensor("vl", (1,), role="weight", bytes_per_elem=8)         # placeholder: the native tiles read __constant__ params
     adapters = os.environ.get("ETX_VL_ADAPTERS", str(HERE / "build" / "imp_tiles.hip"))

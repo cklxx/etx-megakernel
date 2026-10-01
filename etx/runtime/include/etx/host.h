@@ -163,13 +163,15 @@ struct etx_host {
     cooperative = !(lm && !strcmp(lm, "ordinary"));
     const char* sm = getenv("ETX_SYNC");
     sync_block = sm && !strcmp(sm, "block");
-    dev_reset = getenv("ETX_DEV_RESET") != nullptr;
-    if (dev_reset && !cooperative) { fprintf(stderr, "ETX_DEV_RESET needs a cooperative launch (not ETX_LAUNCH=ordinary)\n"); dev_reset = false; }
+    // The emitter's decision, not an independent one: ETX_EMIT_DEV_RESET comes from plan_data.h, which the same
+    // compile produced from the same plan, so the host cannot believe in a tail the kernel does not carry. The env
+    // var only turns OFF what was emitted; it can never turn on what was not.
+    dev_reset = ETX_EMIT_DEV_RESET && !(getenv("ETX_DEV_RESET") && !strcmp(getenv("ETX_DEV_RESET"), "0"));
     build_reset_ops();
   }
   bool cooperative = true;
   bool sync_block = false;        // ETX_SYNC=block: hipStreamSynchronize instead of the watchdog poll
-  bool dev_reset = false;         // ETX_DEV_RESET=1: the kernel rewrites its own per-step state (needs cooperative)
+  bool dev_reset = false;         // ETX_EMIT_DEV_RESET: the kernel rewrites its own per-step state (ETX_DEV_RESET=0 disables)
   bool dev_reset_valid = false;   // the device did the reset for the step about to run
   bool dev_reset_checked = false; // the first step verified that the kernel's tail actually ran
   etx_reset_op* d_reset_ops = nullptr;
@@ -316,17 +318,17 @@ struct etx_host {
     int32_t ctrl[2]; ETX_CHECK(hipMemcpy(ctrl, d_ctrl, 8, hipMemcpyDeviceToHost));
     if (ctrl[0] & 2) { fprintf(stderr, "device %d: kernel hit spin limit (abort=%d, done=%d/%d)\n", device, ctrl[0], ctrl[1], p.n_tasks); dump_events(); return false; }
     if (ctrl[1] != p.n_dynamic) { fprintf(stderr, "device %d: dynamic done=%d of %d\n", device, ctrl[1], p.n_dynamic); dump_events(); return false; }
-    // ETX_DEV_RESET must never be TRUSTED: if the tail did not run (it is behind -DETX_DEV_RESET, which has to reach
-    // the separate device-code compile, not just the final hipcc) the host would skip its own reset and every step
-    // after the first would silently become a no-op -- all workers surplus, 32/32 lost, no diagnostic. So the first
-    // step reads back the exit counter the tail increments and falls back permanently if it is short.
+    // Defence in depth behind the manifest: the first step reads back the exit counter the tail increments and
+    // falls back permanently if it is short. The manifest makes an emitter/host mismatch impossible, but the tail
+    // also has to actually reach its exit (a surplus worker returns early), and a silent no-op step would cost
+    // 32/32 with no diagnostic, so this stays.
     if (dev_reset && !dev_reset_checked) {
       dev_reset_checked = true;
       int32_t c[4] = {0, 0, 0, 0};
       ETX_CHECK(hipMemcpy(c, d_ctrl, 16, hipMemcpyDeviceToHost));
       if (c[2] != ETX_N_LAUNCH) {
         fprintf(stderr, "ETX_DEV_RESET: the kernel's reset tail did not run (%d of %d workgroups reported); "
-                        "falling back to host resets. Is -DETX_DEV_RESET reaching the device-code compile?\n", c[2], ETX_N_LAUNCH);
+                        "falling back to host resets.\n", c[2], ETX_N_LAUNCH);
         dev_reset = false;
       }
     }

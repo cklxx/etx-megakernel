@@ -86,10 +86,10 @@ if [ "${ETX_VL_UC:-0}" = 1 ]; then export ETX_VL_PIN=1; UCF=(-DETX_VL_UC -DETX_C
 # 2026-10-01 round 16: weights are read once per token and have no reuse, so caching them evicts the MALL-resident
 # KV cache and the activations. Measured -0.106 ms/token with L2 hit rate 31.9% -> 34.6%; ETX_VL_NT=0 restores it.
 NTF=(); [ "${ETX_VL_NT:-1}" = 1 ] && NTF=(-DETX_DSL_NT)
+# ETX_DEV_RESET=1 is read by model.py at PLAN time and emitted into plan_data.h as ETX_EMIT_DEV_RESET, so it needs
+# no define here. It had one until round 19, and this `if` overwrote the array that carried it whenever ETX_VL_COH
+# was also set -- the host then believed in a reset tail that was never compiled: 0/32 tokens, no diagnostic.
 COHF=()
-# ETX_DEV_RESET=1: the kernel rewrites its own per-step state at the end of the step (a cooperative grid sync, then
-# the grid copies the host-built init images), so the host enqueues only the ctrl memset instead of ~17 calls
-[ "${ETX_DEV_RESET:-0}" = 1 ] && COHF+=(-DETX_DEV_RESET)
 if [ "${ETX_VL_COH:-0}" = 1 ]; then
   [ "${ETX_VL_UC:-0}" = 1 ] && { echo "ETX_VL_COH=1 with ETX_VL_UC=1 is untested; pick one" >&2; exit 1; }
   COHF=(-DETX_DSL_COH)
