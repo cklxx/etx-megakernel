@@ -300,19 +300,28 @@ def instances(d) -> list[dict]:
             add("fused_add_rms_norm", L, "post_norm", (1, 1, 1))
         if d.moe:
             gemv(L, "router", d.E, d.H)
+            # The XCD-affine expert path (slot -> XCD, per-XCD events) is correct exactly when every top-k slot's
+            # tasks land on one XCD: slot s = task / tpe is a contiguous block, so XCD x holds whole slots
+            # [x * TOPK / NX, (x + 1) * TOPK / NX) iff TOPK % NX == 0 (TOPK == NX, the shape this began as, is the
+            # identity; TOPK = 2 * NX etc. needs no tile change). Any other TOPK (Mixtral's 2, DeepSeek's 6) would
+            # split a slot across XCDs and the per-XCD moe_up -> moe_down edge would wait the wrong producers, so
+            # those shapes run the MoE block UNPINNED instead: default placement spreads its tasks over all NX XCDs
+            # (full stream width) at the price of device-scope edges in and out (~1.2 us/layer,
+            # docs/BUDGET-2026-10-01.md) -- against idling (NX - TOPK) / NX of the machine for the ~50 us expert
+            # stream if the few slots were pinned. The top-k then keeps ONE copy (rep = 1): the unpinned expert
+            # tasks all read copy 0, which is the host's rr = 0 block (host.hip addresses copies as rr * TOPK).
+            noaff = XCD and d.TOPK % NX != 0
             if not DSL_FOLD or not FOLD_TOPK:
-                add("dsl_topk" if (DSL or DSL_TOPK) else "topk_softmax_e128", L, "topk", (1, 1, 1))
-            if XCD and d.TOPK != NX:                          # the XCD-affine expert path puts slot s on XCD s
-                raise SystemExit(f"ETX_VL_XCD needs TOPK == {NX} (top-k slot per XCD), model has {d.TOPK}")
+                add("dsl_topk" if (DSL or DSL_TOPK) else "topk_softmax_e128", L, "topk", (1, 1, 1), noaff=noaff)
             if DSL_GEMV:                                      # 32 gate + 32 up rows (256 KB) per task; 64 down rows (96 KB)
-                add("dsl_moe_up_fold" if DSL_FOLD else "dsl_moe_up", L, "moe_up", (d.TOPK * (d.MI // 32), 1, 1), M=d.MI, K=d.H)
-                add("dsl_moe_down_fold" if DSL_FOLD else "dsl_moe_down", L, "moe_down", (d.TOPK * (d.H // 64), 1, 1), M=d.H, K=d.MI)
+                add("dsl_moe_up_fold" if DSL_FOLD else "dsl_moe_up", L, "moe_up", (d.TOPK * (d.MI // 32), 1, 1), M=d.MI, K=d.H, noaff=noaff)
+                add("dsl_moe_down_fold" if DSL_FOLD else "dsl_moe_down", L, "moe_down", (d.TOPK * (d.H // 64), 1, 1), M=d.H, K=d.MI, noaff=noaff)
             else:
-                add("fused_moe_up", L, "moe_up", (d.TOPK * math.ceil(2 * d.MI / MOE_BN), 1, 1))
-                add("silu_and_mul", L, "moe_act", (d.TOPK, 1, 1))
-                add("fused_moe_down", L, "moe_down", (d.TOPK * math.ceil(d.H / MOE_BN), 1, 1))
+                add("fused_moe_up", L, "moe_up", (d.TOPK * math.ceil(2 * d.MI / MOE_BN), 1, 1), noaff=noaff)
+                add("silu_and_mul", L, "moe_act", (d.TOPK, 1, 1), noaff=noaff)
+                add("fused_moe_down", L, "moe_down", (d.TOPK * math.ceil(d.H / MOE_BN), 1, 1), noaff=noaff)
             if not DSL and not DSL_FOLD:                           # DSL: the next in_norm reads the 8 expert rows itself
-                add("moe_sum_k8", L, "moe_sum", (1, 1, 1))
+                add("moe_sum_k8", L, "moe_sum", (1, 1, 1), noaff=noaff)
             continue
         gemv(L, "gate_up", 2 * d.INTER, d.H)
         add("silu_and_mul", L, "act", (1, 1, 1))
@@ -331,7 +340,7 @@ def plan_offsets(insts: list[dict], imp: dict, start: int = 0) -> int:
         info = imp[i["export"]]
         i["tasks"] = math.ceil(i["grid"][0] * i["grid"][1] * i["grid"][2] / info["slots"])
         stride = (info["arg_bytes"] + 15) // 16 * 16
-        i["rep"] = NX if XCD and (i["role"] in REP_ROLES or i["role"] in XAFF_ROLES or
+        i["rep"] = NX if XCD and not i.get("noaff") and (i["role"] in REP_ROLES or i["role"] in XAFF_ROLES or
                                    (i["role"] in XGEMV_AFTER and n > 0 and insts[n - 1]["role"] == XGEMV_AFTER[i["role"]])) else 1
         i["stride"] = stride
         off = (off + 15) // 16 * 16
@@ -340,7 +349,7 @@ def plan_offsets(insts: list[dict], imp: dict, start: int = 0) -> int:
         i["copyoff"] = -1
         # in-place norms copy the shared input into their XCD's copy first; after moe_sum (itself a replica writing its
         # XCD's copy) there is nothing to copy
-        after_moe = n > 0 and insts[n - 1]["role"] == "moe_sum"
+        after_moe = n > 0 and insts[n - 1]["role"] == "moe_sum" and insts[n - 1]["rep"] > 1
         if (i["rep"] > 1 and i["role"] in ("in_norm", "post_norm", "final_norm") and not (i["role"] == "in_norm" and i["layer"] == 0)
                 and not after_moe):
             i["copyoff"] = off
@@ -433,6 +442,8 @@ def build() -> Graph:
         if not BATCH or len(grp) != 1:
             return False
         i = grp[0]
+        if i.get("noaff"):                             # the batched MoE rides the slot-per-XCD split (S = s * nb + rq)
+            return False
         if i["role"] in BATCH_ROLES and i["export"].startswith("dsl_gemv"):
             return True
         if FT or not (DSL or DSL_TOPK):                              # the batched MoE path needs the standalone top-k's ids/wts
