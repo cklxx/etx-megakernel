@@ -70,8 +70,8 @@ case " $E " in *ETX_VL_QKNR=1*|*ETX_VL_QKNR=grid*) EXP="$EXP,qknorm_rope";; esac
 BLK=(--block rms_norm_2d=$((H / 8)) --block reshape_and_cache=$((NKV * HD / 8))); SL=""
 if [ "$(cfg moe)" = "True" ]; then
   [ "$DG" = 1 ] || EXP="$EXP,wvsplitk_y1,fused_moe_up,fused_moe_down"
-  [ "$DT" = 1 ] || EXP="$EXP,topk_softmax_e128"
-  case " $E " in *ETX_VL_IMPORTED=1*|*ETX_VL_DSL_FOLD=0*) EXP="$EXP,moe_sum_k8";; esac
+  [ "$DT" = 1 ] || EXP="$EXP,topk_softmax_e$(cfg E)"
+  case " $E " in *ETX_VL_IMPORTED=1*|*ETX_VL_DSL_FOLD=0*) EXP="$EXP,moe_sum_k$(cfg TOPK)";; esac
   BLK+=(--block silu_and_mul=$(( $(cfg MI) / 8 > 1024 ? 1024 : $(cfg MI) / 8 ))); SL="fused_moe_up=1,fused_moe_down=1,silu_and_mul=1"
 fi
 echo "== import ($EXP)"

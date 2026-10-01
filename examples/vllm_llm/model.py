@@ -312,7 +312,7 @@ def instances(d) -> list[dict]:
             # tasks all read copy 0, which is the host's rr = 0 block (host.hip addresses copies as rr * TOPK).
             noaff = XCD and d.TOPK % NX != 0
             if not DSL_FOLD or not FOLD_TOPK:
-                add("dsl_topk" if (DSL or DSL_TOPK) else "topk_softmax_e128", L, "topk", (1, 1, 1), noaff=noaff)
+                add("dsl_topk" if (DSL or DSL_TOPK) else f"topk_softmax_e{d.E}", L, "topk", (1, 1, 1), noaff=noaff)
             if DSL_GEMV:                                      # 32 gate + 32 up rows (256 KB) per task; 64 down rows (96 KB)
                 add("dsl_moe_up_fold" if DSL_FOLD else "dsl_moe_up", L, "moe_up", (d.TOPK * (d.MI // 32), 1, 1), M=d.MI, K=d.H, noaff=noaff)
                 add("dsl_moe_down_fold" if DSL_FOLD else "dsl_moe_down", L, "moe_down", (d.TOPK * (d.H // 64), 1, 1), M=d.H, K=d.MI, noaff=noaff)
@@ -321,7 +321,7 @@ def instances(d) -> list[dict]:
                 add("silu_and_mul", L, "moe_act", (d.TOPK, 1, 1), noaff=noaff)
                 add("fused_moe_down", L, "moe_down", (d.TOPK * math.ceil(d.H / MOE_BN), 1, 1), noaff=noaff)
             if not DSL and not DSL_FOLD:                           # DSL: the next in_norm reads the 8 expert rows itself
-                add("moe_sum_k8", L, "moe_sum", (1, 1, 1), noaff=noaff)
+                add(f"moe_sum_k{d.TOPK}", L, "moe_sum", (1, 1, 1), noaff=noaff)
             continue
         gemv(L, "gate_up", 2 * d.INTER, d.H)
         add("silu_and_mul", L, "act", (1, 1, 1))

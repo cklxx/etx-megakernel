@@ -117,12 +117,23 @@ SOURCES = [
         Kernel("topk_softmax_e128", "topkGatingILi8ELi128ELi4ELi16ELi64Ei14__hip_bfloat16LNS0_11ScoringFuncE0E",
                f"vllm::moe::topkGating<8, 128, 4, 16, 64, int, {BF}, vllm::moe::ScoringFunc::SCORING_SOFTMAX>", (64, 4, 1),
                note="128 experts, softmax scoring, int32 ids (Qwen3-30B-A3B)"),
+        # topkGating is instantiated per expert count by the launcher switch; BYTES = min(16, 2E), ELTS = BYTES/2,
+        # VPT = max(1, E/(ELTS*64))*ELTS -- 8 for both E=8 and E=128. Slicing one expert count and running another
+        # computes garbage deterministically (Mixtral top-2-of-8 through the e128 slice, 2026-10-02): shape-keyed.
+        Kernel("topk_softmax_e8", "topkGatingILi8ELi8ELi4ELi16ELi64Ei14__hip_bfloat16LNS0_11ScoringFuncE0E",
+               f"vllm::moe::topkGating<8, 8, 4, 16, 64, int, {BF}, vllm::moe::ScoringFunc::SCORING_SOFTMAX>", (64, 4, 1),
+               note="8 experts (Mixtral-8x7B)"),
     ]),
     Source("csrc/libtorch_stable/moe/moe_align_sum_kernels.cu", kernels=[
         # moe_sum, vectorised path (hidden contiguous, 16 B aligned): block 256, grid min(ceil(tokens * d / 8 / 256), 65535)
         Kernel("moe_sum_k8", "moe_sum_vec_kernelIN3c108BFloat16EiLi8ELb0E",
                f"vllm::moe::moe_sum_vec_kernel<{CB}, int32_t, 8, false>", (256, 1, 1),
                note="top-8, not pad-aware (no expert map)"),
+        # moe_sum_vec_kernel bakes TOPK into the template: the k8 slice at top-2 sums six rows nobody wrote
+        # (the Mixtral failure root cause). Shape-keyed like the topk entries.
+        Kernel("moe_sum_k2", "moe_sum_vec_kernelIN3c108BFloat16EiLi2ELb0E",
+               f"vllm::moe::moe_sum_vec_kernel<{CB}, int32_t, 2, false>", (256, 1, 1),
+               note="top-2 (Mixtral-8x7B), not pad-aware"),
     ]),
 ]
 
