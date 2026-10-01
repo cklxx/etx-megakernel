@@ -41,6 +41,30 @@ static __device__ __attribute__((always_inline)) void dsl_run_dsl_attnprep(const
   const int BS = *(const int*)(a + 80), X = *(const int*)(a + 84);
   const int G = NH / NKV, h = blk;                       // this task's kv head; q heads G*h .. G*h+G-1, then its k head
   const int wave = etx_wave(), lane = etx_lane();
+  // Round 22, on where prep's ~5.7 us goes: the coherent accessors are 2-byte atomic loads/stores issued PER LANE,
+  // so a head row (128 bf16 = 256 B = 2 cache lines) is fetched as 128 separate 2-byte uncached requests, and a
+  // task issues roughly 2300 of them across its G+2 waves. That is a request-rate cost, not the dependent chain
+  // the body was first read as: hoisting the chain's late loads changes nothing (above). Vectorising the coherent
+  // path (16 B per request, 8 elements per lane) is the lever, but it moves the lane -> element mapping, which the
+  // rope partner shuffle (lane ^ 32) and the 2-elements-per-lane cache writes both depend on.
+#ifdef ETX_DSL_PREP_EARLY
+  // positions[0] and slot_mapping[0] depend only on the argument block, but in program order they sit after the
+  // wave reduction and after the row stores, so each adds a full round trip (~690 ns loaded) to a chain measured
+  // at 8.5 hops. Issue them with the row load instead. Round 4 hoisted `positions` alone and lost 0.044 ms, read
+  // as register pressure at spill 13-15; this pairs the hoist with the wave-uniform load, so each scalar costs one
+  // request per wave rather than one per lane (a coherent load bypasses L1/L2, so the per-lane form really is 64
+  // requests to one address).
+  // MEASURED ROUND 22: neutral, and prep's body does not move -- 5.70 us control vs 5.68 with the hoist, step
+  // +0.003 ms over three interleaved rounds (inside the 0.017 spread), VGPR/spill/LDS identical. The compiler was
+  // already scheduling these loads as early as the dependences allow, so source order was never the constraint.
+  // Left off by default. The body is NOT a chain of late-issued independent loads; see the request-rate note below.
+  const long long dsl_pos_e = dsl_a_ldll_u(positions), dsl_slot_e = dsl_a_ldll_u(slot_mapping);
+#define DSL_PREP_POS  dsl_pos_e
+#define DSL_PREP_SLOT dsl_slot_e
+#else
+#define DSL_PREP_POS  dsl_a_ldll_u(positions)
+#define DSL_PREP_SLOT dsl_a_ldll_u(slot_mapping)
+#endif
   if (wave <= G && HD == 2 * ETX_WAVE_SIZE) {
     // head row: q head G*h + wave, or (wave == G) the k head h
     const bool isq = wave < G;
@@ -54,7 +78,7 @@ static __device__ __attribute__((always_inline)) void dsl_run_dsl_attnprep(const
     e0 *= rms_rcp * __bfloat162float(w[2 * lane]);
     e1 *= rms_rcp * __bfloat162float(w[2 * lane + 1]);
     // neox rope over the whole head: partner element d ^ 64 lives on lane ^ 32; sign - for d < 64
-    const long long pos = dsl_a_ldll_u(positions);   // hoisting this above the reduction measured +0.044 ms (round 4)
+    const long long pos = DSL_PREP_POS;   // hoisting this alone above the reduction measured +0.044 ms (round 4)
     const __hip_bfloat16* cosp = cs + pos * HD;           // [cos (HD/2) | sin (HD/2)]
     const __hip_bfloat16* sinp = cosp + HD / 2;
     const float p0 = __shfl_xor(e0, ETX_WAVE_SIZE / 2, ETX_WAVE_SIZE), p1 = __shfl_xor(e1, ETX_WAVE_SIZE / 2, ETX_WAVE_SIZE);
@@ -67,20 +91,22 @@ static __device__ __attribute__((always_inline)) void dsl_run_dsl_attnprep(const
     const __hip_bfloat16 o0 = __float2bfloat16(e0), o1 = __float2bfloat16(e1);
     dsl_a_stbf(row + 2 * lane, o0); dsl_a_stbf(row + 2 * lane + 1, o1);
     if (!isq) {                                           // the k head into the cache: [block][h][d / X][off][d % X]
-      const long long slot = dsl_a_ldll_u(slot_mapping);
+      const long long slot = DSL_PREP_SLOT;
       const long long block = slot / BS, off = slot % BS;
       __hip_bfloat16* kdst = kc + (((block * NKV + h) * (HD / X)) * BS) * X + off * X;
       dsl_a_stbf(kdst + (2 * lane) / X * BS * X + (2 * lane) % X, o0);
       dsl_a_stbf(kdst + (2 * lane + 1) / X * BS * X + (2 * lane + 1) % X, o1);
     }
   } else if (wave == G + 1 && HD == 2 * ETX_WAVE_SIZE) {   // the v head into the cache: [block][h][d][off]
-    const long long slot = dsl_a_ldll_u(slot_mapping);
+    const long long slot = DSL_PREP_SLOT;
     const long long block = slot / BS, off = slot % BS;
     const __hip_bfloat16* vrow = qkv + (size_t)(NH + NKV) * HD + (size_t)h * HD;
     __hip_bfloat16* vdst = vc + ((block * NKV + h) * HD) * BS + off;
     dsl_a_stbf(vdst + (2 * lane) * BS, __float2bfloat16(dsl_a_ldbf(vrow + 2 * lane)));
     dsl_a_stbf(vdst + (2 * lane + 1) * BS, __float2bfloat16(dsl_a_ldbf(vrow + 2 * lane + 1)));
   }
+#undef DSL_PREP_POS
+#undef DSL_PREP_SLOT
 }
 extern "C" __device__ __attribute__((always_inline)) void etx_tile_dsl_attnprep(const etx_ctx* c) {
   dsl_run_dsl_attnprep(etx_imp_argblock(c->args, c->cst[0]), c->coord[0]);

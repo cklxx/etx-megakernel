@@ -89,6 +89,9 @@ NTF=(); [ "${ETX_VL_NT:-1}" = 1 ] && NTF=(-DETX_DSL_NT)
 # ETX_DEV_RESET=1 is read by model.py at PLAN time and emitted into plan_data.h as ETX_EMIT_DEV_RESET, so it needs
 # no define here. It had one until round 19, and this `if` overwrote the array that carried it whenever ETX_VL_COH
 # was also set -- the host then believed in a reset tail that was never compiled: 0/32 tokens, no diagnostic.
+# ETX_VL_PREP_EARLY=1: dsl_attnprep issues positions[0] / slot_mapping[0] with the row load instead of after the
+# wave reduction, wave-uniform (one request per wave, not one per lane). Round 22.
+PREPF=(); [ "${ETX_VL_PREP_EARLY:-0}" = 1 ] && PREPF=(-DETX_DSL_PREP_EARLY -DETX_DSL_UNIFORM)
 COHF=()
 if [ "${ETX_VL_COH:-0}" = 1 ]; then
   [ "${ETX_VL_UC:-0}" = 1 ] && { echo "ETX_VL_COH=1 with ETX_VL_UC=1 is untested; pick one" >&2; exit 1; }
@@ -110,7 +113,7 @@ ABL=(); [ -n "${ETX_VL_ABLATE:-}" ] && ABL=(-DDSL_ABLATE_$(echo "$ETX_VL_ABLATE"
 [ "${ETX_VL_FOLD_TOPK:-1}" = 0 ] && ABL+=(-DETX_VL_NO_TOPK_FOLD)
 hipcc -O3 -std=c++17 --offload-arch=gfx942 "${ROCMINC[@]}" "${NBF[@]}" -I "$ROOT/etx/runtime/include" -I "$OUT" -I "$ROOT" \
   -Xclang -mlink-builtin-bitcode -Xclang "$OUT/imports.bc" -Rpass-analysis=kernel-resource-usage \
-  "${CHK[@]}" "${UCF[@]}" "${COHF[@]}" "${NTF[@]}" "${ABL[@]}" -DETX_VL_REQUESTS=${ETX_VL_REQUESTS:-1} ${ETX_HIPCC_FLAGS:-} "$OUT/megakernel_d0.hip" "$ROOT/examples/vllm_llm/host.hip" $([ "${ETX_VL_CHECK:-0}" = 1 ] && echo "$OUT/imp/orig_table.hip -x none $OUT/imp/orig_*.o") -o "$OUT/run" 2>&1 \
+  "${CHK[@]}" "${UCF[@]}" "${COHF[@]}" "${NTF[@]}" "${ABL[@]}" "${PREPF[@]}" -DETX_VL_REQUESTS=${ETX_VL_REQUESTS:-1} ${ETX_HIPCC_FLAGS:-} "$OUT/megakernel_d0.hip" "$ROOT/examples/vllm_llm/host.hip" $([ "${ETX_VL_CHECK:-0}" = 1 ] && echo "$OUT/imp/orig_table.hip -x none $OUT/imp/orig_*.o") -o "$OUT/run" 2>&1 \
   | grep -E "Function Name|VGPRs:|ScratchSize|VGPRs Spill|LDS Size|error" | sed -E "s/.*remark: +//; s/ \[-Rpass.*//" | paste - - - - - || true
 [ -x "$OUT/run" ] || { echo "build failed: no $OUT/run"; exit 1; }
 echo "built $OUT/run (plan $OUT/vl_plan.txt)"
