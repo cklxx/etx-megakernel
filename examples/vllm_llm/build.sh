@@ -45,10 +45,11 @@ EXPORTS="$EXPORTS,silu_and_mul"
 # need 80 KB of LDS and put 192 programs on 48 CUs)
 MOEBLK=(); MOESLOTS=""
 if [ "$(cfg moe)" = 1 ]; then
-  [ "$D_GEMV" != 1 ] && EXPORTS="$EXPORTS,wvsplitk_y1,fused_moe_up,fused_moe_down"
+  MOESFX=$([ "$(cfg E)" = 128 ] && echo "" || echo "_e$(cfg E)")   # shape-keyed fused_moe (round 39)
+  [ "$D_GEMV" != 1 ] && EXPORTS="$EXPORTS,wvsplitk_y1,fused_moe_up$MOESFX,fused_moe_down$MOESFX"
   [ "$D_TOPK" != 1 ] && EXPORTS="$EXPORTS,topk_softmax_e$(cfg E)"
   [ "$D_FOLD" != 1 ] && EXPORTS="$EXPORTS,moe_sum_k$(cfg TOPK)"
-  MOEBLK=(--block silu_and_mul=$(( $(cfg MI) / 8 > 1024 ? 1024 : $(cfg MI) / 8 ))); MOESLOTS="fused_moe_up=1,fused_moe_down=1,silu_and_mul=1"
+  MOEBLK=(--block silu_and_mul=$(( $(cfg MI) / 8 > 1024 ? 1024 : $(cfg MI) / 8 ))); MOESLOTS="fused_moe_up$MOESFX=1,fused_moe_down$MOESFX=1,silu_and_mul=1"
 fi
 # The device bitcode moves between ROCm layouts (7.2: lib/llvm/lib/clang/<v>/lib/amdgcn/bitcode; 7.14:
 # core-<v>/lib/llvm/amdgcn/bitcode), so search instead of assuming, and never let a failing `ls` kill the script

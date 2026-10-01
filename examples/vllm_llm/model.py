@@ -317,9 +317,9 @@ def instances(d) -> list[dict]:
                 add("dsl_moe_up_fold" if DSL_FOLD else "dsl_moe_up", L, "moe_up", (d.TOPK * (d.MI // 32), 1, 1), M=d.MI, K=d.H, noaff=noaff)
                 add("dsl_moe_down_fold" if DSL_FOLD else "dsl_moe_down", L, "moe_down", (d.TOPK * (d.H // 64), 1, 1), M=d.H, K=d.MI, noaff=noaff)
             else:
-                add("fused_moe_up", L, "moe_up", (d.TOPK * math.ceil(2 * d.MI / MOE_BN), 1, 1), noaff=noaff)
+                add("fused_moe_up" if d.E == 128 else f"fused_moe_up_e{d.E}", L, "moe_up", (d.TOPK * math.ceil(2 * d.MI / MOE_BN), 1, 1), noaff=noaff)
                 add("silu_and_mul", L, "moe_act", (d.TOPK, 1, 1), noaff=noaff)
-                add("fused_moe_down", L, "moe_down", (d.TOPK * math.ceil(d.H / MOE_BN), 1, 1), noaff=noaff)
+                add("fused_moe_down" if d.E == 128 else f"fused_moe_down_e{d.E}", L, "moe_down", (d.TOPK * math.ceil(d.H / MOE_BN), 1, 1), noaff=noaff)
             if not DSL and not DSL_FOLD:                           # DSL: the next in_norm reads the 8 expert rows itself
                 add(f"moe_sum_k{d.TOPK}", L, "moe_sum", (1, 1, 1), noaff=noaff)
             continue

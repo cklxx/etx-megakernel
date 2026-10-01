@@ -69,10 +69,11 @@ case $M in qwen3*) [ -n "$DSLOPS_PRE" ] || EXP="$EXP,rms_norm_3d";; esac
 case " $E " in *ETX_VL_QKNR=1*|*ETX_VL_QKNR=grid*) EXP="$EXP,qknorm_rope";; esac   # as build.sh: any value but 0
 BLK=(--block rms_norm_2d=$((H / 8)) --block reshape_and_cache=$((NKV * HD / 8))); SL=""
 if [ "$(cfg moe)" = "True" ]; then
-  [ "$DG" = 1 ] || EXP="$EXP,wvsplitk_y1,fused_moe_up,fused_moe_down"
+  MOESFX=$([ "$(cfg E)" = 128 ] && echo "" || echo "_e$(cfg E)")   # shape-keyed fused_moe (round 39)
+  [ "$DG" = 1 ] || EXP="$EXP,wvsplitk_y1,fused_moe_up$MOESFX,fused_moe_down$MOESFX"
   [ "$DT" = 1 ] || EXP="$EXP,topk_softmax_e$(cfg E)"
   case " $E " in *ETX_VL_IMPORTED=1*|*ETX_VL_DSL_FOLD=0*) EXP="$EXP,moe_sum_k$(cfg TOPK)";; esac
-  BLK+=(--block silu_and_mul=$(( $(cfg MI) / 8 > 1024 ? 1024 : $(cfg MI) / 8 ))); SL="fused_moe_up=1,fused_moe_down=1,silu_and_mul=1"
+  BLK+=(--block silu_and_mul=$(( $(cfg MI) / 8 > 1024 ? 1024 : $(cfg MI) / 8 ))); SL="fused_moe_up$MOESFX=1,fused_moe_down$MOESFX=1,silu_and_mul=1"
 fi
 echo "== import ($EXP)"
 XS=$(echo "$E" | tr " " "\n" | sed -n "s/^ETX_VL_SLOTS=//p"); SL="${XS:+$XS,}$SL"; SL="${SL%,}"

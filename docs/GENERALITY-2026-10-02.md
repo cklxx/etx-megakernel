@@ -54,3 +54,27 @@ the LDS staging buffer is K floats. A K-chunked staging variant would open it; r
 
 Timing context (NOT a comparison — ETX's output is still wrong): vLLM 8.662 ms/token; the wrong-output ETX runs
 were ~12.7 (e128 top-k alone was ~5 ms of that: 12.9 → 7.5 with the DSL top-k, which takes E at runtime).
+
+## Round 39: the Triton harvest finished — kernels faithful, one dispatch-glue bug remains
+
+Harvested the Mixtral-shape `fused_moe_up`/`fused_moe_down` from vLLM's Triton cache (ran vLLM once with a mounted
+`TRITON_CACHE_DIR`, eager so decode compiles at the true M=1; classified the entries by `arith.mulf`/`topk_weights`
+in the `.ttir` — mulf=0 is up, mulf=1 is down with `MUL_ROUTED_WEIGHT` — and by block constants against vLLM's
+`E=8,N={14336,4096}` tuned configs). Committed as shape-keyed `fused_moe_up_e8` / `fused_moe_down_e8`; the exports
+are now `fused_moe_{up,down}` for E=128 (Qwen, byte-stable) else `_e{E}`, same pattern as `topk_softmax_e{E}` /
+`moe_sum_k{TOPK}`.
+
+Result: **every imported launch is byte-identical to vLLM's original — `--check 32` reports 0 of 384 launches
+differ, all 32 layers.** The first wrong token moved EOS(2) → 6495 (HF 28711) at position 0: the kernels now run the
+correct shape, so the garbage is gone, but the chained output is still wrong.
+
+Because `--check` validates each kernel on reference I/O and finds all faithful, the remaining bug is NOT a kernel —
+it is ETX's hand-built MoE **dispatch metadata** for top-k ≠ 8: `num_tokens_post_padded`/`sorted_token_ids`/
+`expert_ids` wired at `host.hip:216,405-409` with `ntpp_val = TOPK * MOE_BM` and `ti_r` as the sorted ids. This was
+written for Qwen's top-8 single-token layout; at top-2 the per-block expert assignment the Triton `fused_moe_kernel`
+reads is not what ETX hands it. **Operator: moe_up/moe_down dispatch glue (not the kernels). Layer: 0 onward.
+Magnitude: argmax wrong at the first decode step (6495 vs 28711).** This is a host/compiler change, not a cache
+harvest, so it is the next round's item — the mechanical harvest this round owned is complete and correct.
+
+Zero-compiler-change verdict, updated: the plan, events, placement and every imported kernel generalise to Mixtral
+with no compiler change; the one remaining compiler-side item is the MoE dispatch metadata for top-k ≠ 8.

@@ -143,8 +143,13 @@ SOURCES = [
 # is not a multiple of 16, which selects the entries without that divisibility specialisation.
 TRITON_DIR = HERE.parents[1] / "examples/vllm_llm/triton"
 TRITON = {
-    "fused_moe_up": ("fused_moe_kernel", "experts gate_up: top_k = 8, MUL_ROUTED_WEIGHT = False; grid 8 x 1536/64 = 192"),
-    "fused_moe_down": ("fused_moe_kernel", "experts down: top_k = 1, MUL_ROUTED_WEIGHT = True; grid 8 x 2048/64 = 256"),
+    # The fused_moe kernels are decode-shape binaries harvested from the Triton cache vLLM wrote for THIS model
+    # (top_k, MUL_ROUTED_WEIGHT and the block config are constexprs baked at compile): keyed by expert count so a
+    # model whose entries were not harvested fails at import with a name, not at EOS (Mixtral, 2026-10-02).
+    "fused_moe_up": ("fused_moe_kernel", "Qwen3-30B-A3B gate_up: E=128, MUL_ROUTED_WEIGHT=False"),
+    "fused_moe_down": ("fused_moe_kernel", "Qwen3-30B-A3B down: E=128, MUL_ROUTED_WEIGHT=True"),
+    "fused_moe_up_e8": ("fused_moe_kernel", "Mixtral-8x7B gate_up: E=8, BN=16 BK=256 nw=2, MUL_ROUTED_WEIGHT=False"),
+    "fused_moe_down_e8": ("fused_moe_kernel", "Mixtral-8x7B down: E=8, BN=16 BK=256 nw=2, MUL_ROUTED_WEIGHT=True"),
 }
 
 
