@@ -31,13 +31,22 @@ import os as _os
 #   B=2 batched 7.104 ms/step vs B=2 replicated 6.811 (same build generation) -- batching is 0.29 ms SLOWER.
 # Two causes, both from the layer-11 traces:
 #   1. the shared weight read buys little. qkv body 12.02 us at NB=1 -> 22.84 at NB=2: the second column costs 90% of
-#      the first, because it doubles the LDS reads and the FMAs while saving only the weight stream. Dense bodies over
-#      a layer: 37.88 us batched vs 40.78 replicated -- 2.9 us/layer, 7%, not the ~12 us a bandwidth argument predicts.
+#      the first. NOT because it doubles the FMAs and the LDS reads -- that was asserted here and is wrong. Itemised
+#      2026-10-01 for qkv (20 rows/task, K=2048, so 40960 MACs per column): the extra column adds 0.076 us of FMA
+#      (256 FMA/clk/CU) and 0.61 us of LDS (128 B/clk/CU), 6.3% of the 10.8 us regression, 0.70% for the FMAs alone.
+#      So a matrix instruction cannot pay: it attacks the 0.70%, and at NB=2 it idles 14 of 16 output columns
+#      (v_mfma_f32_16x16x16_bf16) or 2 of 4 (v_mfma_f32_4x4x4_16b_bf16, which is what vLLM's own wvSplitK already
+#      uses -- and dsl_gemv_rows beats it 6.29 vs 6.75 us on the identical 5120x2048 shape, docs/PHASES-2026-10-01.md).
+#      Register pressure is not it either: batched spills 20 against replicated 21, LDS 50216 vs 29736, both leaving
+#      one workgroup per CU. The dense PHASES in fact win -- qkv spans 20.9 us batched against 25.9 for the replicated
+#      pair; it is cause 2 below that loses the step. Dense bodies over a layer: 37.88 us batched vs 40.78 replicated.
 #   2. the join costs more than that. A batched phase waits for EVERY request's previous event, so it cannot start
 #      until the slowest request's attention is done: o_proj wait 24.04 us batched vs 12.20 / 6.03 replicated. The
 #      replicated graph overlaps request 0's compute with request 1's stalls; batching removes that slack at every
 #      dense phase (9 joins per layer).
 # So batching pays only if the WHOLE layer batches -- MoE included, with the expert union -- leaving no per-phase join.
+# Also measured and rejected 2026-10-01: restoring the replicated task count at NB=2 (ETX_VL_CU=512, 119956 tasks of
+# 10 rows against 83604 of 20) is far worse -- 9.410 ms/step against 7.121 batched and 6.865 replicated, all 32/32.
 # Kept behind the switch (default off) because that second half is the only thing that can change the verdict.
 DSL_NB = max(1, int(_os.environ.get("ETX_VL_NB", "1")))
 ARG_BYTES, GRID_OFF = 160, 144

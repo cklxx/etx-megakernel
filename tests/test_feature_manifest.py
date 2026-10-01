@@ -18,6 +18,16 @@ from etx.passes import compile_graph
 RES = Resource(threads=256, lds_bytes=0, vgpr=64)
 FEATURES = ("argpf", "bar2", "dev_reset")
 
+def body_without_manifest(src: str) -> str:
+    """Emission minus the feature-manifest block. The manifest names every macro it governs, including the ones
+    that are off, so a test asserting a feature's code is absent must look past it (etx/codegen/manifest.py)."""
+    marker = "// ---- feature manifest"
+    if marker not in src:
+        return src
+    head, rest = src.split(marker, 1)
+    return head + rest.split("\n\n", 1)[-1]
+
+
 
 def _plan(**codegen):
     g = Graph("fm")
@@ -57,7 +67,8 @@ def test_dev_reset_tail_is_not_behind_a_compile_define():
     """A -D is exactly what build.sh dropped; the tail must depend on the plan alone."""
     src = emit_kernel(_plan(dev_reset=True))
     assert "p.n_reset_ops" in src
-    assert "#ifdef ETX_DEV_RESET" not in src and "#ifndef ETX_DEV_RESET" not in src
+    body = body_without_manifest(src)
+    assert "#ifdef ETX_DEV_RESET" not in body and "#ifndef ETX_DEV_RESET" not in body
 
 
 def test_dev_reset_tail_fences_the_exit_counter():

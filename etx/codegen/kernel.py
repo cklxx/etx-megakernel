@@ -11,6 +11,8 @@ is emitted separately as JSON for the host launcher.
 """
 from __future__ import annotations
 
+from . import manifest
+
 import json
 from typing import Any
 
@@ -155,6 +157,7 @@ def emit_kernel(plan: Plan, device: int = 0) -> str:
     out.append("#ifndef ETX_EV_STRIDE   // event counter spacing in words, from the machine model (must match plan_data.h)")
     out.append(f"#define ETX_EV_STRIDE {int(m.lowering.get('event_stride_words', 1))}")
     out.append("#endif")
+    out.extend(manifest.guard_block(plan.graph.codegen))   # before any tile source reads a feature macro
     out.append("#include \"etx/abi.h\"")
     out.append("#include \"etx_lowering.h\"")
     out.append("#include \"etx/primitives.h\"")

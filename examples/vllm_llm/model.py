@@ -368,6 +368,15 @@ def build() -> Graph:
     # reads independently: build.sh gated the tile's define on ETX_VL_FOLD_TOPK while the plan derived the opposite,
     # and the expert tiles recomputed a top-k the plan had already given its own phase -- 0.63 ms, measured round 30.
     g.codegen["fold_topk"] = fold_topk(d)
+    # Compile-time decisions the tiles and the host must share. They are published through the manifest
+    # (etx/codegen/manifest.py) and MUST NOT also be passed as -D: build.sh re-deriving the same decision is how
+    # ETX_VL_NB (round 14), ETX_DEV_RESET (rounds 19/20) and the top-k fold (round 30) each produced a build that
+    # looked healthy and was wrong. COH in particular was derived twice -- here and in build.sh's own default
+    # expression -- which agreed only by hand-matching.
+    g.codegen["coh"] = COH
+    g.codegen["nb"] = REQUESTS if BATCH else 1
+    g.codegen["requests"] = REQUESTS
+    g.codegen["uc"] = os.environ.get("ETX_VL_UC", "0") == "1"
     g.tensor("impargs", (total,), role="weight", bytes_per_elem=1)
     g.tensor("vl", (1,), role="weight", bytes_per_elem=8)         # placeholder: the native tiles read __constant__ params
     adapters = os.environ.get("ETX_VL_ADAPTERS", str(HERE / "build" / "imp_tiles.hip"))

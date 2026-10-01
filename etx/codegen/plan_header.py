@@ -9,6 +9,8 @@ plan.json instead.
 """
 from __future__ import annotations
 
+from . import manifest
+
 from ..ir.types import Scope
 from ..passes.plan import Plan
 from .kernel import _arg_table
@@ -58,8 +60,7 @@ def emit_plan_header(plan: Plan, device: int = 0) -> str:
     # nowhere else -- in particular never as a -D the final hipcc gets and the emitter does not, which produced
     # silent wrong answers twice (ETX_VL_NB, 2026-10-01 round 14; dev_reset, round 19: build.sh overwrote the flag
     # array when ETX_VL_COH was also set, so the host believed in a tail that was never compiled).
-    for feat in ("argpf", "bar2", "dev_reset", "fold_topk"):
-        out.append(f"#define ETX_EMIT_{feat.upper()} {1 if g.codegen.get(feat) else 0}")
+    out.extend(manifest.guard_block(g.codegen))
     out.append(f"#define ETX_LDS_BYTES {max([gg.resource.lds_bytes + gg.resource.prefetch_bytes for gg in g.grids] + [0])}")
     out.append(_arr("etx_n_tasks_dev", [sum(1 for t in plan.tasks if t.device == d) for d in range(nd)]))
     out.append(_arr("etx_n_dynamic_dev", [sum(1 for t in plan.tasks if t.device == d and t.mode != "static") for d in range(nd)]))

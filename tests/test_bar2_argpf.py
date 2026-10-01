@@ -47,7 +47,8 @@ def _run_task(src: str) -> str:
 
 
 def test_switches_off_is_the_old_emission():
-    base = emit_kernel(compile_graph(_build(), "gfx942", {}, {}))
+    from tests.test_feature_manifest import body_without_manifest
+    base = body_without_manifest(emit_kernel(compile_graph(_build(), "gfx942", {}, {})))
     assert "etx_argpf" not in base and "BAR2" not in base and "s_task2" not in base
     on = emit_kernel(compile_graph(_build(argpf=True, bar2=True), "gfx942", {}, {}))
     assert base != on
