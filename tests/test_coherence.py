@@ -75,7 +75,7 @@ def test_dsl_tiles_use_the_coherent_accessors():
         assert "ETX_DSL_COH_HELPERS" in src                              # guarded: safe under concatenation
         assert "dsl_a_ldbf(" in src or "dsl_a_ld64(" in src
     g = gemv.emit_tiles()
-    for fn in ("dsl_a_stbf(rout + i", "dsl_a_ldbf(rows +", "dsl_a_ldi(d.ids + s)"):
+    for fn in ("dsl_a_stbf(rout + i", "dsl_a_ldbf(rows +", "dsl_a_ldi(d.ids + (size_t)rq * d.srows + s)"):
         assert fn in g, fn
     # positions / slot_mapping are wave-uniform scalars: one coherent load per wave, broadcast (dsl_a_ldll_u)
     assert "dsl_a_ldll_u(positions)" in attnprep.emit_tiles()

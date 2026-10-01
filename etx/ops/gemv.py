@@ -44,10 +44,18 @@ import os as _os
 #      until the slowest request's attention is done: o_proj wait 24.04 us batched vs 12.20 / 6.03 replicated. The
 #      replicated graph overlaps request 0's compute with request 1's stalls; batching removes that slack at every
 #      dense phase (9 joins per layer).
-# So batching pays only if the WHOLE layer batches -- MoE included, with the expert union -- leaving no per-phase join.
+# So batching pays only if the WHOLE layer batches -- MoE included -- leaving no per-phase join. THAT WAS BUILT AND
+# MEASURED TOO (round 33, 2026-10-01): topk batched (one replica set, wave w does column w) and the MoE batched
+# (requests x slots tasks, S = s * nb + rq, each task one column), leaving only the o_proj join. B=2 whole-layer
+# batched 7.483 ms/step against 6.901 replicated and 7.121 dense-only batched, all 32/32 -- WORSE than batching
+# less. The trace says why: the batched moe_up is 384 tasks over 304 workers (48 per XCD on 38 CUs), so ten tasks
+# per XCD run as a second serial wave (last-ready spread 28.2 us, phase 40.5 us against a 22.45 us body), and the
+# lockstep layer removes the cross-request overlap that replication gets free (replicated r0/r1 phases interleave
+# ~12 us apart, each filling the other's stalls). Joins were never the binding cost; worker oversubscription and
+# lost overlap are. A union dedup cannot fix that at B=2 (it saves ~3% of expert bytes).
 # Also measured and rejected 2026-10-01: restoring the replicated task count at NB=2 (ETX_VL_CU=512, 119956 tasks of
 # 10 rows against 83604 of 20) is far worse -- 9.410 ms/step against 7.121 batched and 6.865 replicated, all 32/32.
-# Kept behind the switch (default off) because that second half is the only thing that can change the verdict.
+# Kept behind the switch (default off): correct, gated, and the measured record of why it is off.
 DSL_NB = max(1, int(_os.environ.get("ETX_VL_NB", "1")))
 ARG_BYTES, GRID_OFF = 160, 144
 # the "_fold" forms carry a prologue (docs/MODEL-vllm-kernels.md section 16): norm fold (mode 1): x = rms_norm(bf16(bf16(sum
@@ -462,7 +470,12 @@ BODIES = {
     for (int b = 0; b < DSL_NB; ++b) dsl_a_stbf(out + (size_t)b * sout + r, __float2bfloat16(v[b]));
   });''',
     "silu_mul": '''
-  const int s = blk / d.tpe, j = blk - s * d.tpe;
+  // ETX_VL_BATCH (nb > 1): the slot index runs over requests x slots as S = s * nb + rq, so slot s of every request
+  // lands on the same XCD (the xw->x affinity is unchanged) and the per-request tensors are reached through the
+  // request strides the host passes (sx: x, sout: out, srows: ids, srin: wts -- the slabs are one allocation).
+  const int S0 = blk / d.tpe, j = blk - S0 * d.tpe;
+  int s = S0, rq = 0;
+  if (DSL_NB > 1 && d.nb > 1) { s = S0 / d.nb; rq = S0 - s * d.nb; }
   const int r0 = j * d.rpt, r1 = min(d.M, r0 + d.rpt);
   if (r0 >= r1) return;
   float* g = xs + d.K; float* part = g + 2 * d.rpt;
@@ -473,20 +486,22 @@ BODIES = {
 #else
   if (d.mode >= 2) dsl_topk_lds(d.logits, d.E, d.R, d.mode == 3 ? 1 : 0, lids, lwts);
 #endif
-  const __hip_bfloat16* We = d.W + (size_t)(d.mode >= 2 ? lids[s] : dsl_a_ldi(d.ids + s)) * d.estride;     // g: 2 x rpt floats (rpt <= DSL_RCH, host-checked)
-  dsl_stage(d.x, d.K, xs);
+  const __hip_bfloat16* We = d.W + (size_t)(d.mode >= 2 ? lids[s] : dsl_a_ldi(d.ids + (size_t)rq * d.srows + s)) * d.estride;     // g: 2 x rpt floats (rpt <= DSL_RCH, host-checked)
+  dsl_stage(d.x + (size_t)rq * d.sx, d.K, xs);
   dsl_gemv_chunked(We, d.K, xs, r0, r1, part, [&](int r, float v) { g[r - r0] = dsl_bfr(v); });
 #ifndef DSL_ABLATE_ONEPASS                                                      // ablation: gate only, no up pass (WRONG output)
   dsl_gemv_chunked(We + (size_t)d.M * d.K, d.K, xs, r0, r1, part, [&](int r, float v) { g[d.rpt + r - r0] = dsl_bfr(v); });
 #endif
-  __hip_bfloat16* act = d.out + (size_t)s * d.M;
+  __hip_bfloat16* act = d.out + (size_t)rq * d.sout + (size_t)s * d.M;
 #ifdef DSL_ABLATE_EPI                                                           // ablation: no silu, no multiply (WRONG output)
   for (int r = r0 + (int)threadIdx.x; r < r1; r += blockDim.x) dsl_a_stbf(act + r, __float2bfloat16(g[r - r0]));
 #else
   for (int r = r0 + (int)threadIdx.x; r < r1; r += blockDim.x) dsl_a_stbf(act + r, __float2bfloat16(dsl_silu(g[r - r0]) * g[d.rpt + r - r0]));
 #endif''',
     "scale": '''
-  const int s = blk / d.tpe, j = blk - s * d.tpe;
+  const int S0 = blk / d.tpe, j = blk - S0 * d.tpe;    // batched: S = s * nb + rq, as silu_mul
+  int s = S0, rq = 0;
+  if (DSL_NB > 1 && d.nb > 1) { s = S0 / d.nb; rq = S0 - s * d.nb; }
   const int r0 = j * d.rpt, r1 = min(d.M, r0 + d.rpt);
   if (r0 >= r1) return;
   int* lids = (int*)(xs + d.K + 16 * DSL_RCH); float* lwts = (float*)(lids + 16);
@@ -496,15 +511,15 @@ BODIES = {
 #else
   if (d.mode >= 2) dsl_topk_lds(d.logits, d.E, d.R, d.mode == 3 ? 1 : 0, lids, lwts);
 #endif
-  const __hip_bfloat16* We = d.W + (size_t)(d.mode >= 2 ? lids[s] : dsl_a_ldi(d.ids + s)) * d.estride;
-  dsl_stage(d.x + (size_t)s * d.K, d.K, xs);
-  __hip_bfloat16* out = d.out + (size_t)s * d.M;
+  const __hip_bfloat16* We = d.W + (size_t)(d.mode >= 2 ? lids[s] : dsl_a_ldi(d.ids + (size_t)rq * d.srows + s)) * d.estride;
+  dsl_stage(d.x + (size_t)rq * d.sx + (size_t)s * d.K, d.K, xs);
+  __hip_bfloat16* out = d.out + (size_t)rq * d.sout + (size_t)s * d.M;
 #if defined(DSL_ABLATE_EPI) || defined(DSL_ABLATE_WTS)   // ablation: no routing-weight multiply (WRONG output). WTS is
   // the down-only form: EPI also drops moe_up's silu, so it cannot price what moe_down does that vLLM's kernel does not
   // (vLLM applies the routing weight in its separate moe_sum, which our fold deletes).
   dsl_gemv_chunked(We, d.K, xs, r0, r1, xs + d.K, [&](int r, float v) { dsl_a_stbf(out + r, __float2bfloat16(v)); });
 #else
-  const float ws = d.mode >= 2 ? lwts[s] : dsl_a_ldf(d.wts + s);
+  const float ws = d.mode >= 2 ? lwts[s] : dsl_a_ldf(d.wts + (size_t)rq * d.srin + s);
   dsl_gemv_chunked(We, d.K, xs, r0, r1, xs + d.K, [&](int r, float v) { dsl_a_stbf(out + r, __float2bfloat16(v * ws)); });
 #endif''',
 }

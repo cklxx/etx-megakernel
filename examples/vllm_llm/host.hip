@@ -311,7 +311,12 @@ int main(int argc, char** argv) {
     else if (x.exp == "dsl_attnprep") a.ptr(qkv).ptr(W(pl + "qn")).ptr(W(pl + "kn")).ptr(W("cos_sin")).ptr(positions).ptr(kc[x.layer]).ptr(vc[x.layer])
                                        .ptr(slot_mapping).i32(NH).i32(NKV).i32(HD).f32(eps).i32(BS).i32(X);
     else if (x.exp == "dsl_topk" && E > 128) die("dsl_topk: E > 128 (etx/ops/topk.py: one wave, 2 logits per lane)");
-    else if (x.exp == "dsl_topk") a.ptr(rlog).ptr(tw_r).ptr(ti_r).ptr(tei + (size_t)rr * TOPK).i32(E).i32(TOPK).i32(norm_topk ? 1 : 0);
+    // batched (x.nb > 1): wave w of the one replica set does request w's column; the last word packs nb | (sv << 8),
+    // sv = the request stride of wts/ids/tei (n_tk elements; the slabs are one allocation, ETX_VL_SLICE). The logits
+    // request stride is E itself (n_rlog), carried by no field. nb = 1 keeps the single-wave behaviour exactly.
+    else if (x.exp == "dsl_topk" && x.nb > 1 && (size_t)n_tk >= (1u << 24)) die("dsl_topk: n_tk does not fit the packed stride");
+    else if (x.exp == "dsl_topk") a.ptr(rlog).ptr(tw_r).ptr(ti_r).ptr(tei + (size_t)rr * TOPK).i32(E).i32(TOPK).i32(norm_topk ? 1 : 0)
+                                   .i32(x.nb > 1 ? (x.nb | ((int)n_tk << 8)) : 1);
     else if (x.exp == "dsl_gemv_fold") {
       // norm fold (mode 1): qkv (L > 0) = norm(residual + the 8 expert rows) with ln1; router = norm(residual + o) with ln2;
       // lm_head = norm(residual + the last layer's expert rows) with final_norm
@@ -342,11 +347,20 @@ int main(int argc, char** argv) {
 // so the two cannot disagree. It was a -D until round 30, where build.sh defaulted it to "fold" while the plan had
 // derived "keep": the expert tiles recomputed a top-k that already had its own phase, 0.63 ms/token for nothing.
 #if !ETX_EMIT_FOLD_TOPK
+    // batched MoE (x.nb > 1): one node, requests x slots tasks (S = s * nb + rq, etx/ops/gemv.py); the request strides
+    // ride the dense fields -- sx: x, sout: out, srows: ids, srin: wts. Each task serves one column: the joins go, the
+    // duplicated expert weight stream stays (the union dedup is a further step).
     else if (x.exp == "dsl_moe_up_fold") a.ptr(W(pl + "w13")).ptr(ox).ptr(mc2).ptr(ti_r).ptr(nullptr).i64((long long)2 * MI * H).i32(MI).i32(H).i32(32).i32(MI / 32)
-                                           .ptr(nullptr).ptr(nullptr).ptr(nullptr).ptr(nullptr).i32(TOPK).f32(0.f).i32(0).i32(E).ptr(rlog) ETX_VL_NOBATCH;
+                                           .ptr(nullptr).ptr(nullptr).ptr(nullptr).ptr(nullptr).i32(TOPK).f32(0.f).i32(0).i32(E).ptr(rlog)
+                                           .i32(x.nb).i32(x.nb > 1 ? (int)n_ox : 0).i32(x.nb > 1 ? (int)n_mc2 : 0)
+                                           .i32(x.nb > 1 ? (int)n_tk : 0).i32(x.nb > 1 ? (int)n_tk : 0).i32(0);
     else if (x.exp == "dsl_moe_down_fold") a.ptr(W(pl + "w2")).ptr(mc2).ptr(mc3).ptr(ti_r).ptr(tw_r).i64((long long)H * MI).i32(H).i32(MI).i32(64).i32(H / 64)
-                                             .ptr(nullptr).ptr(nullptr).ptr(nullptr).ptr(nullptr).i32(TOPK).f32(0.f).i32(0).i32(E).ptr(rlog) ETX_VL_NOBATCH;
+                                             .ptr(nullptr).ptr(nullptr).ptr(nullptr).ptr(nullptr).i32(TOPK).f32(0.f).i32(0).i32(E).ptr(rlog)
+                                             .i32(x.nb).i32(x.nb > 1 ? (int)n_mc2 : 0).i32(x.nb > 1 ? (int)n_mc3 : 0)
+                                             .i32(x.nb > 1 ? (int)n_tk : 0).i32(x.nb > 1 ? (int)n_tk : 0).i32(0);
 #else
+    else if ((x.exp == "dsl_moe_up_fold" || x.exp == "dsl_moe_down_fold") && x.nb > 1)
+      die("ETX_VL_BATCH: a batched MoE needs the standalone top-k (the fold would recompute it per task per column)");
     else if (x.exp == "dsl_moe_up_fold") a.ptr(W(pl + "w13")).ptr(ox).ptr(mc2).ptr(nullptr).ptr(nullptr).i64((long long)2 * MI * H).i32(MI).i32(H).i32(32).i32(MI / 32)
                                            .ptr(nullptr).ptr(nullptr).ptr(nullptr).ptr(nullptr).i32(TOPK).f32(0.f).i32(norm_topk ? 3 : 2).i32(E).ptr(rlog) ETX_VL_NOBATCH;
     else if (x.exp == "dsl_moe_down_fold") a.ptr(W(pl + "w2")).ptr(mc2).ptr(mc3).ptr(nullptr).ptr(nullptr).i64((long long)H * MI).i32(H).i32(MI).i32(64).i32(H / 64)
@@ -355,9 +369,13 @@ int main(int argc, char** argv) {
     else if (x.exp == "dsl_moe_up" && (MI % 32 || H > 4096 || H % 256)) die("dsl_moe_up: MI % 32 or H > 4096 (etx/ops/gemv.py K_MAX, RCH)");
     else if (x.exp == "dsl_moe_down" && (H % 64 || MI > 4096 || MI % 256)) die("dsl_moe_down: H % 64 or MI > 4096");
     else if (x.exp == "dsl_moe_up") a.ptr(W(pl + "w13")).ptr(o_norm).ptr(mc2).ptr(ti_r).ptr(nullptr).i64((long long)2 * MI * H).i32(MI).i32(H).i32(32).i32(MI / 32)
-                                      .ptr(nullptr).ptr(nullptr).ptr(nullptr).ptr(nullptr).i32(0).f32(0.f).i32(0).i32(0).ptr(nullptr) ETX_VL_NOBATCH;
+                                      .ptr(nullptr).ptr(nullptr).ptr(nullptr).ptr(nullptr).i32(0).f32(0.f).i32(0).i32(0).ptr(nullptr)
+                                      .i32(x.nb).i32(x.nb > 1 ? (int)n_ox : 0).i32(x.nb > 1 ? (int)n_mc2 : 0)
+                                      .i32(x.nb > 1 ? (int)n_tk : 0).i32(x.nb > 1 ? (int)n_tk : 0).i32(0);
     else if (x.exp == "dsl_moe_down") a.ptr(W(pl + "w2")).ptr(mc2).ptr(mc3).ptr(ti_r).ptr(tw_r).i64((long long)H * MI).i32(H).i32(MI).i32(64).i32(H / 64)
-                                        .ptr(nullptr).ptr(nullptr).ptr(nullptr).ptr(nullptr).i32(0).f32(0.f).i32(0).i32(0).ptr(nullptr) ETX_VL_NOBATCH;
+                                        .ptr(nullptr).ptr(nullptr).ptr(nullptr).ptr(nullptr).i32(0).f32(0.f).i32(0).i32(0).ptr(nullptr)
+                                        .i32(x.nb).i32(x.nb > 1 ? (int)n_mc2 : 0).i32(x.nb > 1 ? (int)n_mc3 : 0)
+                                        .i32(x.nb > 1 ? (int)n_tk : 0).i32(x.nb > 1 ? (int)n_tk : 0).i32(0);
     else if (r == "in_norm" && x.layer == 0) a.ptr(hn_r).ptr(res_r).i64(H).i64(0).i64(0).i64(0).i64(0).ptr(W(pl + "ln1")).i64(0).f32(eps).i32(1).i32(H);
     else if (r == "in_norm") { copy(dn, d_norm, H * 2); fused_add(d_norm, W(pl + "ln1")); }
     else if (r == "qkv") gemv(W(pl + "wqkv"), qkv_in, qkv, bias ? W(pl + "bqkv") : nullptr);

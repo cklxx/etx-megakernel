@@ -177,3 +177,44 @@ def test_attention_block_by_kv_head(tmp_path, monkeypatch):
     assert [d["domain"] for d in by["prep_1"]] == [0, 1, 2, 3]
     assert all(d["domain"] == d["coord"][0] // 5 for d in by["attn_1"])          # partition p of head h on XCD h
     assert [d["domain"] for d in by["reduce_1"]] == [0, 1, 2, 3]
+
+
+def test_whole_layer_batching_leaves_one_join(tmp_path, monkeypatch):
+    """ETX_VL_BATCH=1 (round 33): topk and the MoE batch along with the dense GEMVs, so the only node per layer whose
+    in-edges span requests is the batched o_proj (after the per-request attention). The MoE nodes carry requests x
+    slots tasks (S = s * nb + rq, slot s of every request on XCD s); topk is one replica set whose waves do the
+    columns. Nothing else joins: a batched node fed by a batched node has one in-event."""
+    import json as _json
+    from etx.ops import attnprep as _prep, gemv as _gemv, topk as _topk
+    imp = {e: {"slots": s, "arg_bytes": a} for e, (s, a) in IMPORTS.items()}
+    imp["attn_mfma16_g8"]["slots"] = 1                        # ETX_VL_SLOTS=attn_mfma16_g8=1, as the head build sets
+    for mod in (_gemv, _topk, _prep):
+        imp.update(_json.loads(_json.dumps(mod.import_entries())))
+    (tmp_path / "imports.json").write_text(_json.dumps(imp))
+    for k, v in {"ETX_VL_IMPORTS": str(tmp_path / "imports.json"), "ETX_LLM_CONFIG": str(ROOT / "examples/llm/configs/qwen3-30b-a3b.json"),
+                 "ETX_LLM_LAYERS": "2", "ETX_VL_XCD": "1", "ETX_VL_CHAIN": "1", "ETX_VL_PLAN": str(tmp_path / "vl_plan.txt"),
+                 "ETX_VL_CHAINS": str(tmp_path / "chain_tiles.hip"), "ETX_VL_DSL_GEMV": "1", "ETX_VL_DSL_TOPK": "1",
+                 "ETX_VL_DSL_ATTN": "head", "ETX_VL_DSL_FOLD": "1", "ETX_VL_REQUESTS": "2", "ETX_VL_BATCH": "1",
+                 "ETX_VL_NB": "2"}.items():
+        monkeypatch.setenv(k, v)
+    monkeypatch.delenv("ETX_VL_IMPORTED", raising=False)
+    import importlib
+
+    import examples.vllm_llm.model as vm
+    vm = importlib.reload(vm)
+    assert vm.BATCH and vm.REQUESTS == 2 and not vm.fold_topk(vm.load_dims())
+    g = vm.build()
+    by = {gr.name: gr for gr in g.grids}
+    # one node each, no r1_ copy, and the MoE tasks doubled with the slot-per-XCD split intact
+    for name, tasks in (("topk_1_x", 8), ("moe_up_1", 384), ("moe_down_1", 512)):
+        assert name in by and "r1_" + name not in by and "r0_" + name not in by, name
+        assert int(by[name].grid[0]) * (int(by[name].grid[1]) if len(by[name].grid) > 1 else 1) == tasks, (name, by[name].grid)
+    # join census: only o_proj (and the layer-0 qkv after the per-request in_norm replicas) waits on more than one event
+    multi = sorted(n for n, gr in by.items() if len(gr.in_edges) > 1)
+    assert all(("o_proj" in n) or ("qkv_0" in n) for n in multi), multi
+    plan = compile_graph(g, "gfx942", {}, {})
+    assert verify_plan(plan) == []
+    # the plan file records nb=2 on the batched MoE rows
+    rows = [ln.split() for ln in (tmp_path / "vl_plan.txt").read_text().splitlines()[2:]]
+    moe = [r for r in rows if r[3] in ("moe_up", "moe_down") and r[2] == "1"]
+    assert moe and all(r[-1] == "2" for r in moe), moe

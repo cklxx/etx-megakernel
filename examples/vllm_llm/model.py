@@ -193,6 +193,14 @@ REQUESTS = int(os.environ.get("ETX_VL_REQUESTS", "1"))
 # on every request's previous event and every request's chain continues from its single output event.
 BATCH = os.environ.get("ETX_VL_BATCH", "0") == "1" and REQUESTS > 1
 BATCH_ROLES = {"qkv", "o_proj", "router", "lm_head"}
+# Whole-layer batching (round 33): topk and the MoE batch too, so the only join left per layer is the batched
+# o_proj waiting on every request's reduce (attention is per-sequence and cannot batch). topk: one x-form replica
+# set whose wave w does request w's column (etx/ops/topk.py). MoE: the slot index runs over requests x slots,
+# S = s * REQUESTS + rq, slot s of every request on XCD s as before; each task serves ONE column, so this removes
+# the joins, not the duplicated expert weight stream -- the union dedup is a further step (at B=2 it would save
+# only ~3% of expert bytes; the join is the point here). Requires the standalone top-k (no fold: the fold would
+# recompute per task per column, round 7's mistake squared), which fold_topk already derives for this model.
+BATCH_MOE_ROLES = {"topk", "moe_up", "moe_down"}
 
 
 def imports() -> dict:
@@ -419,8 +427,19 @@ def build() -> Graph:
     for n in range(len(groups_r[0])):
         for r in range(REQUESTS):
             order.append((r, n))
+    FT = fold_topk(d)
+
     def is_batched(grp):
-        return BATCH and len(grp) == 1 and grp[0]["role"] in BATCH_ROLES and grp[0]["export"].startswith("dsl_gemv")
+        if not BATCH or len(grp) != 1:
+            return False
+        i = grp[0]
+        if i["role"] in BATCH_ROLES and i["export"].startswith("dsl_gemv"):
+            return True
+        if FT or not (DSL or DSL_TOPK):                              # the batched MoE path needs the standalone top-k's ids/wts
+            return False
+        if i["role"] == "topk" and i["export"] == "dsl_topk":
+            return True
+        return i["role"] in ("moe_up", "moe_down") and i["export"].startswith("dsl_moe")
 
     for r, n in order:
         groups = groups_r[r]
@@ -449,13 +468,16 @@ def build() -> Graph:
             name = P + (f"{i['role']}_{i['layer']}_x" if i["layer"] >= 0 else f"{i['role']}_x")
             g.call_device(name, (NX,), hip_link(src_of(i), f"etx_tile_rep_{i['export']}", pre_wait=f"etx_pre_x_{i['export']}", coherence=coh_of(i), arg_bytes=i.get("arg_bytes", 0)),
                           resource=res, args=["impargs"],
-                          consts=(i["offset"], i["stride"], i["copyoff"]), in_edges={prev[r]: "x->(0)"}, out_edges={ev: "x->x"},
+                          consts=(i["offset"], i["stride"], i["copyoff"]), in_edges=ins_of("x->(0)"), out_edges={ev: "x->x"},
                           domain_map="x->x", duration_us=3.0)
             prev_x[r] = True
         elif len(grp) == 1 and grp[0]["rep"] > 1:
             # a grid split over the XCDs, (XCDs, tasks per XCD) pinned xw->x, each part waiting on its XCD's part of the
             # previous launch: the GEMV after a replica (38 per XCD) or an XCD-affine MoE launch (one expert slot per XCD)
             i = grp[0]
+            if bat and i["role"] in ("moe_up", "moe_down"):    # batched MoE: requests x slots tasks, one node
+                i["tasks"] *= REQUESTS                         # (a batched dense GEMV that is also a replica -- layer-0
+                i["grid"] = (i["grid"][0] * REQUESTS, i["grid"][1], i["grid"][2])   # qkv -- keeps its task count: NB columns share tasks)
             per = i["tasks"] // NX
             if per * NX != i["tasks"] or (i["role"] not in XAFF_ROLES and per != WPX):
                 raise SystemExit(f"{i['export']}: {i['tasks']} tasks do not split over {NX} XCDs as {i['role']} needs")
