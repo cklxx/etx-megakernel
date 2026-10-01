@@ -118,3 +118,23 @@ traces show the natural stagger exceeding line lifetime. The expected landing zo
 lost stagger) structurally impossible because the task structure is untouched. The B-crossing of vLLM remains
 closed off by moe_up's slice exceeding L2; that is the honest residual wall, and it is a property of top-8 over
 128 experts at this hidden size, not of ETX.
+
+## Addendum, same day: the deciding experiment refuted the design
+
+Replicated B=2 with `ETX_VL_NT=0` against NT on, three interleaved rounds each, all 32/32 on both requests
+(both builds identical resources; the box tree's spill count differed from round 30's — both arms shared it,
+so the paired comparison stands):
+
+| | wall ms/step |
+|---|---|
+| NT on (shipped) | 6.875 / 6.879 / 6.883 |
+| NT off | 6.916 / 6.921 / 6.924 |
+
+Removing the non-temporal hint costs 0.04 ms rather than recovering any of the projected 0.81. The missing term
+in this document's arithmetic: request 1's replica task waits ~12 µs for its own chain's event, and during that
+wait the XCD's other 37 CUs keep streaming request 0's subsequent phases — roughly 5.3 MB through the shared
+4 MB L2 — so the lines are evicted before the replica reads them. Cross-request L2 reuse needs the halves within
+about a microsecond, which neither today's queues nor the Option A/B orderings provide (the wait, not the queue
+position, sets the distance). The options below are therefore not worth building as stated; any revival must
+first show a mechanism that closes the halves to ~1 µs without recreating round 33's lockstep. `ETX_VL_NT`
+stays on unconditionally: it wins at B=1 (+0.106) and at B=2 (+0.04).
