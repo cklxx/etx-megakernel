@@ -55,11 +55,20 @@ follows. Nothing in the imported path can opt out.
 | attn | 5 / 13.18 | 20 / 6.06 |
 | reduce | 4 / 5.76 | 4 / 5.79 |
 | o_proj | 304 / 6.45 | 256 / 5.26 |
-| router | 304 / 2.51 | 256 / 3.16 |
-| moe_up | 192 / 20.57 | 192 / 18.70 |
+| post_norm | 8 / 3.10 | — folded into router |
+| router | 304 / 2.51 | 256 / 3.16 (incl. the fold) |
+| topk | 8 / 7.44 | 8 / 7.96 |
+| moe_up | 192 / 20.57 | 192 / 18.70 (incl. silu) |
 | moe_act (silu) | 8 / 1.88 | — folded away |
-| moe_down | 256 / 10.57 | 256 / 11.73 |
-| **layer period** | **≈122** | **≈95** |
+| moe_down | 256 / 10.57 | 256 / 11.73 (incl. the routing weight) |
+| moe_sum | 8 / 2.93 | — folded away |
+| **layer period** | **127.9** | **96.6** |
+
+**Read this table only with the folds paired.** Three rows look like deficits and are not: `router` against
+`post_norm` + `router` is 3.16 against 5.61, `moe_down` against `moe_down` + `moe_sum` is 11.73 against 13.50, and
+`moe_up` already contains the silu that `moe_act` runs separately. The complete like-for-like pairing, with every
+phase and the arithmetic reconciled to the layer period, is in **`docs/PHASES-2026-10-01.md`**; its conclusion is
+that on kernel speed the two tile sets tie to within 0.04 ms/token and the entire 1.50 ms difference is structure.
 
 Total span 6347.1 against 4804.1 µs.
 
@@ -78,7 +87,8 @@ qkv prologue; `imp` runs it as the separate `in_norm` phase. Comparing the same 
 time. The fold costs 3.75 µs (10.04 - 6.29) and is still the right choice for us, because our own separate
 `in_norm` phase costs more: 5.9 µs of layer-delta at layer 0 against the fold's 3.75, our 8-task x-form replica
 being dearer than vLLM's. We beat `wvsplitk` on o_proj (5.26 against 6.45) and moe_up (18.70 against 20.57) too.
-**There is no GEMV gap to close.**
+**There is no GEMV gap to close.** The same pairing error applies to `router` and `moe_down`, both corrected
+in the table above: once `post_norm` and `moe_sum` are counted on the imported side, we are ahead on both.
 
 **What the imported build loses on is structure, which the kernels dictate:**
 
