@@ -86,6 +86,10 @@ if [ "${ETX_VL_UC:-0}" = 1 ]; then export ETX_VL_PIN=1; UCF=(-DETX_VL_UC -DETX_C
 # 2026-10-01 round 16: weights are read once per token and have no reuse, so caching them evicts the MALL-resident
 # KV cache and the activations. Measured -0.106 ms/token with L2 hit rate 31.9% -> 34.6%; ETX_VL_NT=0 restores it.
 NTF=(); [ "${ETX_VL_NT:-1}" = 1 ] && NTF=(-DETX_DSL_NT)
+# ETX_VL_VECNORM: the folded norm stages 8 elements per thread with 16 B coherent accesses instead of one 2 B request
+# per element (etx/ops/gemv.py dsl_stage_norm_at). Own array, never reassigned -- a flag appended to an array that a
+# later `if` overwrites is how ETX_DEV_RESET silently never compiled (round 19/20).
+VNF=(); [ "${ETX_VL_VECNORM:-1}" = 1 ] && VNF=(-DETX_DSL_VECNORM)   # ON by default: -0.105 ms, round 23
 # ETX_DEV_RESET=1 is read by model.py at PLAN time and emitted into plan_data.h as ETX_EMIT_DEV_RESET, so it needs
 # no define here. It had one until round 19, and this `if` overwrote the array that carried it whenever ETX_VL_COH
 # was also set -- the host then believed in a reset tail that was never compiled: 0/32 tokens, no diagnostic.
@@ -113,7 +117,7 @@ ABL=(); [ -n "${ETX_VL_ABLATE:-}" ] && ABL=(-DDSL_ABLATE_$(echo "$ETX_VL_ABLATE"
 [ "${ETX_VL_FOLD_TOPK:-1}" = 0 ] && ABL+=(-DETX_VL_NO_TOPK_FOLD)
 hipcc -O3 -std=c++17 --offload-arch=gfx942 "${ROCMINC[@]}" "${NBF[@]}" -I "$ROOT/etx/runtime/include" -I "$OUT" -I "$ROOT" \
   -Xclang -mlink-builtin-bitcode -Xclang "$OUT/imports.bc" -Rpass-analysis=kernel-resource-usage \
-  "${CHK[@]}" "${UCF[@]}" "${COHF[@]}" "${NTF[@]}" "${ABL[@]}" "${PREPF[@]}" -DETX_VL_REQUESTS=${ETX_VL_REQUESTS:-1} ${ETX_HIPCC_FLAGS:-} "$OUT/megakernel_d0.hip" "$ROOT/examples/vllm_llm/host.hip" $([ "${ETX_VL_CHECK:-0}" = 1 ] && echo "$OUT/imp/orig_table.hip -x none $OUT/imp/orig_*.o") -o "$OUT/run" 2>&1 \
+  "${CHK[@]}" "${UCF[@]}" "${COHF[@]}" "${NTF[@]}" "${VNF[@]}" "${ABL[@]}" "${PREPF[@]}" -DETX_VL_REQUESTS=${ETX_VL_REQUESTS:-1} ${ETX_HIPCC_FLAGS:-} "$OUT/megakernel_d0.hip" "$ROOT/examples/vllm_llm/host.hip" $([ "${ETX_VL_CHECK:-0}" = 1 ] && echo "$OUT/imp/orig_table.hip -x none $OUT/imp/orig_*.o") -o "$OUT/run" 2>&1 \
   | grep -E "Function Name|VGPRs:|ScratchSize|VGPRs Spill|LDS Size|error" | sed -E "s/.*remark: +//; s/ \[-Rpass.*//" | paste - - - - - || true
 [ -x "$OUT/run" ] || { echo "build failed: no $OUT/run"; exit 1; }
 echo "built $OUT/run (plan $OUT/vl_plan.txt)"

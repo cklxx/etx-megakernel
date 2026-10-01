@@ -71,12 +71,17 @@ def import_entries(threads: int = 1024) -> dict:
 
 STREAM = r'''
 // ---- the stream loop (examples/llm/gemv.h): segments of 64 lanes x EPL bf16 inside one row, U loads per lane in flight
+#ifndef DSL_U32X4_DEFINED                                 // also defined by etx/ops/coh.py, whichever is emitted first
+#define DSL_U32X4_DEFINED
 typedef unsigned int dsl_u32x4 __attribute__((ext_vector_type(4)));
+#endif
 typedef unsigned int dsl_u32x2 __attribute__((ext_vector_type(2)));
 template <int EPL> struct dsl_wvec;
 template <> struct dsl_wvec<8> { typedef dsl_u32x4 T; };
 template <> struct dsl_wvec<4> { typedef dsl_u32x2 T; };
+#ifndef DSL_G
 #define DSL_G __attribute__((address_space(1)))          // global loads, not flat (flat waits on the LDS counter too)
+#endif
 // ETX_DSL_NT: weight loads marked non-temporal. Weights are read exactly once per token (6.08 GB), so they have no
 // reuse to preserve, yet they pass through the XCD's 4 MB L2 and the 256 MB MALL and evict what does have reuse (the
 // 104 MB KV cache, the activations). Measured L2 hit rate without it: 31.9 % (rocprofv3 TCC_HIT_sum / (HIT+MISS)).
@@ -298,6 +303,50 @@ static __device__ __forceinline__ void dsl_stage_norm_at(const DslArgs& d, const
                                                         __hip_bfloat16* rout, __hip_bfloat16* xout, float* xs, float* red, bool store) {
   const int K = d.K;
   float ss = 0.f;
+#ifdef ETX_DSL_VECNORM
+  // 8 elements per thread per trip: the per-element accessors issue one coherent request each (K=2048 gives 4096 of
+  // them against o_proj's 1024 wide ones, round 23). The R reduction keeps its per-element order; the sum of squares
+  // is accumulated over a different partition of the elements, which is a fp32 rounding difference, not a reordering
+  // of a dependence. Needs K % 8 == 0, true for every shape we build and asserted by the host.
+  for (int i = (int)threadIdx.x; i < K / 8; i += blockDim.x) {
+    float z[8];
+#pragma unroll
+    for (int j = 0; j < 8; ++j) z[j] = 0.f;
+    for (int s = 0; s < d.R; ++s) {
+      const dsl_u32x4 r = dsl_a_ld128(rows + (size_t)s * K + 8 * i);
+#pragma unroll
+      for (int j = 0; j < 4; ++j) {
+        z[2 * j] += __uint_as_float(r[j] << 16); z[2 * j + 1] += __uint_as_float(r[j] & 0xffff0000u);
+      }
+    }
+    const dsl_u32x4 ri = dsl_a_ld128(rin + 8 * i);
+    dsl_u32x4 ro;
+#pragma unroll
+    for (int j = 0; j < 4; ++j) {
+      const float a0 = d.R > 1 ? dsl_bfr(z[2 * j]) : z[2 * j], a1 = d.R > 1 ? dsl_bfr(z[2 * j + 1]) : z[2 * j + 1];
+      z[2 * j] = dsl_bfr(a0 + __uint_as_float(ri[j] << 16));
+      z[2 * j + 1] = dsl_bfr(a1 + __uint_as_float(ri[j] & 0xffff0000u));
+      ro[j] = (__float_as_uint(z[2 * j]) >> 16) | (__float_as_uint(z[2 * j + 1]) & 0xffff0000u);
+    }
+#pragma unroll
+    for (int j = 0; j < 8; ++j) { xs[8 * i + j] = z[j]; ss += z[j] * z[j]; }
+    if (store && rout != nullptr) dsl_a_st128(rout + 8 * i, ro);
+  }
+  ss = etx_block_sum(ss, red);
+  const float sv = rsqrtf(ss / (float)K + d.eps);
+  for (int i = (int)threadIdx.x; i < K / 8; i += blockDim.x) {
+    const dsl_u32x4 w = *(const DSL_G dsl_u32x4*)(d.ln + 8 * i);          // the norm weight is read-only: stays cached
+    dsl_u32x4 o;
+#pragma unroll
+    for (int j = 0; j < 4; ++j) {
+      const float v0 = dsl_bfr(xs[8 * i + 2 * j] * sv * __uint_as_float(w[j] << 16));
+      const float v1 = dsl_bfr(xs[8 * i + 2 * j + 1] * sv * __uint_as_float(w[j] & 0xffff0000u));
+      xs[8 * i + 2 * j] = v0; xs[8 * i + 2 * j + 1] = v1;
+      o[j] = (__float_as_uint(v0) >> 16) | (__float_as_uint(v1) & 0xffff0000u);
+    }
+    if (store && xout != nullptr) dsl_a_st128(xout + 8 * i, o);
+  }
+#else
   for (int i = (int)threadIdx.x; i < K; i += blockDim.x) {
     float acc = 0.f;
     for (int s = 0; s < d.R; ++s) acc += dsl_a_ldbf(rows + (size_t)s * K + i);
@@ -312,6 +361,7 @@ static __device__ __forceinline__ void dsl_stage_norm_at(const DslArgs& d, const
     xs[i] = dsl_bfr(xs[i] * sv * __bfloat162float(d.ln[i]));
     if (store && xout != nullptr) dsl_a_stbf(xout + i, __float2bfloat16(xs[i]));   // the normed vector, for later consumers
   }
+#endif
   __syncthreads();
 }
 static __device__ __forceinline__ void dsl_stage_norm(const DslArgs& d, float* xs, float* red, bool store) {
