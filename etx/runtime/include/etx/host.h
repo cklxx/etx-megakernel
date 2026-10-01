@@ -26,7 +26,9 @@ struct etx_host {
   etx_params p{};
   std::vector<int32_t> ev_strided;   // initial counts at their strided positions (ETX_EV_STRIDE > 1)
   int32_t *d_events = nullptr, *d_ctrl = nullptr, *d_slots = nullptr, *d_trace = nullptr, *d_remaining = nullptr;
-  bool exec_count = false;          // ETX_EXEC_COUNT / ETX_TRACE: per-task execution counter (fused path only)
+  bool exec_count = false;
+  int32_t gq_init[2] = {0, -1};             // persistent source for the global-queue head/tail copy
+  std::vector<int32_t> lq_heads, lq_tails;   // persistent: hipMemcpyAsync sources must outlive the call          // ETX_EXEC_COUNT / ETX_TRACE: per-task execution counter (fused path only)
   uint64_t* d_trace_time = nullptr;
   int32_t* d_ev_sub = nullptr;
   int32_t* d_mirror = nullptr;             // relay mirrors [n_domains][event words]
@@ -165,38 +167,39 @@ struct etx_host {
   void reset_step() {
     ETX_CHECK(hipSetDevice(device));
     if (owns_events) {
-      if (ETX_EV_STRIDE == 1) ETX_CHECK(hipMemcpy(d_events, etx_ev_counts, ETX_EVENT_WORDS * sizeof(int32_t), hipMemcpyHostToDevice));
+      if (ETX_EV_STRIDE == 1) ETX_CHECK(hipMemcpyAsync(d_events, etx_ev_counts, ETX_EVENT_WORDS * sizeof(int32_t), hipMemcpyHostToDevice, stream));
       else {                                             // counters at word * ETX_EV_STRIDE (one cache line each)
         if (ev_strided.empty()) { ev_strided.assign((size_t)ETX_EVENT_WORDS * ETX_EV_STRIDE, 0); for (int i = 0; i < ETX_EVENT_WORDS; ++i) ev_strided[(size_t)ETX_EVW(i)] = etx_ev_counts[i]; }
-        ETX_CHECK(hipMemcpy(d_events, ev_strided.data(), ev_strided.size() * sizeof(int32_t), hipMemcpyHostToDevice));
+        ETX_CHECK(hipMemcpyAsync(d_events, ev_strided.data(), ev_strided.size() * sizeof(int32_t), hipMemcpyHostToDevice, stream));
       }
     }
-    ETX_CHECK(hipMemset(d_ctrl, 0, 64));
-    ETX_CHECK(hipMemset(d_slots, 0, (ETX_N_DOMAINS * 2 + ETX_N_DOMAINS * 256) * sizeof(int32_t)));
-    ETX_CHECK(hipMemset(d_slots + ETX_N_DOMAINS * 2 + ETX_N_DOMAINS * 256, 0xFF, ETX_N_DOMAINS * 256 * sizeof(int32_t)));
-    ETX_CHECK(hipMemset(d_trace, 0, ETX_N_TASKS * sizeof(int32_t)));
-    ETX_CHECK(hipMemcpy(d_remaining, etx_task_remaining, ETX_N_TASKS * sizeof(int32_t), hipMemcpyHostToDevice));
-    ETX_CHECK(hipMemset(d_ev_sub, 0, (size_t)ETX_N_DOMAINS * ETX_EVENT_WORDS * sizeof(int32_t)));
-    if (d_mirror) ETX_CHECK(hipMemcpy(d_mirror, mirror_init.data(), mirror_init.size() * sizeof(int32_t), hipMemcpyHostToDevice));
+    ETX_CHECK(hipMemsetAsync(d_ctrl, 0, 64, stream));
+    ETX_CHECK(hipMemsetAsync(d_slots, 0, (ETX_N_DOMAINS * 2 + ETX_N_DOMAINS * 256) * sizeof(int32_t), stream));
+    ETX_CHECK(hipMemsetAsync(d_slots + ETX_N_DOMAINS * 2 + ETX_N_DOMAINS * 256, 0xFF, ETX_N_DOMAINS * 256 * sizeof(int32_t), stream));
+    if (exec_count) ETX_CHECK(hipMemsetAsync(d_trace, 0, ETX_N_TASKS * sizeof(int32_t), stream));   // 241 KB; dead work when the counter is off
+    ETX_CHECK(hipMemcpyAsync(d_remaining, etx_task_remaining, ETX_N_TASKS * sizeof(int32_t), hipMemcpyHostToDevice, stream));
+    ETX_CHECK(hipMemsetAsync(d_ev_sub, 0, (size_t)ETX_N_DOMAINS * ETX_EVENT_WORDS * sizeof(int32_t), stream));
+    if (d_mirror) ETX_CHECK(hipMemcpyAsync(d_mirror, mirror_init.data(), mirror_init.size() * sizeof(int32_t), hipMemcpyHostToDevice, stream));
     int32_t total = 0; for (int d = 0; d < ETX_N_DOMAINS; ++d) total += etx_local_capacity[device * ETX_N_DOMAINS + d];
-    if (total) ETX_CHECK(hipMemset(d_lq_slots, 0xFF, total * sizeof(int32_t)));
-    std::vector<int32_t> heads(ETX_N_DOMAINS, 0), tails(ETX_N_DOMAINS, 0);
+    if (total) ETX_CHECK(hipMemsetAsync(d_lq_slots, 0xFF, total * sizeof(int32_t), stream));
+    if (lq_heads.empty()) { lq_heads.assign(ETX_N_DOMAINS, 0); lq_tails.assign(ETX_N_DOMAINS, 0); }
+    std::vector<int32_t>& heads = lq_heads; std::vector<int32_t>& tails = lq_tails;
     int32_t off = 0, src = 0;
     for (int dd = 0; dd < device * ETX_N_DOMAINS; ++dd) src += etx_init_local_len[dd];
     for (int d = 0; d < ETX_N_DOMAINS; ++d) {
       const int32_t n = etx_init_local_len[device * ETX_N_DOMAINS + d];
-      if (n) ETX_CHECK(hipMemcpy(d_lq_slots + off, etx_init_local + src, n * sizeof(int32_t), hipMemcpyHostToDevice));
+      if (n) ETX_CHECK(hipMemcpyAsync(d_lq_slots + off, etx_init_local + src, n * sizeof(int32_t), hipMemcpyHostToDevice, stream));
       tails[d] = n; src += n; off += etx_local_capacity[device * ETX_N_DOMAINS + d];
     }
-    ETX_CHECK(hipMemcpy(d_lq_head, heads.data(), ETX_N_DOMAINS * sizeof(int32_t), hipMemcpyHostToDevice));
-    ETX_CHECK(hipMemcpy(d_lq_tail, tails.data(), ETX_N_DOMAINS * sizeof(int32_t), hipMemcpyHostToDevice));
+    ETX_CHECK(hipMemcpyAsync(d_lq_head, heads.data(), ETX_N_DOMAINS * sizeof(int32_t), hipMemcpyHostToDevice, stream));
+    ETX_CHECK(hipMemcpyAsync(d_lq_tail, tails.data(), ETX_N_DOMAINS * sizeof(int32_t), hipMemcpyHostToDevice, stream));
     const int32_t gcap = etx_global_capacity[device];
-    if (gcap) ETX_CHECK(hipMemset(d_gq_slots, 0xFF, gcap * sizeof(int32_t)));
+    if (gcap) ETX_CHECK(hipMemsetAsync(d_gq_slots, 0xFF, gcap * sizeof(int32_t), stream));
     int32_t gsrc = 0; for (int dd = 0; dd < device; ++dd) gsrc += etx_init_global_len[dd];
     const int32_t gn = etx_init_global_len[device];
-    if (gn) ETX_CHECK(hipMemcpy(d_gq_slots, etx_init_global + gsrc, gn * sizeof(int32_t), hipMemcpyHostToDevice));
-    int32_t gq[2] = {0, gn};
-    ETX_CHECK(hipMemcpy((void*)p.global_queue.head, gq, 8, hipMemcpyHostToDevice));
+    if (gn) ETX_CHECK(hipMemcpyAsync(d_gq_slots, etx_init_global + gsrc, gn * sizeof(int32_t), hipMemcpyHostToDevice, stream));
+    if (gq_init[1] != gn) { gq_init[0] = 0; gq_init[1] = gn; }
+    ETX_CHECK(hipMemcpyAsync((void*)p.global_queue.head, gq_init, 8, hipMemcpyHostToDevice, stream));
   }
   bool check_residency() {
     ETX_CHECK(hipSetDevice(device));
@@ -211,14 +214,14 @@ struct etx_host {
   }
   hipEvent_t ev_start = nullptr, ev_stop = nullptr;
   // asynchronous launch (call reset_step first; for multi-device, reset all then launch all, then wait all)
-  void launch() {
+  void launch(bool record_events = true) {
     ETX_CHECK(hipSetDevice(device));
     if (!ev_start) { ETX_CHECK(hipEventCreate(&ev_start)); ETX_CHECK(hipEventCreate(&ev_stop)); }
-    ETX_CHECK(hipEventRecord(ev_start, stream));
+    if (record_events) ETX_CHECK(hipEventRecord(ev_start, stream));
     void* kargs[] = {&p};
     if (cooperative) ETX_CHECK(hipLaunchCooperativeKernel(kernel, dim3(ETX_N_LAUNCH), dim3(ETX_THREADS), kargs, 0, stream));
     else ETX_CHECK(hipLaunchKernel(kernel, dim3(ETX_N_LAUNCH), dim3(ETX_THREADS), kargs, 0, stream));   // residency checked by check_residency()
-    ETX_CHECK(hipEventRecord(ev_stop, stream));
+    if (record_events) ETX_CHECK(hipEventRecord(ev_stop, stream));
   }
   // wait with watchdog; returns false on timeout / spin limit / incomplete
   bool wait(double timeout_s, std::chrono::steady_clock::time_point t0) {
@@ -232,7 +235,7 @@ struct etx_host {
         dump_events();
         return false;
       }
-      std::this_thread::sleep_for(std::chrono::microseconds(50));
+      std::this_thread::yield();   // a 50 us sleep overshot the 5 ms kernel by ~100 us/step (2026-10-01)
     }
     ETX_CHECK(hipStreamSynchronize(stream));
     float ms = 0.f; ETX_CHECK(hipEventElapsedTime(&ms, ev_start, ev_stop));   // device timestamps: launch to kernel end, no host polling jitter
@@ -279,13 +282,64 @@ struct etx_host {
     float ms = 0.f; ETX_CHECK(hipEventElapsedTime(&ms, ev_start, ev_stop)); last_ms = ms;
     return true;
   }
+  // ETX_HOST_PROF=1: accumulate the per-step host cost of each stage (the wall-vs-device gap, 2026-10-01)
+  struct HostProf { double reset = 0, resid = 0, launch = 0, wait = 0; long n = 0;
+    ~HostProf() { if (n) fprintf(stderr, "HOSTPROF steps %ld: reset %.3f us  residency %.3f  launch %.3f  wait %.3f  total %.3f\n",
+                                 n, reset / n, resid / n, launch / n, wait / n, (reset + resid + launch + wait) / n); } };
+  static HostProf& host_prof() { static HostProf hp; return hp; }
+  static bool host_prof_on() { static bool on = getenv("ETX_HOST_PROF") != nullptr; return on; }
+  // ETX_VL_GRAPH=1: capture reset_step + launch once and replay the graph per step. MEASURED 2026-10-01 and it does
+  // NOT pay once reset_step is async: wall 5.053 against 5.044 for a plain ordinary launch and 5.060 cooperative
+  // (interleaved medians, same binary). The host cost left after the async conversion is the wait() poll and the
+  // dispatch, neither of which a graph removes. Kept, off by default, so nobody re-tries it blind. The ~17 state copies and the
+  // dispatch are identical every step -- every hipMemcpyAsync source is a stable buffer (the etx_* tables are static,
+  // ev_strided / mirror_init / lq_heads / lq_tails / gq_init are members) -- so only the replay crosses to the driver.
+  // Requires ETX_LAUNCH_MODE=ordinary: a cooperative launch cannot be captured.
+  hipGraphExec_t step_exec = nullptr;
+  bool graph_step() {
+    if (!step_exec) {
+      if (cooperative) { fprintf(stderr, "ETX_VL_GRAPH needs ETX_LAUNCH_MODE=ordinary (cooperative launches are not capturable)\n"); return false; }
+      if (!check_residency()) return false;
+      hipGraph_t g;
+      ETX_CHECK(hipStreamBeginCapture(stream, hipStreamCaptureModeGlobal));
+      reset_step();
+      launch(false);                       // the timing events stay outside: captured, they are graph nodes and
+      ETX_CHECK(hipStreamEndCapture(stream, &g));   // hipEventElapsedTime then fails with an invalid handle
+      ETX_CHECK(hipGraphInstantiate(&step_exec, g, nullptr, nullptr, 0));
+      if (!ev_start) { ETX_CHECK(hipEventCreate(&ev_start)); ETX_CHECK(hipEventCreate(&ev_stop)); }
+    }
+    ETX_CHECK(hipEventRecord(ev_start, stream));
+    ETX_CHECK(hipGraphLaunch(step_exec, stream));
+    ETX_CHECK(hipEventRecord(ev_stop, stream));
+    return true;
+  }
   // single-device convenience
   bool run(double timeout_s = 5.0) {
-    reset_step();
-    if (!check_residency()) return false;
-    auto t0 = std::chrono::steady_clock::now();
-    launch();
-    return wait(timeout_s, t0);
+    static const bool use_graph = getenv("ETX_VL_GRAPH") != nullptr;
+    if (use_graph) {
+      auto t0 = std::chrono::steady_clock::now();
+      if (!graph_step()) return false;
+      return wait(timeout_s, t0);
+    }
+    if (!host_prof_on()) {
+      reset_step();
+      if (!check_residency()) return false;
+      auto t0 = std::chrono::steady_clock::now();
+      launch();
+      return wait(timeout_s, t0);
+    }
+    auto& hp = host_prof(); using C = std::chrono::steady_clock;
+    const auto a = C::now(); reset_step();
+    const auto b = C::now(); if (!check_residency()) return false;
+    const auto c = C::now(); launch();
+    const auto d = C::now(); const bool ok = wait(timeout_s, c);
+    const auto e = C::now();
+    hp.reset += std::chrono::duration<double, std::micro>(b - a).count();
+    hp.resid += std::chrono::duration<double, std::micro>(c - b).count();
+    hp.launch += std::chrono::duration<double, std::micro>(d - c).count();
+    hp.wait += std::chrono::duration<double, std::micro>(e - d).count();
+    ++hp.n;
+    return ok;
   }
   void dump_events() {
     dump_trace();
