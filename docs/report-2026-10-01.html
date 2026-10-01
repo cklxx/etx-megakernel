@@ -31,15 +31,15 @@
 
 <table>
 <tr><th>Configuration</th><th class="n">ms/token</th><th class="n">vs vLLM</th></tr>
-<tr><td>vLLM 0.27.1 default</td><td class="n">4.862</td><td class="n">—</td></tr>
+<tr><td>vLLM 0.27.1 default</td><td class="n">4.863</td><td class="n">—</td></tr>
 <tr><td>vLLM + AITER</td><td class="n">4.975</td><td class="n">+2.3%</td></tr>
-<tr class="hi"><td>ETX megakernel</td><td class="n">4.865</td><td class="n win">+0.06%</td></tr>
+<tr class="hi"><td>ETX megakernel</td><td class="n">4.823</td><td class="n win">−0.8%</td></tr>
 <tr><td>ETX unfused — same tiles, HIP-graph replay</td><td class="n">4.998</td><td class="n">+2.8%</td></tr>
 </table>
 
-<p class="key"><strong>ETX reaches parity with vLLM, and fusion pays.</strong> 4.865 against 4.862 — 0.003 ms, inside the
-0.017 run-to-run spread, so the two are indistinguishable. A persistent kernel beats a HIP-graph replay of the same
-tiles; the day began with fusion <em>losing</em> by 4.2%. The system improved 17.5% against itself.</p>
+<p class="key"><strong>ETX beats vLLM, and fusion pays.</strong> 4.823 against 4.863, interleaved on the same box in the same
+minutes, with non-overlapping ranges (ETX max 4.824 under vLLM min 4.851) — ahead by 0.8%. The day began 21%
+behind with fusion <em>losing</em> by 4.2%. The system improved 18.2% against itself.</p>
 
 <p class="fine">Wall clock, the basis vLLM's benchmark uses. Three interleaved runs per row, one binary generation,
 all 32/32 tokens against HuggingFace greedy with every DSL operator of the last layer within 2 bf16 ulps of a CPU
@@ -48,7 +48,7 @@ reference. Machine: 1× MI300X VF, ROCm 7.14. Confirmed on bare metal (ROCm 7.2.
 
 <h2>Why fusion now pays</h2>
 
-<p>Six changes account for the 17.5%. The first is the whole story; the rest are the tail.</p>
+<p>Seven changes account for the 18.2%. The first is the whole story; the rest are the tail.</p>
 
 <table>
 <tr><th>Change</th><th class="n">ms</th><th>Mechanism</th></tr>
@@ -58,6 +58,7 @@ reference. Machine: 1× MI300X VF, ROCm 7.14. Confirmed on bare metal (ROCm 7.2.
 <tr><td>Non-temporal weight loads</td><td class="n win">−0.106</td><td>6.08 GB read once per token were evicting the MALL-resident KV cache. L2 hit 31.9 → 34.6%.</td></tr>
 <tr><td>Vectorising the coherent path in <code>attnprep</code></td><td class="n win">−0.074</td><td>The same disease, in the tile where it was worst: 3400 coherent requests per task became 768. The new lane→element mapping puts the neox rope partner in the same lane's registers, so the shuffle disappears, and register spills fell 16 → 8 — a whole-kernel effect that also moved <code>attn</code> and <code>o_proj</code>.</td></tr>
 <tr><td>Vectorising the coherent norm path</td><td class="n win">−0.105</td><td>A coherent access bypasses L1 and L2, so a 2-byte accessor issues one memory request per lane per element: the folded norm staged 4096 requests per task against <code>o_proj</code>'s 1024 at four times the width. 16-byte accesses cut <code>qkv</code>'s body 11.81 → 9.50 µs. Predicted not to move the MoE phases, which already use the wide path; it did not.</td></tr>
+<tr><td>GEMV load depth U=4 → U=2</td><td class="n win">−0.054</td><td>Found while refuting the occupancy lever: halving the in-flight vector registers relieves VMEM queue pressure and sheds 1 MB of code; Little's-law headroom remains 2.4×. Occupancy itself is grid-fixed at 4 waves/SIMD — one 16-wave workgroup per CU — and forcing VGPR to 64 left it at 4.000 while spill traffic doubled the step.</td></tr>
 <tr><td>Phase width, import prune</td><td class="n win">−0.082</td><td>304 → 256 tasks; an unused imported tile was setting the LDS arena.</td></tr>
 </table>
 

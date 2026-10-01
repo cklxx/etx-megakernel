@@ -26,16 +26,16 @@ the same kernels fused (ETX), launched one by one (ETX unfused, HIP graph) and i
     VLLM=~/vllm bash examples/vllm_llm/build.sh ~/llm/qwen3-8b            # on the GPU host
     nohup bash examples/vllm_llm/vm_run.sh > ~/vl.log 2>&1 &              # the whole comparison on a fresh VM
 
-## Status: fusion pays (2026-10-01)
+## Status: ETX beats vLLM at batch 1 (2026-10-02)
 
 Qwen3-30B-A3B bf16 decode, batch 1, one MI300X, wall clock, 32/32 tokens against HF greedy with every DSL
 operator of the last layer within 2 bf16 ulps of a CPU reference:
 
 | | ms/token | vs vLLM |
 |---|---|---|
-| vLLM 0.27.1 default | 4.862 | — |
+| vLLM 0.27.1 default | 4.863 | — |
 | vLLM + AITER | 4.975 | +2.3% |
-| **ETX megakernel** | **4.865** | **+0.06% — parity** |
+| **ETX megakernel** | **4.823** | **−0.8% — ahead** |
 | ETX unfused — same tiles, HIP-graph replay | 4.998 | +2.8% |
 
 **The claim ETX exists to prove now holds: one persistent kernel beats a HIP-graph replay of the same tiles
@@ -47,7 +47,7 @@ What flipped it: every task's acquire was `buffer_inv sc1`, a whole-L2 invalidat
 128-logit softmax (−0.231); asynchronous per-step host work (−0.152); non-temporal weight loads (−0.106); vectorising the coherent paths, which were issuing
 one memory request per lane per 2-byte element (−0.105 in the folded norm, −0.074 in the attention prologue).
 
-ETX is at parity with vLLM (0.003 ms, inside the 0.017 spread), and the budget says where the rest went: hand-off sits at the event protocol's floor, workgroup
+ETX is ahead of vLLM by 0.8% (interleaved, non-overlapping ranges), and the budget says where the rest went: hand-off sits at the event protocol's floor, workgroup
 start delay is below the hardware dispatcher's own jitter, host work is 0.135 ms, and the instruction cache hits
 99.90%. **The orchestration is spent; 1.29 ms of the step is our own hand-written tiles** — which was never
 ETX's claim. Full report: [docs/ETX-report-2026-10-01.pdf](docs/ETX-report-2026-10-01.pdf), per-phase budget in
