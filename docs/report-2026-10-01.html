@@ -136,11 +136,16 @@ workgroups do nothing: the register term is 4 at any size.</p>
 119,956 / 239,912 — so every request streams its own copy of the weights, while vLLM reads a weight tile once per
 B-column activation matrix. Batch is ETX's worst regime, not its best.</p>
 
-<p>The remedy was built and lost. A skinny GEMM serving two columns from one weight read cost <span class="loss">+0.29
-ms</span>: the second column costs 90% of the first, because the tile sits where compute time equals stream time and
-extra columns double the LDS traffic while saving only the weight stream; and a batched phase must wait on every
-request's previous event, removing the slack replication provides. LDS caps the design at B=2 regardless. Proper
-batching needs matrix instructions for B&gt;1 and whole-layer batching with no per-phase join — a separate project.</p>
+<p>The remedy was built three times, and each build refuted its own diagnosis. Dense-only batching lost by 0.25 ms
+and was blamed on the second column doubling the arithmetic — refuted by counting it (FMA is 0.7% of the regression,
+so matrix instructions were rejected without being built). The blame moved to the per-phase joins — refuted by
+removing them: whole-layer batching with an on-device expert union brings nine joins per layer down to one and loses
+by <span class="loss">more</span> (7.48 against 6.90 replicated per two-token step), because the join was cheap all
+along. The real costs, from the traces: the batched MoE runs 384 tasks over 304 workers, so a quarter of them queue
+as a second serial wave; and lockstep batching destroys the ~12&nbsp;µs stagger replication gets free, in which each
+request fills the other's stalls. <strong>Batching cannot beat replication under a lockstep phase model.</strong>
+Sharing weights while keeping the stagger needs split-phase scheduling the runtime does not have — that is the wall,
+stated rather than attempted. ETX at B&ge;2 ships replicated.</p>
 
 <h2>What vLLM's fusion is worth, for scale</h2>
 
