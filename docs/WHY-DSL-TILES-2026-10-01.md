@@ -49,7 +49,8 @@ follows. Nothing in the imported path can opt out.
 
 | phase | `imp` tasks / body | `dsl` tasks / body |
 |---|---|---|
-| qkv | 304 / 6.75 | 256 / 10.04 |
+| in_norm | 8 / 2.50 | — folded into qkv |
+| qkv | 304 / 6.75 | 256 / 10.04 (incl. the fold) |
 | q/k norm + rope + cache | 1 / **16.24** (chained, one workgroup) | prep 4 / 5.11 |
 | attn | 5 / 13.18 | 20 / 6.06 |
 | reduce | 4 / 5.76 | 4 / 5.79 |
@@ -62,8 +63,22 @@ follows. Nothing in the imported path can opt out.
 
 Total span 6347.1 against 4804.1 µs.
 
-**vLLM's kernels are not worse in isolation.** `wvsplitk` beats our GEMV on qkv (6.75 against 10.04); we beat
-it on o_proj (5.26 against 6.45) and moe_up (18.70 against 20.57). Per-task the two tile families trade blows.
+**vLLM's kernels are not worse in isolation**, but the qkv row above is not like-for-like and the first reading of
+it was wrong (corrected 2026-10-01, round 25). Our `dsl_gemv_fold` folds the input `fused_add_rms_norm` into the
+qkv prologue; `imp` runs it as the separate `in_norm` phase. Comparing the same work:
+
+| | `imp` | `dsl` |
+|---|---|---|
+| bodies, in_norm + qkv | 2.50 + 6.75 = **9.25** | **10.04** |
+| layer-delta, in_norm + qkv | 3.4 + 11.3 = **14.7** | **15.2** |
+
+0.5-0.8 µs/layer, not 3.29. And the GEMV alone is ours by a margin: layer 0 is the one layer the DSL build does
+*not* fold (`model.py`: `fold = ... (role == "qkv" and layer > 0)`), and `qkv_0`'s body is **6.29 µs against
+`wvsplitk`'s 6.75** on the identical 5120x2048 shape, with 256 workgroups against 304 — more rows per task in less
+time. The fold costs 3.75 µs (10.04 - 6.29) and is still the right choice for us, because our own separate
+`in_norm` phase costs more: 5.9 µs of layer-delta at layer 0 against the fold's 3.75, our 8-task x-form replica
+being dearer than vLLM's. We beat `wvsplitk` on o_proj (5.26 against 6.45) and moe_up (18.70 against 20.57) too.
+**There is no GEMV gap to close.**
 
 **What the imported build loses on is structure, which the kernels dictate:**
 
@@ -81,6 +96,6 @@ tiles, and **fusion does not pay at all** (−0.171, −0.284) because the acqui
 we did not generate.
 
 The answer to "why not just use vLLM's kernels" is therefore not that they are slow — per task they are
-competitive, and better than ours on qkv. It is that using them forces vLLM's launch structure (its phase
+competitive. It is that using them forces vLLM's launch structure (its phase
 boundaries, its one-workgroup chains, its separate silu and moe_sum launches) and forbids the one change that
 made fusion pay. The DSL tiles earn their place by being editable, not by being faster.
