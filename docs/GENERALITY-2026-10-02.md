@@ -106,3 +106,29 @@ run) and diff against ETX's uploaded values at host.hip:216,405-409. That diff n
 
 Verdict unchanged and now sharper: plan, events, placement and every imported kernel generalise with zero compiler
 change; the one open item is the MoE dispatch *values* (not the layout, not the kernels) for top-k ≠ 8.
+
+## Round 41: the MoE-dispatch hypothesis is refuted from vLLM's source; the bug is upstream
+
+Route 1 did not name a wrong scalar — it proved there is none. vLLM 0.27.1 `fused_moe.py:1556` gates the naive
+block path on `expert_map is None and num_tokens*top_k*4 <= global_num_experts`. At decode (num_tokens=1): Qwen
+`1*8*4=32 ≤ 128` and Mixtral `1*2*4=8 ≤ 8` — BOTH naive. In the naive branch (`:1566`) vLLM sets
+`sorted_token_ids=None`, `expert_ids = topk_ids.view(-1)`, `num_tokens_post_padded = topk_ids.numel()*BLOCK_SIZE_M`,
+and the kernel (`:408` `naive_block_assignment` true) reads `off_experts = expert_ids[pid_m]`,
+`offs_token = where(offs==0, pid_m, num_valid)`, `a` row `offs_token // top_k`. That is **exactly**
+host.hip:216/405-409: `ntpp = TOPK*MOE_BM`, `expert_ids = ti_r = topk_ids` in router order, `num_valid = TOPK`,
+single activation row. It degenerates correctly at both shapes with no change. Round 40's "wrong dispatch value"
+was wrong: the dispatch is a verbatim, correct implementation of the naive path.
+
+Confirmed by experiment: `ETX_VL_DSL_TOPK=1` (a runtime top-k that takes E/TOPK as data, not a baked kernel)
+leaves the divergence bit-identical (6495 at token 0). So routing/top-k is not it either.
+
+**What is left, after eliminating config, argument order, replicas, kernel fidelity, MoE dispatch and routing:**
+the pieces that differ Qwen↔Mixtral and that `--check` cannot validate because it feeds both sides ETX's args —
+the **G=4 attention path** (`attn_mfma4_g4`/`attn_reduce`, which no end-to-end-correct ETX model has exercised;
+every shipped model is G=8) and ETX's own non-imported tiles (embedding gather, argmax). The divergence is at
+generated token 0 with argmax 6495 vs 28711.
+
+**Next experiment (the directive's final step):** dump ETX's layer-0 output activation and compare against a torch
+forward computed directly from the HF weights on disk — that isolates attention vs MLP vs embedding without a vLLM
+reference. Stopping here per the directive, with the suspect set reduced to the attention path and the ETX tiles.
+No code changed this round (nothing in the MoE dispatch was wrong); Qwen is untouched.
