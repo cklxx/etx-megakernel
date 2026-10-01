@@ -490,7 +490,9 @@ BODIES = {
   const __hip_bfloat16* We = d.W + (size_t)(d.mode >= 2 ? lids[s] : dsl_a_ldi(d.ids + s)) * d.estride;
   dsl_stage(d.x + (size_t)s * d.K, d.K, xs);
   __hip_bfloat16* out = d.out + (size_t)s * d.M;
-#ifdef DSL_ABLATE_EPI                                                           // ablation: no routing-weight multiply (WRONG output)
+#if defined(DSL_ABLATE_EPI) || defined(DSL_ABLATE_WTS)   // ablation: no routing-weight multiply (WRONG output). WTS is
+  // the down-only form: EPI also drops moe_up's silu, so it cannot price what moe_down does that vLLM's kernel does not
+  // (vLLM applies the routing weight in its separate moe_sum, which our fold deletes).
   dsl_gemv_chunked(We, d.K, xs, r0, r1, xs + d.K, [&](int r, float v) { dsl_a_stbf(out + r, __float2bfloat16(v)); });
 #else
   const float ws = d.mode >= 2 ? lwts[s] : dsl_a_ldf(d.wts + s);

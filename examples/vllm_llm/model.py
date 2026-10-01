@@ -129,6 +129,19 @@ if CU % NX:
     raise SystemExit(f"ETX_VL_CU={CU} must be a multiple of {NX} (one worker count per XCD)")
 WPX = CU // NX                # workers per XCD of an XCD-affine dense phase (304 -> 38, 192 -> 24)
 REP_ROLES = {"in_norm", "post_norm", "act", "final_norm", "topk", "moe_sum"}
+# ETX_VL_NOREP=<roles>: roles kept at one task set instead of one replica per XCD. The replica exists so each XCD's
+# consumers wait on an XCD-local event, which was worth its publication cost before ETX_VL_COH; with coherent reads a
+# consumer no longer invalidates, so 8 coherent copies against 1 copy plus a device-scope read is a measurement, not
+# an obvious choice (round 13 priced the top-k replica's body as one write-through round trip, not its arithmetic).
+_NOREP = {r for r in os.environ.get("ETX_VL_NOREP", "").split(",") if r}
+# host.hip addresses the top-k copy as topk_w + rr * TOPK (its "this XCD's top-k copy"), so de-replicating topk alone
+# leaves XCDs 1-7 reading a copy nobody writes: measured 2026-10-01 as 19533 values beyond 2 ulps, correct-looking
+# build, wrong answer. Refuse rather than miscompile. The arithmetic says it could not pay anyway: the 8 replicas run
+# concurrently, one per XCD, so the phase costs one body either way, while the consumers' wait would rise from
+# XCD-local to device scope (1.00 us by the budget's hand-off figure).
+if "topk" in _NOREP:
+    raise SystemExit("ETX_VL_NOREP=topk needs host.hip to point every consumer at copy 0; see model.py")
+REP_ROLES -= _NOREP
 XGEMV_AFTER = {"qkv": "in_norm", "gate_up": "post_norm", "down": "act", "lm_head": "final_norm", "router": "post_norm"}
 # MoE with ETX_VL_XCD: the expert path stays on one XCD per selected expert. top-k runs once per XCD (a replica); XCD x
 # then runs the blocks of expert slot x of gate_up (fused_moe pid_m = pid // (N / BLOCK_SIZE_N) = x), of silu (row x) and
