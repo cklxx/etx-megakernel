@@ -109,4 +109,5 @@ still differ from `build.sh`'s, so its LDS figure is not the shipped one — use
    larger fails. This is the only gate that sees an output row no kernel writes: round 42's wvSplitK hole
    (lm_head rows [8192, 9728) never written) passed the other two for weeks. `ETX_DEBUG_HOLE=<M'>` re-creates
    that bug shape on demand as the gate's negative test. Setup-time asserts cover the host-controlled siblings
-   (MoE task counts vs slots, attention partitions vs maxlen).
+   (MoE task counts vs slots, attention partitions vs maxlen). Limitation: the gate sees only rows the
+   reference's argmax visits; a hole above every argmax of the sequence is invisible to all three gates.
