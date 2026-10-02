@@ -461,6 +461,9 @@ static __device__ __forceinline__ void dsl_stage_norm_at(const DslArgs& d, const
   // one bf16 rounding, as torch's nn.LayerNorm on a bf16 tensor. mode 1 keeps the RMS path bit-for-bit.
   float mean = 0.f;
   if (d.mode == 4) {
+    __syncthreads();                    // mode 4 reads the WHOLE staged xs[] (mean), written by every thread --
+                                        // mode 1 never needed this: each thread reduces only its own ss during
+                                        // staging. Without it the mean reads unwritten LDS (NaN at full occupancy).
     float s1 = 0.f;
     for (int i = (int)threadIdx.x; i < K; i += blockDim.x) s1 += xs[i];
     mean = etx_block_sum(s1, red) / (float)K;
@@ -509,6 +512,9 @@ static __device__ __forceinline__ void dsl_stage_norm_at(const DslArgs& d, const
 #if ETX_EMIT_DSL_EXT
   float mean = 0.f;
   if (d.mode == 4) {
+    __syncthreads();                    // mode 4 reads the WHOLE staged xs[] (mean), written by every thread --
+                                        // mode 1 never needed this: each thread reduces only its own ss during
+                                        // staging. Without it the mean reads unwritten LDS (NaN at full occupancy).
     float s1 = 0.f;
     for (int i = (int)threadIdx.x; i < K; i += blockDim.x) s1 += xs[i];
     mean = etx_block_sum(s1, red) / (float)K;
@@ -653,7 +659,8 @@ BODIES = {
 #else
   if (d.mode >= 2) dsl_topk_lds(d.logits, d.E, d.R, d.mode == 3 ? 1 : 0, lids, lwts);
 #endif
-  const __hip_bfloat16* We = d.W + (size_t)(d.mode >= 2 ? lids[s] : dsl_a_ldi(d.ids + (size_t)rq * d.srows + s)) * d.estride;     // g: 2 x rpt floats (rpt <= DSL_RCH, host-checked)
+  const int dsl_eid = d.mode >= 2 ? lids[s] : dsl_a_ldi(d.ids + (size_t)rq * d.srows + s);
+  const __hip_bfloat16* We = d.W + (size_t)dsl_eid * d.estride;     // g: 2 x rpt floats (rpt <= DSL_RCH, host-checked)
 #if ETX_EMIT_DSL_BIGK
   if (d.K > DSL_K_MAX) {                               // K > the staged window (host allows it for the MoE forms only):
     float* gb = xs + DSL_K_MAX; float* pb = gb + 2 * d.rpt;      // fixed LDS bases -- xs + d.K would overflow the block
@@ -696,7 +703,8 @@ BODIES = {
 #else
   if (d.mode >= 2) dsl_topk_lds(d.logits, d.E, d.R, d.mode == 3 ? 1 : 0, lids, lwts);
 #endif
-  const __hip_bfloat16* We = d.W + (size_t)(d.mode >= 2 ? lids[s] : dsl_a_ldi(d.ids + (size_t)rq * d.srows + s)) * d.estride;
+  const int dsl_eid = d.mode >= 2 ? lids[s] : dsl_a_ldi(d.ids + (size_t)rq * d.srows + s);
+  const __hip_bfloat16* We = d.W + (size_t)dsl_eid * d.estride;
 #if ETX_EMIT_DSL_BIGK
   if (d.K > DSL_K_MAX) {                               // chunked staging; fixed LDS bases (see silu_mul)
     float* pb = xs + DSL_K_MAX;

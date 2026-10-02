@@ -348,10 +348,20 @@ struct etx_host {
   const void* unfused_kernel = nullptr;
   hipGraphExec_t unfused_exec = nullptr;
   void enqueue_unfused() {
+    // ETX_UNFUSED_SYNC=1: synchronize after every launch and name the one that faults (debug; forces graph off)
+    static const bool dbg_sync = [] { const char* e = getenv("ETX_UNFUSED_SYNC"); return e && *e == '1'; }();
     for (int i = etx_launch_begin[device]; i < etx_launch_begin[device + 1]; ++i) {
       int32_t first = etx_launch_first[i];
       void* kargs[] = {&p, &first};
       ETX_CHECK(hipLaunchKernel(unfused_kernel, dim3(etx_launch_count[i]), dim3(ETX_THREADS), kargs, 0, stream));
+      if (dbg_sync) {
+        const hipError_t e = hipStreamSynchronize(stream);
+        if (e != hipSuccess) {
+          fprintf(stderr, "ETX_UNFUSED_SYNC: launch %d type %s (%d tasks, first task %d) failed: %s\n",
+                  i, etx_type_names[etx_descs[first].type], etx_launch_count[i], first, hipGetErrorString(e));
+          abort();
+        }
+      }
     }
   }
   bool run_unfused() {

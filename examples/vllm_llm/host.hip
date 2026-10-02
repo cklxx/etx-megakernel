@@ -843,13 +843,24 @@ int main(int argc, char** argv) {
       for (const Inst& x2 : insts) if (x2.layer == Lc && x2.role == "topk" && x2.exp == "dsl_topk") { relaunch("topk", "dsl_topk"); break; }
       std::vector<int32_t> ids(TOPK); std::vector<float> wts(TOPK);
       ETX_CHECK(hipMemcpy(ids.data(), topk_ids, TOPK * 4, hipMemcpyDeviceToHost)); ETX_CHECK(hipMemcpy(wts.data(), topk_w, TOPK * 4, hipMemcpyDeviceToHost));
+      { printf("  topk dev  ids ["); for (int t = 0; t < TOPK; ++t) printf("%s%d", t ? " " : "", ids[t]);
+        printf("] wts ["); for (int t = 0; t < TOPK; ++t) printf("%s%.6f", t ? " " : "", wts[t]); printf("]\n"); fflush(stdout);
+        for (int t = 0; t < TOPK; ++t) if (ids[t] < 0 || ids[t] >= E) printf("  topk dev  id[%d]=%d OUT OF [0,%d) -- moe reads a garbage expert pointer\n", t, ids[t], E); fflush(stdout); }
       if (is_fold("moe_up")) {                                     // no top-k buffers: the CPU top-k of the logits stands in
         std::vector<float> lg = tof(dev(rlog, E)); float mx = -INFINITY; for (float v : lg) mx = std::max(mx, v);
         std::vector<float> pr(E); double sum = 0; for (int e = 0; e < E; ++e) { pr[e] = expf(lg[e] - mx); sum += pr[e]; }
         for (int e = 0; e < E; ++e) pr[e] = (float)(pr[e] / sum);
         std::vector<bool> used(E, false); double sel = 0;
+        if (sparsemixer) for (int t = 0; t < TOPK; ++t) {          // the device ran sparsemixer: the ref must too
+          float mt = -INFINITY; int bi = -1;
+          for (int e = 0; e < E; ++e) if (!used[e] && lg[e] > mt) { mt = lg[e]; bi = e; }
+          double S = 0;
+          for (int e = 0; e < E; ++e) if (!used[e] && !(((mt - lg[e]) / std::max(fabsf(lg[e]), mt)) > 0.02f)) S += exp((double)lg[e] - mt);
+          used[bi] = true; ids[t] = bi; wts[t] = (float)(1.0 / S);
+        }
+        else
         for (int t = 0; t < TOPK; ++t) { int b = -1; for (int e = 0; e < E; ++e) if (!used[e] && (b < 0 || pr[e] > pr[b])) b = e; used[b] = true; ids[t] = b; wts[t] = pr[b]; sel += pr[b]; }
-        if (norm_topk) for (int t = 0; t < TOPK; ++t) wts[t] = (float)(wts[t] / sel);
+        if (!sparsemixer && norm_topk) for (int t = 0; t < TOPK; ++t) wts[t] = (float)(wts[t] / sel);
         x = tof(dev(ox, H));                                       // the router's stored normed vector
       }
       if (!is_fold("moe_up")) { std::vector<float> lg = tof(dev(rlog, E)); float mx = -INFINITY; for (float v : lg) mx = std::max(mx, v);

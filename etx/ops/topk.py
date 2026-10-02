@@ -74,6 +74,8 @@ static __device__ __attribute__((always_inline)) void dsl_run_dsl_topk(const uns
         const float ov = __shfl_xor(bv, off, ETX_WAVE_SIZE); const int oi = __shfl_xor(bi, off, ETX_WAVE_SIZE);
         if (ov > bv || (ov == bv && oi < bi)) { bv = ov; bi = oi; }
       }
+      if (bi < 0 || bi >= E) bi = 0;      // all-NaN logits: every comparison is false and bi keeps its init;
+                                          // never let a sentinel become an expert index (a wild weight pointer)
       // masked softmax of the working row: exclude taken and jitter-masked elements (mask from the ORIGINAL logits)
       float c = 0.f;
 #pragma unroll
