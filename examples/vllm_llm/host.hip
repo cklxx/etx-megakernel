@@ -282,6 +282,13 @@ int main(int argc, char** argv) {
   }
 // ETX_VL_BATCH: the last six argument words are nb + the per-column strides; a tile that does not batch takes nb = 1
 #define ETX_VL_NOBATCH .i32(1).i32(0).i32(0).i32(0).i32(0).i32(0)
+// ETX_EMIT_DSL_EXT: the DSL gemv layout grows two trailing pointers (output bias, LayerNorm bias). The MoE forms
+// use neither, so they pass null, but the struct needs the fields present. Appended at the end of every MoE fill.
+#if ETX_EMIT_DSL_EXT
+#define ETX_VL_EXT2 .ptr(nullptr).ptr(nullptr)
+#else
+#define ETX_VL_EXT2
+#endif
 #define ETX_VL_BIND(Q)                                                                                                    \
   bf *resid = (Q).resid, *resid2 = (Q).resid2, *hn = (Q).hn, *qkv = (Q).qkv, *qn = (Q).qn, *kn = (Q).kn, *dx = (Q).dx, *ox = (Q).ox, *actx = (Q).actx;  \
   bf *attn_out = (Q).attn_out, *o = (Q).o, *gu = (Q).gu, *act = (Q).act, *dn = (Q).dn, *logits = (Q).logits, *tmp_out = (Q).tmp_out; \
@@ -437,18 +444,18 @@ int main(int argc, char** argv) {
     else if (x.exp == "dsl_moe_up_fold") a.ptr(W(pl + "w13")).ptr(ox).ptr(mc2).ptr(ti_r).ptr(nullptr).i64((long long)2 * MI * H).i32(MI).i32(H).i32(32).i32(MI / 32)
                                            .ptr(nullptr).ptr(nullptr).ptr(nullptr).ptr(nullptr).i32(TOPK).f32(0.f).i32(0).i32(E).ptr(rlog)
                                            .i32(x.nb).i32(x.nb > 1 ? (int)n_ox : 0).i32(x.nb > 1 ? (int)n_mc2 : 0)
-                                           .i32(x.nb > 1 ? (int)n_tk : 0).i32(x.nb > 1 ? (int)n_tk : 0).i32(0);
+                                           .i32(x.nb > 1 ? (int)n_tk : 0).i32(x.nb > 1 ? (int)n_tk : 0).i32(0) ETX_VL_EXT2;
     else if (x.exp == "dsl_moe_down_fold") a.ptr(W(pl + "w2")).ptr(mc2).ptr(mc3).ptr(ti_r).ptr(tw_r).i64((long long)H * MI).i32(H).i32(MI).i32(64).i32(H / 64)
                                              .ptr(nullptr).ptr(nullptr).ptr(nullptr).ptr(nullptr).i32(TOPK).f32(0.f).i32(0).i32(E).ptr(rlog)
                                              .i32(x.nb).i32(x.nb > 1 ? (int)n_mc2 : 0).i32(x.nb > 1 ? (int)n_mc3 : 0)
-                                             .i32(x.nb > 1 ? (int)n_tk : 0).i32(x.nb > 1 ? (int)n_tk : 0).i32(0);
+                                             .i32(x.nb > 1 ? (int)n_tk : 0).i32(x.nb > 1 ? (int)n_tk : 0).i32(0) ETX_VL_EXT2;
 #else
     else if ((x.exp == "dsl_moe_up_fold" || x.exp == "dsl_moe_down_fold") && x.nb > 1)
       die("ETX_VL_BATCH: a batched MoE needs the standalone top-k (the fold would recompute it per task per column)");
     else if (x.exp == "dsl_moe_up_fold") a.ptr(W(pl + "w13")).ptr(ox).ptr(mc2).ptr(nullptr).ptr(nullptr).i64((long long)2 * MI * H).i32(MI).i32(H).i32(32).i32(MI / 32)
-                                           .ptr(nullptr).ptr(nullptr).ptr(nullptr).ptr(nullptr).i32(TOPK).f32(0.f).i32(norm_topk ? 3 : 2).i32(E).ptr(rlog) ETX_VL_NOBATCH;
+                                           .ptr(nullptr).ptr(nullptr).ptr(nullptr).ptr(nullptr).i32(TOPK).f32(0.f).i32(norm_topk ? 3 : 2).i32(E).ptr(rlog) ETX_VL_NOBATCH ETX_VL_EXT2;
     else if (x.exp == "dsl_moe_down_fold") a.ptr(W(pl + "w2")).ptr(mc2).ptr(mc3).ptr(nullptr).ptr(nullptr).i64((long long)H * MI).i32(H).i32(MI).i32(64).i32(H / 64)
-                                             .ptr(nullptr).ptr(nullptr).ptr(nullptr).ptr(nullptr).i32(TOPK).f32(0.f).i32(norm_topk ? 3 : 2).i32(E).ptr(rlog) ETX_VL_NOBATCH;
+                                             .ptr(nullptr).ptr(nullptr).ptr(nullptr).ptr(nullptr).i32(TOPK).f32(0.f).i32(norm_topk ? 3 : 2).i32(E).ptr(rlog) ETX_VL_NOBATCH ETX_VL_EXT2;
 #endif
 #if ETX_EMIT_DSL_BIGK
     else if (x.exp == "dsl_moe_up" && (MI % 32 || H % 256 || H > 65536)) die("dsl_moe_up: MI % 32 or H % 256 (K > 4096 is chunked: etx/ops/gemv.py dsl_gemv_bigk)");
@@ -460,11 +467,11 @@ int main(int argc, char** argv) {
     else if (x.exp == "dsl_moe_up") a.ptr(W(pl + "w13")).ptr(o_norm).ptr(mc2).ptr(ti_r).ptr(nullptr).i64((long long)2 * MI * H).i32(MI).i32(H).i32(32).i32(MI / 32)
                                       .ptr(nullptr).ptr(nullptr).ptr(nullptr).ptr(nullptr).i32(0).f32(0.f).i32(0).i32(0).ptr(nullptr)
                                       .i32(x.nb).i32(x.nb > 1 ? (int)n_ox : 0).i32(x.nb > 1 ? (int)n_mc2 : 0)
-                                      .i32(x.nb > 1 ? (int)n_tk : 0).i32(x.nb > 1 ? (int)n_tk : 0).i32(0);
+                                      .i32(x.nb > 1 ? (int)n_tk : 0).i32(x.nb > 1 ? (int)n_tk : 0).i32(0) ETX_VL_EXT2;
     else if (x.exp == "dsl_moe_down") a.ptr(W(pl + "w2")).ptr(mc2).ptr(mc3).ptr(ti_r).ptr(tw_r).i64((long long)H * MI).i32(H).i32(MI).i32(64).i32(H / 64)
                                         .ptr(nullptr).ptr(nullptr).ptr(nullptr).ptr(nullptr).i32(0).f32(0.f).i32(0).i32(0).ptr(nullptr)
                                         .i32(x.nb).i32(x.nb > 1 ? (int)n_mc2 : 0).i32(x.nb > 1 ? (int)n_mc3 : 0)
-                                        .i32(x.nb > 1 ? (int)n_tk : 0).i32(x.nb > 1 ? (int)n_tk : 0).i32(0);
+                                        .i32(x.nb > 1 ? (int)n_tk : 0).i32(x.nb > 1 ? (int)n_tk : 0).i32(0) ETX_VL_EXT2;
     else if (r == "in_norm" && x.layer == 0) a.ptr(hn_r).ptr(res_r).i64(H).i64(0).i64(0).i64(0).i64(0).ptr(W(pl + "ln1")).i64(0).f32(eps).i32(1).i32(H);
     else if (r == "in_norm") { copy(dn, d_norm, H * 2); fused_add(d_norm, W(pl + "ln1")); }
     else if (r == "qkv") gemv(W(pl + "wqkv"), qkv_in, qkv, bias ? W(pl + "bqkv") : nullptr);

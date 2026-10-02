@@ -250,3 +250,35 @@ o_proj/lm_head bias in the gemv epilogue (qkv bias exists on the import path; th
 
 **Corrected claim:** the class this week validated is "GQA attention + *softmax-topk* routed MoE" — one notch
 narrower than "routed MoE". No download, no GPU time was spent; the refusal cost one config read.
+
+## Round 47: PhiMoE support — three of four hard features land; moe_up OOB localized
+
+Phi-3.5-MoE (microsoft/Phi-3.5-MoE-instruct: H=4096, 32L, G=4, E=16, top-2, MI=6400, LayerNorm, biases on
+qkv/o_proj/lm_head, LongRoPE, sparsemixer routing) exercises four structures no prior model had. Built as new,
+model-local code, all behind the feature manifest (`dsl_ext`), Qwen plan byte-identical and Qwen GPU run 32/32 +
+CHECK-DSL + wall 4.851 unchanged:
+
+1. **sparsemixer routing** — `dsl_topk` mode 2 (etx/ops/topk.py): per-round masked softmax, ids = plain top-2,
+   weights the per-round masked softmax at the winner. Cross-checked against vLLM's python on 2000 random rows
+   (E=8 and 16): identical ids, weights to 1e-6. Reference added to --check-dsl.
+2. **LayerNorm fold (mode 4)** — mean-centred + biased, in dsl_stage_norm_at, both VECNORM and scalar.
+3. **Output bias** — o_proj/lm_head/folded-qkv, in the gemv epilogue and the fold; two trailing arg pointers
+   (bias, LayerNorm bias) appended only when ETX_VL_DSL_EXT sized the layout, asserted to agree with the plan's
+   own config derivation (the round-14/19/30 drift class).
+4. **LongRoPE** — longrope cos/sin cache in prep.py with the config's explicit short/long mscale.
+
+Also fixed: the import arena was sized by whichever tile file included etx/import.h first (imp_tiles.hip for
+Qwen, whose layer 0 uses imported rms_norm; dsl_tiles.hip for a model that folds layer 0), so a folded-layer-0
+model got the default 16-byte arena. emit.py now defines ETX_IMPORT_LDS (#ifndef-guarded, the imports.json max)
+before the include, order-independent.
+
+**Verified correct via --check-dsl** (relaunch each op, 0 beyond 2 ulps): qkv (folded, LayerNorm mode 4, R=0),
+o_proj (bias), router (folded, LayerNorm). So the LayerNorm fold, the bias epilogue, and sparsemixer-fed routing
+are correct end to end.
+
+**Open, single remaining item:** `dsl_moe_up` faults with a memory aperture violation — localized precisely
+(qkv/o_proj/router pass, moe_up is the first expert-indexed op to run), XCD-independent (crashes with XCD off
+too, so not the unpinned slot mapping), expert weight shapes verified (w1/w3 [6400,4096], w2 [4096,6400], estride
+2·MI·H correct). Mixtral's DSL moe_up (K=4096, same path) ran; Phi differs in E (16 vs 8) and MI (6400 vs 14336),
+neither of which the tile's mode-0 path uses for addressing. The fault is in the MoE expert GEMV for this shape
+and needs a focused pass, not a shared-box rebuild loop. Everything that passed is committed and gated.
