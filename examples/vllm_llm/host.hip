@@ -281,7 +281,10 @@ int main(int argc, char** argv) {
     bf* qbuf = qn_sep ? qn : qkv; bf* kbuf = qn_sep ? kn : qkv + NH * HD;
     const long long qstr = qn_sep ? NH * HD : NQKV, kstr = qn_sep ? NKV * HD : NQKV;
     auto gemv = [&](const void* w, const void* in, void* out, const void* b) {   // ops.wvSplitK(weight, x, cu_count, bias)
-      a.i32(x.K).i32(x.K).i32(x.K).i32(x.M).i32(b ? x.M : 1).i32(1).ptr(w).ptr(in).ptr(b).ptr(out).i32(x.wv).i32(304);
+      // CuCount must be the GRID SIZE actually launched, not the device's CU count: the kernel's row loop strides by
+      // CuCount * _WvPrGrp * YTILE, so a larger value than the grid leaves rows [grid*wv*YT, CuCount*wv*YT) of every
+      // pass unwritten. Only lm_head (M > grid*wv*YT) loops; its holes hit any token id in them (round 42: Mixtral).
+      a.i32(x.K).i32(x.K).i32(x.K).i32(x.M).i32(b ? x.M : 1).i32(1).ptr(w).ptr(in).ptr(b).ptr(out).i32(x.wv).i32(x.gx * x.gy * x.gz);
     };
     auto copy = [&](const void* src, void* dst, size_t bytes) {         // the replica's copy before an in-place kernel
       if (x.copyoff < 0) return;
@@ -554,6 +557,24 @@ int main(int argc, char** argv) {
       vl_set_params(vps.data(), nreq, hst.stream);
       if (unfused) { if (!hst.run_unfused()) { printf("step %d: unfused step failed\n", t); return 2; } }
       else if (!hst.run(60.0)) { printf("step %d: ETX step failed\n", t); return 2; }
+      // ETX_DUMP=<dir>: after step ETX_DUMP_STEP (default 0), write the stage buffers to files (ETX_LLM_LAYERS=1
+      // keeps layer 0's values in them). Diffed against a torch forward of the HF weights to bisect by stage (round 42).
+      if (getenv("ETX_DUMP") && t == (getenv("ETX_DUMP_STEP") ? atoi(getenv("ETX_DUMP_STEP")) : 0)) {
+        const std::string dir = getenv("ETX_DUMP"); const Req& q = reqs[0];
+        auto dump = [&](const char* n, const void* ptr, size_t bytes) {
+          if (!ptr) return; std::vector<uint8_t> h(bytes);
+          ETX_CHECK(hipMemcpy(h.data(), ptr, bytes, hipMemcpyDeviceToHost));
+          FILE* f = fopen((dir + "/" + n + ".bin").c_str(), "wb"); fwrite(h.data(), 1, bytes, f); fclose(f);
+        };
+        dump("resid", q.resid, n_resid * 2);       dump("hn", q.hn, n_hn * 2);
+        dump("qkv", q.qkv, n_qkv * 2);             dump("attn_out", q.attn_out, n_attn_out * 2);
+        dump("o", q.o, n_o * 2);                   dump("rlog", q.rlog, n_rlog * 2);
+        dump("topk_w", q.topk_w, (size_t)NR * std::max(TOPK, 1) * 4);
+        dump("topk_ids", q.topk_ids, (size_t)NR * std::max(TOPK, 1) * 4);
+        dump("mc1", q.mc1, n_mc1 * 2); dump("mc2", q.mc2, n_mc2 * 2); dump("mc3", q.mc3, n_mc3 * 2);
+        dump("dn", q.dn, n_dn * 2);                dump("logits", q.logits, n_logits * 2);
+        printf("  dumped step-%d stage buffers to %s\n", t, dir.c_str());
+      }
       const double wms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - w0).count();
       if (t + 1 >= (int)prompt.size()) wall_ms.push_back(wms);
       if (progress && (t % progress == 0 || t < 3)) { printf("  step %d: %.3f ms wall\n", t, wms); fflush(stdout); }
@@ -564,6 +585,13 @@ int main(int argc, char** argv) {
     for (int r = 0; r < nreq; ++r) {
       ETX_CHECK(hipMemcpy(out.data(), reqs[r].token_out, steps * 4, hipMemcpyDeviceToHost));
       ETX_CHECK(hipMemcpy(tt.data(), reqs[r].token_time, 2 * steps * 8, hipMemcpyDeviceToHost));
+      // ETX_TOKTRACE=<file>: every step's argmax (the whole teacher-forced prompt too), one per line, to
+      // bisect a divergence by position against a HF prefill's per-position argmax (round 42).
+      if (const char* tf = getenv("ETX_TOKTRACE")) {
+        FILE* f = fopen(tf, "w");
+        for (int t = 0; t < steps; ++t) fprintf(f, "%d\n", out[t]);
+        fclose(f);
+      }
       int first_div = -1; matched[r] = 0;
       for (int i = 0; i < gen; ++i) {
         const int t = (int)prompt.size() - 1 + i;

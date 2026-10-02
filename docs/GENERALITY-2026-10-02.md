@@ -132,3 +132,48 @@ generated token 0 with argmax 6495 vs 28711.
 forward computed directly from the HF weights on disk — that isolates attention vs MLP vs embedding without a vLLM
 reference. Stopping here per the directive, with the suspect set reduced to the attention path and the ETX tiles.
 No code changed this round (nothing in the MoE dispatch was wrong); Qwen is untouched.
+
+## Round 42: two scalar bugs named and fixed — Mixtral-8x7B reaches 32/32
+
+The layer-0 activation bisect ran as directed and the prime suspect is CLEARED: at position 0 (BOS, 1-layer build,
+`ETX_DUMP` stage dump in host.hip) hn/qkv/attn_out match a torch forward of the on-disk HF weights to bf16 noise
+(corr 1.00000), and at positions 1 and 300 the full stage chain — rope (theta 1e6, neox), G=4 attention over 2 and
+301 keys, router, top-k — matches too. **attn_mfma4_g4/attn_reduce are correct.** (The dumped `o`/`dn` buffers are
+stale in the imported path — rlog computed downstream of o_proj matched while `o` didn't; dump artifact, not a bug.)
+
+What the bisect actually named, in order:
+
+**Bug 1 — fused_moe grid vs the harvested binary's BLOCK_SIZE_N.** mc1 was written only in slot 0's gate half;
+slot 1 and every up column were zeros (mc2 = silu(g)·0 = 0 legitimately, so the whole MoE output was ~0 and the
+model collapsed to attention-only). Cause: `MOE_BN = 64` is the Qwen harvest's BLOCK_SIZE_N; the Mixtral e8 ttir
+bakes BM=16 BK=256 **BN=16**, so the grid `TOPK*ceil(2*MI/64)` launched 896 of the 3584 blocks the binary needs.
+`--check` is blind to a wrong grid for the same reason it is blind to wrong argument values: it launches BOTH
+kernels with ETX's grid. Fix: model.py keys MOE_BN by shape exactly as the kernel name is keyed (`MOE_BN_E8 = 16`).
+
+**Bug 2 — wvSplitK's CuCount argument vs the launched grid.** After bug 1 the model was right at steps 0–1 but
+wrong at 174 of 1024 teacher-forced prompt positions — precisely the positions whose true argmax token id falls in
+rows the lm_head never writes. host.hip passed `CuCount=304` (the device's CU count) while the gemv grid is
+`CU=256` blocks (the DSL-tuning default in model.py). The kernel's row loop strides by `CuCount*_WvPrGrp*YTILE`
+(skinny_gemms.cu:623,791), so rows `[256*wv*YT, 304*wv*YT)` of every pass — for V=32000, [8192,9728) mod 9728 —
+were never written and held stale values. Only lm_head loops (every other gemv fits one pass: qkv 6144 = 256*12*2
+exactly, o_proj 4096 = 256*8*2 exactly), which is why 28 rounds of Qwen gates never tripped it: a hole only shows
+when the true argmax lands in it (Qwen's goldens never did; Mixtral's "):\n" tokens 28711/28732 ≡ 9255/9276 mod
+9728 sit inside). Deterministic, reproduced identically by --unfused, found by diffing per-step argmax against a
+single HF prefill (`ETX_TOKTRACE`), then solving which input each 4096-row logits block had consumed. Fix:
+host.hip passes the grid size (`x.gx*x.gy*x.gz`) as CuCount.
+
+Gates, all green:
+- Mixtral-8x7B: **32/32 generated tokens match HF greedy** (b_r42_fix2, imported mode), two runs.
+- Mixtral `--check 32`: 0 launches differ (the imported kernels remain byte-faithful under the fixed grids).
+- Qwen3-30B-A3B: plan byte-identical to the round-37 reference; GPU run **32/32** and **CHECK-DSL OK** (0 values
+  beyond 2 bf16 ulps, layer 47), median 4.679 ms/token — unchanged.
+
+Diagnostics added (both env-gated, zero cost when unset): `ETX_DUMP`/`ETX_DUMP_STEP` stage-buffer dump after one
+step; `ETX_TOKTRACE` per-step argmax trace over the whole teacher-forced prompt.
+
+GENERALITY VERDICT: the second MoE model — different expert count (8 vs 128), different top-k (2 vs 8), different
+GQA ratio (G=4 vs G=8), untied embeddings, vocab 32000 — runs end-to-end through the unchanged ETX compiler
+(plan, events, placement, importer) to exact HF-greedy agreement. Everything model-specific that broke was
+host-side glue, and each break was a scalar keyed to shape: the Triton binaries' baked constexprs (rounds 38-39),
+their launch grids (bug 1), and a grid-vs-stride constant (bug 2, a latent bug for every model, exposed by vocab
+position). The megakernel machinery itself needed nothing.

@@ -76,6 +76,7 @@ PART = 256                    # paged attention partition size (fixed in paged_a
 # (results_2026-10-01/round11/FINDING.md).
 THREADS = 1024                # megakernel workgroup = the largest imported block (wvSplitK 64 x 16)
 MOE_BN = 64                   # fused_moe_kernel BLOCK_SIZE_N of vLLM's default config at batch 1 (examples/vllm_llm/triton)
+MOE_BN_E8 = 16                # same, for the E=8 harvest (Mixtral shape): BM=16 BK=256 BN=16 per its ttir (round 42)
 MAXLEN = int(os.environ.get("ETX_VL_MAXLEN", "1072"))    # vLLM's max_model_len for the benchmark (prompt + 32 + 16)
 # ETX_VL_PIN=1: the small launches between qkv and o_proj (q/k norm, rope, cache, attention, reduce) all run on
 # XCD 0, so the events between them are XCD-local (a wait on L2 of one XCD) instead of device-wide
@@ -317,9 +318,12 @@ def instances(d) -> list[dict]:
                 add("dsl_moe_up_fold" if DSL_FOLD else "dsl_moe_up", L, "moe_up", (d.TOPK * (d.MI // 32), 1, 1), M=d.MI, K=d.H, noaff=noaff)
                 add("dsl_moe_down_fold" if DSL_FOLD else "dsl_moe_down", L, "moe_down", (d.TOPK * (d.H // 64), 1, 1), M=d.H, K=d.MI, noaff=noaff)
             else:
-                add("fused_moe_up" if d.E == 128 else f"fused_moe_up_e{d.E}", L, "moe_up", (d.TOPK * math.ceil(2 * d.MI / MOE_BN), 1, 1), noaff=noaff)
+                bn = MOE_BN if d.E == 128 else MOE_BN_E8   # grid must match the harvested binary's BLOCK_SIZE_N:
+                #   too few blocks silently leaves output columns unwritten (zeros) and --check cannot see it,
+                #   because --check launches the original with ETX's grid too (round 42: Mixtral MoE output was 0)
+                add("fused_moe_up" if d.E == 128 else f"fused_moe_up_e{d.E}", L, "moe_up", (d.TOPK * math.ceil(2 * d.MI / bn), 1, 1), noaff=noaff)
                 add("silu_and_mul", L, "moe_act", (d.TOPK, 1, 1), noaff=noaff)
-                add("fused_moe_down" if d.E == 128 else f"fused_moe_down_e{d.E}", L, "moe_down", (d.TOPK * math.ceil(d.H / MOE_BN), 1, 1), noaff=noaff)
+                add("fused_moe_down" if d.E == 128 else f"fused_moe_down_e{d.E}", L, "moe_down", (d.TOPK * math.ceil(d.H / bn), 1, 1), noaff=noaff)
             if not DSL and not DSL_FOLD:                           # DSL: the next in_norm reads the 8 expert rows itself
                 add(f"moe_sum_k{d.TOPK}", L, "moe_sum", (1, 1, 1), noaff=noaff)
             continue
