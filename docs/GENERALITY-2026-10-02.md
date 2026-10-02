@@ -223,3 +223,14 @@ decoder); Qwen3.6's generation moved the class (hybrid linear attention, shared 
 step 0 with a named reason — which is the behaviour rounds 38 and 28 built (DeepSeek-V2-Lite's MLA and the mixed
 dense/MoE layout are refused the same way), and the opposite of the silent-wrong-answer failures this document
 exists to prevent.
+
+
+## Round 43: Mixtral on the DSL path
+
+Opening the DSL tiles to K > 4096 (chunked staging of x, numerically exact — CHECK-DSL clean at layer 31)
+gives Mixtral the DSL path: **10.365 ms/token against 17.058 all-imported (1.65x) and vLLM's 8.686 (1.19x behind)**.
+Streaming floor ~7.3-8.5 ms; vLLM sits on it. The remaining gap is named from the trace and is not the chunked
+path: the MoE rows-per-task constants are Qwen-tuned (moe_up 896 tasks on 304 workers = three serial waves,
+moe_down 128 tasks with 58% of workers idle; MoE is 73% of the layer) — per-shape task widths are the next knob.
+A Qwen regression (+0.12 ms from the resident big-K branch) was caught by the interleaved gate and fixed via the
+feature manifest (`dsl_bigk`, derived from max(H, MI) > 4096); Qwen's emitted source is token-identical with it off.

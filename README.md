@@ -50,7 +50,13 @@ one memory request per lane per 2-byte element (−0.105 in the folded norm, −
 ETX is ahead of vLLM by 0.8% (interleaved, non-overlapping ranges), and the budget says where the rest went: hand-off sits at the event protocol's floor, workgroup
 start delay is below the hardware dispatcher's own jitter, host work is 0.135 ms, and the instruction cache hits
 99.90%. **The orchestration is spent; 1.29 ms of the step is our own hand-written tiles** — which was never
-ETX's claim. Full report: [docs/ETX-report-2026-10-01.pdf](docs/ETX-report-2026-10-01.pdf), per-phase budget in
+ETX's claim. Generality (2026-10-02): a second MoE, Mixtral-8x7B (top-2 of 8, G=4, K=14336), runs 32/32 through the same
+compiler with zero compiler changes — every break was host-side shape glue, now shape-keyed so unknown shapes fail
+loudly at import. On the DSL path it reaches 10.365 ms/token against vLLM's 8.686 (floor ~7.3-8.5); the remaining
+gap is Qwen-tuned task-width constants, named in [docs/GENERALITY-2026-10-02.md](docs/GENERALITY-2026-10-02.md).
+Out-of-class architectures (Qwen3.6's hybrid linear attention) are refused by name at the config.
+
+Full report: [docs/ETX-report-2026-10-01.pdf](docs/ETX-report-2026-10-01.pdf), per-phase budget in
 [docs/BUDGET-2026-10-01.md](docs/BUDGET-2026-10-01.md), measured data index in [docs/DATA.md](docs/DATA.md).
 
 ## Earlier: the real model runs (2026-09-23)
