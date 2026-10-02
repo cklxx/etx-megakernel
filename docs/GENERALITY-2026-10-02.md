@@ -191,3 +191,35 @@ ETX Mixtral is ~1.9x slower than vLLM default — expected: this is the all-impo
 this shape. The generality claim this document is for is CORRECTNESS of the compiler path on a second model, which
 is now closed; making Mixtral fast is its own (unstarted) tuning ladder. One decode trace captured
 (round42/trace_r42_mixtral.{bin,log}, median 16.751 ms on-device).
+
+## Round 44: Qwen3.6-35B-A3B — refused at the config, correctly
+
+The third candidate (`Qwen/Qwen3.6-35B-A3B`, model_type `qwen3_5_moe`, 71.9 GB bf16) was examined and **not
+attempted**: it is not a shape variant of the family this path expresses, it is a different architecture class.
+Decided from `config.json` and the checkpoint index alone — no download, no GPU time.
+
+What the checkpoint actually contains (verified against `model.safetensors.index.json`, 1045 tensors):
+
+| fact | value | why it stops the ladder |
+|---|---|---|
+| hybrid attention | **30 of 40 layers are `linear_attention`** (gated delta-rule: `A_log`, `dt_bias`, `conv1d` k=4, 32 value heads × 128), full attention only every 4th layer | ETX has no linear-attention tile family, and the recurrent state is **cross-step persistent state** — a tensor lifetime the per-step task graph does not have (the KV cache is today's only cross-step state, owned by imported kernels) |
+| `attn_output_gate: true` | output gating on the 10 full-attention layers | not expressible in the current qkv/o_proj path |
+| shared expert | `shared_expert_intermediate_size: 512`, 164 tensors | the MoE block has no shared-expert branch (routed-only) |
+| experts | 256 routed, top-8, moe_int 512 | would need new keyed harvests — moot given the rows above |
+| wrapper | multimodal (`model.language_model.*` paths, vision tower), plus an `mtp.*` head (19 tensors) | mechanical prep work — also moot |
+
+The G of the full-attention layers is 16/2 = 8, which the existing `attn_mfma16_g8` import serves — but only 10 of
+40 layers are full attention, so there is no partial path.
+
+What running this model would require, in order of size: (1) a linear-attention tile family (short conv + gated
+delta-rule recurrence) **and a persistent cross-step state class in the runtime**; (2) a shared-expert branch in
+the MoE block; (3) output gating on full-attention layers; (4) multimodal path remapping and the MTP strip in prep
+(mechanical); (5) E=256 keyed harvests (mechanical). Items 1–3 are new compute structures, not shape facts — the
+config-key derivations, shape-keyed exports and grid fixes from rounds 38–42 cover none of them and all of them
+are outside what rounds 38–42 established generality FOR.
+
+Verdict for the record: the generality claim holds **within the architecture class** (GQA attention + routed-MoE
+decoder); Qwen3.6's generation moved the class (hybrid linear attention, shared experts). The refusal happened at
+step 0 with a named reason — which is the behaviour rounds 38 and 28 built (DeepSeek-V2-Lite's MLA and the mixed
+dense/MoE layout are refused the same way), and the opposite of the silent-wrong-answer failures this document
+exists to prevent.
