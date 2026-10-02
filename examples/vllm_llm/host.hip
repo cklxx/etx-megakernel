@@ -84,6 +84,11 @@ static std::vector<int> read_ints(std::istream& in) {
   std::vector<int> v; int x; while (s >> x) v.push_back(x); return v;
 }
 
+static std::vector<double> read_floats(std::istream& in) {
+  std::string line; std::getline(in, line); std::istringstream s(line); std::string head; s >> head;
+  std::vector<double> v; double x; while (s >> x) v.push_back(x); return v;
+}
+
 struct Inst { int n; std::string exp; int layer; std::string role; int gx, gy, gz; size_t off; int tasks; int M, K, wv; int rep = 1; size_t stride = 0; long long copyoff = -1; int req = 0; int nb = 1; };
 
 // fills one argument block in declaration order, checking every value's type against the import's layout
@@ -105,9 +110,9 @@ struct Args {
 };
 
 int main(int argc, char** argv) {
-  if (argc < 3) die("usage: run <packed-dir> <plan.txt> [--golden F] [--gen N] [--repeat R] [--teacher] [--unfused]");
+  if (argc < 3) die("usage: run <packed-dir> <plan.txt> [--golden F] [--gen N] [--repeat R] [--teacher] [--unfused] [--check-coverage]");
   const std::string dir = argv[1], plan_path = argv[2];
-  int gen = -1, repeat = 2, check_layers = 0, max_steps = 0; bool teacher = false, unfused = false, check_dsl = false; std::string golden_name = "golden_c1024.txt"; std::vector<std::string> extra_goldens;
+  int gen = -1, repeat = 2, check_layers = 0, max_steps = 0; bool teacher = false, unfused = false, check_dsl = false, check_coverage = false; std::string golden_name = "golden_c1024.txt"; std::vector<std::string> extra_goldens;
   for (int i = 3; i < argc; ++i) {
     const std::string a = argv[i];
     if (a == "--gen" && i + 1 < argc) gen = atoi(argv[++i]);
@@ -124,6 +129,11 @@ int main(int argc, char** argv) {
       extra_goldens[r - 1] = argv[++i];
     }
     else if (a == "--max-steps" && i + 1 < argc) max_steps = atoi(argv[++i]);
+    // --check-coverage: the third gate. Teacher-force the FULL golden sequence and diff every position's argmax
+    // against the HF prefill reference prep.py writes beside the golden (prefill_*.txt). Catches what the other two
+    // gates cannot: an output row no kernel ever writes (round 42: wvSplitK's CuCount hole held rows [8192,9728) of
+    // lm_head stale through weeks of green --check and 32/32 runs). Implies --teacher.
+    else if (a == "--check-coverage") { check_coverage = true; teacher = true; }
     else if (a == "--check-dsl") check_dsl = true;   // the DSL GEMVs of the last layer against a CPU reference (bf16 tolerance)   // traces: stop after N steps (no token check)
     else if (a == "--check" && i + 1 < argc) check_layers = atoi(argv[++i]);   // compare each imported launch with vLLM's original, layers < N
   }
@@ -165,6 +175,12 @@ int main(int argc, char** argv) {
   }
   bool qknr = false;                                                        // the plan runs the fused q/k norm + rope (in place)
   for (const Inst& x : insts) qknr = qknr || x.role == "qknr" || x.role == "prep";
+  // paged attention partitions by a hardcoded 256 tokens (vllm attention.cu T_PAR_SIZE; round 11): a plan whose
+  // partition count does not cover maxlen would silently never attend to the tail of the sequence
+  for (const Inst& x : insts) if (x.role == "attn") {
+    if (parts * 256 < MAXLEN) die("attention partitions (" + std::to_string(parts) + " x 256) do not cover maxlen " + std::to_string(MAXLEN));
+    break;
+  }
 
   // ---- golden: request 0 from --golden, request r from --golden<r>; the prompts have one length
   std::vector<std::vector<int>> prompts, goldens;
@@ -181,6 +197,18 @@ int main(int argc, char** argv) {
   const std::vector<int>& prompt = prompts[0];
   const std::vector<int>& golden = goldens[0];
   const int steps = (int)prompt.size() + gen - 1;
+  // --check-coverage references: prefill_<golden>'s per-position argmax and top-1 margin (prep.py --prefill-only)
+  std::vector<std::vector<int>> cov_am(nreq); std::vector<std::vector<double>> cov_marg(nreq);
+  if (check_coverage) for (int r = 0; r < nreq; ++r) {
+    std::string gname = r == 0 ? golden_name : extra_goldens[r - 1];
+    if (gname.rfind("golden", 0) != 0) die("--check-coverage: golden file name must start with 'golden'");
+    const std::string pname = "prefill" + gname.substr(6);
+    std::ifstream pf(dir + "/" + pname);
+    if (!pf) die("--check-coverage: no " + pname + " beside the golden; write it with examples/llm/prep.py --prefill-only");
+    cov_am[r] = read_ints(pf); cov_marg[r] = read_floats(pf);
+    if ((int)cov_am[r].size() < steps || cov_marg[r].size() != cov_am[r].size())
+      die(pname + ": expected >= " + std::to_string(steps) + " argmax positions with margins");
+  }
   if (steps + 1 > MAXLEN) die("prompt + generation exceeds maxlen");
 
   // ---- weights
@@ -267,6 +295,22 @@ int main(int argc, char** argv) {
     ETX_VL_BIND(reqs[x.req])
     Args a(x.exp.c_str(), ab.data() + x.off + rr * x.stride);
     const std::string r = x.role; const std::string pl = "L" + std::to_string(x.layer) + ".";
+    // ETX_DEBUG_HOLE=<M'>: shrink lm_head's M so logits rows [M', V) are never written -- the negative test of
+    // --check-coverage. It reproduces the round-42 wvSplitK bug's effect exactly: --check stays green (both kernels
+    // get the same M') and 32/32 stays green unless a generated argmax lands in the hole; only the coverage gate sees it.
+    int xM = x.M;
+    if (r == "lm_head") if (const char* hh = getenv("ETX_DEBUG_HOLE")) {
+      xM = atoi(hh);
+      if (xM <= 0 || xM > x.M) die("ETX_DEBUG_HOLE must be in (0, V]");
+      static bool warned = false;
+      if (!warned) { printf("ETX_DEBUG_HOLE: lm_head M %d -> %d; logits rows [%d, %d) are deliberately never written\n", x.M, xM, xM, x.M); warned = true; }
+    }
+    // coverage invariants the gate should never have to catch (the round-42 class): the written-output arithmetic
+    // the host controls, asserted once at setup
+    if (x.exp.rfind("dsl_moe_up", 0) == 0 && x.tasks != std::max(x.nb, 1) * TOPK * (MI / 32))
+      die(x.exp + ": tasks " + std::to_string(x.tasks) + " do not cover nb*TOPK*(MI/32) expert rows");
+    if (x.exp.rfind("dsl_moe_down", 0) == 0 && x.tasks != std::max(x.nb, 1) * TOPK * (H / 64))
+      die(x.exp + ": tasks " + std::to_string(x.tasks) + " do not cover nb*TOPK*(H/64) output rows");
     const bool per_xcd = NR > 1;                                          // replicas read / write their XCD's copies
     bf* res_r = resid + (size_t)rr * H;
     bf* hn_r = hn + (size_t)rr * H; bf* dx_r = dx + (size_t)rr * H; bf* ox_r = ox + (size_t)rr * H; bf* act_r = actx + (size_t)rr * I;
@@ -284,7 +328,7 @@ int main(int argc, char** argv) {
       // CuCount must be the GRID SIZE actually launched, not the device's CU count: the kernel's row loop strides by
       // CuCount * _WvPrGrp * YTILE, so a larger value than the grid leaves rows [grid*wv*YT, CuCount*wv*YT) of every
       // pass unwritten. Only lm_head (M > grid*wv*YT) loops; its holes hit any token id in them (round 42: Mixtral).
-      a.i32(x.K).i32(x.K).i32(x.K).i32(x.M).i32(b ? x.M : 1).i32(1).ptr(w).ptr(in).ptr(b).ptr(out).i32(x.wv).i32(x.gx * x.gy * x.gz);
+      a.i32(x.K).i32(x.K).i32(x.K).i32(xM).i32(b ? xM : 1).i32(1).ptr(w).ptr(in).ptr(b).ptr(out).i32(x.wv).i32(x.gx * x.gy * x.gz);
     };
     auto copy = [&](const void* src, void* dst, size_t bytes) {         // the replica's copy before an in-place kernel
       if (x.copyoff < 0) return;
@@ -294,7 +338,7 @@ int main(int argc, char** argv) {
     auto fused_add = [&](bf* in, const void* w) { a.ptr(in).i64(H).ptr(res_r).ptr(w).f32(eps).i32(1).i32(H).i64(H); };
     // the DSL GEMVs (etx.ops.gemv): W, x, out, ids, wts, expert stride, M, K, rows per task, tasks per expert
     if (x.exp == "dsl_gemv") {
-      const int nblk = x.gx * x.gy * x.gz, rpt = (x.M + nblk - 1) / nblk;
+      const int nblk = x.gx * x.gy * x.gz, rpt = (xM + nblk - 1) / nblk;
       if (x.K > 4096 || x.K % 256) die("dsl_gemv: K must be a multiple of 256 and <= 4096 (etx/ops/gemv.py)");
       const void* w; const void* in; void* out; size_t sx = 0, sout = 0;   // sx / sout: the request stride of in / out
       if (r == "qkv") { if (bias) die("dsl_gemv: qkv bias not supported"); w = W(pl + "wqkv"); in = qkv_in; out = qkv; sx = x.layer == 0 ? n_hn : n_dx; sout = n_qkv; }
@@ -304,7 +348,7 @@ int main(int argc, char** argv) {
       else if (r == "down") { w = W(pl + "wd"); in = act_out; out = dn; sx = n_actx; sout = n_dn; }
       else if (r == "lm_head") { w = tie ? W("embed") : W("lm_head"); in = d_norm; out = logits; sx = n_dx; sout = n_logits; }
       else die("dsl_gemv: role " + r);
-      a.ptr(w).ptr(in).ptr(out).ptr(nullptr).ptr(nullptr).i64(0).i32(x.M).i32(x.K).i32(rpt).i32(0)
+      a.ptr(w).ptr(in).ptr(out).ptr(nullptr).ptr(nullptr).i64(0).i32(xM).i32(x.K).i32(rpt).i32(0)
        .ptr(nullptr).ptr(nullptr).ptr(nullptr).ptr(nullptr).i32(0).f32(0.f).i32(0).i32(0).ptr(nullptr)
        .i32(x.nb).i32((int)sx).i32((int)sout).i32(0).i32(0).i32(0);
     }
@@ -323,7 +367,7 @@ int main(int argc, char** argv) {
     else if (x.exp == "dsl_gemv_fold") {
       // norm fold (mode 1): qkv (L > 0) = norm(residual + the 8 expert rows) with ln1; router = norm(residual + o) with ln2;
       // lm_head = norm(residual + the last layer's expert rows) with final_norm
-      const int nblk = x.gx * x.gy * x.gz, rpt = (x.M + nblk - 1) / nblk;
+      const int nblk = x.gx * x.gy * x.gz, rpt = (xM + nblk - 1) / nblk;
       if (x.K > 4096 || x.K % 256) die("dsl_gemv_fold: K must be a multiple of 256 and <= 4096");
       if (E == 0) die("dsl_gemv_fold: the fold is written for the MoE model (expert rows)");
       const void* w; void* out; const bf* rows; const bf* rin; bf* rout; const void* ln; int R; bf* xout = nullptr;
@@ -338,7 +382,7 @@ int main(int argc, char** argv) {
       else if (r == "lm_head") { w = tie ? W("embed") : W("lm_head"); out = logits; rows = mc3; rin = resid2; rout = nullptr; ln = W("final_norm"); R = TOPK;
                         sout = n_logits; srows = n_mc3; srin = n_resid2; }
       else die("dsl_gemv_fold: role " + r);
-      a.ptr(w).ptr(xout).ptr(out).ptr(nullptr).ptr(nullptr).i64(0).i32(x.M).i32(x.K).i32(rpt).i32(0)
+      a.ptr(w).ptr(xout).ptr(out).ptr(nullptr).ptr(nullptr).i64(0).i32(xM).i32(x.K).i32(rpt).i32(0)
        .ptr(rows).ptr(rin).ptr(rout).ptr(ln).i32(R).f32(eps).i32(1).i32(0).ptr(nullptr)
        .i32(x.nb).i32((int)sx).i32((int)sout).i32((int)srows).i32((int)srin).i32((int)srout);
     }
@@ -556,6 +600,7 @@ int main(int argc, char** argv) {
   const int progress = getenv("ETX_VL_PROGRESS") ? atoi(getenv("ETX_VL_PROGRESS")) : 0;   // print every N-th step's wall time
   setvbuf(stdout, nullptr, _IOLBF, 0);
   std::vector<int> matched(nreq, 0);
+  int cov_hard = 0;
   for (int run = 0; run < repeat; ++run) {
     for (int r = 0; r < nreq; ++r) {
       std::vector<int32_t> tin(steps + 2, 0);
@@ -615,6 +660,23 @@ int main(int argc, char** argv) {
              matched[r], gen, teacher ? " (teacher-forced argmax)" : "");
       if (first_div >= 0) printf("; first divergence at %d (ours %d, HF %d)", first_div, out[(int)prompt.size() - 1 + first_div], goldens[r][first_div]);
       printf("\n");
+      // --check-coverage: every position's argmax against the HF prefill. A mismatch whose HF top-1 margin is tiny is
+      // an argmax tie flipped by bf16 rounding (the 32-token gate has the same property); one with a real margin means
+      // a logits row the device never wrote or wrote wrongly. Gate: zero mismatches with margin > 0.5.
+      if (check_coverage && run == 0) {
+        int hard = 0, ties = 0, first_hard = -1;
+        for (int t = 0; t < steps; ++t) {
+          if (out[t] == cov_am[r][t]) continue;
+          if (cov_marg[r][t] <= 0.5) { ++ties; continue; }
+          if (first_hard < 0) first_hard = t;
+          if (hard < 8) printf("  coverage%s: position %d ours %d, HF %d (margin %.3f)\n",
+                               nreq > 1 ? (" request " + std::to_string(r)).c_str() : "", t, out[t], cov_am[r][t], cov_marg[r][t]);
+          ++hard;
+        }
+        cov_hard += hard;
+        printf("CHECK-COVERAGE %s%s: %d position(s), %d wrong beyond ties, %d tie-tolerated (HF margin <= 0.5)\n",
+               hard ? "FAILED" : "OK", nreq > 1 ? (" request " + std::to_string(r)).c_str() : "", steps, hard, ties);
+      }
     }
     step_ms.clear();
     for (int i = 0; i < gen; ++i) { const int t = (int)prompt.size() - 1 + i; step_ms.push_back((t1[t] - t0[t]) * 1e-5); }
@@ -773,5 +835,6 @@ int main(int argc, char** argv) {
   for (int r = 1; r < nreq; ++r) { mall = std::min(mall, matched[r]); ms += "," + std::to_string(matched[r]); }
   printf("RESULT model=%s requests=%d matched=%d gen=%d median_ms=%.3f wall_ms=%.3f tokens_per_s=%.0f matched_each=%s\n", dir.c_str(), nreq, mall, gen,
          med, wmed, med > 0 ? nreq * 1e3 / med : 0.0, ms.c_str());
+  if (check_coverage && cov_hard) { printf("CHECK-COVERAGE FAILED: %d position(s) wrong beyond ties\n", cov_hard); return 5; }
   return 0;
 }

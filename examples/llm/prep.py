@@ -53,10 +53,39 @@ def reference(src: Path, prompt: str, gen: int, context: int = 0, rotate: int = 
     for i in range(gen):
         top2 = torch.topk(logits[ids.shape[1] - 1 + i], 2).values
         margins.append(float(top2[0] - top2[1]))
+    # the coverage reference (--check-coverage): every position's argmax and top-1 margin over the whole
+    # teacher-forced sequence, not just the generated tail -- an unwritten logits row is invisible to the
+    # 32-token gate unless the argmax lands in it (round 42: wvSplitK's hole passed both gates for weeks)
+    am = logits.argmax(dim=-1).tolist()
+    top2a = torch.topk(logits, 2, dim=-1).values
+    marg_all = (top2a[:, 0] - top2a[:, 1]).tolist()
     text = tok.decode(gen_ids)
     del model
     torch.cuda.empty_cache()
-    return ids[0].tolist(), gen_ids, margins, text
+    return ids[0].tolist(), gen_ids, margins, text, am, marg_all
+
+
+def prefill_reference(src: Path, full_ids: list[int]):
+    """Per-position argmax + top-1 margin of one teacher-forced forward over full_ids (the coverage reference)."""
+    from transformers import AutoModelForCausalLM
+    model = AutoModelForCausalLM.from_pretrained(src, dtype=torch.bfloat16, device_map="cuda")
+    model.eval()
+    with torch.no_grad():
+        logits = model(torch.tensor([full_ids], device="cuda")).logits[0].float()
+    am = logits.argmax(dim=-1).tolist()
+    top2 = torch.topk(logits, 2, dim=-1).values
+    marg = (top2[:, 0] - top2[:, 1]).tolist()
+    del model
+    torch.cuda.empty_cache()
+    return am, marg
+
+
+def write_prefill(out: Path, gname: str, am: list[int], marg: list[float]):
+    """prefill_*.txt beside golden_*.txt: 'argmax:' and 'margin:' lines, one value per position."""
+    pname = "prefill" + gname[len("golden"):]
+    (out / pname).write_text("argmax: " + " ".join(map(str, am)) + "\n"
+                             + "margin: " + " ".join(f"{m:.4f}" for m in marg) + "\n")
+    print(f"coverage reference: {pname} ({len(am)} positions)")
 
 
 def pack(src: Path, out: Path, d: M.Dims):
@@ -195,6 +224,8 @@ def main():
     ap.add_argument("--sliced", action="store_true", help="also pack the per-XCD slices (sliced.bin / sliced.manifest)")
     ap.add_argument("--rotate", type=int, default=0, help="rotate the --context prompt by N tokens (a second request); golden_c<N>_r<rot>.txt")
     ap.add_argument("--golden-only", action="store_true", help="write the golden file only (no packing)")
+    ap.add_argument("--prefill-only", action="store_true",
+                    help="write the coverage reference (prefill_*.txt) for an EXISTING golden file, then exit")
     a = ap.parse_args()
     if a.rotate and not a.context:
         raise SystemExit("--rotate rotates the --context prompt: give --context too")
@@ -209,10 +240,18 @@ def main():
     part = M.partition(d)
 
     gname = (f"golden_c{a.context}" + (f"_r{a.rotate}" if a.rotate else "") + ".txt") if a.context else "golden.txt"
+    if a.prefill_only:
+        glines = (out / gname).read_text().splitlines()
+        pids = [int(t) for t in glines[0].split()[1:]]
+        gids = [int(t) for t in glines[1].split()[1:]]
+        am, marg = prefill_reference(src, pids + gids)
+        write_prefill(out, gname, am, marg)
+        return
     if not (out / gname).exists():
-        pids, gids, margins, text = reference(src, a.prompt, a.gen, a.context, a.rotate)
+        pids, gids, margins, text, am, marg = reference(src, a.prompt, a.gen, a.context, a.rotate)
         (out / gname).write_text("prompt: " + " ".join(map(str, pids)) + "\n" + "gen: " + " ".join(map(str, gids)) + "\n"
                                         + "margin: " + " ".join(f"{m:.4f}" for m in margins) + "\n")
+        write_prefill(out, gname, am, marg)
         print("HF greedy:", repr(text))
     if a.golden_only:
         return

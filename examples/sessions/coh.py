@@ -68,6 +68,8 @@ job(name=f"build_{B}", lane="cpu", after=["etx_env", "dl"], timeout=2400,
         f"cp $HOME/sess/b_{B}/plan.json $HOME/sess/plan_{B}.json; cp $HOME/sess/b_{B}/dsl_tiles.hip $HOME/sess/; test -x $HOME/sess/b_{B}/run",
     summary=[r"tasks=|megakernel|VGPRs Spill"])
 RUN = f"$HOME/sess/b_{B}/run {LLM}/{M} $HOME/sess/b_{B}/vl_plan.txt"
+# Gates on a fresh model: 32/32 + --check-dsl + --check-coverage (the third gate, round 45: a full-prefill
+# argmax diff that sees unwritten output rows; needs prefill_*.txt from examples/llm/prep.py --prefill-only).
 # the timed fused number, with the per-task execution counter OFF (it is ~67k device atomics per token on the fused
 # path only -- see etx/runtime/include/etx/host.h; correctness here rests on --check-dsl and 32/32 tokens)
 job(name="run_fused", gpu=0, after=[f"build_{B}", "prep"], timeout=900, cmd=f"stdbuf -oL {RUN} --repeat 1 --check-dsl", summary=[RES])

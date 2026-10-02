@@ -97,3 +97,16 @@ include, so they cannot disagree. **Do not add a `-D` flag for anything the host
 `examples/vllm_llm/rocm_build_check.sh` duplicates `build.sh`'s export and slot logic by string-matching, and the two
 drifted again here. Both are now aligned, but the duplication remains and is worth removing. Its `--block` arguments
 still differ from `build.sh`'s, so its LDS figure is not the shipped one — use the box's build for resource numbers.
+
+
+## The three correctness gates
+
+1. **32/32 tokens against HF greedy** — end to end, every run.
+2. **`--check-dsl`** — every DSL operator of the last layer within 2 bf16 ulps of a CPU reference.
+3. **`--check-coverage`** — teacher-force the full golden sequence and diff every position's argmax against the
+   HF prefill reference (`prefill_*.txt`, written by `examples/llm/prep.py` at golden time or `--prefill-only`
+   for existing goldens). Mismatches at HF top-1 margins <= 0.5 are bf16 argmax ties and are tolerated; anything
+   larger fails. This is the only gate that sees an output row no kernel writes: round 42's wvSplitK hole
+   (lm_head rows [8192, 9728) never written) passed the other two for weeks. `ETX_DEBUG_HOLE=<M'>` re-creates
+   that bug shape on demand as the gate's negative test. Setup-time asserts cover the host-controlled siblings
+   (MoE task counts vs slots, attention partitions vs maxlen).
