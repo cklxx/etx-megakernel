@@ -1,0 +1,22 @@
+devlibs: /opt/rocm/lib/llvm/amdgcn/bitcode
+== import (wvsplitk_y2,attn_mfma4_g4,attn_reduce,rms_norm_2d,fused_add_rms_norm,rope_neox,reshape_and_cache,silu_and_mul,wvsplitk_y1,fused_moe_up_e8,fused_moe_down_e8,topk_softmax_e8,moe_sum_k2)
+wvsplitk_y2            (64, 16, 1) slots=1 args=80B lds=32768B barriers=1
+wvsplitk_y1            (64, 16, 1) slots=1 args=80B lds=32768B barriers=1
+attn_mfma4_g4          (256, 1, 1) slots=4 args=160B lds=21120B barriers=2
+attn_reduce            (128, 1, 1) slots=8 args=80B lds=2176B barriers=1
+rms_norm_2d            (512, 1, 1) slots=2 args=100B lds=160B barriers=2
+fused_add_rms_norm     (1024, 1, 1) slots=1 args=72B lds=80B barriers=2
+rope_neox              (512, 1, 1) slots=2 args=108B lds=0B barriers=0
+reshape_and_cache      (128, 1, 1) slots=8 args=96B lds=0B barriers=0
+silu_and_mul           (1024, 1, 1) slots=1 args=48B lds=0B barriers=0
+topk_softmax_e8        (64, 4, 1) slots=4 args=104B lds=0B barriers=0
+moe_sum_k2             (256, 1, 1) slots=4 args=96B lds=0B barriers=0
+fused_moe_up_e8        (128, 1, 1) slots=1 args=136B lds=16384B barriers=5
+fused_moe_down_e8      (128, 1, 1) slots=1 args=144B lds=16384B barriers=5
+== plan
+  devices=1 domains/device=8 workers/domain=38 (wg/CU=1)
+  tasks=156611 events=452 eliminated=[]
+== hipcc
+Function Name: etx_megakernel_d0	VGPRs: 128	ScratchSize [bytes/lane]: 0	VGPRs Spill: 0	LDS Size [bytes/block]: 41384
+Function Name: etx_unfused_d0	VGPRs: 108	ScratchSize [bytes/lane]: 0	VGPRs Spill: 0	LDS Size [bytes/block]: 41352
+built /root/sess/b_r42_fix2/run (plan /root/sess/b_r42_fix2/vl_plan.txt)

@@ -1,0 +1,16 @@
+===== round 1  00:25:59
+run 0: 32/32 generated tokens match HF greedy
+RESULT model=/root/llm/mixtral-8x7b requests=1 matched=32 gen=32 median_ms=16.826 wall_ms=17.006 tokens_per_s=59 matched_each=32
+VLLM label=mixtral-8x7b aiter=0 custom_ops=None eager=0 cudagraph=None compile_mode=None batch=1 version=0.27.1 context=1024 median_ms=8.681 tokens_per_s=115 per_token=[8.681] first_divergence=32/32
+VLLM label=mixtral-8x7b aiter=1 custom_ops=None eager=0 cudagraph=None compile_mode=None batch=1 version=0.27.1 context=1024 median_ms=12.488 tokens_per_s=80 per_token=[12.488] first_divergence=32/32
+===== round 2  00:29:17
+run 0: 32/32 generated tokens match HF greedy
+RESULT model=/root/llm/mixtral-8x7b requests=1 matched=32 gen=32 median_ms=16.719 wall_ms=16.895 tokens_per_s=60 matched_each=32
+VLLM label=mixtral-8x7b aiter=0 custom_ops=None eager=0 cudagraph=None compile_mode=None batch=1 version=0.27.1 context=1024 median_ms=8.697 tokens_per_s=115 per_token=[8.697] first_divergence=32/32
+VLLM label=mixtral-8x7b aiter=1 custom_ops=None eager=0 cudagraph=None compile_mode=None batch=1 version=0.27.1 context=1024 median_ms=12.525 tokens_per_s=80 per_token=[12.525] first_divergence=32/32
+===== round 3  00:32:17
+run 0: 32/32 generated tokens match HF greedy
+RESULT model=/root/llm/mixtral-8x7b requests=1 matched=32 gen=32 median_ms=16.756 wall_ms=16.927 tokens_per_s=60 matched_each=32
+VLLM label=mixtral-8x7b aiter=0 custom_ops=None eager=0 cudagraph=None compile_mode=None batch=1 version=0.27.1 context=1024 median_ms=8.711 tokens_per_s=115 per_token=[8.711] first_divergence=32/32
+VLLM label=mixtral-8x7b aiter=1 custom_ops=None eager=0 cudagraph=None compile_mode=None batch=1 version=0.27.1 context=1024 median_ms=12.499 tokens_per_s=80 per_token=[12.499] first_divergence=32/32
+===== done 00:35:14

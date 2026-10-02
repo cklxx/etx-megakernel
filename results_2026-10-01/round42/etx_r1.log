@@ -1,0 +1,5 @@
+etx: 156611 tasks, 452 event words, 304 workers (8 domains x 38), 450 grid instances, 44736 B of argument blocks
+run 0: 32/32 generated tokens match HF greedy
+per-token latency on device (prologue -> argmax): median 16.826 ms  min 16.758  max 16.916; host wall per step median 17.006 ms
+mode: ETX megakernel (vLLM kernels imported)
+RESULT model=/root/llm/mixtral-8x7b requests=1 matched=32 gen=32 median_ms=16.826 wall_ms=17.006 tokens_per_s=59 matched_each=32

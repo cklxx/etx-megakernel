@@ -177,3 +177,17 @@ GQA ratio (G=4 vs G=8), untied embeddings, vocab 32000 — runs end-to-end throu
 host-side glue, and each break was a scalar keyed to shape: the Triton binaries' baked constexprs (rounds 38-39),
 their launch grids (bug 1), and a grid-vs-stride constant (bug 2, a latent bug for every model, exposed by vocab
 position). The megakernel machinery itself needed nothing.
+
+Timed runs (3 interleaved rounds, context 1024, batch 1, all runs 32/32 vs HF greedy; logs results_2026-10-01/round42/):
+
+| config                      | per-token median (3 rounds)        |
+|-----------------------------|------------------------------------|
+| ETX megakernel (imported)   | 16.719 / 16.756 / 16.826 ms        |
+| vLLM 0.27.1 default         |  8.681 /  8.697 /  8.711 ms        |
+| vLLM 0.27.1 AITER           | 12.488 / 12.499 / 12.525 ms        |
+
+ETX Mixtral is ~1.9x slower than vLLM default — expected: this is the all-imported mode (the Qwen equivalent was
+6.435 vs 4.937 in round 24), with Qwen-tuned CU/grid settings and none of the DSL-tile or fusion tuning applied to
+this shape. The generality claim this document is for is CORRECTNESS of the compiler path on a second model, which
+is now closed; making Mixtral fast is its own (unstarted) tuning ladder. One decode trace captured
+(round42/trace_r42_mixtral.{bin,log}, median 16.751 ms on-device).
