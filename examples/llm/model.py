@@ -62,6 +62,13 @@ class Dims:
     TOPK: int = 0
     MI: int = 0
     norm_topk: bool = False
+    # PhiMoE (Phi-3.5-MoE): nn.LayerNorm (mean-centred, with a learnable bias) in place of RMSNorm everywhere,
+    # sparsemixer routing in place of softmax-topk, and biases on o_proj and lm_head. Shape facts, derived once here;
+    # prep.py, model.py and build.sh all read them from this loader or from the manifest prep writes from it.
+    ln_norm: bool = False
+    sparsemixer: bool = False
+    bias_o: bool = False
+    bias_lm: bool = False
 
     @property
     def G(self) -> int:
@@ -108,7 +115,11 @@ def load_dims(path: str | None = None) -> Dims:
                 # (MixtralSparseMoeBlock: softmax over E, top-k, divide by the sum) -- the same order our topk
                 # tile implements for Qwen's norm_topk_prob=true. Reading only the key would silently skip the
                 # renormalisation for Mixtral.
-                norm_topk=bool(c.get("norm_topk_prob", mt == "mixtral")))
+                norm_topk=bool(c.get("norm_topk_prob", mt == "mixtral")),
+                # phimoe: sparsemixer is the ROUTING FUNCTION, not a weight option -- a softmax-topk build would
+                # select the same experts with the wrong weights and pass every structural gate (round 46).
+                ln_norm=mt == "phimoe", sparsemixer=mt == "phimoe",
+                bias_o=mt == "phimoe" and bool(c.get("attention_bias", False)), bias_lm=bool(c.get("lm_head_bias", False)))
 
 
 def workers(d: "Dims") -> int:

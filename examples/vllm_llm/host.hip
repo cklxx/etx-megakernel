@@ -144,6 +144,13 @@ int main(int argc, char** argv) {
   const float eps = (float)m.cfg.at("eps"), scale = 1.0f / sqrtf((float)HD);
   auto cfg0 = [&](const char* k) { auto it = m.cfg.find(k); return it == m.cfg.end() ? 0 : (int)it->second; };
   const bool moe = cfg0("moe"); const int E = cfg0("E"), TOPK = cfg0("TOPK"), MI = cfg0("MI"); const bool norm_topk = cfg0("norm_topk");
+  // PhiMoE-class (prep.py wrote these from the config; the plan derived dsl_ext from the same config and model.py
+  // asserted the tile layout matches, so ETX_EMIT_DSL_EXT here cannot disagree with what the manifest says)
+  const bool ln_norm = cfg0("ln_norm"), sparsemixer = cfg0("sparsemixer");
+#if !ETX_EMIT_DSL_EXT
+  if (ln_norm) die("ln_norm model on a build whose tiles lack the LayerNorm fold (ETX_EMIT_DSL_EXT=0)");
+#endif
+  if (sparsemixer && norm_topk) die("sparsemixer and norm_topk are mutually exclusive");
   const int MOE_BM = 16;                  // fused_moe_kernel BLOCK_SIZE_M (vLLM's default config at batch 1)
   const int BS = 16, X = 8, MAXBLK = (MAXLEN + BS - 1) / BS;
 
@@ -341,8 +348,9 @@ int main(int argc, char** argv) {
       const int nblk = x.gx * x.gy * x.gz, rpt = (xM + nblk - 1) / nblk;
       if (x.K > 4096 || x.K % 256) die("dsl_gemv: K must be a multiple of 256 and <= 4096 (etx/ops/gemv.py)");
       const void* w; const void* in; void* out; size_t sx = 0, sout = 0;   // sx / sout: the request stride of in / out
-      if (r == "qkv") { if (bias) die("dsl_gemv: qkv bias not supported"); w = W(pl + "wqkv"); in = qkv_in; out = qkv; sx = x.layer == 0 ? n_hn : n_dx; sout = n_qkv; }
-      else if (r == "o_proj") { w = W(pl + "wo"); in = attn_out; out = o; sx = n_attn_out; sout = n_o; }
+      const void* gbias = nullptr;                                         // output bias (PhiMoE o_proj; ETX_EMIT_DSL_EXT)
+      if (r == "qkv") { if (bias) die("dsl_gemv: unfolded qkv bias not supported (PhiMoE's qkv is folded)"); w = W(pl + "wqkv"); in = qkv_in; out = qkv; sx = x.layer == 0 ? n_hn : n_dx; sout = n_qkv; }
+      else if (r == "o_proj") { w = W(pl + "wo"); in = attn_out; out = o; sx = n_attn_out; sout = n_o; gbias = W(pl + "bo", false); }
       else if (r == "router") { w = W(pl + "wr"); in = o_norm; out = rlog; sx = n_ox; sout = n_rlog; }
       else if (r == "gate_up") { w = W(pl + "wgu"); in = o_norm; out = gu; sx = n_ox; sout = n_gu; }
       else if (r == "down") { w = W(pl + "wd"); in = act_out; out = dn; sx = n_actx; sout = n_dn; }
@@ -350,7 +358,12 @@ int main(int argc, char** argv) {
       else die("dsl_gemv: role " + r);
       a.ptr(w).ptr(in).ptr(out).ptr(nullptr).ptr(nullptr).i64(0).i32(xM).i32(x.K).i32(rpt).i32(0)
        .ptr(nullptr).ptr(nullptr).ptr(nullptr).ptr(nullptr).i32(0).f32(0.f).i32(0).i32(0).ptr(nullptr)
-       .i32(x.nb).i32((int)sx).i32((int)sout).i32(0).i32(0).i32(0);
+       .i32(x.nb).i32((int)sx).i32((int)sout).i32(0).i32(0).i32(0)
+#if ETX_EMIT_DSL_EXT
+       .ptr(gbias).ptr(nullptr)
+#endif
+       ;
+      (void)gbias;
     }
     // dsl_attnprep (etx/ops/attnprep.py): q/k norm + rope of one kv head in place on qkv, its k / v rows into the cache
     else if (x.exp == "dsl_attnprep" && (HD != 128 || NH % NKV || NH / NKV + 2 > ETX_THREADS / 64 || !qk_norm))
@@ -362,7 +375,7 @@ int main(int argc, char** argv) {
     // sv = the request stride of wts/ids/tei (n_tk elements; the slabs are one allocation, ETX_VL_SLICE). The logits
     // request stride is E itself (n_rlog), carried by no field. nb = 1 keeps the single-wave behaviour exactly.
     else if (x.exp == "dsl_topk" && x.nb > 1 && (size_t)n_tk >= (1u << 24)) die("dsl_topk: n_tk does not fit the packed stride");
-    else if (x.exp == "dsl_topk") a.ptr(rlog).ptr(tw_r).ptr(ti_r).ptr(tei + (size_t)rr * TOPK).i32(E).i32(TOPK).i32(norm_topk ? 1 : 0)
+    else if (x.exp == "dsl_topk") a.ptr(rlog).ptr(tw_r).ptr(ti_r).ptr(tei + (size_t)rr * TOPK).i32(E).i32(TOPK).i32(sparsemixer ? 2 : (norm_topk ? 1 : 0))
                                    .i32(x.nb > 1 ? (x.nb | ((int)n_tk << 8)) : 1);
     else if (x.exp == "dsl_gemv_fold") {
       // norm fold (mode 1): qkv (L > 0) = norm(residual + the 8 expert rows) with ln1; router = norm(residual + o) with ln2;
@@ -371,20 +384,35 @@ int main(int argc, char** argv) {
       if (x.K > 4096 || x.K % 256) die("dsl_gemv_fold: K must be a multiple of 256 and <= 4096");
       if (E == 0) die("dsl_gemv_fold: the fold is written for the MoE model (expert rows)");
       const void* w; void* out; const bf* rows; const bf* rin; bf* rout; const void* ln; int R; bf* xout = nullptr;
+      const void* gbias = nullptr; const void* lnb = nullptr; const int mode = ln_norm ? 4 : 1;   // 4: LayerNorm (PhiMoE)
       // the residual alternates: X = resid (copy 0; the prologue's embedding row, what layer 0's in_norm reads) and Y = resid2.
       // router(L) reads X, writes Y = X + o; qkv(L >= 1) reads Y, writes X = Y + the expert rows; lm_head reads Y + the last
       // expert rows. Readers and the one writer of a grid never share a buffer; layer 0 has no qkv fold (imported in_norm)
       size_t sx = 0, sout = 0, srows = 0, srin = 0, srout = 0;              // the request strides of xout / out / rows / rin / rout
-      if (r == "qkv") { w = W(pl + "wqkv"); out = qkv; rows = mc3; rin = resid2; rout = resid; ln = W(pl + "ln1"); R = TOPK;
+      if (r == "qkv" && x.layer == 0) {               // folded layer 0 (LayerNorm models): no previous expert rows,
+                        // z = bf16(0 + resid) = the embedding row the prologue stored; the residual stream is untouched
+                        w = W(pl + "wqkv"); out = qkv; rows = mc3; rin = resid; rout = nullptr; ln = W(pl + "ln1"); R = 0;
+                        gbias = W(pl + "bqkv", false); lnb = W(pl + "ln1b", false);
+                        sout = n_qkv; srows = n_mc3; srin = n_resid; }
+      else if (r == "qkv") { w = W(pl + "wqkv"); out = qkv; rows = mc3; rin = resid2; rout = resid; ln = W(pl + "ln1"); R = TOPK;
+                        gbias = W(pl + "bqkv", false); lnb = W(pl + "ln1b", false);
                         sout = n_qkv; srows = n_mc3; srin = n_resid2; srout = n_resid; }
       else if (r == "router") { w = W(pl + "wr"); out = rlog; rows = o; rin = resid; rout = resid2; ln = W(pl + "ln2"); R = 1; xout = ox;   // ox: what moe_up reads
+                        lnb = W(pl + "ln2b", false);
                         sx = n_ox; sout = n_rlog; srows = n_o; srin = n_resid; srout = n_resid2; }
       else if (r == "lm_head") { w = tie ? W("embed") : W("lm_head"); out = logits; rows = mc3; rin = resid2; rout = nullptr; ln = W("final_norm"); R = TOPK;
+                        gbias = W("lm_head_b", false); lnb = W("final_norm_b", false);
                         sout = n_logits; srows = n_mc3; srin = n_resid2; }
       else die("dsl_gemv_fold: role " + r);
+      if (mode == 4 && lnb == nullptr) die("dsl_gemv_fold: LayerNorm (mode 4) needs the norm bias tensor for " + r);
+      (void)gbias; (void)lnb;
       a.ptr(w).ptr(xout).ptr(out).ptr(nullptr).ptr(nullptr).i64(0).i32(xM).i32(x.K).i32(rpt).i32(0)
-       .ptr(rows).ptr(rin).ptr(rout).ptr(ln).i32(R).f32(eps).i32(1).i32(0).ptr(nullptr)
-       .i32(x.nb).i32((int)sx).i32((int)sout).i32((int)srows).i32((int)srin).i32((int)srout);
+       .ptr(rows).ptr(rin).ptr(rout).ptr(ln).i32(R).f32(eps).i32(mode).i32(0).ptr(nullptr)
+       .i32(x.nb).i32((int)sx).i32((int)sout).i32((int)srows).i32((int)srin).i32((int)srout)
+#if ETX_EMIT_DSL_EXT
+       .ptr(gbias).ptr(lnb)
+#endif
+       ;
     }
     // top-k fold (mode 2 / 3 = renormalised): the expert tasks recompute the top-k from the router logits
     // ETX_EMIT_DSL_BIGK (manifest): with it, K beyond the 4096-float staged window is chunked inside the MoE tiles
@@ -397,6 +425,7 @@ int main(int argc, char** argv) {
     else if ((x.exp == "dsl_moe_up_fold" || x.exp == "dsl_moe_down_fold") && (MI % 32 || H > 4096 || H % 256 || H % 64 || MI > 4096 || MI % 256 || E > 128))
       die("dsl_moe_*_fold: needs MI % 32 == 0, H % 256 == 0, MI % 256 == 0, H and MI <= 4096, E <= 128");
 #endif
+// Folded top-k computes softmax-topk in LDS (dsl_topk_lds) -- sparsemixer has no fold (model.py fold_topk refuses).
 // ETX_EMIT_FOLD_TOPK: did the plan fold the top-k into the expert tasks, or give it its own phase? Derived from the
 // model's shapes (model.py fold_topk) and published through plan_data.h, which the kernel and this file both include,
 // so the two cannot disagree. It was a -D until round 30, where build.sh defaulted it to "fold" while the plan had
@@ -702,13 +731,25 @@ int main(int argc, char** argv) {
     // (q/k norm + rope on qkv, final_norm on the normed input, post_norm on o) rewrites it
     auto is_fold = [&](const char* role) { for (const Inst& x : insts) if (x.layer == Lc && x.role == role && x.req == 0) return x.exp.size() > 5 && x.exp.compare(x.exp.size() - 5, 5, "_fold") == 0; return false; };
     // the CPU side of the norm fold: z = bf16(bf16(sum of R rows) + rin), x = bf16(z * rsqrt(mean z^2 + eps) * ln)
-    auto norm_fold = [&](const std::vector<uint16_t>& rows_b, int R, const std::vector<uint16_t>& rin, const std::vector<uint16_t>& ln) {
-      std::vector<float> xv(H); double ss = 0;
+    auto norm_fold = [&](const std::vector<uint16_t>& rows_b, int R, const std::vector<uint16_t>& rin, const std::vector<uint16_t>& ln,
+                         const std::vector<uint16_t>& lnb) {
+      std::vector<float> xv(H); double ss = 0, s1 = 0;
       for (int i = 0; i < H; ++i) { float acc = 0.f; for (int s2 = 0; s2 < R; ++s2) acc += b2f(rows_b[(size_t)s2 * H + i]);
-        const float inv = R > 1 ? b2f(f2b(acc)) : acc; const float z = b2f(f2b(inv + b2f(rin[i]))); xv[i] = z; ss += (double)z * z; }
+        const float inv = R > 1 ? b2f(f2b(acc)) : acc; const float z = b2f(f2b(inv + b2f(rin[i]))); xv[i] = z; ss += (double)z * z; s1 += z; }
+      if (ln_norm) {                                     // mode 4: LayerNorm -- (z - mean) * rsqrt(var + eps) * w + b
+        const float mean = (float)(s1 / H); double s2v = 0;
+        for (int i = 0; i < H; ++i) { const double zc = xv[i] - mean; s2v += zc * zc; }
+        const float sv = 1.0f / sqrtf((float)(s2v / H) + eps);
+        for (int i = 0; i < H; ++i) xv[i] = b2f(f2b((xv[i] - mean) * sv * b2f(ln[i]) + b2f(lnb[i])));
+        return xv;
+      }
       const float sv = 1.0f / sqrtf((float)(ss / H) + eps);
       for (int i = 0; i < H; ++i) xv[i] = b2f(f2b(xv[i] * sv * b2f(ln[i])));
       return xv; };
+    auto host_w_opt = [&](const std::string& n, size_t elems) {
+      return m.t.count(n) ? host_w(n, 0, elems) : std::vector<uint16_t>(); };
+    auto add_bias = [&](std::vector<float>& ref, const std::vector<uint16_t>& bb) {
+      if (!bb.empty()) for (size_t i = 0; i < ref.size(); ++i) ref[i] += b2f(bb[i]); };
     // an instance's launch: usually launch x.n + 1 (launch 0 is the one prologue, then one launch per instance), but
     // located by the launch's type name ("role_layer", or "role_layer_x" for a per-XCD replica form) so the check does
     // not depend on that arithmetic. An x-form instance (tasks == 1, rep > 1: one replica per XCD, e.g. the non-fold
@@ -751,9 +792,12 @@ int main(int argc, char** argv) {
     };
     // qkv: W [NQKV][H] . normed input (replica 0's copy)
     { const bf* in = Lc == 0 ? hn : (NR > 1 ? dx : dn); std::vector<float> x = tof(dev(in, H)); auto Wm = host_w(pl + "wqkv", 0, (size_t)NQKV * H);
-      if (is_fold("qkv")) x = norm_fold(dev(mc3, (size_t)TOPK * H), TOPK, dev(resid2, H), host_w(pl + "ln1", 0, H));
+      if (is_fold("qkv")) x = Lc == 0 ? norm_fold({}, 0, dev(resid, H), host_w(pl + "ln1", 0, H), host_w_opt(pl + "ln1b", H))
+                                      : norm_fold(dev(mc3, (size_t)TOPK * H), TOPK, dev(resid2, H), host_w(pl + "ln1", 0, H), host_w_opt(pl + "ln1b", H));
       relaunch("qkv", "dsl_gemv");
-      std::vector<float> ref(NQKV); for (int r = 0; r < NQKV; ++r) ref[r] = dot(Wm.data() + (size_t)r * H, x, H); cmp("qkv", dev(qkv, NQKV), ref); }
+      std::vector<float> ref(NQKV); for (int r = 0; r < NQKV; ++r) ref[r] = dot(Wm.data() + (size_t)r * H, x, H);
+      if (is_fold("qkv")) add_bias(ref, host_w_opt(pl + "bqkv", NQKV));
+      cmp("qkv", dev(qkv, NQKV), ref); }
     for (const Inst& x2 : insts) if (x2.layer == Lc && x2.role == "prep" && x2.exp == "dsl_attnprep" && x2.req == 0) {
       std::vector<float> in = tof(dev(qkv, NQKV));
       long long pos = 0, slot = 0; ETX_CHECK(hipMemcpy(&pos, positions, 8, hipMemcpyDeviceToHost)); ETX_CHECK(hipMemcpy(&slot, slot_mapping, 8, hipMemcpyDeviceToHost));
@@ -782,10 +826,11 @@ int main(int argc, char** argv) {
     }
     { std::vector<float> x = tof(dev(attn_out, (size_t)NH * HD)); auto Wm = host_w(pl + "wo", 0, (size_t)H * NH * HD);
       relaunch("o_proj", "dsl_gemv");
-      std::vector<float> ref(H); for (int r = 0; r < H; ++r) ref[r] = dot(Wm.data() + (size_t)r * NH * HD, x, NH * HD); cmp("o_proj", dev(o, H), ref); }
+      std::vector<float> ref(H); for (int r = 0; r < H; ++r) ref[r] = dot(Wm.data() + (size_t)r * NH * HD, x, NH * HD);
+      add_bias(ref, host_w_opt(pl + "bo", H)); cmp("o_proj", dev(o, H), ref); }
     if (E > 0) {
       const bf* on = NR > 1 ? ox : o; std::vector<float> x = tof(dev(on, H));
-      if (is_fold("router")) x = norm_fold(dev(o, H), 1, dev(resid, H), host_w(pl + "ln2", 0, H));
+      if (is_fold("router")) x = norm_fold(dev(o, H), 1, dev(resid, H), host_w(pl + "ln2", 0, H), host_w_opt(pl + "ln2b", H));
       { auto Wm = host_w(pl + "wr", 0, (size_t)E * H); relaunch("router", "dsl_gemv");
         std::vector<float> ref(E); for (int r = 0; r < E; ++r) ref[r] = dot(Wm.data() + (size_t)r * H, x, H); cmp("router", dev(rlog, E), ref); }
       for (const Inst& x2 : insts) if (x2.layer == Lc && x2.role == "topk" && x2.exp == "dsl_topk") { relaunch("topk", "dsl_topk"); break; }
@@ -804,6 +849,17 @@ int main(int argc, char** argv) {
         std::vector<float> pr(E); double sum = 0; for (int e = 0; e < E; ++e) { pr[e] = expf(lg[e] - mx); sum += pr[e]; }
         for (int e = 0; e < E; ++e) pr[e] = (float)(pr[e] / sum);
         std::vector<int> ref_ids; std::vector<float> ref_w; std::vector<bool> used(E, false); double sel = 0;
+        if (sparsemixer) {
+          // PhiMoE's routing (vllm phimoe.py sparsemixer, inference): per round over the working row, mask from the
+          // ORIGINAL logits, weight = the masked softmax at the winner; cross-checked vs vLLM's python (round 47)
+          for (int t = 0; t < TOPK; ++t) {
+            float mt = -INFINITY; int bi = -1;
+            for (int e = 0; e < E; ++e) if (!used[e] && lg[e] > mt) { mt = lg[e]; bi = e; }
+            double S = 0;
+            for (int e = 0; e < E; ++e) if (!used[e] && !(((mt - lg[e]) / std::max(fabsf(lg[e]), mt)) > 0.02f)) S += exp((double)lg[e] - mt);
+            used[bi] = true; ref_ids.push_back(bi); ref_w.push_back((float)(1.0 / S));
+          }
+        } else
         for (int t = 0; t < TOPK; ++t) { int b = -1; for (int e = 0; e < E; ++e) if (!used[e] && (b < 0 || pr[e] > pr[b])) b = e; used[b] = true; ref_ids.push_back(b); ref_w.push_back(pr[b]); sel += pr[b]; }
         int bad = 0; double worst = 0;
         for (int t = 0; t < TOPK; ++t) { const float rw = norm_topk ? (float)(ref_w[t] / sel) : ref_w[t]; if (ids[t] != ref_ids[t]) ++bad;

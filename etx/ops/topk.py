@@ -2,6 +2,14 @@
 softmax over E logits (expf(v - max) * (1 / sum), as topk_softmax_kernels.cu), k rounds of argmax with the lower
 expert index winning ties, weights renormalised over the selected k when asked; outputs as vLLM's: topk_weights
 (float), topk_ids (int), token_expert_indices (k index for one token). One wave does it (E <= 2 x 64 lanes).
+
+mode (the former renorm word): 0 plain softmax-topk, 1 renormalised, 2 sparsemixer (PhiMoE's routing,
+vllm/model_executor/models/phimoe.py sparsemixer, inference path): per round, over the working row (previous
+winners at -inf), m = max, winner = argmax (lowest index on ties); elements with ((m - s) / max(|s|, m)) > 0.02
+(s = the ORIGINAL logit) are masked out of that round's softmax; the round's weight is the masked softmax at the
+winner = 1 / sum(exp(work - m)) over unmasked available elements. Ids equal plain top-k; weights do not, and a
+softmax-topk build would pass every structural gate with wrong weights (round 46). Cross-checked against vLLM's
+python on 2000 random rows (E = 8 and 16): identical ids, weights to 1e-6 (results_2026-10-01/round47/).
 """
 from __future__ import annotations
 
@@ -11,7 +19,7 @@ ARG_BYTES, GRID_OFF = 64, 48
 # elements (NR * TOPK: the slabs are one allocation, host.hip ETX_VL_SLICE). The logits request stride is E
 # itself (n_rlog), so it needs no field. nb <= 1 keeps the old single-wave behaviour exactly.
 PARAMS = [("logits", "ptr addrspace(1)", 0, 8), ("wts", "ptr addrspace(1)", 8, 8), ("ids", "ptr addrspace(1)", 16, 8),
-          ("tei", "ptr addrspace(1)", 24, 8), ("E", "i32", 32, 4), ("K", "i32", 36, 4), ("renorm", "i32", 40, 4),
+          ("tei", "ptr addrspace(1)", 24, 8), ("E", "i32", 32, 4), ("K", "i32", 36, 4), ("mode", "i32", 40, 4),
           ("nbsv", "i32", 44, 4)]
 
 
@@ -31,7 +39,7 @@ static __device__ __attribute__((always_inline)) void dsl_run_dsl_topk(const uns
   const int nb = nbsv & 0xff ? (int)(nbsv & 0xff) : 1, sv = (int)(nbsv >> 8);
   const int w = etx_wave();
   if (w >= nb) return;
-  const int E = *(const int*)(a + 32), K = *(const int*)(a + 36), renorm = *(const int*)(a + 40);
+  const int E = *(const int*)(a + 32), K = *(const int*)(a + 36), mode = *(const int*)(a + 40);
   const __hip_bfloat16* logits = *(const __hip_bfloat16* const*)(a + 0) + (size_t)w * E;
   float* wts = *(float* const*)(a + 8) + (size_t)w * sv;
   int* ids = *(int* const*)(a + 16) + (size_t)w * sv; int* tei = *(int* const*)(a + 24) + (size_t)w * sv;
@@ -51,6 +59,35 @@ static __device__ __attribute__((always_inline)) void dsl_run_dsl_topk(const uns
 #endif
     : -INFINITY; taken[k] = e >= E; m = fmaxf(m, p[k]); }
   m = etx_wave_max(m);
+  if (mode == 2) {                                    // sparsemixer: p[] holds the RAW logits throughout
+    float raw[2]; raw[0] = p[0]; raw[1] = p[1];
+    for (int t = 0; t < K; ++t) {
+      // the round's max and winner over the working row (taken -> excluded), lowest index on ties
+      float mt = -INFINITY;
+#pragma unroll
+      for (int k = 0; k < 2; ++k) if (!taken[k]) mt = fmaxf(mt, raw[k]);
+      mt = etx_wave_max(mt);
+      float bv = -INFINITY; int bi = 0x7fffffff;
+#pragma unroll
+      for (int k = 0; k < 2; ++k) { const int e = lane + k * ETX_WAVE_SIZE; if (!taken[k] && raw[k] > bv) { bv = raw[k]; bi = e; } }
+      for (int off = ETX_WAVE_SIZE / 2; off > 0; off >>= 1) {
+        const float ov = __shfl_xor(bv, off, ETX_WAVE_SIZE); const int oi = __shfl_xor(bi, off, ETX_WAVE_SIZE);
+        if (ov > bv || (ov == bv && oi < bi)) { bv = ov; bi = oi; }
+      }
+      // masked softmax of the working row: exclude taken and jitter-masked elements (mask from the ORIGINAL logits)
+      float c = 0.f;
+#pragma unroll
+      for (int k = 0; k < 2; ++k) if (!taken[k] && !(((mt - raw[k]) / fmaxf(fabsf(raw[k]), mt)) > 0.02f)) c += expf(raw[k] - mt);
+      const float S = etx_wave_sum(c);
+#pragma unroll
+      for (int k = 0; k < 2; ++k) if (lane + k * ETX_WAVE_SIZE == bi) taken[k] = true;
+      if (lane == 0) {
+        dsl_a_sti(ids + t, bi); dsl_a_sti(tei + t, t);
+        dsl_a_stf(wts + t, 1.f / S);                  // = exp(mt - mt) / S, the masked softmax at the winner
+      }
+    }
+    return;
+  }
   float s = 0.f;
 #pragma unroll
   for (int k = 0; k < 2; ++k) { p[k] = taken[k] ? 0.f : expf(p[k] - m); s += p[k]; }
@@ -84,9 +121,9 @@ static __device__ __attribute__((always_inline)) void dsl_run_dsl_topk(const uns
     sel += bv;
   }
 #ifdef ETX_ABL_TOPK_NOSTORE  // timing-only: the scan runs, the 24 coherent stores do not (WRONG OUTPUT)
-  if (lane == 0) for (int t = 0; t < K && t < 16; ++t) { const float v = renorm ? lw[t] / sel : lw[t]; asm volatile("" :: "v"(v)); }
+  if (lane == 0) for (int t = 0; t < K && t < 16; ++t) { const float v = mode == 1 ? lw[t] / sel : lw[t]; asm volatile("" :: "v"(v)); }
 #else
-  if (lane == 0) for (int t = 0; t < K && t < 16; ++t) dsl_a_stf(wts + t, renorm ? lw[t] / sel : lw[t]);
+  if (lane == 0) for (int t = 0; t < K && t < 16; ++t) dsl_a_stf(wts + t, mode == 1 ? lw[t] / sel : lw[t]);
 #endif
 }
 extern "C" __device__ __attribute__((always_inline)) void etx_tile_dsl_topk(const etx_ctx* c) {

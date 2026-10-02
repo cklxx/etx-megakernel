@@ -85,6 +85,9 @@ python3 -m etx.importer.vllm_kernels --vllm /code/vllm --out $OUT/imp --compiler
 # Mirrors the derivation in build.sh -- when the two diverged, a variant silently built without the tiles its
 # plan expected, which is the class of bug rounds 14, 19 and 20 all hit.
 DSLON=1; case " $E " in *ETX_VL_IMPORTED=1*) DSLON=0;; esac
+# PhiMoE-class layout (bias / LayerNorm-bias pointers): the ONE derivation is load_dims (build.sh reads the same
+# facts from the manifest prep wrote from load_dims); the plan asserts layout and codegen agree either way.
+export ETX_VL_DSL_EXT=$([ "$(cfg ln_norm)" = "True" ] || [ "$(cfg bias_o)" = "True" ] || [ "$(cfg bias_lm)" = "True" ] && echo 1 || echo 0)
 DSLOPS=""
 case " $E " in *ETX_VL_DSL_GEMV=0*) ;; *ETX_VL_DSL_GEMV=1*) DSLOPS="gemv";; *) [ "$DSLON" = 1 ] && DSLOPS="gemv";; esac
 case " $E " in *ETX_VL_DSL_TOPK=0*) ;; *ETX_VL_DSL_TOPK=1*) DSLOPS="${DSLOPS:+$DSLOPS,}topk";; *) [ "$DSLON" = 1 ] && DSLOPS="${DSLOPS:+$DSLOPS,}topk";; esac

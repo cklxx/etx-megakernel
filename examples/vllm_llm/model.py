@@ -234,6 +234,10 @@ def fold_topk(d) -> bool:
     accesses, which do not share a cache line, and each redoes a TOPK-deep selection whose every step is a full wave
     reduction. A model with fewer experts or fewer expert tasks can flip it, so folds.py does the comparison.
     """
+    if getattr(d, "sparsemixer", False):
+        # PhiMoE: the expert tasks' fold (dsl_topk_lds) computes softmax-topk; folding would silently select the
+        # right experts with the WRONG weights -- the class round 46 refused. The standalone tile has the mode.
+        return False
     if _FOLD_TOPK_ENV is not None:
         return _FOLD_TOPK_ENV == "1"
     return folds.decide(d, CU, NX).get("topk", False)
@@ -252,7 +256,7 @@ def instances(d) -> list[dict]:
 
     def gemv(layer, role, m, k):
         if DSL_GEMV:                                          # rows per task = ceil(M / CU): at 304, 17 (qkv), 7 (o_proj), 1 (router)
-            fold = DSL_FOLD and (role in ("router", "lm_head") or (role == "qkv" and layer > 0))
+            fold = DSL_FOLD and (role in ("router", "lm_head") or (role == "qkv" and (layer > 0 or getattr(d, "ln_norm", False))))
             add("dsl_gemv_fold" if fold else "dsl_gemv", layer, role, (CU, 1, 1), M=m, K=k, wvprgrp=0)
             return
         y = wvsplitk_ytile(m)
@@ -260,7 +264,10 @@ def instances(d) -> list[dict]:
 
     attn = {4: "attn_mfma4_g4", 6: "attn_mfma16_g6", 8: "attn_mfma16_g8"}[d.G]
     for L in range(d.L):
-        if not (DSL_FOLD and L > 0):
+        if not (DSL_FOLD and (L > 0 or getattr(d, "ln_norm", False))):
+            if getattr(d, "ln_norm", False):
+                raise SystemExit("ln_norm (PhiMoE) needs the DSL fold path: there is no imported LayerNorm kernel "
+                                 "(set ETX_VL_DSL_GEMV=1 ETX_VL_DSL_FOLD=1, the defaults)")
             add("rms_norm_2d" if L == 0 else "fused_add_rms_norm", L, "in_norm", (1, 1, 1))
         gemv(L, "qkv", d.NQKV, d.H)
         if DSL_ATTN:
@@ -392,6 +399,16 @@ def build() -> Graph:
     # MoE K beyond the tiles' 4096-float staged window (Mixtral moe_down: 14336): the chunked path is compiled in
     # only when a shape needs it -- it measured +0.12 ms on Qwen as a resident runtime branch (round 43).
     g.codegen["dsl_bigk"] = bool(DSL_GEMV and d.moe and max(d.H, d.MI) > 4096)
+    # PhiMoE-class: LayerNorm fold + output biases. The tile layout (two extra arg pointers) was sized at emit time
+    # by ETX_VL_DSL_EXT (build.sh, from the manifest prep wrote); the plan derives the SAME fact from the config here
+    # and the two must agree -- a mismatch is the round-14/19/30 silent class, so it dies loudly instead.
+    g.codegen["dsl_ext"] = bool(getattr(d, "ln_norm", False) or getattr(d, "bias_o", False) or getattr(d, "bias_lm", False))
+    if DSL_GEMV:
+        _ab = imports().get("dsl_gemv", {}).get("arg_bytes", 160)
+        if bool(g.codegen["dsl_ext"]) != (_ab == 176):
+            raise SystemExit(f"dsl_ext layout mismatch: the plan derives dsl_ext={g.codegen['dsl_ext']} from the "
+                             f"config but the emitted tile layout has arg_bytes={_ab} (ETX_VL_DSL_EXT at emit time); "
+                             "build.sh must export ETX_VL_DSL_EXT=1 exactly for the models whose manifest says so")
     # Compile-time decisions the tiles and the host must share. They are published through the manifest
     # (etx/codegen/manifest.py) and MUST NOT also be passed as -D: build.sh re-deriving the same decision is how
     # ETX_VL_NB (round 14), ETX_DEV_RESET (rounds 19/20) and the top-k fold (round 30) each produced a build that

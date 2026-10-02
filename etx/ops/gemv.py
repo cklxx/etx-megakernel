@@ -71,7 +71,13 @@ import os as _os
 # 10 rows against 83604 of 20) is far worse -- 9.410 ms/step against 7.121 batched and 6.865 replicated, all 32/32.
 # Kept behind the switch (default off): correct, gated, and the measured record of why it is off.
 DSL_NB = max(1, int(_os.environ.get("ETX_VL_NB", "1")))
-ARG_BYTES, GRID_OFF = 160, 144
+# ETX_VL_DSL_EXT (build.sh, from the model's manifest: PhiMoE-class models): appends two pointers AFTER the grid
+# words -- `bias` (the GEMV output bias, o_proj / lm_head / the folded qkv) and `lnb` (the LayerNorm bias of the
+# folded norm, mode 4). The grid offset does not move and a build without the env is byte-identical, which is the
+# Qwen regression gate. The matching device code compiles under ETX_EMIT_DSL_EXT (the feature manifest); model.py
+# asserts the imports.json layout and the plan's codegen flag agree, so the env and the manifest cannot drift apart.
+DSL_EXT = _os.environ.get("ETX_VL_DSL_EXT", "0") == "1"
+ARG_BYTES, GRID_OFF = (176, 144) if DSL_EXT else (160, 144)
 # the "_fold" forms carry a prologue (docs/MODEL-vllm-kernels.md section 16): norm fold (mode 1): x = rms_norm(bf16(bf16(sum
 # of R rows) + resid_in)) with weight ln (vLLM's moe_sum + fused_add_rms_norm numerics: the sum rounded, the add rounded
 # per element, the variance over the rounded values, out = bf16(z * rsqrt * w)); task 0 stores the new residual to
@@ -84,7 +90,8 @@ PARAMS = [("W", "ptr addrspace(1)", 0, 8), ("x", "ptr addrspace(1)", 8, 8), ("ou
           ("ln", "ptr addrspace(1)", 88, 8), ("R", "i32", 96, 4), ("eps", "float", 100, 4), ("mode", "i32", 104, 4),
           ("E", "i32", 108, 4), ("logits", "ptr addrspace(1)", 112, 8),
           ("nb", "i32", 120, 4), ("sx", "i32", 124, 4), ("sout", "i32", 128, 4), ("srows", "i32", 132, 4),
-          ("srin", "i32", 136, 4), ("srout", "i32", 140, 4)]
+          ("srin", "i32", 136, 4), ("srout", "i32", 140, 4)] + (
+         [("bias", "ptr addrspace(1)", 160, 8), ("lnb", "ptr addrspace(1)", 168, 8)] if DSL_EXT else [])
 FORMS = {"dsl_gemv": "plain", "dsl_moe_up": "silu_mul", "dsl_moe_down": "scale",
          "dsl_gemv_fold": "plain", "dsl_moe_up_fold": "silu_mul", "dsl_moe_down_fold": "scale"}
 K_MAX, RCH, THREADS = 4096, 64, 1024                              # x (K floats) + 2 x RCH (moe_up's g) + 16 waves x RCH partials
@@ -395,7 +402,11 @@ static __device__ __forceinline__ void dsl_gemv_bigk(const __hip_bfloat16* __res
 #endif
 struct DslArgs { const __hip_bfloat16* W; const __hip_bfloat16* x; __hip_bfloat16* out; const int* ids; const float* wts; long long estride; int M, K, rpt, tpe;
                  const __hip_bfloat16* rows; const __hip_bfloat16* resid_in; __hip_bfloat16* resid_out; const __hip_bfloat16* ln; int R; float eps; int mode, E;
-                 const __hip_bfloat16* logits; int nb, sx, sout, srows, srin, srout; };
+                 const __hip_bfloat16* logits; int nb, sx, sout, srows, srin, srout;
+#if ETX_EMIT_DSL_EXT
+                 const __hip_bfloat16* bias; const __hip_bfloat16* lnb;   // output bias; LayerNorm bias (mode 4)
+#endif
+};
 static __device__ __forceinline__ DslArgs dsl_args(const unsigned char* a) {
   DslArgs d;
   d.W = *(const __hip_bfloat16* const*)(a + 0); d.x = *(const __hip_bfloat16* const*)(a + 8); d.out = *(__hip_bfloat16* const*)(a + 16);
@@ -406,6 +417,9 @@ static __device__ __forceinline__ DslArgs dsl_args(const unsigned char* a) {
   d.E = *(const int*)(a + 108); d.logits = *(const __hip_bfloat16* const*)(a + 112);
   d.nb = *(const int*)(a + 120); d.sx = *(const int*)(a + 124); d.sout = *(const int*)(a + 128);
   d.srows = *(const int*)(a + 132); d.srin = *(const int*)(a + 136); d.srout = *(const int*)(a + 140);
+#if ETX_EMIT_DSL_EXT
+  d.bias = *(const __hip_bfloat16* const*)(a + 160); d.lnb = *(const __hip_bfloat16* const*)(a + 168);
+#endif
   return d;
 }
 // norm fold: xs = bf16(rms_norm(z)) as floats, z = bf16(bf16(sum of R rows) + resid_in) per element; task 0 stores z
@@ -442,11 +456,38 @@ static __device__ __forceinline__ void dsl_stage_norm_at(const DslArgs& d, const
     for (int j = 0; j < 8; ++j) { xs[8 * i + j] = z[j]; ss += z[j] * z[j]; }
     if (store && rout != nullptr) dsl_a_st128(rout + 8 * i, ro);
   }
+#if ETX_EMIT_DSL_EXT
+  // mode 4: LayerNorm (PhiMoE): mean-centred, biased -- out = (z - mean) * rsqrt(var + eps) * w + b, fp32 inside,
+  // one bf16 rounding, as torch's nn.LayerNorm on a bf16 tensor. mode 1 keeps the RMS path bit-for-bit.
+  float mean = 0.f;
+  if (d.mode == 4) {
+    float s1 = 0.f;
+    for (int i = (int)threadIdx.x; i < K; i += blockDim.x) s1 += xs[i];
+    mean = etx_block_sum(s1, red) / (float)K;
+    float s2 = 0.f;
+    for (int i = (int)threadIdx.x; i < K; i += blockDim.x) { const float zc = xs[i] - mean; s2 += zc * zc; }
+    ss = etx_block_sum(s2, red);
+  } else
+#endif
   ss = etx_block_sum(ss, red);
   const float sv = rsqrtf(ss / (float)K + d.eps);
   for (int i = (int)threadIdx.x; i < K / 8; i += blockDim.x) {
     const dsl_u32x4 w = *(const DSL_G dsl_u32x4*)(d.ln + 8 * i);          // the norm weight is read-only: stays cached
     dsl_u32x4 o;
+#if ETX_EMIT_DSL_EXT
+    if (d.mode == 4) {
+      const dsl_u32x4 bq = *(const DSL_G dsl_u32x4*)(d.lnb + 8 * i);
+#pragma unroll
+      for (int j = 0; j < 4; ++j) {
+        const float v0 = dsl_bfr((xs[8 * i + 2 * j] - mean) * sv * __uint_as_float(w[j] << 16) + __uint_as_float(bq[j] << 16));
+        const float v1 = dsl_bfr((xs[8 * i + 2 * j + 1] - mean) * sv * __uint_as_float(w[j] & 0xffff0000u) + __uint_as_float(bq[j] & 0xffff0000u));
+        xs[8 * i + 2 * j] = v0; xs[8 * i + 2 * j + 1] = v1;
+        o[j] = (__float_as_uint(v0) >> 16) | (__float_as_uint(v1) & 0xffff0000u);
+      }
+      if (store && xout != nullptr) dsl_a_st128(xout + 8 * i, o);
+      continue;
+    }
+#endif
 #pragma unroll
     for (int j = 0; j < 4; ++j) {
       const float v0 = dsl_bfr(xs[8 * i + 2 * j] * sv * __uint_as_float(w[j] << 16));
@@ -465,10 +506,26 @@ static __device__ __forceinline__ void dsl_stage_norm_at(const DslArgs& d, const
     xs[i] = z; ss += z * z;
     if (store && rout != nullptr) dsl_a_stbf(rout + i, __float2bfloat16(z));
   }
+#if ETX_EMIT_DSL_EXT
+  float mean = 0.f;
+  if (d.mode == 4) {
+    float s1 = 0.f;
+    for (int i = (int)threadIdx.x; i < K; i += blockDim.x) s1 += xs[i];
+    mean = etx_block_sum(s1, red) / (float)K;
+    float s2 = 0.f;
+    for (int i = (int)threadIdx.x; i < K; i += blockDim.x) { const float zc = xs[i] - mean; s2 += zc * zc; }
+    ss = etx_block_sum(s2, red);
+  } else
+#endif
   ss = etx_block_sum(ss, red);
   const float sv = rsqrtf(ss / (float)K + d.eps);
   for (int i = (int)threadIdx.x; i < K; i += blockDim.x) {
+#if ETX_EMIT_DSL_EXT
+    xs[i] = d.mode == 4 ? dsl_bfr((xs[i] - mean) * sv * __bfloat162float(d.ln[i]) + __bfloat162float(d.lnb[i]))
+                        : dsl_bfr(xs[i] * sv * __bfloat162float(d.ln[i]));
+#else
     xs[i] = dsl_bfr(xs[i] * sv * __bfloat162float(d.ln[i]));
+#endif
     if (store && xout != nullptr) dsl_a_stbf(xout + i, __float2bfloat16(xs[i]));   // the normed vector, for later consumers
   }
 #endif
@@ -555,13 +612,26 @@ BODIES = {
   if (r0 >= r1) return;
   const int KS = DSL_K_MAX;                                    // columns are DSL_K_MAX floats apart in LDS
   float* part = xs + DSL_NB * KS;
-  if (d.mode == 1) dsl_stage_norm_nb(d, DSL_NB, KS, xs, part + DSL_NB * 16 * DSL_RCH, blk == 0);
+  if (d.mode == 1
+#if ETX_EMIT_DSL_EXT
+      || d.mode == 4
+#endif
+     ) dsl_stage_norm_nb(d, DSL_NB, KS, xs, part + DSL_NB * 16 * DSL_RCH, blk == 0);
   else dsl_stage_nb(d.x, d.K, d.sx, DSL_NB, KS, xs);
   __hip_bfloat16* out = d.out; const int sout = d.sout;
+#if ETX_EMIT_DSL_EXT
+  const __hip_bfloat16* bias = d.bias;                 // output bias (o_proj / lm_head / the folded qkv); null = none
+  dsl_gemv_chunked_nb<DSL_NB>(d.W, d.K, KS, xs, r0, r1, part, [&](int r, const float* v) {
+    const float bv = bias ? __bfloat162float(bias[r]) : 0.f;
+#pragma unroll
+    for (int b = 0; b < DSL_NB; ++b) dsl_a_stbf(out + (size_t)b * sout + r, __float2bfloat16(v[b] + bv));
+  });
+#else
   dsl_gemv_chunked_nb<DSL_NB>(d.W, d.K, KS, xs, r0, r1, part, [&](int r, const float* v) {
 #pragma unroll
     for (int b = 0; b < DSL_NB; ++b) dsl_a_stbf(out + (size_t)b * sout + r, __float2bfloat16(v[b]));
-  });''',
+  });
+#endif''',
     "silu_mul": '''
   // ETX_VL_BATCH (nb > 1): the slot index runs over requests x slots as S = s * nb + rq, so slot s of every request
   // lands on the same XCD (the xw->x affinity is unchanged) and the per-request tensors are reached through the

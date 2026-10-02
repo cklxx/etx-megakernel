@@ -85,6 +85,11 @@ if [ "$D_ATTN" = head ]; then DSLOPS="${DSLOPS:+$DSLOPS,}attnprep"; SLOTS="${SLO
 "$PY" -m etx.importer.vllm_kernels --vllm "$VLLM" --out "$OUT/imp" --compiler hipcc --only "$EXPORTS" "${ORIG[@]}" --slots "$SLOTS" \
   --block rms_norm_2d=$((H / 8)) --block reshape_and_cache=$((NKV * HD / 8)) "${MOEBLK[@]}"
 # the DSL ops' tiles and argument layouts join imports.json after the import, before the adapter
+# PhiMoE-class models (the manifest's ln_norm / bias_o / bias_lm, written by prep.py from the config): the DSL gemv
+# layout grows two pointers (bias, LayerNorm bias). Exported for BOTH the tile emission and the plan, which asserts
+# the layout and its own config derivation agree (model.py) -- the round-14/19/30 drift class dies loudly.
+DSLEXT=$([ "$(cfg ln_norm)" = 1 ] || [ "$(cfg bias_o)" = 1 ] || [ "$(cfg bias_lm)" = 1 ] && echo 1 || echo 0)
+export ETX_VL_DSL_EXT=$DSLEXT
 DSLT=(); if [ -n "$DSLOPS" ]; then "$PY" -m etx.ops.emit "$OUT/imp/imports.json" --tiles "$OUT/dsl_tiles.hip" --ops "$DSLOPS"; DSLT=(ETX_VL_DSL_TILES="$OUT/dsl_tiles.hip"); fi
 "$PY" -m etx.importer.adapter "$OUT/imp/imports.json" --tiles "$OUT/imp_tiles.hip" --header "$OUT/imports.h"
 "$PY" -m etx.importer.bundle --imports "$OUT/imp" --exports "$EXPORTS" --devlibs "$DEVLIBS" -o "$OUT/imports.bc"

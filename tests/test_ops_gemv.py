@@ -16,11 +16,17 @@ def test_entries_and_tiles_agree():
         for name in (f"etx_tile_{e}", f"etx_tile_x_{e}", f"etx_pre_{e}", f"etx_pre_x_{e}"):
             assert re.search(rf"void {name}\(const etx_ctx\* c\)", src), name
         assert f"a + {gemv.GRID_OFF + 12}" in src                       # nblk from the grid words, as the adapter's tiles
-    # every argument offset the tile reads is a declared parameter at that offset
+    # every argument offset the tile reads is a declared parameter at that offset. The ETX_EMIT_DSL_EXT reads
+    # (bias / lnb at 160 / 168) are compiled only when ETX_VL_DSL_EXT sized the layout, so strip the guarded
+    # region when the env is off and require the declarations when it is on (both directions pinned).
+    reader = src.split("struct DslArgs")[1].split("}")[1]
+    if not gemv.DSL_EXT:
+        reader = re.sub(r"#if ETX_EMIT_DSL_EXT.*?#endif", "", reader, flags=re.S)
     offs = {p["offset"] for p in ent["dsl_gemv"]["params"]}
-    for m in re.finditer(r"\(a \+ (\d+)\)", src.split("struct DslArgs")[1].split("}")[1]):
+    for m in re.finditer(r"\(a \+ (\d+)\)", reader):
         assert int(m.group(1)) in offs, m.group(0)
     assert {p[2] for p in gemv.PARAMS} == offs
+    assert (160 in offs) == gemv.DSL_EXT and (168 in offs) == gemv.DSL_EXT
 
 
 def test_adapter_skips_dsl_but_host_header_includes_it():
@@ -73,3 +79,18 @@ def test_kernel_emits_touch_before_the_wait_on_the_other_waves():
     import json
     types = json.loads(emit_plan_json(plan))["types"]
     assert types["second"]["touch"] == "etx_touch_second" and types["first"]["touch"] == "etx_touch_first"
+
+
+def test_dsl_ext_layout_is_env_gated():
+    """ETX_VL_DSL_EXT (PhiMoE-class) appends bias/lnb AFTER the grid words; off keeps the layout byte-identical
+    (the Qwen regression gate) and the plan asserts its own derivation matches (model.py)."""
+    import importlib, os, subprocess, sys
+    out = subprocess.run([sys.executable, "-c",
+        "import os; os.environ['ETX_VL_DSL_EXT']='1';"
+        "from etx.ops import gemv;"
+        "assert gemv.DSL_EXT and gemv.ARG_BYTES == 176 and gemv.GRID_OFF == 144;"
+        "offs={p[2] for p in gemv.PARAMS}; assert 160 in offs and 168 in offs;"
+        "print('ok')"], capture_output=True, text=True)
+    assert out.returncode == 0 and "ok" in out.stdout, out.stderr
+    from etx.ops import gemv
+    assert not gemv.DSL_EXT and gemv.ARG_BYTES == 160 and gemv.GRID_OFF == 144
