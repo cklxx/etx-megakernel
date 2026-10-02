@@ -358,6 +358,41 @@ template <class Epi>
 static __device__ __forceinline__ void dsl_gemv_chunked(const __hip_bfloat16* __restrict__ W, int K, const float* xs, int r0, int r1, float* part, Epi epi) {
   for (int r = r0; r < r1; r += DSL_RCH) dsl_gemv(W, K, xs, r, min(r1, r + DSL_RCH), part, epi);
 }
+#if ETX_EMIT_DSL_BIGK
+// K > DSL_K_MAX (Mixtral moe_down: 14336): x staged in DSL_K_MAX-column chunks, every chunk's partial dots
+// accumulated into the same per-(wave, row) LDS array, the epilogue once per row chunk after the last column chunk.
+// LDS unchanged (the x region holds one chunk); the weight walk per chunk is today's walk for a K-chunk matrix whose
+// row stride is the full K (dsl_gemv_accum separates ld from kcols), so contiguity within a segment is untouched.
+// Deterministic: fixed chunk order, partials accumulated in k order per wave, final sum in wave order. 16 B loads for
+// the 512-aligned span of each chunk, the 8 B path for a %512 tail (a tail exists only in the last chunk: chunks are
+// DSL_K_MAX = 4096 columns, and K % 256 == 0 is host-checked). Costs one stage + one barrier per (row chunk, column
+// chunk) -- cheap when rows-per-task <= DSL_RCH (one row chunk, the MoE shapes), quadratic-ish beyond: the dense
+// forms keep the host's K <= DSL_K_MAX guard, only the MoE forms route here.
+template <class Epi>
+static __device__ __forceinline__ void dsl_gemv_bigk(const __hip_bfloat16* __restrict__ W, const __hip_bfloat16* __restrict__ x,
+                                                     int K, float* xs, int r0, int r1, float* part, Epi epi) {
+  constexpr int WIDE = ETX_WAVE_SIZE * 8;
+  const int nw = etx_nwaves();
+  dsl_lds_fw* pl = (dsl_lds_fw*)part;
+  for (int r = r0; r < r1; r += DSL_RCH) {
+    const int rr = min(r1, r + DSL_RCH), nrt = rr - r;
+    for (int i = (int)threadIdx.x; i < nw * nrt; i += blockDim.x) pl[i] = 0.f;
+    for (int k0 = 0; k0 < K; k0 += DSL_K_MAX) {
+      const int kc = min(DSL_K_MAX, K - k0), KW = (kc / WIDE) * WIDE;
+      dsl_stage(x + k0, kc, xs);                       // ends in __syncthreads: zeroed partials + staged chunk visible
+      dsl_gemv_accum<8, 4>(W + k0, K, KW, 0, xs, r, rr, part);
+      dsl_gemv_accum<4, 4>(W + k0, K, kc - KW, KW, xs, r, rr, part);
+      __syncthreads();                                 // partials written, xs free for the next chunk
+    }
+    for (int q = (int)threadIdx.x; q < nrt; q += blockDim.x) {
+      float v = 0.f;
+      for (int w2 = 0; w2 < nw; ++w2) v += pl[w2 * nrt + q];
+      epi(r + q, v);
+    }
+    __syncthreads();
+  }
+}
+#endif
 struct DslArgs { const __hip_bfloat16* W; const __hip_bfloat16* x; __hip_bfloat16* out; const int* ids; const float* wts; long long estride; int M, K, rpt, tpe;
                  const __hip_bfloat16* rows; const __hip_bfloat16* resid_in; __hip_bfloat16* resid_out; const __hip_bfloat16* ln; int R; float eps; int mode, E;
                  const __hip_bfloat16* logits; int nb, sx, sout, srows, srin, srout; };
@@ -536,7 +571,11 @@ BODIES = {
   if (DSL_NB > 1 && d.nb > 1) { s = S0 / d.nb; rq = S0 - s * d.nb; }
   const int r0 = j * d.rpt, r1 = min(d.M, r0 + d.rpt);
   if (r0 >= r1) return;
+#if ETX_EMIT_DSL_BIGK
+  float* g = xs + min(d.K, DSL_K_MAX); float* part = g + 2 * d.rpt;   // min: K > DSL_K_MAX takes the chunked path below, whose x region is one chunk
+#else
   float* g = xs + d.K; float* part = g + 2 * d.rpt;
+#endif
   int* lids = (int*)(part + 16 * DSL_RCH); float* lwts = (float*)(lids + 16);   // top-k fold: R = k, mode 3 = renormalised
 #ifdef DSL_ABLATE_TOPK
   if (etx_wave() == 0 && etx_lane() == 0) { lids[s] = s; lwts[s] = 1.f; }       // ablation: slot s -> expert s (WRONG output)
@@ -545,6 +584,17 @@ BODIES = {
   if (d.mode >= 2) dsl_topk_lds(d.logits, d.E, d.R, d.mode == 3 ? 1 : 0, lids, lwts);
 #endif
   const __hip_bfloat16* We = d.W + (size_t)(d.mode >= 2 ? lids[s] : dsl_a_ldi(d.ids + (size_t)rq * d.srows + s)) * d.estride;     // g: 2 x rpt floats (rpt <= DSL_RCH, host-checked)
+#if ETX_EMIT_DSL_BIGK
+  if (d.K > DSL_K_MAX) {                               // K > the staged window (host allows it for the MoE forms only):
+    float* gb = xs + DSL_K_MAX; float* pb = gb + 2 * d.rpt;      // fixed LDS bases -- xs + d.K would overflow the block
+    const __hip_bfloat16* xr = d.x + (size_t)rq * d.sx;
+    dsl_gemv_bigk(We, xr, d.K, xs, r0, r1, pb, [&](int r, float v) { gb[r - r0] = dsl_bfr(v); });
+    dsl_gemv_bigk(We + (size_t)d.M * d.K, xr, d.K, xs, r0, r1, pb, [&](int r, float v) { gb[d.rpt + r - r0] = dsl_bfr(v); });
+    __hip_bfloat16* actb = d.out + (size_t)rq * d.sout + (size_t)s * d.M;
+    for (int r = r0 + (int)threadIdx.x; r < r1; r += blockDim.x) dsl_a_stbf(actb + r, __float2bfloat16(dsl_silu(gb[r - r0]) * gb[d.rpt + r - r0]));
+    return;
+  }
+#endif
   dsl_stage(d.x + (size_t)rq * d.sx, d.K, xs);
 #ifdef DSL_ABLATE_NOGEMV                                 // ablation: prologue only -- topk + stage, no passes, no stores (WRONG output)
   asm volatile("" :: "v"((unsigned)(size_t)We)); return;
@@ -565,7 +615,11 @@ BODIES = {
   if (DSL_NB > 1 && d.nb > 1) { s = S0 / d.nb; rq = S0 - s * d.nb; }
   const int r0 = j * d.rpt, r1 = min(d.M, r0 + d.rpt);
   if (r0 >= r1) return;
+#if ETX_EMIT_DSL_BIGK
+  int* lids = (int*)(xs + min(d.K, DSL_K_MAX) + 16 * DSL_RCH); float* lwts = (float*)(lids + 16);   // min: as silu_mul
+#else
   int* lids = (int*)(xs + d.K + 16 * DSL_RCH); float* lwts = (float*)(lids + 16);
+#endif
 #ifdef DSL_ABLATE_TOPK
   if (etx_wave() == 0 && etx_lane() == 0) { lids[s] = s; lwts[s] = 1.f; }       // ablation: slot s -> expert s (WRONG output)
   __syncthreads();
@@ -573,6 +627,16 @@ BODIES = {
   if (d.mode >= 2) dsl_topk_lds(d.logits, d.E, d.R, d.mode == 3 ? 1 : 0, lids, lwts);
 #endif
   const __hip_bfloat16* We = d.W + (size_t)(d.mode >= 2 ? lids[s] : dsl_a_ldi(d.ids + (size_t)rq * d.srows + s)) * d.estride;
+#if ETX_EMIT_DSL_BIGK
+  if (d.K > DSL_K_MAX) {                               // chunked staging; fixed LDS bases (see silu_mul)
+    float* pb = xs + DSL_K_MAX;
+    const float wsb = d.mode >= 2 ? lwts[s] : dsl_a_ldf(d.wts + (size_t)rq * d.srin + s);
+    __hip_bfloat16* outb = d.out + (size_t)rq * d.sout + (size_t)s * d.M;
+    dsl_gemv_bigk(We, d.x + (size_t)rq * d.sx + (size_t)s * d.K, d.K, xs, r0, r1, pb,
+                  [&](int r, float v) { dsl_a_stbf(outb + r, __float2bfloat16(v * wsb)); });
+    return;
+  }
+#endif
   dsl_stage(d.x + (size_t)rq * d.sx + (size_t)s * d.K, d.K, xs);
 #ifdef DSL_ABLATE_NOGEMV
   asm volatile("" :: "v"((unsigned)(size_t)We)); return;

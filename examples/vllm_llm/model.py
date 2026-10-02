@@ -389,6 +389,9 @@ def build() -> Graph:
     # reads independently: build.sh gated the tile's define on ETX_VL_FOLD_TOPK while the plan derived the opposite,
     # and the expert tiles recomputed a top-k the plan had already given its own phase -- 0.63 ms, measured round 30.
     g.codegen["fold_topk"] = fold_topk(d)
+    # MoE K beyond the tiles' 4096-float staged window (Mixtral moe_down: 14336): the chunked path is compiled in
+    # only when a shape needs it -- it measured +0.12 ms on Qwen as a resident runtime branch (round 43).
+    g.codegen["dsl_bigk"] = bool(DSL_GEMV and d.moe and max(d.H, d.MI) > 4096)
     # Compile-time decisions the tiles and the host must share. They are published through the manifest
     # (etx/codegen/manifest.py) and MUST NOT also be passed as -D: build.sh re-deriving the same decision is how
     # ETX_VL_NB (round 14), ETX_DEV_RESET (rounds 19/20) and the top-k fold (round 30) each produced a build that

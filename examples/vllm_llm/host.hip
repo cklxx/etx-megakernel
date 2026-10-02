@@ -343,8 +343,16 @@ int main(int argc, char** argv) {
        .i32(x.nb).i32((int)sx).i32((int)sout).i32((int)srows).i32((int)srin).i32((int)srout);
     }
     // top-k fold (mode 2 / 3 = renormalised): the expert tasks recompute the top-k from the router logits
+    // ETX_EMIT_DSL_BIGK (manifest): with it, K beyond the 4096-float staged window is chunked inside the MoE tiles
+    // (dsl_gemv_bigk) and 65536 is a sanity bound; without it the tiles have no chunked path compiled in, so the
+    // original 4096 cap must hold -- the guard and the tile switch on the SAME macro and cannot disagree.
+#if ETX_EMIT_DSL_BIGK
+    else if ((x.exp == "dsl_moe_up_fold" || x.exp == "dsl_moe_down_fold") && (MI % 32 || H % 256 || H % 64 || MI % 256 || H > 65536 || MI > 65536 || E > 128))
+      die("dsl_moe_*_fold: needs MI % 32 == 0, H % 256 == 0, MI % 256 == 0, H and MI <= 65536, E <= 128");
+#else
     else if ((x.exp == "dsl_moe_up_fold" || x.exp == "dsl_moe_down_fold") && (MI % 32 || H > 4096 || H % 256 || H % 64 || MI > 4096 || MI % 256 || E > 128))
       die("dsl_moe_*_fold: needs MI % 32 == 0, H % 256 == 0, MI % 256 == 0, H and MI <= 4096, E <= 128");
+#endif
 // ETX_EMIT_FOLD_TOPK: did the plan fold the top-k into the expert tasks, or give it its own phase? Derived from the
 // model's shapes (model.py fold_topk) and published through plan_data.h, which the kernel and this file both include,
 // so the two cannot disagree. It was a -D until round 30, where build.sh defaulted it to "fold" while the plan had
@@ -369,8 +377,13 @@ int main(int argc, char** argv) {
     else if (x.exp == "dsl_moe_down_fold") a.ptr(W(pl + "w2")).ptr(mc2).ptr(mc3).ptr(nullptr).ptr(nullptr).i64((long long)H * MI).i32(H).i32(MI).i32(64).i32(H / 64)
                                              .ptr(nullptr).ptr(nullptr).ptr(nullptr).ptr(nullptr).i32(TOPK).f32(0.f).i32(norm_topk ? 3 : 2).i32(E).ptr(rlog) ETX_VL_NOBATCH;
 #endif
+#if ETX_EMIT_DSL_BIGK
+    else if (x.exp == "dsl_moe_up" && (MI % 32 || H % 256 || H > 65536)) die("dsl_moe_up: MI % 32 or H % 256 (K > 4096 is chunked: etx/ops/gemv.py dsl_gemv_bigk)");
+    else if (x.exp == "dsl_moe_down" && (H % 64 || MI % 256 || MI > 65536)) die("dsl_moe_down: H % 64 or MI % 256");
+#else
     else if (x.exp == "dsl_moe_up" && (MI % 32 || H > 4096 || H % 256)) die("dsl_moe_up: MI % 32 or H > 4096 (etx/ops/gemv.py K_MAX, RCH)");
     else if (x.exp == "dsl_moe_down" && (H % 64 || MI > 4096 || MI % 256)) die("dsl_moe_down: H % 64 or MI > 4096");
+#endif
     else if (x.exp == "dsl_moe_up") a.ptr(W(pl + "w13")).ptr(o_norm).ptr(mc2).ptr(ti_r).ptr(nullptr).i64((long long)2 * MI * H).i32(MI).i32(H).i32(32).i32(MI / 32)
                                       .ptr(nullptr).ptr(nullptr).ptr(nullptr).ptr(nullptr).i32(0).f32(0.f).i32(0).i32(0).ptr(nullptr)
                                       .i32(x.nb).i32(x.nb > 1 ? (int)n_ox : 0).i32(x.nb > 1 ? (int)n_mc2 : 0)

@@ -37,6 +37,7 @@ FEATURES: dict[str, tuple[str, str, int]] = {
     "nb": ("ETX_VL_NB", "value", 1),                # activation columns the tiles were emitted for (host.hip)
     "requests": ("ETX_VL_REQUESTS", "value", 1),    # concurrent decode requests the plan carries (host.hip)
     "uc": ("ETX_VL_UC", "flag", 0),                 # cross-XCD tensors in uncached memory (host.hip, lowering)
+    "dsl_bigk": ("ETX_EMIT_DSL_BIGK", "value", 0),  # MoE K > 4096 chunked in the DSL tiles (gemv.py, host.hip guards)
 }
 
 # Macros that used to be passed as -D for a feature now in FEATURES. Trapped by name so an old build script, an old
