@@ -234,3 +234,19 @@ path: the MoE rows-per-task constants are Qwen-tuned (moe_up 896 tasks on 304 wo
 moe_down 128 tasks with 58% of workers idle; MoE is 73% of the layer) — per-shape task widths are the next knob.
 A Qwen regression (+0.12 ms from the resident big-K branch) was caught by the interleaved gate and fixed via the
 feature manifest (`dsl_bigk`, derived from max(H, MI) > 4096); Qwen's emitted source is token-identical with it off.
+
+
+## Round 46: Phi-3.5-MoE — refused at the config; the class boundary is sharper than we knew
+
+Shape facts fit (E=16, TOPK=2, G=4, no shared expert; MI=6400 would exercise the big-K DSL path), but the
+refusal is decisive and named: **PhiMoE routes with `sparsemixer`, not softmax-topk** — per selection round,
+mask logits where (max−s)/max(|s|,max) > 2·0.01, softmax the masked row, gather at the argmax; the ids equal
+plain top-2 but the weights are never renormalized across the pair. Even vLLM runs it as Python
+(`phimoe.py:175,283`), so there is nothing to import, and both of our top-k ops compute softmax-topk: the
+build would pass every structural gate and generate wrong weights — the silent class this document exists to
+prevent. Secondary, tractable items if a sparsemixer op is ever written (an afternoon in `etx/ops/topk.py`;
+deterministic at inference): the LongRoPE cos/sin cache (additive branch in `prep.py:28`, kernel reusable) and
+o_proj/lm_head bias in the gemv epilogue (qkv bias exists on the import path; the rest is unverified).
+
+**Corrected claim:** the class this week validated is "GQA attention + *softmax-topk* routed MoE" — one notch
+narrower than "routed MoE". No download, no GPU time was spent; the refusal cost one config read.
