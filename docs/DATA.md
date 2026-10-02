@@ -64,3 +64,5 @@ its pattern will fail on a fresh box; the working tag on 2026-10-01 was `vllm/vl
   per task; staging costs; workgroup primitives; clock under FMA load; co-residency pair factors; counters (i-cache, TLB).
 - Routing overlap of concurrent requests (uniform: 11.38 of 11.44 experts for two).
 - ETX_EV_STRIDE 32 vs 1 on the vLLM-kernel Qwen graphs (0.5-3%), the imported MoE kernels' per-launch cost against vLLM (2026-09-28).
+
+- **backup data-2026-10-02** (releases on cklxx/etx-data and metalopscloud/amdproject): results_2026-09-30 + results_2026-10-01 as one tarball, sha256 5f1b9d3a0bd439e8..., download-verified. Covers every round of the 2026-10-01/02 session.
