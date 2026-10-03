@@ -101,15 +101,26 @@ def derive(b: dict) -> dict:
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("logdir")
-    ap.add_argument("--plan", default="results_2026-09-28/plan_b_moe_xcd.json")
-    ap.add_argument("--measured", default="results_2026-09-28/measured.json")
+    ap.add_argument("--plan", help="optional archived plan; requires --measured")
+    ap.add_argument("--measured", help="optional archived measurements; requires --plan")
     ap.add_argument("--json", default=None)
     a = ap.parse_args()
+    if bool(a.plan) != bool(a.measured):
+        ap.error("--plan and --measured must be provided together")
+    d = derive(read_dir(a.logdir))
+    if not a.plan:
+        print("microbenchmark-only: derived parameters; no fitted model or simulated latency")
+        for key, (value, source) in d.items():
+            print(f"{key}: {value} ({source})")
+        if a.json:
+            with open(a.json, "w") as stream:
+                json.dump({"derived": {k: v[0] for k, v in d.items()},
+                           "sources": {k: v[1] for k, v in d.items()}, "sim": {}}, stream, indent=1)
+        return
     from etx.sim.xcd import Hw, simulate
     from examples.vllm_llm import kmodel as km
     from examples.vllm_llm.xcd_run import cost_fn
 
-    d = derive(read_dir(a.logdir))
     fit = km.fit(json.load(open(a.measured)))
     fitted = {"t_v": fit.t_v, "t_s": fit.t_s, "F": fit.F, "bw": fit.bw, "t_swbar": fit.hw["t_swbar"], "t_round": fit.hw["t_bar"],
               "A_task_vector": fit.A_task, "A_task_scalar": None, "ready_wait": None}

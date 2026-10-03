@@ -29,6 +29,7 @@ from __future__ import annotations
 
 # codegen key -> (macro the sources test, spelling, default when the plan says nothing)
 FEATURES: dict[str, tuple[str, str, int]] = {
+    "moe_block_m": ("ETX_EMIT_MOE_BLOCK_M", "value", 16),  # captured MoE argument/grid contract
     "argpf": ("ETX_EMIT_ARGPF", "value", 0),        # next-task argument prefetch (kernel.py)
     "bar2": ("ETX_EMIT_BAR2", "value", 0),          # two-barrier static loop (kernel.py)
     "dev_reset": ("ETX_EMIT_DEV_RESET", "value", 0),  # the kernel resets its own per-step state (host.h)

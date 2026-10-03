@@ -1,0 +1,23 @@
+name: CPU acceptance
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  cpu:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -e '.[dev]'
+      - run: python -m etx.tools.cpu_check --out build/cpu-acceptance
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cpu-acceptance
+          path: build/cpu-acceptance/

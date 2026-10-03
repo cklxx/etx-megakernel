@@ -10,6 +10,8 @@ branching on an architecture name.
 Repository: https://github.com/cklxx/etx-megakernel (private). Design page (the spec): https://etc-dynamic-megakernel-arch.q1293822641.workers.dev
 (source in `docs/site/index.html`). Code map: `docs/ARCHITECTURE.md`.
 
+CPU acceptance target and one-command checks: [G0 readiness](docs/CPU-READINESS.md).
+
 ## Fusing the state-of-the-art kernels (2026-09-25)
 
 ETX now imports compiled kernels instead of re-implementing them: `etx/importer/` takes a kernel's AMDGPU

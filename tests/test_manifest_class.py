@@ -4,6 +4,7 @@ Each of these was a build that compiled, ran, and in three of four cases still m
 plan and the compiled code disagreed about a feature (etx/codegen/manifest.py records the four).
 """
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -70,8 +71,10 @@ def test_every_macro_the_tiles_test_is_either_published_or_tile_local():
 def test_the_trap_fires_on_a_command_line_define():
     """The mechanism itself: a -D for a published feature must stop the compile, not change behaviour."""
     block = "\n".join(manifest.guard_block({"coh": True}))
-    src = "#define ETX_DSL_COH 1\n" + block                  # as if -DETX_DSL_COH had been passed
-    out = subprocess.run([sys.executable, "-c", "pass"], capture_output=True)   # keep the suite hermetic
-    assert out.returncode == 0
-    assert src.index("#define ETX_DSL_COH 1") < src.index("#error")             # the trap sees it
-    assert block.count("#error") == len(manifest.RETIRED)
+    compiler = shutil.which("c++")
+    assert compiler, "CPU acceptance requires a C++ preprocessor"
+    good = subprocess.run([compiler, "-E", "-x", "c++", "-"], input=block, capture_output=True, text=True)
+    bad = subprocess.run([compiler, "-E", "-x", "c++", "-DETX_DSL_COH=1", "-"],
+                         input=block, capture_output=True, text=True)
+    assert good.returncode == 0, good.stderr
+    assert bad.returncode != 0 and "must not be defined on the command line" in bad.stderr

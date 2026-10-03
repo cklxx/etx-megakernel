@@ -16,6 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 LLVM = Path(os.environ.get("ETX_LLVM", "/opt/homebrew/opt/llvm/bin"))
 VLLM = Path(os.environ.get("ETX_VLLM", Path.home() / "code/vllm"))
 HDRS = Path(os.environ.get("ETX_ROCM_HEADERS", Path.home() / "code/rocm-headers"))
+ASSEMBLER = LLVM / ("llvm-as" if (LLVM / "llvm-as").exists() else "llvm-link")
 need = pytest.mark.skipif(not ((LLVM / "clang++").exists() and (VLLM / "csrc/rocm/skinny_gemms.cu").exists() and (HDRS / "inc/hip").exists()),
                           reason="local LLVM / vLLM / ROCm headers not available")
 
@@ -48,7 +49,8 @@ def test_slice_keeps_kernels_drops_host():
 
 
 @need
-def test_wvsplitk_import_links_and_inlines(tmp_path):
+def test_wvsplitk_import_links_and_inlines(tmp_path, monkeypatch):
+    monkeypatch.delenv("ETX_DEVLIBS", raising=False)  # import first; final-link settings must not lower IDs early
     sl = tmp_path / "skinny.hip"
     sl.write_text(slice_device((VLLM / "csrc/rocm/skinny_gemms.cu").read_text(), r"wvSplitKQ|fp8|Fp8|FP8") + INST)
     ll = tmp_path / "skinny.ll"
@@ -57,7 +59,7 @@ def test_wvsplitk_import_links_and_inlines(tmp_path):
     out, info = import_kernel(ll.read_text(), "wvSplitK_hf_sml_", "etx_imp_wv", (64, 16, 1), 1024, lds_cap=24576)
     assert len(info.params) == 12 and info.slots == 1 and info.lds_bytes == 24576 and info.arg_bytes == 80
     imp = tmp_path / "imp.ll"; imp.write_text(out)
-    run([str(LLVM / "llvm-as"), str(imp), "-o", str(tmp_path / "imp.bc")])
+    run([str(ASSEMBLER), str(imp), "-o", str(tmp_path / "imp.bc")])
     (tmp_path / "mk.hip").write_text(MK)
     run(["bash", str(ROOT / "etx/importer/hip_ir_local.sh"), str(tmp_path / "mk.hip"), str(tmp_path / "mk.ll"), "-I", str(ROOT / "etx/runtime/include"),
          "-Xclang", "-mlink-builtin-bitcode", "-Xclang", str(tmp_path / "imp.bc")])
@@ -136,13 +138,16 @@ def test_triton_downgrade_float_literals_and_attrs():
     assert lds.startswith("@global_smem = internal addrspace(3) global [20480 x i8] undef, align 16")
 
 
-@pytest.mark.skipif(not (LLVM / "llvm-as").exists(), reason="local LLVM not available")
+@pytest.mark.skipif(not ASSEMBLER.exists(), reason="local LLVM not available")
 def test_triton_downgrade_hex_literals_parse_back(tmp_path):
     # the hex literal must name the same value LLVM 23 printed: round-trip through the local LLVM 23
     from etx.importer.triton_import import downgrade_ir
     src = "define <2 x bfloat> @f() {\n  ret <2 x bfloat> <bfloat +nan(0x3F), bfloat -qnan>\n}\n"
     t, _ = downgrade_ir(src)
     (tmp_path / "a.ll").write_text(t)
-    run([str(LLVM / "llvm-as"), str(tmp_path / "a.ll"), "-o", str(tmp_path / "a.bc")])
+    run([str(ASSEMBLER), str(tmp_path / "a.ll"), "-o", str(tmp_path / "a.bc")])
     back = run([str(LLVM / "llvm-dis"), str(tmp_path / "a.bc"), "-o", "-"])
-    assert "bfloat +nan(0x3F), bfloat -qnan" in back
+    # LLVM 22 prints hex bits; LLVM 23 prints named NaNs. Both must preserve
+    # the payload and sign, rather than merely parsing successfully.
+    assert ("bfloat +nan(0x3F), bfloat -qnan" in back or
+            "bfloat 0xR7FFF, bfloat 0xRFFC0" in back)
