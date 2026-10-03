@@ -76,14 +76,14 @@ def test_results(path):
     return result
 
 
-def command_step(name, command, out, *, timeout=300, cwd=ROOT):
+def command_step(name, command, out, *, timeout=300, cwd=ROOT, env=None):
     log = out / f"{name}.log"
     print(f"START {name}: {' '.join(map(str, command))}", flush=True)
     started = time.monotonic()
     with log.open("w") as stream:
         try:
             proc = subprocess.Popen(list(map(str, command)), cwd=cwd, stdout=stream,
-                                    stderr=subprocess.STDOUT, start_new_session=True)
+                                    stderr=subprocess.STDOUT, start_new_session=True, env=env)
             while True:
                 try:
                     code = proc.wait(timeout=10)
@@ -103,6 +103,16 @@ def command_step(name, command, out, *, timeout=300, cwd=ROOT):
             code = 127
     print(f"END {name}: exit={code}", flush=True)
     return {"step": name, "returncode": code, "log": log.name, "seconds": time.monotonic() - started}
+
+
+def pytest_environment():
+    env = os.environ.copy()
+    # Acceptance always executes the repository suite with built-in pytest plus
+    # our inventory plugin. Ambient selection/plugin settings are not a protocol.
+    env.pop("PYTEST_ADDOPTS", None)
+    env.pop("PYTEST_PLUGINS", None)
+    env["PYTEST_DISABLE_PLUGIN_AUTOLOAD"] = "1"
+    return env
 
 
 def run(out, *, formal=False, require_external=False, rocm_image=None, rocm_root=None, local_matrix=False):
@@ -131,7 +141,12 @@ def run(out, *, formal=False, require_external=False, rocm_image=None, rocm_root
     for example in ("splitk_sum", "moe_layer", "gemm_rs"):
         steps.append(command_step(f"codegen-{example}", [sys.executable, "-m", "etx", "compile",
             ROOT / f"examples/{example}.py", "--arch", "gfx942", "--out", out / "codegen" / example], out))
-    steps.append(command_step("pytest", [sys.executable, "-m", "pytest", "-q", "-ra", f"--junitxml={out / 'pytest.xml'}"], out, timeout=1800))
+    steps.append(command_step("pytest", [sys.executable, "-m", "pytest", "-q", "-ra", "-o", "addopts=",
+        "-p", "etx.tools.pytest_acceptance", f"--acceptance-inventory={out / 'test-inventory.json'}",
+        f"--junitxml={out / 'pytest.xml'}", ROOT / "tests"], out, timeout=1800, env=pytest_environment()))
+    inventory = out / "test-inventory.json"
+    complete = inventory.exists() and json.loads(inventory.read_text()).get("complete") is True
+    steps.append({"step": "test-completeness", "returncode": int(not complete)})
     if (out / "pytest.xml").exists():
         manifest["tests"] = test_results(out / "pytest.xml")
         manifest["external_pending"].extend(manifest["tests"]["skipped"])

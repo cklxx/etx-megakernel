@@ -48,3 +48,34 @@ def test_matrix_child_failures_propagate(tmp_path):
     result = subprocess.run(['bash', str(root / 'examples/vllm_llm/local_matrix.sh'), str(tmp_path / 'matrix')],
                             capture_output=True, text=True, env=env)
     assert result.returncode != 0 and 'unsupported model' in result.stderr
+
+
+def test_acceptance_ignores_ambient_test_selection(tmp_path, monkeypatch):
+    from etx.tools.cpu_check import pytest_environment
+    suite = tmp_path / 'test_example.py'
+    suite.write_text('def test_one(): pass\ndef test_two(): pass\n')
+    monkeypatch.setenv('PYTEST_ADDOPTS', '-k test_one')
+    inventory = tmp_path / 'inventory.json'
+    command = [sys.executable, '-m', 'pytest', '-q', '-o', 'addopts=', '-p',
+               'etx.tools.pytest_acceptance', f'--acceptance-inventory={inventory}', str(suite)]
+    result = subprocess.run(command, env=pytest_environment(), capture_output=True, text=True)
+    report = json.loads(inventory.read_text())
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert report['complete'] and len(report['executed']) == 2
+    # Even explicit selection must not silently weaken the inventory gate.
+    result = subprocess.run(command + ['-k', 'test_one'], env=pytest_environment(), capture_output=True, text=True)
+    report = json.loads(inventory.read_text())
+    assert result.returncode != 0 and not report['complete']
+    assert len(report['deselected']) == 1
+
+
+def test_acceptance_rejects_early_exit(tmp_path):
+    from etx.tools.cpu_check import pytest_environment
+    suite = tmp_path / 'test_example.py'
+    suite.write_text('import pytest\ndef test_one(): pytest.exit("stop", returncode=0)\ndef test_two(): pass\n')
+    inventory = tmp_path / 'inventory.json'
+    result = subprocess.run([sys.executable, '-m', 'pytest', '-q', '-p',
+        'etx.tools.pytest_acceptance', f'--acceptance-inventory={inventory}', str(suite)],
+        env=pytest_environment(), capture_output=True, text=True)
+    assert result.returncode != 0
+    assert not json.loads(inventory.read_text())['complete']
