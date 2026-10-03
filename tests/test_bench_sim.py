@@ -154,3 +154,32 @@ def test_nonfinite_sample_is_retained_as_strict_json(tmp_path, monkeypatch):
     assert "Infinity" not in raw and "NaN" not in raw
     samples = [json.loads(s) for s in raw.splitlines()]
     assert all(s["result"]["makespan_us"] is None and s["errors"] for s in samples)
+
+
+def test_inflated_makespan_fails_trace_and_report(observation, experiment):
+    spec, result = observation
+    result['makespan_us'] *= 100
+    assert any('makespan disagrees' in e for e in bench.check_sample(spec, result))
+    samples = [json.loads(s) for s in (experiment / 'samples.jsonl').read_text().splitlines()]
+    samples[0]['result']['makespan_us'] *= 100
+    rewrite_samples(experiment, samples)
+    assert bench.report(experiment) == 1
+    assert not json.loads((experiment / 'summary.json').read_text())['comparisons']
+
+
+def test_provenance_binds_non_python_sources(tmp_path, monkeypatch):
+    import subprocess
+    subprocess.run(['git', 'init', '-q', str(tmp_path)], check=True)
+    names = ['driver.sh', 'host.hip', 'runtime.h', 'model.tla', 'model.cfg', 'proof.lean', 'workflow.yml']
+    for name in names:
+        (tmp_path / name).write_text('original\n')
+    subprocess.run(['git', '-C', str(tmp_path), 'add', '.'], check=True)
+    subprocess.run(['git', '-C', str(tmp_path), '-c', 'user.name=test', '-c',
+                    'user.email=test@example.com', 'commit', '-qm', 'fixture'], check=True)
+    monkeypatch.setattr(bench, 'ROOT', tmp_path)
+    before = bench.provenance()
+    for name in names:
+        (tmp_path / name).write_text('changed\n')
+    after = bench.provenance()
+    assert before['commit'] == after['commit']
+    assert all(before['source_sha256'][n] != after['source_sha256'][n] for n in names)
