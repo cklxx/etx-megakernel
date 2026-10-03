@@ -36,6 +36,14 @@ Restore with `gh release download data-2026-09-27 --repo cklxx/etx-data && shasu
 Earlier sets (2026-09-22 .. 26) are summarized in the design document (section 15) and `examples/*/results/`; their raw
 traces were not kept.
 
+## CPU protocol simulation artifacts (not measurements)
+
+The [benchmark harness](../bench/README.md) writes version-bound plans, raw paired
+samples, artifact hashes and recomputable reports under a caller-selected directory
+(e.g. `build/bench/`). These are modeled scheduler estimates, not GPU data or model
+correctness evidence. Keep failed records; do not mix them into the measured sets
+above. The frozen initial config is `bench/configs/protocol-gfx942-v1.json`.
+
 ## Not kept (regenerated on each VM today; to keep from the next session on)
 
 | artefact | size | cost to regenerate | action |

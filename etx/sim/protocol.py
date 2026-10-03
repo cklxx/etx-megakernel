@@ -127,7 +127,7 @@ def simulate(plan: Plan, seed: int = 0, cv_scale: float = 1.0) -> SimResult:
             # local queue (hybrid + dynamic-local)
             q = local_q.get((d, dom), [])
             for i, (tid, at) in enumerate(q):
-                r = deps_ready(tid) if plan.tasks[tid].mode == "hybrid" else 0.0
+                r = deps_ready(tid)
                 if r == INF:
                     continue
                 s = max(free[key], at, r)
@@ -135,7 +135,13 @@ def simulate(plan: Plan, seed: int = 0, cv_scale: float = 1.0) -> SimResult:
                 if best is None or s + c < best[0]:
                     best = (s + c, key, tid, ("local", i), c)
             for i, (tid, at) in enumerate(global_q[d]):
-                s = max(free[key], at)
+                # Tasks are processed in start-time order, not completion order.
+                # Being enqueued means all producers have been visited; the
+                # latest-finishing producer (and its event) may still be pending.
+                r = deps_ready(tid)
+                if r == INF:
+                    continue
+                s = max(free[key], at, r)
                 c = pop_cost * (1.0 + 0.01 * wpdev)
                 if best is None or s + c < best[0]:
                     best = (s + c, key, tid, ("global", i), c)
