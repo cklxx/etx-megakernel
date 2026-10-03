@@ -210,6 +210,8 @@ def main():
             rel = float(np.max(np.abs(ours - theirs)) / max(np.max(np.abs(theirs)), 1e-12))
             flag = "" if rel < 2e-2 and cos > 0.999 else "  <-- differs"
             print(f"  layer {L:2d}: cosine {cos:.6f}  max rel {rel:.2e}{flag}")
+        if match != a.gen:
+            raise SystemExit("FAILED: NumPy/HF greedy tokens differ")
 
 
 if __name__ == "__main__":

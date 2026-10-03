@@ -7,6 +7,10 @@ graphs. No GPU, weights, tensor computation, production operators or inference
 engine are executed. A protocol pass does not establish numerical correctness,
 output-buffer coverage, cache visibility correctness or measured GPU performance.
 
+For the complete CPU acceptance target (numerical gates, captured operator specs,
+regression tests, code generation and optional formal/device compilation), see
+[G0 CPU readiness](../docs/CPU-READINESS.md).
+
 ## Run and recompute
 
 From the repository root, with Python 3.11 or newer:

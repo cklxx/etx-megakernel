@@ -151,7 +151,7 @@ int main(int argc, char** argv) {
   if (ln_norm) die("ln_norm model on a build whose tiles lack the LayerNorm fold (ETX_EMIT_DSL_EXT=0)");
 #endif
   if (sparsemixer && norm_topk) die("sparsemixer and norm_topk are mutually exclusive");
-  const int MOE_BM = 16;                  // fused_moe_kernel BLOCK_SIZE_M (vLLM's default config at batch 1)
+  const int MOE_BM = ETX_EMIT_MOE_BLOCK_M; // captured specification, published by the plan
   const int BS = 16, X = 8, MAXBLK = (MAXLEN + BS - 1) / BS;
 
   // ---- plan

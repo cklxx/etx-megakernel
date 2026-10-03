@@ -218,7 +218,12 @@ def compile_ir(src_hip: Path, out_ll: Path, vllm: Path, s: Source, compiler: str
         cmd = ["hipcc", "-x", "hip", "--cuda-device-only", "--offload-arch=gfx942", "-nogpulib", "-std=c++17", "-O3", "-S", "-emit-llvm",
                "-D__HIP_PLATFORM_AMD__", "-DUSE_ROCM", "-DNDEBUG", "-isystem", th] + _rocm_inc() + [
                "-include", str(HERE / "shim/etx_cuda2hip.h"), "-I", str(HERE / "shim")] + defs + inc + [str(src_hip), "-o", str(out_ll)]
-    r = subprocess.run(cmd, capture_output=True, text=True)
+    env = os.environ.copy()
+    if compiler == "local":
+        # The final megakernel links device libraries; imports must retain
+        # their original ID calls. Do not inherit a matrix's final-link setting.
+        env.pop("ETX_DEVLIBS", None)
+    r = subprocess.run(cmd, capture_output=True, text=True, env=env)
     if r.returncode:
         raise SystemExit(f"compile {s.path} failed:\n{r.stderr[-4000:]}")
 
@@ -254,16 +259,18 @@ def run(vllm: Path, out: Path, threads: int, compiler: str, blocks: dict[str, tu
                 raise SystemExit(f"llvm-as {k.export}: {r.stderr[-2000:]}")
             report[k.export] = info.to_json() | {"source": s.path, "spec": k.spec, "note": k.note}
     from etx.importer.triton_import import import_triton
+    from etx.importer.launch_spec import verify_capture
     for e, (kname, note) in TRITON.items():
         if only is not None and e not in only:
             continue
+        capture_spec = verify_capture(e, TRITON_DIR)
         txt, info, meta, notes = import_triton(TRITON_DIR / e, kname, f"etx_imp_{e}", threads, (slots or {}).get(e))
         (out / f"{e}.ll").write_text(txt)
         r = subprocess.run([llvm_as, str(out / f"{e}.ll"), "-o", str(out / f"{e}.bc")], capture_output=True, text=True)
         if r.returncode:
             raise SystemExit(f"llvm-as {e}: {r.stderr[-2000:]}")
         report[e] = info.to_json() | {"source": f"triton:{(TRITON_DIR / e / 'CACHE_DIR').read_text().strip()}", "spec": kname,
-                                      "note": note, "downgrade": notes}
+                                      "note": note, "downgrade": notes, "capture_spec": capture_spec}
     old = json.loads((out / "imports.json").read_text()) if only and (out / "imports.json").exists() else {}
     (out / "imports.json").write_text(json.dumps(old | report, indent=1))     # --only updates, it does not drop the rest
     return report

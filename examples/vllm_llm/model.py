@@ -45,6 +45,7 @@ sys.path.insert(0, str(HERE.parents[1]))
 from etx.frontends import hip_link  # noqa: E402
 from etx.ir import Graph, Resource  # noqa: E402
 from examples.llm.model import load_dims  # noqa: E402
+from etx.importer.launch_spec import launch_for, validate_wvsplitk
 from examples.vllm_llm import folds  # noqa: E402
 
 # ETX_VL_CU: workgroups a DSL dense phase spreads over (one task per workgroup). 304 = every CU, which is what
@@ -75,8 +76,6 @@ PART = 256                    # paged attention partition size (fixed in paged_a
 # correct value at MAXLEN 1072, 128 only adds early-exiting tasks, 512 is incorrect. Not a tuning knob
 # (results_2026-10-01/round11/FINDING.md).
 THREADS = 1024                # megakernel workgroup = the largest imported block (wvSplitK 64 x 16)
-MOE_BN = 64                   # fused_moe_kernel BLOCK_SIZE_N of vLLM's default config at batch 1 (examples/vllm_llm/triton)
-MOE_BN_E8 = 16                # same, for the E=8 harvest (Mixtral shape): BM=16 BK=256 BN=16 per its ttir (round 42)
 MAXLEN = int(os.environ.get("ETX_VL_MAXLEN", "1072"))    # vLLM's max_model_len for the benchmark (prompt + 32 + 16)
 # ETX_VL_PIN=1: the small launches between qkv and o_proj (q/k norm, rope, cache, attention, reduce) all run on
 # XCD 0, so the events between them are XCD-local (a wait on L2 of one XCD) instead of device-wide
@@ -250,6 +249,7 @@ def instances(d) -> list[dict]:
     global DSL_ATTNHEAD
     DSL_ATTNHEAD = _attn_head(d)
     out = []
+    moe_specs = {role: launch_for(d, role) for role in ("up", "down")} if d.moe and not DSL_GEMV else {}
 
     def add(export, layer, role, grid, **kw):
         out.append({"export": export, "layer": layer, "role": role, "grid": grid, **kw})
@@ -260,7 +260,9 @@ def instances(d) -> list[dict]:
             add("dsl_gemv_fold" if fold else "dsl_gemv", layer, role, (CU, 1, 1), M=m, K=k, wvprgrp=0)
             return
         y = wvsplitk_ytile(m)
-        add(f"wvsplitk_y{y}", layer, role, (CU, 1, 1), M=m, K=k, wvprgrp=mindiv(m, CU * y, 16))
+        waves = mindiv(m, CU * y, 16)
+        validate_wvsplitk(grid=(CU, 1, 1), cu_count=CU, rows=m, ytile=y, wave_groups=waves)
+        add(f"wvsplitk_y{y}", layer, role, (CU, 1, 1), M=m, K=k, wvprgrp=waves)
 
     attn = {4: "attn_mfma4_g4", 6: "attn_mfma16_g6", 8: "attn_mfma16_g8"}[d.G]
     for L in range(d.L):
@@ -325,12 +327,10 @@ def instances(d) -> list[dict]:
                 add("dsl_moe_up_fold" if DSL_FOLD else "dsl_moe_up", L, "moe_up", (d.TOPK * (d.MI // 32), 1, 1), M=d.MI, K=d.H, noaff=noaff)
                 add("dsl_moe_down_fold" if DSL_FOLD else "dsl_moe_down", L, "moe_down", (d.TOPK * (d.H // 64), 1, 1), M=d.H, K=d.MI, noaff=noaff)
             else:
-                bn = MOE_BN if d.E == 128 else MOE_BN_E8   # grid must match the harvested binary's BLOCK_SIZE_N:
-                #   too few blocks silently leaves output columns unwritten (zeros) and --check cannot see it,
-                #   because --check launches the original with ETX's grid too (round 42: Mixtral MoE output was 0)
-                add("fused_moe_up" if d.E == 128 else f"fused_moe_up_e{d.E}", L, "moe_up", (d.TOPK * math.ceil(2 * d.MI / bn), 1, 1), noaff=noaff)
+                up, down = moe_specs["up"], moe_specs["down"]
+                add(up.export, L, "moe_up", up.grid, noaff=noaff)
                 add("silu_and_mul", L, "moe_act", (d.TOPK, 1, 1), noaff=noaff)
-                add("fused_moe_down" if d.E == 128 else f"fused_moe_down_e{d.E}", L, "moe_down", (d.TOPK * math.ceil(d.H / bn), 1, 1), noaff=noaff)
+                add(down.export, L, "moe_down", down.grid, noaff=noaff)
             if not DSL and not DSL_FOLD:                           # DSL: the next in_norm reads the 8 expert rows itself
                 add(f"moe_sum_k{d.TOPK}", L, "moe_sum", (1, 1, 1), noaff=noaff)
             continue
@@ -386,6 +386,8 @@ def build() -> Graph:
     # the ETX tiles' own LDS (argmax: one value and one index per thread)
     res = Resource(threads=THREADS, vgpr=128, agpr=0, lds_bytes=8 * THREADS + 256)
     g = Graph(f"vl_{d.name}" + (f"_r{REQUESTS}" if REQUESTS > 1 else ""))
+    if d.moe and not DSL_GEMV:
+        g.codegen["moe_block_m"] = launch_for(d, "up").block_m
     if ARGPF:
         g.codegen["argpf"] = True
     if BAR2:

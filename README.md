@@ -14,6 +14,8 @@ Repository: https://github.com/cklxx/etx-megakernel (private). Design page (the 
 Proposed scope, evidence limits, and staged acceptance gates: [project roadmap](docs/ROADMAP.md)
 (updated 2026-10-03).
 
+CPU acceptance target and one-command checks: [G0 readiness](docs/CPU-READINESS.md).
+
 ## Fusing the state-of-the-art kernels (2026-09-25)
 
 ETX now imports compiled kernels instead of implementations that ETX authors rewrite.

@@ -1,0 +1,110 @@
+{
+  "schema_version": 1,
+  "scope": "reviewed batch-1 captures; constants bound to fingerprints, not inferred from expert count",
+  "captures": {
+    "fused_moe_up": {
+      "role": "up",
+      "shape": {
+        "H": 2048,
+        "MI": 768,
+        "E": 128,
+        "TOPK": 8
+      },
+      "dtype": "bf16",
+      "arch": "gfx942",
+      "constants": {
+        "BLOCK_SIZE_M": 16,
+        "BLOCK_SIZE_N": 64,
+        "BLOCK_SIZE_K": 128,
+        "top_k": 8,
+        "MUL_ROUTED_WEIGHT": false
+      },
+      "shared_bytes": 20480,
+      "num_warps": 4,
+      "sha256": {
+        "fused_moe_kernel.ttir": "49b886c25c7767c914fe6199221c17560839075912403e748b2544c74d17b6d9",
+        "fused_moe_kernel.llir": "3ef222727cc36770a3ded303802ba1cf8d2209657d1288a8b6f008df9cf74e93",
+        "fused_moe_kernel.json": "0c57ba19762f5a5bd566484fbb146c8efb624df17ff7607df10653544fa1a265",
+        "fused_moe_kernel.hsaco": "0f9de4ad4ad7ba3f24cd19f88c7258a4e81c66e03add6423b920e4f3a6cbdb7d"
+      }
+    },
+    "fused_moe_down": {
+      "role": "down",
+      "shape": {
+        "H": 2048,
+        "MI": 768,
+        "E": 128,
+        "TOPK": 8
+      },
+      "dtype": "bf16",
+      "arch": "gfx942",
+      "constants": {
+        "BLOCK_SIZE_M": 16,
+        "BLOCK_SIZE_N": 64,
+        "BLOCK_SIZE_K": 128,
+        "top_k": 1,
+        "MUL_ROUTED_WEIGHT": true
+      },
+      "shared_bytes": 20480,
+      "num_warps": 4,
+      "sha256": {
+        "fused_moe_kernel.ttir": "37a68b9c934083a23234e62ec63277e469aa4bdf3561830251804ce5e75a1c0b",
+        "fused_moe_kernel.llir": "f23a2e672cb08417098a9114cd8fa07166fe170d445500a06335b1d7d364a7bd",
+        "fused_moe_kernel.json": "eeb68d9dc5bf62628a3fcff46835ea7f147871025b710145c635ff2d1be78b88",
+        "fused_moe_kernel.hsaco": "6645d406dfb26cf13b87a9e91be30140079da360b34e1c8be15bfd013a277ba6"
+      }
+    },
+    "fused_moe_up_e8": {
+      "role": "up",
+      "shape": {
+        "H": 4096,
+        "MI": 14336,
+        "E": 8,
+        "TOPK": 2
+      },
+      "dtype": "bf16",
+      "arch": "gfx942",
+      "constants": {
+        "BLOCK_SIZE_M": 16,
+        "BLOCK_SIZE_N": 16,
+        "BLOCK_SIZE_K": 256,
+        "top_k": 2,
+        "MUL_ROUTED_WEIGHT": false
+      },
+      "shared_bytes": 16384,
+      "num_warps": 2,
+      "sha256": {
+        "fused_moe_kernel.ttir": "6863ee5bfa307f201df909b2090ae539fad7019e7f0579f84fe186075196c28d",
+        "fused_moe_kernel.llir": "ff19055c8bfc838b82fbda99d8a3b29c76cd52159d211910341731b6ca18cedb",
+        "fused_moe_kernel.json": "5c4a37e245867f98361e19b1ac095a0b417aefc4e1fcad521a5fbd6001a510c1",
+        "fused_moe_kernel.hsaco": "c14955f6a94ea96d660d827c0b223290b0a11e1de36bdeed197624621afb7584"
+      }
+    },
+    "fused_moe_down_e8": {
+      "role": "down",
+      "shape": {
+        "H": 4096,
+        "MI": 14336,
+        "E": 8,
+        "TOPK": 2
+      },
+      "dtype": "bf16",
+      "arch": "gfx942",
+      "constants": {
+        "BLOCK_SIZE_M": 16,
+        "BLOCK_SIZE_N": 16,
+        "BLOCK_SIZE_K": 256,
+        "top_k": 1,
+        "MUL_ROUTED_WEIGHT": true
+      },
+      "shared_bytes": 16384,
+      "num_warps": 2,
+      "sha256": {
+        "fused_moe_kernel.ttir": "7e0b21623db4e694da10e754884898587bedec7f75843238107102a951bd85fb",
+        "fused_moe_kernel.llir": "76d97b17c499fddee0980d315620fd3a2a8a4bbf8b1ef970960c8a052bfb2ade",
+        "fused_moe_kernel.json": "ce703873d62dc5a93467c74bc84911cab9da86f34e4346c57373be21a1b28dd0",
+        "fused_moe_kernel.hsaco": "bf803ffb5444c4ca0cd4dc1b68470b47135a1f4a3a2b772a3495cef4e18cb32a"
+      }
+    }
+  }
+}
