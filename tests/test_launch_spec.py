@@ -86,3 +86,13 @@ def test_import_does_not_inherit_final_device_libraries(monkeypatch, tmp_path):
     monkeypatch.setattr(vllm_kernels.subprocess, 'run', run)
     vllm_kernels.compile_ir(tmp_path/'input.hip', tmp_path/'output.ll', tmp_path, vllm_kernels.SOURCES[0], 'local')
     assert 'ETX_DEVLIBS' not in seen['env']
+
+
+@pytest.mark.parametrize('override', [
+    {'grid': (128, 2, 1)}, {'grid': (128, 1, 2)},
+    {'cu_count': 256.0}, {'ytile': True}, {'ytile': 2.0}, {'wave_groups': 1.5},
+])
+def test_wvsplitk_rejects_unsupported_grid_and_noninteger_abi(override):
+    args = dict(grid=(256, 1, 1), cu_count=256, rows=8192, ytile=2, wave_groups=16)
+    with pytest.raises(ValueError):
+        validate_wvsplitk(**(args | override))
