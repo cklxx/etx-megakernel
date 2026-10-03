@@ -1,13 +1,19 @@
 # vLLM's decode kernels on MI300X, in vLLM's form and fused by ETX: operation model, calibration, XCD simulation
 
-Status: 2026-09-28. Built after session moe_gate (results_2026-09-28) to replace "measure, then guess" with "model,
-then measure what the model cannot explain". Every number is labelled measured, fitted (a free parameter set from
-data) or predicted (from the model with no parameter fitted to that number).
+Status: 2026-09-28, after session moe_gate in results_2026-09-28.
+The approach replaces “measure, then guess” with “model, then measure what the model cannot explain”.
+Each number has one label: measured, fitted, or predicted.
+A fitted number uses a free parameter from data.
+A prediction uses the model without a parameter fitted to that number.
 
-Tools: `examples/vllm_llm/ops/hip.md`, `ops/fused_moe.md` (operation inventories, cited to source and assembly lines),
-`isa_build.sh` + `isa_inventory.py` (instruction counts, vLLM's form vs the imported form, ROCm 7.2.4 compiler),
-`kmodel.py` (the cost model and its fit), `etx/sim/xcd.py` + `xcd_run.py` (the XCD simulation), `measured.py` (every
-measured per-role number in one JSON), `compare.py` (ledgers).
+Tools:
+
+- `examples/vllm_llm/ops/hip.md` and `ops/fused_moe.md` list operations with source and assembly line references.
+- `isa_build.sh` + `isa_inventory.py` compare instruction counts for vLLM and imported forms with the ROCm 7.2.4 compiler.
+- `kmodel.py` contains the cost model and its fit.
+- `etx/sim/xcd.py` + `xcd_run.py` simulate the XCDs.
+- `measured.py` stores all measured per-role values in one JSON.
+- `compare.py` produces the ledgers.
 
 ## 1. The model architecture: one Qwen3-30B-A3B decode layer (batch 1, context 1024, bf16)
 
@@ -43,15 +49,17 @@ measured per-role number in one JSON), `compare.py` (ledgers).
 | idle dependent round trip of fresh data t_v | 0.2 us | fitted | kmodel fit |
 | issue cost per instruction on a wave's critical path t_i | 1.5 ns | fitted | kmodel fit |
 | scalar round trip t_s | 0 (absorbed in F) | fitted, not identifiable | kmodel fit |
-| effective stream bandwidth | 5.2 TB/s | fitted (at the grid's edge; includes overlap the model does not describe) | kmodel fit |
+| effective stream bandwidth | 5.2 TB/s | fitted (at the grid's edge<br> includes overlap the model does not describe) | kmodel fit |
 | ETX unfused: extra front per launch A_unf | 0.65 us | fitted to ETX's unfused launches without software barriers | kmodel fit |
 | ETX task: front of every imported kernel A_task | 2.1 us | fitted to ETX's small fused tasks | kmodel fit |
-| hand-off XCD-local / device-wide | 1.0 / 1.3 us | measured (hw_bench handoff, padded counters) | used unchanged by the simulator |
+| handoff XCD-local / device-wide | 1.0 / 1.3 us | measured (hw_bench handoff, padded counters) | used unchanged by the simulator |
 | wake-up spread / per-task stream-rate spread | 0.6 us / 3% | fitted to the measured ramps and tails | simulator |
 
-The stream of every kernel follows Little's law: a trip's memory time is the loaded latency max(t_v, bytes in flight on
-the GPU / bandwidth), and trips = bytes per block / bytes in flight per CU; work of a trip not overlapped with memory
-(fused_moe's LDS write / barrier / read, 0.33 us) adds to every trip.
+Every kernel's stream follows Little's law.
+A trip's memory time is the loaded latency max(t_v, bytes in flight on the GPU / bandwidth).
+The trip count is bytes per block / bytes in flight per CU.
+Work outside the memory overlap adds to each trip.
+For fused_moe, the LDS write / barrier / read costs 0.33 us.
 
 ## 3. The kernels as pipelines (ops/hip.md section 13, ops/fused_moe.md)
 
@@ -59,20 +67,21 @@ At batch 1 every kernel is a dependent chain. What decides each one's time:
 
 | kernel | chain per block | stream | bound (vLLM form) |
 |---|---|---|---|
-| fused_add_rms_norm | 2 S, 2 V, 10 LDS steps, 2 barriers; the weight load waits for barrier 2 | - | latency |
-| wvSplitK (qkv / o_proj / router) | 4 S; the whole activation into LDS; barrier; then weight trips, each waiting for its own 4 x 16 B loads (not pipelined); 8-16 DPP | 16 KB (4 waves) or 36 KB (9 waves) in flight per CU | bandwidth (qkv, o_proj), latency (router: 32 CUs) |
-| rms_norm_3d, rope | 4 S + 2 V + 2 barriers; rope 5 V of 2 B scalar loads | - | latency |
+| fused_add_rms_norm | 2 S, 2 V, 10 LDS steps, 2 barriers<br> the weight load waits for barrier 2 | - | latency |
+| wvSplitK (qkv / o_proj / router) | 4 S<br> the whole activation into LDS<br> barrier<br> then weight trips, each waiting for its own 4 x 16 B loads (not pipelined)<br> 8-16 DPP | 16 KB (4 waves) or 36 KB (9 waves) in flight per CU | bandwidth (qkv, o_proj), latency (router: 32 CUs) |
+| rms_norm_3d, rope | 4 S + 2 V + 2 barriers<br> rope 5 V of 2 B scalar loads | - | latency |
 | reshape_and_cache | 9 V: the V copy is 8 serial 2 B load / store rounds | - | latency |
 | paged attention mfma16 | 4 S + 7 V (2 scratch reloads), 7 barriers, 8 of 16 MFMA rows real | 128 KB KV per block | latency at 1024 tokens |
 | reduce | 3 S + 1 V, 12 LDS steps, 1 barrier | - | latency |
 | topkGating | 2 S + 5 V, 40 dependent LDS steps, ~1500 instructions, 16 lanes | - | issue / latency |
 | silu (MoE) | 2 S + 1 V, ~340 VALU (expf + IEEE divide) | - | issue |
 | moe_sum | 2 S + 1 V, 8 x 16 B loads | - | latency |
-| fused_moe gate_up / down | 2 S + 2-3 V prologue; K tiles of 16 KB, 2 barriers each (31 / 11 per program), the next tile's loads issued after this tile's LDS work | 16 KB in flight per CU | bandwidth + 0.33 us exposed per tile |
+| fused_moe gate_up / down | 2 S + 2-3 V prologue<br> K tiles of 16 KB, 2 barriers each (31 / 11 per program), the next tile's loads issued after this tile's LDS work | 16 KB in flight per CU | bandwidth + 0.33 us exposed per tile |
 
-Imported form (`isa_inventory.py`): the same instructions, except that every barrier of a kernel whose block is smaller
-than the 1024-thread workgroup (attention, reduce, rms_norm_3d, fused_moe) becomes a software slot barrier, and the
-fused_moe prologue chains 5-6 dependent round trips instead of 2.
+The imported form in `isa_inventory.py` has the same instructions, with two exceptions.
+For blocks smaller than the 1024-thread workgroup, each barrier becomes a software slot barrier.
+This affects attention, reduce, rms_norm_3d, and fused_moe.
+The fused_moe prologue also has 5-6 dependent round trips instead of 2.
 
 ## 4. The three forms: predicted against measured (us)
 
@@ -96,38 +105,51 @@ vLLM fitted; both ETX columns predicted except the two front constants (A_unf, A
 
 Qwen2.5-1.5B (the same parameters): vLLM layer 61.6 / 61.6, ETX unfused 70.2 / 70.0 us.
 
-**The imported fused_moe explained:** vLLM's is bandwidth-bound (48 MB at the loaded latency); in ETX's form each K tile
-adds two software barriers on its critical path (+0.37 us per tile), which moves it to latency-bound: gate_up +7.1 us,
-down +3.4 us, predicted within 0.65 us of both unfused measurements; no ETX-side parameter was fitted to fused_moe
-(A_unf was fitted on the kernels without software barriers).
+**The imported fused_moe cost has an explanation.**
+vLLM's version is bandwidth-bound, with 48 MB at loaded latency.
+In ETX, each K tile adds two software barriers to the critical path, or +0.37 us per tile.
+This makes the kernel latency-bound.
+
+The predicted increases are gate_up +7.1 us and down +3.4 us, within 0.65 us of both unfused measurements.
+No ETX-side parameter was fitted to fused_moe.
+A_unf was fitted only to kernels without software barriers.
 
 ## 5. The XCD simulation (etx/sim/xcd.py)
 
-The compiled plan (67,994 tasks, every worker's static queue, every event with its producers and scope) runs task by
-task: wait for its events (last producer's end + the scope's hand-off + wake-up spread), front, chain, stream (Little's
-law, shared by every CU streaming at that moment), end. The output has ETX_TRACE's layout, so the measured and the
-simulated step go through the same ledger.
+The simulation executes the compiled plan task by task.
+The plan has 67,994 tasks, each worker's static queue, and each event's producers and scope.
+A task first waits for its events: the last producer's end, plus scope-dependent handoff and wake-up spread.
+It then executes front, chain, stream, and end.
+Little's law distributes stream bandwidth among all active CUs.
+
+The output uses the ETX_TRACE layout.
+Thus, the same ledger processes measured and simulated steps.
 
 MoE, ETX_VL_XCD schedule (one selected expert per XCD), per layer (us, layers 2-45):
 
-| | hand-offs | ramp | bodies | tails | layer | token |
+| | handoffs | ramp | bodies | tails | layer | token |
 |---|---|---|---|---|---|---|
 | measured | 13.7 | 4.5 | 102.2 | 10.7 | 131.0 | 6.63 ms |
 | simulated | | | | | 121.2 | 5.84 ms |
 
-The simulation is 12% optimistic. Where the difference sits: device-wide hand-offs measured 1.5-2.1 us against 1.3
-(they include the first read of data another XCD wrote), XCD-local hand-offs measured 0.3-0.5 us against 1.0 (faster
-than the microbenchmark: one producer, readers on the same L2), and the bodies of reduce, topk, post_norm and moe_sum
-(1-2 us each, section 7).
+The simulation is 12% optimistic.
+Device-wide handoffs measure 1.5-2.1 us against 1.3, including the first read of data from another XCD.
+XCD-local handoffs measure 0.3-0.5 us against 1.0.
+They are faster than the microbenchmark because one producer and its readers share L2.
+The reduce, topk, post_norm, and moe_sum bodies also differ by 1-2 us each. See section 7.
 
-What the XCD view shows (the page's timeline, layer 5): the attention block (q/k norm + rope + cache in one task, then
-attention on 5 CUs and the reduction on 4) runs while about 300 CUs wait: 38 us of the 131; the expert path runs 24 (gate_up) and 32 (down) CUs per XCD, each XCD on its own expert, and
-an XCD that finishes its expert starts the next launch without waiting for the others (negative hand-offs in the ledger);
-top-k and moe_sum are the two points where all XCDs meet.
+The XCD view of layer 5 shows the dependency stalls.
+The attention block combines q/k norm + rope + cache in one task, then uses 5 CUs for attention and 4 for reduction.
+About 300 CUs wait during 38 us of the 131 us layer.
+
+The expert path uses 24 gate_up CUs and 32 down CUs per XCD, with one expert per XCD.
+An XCD starts the next launch as soon as its expert finishes, without a wait for other XCDs.
+This produces negative handoffs in the ledger.
+All XCDs meet only at top-k and moe_sum.
 
 ## 6. What the model says
 
-Per imported kernel, a fused task costs its front (2.1 us, fitted) plus a hand-off (1.0-1.3 us) where vLLM pays one
+Per imported kernel, a fused task costs its front (2.1 us, fitted) plus a handoff (1.0-1.3 us) where vLLM pays one
 kernel boundary (2.5 us, fitted): **fusing an imported kernel as it is today costs 0.6-0.9 us more than launching it**,
 before any barrier effect. The two fixes and what the simulation predicts (MoE, ms per token; vLLM 4.90):
 
@@ -143,25 +165,34 @@ With the 12% the simulation is optimistic by, both fixes land at about 4.1-4.6 m
 
 | residual | size | candidate | measurement |
 |---|---|---|---|
-| A_task = 2.1 us per imported kernel (chained parts pay it too) | 720 tasks x 2.1 = 1.5 ms per token | the argument chain (args[0] -> argument block -> parameters) before the first load, 5-6 round trips for fused_moe | build with the argument block read before the wait; trace: body shrinks by the predicted amount or not |
-| software barrier cost | 0.26 us predicted | the slot barrier's LDS round trips | build with hardware barrier rounds; fused_moe gate_up task body 21.9 -> ~15 us predicted |
-| ETX unfused excess not explained (reduce +2.0, topk +1.3, cache +0.8, silu 1.5B +1.5 us) | 5-7 us per layer | instruction-cache misses (the unfused kernel holds every tile's code), slot packing (reduce: 8 blocks per workgroup) | SQC_ICACHE_MISSES per launch, ETX unfused vs vLLM; reduce with slots = 1 |
-| device hand-off 1.5-2.1 us vs 1.3 | ~4 us per layer | first read of remote-written data (staging) | trace: split ready -> first load |
+| A_task = 2.1 us per imported kernel (chained parts pay it too) | 720 tasks x 2.1 = 1.5 ms per token | the argument chain (args[0] -> argument block -> parameters) before the first load, 5-6 round trips for fused_moe | build with the argument block read before the wait<br> trace: body shrinks by the predicted amount or not |
+| software barrier cost | 0.26 us predicted | the slot barrier's LDS round trips | build with hardware barrier rounds<br> fused_moe gate_up task body 21.9 -> ~15 us predicted |
+| ETX unfused excess not explained (reduce +2.0, topk +1.3, cache +0.8, silu 1.5B +1.5 us) | 5-7 us per layer | instruction-cache misses (the unfused kernel holds every tile's code), slot packing (reduce: 8 blocks per workgroup) | SQC_ICACHE_MISSES per launch, ETX unfused vs vLLM<br> reduce with slots = 1 |
+| device handoff 1.5-2.1 us vs 1.3 | ~4 us per layer | first read of remote-written data (staging) | trace: split ready -> first load |
 | vLLM attention 7.0 vs 5.7 us | 1.3 us | the model's attention chain (KV loads at 1024 tokens) | from vLLM's trace at shorter contexts (no GPU needed if the traces exist) |
 
-Correctness question raised by the inventory: imported kernels read the per-step scalars (positions, seq_lens,
-slot_mapping) with scalar loads, and ETX's acquires invalidate the vector caches, not the scalar cache. Not a bug in the
-current host: every step is its own megakernel launch (the kernel start invalidates the scalar cache), and within a launch
-every reader waits (transitively) on the prologue that writes them, so a CU's first read of them in a launch comes after
-the write. Evidence: every run decodes 1055 steps with a new position each and matches 32/32; a stale position would
-write the KV cache at the wrong slot. It would become a bug if one launch ran several steps.
+The inventory raises a scalar-cache correctness question.
+Imported kernels use scalar loads for per-step positions, seq_lens, and slot_mapping.
+ETX acquires invalidate vector caches, not the scalar cache.
+
+The current host is correct because each step launches its own megakernel, which invalidates the scalar cache at kernel start.
+Within that launch, every reader waits transitively for the prologue that writes those scalars.
+Thus, each CU first reads them after the write.
+Each run decodes 1055 steps with a new position and matches 32/32 tokens.
+A stale position would write the wrong KV-cache slot.
+This would become a bug if one launch executed several steps.
 
 ## 8. What each lever is worth (examples/vllm_llm/whatif_sim.py, simulated; ~12% optimistic today)
 
-The CU time of a measured layer (layer 5, 304 CUs x 130.7 us): 32% in tasks, 51% on CUs the launch has no task for
-(1-8-task launches: norms, top-k, moe_sum, the attention block; 192 / 256 of 304 CUs in the expert launches), 10% in
-hand-offs between launches, 7% in ramps and tails. Weight streaming is 31% of the CU time; the layer's 116 MB would take
-27 us at 4.3 TB/s. The empty CUs are waiting on the dependency chain, not moving data.
+The measured layer 5 contains 304 CUs x 130.7 us of CU time.
+Tasks occupy 32%, and CUs without a task account for 51%.
+The sparse launches have 1-8 tasks: norms, top-k, moe_sum, and attention.
+Expert launches use 192 / 256 of 304 CUs.
+Handoffs take 10%, and ramps and tails take 7%.
+
+Weight transfer accounts for 31% of CU time.
+The layer's 116 MB would take 27 us at 4.3 TB/s.
+Idle CUs wait for dependencies instead of data transfer.
 
 | one request | ms per token | tokens/s |
 |---|---|---|
@@ -169,8 +200,8 @@ hand-offs between launches, 7% in ramps and tails. Weight streaming is 31% of th
 | hardware barriers for imports | 5.31 | 188 |
 | argument path 2.1 -> 0.5 us | 4.61 | 217 |
 | both | 4.08 | 245 |
-| both + hand-offs halved | 3.71 | 270 |
-| no argument path, no hand-off (bound for these kernels) | 2.95 | 339 |
+| both + handoffs halved | 3.71 | 270 |
+| no argument path, no handoff (bound for these kernels) | 2.95 | 339 |
 | vLLM, measured | 4.90 | 204 |
 
 | two requests interleaved, one workgroup per CU (request 1 fills the CUs request 0 leaves idle) | ms per step | tokens/s |
@@ -179,11 +210,14 @@ hand-offs between launches, 7% in ramps and tails. Weight streaming is 31% of th
 | both fixes | 5.28 | 379 (x1.54) |
 | vLLM batch 2, measured | 5.72 | 349 |
 
-Reading: the argument path is the largest single lever (1.2 ms), the barriers second (0.5 ms). With both, one request
-lands at vLLM's latency (4.1 simulated, ~4.6 with the simulation's bias) and two interleaved requests at +9% over vLLM's
-batch 2 with lower latency per request, inside the simulation's error. Even with free arguments and free hand-offs these
-kernels take 2.95 ms at batch 1 (their own dependent round trips and synchronisation; floor 1.44): going further takes
-different kernels or more work per step (more requests, speculative decoding), not scheduling.
+The argument path is the largest opportunity at 1.2 ms, followed by barriers at 0.5 ms.
+Both fixes put one request at vLLM latency: 4.1 simulated, or ~4.6 with simulation bias.
+Two interleaved requests reach +9% over vLLM batch 2 with lower per-request latency, within simulation error.
+
+Even with free arguments and handoffs, these kernels take 2.95 ms at batch 1, against a floor of 1.44.
+Their dependent round trips and synchronization impose this cost.
+Further progress needs different kernels or more work per step, such as more requests or speculative decoding.
+Scheduling alone cannot supply it.
 
 ## 9. The fixes as built (2026-09-28, local; session examples/sessions/moe_fix.py)
 
@@ -194,7 +228,7 @@ different kernels or more work per step (more requests, speculative decoding), n
   `return` inside a kernel joins the rounds, as a terminated wave leaves the hardware barrier count. `-DETX_IMP_SW_BARRIER`
   restores the software slot barrier.
 - **Argument path** (import.h `etx_imp_argblock`, codegen `pre_wait` hook): the argument-block pointer is made
-  wave-uniform, so the kernel's parameter reads compile to scalar loads (megakernel: 95 -> 2644 `s_load`, i.e. they had
+  wave-uniform, so the kernel's parameter reads compile to scalar loads (megakernel: 95 -> 2644 `s_load`, that is, they had
   been vector loads through the L1/L2 every acquire invalidates), and wave 0 touches the task's argument block (every part
   of a chained task) into the scalar cache before it waits for the task's events. `-DETX_IMP_VECTOR_ARGS` and
   `-DETX_NO_PRE_WAIT` restore the old path and remove the touch.
@@ -207,7 +241,7 @@ Pre-registered, xcd schedule, ms per token (simulation x 1.135, its bias against
 
 | build | predicted |
 |---|---|
-| old (all three switches) | 6.63 (today; otherwise compare ratios) |
+| old (all three switches) | 6.63 (today<br> otherwise compare ratios) |
 | hardware barriers only | 6.03 |
 | argument path only, front 0.3 / 1.0 / 1.5 us | 5.05 / 5.67 / 6.10 |
 | both | 4.45 / 5.07 / 5.51 |
@@ -220,7 +254,7 @@ The trace of the new build measures the front directly; that number decides whic
 ## 10. Every parameter from a microbenchmark (pre-registered 2026-09-28, before the session)
 
 Sections 4-9 fit six numbers to launch times (F, t_s, t_v, t_i, BW, A_task) and assume three more (t_swbar from an
-instruction count, the hand-offs from a benchmark whose protocol is not ETX's). Fitted values can absorb a wrong
+instruction count, the handoffs from a benchmark whose protocol is not ETX's). Fitted values can absorb a wrong
 structure: t_v = 0.2 us and t_s = 0 are below any physical round trip on MI300X, so the fit has most likely traded
 them against F (2.5 us against a measured 1.6 us kernel boundary) and against round-trip counts that overlap in
 reality. The session measures each one directly, first, on GPU 0 (`bench/hw/hw_bench.hip` lat / lf / launch / evx,
@@ -230,7 +264,7 @@ with microbenchmark values only.
 
 | measurement | stands for | fitted / assumed | predicted range | if outside |
 |---|---|---|---|---|
-| lat vector MALL idle | t_v | 0.2 | 0.25-0.5 us | above 0.3: the V counts of section 3 overcount dependent trips; recount from the ISA, do not refit |
+| lat vector MALL idle | t_v | 0.2 | 0.25-0.5 us | above 0.3: the V counts of section 3 overcount dependent trips<br> recount from the ISA, do not refit |
 | lat vector L1, L2, HBM idle | levels | - | 0.05-0.15, 0.1-0.3, 0.3-0.8 us | |
 | loaded / idle, same level | Little's-law latency | - | x1.5-3 at full rate | |
 | lat scalar K$ after inv sc1 | the K$ survives ETX's acquire | assumed | < 0.1 us (a K$ hit) | the argument fix of section 9 has no effect: the scalar path is also invalidated |
@@ -239,8 +273,8 @@ with microbenchmark values only.
 | lf 192 WGs x 16 KB (fused_moe) | fused_moe stream rate | 3.2 TB/s (model) | 2.5-3.5 TB/s | the gate_up body cannot reach 15 us |
 | launch empty, 304 x 1024 | F | 2.5 | 1.5-1.8 us (sync_bench: 1.6) | |
 | launch hops 0 - empty | first load after a boundary | - | 0.3-0.8 us | |
-| evx xcd P 37 C 37 median | DOMAIN hand-off | 1.0 | 0.3-0.6 us (the trace's 0.3-0.5) | ETX's poll is not what the trace saw |
-| evx device P 296 C 296 median | DEVICE hand-off | 1.3 | 1.3-2.1 us (the trace's 1.5-2.1) | |
+| evx xcd P 37 C 37 median | DOMAIN handoff | 1.0 | 0.3-0.6 us (the trace's 0.3-0.5) | ETX's poll is not what the trace saw |
+| evx device P 296 C 296 median | DEVICE handoff | 1.3 | 1.3-2.1 us (the trace's 1.5-2.1) | |
 | evx late (event already complete) | per-task wait cost | 0 | 0.1-0.4 us | a term the simulator lacks |
 | impbar sw, fused_moe | t_swbar | 0.26 | 0.2-0.3 us | |
 | impbar rounds, fused_moe | the round barrier | 0.077 (bare s_barrier) | 0.08-0.12 us | above 0.15: the hardware-barrier gain of section 9 shrinks |
@@ -254,13 +288,13 @@ by more than 15% is re-examined structurally (what it counts, what overlaps), no
 What it replaces: the attention block's preparation (q_norm 32 blocks, k_norm 4, rope, cache) ran as one chained task
 on one CU for 19 us of the 40 us block (trace, layer 5): four argument paths and about 20 dependent round trips in
 series. (Why it is serial: model.py links every launch to the previous one in vLLM's order, so q_norm and k_norm,
-which write different buffers, do not overlap either; splitting the chain into tasks only adds hand-offs, simulated
+which write different buffers, do not overlap either; splitting the chain into tasks only adds handoffs, simulated
 6.05 against 5.84 ms.) vLLM ships `tensorrt_llm::kernels::fusedQKNormRopeKernel` (csrc/libtorch_stable/
 fused_qknorm_rope_kernel.cu, ROCm paths included), enabled by compilation_config pass_config
 enable_qk_norm_rope_fusion (off by default; it adds +rotary_embedding). One 32-lane warp per head, 8 per 256-thread
 block, 5 blocks for 32 + 4 heads, in place on qkv; per warp: the qkv and position loads, a 5-step reduce, cos/sin
 after the position, the store (2 dependent round trips, from the source; the kernel model's `qknr` entry). Imported:
-80 B of arguments, no LDS, no barrier, 4 slots per workgroup; the megakernel's registers are unchanged (VGPR 128, the
+80 B of arguments, no LDS, no barrier, 4 slots per workgroup. The megakernel's registers are unchanged (VGPR 128, the
 xcd build's 2 spills). The cache write (9 serial round trips) stays.
 
 Simulated (fitted parameters, ms per token; the fitted set is ~12% optimistic):
@@ -276,7 +310,7 @@ Predictions for the session (moe_xcd_qknr_new = grid, moe_xcd_qknrc_new = chaine
 faster than moe_xcd_new, grid and chained within 1% of each other; the preparation span in the trace 19 -> 8-11 us.
 Correctness: moe_base_qknr --check byte-identical against the original fused kernel, 32/32 tokens (the fused kernel
 rounds once where rms_norm + rotary rounded twice, so a token flip is possible; if it happens it is reported, not
-hidden). Baseline: vLLM with the same pass on, same image, same VM, beside the default; the rocprof trace must show
+hidden). Baseline: vLLM with the same pass on, same image, same VM, beside the default. The rocprof trace must show
 fusedQKNormRope launches (48 per step) or the vLLM number does not count as "the same kernels".
 
 ### 10.1 Measured (results_2026-09-28b, 1x MI300X enc1-gpuvm002, 16:13 UTC, before any timed run of the session)
@@ -294,13 +328,13 @@ fusedQKNormRope launches (48 per step) or the vLLM number does not count as "the
 | software slot barrier (fused_moe shape) | 0.2-0.3 | 0.282 us | |
 | round barrier / exit protocol per task | 0.08-0.12 / < 0.5 | 0.106 / 0.311 us | |
 | wait on a complete event (acquire + barrier) | 0.1-0.4 | 0.52 us | a per-task term the simulator lacks |
-| evx XCD P 37 C 37 / device 296 / 296 | 0.3-0.6 / 1.3-2.1 | 2.20 / 3.91 us | NOT the trace's hand-off: unexplained, not used |
+| evx XCD P 37 C 37 / device 296 / 296 | 0.3-0.6 / 1.3-2.1 | 2.20 / 3.91 us | NOT the trace's handoff: unexplained, not used |
 
 Derived (examples/vllm_llm/bench_params.py): the argument path under load, vector build = one invalidate (0.63) + two
 hops that miss it (2 x 0.51) = 1.65 us (fitted A_task 2.1); scalar build = 0.63 + two K$ hits = 0.86 us. So the
 argument fix saves ~0.8 us per imported task, not the 1.6-1.8 the section 9 table's best column assumed.
 
-The simulation with microbenchmark values only (t_v, t_s, F, BW, t_swbar, the round barrier, A_task; hand-offs from
+The simulation with microbenchmark values only (t_v, t_s, F, BW, t_swbar, the round barrier, A_task; handoffs from
 the trace, 0.4 / 1.8 us): **today's build 6.661 ms against the measured 6.63 (0.5%)**, where the fitted set said
 5.84. Its predictions for this session's builds, written before they run:
 
@@ -314,8 +348,8 @@ the trace, 0.4 / 1.8 us): **today's build 6.661 ms against the measured 6.63 (0.
 ## 12. The DSL structure for the small ops, simulated before building (2026-09-29, local)
 
 ETX_VL_DSL=1 in model.py (simulation only): q/k norm + rope + cache + attention as one tile task per (partition, kv
-head), top-k as one tile, moe_sum folded into the next in_norm; the streaming ops stay vLLM's. Costs: kmodel DSL_MOE
-(estimated from the chains); parameters from the microbenchmarks, hand-offs from the trace; examples/vllm_llm/dsl_ceiling.py.
+head), top-k as one tile, moe_sum folded into the next in_norm. The streaming ops stay vLLM's. Costs: kmodel DSL_MOE
+(estimated from the chains); parameters from the microbenchmarks, handoffs from the trace; examples/vllm_llm/dsl_ceiling.py.
 
 | plan | simulated | measured | realistic (sim x 1.12) |
 |---|---|---|---|
@@ -324,12 +358,18 @@ head), top-k as one tile, moe_sum folded into the next in_norm; the streaming op
 | DSL: fused small ops | 4.55 | - | ~5.1 (vLLM 4.67) |
 | DSL, two interleaved requests | 6.16 ms/step, 325 tok/s | - | ~290 tok/s (vLLM batch 2: 360) |
 
-Layer 5: 113 -> 108 -> 92.5 us; the small-op savings are 15 us per layer, not the 39 estimated by hand. The go/no-go
-threshold of 4.4 ms is not met. What is left in a layer at 92.5 us: 29.5 us of bytes at 3.93 TB/s, ~28 us of
-latency-bound tasks, ~15 us of hand-offs, and ~20 us of streaming excess inside vLLM's own kernels (fused_moe gate_up
-21.6 us per task against 12.8 at full rate: 16 KB in flight per program and a 0.33 us gap per trip; down 11.6 vs 6.4;
-qkv 7.9 vs 5.3; o_proj 7.0 vs 4.3). That excess (~14 us/layer, ~0.65 ms/token) is the only lever that reaches vLLM at
-batch 1, and it means generating the streaming GEMVs in the DSL instead of importing them.
+Layer 5 changes from 113 -> 108 -> 92.5 us.
+Small-op savings are 15 us per layer, not the manual estimate of 39.
+The result fails the 4.4 ms go/no-go threshold.
+
+The 92.5 us layer contains 29.5 us of bytes at 3.93 TB/s and ~28 us of latency-bound tasks.
+It also contains ~15 us of handoffs and ~20 us of stream excess inside vLLM's kernels.
+fused_moe gate_up takes 21.6 us per task against 12.8 at full rate.
+It has 16 KB in flight per program and a 0.33 us gap per trip.
+Other pairs are down 11.6 vs 6.4, qkv 7.9 vs 5.3, and o_proj 7.0 vs 4.3.
+
+This excess, ~14 us/layer or ~0.65 ms/token, is the only opportunity that reaches vLLM at batch 1.
+It requires DSL-generated GEMV streams instead of imported kernels.
 
 ## 13. Direction A: the streaming GEMVs generated by the DSL (2026-09-29, pre-registered)
 
@@ -337,7 +377,7 @@ Decision (the user's, 2026-09-29): direction A, the DSL generates the streaming 
 `etx/ops/gemv.py` emits the tiles and the argument layout in the adapter's form (three exports: dsl_gemv, dsl_moe_up
 with silu fused into the epilogue, dsl_moe_down with the routing weight); model.py links them with ETX_VL_DSL_GEMV=1;
 the host fills their blocks and, with --check-dsl, checks the last layer's outputs against a CPU reference (2 bf16
-ulps; the summation order differs from vLLM's kernels, so byte identity is not the criterion). The stream loop is
+ulps. The summation order differs from vLLM's kernels, so byte identity is not the criterion). The stream loop is
 examples/llm/gemv.h's at 4 (16 B) or 8 (8 B) loads per lane in flight: 64 KB per 16-wave workgroup (16 per lane, the
 4-wave design, spilled 359 VGPRs in the 128-register megakernel). ROCm 7.2.4 build: 7 spills (2 before). The ISA of
 the standalone tile: 4 global_load_dwordx4 back to back per batch, one 16 B load per thread for the staged x.
@@ -349,26 +389,30 @@ Simulated (microbenchmark parameters), ms per token:
 | today's best (xcd + fused q/k norm + rope, grid) | 5.26 | measured 5.86 |
 | build 1: + DSL GEMVs | 4.58 | ~5.1 |
 | build 1 + DSL top-k (etx/ops/topk.py) | 4.42 | ~4.9 |
-| build 2: + the attention block by kv head (etx/ops/attnprep.py on XCD h; vLLM's attention at one block per task and its reduce on XCD h; the session, examples/sessions/dsl_gemv.py) | 4.01 | ~4.45 |
-| build 2, two interleaved requests (ETX_VL_REQUESTS=2; the session's run_two) | 5.20 ms / step | ~2.89 ms per token, 347 tok/s (vLLM batch 2: 360) |
+| build 2: + the attention block by kv head (etx/ops/attnprep.py on XCD h<br> vLLM's attention at one block per task and its reduce on XCD h<br> the session, examples/sessions/dsl_gemv.py) | 4.01 | ~4.45 |
+| build 2, two interleaved requests (ETX_VL_REQUESTS=2<br> the session's run_two) | 5.20 ms / step | ~2.89 ms per token, 347 tok/s (vLLM batch 2: 360) |
 | + DSL top-k and the moe_sum fold (phase 1) | 4.36 | ~4.85 |
 | + attention with its preparation in one task (all of A) | 4.00 | ~4.45 (vLLM 4.67) |
 
-The session's build is build 2, predicted at 4.4-4.5 ms (vLLM 4.67). Build 2 gets A's attention gain without a DSL
-attention kernel: the preparation of one kv head (norm + rope + cache write) is a 9-wave DSL task on XCD h, and the
-head's attention partitions and reduce sit on XCD h, so qkv -> prep and reduce -> o_proj are the block's only
-device-wide hand-offs (five before). GQA's topology (a kv head's q rows span two XCDs at full qkv bandwidth) is why the
-qkv -> prep hand-off stays device-wide. Gates: 32/32 tokens, CHECK-DSL OK. If build 1 measures above 5.4 ms the GEMV tiles are not at the lf rate
-and the trace (per-task bodies of qkv / o_proj / moe_up / moe_down against 5.3 / 4.3 / 12.8 / 6.4 us) says which.
+The session uses build 2, predicted at 4.4-4.5 ms against vLLM at 4.67.
+Build 2 obtains A's attention benefit without a DSL attention kernel.
+Preparation for one kv head combines norm + rope + cache write in a 9-wave DSL task on XCD h.
+The head's attention partitions and reduce also use XCD h.
+
+Only qkv -> prep and reduce -> o_proj remain device-wide handoffs, versus five before.
+GQA keeps qkv -> prep device-wide because one kv head's q rows span two XCDs at full qkv bandwidth.
+The gates are 32/32 tokens and CHECK-DSL OK.
+If build 1 exceeds 5.4 ms, the GEMV tiles fail to reach the lf rate.
+Compare qkv / o_proj / moe_up / moe_down bodies with 5.3 / 4.3 / 12.8 / 6.4 us to locate the loss.
 
 ## 14. Formal checks (2026-09-29, `formal/`, `bash formal/check.sh [old]`)
 
 | what | tool | claim | result |
 |---|---|---|---|
-| the DSL GEMV stream loop (etx/ops/gemv.py: segments in contiguous per-wave runs, flush on row change, per-wave partials summed) | Lean 4 (core, no Mathlib), `formal/Gemv.lean` | `gemv_correct`: for every row, the sum over waves of the partials equals the sum of the row's segment values, for any spr, S, per >= 1 and any wave count covering S (so the flush bookkeeping and the tail path lose or duplicate nothing) | proved; axioms `propext`, `Quot.sound` only |
-| the imported-kernel barrier protocol (import.h: counted s_barrier in rounds, exit by round number) | TLA+ / TLC, `formal/ImportRounds.tla` | no deadlock; every wave of a use has taken the same number of barriers when it leaves (SameNbarAtBoundary); no wave leaves while another still has block barriers to take (NoOrphanBarrier); termination under weak fairness; shared-memory steps interleave freely | NW 3, 2 uses, 0-2 barriers per wave: 271,503 states, no error; NW 4: 9,397,101 states, no error |
+| the DSL GEMV stream loop (etx/ops/gemv.py: segments in contiguous per-wave runs, flush on row change, per-wave partials summed) | Lean 4 (core, no Mathlib), `formal/Gemv.lean` | `gemv_correct`: for every row, the sum over waves of the partials equals the sum of the row's segment values, for any spr, S, per >= 1 and any wave count covering S (so the flush bookkeeping and the tail path lose or duplicate nothing) | proved<br> axioms `propext`, `Quot.sound` only |
+| the imported-kernel barrier protocol (import.h: counted s_barrier in rounds, exit by round number) | TLA+ / TLC, `formal/ImportRounds.tla` | no deadlock<br> every wave of a use has taken the same number of barriers when it leaves (SameNbarAtBoundary)<br> no wave leaves while another still has block barriers to take (NoOrphanBarrier)<br> termination under weak fairness<br> shared-memory steps interleave freely | NW 3, 2 uses, 0-2 barriers per wave: 271,503 states, no error<br> NW 4: 9,397,101 states, no error |
 | the first version of that protocol (leave when done = NW, reset at the next begin: the race the 2026-09-28 review found) | `formal/ImportRoundsOld.tla` | the same claims | TypeOK violated (done exceeds NW: a wave of the next use increments before the reset): the model discriminates |
-| the DEVICE event with the last-arriver flush (primitives.h: per-domain sub-counter, the domain's last producer writes back and subtracts the share; consumers poll <= 0 then acquire) | `formal/EventFlush.tla` | the word never goes negative; it reaches 0 only when every producer's output is visible device-wide; a consumer past its wait reads every output (no stale read); one flush per domain; termination | 3 domains x 2 producers, 2 consumers: 1,848 states, no error |
+| the DEVICE event with the last-arriver flush (primitives.h: per-domain sub-counter, the domain's last producer writes back and subtracts the share<br> consumers poll <= 0 then acquire) | `formal/EventFlush.tla` | the word never goes negative<br> it reaches 0 only when every producer's output is visible device-wide<br> a consumer past its wait reads every output (no stale read)<br> one flush per domain<br> termination | 3 domains x 2 producers, 2 consumers: 1,848 states, no error |
 
 What these do not cover: the hardware's memory model beyond "release makes the domain's L2 hold the data, write-back
 makes it visible" (the K$ and vector-L1 behaviour was measured, section 10), the fp32 summation order of the GEMV (the
@@ -391,8 +435,8 @@ The one-block launches between the GEMVs become prologues of their consumers (th
 8 expert rows + the residual and norms them (ln1) itself, task 0 storing the new residual; every router task norms
 o + residual (ln2), task 0 storing the residual and the normed vector; lm_head does the same with final_norm; every
 expert task recomputes the softmax top-k from the logits (deterministic, lower index on ties) and takes its slot's
-expert and weight. Gone per layer: in_norm, post_norm, top-k, moe_sum (4 launches, 4 hand-offs, 4 fronts, 3 device-wide
-events); the residual alternates between two buffers (router reads X writes Y, qkv of the next layer reads Y writes X, lm_head
+expert and weight. Gone per layer: in_norm, post_norm, top-k, moe_sum (4 launches, 4 handoffs, 4 fronts, 3 device-wide
+events). The residual alternates between two buffers (router reads X writes Y, qkv of the next layer reads Y writes X, lm_head
 reads Y; layer 0 keeps its imported in_norm on X) so readers and the one writer never touch the same one in a step.
 Numerics follow vLLM's moe_sum + fused_add_rms_norm (the sum rounded, the add rounded per element, the variance over the
 rounded values, out = bf16(z * rsqrt * w)) and topkGating; only the reduction orders differ.
@@ -410,21 +454,22 @@ Gates as before; ROCm 7.2.4 build: 4 spills (two requests: see the build log).
 
 ## 17. Sensitivity of the build-3 prediction; batching against pipelining (2026-09-29, before the measurement)
 
-`examples/vllm_llm/sensitivity.py` reruns build 3 (one and two requests) with the parameters the microbenchmarks left
-uncertain, so a miss points at a parameter. Simulated ms per token; the realistic figure is x1.11.
+`examples/vllm_llm/sensitivity.py` repeats build 3 for one and two requests with parameters that the microbenchmarks left uncertain.
+A mismatch can then identify a parameter.
+The table reports simulated ms per token. Multiply by x1.11 for the realistic figure.
 
 | variant | R = 1 sim | x1.11 | R = 2 sim / token | x1.11 |
 |---|---|---|---|---|
-| baseline: trace hand-offs 0.4 / 1.8, A_task 0.86, wake 0.6, t_v 0.26 (pre-registered) | 3.54 | 3.93 | 2.28 | 2.53 |
-| hand-offs = evx microbenchmark 2.2 / 3.9 | 4.31 | 4.79 | 2.56 | 2.84 |
-| hand-offs 0 (a perfect event) | 2.98 | 3.30 | 2.42 | 2.68 |
+| baseline: trace handoffs 0.4 / 1.8, A_task 0.86, wake 0.6, t_v 0.26 (pre-registered) | 3.54 | 3.93 | 2.28 | 2.53 |
+| handoffs = evx microbenchmark 2.2 / 3.9 | 4.31 | 4.79 | 2.56 | 2.84 |
+| handoffs 0 (a perfect event) | 2.98 | 3.30 | 2.42 | 2.68 |
 | argument path A_task x 0.5 / x 1.5 | 3.38 / 3.71 | 3.75 / 4.12 | 2.17 / 2.40 | 2.41 / 2.66 |
 | wake-up spread 0.3 / 0.9 us | 3.51 / 3.58 | 3.89 / 3.97 | 2.29 / 2.28 | 2.54 / 2.53 |
 | prologue round trip t_v 0.41 (idle HBM) / 0.70 (loaded) | 3.73 / 4.09 | 4.14 / 4.54 | 2.44 / 2.75 | 2.71 / 3.05 |
 | everything pessimistic (evx, A x 1.5, t_v 0.7, wake 0.9) | 5.07 | 5.63 | 3.04 | 3.38 |
 
 Reading a miss: 3.9-4.2 ms is the prediction; ~4.5 says the prologue loads see the loaded latency (the GEMV prologues
-run while other tasks stream: plausible, and the fix is to issue them before the acquire); ~4.8 says the hand-offs are
+run while other tasks stream: plausible, and the fix is to issue them before the acquire); ~4.8 says the handoffs are
 what evx measured, not what the trace showed; 5.6 says all three. Two requests are less sensitive to everything (the
 second request's tasks fill the waits): 2.5-2.7 ms per token in every single-parameter variant, 3.4 at worst. The
 two-request figure of section 16 (2.63) came from a cost table that did not parse the `r<k>_` task prefix (fixed in
@@ -436,7 +481,7 @@ queue order, not a property of the hardware.
 Bytes per token 6.08 GB (dense 1.84, 8 experts 3.62, lm_head 0.62): 1.71 ms at the 3.56 TB/s streaming rate; the
 step's tax (sim 3.54 - floor 1.55 at 3.93) 1.99 ms. Batch of B on the whole GPU: tax + bytes(B) / BW, the experts the
 union of B independent top-8 draws. Pipeline of S stages (8/S XCDs each, 48/S layers, micro-batch m = B/S, S x m
-requests in flight): stage step = (tax - 0.4 ms device-wide hand-off premium) / S + bytes(m) / S at f x (8/S)/8 of the
+requests in flight): stage step = (tax - 0.4 ms device-wide handoff premium) / S + bytes(m) / S at f x (8/S)/8 of the
 GPU's bandwidth, **f assumed** (1.0 / 0.8 / 0.6) until `hw_bench lfx` measures what 1 / 2 / 4 XCDs pull. All x1.11.
 
 | B | batch: ms, tok/s | PP S=8 f=1.0 | PP S=8 f=0.6 | PP S=4 f=1.0 | PP S=2 f=1.0 | PP S=2 f=0.6 |
@@ -449,9 +494,9 @@ GPU's bandwidth, **f assumed** (1.0 / 0.8 / 0.6) until `hw_bench lfx` measures w
 
 (PP columns: latency per token = S x stage step, then tok/s.) With the same requests in flight, batching beats the
 pipeline at every f and every S: the pipeline streams the dense weights once per micro-batch instead of once per batch
-and only saves the device-wide hand-off premium; per-token latency grows with S. Even f = 1 (a stage pulls its full
+and only saves the device-wide handoff premium; per-token latency grows with S. Even f = 1 (a stage pulls its full
 share of the bandwidth) does not close it. Pipelining is for the multi-GPU case; on one MI300X the order is batching
-(B <= 8: 779 tok/s at 10.3 ms), then the tax. The lfx number settles f; it does not change the ranking.
+(B <= 8: 779 tok/s at 10.3 ms), then the tax. The lfx number settles f. It does not change the ranking.
 
 ## 18. The touch hook: the dense GEMVs' first weight trip during the wait (2026-09-29, pre-registered; ETX_VL_TOUCH=1)
 
@@ -468,7 +513,7 @@ outstanding load, so they would be waited for before the next wait began.) `-DET
 kernel has no wait and no touch.
 
 `etx/ops/gemv.py` (`dsl_touch_plain`): for the dense forms (dsl_gemv, dsl_gemv_fold; not the expert forms, whose rows
-depend on the top-k, i.e. on the event), waves 1..15 load the first U vectors of their own segment range of the task's
+depend on the top-k, that is, on the event), waves 1..15 load the first U vectors of their own segment range of the task's
 first DSL_RCH-row pass, exactly what `dsl_gemv_rows` loads first: 15 x 64 lanes x 4 x 16 B = 60 KB per workgroup, one
 trip, since 38 workgroups x 64 KB already take most of an XCD's 4 MB L2. `asm volatile` keeps the loads. The arg block
 comes through the K$ as the tile's does. `ETX_VL_TOUCH=1` in model.py sets the hook on those grids (qkv, o_proj,
@@ -476,11 +521,11 @@ router, lm_head, plain and x forms).
 
 Simulation (`etx/sim/xcd.py` `Cost.touch_bytes`, `xcd_run.cost_fn`): the touched bytes (one inflight, 64 KB) stream
 from the moment the worker takes the task, before its events fire, sharing the bandwidth with every other stream
-(Little's law as before); the body's stream of the rest starts when both the touch and front + chain are done, plus one
+(Little's law as before). The body's stream of the rest starts when both the touch and front + chain are done, plus one
 L2 round trip (0.143 us) to re-read the touched trip. What the model does not capture: L2 eviction of the touched
 lines by the previous task's own stream passing through L2 (38 x 64 KB = 2.4 MB of 4 MB), and a wait shorter than the
 touch's own round trip (then the touch delays the barrier by what the body would have paid anyway, +0.143). A first
-version that simply dropped the trip from the stream (no bandwidth for the touched bytes) gave 3.13 / 3.47; it is
+version that simply dropped the trip from the stream (no bandwidth for the touched bytes) gave 3.13 / 3.47. It is
 wrong because the touch of 304 workgroups is 19 MB, 5.5 us of bandwidth, longer than the wait it hides in.
 
 `examples/vllm_llm/sensitivity.py`, build 3 (x1.11 = realistic):
@@ -489,19 +534,20 @@ wrong because the touch of 304 workgroups is 19 MB, 5.5 us of bandwidth, longer 
 |---|---|---|---|---|
 | baseline (section 17) | 3.54 | 3.93 | 2.28 | 2.53 |
 | + touch | 3.20 | **3.56** | 2.18 | **2.42** |
-| + touch, hand-offs = evx 2.2 / 3.9 | 3.97 | 4.41 | 2.39 | 2.65 |
+| + touch, handoffs = evx 2.2 / 3.9 | 3.97 | 4.41 | 2.39 | 2.65 |
 
 Pre-registered: build 3 with the touch hook ~3.56 ms per token (vLLM 4.67), two requests ~2.42 ms per token (413
 tok/s). An analytic bound agrees on the order: per dense GEMV launch the touch fills the idle bandwidth of the wait
-(hand-off 1.8 + wake ~0.6 us of a 6 us qkv stream), ~2 us per launch, 48 layers x 2 launches + lm_head ~0.2-0.35 ms.
+(handoff 1.8 + wake ~0.6 us of a 6 us qkv stream), ~2 us per launch, 48 layers x 2 launches + lm_head ~0.2-0.35 ms.
 Container build (`rocm_build_check.sh qwen3-30b-a3b xcd_dsl3_touch`, and `xcd_dsl3x2_touch`): 10 VGPR spills, 36 B
 scratch per lane, as without the hook. The session (`examples/sessions/dsl_gemv.py`) builds build 3 and its
 two-request form with ETX_VL_TOUCH=1; build 2 stays the fallback without it.
 
 ## 19. The model was wrong in kind; what replaced it (2026-09-30, after the measurement)
 
-Sections 10-18 costed a task as a per-task tax plus dependent round trips, and counted events. On that model,
-folding operations away and cutting the event count predicted large gains. The hardware paid 0.7% of them.
+Sections 10-18 modeled each task as a fixed cost plus dependent round trips, then counted events.
+The model predicted large gains from folds and fewer events.
+Hardware delivered only 0.7%.
 
 | build | predicted (section 17-18) | measured |
 |---|---|---|
@@ -509,8 +555,9 @@ folding operations away and cutting the event count predicted large gains. The h
 | build 2 (no fold, no touch), fused | 4.45 | **5.934** |
 | build 3, two requests, per token | 2.42 | **4.49** |
 
-Both correctness gates passed and the event count did fall from 580 to 388, so the structure was built as
-designed; the cost model was measuring the wrong thing. Two measurements say what the right thing is.
+Both correctness gates passed, and the event count fell from 580 to 388.
+The implementation matched the design. The cost model measured the wrong quantity.
+Two measurements identify the correct quantity.
 
 **A phase has a floor, and it does not depend on the bytes.** `hw_bench stream`, no events and no ETX, just N
 workgroups reading B bytes each: 296 workgroups reading 896 B still take 3.2 us. Spans at 296 workgroups,
@@ -534,10 +581,14 @@ Infinity Cache. A weight stream (6.2 GB per token) never does, so `etx.sim.phase
 the model does not inherit them. **The 30-60% row-mapping gain reported from the raw table is largely a MALL
 artifact; between HBM-resident points it is 4-7%.**
 
-**Cost follows how wide a phase is, not how many phases there are.** Build 3 runs 8 phases per layer and the qknr
-build runs 13, and they measure 5.895 and 5.875 ms. The five extra narrow phases (8 tasks each) cost nothing,
-while a 304-task phase costs about 10 us however few bytes it moves -- `router` spreads 0.5 MB over 304 tasks and
-takes 11.7 us a layer, 0.56 ms a token. So a task of an n-task phase is charged `(floor + etx) * min(1, n/296)`.
+**Cost follows phase width, not the number of phases.**
+Build 3 has 8 phases per layer and takes 5.895 ms.
+The qknr build has 13 and takes 5.875 ms.
+The five extra narrow phases, with 8 tasks each, add no measurable cost.
+
+A 304-task phase costs about 10 us even with few bytes.
+`router` spreads 0.5 MB over 304 tasks and takes 11.7 us per layer, or 0.56 ms per token.
+Thus, each task in an n-task phase receives `(floor + etx) * min(1, n/296)` cost.
 
 ### The model (`etx/sim/phase.py`, `examples/vllm_llm/pmodel.py`)
 
@@ -545,11 +596,14 @@ takes 11.7 us a layer, 0.56 ms a token. So a task of an n-task phase is charged 
          + chain_us                                                     known dependent work (attention partitions)
          + bytes_per_task / min(cu_rate, agg_bw(bytes_per_task) / n)    measured rates, HBM-clamped
 
-`floor_us` 3.0 us is hardware. `etx_us` 7.5 us and `fused_us` 1.8 us are the only fitted constants, fitted to the
-eight measured builds. `fused_us` applies to the megakernel alone and is **positive**: build 3 measures 5.895 ms
-fused and 5.660 unfused, and the qknr build 5.875 / 5.623, although an unfused launch also pays a 1.61 us kernel
-boundary per phase. Fusing costs about 2 us per phase more than launching the same tile separately, which is the
-opposite of what ETX was built to buy, and is the number to attack next.
+The hardware floor, `floor_us`, is 3.0 us.
+Only `etx_us` at 7.5 us and `fused_us` at 1.8 us are fitted constants, from eight measured builds.
+`fused_us` applies only to the megakernel and is **positive**.
+Build 3 takes 5.895 ms fused and 5.660 unfused. The qknr pair is 5.875 / 5.623.
+
+An unfused launch also pays a 1.61 us kernel boundary per phase.
+Yet fusion costs about 2 us more per phase than separate launches of the same tile.
+This contradicts ETX's intended benefit and defines the next target.
 
 ### Validation (`python3 -m examples.vllm_llm.validate`)
 
@@ -564,10 +618,11 @@ opposite of what ETX was built to buy, and is the number to attack next.
 | moe new | 6.493 | 6.313 | +2.9% | 15% |
 | moe old | 6.493 | 6.556 | -1.0% | 15% |
 
-What it does not fit, stated plainly. The three 2026-09-28b builds are structurally identical to this model -- same
-phases, same widths -- so it predicts one number for all three, while they measured 5.875 / 6.313 / 6.556. That
-spread (0.68 ms) came from the argument-path implementation, which the new model has no term for; it is inside the
-15% tolerance only because the tolerance is wide. The two-request build is the worst fit at +9.1%.
+The model cannot distinguish the three 2026-09-28b builds because their phases and widths are identical.
+It predicts one result, but they measured 5.875 / 6.313 / 6.556.
+Their 0.68 ms spread comes from argument-path implementations, which the new model does not represent.
+The result fits the 15% tolerance only because that tolerance is wide.
+The two-request build has the worst fit at +9.1%.
 
 ### What the corrected model chooses
 
@@ -595,21 +650,23 @@ the Infinity Cache contaminated. Not implemented.
 
 ## 20. ETX_VL_COH: the acquire stops destroying the cache (2026-09-30, pre-registered)
 
-Section 19's `fused_us` is positive: an in-kernel phase boundary costs more than a kernel launch. The mechanism
-found in the lowering: every task's acquire is `buffer_inv sc1` (gfx942.yaml), which invalidates the XCD's whole
-L2 -- every phase starts as cold as a fresh kernel, and the touch hook of section 18 was nullified outright (waves
-1-15 pull weights into L2 during the wait; thread 0's acquire throws them away before the body). The megakernel's
-one structural advantage, cache continuity across phases, was disabled by its own memory ordering.
+Section 19 has positive `fused_us`: an in-kernel phase boundary costs more than a kernel launch.
+The lowering identifies the mechanism: every task uses `buffer_inv sc1` from gfx942.yaml for its acquire.
+This invalidates the whole XCD L2 and makes each phase as cold as a new kernel.
+
+It also cancels the section 18 touch hook.
+Waves 1-15 fetch weights into L2 during the wait. Thread 0's acquire then discards them before the body.
+ETX's own memory protocol disabled cache continuity across phases, its structural advantage.
 
 The redesign (`ETX_VL_COH=1`, commit dc9105d) splits by data class: DSL tiles read and write ACTIVATIONS with
 coherent `sc0 sc1` accesses (weights stay plain cached loads) and skip the acquire inv entirely; imported kernels
-(attn, reduce) keep `buffer_inv sc1`; an imported producer feeding a coherent consumer keeps a `buffer_wbl2 sc1`
+(attn, reduce) keep `buffer_inv sc1`. An imported producer feeding a coherent consumer keeps a `buffer_wbl2 sc1`
 release (the reduce -> o_proj stale-L2 trap); events whose producers are all coherent arrive without the L2
 write-back. TLA+ (`formal/DataVis.tla`): fresh-data guarantee holds for every class x placement combination, and
 dropping the write-back on an imported->coherent edge is caught (negative test). Container build: spill 9 (was 10).
 
 **What the model can and cannot say.** The fitted `etx_us + fused_us` (9.3 us per phase width) bundles acquire,
-argument path, release and wave start; the inv + write-back share is bounded by measured pieces only: 0.5 us
+argument path, release and wave start. The inv + write-back share is bounded by measured pieces only: 0.5 us
 (idle inv 0.19 + fence 0.18) to 1.5 us (loaded inv 0.63 + a loaded wbl2 arrive). The touch's value under COH is
 the sim's overlap of the dense first trips with the wait, which was optimistic once already (section 18), so the
 low end is capped. `python3 -m examples.vllm_llm.pmodel <plan> --coh`:
@@ -636,13 +693,14 @@ task. `ETX_VL_ARGPF=1`: wave 1 pulls the NEXT static task's block (per-type offs
 thread 0 runs the arrive; with COH no invalidate follows, so the lines survive into the next task's reads.
 `ETX_VL_BAR2=1`: thread 0 advances the queue into a double-buffered shared slot BEFORE the post-drain barrier,
 which then doubles as the broadcast; the loop-top and loop-end barriers disappear (two barriers per task, not
-four; the write-after-read hazard is closed by the parity slots). Both are emission switches on the graph,
+four. The write-after-read hazard is closed by the parity slots). Both are emission switches on the graph,
 default off; off = byte-identical emission (tests/test_bar2_argpf.py). Container: spill 9, tasks/events
 unchanged (66938/388).
 
-The model bound for the pair is 0.10-0.35 ms per step: the argument path's measured 0.24 ms as the upper share,
-one to two dropped barriers at the measured s_swbar 0.106-0.282 us over 384 phases for the rest. No floor
-crossing is promised: `pmodel <plan> --all` clamps at 4.6 ms.
+The model bounds the pair's savings at 0.10-0.35 ms per step.
+The argument path contributes at most its measured 0.24 ms.
+Removal of one to two barriers at measured s_swbar 0.106-0.282 us across 384 phases accounts for the rest.
+This promises no floor crossing: `pmodel <plan> --all` clamps at 4.6 ms.
 
 | build 5 = build 4 + ARGPF + BAR2 | anchored range |
 |---|---|

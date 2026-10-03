@@ -1,7 +1,7 @@
 # ETX roadmap (written 2026-09-30)
 
-Where we are, what comes next, and the rules for how the work is done. Numbers are from docs/MODEL-vllm-kernels.md
-(sections 10-18), docs/DATA.md and docs/SURVEY-2026-09-29.md.
+This roadmap states the current position, next steps, and work rules.
+Its numbers come from docs/MODEL-vllm-kernels.md, sections 10-18, docs/DATA.md, and docs/SURVEY-2026-09-29.md.
 
 ## Where we are
 
@@ -9,21 +9,25 @@ Qwen3-30B-A3B bf16, one MI300X, batch 1, greedy, 32/32 tokens against HF:
 
 | | ms per token | of the 5.3 TB/s peak |
 |---|---|---|
-| vLLM (default; aiter on is 4.92) | 4.67 | 25% |
+| vLLM (default<br> aiter on is 4.92) | 4.67 | 25% |
 | ETX measured best (qknr, unfused / fused) | 5.62 / 5.86 | 21% |
 | ETX build 3 + touch, predicted (sim x 1.11) | 3.56 | 33% |
 | streaming floor at 3.56 / 4.3 TB/s | 1.71 / 1.41 | |
 
-The whole gap is the per-task tax: 1.4-2.9 us per task, about a kernel boundary (1.61 us), over several hundred tasks
-per token, about 2 ms. Nobody has published more than 36% at batch 1 on gfx942 (Kog, closed). What is already right:
-XCD-affine placement by reading XCC_ID, two-level event scope (the last worker per XCD flushes), AOT static per-worker
-queues, a simulator calibrated to 11%, Lean and TLA+ on the GEMV loop and the event protocols.
+The whole gap is the per-task cost: 1.4-2.9 us, close to a kernel boundary of 1.61 us.
+Several hundred tasks per token produce about 2 ms of this cost.
+No published batch-1 result on gfx942 exceeds 36%, from the closed Kog system.
+
+The correct mechanisms already include XCD-affine placement from XCC_ID and two-level event scope, with one flush from the last worker per XCD.
+They also include AOT static per-worker queues and a simulator calibrated to 11%.
+Lean and TLA+ cover the GEMV loop and event protocols.
 
 ## Near term: the queued session (examples/sessions/coh.py)
 
-Ran 2026-09-30 (docs/RESULTS-2026-09-30.md): the dsl_gemv session measured build 3 at 5.895 (predicted 3.56),
-fold + touch worth 0.7%, and the diagnosis that replaced the model: a per-phase floor, the acquire's cache
-invalidate, and the row mapping. The next session is queued, one run per number:
+The dsl_gemv session ran on 2026-09-30. See docs/RESULTS-2026-09-30.md.
+Build 3 measured 5.895 against a prediction of 3.56. Fold + touch saved 0.7%.
+The diagnosis replaced the model with a phase floor, acquire cache invalidation, and row layout.
+The next session is queued, with one run per number:
 
 1. Microbenchmarks first: hw_bench restart (the inv's cost to a warm phase), cohload, the fixed width sweep,
    lfx. These are the diagnosis whatever the build does.
@@ -33,28 +37,31 @@ invalidate, and the row mapping. The next session is queued, one run per number:
 
 ## Mid term (1-2 months): kill the fusion penalty, then batching
 
-1. Coherence (built, queued: examples/sessions/coh.py, section 20). The acquire's `buffer_inv sc1` made every
-   phase start cold and nullified the touch; ETX_VL_COH gives DSL tiles coherent activation access and no inv.
-   TLA-checked, container-built (spill 9). Pre-registered: 4.9-5.8 against build 3's 5.895; fused < unfused
-   (5.660) is the reading that matters -- the 0.235 ms fusion penalty is the number this exists to kill.
-   The sentinel hand-off (Kog) measured SLOWER than our events (sdat, 2026-09-30) and is dead.
-2. Phase width. The model says spreading router's 0.5 MB over 304 tasks costs 0.56 ms/token and the right widths
-   save 2.22 ms -- but that extrapolates a 296-workgroup bandwidth table down to 88 workgroups on one narrow data
-   point. The fixed width sweep (hw_bench stream, in the queued session) decides it before any implementation.
+1. Coherence is built and queued in examples/sessions/coh.py, section 20.
+   The acquire's `buffer_inv sc1` made each phase start cold and removed the touch benefit.
+   ETX_VL_COH uses coherent activation access in DSL tiles without the invalidate.
+   TLA checks and the container build pass, with spill 9.
+   The pre-registered range is 4.9-5.8 against build 3 at 5.895.
+   Fused time below unfused time, 5.660, removes the 0.235 ms fusion penalty and is the decisive result.
+   The Kog sentinel handoff was SLOWER than our events in sdat on 2026-09-30. This option is closed.
+2. Phase width. The model assigns 0.56 ms/token to router's 0.5 MB across 304 tasks and predicts 2.22 ms of savings from appropriate widths.
+   This extrapolates a 296-workgroup rate table to 88 workgroups from one narrow data point.
+   The queued hw_bench stream width sweep must decide this before implementation.
 3. Prefetch to the experts. The expert ids are known when the router's event fires; the down projection's weights
    can stream while the up projection runs. Experts are 60% of the bytes per token; larger than the dense touch,
    and only worth building once COH proves the touched lines survive.
 4. Batching B <= 8 with dynamic expert scheduling (the union of the requests' experts per layer). Target about 800 tok/s
    at B = 8 (analytic: 779) against vLLM's 560-600. Batch 1 can win by 20-30%; batching is where the gap opens.
-5. Generality. Build 3 is a set of ETX_VL_* switches assembled by hand. The compiler must derive the streaming GEMV
-   tiles, the norm / top-k folds, the placement by kv head and the configuration (autoconf) for any model: Llama
-   dense and DeepSeek-V2-Lite without code changes. This is what makes ETX a DSL rather than a port.
+5. Generality. Build 3 combines manually selected ETX_VL_* switches.
+   For any model, the compiler must derive the GEMV stream tiles, norm / top-k folds, kv-head placement, and autoconf configuration.
+   Llama dense and DeepSeek-V2-Lite must require no code changes.
+   This distinguishes a DSL from a model port.
 6. Simulator. Fit the tax from its four parts (fence, atomic, descriptor fetch, wave start; no public gfx942 breakdown
    exists), bring the x1.11 under 5%, and gate every GPU run on a predicted gain.
 
 ## Long term (3-6 months)
 
-- FP8 weights: half the bytes, floor about 0.8 ms; the tax then dominates even more, which is why it comes first.
+- FP8 weights: half the bytes, floor about 0.8 ms. The tax then dominates even more, which is why it comes first.
 - gfx950 / MI355X port (Fleet's ground; a direct comparison).
 - Multi-GPU: TP over 8 MI300X with in-kernel collectives (Kog's KCCL under 3 us against RCCL's 8 us).
 - Serving: ETX as a decode backend behind vLLM (prefill stays in vLLM). Without this the numbers stay a benchmark.
