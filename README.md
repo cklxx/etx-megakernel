@@ -1,11 +1,12 @@
 # ETX
 
-A DSL-agnostic, chiplet-aware compiler for dynamic GPU megakernels. It fuses
-many operators into one persistent kernel while keeping shape dynamism and
-data-dependent control flow (MoE routing, speculative decoding) as first-class
-inputs, and it targets different machines (MI300X's 8 XCDs, MI250X's two GCDs,
-MI355X, H100, B200) from one IR by reading a machine model instead of
-branching on an architecture name.
+ETX is a DSL-agnostic, chiplet-aware compiler for dynamic GPU megakernels.
+It fuses many operators into one persistent kernel.
+Shape dynamism and data-dependent control flow are first-class inputs.
+Examples include MoE routing and speculative decoding.
+
+One IR targets MI300X's 8 XCDs, MI250X's two GCDs, MI355X, H100, and B200.
+The compiler reads a machine model instead of a branch on an architecture name.
 
 Repository: https://github.com/cklxx/etx-megakernel (private). Design page (the spec): https://etc-dynamic-megakernel-arch.q1293822641.workers.dev
 (source in `docs/site/index.html`). Code map: `docs/ARCHITECTURE.md`.
@@ -15,15 +16,20 @@ Proposed scope, evidence limits, and staged acceptance gates: [project roadmap](
 
 ## Fusing the state-of-the-art kernels (2026-09-25)
 
-ETX now imports compiled kernels instead of re-implementing them: `etx/importer/` takes a kernel's AMDGPU
-IR (vLLM's HIP sources today, Triton IR next), turns the `amdgpu_kernel` into an inlinable device function
-(arguments from an argument block, block/thread ids from the ETX task, LDS into a shared arena, several
-blocks per workgroup with slot barriers) and generates the ETX tiles around it. `examples/vllm_llm` runs
-Qwen decode with the twelve kernels vLLM itself uses on MI300X at batch 1 (`wvSplitK`,
-`paged_attention_rocm`, `rms_norm`, `fused_add_rms_norm`, `rotary_embedding`, `reshape_and_cache`,
-`silu_and_mul`), in vLLM's stream order, one ETX grid per vLLM launch. The comparison it is built for:
-the same kernels fused (ETX), launched one by one (ETX unfused, HIP graph) and inside vLLM
-(`custom_ops=all`), plus a vLLM kernel trace that bounds what fusion can recover. See design section 15.9.
+ETX now imports compiled kernels instead of implementations that ETX authors rewrite.
+`etx/importer/` takes a kernel's AMDGPU IR and converts `amdgpu_kernel` to an inlinable device function.
+The current source is vLLM's HIP code. Triton IR is next.
+Arguments come from an argument block. Block/thread ids come from the ETX task.
+
+LDS uses a shared arena. Each workgroup can contain several blocks with slot barriers.
+The importer generates ETX tiles around this function.
+`examples/vllm_llm` runs Qwen decode with the twelve kernels that vLLM uses on MI300X at batch 1.
+These include `wvSplitK`, `paged_attention_rocm`, `rms_norm`, `fused_add_rms_norm`, `rotary_embedding`, `reshape_and_cache`, and `silu_and_mul`.
+Execution follows vLLM's stream order, with one ETX grid per vLLM launch.
+
+The comparison uses the same kernels in three forms: ETX fusion, separate ETX launches through a HIP graph, and vLLM with `custom_ops=all`.
+A vLLM kernel trace bounds the possible fusion benefit.
+See design section 15.9.
 
     python -m etx.importer.vllm_kernels --vllm ~/code/vllm --out build/imp --block rms_norm_2d=512 --block reshape_and_cache=128
     VLLM=~/vllm bash examples/vllm_llm/build.sh ~/llm/qwen3-8b            # on the GPU host
@@ -31,8 +37,9 @@ the same kernels fused (ETX), launched one by one (ETX unfused, HIP graph) and i
 
 ## Status: ETX beats vLLM at batch 1 (2026-10-02)
 
-Qwen3-30B-A3B bf16 decode, batch 1, one MI300X, wall clock, 32/32 tokens against HF greedy with every DSL
-operator of the last layer within 2 bf16 ulps of a CPU reference:
+Conditions: Qwen3-30B-A3B bf16 decode, batch 1, one MI300X, wall clock.
+The run matches 32/32 tokens against HF greedy.
+Every DSL operator of the last layer is within 2 bf16 ulps of a CPU reference:
 
 | | ms/token | vs vLLM |
 |---|---|---|
@@ -41,39 +48,52 @@ operator of the last layer within 2 bf16 ulps of a CPU reference:
 | **ETX megakernel** | **4.823** | **−0.8% — ahead** |
 | ETX unfused — same tiles, HIP-graph replay | 4.998 | +2.8% |
 
-**The claim ETX exists to prove now holds: one persistent kernel beats a HIP-graph replay of the same tiles
-by 1.2%.** It lost by 4.2% the day before. The system improved 17.5% against itself, confirmed on a second
-machine (bare metal, ROCm 7.2.4: fusion margin +0.224 against −0.235 on 2026-09-30).
+**The recorded round23 comparison shows a 1.2% fusion benefit for the same DSL tiles: 4.937 versus 4.998 ms/token.**
+This percentage does not describe the newer 4.823 entry above.
+The corresponding newer paired raw logs are absent from the inspected archive. Thus, a new fusion percentage remains unverified.
+The previous claim of a 4.2% loss refers to the day before.
 
-What flipped it: every task's acquire was `buffer_inv sc1`, a whole-L2 invalidate, so every phase began cold
-(−0.317 ms to fix); unfolding an earlier "optimisation" of ours that had 448 expert tasks per layer each redo a
-128-logit softmax (−0.231); asynchronous per-step host work (−0.152); non-temporal weight loads (−0.106); vectorising the coherent paths, which were issuing
-one memory request per lane per 2-byte element (−0.105 in the folded norm, −0.074 in the attention prologue).
+The system improved 17.5% against itself, with confirmation on a second machine.
+That machine used bare metal and ROCm 7.2.4.
+Its fusion margin was +0.224 against −0.235 on 2026-09-30.
+These DSL results do not establish the all-imported claim.
+The all-imported comparison still loses in [docs/WHY-DSL-TILES-2026-10-01.md](docs/WHY-DSL-TILES-2026-10-01.md).
 
-ETX is ahead of vLLM by 0.8% (interleaved, non-overlapping ranges), and the budget says where the rest went: hand-off sits at the event protocol's floor, workgroup
-start delay is below the hardware dispatcher's own jitter, host work is 0.135 ms, and the instruction cache hits
-99.90%. **The orchestration is spent; 1.29 ms of the step is our own hand-written tiles** — which was never
-ETX's claim. Generality (2026-10-02): a second MoE, Mixtral-8x7B (top-2 of 8, G=4, K=14336), runs 32/32 through the same
-compiler with zero compiler changes — every break was host-side shape glue, now shape-keyed so unknown shapes fail
-loudly at import. On the DSL path it reaches 10.365 ms/token against vLLM's 8.686 (floor ~7.3-8.5); the remaining
-gap is Qwen-tuned task-width constants, named in [docs/GENERALITY-2026-10-02.md](docs/GENERALITY-2026-10-02.md).
-Out-of-class architectures (Qwen3.6's hybrid linear attention) are refused by name at the config.
+The acquire fix saved −0.317 ms. Each task previously used `buffer_inv sc1`, which invalidated the whole L2 and made each phase start cold.
+Removal of an earlier fold saved −0.231. That fold made 448 expert tasks per layer each repeat a 128-logit softmax.
+
+Asynchronous host work per step saved −0.152. Non-temporal weight loads saved −0.106.
+The coherent paths previously issued one memory request per lane per 2-byte element.
+Vector accesses saved −0.105 in the folded norm and −0.074 in the attention prologue.
+
+ETX is ahead of vLLM by 0.8% in interleaved runs with non-overlapping ranges.
+The budget explains the remaining time.
+Handoff is at the event protocol's floor. Workgroup start delay is below the hardware dispatcher's own jitter.
+Host work is 0.135 ms. The instruction cache hit rate is 99.90%.
+
+**The orchestration budget is exhausted. Our own hand-written tiles account for 1.29 ms of the step.**
+Tile quality was never ETX's claim. Generality on 2026-10-02: Mixtral-8x7B runs 32/32 through the same compiler with zero compiler changes.
+Its shape is top-2 of 8, G=4, K=14336.
+Every failure came from host-side shape glue. Shape keys now make unknown shapes fail with an explicit import error.
+The DSL path reaches 10.365 ms/token against vLLM's 8.686. The floor is ~7.3-8.5.
+
+Qwen-tuned task-width constants explain the remaining gap. See [docs/GENERALITY-2026-10-02.md](docs/GENERALITY-2026-10-02.md).
+The config rejects out-of-class architectures by name, such as Qwen3.6's hybrid linear attention.
 
 Full report: [docs/ETX-report-2026-10-01.pdf](docs/ETX-report-2026-10-01.pdf), per-phase budget in
 [docs/BUDGET-2026-10-01.md](docs/BUDGET-2026-10-01.md), measured data index in [docs/DATA.md](docs/DATA.md).
 
 ## Earlier: the real model runs (2026-09-23)
 
-`examples/dsv2lite/` is fleet-mi300x's DeepSeek-Coder-V2-Lite decode graph in
-ETX with fleet's own tile bodies linked through a shim. On one MI300X it
-decodes 32 tokens identical to HuggingFace greedy with all 27 layers inside
-fleet's per-layer gate, at **3.76-3.78 ms/token** against fleet's hand-written
-3.557 ms on the same GPU (3.70 was measured with the relay's hierarchical acquire,
-since shown unsafe and turned off). The gap closed from 54% to 6% through compiler and
-runtime rules (last-arriver flush, agent-scope polling, in-body q_c wait, one
-acquire per workgroup, one call site per tile body, a lean all-static loop,
-per-grid immediates, a per-XCD relay with hierarchical acquire, and a
-whole-program device build), with no change to fleet's tile code.
+`examples/dsv2lite/` puts fleet-mi300x's DeepSeek-Coder-V2-Lite decode graph in ETX. A shim links fleet's own tile bodies.
+On one MI300X, it decodes 32 tokens identical to HuggingFace greedy. All 27 layers pass fleet's per-layer gate.
+It runs at **3.76-3.78 ms/token** against fleet's hand-written 3.557 ms on the same GPU.
+The earlier 3.70 measurement used the relay's hierarchical acquire, which proved unsafe and is now off.
+
+Compiler and runtime rules reduced the gap from 54% to 6%, without changes to fleet's tile code.
+The rules include last-arriver flush, agent-scope polling, in-body q_c wait, and one acquire per workgroup.
+They also include one call site per tile body, a lean all-static loop, and per-grid immediates.
+The sequence included a per-XCD relay with hierarchical acquire and a whole-program device build.
 `examples/dsv2lite/ab.sh` re-runs the A/B on one VM. Build:
 
 ```bash
@@ -84,9 +104,10 @@ ETX_TRACE=1 .../run --tokens 4          # per-phase timeline (wait / body / firs
 
 ## More models, same compiler (2026-09-24)
 
-`examples/llm` builds the graph from a Hugging Face `config.json` and runs one set of generic
-batch-1 tiles, with no model-specific runtime code. Results on one MI300X, against Hugging Face
-greedy decoding (bf16, 32 tokens), deterministic over three runs:
+`examples/llm` builds the graph from a Hugging Face `config.json`.
+It runs one set of generic batch-1 tiles, with no model-specific runtime code.
+The results use one MI300X and Hugging Face greedy decode as the reference, with bf16 and 32 tokens.
+They are deterministic over three runs:
 
 | Model | Teacher-forced argmax | Free-running | ms/token |
 |---|---|---|---|
@@ -106,17 +127,19 @@ uses the DSL tiles and the coherence design:
 | Qwen2.5-1.5B | 1.86 ms | 4.05 ms | 4.47 ms | - |
 | Qwen3-8B | 4.91 ms | 9.45 ms | 10.07 ms | - |
 | Qwen3-30B-A3B | 4.84 ms | 9.07 ms | 10.48 ms | - |
-| DeepSeek-Coder-V2-Lite | 4.12 ms (AITER; default 6.36) | - | 3.78 ms (fleet's tiles) | 3.57 ms |
+| DeepSeek-Coder-V2-Lite | 4.12 ms (AITER<br> default 6.36) | - | 3.78 ms (fleet's tiles) | 3.57 ms |
 
-With fleet's tuned tiles ETX beats vLLM by 8%; with the generic tiles it is about 2x slower, and the
-per-phase trace puts that gap in the tiles, not in synchronisation. A per-XCD sliced graph
-(`examples/llm/model_sliced.py`, two device-wide events per layer) brings the megakernel to within
-2-5% of the same tiles run as one kernel per grid from a HIP graph, but not ahead of them: at batch 1
-the graph is a chain of barriers with nothing to overlap (design document, section 15.7).
+With fleet's tuned tiles, ETX beats vLLM by 8%. With the generic tiles, it is about 2x slower.
+The per-phase trace attributes that gap to the tiles, not to synchronization.
+
+The per-XCD sliced graph in `examples/llm/model_sliced.py` uses two device-wide events per layer.
+It puts the megakernel within 2-5% of the same tiles as one kernel per grid through a HIP graph.
+It does not put the megakernel ahead. At batch 1, the graph is a barrier chain with no overlap opportunity.
+See design document, section 15.7.
 
 ## Starting point (reworked 2026-09-23)
 
-The architecture is broad; the proof is narrow. The target is one real model on
+The architecture is broad. The proof is narrow. The target is one real model on
 one machine with a known hand-written result: DeepSeek-Coder-V2-Lite-Base,
 batch 1, one MI300X, where fleet-mi300x runs at 3.60 ms/token. Order of work:
 M0 baselines (done: the per-step fixed cost is decomposed, see below), M1
@@ -140,12 +163,13 @@ make test                       # 30-ish tests: IR, edge maps, machine tables, p
 .venv/bin/python -m etx compile examples/moe_layer.py --arch gfx942 --out build/moe_gfx942 --sim
 ```
 
-`compile` verifies the graph, runs the seven L4 passes, writes the persistent
-kernel source (`megakernel_d0.hip`), the per-arch lowering header, tile
-prototypes, `plan.json` (queues, descriptors, event layout, push lists) and
-`decisions.log` (why each subgraph is static / dynamic / hybrid, which events
-were eliminated by recomputation). `--sim` runs the host-side protocol
-simulator: deadlock check, makespan, busy / wait / scheduling budget.
+`compile` verifies the graph and runs the seven L4 passes.
+It writes the persistent kernel source, `megakernel_d0.hip`, the per-arch lowering header, and tile prototypes.
+It also writes `plan.json` with queues, descriptors, event layout, and push lists.
+`decisions.log` explains each static / dynamic / hybrid choice and the events that recomputation eliminates.
+
+`--sim` runs the host-side protocol simulator.
+It reports the deadlock check, makespan, and busy / wait / scheduling budget.
 
 ## What has run on hardware (MI300X, ROCm 7.2.4, 2026-09-22)
 
@@ -162,7 +186,7 @@ simulator: deadlock check, makespan, busy / wait / scheduling budget.
   memory, peer reads over xGMI, 0.365 ms per step).
 * Measured on the short-task MoE configuration (`ETX_MOE_SMALL=1`, B=64): static
   0.445 ms vs hybrid 0.654 ms vs dynamic 0.653 ms; Pass 3 event elimination 0.546
-  vs 0.653 ms in the hybrid regime; the l2-warm prefetch showed no effect.
+  vs 0.653 ms in the hybrid regime. The l2-warm prefetch showed no effect.
 * Cross-device: system-scope flag one-way 10.6 µs, peer store 285 GB/s; whole-GPU
   counter barrier 8.6 µs at 304 workgroups.
 * Five runtime defects were found only on hardware and are now rules with tests

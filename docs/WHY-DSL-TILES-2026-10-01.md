@@ -2,11 +2,14 @@
 
 Measured answer to a question previously settled only by argument. Raw logs: `results_2026-10-01/round24/`.
 
-Measured on today's codebase (HEAD 7cbd872), VF box, ROCm 7.14. Wall ms/token, three interleaved rounds.
-Gate: 32/32 tokens against HF greedy on every build. `--check-dsl` checks DSL operators only, so it does not
-apply to an all-imported build; `--check` would need `ETX_VL_CHECK=1`, a different binary with vLLM's original
-kernels linked in, which perturbs timing — not built. The end-to-end token gate is the one that applies to all
-three equally.
+These measurements use HEAD 7cbd872 on the VF box with ROCm 7.14.
+They report wall ms/token across three interleaved rounds.
+Every build passes 32/32 tokens against HF greedy.
+`--check-dsl` checks only DSL operators, so it does not apply to an all-imported build.
+
+The imported `--check` requires `ETX_VL_CHECK=1`, a different binary with vLLM's original kernels linked in.
+That binary changes timing and was not built.
+The end-to-end token gate applies equally to all three builds.
 
 ## Switch sets
 
@@ -16,11 +19,12 @@ three equally.
 | `qknr` — all vLLM + fused q/k-norm-rope | `+ ETX_VL_QKNR=1` | 67994 | 628 | 41448 | 8 |
 | `dsl` — control, today's best | `+ DSL_GEMV, DSL_TOPK, DSL_ATTN=head, DSL_FOLD, TOUCH, COH, FOLD_TOPK=0, CU=256` | 60362 | 436 | 29736 | 16 |
 
-`ETX_VL_COH`, `ETX_VL_NT`, `ETX_VL_VECNORM` and `ETX_VL_CU` act only on DSL tiles and are no-ops for the
-imported builds — that is the point of the experiment, not an oversight. The host-side improvements
-(async `reset_step`, the dead memset, the poll yield) are in `host.h` and apply to all three.
-`qknorm_rope` is instantiated 48 times in `qknr` and 0 times in `imp`, so the variant took effect; the task
-count coincides because the chain merges the launches it replaces.
+`ETX_VL_COH`, `ETX_VL_NT`, `ETX_VL_VECNORM`, and `ETX_VL_CU` affect only DSL tiles.
+They do nothing for imported builds, by design for this experiment.
+The host improvements in `host.h` apply to all three builds: async `reset_step`, removal of the dead memset, and poll yield.
+
+`qknorm_rope` has 48 instances in `qknr` and 0 in `imp`, so the variant took effect.
+Task counts match because the chain merges the launches that this kernel replaces.
 
 ## Result
 
@@ -40,10 +44,11 @@ Two numbers, both decisive:
    (5.875 fused / 5.623 unfused, device basis, bare metal). The fusion margin turned positive this year
    *only* for builds whose tiles we generate.
 
-That second point is the mechanism. `ETX_VL_COH` removes the per-task `buffer_inv sc1` by making the tile's
-activation accesses coherent — which requires editing the tile. An imported kernel's loads come from vLLM's
-source, so its task keeps the acquire, and the acquire invalidates the whole XCD L2 for every phase that
-follows. Nothing in the imported path can opt out.
+The second result identifies the mechanism.
+`ETX_VL_COH` removes the per-task `buffer_inv sc1` through coherent activation accesses inside the tile.
+That requires a tile edit.
+Imported loads come from vLLM's source, so each imported task retains its acquire.
+The acquire invalidates the whole XCD L2 for subsequent phases. The imported path cannot omit it.
 
 ## Per-phase, layer 11 (decode traces, µs)
 
@@ -67,7 +72,7 @@ follows. Nothing in the imported path can opt out.
 **Read this table only with the folds paired.** Three rows look like deficits and are not: `router` against
 `post_norm` + `router` is 3.16 against 5.61, `moe_down` against `moe_down` + `moe_sum` is 11.73 against 13.50, and
 `moe_up` already contains the silu that `moe_act` runs separately. The complete like-for-like pairing, with every
-phase and the arithmetic reconciled to the layer period, is in **`docs/PHASES-2026-10-01.md`**; its conclusion is
+phase and the arithmetic reconciled to the layer period, is in **`docs/PHASES-2026-10-01.md`**. Its conclusion is
 that on kernel speed the two tile sets tie to within 0.04 ms/token and the entire 1.50 ms difference is structure.
 
 Total span 6347.1 against 4804.1 µs.
@@ -90,7 +95,7 @@ being dearer than vLLM's. We beat `wvsplitk` on o_proj (5.26 against 6.45) and m
 **There is no GEMV gap to close.** The same pairing error applies to `router` and `moe_down`, both corrected
 in the table above: once `post_norm` and `moe_sum` are counted on the imported side, we are ahead on both.
 
-**What the imported build loses on is structure, which the kernels dictate:**
+**The imported build loses because its kernels impose a different structure:**
 
 - the q/k norm + rope + cache chain runs as **one task on one workgroup, 16.24 µs serialized**, where the DSL
   path spreads the same work over 4 per-kv-head tasks at 5.11;

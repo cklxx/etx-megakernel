@@ -1,9 +1,9 @@
 # What vLLM's own fusion is worth, and how ETX's megakernel compares
 
-VF box (1x MI300X VF, ROCm 7.14), Qwen3-30B-A3B bf16, batch 1, greedy, context 1024, the protocol every vLLM
-number in this session used (`vllm/vllm-openai-rocm:v0.27.1`, vLLM 0.27.1, `examples/llm/vllm_bench.py`).
-Three runs of each configuration, interleaved one-of-each per round so drift cannot favour a row. Every run
-matched 32/32 tokens against the golden.
+Conditions: 1x MI300X VF, ROCm 7.14, Qwen3-30B-A3B bf16, batch 1, greedy decode, and context 1024.
+Every vLLM number uses the same protocol, `vllm/vllm-openai-rocm:v0.27.1`, vLLM 0.27.1, and `examples/llm/vllm_bench.py`.
+Each configuration has three runs, with one of each per interleaved round to limit drift bias.
+Every run matches 32/32 tokens against the golden.
 
 All day we compared our best against vLLM's best without asking how much of vLLM's number is its own fusion
 machinery. This is that ladder.
@@ -20,24 +20,28 @@ machinery. This is that ladder.
 **vLLM's graph is worth 27.8 ms, a 6.7x speedup** (32.710 -> 4.862). **Its op fusion is worth 0.027 ms, 0.6%**
 (4.889 -> 4.862). The two differ by three orders of magnitude.
 
-`cudagraph_mode=NONE` keeps torch.compile and the fused kernels and only drops the graph replay, so its 6.7x
-cannot be a device-side effect: it is host dispatch. Everything vLLM's graph buys at batch 1 is the removal of
-per-op host overhead. Compilation without graphs accounts for only 2.4 ms of that (35.134 -> 32.710).
+`cudagraph_mode=NONE` retains torch.compile and fused kernels. It removes only graph replay.
+Thus, its 6.7x difference is host dispatch, not a device-side effect.
+At batch 1, vLLM's graph removes per-op host overhead.
+Compilation without graphs accounts for only 2.4 ms of that difference, from 35.134 -> 32.710.
 
 ## Putting ETX on the same scale, and a timing basis that was not like-for-like
 
-`vllm_bench.py` times wall clock around `llm.generate` and differences two lengths, so every vLLM figure here is
-**host** time. ETX's runs report both: the device span (`hipEvent` around the kernel) and the host wall per step.
-Today's comparisons used ETX's *device* median against vLLM's *host* figure. Both ETX numbers, same five runs:
+`vllm_bench.py` measures wall time around `llm.generate` and subtracts results for two lengths.
+Thus, every vLLM figure here is **host** time.
+ETX reports both the device span from `hipEvent` around the kernel and host wall time per step.
+Today's comparisons used ETX's device median against vLLM's host figure.
+Both ETX measurements from the same five runs follow:
 
 | | device median | wall median | host overhead |
 |---|---|---|---|
 | ETX fused (megakernel) | 4.907 | **5.104** | 0.197 |
 | ETX unfused (HIP graph of the same tiles) | 5.107 | **5.143** | 0.036 |
 
-The megakernel carries 0.197 ms of per-step host work that the device timer does not see — argument blocks and
-event state refilled every step — while the unfused path replays a graph instantiated once. On the basis vLLM is
-measured on:
+The megakernel carries 0.197 ms of host work per step that the device timer excludes.
+The host refills argument blocks and event state every step.
+The unfused path instead replays a graph that it instantiates once.
+The comparison on vLLM's measurement basis follows:
 
 | step | device basis | wall basis |
 |---|---|---|

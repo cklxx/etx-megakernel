@@ -1,19 +1,20 @@
 # Split-phase scheduling: sharing the weight stream without lockstep (design, 2026-10-01)
 
-Round 33 ended the batching line with a wall: every batched design loses to replication, because batching
-oversubscribes the workers (384 MoE tasks on 304) and destroys the ~12 µs cross-request stagger in which each
-request fills the other's stalls (`results_2026-10-01/round33/FINDING.md`). Yet the batched dense phases
-themselves *win* per phase (qkv 20.9 µs against 25.9 for the replicated pair), because the weights stream once.
-The prize is therefore a design that streams each phase's weights once while letting the per-request halves start
-and finish at different times. This document designs that, does the arithmetic, and names the deciding
-experiments. **No code is changed by this document.**
+Round 33 rejected the tested batch designs. All lose to replication.
+Batching oversubscribes workers, with 384 MoE tasks on 304, and removes the ~12 µs stagger between requests.
+During that stagger, each request fills the other's stalls. See `results_2026-10-01/round33/FINDING.md`.
+The batched dense phases themselves win: qkv takes 20.9 µs against 25.9 for the replicated pair, because weights stream once.
+
+The proposed design reads each phase's weights once but lets each request's part start and finish at different times.
+This document specifies that design, its estimated ceiling, and the deciding experiments.
+**This document changes no code.**
 
 ## 1. The physical mechanism: the second request's reads can hit L2
 
 Facts (docs/BUDGET-2026-10-01.md, RESULTS-2026-10-01.md, round 15/23/30 findings):
 
-- L2 is 4 MB **per XCD** and is exactly what `ETX_VL_COH` stopped invalidating; a warm L2-resident phase runs at
-  11+ TB/s against ~2.5 TB/s streamed (hw_bench `restart`).
+- Each XCD has 4 MB of L2, which `ETX_VL_COH` no longer invalidates.
+  In hw_bench `restart`, a warm L2-resident phase reaches 11+ TB/s against ~2.5 TB/s for a stream.
 - The dense `domain_map` sends task coordinate *i* to the same XCD for every request, so **request 1's task *i*
   reads the same weight rows, on the same XCD, as request 0's task *i***. Per layer per XCD the slices are:
 
@@ -26,29 +27,34 @@ Facts (docs/BUDGET-2026-10-01.md, RESULTS-2026-10-01.md, round 15/23/30 findings
   | moe_up | 6.00 | **no** — cyclic stream larger than the cache gives ~0 hits under LRU |
   | lm_head | 78 | no |
 
-- The replicated graph already alternates the requests' launches (`model.py:186-189, 426`), so each worker's
-  static queue holds request 0's phase-*n* task immediately followed by request 1's. The measured stagger between
-  the halves is ~12 µs, during which that XCD streams almost nothing else (the attention block is tiny and the
-  next heavy phase waits on its own event). The lines plausibly survive.
-- **The one thing standing directly in the way is our own round-15 optimisation**: `ETX_DSL_NT` marks every DSL
-  weight load non-temporal (`etx/ops/gemv.py:102-108`), precisely so the lines do *not* linger. At B=1 that is
-  right (+0.106 ms: weights must not evict the MALL-resident KV cache). At B≥2 it forbids the only mechanism by
-  which the replica could reuse the stream.
+- The replicated graph already alternates requests' launches in `model.py:186-189, 426`.
+  Each worker's static queue places request 1's phase-*n* task immediately after request 0's.
+  The measured stagger is ~12 µs. During it, the XCD reads almost no other data.
+  The attention block is small, and the next heavy phase waits on its own event.
+  The lines could plausibly remain in cache.
+- **The direct obstacle is our round-15 optimization.**
+  `ETX_DSL_NT` marks every DSL weight load non-temporal in `etx/ops/gemv.py:102-108`, so the lines do not remain.
+  At B=1, this is correct: +0.106 ms reflects the need to protect the MALL-resident KV cache.
+  At B≥2, it prevents the replica from reusing the weight stream.
 
-So the design space is not a new scheduler. Replication already gives adjacency-in-time, same-XCD placement, and
-per-request stagger. What it does not give is (a) line retention (NT suppresses it) and (b) same-worker
-alignment (the round-robin counter in `p5_queues.py:74-76` is keyed by domain and never resets, so request 1's
-task *i* lands ~32 workers offset from request 0's — same XCD, different CU; L2 is shared per XCD so this costs
-nothing for L2 reuse, but alignment would also give L1/K$ locality and perfectly serialised pair ordering).
+Replication already provides nearby execution times, same-XCD placement, and stagger between requests.
+It lacks line retention because NT suppresses it.
+It also lacks same-worker alignment.
+The domain-keyed round-robin counter in `p5_queues.py:74-76` never resets.
+Thus, request 1's task *i* lands ~32 workers away from request 0's task, on the same XCD but a different CU.
+
+The XCD shares L2, so this offset does not affect L2 reuse.
+Worker alignment would also provide L1/K$ locality and a strict serial order for each pair.
 
 ## 2. Options
 
 ### Option A — replication + per-phase NT policy (no scheduling change at all)
 
-Keep `REQUESTS=N` exactly as shipped. Change only the cache policy: weight loads are non-temporal **iff** the
-phase's per-XCD slice exceeds L2 or B=1 (`nt := B == 1 or slice_bytes/XCD > L2`). qkv, o_proj, router and
-moe_down keep their lines; moe_up and lm_head stay NT (no reuse is possible there anyway, and they are the
-phases whose traffic most threatens the KV cache in the MALL).
+Keep the shipped `REQUESTS=N` structure.
+Change only the cache policy: use non-temporal weight loads iff B=1 or the phase's per-XCD slice exceeds L2.
+The predicate is `nt := B == 1 or slice_bytes/XCD > L2`.
+qkv, o_proj, router, and moe_down retain their lines.
+moe_up and lm_head remain NT because reuse is impossible and their traffic most threatens the MALL KV cache.
 
 - Mechanism required: nothing new. The 12 µs stagger *is* the split-phase: halves share the stream through L2
   and still start/finish apart.
@@ -60,19 +66,21 @@ phases whose traffic most threatens the KV cache in the MALL).
 
 ### Option B — Option A + worker alignment
 
-Reset the round-robin counter per grid (one line in `p5_queues.py`) so request r's task *i* lands on the same
-worker for every r. The pair becomes strictly back-to-back in one queue: request 1's half starts the moment its
-event fires with the lines still warmest, and K$/L1 locality is added on top of L2. Slightly tightens the
-stagger (the pair can no longer drift apart by more than the event skew); the stall-filling overlap between
-*different* phases of the two requests is untouched, which is where the measured 12 µs of mutual stall-filling
-actually lives (r1_attn waits while r0's MoE streams — different phases, different workers).
+Reset the round-robin counter per grid in `p5_queues.py`, so task *i* uses the same worker for each request r.
+The pair becomes consecutive in one queue.
+Request 1's part starts as soon as its event fires, while lines are warmest.
+This adds K$/L1 locality to L2 reuse.
+
+The change slightly limits the stagger: the pair cannot separate by more than event skew.
+It retains overlap between different phases, the source of the measured 12 µs of mutual stall coverage.
+For example, r1_attn waits while r0's MoE streams, on different phases and workers.
 
 ### Option C — a split-phase IR construct (only if A/B underdeliver)
 
 One phase, R column groups; group r's tasks wait on request r's event; groups share the worker set without
 exceeding it (p2 derives one event set per group — already expressible, since the per-request events exist;
 p5 orders group 0's tasks then group r's on the same workers — which is exactly what A+B already produce under
-replication; the emitter needs nothing, the per-task wait is unchanged). C's only addition over A+B is *forcing*
+replication. The emitter needs nothing, the per-task wait is unchanged). C's only addition over A+B is *forcing*
 adjacency when the natural stagger exceeds L2 lifetime, at the cost of coupling the halves' schedules. Build it
 only if the measured reuse under A/B is partial and the traces show eviction between the halves.
 
@@ -87,12 +95,13 @@ back ~0.2. So:
 - **B=2: ~6.0–6.3 against 6.90 today.** Clearly below today, clearly not past vLLM.
 - **B=4: each extra request saves the same 2.84 GB** (requests 1–3 all read lines request 0 warmed, within the
   same window): 24.3 → 15.8 GB, ~−2.4 ms on 12.49 → **~10.1 ms, ratio to vLLM 1.80× → ~1.45×.** The curve bends;
-  it does not cross. Crossing needs the moe_up slice to fit reuse too, i.e. fewer-larger expert tasks are not
+  it does not cross. Crossing needs the moe_up slice to fit reuse too, that is, fewer-larger expert tasks are not
   enough — it exceeds L2 per XCD by construction at top-8; only a B-column batched MoE shares it, and round 33
   measured why that loses under lockstep.
 
-Per the directive's bar — "if the ceiling is not clearly below 6.9, do not build" — the ceiling **is** clearly
-below 6.9, from a mechanism measured on this machine, at near-zero implementation cost for Options A/B.
+The directive requires a ceiling clearly below 6.9 before implementation.
+**This estimated ceiling is clearly below 6.9**, from a mechanism measured on this machine.
+Options A/B require almost no implementation work.
 
 ## 4. Deciding experiments, ranked by cost
 
@@ -100,7 +109,7 @@ below 6.9, from a mechanism measured on this machine, at near-zero implementatio
    (the env escape hatch exists). If L2 reuse is real, the step improves immediately — today's queues already
    put the halves on the same XCD ~12 µs apart. This one run tests the entire mechanism *including* the
    KV-eviction risk, since it reports the net. Expected if the mechanism holds: 6.90 → ≤ 6.4 even with NT lost
-   on every phase; a null result here kills the design before any code is written.
+   on every phase. A null result here kills the design before any code is written.
 2. **Per-phase NT policy (Option A proper, ~20 lines, manifest-routed):** NT only for moe_up and lm_head.
    Isolates the KV-cache protection from the reuse. Compare against experiment 1 to price each side.
 3. **Worker alignment (Option B, one line in p5):** rr counter keyed by (domain, grid-role) or reset per grid.
@@ -111,13 +120,15 @@ below 6.9, from a mechanism measured on this machine, at near-zero implementatio
 
 ## 5. Recommendation
 
-Do not build a scheduler. **Option A (per-phase NT policy over today's replication), preceded by the free
-experiment 1**, then Option B's one-line alignment. The split-phase construct (C) stays unbuilt unless the
-traces show the natural stagger exceeding line lifetime. The expected landing zone is ~6.0–6.3 at B=2 and
-~10 at B=4 — a real bend from a cache policy and a queue key, with the lockstep failure modes (oversubscription,
-lost stagger) structurally impossible because the task structure is untouched. The B-crossing of vLLM remains
-closed off by moe_up's slice exceeding L2; that is the honest residual wall, and it is a property of top-8 over
-128 experts at this hidden size, not of ETX.
+Do not build a scheduler.
+Start with experiment 1, then **Option A**, the per-phase NT policy for current replication.
+Next, evaluate Option B's single-line worker alignment change.
+Do not build Option C unless traces show that the natural stagger exceeds line lifetime.
+
+The expected range is ~6.0–6.3 at B=2 and ~10 at B=4.
+The cache policy and queue key retain the task structure, so the lockstep failures of oversubscription and lost stagger cannot occur.
+moe_up's slice exceeds L2, which still prevents a batch win over vLLM.
+That limit comes from top-8 over 128 experts at this hidden size, not ETX.
 
 ## Addendum, same day: the deciding experiment refuted the design
 

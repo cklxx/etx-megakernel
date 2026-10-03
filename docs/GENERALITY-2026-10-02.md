@@ -1,16 +1,16 @@
 # Generality, measured: a second MoE through the ETX path (2026-10-02)
 
-Goal: Mixtral-8x7B (top-2 of 8 experts, GQA G=4) end to end through the imported-kernel path, exercising the
-TOPK < NX unpinned MoE mapping (commit 6012b5b) that had only ever been planned. DeepSeek-V2-Lite was rejected
-first: MLA's projections do not fit the path's GQA parameterisation, and its `first_k_dense_replace` mixed layout
-is now refused loudly instead of planned wrongly (examples/llm/model.py).
+The goal is end-to-end Mixtral-8x7B execution through the imported-kernel path, with top-2 of 8 experts and GQA G=4.
+This tests the TOPK < NX unpinned MoE mapping from commit 6012b5b, which previously had only a plan.
+DeepSeek-V2-Lite was the first rejected candidate. Its MLA projections do not fit this path's GQA parameters.
+The config now explicitly rejects its `first_k_dense_replace` mixed layout instead of an incorrect plan. See examples/llm/model.py.
 
 ## How far the ladder got
 
 | step | result |
 |---|---|
 | config + local plan | passes: 58307 tasks / 452 events, MoE and top-k unpinned (TOPK % NX != 0), attnprep correctly derived OFF (no q/k norm) |
-| container device build | passes: megakernel VGPR 128, spill 0, LDS 41384; attn_mfma4_g4 (G=4) imports cleanly |
+| container device build | passes: megakernel VGPR 128, spill 0, LDS 41384<br> attn_mfma4_g4 (G=4) imports cleanly |
 | weights + prep + HF golden | passes: 93.41 GB packed, manifest TOPK=2 MI=14336 norm_topk=1 |
 | `--check` vs vLLM originals | **every imported launch byte-identical for layers 0-1** |
 | vLLM itself vs the HF golden | 32/32 (8.662 ms/token on this box) |
@@ -18,13 +18,13 @@ is now refused loudly instead of planned wrongly (examples/llm/model.py).
 
 ## The finding: the imported path is shape-keyed at three levels
 
-The kernels we import are not one artefact per operator; they are one artefact per operator PER SHAPE, at three
-different levels, and only the first level fails loudly:
+An imported artefact belongs to one operator and one shape.
+Shape dependencies occur at three levels. Only the first level fails with an explicit error:
 
 1. **Export selection** (loud). `wvsplitk_y1` missing for a non-Qwen MoE because the check script re-derived MoE
    detection from `num_experts` alone — the round-28 bug class in a second copy. Fixed: the check script now asks
    `load_dims`, the one derivation. The silu block size `MI/8` exceeded the 1024-thread workgroup at Mixtral's
-   expert width (1792) — capped; vLLM's act kernels stride, so the block is shape, not correctness.
+   expert width (1792) — capped. vLLM's act kernels stride, so the block is shape, not correctness.
 2. **C++ template instantiations** (silent). `topk_softmax_e128` is `topkGating<8, 128, ...>` and `moe_sum_k8` is
    `moe_sum_vec_kernel<..., 8, ...>`: expert count and top-k are template arguments. Run at top-2-of-8 they compute
    deterministic garbage, and `--check` CANNOT catch it — the original receives the same wrong template. Fixed:
@@ -43,30 +43,37 @@ Progression of the first wrong token as the levels were fixed: 8192 (levels 2+3 
 
 ## What generality cost, in edits
 
-Zero compiler changes for the plan, the runtime, the events, the placement — the TOPK<NX branch, G=4 attention
-import and the whole megakernel machinery worked unmodified. The edits were all in the model/data layer, each a
-shape fact: the Mixtral config; `norm_topk` derived for `model_type=mixtral` (it always renormalises, has no
-config key); Mixtral weight naming in prep (`block_sparse_moe`, `w1/w3/w2`); the two script fixes and the
-manifest entries above. The one genuinely open compiler-adjacent item is level 3's per-shape Triton capture flow.
+The plan, runtime, events, and placement required zero compiler changes.
+The TOPK<NX branch, G=4 attention import, and megakernel execution worked without changes.
+All edits concerned shape facts in the model/data layer.
 
-DSL-tile note: the DSL GEMV path is closed to Mixtral by `K <= 4096` (host.hip guard; moe_down K = MI = 14336) —
-the LDS staging buffer is K floats. A K-chunked staging variant would open it; recorded, not attempted.
+These edits include the Mixtral config and `norm_topk` for `model_type=mixtral`, which always renormalises and has no config key.
+They also include weight names in prep, `block_sparse_moe` and `w1/w3/w2`, plus the two script fixes and manifest entries above.
+The open compiler-adjacent item is the per-shape Triton capture flow at level 3.
 
-Timing context (NOT a comparison — ETX's output is still wrong): vLLM 8.662 ms/token; the wrong-output ETX runs
-were ~12.7 (e128 top-k alone was ~5 ms of that: 12.9 → 7.5 with the DSL top-k, which takes E at runtime).
+The `K <= 4096` guard in host.hip prevents Mixtral from using the DSL GEMV path.
+Mixtral moe_down has K = MI = 14336, but the LDS staging buffer holds K floats.
+A variant that stages K chunks would permit this path. This option is recorded but untested.
+
+Timing context only: **ETX's output is still wrong, so these figures are not a performance comparison.**
+vLLM takes 8.662 ms/token. ETX runs with wrong outputs took ~12.7.
+The e128 top-k alone cost ~5 ms. Runtime-E DSL top-k changed 12.9 → 7.5.
 
 ## Round 39: the Triton harvest finished — kernels faithful, one dispatch-glue bug remains
 
-Harvested the Mixtral-shape `fused_moe_up`/`fused_moe_down` from vLLM's Triton cache (ran vLLM once with a mounted
-`TRITON_CACHE_DIR`, eager so decode compiles at the true M=1; classified the entries by `arith.mulf`/`topk_weights`
-in the `.ttir` — mulf=0 is up, mulf=1 is down with `MUL_ROUTED_WEIGHT` — and by block constants against vLLM's
-`E=8,N={14336,4096}` tuned configs). Committed as shape-keyed `fused_moe_up_e8` / `fused_moe_down_e8`; the exports
-are now `fused_moe_{up,down}` for E=128 (Qwen, byte-stable) else `_e{E}`, same pattern as `topk_softmax_e{E}` /
-`moe_sum_k{TOPK}`.
+The Mixtral-shape `fused_moe_up`/`fused_moe_down` now come from vLLM's Triton cache.
+One eager vLLM run with a mounted `TRITON_CACHE_DIR` compiled decode at the actual M=1.
+Classification used `arith.mulf`/`topk_weights` in `.ttir`: mulf=0 means up, and mulf=1 means down with `MUL_ROUTED_WEIGHT`.
+Block constants also matched vLLM's tuned `E=8,N={14336,4096}` configs.
 
-Result: **every imported launch is byte-identical to vLLM's original — `--check 32` reports 0 of 384 launches
-differ, all 32 layers.** The first wrong token moved EOS(2) → 6495 (HF 28711) at position 0: the kernels now run the
-correct shape, so the garbage is gone, but the chained output is still wrong.
+The committed shape-keyed entries are `fused_moe_up_e8` / `fused_moe_down_e8`.
+Exports remain `fused_moe_{up,down}` for Qwen at E=128, byte-stable, and use `_e{E}` otherwise.
+This matches the `topk_softmax_e{E}` / `moe_sum_k{TOPK}` pattern.
+
+**Every imported launch is byte-identical to vLLM's original.**
+`--check 32` reports 0 differences among 384 launches across all 32 layers.
+At position 0, the first wrong token changes from EOS, id 2, to 6495 against HF 28711.
+The kernels now use the correct shape. The chained output remains wrong.
 
 Because `--check` validates each kernel on reference I/O and finds all faithful, the remaining bug is NOT a kernel —
 it is ETX's hand-built MoE **dispatch metadata** for top-k ≠ 8: `num_tokens_post_padded`/`sorted_token_ids`/
@@ -77,12 +84,13 @@ Magnitude: argmax wrong at the first decode step (6495 vs 28711).** This is a ho
 harvest, so it is the next round's item — the mechanical harvest this round owned is complete and correct.
 
 Zero-compiler-change verdict, updated: the plan, events, placement and every imported kernel generalise to Mixtral
-with no compiler change; the one remaining compiler-side item is the MoE dispatch metadata for top-k ≠ 8.
+with no compiler change. The one remaining compiler-side item is the MoE dispatch metadata for top-k ≠ 8.
 
 ## Round 40: the top-k≠8 blocker localised to MoE dispatch *values*, not reached to 32/32
 
-The directive was to fix ETX's MoE dispatch metadata for top-k≠8. Diagnosis narrowed it hard but did not close it;
-recording precisely, no code changed this round (so Qwen is untouched; the box plan stays 60362/436).
+The directive was to fix ETX's MoE dispatch metadata for top-k≠8.
+This round narrowed the diagnosis but did not resolve it.
+No code changed. Qwen is unchanged, and the box plan remains 60362/436.
 
 Ruled out, each with the test:
 - **Kernel fidelity**: `--check 32` launches BOTH vLLM's original and the imported kernel with ETX's *production*
@@ -105,7 +113,7 @@ feeds both sides the same values. The deciding experiment, beyond this round's b
 run) and diff against ETX's uploaded values at host.hip:216,405-409. That diff names the exact wrong scalar.
 
 Verdict unchanged and now sharper: plan, events, placement and every imported kernel generalise with zero compiler
-change; the one open item is the MoE dispatch *values* (not the layout, not the kernels) for top-k ≠ 8.
+change. The one open item is the MoE dispatch *values* (not the layout, not the kernels) for top-k ≠ 8.
 
 ## Round 41: the MoE-dispatch hypothesis is refuted from vLLM's source; the bug is upstream
 
@@ -119,8 +127,10 @@ host.hip:216/405-409: `ntpp = TOPK*MOE_BM`, `expert_ids = ti_r = topk_ids` in ro
 single activation row. It degenerates correctly at both shapes with no change. Round 40's "wrong dispatch value"
 was wrong: the dispatch is a verbatim, correct implementation of the naive path.
 
-Confirmed by experiment: `ETX_VL_DSL_TOPK=1` (a runtime top-k that takes E/TOPK as data, not a baked kernel)
-leaves the divergence bit-identical (6495 at token 0). So routing/top-k is not it either.
+`ETX_VL_DSL_TOPK=1` confirms this result experimentally.
+This top-k takes E/TOPK at runtime instead of constants in a compiled kernel.
+The divergence stays bit-identical: 6495 at token 0.
+Thus, routing/top-k is not the cause.
 
 **What is left, after eliminating config, argument order, replicas, kernel fidelity, MoE dispatch and routing:**
 the pieces that differ Qwen↔Mixtral and that `--check` cannot validate because it feeds both sides ETX's args —
@@ -128,27 +138,36 @@ the **G=4 attention path** (`attn_mfma4_g4`/`attn_reduce`, which no end-to-end-c
 every shipped model is G=8) and ETX's own non-imported tiles (embedding gather, argmax). The divergence is at
 generated token 0 with argmax 6495 vs 28711.
 
-**Next experiment (the directive's final step):** dump ETX's layer-0 output activation and compare against a torch
-forward computed directly from the HF weights on disk — that isolates attention vs MLP vs embedding without a vLLM
-reference. Stopping here per the directive, with the suspect set reduced to the attention path and the ETX tiles.
-No code changed this round (nothing in the MoE dispatch was wrong); Qwen is untouched.
+**Next experiment, the directive's final step:** dump ETX's layer-0 output activation.
+Compare it with a torch forward from the HF weights on disk.
+This separates attention, MLP, and embedding without a vLLM reference.
+The round stops here as directed, with attention and ETX tiles as the suspects.
+No code changed because the MoE dispatch was correct. Qwen is unchanged.
 
 ## Round 42: two scalar bugs named and fixed — Mixtral-8x7B reaches 32/32
 
-The layer-0 activation bisect ran as directed and the prime suspect is CLEARED: at position 0 (BOS, 1-layer build,
-`ETX_DUMP` stage dump in host.hip) hn/qkv/attn_out match a torch forward of the on-disk HF weights to bf16 noise
-(corr 1.00000), and at positions 1 and 300 the full stage chain — rope (theta 1e6, neox), G=4 attention over 2 and
-301 keys, router, top-k — matches too. **attn_mfma4_g4/attn_reduce are correct.** (The dumped `o`/`dn` buffers are
-stale in the imported path — rlog computed downstream of o_proj matched while `o` didn't; dump artifact, not a bug.)
+The layer-0 activation comparison clears the main suspect.
+At position 0, the BOS of a 1-layer build, the `ETX_DUMP` stage dump in host.hip matches a torch forward from HF weights.
+hn/qkv/attn_out agree within bf16 noise, with corr 1.00000.
+Positions 1 and 300 also match through the full stage chain.
+That chain includes neox rope with theta 1e6, G=4 attention over 2 and 301 keys, router, and top-k.
+
+**attn_mfma4_g4/attn_reduce are correct.**
+The imported path leaves stale `o`/`dn` dump buffers.
+rlog after o_proj matched although `o` did not. This is a dump artifact, not a compute bug.
 
 What the bisect actually named, in order:
 
-**Bug 1 — fused_moe grid vs the harvested binary's BLOCK_SIZE_N.** mc1 was written only in slot 0's gate half;
-slot 1 and every up column were zeros (mc2 = silu(g)·0 = 0 legitimately, so the whole MoE output was ~0 and the
-model collapsed to attention-only). Cause: `MOE_BN = 64` is the Qwen harvest's BLOCK_SIZE_N; the Mixtral e8 ttir
-bakes BM=16 BK=256 **BN=16**, so the grid `TOPK*ceil(2*MI/64)` launched 896 of the 3584 blocks the binary needs.
-`--check` is blind to a wrong grid for the same reason it is blind to wrong argument values: it launches BOTH
-kernels with ETX's grid. Fix: model.py keys MOE_BN by shape exactly as the kernel name is keyed (`MOE_BN_E8 = 16`).
+**Bug 1 — fused_moe grid versus the harvested binary's BLOCK_SIZE_N.**
+mc1 contained writes only in slot 0's gate half. Slot 1 and every up column contained zeros.
+Thus, mc2 = silu(g)·0 = 0 was legitimate, and the whole MoE output was ~0.
+The model reduced to attention-only execution.
+
+`MOE_BN = 64` comes from the Qwen harvest's BLOCK_SIZE_N.
+Mixtral's e8 ttir uses BM=16 BK=256 and **BN=16**.
+The grid `TOPK*ceil(2*MI/64)` launched only 896 of the required 3584 blocks.
+`--check` cannot detect a wrong grid because both kernels receive ETX's grid, just as both receive its argument values.
+The fix keys MOE_BN by shape in model.py, as the kernel name already does: `MOE_BN_E8 = 16`.
 
 **Bug 2 — wvSplitK's CuCount argument vs the launched grid.** After bug 1 the model was right at steps 0–1 but
 wrong at 174 of 1024 teacher-forced prompt positions — precisely the positions whose true argmax token id falls in
@@ -168,15 +187,19 @@ Gates, all green:
 - Qwen3-30B-A3B: plan byte-identical to the round-37 reference; GPU run **32/32** and **CHECK-DSL OK** (0 values
   beyond 2 bf16 ulps, layer 47), median 4.679 ms/token — unchanged.
 
-Diagnostics added (both env-gated, zero cost when unset): `ETX_DUMP`/`ETX_DUMP_STEP` stage-buffer dump after one
-step; `ETX_TOKTRACE` per-step argmax trace over the whole teacher-forced prompt.
+Two optional diagnostics now exist: `ETX_DUMP`/`ETX_DUMP_STEP` for a stage-buffer dump after one step, and `ETX_TOKTRACE` for per-step argmax.
+The latter covers the whole teacher-forced prompt.
+Both use environment flags and cost nothing when unset.
 
-GENERALITY VERDICT: the second MoE model — different expert count (8 vs 128), different top-k (2 vs 8), different
-GQA ratio (G=4 vs G=8), untied embeddings, vocab 32000 — runs end-to-end through the unchanged ETX compiler
-(plan, events, placement, importer) to exact HF-greedy agreement. Everything model-specific that broke was
-host-side glue, and each break was a scalar keyed to shape: the Triton binaries' baked constexprs (rounds 38-39),
-their launch grids (bug 1), and a grid-vs-stride constant (bug 2, a latent bug for every model, exposed by vocab
-position). The megakernel machinery itself needed nothing.
+GENERALITY VERDICT: the second MoE model reaches exact HF-greedy agreement through the unchanged ETX compiler.
+The plan, events, placement, and importer need no changes.
+The model differs in expert count, 8 vs 128, and top-k, 2 vs 8.
+It also differs in GQA ratio, G=4 vs G=8, has untied embeddings, and uses vocab 32000.
+
+Every model-specific failure came from a shape-dependent host scalar.
+These were baked Triton constexprs in rounds 38-39, launch grids in bug 1, and a grid-versus-stride constant in bug 2.
+The last was latent in every model, but vocabulary position exposed it.
+The megakernel mechanism needed no changes.
 
 Timed runs (3 interleaved rounds, context 1024, batch 1, all runs 32/32 vs HF greedy; logs results_2026-10-01/round42/):
 
@@ -186,17 +209,20 @@ Timed runs (3 interleaved rounds, context 1024, batch 1, all runs 32/32 vs HF gr
 | vLLM 0.27.1 default         |  8.681 /  8.697 /  8.711 ms        |
 | vLLM 0.27.1 AITER           | 12.488 / 12.499 / 12.525 ms        |
 
-ETX Mixtral is ~1.9x slower than vLLM default — expected: this is the all-imported mode (the Qwen equivalent was
-6.435 vs 4.937 in round 24), with Qwen-tuned CU/grid settings and none of the DSL-tile or fusion tuning applied to
-this shape. The generality claim this document is for is CORRECTNESS of the compiler path on a second model, which
-is now closed; making Mixtral fast is its own (unstarted) tuning ladder. One decode trace captured
-(round42/trace_r42_mixtral.{bin,log}, median 16.751 ms on-device).
+ETX Mixtral is ~1.9x slower than vLLM default, as expected for this all-imported mode.
+The Qwen equivalent was 6.435 vs 4.937 in round 24.
+This run retains Qwen-tuned CU/grid settings, without DSL-tile or fusion optimizations for the new shape.
+
+This document's generality claim concerns compiler-path correctness on a second model. That claim is now established.
+Mixtral performance is a separate, unstarted optimization sequence.
+One decode trace exists at round42/trace_r42_mixtral.{bin,log}, with a median of 16.751 ms on-device.
 
 ## Round 44: Qwen3.6-35B-A3B — refused at the config, correctly
 
-The third candidate (`Qwen/Qwen3.6-35B-A3B`, model_type `qwen3_5_moe`, 71.9 GB bf16) was examined and **not
-attempted**: it is not a shape variant of the family this path expresses, it is a different architecture class.
-Decided from `config.json` and the checkpoint index alone — no download, no GPU time.
+The third candidate is `Qwen/Qwen3.6-35B-A3B`, model_type `qwen3_5_moe`, with 71.9 GB bf16 weights.
+It was examined but **not attempted**.
+It belongs to a different architecture class, rather than a shape variant of this path's family.
+The decision used only `config.json` and the checkpoint index, with no download or GPU time.
 
 What the checkpoint actually contains (verified against `model.safetensors.index.json`, 1045 tensors):
 
@@ -227,13 +253,20 @@ exists to prevent.
 
 ## Round 43: Mixtral on the DSL path
 
-Opening the DSL tiles to K > 4096 (chunked staging of x, numerically exact — CHECK-DSL clean at layer 31)
-gives Mixtral the DSL path: **10.365 ms/token against 17.058 all-imported (1.65x) and vLLM's 8.686 (1.19x behind)**.
-Streaming floor ~7.3-8.5 ms; vLLM sits on it. The remaining gap is named from the trace and is not the chunked
-path: the MoE rows-per-task constants are Qwen-tuned (moe_up 896 tasks on 304 workers = three serial waves,
-moe_down 128 tasks with 58% of workers idle; MoE is 73% of the layer) — per-shape task widths are the next knob.
-A Qwen regression (+0.12 ms from the resident big-K branch) was caught by the interleaved gate and fixed via the
-feature manifest (`dsl_bigk`, derived from max(H, MI) > 4096); Qwen's emitted source is token-identical with it off.
+The DSL tiles now support K > 4096 through chunked staging of x.
+The path is numerically exact and passes CHECK-DSL at layer 31.
+Mixtral reaches **10.365 ms/token against 17.058 all-imported, a 1.65x speedup**.
+vLLM takes **8.686, which leaves ETX 1.19x behind**.
+The stream floor is ~7.3-8.5 ms, where vLLM operates.
+
+The trace attributes the gap to Qwen-tuned MoE task widths, not the chunked path.
+moe_up has 896 tasks on 304 workers, which requires three serial waves.
+moe_down has 128 tasks and leaves 58% of workers idle.
+MoE accounts for 73% of the layer. Per-shape task widths are the next control to evaluate.
+
+An interleaved check caught a Qwen regression of +0.12 ms from the resident big-K branch.
+The feature manifest now selects `dsl_bigk` from max(H, MI) > 4096.
+With the feature off, Qwen's emitted source is token-identical.
 
 
 ## Round 46: Phi-3.5-MoE — refused at the config; the class boundary is sharper than we knew
@@ -249,14 +282,15 @@ deterministic at inference): the LongRoPE cos/sin cache (additive branch in `pre
 o_proj/lm_head bias in the gemv epilogue (qkv bias exists on the import path; the rest is unverified).
 
 **Corrected claim:** the class this week validated is "GQA attention + *softmax-topk* routed MoE" — one notch
-narrower than "routed MoE". No download, no GPU time was spent; the refusal cost one config read.
+narrower than "routed MoE". No download, no GPU time was spent. The refusal cost one config read.
 
 ## Round 47: PhiMoE support — three of four hard features land; moe_up OOB localized
 
-Phi-3.5-MoE (microsoft/Phi-3.5-MoE-instruct: H=4096, 32L, G=4, E=16, top-2, MI=6400, LayerNorm, biases on
-qkv/o_proj/lm_head, LongRoPE, sparsemixer routing) exercises four structures no prior model had. Built as new,
-model-local code, all behind the feature manifest (`dsl_ext`), Qwen plan byte-identical and Qwen GPU run 32/32 +
-CHECK-DSL + wall 4.851 unchanged:
+Phi-3.5-MoE from microsoft/Phi-3.5-MoE-instruct tests four structures that no prior model used.
+Its shape is H=4096, 32L, G=4, E=16, top-2, MI=6400.
+It uses LayerNorm, qkv/o_proj/lm_head biases, LongRoPE, and sparsemixer routing.
+The new model-local code uses the `dsl_ext` feature manifest.
+Qwen's plan is byte-identical, and its GPU run remains 32/32 + CHECK-DSL with wall time 4.851:
 
 1. **sparsemixer routing** — `dsl_topk` mode 2 (etx/ops/topk.py): per-round masked softmax, ids = plain top-2,
    weights the per-round masked softmax at the winner. Cross-checked against vLLM's python on 2000 random rows
@@ -267,10 +301,12 @@ CHECK-DSL + wall 4.851 unchanged:
    own config derivation (the round-14/19/30 drift class).
 4. **LongRoPE** — longrope cos/sin cache in prep.py with the config's explicit short/long mscale.
 
-Also fixed: the import arena was sized by whichever tile file included etx/import.h first (imp_tiles.hip for
-Qwen, whose layer 0 uses imported rms_norm; dsl_tiles.hip for a model that folds layer 0), so a folded-layer-0
-model got the default 16-byte arena. emit.py now defines ETX_IMPORT_LDS (#ifndef-guarded, the imports.json max)
-before the include, order-independent.
+The import arena previously took its size from the first tile file to include etx/import.h.
+For Qwen, imp_tiles.hip came first because layer 0 uses imported rms_norm.
+For a model that folds layer 0, dsl_tiles.hip came first.
+That folded-layer-0 model received the default 16-byte arena.
+emit.py now defines ETX_IMPORT_LDS before the include, with an #ifndef guard and the imports.json maximum.
+The size no longer depends on include order.
 
 **Verified correct via --check-dsl** (relaunch each op, 0 beyond 2 ulps): qkv (folded, LayerNorm mode 4, R=0),
 o_proj (bias), router (folded, LayerNorm). So the LayerNorm fold, the bias epilogue, and sparsemixer-fed routing
@@ -282,3 +318,43 @@ too, so not the unpinned slot mapping), expert weight shapes verified (w1/w3 [64
 2·MI·H correct). Mixtral's DSL moe_up (K=4096, same path) ran; Phi differs in E (16 vs 8) and MI (6400 vs 14336),
 neither of which the tile's mode-0 path uses for addressing. The fault is in the MoE expert GEMV for this shape
 and needs a focused pass, not a shared-box rebuild loop. Everything that passed is committed and gated.
+
+## Round 48: the PhiMoE "moe_up OOB" was a missing barrier in the new LayerNorm fold — all three gates green
+
+The round-47 aperture violation required a live step.
+Synthetic zero-weight 2-layer shapes with sparse vl.bin and no downloads cleared E=16, MI=6400, and the exact Phi shape.
+A real-weight 2-layer model used the full vl.bin through an L=2 manifest and cleared values at rest.
+
+The new ETX_UNFUSED_SYNC mode adds one synchronization per unfused launch and identified moe_up_0.
+An emit-gated expert-id guard showed every MoE task in every step read expert id 0x7fffffff.
+That initial top-k argmax value survives only when all router logits are NaN.
+ETX_DUMP after step 0 of an L=1 build located the first NaN in the layer-0 qkv fold output.
+The input embedding row was clean. The same operator was bit-correct when relaunched alone.
+
+The cause was a race in the new LayerNorm fold, mode 4.
+Every thread writes part of staged xs[], but the mean pass reads the whole array without a barrier.
+The RMS fold needed no such barrier because each thread reduced only its private partial as it staged data.
+That precedent made the new pattern look safe.
+
+At full occupancy, the mean pass read unwritten LDS, whose junk bits could produce NaN.
+An isolated kernel won the race, so --check-dsl relaunches passed while the fused step failed.
+NaN logits also made vl_argmax emit 0x7fffffff as a token id.
+The next prologue then read embed[2^31-1], which made the crash location vary.
+
+One __syncthreads() before the mean pass fixes both VECNORM and scalar paths.
+A clamp on the sparsemixer winner index also prevents all-NaN logits from producing a wild weight pointer.
+
+**Phi-3.5-MoE end to end:** MI300X, context 1024, bs 1, and 32/32 tokens against HF greedy.
+CHECK-DSL reports 0 of 31248 listed output values beyond 2 bf16 ulps at layer 31.
+The operators include LayerNorm-folded qkv/router, biased o_proj, sparsemixer top-k, and both MoE stages.
+CHECK-COVERAGE reports 1055 positions and 0 wrong beyond ties.
+
+Three interleaved timed runs give ETX wall times of 6.459 / 6.481 / 6.466 ms/token.
+The median on-device time is 6.34.
+vLLM v0.27.1 gives 11.035 / 11.078 / 11.057 with default settings and 11.398 / 11.335 / 11.360 with AITER.
+ETX is 1.71x faster.
+vLLM's greedy output also matches the HF golden 32/32, so both systems process identical tokens.
+
+The --check-dsl fold branch previously recomputed softmax-topk weights for a sparsemixer model.
+Its moe_down reference differed by up to 14x while the device result was correct.
+The reference now uses the model's routing function.

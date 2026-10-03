@@ -1,9 +1,13 @@
 # Bare-metal validation of the 2026-10-01 work
 
-Hot Aisle `enc1-gpuvm005`, bare metal MI300X (2 GPUs, GPU 0 used), ROCm 7.2.4, 26 cores. Qwen3-30B-A3B bf16,
-greedy, batch 1, context 1024, the same protocol as every other number in this session. Run 2026-09-30 23:28
-to 23:55 UTC. Every ETX run matched 32/32 tokens against HF greedy; the first also passed `--check-dsl`
-(0 values beyond 2 bf16 ulps at layer 47). Both vLLM runs reported `first_divergence=32/32`.
+Conditions: Hot Aisle `enc1-gpuvm005`, bare metal MI300X, 2 GPUs with GPU 0 used, ROCm 7.2.4, and 26 cores.
+The model is Qwen3-30B-A3B bf16, with greedy decode, batch 1, and context 1024.
+The run uses the same protocol as every other number in this session.
+It ran from 2026-09-30 23:28 to 23:55 UTC.
+
+Every ETX run matched 32/32 tokens against HF greedy.
+The first also passed `--check-dsl`, with 0 values beyond 2 bf16 ulps at layer 47.
+Both vLLM runs reported `first_divergence=32/32`.
 
 Purpose: today's entire result was measured on a *virtualised* MI300X VF with ROCm 7.14, where our build
 compiles differently. This box is the machine type every historical number in the project came from.
@@ -21,8 +25,8 @@ import prune in build.sh).
 | megakernel LDS | 29736 | 29736 |
 | unfused VGPR / spill | 110 / 0 | 104 / 0 |
 
-The plan is identical; only the register allocator differs. The import prune (round 16) works here too: LDS
-29736, not 41448.
+The plan is identical. Only the register allocator differs.
+The import prune from round 16 also works here: LDS is 29736, not 41448.
 
 ## Measured
 
@@ -40,7 +44,7 @@ repeats per invocation.
 
 - **Fusion wins by 0.224 ms (4.3%)** — the same margin as the VF box's +0.219.
 - **ETX is 3.1% behind vLLM default** (5.042 vs 4.887). aiter is slower than default here, as on every box.
-- The first three fused runs spread 0.006; the drift check 12 minutes later is 0.029 higher, so a session-long
+- The first three fused runs spread 0.006. The drift check 12 minutes later is 0.029 higher, so a session-long
   drift of that order exists on this box too. Comparisons within a few minutes are good to ~0.01.
 
 ## Against the historical bare-metal baseline (2026-09-30, same machine type)
@@ -64,7 +68,7 @@ holds on the machine type where it was originally measured as negative.
 | ratio ETX/vLLM | 1.032 | 1.005–1.012 |
 
 Both are faster on the VF box, ETX by more than vLLM, so our relative position is slightly worse here. The
-absolute numbers are not interchangeable between the boxes; the ratio and the fusion margin are.
+absolute numbers are not interchangeable between the boxes. The ratio and the fusion margin are.
 
 ## Microbenchmarks reproduce (the extra measurement)
 
@@ -92,9 +96,10 @@ used here is the current 0.27.x CDNA image.
 
 ## The full machine-parameter suite on bare metal (added after the validation run)
 
-`hw_bench` was run end to end on the bare-metal box before it was released — `lat`, `launch`, `evx`, `lfx`,
-`cohload`, `moegather`, `sdat`, `lf`, 156 RESULT lines in `results_2026-10-01/baremetal/hw_all.log` — so the
-machine parameters the whole budget rests on now exist on both machines. They agree:
+The complete `hw_bench` suite ran on the bare-metal box before its release.
+The modes were `lat`, `launch`, `evx`, `lfx`, `cohload`, `moegather`, `sdat`, and `lf`.
+The 156 RESULT lines reside in `results_2026-10-01/baremetal/hw_all.log`.
+The parameters for the budget now exist on both machines. They agree:
 
 | parameter | bare metal (ROCm 7.2.4) | VF box (ROCm 7.14) |
 |---|---|---|
@@ -108,16 +113,18 @@ machine parameters the whole budget rests on now exist on both machines. They ag
 | `lfx` 1 XCD, per XCD | 0.623 TB/s | 0.687 TB/s |
 | `evx` device scope, P=8 C=8 | 2.61 us | — |
 
-**The strongest evidence for the COH redesign is this suite's `lat` row, and it was not measured before today.**
-A dependent load chain that crosses a `buffer_inv sc1` pays **1107 ns per hop against 103 ns without it — 10.6x on
-bare metal, 11.4x on the VF box.** The 4.1x figure the redesign was argued from (`restart`, an L2-resident phase
-losing its reuse) is the bandwidth side of the same mechanism; this is the latency side, it is larger, and it bears
-directly on the phases that are dependent chains rather than streams (`prep` 8.5 hops, `reduce` 8.1, `topk` 11.8).
-Both numbers are machine-independent, so neither is an artefact of the virtualised box the day's work was done on.
+**The `lat` row gives the strongest evidence for the COH design.** This row had no measurement before today.
+A dependent load chain after `buffer_inv sc1` costs **1107 ns per hop against 104.3 ns without it**.
+The ratios are **10.6x on bare metal and 11.4x on the VF box**.
+
+The earlier `restart` result, 4.1x, measured lost reuse in an L2-resident phase.
+That result shows the bandwidth effect. The larger `lat` result shows the latency effect.
+It directly affects dependent chains: `prep` has 8.5 hops, `reduce` has 8.1, and `topk` has 11.8.
+Both effects hold across machines. Neither is an artefact of the virtualised box.
 
 `rocprofv3` could not be used here: it aborted at startup (SIGABRT, `results_2026-10-01/baremetal/prof_bm.log`),
 a different failure from the VF box where it writes its database and then segfaults at teardown. The occupancy
-figures in `docs/BUDGET-2026-10-01.md` therefore remain VF-only; the VGPR 128 that sets them is 128 on both boxes,
+figures in `docs/BUDGET-2026-10-01.md` therefore remain VF-only. The VGPR 128 that sets them is 128 on both boxes,
 so the 4 waves/SIMD conclusion carries, but it is derived here rather than measured.
 
 ## Timing basis (added after the vLLM ladder)

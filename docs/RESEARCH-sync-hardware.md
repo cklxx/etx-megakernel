@@ -1,23 +1,29 @@
-# Research: hardware levers for making a megakernel's synchronisation cheaper than a kernel boundary on MI300X
+# Research: hardware levers for making a megakernel's synchronization cheaper than a kernel boundary on MI300X
 
 Status: research, no measurements yet · Date: 2026-09-26 · Sources: LLVM AMDGPUUsage "Memory Model GFX942" (main, 2026), AMD Instinct MI300 CDNA3 ISA Reference Guide (561 pages), ROCm 7.2.4 device libraries (`ockl.bc`), ETX measurements of 2026-09-22/26
 
 ## 0. The problem in one line
 
-With vLLM's own kernels, ETX's fused version is 7-16% slower than the same kernels launched one by one, because each token crosses 310-472 device-wide synchronisations and one ETX device event costs about 1.2 us more than a kernel boundary. Fusion wins only if a synchronisation costs less than a boundary, or if work overlaps it.
+With vLLM's own kernels, ETX fusion is 7-16% slower than separate launches of the same kernels.
+Each token crosses 310-472 device-wide synchronizations. Each ETX device event costs about 1.2 us more than a kernel boundary.
+Fusion wins only if synchronization costs less than a boundary or overlaps other work.
 
 ## 1. What a device-scope event costs today, and why
 
-On gfx942 each XCD has its own 4 MB L2, and L2s are not kept coherent with each other for ordinary device memory. An agent-scope release/acquire pair therefore compiles to (AMDGPUUsage, GFX942 code sequences):
+On gfx942, each XCD has its own 4 MB L2.
+Ordinary device memory does not provide coherence between these L2 caches.
+An agent-scope release/acquire pair therefore uses these GFX942 code sequences from AMDGPUUsage:
 
 | Side | Sequence | What the hardware does |
 |---|---|---|
 | producer release | `s_waitcnt vmcnt(0)`, `buffer_wbl2 sc1` | writes back every dirty line of the producer XCD's L2 |
-| arrive | atomic add, agent scope | performed at the L2 that owns the line; bypasses L1 |
+| arrive | atomic add, agent scope | performed at the L2 that owns the line<br> bypasses L1 |
 | consumer wait | atomic/`sc1` load poll, `s_sleep` backoff | one round trip per poll, 64-8128-clock sleep granularity |
 | consumer acquire | `s_waitcnt vmcnt(0)`, `buffer_inv sc1` | invalidates the non-local lines of the consumer XCD's L2 |
 
-The measured one-way cost of a counter between XCDs is about 0.74-0.9 us (2026-09-22 calibration), and a whole-GPU counter barrier with 304 workgroups was 8.6 us. A kernel boundary pays a similar writeback/invalidate once per dispatch through the command processor, but only once, not once per waiting workgroup.
+The 2026-09-22 calibration measured a one-way cross-XCD counter cost of about 0.74-0.9 us.
+A whole-GPU counter barrier with 304 workgroups cost 8.6 us.
+A kernel boundary performs similar writeback/invalidation through the command processor once per dispatch, instead of once per workgroup that waits.
 
 ## 2. The levers
 
@@ -26,9 +32,12 @@ The measured one-way cost of a counter between XCDs is about 0.74-0.9 us (2026-0
 AMDGPUUsage: "PCIe access from the GPU to the CPU can be kept coherent by using the MTYPE UC (uncached) which bypasses the L2", and local-memory lines under MTYPE RW are invalidated by probes when another L2 writes them. The memory type is a page attribute, set at allocation (`hipExtMallocWithFlags(..., hipDeviceMallocUncached)`, or fine-grained allocation), so **the imported kernels do not change**.
 
 - Put the small tensors that cross XCDs in uncached memory: activation vectors (KBs per layer), the ETX event words, and possibly the attention partials.
-- Weights stay in ordinary cached memory; they are never written during a step, so they never need a writeback or an invalidate.
+- Keep weights in ordinary cached memory.
+  No step writes them, so they need no writeback or invalidate.
 - The device-scope release then needs only `s_waitcnt vmcnt(0)` (an uncached store is complete once acknowledged), and the acquire only the L1 invalidate (`buffer_inv sc0`). Both whole-L2 operations disappear from every event.
-- It also makes the relay's hierarchical acquire (one poller per XCD, consumers invalidating only L1) safe. That acquire was measured unsafe on 2026-09-24 because stale lines could sit in L2; with uncached data there is no stale L2 line to see.
+- It also makes the relay's hierarchical acquire safe: one poller per XCD, with only an L1 invalidate at each consumer.
+  This acquire was unsafe on 2026-09-24 because L2 could retain stale lines.
+  Uncached data cannot leave such lines in L2.
 - Cost: accesses to those buffers go to HBM (about 350 ns instead of about 100 ns for L2). They are vectors of a few KB read once per phase, so the latency matters and the bandwidth does not. The KV cache is the open question: one row is written per token and 1024 rows are read, so it probably stays cached, with the new row made visible by the cache-write kernel's event.
 - In ETX this is a machine-model change: a DEVICE-scope lowering row for "coherent memory" (release `s_waitcnt vmcnt(0)`, acquire `buffer_inv sc0`), chosen when every tensor an event protects is allocated uncached.
 
@@ -51,7 +60,10 @@ XCD-local events need only `s_waitcnt vmcnt(0)` and `buffer_inv sc0`, because th
 ### 2.3 Barrier shape
 
 - **Fan-in:** 304 atomics on one word serialise at the L2 atomic unit. ETX already combines per XCD (38 local arrivals, then one device arrival per XCD, "last-arriver flush").
-- **Fan-out:** 304 pollers on one word means 304 round trips per poll interval. One poller per XCD with an XCD-local flag for the others (ETX's relay, P5) cuts that to 8. It was neutral with the full acquire and unsafe with the cheap one; with 2.1 it becomes both safe and cheap.
+- **Fan-out:** 304 pollers require 304 round trips per poll interval.
+  ETX's P5 relay uses one poller per XCD and an XCD-local flag for other workers, which reduces the count to 8.
+  The full acquire was neutral, and the cheap acquire was unsafe.
+  With 2.1, the proposal becomes both safe and cheap.
 
 ### 2.4 Waiting: sleep, wake-up, priority
 
@@ -61,24 +73,29 @@ XCD-local events need only `s_waitcnt vmcnt(0)` and `buffer_inv sc0`, because th
 
 ### 2.5 Hardware global barrier (GWS): exists, unproven
 
-The CDNA3 ISA has a Global Wave Sync unit with 64 resources: `DS_GWS_INIT`, `DS_GWS_BARRIER`, and semaphores (`DS_GWS_SEMA_V/P/BR/RELEASE_ALL`). Waiting waves are queued in hardware, so there is no polling traffic at all. But:
+The CDNA3 ISA has a Global Wave Sync unit with 64 resources.
+It provides `DS_GWS_INIT`, `DS_GWS_BARRIER`, and the `DS_GWS_SEMA_V/P/BR/RELEASE_ALL` semaphores.
+Hardware queues the waves, so they generate no poll traffic. But:
 
 - ROCm 7.2.4's own grid sync (`__ockl_grid_sync`) takes a **software** barrier (atomics plus `s_sleep`) on gfx942 and gfx950 and uses GWS only for other ISAs.
 - GWS has to be allocated to the queue by the kernel driver.
 
-So AMD itself does not rely on it on this chip. It is worth one microbenchmark, not a design dependency. It also orders waves only, not memory: data still needs 2.1 or the L2 operations.
+AMD does not rely on GWS on this chip.
+It warrants one microbenchmark, but no design dependency.
+GWS orders waves, not memory. Data still needs 2.1 or the L2 operations.
 
 ### 2.6 Overlapping the wait
 
 - Our own tiles can issue their weight loads before waiting, since weights do not depend on the event (registers or LDS, not L2: L2 warming measured -3% on 2026-09-25 because it competes with the previous phase's streaming tail).
-- Imported kernels cannot be reordered internally, so overlap has to come from the graph: independent launches (for example q-norm and k-norm) can run side by side instead of in stream order.
+- Imported kernels permit no internal reorder, so overlap must come from the graph.
+  Independent launches, such as q-norm and k-norm, can run side by side instead of in stream order.
 
 ### 2.7 Levers that do not help here
 
 - Direct-to-LDS loads on gfx942 are dword-only and unswizzled.
 - There is no TMA / `cp.async` equivalent on CDNA3.
 - AGPRs are a partition of the register file, not extra capacity.
-- The 256 MB MALL cannot hold 16 GB of weights; it is useful only for the small per-step tensors, which 2.1 routes around it anyway.
+- The 256 MB MALL cannot hold 16 GB of weights. It is useful only for the small per-step tensors, which 2.1 routes around it anyway.
 
 (See also the memory note on gfx942 latency-hiding limits.)
 
@@ -92,4 +109,7 @@ So AMD itself does not rely on it on this chip. It is worth one microbenchmark, 
 
 ## 4. Recommendation
 
-Try 2.1 first. It is the only lever that removes the per-event whole-L2 work without touching the imported kernels, and it makes the relay usable. It combines with 2.2 and 2.3, which are already built. GWS and priority tuning come second, after measurements show where the remaining time is.
+Try 2.1 first.
+It alone removes whole-L2 work per event without changes to imported kernels and makes the relay usable.
+It combines with the existing 2.2 and 2.3.
+Measure the remaining time before GWS and priority adjustments.

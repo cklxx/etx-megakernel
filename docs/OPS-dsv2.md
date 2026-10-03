@@ -1,10 +1,14 @@
 # Operation inventory: fleet's DeepSeek-V2-Lite decode tasks as the ETX port runs them
 
-Source-derived (fleet-mi300x `src/kernels/{fleet_kernel.hip, gemv.h, attention.h, expert.h}`, `src/runtime/*`, ETX
-`examples/dsv2lite/{fleet_shim.hip, graph.py, host.hip}`), 2026-09-27. Abbreviations: FK fleet_kernel.hip, G gemv.h,
-A attention.h, E expert.h, RT fleet_runtime.h, SH fleet_shim.hip, GR graph.py, HO host.hip; "RT" in tables = dependent
-memory round trip; WG = 256 threads (4 waves). Position 1024 (S = 1025). Items marked *ISA* cannot be decided from source
-(loop unrolling, scalarization, LDS reuse) and are to be read from the `-save-temps` ISA.
+The inventory derives from source on 2026-09-27.
+Sources are fleet-mi300x `src/kernels/{fleet_kernel.hip, gemv.h, attention.h, expert.h}`, `src/runtime/*`, and ETX `examples/dsv2lite/{fleet_shim.hip, graph.py, host.hip}`.
+
+Abbreviations: FK fleet_kernel.hip, G gemv.h, A attention.h, E expert.h, RT fleet_runtime.h, SH fleet_shim.hip, GR graph.py, HO host.hip.
+In tables, "RT" means dependent memory round trip.
+WG = 256 threads, or 4 waves. Position 1024 has S = 1025.
+
+Source alone cannot determine the items marked *ISA*: loop unrolling, scalarization, and LDS reuse.
+Read these from the `-save-temps` ISA.
 
 ## Configuration facts that change what the bodies do
 
@@ -26,14 +30,14 @@ memory round trip; WG = 256 threads (4 waves). Position 1024 (S = 1025). Items m
 
 | block | per WG | file:line |
 |---|---|---|
-| stage_vector(src, n) | float4 loads n/1024 per thread, LDS write 4n B, 1 barrier; 1 RT | G:188-197 |
-| stage_residual fold (bf16 partials) | per thread 8 x 16 B `expert_out[x]` (8 XCDs, 32 KiB) + 2 float4 of src (8 KiB): 10 x 16 B in flight, 40,960 B, 1 RT; 64 fp32 adds + 16 bf16 roundings per thread; 8 KiB LDS write; 1 barrier; WG (0,0) publishes 8 KiB | FK:168-199 |
-| stage_residual_f32 (fp32 o_proj partials) | 2 loop iterations x (8 + 1) float4 per thread = 73,728 B per WG; 1-2 RT (*ISA*); 8 KiB LDS; 1 barrier; WG (0,0) publishes x[1] | FK:118-142 |
+| stage_vector(src, n) | float4 loads n/1024 per thread, LDS write 4n B, 1 barrier<br> 1 RT | G:188-197 |
+| stage_residual fold (bf16 partials) | per thread 8 x 16 B `expert_out[x]` (8 XCDs, 32 KiB) + 2 float4 of src (8 KiB): 10 x 16 B in flight, 40,960 B, 1 RT<br> 64 fp32 adds + 16 bf16 roundings per thread<br> 8 KiB LDS write<br> 1 barrier<br> WG (0,0) publishes 8 KiB | FK:168-199 |
+| stage_residual_f32 (fp32 o_proj partials) | 2 loop iterations x (8 + 1) float4 per thread = 73,728 B per WG<br> 1-2 RT (*ISA*)<br> 8 KiB LDS<br> 1 barrier<br> WG (0,0) publishes x[1] | FK:118-142 |
 | rms_norm_lds (2048) | 8 KiB LDS read, block_reduce_ordered: LDS tree of 8 levels with a barrier each (10 barriers), rsqrtf, gamma 4 KiB as 2 B scalars **after** the reduce (1 RT), 8 KiB LDS read-modify-write, 1 barrier: 11 barriers + 1 RT | FK:82-95, G:167-177 |
-| gemv_rows path | K <= 256 half-wave <8>; <= 512 <8,1>; <= 1024 <4,2>; <= 2048 <2,4>; else impl <2,4> (all five instantiated at every call site: 262 registers) | G:456-466 |
-| pipelined <RPI,D> | wave owns groups RPI*wave + 16m; per group RPI x D x 16 B per lane, 2 groups in flight; **one extra group issued past the last, clamped to row cnt-1, never consumed**; per row a 6-step wave_sum, lane 0 stores | G:265-334 |
+| gemv_rows path | K <= 256 half-wave <8><br> <= 512 <8,1><br> <= 1024 <4,2><br> <= 2048 <2,4><br> else impl <2,4> (all five instantiated at every call site: 262 registers) | G:456-466 |
+| pipelined <RPI,D> | wave owns groups RPI*wave + 16m<br> per group RPI x D x 16 B per lane, 2 groups in flight<br> **one extra group issued past the last, clamped to row cnt-1, never consumed**<br> per row a 6-step wave_sum, lane 0 stores | G:265-334 |
 | fma8 | 20 VALU per 16 B chunk (8 MACs) | G:85-92 |
-| gemv_gate_up_rows | wave owns pairs wave + 4m; 8 x 16 B per lane per pair, 16 in flight, one extra pair over-issued; per pair 12 bpermutes, 1 expf + 1 divide (SiLU), 4 bf16 roundings, 4 B store | G:484-565 |
+| gemv_gate_up_rows | wave owns pairs wave + 4m<br> 8 x 16 B per lane per pair, 16 in flight, one extra pair over-issued<br> per pair 12 bpermutes, 1 expf + 1 divide (SiLU), 4 bf16 roundings, 4 B store | G:484-565 |
 
 ## Tasks
 
@@ -44,8 +48,8 @@ every XCD** (workers 0-20 own 16, the rest 15); K = 2048 -> <2,4>.
 |---|---|---|---|---|
 | 1 | fold (layers 2-26): 32 KiB partials + 8 KiB x[1], 10 x 16 B per lane -> LDS, barrier | 40,960 B | shared by 296 | 1 |
 | 2 | rms_norm_lds: gamma 4 KiB, 11 barriers | | shared | 1 |
-| 3 | q GEMV (EPI_BF16 -> act.q): useful 45,056 / 40,960 B, **issued 81,920 / 73,728 B**; 24,576 MACs, 72 bpermutes | | unique, NT | ~1 |
-| 4 | kv_a GEMV (-> act.kv_a[xcd]): useful 65,536 / 61,440 B, **issued 98,304 B**; 32,768 MACs, 96 bpermutes | | **shared across the 8 XCDs (each reads all 2.36 MB)**, NT | ~1, after #3 drains |
+| 3 | q GEMV (EPI_BF16 -> act.q): useful 45,056 / 40,960 B, **issued 81,920 / 73,728 B**<br> 24,576 MACs, 72 bpermutes | | unique, NT | ~1 |
+| 4 | kv_a GEMV (-> act.kv_a[xcd]): useful 65,536 / 61,440 B, **issued 98,304 B**<br> 32,768 MACs, 96 bpermutes | | **shared across the 8 XCDs (each reads all 2.36 MB)**, NT | ~1, after #3 drains |
 
 Before the weights: 2 dependent global RTs + 12 barriers. Per layer: 14.9 MB unique, 31.5 MB requested (kv_a x 8),
 **51.8 MB issued** with the over-issue.
@@ -63,12 +67,12 @@ attention polls.
 | 2 | sum of squares, 10-barrier tree, rsqrtf | | |
 | 3 | **kv_a_raw reloaded** + kv_a_norm_w 1 KiB + rope part 256 B -> LDS | 3,328 B | 1 |
 | 4 | RoPE: cos/sin 512 B (threads < 32), 3 barriers | 512 B | 1 |
-| 5 | bf16 rounding; WG (0,0) writes the cache row (1,152 B); barrier | | |
+| 5 | bf16 rounding<br> WG (0,0) writes the cache row (1,152 B)<br> barrier | | |
 | 6 | PUB_WAIT: poll the XCD counter bumped by q_absorb (s_sleep 1), then `s_waitcnt 0` + `buffer_inv sc0`, barrier | | >= 1 |
 | 7 | q_absorbed (4 KiB) + q_pe (256 B), barrier | 4,352 B | 1 |
 | 8 | RoPE on q_pe: **cos/sin reloaded**, 2 barriers | 512 B | 1 |
-| 9 | cache stream: batches of 8 positions, **not double buffered**; 16 loads per lane in flight; `vr` (k_pe) issued by all 64 lanes but only lanes 0-7 use it; wave 0 does 3 serial batches | useful 74,880 B, distinct 82,944 B, lane-load 147,456 B | 3 serial |
-| 10 | scores: 73,728 lane-MACs (37,440 useful: 448 of 1024 wasted on k_pe); 48 bpermutes per batch; online softmax 2 expf per position | | |
+| 9 | cache stream: batches of 8 positions, **not double buffered**<br> 16 loads per lane in flight<br> `vr` (k_pe) issued by all 64 lanes but only lanes 0-7 use it<br> wave 0 does 3 serial batches | useful 74,880 B, distinct 82,944 B, lane-load 147,456 B | 3 serial |
+| 10 | scores: 73,728 lane-MACs (37,440 useful: 448 of 1024 wasted on k_pe)<br> 48 bpermutes per batch<br> online softmax 2 expf per position | | |
 | 11 | per-wave (m, l, acc[512]) to LDS, barrier, every thread recomputes the 4 wave exps (1,024 redundant exps per WG), fp32 partial store 2,056 B | | |
 
 20 barriers; before the first cache load **>= 5 dependent global RTs + 1 atomic poll + 18 barriers**.
@@ -108,7 +112,7 @@ fp32 logits stores -> candidate argmax: 346 scalar loads at 148 B stride, 9-barr
 
 | phase | WGs | unique HBM | requested | issued (with over-issue) | shared reads: unique / requested |
 |---|---|---|---|---|---|
-| qkv (fold) | 296 | 14,942,208 | 31,457,280 | 51,838,976 | fold 40,960 / 12,124,160; gamma 4,096 / 1,212,416 |
+| qkv (fold) | 296 | 14,942,208 | 31,457,280 | 51,838,976 | fold 40,960 / 12,124,160<br> gamma 4,096 / 1,212,416 |
 | q_absorb | 32 | 2,097,152 | 2,097,152 | 2,097,152 | |
 | attention | 256 | 1,179,648 (cache) | 18,874,368 | 20,938,752 | ~2.75 MB small activations |
 | merge_uv | 256 | 2,097,152 | 2,097,152 | 4,194,304 | partials 526,336 / 8,421,376 |
