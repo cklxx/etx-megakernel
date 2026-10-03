@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "arch": "gfx942",
+  "rounds": 3,
+  "seed": 20261003,
+  "cases": [
+    {"name": "splitk-small", "workload": "splitk", "size": 16, "duration_cv": 0.1},
+    {"name": "splitk-imbalanced", "workload": "splitk", "size": 64, "duration_cv": 1.0},
+    {"name": "moe-small", "workload": "moe", "size": 4, "duration_cv": 0.1},
+    {"name": "moe-imbalanced", "workload": "moe", "size": 8, "duration_cv": 0.6}
+  ]
+}
