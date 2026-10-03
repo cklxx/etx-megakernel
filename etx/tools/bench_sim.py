@@ -135,6 +135,9 @@ def check_sample(spec, result):
             tasks[segment["task"]] = segment
         elif segment["kind"] not in ("wait", "sched"):
             errors.append("unknown segment kind")
+    if finite(span) and not math.isclose(span, max(worker_ends.values(), default=0),
+                                       rel_tol=1e-9, abs_tol=1e-8):
+        errors.append("makespan disagrees with final trace completion")
     for task, deps in spec["dependencies"].items():
         consumer = tasks.get(int(task))
         if consumer is None:
@@ -156,10 +159,12 @@ def check_sample(spec, result):
 def provenance():
     def git(*args):
         return subprocess.check_output(["git", "-C", str(ROOT), *args], text=True).strip()
-    # Bind tracked AND new Python/YAML/config sources, including dirty content.
+    # Bind all tracked and unignored new files, including scripts, HIP, headers,
+    # formal inputs and symlink targets. A dirty flag alone cannot identify edits.
     paths = sorted(set(git("ls-files", "--cached", "--others", "--exclude-standard").splitlines()))
-    hashes = {p: digest((ROOT / p).read_bytes()) for p in paths
-              if (ROOT / p).is_file() and Path(p).suffix in (".py", ".yaml", ".json", ".toml")}
+    hashes = {p: digest(os.readlink(ROOT / p).encode() if (ROOT / p).is_symlink()
+                        else (ROOT / p).read_bytes()) for p in paths
+              if (ROOT / p).is_file() or (ROOT / p).is_symlink()}
     return {"commit": git("rev-parse", "HEAD"), "dirty": bool(git("status", "--porcelain")),
             "source_sha256": hashes, "python": platform.python_version(), "host": platform.platform(),
             "created_utc": datetime.now(timezone.utc).isoformat()}
