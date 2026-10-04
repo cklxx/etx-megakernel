@@ -175,9 +175,12 @@ static int* alloc(size_t bytes, bool uncached) {
   return p;
 }
 
+#include "fresh_handoff.h"
+
 int main(int argc, char** argv) {
   setvbuf(stdout, nullptr, _IOLBF, 0);
   const std::string what = argc > 1 ? argv[1] : "all";
+  if (what == "fresh") return fresh::run(argc, argv);
   hipDeviceProp_t prop; CHECK(hipGetDeviceProperties(&prop, 0));
   const int ncu = prop.multiProcessorCount;
   printf("device %s, %d CUs, clock tick 100 MHz for wall_clock64\n", prop.gcnArchName, ncu);
