@@ -63,7 +63,7 @@ def cost_fn(model: str, p: km.Params, variant: dict | None = None, plan: dict | 
             chain = t["scalar"] + t["chain"] + t["sync"] + t["issue"]
             if k.bytes_block:
                 exposed = k.gap + k.sw_per_trip * (p.hw["t_swbar"] - p.hw["t_bar"])
-                c = Cost(front_us=t["etx_args"], chain_us=chain, stream_bytes=k.bytes_block, inflight=k.inflight, exposed_us=exposed)
+                c = Cost(front_us=t["etx_args"], chain_us=chain, stream_bytes=k.bytes_block, mall_bytes=k.mall_block, inflight=k.inflight, exposed_us=exposed)
             else:
                 c = Cost(front_us=t["etx_args"], chain_us=chain)
         else:                                              # prologue, argmax, lm_head, final norm: fixed guesses

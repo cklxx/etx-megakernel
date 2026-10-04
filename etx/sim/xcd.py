@@ -18,12 +18,19 @@ Streams follow Little's law: all of them see one loaded latency L = max(idle rou
 bandwidth), and each pulls its bytes in flight / (L + the work of a trip that is not overlapped with memory). So a GPU
 full of streams is bandwidth-bound, a few streams are latency-bound, and an XCD that streams alone runs faster. Workers run their static queue in order, one task at a time (the generated kernel's loop).
 
+Streams are split by where their bytes come from. Weights (6.1 GB per token) never fit in any cache and stream from
+HBM; the KV cache (104 MB) fits in the 256 MB Infinity Cache (MALL) and streams from there at MALL rate
+(docs/BUDGET-2026-10-01.md: attn 2.16 MB/layer in 6.28 us = 344 GB/s per task, MALL-resident). Cost.mall_bytes marks
+the MALL part of a task's stream_bytes; HBM and MALL are separate bandwidth pools that share nothing, so an XCD
+streaming KV does not take HBM bandwidth from an XCD streaming weights. Before this split the model charged every
+byte against HBM, which over-predicted contention whenever attention overlapped GEMMs.
+
 The output has the layout of ETX_TRACE_RAW (type, coord x4, taken, ready, done, worker; 10 ns ticks), so the same tools
 read a simulated and a measured schedule: etx.tools.timeline (per-XCD occupancy, critical path, HTML) and
 examples/vllm_llm/compare.py ledger.
 
   from etx.sim.xcd import Cost, Hw, simulate
-  rows = simulate(plan_json, cost_of_type, Hw(...))
+  rows = simulate(plan_json, cost_of_type, Hw.mi300x())
 """
 from __future__ import annotations
 
@@ -44,18 +51,25 @@ class Cost:
                                  # with the stream, and it is what makes a phase, not a task, the unit of cost
     etx_us: float = 0.0          # ETX's own per-task cost on top of the floor: acquire, argument path, release, wave
                                  # start. Fitted to the measured builds, not to an instruction count
-    stream_bytes: float = 0.0    # bytes this task streams from HBM (weights, KV)
+    stream_bytes: float = 0.0    # bytes this task streams (weights from HBM, KV from MALL; see mall_bytes)
+    mall_bytes: float = 0.0      # of stream_bytes, this many are served from the Infinity Cache (MALL) and never
+                                 # touch HBM: the KV cache (104 MB) fits in MALL (256 MB) and streams at MALL rate,
+                                 # so it contends with other MALL streams only (docs/BUDGET-2026-10-01.md: attn
+                                 # 2.16 MB/layer in 6.28 us = 344 GB/s per task, MALL-resident). Clamped to
+                                 # stream_bytes by simulate; 0.0 keeps the old all-HBM behaviour.
     cu_rate: float = 30e3        # bytes/us one CU of this task can pull alone, when inflight is 0 (a fixed cap); the
                                  # new model takes it from etx.sim.phase.cu_rate(row mapping)
     agg_bw: float = 0.0          # bytes/us the whole device sustains for streams of this shape (0: hw.bw_max). It is
                                  # not one number: a workgroup reading 28 KB keeps a shallower queue than one reading
-                                 # 1 MB and the device only reaches 3.5 TB/s at the deep end (etx.sim.phase.agg_bw)
+                                 # 1 MB and the device only reaches 3.5 TB/s at the deep end (etx.sim.phase.agg_bw).
+                                 # Applies to the HBM pool; the MALL pool uses hw.mall_bw_max.
     end_us: float = 0.0          # stores and the release after the stream
     inflight: float = 0.0        # bytes this task keeps in flight; with it the rate follows Little's law:
     exposed_us: float = 0.0      # rate = inflight / (loaded latency + exposed work per trip)
     touch_bytes: float = 0.0     # the touch hook: this many of stream_bytes are pulled (same inflight, same bandwidth
                                  # sharing) from the moment the worker takes the task, before its events fire; the body's
-                                 # stream of the rest starts when both the touch and front + chain are done
+                                 # stream of the rest starts when both the touch and front + chain are done.
+                                 # Touch prefetches weights (HBM pool); MALL bytes are never touched.
 
     @property
     def fixed_us(self) -> float:
@@ -69,48 +83,81 @@ class Hw:
     n_half: float = 20.0
     handoff_us: dict = field(default_factory=lambda: {"DOMAIN": 1.0, "DEVICE": 1.3})
     release_us: float = 0.0
-    xcd_bw: float | None = None  # optional cap per XCD (bytes/us)
+    xcd_bw: float | None = None  # optional cap per XCD (bytes/us), applied to HBM + MALL together
     domains: int = 8
     wake_us: float = 0.0         # a waiter notices its event up to this late (uniform): polling / wake-up spread
     lat_us: float = 0.2          # idle round trip; loaded latency = max(lat_us, bytes in flight on the GPU / bw_max)
     rate_cv: float = 0.0         # per-task spread of the per-CU stream cap (normal, coefficient of variation)
     seed: int = 0
+    # Infinity Cache (MALL): the on-package cache the KV cache streams from. A separate bandwidth pool from HBM.
+    mall_bw_max: float = 2.0e6   # bytes/us aggregate MALL bandwidth. FIT, not measured: 344 GB/s per attn task
+                                 # (docs/BUDGET-2026-10-01.md) x ~6 concurrent KV-streaming tasks, conservative.
+                                 # Refit with an hw_bench MALL stream sweep (cf. etx.sim.phase.SPAN_US) before
+                                 # trusting contention predictions between many concurrent attention tasks.
+    mall_lat_us: float = 0.15    # MALL idle round trip, below HBM's (on-package, no HBM PHY)
+    mall_n_half: float = 8.0     # MALL saturates with fewer streams than HBM (fewer clients share it)
 
     def total_bw(self, n: int) -> float:
         return self.bw_max * n / (n + self.n_half) if n > 0 else 0.0
 
+    def mall_total_bw(self, n: int) -> float:
+        return self.mall_bw_max * n / (n + self.mall_n_half) if n > 0 else 0.0
 
-def _rates(active: dict[int, list], hw: Hw) -> dict[int, float]:
-    """Streams with `inflight` follow Little's law: every one of them sees the same loaded latency
-    L = max(idle round trip, total bytes in flight / bw_max) and pulls inflight / (L + its exposed work per trip);
-    streams given only a fixed cap are water-filled into what is left of the bandwidth."""
+    @classmethod
+    def mi300x(cls, **overrides) -> "Hw":
+        """MI300X preset. Every number names its source; refit when the workload changes (sim_fit.py)."""
+        return cls(
+            bw_max=4.3e6,          # fitted to the measured stream rates
+            n_half=20.0,
+            handoff_us={"DOMAIN": 1.0, "DEVICE": 1.3},   # hw_bench handoff, padded counters
+            lat_us=0.2,            # idle HBM round trip
+            mall_bw_max=2.0e6,     # FIT, see field doc
+            mall_lat_us=0.15,
+            mall_n_half=8.0,
+            **overrides,
+        )
+
+
+def _rates(active: dict, hw: Hw, pool_of: dict) -> dict:
+    """Per-pool fluid model. 'hbm' and 'mall' streams share nothing with each other; inside one pool the rule is
+    unchanged: streams with `inflight` follow Little's law (every one of them sees the pool's loaded latency
+    L = max(idle round trip, total bytes in flight / pool bw_max) and pulls inflight / (L + its exposed work per
+    trip)); streams given only a fixed cap are water-filled into what is left of the pool's bandwidth."""
     if not active:
         return {}
     rate = {}
-    little = {k: v for k, v in active.items() if v[3] > 0}
-    if little:
-        L = max(hw.lat_us, sum(v[3] for v in little.values()) / hw.bw_max)
-        for k, v in little.items():
-            rate[k] = v[3] / (L + v[4])
-    fixed = {k: v for k, v in active.items() if v[3] <= 0}
-    if fixed:
-        # the device's own limit for the shapes streaming right now: the smallest transfer sets it, since it is the
-        # one whose queue is shallowest (etx.sim.phase.agg_bw)
-        caps = [v[5] for v in active.values() if len(v) > 5 and v[5] > 0]
-        total = min(caps) if caps else hw.total_bw(len(active))
-        left = max(0.0, total - sum(rate.values()))
-        todo = {k: v[1] for k, v in fixed.items()}
-        while todo:
-            share = left / len(todo)
-            low = {k: c for k, c in todo.items() if c <= share}
-            if not low:
-                for k in todo:
-                    rate[k] = share
-                break
-            for k, c in low.items():
-                rate[k] = c
-                left -= c
-                del todo[k]
+    pools: dict[str, dict] = {}
+    for k, v in active.items():
+        pools.setdefault(pool_of.get(k, "hbm"), {})[k] = v
+    for pool, sub in pools.items():
+        if pool == "mall":
+            bw_max, lat, n_half = hw.mall_bw_max, hw.mall_lat_us, hw.mall_n_half
+        else:
+            bw_max, lat, n_half = hw.bw_max, hw.lat_us, hw.n_half
+        little = {k: v for k, v in sub.items() if v[3] > 0}
+        if little:
+            L = max(lat, sum(v[3] for v in little.values()) / bw_max)
+            for k, v in little.items():
+                rate[k] = v[3] / (L + v[4])
+        fixed = {k: v for k, v in sub.items() if v[3] <= 0}
+        if fixed:
+            # the device's own limit for the shapes streaming right now: the smallest transfer sets it, since it is
+            # the one whose queue is shallowest (etx.sim.phase.agg_bw). HBM pool only; MALL uses mall_bw_max.
+            caps = [v[5] for v in sub.values() if len(v) > 5 and v[5] > 0]
+            total = min(caps) if caps else bw_max * len(sub) / (len(sub) + n_half)
+            left = max(0.0, total - sum(rate[k] for k in little))
+            todo = {k: v[1] for k, v in fixed.items()}
+            while todo:
+                share = left / len(todo)
+                low = {k: c for k, c in todo.items() if c <= share}
+                if not low:
+                    for k in todo:
+                        rate[k] = share
+                    break
+                for k, c in low.items():
+                    rate[k] = c
+                    left -= c
+                    del todo[k]
     if hw.xcd_bw:
         by = {}
         for k, v in active.items():
@@ -173,6 +220,7 @@ def simulate(plan: dict, cost_of: Callable[[str, dict], Cost], hw: Hw, max_tasks
 
     touch_done = {}                                           # task -> time its touch stream finished (None while in flight)
     stream_pending = set()                                    # tasks whose body stream waits for their touch
+    parts_left: dict[int, int] = {}                           # task -> stream parts (HBM and/or MALL) not yet done
 
     def try_start(w, now):
         if pos[w] >= len(queues[w]):
@@ -186,6 +234,7 @@ def simulate(plan: dict, cost_of: Callable[[str, dict], Cost], hw: Hw, max_tasks
         if c.touch_bytes > 0 and t not in touch_done:         # the touch hook streams from the moment the worker is free
             touch_done[t] = None
             active[("touch", t)] = [min(c.touch_bytes, c.stream_bytes), c.cu_rate, descs[t]["domain"], c.inflight, c.exposed_us, c.agg_bw]
+            pool_of[("touch", t)] = "hbm"                     # touch prefetches weights, never KV
         r = ready_time(t)
         if r is None:
             return                                            # woken when its last event fires
@@ -193,16 +242,34 @@ def simulate(plan: dict, cost_of: Callable[[str, dict], Cost], hw: Hw, max_tasks
         ready[t] = max(r, worker_free[w])
         push(ready[t] + c.fixed_us, "stream", t)
 
+    def part_done(t) -> bool:
+        """One stream part of task t finished; True when the task's whole stream is done."""
+        parts_left[t] -= 1
+        return parts_left[t] <= 0
+
     def start_stream(t, now):
         c = cost[t]
-        left = c.stream_bytes - (min(c.touch_bytes, c.stream_bytes) if t in touch_done else 0.0)
-        if left > 0:
+        mall = max(0.0, min(c.mall_bytes, c.stream_bytes))
+        touched = min(c.touch_bytes, c.stream_bytes) if t in touch_done else 0.0
+        hbm_left = max(0.0, c.stream_bytes - mall - touched)
+        dom = descs[t]["domain"]
+        parts = 0
+        if hbm_left > 0:
             f = max(0.3, rng.gauss(1.0, hw.rate_cv)) if hw.rate_cv else 1.0
-            active[t] = [left, c.cu_rate * f, descs[t]["domain"], c.inflight * f, c.exposed_us, c.agg_bw]
-        else:
+            active[t] = [hbm_left, c.cu_rate * f, dom, c.inflight * f, c.exposed_us, c.agg_bw]
+            pool_of[t] = "hbm"
+            parts += 1
+        if mall > 0:
+            f = max(0.3, rng.gauss(1.0, hw.rate_cv)) if hw.rate_cv else 1.0
+            active[("mall", t)] = [mall, c.cu_rate * f, dom, c.inflight * f, c.exposed_us, c.agg_bw]
+            pool_of[("mall", t)] = "mall"
+            parts += 1
+        parts_left[t] = parts
+        if parts == 0:
             push(now + c.end_us, "done", t)
 
-    active = {}                                               # task -> [bytes left, cap, domain, inflight, exposed, agg_bw]
+    active = {}                                               # stream key -> [bytes left, cap, domain, inflight, exposed, agg_bw]
+    pool_of: dict = {}                                        # stream key -> "hbm" | "mall"
     last = 0.0
     rates = {}
     for w in queues:
@@ -231,13 +298,17 @@ def simulate(plan: dict, cost_of: Callable[[str, dict], Cost], hw: Hw, max_tasks
                 start_stream(t, now)
         elif kind == "stream_done":
             del active[t]
-            if isinstance(t, tuple):                          # ("touch", task)
-                t = t[1]
-                touch_done[t] = now
-                if t in stream_pending:
-                    stream_pending.discard(t)
-                    start_stream(t, now)
-            else:
+            del pool_of[t]
+            if isinstance(t, tuple):                          # ("touch", task) or ("mall", task)
+                tag, t = t
+                if tag == "touch":
+                    touch_done[t] = now
+                    if t in stream_pending:
+                        stream_pending.discard(t)
+                        start_stream(t, now)
+                    continue
+                # tag == "mall": fall through to the join below with t = the task
+            if part_done(t):
                 push(now + cost[t].end_us, "done", t)
         elif kind == "done":
             done[t] = now
@@ -256,7 +327,7 @@ def simulate(plan: dict, cost_of: Callable[[str, dict], Cost], hw: Hw, max_tasks
                 w2 = owner.get(c2)
                 if w2 is not None and queues[w2][pos[w2]:pos[w2] + 1] == [c2]:
                     try_start(w2, now)
-        rates = _rates(active, hw)
+        rates = _rates(active, hw, pool_of)
     rows = []                                                  # one row per plan task, as ETX_TRACE_RAW writes them
     for t in range(len(descs)):
         d = descs[t]
