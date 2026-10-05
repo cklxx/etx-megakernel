@@ -65,9 +65,18 @@ necessary to establish that the recorded IDs describe actual launch calls.
 
 There are 18 size/topology/load combinations. Each has three adjacent cached/bypass
 pairs with alternating order, plus two negative controls: 144 processes, each with
-two launches. Each positive launch checks at least 10 million words **per reader**:
-625000, 4883, or 611 handoffs for the three sizes. Every negative launch executes
-at least **one million handoffs**, independently of payload size.
+two launches. **Every** variant requires at least **one million handoffs**, so the
+checked-word floor follows from the payload: 16, 2048 or 16384 words per handoff, and
+at least 10 million words per reader (16 million at 64 B, which is the smallest case).
+
+That count costs address space. A positive slot is unique within its launch, so the
+payload allocation is rounds x line-rounded size: 0.12 GiB at 64 B, 7.63 GiB at 8 KB,
+**61 GiB at 64 KB** for the positive cases; the negative controls keep their one reused
+slot. Across the matrix, positive payload traffic is 7.1 TB written and 21.2 TB read
+(the fanout cases read seven times), 28.3 TB in total, plus about 35 GB of raw CSV.
+At the 4.3 TB/s ceiling that is at least 1.8 h of streaming before any handoff latency,
+so the session budget below must be re-planned: the 2-hour cap was sized for 611
+handoffs at 64 KB, not for one million.
 
 Negative controls intentionally reuse one slot to stay within memory limits:
 
@@ -135,10 +144,13 @@ Output must be new. The runner preserves full per-case logs, a frozen matrix,
 binary/source hashes, Git revision and worktree state, exit statuses, evidence
 checksums, placements and raw samples. Analysis independently recomputes counts,
 checksums, placement, epoch pairing and timings. Missing runs fail closed. The
-budget is a **cap**, not a claim that 144 processes will fit; large negative cases
-may require a separately planned session. Allow several GB for raw CSVs. Device
-waits have a 5-second progress timeout, a 180-second launch watchdog and 10-second
-host heartbeats; the outer process deadline also covers host CSV output.
+budget is a **cap**, not a claim that 144 processes will fit: at one million handoffs
+per variant a 64 KB positive case allocates 61 GiB and moves 65 GB per epoch, so plan
+about 8 h of GPU time and 10 h of wall time, and keep the per-case cap above the
+slowest expected case. Earlier 7200 s / 420 s values were sized for the word-based
+counts (611 handoffs at 64 KB) and will truncate the matrix. Allow several GB for raw
+CSVs. Device waits have a 5-second progress timeout, a 180-second launch watchdog and
+10-second host heartbeats; the outer process deadline also covers host CSV output.
 
 No GPU has been provisioned. The runner captures uname, hipconfig and rocm-smi
 identity/driver/clock/power/utilization/PID output (including missing-tool failures).
