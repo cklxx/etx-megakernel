@@ -91,6 +91,7 @@ def test_import_does_not_inherit_final_device_libraries(monkeypatch, tmp_path):
 @pytest.mark.parametrize('override', [
     {'grid': (128, 2, 1)}, {'grid': (128, 1, 2)},
     {'cu_count': 256.0}, {'ytile': True}, {'ytile': 2.0}, {'wave_groups': 1.5},
+    {'rows': 1}, {'rows': 2 ** 31}, {'grid': (2 ** 31, 1, 1), 'cu_count': 2 ** 31},
 ])
 def test_wvsplitk_rejects_unsupported_grid_and_noninteger_abi(override):
     args = dict(grid=(256, 1, 1), cu_count=256, rows=8192, ytile=2, wave_groups=16)

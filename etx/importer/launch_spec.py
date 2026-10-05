@@ -13,6 +13,7 @@ from pathlib import Path
 
 REGISTRY = Path(__file__).with_name("specs") / "moe-decode-v1.json"
 CAPTURE_ROOT = Path(__file__).resolve().parents[2] / "examples/vllm_llm/triton"
+INT32_MAX = 2**31 - 1    # wvSplitK's M, grid and CuCount are `const int` in the kernel ABI
 
 
 @dataclass(frozen=True)
@@ -99,6 +100,11 @@ def validate_wvsplitk(*, grid, cu_count, rows, ytile, wave_groups):
         raise ValueError("wvSplitK: unsupported rows/ytile/wave-group configuration")
     if type(cu_count) is not int or cu_count != grid[0]:
         raise ValueError("wvSplitK: CuCount must equal launched blocks, otherwise output rows may be unwritten")
+    if rows > INT32_MAX or grid[0] > INT32_MAX:
+        raise ValueError("wvSplitK: rows and grid must fit the kernel's signed 32-bit ABI")
+    if rows < ytile:
+        raise ValueError("wvSplitK: rows below one tile underflow the kernel's fragmentation shift "
+                         "(M - YTILE) and write outside the output")
 
 
 def model_specs(config):

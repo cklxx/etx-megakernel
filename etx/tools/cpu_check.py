@@ -62,8 +62,14 @@ def verify_archive(directory, expected_index=ARCHIVE_INDEX_SHA256):
         verified[str(path)] = expected
     if not members:
         raise ValueError("empty archive inventory")
-    # An unlisted file could still be loaded by a regression test.
-    present = {p.resolve() for p in directory.rglob("*") if p.is_file() and p != index}
+    # An unlisted file could still be loaded by a regression test. Resolving the enumeration to its
+    # targets hides an unlisted symlink alias, and rglob does not descend into directory symlinks at
+    # all, so no symlink is allowed in the archive instead.
+    entries = list(directory.rglob("*"))
+    links = [p for p in entries if p.is_symlink()]
+    if links:
+        raise ValueError(f"archive contains a symlink: {links[0]}")
+    present = {p.resolve() for p in entries if p.is_file() and p != index}
     if present != members:
         raise ValueError("archive contains unlisted files")
     return verified

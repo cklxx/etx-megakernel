@@ -102,6 +102,26 @@ def test_archive_members_must_match_pinned_inventory(tmp_path):
         verify_archive(tmp_path, pin)
 
 
+def test_archive_rejects_symlink_alias(tmp_path):
+    import hashlib
+    import pytest
+    from etx.tools.cpu_check import verify_archive
+    member = tmp_path / 'plan.json'
+    member.write_text('{"tasks": 1}\n')
+    index = tmp_path / 'SHA256SUMS'
+    index.write_text(hashlib.sha256(member.read_bytes()).hexdigest() + '  ./plan.json\n')
+    pin = hashlib.sha256(index.read_bytes()).hexdigest()
+    assert str(member) in verify_archive(tmp_path, pin)
+    alias = tmp_path / 'alias.json'
+    alias.symlink_to(member)    # resolves onto a listed member, so a resolved-only inventory misses it
+    with pytest.raises(ValueError, match='symlink'):
+        verify_archive(tmp_path, pin)
+    alias.unlink()
+    (tmp_path / 'outside').symlink_to(tmp_path.parent)
+    with pytest.raises(ValueError, match='symlink'):
+        verify_archive(tmp_path, pin)
+
+
 def test_dependency_failure_preserves_failed_manifest(tmp_path, monkeypatch):
     from etx.tools import cpu_check
     def fail():
@@ -132,13 +152,14 @@ os.execv(sys.executable, [sys.executable] + sys.argv[1:])
         record = tmp_path / f'{variant}-env.json'
         env = {**os.environ, 'LOCAL_MATRIX': f'qwen3-8b:{variant}', 'ETX_PYTHON': str(shim),
                'REVIEW_ENV_RECORD': str(record), 'ETX_VL_CHAIN': '1', 'ETX_VL_REQUESTS': '4',
-               'ETX_LLM_CONFIG': 'wrong-model.json', 'DSL_ABLATE_REVIEW': '1'}
+               'ETX_LLM_CONFIG': 'wrong-model.json', 'DSL_ABLATE_REVIEW': '1', 'ETX_DEV_RESET': '1'}
         result = subprocess.run(['bash', str(root / 'examples/vllm_llm/local_matrix.sh'), str(out)],
                                 env=env, capture_output=True, text=True)
         assert result.returncode != 0  # Deliberately stop before any compiler.
         got = json.loads(record.read_text())
         assert got.get('ETX_VL_CHAIN') == ('1' if variant == 'chain' else None)
         assert 'ETX_VL_REQUESTS' not in got and 'DSL_ABLATE_REVIEW' not in got
+        assert 'ETX_DEV_RESET' not in got  # no ETX_VL_ prefix, but read at plan time by model.py
         assert got['ETX_LLM_CONFIG'].endswith('qwen3-8b.json')
         config = json.loads((out / f'qwen3-8b_{variant}/configuration.json').read_text())
         assert config['variant'] == variant
