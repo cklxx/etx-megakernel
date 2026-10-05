@@ -72,11 +72,12 @@ at least 10 million words per reader (16 million at 64 B, which is the smallest 
 That count costs address space. A positive slot is unique within its launch, so the
 payload allocation is rounds x line-rounded size: 0.12 GiB at 64 B, 7.63 GiB at 8 KB,
 **61 GiB at 64 KB** for the positive cases; the negative controls keep their one reused
-slot. Across the matrix, positive payload traffic is 7.1 TB written and 21.2 TB read
-(the fanout cases read seven times), 28.3 TB in total, plus about 35 GB of raw CSV.
-At the 4.3 TB/s ceiling that is at least 1.8 h of streaming before any handoff latency,
-so the session budget below must be re-planned: the 2-hour cap was sized for 611
-handoffs at 64 KB, not for one million.
+slot. Payload traffic across the 144 cases is 7.1 TB written and 21.2 TB read, 28.3 TB
+in the timed pass; the positive cases alone are 21.25 TB, and the controls' priming pass
+brings the whole matrix to 35.42 TB, plus about 35 GB of raw CSV. That traffic is not the
+constraint: 28.3 TB at the 4.3 TB/s ceiling is 6.6 s. The wall time comes from the
+per-handoff round trips, predicted below at 6598 s, so the session budget must be
+re-planned: the 2-hour cap was sized for 611 handoffs at 64 KB, not for one million.
 
 Negative controls intentionally reuse one slot to stay within memory limits:
 
@@ -93,6 +94,30 @@ positive case, incorrectly placed, undersized, or has an inconclusive control.
 A stale result stops promotion of the protocol; do not relax the test to pass it.
 A completed failed case remains in the report. Driver failures/timeouts stop the
 runner rather than scheduling more kernels on a potentially unhealthy device.
+
+## CPU cost model (pre-GPU estimate)
+
+`etx/tools/fresh_sim.py` prices the same frozen matrix on the CPU from this repository's
+measured constants. Every constant carries its `file:line` and a measured / derived /
+assumed status, and the tool fails closed if the cited line disappears; `docs/MODEL-vllm-kernels.md`
+section 10 supplies the L1 / L2 / MALL round trips, the `buffer_inv sc1` cost and the
+loaded multiples. It is a conditional p50 scenario, not a measurement, and it cannot
+decide staleness.
+
+- Predicted per-handoff full flow (write, flush, flag, poll, read, check, ACK): 2.07 us
+  at 64 B up to 65.23 us at 64 KB x fanout x busy.
+- Reader first load: 0.143 us (L2, idle, same XCD) to 0.710-0.730 us under synthetic
+  load, so the 0.1-0.2 us target is predicted only in the idle local cases.
+- Matrix wall: 6598 s against the 28 800 s budget, conditional on the omitted overhead
+  being small; the bandwidth floor of the timed pass is 6.6 s.
+- Cached against bypass, same allocation and protocol: idle 65 536-fanout is 11.99 us
+  cached against 40.89 us bypass, but under synthetic load the two converge (65.23
+  against 63.95 us) because queueing, not the cache level, sets the loaded latency.
+
+The model's unknown list is the GPU run's job list: real fresh / bypass single-dword
+latency, bandwidth sharing, store and flag latency, loaded writeback, fanout contention,
+per-word check cost, barriers and timers, setup and host I/O, the tail percentile, and
+the stale rate itself.
 
 ## Timing and decision
 
@@ -122,7 +147,8 @@ CPU only:
 
 ```sh
 python -m etx.tools.fresh_handoff plan > build/fresh-plan.json
-python -m pytest -q tests/test_fresh_handoff.py
+python -m etx.tools.fresh_sim --json build/fresh-sim.json
+python -m pytest -q tests/test_fresh_handoff.py tests/test_fresh_sim.py
 hipcc -O3 -std=c++17 --offload-arch=gfx942 bench/sync/sync_bench.hip -o build/fresh-sync-bench
 hipcc -O3 -std=c++17 --offload-arch=gfx942 --cuda-device-only -S bench/sync/sync_bench.hip -o build/fresh-sync-bench.s
 ```
