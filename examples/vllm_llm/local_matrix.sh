@@ -3,6 +3,14 @@
 # local LLVM and the ROCm device libraries; prints tasks/events, VGPRs, spills, LDS, the UC plan check. No GPU needed.
 #   bash examples/vllm_llm/local_matrix.sh [outdir]
 set -uo pipefail
+# A matrix label describes a fixed variant, not the caller's last experiment.
+# Preserve toolchain locations, but discard model and DSL experiment overrides.
+# ETX_DEV_RESET carries no ETX_VL_/ETX_LLM_ prefix yet is read at plan time (model.py DEV_RESET) and
+# changes the emitted kernel, so it is cleared by name; a variant may still set it back via E.
+unset ETX_DEV_RESET
+for variable in ${!ETX_VL_@} ${!ETX_LLM_@} ${!ETX_DSL_@} ${!DSL_ABLATE_@}; do
+  unset "$variable"
+done
 cd "$(dirname "$0")/../.."
 S=${1:-/tmp/etx_matrix}; mkdir -p $S
 R=${ETX_ROCM_HEADERS:-${ROCM_HEADERS:-$HOME/code/rocm-headers}}
@@ -28,6 +36,16 @@ one() {
              uc) E="ETX_VL_UC=1 ETX_VL_PIN=1 ETX_VL_XCD=1 ETX_VL_CHAIN=1"; UC=1;;
              uc_s1) E="ETX_VL_UC=1 ETX_VL_PIN=1 ETX_VL_XCD=1 ETX_VL_CHAIN=1"; SL=$SLOTS1; UC=1;;
              *) echo "unsupported variant: $v" >&2; return 2;; esac
+  env $E ETX_VL_IMPORTED=1 "$PY" -c '
+import json, os, sys
+with open(sys.argv[1], "w") as stream:
+    json.dump({"model": sys.argv[2], "variant": sys.argv[3],
+               "model_config": sys.argv[4], "overrides": {k: v for k, v in os.environ.items()
+                if k.startswith(("ETX_VL_", "ETX_LLM_", "ETX_DSL_", "DSL_ABLATE_"))
+                or k == "ETX_DEV_RESET"}},
+              stream, indent=2, sort_keys=True)
+    stream.write("\n")
+' "$O/configuration.json" "$n" "$v" "$cfg" || return $?
   { $PY -m etx.importer.vllm_kernels --vllm "$VLLM" --out $O/imp --only $EXP $BLK --slots "${SL:+$SL,}$MS" \
     && $PY -m etx.importer.adapter $O/imp/imports.json --tiles $O/imp_tiles.hip --header $O/imports.h \
     && $PY -m etx.importer.bundle --imports $O/imp --exports $EXP --devlibs $DL -o $O/imports.bc \

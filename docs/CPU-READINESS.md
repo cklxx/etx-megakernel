@@ -210,3 +210,23 @@ The following hashes identify the retained evidence; they are not GPU measuremen
 | `formal.log` | `0280d3456bc3ba34499f65e876660cd5bfb37c83cd7479031ca1201c63d47cbb` |
 | `device-compile.log` | `79f015b7f5d7130ab223aa4364b86e6bd19036724f2ca0f30bacda485b74892f` |
 | `local-matrix.log` | `218bb845d3270dadac5acb5c7a5e8bed363b4a8e7ce34fe7baa11aabe750199c` |
+
+## Input integrity gates
+
+The production build matrix clears inherited `ETX_VL_*`, `ETX_LLM_*`,
+`ETX_DSL_*`, and `DSL_ABLATE_*` experiment settings before defining each variant.
+Toolchain paths remain configurable. Each build saves `configuration.json` with
+its model, variant, model config path and explicit overrides; generated plans
+and manifests retain derived settings.
+
+wvSplitK supports only a one-dimensional launch grid. Its kernel uses
+`blockIdx.x`, so equality between CuCount and the product of arbitrary grid
+axes is insufficient to establish output coverage. Grid dimensions, CuCount,
+row count, tile size and wave count must use supported integer values.
+
+If the September 30 archive is present, acceptance verifies the pinned
+`SHA256SUMS` digest and every listed file before starting tests. Missing, changed,
+unsafe, duplicate or unlisted members reject the run. A dependency failure saves
+`status=failed` and its reason in the acceptance manifest instead of producing a
+successful report from unverified inputs. An absent archive still follows the
+explicit external-skip policy; strict acceptance does not permit those skips.

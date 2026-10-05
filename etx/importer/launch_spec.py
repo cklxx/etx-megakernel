@@ -13,6 +13,7 @@ from pathlib import Path
 
 REGISTRY = Path(__file__).with_name("specs") / "moe-decode-v1.json"
 CAPTURE_ROOT = Path(__file__).resolve().parents[2] / "examples/vllm_llm/triton"
+INT32_MAX = 2**31 - 1    # wvSplitK's M, grid and CuCount are `const int` in the kernel ABI
 
 
 @dataclass(frozen=True)
@@ -92,10 +93,18 @@ def validate_wvsplitk(*, grid, cu_count, rows, ytile, wave_groups):
     """Reject the historical lm_head row-stride hole before launching a kernel."""
     if len(grid) != 3 or any(type(x) is not int or x <= 0 for x in grid):
         raise ValueError("wvSplitK: grid must contain three positive integers")
-    if type(rows) is not int or rows <= 0 or ytile not in (1, 2) or not 1 <= wave_groups <= 16:
+    if tuple(grid[1:]) != (1, 1):
+        raise ValueError("wvSplitK: only a one-dimensional grid is supported (kernel uses blockIdx.x)")
+    if (type(rows) is not int or rows <= 0 or type(ytile) is not int or ytile not in (1, 2)
+            or type(wave_groups) is not int or not 1 <= wave_groups <= 16):
         raise ValueError("wvSplitK: unsupported rows/ytile/wave-group configuration")
-    if cu_count != grid[0] * grid[1] * grid[2]:
+    if type(cu_count) is not int or cu_count != grid[0]:
         raise ValueError("wvSplitK: CuCount must equal launched blocks, otherwise output rows may be unwritten")
+    if rows > INT32_MAX or grid[0] > INT32_MAX:
+        raise ValueError("wvSplitK: rows and grid must fit the kernel's signed 32-bit ABI")
+    if rows < ytile:
+        raise ValueError("wvSplitK: rows below one tile underflow the kernel's fragmentation shift "
+                         "(M - YTILE) and write outside the output")
 
 
 def model_specs(config):

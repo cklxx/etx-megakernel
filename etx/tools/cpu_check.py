@@ -6,6 +6,7 @@ import hashlib
 import importlib.metadata
 import json
 import os
+import re
 from pathlib import Path
 import subprocess
 import sys
@@ -36,6 +37,44 @@ def file_hash(path):
     return h.hexdigest()
 
 
+ARCHIVE_INDEX_SHA256 = "d4031ea630a8df134c57c43f269a2f090ef0396f6167dec82b4d0585ee2b5f71"
+
+
+def verify_archive(directory, expected_index=ARCHIVE_INDEX_SHA256):
+    """Verify the pinned inventory and every member before using calibration data."""
+    index = directory / "SHA256SUMS"
+    if file_hash(index) != expected_index:
+        raise ValueError(f"archive inventory checksum mismatch: {index}")
+    verified = {str(index): expected_index}
+    members = set()
+    root = directory.resolve()
+    for line in index.read_text().splitlines():
+        match = re.fullmatch(r"([0-9a-f]{64}) [ *](.+)", line)
+        if not match:
+            raise ValueError(f"invalid archive checksum entry: {line!r}")
+        expected, name = match.groups()
+        path = (directory / name).resolve()
+        if not path.is_relative_to(root) or path in members or path == index.resolve():
+            raise ValueError(f"unsafe or duplicate archive entry: {name}")
+        members.add(path)
+        if not path.is_file() or file_hash(path) != expected:
+            raise ValueError(f"archive member checksum mismatch or missing file: {name}")
+        verified[str(path)] = expected
+    if not members:
+        raise ValueError("empty archive inventory")
+    # An unlisted file could still be loaded by a regression test. Resolving the enumeration to its
+    # targets hides an unlisted symlink alias, and rglob does not descend into directory symlinks at
+    # all, so no symlink is allowed in the archive instead.
+    entries = list(directory.rglob("*"))
+    links = [p for p in entries if p.is_symlink()]
+    if links:
+        raise ValueError(f"archive contains a symlink: {links[0]}")
+    present = {p.resolve() for p in entries if p.is_file() and p != index}
+    if present != members:
+        raise ValueError("archive contains unlisted files")
+    return verified
+
+
 def dependencies():
     result = {"packages": {}, "artifacts": {}, "checkouts": {}}
     for name in ("numpy", "pytest", "pyyaml", "torch", "transformers", "safetensors"):
@@ -47,9 +86,9 @@ def dependencies():
     for path in sorted(model.glob("*")):
         if path.suffix in (".json", ".safetensors", ".txt") and path.is_file():
             result["artifacts"][str(path)] = file_hash(path)
-    archived = ROOT / "results_2026-09-30/SHA256SUMS"
+    archived = ROOT / "results_2026-09-30"
     if archived.exists():
-        result["artifacts"][str(archived)] = file_hash(archived)
+        result["artifacts"].update(verify_archive(archived))
     for key in ("ETX_VLLM",):
         if os.environ.get(key):
             path = Path(os.environ[key]).expanduser()
@@ -122,7 +161,14 @@ def run(out, *, formal=False, require_external=False, rocm_image=None, rocm_root
                 "gpu_executed": False, "cpu_core_passed": False, "all_external_checks_passed": False,
                 "status": "incomplete", "steps": [], "external_pending": [], "artifacts": {}}
     write_json(out / "acceptance.json", manifest)
-    manifest["dependencies"] = dependencies()
+    try:
+        manifest["dependencies"] = dependencies()
+    except (OSError, ValueError) as exc:
+        manifest.update(status="failed", dependency_error=str(exc))
+        write_json(out / "acceptance.json", manifest)
+        (out / "README.md").write_text(f"# CPU acceptance\n\nStatus: **failed**.\n\n{exc}\n")
+        print(f"CPU CHECK FAILED: {exc}", flush=True)
+        return 1
     steps = manifest["steps"]
     # Run these in a child so assertion/import/shape failures retain a log and
     # cannot prevent the remaining independent checks from running.
