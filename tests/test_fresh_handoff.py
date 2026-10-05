@@ -8,7 +8,7 @@ from etx.tools import fresh_handoff as probe
 
 def fixture(root, monkeypatch, mode='cached', topology='cross'):
     monkeypatch.setattr(probe, 'MIN_WORDS', 32)
-    monkeypatch.setattr(probe, 'MIN_NEGATIVE_HANDOFFS', 2)
+    monkeypatch.setattr(probe, 'MIN_HANDOFFS', 2)
     case = dict(bytes=64, handoffs=2, topology=topology, load='idle', mode=mode)
     readers = 7 if topology == 'fanout' else 1
     wrong = 16 if mode in ('forced_old', 'primed_stale') else 0
@@ -38,15 +38,13 @@ def save(root, records):
     (root / 'results.jsonl').write_text(''.join(json.dumps(r)+'\n' for r in records))
 
 
-def test_plan_has_full_matrix_and_distinct_thresholds():
+def test_plan_has_full_matrix_and_one_handoff_threshold():
     plan = probe.matrix()
     assert len(plan['cases']) == 144
     assert len({c['id'] for c in plan['cases']}) == 144
     for c in plan['cases']:
-        if c['mode'] in ('forced_old', 'primed_stale'):
-            assert c['handoffs'] == 1_000_000
-        else:
-            assert c['handoffs'] * c['bytes']//4 >= 10_000_000
+        assert c['handoffs'] == 1_000_000        # every mode, not only the negative controls
+        assert c['handoffs'] * c['bytes']//4 >= 10_000_000
     assert len(plan['model_followup']) == 2
     assert all('blocked' in m['status'] for m in plan['model_followup'])
 
@@ -115,9 +113,9 @@ def test_small_fixture_cannot_pass_production_threshold(tmp_path, monkeypatch):
         probe.validate_case(tmp_path, case)
 
 
-def test_negative_threshold_is_handoffs_not_words(tmp_path, monkeypatch):
+def test_handoff_threshold_covers_every_mode(tmp_path, monkeypatch):
     case, _ = fixture(tmp_path, monkeypatch, 'forced_old')
-    monkeypatch.setattr(probe, 'MIN_NEGATIVE_HANDOFFS', 1_000_000)
+    monkeypatch.setattr(probe, 'MIN_HANDOFFS', 1_000_000)
     with pytest.raises(ValueError, match='insufficient'):
         probe.validate_case(tmp_path, case)
 

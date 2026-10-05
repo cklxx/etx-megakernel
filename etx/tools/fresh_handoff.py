@@ -15,8 +15,8 @@ from pathlib import Path
 import subprocess
 import time
 
-MIN_WORDS = 10_000_000
-MIN_NEGATIVE_HANDOFFS = 1_000_000
+MIN_WORDS = 10_000_000      # pass definition: checked words per reader, in every mode
+MIN_HANDOFFS = 1_000_000    # count requirement: handoffs per variant (case), in every mode
 MODES = ('cached', 'bypass', 'forced_old', 'primed_stale')
 
 
@@ -29,7 +29,7 @@ def matrix(repeats: int = 3) -> dict:
         for repeat in range(repeats + 1):
             modes = (('cached', 'bypass') if repeat % 2 == 0 else ('bypass', 'cached')) if repeat < repeats else MODES[2:]
             for mode in modes:
-                rounds = math.ceil(MIN_WORDS / (size // 4)) if mode in MODES[:2] else MIN_NEGATIVE_HANDOFFS
+                rounds = MIN_HANDOFFS
                 cases.append(dict(id=f'{size}-{topology}-{load}-{mode}-{repeat}', bytes=size,
                                   topology=topology, load=load, mode=mode, repeat=repeat, handoffs=rounds))
     return dict(schema_version=1, evidence='planned, not measured', cases=cases,
@@ -85,7 +85,7 @@ def validate_case(directory: Path, case: dict) -> list[dict]:
         require(r['readers'] == readers, 'wrong reader count')
         words = size // 4
         negative = mode in MODES[2:]
-        require(rounds >= MIN_NEGATIVE_HANDOFFS if negative else rounds * words >= MIN_WORDS,
+        require(rounds >= MIN_HANDOFFS and rounds * words >= MIN_WORDS,
                 'insufficient handoffs or checked words per reader')
         require(r['words_checked'] == rounds * words * readers, 'incorrect checked-word total')
         require(r['complete'] is True and r['placement_valid'] is True, 'incomplete run or invalid placement')

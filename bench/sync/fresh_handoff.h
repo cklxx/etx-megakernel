@@ -177,7 +177,7 @@ static int run(int argc, char** argv) {
   const int mode=mode_s=="cached"?CACHED:mode_s=="bypass"?BYPASS:mode_s=="forced_old"?FORCED_OLD:mode_s=="primed_stale"?PRIMED_STALE:-1;
   if ((bytes!=64 && bytes!=8192 && bytes!=65536) || rounds<1 || rounds>2000000 || topology<0 || mode<0 ||
       (load!="idle" && load!="synthetic_busy")) usage();
-  if ((mode>=FORCED_OLD && rounds<1000000) || (mode<FORCED_OLD && (uint64_t)rounds*(bytes/4)<10000000)) usage();
+  if ((mode>=FORCED_OLD && rounds<1000000) || (mode<FORCED_OLD && ((uint64_t)rounds<1000000 || (uint64_t)rounds*(bytes/4)<10000000))) usage();
   if (mkdir(out.c_str(), 0755) != 0) { perror("fresh output directory (must be new)"); return 2; }
   hipDeviceProp_t prop; CHECK(hipGetDeviceProperties(&prop,0));
   if (std::string(prop.gcnArchName).find("gfx942")!=0 || prop.multiProcessorCount>1024 || !prop.cooperativeLaunch) {
