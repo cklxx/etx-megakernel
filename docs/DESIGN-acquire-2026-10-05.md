@@ -1,6 +1,6 @@
 # Best design: remove the per-task L2 invalidation from imported vLLM kernels (coherent activation loads)
 
-Status: design only. No code and no GPU rental. This document adds one file and changes nothing else.
+Status: design with a local trace check. No GPU rental. Section 9 describes the check.
 Merged 2026-10-05 from two independent agent designs of this repository.
 Labels: [M] measured, [E] estimate on measured numbers, [U] unknown.
 
@@ -199,3 +199,97 @@ independently.  One run reasoned from `docs/MODEL-vllm-kernels.md:481` (6.08 GB,
 other from line 37 (6.19 GB, 1.44 ms floor); both numbers are in that file and section 2 lists both.
 The per-edge prices, the negative control and section 5 come from the longer run; the explicit
 AITER control in section 4 and the one-million-round rule come from the shorter one.
+
+## 9. Raw trace check for section 7 item 1
+
+Use `etx.tools.layer_budget` with the plan from each build. No GPU or VM is required.
+Set `PLAN_A` and `TRACE_A` to the imported build paths.
+Set `PLAN_B` and `TRACE_B` to the reference build paths.
+Then run this command from the repo root:
+
+```sh
+/Users/ckl/code/etx/.venv/bin/python -m etx.tools.layer_budget \
+  "$PLAN_A" "$TRACE_A" --compare "$PLAN_B" "$TRACE_B" \
+  --json /tmp/layer-budget.json > /tmp/layer-budget.txt
+```
+
+The report contains both phase tables, layer gaps, wait totals for each worker, and the exposed critical path by task type.
+The last tables show A minus B for each layer and each worker.
+The JSON file also contains each phase edge.
+The tool rejects differences in task count, task type, or task coordinates between a trace and its plan.
+
+Definitions:
+
+- The phase table has the same columns and precision as `host.h::report_phases`.
+  First-ready is relative to the earliest task-taken timestamp.
+  Last-ready and last-done are relative to that phase's first-ready timestamp.
+  Total span is latest done minus earliest taken.
+- Phase order is type-ID order, as in the host table.
+  Each gap is `next first-ready - (this first-ready + this last-done)`.
+  The source layer owns the edge, including the edge to the next layer or `lm_head`.
+  Negative gaps remain negative because phases can overlap.
+  Names must end with `_<layer>` or `_<layer>_x` for layer assignment.
+- Each worker's wait total is the sum of `ready - taken` for its tasks in that layer.
+  `wait_per_worker` is the sum across workers divided by the number of workers that execute tasks in the trace.
+  Workers with no task in a layer contribute zero.
+  Wait totals measure worker time. Do not add them to exposed device time.
+- `body` in the difference table is the sum of differences in mean body time for shared attention and reduce phases.
+  The default selector is `^(attn|reduce)_`. Use `--shared-body REGEX` for other names.
+  Both traces must contain the same selected phase names in each layer.
+  `excess` is the gap difference plus this body difference.
+  Compare layers 2–45 with the 8.3 us threshold in section 7.
+  This sum is a pre-check metric. It is not a measured acquire cost.
+- The critical path uses the existing timeline analysis and dependency lists from the plan.
+  Its split contains body, dependency gap, and queue gap time for each type.
+  The tool reports when dependency lists are absent. Such a path uses queue order only.
+
+The code in `etx/codegen/kernel.py` places the ready timestamp after acquire and the workgroup barrier.
+Thus, wait includes acquire time and event wait time.
+The done timestamp follows the body, domain release, and barrier. It precedes event publication.
+A raw trace alone does not identify the decode position or prove output correctness.
+Check the run log and the source for each build before a rental decision.
+
+### Round 11 correspondence check
+
+The data resides outside git, as specified in `docs/DATA.md`.
+The test first checks this checkout, then `~/code/etx`.
+Use `ETX_DATA_ROOT` to specify another data directory.
+The test skips only if the raw data is absent.
+
+```sh
+/Users/ckl/code/etx/.venv/bin/python -m pytest -q tests/test_layer_budget.py
+/Users/ckl/code/etx/.venv/bin/python -m etx.tools.layer_budget \
+  /Users/ckl/code/etx/results_2026-10-01/round11/plan_r8base.json \
+  /Users/ckl/code/etx/results_2026-10-01/round11/trace_r11_decode.bin \
+  --json /tmp/round11-budget.json > /tmp/round11-budget.txt
+```
+
+[M] The trace and plan contain 60,362 tasks and 436 grid instances.
+Every raw task type and coordinate matches the plan.
+All 436 printed phase rows match `trace_r11_decode.log` exactly.
+The rounded device span is 5081.5 us.
+The log header says 434 grid instances. Its phase table and the raw data contain 436.
+The test uses the raw count, not this incorrect header count.
+
+Conditions: MI300X VF, Qwen3-30B-A3B, batch 1, decode position 1054, sequence length 1055.
+`round11/FINDING.md` identifies this final decode step.
+The log reports 32/32 tokens equal to HF greedy.
+These gaps come from the traced device step. They are not wall times or differences between builds.
+
+Measured layer gaps in us, including each layer's outgoing edge:
+
+```text
+layer gap    layer gap    layer gap    layer gap
+ 0   10.50    12    7.05    24   10.85    36   12.30
+ 1    9.80    13    7.76    25    8.95    37    9.54
+ 2    9.95    14    9.18    26    8.26    38    9.13
+ 3    8.34    15    9.66    27   10.00    39    9.78
+ 4    8.28    16    9.11    28    9.02    40    8.18
+ 5    8.77    17    9.92    29    7.92    41    9.90
+ 6    9.15    18    7.91    30    9.00    42   12.41
+ 7    9.59    19    8.45    31    7.05    43    9.12
+ 8    6.78    20    9.13    32    9.42    44    8.96
+ 9    8.20    21    7.51    33   10.71    45   10.69
+10    8.56    22    8.87    34    7.25    46    9.98
+11    8.40    23    9.02    35    8.14    47    8.51
+```
