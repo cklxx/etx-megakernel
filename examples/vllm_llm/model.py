@@ -45,7 +45,7 @@ sys.path.insert(0, str(HERE.parents[1]))
 from etx.frontends import hip_link  # noqa: E402
 from etx.ir import Graph, Resource  # noqa: E402
 from examples.llm.model import load_dims  # noqa: E402
-from etx.importer.launch_spec import launch_for, validate_wvsplitk
+from etx.importer.spec import launch_for, validate_wvsplitk, grid_for, OPERATORS
 from examples.vllm_llm import folds  # noqa: E402
 
 # ETX_VL_CU: workgroups a DSL dense phase spreads over (one task per workgroup). 304 = every CU, which is what
@@ -68,8 +68,8 @@ def _on(name: str, universal: bool = True) -> bool:
 
 # UNIVERSAL (see docs/OPTIMISATIONS.md): on for every model, `=0` only to reproduce a measurement.
 CU = int(os.environ.get("ETX_VL_CU", "256"))    # MI300X has 304 compute units
-BS = 16                       # KV block size (vLLM default on ROCm)
-PART = 256                    # paged attention partition size (fixed in paged_attention_custom_launcher).
+BS = OPERATORS["attn_mfma4_g4"].constants["BS"]                       # KV block size (vLLM default on ROCm)
+PART = OPERATORS["attn_mfma4_g4"].constants["PART"]                    # paged attention partition size (fixed in paged_attention_custom_launcher).
 # Sets only parts = ceil(MAXLEN / PART) = gridDim.y; the partition SIZE is a hardcoded T_PAR_SIZE = 256 in the
 # kernel (vllm/csrc/rocm/attention.cu:362), and a partition past the sequence early-exits (:366-369). So parts
 # * 256 must cover seq_len or the tail is never attended and reduce reads unwritten partials: 256 is the minimum
@@ -207,7 +207,12 @@ def imports() -> dict:
     p = os.environ.get("ETX_VL_IMPORTS")
     if not p:
         raise SystemExit("ETX_VL_IMPORTS=<imports.json from etx.importer.vllm_kernels> is required")
-    return json.loads(Path(p).read_text())
+    result = json.loads(Path(p).read_text())
+    from etx.importer.spec import validate_import
+    for export, info in result.items():
+        if export in OPERATORS and "params" in info:
+            validate_import(export, info)
+    return result
 
 
 def mindiv(n: int, div1: int, div2: int) -> int:          # vLLM skinny_gemms.cu, the waves-per-group choice
@@ -251,7 +256,12 @@ def instances(d) -> list[dict]:
     out = []
     moe_specs = {role: launch_for(d, role) for role in ("up", "down")} if d.moe and not DSL_GEMV else {}
 
-    def add(export, layer, role, grid, **kw):
+    def add(export, layer, role, grid=None, **kw):
+        if export in OPERATORS:
+            expected = grid_for(export, d, role=role, cu=CU, parts=parts)
+            if grid is not None and grid != expected:
+                raise ValueError(f"{export}: grid conflicts with operator specification")
+            grid = expected
         out.append({"export": export, "layer": layer, "role": role, "grid": grid, **kw})
 
     def gemv(layer, role, m, k):
@@ -262,7 +272,7 @@ def instances(d) -> list[dict]:
         y = wvsplitk_ytile(m)
         waves = mindiv(m, CU * y, 16)
         validate_wvsplitk(grid=(CU, 1, 1), cu_count=CU, rows=m, ytile=y, wave_groups=waves)
-        add(f"wvsplitk_y{y}", layer, role, (CU, 1, 1), M=m, K=k, wvprgrp=waves)
+        add(f"wvsplitk_y{y}", layer, role, None, M=m, K=k, wvprgrp=waves)
 
     attn = {4: "attn_mfma4_g4", 6: "attn_mfma16_g6", 8: "attn_mfma16_g8"}[d.G]
     for L in range(d.L):
@@ -270,7 +280,7 @@ def instances(d) -> list[dict]:
             if getattr(d, "ln_norm", False):
                 raise SystemExit("ln_norm (PhiMoE) needs the DSL fold path: there is no imported LayerNorm kernel "
                                  "(set ETX_VL_DSL_GEMV=1 ETX_VL_DSL_FOLD=1, the defaults)")
-            add("rms_norm_2d" if L == 0 else "fused_add_rms_norm", L, "in_norm", (1, 1, 1))
+            add("rms_norm_2d" if L == 0 else "fused_add_rms_norm", L, "in_norm")
         gemv(L, "qkv", d.NQKV, d.H)
         if DSL_ATTN:
             # prep + cache + attention in one block per (partition, kv head). NOTE (round 9, 2026-10-01): this shape
@@ -294,20 +304,20 @@ def instances(d) -> list[dict]:
                 raise SystemExit("ETX_VL_DSL_ATTN=head needs q/k norm and G + 2 waves per workgroup (etx/ops/attnprep.py)")
             add("dsl_attnprep", L, "prep", (d.NKV, 1, 1), G=d.G, parts=parts)
         elif d.qk_norm and (QKNR or DSL):
-            add("qknorm_rope", L, "qknr", (math.ceil((d.NH + d.NKV) / 8), 1, 1))
+            add("qknorm_rope", L, "qknr", None)
         else:
             if d.qk_norm:
-                add("rms_norm_3d", L, "q_norm", (d.NH, 1, 1))
-                add("rms_norm_3d", L, "k_norm", (d.NKV, 1, 1))
-            add("rope_neox", L, "rope", (1, 1, 1))
+                add("rms_norm_3d", L, "q_norm", None)
+                add("rms_norm_3d", L, "k_norm", None)
+            add("rope_neox", L, "rope", None)
         if not DSL_ATTN and not DSL_ATTNHEAD:
-            add("reshape_and_cache", L, "cache", (1, 1, 1))
+            add("reshape_and_cache", L, "cache", None)
         if not DSL_ATTN:
-            add(attn, L, "attn", (1, parts, d.NKV), parts=parts)
-        add("attn_reduce", L, "reduce", (d.NH, 1, 1), G=d.G)
+            add(attn, L, "attn", None, parts=parts)
+        add("attn_reduce", L, "reduce", None, G=d.G)
         gemv(L, "o_proj", d.H, d.NH * d.HD)
         if not DSL_FOLD:
-            add("fused_add_rms_norm", L, "post_norm", (1, 1, 1))
+            add("fused_add_rms_norm", L, "post_norm", None)
         if d.moe:
             gemv(L, "router", d.E, d.H)
             # The XCD-affine expert path (slot -> XCD, per-XCD events) is correct exactly when every top-k slot's
@@ -328,17 +338,17 @@ def instances(d) -> list[dict]:
                 add("dsl_moe_down_fold" if DSL_FOLD else "dsl_moe_down", L, "moe_down", (d.TOPK * (d.H // 64), 1, 1), M=d.H, K=d.MI, noaff=noaff)
             else:
                 up, down = moe_specs["up"], moe_specs["down"]
-                add(up.export, L, "moe_up", up.grid, noaff=noaff)
-                add("silu_and_mul", L, "moe_act", (d.TOPK, 1, 1), noaff=noaff)
-                add(down.export, L, "moe_down", down.grid, noaff=noaff)
+                add(up.export, L, "moe_up", None, noaff=noaff)
+                add("silu_and_mul", L, "moe_act", None, noaff=noaff)
+                add(down.export, L, "moe_down", None, noaff=noaff)
             if not DSL and not DSL_FOLD:                           # DSL: the next in_norm reads the 8 expert rows itself
-                add(f"moe_sum_k{d.TOPK}", L, "moe_sum", (1, 1, 1), noaff=noaff)
+                add(f"moe_sum_k{d.TOPK}", L, "moe_sum", None, noaff=noaff)
             continue
         gemv(L, "gate_up", 2 * d.INTER, d.H)
-        add("silu_and_mul", L, "act", (1, 1, 1))
+        add("silu_and_mul", L, "act", None)
         gemv(L, "down", d.H, d.INTER)
     if not DSL_FOLD:
-        add("fused_add_rms_norm", -1, "final_norm", (1, 1, 1))
+        add("fused_add_rms_norm", -1, "final_norm", None)
     gemv(-1, "lm_head", d.V, d.H)
     return out
 
@@ -371,6 +381,8 @@ def plan_offsets(insts: list[dict], imp: dict, start: int = 0) -> int:
 def build() -> Graph:
     d = load_dims()
     imp = imports()
+    from etx.importer.spec import validate_model_imports
+    validate_model_imports(imp, d)
     base = instances(d)
     skip = set(filter(None, os.environ.get("ETX_VL_SKIP", "").split(",")))    # register analysis only: drop roles
     if skip:

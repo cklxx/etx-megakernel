@@ -33,12 +33,17 @@ class MoeLaunch:
     dtype: str = "bf16"
     aliases: tuple = ()
 
-    def validate(self, *, grid, n, k, top_k, block_m):
-        expected = (self.grid, self.n, self.k, self.top_k, self.block_m)
-        observed = (tuple(grid), n, k, top_k, block_m)
-        if observed != expected:
-            raise ValueError(f"{self.export}: launch conflicts with captured specification: "
-                             f"expected grid/N/K/top_k/BM={expected}, got {observed}")
+    def validate(self, *, grid, n, k, top_k, block_m, block_n=None, moe_bn=None):
+        fields = {"grid/BLOCK_SIZE_N/MOE_BN": (tuple(grid), self.grid),
+                  "N": (n, self.n), "K": (k, self.k),
+                  "top_k": (top_k, self.top_k), "BLOCK_SIZE_M": (block_m, self.block_m)}
+        if block_n is not None:
+            fields["BLOCK_SIZE_N"] = (block_n, self.block_n)
+        if moe_bn is not None:
+            fields["MOE_BN"] = (moe_bn, self.block_n)
+        for parameter, (actual, expected) in fields.items():
+            if actual != expected:
+                raise ValueError(f"{self.export}: {parameter} conflicts: expected {expected}, got {actual}")
 
 
 def registry():
@@ -66,8 +71,20 @@ def verify_capture(export, root=CAPTURE_ROOT):
     c = record["constants"]
     bm, bn, bk = (c[key] for key in ("BLOCK_SIZE_M", "BLOCK_SIZE_N", "BLOCK_SIZE_K"))
     if not dots or any(tuple(map(int, dot)) != (bm, bk, bk, bn, bm, bn) for dot in dots):
-        raise ValueError(f"{export}: block constants conflict with captured TTIR dot shapes")
+        raise ValueError(f"{export}: block constants BLOCK_SIZE_M/BLOCK_SIZE_N/BLOCK_SIZE_K conflict with captured TTIR dot shapes")
     return record
+
+
+def capture_dimensions(record):
+    shape = record["shape"]
+    return ((2 * shape["MI"], shape["H"]) if record["role"] == "up"
+            else (shape["H"], shape["MI"]))
+
+
+def capture_grid(record):
+    n, _ = capture_dimensions(record)
+    bn = record["constants"]["BLOCK_SIZE_N"]
+    return (record["shape"]["TOPK"] * ((n + bn - 1) // bn), 1, 1)
 
 
 def launch_for(dims, role, *, batch=1):
@@ -78,12 +95,12 @@ def launch_for(dims, role, *, batch=1):
         if record["shape"] == shape and record["role"] == role:
             verify_capture(export)
             constants = record["constants"]
-            n, k = (2 * dims.MI, dims.H) if role == "up" else (dims.H, dims.MI)
+            n, k = capture_dimensions(record)
             bn = constants["BLOCK_SIZE_N"]
             reads = ("input", "weights", "expert_ids", "num_tokens_post_padded")
             if role == "down":
                 reads += ("routing_weights",)
-            return MoeLaunch(export, (dims.TOPK * ((n + bn - 1) // bn), 1, 1),
+            return MoeLaunch(export, capture_grid(record),
                              constants["BLOCK_SIZE_M"], bn, constants["BLOCK_SIZE_K"],
                              n, k, dims.TOPK, role == "down", reads)
     raise ValueError(f"no captured bf16 MoE {role} specification for {shape}; recapture required")

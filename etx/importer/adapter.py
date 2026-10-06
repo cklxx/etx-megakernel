@@ -118,6 +118,9 @@ def emit_host_header(imports: dict) -> str:
         out.append(f'  if (!__builtin_strcmp(name, "{e}")) return &etx_imp_{e}_desc;')
     out.append("  return nullptr;")
     out.append("}")
+    from etx.importer.spec import emit_validation, emit_model_validation
+    out.append(emit_validation(imports))
+    out.append(emit_model_validation(imports))
     return "\n".join(out) + "\n"
 
 
@@ -129,8 +132,14 @@ def main():
     ap.add_argument("imports"); ap.add_argument("--tiles", required=True); ap.add_argument("--header", required=True)
     a = ap.parse_args()
     imp = json.loads(Path(a.imports).read_text())
+    from etx.importer.spec import OPERATORS, validate_import
+    for export, info in imp.items():
+        if export in OPERATORS:
+            validate_import(export, info)
     Path(a.tiles).write_text(emit_adapters(imp))
     Path(a.header).write_text(emit_host_header(imp))
+    from etx.importer.spec import emit_host_files
+    emit_host_files(Path(a.header).parent)
 
 
 if __name__ == "__main__":

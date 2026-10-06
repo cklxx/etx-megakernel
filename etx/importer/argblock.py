@@ -16,6 +16,8 @@ def pack(info: dict, values: list, grid: tuple[int, int, int]) -> bytes:
     params = info["params"]
     if len(values) != len(params):
         raise ValueError(f"{info['export']}: {len(values)} values for {len(params)} parameters")
+    from etx.importer.spec import validate_values
+    validate_values(info["export"], values, grid)
     buf = bytearray(info["arg_bytes"])
     for p, v in zip(params, values):
         fmt = "Q" if p["ty"].startswith("ptr") else _FMT[p["ty"]]
