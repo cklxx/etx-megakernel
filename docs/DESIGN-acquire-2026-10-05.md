@@ -177,6 +177,41 @@ Delete the VM when the work is done, verify "No virtual machines", record the ba
    unfused, fused and unfused are already about equal on device. Does not stop the experiment, but
    section 4's wall threshold includes the host share.
 
+### Limits of the layer budget tool
+
+`etx.tools.layer_budget` requires one trace row for every task in the plan.
+Each row must match the task type and coordinates.
+All three timestamps must be positive and satisfy `taken <= ready <= done`.
+The tool rejects missing rows and zero timestamps before it reports numbers.
+This check confirms trace completeness. It does not confirm model correctness.
+
+The original `gap` field uses type-id order, as the host table does.
+Type-id order is not dependency order.
+The `dependency_gap` field uses a topological order of phase dependencies from `task_in` and `ev_inst`.
+The lowest type id resolves each tie.
+Consecutive phases in this order do not necessarily share a dependency.
+If dependency lists are absent or phase dependencies have a cycle, this metric is unavailable.
+
+Both metrics subtract the previous phase's last-done time from the next phase's first-ready time.
+Each source layer owns its outgoing gap, including an edge to another layer.
+Negative overlaps can cancel positive gaps in both sums.
+Neither sum measures exposed device time.
+Do not use either sum alone for the 8.3 us rental gate.
+Check the dependency path and parallel phases before a rental decision.
+The host log has no gap column. Its phase table cannot independently confirm gap arithmetic.
+A hand-built trace test checks the arithmetic with known timestamps.
+
+The round11 decode trace uses MI300X VF, batch 1, and a sequence length of 1055 tokens.
+It has 436 phase rows and a device span of 5081.5 us.
+For layer 2, type-id order and dependency order each give 9.95 us.
+For layers 2–45, each mean is 9.003864 us per layer.
+These values describe this trace only. They do not establish the round24 imported excess.
+
+The round11 data set is external because Git ignores `results_2026-*/`.
+If the data set is absent, the acceptance test fails with an explicit message.
+Set `ETX_DATA_ROOT` to the directory that contains `results_2026-10-01`.
+An explicit path disables the default search, so another local copy cannot hide an absent data set.
+
 ## 8. Sources
 
 `CLAUDE.md` and `AGENTS.md` for the rules; `docs/NEXT-2026-10-03.md` candidates 1 and 2 for the
