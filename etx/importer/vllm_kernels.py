@@ -15,143 +15,14 @@ import argparse
 import json
 import os
 import subprocess
-from dataclasses import dataclass, field
+from dataclasses import asdict
 from pathlib import Path
 
 from etx.importer.ir_import import import_kernel
 from etx.importer.slice_device import slice_device
 
 HERE = Path(__file__).resolve().parent
-BF = "__hip_bfloat16"
-CB = "c10::BFloat16"
-
-
-@dataclass
-class Kernel:
-    export: str                   # etx_imp_<export>
-    match: str                    # substring of the mangled name, unique among the file's specialisations
-    spec: str                     # the specialisation, as written in the (void)&... keep line
-    block: tuple[int, int, int]   # the launch's block shape (from vLLM's host code)
-    lds_cap: int | None = None
-    note: str = ""
-    inline: bool = True           # False: an out-of-line call (own register allocation), see ir_import
-
-
-@dataclass
-class Source:
-    path: str                     # relative to the vLLM checkout
-    kernels: list[Kernel]
-    drop: str | None = None       # extra definitions to drop (slice_device --drop)
-    includes: list[str] = field(default_factory=list)   # extra -I (relative to etx/importer)
-    defines: list[str] = field(default_factory=list)
-
-
-SOURCES = [
-    Source("csrc/rocm/skinny_gemms.cu", drop=r"wvSplitKQ|fp8|Fp8|FP8", includes=["shim_nofp8"], kernels=[
-        # wvSplitK(): gfx9 -> WVSPLIT_TILE_CFG(THRDS=64, WVPRGRP=16, sYT, N); sYT = ceil(M / (CuCount*4));
-        # N == 1 -> YTILE 2, UNRL 2 unless sYT <= 1 (YTILE 1, UNRL 4); Kbp*N <= LDS/2 -> the _sml_ variant.
-        Kernel("wvsplitk_y2", "wvSplitK_hf_sml_I14__hip_bfloat16Li64ELi2ELi16ELi8ELi2ELi1E",
-               f"wvSplitK_hf_sml_<{BF}, 64, 2, 16, 8, 2, 1>", (64, 16, 1), lds_cap=32 * 1024,
-               note="M > 1216 (every projection and lm_head); LDS holds the K-vector, K <= 16384"),
-        Kernel("wvsplitk_y1", "wvSplitK_hf_sml_I14__hip_bfloat16Li64ELi1ELi16ELi8ELi4ELi1E",
-               f"wvSplitK_hf_sml_<{BF}, 64, 1, 16, 8, 4, 1>", (64, 16, 1), lds_cap=32 * 1024,
-               note="M <= 1216 (the MoE router, 128 rows)"),
-    ]),
-    Source("csrc/rocm/attention.cu", defines=["ENABLE_FP8"], kernels=[
-        # paged_attention_custom_launcher: grid (num_seqs, max_num_partitions, num_kv_heads), block 256;
-        # gqa <= 4 -> mfma4, else mfma16; then the reduction, grid (num_heads, num_seqs), block head_size.
-        Kernel("attn_mfma4_g4", "QKV_mfma4_kernelI14__hip_bfloat16S0_LN4vllm18Fp8KVCacheDataTypeE0ES0_Li16ELi128ELi256ELb0ELi4E",
-               f"paged_attention_ll4mi_QKV_mfma4_kernel<{BF}, {BF}, vllm::Fp8KVCacheDataType::kAuto, {BF}, 16, 128, 256, false, 4>", (256, 1, 1),
-               note="Qwen3-8B (32/8 heads)"),
-        Kernel("attn_mfma16_g6", "QKV_mfma16_kernelI14__hip_bfloat16S0_LN4vllm18Fp8KVCacheDataTypeE0ES0_Li16ELi128ELi256ELb0ELi6E",
-               f"paged_attention_ll4mi_QKV_mfma16_kernel<{BF}, {BF}, vllm::Fp8KVCacheDataType::kAuto, {BF}, 16, 128, 256, false, 6, MFMAType::F16>", (256, 1, 1),
-               note="Qwen2.5-1.5B (12/2 heads)"),
-        Kernel("attn_mfma16_g8", "QKV_mfma16_kernelI14__hip_bfloat16S0_LN4vllm18Fp8KVCacheDataTypeE0ES0_Li16ELi128ELi256ELb0ELi8E",
-               f"paged_attention_ll4mi_QKV_mfma16_kernel<{BF}, {BF}, vllm::Fp8KVCacheDataType::kAuto, {BF}, 16, 128, 256, false, 8, MFMAType::F16>", (256, 1, 1),
-               note="Qwen3-30B-A3B (32/4 heads)"),
-        Kernel("attn_reduce", "reduce_kernelI14__hip_bfloat16S0_Li128ELi128ELi256ELi1E",
-               f"paged_attention_ll4mi_reduce_kernel<{BF}, {BF}, 128, 128, 256, 1>", (128, 1, 1),
-               note="npar_loops = ceil(partitions / 64) = 1 up to 16K tokens"),
-    ]),
-    Source("csrc/libtorch_stable/layernorm_kernels.cu", kernels=[
-        # rms_norm: grid num_tokens, block min(hidden / vec, 1024), vec = gcd(8, hidden); 2-D for a vector,
-        # 3-D for q/k norm over [tokens, heads, head_dim].
-        Kernel("rms_norm_2d", "rms_norm_kernelIN3c108BFloat16ELi8ELi2ELb1E", f"vllm::rms_norm_kernel<{CB}, 8, 2, true>", (0, 1, 1),
-               note="block = hidden/8 (512 for 4096, 192 for 1536, 256 for 2048): set per model"),
-        Kernel("rms_norm_3d", "rms_norm_kernelIN3c108BFloat16ELi8ELi3ELb1E", f"vllm::rms_norm_kernel<{CB}, 8, 3, true>", (16, 1, 1),
-               note="q/k norm: head_dim 128 / 8 = 16 threads per head"),
-        # fused_add_rms_norm: grid num_tokens, block min(hidden, 1024), width 8 when aligned
-        Kernel("fused_add_rms_norm", "fused_add_rms_norm_kernelIN3c108BFloat16ELi8ELb1E", f"vllm::fused_add_rms_norm_kernel<{CB}, 8, true>", (1024, 1, 1)),
-    ]),
-    Source("csrc/libtorch_stable/pos_encoding_kernels.cu", kernels=[
-        # rotary_embedding: grid num_tokens, block min(num_heads * rot_dim / 2, 512); neox style for Qwen
-        Kernel("rope_neox", "rotary_embedding_kernelIN3c108BFloat16ES2_Lb1E", f"vllm::rotary_embedding_kernel<{CB}, {CB}, true>", (512, 1, 1),
-               note="block min(NH*64, 512): 512 for every model here"),
-    ]),
-    Source("csrc/libtorch_stable/fused_qknorm_rope_kernel.cu", kernels=[
-        # fused_qk_norm_rope (vLLM's QKNormRoPEFusionPass, compilation_config enable_qk_norm_rope_fusion): batch 1 ->
-        # token_heads_per_warp 1 (auto-select only raises it on SM 9.0) -> launchFusedQKNormRope: block 256 (8 warps of
-        # 32 lanes), grid ceil((NH + NKV) / 8), one warp per head; bf16 qkv and cos/sin cache, neox -> interleave false
-        Kernel("qknorm_rope", "fusedQKNormRopeKernelIN3c108BFloat16E",
-               f"tensorrt_llm::kernels::fusedQKNormRopeKernel<{CB}, {CB}, 128, false>", (256, 1, 1),
-               note="head_dim 128 (Qwen3); grid 5 for 32 + 4 heads"),
-    ]),
-    Source("csrc/libtorch_stable/cache_kernels.cu", defines=["ENABLE_FP8"], kernels=[
-        # reshape_and_cache: grid num_tokens, block min(num_kv_heads * head_size / x, 512), x = 16 / 2
-        Kernel("reshape_and_cache", "reshape_and_cache_kernelI14__hip_bfloat16S1_LNS_18Fp8KVCacheDataTypeE0E",
-               f"vllm::reshape_and_cache_kernel<{BF}, {BF}, vllm::Fp8KVCacheDataType::kAuto>", (0, 1, 1),
-               note="block = NKV * 16: 128 (8B), 32 (1.5B), 64 (30B-A3B): set per model"),
-    ]),
-    Source("csrc/libtorch_stable/activation_kernels.cu", kernels=[
-        # silu_and_mul: grid num_tokens, block min(d / vec, 1024), vec = 16 / 2 (d % 8 == 0)
-        Kernel("silu_and_mul", "act_and_mul_kernelIN3c108BFloat16E",
-               f"vllm::act_and_mul_kernel<{CB}, typename vllm::PackedTypeConverter<{CB}>::Type, vllm::silu_kernel<{CB}>, "
-               f"vllm::packed_silu_kernel<typename vllm::PackedTypeConverter<{CB}>::Type>, true, true, false, false>", (1024, 1, 1),
-               note="dense: 1 row, block 1024; MoE (fused_experts): 8 rows of 768, block 768/8 = 96: set per model"),
-    ]),
-    # Qwen3-30B-A3B MoE at batch 1 (fused_moe/fused_moe.py, TritonExperts; docs/RESEARCH-moe-import.md): router
-    # (wvsplitk_y1), top-k, two Triton fused_moe_kernel launches (etx.importer.triton_import), silu, moe_sum
-    Source("csrc/libtorch_stable/moe/topk_softmax_kernels.cu", kernels=[
-        # topkGatingLauncherHelper: BYTES_PER_LDG = min(16, 2 * 128) = 16, VPT = 128 / (64 / (256 / 16)) ... = 8,
-        # ROWS_PER_WARP = 64 / 16 = 4; block (64, WARPS_PER_TB = 4); grid ceil(ceil(rows / 4) / 4) = 1 at batch 1
-        Kernel("topk_softmax_e128", "topkGatingILi8ELi128ELi4ELi16ELi64Ei14__hip_bfloat16LNS0_11ScoringFuncE0E",
-               f"vllm::moe::topkGating<8, 128, 4, 16, 64, int, {BF}, vllm::moe::ScoringFunc::SCORING_SOFTMAX>", (64, 4, 1),
-               note="128 experts, softmax scoring, int32 ids (Qwen3-30B-A3B)"),
-        # topkGating is instantiated per expert count by the launcher switch; BYTES = min(16, 2E), ELTS = BYTES/2,
-        # VPT = max(1, E/(ELTS*64))*ELTS -- 8 for both E=8 and E=128. Slicing one expert count and running another
-        # computes garbage deterministically (Mixtral top-2-of-8 through the e128 slice, 2026-10-02): shape-keyed.
-        Kernel("topk_softmax_e8", "topkGatingILi8ELi8ELi4ELi16ELi64Ei14__hip_bfloat16LNS0_11ScoringFuncE0E",
-               f"vllm::moe::topkGating<8, 8, 4, 16, 64, int, {BF}, vllm::moe::ScoringFunc::SCORING_SOFTMAX>", (64, 4, 1),
-               note="8 experts (Mixtral-8x7B)"),
-    ]),
-    Source("csrc/libtorch_stable/moe/moe_align_sum_kernels.cu", kernels=[
-        # moe_sum, vectorised path (hidden contiguous, 16 B aligned): block 256, grid min(ceil(tokens * d / 8 / 256), 65535)
-        Kernel("moe_sum_k8", "moe_sum_vec_kernelIN3c108BFloat16EiLi8ELb0E",
-               f"vllm::moe::moe_sum_vec_kernel<{CB}, int32_t, 8, false>", (256, 1, 1),
-               note="top-8, not pad-aware (no expert map)"),
-        # moe_sum_vec_kernel bakes TOPK into the template: the k8 slice at top-2 sums six rows nobody wrote
-        # (the Mixtral failure root cause). Shape-keyed like the topk entries.
-        Kernel("moe_sum_k2", "moe_sum_vec_kernelIN3c108BFloat16EiLi2ELb0E",
-               f"vllm::moe::moe_sum_vec_kernel<{CB}, int32_t, 2, false>", (256, 1, 1),
-               note="top-2 (Mixtral-8x7B), not pad-aware"),
-    ]),
-]
-
-# Triton kernels, taken from the Triton cache vLLM wrote on the VM (vLLM compiles them at run time, so the exact kernel
-# is the cached one; examples/vllm_llm/triton/<export>/CACHE_DIR names the cache entry). fused_moe_kernel at batch 1
-# (naive block assignment, default config BLOCK_SIZE_M/N/K = 16/64/128, 4 warps, 20 KB LDS): num_valid_tokens = 8
-# is not a multiple of 16, which selects the entries without that divisibility specialisation.
-TRITON_DIR = HERE.parents[1] / "examples/vllm_llm/triton"
-TRITON = {
-    # The fused_moe kernels are decode-shape binaries harvested from the Triton cache vLLM wrote for THIS model
-    # (top_k, MUL_ROUTED_WEIGHT and the block config are constexprs baked at compile): keyed by expert count so a
-    # model whose entries were not harvested fails at import with a name, not at EOS (Mixtral, 2026-10-02).
-    "fused_moe_up": ("fused_moe_kernel", "Qwen3-30B-A3B gate_up: E=128, MUL_ROUTED_WEIGHT=False"),
-    "fused_moe_down": ("fused_moe_kernel", "Qwen3-30B-A3B down: E=128, MUL_ROUTED_WEIGHT=True"),
-    "fused_moe_up_e8": ("fused_moe_kernel", "Mixtral-8x7B gate_up: E=8, BN=16 BK=256 nw=2, MUL_ROUTED_WEIGHT=False"),
-    "fused_moe_down_e8": ("fused_moe_kernel", "Mixtral-8x7B down: E=8, BN=16 BK=256 nw=2, MUL_ROUTED_WEIGHT=True"),
-}
-
+from etx.importer.spec import SOURCES, TRITON, TRITON_DIR, OPERATORS, Source
 
 def _rocm_inc() -> list[str]:
     """ETX_ROCM_HEADERS: a ROCm include tree (hip/, hipcub/, rocprim/) for boxes whose ROCm install ships the
@@ -257,7 +128,7 @@ def run(vllm: Path, out: Path, threads: int, compiler: str, blocks: dict[str, tu
             r = subprocess.run([llvm_as, str(out / f"{k.export}.ll"), "-o", str(out / f"{k.export}.bc")], capture_output=True, text=True)
             if r.returncode:
                 raise SystemExit(f"llvm-as {k.export}: {r.stderr[-2000:]}")
-            report[k.export] = info.to_json() | {"source": s.path, "spec": k.spec, "note": k.note}
+            report[k.export] = info.to_json() | {"source": s.path, "spec": k.spec, "note": k.note, "operator_spec": asdict(OPERATORS[k.export])}
     from etx.importer.triton_import import import_triton
     from etx.importer.launch_spec import verify_capture
     for e, (kname, note) in TRITON.items():
@@ -270,7 +141,10 @@ def run(vllm: Path, out: Path, threads: int, compiler: str, blocks: dict[str, tu
         if r.returncode:
             raise SystemExit(f"llvm-as {e}: {r.stderr[-2000:]}")
         report[e] = info.to_json() | {"source": f"triton:{(TRITON_DIR / e / 'CACHE_DIR').read_text().strip()}", "spec": kname,
-                                      "note": note, "downgrade": notes, "capture_spec": capture_spec}
+                                      "note": note, "downgrade": notes, "capture_spec": capture_spec, "operator_spec": asdict(OPERATORS[e])}
+    from etx.importer.spec import validate_import
+    for export, info in report.items():
+        validate_import(export, info)
     old = json.loads((out / "imports.json").read_text()) if only and (out / "imports.json").exists() else {}
     (out / "imports.json").write_text(json.dumps(old | report, indent=1))     # --only updates, it does not drop the rest
     return report
