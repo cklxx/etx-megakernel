@@ -109,6 +109,8 @@ def build_trace(plan: dict, rows: list[tuple[int, ...]], grids: str | None = Non
         notes.append(f"trace has {len(rows)} rows, plan {len(descs)} tasks: using the first {min(len(rows), len(descs))}")
     k = tick_ns / 1000.0
     all_tasks: list[Task] = []
+    # Subtract integer ticks first. Absolute GPU timestamps can lose float precision.
+    origin_ticks = min((r[5] for r in rows[:len(descs)] if r[5] and r[7]), default=0)
     for i, r in enumerate(rows[:len(descs)]):
         ty, taken, ready, done, worker = r[0], r[5], r[6], r[7], r[8]
         if taken == 0 or done == 0:
@@ -117,7 +119,8 @@ def build_trace(plan: dict, rows: list[tuple[int, ...]], grids: str | None = Non
         w = int(worker) & 0xFFFFFFFF
         dom = d["domain"] if d.get("mode", "static") == "static" else w // max(1, wpd)
         all_tasks.append(Task(i, int(ty), names[int(ty)] if 0 <= ty < len(names) else str(ty), int(dom), w,
-                              taken * k, max(ready, taken) * k, max(done, ready, taken) * k))
+                              (taken - origin_ticks) * k, (max(ready, taken) - origin_ticks) * k,
+                              (max(done, ready, taken) - origin_ticks) * k))
     if not all_tasks:
         raise SystemExit("no executed task in the trace (was it written with ETX_TRACE=1?)")
     origin = min(t.taken for t in all_tasks)
