@@ -197,7 +197,9 @@ class Operator:
     # Parameter index, parameter name, required expression. The ABI supplies offsets.
     checks: tuple[tuple[int, str, str], ...] = ()
     arguments: dict = field(default_factory=dict)
-    block_rule: tuple[str, str, str] = ("0", "1", "1")
+    # Inclusive bounds per axis. Equal bounds require an exact value.
+    # Expressions use integer constants, model names, and multiplication.
+    block_rule: tuple[tuple[str, str], ...] = (("1", "1024"), ("1", "1"), ("1", "1"))
 
     def grid(self, **context):
         return tuple(int(eval(v, {"__builtins__": {}}, context)) for v in self.grid_rule)
@@ -294,10 +296,13 @@ for source in SOURCES:
             constants = dict(TOPK=topk)
             checks = ((2, "num_tokens", "1"), (4, "stride_token/TOPK", f"{topk}*p5"))
             reads = ("expert_output",)
-        block_rule = tuple(str(value) for value in kernel.block)
-        if e == 'rms_norm_2d': block_rule = ('H//8', '1', '1')
-        if e == 'reshape_and_cache': block_rule = ('NKV*16', '1', '1')
-        if e == 'silu_and_mul': block_rule = ('min(MI//8,1024) if moe else 1024', '1', '1')
+        block_rule = tuple((str(value), str(value)) for value in kernel.block)
+        if e in ('rms_norm_2d', 'rms_norm_3d', 'fused_add_rms_norm',
+                 'rope_neox', 'silu_and_mul', 'moe_sum_k8', 'moe_sum_k2'):
+            block_rule = (('1', '1024'), ('1', '1'), ('1', '1'))
+        if e == 'reshape_and_cache':
+            # Each thread copies one head segment. Extra threads return.
+            block_rule = (('NKV*16', '1024'), ('1', '1'), ('1', '1'))
         OPERATORS[e] = Operator(e, kernel.spec, grid, shape, constants, reads, writes, aliases, layout,
                                 checks=checks, block_rule=block_rule)
 
@@ -331,7 +336,7 @@ for e, capture in registry().items():
         tuple(map(str, capture_grid(capture))),
         f"batch=1, {s}", c | {'MOE_BN': c['BLOCK_SIZE_N']},
         ('input', 'weights', 'expert_ids', 'num_tokens_post_padded') + (() if up else ('routing_weights',)),
-        ('output',), checks=checks, block_rule=(str(capture['num_warps']*64), '1', '1'), arguments={('moe_up' if up else 'moe_down'): ARGUMENTS['moe_up' if up else 'moe_down']})
+        ('output',), checks=checks, block_rule=((str(capture['num_warps']*64),)*2, ('1', '1'), ('1', '1')), arguments={('moe_up' if up else 'moe_down'): ARGUMENTS['moe_up' if up else 'moe_down']})
 
 
 def grid_for(export, dims, *, role, cu, parts):
@@ -436,11 +441,9 @@ def emit_model_validation(imports):
             out.append(f'    if (parts < 1 || parts > {spec.constants["MAX_PARTS"]}) return "parts exceeds MAX_PARTS";')
         if e == 'rms_norm_2d':
             out.append('    if (H <= 0 || H % 8) return "H conflicts with VEC=8";')
-        for axis, expression in enumerate(spec.block_rule):
-            expression = expression.replace('//', '/')
-            if ' if moe else ' in expression:
-                expression = '(E > 0 ? (MI/8 < 1024 ? MI/8 : 1024) : 1024)'
-            out.append(f'    if (({expression}) != {imports[e]["block"][axis]}) return "block conflicts with model shape";')
+        for axis, (lower, upper) in enumerate(spec.block_rule):
+            block = imports[e]['block'][axis]
+            out.append(f'    if ({block} < ({lower}) || {block} > ({upper})) return "block conflicts with operator specification";')
         condition = ' || '.join(f'{axis} != ({expr.replace("//", "/")})' for axis, expr in zip(('gx','gy','gz'), spec.grid_rule))
         parameter = 'BLOCK_SIZE_N/MOE_BN' if e.startswith('fused_moe') else 'grid'
         out.append(f'    if ({condition}) return "{parameter} conflicts with grid";')
@@ -457,6 +460,10 @@ def validate_import(export, info):
         import json
         current = json.loads(json.dumps(asdict(spec)))
         recorded = json.loads(json.dumps(recorded))
+        # Block guidance is not part of the ABI or the compiled constants.
+        # Check the actual descriptor against the current bounds below.
+        current.pop('block_rule')
+        recorded.pop('block_rule', None)
         if recorded != current:
             keys = [key for key in current if recorded.get(key) != current[key]]
             if 'constants' in keys:
@@ -465,10 +472,7 @@ def validate_import(export, info):
             raise ValueError(f'{export}: operator specification conflicts: {keys}')
     if 'spec' in info and info['spec'] != spec.template:
         raise ValueError(f'{export}: template conflicts with compiled constants {list(spec.constants)}')
-    if all(expr.isdigit() for expr in spec.block_rule):
-        expected_block = tuple(map(int, spec.block_rule))
-        if tuple(info['block']) != expected_block:
-            raise ValueError(f'{export}: block conflicts: expected {expected_block}, got {info["block"]}')
+    validate_block(spec, info['block'])
     types = {'ptr': 'ptr', 'i32': 'i32', 'i64': 'i64', 'f32': 'float', 'f64': 'double', 'b8': 'i1'}
     for role, args in spec.arguments.items():
         actual = [p['ty'].split()[0] for p in info['params']]
@@ -481,12 +485,42 @@ def validate_import(export, info):
             raise ValueError(f'{export}: BLOCK_SIZE_N/MOE_BN or capture constants conflict')
 
 
-def validate_model_imports(imports, dims):
-    context = dict(H=dims.H, MI=dims.MI, NKV=dims.NKV, moe=dims.moe, min=min)
+def validate_block(spec, block, context=None):
+    """Check the shared bounds. Defer model bounds until the plan exists."""
+    if len(block) != 3 or any(type(value) is not int for value in block):
+        raise ValueError(f'{spec.name}: block must contain three integers')
+    for value, (lower, upper) in zip(block, spec.block_rule):
+        for expression, is_lower in ((lower, True), (upper, False)):
+            if context is None and not expression.isdigit():
+                continue
+            bound = eval(expression, {'__builtins__': {}}, context or {})
+            if (value < bound if is_lower else value > bound):
+                raise ValueError(f'{spec.name}: block conflicts with bounds {spec.block_rule}: got {block}')
+    if any(value < 1 for value in block) or block[0]*block[1]*block[2] > 1024:
+        raise ValueError(f'{spec.name}: block exceeds hardware limits')
+
+
+def validate_model_imports(imports, dims, exports=None):
+    """Reject faults in used exports. Return separate checks for unused exports."""
+    used = set(imports) if exports is None else set(exports)
+    missing = used - imports.keys()
+    if missing:
+        raise ValueError(f'missing imported exports: {sorted(missing)}')
+    context = dict(NKV=dims.NKV)
+    report = {'used': {}, 'unused': {}}
     for export, info in imports.items():
-        if export not in OPERATORS or 'params' not in info:
-            continue  # Simulation records contain resource sizes only.
-        op = OPERATORS[export]
-        expected = tuple(eval(expr, {'__builtins__': {}}, context) for expr in op.block_rule)
-        if tuple(info['block']) != expected:
-            raise ValueError(f'{export}: block conflicts with model shape: expected {expected}, got {info["block"]}')
+        status = 'ok'
+        try:
+            if export not in OPERATORS:
+                status = 'outside operator specification'
+            elif 'params' not in info:
+                status = 'resource-only simulation record'
+            else:
+                validate_import(export, info)
+                validate_block(OPERATORS[export], info['block'], context)
+        except ValueError as error:
+            if export in used:
+                raise
+            status = str(error)
+        report['used' if export in used else 'unused'][export] = status
+    return report
