@@ -2,11 +2,48 @@
 from __future__ import annotations
 
 import argparse
+import heapq
 import json
 import re
 from pathlib import Path
 
 from . import timeline as tl
+
+
+METRIC_LIMITS = (
+    "Type-id order is not dependency order. "
+    "Negative overlaps can cancel positive gaps in both sums. "
+    "Neither sum measures exposed device time. "
+    "Do not use either sum alone for the 8.3 us rental gate."
+)
+
+
+def dependency_order(plan):
+    """Sort phases by dependencies. Use the lowest type id to resolve ties."""
+    deps = tl._deps_from_plan(plan)
+    if deps is None:
+        return None
+    types = [d["type"] for d in plan["descs"]]
+    parents = {ty: set() for ty in types}
+    children = {ty: set() for ty in types}
+    for target, producers in enumerate(deps):
+        for source in producers:
+            a, b = types[source], types[target]
+            if a != b:
+                parents[b].add(a)
+                children[a].add(b)
+    ready = [ty for ty in parents if not parents[ty]]
+    heapq.heapify(ready)
+    order = []
+    while ready:
+        ty = heapq.heappop(ready)
+        order.append(ty)
+        for child in sorted(children[ty]):
+            parents[child].remove(ty)
+            if not parents[child]:
+                heapq.heappush(ready, child)
+    # A task graph can be acyclic while its phase graph has a cycle.
+    return order if len(order) == len(parents) else None
 
 
 def layer_of(name):
@@ -17,15 +54,17 @@ def layer_of(name):
 def analyze(plan, rows, tick_ns=tl.TICK_NS):
     """Use integer tick differences to reproduce host.h report_phases."""
     if len(rows) != len(plan["descs"]):
-        raise ValueError("trace task count does not match the plan")
+        raise ValueError("trace is not complete: task count does not match the plan")
     names = {v["id"]: k for k, v in plan["types"].items()}
     for desc, row in zip(plan["descs"], rows):
+        if len(row) != tl.ROW or any(t <= 0 for t in row[5:8]):
+            raise ValueError(f"trace is not complete: task {desc['id']} needs three positive timestamps")
         coord = (desc["coord"] + [0] * 4)[:4]
         if row[0] != desc["type"] or list(row[1:5]) != coord:
             raise ValueError(f"trace task {desc['id']} does not match the plan")
-    active = [r for r in rows if r[5] and r[7]]
+    active = rows
     if not active:
-        raise ValueError("trace has no executed tasks")
+        raise ValueError("trace is not complete: no executed tasks")
     if any(not r[5] <= r[6] <= r[7] for r in active):
         raise ValueError("trace timestamps are not in task order")
     origin = min(r[5] for r in active)
@@ -60,12 +99,28 @@ def analyze(plan, rows, tick_ns=tl.TICK_NS):
             gap = b["first_ready"] - (a["first_ready"] + a["last_done"])
             layers[layer]["gap"] += gap
             layers[layer]["edges"].append(dict(source=a["type"], target=b["type"], gap=gap))
+    order = dependency_order(plan)
+    by_type = {ty: phase for ty, phase in zip(sorted(groups), phases)}
+    for p in layers.values():
+        p["dependency_gap"] = 0.0 if order is not None else None
+        p["dependency_edges"] = []
+    if order is not None:
+        for src, dst in zip(order, order[1:]):
+            a, b = by_type[src], by_type[dst]
+            layer = layer_of(a["type"])
+            if layer is not None:
+                gap = b["first_ready"] - (a["first_ready"] + a["last_done"])
+                layers[layer]["dependency_gap"] += gap
+                layers[layer]["dependency_edges"].append(
+                    dict(source=a["type"], target=b["type"], gap=gap))
     tr = tl.build_trace(plan, rows, tick_ns=tick_ns)
     steps = tl.critical_path(tr)
     return dict(span=(max(r[7] for r in active) - origin) * k, phases=phases,
                 layers=layers, critical=tl.critical_by_type(steps),
                 critical_span=sum(s["body"] + s["gap"] for s in steps),
-                dependency_lists=tr.deps is not None)
+                dependency_lists=tr.deps is not None,
+                dependency_order=[names[ty] for ty in order] if order is not None else None,
+                metric_limits=METRIC_LIMITS)
 
 
 def compare(a, b, shared_body):
@@ -103,10 +158,16 @@ def report(result, label):
         print(f"  {p['type']:22} {p['tasks']:6d} {p['wait']:9.2f} {p['body']:9.2f} "
               f"{p['first_ready']:11.1f} {p['last_ready']:10.1f} {p['last_done']:10.1f}")
     print("\nEach layer owns its outgoing edge. Negative gaps indicate overlap.")
+    print(result["metric_limits"])
+    print("Dependency order uses phase dependencies, with the lowest type id first for ties.")
+    print("Consecutive phases in this order do not necessarily share a dependency.")
+    if result["dependency_order"] is None:
+        print("Dependency-order gap is unavailable: dependency lists are absent or phase dependencies have a cycle.")
     print("Wait totals measure worker time, not exposed device time.")
-    print("layer gap_us wait_per_worker_us")
+    print("layer type_id_gap_us dependency_gap_us wait_per_worker_us")
     for layer, p in result["layers"].items():
-        print(f"{layer} {p['gap']:.2f} {p['wait_per_worker']:.2f}")
+        dep = "unavailable" if p["dependency_gap"] is None else f"{p['dependency_gap']:.2f}"
+        print(f"{layer} {p['gap']:.2f} {dep} {p['wait_per_worker']:.2f}")
     print("\nlayer worker wait_total_us")
     for layer, p in result["layers"].items():
         for w, wait in p["worker_wait"].items():
