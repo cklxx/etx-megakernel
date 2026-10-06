@@ -200,3 +200,137 @@ def test_host_argument_code_matches_before_change(tmp_path, kind, digest):
     emit_host_files(tmp_path)
     source = (tmp_path/f'operator_{kind}.inc').read_text()
     assert hashlib.sha256(re.sub(r'\s+', '', source).encode()).hexdigest() == digest
+
+
+def model_dims(**changes):
+    from dataclasses import replace
+    from examples.llm.model import load_dims
+    dims = load_dims(str(ROOT/'examples/llm/configs/qwen3-30b-a3b.json'))
+    return replace(dims, **changes)
+
+
+def operator_info(name, block):
+    types = {'ptr': 'ptr', 'i32': 'i32', 'i64': 'i64', 'f32': 'float', 'f64': 'double', 'b8': 'i1'}
+    args = next(iter(OPERATORS[name].arguments.values()))
+    return dict(block=list(block), params=[{'ty': types[ty]} for ty, _ in args])
+
+
+def test_unused_export_does_not_stop_plan():
+    from etx.importer.spec import validate_model_imports
+    records = {'silu_and_mul': operator_info('silu_and_mul', (1024, 1, 1))}
+    report = validate_model_imports(records, model_dims(), set())
+    assert report['used'] == {}
+    assert 'silu_and_mul' in report['unused']
+
+
+@pytest.mark.parametrize('name,block,changes', [
+    ('rms_norm_2d', (1024, 1, 1), {'H': 16384}),
+    ('rms_norm_2d', (128, 1, 1), {}),
+    ('rms_norm_3d', (32, 1, 1), {}),
+    ('fused_add_rms_norm', (256, 1, 1), {}),
+    ('silu_and_mul', (1024, 1, 1), {}),
+    ('rope_neox', (256, 1, 1), {}),
+    ('reshape_and_cache', (128, 1, 1), {}),
+    ('moe_sum_k8', (128, 1, 1), {}),
+])
+def test_legal_block_range(tmp_path, name, block, changes):
+    from etx.importer.spec import validate_import, validate_model_imports
+    records = {name: operator_info(name, block)}
+    validate_import(name, records[name])
+    validate_model_imports(records, model_dims(**changes))
+    result = host_model_check(tmp_path, records, model_dims(**changes), name)
+    assert result.returncode == 0, result.stdout
+
+
+def host_model_check(tmp_path, records, dims, name, *, parts=64):
+    from etx.importer.spec import emit_model_validation
+    from etx.importer.bundle import llvm_tool
+    spec = OPERATORS[name]
+    role = next(iter(spec.arguments))
+    grid = spec.grid(CU=256, parts=parts, NKV=dims.NKV, NH=dims.NH,
+                     heads=dims.NH if role == 'q_norm' else dims.NKV,
+                     rows=dims.TOPK if role == 'moe_act' else 1)
+    values = [dims.H, dims.MI, dims.E, dims.TOPK, dims.NH, dims.NKV, dims.HD, 16, parts, *grid]
+    source = '#include <cstring>\n#include <cstdio>\n' + emit_model_validation(records)
+    source += '\nint main() { const char* error = etx_spec_model("' + name + '", "' + role + '", '
+    source += ', '.join(map(str, values)) + '); if (error) { puts(error); return 1; } return 0; }\n'
+    path = tmp_path/'model.cpp'
+    path.write_text(source)
+    result = subprocess.run([llvm_tool('clang++'), '-std=c++17', str(path), '-o', str(tmp_path/'model')],
+                            capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+    return subprocess.run([str(tmp_path/'model')], capture_output=True, text=True)
+
+
+@pytest.mark.parametrize('name,block', [
+    ('rms_norm_2d', (0, 1, 1)),
+    ('rms_norm_2d', (1025, 1, 1)),
+    ('silu_and_mul', (96, 2, 1)),
+    ('reshape_and_cache', (63, 1, 1)),
+    ('wvsplitk_y2', (64, 8, 1)),
+    ('attn_reduce', (64, 1, 1)),
+])
+def test_illegal_block_fails_in_python_and_host(tmp_path, name, block):
+    from etx.importer.spec import validate_model_imports
+    dims = model_dims()
+    records = {name: operator_info(name, block)}
+    with pytest.raises(ValueError, match='block'):
+        validate_model_imports(records, dims, {name})
+    result = host_model_check(tmp_path, records, dims, name)
+    assert result.returncode == 1 and 'block' in result.stdout
+
+
+def test_unused_fault_is_recorded_and_missing_export_fails():
+    from etx.importer.spec import validate_model_imports
+    records = {'silu_and_mul': operator_info('silu_and_mul', (1025, 1, 1))}
+    report = validate_model_imports(records, model_dims(), set())
+    assert 'block' in report['unused']['silu_and_mul']
+    with pytest.raises(ValueError, match='silu_and_mul.*block'):
+        validate_model_imports(records, model_dims(), {'silu_and_mul'})
+    with pytest.raises(ValueError, match='missing.*rms_norm_2d'):
+        validate_model_imports(records, model_dims(), {'rms_norm_2d'})
+
+
+def test_block_rule_change_reaches_python_and_host(monkeypatch, tmp_path):
+    from dataclasses import replace
+    from etx.importer.spec import validate_model_imports
+    name = 'silu_and_mul'
+    monkeypatch.setitem(OPERATORS, name, replace(OPERATORS[name],
+                       block_rule=(('32', '512'), ('1', '1'), ('1', '1'))))
+    for threads in (31, 32, 512, 513):
+        records = {name: operator_info(name, (threads, 1, 1))}
+        valid = 32 <= threads <= 512
+        if valid:
+            validate_model_imports(records, model_dims())
+        else:
+            with pytest.raises(ValueError, match='block'):
+                validate_model_imports(records, model_dims())
+        result = host_model_check(tmp_path, records, model_dims(), name)
+        assert result.returncode == (0 if valid else 1), result.stdout
+
+
+@pytest.mark.parametrize('maxlen,valid', [(16384, True), (16385, False), (17000, False)])
+def test_reduce_partition_limit(tmp_path, maxlen, valid):
+    from etx.importer.spec import grid_for
+    dims = model_dims()
+    parts = (maxlen + 255)//256
+    if valid:
+        assert grid_for('attn_reduce', dims, role='reduce', cu=256, parts=parts) == (dims.NH, 1, 1)
+    else:
+        with pytest.raises(ValueError, match='MAX_PARTS'):
+            grid_for('attn_reduce', dims, role='reduce', cu=256, parts=parts)
+    records = {'attn_reduce': operator_info('attn_reduce', (128, 1, 1))}
+    result = host_model_check(tmp_path, records, dims, 'attn_reduce', parts=parts)
+    assert result.returncode == (0 if valid else 1), result.stdout
+    if not valid:
+        assert 'MAX_PARTS' in result.stdout
+
+
+def test_old_block_guidance_does_not_change_compiled_abi():
+    from dataclasses import asdict
+    from etx.importer.spec import validate_import
+    name = 'silu_and_mul'
+    info = operator_info(name, (1024, 1, 1))
+    info['operator_spec'] = asdict(OPERATORS[name]) | {
+        'block_rule': ['min(MI//8,1024) if moe else 1024', '1', '1']}
+    validate_import(name, info)

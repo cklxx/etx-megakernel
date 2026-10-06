@@ -208,10 +208,6 @@ def imports() -> dict:
     if not p:
         raise SystemExit("ETX_VL_IMPORTS=<imports.json from etx.importer.vllm_kernels> is required")
     result = json.loads(Path(p).read_text())
-    from etx.importer.spec import validate_import
-    for export, info in result.items():
-        if export in OPERATORS and "params" in info:
-            validate_import(export, info)
     return result
 
 
@@ -382,13 +378,13 @@ def build() -> Graph:
     d = load_dims()
     imp = imports()
     from etx.importer.spec import validate_model_imports
-    validate_model_imports(imp, d)
     base = instances(d)
     skip = set(filter(None, os.environ.get("ETX_VL_SKIP", "").split(",")))    # register analysis only: drop roles
     if skip:
         if XCD or REQUESTS > 1:
             raise SystemExit("ETX_VL_SKIP cannot be combined with ETX_VL_XCD or ETX_VL_REQUESTS (a replica or its GEMV could be dropped alone)")
         base = [i for i in base if i["role"] not in skip]
+    import_validation = validate_model_imports(imp, d, {i['export'] for i in base})
     per_req, total = [], 0
     for r in range(REQUESTS):                                  # each request its own argument blocks
         ins = [dict(i, req=r) for i in base]
@@ -609,6 +605,7 @@ def build() -> Graph:
 
     plan = os.environ.get("ETX_VL_PLAN")
     if plan:
+        Path(str(plan) + '.imports-check.json').write_text(json.dumps(import_validation, indent=2) + '\n')
         insts = [i for r, n in order for i in groups_r[r][n]]
         with open(plan, "w") as f:
             f.write(f"# vl plan {d.name}: instance export layer role gx gy gz offset tasks M K wvprgrp rep stride copyoff req nb; total {total} bytes\n")

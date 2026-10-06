@@ -218,3 +218,27 @@ def test_whole_layer_batching_leaves_one_join(tmp_path, monkeypatch):
     rows = [ln.split() for ln in (tmp_path / "vl_plan.txt").read_text().splitlines()[2:]]
     moe = [r for r in rows if r[3] in ("moe_up", "moe_down") and r[2] == "1"]
     assert moe and all(r[-1] == "2" for r in moe), moe
+
+
+def test_plan_records_unused_descriptor_and_rejects_missing_export(tmp_path, monkeypatch):
+    import pytest
+    vm, _ = _graph(tmp_path, monkeypatch, xcd=False)
+    path = tmp_path/'imports.json'
+    records = json.loads(path.read_text())
+    records['silu_and_mul'].update(block=[1024, 1, 1], params=[
+        {'ty': ty} for ty in ('ptr', 'ptr', 'i32', 'float', 'float', 'float')])
+    monkeypatch.setenv('ETX_VL_SKIP', 'moe_act')
+    path.write_text(json.dumps(records))
+    vm.build()
+    report_path = tmp_path/'vl_plan.txt.imports-check.json'
+    report = json.loads(report_path.read_text())
+    assert report['unused']['silu_and_mul'] == 'ok'
+    assert 'silu_and_mul' not in report['used']
+    records['silu_and_mul']['block'][0] = 1025
+    path.write_text(json.dumps(records))
+    vm.build()
+    assert 'block' in json.loads(report_path.read_text())['unused']['silu_and_mul']
+    del records['wvsplitk_y2']
+    path.write_text(json.dumps(records))
+    with pytest.raises(ValueError, match='missing.*wvsplitk_y2'):
+        vm.build()
