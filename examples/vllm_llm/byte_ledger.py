@@ -26,6 +26,10 @@ import re
 import sys
 from pathlib import Path
 
+# Let `python examples/vllm_llm/byte_ledger.py` import `examples.*` like the -m form does.
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
 BW_TBPS = 4.3
 BF16 = 2
 ALIGN = 256          # prep.py pads every tensor to a 256-byte offset
