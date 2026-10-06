@@ -5,13 +5,13 @@ It does not rent a GPU or execute a kernel.
 The round48 evidence came from the main checkout at `results_2026-10-01/round48/`.
 That archive is absent from this worktree.
 
-Run the gate and write the complete inventory:
+Run the gate and write the inventory:
 
 ```sh
 /Users/ckl/code/etx/.venv/bin/python -m etx.tools.shared_state --output docs/shared-state-inventory.json
 ```
 
-The [inventory](shared-state-inventory.json) gives writers, readers, and order for each site.
+The [inventory](shared-state-inventory.json) gives source references for writers, readers, and order at each site.
 The tool derives LDS sites from emitted tile source and runtime headers.
 It follows arena aliases and helper arguments to a fixed point.
 It keeps source expressions for the thread, wave, and row indices.
@@ -40,15 +40,30 @@ The attention extent includes every partition that can execute as the sequence g
 For cache writes, the extent is the current token's key and value slice.
 Existing cache positions belong to earlier steps.
 
-The checker expands actual task coordinates with the adapter's block rules.
+The checker expands actual task coordinates with a local copy of the adapter's block rules.
+It does not call the adapter implementation.
 It rejects holes, duplicate writers, absent static queue entries, and absent tasks.
 It also checks argument ranges, replica strides, event counts, and cross-domain event scope.
-It preserves required API edges across compilation with an independent copy of the input contract.
+It checks that compilation preserves required API edges against an independent copy of the input contract.
 A removed edge fails even if another data structure still contains its old copy.
 
-The source checks require writes and barriers in the supported tile protocols.
-They check the position of each barrier relative to the write and read.
-They also check the dense and expert store calls and the fold side stores.
+The source checks retain text-order checks for writes, barriers, and reads in the supported tile protocols.
+The dense, expert, fold, and import checks use source expressions and text order.
+These checks do not prove control flow for those stores or the import protocol.
+
+The statement parser in `etx/tools/source_control.py` adds control-path checks for nine LDS helper and tile functions.
+It parses blocks, branches, and loops after preprocessor branch selection.
+Each barrier must be a separate statement on its specified control path.
+The approved conditions and loop bounds are uniform across the workgroup in the supported callers.
+The parser rejects barriers in dead branches, branches that only some threads reach, or new control paths.
+It also rejects hidden barrier calls and unsupported control statements in these functions.
+It rejects early exits from these protocols.
+Only the final return in each block reduction is allowed.
+
+The LayerNorm branch must start with its barrier.
+The native checks require the exact output stores and their thread or loop paths.
+These checks include `token_out[t]`, optional `token_in[t + 1]`, timestamps, metadata, and the residual copy.
+The graph checks still require one native task per output region.
 A source change that alters these expressions needs a contract review.
 This is a conservative source check, not a general C++ proof.
 
@@ -80,6 +95,10 @@ Other negative tests remove a real output task, a tile store, an event edge, an 
 A vocabulary test removes 1536 rows from the launch extent but retains the full model vocabulary as the required extent.
 It fails without an argmax reference.
 The tests also remove each checked LDS barrier separately.
+Three regression tests disable all barriers, restrict a reduction barrier to lane zero, and delete the native token store.
+Each test failed before the source fix.
+Separate mutations test each source guard without an error from another guard.
+The LayerNorm mutation moves its barrier outside the mean branch but preserves text order.
 
 ## Limits
 
@@ -89,6 +108,18 @@ The import descriptors in these fixtures do not replace an ABI check against a r
 The graph contract checks compiler preservation of declared edges.
 It cannot prove that an arbitrary new pointer alias has the correct declared dependency.
 The LDS inventory is a source index, not a complete C++ alias analysis.
+The statement parser treats expressions as tokens.
+It does not prove variable values, helper effects, pointer aliases, or arbitrary C++ behavior.
+The uniformity of approved conditions and bounds remains a contract with the supported callers.
+
+### Named gap: imported and dense build coverage
+
+The local graph fixtures cover only the DSL path of the three MoE models listed above.
+`build_local()` clears `ETX_VL_IMPORTED` and other `ETX_VL_*` options before each build.
+The row checker rejects GEMV exports that do not start with `dsl_gemv`.
+Thus, this gate does not cover the all-imported build with `ETX_VL_IMPORTED=1` or dense models such as Qwen3-8B.
+A missing output in either build can remain undetected by this suite.
+These builds need separate launch descriptors and output contracts before this gate can cover them.
 
 The local checks do not establish a new GPU correctness result.
 The planned 1000 repetitions with real weights and the 2 bf16 ulp limit remain GPU work.
@@ -96,9 +127,14 @@ No GPU session or performance claim is part of this change.
 
 ## Local verification
 
-The final local suite passed with 297 tests and 6 skips.
+On 2026-10-06, the final local suite passed with 349 tests and 6 skips.
 The command used `/Users/ckl/code/etx/.venv/bin/python -m pytest -q`.
-The focused coverage suite passed all 49 tests.
-The inventory command passed with zero errors.
-It reported 76 LDS sites, 1416 output sites, and 2113 argument regions.
+This run included all 74 tests in `tests/test_coverage_gate.py`.
+The three requested source mutations produced 9, 1, and 1 errors, respectively.
+The first full run found one error in a new mutation test.
+A source comment blocked that test's replacement expression.
+The corrected test uses preprocessed source and passes for both activation paths.
+
+The existing inventory records zero errors, 76 LDS sites, 1416 output sites, and 2113 argument regions.
+This change does not regenerate that inventory.
 No GPU time or rental cost occurred.

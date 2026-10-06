@@ -173,3 +173,136 @@ def test_missing_tile_store(symbol):
     body = functions(src["gemv"])[symbol][1]
     src["gemv"] = src["gemv"].replace(body, body.replace("dsl_a_stbf(", "removed_store("))
     assert any(symbol in error for error in check_source(src))
+
+
+def test_dead_barriers_fail():
+    src = {name: text.replace('__syncthreads();', 'if (false) __syncthreads();')
+           for name, text in sources().items()}
+    assert check_source(src)
+
+
+def test_lane_only_barrier_fails():
+    from etx.tools.shared_state import functions
+    src = sources()
+    body = functions(src['reduction'])['etx_block_sum'][1]
+    changed = body.replace('__syncthreads();',
+                           'if (etx_lane() == 0) { __syncthreads(); }', 1)
+    src['reduction'] = src['reduction'].replace(body, changed)
+    assert check_source(src) == [
+        'etx_block_sum:red: barrier control path differs from the required protocol']
+
+
+def test_missing_native_token_store_fails():
+    src = sources()
+    assert 'VP.token_out[t] = si[0];' in src['native']
+    src['native'] = src['native'].replace('VP.token_out[t] = si[0];', '')
+    assert check_source(src) == [
+        'vl_argmax: native output needs one writer on its required path: VP.token_out[t] = si[0];']
+
+
+def test_norm_barrier_guard_alone():
+    # Text order stays valid. The barrier no longer belongs to the mean branch.
+    src = sources()
+    src['gemv'] = src['gemv'].replace(
+        'if (d.mode == 4) {\n    __syncthreads();',
+        '__syncthreads();\n  if (d.mode == 4) {')
+    errors = check_source(src)
+    assert len(errors) == 1, errors
+    assert 'dsl_stage_norm_at:xs' in errors[0]
+
+
+@pytest.mark.parametrize('coherent', [0, 1])
+def test_norm_barrier_must_start_the_mean_branch(coherent):
+    from etx.tools.shared_state import preprocess
+    src = sources()
+    import re
+    src['gemv'], count = re.subn(
+        r'(if \(d.mode == 4\) \{\s*)__syncthreads\(\);(\s*float s1 = 0.f;)',
+        r'\1\2 __syncthreads();', preprocess(src['gemv'], coherent))
+    assert count == 1
+    assert check_source(src) == [
+        'dsl_stage_norm_at:xs: barrier control path differs from the required protocol']
+
+
+@pytest.mark.parametrize('replacement', [
+    'if (false) { __syncthreads(); }',
+    'if (etx_lane() == 0) __syncthreads();',
+    'while (false) __syncthreads();',
+    'auto unused = [&]() { __syncthreads(); };',
+])
+def test_barrier_control_forms(replacement):
+    from etx.tools.shared_state import functions
+    src = sources()
+    body = functions(src['reduction'])['etx_block_sum'][1]
+    src['reduction'] = src['reduction'].replace(
+        body, body.replace('__syncthreads();', replacement, 1))
+    assert check_source(src) == [
+        'etx_block_sum:red: barrier control path differs from the required protocol']
+
+
+def test_early_exit_guard_alone():
+    from etx.tools.shared_state import functions
+    src = sources()
+    body = functions(src['reduction'])['etx_block_sum'][1]
+    src['reduction'] = src['reduction'].replace(
+        body, 'if (etx_lane() == 0) return 0.f;\n' + body)
+    assert check_source(src) == ['etx_block_sum: unsupported control exit']
+
+
+@pytest.mark.parametrize('replacement', [
+    'if (false) VP.token_out[t] = si[0];',
+    'VP.token_out[t + 1] = si[0];',
+    '',
+])
+def test_native_writer_path_and_index(replacement):
+    src = sources()
+    src['native'] = src['native'].replace('VP.token_out[t] = si[0];', replacement)
+    assert check_source(src) == [
+        'vl_argmax: native output needs one writer on its required path: VP.token_out[t] = si[0];']
+
+
+def test_control_parse_guard_alone():
+    from etx.tools.shared_state import functions
+    src = sources()
+    body = functions(src['reduction'])['etx_block_sum'][1]
+    src['reduction'] = src['reduction'].replace(body, 'switch (0) { default: break; }' + body)
+    assert check_source(src) == [
+        'etx_block_sum: control parse failed: unsupported control statement: switch']
+
+
+def test_unconditional_braces_preserve_barrier():
+    src = sources()
+    src['reduction'] = src['reduction'].replace('__syncthreads();', '{ { __syncthreads(); } }')
+    assert check_source(src) == []
+
+
+@pytest.mark.parametrize('name,store', [
+    ('vl_prologue', 'VP.token_time[2 * t] = wall_clock64();'),
+    ('vl_prologue', 'VP.positions[0] = VP.pos;'),
+    ('vl_prologue', 'VP.seq_lens[0] = VP.pos + 1;'),
+    ('vl_prologue', 'VP.slot_mapping[0] = VP.pos;'),
+    ('vl_prologue', 'dst[i] = src[i % n8];'),
+    ('vl_argmax', 'VP.token_in[t + 1] = si[0];'),
+    ('vl_argmax', 'VP.token_time[2 * t + 1] = wall_clock64();'),
+])
+def test_each_native_output_has_a_source_writer(name, store):
+    src = sources()
+    assert src['native'].count(store) == 1
+    # Keep an empty statement so each unbraced loop or branch retains its body.
+    src['native'] = src['native'].replace(store, ';')
+    assert check_source(src) == [
+        f'{name}: native output needs one writer on its required path: {store}']
+
+
+def test_text_order_guard_alone():
+    src = sources()
+    src['reduction'] = src['reduction'].replace('t += red[w];', 't += red[0];')
+    assert check_source(src) == [
+        r'etx_block_sum:red: required write or barrier absent: red\[w\]']
+
+
+def test_fold_output_guard_alone():
+    src = sources()
+    src['gemv'] = src['gemv'].replace('store && rout != nullptr', 'store && rout == nullptr')
+    assert check_source(src) == [
+        'dsl_stage_norm_at:rout: required fold output write absent']

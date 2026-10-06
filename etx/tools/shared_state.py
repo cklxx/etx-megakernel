@@ -191,15 +191,16 @@ def lds_inventory(src=None):
 
 
 def check_source(src=None):
-    """Check both activation paths after the C preprocessor removes dead branches."""
+    """Check both activation paths after preprocessor branch selection."""
     src = sources() if src is None else src
     return sorted(set(error for coherent in (0, 1) for error in _check_source(
         {name: preprocess(text, coherent) for name, text in src.items()})))
 
 
 def _check_source(src):
+    from etx.tools.source_control import check_control
     fs = {name: body for text in src.values() for name, (_, body) in functions(text).items()}
-    errors = []
+    errors = check_control(fs)
 
     def ordered(name, site, patterns):
         body = fs.get(name, "")
@@ -215,9 +216,6 @@ def _check_source(src):
     ordered("dsl_stage", "xs", [r"xs\[8 \* i \+ 2 \* j\] =", r"xs\[8 \* i \+ 2 \* j \+ 1\] =", bar])
     # Both coherent and scalar branches must retain the round48 barrier.
     norm = fs.get("dsl_stage_norm_at", "")
-    modes = re.findall(r"if \(d.mode == 4\) \{(.*?)float s1", norm, re.S)
-    if len(modes) != 1 or any(not re.search(bar, mode) for mode in modes):
-        errors.append("dsl_stage_norm_at:xs: LayerNorm mean lacks its staging barrier")
     ordered("dsl_stage_norm_at", "xs", [r"xs\[(?:8 \* i \+ j|i)\] =", bar, r"s1 \+= xs\[i\]", bar])
     vector = "xs[8 * i + j]" in norm
     for target, count in (("rout", 1), ("xout", 2 if vector else 1)):
@@ -272,7 +270,7 @@ def read_launches(path):
 
 
 def _blocks(plan, launch, info, tasks_by_grid):
-    """Use the adapter's coordinate rules. Never infer writes from task count alone."""
+    """Model the adapter coordinates locally. Do not use task count alone."""
     for grid in plan.graph.grids:
         if "impargs" not in grid.args or launch["offset"] not in grid.consts[:1] and not (
                 grid.name.startswith("chain_") and launch["offset"] in grid.consts):
