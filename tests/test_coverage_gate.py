@@ -1,11 +1,14 @@
-"""--check-coverage, the third gate (round 45).
+"""Coverage checks for complete write extents and execution order.
 
-Round 42's wvSplitK bug — lm_head rows [8192, 9728) never written — passed `--check` (both kernels get ETX's
-grid, so both leave the same hole) and 32/32 (the golden's argmax never landed in the band) for weeks. Neither
-gate can see an unwritten output row; a full-prefill per-position argmax diff can. These tests pin the gate's
-wiring and the setup-time coverage asserts so the class stays closed.
+Token comparisons cannot prove that every output row has a writer. The local
+checks below scan complete extents and require the declared event protocol.
 """
 from pathlib import Path
+import copy
+
+import pytest
+
+from etx.tools.shared_state import check_plan, check_source, lds_inventory, sources
 
 ROOT = Path(__file__).resolve().parents[1]
 HOST = (ROOT / "examples/vllm_llm/host.hip").read_text()
@@ -53,3 +56,120 @@ def test_setup_asserts_cover_the_sibling_sites():
     assert "do not cover nb*TOPK*(MI/32)" in HOST
     assert "do not cover nb*TOPK*(H/64)" in HOST
     assert "do not cover maxlen" in HOST
+
+
+@pytest.fixture(params=["qwen3-30b-a3b", "mixtral-8x7b", "phi-3.5-moe"])
+def shared_plan(request, tmp_path):
+    """Build the real task graph. No tensor values or GPU weights are needed."""
+    from etx.tools.shared_state import build_local
+    return build_local(request.param, tmp_path, layers=2)
+
+
+def test_shared_state_acceptance(shared_plan):
+    plan, contract = shared_plan
+    errors, report = check_plan(plan, contract)
+    assert errors == []
+    assert check_source() == []
+    from etx.tools.shared_state import check_arguments
+    assert check_arguments(plan, contract) == []
+    assert sum(s["elements"] for s in report if s["site"].endswith("/lm_head")) == contract.dims.V
+    assert {s["site"].split("/")[-1] for s in report} >= {"moe_up", "moe_down", "attn", "reduce", "lm_head"}
+
+
+@pytest.mark.parametrize("fault", ["write", "edge", "compiled_edge", "count", "tail", "duplicate"])
+def test_missing_write_or_edge_names_the_site(shared_plan, fault):
+    plan, contract = shared_plan
+    plan = copy.deepcopy(plan)
+    target = next(t for t in plan.tasks if t.grid == "lm_head" and t.coord == (200,))
+    if fault == "write":
+        plan.tasks.remove(target)
+    elif fault == "duplicate":
+        plan.tasks.append(copy.deepcopy(target))
+    elif fault == "edge":
+        plan.graph.grid("lm_head").in_edges.clear()
+    elif fault == "compiled_edge":
+        plan.inst.task_in[(target.grid, target.coord)].clear()
+    elif fault == "count":
+        event = next(iter(plan.graph.grid("lm_head").out_edges))
+        plan.events[event].counts[0] -= 1
+    elif fault == "tail":
+        # The reference extent stays V. Shrink only the host launch extent.
+        contract = copy.deepcopy(contract)
+        next(x for x in contract.launches if x["role"] == "lm_head")["M"] -= 1536
+    errors, _ = check_plan(plan, contract)
+    assert errors
+    assert any("lm_head" in e or fault == "count" and event in e for e in errors), errors
+    if fault in ("write", "tail"):
+        assert any("missing write" in e and "/lm_head" in e for e in errors), errors
+
+
+def test_round48_barrier_negative():
+    src = sources()
+    # Remove the barrier from both compile branches. Leave all numerical work intact.
+    import re
+    src["gemv"] = re.sub(r"(if \(d.mode == 4\) \{\s*)__syncthreads\(\);", r"\1", src["gemv"])
+    assert any("dsl_stage_norm_at:xs" in e for e in check_source(src))
+
+
+def test_lds_inventory_comes_from_source():
+    src = sources()
+    original = lds_inventory(src)
+    assert any(s["site"] == "gemv:dsl_stage_norm_at:xs" and s["writers"] and s["readers"] for s in original)
+    src["native"] = src["native"].replace("sv", "new_shared_values")
+    changed = lds_inventory(src)
+    assert any(s["site"] == "native:vl_argmax:new_shared_values" for s in changed)
+    assert not any(s["site"] == "native:vl_argmax:sv" for s in changed)
+
+
+@pytest.mark.parametrize("model", ["qwen3-30b-a3b", "mixtral-8x7b", "phi-3.5-moe"])
+def test_all_model_layers(model, tmp_path):
+    from etx.tools.shared_state import build_local, check_arguments
+    plan, contract = build_local(model, tmp_path)
+    errors, report = check_plan(plan, contract)
+    assert errors == []
+    assert check_arguments(plan, contract) == []
+    assert len([s for s in report if s["site"].endswith("/moe_down")]) == contract.dims.L
+
+
+@pytest.mark.parametrize("unit,function,count", [
+    ("gemv", "dsl_stage", 1), ("gemv", "dsl_stage_norm_at", 2),
+    ("gemv", "dsl_topk_lds", 1), ("gemv", "dsl_gemv_rows_nb", 3),
+    ("gemv", "dsl_gemv_split", 3), ("gemv", "dsl_gemv_bigk", 2),
+    ("reduction", "etx_block_sum", 2), ("reduction", "etx_block_max", 2),
+    ("native", "vl_argmax", 2),
+])
+def test_each_required_lds_barrier(unit, function, count):
+    from etx.tools.shared_state import functions, preprocess
+    src = {name: preprocess(text) for name, text in sources().items()}
+    body = functions(src[unit])[function][1]
+    assert body.count("__syncthreads();") == count
+    for ordinal in range(count):
+        parts = body.split("__syncthreads();")
+        parts[ordinal:ordinal + 2] = [parts[ordinal] + parts[ordinal + 1]]
+        broken = {**src, unit: src[unit].replace(body, "__syncthreads();".join(parts))}
+        assert any(function in error for error in check_source(broken)), (function, ordinal)
+
+
+def test_missing_queue_entry(shared_plan):
+    plan, contract = shared_plan
+    task = next(t for t in plan.tasks if t.grid == "moe_down_0")
+    plan.static_queues[task.device, task.worker].remove(task.id)
+    errors, _ = check_plan(plan, contract)
+    assert any("moe_down_0" in error and "queue" in error for error in errors)
+
+
+def test_wrong_argument_stride(shared_plan):
+    from etx.tools.shared_state import check_arguments
+    plan, contract = shared_plan
+    grid = next(g for g in plan.graph.grids if "impargs" in g.args)
+    grid.consts = (grid.consts[0] + 16, *grid.consts[1:])
+    assert any(grid.name in error for error in check_arguments(plan, contract))
+
+
+@pytest.mark.parametrize("symbol", ["dsl_run_dsl_gemv_fold", "dsl_run_dsl_moe_up_fold", "dsl_run_dsl_moe_down_fold"])
+def test_missing_tile_store(symbol):
+    from etx.tools.shared_state import functions, preprocess
+    src = {name: preprocess(text) for name, text in sources().items()}
+    body = functions(src["gemv"])[symbol][1]
+    src["gemv"] = src["gemv"].replace(body, body.replace("dsl_a_stbf(", "removed_store("))
+    assert any(symbol in error for error in check_source(src))
