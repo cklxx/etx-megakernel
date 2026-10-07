@@ -82,7 +82,9 @@ def test_dsl_tiles_use_the_coherent_accessors():
     assert "dsl_a_ldll_u(slot_mapping)" in attnprep.emit_tiles()
     # weights never go through the coherent accessors: the stream loop loads them with dsl_wload, which is a plain
     # load (or a non-temporal one under ETX_DSL_NT -- weights are read once per token and have no reuse to keep)
-    assert "dsl_wload(base + (size_t)(s0 + u) * ETX_WAVE_SIZE)" in g
+    assert "dsl_wload(DSL_WP(s0 + u))" in g
+    assert "#define DSL_WP(sg) (base + (size_t)(sg) * ETX_WAVE_SIZE)" in g             # the default address
+    assert "#define DSL_WP(sg) (ubase + (size_t)(sg) * ETX_WAVE_SIZE + lane)" in g     # ETX_DSL_SCALAR / GU1: same address
     assert "__builtin_nontemporal_load" in g and "#ifdef ETX_DSL_NT" in g
     for bad in ("dsl_a_ld", "dsl_a_st"):
         assert bad not in g.split("dsl_wload")[1].split("consume(")[0], bad
