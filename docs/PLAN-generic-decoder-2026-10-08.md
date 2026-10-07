@@ -35,13 +35,20 @@ The time per token has two floors:
 1. The bandwidth floor is the bytes per token divided by the attainable bandwidth.
 2. The latency floor is the time of the dependency chain at its minimum. It is the number of edges times the minimum cost of one edge, plus the minimum body time of each phase on the chain.
 
-The true floor of a model is the larger of the two floors.
+The file gives two combined floors:
+1. The overlap floor is the larger of the two floors. It assumes that the weight stream fully overlaps the low-occupancy phases. This needs complete prefetch across each barrier.
+2. The serial floor assumes no prefetch. For each phase, take the larger of its bytes divided by the bandwidth and its minimum body time. Add the results of all phases. Then add the synchronization cost.
+
+The serial floor minus the overlap floor is the maximum gain from prefetch across barriers.
+Section 3 uses this difference to rank the levers.
+The overlap floor also needs a place to hold the prefetched bytes. The LDS, the L2 and the Infinity Cache have limited capacity.
+
 A dense model is near its bandwidth floor. A MoE model with small experts can be near its latency floor.
 
 For Qwen3-30B-A3B, the measured handoff cost is 9 edges per layer at 1.00 us each, or 0.433 ms per token.
 Source: `docs/BUDGET-2026-10-01.md:267`. The minimum body times are not known.
 Thus, the latency floor is at least 0.433 ms. Nobody computed the full latency floor yet.
-The next CPU task is an estimate from the round11 trace.
+The next CPU task is an estimate of both combined floors from the round11 trace. The estimate needs the bytes and the minimum body time of each phase.
 
 ### 2.3 Bandwidth utilization at this time
 
@@ -93,6 +100,11 @@ Two items own most of the excess:
 2. The gaps on the critical path take 877 us.
 
 The two items can overlap. Their sum is an upper bound.
+
+The rank of the levers comes from the floors of section 2.2:
+1. The serial floor minus the overlap floor gives the maximum gain from prefetch across barriers.
+2. The measured time minus the serial floor gives the maximum gain from phase merges, shorter bodies and fewer gaps without prefetch.
+The larger value selects the first lever. Both values come from the same CPU estimate.
 
 The first lever is to stream the weights of the next phases during the low-occupancy phases.
 The second lever is to merge phases on the critical path.
