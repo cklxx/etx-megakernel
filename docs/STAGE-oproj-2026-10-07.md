@@ -2,6 +2,8 @@
 
 ## Scope and result
 
+Priority: low. The predicted gain is small against the 3.6 ms excess above the bandwidth floor. See section 3 of `docs/PLAN-generic-decoder-2026-10-08.md`.
+
 This report prices one lever on the CPU. No GPU ran for this report. No kernel code changes.
 The tool is `etx/tools/stage_sim.py`. Its tests are `tests/test_stage_sim.py`.
 
