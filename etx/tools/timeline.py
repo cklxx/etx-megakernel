@@ -302,6 +302,66 @@ def memory_demand(tr: Trace, bw_tbs: float = 4.3, bin_us: float = 0.5, idle_frac
             "idle_frac": idle_frac, "mean_util": sum(util) / n}
 
 
+def bandwidth_phases(tr: Trace, spec: dict[str, float], bw_tbs: float = 4.3) -> dict:
+    """Charge each phase from its first ready time to the next phase's first ready time.
+
+    This interval includes phase tails and handoffs. It does not isolate tile body time.
+    Only byte rules in the spec count as known. Unknown phases retain their device time.
+    """
+    if bw_tbs <= 0 or not tr.tasks or tr.t0 != 0 or tr.notes:
+        raise ValueError("bandwidth report needs a full, complete trace and positive bandwidth")
+    rules = [re.compile(k) for k in spec]
+    types = per_type(tr)
+    phases: dict[str, dict] = {}
+    for i, a in enumerate(types):
+        name = a["type"]
+        stem = re.sub(r"_\d+(?:_x)?$", "", name)
+        known = any(rx.search(name) for rx in rules)
+        # Charge the pre-first-ready delay to the first phase. The intervals then telescope.
+        start = tr.t0 if i == 0 else a["first_ready"] + tr.t0
+        end = types[i + 1]["first_ready"] + tr.t0 if i + 1 < len(types) else tr.t1
+        if end < start:
+            raise ValueError(f"phase {name} has negative device time")
+        row = phases.setdefault(stem, {"phase": stem, "bytes": 0.0, "us": 0.0, "known": True})
+        row["us"] += end - start
+        row["bytes"] += a["bytes"]
+        row["known"] &= known
+    for row in phases.values():
+        if row["known"]:
+            row["floor_us"] = row["bytes"] / (bw_tbs * 1e6)
+            row["wasted_us"] = row["us"] - row["floor_us"]
+            row["gb_s"] = row["bytes"] / row["us"] / 1e3 if row["us"] else 0.0
+            row["percent"] = row["gb_s"] / (bw_tbs * 1e3) * 100
+        else:
+            row["bytes"] = None
+            row["floor_us"] = row["wasted_us"] = row["gb_s"] = row["percent"] = None
+    ranked = sorted((r for r in phases.values() if r["known"]), key=lambda r: (-r["wasted_us"], r["phase"]))
+    unknown = sorted((r for r in phases.values() if not r["known"]), key=lambda r: (-r["us"], r["phase"]))
+    known_bytes = sum(r["bytes"] for r in ranked)
+    floor_us = known_bytes / (bw_tbs * 1e6)
+    return {"ranked": ranked, "unknown": unknown, "span_us": tr.span, "known_bytes": known_bytes,
+            "floor_us": floor_us, "percent": floor_us / tr.span * 100, "bw_tbs": bw_tbs}
+
+
+def bandwidth_report(tr: Trace, spec: dict[str, float], bw_tbs: float = 4.3, out=None) -> dict:
+    out = out or sys.stdout
+    r = bandwidth_phases(tr, spec, bw_tbs)
+    print("Phase bytes include only the specified traffic. Device time includes tails and handoffs.", file=out)
+    print(f"{'phase':16} {'GB':>10} {'us':>10} {'GB/s':>10} {'% of cap':>10} {'wasted us':>12}", file=out)
+    for row in r["ranked"]:
+        print(f"{row['phase']:16} {row['bytes'] / 1e9:10.4f} {row['us']:10.1f} {row['gb_s']:10.1f} "
+              f"{row['percent']:10.1f} {row['wasted_us']:12.1f}", file=out)
+    for row in r["unknown"]:
+        print(f"{row['phase']:16} {'unknown':>10} {row['us']:10.1f} {'unknown':>10} "
+              f"{'unknown':>10} {'unknown':>12}", file=out)
+    print(f"TOTAL known {r['known_bytes'] / 1e9:.4f} GB; device span {r['span_us']:.1f} us; "
+          f"floor {r['floor_us']:.1f} us at {bw_tbs} TB/s (estimate); "
+          f"achieved {r['percent']:.1f}% (known bytes / full span)", file=out)
+    if r["unknown"]:
+        print("Unknown phase bytes exclude some traffic. Total achieved rate is a lower bound.", file=out)
+    return r
+
+
 # ------------------------------------------------------------------ report
 def report(tr: Trace, bw_tbs: float = 4.3, out=None) -> dict:
     out = out or sys.stdout
@@ -428,11 +488,14 @@ def main(argv=None) -> int:
     ap.add_argument("--tick-ns", type=float, default=TICK_NS)
     ap.add_argument("--html", help="write the timeline page here")
     ap.add_argument("--json", help="write the numbers here")
+    ap.add_argument("--bandwidth-report", action="store_true", help="rank phase device time above the byte floor")
     a = ap.parse_args(argv)
+    if a.bandwidth_report and (not a.bytes or a.grids):
+        ap.error("--bandwidth-report requires --bytes and a full step (no --grids)")
     plan = load_plan(a.plan)
     spec = json.loads(Path(a.bytes).read_text()) if a.bytes else None
     tr = build_trace(plan, read_raw(a.raw), a.grids, spec, a.tick_ns)
-    res = report(tr, a.bw)
+    res = bandwidth_report(tr, spec, a.bw) if a.bandwidth_report else report(tr, a.bw)
     if a.html:
         write_html(tr, a.html, f"{plan.get('graph', 'ETX')} {a.grids or 'all'}", a.bw)
         print(f"\nwrote {a.html}")
