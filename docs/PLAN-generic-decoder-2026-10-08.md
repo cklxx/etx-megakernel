@@ -42,6 +42,7 @@ Qwen3-30B-A3B changed from 10.48 ms to 4.823 ms between the two tables.
 This is the only measured evidence of a large gain from tuned tiles in this repository.
 The same change also added the coherence design. Thus, the tiles do not own all of the gain.
 DeepSeek-Coder-V2-Lite with tuned fleet tiles is 8% faster than vLLM. Source: `README.md:134`.
+The fleet runtime runs the same tiles at 3.57 ms. ETX is 6% slower than fleet on this model. Source: `README.md:132`.
 
 The Mixtral trace attributes the gap to MoE task widths that use Qwen values.
 The `moe_up` phase has 896 tasks on 304 workers. It needs three serial waves.
@@ -74,7 +75,7 @@ Send this text. It contains the corrections from the ETX group review.
 > - End-to-end correctness on hardware for all three models
 > - Performance reported against two baselines: the same kernels launched one by one, and vLLM's best configuration. Our current measurements use batch 1 on one MI300X:
 >   - Qwen3-30B-A3B with tuned tiles runs at parity with vLLM. With our generic tiles, it was about 2.2x slower. This change also included a new memory-coherence design, so the tiles do not own all of the gain.
->   - DeepSeek-Coder-V2-Lite with hand-tuned tiles is about 8% faster than vLLM.
+>   - DeepSeek-Coder-V2-Lite with hand-tuned tiles is about 8% faster than vLLM. The same tiles in fleet's hand-written runtime run at 3.57 ms, so ETX's fused build is about 6% behind them.
 >   - Qwen3-8B still uses our generic, untuned tiles. It is about 2x slower than vLLM. On these tiles, the fused kernel is also about 6% slower than the same tiles launched one by one. Our trace attributes the gap to the tiles, not to synchronization.
 >   - Mixtral-8x7B is about 1.19x slower than vLLM. Our trace attributes the gap to MoE task widths that still use the Qwen shapes. The registry exists to select these widths per shape.
 >
