@@ -15,12 +15,33 @@ Thus, the Friday scope contains only work that local tests can verify.
 
 ## 2. Current state
 
-| Model | Path | ETX ms/token | Baseline ms/token | Source |
-|---|---|---|---|---|
-| Qwen3-30B-A3B | `examples/vllm_llm`, DSL tiles | 4.823 | vLLM default 4.863 | `docs/ROADMAP.md:66` |
-| Mixtral-8x7B | `examples/vllm_llm`, DSL tiles | 10.365 | vLLM 8.686 | `docs/GENERALITY-2026-10-02.md:258` |
-| DeepSeek-V2-Lite | `examples/dsv2lite`, MLA | 3.76-3.78 | fleet hand-written 3.557 | `README.md:92` |
-| Qwen3-8B | `examples/llm`, generic tiles | 13.4 | not measured | `README.md:117` |
+All rows use batch 1, bf16 and one MI300X.
+
+Table A gives the current tiles of each model.
+
+| Model | Tiles | Date | ETX ms/token | Baseline ms/token | Source |
+|---|---|---|---|---|---|
+| Qwen3-30B-A3B | DSL tiles | 2026-10-02 | 4.823 | vLLM default 4.863 | `README.md:46-50` |
+| Mixtral-8x7B | DSL tiles | 2026-10-02 | 10.365 | vLLM 8.686 | `docs/GENERALITY-2026-10-02.md:258` |
+| DeepSeek-Coder-V2-Lite | fleet hand-written tiles | 2026-09-25 | 3.78 | vLLM AITER 4.12, fleet 3.57 | `README.md:132` |
+| Qwen3-8B | generic, untuned tiles | 2026-09-25 | 10.07 | vLLM best 4.91 | `README.md:130` |
+
+Table B gives the generic, untuned tiles at a 1024-token context. Source: `README.md:123-135`.
+
+| Model | vLLM, best of default and AITER | ETX tiles without fusion | ETX megakernel |
+|---|---|---|---|
+| Qwen3-8B | 4.91 | 9.45 | 10.07 |
+| Qwen3-30B-A3B | 4.84 | 9.07 | 10.48 |
+
+Table B gives three facts:
+1. Qwen3-8B is about 2x slower than vLLM. Nobody measured Qwen3-8B again with the DSL tiles.
+2. With the generic tiles, the megakernel is 6.6% slower than the same tiles without fusion. The fusion benefit is negative for Qwen3-8B at this time.
+3. The README trace attributes the gap to the tiles, not to synchronization.
+
+Qwen3-30B-A3B changed from 10.48 ms to 4.823 ms between the two tables.
+This is the only measured evidence of a large gain from tuned tiles in this repository.
+The same change also added the coherence design. Thus, the tiles do not own all of the gain.
+DeepSeek-Coder-V2-Lite with tuned fleet tiles is 8% faster than vLLM. Source: `README.md:134`.
 
 The Mixtral trace attributes the gap to MoE task widths that use Qwen values.
 The `moe_up` phase has 896 tasks on 304 workers. It needs three serial waves.
@@ -51,7 +72,13 @@ Send this text. It contains the corrections from the ETX group review.
 >
 > **After Friday, once GPUs are available:**
 > - End-to-end correctness on hardware for all three models
-> - Performance reported against two baselines: the same kernels launched one by one, and vLLM's best configuration. For reference, in our current measurements we are at parity with vLLM on Qwen3-30B-A3B and about 1.19x behind on Mixtral-8x7B. Our trace attributes the Mixtral gap to MoE task widths that are still sized for Qwen's shapes, which is exactly the per-shape selection the registry is meant to handle. We will not commit to a specific gain until it is measured on hardware.
+> - Performance reported against two baselines: the same kernels launched one by one, and vLLM's best configuration. Our current measurements use batch 1 on one MI300X:
+>   - Qwen3-30B-A3B with tuned tiles runs at parity with vLLM. With our generic tiles, it was about 2.2x slower. This change also included a new memory-coherence design, so the tiles do not own all of the gain.
+>   - DeepSeek-Coder-V2-Lite with hand-tuned tiles is about 8% faster than vLLM.
+>   - Qwen3-8B still uses our generic, untuned tiles. It is about 2x slower than vLLM. On these tiles, the fused kernel is also about 6% slower than the same tiles launched one by one. Our trace attributes the gap to the tiles, not to synchronization.
+>   - Mixtral-8x7B is about 1.19x slower than vLLM. Our trace attributes the gap to MoE task widths that still use the Qwen shapes. The registry exists to select these widths per shape.
+>
+>   We will not commit to a specific gain before a hardware measurement.
 > - NVIDIA backend validated on hardware before we call it supported
 >
 > To get there, could you let us know whether you can provide MI300X access, which NVIDIA GPU you want targeted (H100 or B200), and roughly how many GPU-hours we can use?
@@ -59,7 +86,7 @@ Send this text. It contains the corrections from the ETX group review.
 The reply follows these rules:
 1. The Friday list contains only work that local tests can verify.
 2. The reply calls NVIDIA started, not supported.
-3. The reply gives the Qwen result and the Mixtral result together.
+3. The reply gives the good results and the bad results together. It includes Qwen3-8B, the core model of the scope.
 4. The reply promises no gain before a hardware measurement.
 
 ## 4. Architecture
@@ -186,9 +213,10 @@ DeepSeek-V2-Lite stays on `examples/dsv2lite`.
 
 1. Run end-to-end correctness for the three models. The gate is 32/32 tokens against the HF greedy reference.
 2. Measure each model against two baselines. The first baseline is the same tiles without fusion. The second baseline is the best vLLM configuration.
-3. Sweep the workgroup size and the Mixtral task widths.
-4. Validate the sm_90 lowerings on hardware before the team calls NVIDIA supported.
-5. If the user approves, build the TileLang adapter and measure an attention tile.
+3. Measure Qwen3-8B with the DSL tiles. The current number uses the generic tiles.
+4. Sweep the workgroup size and the Mixtral task widths.
+5. Validate the sm_90 lowerings on hardware before the team calls NVIDIA supported.
+6. If the user approves, build the TileLang adapter and measure an attention tile.
 
 ## 7. Decisions for the user
 
