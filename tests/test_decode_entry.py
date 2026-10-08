@@ -90,7 +90,15 @@ def test_config_path_and_hf_dir(tmp_path):
     hf.mkdir()
     (hf / "config.json").write_text((ROOT / "examples/llm/configs/mixtral-8x7b.json").read_text())
     assert decode.resolve("mixtral-8x7b", str(hf)) == ("mixtral-8x7b", hf / "config.json")
-    assert decode.resolve(str(hf / "config.json")) == ("hf", hf / "config.json")
+    assert decode.resolve(str(hf / "config.json")) == (tmp_path.name, hf / "config.json")
+    assert decode.resolve(str(hf)) == (tmp_path.name, hf / "config.json")        # <dir>/hf names the model <dir>
+    other = tmp_path / "m2"
+    other.mkdir()
+    (other / "config.json").write_text((hf / "config.json").read_text())
+    assert decode.resolve(str(other)) == ("m2", other / "config.json")
+    r = subprocess.run([sys.executable, "-m", "examples.vllm_llm.decode", str(hf), "--dry-run"],
+                       cwd=ROOT, capture_output=True, text=True, timeout=120)
+    assert r.returncode == 0 and f"model {tmp_path.name}:" in r.stdout, r.stderr
     with pytest.raises(FileNotFoundError):
         decode.resolve("no-such-model")
 
