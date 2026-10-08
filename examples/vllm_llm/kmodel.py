@@ -45,6 +45,9 @@ class Kern:
     S: float = 2            # scalar round trips on the critical path (vLLM form)
     V: float = 1            # dependent vector round trips of fresh data
     bytes_block: float = 0  # bytes one streaming block reads (weights, KV)
+    mall_block: float = 0   # of bytes_block, this many come from the Infinity Cache (MALL), not HBM:
+                            # the KV cache (104 MB) fits in MALL (256 MB); attn streams at MALL rate
+                            # (docs/BUDGET-2026-10-01.md: 2.16 MB/layer in 6.28 us = 344 GB/s)
     inflight: float = 0     # bytes one active CU keeps in flight while streaming
     active: int = 1         # CUs (blocks) that stream
     gap: float = 0          # exposed work per trip not overlapped with memory (fused_moe tile: 0.33 us)
@@ -103,7 +106,7 @@ Q15 = [
 # reads the 8 expert rows (+1 V) instead of a separate moe_sum
 DSL_MOE = [replace(k) for k in MOE if k.role not in ("q_norm", "k_norm", "rope", "cache", "attn", "topk", "moe_sum", "in_norm")] + [
     Kern("in_norm", S=2, V=3, bar=2, shfl=10, instr=300, note="fused_add_rms_norm reading the 8 expert rows (moe_sum folded in)"),
-    Kern("attn", S=3, V=10, bytes_block=128e3, inflight=16e3, active=20, bar=9, shfl=13, instr=1100,
+    Kern("attn", S=3, V=10, bytes_block=128e3, mall_block=128e3, inflight=16e3, active=20, bar=9, shfl=13, instr=1100,
          note="DSL: q/k norm + rope + cache + attention of one (partition, kv head)"),
     Kern("topk", S=2, V=2, shfl=24, instr=400, note="DSL: softmax + top-8 over 128 logits, 64 lanes"),
 ]
