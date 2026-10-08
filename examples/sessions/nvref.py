@@ -40,7 +40,7 @@ job(name="prep", gpu=0, after=["dl", "etx_env"], timeout=2400, quiet_s=600,
 # after the download, not asserted to be a pinned snapshot revision.
 job(name="record", lane="cpu", after="dl", timeout=120,
     cmd="set -e; rocm-smi --showproductname; cat /opt/rocm/.info/version; uname -r; nproc; "
-        "lspci | grep -i mi300; "
+        "(lspci -nn | grep -iE 'mi300|74b5' || echo 'lspci: no MI300 line (0x74b5 is the VF device id)'); "
         f"{PY} -c \"from huggingface_hub import model_info; print('HF_REV', model_info('{HF}').sha)\"")
 job(name="golden_sha", lane="cpu", after="prep", timeout=120,
     cmd=f'echo "bab2f1fbe12f70179711ec40a215c74710845b73169b1cc6a3a6ca50e0a19484  {LLM}/{M}/golden_c1024.txt" | sha256sum -c')

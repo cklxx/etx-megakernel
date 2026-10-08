@@ -68,8 +68,8 @@ Expected: `VLLM label=default aiter=0 … batch=1 version=0.27.1 context=1024 me
 - Correctness first, GPU 0. `gate_all` = `tiles.py:81-85` with b=all: needs `matched=32 gen=32` and `CHECK-DSL OK`.
   `gate_unf`: the same binary with `--unfused --repeat 1`, needs 32/32. `check_imp`: build `chk` (same flags +
   `ETX_VL_CHECK=1`), run `--check 2`, expect `CHECK OK: 0 launch(es) differ` (`host.hip:588`). **Unsure:** `--check`
-  refuses plans with per-XCD replicas (`host.hip:500`) and this plan may have them (`model.py:161`). On that refusal
-  the report prints `IMPORT-CHECK n/a (host.hip:500)`; `CHECK FAILED` means no verdict.
+  refuses plans with per-XCD replicas (`host.hip:515`) and this plan may have them (`model.py:161`). On that refusal
+  the report prints `IMPORT-CHECK n/a (host.hip:515)`; `CHECK FAILED` means no verdict.
 - Timing, R = 1..5, GPU 0, chained with `after_any`: odd rounds `vllm_r`, `etx_r`, `etxu_r`; even rounds reversed.
   ETX command (timeout 300, as `tiles.py:104`), `--unfused` only in `etxu_r` (same-tiles HIP graph, `host.hip:122,867`):
   `set -o pipefail; echo "ETX_ENV ETX_UNFUSED_SYNC=${ETX_UNFUSED_SYNC:-} ETX_UNFUSED_NOGRAPH=${ETX_UNFUSED_NOGRAPH:-}";
