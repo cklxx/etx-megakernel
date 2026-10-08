@@ -10,6 +10,7 @@
 // instead of ETX events.
 #include "plan_data.h"
 #include "etx/host.h"
+#include "etx/selection.h"   // the planner's variant per phase, published by plan_data.h
 #include "imports.h"
 
 #include <algorithm>
@@ -152,6 +153,10 @@ int main(int argc, char** argv) {
   if (ln_norm) die("ln_norm model on a build whose tiles lack the LayerNorm fold (ETX_EMIT_DSL_EXT=0)");
 #endif
   if (sparsemixer && norm_topk) die("sparsemixer and norm_topk are mutually exclusive");
+#ifdef ETX_TOPK_KEY32
+  // ETX_TOPK_KEY32 (etx/runtime/include/etx/tile_util.h): lane t of the one wave keeps round t's result, so K <= 64
+  if (TOPK > 64) die("ETX_TOPK_KEY32: TOPK > 64 (one round result per lane of the 64-lane wave)");
+#endif
   const int MOE_BM = ETX_EMIT_MOE_BLOCK_M; // captured specification, published by the plan
   const int BS = ETX_SPEC_BS, X = ETX_SPEC_CACHE_X, MAXBLK = (MAXLEN + BS - 1) / BS;
 
@@ -178,8 +183,18 @@ int main(int argc, char** argv) {
       // the tile is emitted for a fixed column count (etx/ops/gemv.py DSL_NB); a plan that asks for more would have
       // the extra requests silently read column 0 -- refuse instead (ETX_VL_BATCH sets both from ETX_VL_REQUESTS)
       if (x.nb > ETX_VL_NB) die("plan instance nb=" + std::to_string(x.nb) + " but the tiles were built with ETX_VL_NB=" + std::to_string(ETX_VL_NB));
+      // the variant of this phase comes from the manifest (plan_data.h), never from a re-derivation here: the plan
+      // file and the manifest must name the same export (docs/PLAN-generic-decoder-2026-10-08.md section 6.3)
+      if (const char* error = etx_sel_check(x.role.c_str(), x.layer, x.exp.c_str()))
+        die("plan instance " + std::to_string(x.n) + " (" + x.role + ", layer " + std::to_string(x.layer) + ", " + x.exp + "): " + error);
       insts.push_back(x);
     }
+  }
+  {                                                       // every selected phase runs: a stale manifest names no extra phase
+    std::vector<int> runs(std::max(ETX_SEL_N_PHASES, 1), 0);
+    for (const Inst& x : insts) ++runs[etx_sel_find_instance(x.role.c_str(), x.layer)];
+    for (int i = 0; i < ETX_SEL_N_PHASES; ++i)
+      if (!runs[i]) die(std::string("the selection names phase ") + etx_sel_phase[i] + " (" + etx_sel_export[i] + "), but the plan has no instance of it");
   }
   bool qknr = false;                                                        // the plan runs the fused q/k norm + rope (in place)
   for (const Inst& x : insts) qknr = qknr || x.role == "qknr" || x.role == "prep";

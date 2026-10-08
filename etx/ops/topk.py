@@ -58,7 +58,9 @@ static __device__ __attribute__((always_inline)) void dsl_run_dsl_topk(const uns
     dsl_a_ldbf(logits + e)
 #endif
     : -INFINITY; taken[k] = e >= E; m = fmaxf(m, p[k]); }
+#ifndef ETX_TOPK_KEY32       // the key path takes m from its round-0 winner; sparsemixer never reads this m
   m = etx_wave_max(m);
+#endif
   if (mode == 2) {                                    // sparsemixer: p[] holds the RAW logits throughout
     float raw[2]; raw[0] = p[0]; raw[1] = p[1];
     for (int t = 0; t < K; ++t) {
@@ -90,6 +92,18 @@ static __device__ __attribute__((always_inline)) void dsl_run_dsl_topk(const uns
     }
     return;
   }
+#ifdef ETX_TOPK_KEY32        // select on one 32-bit key per expert, DPP wave max (etx/runtime/include/etx/tile_util.h)
+#ifdef ETX_ABL_TOPK_NOSTORE
+#error "ETX_ABL_TOPK_NOSTORE has no effect with ETX_TOPK_KEY32: the key path stores its outputs itself"
+#endif
+  etx_topk_key32(p, E, K, mode == 1, lane, [&](int t, int bi, float v) {
+    dsl_a_sti(ids + t, bi);
+#ifndef ETX_ABL_TOPK_NOTEI
+    dsl_a_sti(tei + t, t);                            // kept: the same outputs as the old path
+#endif
+    dsl_a_stf(wts + t, v); });
+  return;
+#endif
   float s = 0.f;
 #pragma unroll
   for (int k = 0; k < 2; ++k) { p[k] = taken[k] ? 0.f : expf(p[k] - m); s += p[k]; }

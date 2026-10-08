@@ -61,6 +61,9 @@ def emit_plan_header(plan: Plan, device: int = 0) -> str:
     # silent wrong answers twice (ETX_VL_NB, 2026-10-01 round 14; dev_reset, round 19: build.sh overwrote the flag
     # array when ETX_VL_COH was also set, so the host believed in a tail that was never compiled).
     out.extend(manifest.guard_block(g.codegen))
+    # The planner's variant per phase (manifest.selection_block). Host only: the kernel gets its tile calls from the
+    # same graph, so the device source stays byte-identical when the selection is published.
+    out.extend(manifest.selection_block(g.codegen.get(manifest.SELECTION)))
     out.append(f"#define ETX_LDS_BYTES {max([gg.resource.lds_bytes + gg.resource.prefetch_bytes for gg in g.grids] + [0])}")
     out.append(_arr("etx_n_tasks_dev", [sum(1 for t in plan.tasks if t.device == d) for d in range(nd)]))
     out.append(_arr("etx_n_dynamic_dev", [sum(1 for t in plan.tasks if t.device == d and t.mode != "static") for d in range(nd)]))

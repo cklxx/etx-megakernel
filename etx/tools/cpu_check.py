@@ -26,6 +26,18 @@ EXTERNAL_TESTS = {
     "tests.test_coh_model.test_coh_not_applied_unfused",
     "tests.test_phase_model.test_reproduces_the_measured_builds",
     "tests.test_phase_model.test_folding_narrow_phases_away_is_worth_almost_nothing",
+    "tests.test_acquire_contract.test_real_imported_build[qwen3-30b-a3b_xcd_qknr-48]",
+    "tests.test_acquire_contract.test_real_imported_build[mixtral-8x7b_imported-32]",
+    "tests.test_pairs.test_round48_interleave_log_is_refused",
+    # Round11 archive gates: skipped without ETX_DATA_ROOT, failures when ETX_REQUIRE_DATA=1.
+    "tests.test_layer_budget.test_round11_host_correspondence",
+    "tests.test_bandwidth_phases.test_round11_spec_and_ranked_total",
+    "tests.test_floors.test_round11_table_matches_the_raw_trace",
+    # Hop evidence: the round11 commit is absent from a shallow clone; the vLLM lines need VLLM_SRC.
+    "tests.test_floors.test_tile_evidence_lines_at_the_round11_commit",
+    "tests.test_floors.test_vllm_evidence_lines",
+    # ISA recount needs ETX_ISA_S and ETX_ISA_MAP.
+    "tests.test_floors.test_isa_hop_table_matches_the_matching_build",
 }
 
 
