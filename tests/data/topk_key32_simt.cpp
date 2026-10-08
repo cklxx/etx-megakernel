@@ -1,6 +1,6 @@
 // Host SIMT harness for the ETX_TOPK_KEY32 block of etx/runtime/include/etx/tile_util.h (tests/test_topk_key32.py).
 // The test extracts the block (between "#ifdef ETX_TOPK_KEY32" and its "#endif") into key32_block.inc and compiles
-// this file with g++. 64 host threads run the block as the 64 lanes of one wave. Each cross-lane builtin
+// this file with a host C++20 compiler. 64 host threads run the block as the 64 lanes of one wave. Each cross-lane builtin
 // (update_dpp, readlane, __shfl_xor) publishes the lane values, meets at a barrier, and reads them.
 // stdin: E K renorm, then E bf16 bit patterns (hex). stdout: K lines "id weight_bits_hex" (result t).
 // argv[1] == "lds": run etx_topk_key32_lds (lane 0 stores each round; lane 0 divides by sel, as dsl_topk_lds does).
@@ -8,6 +8,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <thread>
 #include <vector>

@@ -38,6 +38,8 @@ EXTERNAL_TESTS = {
     "tests.test_floors.test_vllm_evidence_lines",
     # ISA recount needs ETX_ISA_S and ETX_ISA_MAP.
     "tests.test_floors.test_isa_hop_table_matches_the_matching_build",
+    # Host SIMT harness needs a C++20 compiler with <barrier>.
+    "tests.test_topk_key32.test_cpp_block_on_a_host_simt_wave",
 }
 
 
