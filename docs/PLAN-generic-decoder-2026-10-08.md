@@ -33,11 +33,12 @@ An NVIDIA result uses the BabelStream copy ceiling of its own GPU. It does not u
 
 The time per token has two floors:
 1. The bandwidth floor is the bytes per token divided by the attainable bandwidth.
-2. The latency floor is the time of the dependency chain at its minimum. It is the number of edges times the minimum cost of one edge, plus the minimum body time of each phase on the chain.
+2. The latency floor is the time of the dependency chain at its minimum. It is the number of edges times the minimum cost of one edge, plus the phase floor of each phase on the chain.
+3. A phase floor comes from hardware values only. It never comes from a measured body. The estimate below gives the rule.
 
 The file gives two combined floors:
 1. The overlap floor is the larger of the two floors. It assumes that the weight stream fully overlaps the low-occupancy phases. This needs complete prefetch across each barrier.
-2. The serial floor assumes no prefetch. For each phase, take the larger of its bytes divided by the bandwidth and its minimum body time. Add the results of all phases. Then add the synchronization cost.
+2. The serial floor assumes no prefetch. For each phase, take the larger of its bytes divided by the bandwidth and its phase floor. Add the results of all phases. Then add the synchronization cost.
 
 The serial floor minus the overlap floor is the maximum gain from prefetch across barriers.
 Section 3 uses this difference to rank the levers.
@@ -45,10 +46,58 @@ The overlap floor also needs a place to hold the prefetched bytes. The LDS, the 
 
 A dense model is near its bandwidth floor. A MoE model with small experts can be near its latency floor.
 
-For Qwen3-30B-A3B, the measured handoff cost is 9 edges per layer at 1.00 us each, or 0.433 ms per token.
-Source: `docs/BUDGET-2026-10-01.md:267`. The minimum body times are not known.
-Thus, the latency floor is at least 0.433 ms. Nobody computed the full latency floor yet.
-The next CPU task is an estimate of both combined floors from the round11 trace. The estimate needs the bytes and the minimum body time of each phase.
+#### Estimate for Qwen3-30B-A3B
+
+`python -m etx.tools.floors --table` computes both floors on the CPU. `tests/test_floors.py` checks it.
+`docs/FLOORS-2026-10-08.md` gives the rule, the hop chains and the line evidence.
+No phase floor comes from a measured body. A body-derived floor makes the serial floor equal to the measured time.
+
+The rule has three cases:
+1. A latency phase uses its dependent round trips times the coherent round trip. The count comes from the tile source.
+2. A stream phase uses its hw_stream probe. A phase adds the round trips that must finish before its stream.
+3. A phase with no count and no probe is unknown. It adds only its bytes divided by the bandwidth.
+
+The coherent round trip is 0.50 to 0.69 us. Source: `docs/TILES-2026-10-07.md:32`.
+The round11 trace gives the bytes. The device span is 5.08 ms. Source: `docs/BANDWIDTH-2026-10-07.md:4`.
+The handoff stays at 9 edges per layer at 1.00 us each. Source: `docs/BUDGET-2026-10-01.md:161`.
+No ISA of the round11 build exists. Thus each hop count is a range. The floors use the minimum counts.
+
+| Phase | Floor, us per layer, at 0.50 / 0.69 us | Source tag | Evidence: hops and chain |
+|---|---|---|---|
+| qkv | 7.23 / 7.42 | probe + hops x RTT | Probe 6.63 us. 1 to 18 hops in the folded norm: 8 rows and the residual. |
+| prep | 1.81 / 2.38 | hops x RTT | 3 to 4 hops: head row, position, slot, store drain. |
+| attn | 3.02 / 3.97 | hops x RTT | 5 to 7 hops: seq_len, block table, Q, K, V. vLLM ISA. |
+| reduce | 1.31 / 1.69 | hops x RTT | 2 to 3 hops: seq_len, max and exp sums, partial outputs. vLLM ISA. |
+| o_proj | 5.30 / 5.30 | probe | Probe only. The touch hook loads the weights during the wait. |
+| router | 1.42 / 1.80 | hops x RTT | 2 to 5 hops: folded norm of 1 row and the residual, store drain. |
+| topk | 1.21 / 1.59 | hops x RTT | 2 to 10 hops: logits, 8 rounds of coherent stores, store drain. |
+| moe_up | 13.65 / 13.84 | probe + hops x RTT | Probe 13.15 us. 1 to 2 hops for the expert id. |
+| moe_down | 8.46 / 8.65 | probe + hops x RTT | Probe 7.96 us. 1 to 2 hops for the expert id. |
+
+Each floor also has cached hops at 0.104 us. `docs/FLOORS-2026-10-08.md` gives each count with its file and line.
+The unknown phases are prologue, in_norm and argmax. They run once per step. Thus each floor below is a lower bound.
+
+| Value, ms | 4.3 TB/s, 0.50 us | 4.3 TB/s, 0.69 us | 3.5 TB/s, 0.50 us | 3.5 TB/s, 0.69 us |
+|---|---:|---:|---:|---:|
+| Measured device span | 5.08 | 5.08 | 5.08 | 5.08 |
+| Serial floor | 2.66 | 2.82 | 2.73 | 2.88 |
+| Overlap floor | 1.44 | 1.44 | 1.77 | 1.77 |
+| Hop chain with handoffs | 0.93 | 1.09 | 0.93 | 1.09 |
+| Bandwidth floor | 1.44 | 1.44 | 1.77 | 1.77 |
+| Maximum gain from prefetch | 1.22 | 1.38 | 0.96 | 1.11 |
+| Maximum gain without prefetch | 2.42 | 2.26 | 2.35 | 2.21 |
+
+The estimate gives four results:
+1. The bandwidth floor sets the overlap floor. The hop chain is only 0.93 to 1.09 ms.
+2. The earlier estimate took its skeletons from the bodies. Its chain was 2.59 ms. Source: `etx/tools/floors.py` at `f437fbe`.
+3. Without prefetch, the utilization cannot pass 54% at 4.3 TB/s. The 78% dense reference of section 2.3 needs prefetch or fewer serial phases.
+4. The maximum counts put the qkv floor above the qkv body. Thus the maximum case is not a valid floor.
+
+The estimate has these limits:
+1. The trace is from 2026-10-01. The shipped build has bodies 2.80 us shorter per layer.
+2. The probes at width 256 are interpolations with an error of about 7%.
+3. LDS steps, barriers inside a task and the coherent request rate are not in the floors.
+4. At 0.28 us, the `hw_cohload` median of one workgroup, the serial floor is 2.48 ms at 4.3 TB/s.
 
 ### 2.3 Bandwidth utilization at this time
 
@@ -101,15 +150,38 @@ Two items own most of the excess:
 
 The two items can overlap. Their sum is an upper bound.
 
-The rank of the levers comes from the floors of section 2.2:
-1. The serial floor minus the overlap floor gives the maximum gain from prefetch across barriers.
-2. The measured time minus the serial floor gives the maximum gain from phase merges, shorter bodies and fewer gaps without prefetch.
-The larger value selects the first lever. Both values come from the same CPU estimate.
+The floors of section 2.2 rank the levers. The values use the minimum hop counts at 0.50 us and 4.3 TB/s.
+The gain without prefetch is 2.42 ms. The gain from prefetch is 1.22 ms.
+The gain without prefetch is larger in all four combinations of bandwidth and round trip. Thus shorter critical bodies come first.
+The two gains can overlap. Their sum is not a gain.
 
-The first lever is to stream the weights of the next phases during the low-occupancy phases.
-The second lever is to merge phases on the critical path.
-fleet measured one form of the first lever: idle-worker prefetch into the Infinity Cache. It gave no gain. Source: fleet-mi300x `docs/STATUS.md:72`.
-Before new work on this lever, find the cause of that result.
+| Part of the gain without prefetch | ms per step |
+|---|---:|
+| Body excess of topk, router, reduce, prep and attn | 1.20 |
+| Body excess of moe_up and moe_down | 0.53 |
+| Body excess of qkv | 0.21 |
+| Body excess of o_proj | 0.01 |
+| Start delay of the critical tasks | 0.41 |
+| Layer 0 and tail above their floors | 0.05 |
+
+The body excess of a phase is its critical body minus its serial floor. Source: `python -m etx.tools.floors`.
+
+The levers have this order:
+1. Shorter bodies of the five latency phases. The gain is at most 1.20 ms, or 1.07 ms at 0.69 us. topk owns 0.34 ms, router 0.28 ms, reduce 0.20 ms, prep 0.20 ms and attn 0.17 ms.
+2. Prefetch across barriers. The gain is at most 1.22 ms. It needs capacity in the LDS, the L2 or the Infinity Cache.
+3. Shorter MoE bodies. The gain is at most 0.53 ms.
+4. A shorter folded norm in qkv. The gain is at most 0.21 ms.
+5. The start delay, 0.41 ms. `docs/BUDGET-2026-10-01.md` assigns most of it to the hardware dispatcher.
+6. The handoffs, 0.43 ms. Each edge is near the protocol floor. Only fewer edges reduce this cost.
+
+Lever 1 has these facts:
+1. Each latency body is 2 to 7 times its hop floor. topk is 6.9 times and attn is 2.1 times.
+2. topk, router and prep are DSL tiles. The tile primitive layer of section 6.4 owns them.
+3. attn and reduce are imported vLLM kernels. A change needs an ETX tile or a TileLang tile.
+4. The floors leave out the LDS steps and the request rate. Thus the real gain is smaller than 1.20 ms.
+
+fleet measured one form of lever 2: idle-worker prefetch into the Infinity Cache. It gave no gain. Source: fleet-mi300x `docs/STATUS.md:72`.
+Before new work on lever 2, find the cause of that result.
 
 The o_proj stage into LDS predicts 0.117 to 0.171 ms. This gain is small against the 3.6 ms excess. Appendix A keeps it at low priority.
 

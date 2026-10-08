@@ -32,6 +32,10 @@ EXTERNAL_TESTS = {
     # Round11 archive gates: skipped without ETX_DATA_ROOT, failures when ETX_REQUIRE_DATA=1.
     "tests.test_layer_budget.test_round11_host_correspondence",
     "tests.test_bandwidth_phases.test_round11_spec_and_ranked_total",
+    "tests.test_floors.test_round11_table_matches_the_raw_trace",
+    # Hop evidence: the round11 commit is absent from a shallow clone; the vLLM lines need VLLM_SRC.
+    "tests.test_floors.test_tile_evidence_lines_at_the_round11_commit",
+    "tests.test_floors.test_vllm_evidence_lines",
 }
 
 
