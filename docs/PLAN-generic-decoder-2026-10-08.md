@@ -53,51 +53,59 @@ A dense model is near its bandwidth floor. A MoE model with small experts can be
 No phase floor comes from a measured body. A body-derived floor makes the serial floor equal to the measured time.
 
 The rule has three cases:
-1. A latency phase uses its dependent round trips times the coherent round trip. The count comes from the tile source.
-2. A stream phase uses its hw_stream probe. A phase adds the round trips that must finish before its stream.
-3. A phase with no count and no probe is unknown. It adds only its bytes divided by the bandwidth.
+1. A latency phase uses its ISA hops. A coherent hop costs one round trip. A cached hop costs 0.104 us. The tag is `ISA hops x RTT`.
+2. A stream phase uses its hw_stream probe. It adds the ISA hops before its first weight load. The tag is `probe + ISA hops x RTT`.
+3. A phase with no count and no probe is unknown. It adds only its bytes divided by the bandwidth. No phase is unknown now.
 
+The counts come from the ISA of the matching build: `isa_r11/MATCH/megakernel_d0.gfx942.s`.
+Compiler: AMD clang 23.0.0git 52226beb (TheRock ROCm 7.14.0a20260612), tile ae1529c. VGPR 128, 14 spilled VGPRs, LDS 41448 bytes.
+A tool follows each data dependency through the waits `s_waitcnt lgkmcnt` and `vmcnt(N)`. It pairs each scratch reload with its store by offset.
+fix built a debug copy with `-gline-tables-only`: `isa_r11/MATCH_loc/`. It has the same 112,693 instructions. Its line tables and inline chains assign each instruction to a phase.
+No line-0 instruction is on a counted chain. The plan uses three vLLM kernels: attn, reduce and in_norm. All other phases are ETX DSL tiles.
+The 7.2.4 build is a control only. ROCm 7.2.4 clang 22.0.0git f58b06dc does not match the fingerprint.
 The coherent round trip is 0.50 to 0.69 us. Source: `docs/TILES-2026-10-07.md:32`.
 The round11 trace gives the bytes. The device span is 5.08 ms. Source: `docs/BANDWIDTH-2026-10-07.md:4`.
 The handoff stays at 9 edges per layer at 1.00 us each. Source: `docs/BUDGET-2026-10-01.md:161`.
-No ISA of the round11 build exists. Thus each hop count is a range. The floors use the minimum counts.
 
-| Phase | Floor, us per layer, at 0.50 / 0.69 us | Source tag | Evidence: hops and chain |
+Hops are coherent/plain/scalar/scratch/store. A plain load costs a round trip in attn, reduce and in_norm, because each of these tasks starts after an acquire.
+
+| Phase | Floor, us per layer, at 0.50 / 0.69 us | Source tag | Evidence: ISA hops and chain |
 |---|---|---|---|
-| qkv | 7.23 / 7.42 | probe + hops x RTT | Probe 6.63 us. 1 to 18 hops in the folded norm: 8 rows and the residual. |
-| prep | 1.81 / 2.38 | hops x RTT | 3 to 4 hops: head row, position, slot, store drain. |
-| attn | 3.02 / 3.97 | hops x RTT | 5 to 7 hops: seq_len, block table, Q, K, V. vLLM ISA. |
-| reduce | 1.31 / 1.69 | hops x RTT | 2 to 3 hops: seq_len, max and exp sums, partial outputs. vLLM ISA. |
-| o_proj | 5.30 / 5.30 | probe | Probe only. The touch hook loads the weights during the wait. |
-| router | 1.42 / 1.80 | hops x RTT | 2 to 5 hops: folded norm of 1 row and the residual, store drain. |
-| topk | 1.21 / 1.59 | hops x RTT | 2 to 10 hops: logits, 8 rounds of coherent stores, store drain. |
-| moe_up | 13.65 / 13.84 | probe + hops x RTT | Probe 13.15 us. 1 to 2 hops for the expert id. |
-| moe_down | 8.46 / 8.65 | probe + hops x RTT | Probe 7.96 us. 1 to 2 hops for the expert id. |
+| qkv | 7.55 / 7.74 | probe + ISA hops x RTT | Probe 6.63 us. Pre-stream chain 0/3/1. Phase chain 1/4/1/0/1. The coherent hop is the residual row at line 96012. |
+| prep | 1.52 / 1.90 | ISA hops x RTT | 1/4/1/0/1. The coherent hop is the position at line 108849. Store drain at line 108952. |
+| attn | 2.92 / 3.87 | ISA hops x RTT | 0/5/2/1/1. seq_len, block table, Q, K, V, then 1 scratch reload at line 108178. vLLM code. |
+| reduce | 2.81 / 3.76 | ISA hops x RTT | 0/5/2/0/1. seq_len, max and exp sums, partial outputs. vLLM code. |
+| o_proj | 5.30 / 5.30 | probe | Probe only. The touch hook loads the weights during the wait. The ISA chain is 1/4/1/0/1. |
+| router | 1.52 / 1.90 | ISA hops x RTT | 1/4/1/0/1. Same code as qkv: folded norm of 1 row and the residual. |
+| topk | 1.21 / 1.59 | ISA hops x RTT | 1/1/1/0/1. Logits load, coherent read at line 95430, store drain. |
+| moe_up | 14.67 / 15.05 | probe + ISA hops x RTT | Probe 13.15 us. Pre-stream chain 1/4/1. Phase chain 1/5/1/0/1. The second lane model gives 6 plain hops. |
+| moe_down | 9.48 / 9.86 | probe + ISA hops x RTT | Probe 7.96 us. Pre-stream chain 1/4/1. Phase chain 1/5/1/0/1. |
 
-Each floor also has cached hops at 0.104 us. `docs/FLOORS-2026-10-08.md` gives each count with its file and line.
-The unknown phases are prologue, in_norm and argmax. They run once per step. Thus each floor below is a lower bound.
+Only attn has a scratch reload on its chain. It is 1 hop. All other phases have 0.
+The tail phases also have ISA counts. prologue is 0/2/2/0/1. in_norm is 0/7/1/0/1. argmax is 0/1/1/0/1.
 
 | Value, ms | 4.3 TB/s, 0.50 us | 4.3 TB/s, 0.69 us | 3.5 TB/s, 0.50 us | 3.5 TB/s, 0.69 us |
 |---|---:|---:|---:|---:|
 | Measured device span | 5.08 | 5.08 | 5.08 | 5.08 |
-| Serial floor | 2.66 | 2.82 | 2.73 | 2.88 |
+| Serial floor | 2.84 | 3.03 | 2.87 | 3.06 |
 | Overlap floor | 1.44 | 1.44 | 1.77 | 1.77 |
-| Hop chain with handoffs | 0.93 | 1.09 | 0.93 | 1.09 |
+| Hop chain with handoffs | 1.22 | 1.44 | 1.22 | 1.44 |
 | Bandwidth floor | 1.44 | 1.44 | 1.77 | 1.77 |
-| Maximum gain from prefetch | 1.22 | 1.38 | 0.96 | 1.11 |
-| Maximum gain without prefetch | 2.42 | 2.26 | 2.35 | 2.21 |
+| Maximum gain from prefetch | 1.40 | 1.59 | 1.10 | 1.30 |
+| Maximum gain without prefetch | 2.24 | 2.05 | 2.21 | 2.02 |
 
 The estimate gives four results:
-1. The bandwidth floor sets the overlap floor. The hop chain is only 0.93 to 1.09 ms.
+1. The bandwidth floor sets the overlap floor. The hop chain is 1.22 to 1.44 ms. At 0.69 us and 4.3 TB/s, the margin is less than 1 us.
 2. The earlier estimate took its skeletons from the bodies. Its chain was 2.59 ms. Source: `etx/tools/floors.py` at `f437fbe`.
-3. Without prefetch, the utilization cannot pass 54% at 4.3 TB/s. The 78% dense reference of section 2.3 needs prefetch or fewer serial phases.
-4. The maximum counts put the qkv floor above the qkv body. Thus the maximum case is not a valid floor.
+3. Without prefetch, the utilization cannot pass 51% at 4.3 TB/s. The 78% dense reference of section 2.3 needs prefetch or fewer serial phases.
+4. No phase floor is above its measured critical body. No tail floor is above its device time.
 
 The estimate has these limits:
 1. The trace is from 2026-10-01. The shipped build has bodies 2.80 us shorter per layer.
 2. The probes at width 256 are interpolations with an error of about 7%.
 3. LDS steps, barriers inside a task and the coherent request rate are not in the floors.
-4. At 0.28 us, the `hw_cohload` median of one workgroup, the serial floor is 2.48 ms at 4.3 TB/s.
+4. At 0.28 us, the `hw_cohload` median of one workgroup, the serial floor is 2.61 ms at 4.3 TB/s. The gain from prefetch is 1.17 ms. The gain without prefetch is 2.47 ms.
+5. moe_up has 5 or 6 plain hops. The two lane models of the tool do not agree. The floor uses 5.
 
 ### 2.3 Bandwidth utilization at this time
 
@@ -150,35 +158,38 @@ Two items own most of the excess:
 
 The two items can overlap. Their sum is an upper bound.
 
-The floors of section 2.2 rank the levers. The values use the minimum hop counts at 0.50 us and 4.3 TB/s.
-The gain without prefetch is 2.42 ms. The gain from prefetch is 1.22 ms.
-The gain without prefetch is larger in all four combinations of bandwidth and round trip. Thus shorter critical bodies come first.
+The floors of section 2.2 rank the levers. The values use the ISA hop counts at 0.50 us and 4.3 TB/s.
+The gain without prefetch is 2.24 ms. The gain from prefetch is 1.40 ms.
+The gain without prefetch is larger in all four combinations of bandwidth and round trip: 2.02 to 2.24 ms against 1.10 to 1.59 ms. Thus shorter critical bodies come first.
 The two gains can overlap. Their sum is not a gain.
 
 | Part of the gain without prefetch | ms per step |
 |---|---:|
-| Body excess of topk, router, reduce, prep and attn | 1.20 |
-| Body excess of moe_up and moe_down | 0.53 |
-| Body excess of qkv | 0.21 |
+| Body excess of topk, router, prep, attn and reduce | 1.14 |
+| Body excess of moe_up and moe_down | 0.43 |
+| Body excess of qkv | 0.20 |
 | Body excess of o_proj | 0.01 |
 | Start delay of the critical tasks | 0.41 |
 | Layer 0 and tail above their floors | 0.05 |
 
 The body excess of a phase is its critical body minus its serial floor. Source: `python -m etx.tools.floors`.
 
-The levers have this order:
-1. Shorter bodies of the five latency phases. The gain is at most 1.20 ms, or 1.07 ms at 0.69 us. topk owns 0.34 ms, router 0.28 ms, reduce 0.20 ms, prep 0.20 ms and attn 0.17 ms.
-2. Prefetch across barriers. The gain is at most 1.22 ms. It needs capacity in the LDS, the L2 or the Infinity Cache.
-3. Shorter MoE bodies. The gain is at most 0.53 ms.
-4. A shorter folded norm in qkv. The gain is at most 0.21 ms.
+The levers have this order. The order did not change with the ISA counts.
+1. Shorter bodies of the five latency phases. The gain is at most 1.14 ms, or 1.00 ms at 0.69 us. topk owns 0.34 ms, router owns 0.28 ms, prep owns 0.22 ms, attn owns 0.17 ms, reduce owns 0.13 ms.
+2. Prefetch across barriers. The gain is at most 1.40 ms, or 1.59 ms at 0.69 us. It needs capacity in the LDS, the L2 or the Infinity Cache.
+3. Shorter MoE bodies. The gain is at most 0.43 ms.
+4. A shorter folded norm in qkv. The gain is at most 0.20 ms.
 5. The start delay, 0.41 ms. `docs/BUDGET-2026-10-01.md` assigns most of it to the hardware dispatcher.
 6. The handoffs, 0.43 ms. Each edge is near the protocol floor. Only fewer edges reduce this cost.
 
+Prefetch alone is larger than lever 1 in three of four combinations. The rule above compares the full gain without prefetch. Thus lever 1 stays first.
+
 Lever 1 has these facts:
-1. Each latency body is 2 to 7 times its hop floor. topk is 6.9 times and attn is 2.1 times.
+1. Each latency body is 2.0 to 6.9 times its ISA chain. topk is 6.9 times and reduce is 2.0 times.
 2. topk, router and prep are DSL tiles. The tile primitive layer of section 6.4 owns them.
 3. attn and reduce are imported vLLM kernels. A change needs an ETX tile or a TileLang tile.
-4. The floors leave out the LDS steps and the request rate. Thus the real gain is smaller than 1.20 ms.
+4. qkv and router serialize 8 row loads with a `vmcnt(0)` wait in each trip. The data chain has 1 coherent hop. This is a compiler lever.
+5. The floors leave out the LDS steps and the request rate. Thus the real gain is smaller than 1.14 ms.
 
 fleet measured one form of lever 2: idle-worker prefetch into the Infinity Cache. It gave no gain. Source: fleet-mi300x `docs/STATUS.md:72`.
 Before new work on lever 2, find the cause of that result.

@@ -1,27 +1,27 @@
 """CPU-only hardware floors for one Qwen3-30B-A3B decode step on MI300X. This is NOT a measurement.
 
 No phase floor comes from a measured task body. Each phase has one source tag:
-* 'hops x RTT': dependent global-memory round trips on the critical task, counted from the tile
-  source, times the coherent-load round trip. Loads that can be in flight together count once.
-  Cached round trips, for example argument-block loads, use the cached-hop price.
+* 'ISA hops x RTT': the exact dependent global-memory round trips of the phase, counted by
+  etx/tools/isa_hops.py in the gfx942 ISA of the round11 build (clang 52226beb, ROCm 7.14.0a20260612,
+  the build that matches the fingerprint). Each hop class has its own price: coherent loads and
+  coherent store drains take the coherent round trip (RTT). Plain loads take the cached price,
+  except after an acquire (`buffer_inv sc1`), where they take the RTT. Scalar loads, scratch
+  reloads and plain store drains take the cached price.
 * 'probe': the hw_stream achievable time of the phase (BUDGET achievable column).
-* 'probe + hops x RTT': the probe plus the round trips that must finish before the stream starts
-  and that the probe kernel does not contain (the folded norm of qkv, the expert ids of the MoE).
+* 'probe + ISA hops x RTT': the probe, plus the ISA hops before the first weight-stream load,
+  plus the store drain.
 * 'bytes/BW': only the byte floor applies (lm_head).
-* 'unknown': no hop count and no probe. The phase adds only its bytes / bandwidth. The result is
-  then a lower bound, and `unknown_phases` lists the phase.
+* 'unknown': no hop count and no probe. The phase adds only its bytes / bandwidth.
 
-Each hop count has a minimum and a maximum. The minimum assumes that the compiler issues every
-independent load as early as the source permits. The maximum follows the program order of the
-source or the ISA evidence. Without ISA of the round11 build, the true count lies in between.
-
-serial floor  = 48 x (sum over phases of max(bytes/BW, phase floor) + handoffs) + tail bytes/BW
-overlap floor = max(step bytes/BW, 48 x (sum over phases of hop time + handoffs))
+serial floor  = 48 x (sum over phases of max(bytes/BW, phase floor) + handoffs)
+                + sum over tail phases of max(bytes/BW, tail floor)
+overlap floor = max(step bytes/BW, 48 x (sum over phases of ISA chain + handoffs) + tail ISA chains)
 The overlap floor assumes that every byte streams under earlier phases, with unlimited capacity.
 The handoff term is the measured 9 edges per layer. It is a measurement of the edge, not of a body.
 
 Inputs: docs/FLOORS-2026-10-08.md holds the round11 phase table, recomputed from the raw trace,
-and the hop table with the chain evidence. `round11_from_trace` recomputes the phase table.
+and the ISA hop table with the MATCH .s lines. `round11_from_trace` recomputes the phase table.
+`python -m etx.tools.isa_phases` recomputes the ISA hop table.
 """
 from __future__ import annotations
 
@@ -40,10 +40,15 @@ VALID = 'docs/VALIDATION-baremetal-2026-10-01.md'
 BW_DOC = 'docs/BANDWIDTH-2026-10-07.md'
 PHASES = ('qkv', 'prep', 'attn', 'reduce', 'o_proj', 'router', 'topk', 'moe_up', 'moe_down')
 TAIL = ('prologue', 'in_norm', 'lm_head', 'argmax')
-TAGS = ('hops x RTT', 'probe', 'probe + hops x RTT', 'bytes/BW', 'unknown')
+ISA_TAIL = ('prologue', 'in_norm', 'argmax')            # tail phases with an ISA hop row
+TAGS = ('ISA hops x RTT', 'probe', 'probe + ISA hops x RTT', 'bytes/BW', 'unknown')
 LAYERS = 48
 BANDWIDTHS_TBS = (4.3, 3.5)
-HOPS = ('min', 'max')
+ISA_FILE = 'isa_r11/MATCH/megakernel_d0.gfx942.s'      # under /workspace on the shared box
+ISA_COMPILER = 'AMD clang 23.0.0git 52226beb (TheRock ROCm 7.14.0a20260612), tile ae1529c'
+ISA_FINGERPRINT = {'vgpr': 128, 'scratch_bytes': 52, 'vgpr_spill': 14, 'lds_bytes': 41448}
+CONTROL_COMPILER = 'ROCm 7.2.4 clang 22.0.0git f58b06dc (no fingerprint match: spill 9, scratch 32)'
+WG_MEDIAN_RTT_US = 0.28                                # hw_cohload.log median of one workgroup
 
 
 def source(path: str, text: str, after: str | None = None) -> tuple[str, str]:
@@ -174,15 +179,34 @@ class Measured:
 
 @dataclass(frozen=True)
 class Hops:
+    """Exact ISA hop counts of one phase. `pre_*`: the hops before the first weight-stream load."""
     name: str
     tag: str
-    coh_min: int
-    coh_max: int
-    cache_min: int
-    cache_max: int
-    probe_used: bool
+    region: str
+    preset: str
+    coherent: int
+    plain: int
+    scalar: int
+    scratch: int
+    store_coherent: int
+    store_plain: int
+    pre_coherent: int
+    pre_plain: int
+    pre_scalar: int
     chain: str
     where: str
+
+    def cost(self, rtt: float, cached: float) -> float:
+        """Price of the whole chain, from the region entry to the publish."""
+        plain = rtt if self.preset == 'acquired' else cached
+        return (self.coherent * rtt + self.plain * plain + (self.scalar + self.scratch) * cached
+                + self.store_coherent * rtt + self.store_plain * cached)
+
+    def pre_cost(self, rtt: float, cached: float) -> float:
+        """Price of the hops before the stream and of the store drain at the end."""
+        plain = rtt if self.preset == 'acquired' else cached
+        return (self.pre_coherent * rtt + self.pre_plain * plain + self.pre_scalar * cached
+                + self.store_coherent * rtt + self.store_plain * cached)
 
 
 def round11_table() -> dict[str, Measured]:
@@ -209,25 +233,30 @@ def tail_table() -> dict[str, tuple[float, float, str, str]]:
 
 
 def hop_table() -> dict[str, Hops]:
+    """ISA hop table: the 9 layer phases and the tail phases with an ISA count."""
     out = {}
-    for name in PHASES:
-        where, line = source(DOC, f'| {name} | ', after='## Hop table')
+    for name in PHASES + ISA_TAIL:
+        where, line = source(DOC, f'| {name} | ', after='## ISA hop table')
         r = cells(line)
-        if len(r) != 8 or r[1] not in TAGS:
-            raise ValueError(f'unexpected hop row: {where}')
-        h = Hops(name, r[1], int(r[2]), int(r[3]), int(r[4]), int(r[5]), r[6] == 'yes', r[7], where)
-        if not (0 <= h.coh_min <= h.coh_max and 0 <= h.cache_min <= h.cache_max):
-            raise ValueError(f'hop range out of order: {where}')
-        if h.probe_used != h.tag.startswith('probe'):
-            raise ValueError(f'tag and probe column disagree: {where}')
+        if len(r) != 15 or r[1] not in TAGS:
+            raise ValueError(f'unexpected ISA hop row: {where}')
+        n = [int(x) for x in r[4:13]]
+        h = Hops(name, r[1], r[2], r[3], *n, r[13], f'{where}; {ISA_FILE}:{r[14]}')
+        if h.preset not in ('warm', 'acquired'):
+            raise ValueError(f'unknown preset: {where}')
+        if min(n) < 0 or h.pre_coherent > h.coherent or h.pre_scalar > h.scalar:
+            raise ValueError(f'hop counts out of order: {where}')
         out[name] = h
     return out
 
 
+def wg_median_rtt_us() -> tuple[float, str]:
+    src = source(DOC, 'median of one workgroup is')
+    return _num(src, r'is (\d+\.\d+) us')[0], src[0]
+
+
 # ------------------------------------------------------------------ arithmetic
-def floors(bw_tbs: float = 4.3, rtt_us: float | None = None, hops: str = 'min') -> dict:
-    if hops not in HOPS:
-        raise ValueError(f'hops must be one of {HOPS}')
+def floors(bw_tbs: float = 4.3, rtt_us: float | None = None) -> dict:
     (rtt_lo, rtt_hi), rtt_src = rtt_range_us()
     rtt = rtt_lo if rtt_us is None else rtt_us
     t_cache, cache_src = cached_hop_us()
@@ -239,35 +268,55 @@ def floors(bw_tbs: float = 4.3, rtt_us: float | None = None, hops: str = 'min') 
     rows, flags = {}, []
     for p in PHASES:
         m, h = meas[p], hop[p]
-        coh = h.coh_min if hops == 'min' else h.coh_max
-        cac = h.cache_min if hops == 'min' else h.cache_max
-        hop_us = coh * rtt + cac * t_cache
-        probe = probes[p][0] if h.probe_used else None
-        if h.probe_used and probe is None:
+        chain_us = h.cost(rtt, t_cache)
+        probe = probes[p][0] if h.tag.startswith('probe') else None
+        if h.tag.startswith('probe') and probe is None:
             raise ValueError(f'{p}: probe tag without a BUDGET probe')
-        floor_lat = hop_us + (probe or 0.0)
+        if h.tag == 'ISA hops x RTT':
+            floor_lat = chain_us
+        elif h.tag == 'probe + ISA hops x RTT':
+            floor_lat = probe + h.pre_cost(rtt, t_cache)
+        elif h.tag == 'probe':
+            floor_lat = probe
+        else:
+            raise ValueError(f'{p}: tag {h.tag} is not valid for a layer phase')
         stream = m.gb_step / LAYERS * 1e3 / bw_tbs              # GB per step -> MB per layer -> us
         serial = max(stream, floor_lat)
         if floor_lat > m.crit_body:
             flags.append(p)
-        rows[p] = {'tag': h.tag, 'coherent_hops': coh, 'cached_hops': cac, 'hop_us': hop_us,
-                   'probe_us': probe, 'phase_floor_us': floor_lat, 'stream_us': stream,
+        rows[p] = {'tag': h.tag, 'region': h.region, 'preset': h.preset,
+                   'hops': {'coherent': h.coherent, 'plain': h.plain, 'scalar': h.scalar, 'scratch': h.scratch,
+                            'store_coherent': h.store_coherent, 'store_plain': h.store_plain},
+                   'chain_us': chain_us, 'probe_us': probe, 'phase_floor_us': floor_lat, 'stream_us': stream,
                    'serial_us': serial, 'crit_body_us': m.crit_body, 'body_excess_us': m.crit_body - serial,
                    'chain': h.chain, 'evidence': h.where, 'measured': m.where,
-                   'probe_source': probes[p][1] if h.probe_used else None}
-    tail_stream = sum(gb for gb, _, _, _ in tail.values()) * 1e3 / bw_tbs
+                   'probe_source': probes[p][1] if probe is not None else None}
+    tail_rows = {}
+    for t, (gb, dev, tag, where) in tail.items():
+        stream = gb * 1e3 / bw_tbs
+        h = hop.get(t)
+        if tag == 'ISA hops x RTT':
+            if h is None:
+                raise ValueError(f'{t}: ISA tag without an ISA hop row')
+            fl = h.cost(rtt, t_cache)
+        else:
+            fl = 0.0
+        if fl > dev:
+            flags.append(t)
+        tail_rows[t] = {'tag': tag, 'floor_us': fl, 'stream_us': stream, 'serial_us': max(stream, fl),
+                        'device_us': dev, 'chain_us': fl, 'measured': where, 'evidence': h.where if h else None}
+    tail_stream = sum(r['stream_us'] for r in tail_rows.values())
     stream_total = LAYERS * sum(r['stream_us'] for r in rows.values()) + tail_stream
-    chain = LAYERS * (sum(r['hop_us'] for r in rows.values()) + hand)
-    serial = LAYERS * (sum(r['serial_us'] for r in rows.values()) + hand) + tail_stream
+    chain = LAYERS * (sum(r['chain_us'] for r in rows.values()) + hand) + sum(r['chain_us'] for r in tail_rows.values())
+    serial = LAYERS * (sum(r['serial_us'] for r in rows.values()) + hand) + sum(r['serial_us'] for r in tail_rows.values())
     overlap = max(stream_total, chain)
     body_excess = LAYERS * sum(r['body_excess_us'] for r in rows.values())
     start = LAYERS * sum(m.start for m in meas.values())
     unknown = sorted([p for p, r in rows.items() if r['tag'] == 'unknown'] +
-                     [p for p, (_, _, tag, _) in tail.items() if tag == 'unknown'])
+                     [p for p, r in tail_rows.items() if r['tag'] == 'unknown'])
     return {
         'bandwidth_tbs': bw_tbs,
         'rtt_us': rtt,
-        'hops': hops,
         'cached_hop_us': t_cache,
         'bandwidth_floor_us': stream_total,
         'hop_chain_us': chain,
@@ -288,6 +337,8 @@ def floors(bw_tbs: float = 4.3, rtt_us: float | None = None, hops: str = 'min') 
         'lower_bound': True,
         'floor_above_measured_body': flags,
         'per_layer': rows,
+        'tail': tail_rows,
+        'isa': {'file': ISA_FILE, 'compiler': ISA_COMPILER, 'fingerprint': ISA_FINGERPRINT},
         'sources': {'rtt': rtt_src, 'rtt_range_us': [rtt_lo, rtt_hi], 'cached_hop': cache_src,
                     'handoff': hand_src, 'span': span_src, 'tail': {k: v[3] for k, v in tail.items()}},
     }
@@ -295,7 +346,13 @@ def floors(bw_tbs: float = 4.3, rtt_us: float | None = None, hops: str = 'min') 
 
 def grid() -> list[dict]:
     (lo, hi), _ = rtt_range_us()
-    return [floors(bw, rtt, h) for h in HOPS for rtt in (lo, hi) for bw in BANDWIDTHS_TBS]
+    return [floors(bw, rtt) for rtt in (lo, hi) for bw in BANDWIDTHS_TBS]
+
+
+def sensitivity() -> list[dict]:
+    """The same floors at the one-workgroup median round trip of hw_cohload.log."""
+    med, _ = wg_median_rtt_us()
+    return [floors(bw, med) for bw in BANDWIDTHS_TBS]
 
 
 # ------------------------------------------------------------------ round11 recomputation (needs the archive)
@@ -328,9 +385,9 @@ def round11_from_trace(plan_path: str | Path, raw_path: str | Path, first: int =
 
 
 def table(results: list[dict]) -> str:
-    lines = ['hops RTT  BW   | bandwidth  chain  overlap  serial  measured | prefetch  non-prefetch | bound']
+    lines = ['RTT  BW   | bandwidth  chain  overlap  serial  measured | prefetch  non-prefetch | bound']
     for r in results:
-        lines.append(f"{r['hops']:4s} {r['rtt_us']:.2f} {r['bandwidth_tbs']:.1f}  | {r['bandwidth_floor_us']:8.1f} "
+        lines.append(f"{r['rtt_us']:.2f} {r['bandwidth_tbs']:.1f}  | {r['bandwidth_floor_us']:8.1f} "
                      f"{r['hop_chain_us']:7.1f} {r['overlap_floor_us']:8.1f} {r['serial_floor_us']:7.1f} "
                      f"{r['measured_span_us']:8.1f} | {r['prefetch_gain_max_us']:8.1f} {r['non_prefetch_gain_max_us']:12.1f}"
                      f" | {r['overlap_bound_by']}")
@@ -345,7 +402,7 @@ def main(argv=None):
     if args.trace:
         print(json.dumps(round11_from_trace(*args.trace), indent=2))
         return 0
-    results = grid()
+    results = grid() + sensitivity()
     print(table(results) if args.table else json.dumps(results, indent=2))
     return 0
 
