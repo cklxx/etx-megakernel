@@ -4,7 +4,7 @@ import subprocess
 import pytest
 
 from examples.vllm_llm import nvref_report as nr
-from etx.tools.gpu_jobs import load_jobs
+from etx.tools.gpu_jobs import Runner, load_jobs
 
 
 def write(d, name, body, gpu="0"):
@@ -46,7 +46,7 @@ def session(tmp_path):
 def test_passing(session, capsys):
     assert nr.main([str(session)]) == 0
     out = capsys.readouterr().out
-    assert "VERDICT LEAD | image vllm/image@sha256:abcdef" in out
+    assert "VERDICT LEAD | import-check OK | image vllm/image@sha256:abcdef" in out
     assert "median=-0.200 spread=0.000" in out
     assert "FUSION (unfused - fused) median=+0.400" in out
     assert "IMPORT-CHECK OK" in out
@@ -59,6 +59,12 @@ def test_passing(session, capsys):
 def test_31_of_32_refuses(session, capsys, arm):
     write(session, f"{arm}_r3", vllm().replace("32/32", "31/32") if arm == "vllm"
           else etx(4.8, "graph" if arm == "etxu" else "fused", matched=31))
+    if arm == "etxu":
+        assert nr.main([str(session)]) == 0
+        out = capsys.readouterr().out
+        assert "FUSION unavailable (etxu_r3:" in out and "32/32" in out
+        assert "VERDICT LEAD" in out and "FUSION (unfused" not in out
+        return
     assert nr.main([str(session)]) == 2
     out = capsys.readouterr().out
     assert "32/32" in out and "VERDICT NOT-COMPLETE" in out
@@ -85,8 +91,10 @@ def test_comment_is_not_gate_evidence(session, capsys):
 
 def test_graph_off_refuses(session, capsys):
     write(session, "etxu_r1", etx(5.2, "graph").replace("ETX_UNFUSED_NOGRAPH=", "ETX_UNFUSED_NOGRAPH=1"))
-    assert nr.main([str(session)]) == 2
-    assert "graph-off" in capsys.readouterr().out
+    assert nr.main([str(session)]) == 0
+    out = capsys.readouterr().out
+    assert "graph-off" in out and "FUSION unavailable" in out
+    assert "VERDICT LEAD" in out and "FUSION (unfused" not in out
 
 
 @pytest.mark.parametrize("count", [30, 32])
@@ -100,6 +108,12 @@ def test_wrong_step_count_refuses(session, capsys, count):
 @pytest.mark.parametrize("gate", ["gate_all", "gate_unf", "check_imp"])
 def test_failed_gate(session, capsys, gate):
     write(session, gate, "CHECK FAILED: 1 launch(es) differ")
+    if gate == "gate_unf":
+        assert nr.main([str(session)]) == 0
+        out = capsys.readouterr().out
+        assert "FUSION unavailable (gate_unf:" in out
+        assert "VERDICT LEAD" in out and "FUSION (unfused" not in out
+        return
     assert nr.main([str(session)]) == 2
     assert "VERDICT NOT-COMPLETE" in capsys.readouterr().out
 
@@ -115,7 +129,7 @@ def test_import_na_and_basis_mismatch(session, capsys):
     write(session, "etx_r1", etx(4.8).replace("wall_ms=4.800", "wall_ms=4.850"))
     assert nr.main([str(session)]) == 0
     out = capsys.readouterr().out
-    assert "IMPORT-CHECK n/a (host.hip:500)" in out
+    assert "IMPORT-CHECK n/a (host.hip:515)" in out
     assert "BASIS-MISMATCH etx_r1 mean_ms=4.800 RESULT wall_ms=4.850" in out
 
 
@@ -142,11 +156,108 @@ def test_session_commands_and_order():
         assert subprocess.run(["bash", "-n", "-c", j.cmd], capture_output=True).returncode == 0
         assert j.lane == "cpu" or j.gpu == 0
     names = [j.name for j in jobs]
-    prev = "check_imp"
+    preceding = ["gate_all", "gate_unf", "check_imp", "check_imp1"]
     for r in range(1, 6):
         for arm in (["vllm", "etx", "etxu"] if r % 2 else ["etxu", "etx", "vllm"]):
             j = next(j for j in jobs if j.name == f"{arm}_r{r}")
-            assert j.after_any == [prev]
+            assert j.after_any == preceding
             assert "golden_sha" in j.after
-            assert names.index(prev) < names.index(j.name)
-            prev = j.name
+            assert all(names.index(dep) < names.index(j.name) for dep in preceding)
+            expected = {"vllm": ["golden_sha", "docker_pull"],
+                        "etx": ["golden_sha", "build_all", "gate_all"],
+                        "etxu": ["golden_sha", "build_all", "gate_all", "gate_unf"]}
+            assert j.after == expected[arm]
+            preceding.append(j.name)
+
+
+@pytest.mark.parametrize("missing", ["gate_unf", "etxu_r1", "etxu_r5", "all"])
+def test_fusion_missing_still_verdict(session, capsys, missing):
+    names = [f"etxu_r{r}" for r in range(1, 6)] if missing == "all" else [missing]
+    for name in names:
+        (session / f"{name}.log").unlink()
+    assert nr.main([str(session)]) == 0
+    out = capsys.readouterr().out
+    assert "| vLLM 0.27.1 default |" in out and "| ETX fused, 4 tile flags |" in out
+    assert "FUSION unavailable (" in out and "missing run/job log" in out
+    assert "FUSION (unfused" not in out and "| ETX unfused, HIP graph |" not in out
+    assert "DELTA r1..r5" in out and "VERDICT LEAD" in out
+
+
+def test_check_imp1_ok_wins_over_legacy_na(session, capsys):
+    """The single-XCD check supplies the evidence; the legacy per-XCD refusal is not reported."""
+    write(session, "check_imp1", "CHECK OK: 0 launch(es) differ")
+    write(session, "check_imp", "ERROR: --check needs a plan without per-XCD replicas (build without ETX_VL_XCD)")
+    assert nr.main([str(session)]) == 0
+    out = capsys.readouterr().out
+    assert "IMPORT-CHECK OK" in out
+
+
+def test_legacy_check_failed_refuses_even_when_new_check_passed(session, capsys):
+    """A differing launch in either build is a correctness failure, not an unavailable check."""
+    write(session, "check_imp1", "CHECK OK: 0 launch(es) differ")
+    write(session, "check_imp", "CHECK FAILED: 1 launch(es) differ")
+    assert nr.main([str(session)]) == 2
+    out = capsys.readouterr().out
+    assert "REFUSED: check_imp: CHECK FAILED" in out
+    assert "DELTA" not in out
+
+
+def test_check_imp1_failure_refuses(session, capsys):
+    write(session, "check_imp1", "CHECK FAILED: 1 launch(es) differ")
+    write(session, "check_imp", "ERROR: --check needs a plan without per-XCD replicas (build without ETX_VL_XCD)")
+    (session / "status.json").write_text(json.dumps([dict(name="check_imp1", status="fail")]))
+    assert nr.main([str(session)]) == 2
+    out = capsys.readouterr().out
+    assert out.startswith("REFUSED: check_imp1:")
+    assert out.endswith("No performance numbers.\nVERDICT NOT-COMPLETE\n")
+    assert "| source |" not in out and "DELTA" not in out
+    assert "CHECK FAILED" in out
+
+
+@pytest.mark.parametrize("body,status", [
+    ("CHECK OK: 0 launch(es) differ", "timeout"),
+    ("ERROR: --check needs a plan without per-XCD replicas (build without ETX_VL_XCD)", "fail"),
+    ("", "skipped"),
+])
+def test_check_imp1_incomplete_proceeds_with_not_met(session, capsys, body, status):
+    """An unavailable check keeps the numbers and marks the gate NOT MET on the verdict line."""
+    write(session, "check_imp1", body)
+    write(session, "check_imp", "ERROR: --check needs a plan without per-XCD replicas (build without ETX_VL_XCD)")
+    (session / "status.json").write_text(json.dumps([dict(name="check_imp1", status=status)]))
+    assert nr.main([str(session)]) == 0
+    out = capsys.readouterr().out
+    assert f"IMPORT-CHECK NOT MET (check_imp1: {status})" in out
+    assert "DELTA r1..r5" in out
+    assert f"VERDICT LEAD | import-check NOT MET (check_imp1: {status})" in out
+
+
+@pytest.mark.parametrize("arm", ["vllm", "etx"])
+def test_missing_required_with_missing_fusion_refuses(session, capsys, arm):
+    (session / "etxu_r1.log").unlink()
+    (session / f"{arm}_r5.log").unlink()
+    assert nr.main([str(session)]) == 2
+    out = capsys.readouterr().out
+    assert "No performance numbers." in out and "VERDICT NOT-COMPLETE" in out
+    assert "| source |" not in out and "DELTA" not in out
+
+
+def test_check_build_and_skipped_neighbour_barrier(tmp_path):
+    jobs = load_jobs("examples/sessions/nvref.py")
+    by_name = {j.name: j for j in jobs}
+    assert "ETX_VL_CHECK=1 ETX_VL_XCD=0" in by_name["build_chk1"].cmd
+    assert "--check 2" in by_name["check_imp1"].cmd
+    assert "CHECK OK: 0 launch(es) differ" in by_name["check_imp1"].cmd
+    runner = Runner(jobs, [0], 2, tmp_path)
+    for job in jobs:
+        job.status = "ok"
+    by_name["gate_unf"].status = "fail"
+    for r in range(1, 6):
+        assert runner._deps_state(by_name[f"etxu_r{r}"]) == "skip"
+        by_name[f"etxu_r{r}"].status = "skipped"
+    by_name["etx_r1"].status = "running"
+    assert runner._deps_state(by_name["etx_r2"]) == "wait"
+    by_name["etx_r1"].status = "ok"
+    assert runner._deps_state(by_name["etx_r2"]) == "ready"
+    for name in ("hostprof", "etx_noprog", "vllm_aiter_r1", "vllm_aiter_r2", "vllm_aiter_r3", "report"):
+        assert runner._deps_state(by_name[name]) == "ready"
+        by_name[name].status = "fail"

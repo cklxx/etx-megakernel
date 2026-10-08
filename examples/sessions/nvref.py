@@ -48,11 +48,12 @@ IMAGE = "vllm/vllm-openai-rocm:v0.27.1"
 job(name="docker_pull", lane="cpu", timeout=1200, quiet_s=900,
     cmd=f"sudo docker pull {IMAGE} && printf 'IMAGE ' && sudo docker inspect --format '{{{{index .RepoDigests 0}}}}' {IMAGE}")
 
-# Two CPU builds are implicit in section 4; keep the tiles.py build shape.
+# One timing build and two import-check builds; keep the tiles.py build shape.
 ALL = "-DETX_DSL_WSUM -DETX_DSL_SCALAR -DETX_DSL_GU1 -DETX_DSL_RBATCH"
-for b in ("all", "chk"):
+for b in ("all", "chk", "chk1"):
     job(name=f"build_{b}", lane="cpu", after=["etx_env", "dl"], timeout=2400, quiet_s=900,
-        cmd=f"set -o pipefail; {V} ETX_VL_CHECK={int(b == 'chk')} ETX_HIPCC_FLAGS='{ALL}' "
+        cmd=f"set -o pipefail; {V} ETX_VL_CHECK={int(b != 'all')} "
+            f"{'ETX_VL_XCD=0 ' if b == 'chk1' else ''}ETX_HIPCC_FLAGS='{ALL}' "
             f"ETX_OUT={S}/b_{b} bash examples/vllm_llm/build.sh {LLM}/{M} 2>&1 | tee {S}/b_{b}.buildlog && "
             f"cp {S}/b_{b}/vl_plan.txt {S}/vlplan_{b}.txt && "
             f"cp {S}/b_{b}/dsl_tiles.hip {S}/dsl_tiles_{b}.hip && "
@@ -82,8 +83,19 @@ job(name="check_imp", gpu=0, after=["build_chk", "prep", "golden_sha"], after_an
         f"grep -Fq -- '--check needs a plan without per-XCD replicas (build without ETX_VL_XCD)' {S}/check_imp.txt; }}",
     summary=[r"CHECK|--check needs"])
 
+job(name="check_imp1", gpu=0, after=["build_chk1", "prep", "golden_sha"],
+    after_any=["check_imp", "gate_all", "gate_unf"], timeout=600,
+    cmd=f"set -o pipefail; stdbuf -oL {run('chk1', '--check 2')} 2>&1 | tee {S}/check_imp1.txt && "
+        f"! grep -q '^CHECK FAILED' {S}/check_imp1.txt && "
+        f"grep -qx 'CHECK OK: 0 launch(es) differ' {S}/check_imp1.txt",
+    summary=[r"CHECK|--check needs"])
+
 ENV = 'set -o pipefail; echo "ETX_ENV ETX_UNFUSED_SYNC=${ETX_UNFUSED_SYNC:-} ETX_UNFUSED_NOGRAPH=${ETX_UNFUSED_NOGRAPH:-}"; '
-DEPS = ["golden_sha", "gate_all", "gate_unf", "check_imp"]
+DEPS = {
+    "vllm": ["golden_sha", "docker_pull"],
+    "etx": ["golden_sha", "build_all", "gate_all"],
+    "etxu": ["golden_sha", "build_all", "gate_all", "gate_unf"],
+}
 
 
 def vllm(name, aiter=False):
@@ -95,32 +107,34 @@ def vllm(name, aiter=False):
             f"--repeats 1 --json {S}/{name}.json")
 
 
-prev = "check_imp"
+# Skipped jobs become terminal immediately. Retain all preceding jobs as
+# completion barriers so a skipped neighbour cannot let a later run overtake.
+finished = ["gate_all", "gate_unf", "check_imp", "check_imp1"]
 pair_logs = []
 for rnd in range(1, 6):
     arms = ["vllm", "etx", "etxu"] if rnd % 2 else ["etxu", "etx", "vllm"]
     for arm in arms:
         name = f"{arm}_r{rnd}"
         is_vllm = arm == "vllm"
-        job(name=name, gpu=0, after=DEPS + (["docker_pull"] if is_vllm else []), after_any=[prev],
+        job(name=name, gpu=0, after=DEPS[arm], after_any=list(finished),
             timeout=420 if is_vllm else 300, quiet_s=240 if is_vllm else 180,
             cmd=vllm(name) if is_vllm else ENV + f"ETX_VL_PROGRESS=1 stdbuf -oL {run(extra='--unfused' if arm == 'etxu' else '')}",
             summary=[r"^VLLM|^RESULT"])
         if not is_vllm:
             pair_logs.append(f"{S}/{name}.log")
-        prev = name
+        finished.append(name)
 
 for name, env in (("hostprof", "ETX_HOST_PROF=1 ETX_VL_PROGRESS=1 "), ("etx_noprog", "")):
-    job(name=name, gpu=0, after=DEPS, after_any=[prev], timeout=300,
+    job(name=name, gpu=0, after=DEPS["etx"], after_any=list(finished), timeout=300,
         cmd=ENV + env + f"stdbuf -oL {run()}", summary=[r"^RESULT|HOSTPROF"])
-    prev = name
+    finished.append(name)
 for rnd in range(1, 4):
     name = f"vllm_aiter_r{rnd}"
-    job(name=name, gpu=0, after=DEPS + ["docker_pull"], after_any=[prev], timeout=420, quiet_s=240,
+    job(name=name, gpu=0, after=DEPS["vllm"], after_any=list(finished), timeout=420, quiet_s=240,
         cmd=vllm(name, aiter=True), summary=[r"^VLLM"])
-    prev = name
+    finished.append(name)
 # pairs' separate verdict is not this experiment's verdict; retain only its table.
-job(name="report", lane="cpu", after_any=[prev], timeout=120,
+job(name="report", lane="cpu", after_any=list(finished), timeout=120,
     cmd=f".venv/bin/python -m examples.vllm_llm.nvref_report {S} && "
-        f".venv/bin/python -m examples.vllm_llm.pairs {' '.join(pair_logs)} --pairs 5 --basis wall "
-        "| sed '/^VERDICT/,$d'", summary=[r"."])
+        f"{{ .venv/bin/python -m examples.vllm_llm.pairs {' '.join(pair_logs)} --pairs 5 --basis wall "
+        f"> {S}/fusion_pairs.txt; sed '/^VERDICT/,$d' {S}/fusion_pairs.txt; }}", summary=[r"."])

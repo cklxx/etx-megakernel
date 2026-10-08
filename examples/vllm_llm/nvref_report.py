@@ -133,23 +133,42 @@ def row(system: str, hardware: str, basis: str, values: list[float]):
 
 def report(directory: Path):
     session = Session(directory)
-    for name in ("gate_all", "gate_unf"):
+    def gate(name):
         text = session.read(name)
         correctness(text, name)
         if not re.search(r"^GATE-OK$", text, re.M):
             raise Refusal(f"{name}: gate failed (missing GATE-OK)")
         if name == "gate_all" and not re.search(r"^CHECK-DSL OK\b", text, re.M):
             raise Refusal(f"{name}: missing CHECK-DSL OK")
-    check = session.read("check_imp", allow_failed=True)
-    if re.search(r"^CHECK FAILED", check, re.M):
-        raise Refusal("check_imp: CHECK FAILED; no performance verdict")
-    if "--check needs a plan without per-XCD replicas (build without ETX_VL_XCD)" in check:
-        imported = "n/a (host.hip:500)"
-    elif re.search(r"^CHECK OK: 0 launch\(es\) differ$", check, re.M):
-        session.read("check_imp")  # a timeout/failure after OK is not success
+
+    gate("gate_all")
+    # A differing launch is a correctness failure and refuses the report. A check that
+    # did not run is different: the session keeps its numbers and the verdict line says
+    # the gate is not met, so no claim rests on evidence that does not exist.
+    PER_XCD = "--check needs a plan without per-XCD replicas (build without ETX_VL_XCD)"
+    texts = {}
+    for name in ("check_imp1", "check_imp"):
+        if (directory / f"{name}.log").exists() or name in session.status:
+            texts[name] = (session.read(name, allow_failed=True), session.status.get(name, {}).get("status", "ok"))
+    for name, (text, _status) in texts.items():
+        if re.search(r"^CHECK FAILED", text, re.M):
+            raise Refusal(f"{name}: CHECK FAILED; no performance verdict")
+    imported = None
+    ok = re.compile(r"^CHECK OK: 0 launch\(es\) differ$", re.M)
+    t1, s1 = texts.get("check_imp1", (None, None))
+    t0, s0 = texts.get("check_imp", (None, None))
+    if t1 and ok.search(t1) and s1 == "ok":
         imported = "OK"
+    elif t1 is None and t0 and ok.search(t0) and s0 == "ok":
+        imported = "OK"          # only the legacy check ran, and it passed
+    elif t1 is not None:
+        # The real check ran (or was attempted): never hide its state behind the legacy refusal.
+        imported = f"NOT MET (check_imp1: {s1})"
+    elif t0 is not None and PER_XCD in t0:
+        imported = "n/a (host.hip:515)"
     else:
-        raise Refusal("check_imp: neither CHECK OK nor the documented per-XCD refusal")
+        reasons = ", ".join(f"{n}: {st}" for n, (_t, st) in texts.items()) or "no check job ran"
+        imported = f"NOT MET ({reasons})"
 
     golden = session.read("golden_sha", "None")
     if not re.search(r"(?:^|/)golden_c1024.txt: OK$", golden, re.M):
@@ -163,13 +182,23 @@ def report(directory: Path):
         raise Refusal("missing machine/image/HF_REV provenance")
 
     arms = {}
-    for arm in ("vllm", "etx", "etxu"):
+    for arm in ("vllm", "etx"):
         runs = []
         for rnd in range(1, 6):
             name = f"{arm}_r{rnd}"
             text = session.read(name)
             runs.append(vllm(text, name) if arm == "vllm" else etx(text, name, "fused" if arm == "etx" else "graph"))
         arms[arm] = runs
+
+    fusion_unavailable = None
+    arms["etxu"] = []
+    try:
+        gate("gate_unf")
+        unfused = [etx(session.read(f"etxu_r{rnd}"), f"etxu_r{rnd}", "graph") for rnd in range(1, 6)]
+    except (Refusal, OSError, ValueError, KeyError, TypeError) as exc:
+        fusion_unavailable = str(exc)
+    else:
+        arms["etxu"] = unfused
 
     # Nice-to-have jobs may be absent or incomplete, but a reported incorrect
     # run must never disappear from the correctness accounting.
@@ -198,7 +227,8 @@ def report(directory: Path):
     v, f, u = ([r.wall for r in arms[a]] for a in ("vllm", "etx", "etxu"))
     row("vLLM 0.27.1 default", hardware, "host wall, (t32-t1)/31", v)
     row("ETX fused, 4 tile flags", hardware, "host wall, 31-step mean", f)
-    row("ETX unfused, HIP graph", hardware, "host wall, 31-step mean", u)
+    if fusion_unavailable is None:
+        row("ETX unfused, HIP graph", hardware, "host wall, 31-step mean", u)
     row("ETX fused (secondary)", hardware, "device span, not vs vLLM", [r.device for r in arms["etx"]])
     # The user requires non-log numbers to be labelled estimates. Keep the
     # section-5 source/system labels verbatim and mark these external values.
@@ -217,10 +247,13 @@ def report(directory: Path):
     deltas = [a - b for a, b in zip(f, v)]
     print("DELTA r1..r5 (ETX fused - vLLM, same round) " + ", ".join(f"{d:+.3f}" for d in deltas)
           + f" median={median(deltas):+.3f} spread={max(deltas) - min(deltas):.3f} ms")
-    print(f"FUSION (unfused - fused) median={median([a - b for a, b in zip(u, f)]):+.3f} ms")
+    if fusion_unavailable is None:
+        print(f"FUSION (unfused - fused) median={median([a - b for a, b in zip(u, f)]):+.3f} ms")
+    else:
+        print(f"FUSION unavailable ({fusion_unavailable})")
     print(f"IMPORT-CHECK {imported}")
     result = verdict(deltas)
-    print(f"VERDICT {result} | image {digest} | HF_REV {revision} | machine {machine}")
+    print(f"VERDICT {result} | import-check {imported} | image {digest} | HF_REV {revision} | machine {machine}")
     if len(aiter) == 3:
         row("vLLM 0.27.1 AITER", hardware, "host wall, (t32-t1)/31", aiter)
         if median(v) - median(aiter) > 0.050 + 1e-12:
