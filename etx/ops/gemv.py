@@ -648,15 +648,9 @@ static __device__ __forceinline__ void dsl_topk_lds(const __hip_bfloat16* logits
 #pragma unroll
     for (int k = 0; k < 2; ++k) { const int e = lane + k * ETX_WAVE_SIZE; p[k] = e < E ? dsl_a_ldbf(logits + e) : -INFINITY; taken[k] = e >= E; m = fmaxf(m, p[k]); }
 #ifdef ETX_TOPK_KEY32                                    // one 32-bit key per expert, DPP wave max (etx/tile_util.h)
-    // Two output forms with the same results. The form only steers the register allocation of the whole kernel
-    // (128 VGPRs, at the limit): each form keeps the switch-off spill count in its configuration, and the other
-    // form adds 1 to 2 spilled VGPRs there (docs/TOPK-KEY32-2026-10-08.md, section 7.4).
-#if ETX_EMIT_FOLD_TOPK   // the plan folds the top-k: this function runs; lane 0 stores each round
-    const float sel = etx_topk_key32_lds(p, E, K, lane, [&](int t, int bi, float v) { ids[t] = bi; wts[t] = v; });
-    if (renorm && lane == 0) for (int t = 0; t < K; ++t) wts[t] = wts[t] / sel;
-#else   // the top-k has its own phase: this function does not run; lane t stores result t (as dsl_run_dsl_topk)
+    // lane t stores result t (the dsl_run_dsl_topk form). etx_topk_key32_lds (lane 0 stores each round) gives the same
+    // bits, but on this tree it adds 11 spilled VGPRs to the fold build (docs/TOPK-KEY32-2026-10-08.md, section 7.4).
     etx_topk_key32(p, E, K, renorm != 0, lane, [&](int t, int bi, float v) { ids[t] = bi; wts[t] = v; });
-#endif
 #else
     m = etx_wave_max(m);
     float s = 0.f;
