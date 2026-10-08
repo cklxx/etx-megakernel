@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from statistics import mean, median
 
-from examples.vllm_llm.pairs import Refusal, kv, parse
+from examples.vllm_llm.pairs import Refusal, kv, parse, verdict as fusion_verdict
 
 
 @dataclass
@@ -31,10 +31,10 @@ class Session:
 
     def read(self, name: str, gpu: str = "0", allow_failed=False) -> str:
         path = self.directory / f"{name}.log"
-        if not path.is_file():
-            raise Refusal(f"{name}: missing run/job log")
         if name in self.status and self.status[name]["status"] != "ok" and not allow_failed:
             raise Refusal(f"{name}: job {self.status[name]['status']}")
+        if not path.is_file():
+            raise Refusal(f"{name}: missing run/job log")
         text = path.read_text(errors="replace")
         headers = re.findall(r"^# job (\S+) gpu=(\S+)", text, re.M)
         if headers != [(name, gpu)]:
@@ -149,7 +149,8 @@ def report(directory: Path):
     texts = {}
     for name in ("check_imp1", "check_imp"):
         if (directory / f"{name}.log").exists() or name in session.status:
-            texts[name] = (session.read(name, allow_failed=True), session.status.get(name, {}).get("status", "ok"))
+            text = session.read(name, allow_failed=True) if (directory / f"{name}.log").exists() else ""
+            texts[name] = (text, session.status.get(name, {}).get("status", "ok"))
     for name, (text, _status) in texts.items():
         if re.search(r"^CHECK FAILED", text, re.M):
             raise Refusal(f"{name}: CHECK FAILED; no performance verdict")
@@ -200,24 +201,20 @@ def report(directory: Path):
     else:
         arms["etxu"] = unfused
 
-    # Nice-to-have jobs may be absent or incomplete, but a reported incorrect
-    # run must never disappear from the correctness accounting.
-    extras = {}
+    # Optional evidence is validated independently; failures cannot refuse the primary report.
+    extras, unavailable = {}, {}
     for name in ("hostprof", "etx_noprog"):
-        path = directory / f"{name}.log"
-        if path.exists():
-            text = session.read(name, allow_failed=True)
-            if re.search(r"^RESULT ", text, re.M):
-                extras[name] = etx(text, name, "fused", steps=name != "etx_noprog")
+        try:
+            extras[name] = etx(session.read(name), name, "fused", steps=name != "etx_noprog")
+        except (Refusal, OSError, ValueError, KeyError, TypeError) as exc:
+            unavailable[name] = str(exc)
     aiter = []
     for rnd in range(1, 4):
         name = f"vllm_aiter_r{rnd}"
-        if (directory / f"{name}.log").exists():
-            text = session.read(name, allow_failed=True)
-            if re.search(r"^VLLM ", text, re.M):
-                measured = vllm(text, name, "1")
-                if session.status.get(name, {}).get("status", "ok") == "ok":
-                    aiter.append(measured.wall)
+        try:
+            aiter.append(vllm(session.read(name), name, "1").wall)
+        except (Refusal, OSError, ValueError, KeyError, TypeError) as exc:
+            unavailable[name] = str(exc)
 
     # All validation precedes output: refusal never leaves a partial table.
     print("Qwen3-30B-A3B bf16, batch 1, prompt 1024, 32 greedy tokens; same GPU 0.")
@@ -247,10 +244,24 @@ def report(directory: Path):
     deltas = [a - b for a, b in zip(f, v)]
     print("DELTA r1..r5 (ETX fused - vLLM, same round) " + ", ".join(f"{d:+.3f}" for d in deltas)
           + f" median={median(deltas):+.3f} spread={max(deltas) - min(deltas):.3f} ms")
+    spread = max(deltas) - min(deltas)
+    if abs(median(deltas)) < spread or spread > 0.050 + 1e-12:
+        print(f"RESOLUTION: paired delta spread {spread:.3f} ms > threshold "
+              f"(|median|={abs(median(deltas)):.3f} ms or 0.050 ms); "
+              "verdict is unresolved by the paired benchmark (该判决在配对基准下不足以分辨)")
     if fusion_unavailable is None:
-        print(f"FUSION (unfused - fused) median={median([a - b for a, b in zip(u, f)]):+.3f} ms")
+        gains = [(a - b) / a for a, b in zip(u, f)]
+        rule = fusion_verdict(gains)
+        print(f"FUSION (unfused - fused) median={median([a - b for a, b in zip(u, f)]):+.3f} ms "
+              f"gain median={rule['median']:.2%} spread={rule['spread']:.2%} "
+              f"rule {'met' if rule['established'] else 'not met'} "
+              "(all gains > 0, median > 2%, median > 2 x spread)")
+        hf, hu = (median([r.result_wall - r.device for r in arms[a]]) for a in ("etx", "etxu"))
+        print(f"HOST-EXCESS fused median={hf:.3f} unfused median={hu:.3f} "
+              f"excess(fused-unfused)={hf - hu:.3f} ms (RESULT wall_ms - median_ms)")
     else:
         print(f"FUSION unavailable ({fusion_unavailable})")
+        print(f"HOST-EXCESS unavailable ({fusion_unavailable})")
     print(f"IMPORT-CHECK {imported}")
     result = verdict(deltas)
     print(f"VERDICT {result} | import-check {imported} | image {digest} | HF_REV {revision} | machine {machine}")
@@ -262,10 +273,12 @@ def report(directory: Path):
             # common reference, explicitly distinguishing the unpaired result.
             ad = [x - median(aiter) for x in f]
             print("DELTA AITER (unpaired, each fused round - AITER median) "
-                  + ", ".join(f"{x:+.3f}" for x in ad) + f" median={median(ad):+.3f} ms")
+                  + ", ".join(f"{x:+.3f}" for x in ad) + f" median={median(ad):+.3f} spread={max(ad) - min(ad):.3f} ms")
             print(f"VERDICT {verdict(ad)} against AITER (unpaired median reference); default={result}")
     else:
-        print("AITER comparison unavailable: nice-to-have runs incomplete.")
+        print("AITER comparison unavailable (nice-to-have runs incomplete)")
+    for name, reason in unavailable.items():
+        print(f"{name} unavailable ({reason})")
     for name, run in extras.items():
         print(f"{name} wall_ms={run.wall:.3f} "
               + ("(RESULT median; no per-step progress)" if name == "etx_noprog" else "(31-step mean)"))

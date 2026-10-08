@@ -125,7 +125,7 @@ for rnd in range(1, 6):
         finished.append(name)
 
 for name, env in (("hostprof", "ETX_HOST_PROF=1 ETX_VL_PROGRESS=1 "), ("etx_noprog", "")):
-    job(name=name, gpu=0, after=DEPS["etx"], after_any=list(finished), timeout=300,
+    job(name=name, gpu=0, after=["golden_sha", "build_all"], after_any=list(finished), timeout=300,
         cmd=ENV + env + f"stdbuf -oL {run()}", summary=[r"^RESULT|HOSTPROF"])
     finished.append(name)
 for rnd in range(1, 4):

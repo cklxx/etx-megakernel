@@ -541,13 +541,23 @@ int main(int argc, char** argv) {
     };
     launch_imported(0);                                              // prologue: embedding row, positions, lengths
     if (!wait_stream(hst.stream, 5.0)) die("prologue hung");
-    int bad = 0;
+    int bad = 0, not_imported = 0;
+    std::string not_imported_names;
     hipEvent_t e0, e1; ETX_CHECK(hipEventCreate(&e0)); ETX_CHECK(hipEventCreate(&e1));
     auto elapsed_us = [&]() { float ms = 0.f; ETX_CHECK(hipEventElapsedTime(&ms, e0, e1)); return 1000.0 * ms; };
     std::map<std::string, std::pair<double, double>> by_kernel;      // export -> (original us, imported us), summed
     double sum_o = 0, sum_i = 0;
     for (const Inst& x : insts) {
       if (x.layer >= check_layers || (x.layer < 0 && check_layers < L)) break;
+      // Same DSL namespace as model.py:src_of and plan_imports.py:planned_imports.
+      // Execute to preserve downstream inputs, but CHECK-DSL owns correctness.
+      if (x.exp.rfind("dsl_", 0) == 0) {
+        launch_imported(x.n + 1);
+        if (!wait_stream(hst.stream, 5.0)) die("DSL tile hung: " + x.exp);
+        if (not_imported < 5) not_imported_names += (not_imported ? ", " : "") + x.exp;
+        ++not_imported;
+        continue;
+      }
       const etx_imp_desc* d = etx_imp_find(x.exp.c_str());
       const void* fn = etx_orig_find(x.exp.c_str());
       const char *tri_path = nullptr, *tri_fn = nullptr; int tri_shared = 0; hipFunction_t tri = nullptr;
@@ -600,6 +610,7 @@ int main(int argc, char** argv) {
     for (auto& kv : by_kernel) printf("  %-20s original %8.1f us  imported %8.1f us  (%+.0f%%)\n", kv.first.c_str(), kv.second.first, kv.second.second,
                                       100.0 * (kv.second.second / std::max(kv.second.first, 1e-9) - 1.0));
     printf("  %-20s original %8.1f us  imported %8.1f us\n", "total", sum_o, sum_i);
+    printf("CHECK NOT-IMPORTED: %d instance(s): %s%s\n", not_imported, not_imported_names.c_str(), not_imported > 5 ? ", ..." : "");
     printf("CHECK %s: %d launch(es) differ\n", bad ? "FAILED" : "OK", bad);
     return bad ? 4 : 0;
 #endif

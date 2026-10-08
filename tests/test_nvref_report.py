@@ -261,3 +261,71 @@ def test_check_build_and_skipped_neighbour_barrier(tmp_path):
     for name in ("hostprof", "etx_noprog", "vllm_aiter_r1", "vllm_aiter_r2", "vllm_aiter_r3", "report"):
         assert runner._deps_state(by_name[name]) == "ready"
         by_name[name].status = "fail"
+
+
+def test_skipped_check_without_log(session, capsys):
+    (session / "status.json").write_text(json.dumps([dict(name="check_imp1", status="skipped")]))
+    assert nr.main([str(session)]) == 0
+    assert "IMPORT-CHECK NOT MET (check_imp1: skipped)" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("name", ["hostprof", "etx_noprog", "vllm_aiter_r1"])
+@pytest.mark.parametrize("failure", ["incorrect", "timeout", "missing", "malformed"])
+def test_optional_failure_never_refuses(session, capsys, name, failure):
+    body = vllm(4.6, 1) if name.startswith("vllm") else etx(4.8)
+    if failure == "incorrect":
+        body = body.replace("32/32", "31/32").replace("matched=32", "matched=31")
+    if failure == "malformed":
+        body = "invalid output"
+    if failure != "missing":
+        write(session, name, body)
+    if failure == "timeout":
+        (session / "status.json").write_text(json.dumps([dict(name=name, status="timeout")]))
+    assert nr.main([str(session)]) == 0
+    out = capsys.readouterr().out
+    assert "VERDICT LEAD" in out and f"{name} unavailable (" in out
+
+
+@pytest.mark.parametrize("values", [[4.801, 5.002, 5.003, 5.004, 5.005], [4.981, 4.992, 5.003, 5.014, 5.025]])
+def test_resolution(session, capsys, values):
+    for r, value in enumerate(values, 1):
+        write(session, f"etx_r{r}", etx(value))
+    assert nr.main([str(session)]) == 0
+    out = capsys.readouterr().out
+    assert "RESOLUTION: paired delta spread" in out
+    assert "该判决在配对基准下不足以分辨" in out
+
+
+@pytest.mark.parametrize("unfused, expected", [([5.2]*5, "met"), ([4.85]*5, "not met"), ([5., 5., 5., 5., 5.4], "not met")])
+def test_fusion_rule(session, capsys, unfused, expected):
+    for r, value in enumerate(unfused, 1):
+        write(session, f"etxu_r{r}", etx(value, "graph"))
+    assert nr.main([str(session)]) == 0
+    line = next(s for s in capsys.readouterr().out.splitlines() if s.startswith("FUSION "))
+    assert f"rule {expected} (" in line
+
+
+def test_host_excess_uses_result_wall(session, capsys):
+    for r in range(1, 6):
+        write(session, f"etx_r{r}", etx(4.8).replace("median_ms=4.650 wall_ms=4.800", "median_ms=4.650 wall_ms=4.847"))
+        write(session, f"etxu_r{r}", etx(5.2, "graph").replace("median_ms=5.050", "median_ms=5.164"))
+    assert nr.main([str(session)]) == 0
+    assert "HOST-EXCESS fused median=0.197 unfused median=0.036 excess(fused-unfused)=0.161 ms" in capsys.readouterr().out
+
+
+def test_tail_needs_builds_not_gates(tmp_path):
+    jobs = load_jobs("examples/sessions/nvref.py")
+    runner = Runner(jobs, [0], 2, tmp_path)
+    by_name = runner.by_name
+    for j in jobs:
+        j.status = "ok"
+    for name in ("gate_all", "gate_unf"):
+        by_name[name].status = "fail"
+    for name in ("hostprof", "etx_noprog", "vllm_aiter_r1", "vllm_aiter_r2", "vllm_aiter_r3", "report"):
+        j = by_name[name]
+        assert runner._deps_state(j) == "ready"
+        assert "gate_all" in j.after_any and "gate_unf" in j.after_any
+        for dep in j.after:
+            by_name[dep].status = "fail"
+            assert runner._deps_state(j) == "skip"
+            by_name[dep].status = "ok"

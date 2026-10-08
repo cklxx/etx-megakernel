@@ -56,3 +56,36 @@ def test_load_and_dry_run(tmp_path, capsys):
 def test_pin_folds_onto_one_gpu(tmp_path):
     rc, j, out, _ = _run(tmp_path, [dict(name="p1", cmd="echo GPU=$GPU", gpu=1), dict(name="p0", cmd="echo GPU=$GPU", gpu=0)], gpus=(0,))
     assert rc == 0 and j["p1"].on_gpu == 0 and "absent" in j["p1"].note
+
+
+def test_live_status_before_report_job(tmp_path):
+    import shlex
+    import sys
+    reader = "import json; from pathlib import Path; s={x['name']:x['status'] for x in json.loads(Path('logs/status.json').read_text())}; assert s['bad']=='fail'; assert s['skip']=='skipped'; assert s['slow']=='timeout'; print('LIVE-STATUS OK')"
+    rc, jobs, _, _ = _run(tmp_path, [
+        dict(name="bad", lane="cpu", cmd="exit 3"),
+        dict(name="skip", lane="cpu", after=["bad"], cmd="exit 99"),
+        dict(name="slow", lane="cpu", cmd="sleep 10", timeout=.1),
+        dict(name="report", lane="cpu", after_any=["bad", "skip", "slow"],
+             cmd=f"{shlex.quote(sys.executable)} -c {shlex.quote(reader)}"),
+    ])
+    assert rc == 1 and jobs["report"].status == "ok"
+    assert "LIVE-STATUS OK" in jobs["report"].log.read_text()
+
+
+def test_status_atomic_replace(tmp_path, monkeypatch):
+    jobs = [gj.Job(name="x", cmd="true")]
+    runner = gj.Runner(jobs, [], 1, tmp_path)
+    runner._write_status()
+    replace = gj.os.replace
+    calls = []
+    def checked_replace(src, dst):
+        assert json.loads(dst.read_text())[0]["status"] == "pending"
+        assert json.loads(src.read_text())[0]["status"] == "fail"
+        calls.append(src)
+        replace(src, dst)
+    monkeypatch.setattr(gj.os, "replace", checked_replace)
+    jobs[0].status = "fail"
+    runner._write_status()
+    assert len(calls) == 1 and not calls[0].exists()
+    assert json.loads((tmp_path / "status.json").read_text())[0]["status"] == "fail"
