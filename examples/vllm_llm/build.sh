@@ -64,6 +64,11 @@ fi
 [ -f "$DEVLIBS/ocml.bc" ] || { echo "no ROCm device bitcode found (set ETX_DEVLIBS); looked under /opt/rocm*" >&2; exit 1; }
 echo "devlibs: $DEVLIBS"
 CONFIG="$DIR/hf/config.json"; [ -f "$CONFIG" ] || CONFIG="$DIR/config.json"
+# The plan can select an imported kernel that the switches above do not list: the etx.select fallback of a GEMV phase
+# outside every DSL variant (Qwen3-8B down, K = 12288 > 4096: wvsplitk_y2), or the norms of a dense model. Add each
+# export that model.py will instantiate and the list lacks. A list that already holds them (Qwen3-30B-A3B) stays equal.
+PLANNED="$(cd "$ROOT" && ETX_LLM_CONFIG="$CONFIG" "$PY" -m examples.vllm_llm.plan_imports "$CONFIG")"
+for e in ${PLANNED//,/ }; do case ",$EXPORTS," in *",$e,"*) ;; *) EXPORTS="$EXPORTS,$e";; esac; done
 
 echo "== import ($EXPORTS)"
 ORIG=(); CHK=(); [ "${ETX_VL_CHECK:-0}" = 1 ] && ORIG=(--orig) && CHK=(-DETX_VL_CHECK)

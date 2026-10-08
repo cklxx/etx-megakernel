@@ -48,6 +48,7 @@ from examples.llm.model import load_dims  # noqa: E402
 from etx.importer.spec import launch_for, validate_wvsplitk, grid_for, OPERATORS
 from examples.vllm_llm import folds  # noqa: E402
 from etx.codegen import manifest  # noqa: E402
+from etx import select as etx_select  # noqa: E402
 
 # ETX_VL_CU: workgroups a DSL dense phase spreads over (one task per workgroup). 304 = every CU, which is what
 # vLLM's wvSplitK uses, but hw_bench stream (2026-10-01) shows 304 is oversubscribed: at the gate_up shape the
@@ -253,6 +254,19 @@ def instances(d) -> list[dict]:
     DSL_ATTNHEAD = _attn_head(d)
     out = []
     moe_specs = {role: launch_for(d, role) for role in ("up", "down")} if d.moe and not DSL_GEMV else {}
+    # The norm folds live in dsl_gemv_fold, which is written for the MoE model (host.hip:394 stops it at E == 0), and
+    # PhiMoE needs them (no imported LayerNorm). A dense model keeps its norm phases (etx.select default_structure).
+    FOLD = DSL_FOLD and (bool(d.moe) or bool(getattr(d, "ln_norm", False)))
+    # etx.select (section 6.2): the planner's variant for each GEMV phase. A phase whose shape is outside every DSL
+    # GEMV variant (Qwen3-8B down: K = 12288 > 4096, host.hip:358) gets wvSplitK instead of a run that stops.
+    gemv_sel = {}
+    if DSL_GEMV:
+        try:
+            gemv_sel = etx_select.plan(
+                d, "gfx942", None, variants=[v for v in etx_select.REGISTRY if v.phase in etx_select.GEMV_PHASES],
+                structure=etx_select.Structure(fold_norms=FOLD, fold_topk=FOLD_TOPK, attn_head=DSL_ATTNHEAD)).phases
+        except etx_select.NoLegalVariant:
+            gemv_sel = {}                                    # no override: host.hip keeps its checks
 
     def add(export, layer, role, grid=None, **kw):
         if export in OPERATORS:
@@ -263,8 +277,10 @@ def instances(d) -> list[dict]:
         out.append({"export": export, "layer": layer, "role": role, "grid": grid, **kw})
 
     def gemv(layer, role, m, k):
-        if DSL_GEMV:                                          # rows per task = ceil(M / CU): at 304, 17 (qkv), 7 (o_proj), 1 (router)
-            fold = DSL_FOLD and (role in ("router", "lm_head") or (role == "qkv" and (layer > 0 or getattr(d, "ln_norm", False))))
+        key = role + "@0" if layer == 0 and role + "@0" in gemv_sel else role
+        if DSL_GEMV and (key not in gemv_sel or gemv_sel[key].kind == "dsl"):   # else: the planner's fallback
+            # rows per task = ceil(M / CU): at 304, 17 (qkv), 7 (o_proj), 1 (router)
+            fold = FOLD and (role in ("router", "lm_head") or (role == "qkv" and (layer > 0 or getattr(d, "ln_norm", False))))
             add("dsl_gemv_fold" if fold else "dsl_gemv", layer, role, (CU, 1, 1), M=m, K=k, wvprgrp=0)
             return
         y = wvsplitk_ytile(m)
@@ -274,7 +290,7 @@ def instances(d) -> list[dict]:
 
     attn = {4: "attn_mfma4_g4", 6: "attn_mfma16_g6", 8: "attn_mfma16_g8"}[d.G]
     for L in range(d.L):
-        if not (DSL_FOLD and (L > 0 or getattr(d, "ln_norm", False))):
+        if not (FOLD and (L > 0 or getattr(d, "ln_norm", False))):
             if getattr(d, "ln_norm", False):
                 raise SystemExit("ln_norm (PhiMoE) needs the DSL fold path: there is no imported LayerNorm kernel "
                                  "(set ETX_VL_DSL_GEMV=1 ETX_VL_DSL_FOLD=1, the defaults)")
@@ -314,7 +330,7 @@ def instances(d) -> list[dict]:
             add(attn, L, "attn", None, parts=parts)
         add("attn_reduce", L, "reduce", None, G=d.G)
         gemv(L, "o_proj", d.H, d.NH * d.HD)
-        if not DSL_FOLD:
+        if not FOLD:
             add("fused_add_rms_norm", L, "post_norm", None)
         if d.moe:
             gemv(L, "router", d.E, d.H)
@@ -329,23 +345,23 @@ def instances(d) -> list[dict]:
             # stream if the few slots were pinned. The top-k then keeps ONE copy (rep = 1): the unpinned expert
             # tasks all read copy 0, which is the host's rr = 0 block (host.hip addresses copies as rr * TOPK).
             noaff = XCD and d.TOPK % NX != 0
-            if not DSL_FOLD or not FOLD_TOPK:
+            if not FOLD or not FOLD_TOPK:
                 add("dsl_topk" if (DSL or DSL_TOPK) else f"topk_softmax_e{d.E}", L, "topk", (1, 1, 1), noaff=noaff)
             if DSL_GEMV:                                      # 32 gate + 32 up rows (256 KB) per task; 64 down rows (96 KB)
-                add("dsl_moe_up_fold" if DSL_FOLD else "dsl_moe_up", L, "moe_up", (d.TOPK * (d.MI // 32), 1, 1), M=d.MI, K=d.H, noaff=noaff)
-                add("dsl_moe_down_fold" if DSL_FOLD else "dsl_moe_down", L, "moe_down", (d.TOPK * (d.H // 64), 1, 1), M=d.H, K=d.MI, noaff=noaff)
+                add("dsl_moe_up_fold" if FOLD else "dsl_moe_up", L, "moe_up", (d.TOPK * (d.MI // 32), 1, 1), M=d.MI, K=d.H, noaff=noaff)
+                add("dsl_moe_down_fold" if FOLD else "dsl_moe_down", L, "moe_down", (d.TOPK * (d.H // 64), 1, 1), M=d.H, K=d.MI, noaff=noaff)
             else:
                 up, down = moe_specs["up"], moe_specs["down"]
                 add(up.export, L, "moe_up", None, noaff=noaff)
                 add("silu_and_mul", L, "moe_act", None, noaff=noaff)
                 add(down.export, L, "moe_down", None, noaff=noaff)
-            if not DSL and not DSL_FOLD:                           # DSL: the next in_norm reads the 8 expert rows itself
+            if not DSL and not FOLD:                           # DSL: the next in_norm reads the 8 expert rows itself
                 add(f"moe_sum_k{d.TOPK}", L, "moe_sum", None, noaff=noaff)
             continue
         gemv(L, "gate_up", 2 * d.INTER, d.H)
         add("silu_and_mul", L, "act", None)
         gemv(L, "down", d.H, d.INTER)
-    if not DSL_FOLD:
+    if not FOLD:
         add("fused_add_rms_norm", -1, "final_norm", None)
     gemv(-1, "lm_head", d.V, d.H)
     return out

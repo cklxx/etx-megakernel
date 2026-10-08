@@ -67,4 +67,13 @@ A shape has the `Dims` fields as integers, and `fold`, `fold_topk` and `first_on
 3. `params` lists the task parameters. The planner does not search them yet.
 4. `cost` does not use the budget. Occupancy needs a GPU measurement.
 5. Only `gfx942` is in `backend`. No tile has an sm_90 lowering yet.
-6. `model.py` and `build.sh` do not call the planner yet.
+6. `model.py` asks the planner for the GEMV phases only. The other phases still follow the `ETX_VL_*` switches.
+7. `CU` is 256 in the registry (the wvSplitK y-tile rule). `model.py` reads `ETX_VL_CU`. With another value, the two can select a different y-tile.
+
+## 7. Wiring into `model.py` and `build.sh`
+
+1. `model.py` `instances()` calls `plan()` with the GEMV variants of `REGISTRY` and the structure of the build. A GEMV phase whose selected variant is imported gets wvSplitK. Example: Qwen3-8B `down`.
+2. `instances()` folds the norms only for an MoE model or PhiMoE (`dsl_gemv_fold` needs E > 0, `host.hip:394`). A dense model keeps `in_norm`, `post_norm` and `final_norm`.
+3. `examples/vllm_llm/plan_imports.py` prints the imported exports of `instances()`. `build.sh` adds each export that its list lacks.
+4. For Qwen3-30B-A3B, Mixtral-8x7B and the PhiMoE configs, `instances()` is equal before and after the change. The check used five environments: default, `ETX_VL_DSL_FOLD=0`, `ETX_VL_FOLD_TOPK=1`, `ETX_VL_IMPORTED=1` and `ETX_VL_DSL_ATTN=0`. The import list of Qwen3-30B-A3B does not change. Thus the MATCH graph and its kernel source do not change.
+5. Qwen3-8B and Qwen2.5-1.5B change. Before the change, `host.hip` stopped both runs (`:358`, `:361`, `:394`).

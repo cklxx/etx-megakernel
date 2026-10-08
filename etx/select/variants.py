@@ -222,6 +222,10 @@ def _dsl(export, phase, shape, rule, res=DSL_RES, cost=floor_cost, params=None):
     register(Variant(export, phase, "dsl", GFX942, "bf16", shape, res, cost, params or {}, rule))
 
 
+# Imported LDS that the CPU registry knows: build.sh records that wvsplitk_y1/y2 declare 32768 B each (round 16).
+IMPORTED_LDS = {"wvsplitk_y1": 32768, "wvsplitk_y2": 32768}
+
+
 def _imp(export, phase, shape, rule, cost=floor_cost):
     op = OPERATORS[export]
     lo = hi = 1
@@ -231,8 +235,9 @@ def _imp(export, phase, shape, rule, cost=floor_cost):
     # The megakernel hosts an imported block inside its workgroup: a fixed 1024-thread block needs a 1024 budget.
     threads = THREADS if lo == hi == THREADS else 0
     # VGPR: the megakernel's __launch_bounds__ caps every linked kernel at 128; the true count needs the ISA.
-    # LDS: imports.json carries the measured lds_bytes at build time; the CPU registry does not have it (0).
-    register(Variant(export, phase, "imported", GFX942, "bf16", shape, Resources(vgpr=DSL_VGPR, lds=0, threads=threads),
+    # LDS: imports.json carries lds_bytes at build time; the CPU registry has IMPORTED_LDS only, else 0.
+    register(Variant(export, phase, "imported", GFX942, "bf16", shape,
+                     Resources(vgpr=DSL_VGPR, lds=IMPORTED_LDS.get(export, 0), threads=threads),
                      cost, {}, rule))
 
 

@@ -8,7 +8,7 @@ from etx.select import (BUDGET_LEVELS, Budget, NoLegalVariant, REGISTRY, Resourc
 from etx.select.variants import GEMV_LDS
 
 CFG = "examples/llm/configs/{}.json"
-MOE_MODELS = ("qwen3-30b-a3b", "mixtral-8x7b")
+MOE_MODELS = ("qwen3-30b-a3b", "mixtral-8x7b", "qwen3-8b")   # qwen3-8b: model.py follows the fallback
 
 
 def _keyed(rows):
@@ -29,14 +29,21 @@ def _keyed(rows):
 
 @pytest.mark.parametrize("name", MOE_MODELS)
 def test_default_plan_equals_model_py_default_build(name):
-    """The planner reproduces the exports that examples/vllm_llm/model.py lays out in its default build."""
-    if any(k.startswith(("ETX_VL_", "ETX_LLM_")) for k in os.environ):
-        pytest.skip("model.py reads ETX_VL_* at import time")
-    from examples.llm.model import load_dims
-    from examples.vllm_llm import model as M
-    d = load_dims(CFG.format(name))
-    want = _keyed((i["role"], i["layer"], i["export"]) for i in M.instances(d))
-    got = {k: v.export for k, v in plan(d).phases.items()}
+    """The planner reproduces the exports that examples/vllm_llm/model.py lays out in its default build. model.py
+    reads ETX_VL_* at import time and other tests import it, so it runs in a fresh interpreter with a clean env."""
+    import json
+    import subprocess
+    import sys
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[1]
+    env = {k: v for k, v in os.environ.items() if not k.startswith(("ETX_VL_", "ETX_LLM_"))}
+    env["PYTHONPATH"] = str(root)
+    code = ("import json, sys; from examples.llm.model import load_dims; from examples.vllm_llm import model as M; "
+            "print(json.dumps([(i['role'], i['layer'], i['export']) for i in M.instances(load_dims(sys.argv[1]))]))")
+    out = subprocess.run([sys.executable, "-c", code, CFG.format(name)], cwd=root, env=env, check=True,
+                         capture_output=True, text=True).stdout
+    want = _keyed(tuple(r) for r in json.loads(out))
+    got = {k: v.export for k, v in plan(CFG.format(name)).phases.items()}
     assert got == want
 
 
