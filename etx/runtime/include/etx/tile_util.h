@@ -75,8 +75,8 @@ static __device__ __forceinline__ unsigned etx_wave_max_u32(unsigned v) {
 // kPerRound = false (etx_topk_key32): lane t keeps round t's id and weight; put(t, id, w) runs once in lane t < K.
 // kPerRound = true (etx_topk_key32_lds, for LDS outputs): put(t, id, w) runs in lane 0 in round t, with the
 // weight before renorm, and the function returns sel (wave-uniform); the caller divides by sel (the old code's way).
-// The fold tiles (ETX_VL_FOLD_TOPK=1) need kPerRound: with the lane-t registers live across the loop, the moe fold
-// tile spills one more VGPR (spill 13 -> 14, scratch 48 -> 52 bytes, 21 -> 72 scratch instructions).
+// The two forms give the same ids and weight bits. dsl_topk_lds (etx/ops/gemv.py) uses the kPerRound form when the
+// plan folds the top-k; that keeps the fold build at the switch-off spill count (the lane-t form: spill 13 -> 14).
 template <bool kPerRound, class Put>
 static __device__ __forceinline__ float etx_topk_key32_impl(const float (&l)[2], int E, int K, bool renorm, int lane, Put put) {
   unsigned key[2]; bool ok[2];

@@ -152,6 +152,10 @@ int main(int argc, char** argv) {
   if (ln_norm) die("ln_norm model on a build whose tiles lack the LayerNorm fold (ETX_EMIT_DSL_EXT=0)");
 #endif
   if (sparsemixer && norm_topk) die("sparsemixer and norm_topk are mutually exclusive");
+#ifdef ETX_TOPK_KEY32
+  // ETX_TOPK_KEY32 (etx/runtime/include/etx/tile_util.h): lane t of the one wave keeps round t's result, so K <= 64
+  if (TOPK > 64) die("ETX_TOPK_KEY32: TOPK > 64 (one round result per lane of the 64-lane wave)");
+#endif
   const int MOE_BM = ETX_EMIT_MOE_BLOCK_M; // captured specification, published by the plan
   const int BS = ETX_SPEC_BS, X = ETX_SPEC_CACHE_X, MAXBLK = (MAXLEN + BS - 1) / BS;
 

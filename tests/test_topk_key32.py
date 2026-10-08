@@ -125,12 +125,25 @@ def _key32_block() -> str:
     return m.group(1)
 
 
+def _guarded_by(src: str, i: int, macro: str) -> bool:
+    """True when offset i of src is inside an `#ifdef macro` branch (nesting followed; #else flips it)."""
+    stack = []
+    for m in re.finditer(r"^#\s*(ifdef|ifndef|if|else|elif|endif)\b[ \t]*(\w*)", src[:i], re.M):
+        d, name = m.group(1), m.group(2)
+        if d in ("ifdef", "ifndef", "if"):
+            stack.append((d, name))
+        elif d == "endif":
+            stack.pop()
+        else:
+            stack[-1] = ("else", stack[-1][1])
+    return ("ifdef", macro) in stack
+
+
 def test_switch_guards_every_key32_line():
     """With the switch off, the preprocessor removes every new line: the off build is the old source."""
     for path, needle in (("etx/ops/topk.py", "etx_topk_key32("), ("etx/ops/gemv.py", "etx_topk_key32_lds(")):
         src = (ROOT / path).read_text()
-        i = src.index(needle)
-        assert src.rfind("#ifdef ETX_TOPK_KEY32", 0, i) > src.rfind("#endif", 0, i)
+        assert _guarded_by(src, src.index(needle), "ETX_TOPK_KEY32")
     blk = _key32_block()
     assert "__builtin_amdgcn_update_dpp" in blk and "asm" not in re.sub(r"//.*", "", blk)
     assert "ds_bpermute" not in re.sub(r"//.*", "", blk)
@@ -193,3 +206,13 @@ def test_sparsemixer_mode_is_unchanged_by_the_switch():
     assert src.index("etx_topk_key32(") > src.index("if (mode == 2) {") + len(blk)
     guard = src[src.rfind("#ifndef ETX_TOPK_KEY32", 0, src.index("if (mode == 2) {")):src.index("if (mode == 2) {")]
     assert re.sub(r"//.*", "", guard).split() == ["#ifndef", "ETX_TOPK_KEY32", "m", "=", "etx_wave_max(m);", "#endif"]
+
+
+def test_key32_build_guards():
+    """K <= 64: lane t keeps round t's result, so host.hip refuses TOPK > 64 when the switch is on (E <= 128 is
+    already checked). ETX_ABL_TOPK_NOSTORE does not act on the key path, so that pair of switches does not compile."""
+    host = (ROOT / "examples/vllm_llm/host.hip").read_text()
+    assert _guarded_by(host, host.index('if (TOPK > 64) die("ETX_TOPK_KEY32'), "ETX_TOPK_KEY32")
+    src = (ROOT / "etx/ops/topk.py").read_text()
+    blk = src[src.index("#ifdef ETX_TOPK_KEY32        //"):src.index("etx_topk_key32(")]
+    assert re.search(r"#ifdef ETX_ABL_TOPK_NOSTORE\n#error [^\n]*\n#endif", blk)

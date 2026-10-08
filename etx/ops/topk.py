@@ -93,6 +93,9 @@ static __device__ __attribute__((always_inline)) void dsl_run_dsl_topk(const uns
     return;
   }
 #ifdef ETX_TOPK_KEY32        // select on one 32-bit key per expert, DPP wave max (etx/runtime/include/etx/tile_util.h)
+#ifdef ETX_ABL_TOPK_NOSTORE
+#error "ETX_ABL_TOPK_NOSTORE has no effect with ETX_TOPK_KEY32: the key path stores its outputs itself"
+#endif
   etx_topk_key32(p, E, K, mode == 1, lane, [&](int t, int bi, float v) {
     dsl_a_sti(ids + t, bi);
 #ifndef ETX_ABL_TOPK_NOTEI
