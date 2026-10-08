@@ -90,8 +90,11 @@ def load_dims(path: str | None = None) -> Dims:
     _E_KEYS = ("num_experts", "num_local_experts", "n_routed_experts")
     E = next((int(c[k]) for k in _E_KEYS if c.get(k)), 0)
     moe = E > 0
+    topk = int(c.get("num_experts_per_tok", 0))
     if not moe and any("expert" in k for k in c):
         raise ValueError(f"{path}: config mentions experts but none of {_E_KEYS} is set; refusing to plan it as dense")
+    if moe and not 1 <= topk <= min(E, 16):
+        raise ValueError(f"{path}: num_experts_per_tok={topk} must be between 1 and {min(E, 16)} for the supported Top-K kernels")
     if moe and (c.get("mlp_only_layers") or c.get("decoder_sparse_step", 1) != 1
                 or c.get("first_k_dense_replace", 0) or c.get("n_shared_experts", 0)):
         # first_k_dense_replace / n_shared_experts are DeepSeek's spellings of a mixed layout and of always-on
@@ -107,7 +110,7 @@ def load_dims(path: str | None = None) -> Dims:
                 INTER=c.get("intermediate_size", 0), L=min(nl, c["num_hidden_layers"]), V=c["vocab_size"],
                 eps=float(c.get("rms_norm_eps", 1e-6)), theta=float(c.get("rope_theta", 10000.0)),
                 tie=bool(c.get("tie_word_embeddings", False)), bias=mt == "qwen2" or bool(c.get("attention_bias", False)),
-                qk_norm=qk_norm, moe=moe, E=E, TOPK=c.get("num_experts_per_tok", 0),
+                qk_norm=qk_norm, moe=moe, E=E, TOPK=topk,
                 # Qwen separates moe_intermediate_size from the dense intermediate_size; Mixtral has only the latter
                 # and it IS the expert width. Falling back to 0 gave an MoE plan with zero-sized expert phases.
                 MI=c.get("moe_intermediate_size") or (c.get("intermediate_size", 0) if moe else 0),

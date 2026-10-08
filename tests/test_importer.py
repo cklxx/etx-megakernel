@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from etx.importer.ir_import import import_kernel
+from etx.importer.ir_import import ImportError_, import_kernel
 from etx.importer.slice_device import slice_device
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -104,6 +104,11 @@ def test_import_slots_and_quoted_struct_lds():
     assert "@etx_imp_slot_barrier(i32 %etx.slot, i32 1)" in out
     assert "icmp ult i32 %tid, 16" in out                                     # lanes past the 16-thread block skip the body
     assert "call i64 @__ockl_get" not in out                                  # every id read rewritten
+
+
+def test_static_lds_over_cap_is_rejected_instead_of_truncated():
+    with pytest.raises(ImportError_, match=r"static LDS needs 80 B per slot, exceeding the 64 B limit"):
+        import_kernel(SYN, "k", "etx_imp_k", (16, 1, 1), 256, lds_cap=64)
 
 
 def test_slice_enters_namespace_holding_host_launchers():

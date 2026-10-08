@@ -62,6 +62,16 @@ def test_cross_device_forces_static_and_system_scope():
     assert len(plan.kernel_instances) == 2
 
 
+def test_p5_queues_support_noncontiguous_device_ids():
+    graph = gemm_rs.build(2)
+    for grid in graph.grids:
+        grid.device = {0: 2, 1: 5}[grid.device]
+    plan = compile_graph(graph, "gfx90a", gemm_rs.bindings(), {})
+    assert plan.n_devices == 2
+    assert {device for device, _ in plan.static_queues} == {2, 5}
+    assert set(plan.global_queue_capacity) == {2, 5}
+
+
 def test_reasons_are_printed():
     b = moe_layer.bindings()
     plan = compile_graph(moe_layer.build(), "gfx942", b, moe_layer.runtime(b))

@@ -1,12 +1,25 @@
 """examples/llm: the generic decoder graph compiles for dense, GQA+bias, q/k-norm and MoE configs."""
+import json
 import math
 import os
+from pathlib import Path
 
 import pytest
 
 from etx.passes import compile_graph
 
 CONFIGS = ["qwen2.5-1.5b", "qwen3-8b", "qwen3-30b-a3b"]
+
+
+def test_llm_rejects_topk_above_kernel_limit(tmp_path):
+    source = Path(__file__).resolve().parents[1] / "examples" / "llm" / "configs" / "qwen3-30b-a3b.json"
+    config = json.loads(source.read_text())
+    config["num_experts_per_tok"] = 17
+    path = tmp_path / "config.json"
+    path.write_text(json.dumps(config))
+    from examples.llm.model import load_dims
+    with pytest.raises(ValueError, match=r"num_experts_per_tok=17.*supported Top-K kernels"):
+        load_dims(str(path))
 
 
 @pytest.mark.parametrize("name", CONFIGS)

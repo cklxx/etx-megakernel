@@ -10,7 +10,7 @@ device function the megakernel's tile can call, without touching the kernel's co
     block id the adapter passes, __ockl_get_local_id / llvm.amdgcn.workitem.id.* are recomputed from the
     thread's index in the kernel's original block shape, sizes are constants
   * the kernel's static LDS moves into one arena shared by all imported tiles (they run one after another
-    on a workgroup, so their LDS can overlap), optionally capped to what the instance really uses
+    on a workgroup, so their LDS can overlap); allocations above the caller's limit are rejected, never truncated
   * when the megakernel's workgroup is k times the kernel's block, k blocks run side by side ("slots"),
     each on its own LDS copy, and the kernel's s_barrier becomes a barrier over the slot's waves only
 
@@ -316,10 +316,11 @@ def import_kernel(text: str, kernel: str, export: str, block: tuple[int, int, in
         cur = (cur + max(align, 4) - 1) // max(align, 4) * max(align, 4)
         offs.append(cur); cur += nbytes
     per_slot = (cur + 15) // 16 * 16
-    if lds_cap is not None and lds_cap < per_slot:
-        if len(lds) != 1:
-            raise ImportError_("--lds-cap needs exactly one LDS variable")
+    # A single LDS variable may be over-dimensioned by the kernel template.
+    if lds_cap is not None and len(lds) == 1:
         per_slot = (lds_cap + 15) // 16 * 16
+    if lds_cap is not None and len(lds) > 1 and per_slot > lds_cap:
+        raise ImportError_(f"{kname}: static LDS needs {per_slot} B per slot, exceeding the {lds_cap} B limit")
     info.lds_bytes_per_slot = per_slot
     info.lds_bytes = per_slot * slots
 
