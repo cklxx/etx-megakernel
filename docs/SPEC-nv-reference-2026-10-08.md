@@ -75,9 +75,12 @@ Expected: `VLLM label=default aiter=0 … batch=1 version=0.27.1 context=1024 me
   `CHECK OK: 0 launch(es) differ` (`host.hip:603`); its process must also exit successfully.
   Both check jobs require only their own build, `prep`, and `golden_sha` to succeed; preceding gates/checks are
   completion barriers (`after_any`). Neither check gates timing jobs through `after`.
-  The report prefers `check_imp1`; failure, timeout, a recorded skip, or unrecognized output refuses the report.
-  Only when it is absent from both logs and status may `check_imp` supply legacy OK or the documented
-  `IMPORT-CHECK n/a (host.hip:515)`. `CHECK FAILED` in the selected check always refuses.
+  The report keeps two rules apart. A **differing launch** is a correctness failure: `CHECK FAILED` in *either* check
+  refuses the report and prints no number. An **unavailable check** is not: when `check_imp1` printed no
+  `CHECK OK` (build failure, timeout, skip) the report still prints every number, writes
+  `IMPORT-CHECK NOT MET (check_imp1: <status>)`, and puts the same text in the verdict line, so a LEAD then makes
+  no byte-identity claim. Only when `check_imp1` never ran at all may `check_imp` supply `OK` or
+  `IMPORT-CHECK n/a (host.hip:515)`; a `check_imp` that passed never masks a `check_imp1` that did not.
 - Timing success dependencies (`after`): `vllm_r1..5` needs `golden_sha`, `docker_pull`;
   `etx_r1..5` needs `golden_sha`, `build_all`, `gate_all`; `etxu_r1..5` adds `gate_unf` to those ETX dependencies.
 - Timing, R = 1..5, GPU 0: odd rounds `vllm_r`, `etx_r`, `etxu_r`; even rounds reversed.
@@ -170,7 +173,7 @@ unknown for 1x). Ceiling 60 min / $3.00. **Hard stop:** delete the VM at 55 min 
 | Risk | Mitigation / evidence location |
 |---|---|
 | Default per-XCD replicas make byte comparison n/a | `build_chk1` sets `ETX_VL_CHECK=1 ETX_VL_XCD=0`; `check_imp1` requires the exact OK line; `build_chk` / `check_imp` retain the refusal demonstration. |
-| A new check failure is hidden by legacy n/a | `nvref_report.py` selects `check_imp1` whenever its log or status exists; `test_check_imp1_failure_refuses` covers FAILED, timeout, refusal and skipped status. |
+| A new check failure is hidden by legacy n/a | A `CHECK FAILED` in either check refuses (`test_legacy_check_failed_refuses_even_when_new_check_passed`); an unavailable `check_imp1` proceeds and marks `import-check NOT MET (check_imp1: <status>)` on the verdict line (`test_check_imp1_incomplete_proceeds_with_not_met`), so no number is ever printed without saying whether the gate was met. |
 | Unmeasured unfused path kills the main comparison | Only `etxu_r1..5` has `gate_unf` in `after`; `etx_r1..5` and `vllm_r1..5` have independent success dependencies. |
 | Skipped neighbours break round interleaving | All earlier jobs remain `after_any` barriers; `test_check_build_and_skipped_neighbour_barrier` checks the runner's actual dependency logic. |
 | Missing/incorrect unfused evidence rejects a valid system verdict | `examples/vllm_llm/nvref_report.py:178` handles unavailable evidence and emits `FUSION unavailable (<reason>)`; `test_fusion_missing_still_verdict` and existing incorrect-run cases cover this. |

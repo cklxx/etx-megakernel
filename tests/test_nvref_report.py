@@ -46,7 +46,7 @@ def session(tmp_path):
 def test_passing(session, capsys):
     assert nr.main([str(session)]) == 0
     out = capsys.readouterr().out
-    assert "VERDICT LEAD | image vllm/image@sha256:abcdef" in out
+    assert "VERDICT LEAD | import-check OK | image vllm/image@sha256:abcdef" in out
     assert "median=-0.200 spread=0.000" in out
     assert "FUSION (unfused - fused) median=+0.400" in out
     assert "IMPORT-CHECK OK" in out
@@ -183,32 +183,52 @@ def test_fusion_missing_still_verdict(session, capsys, missing):
     assert "DELTA r1..r5" in out and "VERDICT LEAD" in out
 
 
-def test_check_imp1_ok_preferred(session, capsys):
+def test_check_imp1_ok_wins_over_legacy_na(session, capsys):
+    """The single-XCD check supplies the evidence; the legacy per-XCD refusal is not reported."""
     write(session, "check_imp1", "CHECK OK: 0 launch(es) differ")
-    write(session, "check_imp", "CHECK FAILED: 1 launch(es) differ")
+    write(session, "check_imp", "ERROR: --check needs a plan without per-XCD replicas (build without ETX_VL_XCD)")
     assert nr.main([str(session)]) == 0
     out = capsys.readouterr().out
-    assert "IMPORT-CHECK OK" in out and "IMPORT-CHECK n/a" not in out
+    assert "IMPORT-CHECK OK" in out
 
 
-@pytest.mark.parametrize("body,status", [
-    ("CHECK FAILED: 1 launch(es) differ", "fail"),
-    ("CHECK OK: 0 launch(es) differ", "timeout"),
-    ("ERROR: --check needs a plan without per-XCD replicas (build without ETX_VL_XCD)", "fail"),
-    (None, "skipped"),
-])
-def test_check_imp1_failure_refuses(session, capsys, body, status):
-    if body is not None:
-        write(session, "check_imp1", body)
+def test_legacy_check_failed_refuses_even_when_new_check_passed(session, capsys):
+    """A differing launch in either build is a correctness failure, not an unavailable check."""
+    write(session, "check_imp1", "CHECK OK: 0 launch(es) differ")
+    write(session, "check_imp", "CHECK FAILED: 1 launch(es) differ")
+    assert nr.main([str(session)]) == 2
+    out = capsys.readouterr().out
+    assert "REFUSED: check_imp: CHECK FAILED" in out
+    assert "DELTA" not in out
+
+
+def test_check_imp1_failure_refuses(session, capsys):
+    write(session, "check_imp1", "CHECK FAILED: 1 launch(es) differ")
     write(session, "check_imp", "ERROR: --check needs a plan without per-XCD replicas (build without ETX_VL_XCD)")
-    (session / "status.json").write_text(json.dumps([dict(name="check_imp1", status=status)]))
+    (session / "status.json").write_text(json.dumps([dict(name="check_imp1", status="fail")]))
     assert nr.main([str(session)]) == 2
     out = capsys.readouterr().out
     assert out.startswith("REFUSED: check_imp1:")
     assert out.endswith("No performance numbers.\nVERDICT NOT-COMPLETE\n")
     assert "| source |" not in out and "DELTA" not in out
-    if body and body.startswith("CHECK FAILED"):
-        assert "CHECK FAILED" in out
+    assert "CHECK FAILED" in out
+
+
+@pytest.mark.parametrize("body,status", [
+    ("CHECK OK: 0 launch(es) differ", "timeout"),
+    ("ERROR: --check needs a plan without per-XCD replicas (build without ETX_VL_XCD)", "fail"),
+    ("", "skipped"),
+])
+def test_check_imp1_incomplete_proceeds_with_not_met(session, capsys, body, status):
+    """An unavailable check keeps the numbers and marks the gate NOT MET on the verdict line."""
+    write(session, "check_imp1", body)
+    write(session, "check_imp", "ERROR: --check needs a plan without per-XCD replicas (build without ETX_VL_XCD)")
+    (session / "status.json").write_text(json.dumps([dict(name="check_imp1", status=status)]))
+    assert nr.main([str(session)]) == 0
+    out = capsys.readouterr().out
+    assert f"IMPORT-CHECK NOT MET (check_imp1: {status})" in out
+    assert "DELTA r1..r5" in out
+    assert f"VERDICT LEAD | import-check NOT MET (check_imp1: {status})" in out
 
 
 @pytest.mark.parametrize("arm", ["vllm", "etx"])

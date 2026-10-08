@@ -142,18 +142,33 @@ def report(directory: Path):
             raise Refusal(f"{name}: missing CHECK-DSL OK")
 
     gate("gate_all")
-    # A present new check must pass; never hide its failure behind the legacy n/a.
-    check_name = "check_imp1" if (directory / "check_imp1.log").exists() or "check_imp1" in session.status else "check_imp"
-    check = session.read(check_name, allow_failed=True)
-    if re.search(r"^CHECK FAILED", check, re.M):
-        raise Refusal(f"{check_name}: CHECK FAILED; no performance verdict")
-    if re.search(r"^CHECK OK: 0 launch\(es\) differ$", check, re.M):
-        session.read(check_name)  # a timeout/failure after OK is not success
+    # A differing launch is a correctness failure and refuses the report. A check that
+    # did not run is different: the session keeps its numbers and the verdict line says
+    # the gate is not met, so no claim rests on evidence that does not exist.
+    PER_XCD = "--check needs a plan without per-XCD replicas (build without ETX_VL_XCD)"
+    texts = {}
+    for name in ("check_imp1", "check_imp"):
+        if (directory / f"{name}.log").exists() or name in session.status:
+            texts[name] = (session.read(name, allow_failed=True), session.status.get(name, {}).get("status", "ok"))
+    for name, (text, _status) in texts.items():
+        if re.search(r"^CHECK FAILED", text, re.M):
+            raise Refusal(f"{name}: CHECK FAILED; no performance verdict")
+    imported = None
+    ok = re.compile(r"^CHECK OK: 0 launch\(es\) differ$", re.M)
+    t1, s1 = texts.get("check_imp1", (None, None))
+    t0, s0 = texts.get("check_imp", (None, None))
+    if t1 and ok.search(t1) and s1 == "ok":
         imported = "OK"
-    elif check_name == "check_imp" and "--check needs a plan without per-XCD replicas (build without ETX_VL_XCD)" in check:
+    elif t1 is None and t0 and ok.search(t0) and s0 == "ok":
+        imported = "OK"          # only the legacy check ran, and it passed
+    elif t1 is not None:
+        # The real check ran (or was attempted): never hide its state behind the legacy refusal.
+        imported = f"NOT MET (check_imp1: {s1})"
+    elif t0 is not None and PER_XCD in t0:
         imported = "n/a (host.hip:515)"
     else:
-        raise Refusal(f"{check_name}: missing CHECK OK (only legacy check_imp permits the documented per-XCD refusal)")
+        reasons = ", ".join(f"{n}: {st}" for n, (_t, st) in texts.items()) or "no check job ran"
+        imported = f"NOT MET ({reasons})"
 
     golden = session.read("golden_sha", "None")
     if not re.search(r"(?:^|/)golden_c1024.txt: OK$", golden, re.M):
@@ -238,7 +253,7 @@ def report(directory: Path):
         print(f"FUSION unavailable ({fusion_unavailable})")
     print(f"IMPORT-CHECK {imported}")
     result = verdict(deltas)
-    print(f"VERDICT {result} | image {digest} | HF_REV {revision} | machine {machine}")
+    print(f"VERDICT {result} | import-check {imported} | image {digest} | HF_REV {revision} | machine {machine}")
     if len(aiter) == 3:
         row("vLLM 0.27.1 AITER", hardware, "host wall, (t32-t1)/31", aiter)
         if median(v) - median(aiter) > 0.050 + 1e-12:
