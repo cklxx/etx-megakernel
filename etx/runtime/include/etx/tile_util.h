@@ -72,8 +72,13 @@ static __device__ __forceinline__ unsigned etx_wave_max_u32(unsigned v) {
 // Arithmetic of the weights = the old path: m = the max logit (here the round-0 winner), p = expf(l - m), s =
 // etx_wave_sum(p) (the same butterfly order), p *= 1 / s, weight = p of the winner, sel = the weights summed in
 // round order, renorm: weight / sel. The sum runs once, after round 0, outside the selection loop.
-template <class Put>
-static __device__ __forceinline__ void etx_topk_key32(const float (&l)[2], int E, int K, bool renorm, int lane, Put put) {
+// kPerRound = false (etx_topk_key32): lane t keeps round t's id and weight; put(t, id, w) runs once in lane t < K.
+// kPerRound = true (etx_topk_key32_lds, for LDS outputs): put(t, id, w) runs in lane 0 in round t, with the
+// weight before renorm, and the function returns sel (wave-uniform); the caller divides by sel (the old code's way).
+// The fold tiles (ETX_VL_FOLD_TOPK=1) need kPerRound: with the lane-t registers live across the loop, the moe fold
+// tile spills one more VGPR (spill 13 -> 14, scratch 48 -> 52 bytes, 21 -> 72 scratch instructions).
+template <bool kPerRound, class Put>
+static __device__ __forceinline__ float etx_topk_key32_impl(const float (&l)[2], int E, int K, bool renorm, int lane, Put put) {
   unsigned key[2]; bool ok[2];
 #pragma unroll
   for (int k = 0; k < 2; ++k) { const int e = lane + k * ETX_WAVE_SIZE; ok[k] = e < E; key[k] = ok[k] ? etx_key32(l[k], e) : 0u; }
@@ -88,7 +93,7 @@ static __device__ __forceinline__ void etx_topk_key32(const float (&l)[2], int E
   const float inv = 1.f / s;
 #pragma unroll
   for (int k = 0; k < 2; ++k) p[k] = ok[k] ? p[k] * inv : 0.f;
-  float sel = 0.f, myw = 0.f; int myid = 0;                            // lane t keeps round t's result
+  float sel = 0.f, myw = 0.f; int myid = 0;                            // kPerRound = false: lane t keeps round t
   for (int t = 0; t < K; ++t) {
     if (t > 0) {
       km = etx_wave_max_u32(etx_umax(key[0], key[1]));
@@ -97,10 +102,20 @@ static __device__ __forceinline__ void etx_topk_key32(const float (&l)[2], int E
     }
     const int bi = etx_key32_expert(km);
     const float bv = __int_as_float(__builtin_amdgcn_readlane(__float_as_int(bi >= ETX_WAVE_SIZE ? p[1] : p[0]), bi & (ETX_WAVE_SIZE - 1)));
-    if (lane == t) { myid = bi; myw = bv; }
+    if constexpr (kPerRound) { if (lane == 0) put(t, bi, bv); }
+    else if (lane == t) { myid = bi; myw = bv; }
     sel += bv;
   }
-  if (lane < K) put(lane, myid, renorm ? myw / sel : myw);
+  if constexpr (!kPerRound) { if (lane < K) put(lane, myid, renorm ? myw / sel : myw); }
+  return sel;
+}
+template <class Put>
+static __device__ __forceinline__ void etx_topk_key32(const float (&l)[2], int E, int K, bool renorm, int lane, Put put) {
+  etx_topk_key32_impl<false>(l, E, K, renorm, lane, put);
+}
+template <class Put>
+static __device__ __forceinline__ float etx_topk_key32_lds(const float (&l)[2], int E, int K, int lane, Put put) {
+  return etx_topk_key32_impl<true>(l, E, K, false, lane, put);
 }
 #endif
 // block-wide reductions; `red` is a scratch array of >= nwaves floats in LDS; result in every thread

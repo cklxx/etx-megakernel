@@ -648,7 +648,8 @@ static __device__ __forceinline__ void dsl_topk_lds(const __hip_bfloat16* logits
 #pragma unroll
     for (int k = 0; k < 2; ++k) { const int e = lane + k * ETX_WAVE_SIZE; p[k] = e < E ? dsl_a_ldbf(logits + e) : -INFINITY; taken[k] = e >= E; m = fmaxf(m, p[k]); }
 #ifdef ETX_TOPK_KEY32                                    // one 32-bit key per expert, DPP wave max (etx/tile_util.h)
-    etx_topk_key32(p, E, K, renorm != 0, lane, [&](int t, int bi, float v) { ids[t] = bi; wts[t] = v; });
+    const float sel = etx_topk_key32_lds(p, E, K, lane, [&](int t, int bi, float v) { ids[t] = bi; wts[t] = v; });
+    if (renorm && lane == 0) for (int t = 0; t < K; ++t) wts[t] = wts[t] / sel;
 #else
     m = etx_wave_max(m);
     float s = 0.f;

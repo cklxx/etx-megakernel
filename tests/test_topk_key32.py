@@ -127,7 +127,7 @@ def _key32_block() -> str:
 
 def test_switch_guards_every_key32_line():
     """With the switch off, the preprocessor removes every new line: the off build is the old source."""
-    for path, needle in (("etx/ops/topk.py", "etx_topk_key32("), ("etx/ops/gemv.py", "etx_topk_key32(")):
+    for path, needle in (("etx/ops/topk.py", "etx_topk_key32("), ("etx/ops/gemv.py", "etx_topk_key32_lds(")):
         src = (ROOT / path).read_text()
         i = src.index(needle)
         assert src.rfind("#ifdef ETX_TOPK_KEY32", 0, i) > src.rfind("#endif", 0, i)
@@ -138,8 +138,8 @@ def test_switch_guards_every_key32_line():
 
 @pytest.mark.skipif(shutil.which("g++") is None, reason="needs g++ (C++20) for the host SIMT harness")
 def test_cpp_block_on_a_host_simt_wave(tmp_path):
-    """Runs the C++ of the ETX_TOPK_KEY32 block itself (64 host threads = 64 lanes, modelled DPP and readlane) and
-    compares it with the Python emulation. Host exp is not numpy exp: ids must match, weights to 1 ulp-ish."""
+    """Runs the C++ of the ETX_TOPK_KEY32 block itself (64 host threads = 64 lanes, modelled DPP and readlane), both
+    output forms, and compares it with the Python emulation. Host exp is not numpy exp: ids must match, weights to 1 ulp-ish."""
     (tmp_path / "key32_block.inc").write_text(_key32_block())
     exe = tmp_path / "simt"
     subprocess.run(["g++", "-std=c++20", "-O1", "-pthread", "-I", str(tmp_path), str(ROOT / "tests/data/topk_key32_simt.cpp"),
@@ -154,17 +154,22 @@ def test_cpp_block_on_a_host_simt_wave(tmp_path):
     v = rng.normal(0, 3, 128).astype(np.float32); v[7] = np.nan
     cases.append((128, 8, 1, tk.bf16_bits(v)))
     inp = "".join(f"{E} {K} {rn}\n" + " ".join(f"{int(b):x}" for b in bits) + "\n" for E, K, rn, bits in cases)
-    out = subprocess.run([str(exe)], input=inp, capture_output=True, text=True, check=True, timeout=120).stdout.split("\n")
-    i = 0
-    for E, K, rn, bits in cases:
-        ids, ws = [], []
-        for _ in range(K):
-            a, b = out[i].split(); i += 1
-            ids.append(int(a)); ws.append(np.uint32(int(b, 16)).view(np.float32))
-        exp_ids, exp_w = tk.key_topk(bits, K, bool(rn))
-        assert ids == exp_ids, (E, K, bits.tolist())
-        for x, y in zip(ws, exp_w):
-            assert (np.isnan(x) and np.isnan(y)) or abs(float(x) - float(y)) <= 4e-7 * max(abs(float(y)), 1e-30)
+    outs = {}
+    for variant in ("put", "lds"):                       # etx_topk_key32 (dsl_run_dsl_topk), etx_topk_key32_lds (fold)
+        outs[variant] = subprocess.run([str(exe), variant], input=inp, capture_output=True, text=True, check=True,
+                                       timeout=120).stdout
+        out = outs[variant].split("\n")
+        i = 0
+        for E, K, rn, bits in cases:
+            ids, ws = [], []
+            for _ in range(K):
+                a, b = out[i].split(); i += 1
+                ids.append(int(a)); ws.append(np.uint32(int(b, 16)).view(np.float32))
+            exp_ids, exp_w = tk.key_topk(bits, K, bool(rn))
+            assert ids == exp_ids, (variant, E, K, bits.tolist())
+            for x, y in zip(ws, exp_w):
+                assert (np.isnan(x) and np.isnan(y)) or abs(float(x) - float(y)) <= 4e-7 * max(abs(float(y)), 1e-30)
+    assert outs["put"] == outs["lds"]                    # the two output forms give the same bits
 
 
 def test_rounding_tie_difference():

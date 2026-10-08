@@ -2,7 +2,8 @@
 // The test extracts the block (between "#ifdef ETX_TOPK_KEY32" and its "#endif") into key32_block.inc and compiles
 // this file with g++. 64 host threads run the block as the 64 lanes of one wave. Each cross-lane builtin
 // (update_dpp, readlane, __shfl_xor) publishes the lane values, meets at a barrier, and reads them.
-// stdin: E K renorm, then E bf16 bit patterns (hex). stdout: K lines "id weight_bits_hex" (lane t prints result t).
+// stdin: E K renorm, then E bf16 bit patterns (hex). stdout: K lines "id weight_bits_hex" (result t).
+// argv[1] == "lds": run etx_topk_key32_lds (lane 0 stores each round; lane 0 divides by sel, as dsl_topk_lds does).
 #include <barrier>
 #include <cmath>
 #include <cstdint>
@@ -50,7 +51,8 @@ static int __builtin_amdgcn_readlane(int v, int lane) {
 
 #include "key32_block.inc"
 
-int main() {
+int main(int argc, char** argv) {
+  const bool lds = argc > 1 && std::strcmp(argv[1], "lds") == 0;
   int E, K, renorm;
   while (std::scanf("%d %d %d", &E, &K, &renorm) == 3) {
     std::vector<unsigned> bits(E);
@@ -63,7 +65,9 @@ int main() {
         t_lane = lane;
         float l[2];
         for (int k = 0; k < 2; ++k) { const int e = lane + 64 * k; l[k] = e < E ? __uint_as_float(bits[e] << 16) : -INFINITY; }
-        etx_topk_key32(l, E, K, renorm != 0, lane, [&](int t, int bi, float v) { id[t] = bi; w[t] = v; });
+        if (!lds) { etx_topk_key32(l, E, K, renorm != 0, lane, [&](int t, int bi, float v) { id[t] = bi; w[t] = v; }); return; }
+        const float sel = etx_topk_key32_lds(l, E, K, lane, [&](int t, int bi, float v) { id[t] = bi; w[t] = v; });
+        if (renorm && lane == 0) for (int t = 0; t < K; ++t) w[t] = w[t] / sel;
       });
     for (auto& t : th) t.join();
     for (int t = 0; t < K; ++t) std::printf("%d %08x\n", id[t], __float_as_uint(w[t]));
