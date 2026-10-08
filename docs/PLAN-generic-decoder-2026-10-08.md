@@ -190,6 +190,7 @@ Lever 1 has these facts:
 3. attn and reduce are imported vLLM kernels. A change needs an ETX tile or a TileLang tile.
 4. qkv and router serialize 8 row loads with a `vmcnt(0)` wait in each trip. The data chain has 1 coherent hop. This is a compiler lever.
 5. The floors leave out the LDS steps and the request rate. Thus the real gain is smaller than 1.14 ms.
+6. topk has a first change behind the switch `ETX_TOPK_KEY32` (default off). It selects on one 32-bit key per expert with a DPP wave max. The selection loop then has 0 `ds_bpermute` and 39 instructions per trip, against 12 and 182. The dependent LDS round trips per task fall from 60 to 6. The switch-off build is MATCH. A GPU run must measure the gain. See `docs/TOPK-KEY32-2026-10-08.md`.
 
 Lever 3 has these facts. Section "Realistic gain from prefetch" of `docs/FLOORS-2026-10-08.md` gives the sources.
 1. The value 1.40 ms is the serial floor minus the overlap floor. It is an upper bound, not an estimate of a real design.
