@@ -9,6 +9,14 @@ A task of an imported grid runs `slots` of the kernel's original blocks side by 
 block t * slots + s. The kernel's argument block for this grid instance is at byte c->cst[0] of the grid's
 first argument (one buffer holds the blocks of every instance; etx.importer.argblock lays them out), and
 ends with u32 grid[3], u32 nblocks. Waves beyond the last slot and slots past the last block do nothing.
+
+The slot index is wave-uniform (a slot is whole waves, ir_import.py slot_thr), but it derives from the opaque thread
+index, so the compiler treated it as per-lane: with slots > 1 the block index, the slot switch of the imported entry
+and the kernel's block-derived index math all went to VGPRs. Mixtral's attention (attn_mfma4_g4 at 4 slots, 128 VGPR
+cap) spilled 96 of the megakernel's 100 spilled VGPRs there. __builtin_amdgcn_readfirstlane makes it an SGPR again; it
+stays inside the task (it reads the asm result), so nothing is hoisted into the persistent loop's preheader.
+Measured (ROCm 7.14, gfx942, entry defaults): Mixtral 100 -> 60 spilled VGPRs (-> 10 with the uniform BIGK branch in
+etx/ops/gemv.py), Qwen3-8B 10 -> 6, Qwen3-30B-A3B 9 -> 8 (its SGPR spills 144 -> 262, into VGPR lanes, no scratch).
 """
 from __future__ import annotations
 
@@ -36,7 +44,7 @@ def emit_adapters(imports: dict) -> str:
                 f'extern "C" __device__ void etx_imp_{e}(const void* args, int blk, int tid, int slot);',
                 f'extern "C" __device__ __attribute__((always_inline)) void etx_tile_{e}(const etx_ctx* c) {{',
                 "  int tx; asm volatile(\"v_mov_b32 %0, %1\" : \"=v\"(tx) : \"v\"((int)threadIdx.x));   // opaque per task: see below",
-                f"  const int slot = tx / {st}, tid = tx - slot * {st};",
+                f"  const int slot = __builtin_amdgcn_readfirstlane(tx / {st}), tid = tx - slot * {st};",
                 leave,
                 "  const unsigned char* a = etx_imp_argblock(c->args, c->cst[0]);",
                 f"  const int nblk = *(const int*)(a + {g + 12});",
@@ -54,7 +62,7 @@ def emit_adapters(imports: dict) -> str:
                 "// waves past the last slot skip the calls but take every barrier",
                 f"static __device__ __attribute__((always_inline)) void etx_all_blocks_{e}(const unsigned char* a) {{",
                 "  int tx; asm volatile(\"v_mov_b32 %0, %1\" : \"=v\"(tx) : \"v\"((int)threadIdx.x));",
-                f"  const int slot = tx / {st}, tid = tx - slot * {st};",
+                f"  const int slot = __builtin_amdgcn_readfirstlane(tx / {st}), tid = tx - slot * {st};",
                 f"  const int nblk = *(const int*)(a + {g + 12});",
                 f"  for (int first = 0; first < nblk; first += {k}) {{",
                 f"    const int blk = first + slot;",
@@ -79,7 +87,7 @@ def emit_adapters(imports: dict) -> str:
                 "// grid (XCDs, tasks per XCD) pinned xw->x: the task reads its XCD's argument block; cst = {block 0, stride, tasks per XCD}",
                 f'extern "C" __device__ __attribute__((always_inline)) void etx_tile_x_{e}(const etx_ctx* c) {{',
                 "  int tx; asm volatile(\"v_mov_b32 %0, %1\" : \"=v\"(tx) : \"v\"((int)threadIdx.x));",
-                f"  const int slot = tx / {st}, tid = tx - slot * {st};",
+                f"  const int slot = __builtin_amdgcn_readfirstlane(tx / {st}), tid = tx - slot * {st};",
                 leave,
                 "  const unsigned char* a = etx_imp_argblock(c->args, c->cst[0] + c->coord[0] * c->cst[1]);",
                 f"  const int nblk = *(const int*)(a + {g + 12});",
