@@ -117,12 +117,18 @@ def plan(model_cfg, machine, budget, *, variants=None) -> Plan:
 
 
 def load():
-    """The real etx.select when it exists, else this stub. Returns (module, is_stub)."""
+    """The real etx.select when it provides `plan`, else this stub. Returns (module, is_stub).
+
+    A bare `import etx.select` is not the test: a leftover etx/select/ directory (for example only __pycache__)
+    imports as an empty namespace package. Only a module with `plan` and the contract types counts as real."""
+    import importlib
+
     try:
-        import etx.select as real
+        real = importlib.import_module("etx.select")
     except ImportError:
-        import tests.select_stub as stub
-        return stub, True
-    return real, False
-
-
+        real = None
+    names = ("plan", "Plan", "Budget", "Resources", "Variant", "NoLegalVariant")
+    if real is not None and getattr(real, "__file__", None) and all(hasattr(real, n) for n in names):
+        return real, False
+    import tests.select_stub as stub
+    return stub, True
