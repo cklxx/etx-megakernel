@@ -199,7 +199,7 @@ Lever 3 has these facts. Section "Realistic gain from prefetch" of `docs/FLOORS-
 5. `b_r8base` already has `ETX_VL_TOUCH=1`. Waves 1 to 15 read the first weight pass of the next dense GEMV into the L2 while wave 0 polls the event. The fold and TOUCH together saved only 0.04 ms: 5.895 against 5.934 ms. Thus most of the 0.22 ms is already in the measured 5.08 ms.
 6. LDS-direct loads add only the step from an L2 hit to the LDS. The prefetch area must be outside the 41,448 B arena. 24,088 B per CU are free.
 
-Before new work on lever 3, explain the TOUCH result and the BAR2 result. `docs/RESULTS-2026-10-01.md:97-98` gives ARGPF as neutral and BAR2 as 0.095 ms slower.
+Before new work on lever 3, explain the TOUCH result and the BAR2 result. `docs/RESULTS-2026-10-01.md:97-98` gives ARGPF as neutral and BAR2 as 0.095 ms slower. The cause of the BAR2 result is not known. Occupancy does not change, so BAR2 is not evidence against LDS staging.
 
 The o_proj stage into LDS predicts 0.117 to 0.171 ms. This gain is small against the 3.6 ms excess. Appendix A keeps it at low priority.
 
