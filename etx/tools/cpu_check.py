@@ -36,6 +36,8 @@ EXTERNAL_TESTS = {
     # Hop evidence: the round11 commit is absent from a shallow clone; the vLLM lines need VLLM_SRC.
     "tests.test_floors.test_tile_evidence_lines_at_the_round11_commit",
     "tests.test_floors.test_vllm_evidence_lines",
+    # ISA recount needs ETX_ISA_S and ETX_ISA_MAP.
+    "tests.test_floors.test_isa_hop_table_matches_the_matching_build",
 }
 
 
