@@ -133,6 +133,9 @@ ROCMINC=(); [ -n "${ETX_ROCM_HEADERS:-}" ] && ROCMINC=(-isystem "$ETX_ROCM_HEADE
 # ETX_VL_ABLATE=<name>: a timing-only build with a piece of the DSL MoE tile removed (etx/ops/gemv.py's DSL_ABLATE_*).
 # Every ablation but EPL4 produces WRONG output on purpose and must never ship; the correctness gates will fail.
 ABL=(); [ -n "${ETX_VL_ABLATE:-}" ] && ABL=(-DDSL_ABLATE_$(echo "$ETX_VL_ABLATE" | tr '[:lower:]' '[:upper:]'))
+# ETX_TOPK_KEY32=1: the softmax top-k selects on one 32-bit key per expert with a DPP wave max (etx/tile_util.h,
+# docs/TOPK-KEY32-2026-10-08.md). Device code only; the plan does not change. Default off.
+[ "${ETX_TOPK_KEY32:-0}" = 1 ] && ABL+=(-DETX_TOPK_KEY32)
 # ETX_VL_FOLD_TOPK forces model.py's derived fold decision; it reaches the tile through plan_data.h's
 # ETX_EMIT_FOLD_TOPK, not a -D here -- the -D defaulted to "fold" and silently contradicted the plan (round 30).
 hipcc -O3 -std=c++17 --offload-arch=gfx942 "${ROCMINC[@]}" -I "$ROOT/etx/runtime/include" -I "$OUT" -I "$ROOT" \
