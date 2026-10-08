@@ -6,7 +6,7 @@ requires-python = ">=3.11"
 dependencies = ["pyyaml>=6"]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "numpy>=1.26"]
+dev = ["pytest>=8", "numpy>=1.26", "build>=1.2", "setuptools>=68", "wheel"]
 reference = ["numpy>=1.26", "torch>=2.6", "transformers>=4.57,<6", "safetensors>=0.5"]
 
 [project.scripts]
@@ -23,4 +23,6 @@ build-backend = "setuptools.build_meta"
 include = ["etx*"]
 
 [tool.setuptools.package-data]
-etx = ["machine/arch/*.yaml", "runtime/include/etx/*.h", "importer/specs/*.json"]
+etx = ["machine/arch/*.yaml", "runtime/include/etx/*.h", "importer/specs/*.json",
+       "importer/*.sh", "importer/shim/**/*.h", "importer/shim/**/*.cuh",
+       "importer/shim_nofp8/**/*.h", "importer/shim_nofp8/**/*.cuh"]

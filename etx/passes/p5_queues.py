@@ -55,9 +55,10 @@ def _decide_relay(plan: Plan) -> None:
 def run(plan: Plan) -> None:
     _decide_relay(plan)
     wpd = plan.workers_per_domain
+    device_ids = sorted({g.device for g in plan.graph.grids}) or [0]
     rr: dict[tuple[int, int], int] = {}
     plan.static_queues.clear()
-    for d in range(plan.n_devices):
+    for d in device_ids:
         for w in range(plan.workers_per_device()):
             plan.static_queues[(d, w)] = []
     local_count: dict[tuple[int, int], int] = {}
@@ -82,7 +83,7 @@ def run(plan: Plan) -> None:
                 global_count[t.device] = global_count.get(t.device, 0) + 1
     for key, n in local_count.items():
         plan.local_queue_capacity[key] = n + 16
-    for d in range(plan.n_devices):
+    for d in device_ids:
         plan.global_queue_capacity[d] = global_count.get(d, 0) + 16
     # consumer lists for pushes
     plan.ev_consumers.clear()
