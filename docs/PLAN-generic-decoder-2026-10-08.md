@@ -41,7 +41,7 @@ The file gives two combined floors:
 2. The serial floor assumes no prefetch. For each phase, take the larger of its bytes divided by the bandwidth and its phase floor. Add the results of all phases. Then add the synchronization cost.
 
 The serial floor minus the overlap floor is the maximum gain from prefetch across barriers.
-Section 3 uses this difference to rank the levers.
+Section 3 uses this difference and the measured prefetch results to rank the levers.
 The overlap floor also needs a place to hold the prefetched bytes. The LDS, the L2 and the Infinity Cache have limited capacity.
 
 A dense model is near its bandwidth floor. A MoE model with small experts can be near its latency floor.
@@ -174,15 +174,15 @@ The two gains can overlap. Their sum is not a gain.
 
 The body excess of a phase is its critical body minus its serial floor. Source: `python -m etx.tools.floors`.
 
-The levers have this order. The order did not change with the ISA counts.
+The levers have this order. The order changed on 2026-10-08: prefetch moved from lever 2 to lever 3.
 1. Shorter bodies of the five latency phases. The gain is at most 1.14 ms, or 1.00 ms at 0.69 us. topk owns 0.34 ms, router owns 0.28 ms, prep owns 0.22 ms, attn owns 0.17 ms, reduce owns 0.13 ms.
-2. Prefetch across barriers. The gain is at most 1.40 ms, or 1.59 ms at 0.69 us. It needs capacity in the LDS, the L2 or the Infinity Cache.
-3. Shorter MoE bodies. The gain is at most 0.43 ms.
+2. Shorter MoE bodies. The gain is at most 0.43 ms.
+3. Prefetch across barriers. The theoretical gain is at most 1.40 ms, or 1.59 ms at 0.69 us. The realistic gain is much smaller. It needs capacity in the LDS, the L2 or the Infinity Cache.
 4. A shorter folded norm in qkv. The gain is at most 0.20 ms.
 5. The start delay, 0.41 ms. `docs/BUDGET-2026-10-01.md` assigns most of it to the hardware dispatcher.
 6. The handoffs, 0.43 ms. Each edge is near the protocol floor. Only fewer edges reduce this cost.
 
-Prefetch alone is larger than lever 1 in three of four combinations. The rule above compares the full gain without prefetch. Thus lever 1 stays first.
+The theoretical prefetch bound alone is larger than lever 1 in three of four combinations. The rule above compares the full gain without prefetch. Thus lever 1 stays first.
 
 Lever 1 has these facts:
 1. Each latency body is 2.0 to 6.9 times its ISA chain. topk is 6.9 times and reduce is 2.0 times.
@@ -191,8 +191,15 @@ Lever 1 has these facts:
 4. qkv and router serialize 8 row loads with a `vmcnt(0)` wait in each trip. The data chain has 1 coherent hop. This is a compiler lever.
 5. The floors leave out the LDS steps and the request rate. Thus the real gain is smaller than 1.14 ms.
 
-fleet measured one form of lever 2: idle-worker prefetch into the Infinity Cache. It gave no gain. Source: fleet-mi300x `docs/STATUS.md:72`.
-Before new work on lever 2, find the cause of that result.
+Lever 3 has these facts. Section "Realistic gain from prefetch" of `docs/FLOORS-2026-10-08.md` gives the sources.
+1. The value 1.40 ms is the serial floor minus the overlap floor. It is an upper bound, not an estimate of a real design.
+2. fleet measured idle-worker prefetch into the Infinity Cache. It gave no gain: 4.84 against 4.80 ms. One CU streams about 30 GB/s, and the phases that can benefit are latency-bound. Source: fleet-mi300x `docs/STATUS.md:72`.
+3. fleet measured a prefetch of the first rows of the next task across the event wait. It was 4% slower, because 8 held loads per thread cost registers. Source: fleet-mi300x `docs/STATUS.md:30`.
+4. A first-rows prefetch saves at most about 1 round trip per handoff: 9 handoffs x 48 layers x 0.5 us, about 0.22 ms. This is an estimate.
+5. `b_r8base` already has `ETX_VL_TOUCH=1`. Waves 1 to 15 read the first weight pass of the next dense GEMV into the L2 while wave 0 polls the event. The fold and TOUCH together saved only 0.04 ms: 5.895 against 5.934 ms. Thus most of the 0.22 ms is already in the measured 5.08 ms.
+6. LDS-direct loads add only the step from an L2 hit to the LDS. The prefetch area must be outside the 41,448 B arena. 24,088 B per CU are free.
+
+Before new work on lever 3, explain the TOUCH result and the BAR2 result. `docs/RESULTS-2026-10-01.md:97-98` gives ARGPF as neutral and BAR2 as 0.095 ms slower.
 
 The o_proj stage into LDS predicts 0.117 to 0.171 ms. This gain is small against the 3.6 ms excess. Appendix A keeps it at low priority.
 
