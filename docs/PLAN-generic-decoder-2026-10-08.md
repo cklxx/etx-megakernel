@@ -259,7 +259,10 @@ Send this text. It contains the corrections from the ETX group review.
 >
 > **What we will deliver by Friday (AMD):**
 > - A generic decoder path driven by the model's config.json, with one entry point for all models
-> - Qwen3-8B, Qwen3-30B-A3B and Mixtral-8x7B running through that common path
+> - Qwen3-8B, Qwen3-30B-A3B and Mixtral-8x7B running through that common path.
+>   "Common path" means the frontend plus the registry. Qwen3-30B-A3B keeps its
+>   existing DSL tiles as the first registered optimized variant; the tiles are
+>   migrated, not rewritten.
 > - A task-code registry with pluggable tiles. Each task-code variant declares its own applicability (shape limits, dtype, LDS/VGPR budget, backend); the registry selects by these constraints, never by model name, and falls back to the generic or imported kernel when none match. Selection is unit-tested on CPU for all three models.
 > - The NVIDIA backend structure started inside the same codebase, but not yet validated
 >
@@ -402,13 +405,23 @@ A TileLang attention tile replaces a production kernel.
 All items run on CPU.
 
 1. Variant declarations for the current DSL tiles and imported kernels of `examples/vllm_llm`.
+   The registry lists "unfused" as a selectable variant: Table B shows the fused kernel
+   6.6% slower than the same tiles launched one by one on Qwen3-8B, so the planner
+   must be able to select unfused when fusion is not beneficial.
 2. A planner that does the joint selection of section 6.2.
 3. Selection tests for Qwen3-8B, Qwen3-30B-A3B and Mixtral-8x7B. Each test reads the model config only.
+   Qwen3-30B-A3B selects its existing DSL tiles as the first registered optimized
+   variant (migrate, not rewrite); the common path is the frontend plus registry,
+   not the tile implementation.
 4. A fallback test. A shape outside every DSL variant must select the imported kernel.
 5. A budget test. A variant above the budget must not change the selection of other phases.
 6. The planner writes its selection into the feature manifest. A test checks that the host reads it from there.
 7. The `wave_sum` primitive with gfx942 and sm_90 lowerings. The gfx942 source must stay equal.
 8. One entry point for the three GQA models.
+9. Cost model validation. The `cost` field of each variant predicts Qwen3-30B-A3B
+   at 4.823 ms/token (the measured ground truth). If the prediction error exceeds
+   10%, the planner falls back to rule-based selection (minimize wave count) and
+   does not use the cost model for joint selection.
 
 DeepSeek-V2-Lite stays on `examples/dsv2lite`.
 
