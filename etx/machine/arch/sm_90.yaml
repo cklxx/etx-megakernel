@@ -57,3 +57,26 @@ lowering:
   timer: 'clock64()'
   domain_id: '0'
   launch: cudaLaunchCooperativeKernel
+# Tile primitives (docs/PLAN-generic-decoder-2026-10-08.md section 6.4). Each entry is the C definition that
+# etx/ops/prims.py emits for this machine. The tile generators call the primitive by name only.
+# No device ran these lowerings. No CUDA compiler checked them on this machine.
+primitives:
+  wave_sum: |
+    // warp32 butterfly: lane distances 16, 8, 4, 2, 1. Every lane gets the sum. All 32 lanes must call it.
+    static_assert(ETX_WAVE_SIZE == 32, "etx_wave_sum (sm_90 lowering) is written for warp32");
+    static __device__ __forceinline__ float etx_wave_sum(float v) {
+      for (int off = ETX_WAVE_SIZE / 2; off > 0; off >>= 1) v += __shfl_xor_sync(0xffffffffu, v, off);
+      return v;
+    }
+  wave_sum0: |
+    // warp32 butterfly: lane distances 16, 8, 4, 2, 1. Every lane gets the sum. The callers read lane 0 only.
+    // All 32 lanes must call it.
+    static_assert(ETX_WAVE_SIZE == 32, "dsl_wave_sum0 (sm_90 lowering) is written for warp32");
+    static __device__ __forceinline__ float dsl_wave_sum0(float v) {
+      v += __shfl_xor_sync(0xffffffffu, v, 16);
+      v += __shfl_xor_sync(0xffffffffu, v, 8);
+      v += __shfl_xor_sync(0xffffffffu, v, 4);
+      v += __shfl_xor_sync(0xffffffffu, v, 2);
+      v += __shfl_xor_sync(0xffffffffu, v, 1);
+      return v;
+    }
