@@ -223,3 +223,46 @@ Evidence-fix risks and local checks (2026-10-08):
 | Gate failure suppresses diagnostic evidence | Tail needs only builds/golden/image success; gates are barriers; `test_tail_needs_builds_not_gates`. |
 | Noisy deltas look resolved; positive fusion median looks sufficient | `test_resolution` covers both resolution conditions; `test_fusion_rule` checks gain and spread rules via the shared pairs verdict. |
 | Wall fusion margin hides megakernel-specific host cost | `test_host_excess_uses_result_wall` checks 0.197 / 0.036 / 0.161 ms using RESULT values distinct from the step mean; unavailable fusion also makes HOST-EXCESS unavailable. |
+
+## 11. Pre-registered expectations
+Written 2026-10-08 before provisioning. `[M]` derives from a logged measurement; `[E]` is an estimate. Each result is
+checked against this section; a miss is a finding, not a reason to re-run.
+- Gates. `gate_all`: `CHECK-DSL OK`, 32/32, device about 4.406, wall about 4.547 `[M, results_tiles/gate_all.txt:20,23]`.
+  The six tile builds were bit-identical (`bitcmp.log:19-24`), so a failure means the binary or machine changed.
+  `gate_unf`: 32/32 `[E]`; this build never ran unfused. `build_all`: spill 9 / scratch 40 `[M, buildlog_all.txt:27]`.
+- `record`: rocm-smi product name, `/opt/rocm/.info/version`, `uname -r`, `nproc`, an `lspci` line and an `HF_REV` line.
+  The hub lookup falls back to `HF_REV unknown (...)`, so a hub failure cannot refuse the report.
+- `check_imp1`. `--check` is parsed at `host.hip:140` and the instance loop breaks at `:551`. Layers 0-1 hold 19
+  instances `[M, results_tiles/vlplan_all.txt:3-21]`: 14 `dsl_*`, 5 imported (`rms_norm_2d`, `attn_mfma16_g8` x2,
+  `attn_reduce` x2). `ETX_VL_XCD` changes only rep, stride and copyoff (`model.py:371-388`), so the NR=1 plan holds the
+  same list. Expected: five `identical` lines (`host.hip:598`), then
+  `CHECK NOT-IMPORTED: 14 instance(s): dsl_gemv, dsl_attnprep, dsl_gemv, dsl_gemv_fold, dsl_topk, ...` (`:613`), then
+  `CHECK OK: 0 launch(es) differ` (`:614`), exit 0. The same three kernels were byte-identical on 2026-09-28
+  (`results_2026-09-28/moe_check.log:54`). `CHECK FAILED` refuses. A count other than 14 means the plan differs from this
+  section: the report prints NOT MET and a LEAD carries no byte-identity claim.
+- vLLM default: 4.83-4.91 per run `[M-derived: VLLM-LADDER:15, results_2026-09-28b/vllm1_b1_default.log:67,
+  results_2026-09-27/vlnext/vllm_moe_b1.log:65; this image was never measured on this box]`.
+- ETX fused wall: 4.53-4.56 `[M, ab1..3_all_x.log:8]`; device 4.39-4.42 `[M]`. Unfused: 4.61-4.65 `[E: 4.405 + device
+  margin 0.172-0.200 (BUDGET:355, VLLM-LADDER:48) + unfused host 0.036-0.042 (VLLM-LADDER:39)]`.
+- DELTA: median about -0.31, each round -0.38 to -0.27 `[E]`. Expected verdict LEAD. A median above -0.25 is a new fact
+  about this box. The verdict is against vLLM default only: `enable_qk_norm_rope_fusion` ran 0.167 ms faster on the dev
+  image (`vllm1_b1_qknr.log:68`) and this session does not run it.
+- RESOLUTION: expected spread 0.02-0.05 `[E]`. Observed vLLM spreads reach 0.052 (`VLLM-LADDER:16`) and 0.083
+  (`vllm_moe_b1.log:65`), so the line may print. The verdict becomes unusable only when spread >= |median|. Five rounds
+  cannot bound the tails: one outlier sets the range and the sign test reaches p = 1/32 one-sided at best.
+- FUSION: gain 1.4-2.1% `[E]`; round 18 measured 1.7% on the wall basis (`round18/FINDING.md:55`). Expected `not met`.
+  `met` requires unfused - fused > 0.093 ms at fused 4.548, all five gains positive and gain spread < median / 2
+  (`pairs.py:33-34`). `not met` with a device margin near 0.2 ms leaves the claim open: fusion wins on the device and the
+  megakernel's own host work eats the win on the wall. A median gain <= 0 refutes it for this build.
+- HOST-EXCESS: fused 0.140 `[M, ab1..3 line 8: 0.140 / 0.143 / 0.139]`; unfused 0.036-0.042 `[E]`; excess about 0.10 `[E]`.
+  Round 18 cut the fused figure from 0.276 to 0.135 (`round18/FINDING.md:34`); above 0.16 means that fix regressed here.
+- HOSTPROF (stderr; `hostprof.log` only, the report does not parse it): steps 2110; reset about 64 us, residency 0.6,
+  launch 18 `[M-derived, round18/FINDING.md:10-12]`; wait about device + 71 us `[E, :13]`.
+- AITER: median about 4.92 `[M, results_2026-09-27/extra/etx/examples/llm/results/vllm_aiter1_qwen3-30b-a3b.json: 4.916 against 4.836 with aiter off (vllm_aiter0_...json)]`: AITER measured *slower* on this model, so the 0.050 ms recompute rule does not fire. `etx_noprog`: RESULT wall within
+  0.022 ms of the fused RESULT wall `[E]`; a larger gap means the progress print leaks into the timing basis.
+- Next step, decided by this run. X = excess(fused - unfused); E_f = fused HOST-EXCESS; P + O = HOSTPROF reset +
+  residency + launch + (wait - device). X < 0.050: no host work, return to the device levers (`FLOORS:288-293`).
+  X >= 0.050 and P + O >= E_f - 0.050: async enqueue, done when X < 0.050. X >= 0.050 and P + O < E_f - 0.050: resident
+  kernel (`ETX_Technical_Design.md:724-726`). The 0.050 is section 7's threshold; the repository fixes no other.
+- Waste checks: a failure of `record`, `golden_sha`, `gate_all`, `docker_pull` or `vllm_r1` makes the report
+  NOT-COMPLETE and shows by about minute 12. Let `check_imp1`, `gate_unf` and `hostprof` finish, then delete the VM.
