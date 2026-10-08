@@ -45,7 +45,10 @@ def resolve(model: str, hf: str | None = None) -> tuple[str, Path]:
         p = p / "config.json"
     if not p.is_file():
         raise FileNotFoundError(f"{model}: not a known model ({', '.join(KNOWN)}) and not a config.json")
-    return (p.parent.name if p.name == "config.json" else p.stem), p
+    if p.name != "config.json":
+        return p.stem, p
+    d = p.parent                                       # vm_run.sh layout: ~/llm/<name>/hf/config.json
+    return (d.parent.name if d.name == "hf" and d.parent.name else d.name), p
 
 
 def check_gqa(config: Path):
@@ -81,8 +84,8 @@ def golden(name: str) -> Path | None:
     return g if g.is_file() else None
 
 
-def describe(d, p) -> str:
-    lines = [f"model {d.name}: H {d.H}, NH {d.NH}, NKV {d.NKV} (G {d.G}), HD {d.HD}, layers {d.L}, "
+def describe(d, p, name: str | None = None) -> str:
+    lines = [f"model {name or d.name}: H {d.H}, NH {d.NH}, NKV {d.NKV} (G {d.G}), HD {d.HD}, layers {d.L}, "
              + (f"MoE E {d.E} top-{d.TOPK} MI {d.MI}" if d.moe else f"dense INTER {d.INTER}")
              + f", q/k norm {int(d.qk_norm)}",
              f"selection: budget {p.budget}, cost {p.cost:.2f} us per layer (placeholder costs until GPU data)"]
@@ -112,7 +115,7 @@ def main(argv=None) -> int:
         print(f"error: {e}", file=sys.stderr)
         return 2
     p = select(config, a.machine)
-    print(describe(d, p))
+    print(describe(d, p, name))
     want = [s for s in a.only.split(",") if s]
     todo = [(k, cmd) for k, cmd in steps(name, hf, work) if k in want]
     g = golden(name)
