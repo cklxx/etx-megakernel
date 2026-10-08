@@ -28,6 +28,7 @@ case $V in base) E="";; chain) E="ETX_VL_CHAIN=1";; xcd) E="ETX_VL_XCD=1 ETX_VL_
   xcd_dsl3_coh) E="ETX_VL_XCD=1 ETX_VL_CHAIN=1 ETX_VL_DSL_GEMV=1 ETX_VL_DSL_TOPK=1 ETX_VL_DSL_ATTN=head ETX_VL_DSL_FOLD=1 ETX_VL_TOUCH=1 ETX_VL_COH=1 ETX_VL_SLOTS=attn_mfma16_g8=1";;
   xcd_dsl3x2_coh) E="ETX_VL_XCD=1 ETX_VL_CHAIN=1 ETX_VL_DSL_GEMV=1 ETX_VL_DSL_TOPK=1 ETX_VL_DSL_ATTN=head ETX_VL_DSL_FOLD=1 ETX_VL_TOUCH=1 ETX_VL_COH=1 ETX_VL_SLOTS=attn_mfma16_g8=1 ETX_VL_REQUESTS=2";;
   default) E="";;                                     # nothing passed: the derived defaults, i.e. what ships
+  chk1) E="ETX_VL_CHECK=1 ETX_VL_XCD=0";;              # examples/sessions/nvref.py build_chk1: NR=1, so --check can run
   imported) E="ETX_VL_IMPORTED=1";;                   # round 24's all-imported comparison
   xcd_dsl3_all) E="ETX_VL_XCD=1 ETX_VL_CHAIN=1 ETX_VL_DSL_GEMV=1 ETX_VL_DSL_TOPK=1 ETX_VL_DSL_ATTN=head ETX_VL_DSL_FOLD=1 ETX_VL_TOUCH=1 ETX_VL_COH=1 ETX_VL_ARGPF=1 ETX_VL_BAR2=1 ETX_VL_SLOTS=attn_mfma16_g8=1";;
   xcd_dsl3x2_all) E="ETX_VL_XCD=1 ETX_VL_CHAIN=1 ETX_VL_DSL_GEMV=1 ETX_VL_DSL_TOPK=1 ETX_VL_DSL_ATTN=head ETX_VL_DSL_FOLD=1 ETX_VL_TOUCH=1 ETX_VL_COH=1 ETX_VL_ARGPF=1 ETX_VL_BAR2=1 ETX_VL_SLOTS=attn_mfma16_g8=1 ETX_VL_REQUESTS=2";;

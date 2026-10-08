@@ -10,6 +10,7 @@
 // instead of ETX events.
 #include "plan_data.h"
 #include "etx/host.h"
+#include "etx/selection.h"   // the planner's variant per phase, published by plan_data.h
 #include "imports.h"
 
 #include <algorithm>
@@ -106,6 +107,7 @@ struct Args {
     if (i != d->nparams) die(std::string(d->name) + ": " + std::to_string(i) + " of " + std::to_string(d->nparams) + " arguments given");
     const uint32_t g[4] = {(uint32_t)gx, (uint32_t)gy, (uint32_t)gz, (uint32_t)(gx * gy * gz)};
     memcpy(p + d->grid_off, g, 16);
+    if (const char* error = etx_spec_validate(d, p, gx, gy, gz)) die(std::string(d->name) + ": " + error);
   }
 };
 
@@ -151,8 +153,12 @@ int main(int argc, char** argv) {
   if (ln_norm) die("ln_norm model on a build whose tiles lack the LayerNorm fold (ETX_EMIT_DSL_EXT=0)");
 #endif
   if (sparsemixer && norm_topk) die("sparsemixer and norm_topk are mutually exclusive");
+#ifdef ETX_TOPK_KEY32
+  // ETX_TOPK_KEY32 (etx/runtime/include/etx/tile_util.h): lane t of the one wave keeps round t's result, so K <= 64
+  if (TOPK > 64) die("ETX_TOPK_KEY32: TOPK > 64 (one round result per lane of the 64-lane wave)");
+#endif
   const int MOE_BM = ETX_EMIT_MOE_BLOCK_M; // captured specification, published by the plan
-  const int BS = 16, X = 8, MAXBLK = (MAXLEN + BS - 1) / BS;
+  const int BS = ETX_SPEC_BS, X = ETX_SPEC_CACHE_X, MAXBLK = (MAXLEN + BS - 1) / BS;
 
   // ---- plan
   std::vector<Inst> insts; size_t total = 0; int parts = 0, nreq = 1;
@@ -177,15 +183,25 @@ int main(int argc, char** argv) {
       // the tile is emitted for a fixed column count (etx/ops/gemv.py DSL_NB); a plan that asks for more would have
       // the extra requests silently read column 0 -- refuse instead (ETX_VL_BATCH sets both from ETX_VL_REQUESTS)
       if (x.nb > ETX_VL_NB) die("plan instance nb=" + std::to_string(x.nb) + " but the tiles were built with ETX_VL_NB=" + std::to_string(ETX_VL_NB));
+      // the variant of this phase comes from the manifest (plan_data.h), never from a re-derivation here: the plan
+      // file and the manifest must name the same export (docs/PLAN-generic-decoder-2026-10-08.md section 6.3)
+      if (const char* error = etx_sel_check(x.role.c_str(), x.layer, x.exp.c_str()))
+        die("plan instance " + std::to_string(x.n) + " (" + x.role + ", layer " + std::to_string(x.layer) + ", " + x.exp + "): " + error);
       insts.push_back(x);
     }
+  }
+  {                                                       // every selected phase runs: a stale manifest names no extra phase
+    std::vector<int> runs(std::max(ETX_SEL_N_PHASES, 1), 0);
+    for (const Inst& x : insts) ++runs[etx_sel_find_instance(x.role.c_str(), x.layer)];
+    for (int i = 0; i < ETX_SEL_N_PHASES; ++i)
+      if (!runs[i]) die(std::string("the selection names phase ") + etx_sel_phase[i] + " (" + etx_sel_export[i] + "), but the plan has no instance of it");
   }
   bool qknr = false;                                                        // the plan runs the fused q/k norm + rope (in place)
   for (const Inst& x : insts) qknr = qknr || x.role == "qknr" || x.role == "prep";
   // paged attention partitions by a hardcoded 256 tokens (vllm attention.cu T_PAR_SIZE; round 11): a plan whose
   // partition count does not cover maxlen would silently never attend to the tail of the sequence
   for (const Inst& x : insts) if (x.role == "attn") {
-    if (parts * 256 < MAXLEN) die("attention partitions (" + std::to_string(parts) + " x 256) do not cover maxlen " + std::to_string(MAXLEN));
+    if (parts * ETX_SPEC_PART < MAXLEN) die("attention partitions (" + std::to_string(parts) + " x 256) do not cover maxlen " + std::to_string(MAXLEN));
     break;
   }
 
@@ -307,6 +323,8 @@ int main(int argc, char** argv) {
   for (const Inst& x : insts) for (int rr = 0; rr < x.rep; ++rr) {
     if (x.req >= nreq) die("plan instance of a request the plan header does not declare");
     ETX_VL_BIND(reqs[x.req])
+    if (const char* error = etx_spec_model(x.exp.c_str(), x.role.c_str(), H, MI, E, TOPK, NH, NKV, HD, BS, parts, x.gx, x.gy, x.gz))
+      die(x.exp + ": " + error);
     Args a(x.exp.c_str(), ab.data() + x.off + rr * x.stride);
     const std::string r = x.role; const std::string pl = "L" + std::to_string(x.layer) + ".";
     // ETX_DEBUG_HOLE=<M'>: shrink lm_head's M so logits rows [M', V) are never written -- the negative test of
@@ -338,18 +356,13 @@ int main(int argc, char** argv) {
     const bool qn_sep = qk_norm && !qknr;
     bf* qbuf = qn_sep ? qn : qkv; bf* kbuf = qn_sep ? kn : qkv + NH * HD;
     const long long qstr = qn_sep ? NH * HD : NQKV, kstr = qn_sep ? NKV * HD : NQKV;
-    auto gemv = [&](const void* w, const void* in, void* out, const void* b) {   // ops.wvSplitK(weight, x, cu_count, bias)
-      // CuCount must be the GRID SIZE actually launched, not the device's CU count: the kernel's row loop strides by
-      // CuCount * _WvPrGrp * YTILE, so a larger value than the grid leaves rows [grid*wv*YT, CuCount*wv*YT) of every
-      // pass unwritten. Only lm_head (M > grid*wv*YT) loops; its holes hit any token id in them (round 42: Mixtral).
-      a.i32(x.K).i32(x.K).i32(x.K).i32(xM).i32(b ? xM : 1).i32(1).ptr(w).ptr(in).ptr(b).ptr(out).i32(x.wv).i32(x.gx * x.gy * x.gz);
-    };
     auto copy = [&](const void* src, void* dst, size_t bytes) {         // the replica's copy before an in-place kernel
       if (x.copyoff < 0) return;
       const unsigned long long c3[4] = {(unsigned long long)src, (unsigned long long)dst, bytes, 0};
       memcpy(ab.data() + x.copyoff + rr * 32, c3, 32);
     };
-    auto fused_add = [&](bf* in, const void* w) { a.ptr(in).i64(H).ptr(res_r).ptr(w).f32(eps).i32(1).i32(H).i64(H); };
+
+#include "operator_helpers.inc"
     // the DSL GEMVs (etx.ops.gemv): W, x, out, ids, wts, expert stride, M, K, rows per task, tasks per expert
     if (x.exp == "dsl_gemv") {
       const int nblk = x.gx * x.gy * x.gz, rpt = (xM + nblk - 1) / nblk;
@@ -472,45 +485,7 @@ int main(int argc, char** argv) {
                                         .ptr(nullptr).ptr(nullptr).ptr(nullptr).ptr(nullptr).i32(0).f32(0.f).i32(0).i32(0).ptr(nullptr)
                                         .i32(x.nb).i32(x.nb > 1 ? (int)n_mc2 : 0).i32(x.nb > 1 ? (int)n_mc3 : 0)
                                         .i32(x.nb > 1 ? (int)n_tk : 0).i32(x.nb > 1 ? (int)n_tk : 0).i32(0) ETX_VL_EXT2;
-    else if (r == "in_norm" && x.layer == 0) a.ptr(hn_r).ptr(res_r).i64(H).i64(0).i64(0).i64(0).i64(0).ptr(W(pl + "ln1")).i64(0).f32(eps).i32(1).i32(H);
-    else if (r == "in_norm") { copy(dn, d_norm, H * 2); fused_add(d_norm, W(pl + "ln1")); }
-    else if (r == "qkv") gemv(W(pl + "wqkv"), qkv_in, qkv, bias ? W(pl + "bqkv") : nullptr);
-    else if (r == "q_norm") a.ptr(qn).ptr(qkv).i64(HD).i64(NQKV).i64(0).i64(NH).i64(0).ptr(W(pl + "qn")).i64(0).f32(eps).i32(NH).i32(HD);
-    else if (r == "k_norm") a.ptr(kn).ptr(qkv + NH * HD).i64(HD).i64(NQKV).i64(0).i64(NKV).i64(0).ptr(W(pl + "kn")).i64(0).f32(eps).i32(NKV).i32(HD);
-    // fused_qk_norm_rope(qkv, nq, nk, nv, head_dim, eps, q_weight, k_weight, cos_sin_cache, is_neox, positions): kernel
-    // arguments (qkv, nq, nk, nv, eps, q_w, k_w, cos_sin, positions, num_tokens, rotary_dim = cos_sin.size(1) = HD)
-    else if (r == "qknr") a.ptr(qkv).i32(NH).i32(NKV).i32(NKV).f32(eps).ptr(W(pl + "qn")).ptr(W(pl + "kn")).ptr(W("cos_sin")).ptr(positions).i32(1).i32(HD);
-    else if (r == "rope") a.ptr(positions).ptr(qbuf).ptr(kbuf).ptr(W("cos_sin")).i32(HD).i64(qstr).i64(kstr).i64(HD).i32(NH).i32(NKV).i32(HD).i64(0).b8(false);
-    else if (r == "cache") a.ptr(kbuf).ptr(qkv + (NH + NKV) * HD).ptr(kc[x.layer]).ptr(vc[x.layer]).ptr(slot_mapping).i32((int)kstr).i32(NQKV).i32(NKV).i32(HD).i32(BS).i32(X).ptr(kv_scale).ptr(kv_scale);
-    else if (r == "attn") a.ptr(qbuf).ptr(kc[x.layer]).ptr(vc[x.layer]).i32(NKV).f32(scale).ptr(block_tables).ptr(seq_lens).ptr(nullptr).i32(MAXBLK).ptr(nullptr)
-                            .i32((int)qstr).i32(NKV * HD * BS).i32(HD * BS).ptr(exp_sums).ptr(max_logits).ptr(tmp_out).ptr(attn_out).i32(MAXBLK).ptr(kv_scale).ptr(kv_scale);
-    else if (r == "reduce") a.ptr(attn_out).ptr(exp_sums).ptr(max_logits).ptr(tmp_out).ptr(seq_lens).ptr(nullptr).i32(parts).ptr(nullptr);
-    else if (r == "o_proj") gemv(W(pl + "wo"), attn_out, o, nullptr);
-    else if (r == "post_norm") { copy(o, o_norm, H * 2); fused_add(o_norm, W(pl + "ln2")); }
-    else if (r == "gate_up") gemv(W(pl + "wgu"), o_norm, gu, nullptr);
-    else if (r == "moe_act") a.ptr(mc2).ptr(mc1).i32(MI).f32(0.0f).f32(1.0f).f32(0.0f);    // one row per expert
-    else if (r == "act") a.ptr(act_out).ptr(gu).i32(I).f32(0.0f).f32(1.0f).f32(0.0f);
-    else if (r == "router") gemv(W(pl + "wr"), o_norm, rlog, nullptr);
-    // topk_softmax -> topkGatingLauncherHelper(gating_output, nullptr, topk_weights, topk_indices, token_expert_indices,
-    // num_tokens, topk, 0, num_experts, renormalize, bias, 1.0, stream, is_padding)
-    else if (r == "topk") a.ptr(rlog).ptr(nullptr).ptr(tw_r).i32(1).ptr(ti_r).ptr(tei + (size_t)rr * TOPK).i32(TOPK).i32(0).i32(E).b8(norm_topk)
-                            .ptr(nullptr).f64(1.0).ptr(nullptr);
-    // invoke_fused_moe_triton_kernel, naive block assignment: EM = M * top_k * BLOCK_SIZE_M, num_valid_tokens = M * top_k;
-    // Triton dropped the None pointers and the strides equal to 1 (stride_ak, stride_bk, stride_cn) from the signature
-    // and appended its global / profile scratch pointers (both sizes 0)
-    else if (r == "moe_up") a.ptr(o_norm).ptr(W(pl + "w13")).ptr(mc1).ptr(ti_r).ptr(ntpp)
-                              .i32(2 * MI).i32(H).i32(TOPK * MOE_BM).i32(TOPK)
-                              .i32(H).i32(2 * MI * H).i32(H).i32(2 * MI).i32(0).i32(0).i32(0).i32(0).i32(0).i32(0).i32(0).ptr(nullptr).ptr(nullptr);
-    else if (r == "moe_down") a.ptr(mc2).ptr(W(pl + "w2")).ptr(mc3).ptr(tw_r).ptr(ti_r).ptr(ntpp)
-                                .i32(H).i32(MI).i32(TOPK * MOE_BM).i32(TOPK)
-                                .i32(MI).i32(H * MI).i32(MI).i32(H).i32(0).i32(0).i32(0).i32(0).i32(0).i32(0).i32(0).ptr(nullptr).ptr(nullptr);
-    // moe_sum, vectorised: (out, input, num_tokens, hidden, stride_token, stride_topk, nullptr, nullptr, 0, 0); the output
-    // is the buffer the next fused_add_rms_norm reads (vLLM copies it there)
-    else if (r == "moe_sum") a.ptr(d_norm).ptr(mc3).i64(1).i32(H).i64((long long)TOPK * H).i64(H).ptr(nullptr).ptr(nullptr).i64(0).i64(0);
-    else if (r == "down") gemv(W(pl + "wd"), act_out, dn, nullptr);
-    else if (r == "final_norm") { copy(dn, d_norm, H * 2); fused_add(d_norm, W("final_norm")); }
-    else if (r == "lm_head") gemv(tie ? W("embed") : W("lm_head"), d_norm, logits, nullptr);
-    else die("unknown role " + r);
+#include "operator_dispatch.inc"
     a.grid(x.gx, x.gy, x.gz);
   }
 
@@ -566,13 +541,23 @@ int main(int argc, char** argv) {
     };
     launch_imported(0);                                              // prologue: embedding row, positions, lengths
     if (!wait_stream(hst.stream, 5.0)) die("prologue hung");
-    int bad = 0;
+    int bad = 0, not_imported = 0;
+    std::string not_imported_names;
     hipEvent_t e0, e1; ETX_CHECK(hipEventCreate(&e0)); ETX_CHECK(hipEventCreate(&e1));
     auto elapsed_us = [&]() { float ms = 0.f; ETX_CHECK(hipEventElapsedTime(&ms, e0, e1)); return 1000.0 * ms; };
     std::map<std::string, std::pair<double, double>> by_kernel;      // export -> (original us, imported us), summed
     double sum_o = 0, sum_i = 0;
     for (const Inst& x : insts) {
       if (x.layer >= check_layers || (x.layer < 0 && check_layers < L)) break;
+      // Same DSL namespace as model.py:src_of and plan_imports.py:planned_imports.
+      // Execute to preserve downstream inputs, but CHECK-DSL owns correctness.
+      if (x.exp.rfind("dsl_", 0) == 0) {
+        launch_imported(x.n + 1);
+        if (!wait_stream(hst.stream, 5.0)) die("DSL tile hung: " + x.exp);
+        if (not_imported < 5) not_imported_names += (not_imported ? ", " : "") + x.exp;
+        ++not_imported;
+        continue;
+      }
       const etx_imp_desc* d = etx_imp_find(x.exp.c_str());
       const void* fn = etx_orig_find(x.exp.c_str());
       const char *tri_path = nullptr, *tri_fn = nullptr; int tri_shared = 0; hipFunction_t tri = nullptr;
@@ -625,6 +610,7 @@ int main(int argc, char** argv) {
     for (auto& kv : by_kernel) printf("  %-20s original %8.1f us  imported %8.1f us  (%+.0f%%)\n", kv.first.c_str(), kv.second.first, kv.second.second,
                                       100.0 * (kv.second.second / std::max(kv.second.first, 1e-9) - 1.0));
     printf("  %-20s original %8.1f us  imported %8.1f us\n", "total", sum_o, sum_i);
+    printf("CHECK NOT-IMPORTED: %d instance(s): %s%s\n", not_imported, not_imported_names.c_str(), not_imported > 5 ? ", ..." : "");
     printf("CHECK %s: %d launch(es) differ\n", bad ? "FAILED" : "OK", bad);
     return bad ? 4 : 0;
 #endif

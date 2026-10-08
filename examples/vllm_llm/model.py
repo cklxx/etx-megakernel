@@ -45,8 +45,10 @@ sys.path.insert(0, str(HERE.parents[1]))
 from etx.frontends import hip_link  # noqa: E402
 from etx.ir import Graph, Resource  # noqa: E402
 from examples.llm.model import load_dims  # noqa: E402
-from etx.importer.launch_spec import launch_for, validate_wvsplitk
+from etx.importer.spec import launch_for, validate_wvsplitk, grid_for, OPERATORS
 from examples.vllm_llm import folds  # noqa: E402
+from etx.codegen import manifest  # noqa: E402
+from etx import select as etx_select  # noqa: E402
 
 # ETX_VL_CU: workgroups a DSL dense phase spreads over (one task per workgroup). 304 = every CU, which is what
 # vLLM's wvSplitK uses, but hw_bench stream (2026-10-01) shows 304 is oversubscribed: at the gate_up shape the
@@ -68,14 +70,15 @@ def _on(name: str, universal: bool = True) -> bool:
 
 # UNIVERSAL (see docs/OPTIMISATIONS.md): on for every model, `=0` only to reproduce a measurement.
 CU = int(os.environ.get("ETX_VL_CU", "256"))    # MI300X has 304 compute units
-BS = 16                       # KV block size (vLLM default on ROCm)
-PART = 256                    # paged attention partition size (fixed in paged_attention_custom_launcher).
+BS = OPERATORS["attn_mfma4_g4"].constants["BS"]                       # KV block size (vLLM default on ROCm)
+PART = OPERATORS["attn_mfma4_g4"].constants["PART"]                    # paged attention partition size (fixed in paged_attention_custom_launcher).
 # Sets only parts = ceil(MAXLEN / PART) = gridDim.y; the partition SIZE is a hardcoded T_PAR_SIZE = 256 in the
 # kernel (vllm/csrc/rocm/attention.cu:362), and a partition past the sequence early-exits (:366-369). So parts
 # * 256 must cover seq_len or the tail is never attended and reduce reads unwritten partials: 256 is the minimum
 # correct value at MAXLEN 1072, 128 only adds early-exiting tasks, 512 is incorrect. Not a tuning knob
 # (results_2026-10-01/round11/FINDING.md).
 THREADS = 1024                # megakernel workgroup = the largest imported block (wvSplitK 64 x 16)
+LDS_BUDGET = 64 * 1024        # LDS per workgroup at one workgroup per CU (etx/machine/arch/gfx942.yaml lds_kb)
 MAXLEN = int(os.environ.get("ETX_VL_MAXLEN", "1072"))    # vLLM's max_model_len for the benchmark (prompt + 32 + 16)
 # ETX_VL_PIN=1: the small launches between qkv and o_proj (q/k norm, rope, cache, attention, reduce) all run on
 # XCD 0, so the events between them are XCD-local (a wait on L2 of one XCD) instead of device-wide
@@ -207,7 +210,8 @@ def imports() -> dict:
     p = os.environ.get("ETX_VL_IMPORTS")
     if not p:
         raise SystemExit("ETX_VL_IMPORTS=<imports.json from etx.importer.vllm_kernels> is required")
-    return json.loads(Path(p).read_text())
+    result = json.loads(Path(p).read_text())
+    return result
 
 
 def mindiv(n: int, div1: int, div2: int) -> int:          # vLLM skinny_gemms.cu, the waves-per-group choice
@@ -250,27 +254,47 @@ def instances(d) -> list[dict]:
     DSL_ATTNHEAD = _attn_head(d)
     out = []
     moe_specs = {role: launch_for(d, role) for role in ("up", "down")} if d.moe and not DSL_GEMV else {}
+    # The norm folds live in dsl_gemv_fold, which is written for the MoE model (host.hip:394 stops it at E == 0), and
+    # PhiMoE needs them (no imported LayerNorm). A dense model keeps its norm phases (etx.select default_structure).
+    FOLD = DSL_FOLD and (bool(d.moe) or bool(getattr(d, "ln_norm", False)))
+    # etx.select (section 6.2): the planner's variant for each GEMV phase. A phase whose shape is outside every DSL
+    # GEMV variant (Qwen3-8B down: K = 12288 > 4096, host.hip:358) gets wvSplitK instead of a run that stops.
+    gemv_sel = {}
+    if DSL_GEMV:
+        try:
+            gemv_sel = etx_select.plan(
+                d, "gfx942", None, variants=[v for v in etx_select.REGISTRY if v.phase in etx_select.GEMV_PHASES],
+                structure=etx_select.Structure(fold_norms=FOLD, fold_topk=FOLD_TOPK, attn_head=DSL_ATTNHEAD)).phases
+        except etx_select.NoLegalVariant:
+            gemv_sel = {}                                    # no override: host.hip keeps its checks
 
-    def add(export, layer, role, grid, **kw):
+    def add(export, layer, role, grid=None, **kw):
+        if export in OPERATORS:
+            expected = grid_for(export, d, role=role, cu=CU, parts=parts)
+            if grid is not None and grid != expected:
+                raise ValueError(f"{export}: grid conflicts with operator specification")
+            grid = expected
         out.append({"export": export, "layer": layer, "role": role, "grid": grid, **kw})
 
     def gemv(layer, role, m, k):
-        if DSL_GEMV:                                          # rows per task = ceil(M / CU): at 304, 17 (qkv), 7 (o_proj), 1 (router)
-            fold = DSL_FOLD and (role in ("router", "lm_head") or (role == "qkv" and (layer > 0 or getattr(d, "ln_norm", False))))
+        key = role + "@0" if layer == 0 and role + "@0" in gemv_sel else role
+        if DSL_GEMV and (key not in gemv_sel or gemv_sel[key].kind == "dsl"):   # else: the planner's fallback
+            # rows per task = ceil(M / CU): at 304, 17 (qkv), 7 (o_proj), 1 (router)
+            fold = FOLD and (role in ("router", "lm_head") or (role == "qkv" and (layer > 0 or getattr(d, "ln_norm", False))))
             add("dsl_gemv_fold" if fold else "dsl_gemv", layer, role, (CU, 1, 1), M=m, K=k, wvprgrp=0)
             return
         y = wvsplitk_ytile(m)
         waves = mindiv(m, CU * y, 16)
         validate_wvsplitk(grid=(CU, 1, 1), cu_count=CU, rows=m, ytile=y, wave_groups=waves)
-        add(f"wvsplitk_y{y}", layer, role, (CU, 1, 1), M=m, K=k, wvprgrp=waves)
+        add(f"wvsplitk_y{y}", layer, role, None, M=m, K=k, wvprgrp=waves)
 
     attn = {4: "attn_mfma4_g4", 6: "attn_mfma16_g6", 8: "attn_mfma16_g8"}[d.G]
     for L in range(d.L):
-        if not (DSL_FOLD and (L > 0 or getattr(d, "ln_norm", False))):
+        if not (FOLD and (L > 0 or getattr(d, "ln_norm", False))):
             if getattr(d, "ln_norm", False):
                 raise SystemExit("ln_norm (PhiMoE) needs the DSL fold path: there is no imported LayerNorm kernel "
                                  "(set ETX_VL_DSL_GEMV=1 ETX_VL_DSL_FOLD=1, the defaults)")
-            add("rms_norm_2d" if L == 0 else "fused_add_rms_norm", L, "in_norm", (1, 1, 1))
+            add("rms_norm_2d" if L == 0 else "fused_add_rms_norm", L, "in_norm")
         gemv(L, "qkv", d.NQKV, d.H)
         if DSL_ATTN:
             # prep + cache + attention in one block per (partition, kv head). NOTE (round 9, 2026-10-01): this shape
@@ -294,20 +318,20 @@ def instances(d) -> list[dict]:
                 raise SystemExit("ETX_VL_DSL_ATTN=head needs q/k norm and G + 2 waves per workgroup (etx/ops/attnprep.py)")
             add("dsl_attnprep", L, "prep", (d.NKV, 1, 1), G=d.G, parts=parts)
         elif d.qk_norm and (QKNR or DSL):
-            add("qknorm_rope", L, "qknr", (math.ceil((d.NH + d.NKV) / 8), 1, 1))
+            add("qknorm_rope", L, "qknr", None)
         else:
             if d.qk_norm:
-                add("rms_norm_3d", L, "q_norm", (d.NH, 1, 1))
-                add("rms_norm_3d", L, "k_norm", (d.NKV, 1, 1))
-            add("rope_neox", L, "rope", (1, 1, 1))
+                add("rms_norm_3d", L, "q_norm", None)
+                add("rms_norm_3d", L, "k_norm", None)
+            add("rope_neox", L, "rope", None)
         if not DSL_ATTN and not DSL_ATTNHEAD:
-            add("reshape_and_cache", L, "cache", (1, 1, 1))
+            add("reshape_and_cache", L, "cache", None)
         if not DSL_ATTN:
-            add(attn, L, "attn", (1, parts, d.NKV), parts=parts)
-        add("attn_reduce", L, "reduce", (d.NH, 1, 1), G=d.G)
+            add(attn, L, "attn", None, parts=parts)
+        add("attn_reduce", L, "reduce", None, G=d.G)
         gemv(L, "o_proj", d.H, d.NH * d.HD)
-        if not DSL_FOLD:
-            add("fused_add_rms_norm", L, "post_norm", (1, 1, 1))
+        if not FOLD:
+            add("fused_add_rms_norm", L, "post_norm", None)
         if d.moe:
             gemv(L, "router", d.E, d.H)
             # The XCD-affine expert path (slot -> XCD, per-XCD events) is correct exactly when every top-k slot's
@@ -321,24 +345,24 @@ def instances(d) -> list[dict]:
             # stream if the few slots were pinned. The top-k then keeps ONE copy (rep = 1): the unpinned expert
             # tasks all read copy 0, which is the host's rr = 0 block (host.hip addresses copies as rr * TOPK).
             noaff = XCD and d.TOPK % NX != 0
-            if not DSL_FOLD or not FOLD_TOPK:
+            if not FOLD or not FOLD_TOPK:
                 add("dsl_topk" if (DSL or DSL_TOPK) else f"topk_softmax_e{d.E}", L, "topk", (1, 1, 1), noaff=noaff)
             if DSL_GEMV:                                      # 32 gate + 32 up rows (256 KB) per task; 64 down rows (96 KB)
-                add("dsl_moe_up_fold" if DSL_FOLD else "dsl_moe_up", L, "moe_up", (d.TOPK * (d.MI // 32), 1, 1), M=d.MI, K=d.H, noaff=noaff)
-                add("dsl_moe_down_fold" if DSL_FOLD else "dsl_moe_down", L, "moe_down", (d.TOPK * (d.H // 64), 1, 1), M=d.H, K=d.MI, noaff=noaff)
+                add("dsl_moe_up_fold" if FOLD else "dsl_moe_up", L, "moe_up", (d.TOPK * (d.MI // 32), 1, 1), M=d.MI, K=d.H, noaff=noaff)
+                add("dsl_moe_down_fold" if FOLD else "dsl_moe_down", L, "moe_down", (d.TOPK * (d.H // 64), 1, 1), M=d.H, K=d.MI, noaff=noaff)
             else:
                 up, down = moe_specs["up"], moe_specs["down"]
-                add(up.export, L, "moe_up", up.grid, noaff=noaff)
-                add("silu_and_mul", L, "moe_act", (d.TOPK, 1, 1), noaff=noaff)
-                add(down.export, L, "moe_down", down.grid, noaff=noaff)
-            if not DSL and not DSL_FOLD:                           # DSL: the next in_norm reads the 8 expert rows itself
-                add(f"moe_sum_k{d.TOPK}", L, "moe_sum", (1, 1, 1), noaff=noaff)
+                add(up.export, L, "moe_up", None, noaff=noaff)
+                add("silu_and_mul", L, "moe_act", None, noaff=noaff)
+                add(down.export, L, "moe_down", None, noaff=noaff)
+            if not DSL and not FOLD:                           # DSL: the next in_norm reads the 8 expert rows itself
+                add(f"moe_sum_k{d.TOPK}", L, "moe_sum", None, noaff=noaff)
             continue
         gemv(L, "gate_up", 2 * d.INTER, d.H)
-        add("silu_and_mul", L, "act", (1, 1, 1))
+        add("silu_and_mul", L, "act", None)
         gemv(L, "down", d.H, d.INTER)
-    if not DSL_FOLD:
-        add("fused_add_rms_norm", -1, "final_norm", (1, 1, 1))
+    if not FOLD:
+        add("fused_add_rms_norm", -1, "final_norm", None)
     gemv(-1, "lm_head", d.V, d.H)
     return out
 
@@ -371,12 +395,14 @@ def plan_offsets(insts: list[dict], imp: dict, start: int = 0) -> int:
 def build() -> Graph:
     d = load_dims()
     imp = imports()
+    from etx.importer.spec import validate_model_imports
     base = instances(d)
     skip = set(filter(None, os.environ.get("ETX_VL_SKIP", "").split(",")))    # register analysis only: drop roles
     if skip:
         if XCD or REQUESTS > 1:
             raise SystemExit("ETX_VL_SKIP cannot be combined with ETX_VL_XCD or ETX_VL_REQUESTS (a replica or its GEMV could be dropped alone)")
         base = [i for i in base if i["role"] not in skip]
+    import_validation = validate_model_imports(imp, d, {i['export'] for i in base})
     per_req, total = [], 0
     for r in range(REQUESTS):                                  # each request its own argument blocks
         ins = [dict(i, req=r) for i in base]
@@ -420,6 +446,11 @@ def build() -> Graph:
     g.codegen["nb"] = REQUESTS if BATCH else 1
     g.codegen["requests"] = REQUESTS
     g.codegen["uc"] = os.environ.get("ETX_VL_UC", "0") == "1"
+    # The variant of each phase, published through the manifest (plan_data.h; docs/SEC7-interface-fix.md). The host
+    # compares every plan instance with it and derives nothing itself. Until the planner of section 6.2 lands, the
+    # selection is the one instances() made above, so the published value equals today's choice by construction.
+    g.codegen[manifest.SELECTION] = manifest.selection_of(((i["role"], i["layer"], i["export"]) for i in base),
+                                                          {"threads": THREADS, "vgpr": res.vgpr, "lds": LDS_BUDGET})
     g.tensor("impargs", (total,), role="weight", bytes_per_elem=1)
     g.tensor("vl", (1,), role="weight", bytes_per_elem=8)         # placeholder: the native tiles read __constant__ params
     adapters = os.environ.get("ETX_VL_ADAPTERS", str(HERE / "build" / "imp_tiles.hip"))
@@ -597,6 +628,7 @@ def build() -> Graph:
 
     plan = os.environ.get("ETX_VL_PLAN")
     if plan:
+        Path(str(plan) + '.imports-check.json').write_text(json.dumps(import_validation, indent=2) + '\n')
         insts = [i for r, n in order for i in groups_r[r][n]]
         with open(plan, "w") as f:
             f.write(f"# vl plan {d.name}: instance export layer role gx gy gz offset tasks M K wvprgrp rep stride copyoff req nb; total {total} bytes\n")

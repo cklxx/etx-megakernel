@@ -152,24 +152,51 @@ static __device__ __forceinline__ float dsl_dot(dsl_u32x2 w, const dsl_lds_f* x)
        + __uint_as_float(w.y << 16) * x[2] + __uint_as_float(w.y & 0xffff0000u) * x[3];
 #endif
 }
+#ifdef ETX_DSL_WSUM
+@@ETX_PRIM:wave_sum0@@
+#endif
 static __device__ __forceinline__ float dsl_bfr(float v) { return __bfloat162float(__float2bfloat16(v)); }
 static __device__ __forceinline__ float dsl_silu(float g) { return g / (1.f + __expf(-g)); }
 // rows [r0, r1) of W (row-major bf16, K columns) times xs (fp32 in LDS); part: LDS, >= nwaves * (r1 - r0) floats;
 // epi(row, dot) once per row by one thread. Deterministic: per-wave partials are summed in wave order.
 // NB columns: the weight vector is loaded ONCE and dotted with NB staged activation vectors (column b at xs + b * KS),
 // giving NB partials per (wave, row). NB = 1 is the batch-1 GEMV and collapses to the original indexing.
+// ETX_DSL_GU1: rows [gsplit, r1 - r0) of the pass sit ggap elements further on (moe_up's up rows behind its gate rows),
+// so gate and up stream as ONE pass. The caller guarantees no wave's segment range crosses gsplit (one base per wave).
 template <int EPL, int U, int NB, class Epi>
-static __device__ __forceinline__ void dsl_gemv_rows_nb(const __hip_bfloat16* __restrict__ W, int K, int KS, const float* xs, int r0, int r1, float* part, Epi epi) {
+static __device__ __forceinline__ void dsl_gemv_rows_nb(const __hip_bfloat16* __restrict__ W, int K, int KS, const float* xs, int r0, int r1, float* part, Epi epi
+#ifdef ETX_DSL_GU1
+                                                        , int gsplit = 0, long long ggap = 0
+#endif
+                                                        ) {
   typedef typename dsl_wvec<EPL>::T V;
   constexpr int SEG = ETX_WAVE_SIZE * EPL;
   const dsl_lds_f* xl = (const dsl_lds_f*)xs;
   dsl_lds_fw* pl = (dsl_lds_fw*)part;
+#ifdef ETX_DSL_SCALAR                                    // all of these are the same in every lane: say so to the compiler
+  K = __builtin_amdgcn_readfirstlane(K); r0 = __builtin_amdgcn_readfirstlane(r0); r1 = __builtin_amdgcn_readfirstlane(r1);
+  const int lane = etx_lane(), wv = __builtin_amdgcn_readfirstlane(etx_wave()), nw = etx_nwaves(), nrt = r1 - r0;
+#else
   const int lane = etx_lane(), wv = etx_wave(), nw = etx_nwaves(), nrt = r1 - r0;
+#endif
   const int spr = K / SEG, S = nrt * spr;
   const int per = (S + nw - 1) / nw, sb = wv * per, se = min(S, sb + per);
   for (int i = (int)threadIdx.x; i < nw * nrt * NB; i += blockDim.x) pl[i] = 0.f;
   __syncthreads();
+#if defined(ETX_DSL_SCALAR) || defined(ETX_DSL_GU1)
+  const DSL_G V* ubase = (const DSL_G V*)(W + (size_t)r0 * K
+#ifdef ETX_DSL_GU1
+                                          + ((gsplit > 0 && sb >= gsplit * spr) ? ggap : 0)
+#endif
+                                          );
+#ifdef DSL_ABLATE_NOVMEM
+  const DSL_G V* base = ubase + lane;
+#endif
+#define DSL_WP(sg) (ubase + (size_t)(sg) * ETX_WAVE_SIZE + lane)   // uniform part first: one scalar base per trip
+#else
   const DSL_G V* base = (const DSL_G V*)(W + (size_t)r0 * K) + lane;
+#define DSL_WP(sg) (base + (size_t)(sg) * ETX_WAVE_SIZE)
+#endif
   int cur = sb / spr;
   float acc[NB];
 #pragma unroll
@@ -177,9 +204,25 @@ static __device__ __forceinline__ void dsl_gemv_rows_nb(const __hip_bfloat16* __
   auto flush = [&]() {
 #ifndef DSL_ABLATE_NORED                                 // ablation: no per-row wave_sum, no partial writes (WRONG output)
 #pragma unroll
+#ifdef ETX_DSL_WSUM
+    for (int b = 0; b < NB; ++b) { const float v = dsl_wave_sum0(acc[b]); if (lane == 0) pl[(wv * nrt + cur) * NB + b] += v; acc[b] = 0.f; }
+#else
     for (int b = 0; b < NB; ++b) { const float v = etx_wave_sum(acc[b]); if (lane == 0) pl[(wv * nrt + cur) * NB + b] += v; acc[b] = 0.f; }
 #endif
+#endif
   };
+#ifdef ETX_DSL_SCALAR
+  // (row, segment) advanced by one per consumed vector: segments are consumed in order, so this is sg / spr and
+  // sg % spr without the division (dsl_gemv_accum's walk, minus its second reduction)
+  int row = cur, seg = sb - cur * spr;
+  auto consume = [&](int, V w) {
+    if (row != cur) { flush(); cur = row; }
+    const int off = seg * SEG + lane * EPL;
+#pragma unroll
+    for (int b = 0; b < NB; ++b) acc[b] += dsl_dot(w, xl + b * KS + off);
+    if (++seg == spr) { seg = 0; ++row; }
+  };
+#else
   auto consume = [&](int sg, V w) {
     const int row = sg / spr;
     if (row != cur) { flush(); cur = row; }
@@ -187,6 +230,7 @@ static __device__ __forceinline__ void dsl_gemv_rows_nb(const __hip_bfloat16* __
 #pragma unroll
     for (int b = 0; b < NB; ++b) acc[b] += dsl_dot(w, xl + b * KS + off);   // one load, NB dots: the point of the batch
   };
+#endif
   int s0 = sb;
   V w[U];
 #ifdef DSL_ABLATE_NOVMEM                                 // ablation: ONE weight vector per wave, reused every trip (WRONG
@@ -197,7 +241,7 @@ static __device__ __forceinline__ void dsl_gemv_rows_nb(const __hip_bfloat16* __
 #ifdef DSL_ABLATE_NOVMEM
     for (int u = 0; u < U; ++u) w[u] = w00;
 #else
-    for (int u = 0; u < U; ++u) w[u] = dsl_wload(base + (size_t)(s0 + u) * ETX_WAVE_SIZE);
+    for (int u = 0; u < U; ++u) w[u] = dsl_wload(DSL_WP(s0 + u));
 #endif
 #pragma unroll
     for (int u = 0; u < U; ++u) consume(s0 + u, w[u]);
@@ -207,7 +251,7 @@ static __device__ __forceinline__ void dsl_gemv_rows_nb(const __hip_bfloat16* __
 #ifdef DSL_ABLATE_NOVMEM
     for (int u = 0; u < U; ++u) if (s0 + u < se) w[u] = w00;
 #else
-    for (int u = 0; u < U; ++u) if (s0 + u < se) w[u] = dsl_wload(base + (size_t)(s0 + u) * ETX_WAVE_SIZE);
+    for (int u = 0; u < U; ++u) if (s0 + u < se) w[u] = dsl_wload(DSL_WP(s0 + u));
 #endif
 #pragma unroll
     for (int u = 0; u < U; ++u) if (s0 + u < se) consume(s0 + u, w[u]);
@@ -231,6 +275,7 @@ static __device__ __forceinline__ void dsl_gemv_rows_nb(const __hip_bfloat16* __
   }
   __syncthreads();
 #endif
+#undef DSL_WP
 }
 template <int EPL, int U, class Epi>
 static __device__ __forceinline__ void dsl_gemv_rows(const __hip_bfloat16* __restrict__ W, int K, const float* xs, int r0, int r1, float* part, Epi epi) {
@@ -327,6 +372,8 @@ static __device__ __forceinline__ void dsl_gemv(const __hip_bfloat16* __restrict
 // rows per pass of the stream loop: the partials take nwaves x DSL_RCH floats of LDS whatever the task's row count
 // (lm_head tasks hold 500 rows; unbounded partials overran the 32 KB arena into the barrier words, review 2026-09-29)
 #define DSL_RCH 64
+// rows per batch of the norm fold's coherent loads (ETX_DSL_RBATCH): one batch for every top-k we build (2 or 8)
+#define DSL_RB 8
 template <int NB, class Epi>
 static __device__ __forceinline__ void dsl_gemv_nb(const __hip_bfloat16* __restrict__ W, int K, int KS, const float* xs, int r0, int r1, float* part, Epi epi) {
   if (K % (ETX_WAVE_SIZE * 8) == 0) dsl_gemv_rows_nb<8, DSL_UW, NB>(W, K, KS, xs, r0, r1, part, epi);
@@ -407,18 +454,30 @@ struct DslArgs { const __hip_bfloat16* W; const __hip_bfloat16* x; __hip_bfloat1
                  const __hip_bfloat16* bias; const __hip_bfloat16* lnb;   // output bias; LayerNorm bias (mode 4)
 #endif
 };
+// ETX_DSL_SCALAR: the argument block is read with scalar loads, as the imported tiles read theirs (etx_imp_argblock),
+// so every size and pointer is wave-uniform for the compiler. Through the generic pointer they were flat loads into
+// VGPRs, which the divergence analysis treats as per-lane values: the stream loop's row / segment arithmetic (a 17-
+// instruction signed division per segment) and its branches all ran on the vector ALU, under exec masks.
+// The pre-wait hook (etx_pre_*) already pulls these lines into the K$; only this form reads them from there.
+#ifdef ETX_DSL_SCALAR
+#define DSL_ARG_AS __attribute__((address_space(4)))
+static __device__ __forceinline__ DslArgs dsl_args(const unsigned char* a_) {
+  const unsigned char DSL_ARG_AS* a = (const unsigned char DSL_ARG_AS*)(uintptr_t)a_;   // a_ is wave-uniform (etx_imp_argblock)
+#else
+#define DSL_ARG_AS
 static __device__ __forceinline__ DslArgs dsl_args(const unsigned char* a) {
+#endif
   DslArgs d;
-  d.W = *(const __hip_bfloat16* const*)(a + 0); d.x = *(const __hip_bfloat16* const*)(a + 8); d.out = *(__hip_bfloat16* const*)(a + 16);
-  d.ids = *(const int* const*)(a + 24); d.wts = *(const float* const*)(a + 32); d.estride = *(const long long*)(a + 40);
-  d.M = *(const int*)(a + 48); d.K = *(const int*)(a + 52); d.rpt = *(const int*)(a + 56); d.tpe = *(const int*)(a + 60);
-  d.rows = *(const __hip_bfloat16* const*)(a + 64); d.resid_in = *(const __hip_bfloat16* const*)(a + 72); d.resid_out = *(__hip_bfloat16* const*)(a + 80);
-  d.ln = *(const __hip_bfloat16* const*)(a + 88); d.R = *(const int*)(a + 96); d.eps = *(const float*)(a + 100); d.mode = *(const int*)(a + 104);
-  d.E = *(const int*)(a + 108); d.logits = *(const __hip_bfloat16* const*)(a + 112);
-  d.nb = *(const int*)(a + 120); d.sx = *(const int*)(a + 124); d.sout = *(const int*)(a + 128);
-  d.srows = *(const int*)(a + 132); d.srin = *(const int*)(a + 136); d.srout = *(const int*)(a + 140);
+  d.W = *(const __hip_bfloat16* const DSL_ARG_AS*)(a + 0); d.x = *(const __hip_bfloat16* const DSL_ARG_AS*)(a + 8); d.out = *(__hip_bfloat16* const DSL_ARG_AS*)(a + 16);
+  d.ids = *(const int* const DSL_ARG_AS*)(a + 24); d.wts = *(const float* const DSL_ARG_AS*)(a + 32); d.estride = *(const long long DSL_ARG_AS*)(a + 40);
+  d.M = *(const int DSL_ARG_AS*)(a + 48); d.K = *(const int DSL_ARG_AS*)(a + 52); d.rpt = *(const int DSL_ARG_AS*)(a + 56); d.tpe = *(const int DSL_ARG_AS*)(a + 60);
+  d.rows = *(const __hip_bfloat16* const DSL_ARG_AS*)(a + 64); d.resid_in = *(const __hip_bfloat16* const DSL_ARG_AS*)(a + 72); d.resid_out = *(__hip_bfloat16* const DSL_ARG_AS*)(a + 80);
+  d.ln = *(const __hip_bfloat16* const DSL_ARG_AS*)(a + 88); d.R = *(const int DSL_ARG_AS*)(a + 96); d.eps = *(const float DSL_ARG_AS*)(a + 100); d.mode = *(const int DSL_ARG_AS*)(a + 104);
+  d.E = *(const int DSL_ARG_AS*)(a + 108); d.logits = *(const __hip_bfloat16* const DSL_ARG_AS*)(a + 112);
+  d.nb = *(const int DSL_ARG_AS*)(a + 120); d.sx = *(const int DSL_ARG_AS*)(a + 124); d.sout = *(const int DSL_ARG_AS*)(a + 128);
+  d.srows = *(const int DSL_ARG_AS*)(a + 132); d.srin = *(const int DSL_ARG_AS*)(a + 136); d.srout = *(const int DSL_ARG_AS*)(a + 140);
 #if ETX_EMIT_DSL_EXT
-  d.bias = *(const __hip_bfloat16* const*)(a + 160); d.lnb = *(const __hip_bfloat16* const*)(a + 168);
+  d.bias = *(const __hip_bfloat16* const DSL_ARG_AS*)(a + 160); d.lnb = *(const __hip_bfloat16* const DSL_ARG_AS*)(a + 168);
 #endif
   return d;
 }
@@ -436,6 +495,24 @@ static __device__ __forceinline__ void dsl_stage_norm_at(const DslArgs& d, const
     float z[8];
 #pragma unroll
     for (int j = 0; j < 8; ++j) z[j] = 0.f;
+#ifdef ETX_DSL_RBATCH
+    // ETX_DSL_RBATCH: the residual and up to DSL_RB rows issued before the first is used. The runtime-R loop below
+    // kept one row's pair of coherent loads in flight and waited for it (s_waitcnt vmcnt(0)) before issuing the
+    // next: R + 1 serial round trips past L2 per trip, 9 for qkv's R = 8. Same additions, same order.
+    const dsl_u32x4 ri = dsl_a_ld128(rin + 8 * i);
+    for (int s0 = 0; s0 < d.R; s0 += DSL_RB) {
+      dsl_u32x4 rv[DSL_RB];
+#pragma unroll
+      for (int u = 0; u < DSL_RB; ++u) if (s0 + u < d.R) rv[u] = dsl_a_ld128(rows + (size_t)(s0 + u) * K + 8 * i);
+#pragma unroll
+      for (int u = 0; u < DSL_RB; ++u) if (s0 + u < d.R) {
+#pragma unroll
+        for (int j = 0; j < 4; ++j) {
+          z[2 * j] += __uint_as_float(rv[u][j] << 16); z[2 * j + 1] += __uint_as_float(rv[u][j] & 0xffff0000u);
+        }
+      }
+    }
+#else
     for (int s = 0; s < d.R; ++s) {
       const dsl_u32x4 r = dsl_a_ld128(rows + (size_t)s * K + 8 * i);
 #pragma unroll
@@ -444,6 +521,7 @@ static __device__ __forceinline__ void dsl_stage_norm_at(const DslArgs& d, const
       }
     }
     const dsl_u32x4 ri = dsl_a_ld128(rin + 8 * i);
+#endif
     dsl_u32x4 ro;
 #pragma unroll
     for (int j = 0; j < 4; ++j) {
@@ -554,6 +632,11 @@ static __device__ __forceinline__ void dsl_topk_lds(const __hip_bfloat16* logits
     float p[2]; bool taken[2]; float m = -INFINITY;
 #pragma unroll
     for (int k = 0; k < 2; ++k) { const int e = lane + k * ETX_WAVE_SIZE; p[k] = e < E ? dsl_a_ldbf(logits + e) : -INFINITY; taken[k] = e >= E; m = fmaxf(m, p[k]); }
+#ifdef ETX_TOPK_KEY32                                    // one 32-bit key per expert, DPP wave max (etx/tile_util.h)
+    // lane t stores result t (the dsl_run_dsl_topk form). etx_topk_key32_lds (lane 0 stores each round) gives the same
+    // bits, but on this tree it adds 11 spilled VGPRs to the fold build (docs/TOPK-KEY32-2026-10-08.md, section 7.4).
+    etx_topk_key32(p, E, K, renorm != 0, lane, [&](int t, int bi, float v) { ids[t] = bi; wts[t] = v; });
+#else
     m = etx_wave_max(m);
     float s = 0.f;
 #pragma unroll
@@ -577,6 +660,7 @@ static __device__ __forceinline__ void dsl_topk_lds(const __hip_bfloat16* logits
       sel += bv;
     }
     if (renorm && lane == 0) for (int t = 0; t < K; ++t) wts[t] = wts[t] / sel;
+#endif
   }
   __syncthreads();
 }
@@ -662,7 +746,10 @@ BODIES = {
   const int dsl_eid = d.mode >= 2 ? lids[s] : dsl_a_ldi(d.ids + (size_t)rq * d.srows + s);
   const __hip_bfloat16* We = d.W + (size_t)dsl_eid * d.estride;     // g: 2 x rpt floats (rpt <= DSL_RCH, host-checked)
 #if ETX_EMIT_DSL_BIGK
-  if (d.K > DSL_K_MAX) {                               // K > the staged window (host allows it for the MoE forms only):
+  // readfirstlane: d.K is one value per task, but without ETX_DSL_SCALAR it is a flat load into a VGPR, so the compiler
+  // took this branch as divergent and structurised both paths together. In the one-function megakernel that pushed
+  // Mixtral (the only BIGK model) from 2 to 60 spilled VGPRs, all of them in the inlined attention (mixtral_spill).
+  if (__builtin_amdgcn_readfirstlane(d.K) > DSL_K_MAX) {   // K > the staged window (host allows it for the MoE forms only):
     float* gb = xs + DSL_K_MAX; float* pb = gb + 2 * d.rpt;      // fixed LDS bases -- xs + d.K would overflow the block
     const __hip_bfloat16* xr = d.x + (size_t)rq * d.sx;
     dsl_gemv_bigk(We, xr, d.K, xs, r0, r1, pb, [&](int r, float v) { gb[r - r0] = dsl_bfr(v); });
@@ -676,10 +763,25 @@ BODIES = {
 #ifdef DSL_ABLATE_NOGEMV                                 // ablation: prologue only -- topk + stage, no passes, no stores (WRONG output)
   asm volatile("" :: "v"((unsigned)(size_t)We)); return;
 #endif
+#ifdef ETX_DSL_GU1
+  // gate and up rows as ONE stream pass, taken only where it cannot change a bit: every row lies inside one wave's
+  // segment range both as two passes of n rows and as one pass of 2n (so each row is one wave's in-order sum either
+  // way, plus exact zeros from the other waves), and no wave straddles gate and up. Saves the second pass's partial
+  // zeroing, cross-wave reduction and two of its barriers. Qwen3-30B-A3B: n = 32, K = 2048: 8 then 16 segments per
+  // wave, 4 per row. Otherwise the two passes below run unchanged.
+  const int gn = r1 - r0, gspr = d.K / (ETX_WAVE_SIZE * 8), gnw = etx_nwaves();
+  const int gp1 = (gn * gspr + gnw - 1) / gnw, gp2 = (2 * gn * gspr + gnw - 1) / gnw;
+  if (d.K % (ETX_WAVE_SIZE * 8) == 0 && 2 * gn <= DSL_RCH && gp1 % gspr == 0 && gp2 % gspr == 0 && (gn * gspr) % gp2 == 0) {
+    dsl_gemv_rows_nb<8, DSL_UW, 1>(We, d.K, 0, xs, r0, r0 + 2 * gn, part, [&](int r, const float* v) {
+      const int q = r - r0; g[q < gn ? q : d.rpt + q - gn] = dsl_bfr(v[0]); }, gn, (long long)(d.M - gn) * d.K);
+  } else
+#endif
+  {
   dsl_gemv_chunked(We, d.K, xs, r0, r1, part, [&](int r, float v) { g[r - r0] = dsl_bfr(v); });
 #ifndef DSL_ABLATE_ONEPASS                                                      // ablation: gate only, no up pass (WRONG output)
   dsl_gemv_chunked(We + (size_t)d.M * d.K, d.K, xs, r0, r1, part, [&](int r, float v) { g[d.rpt + r - r0] = dsl_bfr(v); });
 #endif
+  }
   __hip_bfloat16* act = d.out + (size_t)rq * d.sout + (size_t)s * d.M;
 #ifdef DSL_ABLATE_EPI                                                           // ablation: no silu, no multiply (WRONG output)
   for (int r = r0 + (int)threadIdx.x; r < r1; r += blockDim.x) dsl_a_stbf(act + r, __float2bfloat16(g[r - r0]));
@@ -706,7 +808,7 @@ BODIES = {
   const int dsl_eid = d.mode >= 2 ? lids[s] : dsl_a_ldi(d.ids + (size_t)rq * d.srows + s);
   const __hip_bfloat16* We = d.W + (size_t)dsl_eid * d.estride;
 #if ETX_EMIT_DSL_BIGK
-  if (d.K > DSL_K_MAX) {                               // chunked staging; fixed LDS bases (see silu_mul)
+  if (__builtin_amdgcn_readfirstlane(d.K) > DSL_K_MAX) {   // chunked staging, uniform branch; fixed LDS bases (see silu_mul)
     float* pb = xs + DSL_K_MAX;
     const float wsb = d.mode >= 2 ? lwts[s] : dsl_a_ldf(d.wts + (size_t)rq * d.srin + s);
     __hip_bfloat16* outb = d.out + (size_t)rq * d.sout + (size_t)s * d.M;
@@ -731,10 +833,11 @@ BODIES = {
 }
 
 
-def emit_tiles(lds_floats: int = 8192) -> str:
+def emit_tiles(lds_floats: int = 8192, machine=None) -> str:
     """The tile source: for every form the plain, XCD-affine (x) and pre-wait entry points the plan links
-    (examples/vllm_llm/model.py), reading the argument block like an imported tile; LDS from the import arena."""
-    from etx.ops import coh
+    (examples/vllm_llm/model.py), reading the argument block like an imported tile; LDS from the import arena.
+    machine: the machine model (or its name) whose tile primitives fill the source (etx/ops/prims.py); default gfx942."""
+    from etx.ops import coh, prims
     out = ["// generated by etx.ops.gemv: the DSL streaming GEMVs", "#pragma once",
            '#include "etx/abi.h"', '#include "etx/import.h"', '#include "etx/tile_util.h"',
            f"#define DSL_NB {DSL_NB}            // activation columns per weight read (ETX_VL_NB)",
@@ -742,11 +845,16 @@ def emit_tiles(lds_floats: int = 8192) -> str:
            f"#define DSL_GRID_OFF {GRID_OFF}",
            "#ifdef ETX_IMPORT_LDS   // the staged columns and partials must fit the shared import arena",
            f"_Static_assert({LDS_BYTES} <= ETX_IMPORT_LDS, \"etx.ops.gemv: LDS_BYTES exceeds ETX_IMPORT_LDS"
-           " (raise the arena or lower ETX_VL_NB)\");", "#endif", coh.HELPERS, STREAM]
+           " (raise the arena or lower ETX_VL_NB)\");", "#endif", coh.HELPERS, prims.expand(STREAM, machine)]
     for e, form in FORMS.items():
         out.append(f"// ---- {e}: {form}")
         out.append(f"static __device__ __attribute__((always_inline)) void dsl_run_{e}(const unsigned char* a, int blk) {{")
+        out.append("#ifdef ETX_DSL_SCALAR")
+        out.append("  blk = __builtin_amdgcn_readfirstlane(blk);")
+        out.append(f"  const int nblk = *(const int DSL_ARG_AS*)(uintptr_t)(a + {GRID_OFF + 12});")
+        out.append("#else")
         out.append(f"  const int nblk = *(const int*)(a + {GRID_OFF + 12});")
+        out.append("#endif")
         out.append("  if (blk >= nblk) return;")
         out.append("  const DslArgs d = dsl_args(a);")
         out.append(f"  float* xs = (float*)etx_lds_arena;   // {lds_floats} floats: x (K), then partials")

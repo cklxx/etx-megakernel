@@ -64,6 +64,11 @@ fi
 [ -f "$DEVLIBS/ocml.bc" ] || { echo "no ROCm device bitcode found (set ETX_DEVLIBS); looked under /opt/rocm*" >&2; exit 1; }
 echo "devlibs: $DEVLIBS"
 CONFIG="$DIR/hf/config.json"; [ -f "$CONFIG" ] || CONFIG="$DIR/config.json"
+# The plan can select an imported kernel that the switches above do not list: the etx.select fallback of a GEMV phase
+# outside every DSL variant (Qwen3-8B down, K = 12288 > 4096: wvsplitk_y2), or the norms of a dense model. Add each
+# export that model.py will instantiate and the list lacks. A list that already holds them (Qwen3-30B-A3B) stays equal.
+PLANNED="$(cd "$ROOT" && ETX_LLM_CONFIG="$CONFIG" "$PY" -m examples.vllm_llm.plan_imports "$CONFIG")"
+for e in ${PLANNED//,/ }; do case ",$EXPORTS," in *",$e,"*) ;; *) EXPORTS="$EXPORTS,$e";; esac; done
 
 echo "== import ($EXPORTS)"
 ORIG=(); CHK=(); [ "${ETX_VL_CHECK:-0}" = 1 ] && ORIG=(--orig) && CHK=(-DETX_VL_CHECK)
@@ -133,6 +138,9 @@ ROCMINC=(); [ -n "${ETX_ROCM_HEADERS:-}" ] && ROCMINC=(-isystem "$ETX_ROCM_HEADE
 # ETX_VL_ABLATE=<name>: a timing-only build with a piece of the DSL MoE tile removed (etx/ops/gemv.py's DSL_ABLATE_*).
 # Every ablation but EPL4 produces WRONG output on purpose and must never ship; the correctness gates will fail.
 ABL=(); [ -n "${ETX_VL_ABLATE:-}" ] && ABL=(-DDSL_ABLATE_$(echo "$ETX_VL_ABLATE" | tr '[:lower:]' '[:upper:]'))
+# ETX_TOPK_KEY32=1: the softmax top-k selects on one 32-bit key per expert with a DPP wave max (etx/tile_util.h,
+# docs/TOPK-KEY32-2026-10-08.md). Device code only; the plan does not change. Default off.
+[ "${ETX_TOPK_KEY32:-0}" = 1 ] && ABL+=(-DETX_TOPK_KEY32)
 # ETX_VL_FOLD_TOPK forces model.py's derived fold decision; it reaches the tile through plan_data.h's
 # ETX_EMIT_FOLD_TOPK, not a -D here -- the -D defaulted to "fold" and silently contradicted the plan (round 30).
 hipcc -O3 -std=c++17 --offload-arch=gfx942 "${ROCMINC[@]}" -I "$ROOT/etx/runtime/include" -I "$OUT" -I "$ROOT" \

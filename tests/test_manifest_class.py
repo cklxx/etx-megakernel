@@ -58,7 +58,11 @@ def test_every_macro_the_tiles_test_is_either_published_or_tile_local():
     tile with no plan or host counterpart. Anything else is the bug class waiting to happen."""
     tile_local = {"ETX_DSL_NT", "ETX_DSL_VECNORM", "ETX_DSL_UNIFORM", "ETX_DSL_PREP_EARLY", "ETX_IMPORT_LDS",
                   "ETX_DSL_COH_HELPERS", "DSL_G", "DSL_U32X4_DEFINED", "DSL_SPLIT_TAIL",
-                  "ETX_DSL_U4"}   # load depth: only the tile's own instantiation changes (round 34)
+                  "ETX_DSL_U4",   # load depth: only the tile's own instantiation changes (round 34)
+                  # tile code only, same argument layout and output bits (docs/TILES-2026-10-07.md)
+                  "ETX_DSL_WSUM", "ETX_DSL_SCALAR", "ETX_DSL_GU1", "ETX_DSL_RBATCH",
+                  # top-k selection on a 32-bit key: tile code only, same arguments and outputs (docs/TOPK-KEY32-2026-10-08.md)
+                  "ETX_TOPK_KEY32"}
     published = {m for m, _, _ in manifest.FEATURES.values()}
     tested = set()
     for f in (ROOT / "etx/ops").glob("*.py"):

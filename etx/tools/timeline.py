@@ -109,6 +109,8 @@ def build_trace(plan: dict, rows: list[tuple[int, ...]], grids: str | None = Non
         notes.append(f"trace has {len(rows)} rows, plan {len(descs)} tasks: using the first {min(len(rows), len(descs))}")
     k = tick_ns / 1000.0
     all_tasks: list[Task] = []
+    # Subtract integer ticks first. Absolute GPU timestamps can lose float precision.
+    origin_ticks = min((r[5] for r in rows[:len(descs)] if r[5] and r[7]), default=0)
     for i, r in enumerate(rows[:len(descs)]):
         ty, taken, ready, done, worker = r[0], r[5], r[6], r[7], r[8]
         if taken == 0 or done == 0:
@@ -117,7 +119,8 @@ def build_trace(plan: dict, rows: list[tuple[int, ...]], grids: str | None = Non
         w = int(worker) & 0xFFFFFFFF
         dom = d["domain"] if d.get("mode", "static") == "static" else w // max(1, wpd)
         all_tasks.append(Task(i, int(ty), names[int(ty)] if 0 <= ty < len(names) else str(ty), int(dom), w,
-                              taken * k, max(ready, taken) * k, max(done, ready, taken) * k))
+                              (taken - origin_ticks) * k, (max(ready, taken) - origin_ticks) * k,
+                              (max(done, ready, taken) - origin_ticks) * k))
     if not all_tasks:
         raise SystemExit("no executed task in the trace (was it written with ETX_TRACE=1?)")
     origin = min(t.taken for t in all_tasks)
@@ -299,6 +302,144 @@ def memory_demand(tr: Trace, bw_tbs: float = 4.3, bin_us: float = 0.5, idle_frac
             "idle_frac": idle_frac, "mean_util": sum(util) / n}
 
 
+def bandwidth_phases(tr: Trace, spec: dict[str, float], bw_tbs: float = 4.3) -> dict:
+    """Charge each phase from its first ready time to the next phase's first ready time.
+
+    This interval includes phase tails and handoffs. It does not isolate tile body time.
+    Only byte rules in the spec count as known. Unknown phases retain their device time.
+    """
+    if bw_tbs <= 0 or not tr.tasks or tr.t0 != 0 or tr.notes:
+        raise ValueError("bandwidth report needs a full, complete trace and positive bandwidth")
+    rules = [re.compile(k) for k in spec]
+    types = per_type(tr)
+    phases: dict[str, dict] = {}
+    for i, a in enumerate(types):
+        name = a["type"]
+        stem = re.sub(r"_\d+(?:_x)?$", "", name)
+        known = any(rx.search(name) for rx in rules)
+        # Charge the pre-first-ready delay to the first phase. The intervals then telescope.
+        start = tr.t0 if i == 0 else a["first_ready"] + tr.t0
+        end = types[i + 1]["first_ready"] + tr.t0 if i + 1 < len(types) else tr.t1
+        if end < start:
+            raise ValueError(f"phase {name} has negative device time")
+        row = phases.setdefault(stem, {"phase": stem, "bytes": 0.0, "us": 0.0, "known": True})
+        row["us"] += end - start
+        row["bytes"] += a["bytes"]
+        row["known"] &= known
+    for row in phases.values():
+        if row["known"]:
+            row["floor_us"] = row["bytes"] / (bw_tbs * 1e6)
+            row["wasted_us"] = row["us"] - row["floor_us"]
+            row["gb_s"] = row["bytes"] / row["us"] / 1e3 if row["us"] else 0.0
+            row["percent"] = row["gb_s"] / (bw_tbs * 1e3) * 100
+        else:
+            row["bytes"] = None
+            row["floor_us"] = row["wasted_us"] = row["gb_s"] = row["percent"] = None
+    ranked = sorted((r for r in phases.values() if r["known"]), key=lambda r: (-r["wasted_us"], r["phase"]))
+    unknown = sorted((r for r in phases.values() if not r["known"]), key=lambda r: (-r["us"], r["phase"]))
+    known_bytes = sum(r["bytes"] for r in ranked)
+    floor_us = known_bytes / (bw_tbs * 1e6)
+    return {"ranked": ranked, "unknown": unknown, "span_us": tr.span, "known_bytes": known_bytes,
+            "floor_us": floor_us, "percent": floor_us / tr.span * 100, "bw_tbs": bw_tbs}
+
+
+def latency_phases(tr: Trace) -> list[dict]:
+    """Aggregate phase latency from existing task, dependency, and critical-path data.
+
+    Active XCDs use the exact union of body intervals on each XCD.
+    The denominator sums grid body spans, so gaps between layers do not dilute it.
+    Dependency gaps start at the last producer's body end, before event publication.
+    """
+    if tr.deps is None:
+        raise ValueError("latency report requires plan dependency lists")
+    if (not tr.tasks or tr.notes or tr.t0 != 0 or len(tr.tasks) != len(tr.deps)
+            or len(tr.by_id) != len(tr.deps)):
+        raise ValueError("latency report requires a full, complete trace")
+    groups: dict[str, list[Task]] = {}
+    for t in tr.tasks:
+        groups.setdefault(t.name, []).append(t)
+    crit = {a["type"]: a for a in critical_by_type(critical_path(tr))}
+    skew = {a["type"]: a["skew"] for a in domain_skew(tr)}
+    acc = {}
+    types = per_type(tr)
+    for i, a in enumerate(types):
+        name = a["type"]
+        stem = re.sub(r"_\d+(?:_x)?$", "", name)
+        row = acc.setdefault(stem, dict(phase=stem, tasks=0, grids=0, body=0., wait=0.,
+            grid_span_us=0., xcd_us=0., start_spread_us=0., finish_skew_us=0., outgoing_gap_us=0.,
+            cp_body_us=0., cp_dep_gap_us=0., cp_queue_gap_us=0., dep_gaps=[]))
+        row["tasks"] += a["n"]
+        row["grids"] += 1
+        if i + 1 < len(types):
+            row["outgoing_gap_us"] += types[i + 1]["first_ready"] - a["last_done"]
+        row["body"] += a["body"] * a["n"]
+        row["wait"] += a["wait"] * a["n"]
+        row["grid_span_us"] += a["last_done"] - a["first_ready"]
+        row["start_spread_us"] += a["last_ready"] - a["first_ready"]
+        row["finish_skew_us"] += skew.get(name, 0.)
+        c = crit.get(name, {})
+        for key in ("body", "dep_gap", "queue_gap"):
+            row[f"cp_{key}_us"] += c.get(key, 0.)
+        domains: dict[int, list[tuple[float, float]]] = {}
+        for t in groups[name]:
+            domains.setdefault(t.domain, []).append((t.ready, t.done))
+            producers = [tr.by_id[p] for p in tr.deps[t.id] if p in tr.by_id]
+            if producers:
+                row["dep_gaps"].append(t.ready - max(p.done for p in producers))
+        for intervals in domains.values():
+            end = -float("inf")
+            for lo, hi in sorted(intervals):
+                row["xcd_us"] += max(0., hi - max(lo, end))
+                end = max(end, hi)
+    for row in acc.values():
+        row["body_us"] = row["body"] / row["tasks"]
+        row["wait_us"] = row.pop("wait") / row["tasks"]
+        span = row["grid_span_us"]
+        row["active_tasks"] = row.pop("body") / span if span else 0.
+        row["active_xcds"] = row.pop("xcd_us") / span if span else 0.
+        gaps = sorted(row.pop("dep_gaps"))
+        row["dep_gap_mean_us"] = sum(gaps) / len(gaps) if gaps else None
+        row["dep_gap_p95_us"] = gaps[max(0, (95 * len(gaps) + 99) // 100 - 1)] if gaps else None
+        row["dep_gap_max_us"] = gaps[-1] if gaps else None
+    return list(acc.values())
+
+
+def latency_report(tr: Trace, out=None) -> dict:
+    out = out or sys.stdout
+    rows = latency_phases(tr)
+    print("Body and wait are task means. Active XCDs use each grid's body span.", file=out)
+    print(f"{'phase':16} {'tasks':>7} {'body us':>9} {'wait us':>9} {'tasks live':>11} "
+          f"{'XCDs live':>10} {'dep gap us':>11} {'p95 us':>9} {'CP body':>10} {'CP dep':>10} {'CP queue':>10}", file=out)
+    for r in rows:
+        gap = r['dep_gap_mean_us']
+        p95 = r['dep_gap_p95_us']
+        print(f"{r['phase']:16} {r['tasks']:7d} {r['body_us']:9.3f} {r['wait_us']:9.3f} "
+              f"{r['active_tasks']:11.2f} {r['active_xcds']:10.2f} "
+              f"{gap if gap is not None else float('nan'):11.3f} "
+              f"{p95 if p95 is not None else float('nan'):9.3f} "
+              f"{r['cp_body_us']:10.2f} {r['cp_dep_gap_us']:10.2f} {r['cp_queue_gap_us']:10.2f}", file=out)
+    return {"latency": rows, "span_us": tr.span}
+
+
+def bandwidth_report(tr: Trace, spec: dict[str, float], bw_tbs: float = 4.3, out=None) -> dict:
+    out = out or sys.stdout
+    r = bandwidth_phases(tr, spec, bw_tbs)
+    print("Phase bytes include only the specified traffic. Device time includes tails and handoffs.", file=out)
+    print(f"{'phase':16} {'GB':>10} {'us':>10} {'GB/s':>10} {'% of cap':>10} {'wasted us':>12}", file=out)
+    for row in r["ranked"]:
+        print(f"{row['phase']:16} {row['bytes'] / 1e9:10.4f} {row['us']:10.1f} {row['gb_s']:10.1f} "
+              f"{row['percent']:10.1f} {row['wasted_us']:12.1f}", file=out)
+    for row in r["unknown"]:
+        print(f"{row['phase']:16} {'unknown':>10} {row['us']:10.1f} {'unknown':>10} "
+              f"{'unknown':>10} {'unknown':>12}", file=out)
+    print(f"TOTAL known {r['known_bytes'] / 1e9:.4f} GB; device span {r['span_us']:.1f} us; "
+          f"floor {r['floor_us']:.1f} us at {bw_tbs} TB/s (estimate); "
+          f"achieved {r['percent']:.1f}% (known bytes / full span)", file=out)
+    if r["unknown"]:
+        print("Unknown phase bytes exclude some traffic. Total achieved rate is a lower bound.", file=out)
+    return r
+
+
 # ------------------------------------------------------------------ report
 def report(tr: Trace, bw_tbs: float = 4.3, out=None) -> dict:
     out = out or sys.stdout
@@ -425,11 +566,20 @@ def main(argv=None) -> int:
     ap.add_argument("--tick-ns", type=float, default=TICK_NS)
     ap.add_argument("--html", help="write the timeline page here")
     ap.add_argument("--json", help="write the numbers here")
+    ap.add_argument("--bandwidth-report", action="store_true", help="rank phase device time above the byte floor")
+    ap.add_argument("--latency-report", action="store_true", help="phase task, XCD, and dependency latency")
     a = ap.parse_args(argv)
+    if a.latency_report and (a.bandwidth_report or a.grids):
+        ap.error("--latency-report requires a full step and no --bandwidth-report")
+    if a.bandwidth_report and (not a.bytes or a.grids):
+        ap.error("--bandwidth-report requires --bytes and a full step (no --grids)")
     plan = load_plan(a.plan)
     spec = json.loads(Path(a.bytes).read_text()) if a.bytes else None
     tr = build_trace(plan, read_raw(a.raw), a.grids, spec, a.tick_ns)
-    res = report(tr, a.bw)
+    if a.latency_report:
+        res = latency_report(tr)
+    else:
+        res = bandwidth_report(tr, spec, a.bw) if a.bandwidth_report else report(tr, a.bw)
     if a.html:
         write_html(tr, a.html, f"{plan.get('graph', 'ETX')} {a.grids or 'all'}", a.bw)
         print(f"\nwrote {a.html}")

@@ -70,3 +70,90 @@ def guard_block(codegen: dict) -> list[str]:
             out.append(f"#define {mac} {v}")
     out.append("")
     return out
+
+
+# ---- variant selection (docs/PLAN-generic-decoder-2026-10-08.md sections 6.2, 6.3; docs/SEC7-interface-fix.md)
+#
+# The planner selects one variant (one export) for each phase. `Graph.codegen[SELECTION]` carries that choice, and
+# `selection_block()` publishes it in plan_data.h. The host reads it there and nowhere else: it compares every plan
+# instance with it (etx/runtime/include/etx/selection.h). The device code needs no copy. Its tile calls come from the
+# same graph, so the megakernel source does not change when the selection is published.
+#
+# A phase key is the plan role ("qkv", "topk", ...). A layer-0 instance whose export differs from the other layers
+# of its role has its own key "<role>@0" (layer 0 has no previous expert rows, so its qkv is not folded).
+
+SELECTION = "selection"
+SELECTION_KINDS = ("dsl", "imported")       # index = the value in etx_sel_kind
+LAYER0 = "@0"
+
+
+def kind_of(export: str) -> str:
+    """dsl: a tile that etx.ops emits. imported: a kernel that etx.importer imports from vLLM."""
+    return "dsl" if export.startswith("dsl_") else "imported"
+
+
+def phase_key(role: str, layer: int, phases) -> str:
+    """The key that a plan instance looks up. The C++ twin is etx_sel_find_instance() in etx/selection.h."""
+    return role + LAYER0 if layer == 0 and role + LAYER0 in phases else role
+
+
+def selection_of(rows, budget: dict) -> dict:
+    """The selection that a list of plan instances (role, layer, export) carries, in the manifest format.
+
+    Raises ValueError when one phase has two exports outside the layer-0 rule: such a plan has no single
+    selection to publish."""
+    by_role: dict[str, dict[bool, set[str]]] = {}
+    for role, layer, export in rows:
+        by_role.setdefault(role, {}).setdefault(layer == 0, set()).add(export)
+    phases: dict[str, tuple[str, str]] = {}
+    for role, split in by_role.items():
+        first, rest = split.get(True, set()), split.get(False, set())
+        for name, exports in ((role + LAYER0, first), (role, rest)):
+            if len(exports) > 1:
+                raise ValueError(f"phase {name}: more than one export {sorted(exports)}")
+        if rest:
+            (e,) = rest
+            phases[role] = (e, kind_of(e))
+            if first and first != rest:
+                (e0,) = first
+                phases[role + LAYER0] = (e0, kind_of(e0))
+        else:
+            (e0,) = first
+            phases[role] = (e0, kind_of(e0))
+    for key in ("threads", "vgpr", "lds"):
+        if int(budget[key]) <= 0:
+            raise ValueError(f"budget {key} must be positive")
+    return {"budget": {k: int(budget[k]) for k in ("threads", "vgpr", "lds")}, "phases": dict(sorted(phases.items()))}
+
+
+def selection_block(selection: dict | None) -> list[str]:
+    """plan_data.h only (host translation unit). Empty when the plan publishes no selection."""
+    if not selection:
+        return []
+    phases = selection["phases"]
+    budget = selection["budget"]
+    for phase, (export, kind) in phases.items():
+        if kind not in SELECTION_KINDS:
+            raise ValueError(f"phase {phase}: kind {kind!r} is not one of {SELECTION_KINDS}")
+        if not phase or not export or '"' in phase + export:
+            raise ValueError(f"phase {phase!r}: bad name or export {export!r}")
+    n = len(phases)
+    out = ["", "// ---- variant selection (etx/codegen/manifest.py): the planner's choice per phase. The host reads it",
+           "// here only (etx/selection.h). It is not a command-line decision."]
+    out.append("#ifdef ETX_SEL_N_PHASES")
+    out.append('#error "ETX_SEL_N_PHASES must not be defined on the command line: the plan publishes the selection '
+               '(etx/codegen/manifest.py)."')
+    out.append("#endif")
+    out.append(f"#define ETX_SEL_N_PHASES {n}")
+    out.append(f"#define ETX_SEL_THREADS {budget['threads']}")
+    out.append(f"#define ETX_SEL_VGPR {budget['vgpr']}")
+    out.append(f"#define ETX_SEL_LDS {budget['lds']}")
+    dims = max(1, n)
+    names = ", ".join(f'"{p}"' for p in phases) or '""'
+    exports = ", ".join(f'"{e}"' for e, _ in phases.values()) or '""'
+    kinds = ", ".join(str(SELECTION_KINDS.index(k)) for _, k in phases.values()) or "0"
+    out.append(f"static const char* const etx_sel_phase[{dims}] = {{{names}}};")
+    out.append(f"static const char* const etx_sel_export[{dims}] = {{{exports}}};")
+    out.append(f"static const int32_t etx_sel_kind[{dims}] = {{{kinds}}};   // 0 dsl, 1 imported")
+    out.append("")
+    return out

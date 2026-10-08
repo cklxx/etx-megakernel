@@ -54,6 +54,7 @@ class MachineModel:
     capabilities: dict[str, Any]
     costs: dict[str, Any]
     lowering: dict[str, str] = field(default_factory=dict)   # misc C snippets (backoff, domain_id, timer)
+    primitives: dict[str, str] = field(default_factory=dict)   # tile primitive C definitions (etx/ops/prims.py)
     notes: list[str] = field(default_factory=list)
 
     # ---- topology -------------------------------------------------------
@@ -156,7 +157,7 @@ def load_machine(name_or_path: str | Path) -> MachineModel:
         exec_domains=[ExecDomain(**d) for d in raw["exec_domains"]],
         shared_cache=raw.get("shared_cache", {}), resources=raw["resources"], bandwidth=raw["bandwidth"],
         visibility=_load_visibility(raw["visibility"]), capabilities=raw.get("capabilities", {}),
-        costs=dict(raw.get("costs", {})), lowering=raw.get("lowering", {}), notes=list(raw.get("notes", [])),
+        costs=dict(raw.get("costs", {})), lowering=raw.get("lowering", {}), primitives=dict(raw.get("primitives", {})), notes=list(raw.get("notes", [])),
     )
 
 

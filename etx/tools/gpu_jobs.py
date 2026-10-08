@@ -23,8 +23,8 @@ a free lane takes the first ready job in list order.
   python3 -m etx.tools.gpu_jobs examples/sessions/next.py --gpus 0,1 --logdir ~/vlnext [--machine A] [--dry-run]
 
 Output: one line per start / end with the elapsed session time, a progress block every --progress-s seconds (running
-jobs, their last log line, and a warning for any job silent past quiet_s), and at the end a status table plus
-<logdir>/status.json. Exit code 0 only if every job that ran finished OK.
+jobs, their last log line, and a warning for any job silent past quiet_s), and at the end a status table.
+<logdir>/status.json is atomically refreshed on every transition (including skipped jobs). Exit code 0 only if every job that ran finished OK.
 """
 from __future__ import annotations
 
@@ -36,6 +36,7 @@ import re
 import signal
 import subprocess
 import sys
+import tempfile
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -149,11 +150,13 @@ class Runner:
         j.proc = subprocess.Popen(["bash", "-c", j.cmd], cwd=cwd if os.path.isdir(cwd) else None, env=env, stdout=fh,
                                   stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, start_new_session=True)
         j.status, j.start, j.on_gpu = "running", time.time(), gpu
+        self._write_status()
         self.say(f"start {j.name}" + (f" on GPU {gpu}" if gpu is not None else " (cpu)"))
 
     def _finish(self, j: Job, status: str) -> None:
         j.status, j.end = status, time.time()
         j.rc = j.proc.returncode if j.proc else None
+        self._write_status()
         tail = []
         if j.log and j.log.exists():
             text = j.log.read_text(errors="replace")
@@ -198,6 +201,7 @@ class Runner:
     # -------------------------------------------------------------- main loop
     def run(self) -> int:
         self.logdir.mkdir(parents=True, exist_ok=True)
+        self._write_status()
         last_progress = time.time()
         try:
             while True:
@@ -213,6 +217,7 @@ class Runner:
                 for j in self.jobs:                                   # skips propagate
                     if j.status == "pending" and self._deps_state(j) == "skip":
                         j.status = "skipped"
+                        self._write_status()
                         self.say(f"skip    {j.name}" + (f" [{j.note}]" if j.note else " [a dependency failed]"))
                 busy_gpus = {j.on_gpu for j in self.jobs if j.status == "running" and j.lane == "gpu"}
                 cpu_busy = sum(j.status == "running" and j.lane == "cpu" for j in self.jobs)
@@ -242,6 +247,23 @@ class Runner:
             raise
         return self.report()
 
+    def _write_status(self) -> None:
+        # One scheduler thread owns all state transitions. Unique sibling temp
+        # files + replace keep concurrent job readers on complete snapshots.
+        payload = json.dumps(
+            [{"name": j.name, "status": j.status, "rc": j.rc, "gpu": j.on_gpu,
+              "seconds": (j.end - j.start) if j.end else None, "note": j.note}
+             for j in self.jobs], indent=1)
+        tmp = None
+        try:
+            with tempfile.NamedTemporaryFile(mode="w", dir=self.logdir, prefix=".status-", delete=False) as fh:
+                tmp = Path(fh.name)
+                fh.write(payload)
+            os.replace(tmp, self.logdir / "status.json")
+        finally:
+            if tmp is not None:
+                tmp.unlink(missing_ok=True)
+
     def report(self) -> int:
         self.say("session done")
         print(f"  {'job':32} {'status':8} {'rc':>4} {'gpu':>4} {'seconds':>8}", file=self.out)
@@ -249,9 +271,7 @@ class Runner:
             sec = f"{j.end - j.start:.0f}" if j.end else ""
             gpu = "" if j.on_gpu is None else str(j.on_gpu)
             print(f"  {j.name:32} {j.status:8} {'' if j.rc is None else j.rc:>4} {gpu:>4} {sec:>8}  {j.note}", file=self.out)
-        (self.logdir / "status.json").write_text(json.dumps(
-            [{"name": j.name, "status": j.status, "rc": j.rc, "gpu": j.on_gpu, "seconds": (j.end - j.start) if j.end else None,
-              "note": j.note} for j in self.jobs], indent=1))
+        self._write_status()
         bad = [j for j in self.jobs if j.status in ("fail", "timeout")]
         return 1 if bad else 0
 
