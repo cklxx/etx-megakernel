@@ -1,6 +1,6 @@
 # SPEC: ETX against vLLM on one MI300X, on one timing basis, beside the published NVIDIA rows
 
-Specification only (2026-10-08, base `5f6b603`). The session author commits `examples/sessions/nvref.py`,
+Session specification (2026-10-08, evidence fixes based on `423c040`). The session author commits `examples/sessions/nvref.py`,
 `examples/vllm_llm/nvref_report.py` and `tests/test_nvref_report.py` before provisioning. `~/code/etx/results_*` is outside git.
 
 ## 0. Why 227 tok/s does not answer the question yet
@@ -41,7 +41,7 @@ cost a user pays. **vLLM stays unchanged; ETX changes** from the device span (`m
 - Model `Qwen/Qwen3-30B-A3B`, not the third party's `-Instruct-2507`: only the former has a golden and prep path. Its
   HF `config.json` (fetched 2026-10-08) against `examples/llm/results/config_qwen3-30b-a3b.json:1`: every shape field
   equal; only `rope_theta` (1e7 vs 1e6) and `max_position_embeddings` (262144 vs 40960) differ. Same cost (estimate).
-  `dl` also prints `HF_REV` from `huggingface_hub.model_info('Qwen/Qwen3-30B-A3B').sha`.
+  The separate `record` job prints `HF_REV` from `huggingface_hub.model_info('Qwen/Qwen3-30B-A3B').sha`.
 
 ## 3. vLLM arm: `examples/llm/vllm_bench.py`, unchanged
 Image `vllm/vllm-openai-rocm:v0.27.1`, vLLM 0.27.1 (`docs/DATA.md:69-70`). Default flags, AITER off, the strongest
@@ -71,18 +71,26 @@ Expected: `VLLM label=default aiter=0 … batch=1 version=0.27.1 context=1024 me
 - Two check builds, both with the same four DSL flags and `ETX_VL_CHECK=1`: `build_chk` keeps the default XCD
   replicas; `build_chk1` additionally sets `ETX_VL_XCD=0`, giving NR=1. `ETX_VL_XCD` is on by default
   (`model.py:63-68,164`), not uncertain. `check_imp` retains the `--check 2` demonstration of the documented
+  per-XCD refusal (`host.hip:515`).
   Validated without a GPU on 2026-10-08: the `chk1` variant of `examples/vllm_llm/rocm_build_check.sh`
   (`ETX_VL_CHECK=1 ETX_VL_XCD=0`) compiles in the ROCm 22 container, and its plan has `rep=1` on all 434
   instances, i.e. NR=1. The timing plan has `rep=8` on 146 instances, i.e. NR=8, which is why the refusal fired.
-  per-XCD refusal (`host.hip:515`). `check_imp1` runs `--check 2` and requires
-  `CHECK OK: 0 launch(es) differ` (`host.hip:603`); its process must also exit successfully.
+  `check_imp1` runs `--check 2` and requires the unchanged exact line
+  `CHECK OK: 0 launch(es) differ`; its process must also exit successfully.
+  Exports beginning exactly with `dsl_` are native DSL tiles (`model.py:459`, `plan_imports.py:15`),
+  not imported kernels. `--check` executes them to preserve downstream inputs, skips their original lookup
+  and byte comparison, and prints `CHECK NOT-IMPORTED: N instance(s): <first five names>, ...` separately.
+  The count is of instances visited within the requested layers, not distinct exports. DSL correctness belongs
+  to `CHECK-DSL OK` in `gate_all`. A non-DSL export with no original still dies; differing imported launches
+  still end in `CHECK FAILED: N launch(es) differ`.
   Both check jobs require only their own build, `prep`, and `golden_sha` to succeed; preceding gates/checks are
   completion barriers (`after_any`). Neither check gates timing jobs through `after`.
   The report keeps two rules apart. A **differing launch** is a correctness failure: `CHECK FAILED` in *either* check
   refuses the report and prints no number. An **unavailable check** is not: when `check_imp1` printed no
   `CHECK OK` (build failure, timeout, skip) the report still prints every number, writes
   `IMPORT-CHECK NOT MET (check_imp1: <status>)`, and puts the same text in the verdict line, so a LEAD then makes
-  no byte-identity claim. Only when `check_imp1` never ran at all may `check_imp` supply `OK` or
+  no byte-identity claim. Skipped checks need no log: their status is sufficient to mark NOT MET.
+  Only when `check_imp1` has neither a log nor a status entry may `check_imp` supply `OK` or
   `IMPORT-CHECK n/a (host.hip:515)`; a `check_imp` that passed never masks a `check_imp1` that did not.
 - Timing success dependencies (`after`): `vllm_r1..5` needs `golden_sha`, `docker_pull`;
   `etx_r1..5` needs `golden_sha`, `build_all`, `gate_all`; `etxu_r1..5` adds `gate_unf` to those ETX dependencies.
@@ -96,20 +104,35 @@ Expected: `VLLM label=default aiter=0 … batch=1 version=0.27.1 context=1024 me
   (the ETX_ENV line is what `examples/vllm_llm/pairs.py:6-10` parses).
 - Last, nice to have (each waits for all preceding jobs via `after_any`; failures do not stop the tail): `hostprof` (fused run, `ETX_HOST_PROF=1`, prints `HOSTPROF steps …`, `host.h:387`), `etx_noprog`
   (fused run without `ETX_VL_PROGRESS`: print effect), `vllm_aiter_r1..3` (`-e VLLM_ROCM_USE_AITER=1`).
-- `hostprof` and `etx_noprog` use the fused success dependencies; AITER uses the vLLM dependencies.
+- `hostprof` and `etx_noprog` require only `golden_sha` and `build_all` in `after`; AITER requires only
+  `golden_sha` and `docker_pull`. Gates and all preceding timings are completion barriers (`after_any`),
+  never success dependencies for these diagnostics. A failed gate therefore does not suppress the tail.
+- The single scheduler owns state transitions and atomically replaces `status.json` from a unique sibling
+  temporary file at initialization and every start, finish, timeout, or skip, before starting dependent jobs.
+  The in-session report sees actual terminal states; concurrent readers never see partially written JSON.
 - `report` (cpu, only `after_any` barriers, including the last job): `.venv/bin/python -m examples.vllm_llm.nvref_report $HOME/sess`, then
   `python -m examples.vllm_llm.pairs <etx_r*/etxu_r* logs in run order> --pairs 5 --basis wall` for its table only. Failure of this optional table is logged and does not fail a successful primary report.
 
 ## 5. Report: required system comparison, optional fusion comparison
 `nvref_report.py` validates everything before printing any performance number. vLLM and fused ETX each require
 five valid runs, 32/32 on every run, and fused ETX requires exactly 31 measured steps in the last repeat.
-The required gates, import check, golden checksum and provenance must also validate. Failure prints only
+The required fused gate, golden checksum and provenance must also validate. An actual `CHECK FAILED`
+in either import check also refuses; an unavailable import check merely marks NOT MET as specified above.
+Failure of required evidence prints only
 `REFUSED: <reason>. No performance numbers.` and `VERDICT NOT-COMPLETE`.
 
 The unfused arm is optional: a missing/failed `gate_unf`, any missing/failed `etxu_r*`, wrong mode, non-32/32 result,
 or invalid step count suppresses the unfused row and numerical FUSION line. Print `FUSION unavailable (<reason>)`
 instead; vLLM, fused ETX, DELTA and VERDICT remain available. No partial unfused statistics are printed.
-The unfused row and FUSION line below appear only with five fully valid unfused runs and a valid gate.
+The unfused row and numerical FUSION/HOST-EXCESS lines below appear only with five fully valid unfused runs
+and a valid gate. `HOST-EXCESS` uses each round's RESULT `wall_ms - median_ms`, then takes each arm's median;
+`excess(fused-unfused)` subtracts those medians. This difference of reported medians is a host-overhead proxy,
+not a median of paired per-step overheads, and is separate from the 31-step-mean verdict basis.
+
+Every nice-to-have (`hostprof`, `etx_noprog`, each AITER run) is validated independently. Missing logs,
+failed/timeout/skipped jobs, malformed output, or non-32/32 results print `<job> unavailable (<reason>)`.
+They never refuse the primary report, even if a failed job printed a RESULT. AITER statistics require all three
+valid runs; partial statistics are not printed.
 ```
 | source | system | hardware | basis | runs (ms/token) | median | mean | spread | tok/s | 32/32 |
 | this session | vLLM 0.27.1 default     | MI300X <record> | host wall, (t32-t1)/31    | r1..r5 | m | a | max-min | 1000/m | 5/5 |
@@ -120,7 +143,11 @@ The unfused row and FUSION line below appear only with five fully valid unfused 
 | third party eliovp.com 2025-09-26, not reproduced | vLLM 0.10.2, CUDA 13 | B200 | unknown | - | - | 5.55 | - | 180.1 | not checked |
 | third party eliovp.com 2025-09-26, not reproduced | Paiton, ROCm 6.4.1 | MI300X | unknown | - | - | 5.28 | - | 189.4 | not checked |
 | third party eliovp.com 2025-09-26, not reproduced | vLLM 0.10.0        | MI300X | unknown | - | - | 6.16 | - | 162.2 | not checked |
-DELTA r1..r5 (ETX fused - vLLM, same round) median spread | FUSION (unfused - fused) median | IMPORT-CHECK OK|n/a
+DELTA r1..r5 (ETX fused - vLLM, same round) <five deltas> median spread
+RESOLUTION: paired delta spread X ms against a 0.050 ms threshold; |median|=... ms is ...x the spread [only when unresolved]
+FUSION (unfused - fused) median=... ms gain median=... spread=... rule met|not met
+HOST-EXCESS fused median=... unfused median=... excess(fused-unfused)=... ms
+IMPORT-CHECK OK|NOT MET (<reason>)|n/a
 VERDICT LEAD|TIE|LOSS|INSUFFICIENT|NOT-COMPLETE | image <digest> | HF_REV <sha> | machine <record>
 ```
 Third-party rows: Instruct-2507, ShareGPT, 256 output tokens, mean of 5; ms/token = 1000 / tok/s. Unknown: whether
@@ -142,14 +169,11 @@ their tok/s includes prefill or TTFT (their methodology page could not be fetche
 - The primary verdict uses only fused ETX versus vLLM; unavailable fusion evidence does not change it.
 - **LEAD:** all five Δ_R < 0, median <= -0.050. **LOSS:** all five > 0, median >= +0.050. **TIE:** |median| < 0.050.
   **INSUFFICIENT:** otherwise. If AITER's median is > 0.050 below default, recompute against AITER and print both.
-- Prediction (estimate, across machines): Δ about -0.3 ms (ETX 4.548, `ab2_all_x.log:8`; vLLM 4.836, `vllm_aiter0…json:6`).
-- LEAD: write `docs/NVREF-<date>.md`, index the set in `docs/DATA.md`, update `README.md:48-50`. NVIDIA stays open;
-  the cheapest next step is `vllm_bench.py` with the same golden on one H200, which needs no CUDA port of ETX
-  (`docs/ROADMAP.md:228`). Provider and cost unknown.
-- TIE (the null result): the device-basis lead does not survive host time, and ETX only matches vLLM. Next: the
-  per-step host work (`VLLM-LADDER:62-66`), ranked by `HOSTPROF`. LOSS or INSUFFICIENT: the same, plus a check of the
-  machine record; no claim. A failed required gate/check or < 5 valid runs in either required arm: NOT-COMPLETE, no number.
-  An unavailable unfused arm only removes the fusion claim; it does not invalidate the system comparison.
+- Print the five paired deltas and their spread (max minus min).
+  A paired delta spread above 0.050 ms, or a median inside that spread, prints the `RESOLUTION` line above with
+  the ratio of the median to the spread. When the median is no larger than the spread the sign of the paired
+  difference is not stable, so the verdict becomes `INSUFFICIENT` whatever the median says; otherwise the
+  verdict stands and the ratio tells the reader how far it is from the noise.
 
 ## 8. Before provisioning (CPU), then the session
 P1 `.venv/bin/python -m pytest -q`, including `tests/test_nvref_report.py` (synthetic pass, 31/32 refusal, missing run,
@@ -181,11 +205,21 @@ unknown for 1x). Ceiling 60 min / $3.00. **Hard stop:** delete the VM at 55 min 
 | Skipped neighbours break round interleaving | All earlier jobs remain `after_any` barriers; `test_check_build_and_skipped_neighbour_barrier` checks the runner's actual dependency logic. |
 | Missing/incorrect unfused evidence rejects a valid system verdict | `examples/vllm_llm/nvref_report.py:178` handles unavailable evidence and emits `FUSION unavailable (<reason>)`; `test_fusion_missing_still_verdict` and existing incorrect-run cases cover this. |
 | Invalid required evidence leaks partial numbers | Validation precedes output; `tests/test_nvref_report.py:215` (`test_missing_required_with_missing_fusion_refuses`), required 32/32 and step-count tests retain refusal checks. |
-| Failed nice-to-have job or pairs table loses the primary report | `hostprof`, `etx_noprog`, `vllm_aiter_r1..3`, `report` wait via `after_any`; `report` preserves the optional pairs output without requiring success. |
+| Failed nice-to-have job or pairs table loses the primary report | `hostprof`, `etx_noprog`, `vllm_aiter_r1..3`, `report` wait via `after_any`; `report` preserves the optional pairs output without requiring success; optional parsers catch invalid/incorrect results and print unavailable (`test_optional_failure_never_refuses`). |
 
-Reference corrections in this revision: section 4's `model.py:161` described replicas but did not establish the
-default (`:63-68,164` do); `host.hip:588` is a per-launch comparison, while the final CHECK line is `:603`.
-Section 1's host timing references were stale: `610→625`, `632→647`, `634→649`, `606→621`,
-`633→648`, `864→878`, `870→885`, `640→655`, `678→693`; section 4's mode print moved `867→882`.
-The report's legacy n/a citation was also stale (`host.hip:500→515`). Historical result files outside this
-worktree were not revalidated. This revision does not provision, build on a VM, run a GPU, or push.
+Host line references above describe the base `423c040` unless stated otherwise; this change adds eleven
+lines after the import-check setup. The final CHECK summary is now `host.hip:614`, and the DSL predicate is
+`host.hip:554`; the legacy per-XCD refusal remains at `:515`. The `chk1` compile observation above predates
+this fix and does not establish that the modified GPU path runs correctly. Local CPU dispatch tests use stubs;
+full GPU launch comparisons, CHECK-DSL and 32/32 model correctness remain session-time validation.
+This revision does not provision, build on a VM, run a GPU, or push.
+
+Evidence-fix risks and local checks (2026-10-08):
+
+| Risk | Mitigation / evidence location |
+|---|---|
+| DSL exports have no original and abort `--check` | Exact `dsl_` prefix follows the planner; tiles execute but do not compare. `tests/test_host_import_check.py` compiles the actual dispatch with CPU stubs, including non-DSL failure cases. Real GPU byte identity remains unvalidated. |
+| In-session report sees stale/default status or skipped check has no log | Atomic transition snapshots; `test_live_status_before_report_job`, `test_status_atomic_replace`, `test_skipped_check_without_log`. |
+| Gate failure suppresses diagnostic evidence | Tail needs only builds/golden/image success; gates are barriers; `test_tail_needs_builds_not_gates`. |
+| Noisy deltas look resolved; positive fusion median looks sufficient | `test_resolution` covers both resolution conditions; `test_fusion_rule` checks gain and spread rules via the shared pairs verdict. |
+| Wall fusion margin hides megakernel-specific host cost | `test_host_excess_uses_result_wall` checks 0.197 / 0.036 / 0.161 ms using RESULT values distinct from the step mean; unavailable fusion also makes HOST-EXCESS unavailable. |
