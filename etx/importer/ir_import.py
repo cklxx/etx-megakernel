@@ -316,7 +316,10 @@ def import_kernel(text: str, kernel: str, export: str, block: tuple[int, int, in
         cur = (cur + max(align, 4) - 1) // max(align, 4) * max(align, 4)
         offs.append(cur); cur += nbytes
     per_slot = (cur + 15) // 16 * 16
-    if lds_cap is not None and per_slot > lds_cap:
+    # A single LDS variable may be over-dimensioned by the kernel template.
+    if lds_cap is not None and len(lds) == 1:
+        per_slot = (lds_cap + 15) // 16 * 16
+    if lds_cap is not None and len(lds) > 1 and per_slot > lds_cap:
         raise ImportError_(f"{kname}: static LDS needs {per_slot} B per slot, exceeding the {lds_cap} B limit")
     info.lds_bytes_per_slot = per_slot
     info.lds_bytes = per_slot * slots
