@@ -140,6 +140,45 @@ def test_store_then_barrier_then_load_is_two_hops_only_with_barrier_drain():
     assert _an(body, with_drain=False)['hops']['coherent'] == 1     # a vmcnt(0) drain alone is not a hop
 
 
+def test_partial_vmcnt_drains_only_the_older_operations():
+    # vmcnt(1) after a load and then a store: only the load is done, so the barrier does not order the store
+    body = '''
+\tglobal_load_dword v1, v[2:3], off sc0 sc1
+\ts_waitcnt vmcnt(0)
+\tglobal_load_dword v7, v[10:11], off
+\tglobal_store_dword v[4:5], v1, off sc0 sc1
+\ts_waitcnt vmcnt({n})
+\ts_barrier
+\tglobal_load_dword v6, v[8:9], off sc0 sc1
+'''
+    r = _an(body.format(n=1), with_drain=False, barrier_drain=True)
+    assert r['hops']['coherent'] == 1 and r['hops']['store'] == 0
+    r = _an(body.format(n=0), with_drain=False, barrier_drain=True)
+    assert [h['class'] for h in r['chain']] == ['coherent', 'store', 'coherent']
+
+
+def test_lds_dma_has_no_register_destination():
+    # buffer_load ... lds and global_load_lds write LDS: the address register keeps its value
+    for dma in ('\tbuffer_load_dword v1, s[4:7], 0 offen lds', '\tglobal_load_lds_dword v1, s[4:5]'):
+        r = _an(dma + '\n\ts_waitcnt vmcnt(0)\n\tglobal_load_dword v4, v1, s[8:9]\n')
+        assert r['hops']['plain'] == 1, dma
+
+
+def test_lds_dma_result_reaches_a_later_ds_read():
+    r = _an('''
+\tglobal_load_dword v1, v[2:3], off sc1
+\ts_waitcnt vmcnt(0)
+\tbuffer_load_dword v1, s[4:7], 0 offen lds
+\ts_waitcnt vmcnt(0)
+\ts_barrier
+\tds_read_b32 v5, v6
+\ts_waitcnt lgkmcnt(0)
+\tglobal_load_dword v4, v5, s[8:9]
+''')
+    assert (r['hops']['coherent'], r['hops']['plain'], r['hops']['lds']) == (1, 2, 1)
+    assert [h['line'] for h in r['chain'] if h['class'] != 'lds'] == [2, 4, 9]
+
+
 def test_loop_with_carried_chain_reports_hops_per_trip():
     r = _an('''
 \tglobal_load_dword v1, v[2:3], off

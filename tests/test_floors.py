@@ -122,6 +122,89 @@ def test_isa_hop_table_matches_the_matching_build():
         assert (g['coherent'], g['plain'], g['scalar'], g['scratch']) == (h.coherent, h.plain, h.scalar, h.scratch), ph
 
 
+def _doc_rows(path: str, heading: str, first: str) -> dict[str, list[str]]:
+    """Rows of the first table below `heading` whose first header cell is `first`: name -> cells."""
+    lines = (ROOT / path).read_text().splitlines()
+    i = lines.index(heading)
+    while not lines[i].startswith(f'| {first} |'):
+        i += 1
+    rows = {}
+    for line in lines[i + 2:]:
+        if not line.startswith('|'):
+            break
+        c = fl.cells(line)
+        rows[c[0]] = c[1:]
+    return rows
+
+
+def _close(cell: str, value: float, digits: int) -> bool:
+    return abs(float(cell.replace(',', '')) - value) <= 0.5 * 10 ** -digits + 1e-9
+
+
+STEP_ROWS = {'Measured device span': 'measured_span_us', 'Serial floor': 'serial_floor_us',
+             'Overlap floor': 'overlap_floor_us', 'Hop chain with handoffs': 'hop_chain_us',
+             'Bandwidth floor': 'bandwidth_floor_us', 'Maximum gain from prefetch': 'prefetch_gain_max_us',
+             'Maximum gain without prefetch': 'non_prefetch_gain_max_us'}
+
+
+@pytest.mark.parametrize('path, heading, cases', [
+    (fl.DOC, '## Results', [(4.3, 0.50), (4.3, 0.69), (3.5, 0.50), (3.5, 0.69)]),
+    (fl.DOC, '### Sensitivity at the one-workgroup median', [(4.3, 0.28), (3.5, 0.28)]),
+    ('docs/PLAN-generic-decoder-2026-10-08.md', '#### Estimate for Qwen3-30B-A3B', [(4.3, 0.50), (4.3, 0.69), (3.5, 0.50), (3.5, 0.69)]),
+])
+def test_report_step_tables_are_the_tool_output(path, heading, cases):
+    rows = _doc_rows(path, heading, 'Value, ms')
+    assert set(rows) == set(STEP_ROWS), path
+    for col, (bw, rtt) in enumerate(cases):
+        r = fl.floors(bw, rtt)
+        for name, key in STEP_ROWS.items():
+            assert _close(rows[name][col], r[key] / 1000, 2), (path, name, bw, rtt, r[key])
+
+
+def test_report_phase_tables_are_the_tool_output():
+    lo, hi = fl.floors(4.3, 0.50), fl.floors(4.3, 0.69)
+    rows = _doc_rows(fl.DOC, '### Phase floors', 'Phase')
+    assert set(rows) == set(fl.PHASES)
+    for p, (tag, chain, f50, f69, stream, body) in rows.items():
+        a, b = lo['per_layer'][p], hi['per_layer'][p]
+        assert tag == a['tag'], p
+        for cell, value in ((chain, a['chain_us']), (f50, a['phase_floor_us']), (f69, b['phase_floor_us']),
+                            (stream, a['stream_us']), (body, a['crit_body_us'])):
+            assert _close(cell, value, 2), (p, cell, value)
+    plan = _doc_rows('docs/PLAN-generic-decoder-2026-10-08.md', '#### Estimate for Qwen3-30B-A3B', 'Phase')
+    assert set(plan) == set(fl.PHASES)
+    for p, (floor, tag, _) in plan.items():
+        f50, f69 = floor.split(' / ')
+        assert tag == lo['per_layer'][p]['tag'], p
+        assert _close(f50, lo['per_layer'][p]['phase_floor_us'], 2) and _close(f69, hi['per_layer'][p]['phase_floor_us'], 2), p
+    tail = _doc_rows(fl.DOC, '### Phase floors', 'Tail phase, once per step')
+    assert set(tail) == set(fl.TAIL)
+    for t, (tag, f50, f69, stream, dev) in tail.items():
+        a, b = lo['tail'][t], hi['tail'][t]
+        assert tag == a['tag'], t
+        for cell, value, digits in ((f50, a['floor_us'], 2), (f69, b['floor_us'], 2), (stream, a['stream_us'], 2),
+                                    (dev, a['device_us'], 1)):
+            assert _close(cell, value, digits), (t, cell, value)
+
+
+def test_report_split_is_the_tool_output():
+    r = fl.floors(4.3, 0.50)
+    b, split = r['body_excess_by_phase_us'], r['split_of_non_prefetch_gain_us']
+    want = {'Body excess of prep, attn, reduce, router and topk': sum(b[p] for p in ('prep', 'attn', 'reduce', 'router', 'topk')),
+            'Body excess of moe_up and moe_down': b['moe_up'] + b['moe_down'], 'Body excess of qkv': b['qkv'],
+            'Body excess of o_proj': b['o_proj'], 'Start delay of the critical tasks': split['start_delay'],
+            'Layer 0 and tail above their floors': split['rest'], 'Total': r['non_prefetch_gain_max_us']}
+    rows = _doc_rows(fl.DOC, '### Split of the gain without prefetch', 'Part')
+    assert set(rows) == set(want)
+    for name, value in want.items():
+        assert _close(rows[name][0], value, 0), (name, value)
+    want['Body excess of topk, router, prep, attn and reduce'] = want.pop('Body excess of prep, attn, reduce, router and topk')
+    plan = _doc_rows('docs/PLAN-generic-decoder-2026-10-08.md', '## 3. Priority', 'Part of the gain without prefetch')
+    assert set(plan) == set(want) - {'Total'}
+    for name, (cell,) in plan.items():
+        assert _close(cell, want[name] / 1000, 2), (name, want[name])
+
+
 def _git_show(rev: str, path: str) -> list[str] | None:
     p = subprocess.run(['git', 'show', f'{rev}:{path}'], cwd=ROOT, capture_output=True, text=True)
     return p.stdout.splitlines() if p.returncode == 0 else None
