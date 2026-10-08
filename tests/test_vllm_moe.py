@@ -90,9 +90,9 @@ def test_xcd_simulation_runs_the_plan_and_obeys_littles_law(tmp_path, monkeypatc
     rows, st = simulate(plan, cost, Hw(bw_max=5e6, lat_us=0.2))
     assert st["unfinished"] == 0 and len(rows) == len(plan["descs"]) and st["makespan_us"] > 0
     full = {i: [1e5, 0, 0, 16e3, 0.0] for i in range(304)}
-    assert abs(sum(_rates(full, Hw(bw_max=5e6, lat_us=0.2)).values()) - 5e6) < 1.0      # bandwidth-bound
+    assert abs(sum(_rates(full, Hw(bw_max=5e6, lat_us=0.2), {}).values()) - 5e6) < 1.0      # bandwidth-bound
     few = {i: [1e5, 0, 0, 16e3, 0.0] for i in range(4)}
-    assert abs(_rates(few, Hw(bw_max=5e6, lat_us=0.2))[0] - 16e3 / 0.2) < 1e-6            # latency-bound
+    assert abs(_rates(few, Hw(bw_max=5e6, lat_us=0.2), {})[0] - 16e3 / 0.2) < 1e-6            # latency-bound
 
 
 def test_two_requests_interleave_and_stay_independent(tmp_path, monkeypatch):
