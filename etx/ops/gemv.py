@@ -746,7 +746,10 @@ BODIES = {
   const int dsl_eid = d.mode >= 2 ? lids[s] : dsl_a_ldi(d.ids + (size_t)rq * d.srows + s);
   const __hip_bfloat16* We = d.W + (size_t)dsl_eid * d.estride;     // g: 2 x rpt floats (rpt <= DSL_RCH, host-checked)
 #if ETX_EMIT_DSL_BIGK
-  if (d.K > DSL_K_MAX) {                               // K > the staged window (host allows it for the MoE forms only):
+  // readfirstlane: d.K is one value per task, but without ETX_DSL_SCALAR it is a flat load into a VGPR, so the compiler
+  // took this branch as divergent and structurised both paths together. In the one-function megakernel that pushed
+  // Mixtral (the only BIGK model) from 2 to 60 spilled VGPRs, all of them in the inlined attention (mixtral_spill).
+  if (__builtin_amdgcn_readfirstlane(d.K) > DSL_K_MAX) {   // K > the staged window (host allows it for the MoE forms only):
     float* gb = xs + DSL_K_MAX; float* pb = gb + 2 * d.rpt;      // fixed LDS bases -- xs + d.K would overflow the block
     const __hip_bfloat16* xr = d.x + (size_t)rq * d.sx;
     dsl_gemv_bigk(We, xr, d.K, xs, r0, r1, pb, [&](int r, float v) { gb[r - r0] = dsl_bfr(v); });
@@ -805,7 +808,7 @@ BODIES = {
   const int dsl_eid = d.mode >= 2 ? lids[s] : dsl_a_ldi(d.ids + (size_t)rq * d.srows + s);
   const __hip_bfloat16* We = d.W + (size_t)dsl_eid * d.estride;
 #if ETX_EMIT_DSL_BIGK
-  if (d.K > DSL_K_MAX) {                               // chunked staging; fixed LDS bases (see silu_mul)
+  if (__builtin_amdgcn_readfirstlane(d.K) > DSL_K_MAX) {   // chunked staging, uniform branch; fixed LDS bases (see silu_mul)
     float* pb = xs + DSL_K_MAX;
     const float wsb = d.mode >= 2 ? lwts[s] : dsl_a_ldf(d.wts + (size_t)rq * d.srin + s);
     __hip_bfloat16* outb = d.out + (size_t)rq * d.sout + (size_t)s * d.M;
