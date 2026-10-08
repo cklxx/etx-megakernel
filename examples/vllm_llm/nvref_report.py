@@ -133,23 +133,27 @@ def row(system: str, hardware: str, basis: str, values: list[float]):
 
 def report(directory: Path):
     session = Session(directory)
-    for name in ("gate_all", "gate_unf"):
+    def gate(name):
         text = session.read(name)
         correctness(text, name)
         if not re.search(r"^GATE-OK$", text, re.M):
             raise Refusal(f"{name}: gate failed (missing GATE-OK)")
         if name == "gate_all" and not re.search(r"^CHECK-DSL OK\b", text, re.M):
             raise Refusal(f"{name}: missing CHECK-DSL OK")
-    check = session.read("check_imp", allow_failed=True)
+
+    gate("gate_all")
+    # A present new check must pass; never hide its failure behind the legacy n/a.
+    check_name = "check_imp1" if (directory / "check_imp1.log").exists() or "check_imp1" in session.status else "check_imp"
+    check = session.read(check_name, allow_failed=True)
     if re.search(r"^CHECK FAILED", check, re.M):
-        raise Refusal("check_imp: CHECK FAILED; no performance verdict")
-    if "--check needs a plan without per-XCD replicas (build without ETX_VL_XCD)" in check:
-        imported = "n/a (host.hip:500)"
-    elif re.search(r"^CHECK OK: 0 launch\(es\) differ$", check, re.M):
-        session.read("check_imp")  # a timeout/failure after OK is not success
+        raise Refusal(f"{check_name}: CHECK FAILED; no performance verdict")
+    if re.search(r"^CHECK OK: 0 launch\(es\) differ$", check, re.M):
+        session.read(check_name)  # a timeout/failure after OK is not success
         imported = "OK"
+    elif check_name == "check_imp" and "--check needs a plan without per-XCD replicas (build without ETX_VL_XCD)" in check:
+        imported = "n/a (host.hip:515)"
     else:
-        raise Refusal("check_imp: neither CHECK OK nor the documented per-XCD refusal")
+        raise Refusal(f"{check_name}: missing CHECK OK (only legacy check_imp permits the documented per-XCD refusal)")
 
     golden = session.read("golden_sha", "None")
     if not re.search(r"(?:^|/)golden_c1024.txt: OK$", golden, re.M):
@@ -163,13 +167,23 @@ def report(directory: Path):
         raise Refusal("missing machine/image/HF_REV provenance")
 
     arms = {}
-    for arm in ("vllm", "etx", "etxu"):
+    for arm in ("vllm", "etx"):
         runs = []
         for rnd in range(1, 6):
             name = f"{arm}_r{rnd}"
             text = session.read(name)
             runs.append(vllm(text, name) if arm == "vllm" else etx(text, name, "fused" if arm == "etx" else "graph"))
         arms[arm] = runs
+
+    fusion_unavailable = None
+    arms["etxu"] = []
+    try:
+        gate("gate_unf")
+        unfused = [etx(session.read(f"etxu_r{rnd}"), f"etxu_r{rnd}", "graph") for rnd in range(1, 6)]
+    except (Refusal, OSError, ValueError, KeyError, TypeError) as exc:
+        fusion_unavailable = str(exc)
+    else:
+        arms["etxu"] = unfused
 
     # Nice-to-have jobs may be absent or incomplete, but a reported incorrect
     # run must never disappear from the correctness accounting.
@@ -198,7 +212,8 @@ def report(directory: Path):
     v, f, u = ([r.wall for r in arms[a]] for a in ("vllm", "etx", "etxu"))
     row("vLLM 0.27.1 default", hardware, "host wall, (t32-t1)/31", v)
     row("ETX fused, 4 tile flags", hardware, "host wall, 31-step mean", f)
-    row("ETX unfused, HIP graph", hardware, "host wall, 31-step mean", u)
+    if fusion_unavailable is None:
+        row("ETX unfused, HIP graph", hardware, "host wall, 31-step mean", u)
     row("ETX fused (secondary)", hardware, "device span, not vs vLLM", [r.device for r in arms["etx"]])
     # The user requires non-log numbers to be labelled estimates. Keep the
     # section-5 source/system labels verbatim and mark these external values.
@@ -217,7 +232,10 @@ def report(directory: Path):
     deltas = [a - b for a, b in zip(f, v)]
     print("DELTA r1..r5 (ETX fused - vLLM, same round) " + ", ".join(f"{d:+.3f}" for d in deltas)
           + f" median={median(deltas):+.3f} spread={max(deltas) - min(deltas):.3f} ms")
-    print(f"FUSION (unfused - fused) median={median([a - b for a, b in zip(u, f)]):+.3f} ms")
+    if fusion_unavailable is None:
+        print(f"FUSION (unfused - fused) median={median([a - b for a, b in zip(u, f)]):+.3f} ms")
+    else:
+        print(f"FUSION unavailable ({fusion_unavailable})")
     print(f"IMPORT-CHECK {imported}")
     result = verdict(deltas)
     print(f"VERDICT {result} | image {digest} | HF_REV {revision} | machine {machine}")
