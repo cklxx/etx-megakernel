@@ -71,6 +71,9 @@ Expected: `VLLM label=default aiter=0 … batch=1 version=0.27.1 context=1024 me
 - Two check builds, both with the same four DSL flags and `ETX_VL_CHECK=1`: `build_chk` keeps the default XCD
   replicas; `build_chk1` additionally sets `ETX_VL_XCD=0`, giving NR=1. `ETX_VL_XCD` is on by default
   (`model.py:63-68,164`), not uncertain. `check_imp` retains the `--check 2` demonstration of the documented
+  Validated without a GPU on 2026-10-08: the `chk1` variant of `examples/vllm_llm/rocm_build_check.sh`
+  (`ETX_VL_CHECK=1 ETX_VL_XCD=0`) compiles in the ROCm 22 container, and its plan has `rep=1` on all 434
+  instances, i.e. NR=1. The timing plan has `rep=8` on 146 instances, i.e. NR=8, which is why the refusal fired.
   per-XCD refusal (`host.hip:515`). `check_imp1` runs `--check 2` and requires
   `CHECK OK: 0 launch(es) differ` (`host.hip:603`); its process must also exit successfully.
   Both check jobs require only their own build, `prep`, and `golden_sha` to succeed; preceding gates/checks are
