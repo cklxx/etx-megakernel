@@ -18,6 +18,9 @@ Assumptions (each is unmeasured for this lever):
   first LDS read and any contention with attention's KV reads are omitted (zero is an
   omission, not a claim that they are free).
 * A gain on o_proj's critical body shortens the step one for one (o_proj is serial).
+* The staged bytes would otherwise stream inside the body. The round11 build breaks this: its touch hook
+  (ETX_VL_TOUCH=1) already loads 61,440 of the 65,536 B slice into L2 during the wait, so the result is an
+  upper bound (docs/STAGE-oproj-2026-10-07.md, "Review, 2026-10-08").
 """
 from __future__ import annotations
 
@@ -170,6 +173,8 @@ def report() -> dict:
         ('body_split', 'How much of the o_proj body is weight streaming versus activation wait, reduction and publish.'),
         ('kv_interference', 'Staging loads during attn may evict MALL-resident KV lines; use non-temporal loads and measure.'),
         ('critical_path', 'Whether a shorter o_proj body moves router\'s first ready time one for one.'),
+        ('touch_overlap', 'The round11 build runs ETX_VL_TOUCH=1, which loads 61,440 of the 65,536 B slice into L2 during the '
+                          'wait; the staged bytes are then L2 hits, not HBM traffic, and the gain is an upper bound.'),
     ):
         unknowns.append(dict(name=name, value=None, status='assumed',
                              source=source('etx/tools/stage_sim.py', 'Assumptions (each'), note=note))

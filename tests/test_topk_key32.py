@@ -2,6 +2,7 @@
 See docs/TOPK-KEY32-2026-10-08.md and etx/ops/topk_key32.py."""
 from __future__ import annotations
 
+import os
 from pathlib import Path
 import re
 import shutil
@@ -149,14 +150,29 @@ def test_switch_guards_every_key32_line():
     assert "ds_bpermute" not in re.sub(r"//.*", "", blk)
 
 
-@pytest.mark.skipif(shutil.which("g++") is None, reason="needs g++ (C++20) for the host SIMT harness")
+def _host_cxx(tmp_path):
+    """First host compiler that builds a C++20 <barrier>/<thread> program. A compiler on PATH can lack its
+    standard headers (a stale macOS CommandLineTools install), so each candidate is probed, not just found."""
+    llvm = Path(os.environ.get("ETX_LLVM", "/opt/homebrew/opt/llvm/bin"))
+    probe = tmp_path / "probe.cpp"
+    probe.write_text("#include <barrier>\n#include <cstdlib>\n#include <thread>\nint main() { std::barrier b(1); }\n")
+    for cxx in (os.environ.get("CXX"), "g++", "c++", "clang++", str(llvm / "clang++")):
+        path = cxx and shutil.which(cxx)
+        if path and subprocess.run([path, "-std=c++20", "-pthread", str(probe), "-o", str(tmp_path / "probe")],
+                                   capture_output=True).returncode == 0:
+            return path
+    pytest.skip("needs a host C++20 compiler with <barrier> for the SIMT harness (set CXX)")
+
+
 def test_cpp_block_on_a_host_simt_wave(tmp_path):
     """Runs the C++ of the ETX_TOPK_KEY32 block itself (64 host threads = 64 lanes, modelled DPP and readlane), both
     output forms, and compares it with the Python emulation. Host exp is not numpy exp: ids must match, weights to 1 ulp-ish."""
+    cxx = _host_cxx(tmp_path)
     (tmp_path / "key32_block.inc").write_text(_key32_block())
     exe = tmp_path / "simt"
-    subprocess.run(["g++", "-std=c++20", "-O1", "-pthread", "-I", str(tmp_path), str(ROOT / "tests/data/topk_key32_simt.cpp"),
-                    "-o", str(exe)], check=True, capture_output=True)
+    build = subprocess.run([cxx, "-std=c++20", "-O1", "-pthread", "-I", str(tmp_path),
+                            str(ROOT / "tests/data/topk_key32_simt.cpp"), "-o", str(exe)], capture_output=True, text=True)
+    assert build.returncode == 0, f"{cxx}: {build.stderr}"
     rng = np.random.default_rng(11)
     cases = []
     for E, K in ((128, 8), (64, 6), (8, 2)):

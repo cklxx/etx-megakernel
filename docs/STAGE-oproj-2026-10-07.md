@@ -16,6 +16,7 @@ Conditions: Qwen3-30B-A3B bf16 decode, batch one, one MI300X, `ETX_VL_CU=256`, D
 
 These values are predictions, not measurements.
 The low end is above the 0.028 ms same-binary spread.
+The review below finds that these predictions are upper bounds. They rest on assumptions that the round11 build does not meet. The verdict "above the threshold" is not supported.
 
 ## Why this lever
 
@@ -86,6 +87,25 @@ Go to a flag-gated implementation (`ETX_DSL_OSTAGE`, off by default) only if unk
 The GPU A/B then uses the [TILES](TILES-2026-10-07.md) verdict rules: KEEP at a mean gain at or below -0.030 ms,
 bit-identical output, 32/32 tokens, `CHECK-DSL OK`.
 If the A/B is NEUTRAL, record the trace split from unknown 3 and close the lever.
+
+## Review, 2026-10-08
+
+The o_proj body in the model comes from the round11 trace. Two inputs of the model do not describe that build.
+
+1. TOUCH. Round11 (`b_r8base`) runs with `ETX_VL_TOUCH=1` (`docs/BUDGET-2026-10-01.md:20`). While wave 0 polls the o_proj event,
+   waves 1 to 15 load the first pass of the slice into L2: 15 x 64 lanes x 4 x 16 B = 61,440 of the 65,536 B
+   (`git show ae1529c:etx/ops/gemv.py`, lines 283-310). The model treats the staged bytes as HBM traffic inside the body, at
+   8.9 KB/us in scenario B or as a share of a body that only streams in scenario A. In round11, most of those bytes are
+   already L2 hits. A stage into LDS then replaces an L2 hit with an LDS read. Section "Realistic gain from prefetch" of
+   `docs/FLOORS-2026-10-08.md`, LDS-direct item 4, makes the same point.
+2. LDS. The round11 build uses 41,448 B of LDS (the MATCH fingerprint, `docs/FLOORS-2026-10-08.md:27`). The 29,736 B
+   group segment belongs to the later import-prune build. With 41,448 B, the tool's sweep row gives 0.073 to 0.107 ms.
+
+Estimate, not a measurement: if the stage saves only one L2 round trip per critical o_proj task, the gain is
+48 x 0.143 us, or about 0.007 ms. That is below the 0.030 ms KEEP threshold. The 0.143 us value is a simulation parameter
+of `docs/MODEL-vllm-kernels.md` section 18. It is not a measurement.
+The real gain therefore lies between about 0 and the tool's value. Unknown 3 decides it: whether the o_proj body still waits on weight
+loads with TOUCH on. Only a GPU trace can answer that. Do not build `ETX_DSL_OSTAGE` before that split exists.
 
 ## Next candidate
 

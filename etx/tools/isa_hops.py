@@ -82,6 +82,10 @@ class Insn:
     @property
     def kind(self) -> str:
         m = self.mnem
+        # LDS DMA (`buffer_load_* ... lds`, `global_load_lds_*`): no VGPR destination, every operand is an address
+        if m.startswith(('global_load_lds', 'scratch_load_lds', 'flat_load_lds')) or (
+                m.startswith('buffer_load') and re.search(r'\blds\b', self.mods)):
+            return 'lds_dma'
         if m.startswith('scratch_load'):
             return 'scratch_load'
         if m.startswith('scratch_store'):
@@ -549,7 +553,7 @@ def _masks(st: State, ins: Insn):
     m, ops = ins.mnem, ins.ops
     if not ops or m == 's_waitcnt':
         return
-    defs = regs(ops[0]) if not _NODEF.match(m) or m.startswith('v_cmp') else []
+    defs = regs(ops[0]) if (not _NODEF.match(m) or m.startswith('v_cmp')) and ins.kind != 'lds_dma' else []
     for r in defs:
         st.pin.pop(r, None)
     if ins.line in st.pin_at:
@@ -698,6 +702,11 @@ def _step(st: State, ins: Insn, prices: Prices, scratch_rsrc, barrier_drain, blo
             st.cdep[block] = vmax(st.cdep.get(block, ZERO), v)
         return
     if m in ('s_branch', 's_endpgm', 's_nop', 's_setpc_b64') or m.startswith(('s_set_inst', 's_inst_prefetch')):
+        return
+    if kind == 'lds_dma':                   # a global hop whose result lands in LDS, not in a register
+        v = hop(vmax(st.get([r for o in ops for r in regs(o)]), st.ctrl), ins, 'coherent' if ins.coherent else 'plain', prices)
+        st.lds = vmax(st.lds, v)
+        st.pending.append(('load', v))
         return
     is_scratch_buf = scratch_rsrc is not None and m.startswith(('buffer_load', 'buffer_store')) and len(ops) >= 3 and ops[2] == scratch_rsrc
     if kind == 'scratch_store' or (is_scratch_buf and m.startswith('buffer_store')):
