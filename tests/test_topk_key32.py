@@ -141,7 +141,7 @@ def _guarded_by(src: str, i: int, macro: str) -> bool:
 
 def test_switch_guards_every_key32_line():
     """With the switch off, the preprocessor removes every new line: the off build is the old source."""
-    for path, needle in (("etx/ops/topk.py", "etx_topk_key32("), ("etx/ops/gemv.py", "etx_topk_key32_lds(")):
+    for path, needle in (("etx/ops/topk.py", "etx_topk_key32("), ("etx/ops/gemv.py", "etx_topk_key32(p, E, K, renorm != 0")):
         src = (ROOT / path).read_text()
         assert _guarded_by(src, src.index(needle), "ETX_TOPK_KEY32")
     blk = _key32_block()
