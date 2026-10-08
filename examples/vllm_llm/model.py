@@ -47,6 +47,7 @@ from etx.ir import Graph, Resource  # noqa: E402
 from examples.llm.model import load_dims  # noqa: E402
 from etx.importer.spec import launch_for, validate_wvsplitk, grid_for, OPERATORS
 from examples.vllm_llm import folds  # noqa: E402
+from etx.codegen import manifest  # noqa: E402
 
 # ETX_VL_CU: workgroups a DSL dense phase spreads over (one task per workgroup). 304 = every CU, which is what
 # vLLM's wvSplitK uses, but hw_bench stream (2026-10-01) shows 304 is oversubscribed: at the gate_up shape the
@@ -76,6 +77,7 @@ PART = OPERATORS["attn_mfma4_g4"].constants["PART"]                    # paged a
 # correct value at MAXLEN 1072, 128 only adds early-exiting tasks, 512 is incorrect. Not a tuning knob
 # (results_2026-10-01/round11/FINDING.md).
 THREADS = 1024                # megakernel workgroup = the largest imported block (wvSplitK 64 x 16)
+LDS_BUDGET = 64 * 1024        # LDS per workgroup at one workgroup per CU (etx/machine/arch/gfx942.yaml lds_kb)
 MAXLEN = int(os.environ.get("ETX_VL_MAXLEN", "1072"))    # vLLM's max_model_len for the benchmark (prompt + 32 + 16)
 # ETX_VL_PIN=1: the small launches between qkv and o_proj (q/k norm, rope, cache, attention, reduce) all run on
 # XCD 0, so the events between them are XCD-local (a wait on L2 of one XCD) instead of device-wide
@@ -428,6 +430,11 @@ def build() -> Graph:
     g.codegen["nb"] = REQUESTS if BATCH else 1
     g.codegen["requests"] = REQUESTS
     g.codegen["uc"] = os.environ.get("ETX_VL_UC", "0") == "1"
+    # The variant of each phase, published through the manifest (plan_data.h; docs/SEC7-interface-fix.md). The host
+    # compares every plan instance with it and derives nothing itself. Until the planner of section 6.2 lands, the
+    # selection is the one instances() made above, so the published value equals today's choice by construction.
+    g.codegen[manifest.SELECTION] = manifest.selection_of(((i["role"], i["layer"], i["export"]) for i in base),
+                                                          {"threads": THREADS, "vgpr": res.vgpr, "lds": LDS_BUDGET})
     g.tensor("impargs", (total,), role="weight", bytes_per_elem=1)
     g.tensor("vl", (1,), role="weight", bytes_per_elem=8)         # placeholder: the native tiles read __constant__ params
     adapters = os.environ.get("ETX_VL_ADAPTERS", str(HERE / "build" / "imp_tiles.hip"))
