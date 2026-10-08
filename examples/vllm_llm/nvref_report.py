@@ -245,10 +245,12 @@ def report(directory: Path):
     print("DELTA r1..r5 (ETX fused - vLLM, same round) " + ", ".join(f"{d:+.3f}" for d in deltas)
           + f" median={median(deltas):+.3f} spread={max(deltas) - min(deltas):.3f} ms")
     spread = max(deltas) - min(deltas)
-    if abs(median(deltas)) < spread or spread > 0.050 + 1e-12:
-        print(f"RESOLUTION: paired delta spread {spread:.3f} ms > threshold "
-              f"(|median|={abs(median(deltas)):.3f} ms or 0.050 ms); "
-              "verdict is unresolved by the paired benchmark (该判决在配对基准下不足以分辨)")
+    med_abs = abs(median(deltas))
+    unresolved = med_abs < spread or spread > 0.050 + 1e-12
+    if unresolved:
+        ratio = f"{med_abs / spread:.1f}x the spread" if spread else "spread is zero"
+        print(f"RESOLUTION: paired delta spread {spread:.3f} ms against a 0.050 ms threshold; "
+              f"|median|={med_abs:.3f} ms is {ratio}")
     if fusion_unavailable is None:
         gains = [(a - b) / a for a, b in zip(u, f)]
         rule = fusion_verdict(gains)
@@ -264,6 +266,9 @@ def report(directory: Path):
         print(f"HOST-EXCESS unavailable ({fusion_unavailable})")
     print(f"IMPORT-CHECK {imported}")
     result = verdict(deltas)
+    if unresolved and med_abs <= spread:
+        # The sign of the paired delta is not stable: no verdict can rest on it.
+        result = "INSUFFICIENT"
     print(f"VERDICT {result} | import-check {imported} | image {digest} | HF_REV {revision} | machine {machine}")
     if len(aiter) == 3:
         row("vLLM 0.27.1 AITER", hardware, "host wall, (t32-t1)/31", aiter)

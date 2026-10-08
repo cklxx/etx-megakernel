@@ -144,7 +144,7 @@ valid runs; partial statistics are not printed.
 | third party eliovp.com 2025-09-26, not reproduced | Paiton, ROCm 6.4.1 | MI300X | unknown | - | - | 5.28 | - | 189.4 | not checked |
 | third party eliovp.com 2025-09-26, not reproduced | vLLM 0.10.0        | MI300X | unknown | - | - | 6.16 | - | 162.2 | not checked |
 DELTA r1..r5 (ETX fused - vLLM, same round) <five deltas> median spread
-RESOLUTION: paired delta spread X ms > threshold ... [only when unresolved]
+RESOLUTION: paired delta spread X ms against a 0.050 ms threshold; |median|=... ms is ...x the spread [only when unresolved]
 FUSION (unfused - fused) median=... ms gain median=... spread=... rule met|not met
 HOST-EXCESS fused median=... unfused median=... excess(fused-unfused)=... ms
 IMPORT-CHECK OK|NOT MET (<reason>)|n/a
@@ -169,21 +169,11 @@ their tok/s includes prefill or TTFT (their methodology page could not be fetche
 - The primary verdict uses only fused ETX versus vLLM; unavailable fusion evidence does not change it.
 - **LEAD:** all five Δ_R < 0, median <= -0.050. **LOSS:** all five > 0, median >= +0.050. **TIE:** |median| < 0.050.
   **INSUFFICIENT:** otherwise. If AITER's median is > 0.050 below default, recompute against AITER and print both.
-- Print the five paired deltas and their spread (max minus min). If |median delta| < spread or spread > 0.050 ms,
-  print `RESOLUTION: paired delta spread X ms > threshold`, explain that the paired benchmark cannot resolve
-  this verdict, and retain the pre-registered verdict label with that qualification.
-- Fusion uses the `pairs.py:33-34,138-143` rule on same-round relative gains `(unfused - fused) / unfused`,
-  using 31-step host-wall means: every gain positive, median gain strictly > 2%, and median > 2 x gain spread.
-  Print gain median, spread and `FUSION ... rule met|not met`; a positive millisecond median alone is insufficient.
-- Prediction (estimate, across machines): Δ about -0.3 ms (ETX 4.548, `ab2_all_x.log:8`; vLLM 4.836, `vllm_aiter0…json:6`).
-- LEAD: write `docs/NVREF-<date>.md`, index the set in `docs/DATA.md`, update `README.md:48-50`. NVIDIA stays open;
-  the cheapest next step is `vllm_bench.py` with the same golden on one H200, which needs no CUDA port of ETX
-  (`docs/ROADMAP.md:228`). Provider and cost unknown.
-- TIE (the null result): the device-basis lead does not survive host time, and ETX only matches vLLM. Next: the
-  per-step host work (`VLLM-LADDER:62-66`), ranked by `HOSTPROF`. LOSS or INSUFFICIENT: the same, plus a check of the
-  machine record; no claim. A failed required gate, actual differing import launch, or < 5 valid runs in either
-  required arm: NOT-COMPLETE, no number. An unavailable import check only marks NOT MET.
-  An unavailable unfused arm only removes the fusion claim; it does not invalidate the system comparison.
+- Print the five paired deltas and their spread (max minus min).
+  A paired delta spread above 0.050 ms, or a median inside that spread, prints the `RESOLUTION` line above with
+  the ratio of the median to the spread. When the median is no larger than the spread the sign of the paired
+  difference is not stable, so the verdict becomes `INSUFFICIENT` whatever the median says; otherwise the
+  verdict stands and the ratio tells the reader how far it is from the noise.
 
 ## 8. Before provisioning (CPU), then the session
 P1 `.venv/bin/python -m pytest -q`, including `tests/test_nvref_report.py` (synthetic pass, 31/32 refusal, missing run,

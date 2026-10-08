@@ -286,14 +286,21 @@ def test_optional_failure_never_refuses(session, capsys, name, failure):
     assert "VERDICT LEAD" in out and f"{name} unavailable (" in out
 
 
-@pytest.mark.parametrize("values", [[4.801, 5.002, 5.003, 5.004, 5.005], [4.981, 4.992, 5.003, 5.014, 5.025]])
-def test_resolution(session, capsys, values):
+@pytest.mark.parametrize("values, expected", [
+    # Deltas -0.203, -0.053, -0.203, -0.053, -0.203 against a ~5.003 ms baseline: spread 0.150 ms, but every
+    # round has the same sign and the median (-0.203) sits outside the spread, so the verdict stands.
+    ([4.80, 4.95, 4.80, 4.95, 4.80], "LEAD"),
+    # Median (-0.053) inside the spread (0.150): the sign is not stable, so no verdict may rest on it.
+    ([4.80, 4.95, 4.80, 4.95, 4.95], "INSUFFICIENT"),
+])
+def test_resolution(session, capsys, values, expected):
     for r, value in enumerate(values, 1):
         write(session, f"etx_r{r}", etx(value))
     assert nr.main([str(session)]) == 0
     out = capsys.readouterr().out
-    assert "RESOLUTION: paired delta spread" in out
-    assert "该判决在配对基准下不足以分辨" in out
+    assert "RESOLUTION: paired delta spread" in out and "0.050 ms threshold" in out
+    assert f"VERDICT {expected} |" in out
+
 
 
 @pytest.mark.parametrize("unfused, expected", [([5.2]*5, "met"), ([4.85]*5, "not met"), ([5., 5., 5., 5., 5.4], "not met")])
