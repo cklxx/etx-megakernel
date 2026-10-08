@@ -182,7 +182,9 @@ The levers have this order. The order changed on 2026-10-08: prefetch moved from
 5. The start delay, 0.41 ms. `docs/BUDGET-2026-10-01.md` assigns most of it to the hardware dispatcher.
 6. The handoffs, 0.43 ms. Each edge is near the protocol floor. Only fewer edges reduce this cost.
 
-The theoretical prefetch bound alone is larger than lever 1 in three of four combinations. The rule above compares the full gain without prefetch. Thus lever 1 stays first.
+The theoretical prefetch bound alone is larger than lever 1 in three of four combinations. The comparison of 2.24 ms with 1.40 ms sets levers 1, 2, 4 and 5 together against lever 3. It does not compare lever 1 with lever 3.
+Lever 1 stays first because of the measured prefetch results in items 2 to 5 below, not because of the floors. Those results put the realistic prefetch gain at about 0.22 ms or less.
+Both 1.14 ms and 1.40 ms are upper bounds. The floors price LDS steps, VALU work and MFMA issue at zero. Most of the topk, attn and reduce gap is this kind of work. See "Sources of the latency body excess" in `docs/FLOORS-2026-10-08.md`.
 
 Lever 1 has these facts:
 1. Each latency body is 2.0 to 6.9 times its ISA chain. topk is 6.9 times and reduce is 2.0 times.
@@ -203,6 +205,7 @@ Lever 3 has these facts. Section "Realistic gain from prefetch" of `docs/FLOORS-
 Before new work on lever 3, explain the TOUCH result and the BAR2 result. `docs/RESULTS-2026-10-01.md:97-98` gives ARGPF as neutral and BAR2 as 0.095 ms slower. BAR2 moved the next-task descriptor load after the event wait, which adds one round trip before each body (hypothesis, see FLOORS). Occupancy and LDS bank conflicts do not change, so BAR2 is not evidence against LDS staging.
 
 The o_proj stage into LDS predicts 0.117 to 0.171 ms. This gain is small against the 3.6 ms excess. Appendix A keeps it at low priority.
+That value is an upper bound. In round11, TOUCH already loads 61,440 of the 65,536 B of each o_proj slice into L2 during the wait. The true gain can be below the 0.030 ms KEEP threshold. See "Review, 2026-10-08" in `docs/STAGE-oproj-2026-10-07.md`.
 
 ## 4. Current state
 
@@ -430,5 +433,5 @@ DeepSeek-V2-Lite stays on `examples/dsv2lite`.
 Priority: low. Section 3 gives the reason.
 
 `etx/tools/stage_sim.py` estimates on CPU the gain from a stage of o_proj weights into free LDS during the attention chain.
-The estimate is 0.117 to 0.171 ms per token on Qwen3-30B-A3B. Details: `docs/STAGE-oproj-2026-10-07.md`.
+The estimate is 0.117 to 0.171 ms per token on Qwen3-30B-A3B. It is an upper bound that leaves out TOUCH. Details and the review: `docs/STAGE-oproj-2026-10-07.md`.
 Do not start GPU work on this lever before the work of section 3.

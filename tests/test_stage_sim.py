@@ -90,5 +90,5 @@ def test_report_serializes_and_lists_unknowns():
     out = report()
     json.dumps(out)
     names = {u['name'] for u in out['unknowns']}
-    assert {'current_group_segment', 'lds_dma_rate', 'body_split', 'kv_interference'} <= names
+    assert {'current_group_segment', 'lds_dma_rate', 'body_split', 'kv_interference', 'touch_overlap'} <= names
     assert out['evidence'].startswith('CPU simulation only')
