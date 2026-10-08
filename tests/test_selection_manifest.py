@@ -7,6 +7,7 @@ must not change when the selection equals the current choice.
 """
 import importlib
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -83,10 +84,18 @@ def _published(header: str) -> dict:
     return {p: (e, manifest.SELECTION_KINDS[int(k)]) for p, e, k in zip(arr("etx_sel_phase"), arr("etx_sel_export"), kinds)}
 
 
-def _compiler():
-    cxx = shutil.which("c++")
-    assert cxx, "CPU acceptance requires a C++ compiler"
-    return cxx
+def _compiler(tmp_path):
+    """First host compiler that builds a small C++17 program. A compiler on PATH can lack its standard
+    headers (a stale macOS CommandLineTools install), so each candidate is probed, not just found."""
+    llvm = Path(os.environ.get("ETX_LLVM", "/opt/homebrew/opt/llvm/bin"))
+    probe = tmp_path / "probe.cpp"
+    probe.write_text("#include <cstdio>\nint main() { return 0; }\n")
+    for cxx in (os.environ.get("CXX"), "g++", "c++", "clang++", str(llvm / "clang++")):
+        path = cxx and shutil.which(cxx)
+        if path and subprocess.run([path, "-std=c++17", str(probe), "-o", str(tmp_path / "probe")],
+                                   capture_output=True).returncode == 0:
+            return path
+    pytest.skip("needs a host C++17 compiler with standard headers (set CXX)")
 
 
 def _driver(tmp_path, header: str, *defines):
@@ -95,7 +104,7 @@ def _driver(tmp_path, header: str, *defines):
     (d / "plan_data.h").write_text(header)
     (d / "main.cpp").write_text(DRIVER)
     exe = d / "check"
-    r = subprocess.run([_compiler(), "-std=c++17", "-O0", f"-I{INC}", f"-I{d}", *defines, str(d / "main.cpp"), "-o", str(exe)],
+    r = subprocess.run([_compiler(tmp_path), "-std=c++17", "-O0", f"-I{INC}", f"-I{d}", *defines, str(d / "main.cpp"), "-o", str(exe)],
                        capture_output=True, text=True)
     return exe, r
 
