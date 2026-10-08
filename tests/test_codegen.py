@@ -56,3 +56,37 @@ def test_generated_hip_compiles(tmp_path):
     src.write_text(emit_kernel(plan))
     inc = ROOT / "etx" / "runtime" / "include"
     subprocess.run(["hipcc", "--offload-arch=gfx942", "-fgpu-rdc", "-fsyntax-only", f"-I{inc}", f"-I{tmp_path}", str(src)], check=True)
+
+
+def test_arg_table_does_not_survive_its_plan():
+    """The argument table was cached in a module dict keyed by id(plan). CPython reuses the id of a freed plan, so a
+    new plan with other tensors got the dead plan's table (KeyError 'impargs' when test_selection_manifest.py ran
+    before test_feature_manifest.py). Plans with different tensors are created and freed in turn; each must get its
+    own table."""
+    import gc
+
+    from etx.codegen.kernel import _arg_table
+    from etx.codegen.plan_header import emit_plan_header
+    from etx.frontends import hip_link
+    from etx.ir import Graph, Resource
+
+    def plan_with(tensor):
+        g = Graph("arg_" + tensor)
+        g.tensor(tensor, (64,), role="activation", bytes_per_elem=2)
+        g.etensor("E", (1,), wait_count=1)
+        g.call_device("a", (1,), hip_link("a.hip", "etx_tile_a"), resource=Resource(threads=256), args=[tensor],
+                      out_edges={"E": "i->(0)"}, domain_map="i->(0)", duration_us=1.0)
+        return compile_graph(g, "gfx942", {}, {})
+
+    for n in range(40):
+        name = "impargs" if n % 2 else f"t{n}"
+        p = plan_with(name)
+        assert _arg_table(p) == {name: 0}
+        assert f'"{name}"' in emit_plan_header(p)
+        del p
+        gc.collect()
+    p = plan_with("x")
+    p.graph.tensor("y", (8,), role="activation", bytes_per_elem=2)     # tensors added after the first lookup
+    _arg_table(p)
+    p.graph.tensor("z", (8,), role="activation", bytes_per_elem=2)
+    assert _arg_table(p) == {"x": 0, "y": 1, "z": 2}

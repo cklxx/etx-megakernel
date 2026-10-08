@@ -33,17 +33,18 @@ def _runtime_ptrs(plan: Plan, g: TaskGrid) -> dict[str, str]:
     return ptrs
 
 
-_ARG_CACHE: dict[int, dict[str, int]] = {}
-
-
 def _arg_table(plan: Plan) -> dict[str, int]:
-    key = id(plan)
-    if key not in _ARG_CACHE:
-        names: list[str] = []
-        for t in plan.graph.tensors:
-            names.append(t)
-        _ARG_CACHE[key] = {n: i for i, n in enumerate(names)}
-    return _ARG_CACHE[key]
+    """Tensor name -> argument index, in graph order. Cached on the plan object itself.
+
+    The cache was a module dict keyed by id(plan). CPython reuses the id of a freed object, so a new plan could get
+    the table of a dead plan with other tensors (tests/test_selection_manifest.py, then test_feature_manifest.py:
+    KeyError 'impargs'). The cache now lives and dies with its plan, and it is rebuilt if the tensors change."""
+    names = tuple(plan.graph.tensors)
+    cached = plan.__dict__.get("_etx_arg_table")
+    if cached is None or cached[0] != names:
+        cached = (names, {n: i for i, n in enumerate(names)})
+        plan.__dict__["_etx_arg_table"] = cached
+    return cached[1]
 
 
 def _arg_index(plan: Plan, tensor: str) -> int:
