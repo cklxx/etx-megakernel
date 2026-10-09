@@ -22,10 +22,13 @@ IMAGE = 'vllm/vllm-openai-rocm@sha256:bb44b39aea26798cce43030a98bf48efd0322ca714
 GROUP3 = ['V2 model runner', 'AITER MoE dispatch policy', 'AITER fmoe tuning',
           'block-size 32', 'compile_sizes=[1] + max_autotune', 'skinny GEMM off',
           'shuffle KV cache', 'stream-interval >1']
-PREDICTIONS = 'S1 -0.05…-0.25; S5 -0.1…-0.4; S7/S8 within ±0.1 ms [E]. LEAD survives if F gains <0.40 ms on S0.'
+SCREEN_ARMS = ('S1', 'S3', 'S4f', 'S5f', 'S6f')
+PREDICTIONS = 'S1 -0.05…-0.25; S5f/S6f -0.1…-0.4; S4f worse than S6f; triplets |block−poll| ≤0.010 ms [E]. LEAD survives if F gains <0.30 ms on S3. S9 dead-by-ray (session-iv3fdc3m/docker_pull.log:8).'
 
 
 def config(arm):
+    original = arm
+    arm = arm[:-1] if arm in ('S4f', 'S5f', 'S6f') else arm
     env, kw, flags = {}, {}, []
     if arm in ('S4', 'S5', 'S6'):
         env['VLLM_ROCM_USE_AITER'] = '1'
@@ -41,7 +44,9 @@ def config(arm):
         env['VLLM_ENABLE_V1_MULTIPROCESSING'] = '0'
     if arm == 'S8':
         flags = ['--no-detok']
-    return dict(id=arm, env=env, kw=kw, flags=flags, components=[arm])
+    if original != arm:
+        kw['compilation_config'] = {'use_inductor_graph_partition': True}
+    return dict(id=original, env=env, kw=kw, flags=flags, components=[original])
 
 
 def proof(text, cfg):
@@ -57,9 +62,11 @@ def proof(text, cfg):
     backend = cfg['kw'].get('attention_backend')
     if backend and f'Using {backend} backend (selected via --attention-backend)' not in text:
         return f'backend {backend}'
-    components = cfg['components']
+    components = [c[:-1] if c in ('S4f', 'S5f', 'S6f') else c for c in cfg['components']]
     if any(c in components for c in ('S4', 'S5', 'S6')):
-        for pattern in (r'Enabled custom fusions: [^\n]*qk_norm_rope_kvcache',
+        if 'Disabling fuse_qk_norm_rope_kvcache' in text:
+            return 'Disabling fuse_qk_norm_rope_kvcache'
+        for pattern in (r'Enabled custom fusions: [^\r\n]*qk_norm_rope_kvcache',
                         r'QK-Norm\+RoPE\+KVCache fusion: replaced 48 pattern\(s\)',
                         r'Capturing CUDA graphs \(decode, FULL\)'):
             if not re.search(pattern, text):
@@ -110,6 +117,11 @@ def not_applied(directory, stage):
         return path.read_text().splitlines() if path.exists() else []
     excluded = {}
     if stage == 'a':
+        for line in lines('screen_budget'):
+            match = re.fullmatch(r'SCREEN (S3|S4f|S5f) SKIPPED budget', line)
+            if match:
+                arm = match[1]
+                excluded[arm] = f'NOT-APPLIED {arm}: budget admission'
         if 'MOE-TUNE ray=no' in lines('docker_pull'):
             excluded['S9'] = 'NOT-APPLIED S9: ray missing in image'
         for line in lines('moe_budget'):
@@ -119,13 +131,13 @@ def not_applied(directory, stage):
     if stage == 'b':
         for line in lines('b_budget'):
             if line.startswith('STAGE-B SKIPPED budget '):
-                excluded['C'] = f'NOT-APPLIED C: {line}'
+                excluded['C2'] = f'NOT-APPLIED C2: {line}'
     return excluded
 
 
 def screen(directory, stage='a', candidates=None):
     session = Session(directory)
-    candidates = candidates or [config(f'S{i}') for i in range(1, 10)]
+    candidates = candidates or [config(arm) for arm in SCREEN_ARMS]
     result = dict(winners={}, excluded=not_applied(directory, stage), tested=['S0'], brackets=[])
     try:
         result['brackets'] = [[observation(session.read(f'{stage}_r{r}_S0_{end}'), config('S0'))
@@ -138,6 +150,13 @@ def screen(directory, stage='a', candidates=None):
         if arm in result['excluded']:
             continue
         try:
+            resolved = []
+            for rnd in (1, 2):
+                path = directory / f'{stage}_r{rnd}_{arm}.config.json'
+                resolved.append(json.loads(path.read_text()) if path.exists() else cfg)
+            if resolved[0] != resolved[1]:
+                raise Refusal(f'NOT-APPLIED {arm}: configuration changed between rounds')
+            cfg = resolved[0]
             values = [observation(session.read(f'{stage}_r{r}_{arm}'), cfg) for r in (1, 2)]
             state, deltas = screening(values, result['brackets'])
             result['tested'].append(arm)
@@ -151,11 +170,11 @@ def screen(directory, stage='a', candidates=None):
 
 
 def combination(winners):
-    axes = [('S1', 'S9'), ('S2', 'S3', 'S4', 'S5', 'S6'), ('S7', 'S8')]
+    axes = [('S1', 'S9'), ('S2', 'S3', 'S4', 'S5', 'S6', 'S4f', 'S5f', 'S6f'), ('S7', 'S8')]
     chosen = [min((winners[a] for a in axis if a in winners), key=lambda w: w['gain'], default=None) for axis in axes]
     if sum(c is not None for c in chosen) < 2:
         return None
-    cfg = dict(id='C', env={}, kw={}, flags=[], components=[])
+    cfg = dict(id='C2' if any(a in winners for a in SCREEN_ARMS[1:]) else 'C', env={}, kw={}, flags=[], components=[])
     # MoE last: its tuned Triton path overrides S4's AITER MoE.
     for c in (chosen[1], chosen[2], chosen[0]):
         if c:
@@ -196,6 +215,10 @@ def report(directory):
     cfg = selected['final']
     certificate = cert.validate(directory, (0, 1040))
     default = [observation(session.read(f'S0_r{r}'), config('S0')) for r in range(1, 6)]
+    for rnd in range(1, 6):
+        path = directory / f'F_r{rnd}.config.json'
+        if path.exists() and json.loads(path.read_text()) != cfg:
+            raise Refusal('NOT-COMPLETE: finalist configuration changed')
     final = default if cfg['id'] == 'S0' else [observation(session.read(f'F_r{r}'), cfg) for r in range(1, 6)]
     rid = reference(default, final, cfg['id'])
     rv = default if rid == 'S0' else final

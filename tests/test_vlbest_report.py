@@ -221,3 +221,134 @@ def test_report_spread_diagnostic_roundtrip(tmp_path, capsys):
     assert 'SPREAD-BOUND fused−R: False' in output
     assert '→ LEAD' in output
     assert 'FULL-CLAIM ELIGIBLE' in output
+
+
+@pytest.mark.parametrize('arm', ['S4f', 'S5f', 'S6f'])
+def test_fixed_fusion_positive(arm):
+    cfg = r.config(arm)
+    assert cfg['kw']['compilation_config'] == {'use_inductor_graph_partition': True}
+    base = r.config(arm[:-1])
+    assert cfg['env'] == base['env'] and cfg['flags'] == base['flags']
+    assert cfg['kw']['attention_backend'] == base['kw']['attention_backend']
+    assert r.observation(log(arm), cfg) == 5
+
+
+def test_captured_disabled_fusion():
+    captured = Path(__file__).parent / 'fixtures/vlbest/a_r1_S4.log'
+    text = captured.read_text()
+    assert 'Disabling fuse_qk_norm_rope_kvcache' in text
+    assert r.proof(text, r.config('S4f')) == 'Disabling fuse_qk_norm_rope_kvcache'
+    with pytest.raises(Refusal, match='NOT-APPLIED'):
+        r.observation(text, r.config('S4f'))
+
+
+def test_fusion_banner_newline_regression():
+    # The letter n in rms_norm kills [^\\n]*, but is legal on the banner line.
+    text = log('S4f').replace('fusions: qk_', 'fusions: rms_norm, qk_')
+    assert r.proof(text, r.config('S4f')) is None
+    assert r.proof(text.replace('rms_norm, qk_', 'rms_norm,\nqk_'), r.config('S4f')) is not None
+
+
+@pytest.mark.parametrize('arm', ['S4f', 'S5f', 'S6f'])
+@pytest.mark.parametrize('remove', [
+    'Enabled custom fusions: qk_norm_rope_kvcache',
+    'QK-Norm+RoPE+KVCache fusion: replaced 48 pattern(s)',
+    'Capturing CUDA graphs (decode, FULL)',
+])
+def test_fixed_missing_fusion_proof(arm, remove):
+    with pytest.raises(Refusal, match='NOT-APPLIED'):
+        r.observation(log(arm).replace(remove, ''), r.config(arm))
+
+
+@pytest.mark.parametrize('arm', ['S4f', 'S5f', 'S6f'])
+def test_fixed_disabling_warning_overrides_positive(arm):
+    assert r.proof(log(arm) + '\nDisabling fuse_qk_norm_rope_kvcache', r.config(arm)) is not None
+
+
+def test_c2_union():
+    cfg = r.combination({a: winner(a, -.1) for a in ('S1', 'S6f')})
+    assert cfg['id'] == 'C2'
+    assert set(cfg['components']) == {'S1', 'S6f'}
+    assert r.proof(log('C2', cfg=cfg), cfg) is None
+    assert r.proof(log('C2', cfg=cfg) + '\nDisabling fuse_qk_norm_rope_kvcache', cfg)
+
+
+def test_fusion_guard_mutations(monkeypatch):
+    import inspect
+    source = inspect.getsource(r.proof)
+    cases = [
+        ("if 'Disabling fuse_qk_norm_rope_kvcache' in text:", 'if False:',
+         lambda: test_fixed_disabling_warning_overrides_positive('S4f')),
+        (r'[^\r\n]*qk_norm_rope_kvcache', r'[^\\n]*qk_norm_rope_kvcache',
+         test_fusion_banner_newline_regression),
+    ]
+    for old, new, oracle in cases:
+        assert old in source
+        namespace = dict(r.__dict__)
+        exec(source.replace(old, new), namespace)
+        with monkeypatch.context() as patch:
+            patch.setattr(r, 'proof', namespace['proof'])
+            with pytest.raises(AssertionError):
+                oracle()
+
+
+def test_changed_round_configuration_refused(tmp_path, monkeypatch):
+    from tests.test_nvref_report import write
+    for rnd in (1, 2):
+        for end in ('open', 'close'):
+            write(tmp_path, f'a_r{rnd}_S0_{end}', log())
+        write(tmp_path, f'a_r{rnd}_S4f', log('S4f'))
+    cfg = r.config('S4f')
+    cfg['kw']['compilation_config'] = {'splitting_ops': []}
+    (tmp_path / 'a_r2_S4f.config.json').write_text(json.dumps(cfg))
+    result = r.screen(tmp_path, candidates=[r.config('S4f')])
+    assert 'configuration changed' in result['excluded']['S4f']
+    assert result['tested'] == ['S0']
+
+
+def test_changed_final_configuration_refused(tmp_path, capsys):
+    from tests.test_import_certificate import fixture_session
+    from tests.test_nvref_report import write
+    fixture_session(tmp_path)
+    (tmp_path / 'final.json').write_text(json.dumps(dict(final=r.config('S0'), search={})))
+    for rnd in range(1, 6):
+        write(tmp_path, f'S0_r{rnd}', log())
+    (tmp_path / 'F_r1.config.json').write_text(json.dumps(r.config('S4f')))
+    assert r.main([str(tmp_path)]) == 2
+    assert 'finalist configuration changed' in capsys.readouterr().out
+
+
+def test_configuration_guard_mutations(tmp_path, monkeypatch, capsys):
+    import inspect
+    for func, old, oracle in [
+        (r.screen, 'resolved[0] != resolved[1]',
+         lambda patch: test_changed_round_configuration_refused(tmp_path, patch)),
+        (r.report, "path.exists() and json.loads(path.read_text()) != cfg",
+         lambda patch: test_changed_final_configuration_refused(tmp_path, capsys)),
+    ]:
+        source = inspect.getsource(func)
+        assert old in source
+        namespace = dict(r.__dict__)
+        exec(source.replace(old, 'False'), namespace)
+        with monkeypatch.context() as patch:
+            patch.setattr(r, func.__name__, namespace[func.__name__])
+            with pytest.raises(AssertionError):
+                oracle(patch)
+
+
+def test_budget_omission_overrides_evidence(tmp_path, monkeypatch):
+    (tmp_path / 'screen_budget.log').write_text('SCREEN S4f SKIPPED budget\n')
+    monkeypatch.setattr(r.Session, 'read', lambda *a, **kw: 'valid')
+    monkeypatch.setattr(r, 'observation', lambda *a, **kw: 5)
+    result = r.screen(tmp_path, candidates=[r.config('S4f')])
+    assert result['tested'] == ['S0']
+    assert result['excluded']['S4f'] == 'NOT-APPLIED S4f: budget admission'
+
+
+def test_budget_omission_mutation(tmp_path, monkeypatch):
+    import inspect
+    namespace = dict(r.__dict__)
+    exec(inspect.getsource(r.not_applied).replace('if match:', 'if False:'), namespace)
+    monkeypatch.setattr(r, 'not_applied', namespace['not_applied'])
+    with pytest.raises(AssertionError):
+        test_budget_omission_overrides_evidence(tmp_path, monkeypatch)
