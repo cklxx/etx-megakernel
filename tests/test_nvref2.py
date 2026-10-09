@@ -27,6 +27,11 @@ def test_nvref2_only_primary_vllm_repeats_change():
     old_path = ROOT / "examples/sessions/nvref.py"
     new_path = ROOT / "examples/sessions/nvref2.py"
     old, new = old_path.read_bytes(), new_path.read_bytes()
+    # Keep the original byte-for-byte comparison on the complete existing prefix.
+    prefix, separator, tail = new.partition(b"\n# Optional model diagnostics")
+    assert separator and tail
+    new = prefix
+    # Even comments, deadlines and the optional AITER arm must stay unchanged.
     assert old.count(b"--repeats 1") == 1
     assert new.count(b"--repeats {1 if aiter else 5}") == 1
 
@@ -59,3 +64,20 @@ def test_nvref2_only_primary_vllm_repeats_change():
     assert without_module_docstring(new).replace(
         b"--repeats {1 if aiter else 5}", b"--repeats 1",
     ) == without_module_docstring(old)
+    # Evaluate the full follow-up too: every pre-existing job, including report,
+    # must remain identical to the prefix checked above. No GPU command is run.
+    namespace = {"__file__": str(new_path), "__name__": new_path.stem}
+    exec(compile(ast.parse(new_path.read_bytes()), str(new_path), "exec"), namespace)
+    all_jobs = namespace["JOBS"]
+    assert all_jobs[:-3] == following
+    assert following[-1]["name"] == "report"
+    diagnostics = all_jobs[-3:]
+    assert [j["name"] for j in diagnostics] == ["trace1", "floors_trace", "evx"]
+    for j, predecessor, lane in zip(
+        diagnostics, ("report", "trace1", "floors_trace"), ("gpu", "cpu", "gpu")
+    ):
+        assert j["after"] == predecessor
+        assert j["timeout"] == 300
+        assert j.get("lane", "gpu") == lane
+        if lane == "gpu":
+            assert j["gpu"] == 0

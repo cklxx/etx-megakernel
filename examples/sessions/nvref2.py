@@ -139,3 +139,14 @@ job(name="report", lane="cpu", after_any=list(finished), timeout=120,
     cmd=f".venv/bin/python -m examples.vllm_llm.nvref_report {S} && "
         f"{{ .venv/bin/python -m examples.vllm_llm.pairs {' '.join(pair_logs)} --pairs 5 --basis wall "
         f"> {S}/fusion_pairs.txt; sed '/^VERDICT/,$d' {S}/fusion_pairs.txt; }}", summary=[r"."])
+
+# Optional model diagnostics come strictly after the pre-registered report.
+# The analysis command traces fused execution; --unfused cannot emit phase stamps.
+job(name="trace1", gpu=0, after="report", timeout=300,
+    cmd=f"ETX_TRACE=1 ETX_TRACE_RAW={S}/tr_nvref2.bin stdbuf -oL {run(extra='--repeat 1')}")
+job(name="floors_trace", lane="cpu", after="trace1", timeout=300,
+    cmd=f".venv/bin/python -m etx.tools.floors --trace {S}/b_all/plan.json {S}/tr_nvref2.bin "
+        f"> {S}/floors_nvref2.txt && cat {S}/floors_nvref2.txt")
+job(name="evx", gpu=0, after="floors_trace", timeout=300,
+    cmd=f"hipcc -O3 -std=c++17 --offload-arch=gfx942 bench/hw/hw_bench.hip -o {S}/hw_bench && "
+        f"stdbuf -oL {S}/hw_bench evx")
