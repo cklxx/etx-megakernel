@@ -119,7 +119,7 @@ only a same-session win against the fastest vLLM control claims system competiti
 
 ## 5. Local preflight, no GPU
 
-1. `.venv/bin/python -m pytest -q`, `bash -n` on session scripts, all 12 builds of
+1. `.venv/bin/python -m pytest -q`, `bash -n` on session scripts, all 16 builds of
    `examples/vllm_llm/local_matrix.sh`, local gfx942 compile with `ETX_DEVLIBS`.
 2. `examples/vllm_llm/rocm_build_check.sh qwen3-30b-a3b` for `qknr` and the transformed build.
    VGPR and spill counts must not exceed today's `qknr` (8 spills, LDS 41448 B, `round24/FINDING.md:13`).

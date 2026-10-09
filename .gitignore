@@ -5,7 +5,7 @@ __pycache__/
 .pytest_cache/
 .wrangler/
 *.egg-info/
-results_2026-*/
+results_*/
 .claude/
 
 .venv
