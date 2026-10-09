@@ -148,3 +148,27 @@ def test_job_environment_uses_actual_logdir(tmp_path, monkeypatch, reuse, lane):
         assert (logdir / 'status.json').read_text() == '[]'
     else:
         assert runner.logdir == logdir
+
+
+def test_session_hard_stop_kills_all_lanes_and_skips_tail(tmp_path):
+    jobs = [gj.Job(name=name, cmd='echo started; sleep 30', lane=lane, cwd=str(tmp_path))
+            for name, lane in [('cpu', 'cpu'), ('gpu', 'gpu')]]
+    jobs.append(gj.Job(name='tail', cmd='echo must-not-run', after_any=['cpu', 'gpu']))
+    runner = gj.Runner(jobs, [0], 1, tmp_path, poll_s=.01, out=io.StringIO(), max_seconds=.15)
+    start = time.monotonic()
+    assert runner.run() == 1
+    assert time.monotonic() - start < 3
+    assert [j.status for j in jobs] == ['timeout', 'timeout', 'skipped']
+    assert all(j.note == 'session hard stop' for j in jobs)
+    assert all(j.proc.poll() is not None for j in jobs[:2])
+    assert not (tmp_path / 'tail.log').exists()
+    assert [j['status'] for j in json.loads((tmp_path / 'status.json').read_text())] == [
+        'timeout', 'timeout', 'skipped']
+
+
+@pytest.mark.parametrize('limit', ['0', '-1', "float('inf')", "float('nan')", "'2400'"])
+def test_invalid_session_budget_refused(tmp_path, limit):
+    path = tmp_path / 'session.py'
+    path.write_text(f'JOBS = []\nMAX_SESSION_SECONDS = {limit}\n')
+    with pytest.raises(SystemExit, match='finite and positive'):
+        gj.load_jobs(path)

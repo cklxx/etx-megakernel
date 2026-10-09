@@ -16,6 +16,11 @@ A session is a Python file that defines JOBS, a list of dicts:
   summary   regexes; matching log lines are printed when the job ends (the log keeps everything)
   quiet_s   warn when the job has printed nothing for this long (default 180)
 
+A session may define MAX_SESSION_SECONDS for an aggregate hard stop from runner
+start, including setup. At expiry all running process groups are killed and
+pending jobs skipped; the runner exits nonzero. VM deletion remains the operator's
+responsibility; start earlier to respect an allocation-time budget.
+
 Every GPU job gets HIP_VISIBLE_DEVICES=$GPU, so a single-GPU program runs on the lane's GPU; a docker command passes
 `-e HIP_VISIBLE_DEVICES=$GPU` itself. Order the list by priority (microbenchmarks and correctness first, captures last):
 a free lane takes the first ready job in list order.
@@ -34,6 +39,7 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import json
+import math
 import os
 import re
 import signal
@@ -71,7 +77,7 @@ class Job:
     note: str = ""
 
 
-def load_jobs(path: str | Path) -> list[Job]:
+def load_session(path: str | Path) -> tuple[list[Job], float | None]:
     spec = importlib.util.spec_from_file_location("etx_session", path)
     mod = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
@@ -96,7 +102,14 @@ def load_jobs(path: str | Path) -> list[Job]:
                 raise SystemExit(f"job {j.name}: unknown dependency {dep!r}")
         if j.lane not in ("gpu", "cpu"):
             raise SystemExit(f"job {j.name}: lane must be gpu or cpu")
-    return jobs
+    limit = getattr(mod, "MAX_SESSION_SECONDS", None)
+    if limit is not None and (not isinstance(limit, (int, float)) or not math.isfinite(limit) or limit <= 0):
+        raise SystemExit("MAX_SESSION_SECONDS must be finite and positive")
+    return jobs, limit
+
+
+def load_jobs(path: str | Path) -> list[Job]:
+    return load_session(path)[0]
 
 
 class _Tee:
@@ -115,7 +128,7 @@ class _Tee:
 
 class Runner:
     def __init__(self, jobs: list[Job], gpus: list[int], cpu_slots: int, logdir: Path, progress_s: float = 60.0,
-                 out=None, poll_s: float = 1.0):
+                 out=None, poll_s: float = 1.0, max_seconds: float | None = None):
         self.jobs = jobs
         self.gpus = gpus
         self.cpu_slots = cpu_slots
@@ -124,6 +137,7 @@ class Runner:
         self.out = out or sys.stdout
         self.poll_s = poll_s
         self.t0 = time.time()
+        self.deadline = time.monotonic() + max_seconds if max_seconds is not None else None
         self.by_name = {j.name: j for j in jobs}
 
     # -------------------------------------------------------------- helpers
@@ -161,6 +175,8 @@ class Runner:
             env["GPU"] = str(gpu)
         env["ETX_SESS_LOGDIR"] = str(self.logdir.resolve())
         env["PYTHONUNBUFFERED"] = "1"
+        if self.deadline is not None:
+            env["ETX_SESS_REMAINING_SECONDS"] = str(max(0, int(self.deadline - time.monotonic())))
         cwd = os.path.expanduser(j.cwd)
         fh = open(j.log, "w")
         fh.write(f"# job {j.name} gpu={gpu} cwd={cwd}\n# {j.cmd}\n")
@@ -191,7 +207,8 @@ class Runner:
         try:
             os.killpg(j.proc.pid, signal.SIGTERM)
             try:
-                j.proc.wait(10)
+                grace = min(10, max(0, self.deadline - time.monotonic())) if self.deadline is not None else 10
+                j.proc.wait(grace)
             except subprocess.TimeoutExpired:
                 os.killpg(j.proc.pid, signal.SIGKILL)
                 j.proc.wait(10)
@@ -244,6 +261,25 @@ class Runner:
         last_progress = time.time()
         try:
             while True:
+                if self.deadline is not None and time.monotonic() >= self.deadline:
+                    self.say("HARD-STOP: session budget exhausted; killing running jobs")
+                    # Signal every group first, without one grace period per job.
+                    for j in self.jobs:
+                        if j.status == "running":
+                            try:
+                                os.killpg(j.proc.pid, signal.SIGKILL)
+                            except ProcessLookupError:
+                                pass
+                    for j in self.jobs:
+                        if j.status == "running":
+                            j.proc.wait()
+                            j.note = "session hard stop"
+                            self._finish(j, "timeout")
+                        elif j.status == "pending":
+                            j.status, j.note = "skipped", "session hard stop"
+                    self._write_status()
+                    self.report()
+                    return 1
                 now = time.time()
                 for j in self.jobs:                                   # reap
                     if j.status == "running":
@@ -278,7 +314,8 @@ class Runner:
                     break
                 if time.time() - last_progress > self.progress_s:
                     self._progress(); last_progress = time.time()
-                time.sleep(self.poll_s)
+                remaining = self.deadline - time.monotonic() if self.deadline is not None else self.poll_s
+                time.sleep(max(0, min(self.poll_s, remaining)))
         except KeyboardInterrupt:
             for j in self.jobs:
                 if j.status == "running":
@@ -326,7 +363,8 @@ def main(argv=None) -> int:
     ap.add_argument("--progress-s", type=float, default=60.0)
     ap.add_argument("--dry-run", action="store_true", help="print the plan (order, lanes, dependencies) and exit")
     a = ap.parse_args(argv)
-    jobs = [j for j in load_jobs(a.session) if j.machine == a.machine]
+    jobs, max_seconds = load_session(a.session)
+    jobs = [j for j in jobs if j.machine == a.machine]
     if a.only:
         keep = {j.name for j in jobs if re.search(a.only, j.name)}
         for j in jobs:
@@ -337,12 +375,14 @@ def main(argv=None) -> int:
         jobs = [j for j in jobs if j.name in keep]
     gpus = [int(x) for x in a.gpus.split(",") if x != ""]
     if a.dry_run:
+        if max_seconds is not None:
+            print(f"Session hard stop: {max_seconds:g}s from runner start (includes setup)")
         for i, j in enumerate(jobs):
             pin = f"GPU {j.gpu}" if j.gpu is not None else ("any GPU" if j.lane == "gpu" else "cpu")
             deps = ", ".join(j.after + [f"~{d}" for d in j.after_any] + ([f"gate {j.gate[0]}~{j.gate[1]}"] if j.gate else []))
             print(f"{i:3d} {j.name:32} {pin:8} timeout {j.timeout:5.0f}s  after: {deps or '-'}")
         return 0
-    return Runner(jobs, gpus, a.cpu_slots, Path(os.path.expanduser(a.logdir)), a.progress_s).run()
+    return Runner(jobs, gpus, a.cpu_slots, Path(os.path.expanduser(a.logdir)), a.progress_s, max_seconds=max_seconds).run()
 
 
 if __name__ == "__main__":
