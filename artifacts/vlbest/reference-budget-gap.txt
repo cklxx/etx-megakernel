@@ -1,0 +1,8 @@
+Reference-session budget evidence (no GPU work in this task):
+nvref2 runner.log:1: [08:45:05 +  0m00s] session logs: /root/sess/session-7de5pood
+nvref2 runner.log:181: [09:03:08 + 18m03s] session done
+nvref runner.log:1: [06:03:02 +  0m00s] start vs_r1 on GPU 0
+nvref runner.log:70: [06:15:25 + 12m22s] session done
+nvref: docs/NVREF-2026-10-09.md section 5 gives owner-reported VM life 51m; retained runner evidence only covers the 12m22s follow-up. Original allocation-to-runner gap is unknown.
+nvref2: successful runner 08:45:05–09:03:08 UTC = 18m03s (log measured); docs/NVREF2-2026-10-09.md gives owner-reported VM life 07:53–09:41 UTC = 108m. The difference is 89m57s outside this successful runner, including approximately 52m05s before it started; these derived gaps mix log timestamps with owner-reported lifetime, not a lifecycle-log measurement.
+Neither fetched reference set carries lifecycle/billing logs sufficient to independently measure the full VM-life gap.
