@@ -229,7 +229,10 @@ def test_compiler_failure_cannot_reuse_stale_executable(tmp_path):
     stale = tmp_path / 'run'; stale.write_text('old executable'); stale.chmod(0o755)
     prefix = r'''set -euo pipefail
 hipcc() { echo 'unfiltered diagnostic'; echo 'compiler failed' >&2; return 7; }
-OUT="$1"; ROOT="$1"; ROCMINC=(); CHK=(); NTF=(); VNF=(); ABL=(); PREPF=()
+# Nonempty placeholders isolate compiler status propagation from bash 3.2's
+# empty-array nounset rule, even when mutating the extracted compiler snippet.
+OUT="$1"; ROOT="$1"; ROCMINC=(-I "$1"); CHK=(-DCHECK); NTF=(-DNT)
+VNF=(-DVN); ABL=(-DABL); PREPF=(-DPREP)
 '''
     run = subprocess.run(['bash', '-c', prefix + tail, 'bash', str(tmp_path)], capture_output=True, text=True)
     assert run.returncode == 7
