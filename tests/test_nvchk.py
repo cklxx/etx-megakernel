@@ -18,6 +18,24 @@ def jobs():
     return {j.name: j for j in load_jobs(SESSION)}
 
 
+def test_record_version_fallbacks():
+    graph = jobs()
+    cmd = graph['record'].cmd
+    sources = ('/opt/rocm/.info/version', '/opt/rocm/core-*/.info/version',
+               'hipconfig --version', 'printf unknown')
+    assert all(source in cmd for source in sources)
+    assert [cmd.index(source) for source in sources] == sorted(cmd.index(source) for source in sources)
+    assert 'ROCM-VERSION %s' in cmd
+    assert 'sort -V' in cmd
+    assert cmd.startswith('set -e; rocm-smi --showproductname; ')
+    assert '; uname -r; nproc; ' in cmd
+    assert graph['gate_chkx'].after == ['build_chkx', 'record']
+    for j in graph.values():
+        if 'cat /opt/rocm/.info/version' in j.cmd:
+            assert 'cat /opt/rocm/.info/version 2>/dev/null || ' in j.cmd, j.name
+            assert all(source in j.cmd for source in sources), j.name
+
+
 def ancestors(name, graph, success_only=True):
     deps = graph[name].after + ([] if success_only else graph[name].after_any)
     return set(deps).union(*(ancestors(d, graph, success_only) for d in deps))

@@ -59,6 +59,15 @@ for name in ('apt', 'etx_env', 'llm_env', 'dl', 'prep', 'record', 'golden_sha'):
     entry = deepcopy(next(j for j in reference.JOBS if j['name'] == name))
     job(**entry)
 
+# ROCm images may install under core-<version>; missing metadata is informational.
+record = next(j for j in JOBS if j['name'] == 'record')
+record['cmd'] = record['cmd'].replace(
+    'cat /opt/rocm/.info/version',
+    'rocm_version=$(cat /opt/rocm/.info/version 2>/dev/null || '
+    '{ newest=$(printf "%s\\n" /opt/rocm/core-*/.info/version | sort -V | tail -n 1); '
+    'cat "$newest" 2>/dev/null; } || hipconfig --version 2>/dev/null || printf unknown); '
+    'printf "ROCM-VERSION %s\\n" "$rocm_version"')
+
 job(name='build_chkx', lane='cpu', after=['etx_env', 'prep', 'golden_sha'],
     timeout=1200,
     cmd=f'set -euo pipefail; mkdir -p {S}; {V} ETX_VL_CHECK=1 '
