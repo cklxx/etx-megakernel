@@ -8,10 +8,12 @@ expected about 12 minutes when model, image and environment are warm.
 Operator hard stop: 20 minutes of GPU allocation, including setup; delete
 immediately on completion. Job timeouts are not an aggregate budget limiter.
 
-Warm prerequisites retained from nvref2: ~/sess/b_all (run, vl_plan.txt,
-plan.json), ~/sess/dump_all, and the packed ~/llm/qwen3-30b-a3b model plus
-its golden_c1024.txt. This fixed job list does not rebuild/prep those inputs.
-A cold machine is outside the 12-minute estimate; stage inputs beforehand.
+No artifacts need to survive from a previous machine: dl downloads the HF
+model files when absent; prep packs ~/llm/qwen3-30b-a3b and installs its
+golden_c1024.txt, checked by golden_sha. This session's build_all creates
+~/sess/b_all (run, vl_plan.txt, plan.json), and gate_all creates ~/sess/dump_all.
+A warm box only makes these jobs fast; it is never a prerequisite.
+A cold machine is outside the 12-minute estimate; the hard stop still applies.
 
 Go/no-go, before the run: check_full passing with all 97 imported instances
 means the import gate covers every instance in the NR=1 build only, not the
@@ -41,6 +43,7 @@ def job(**kw):
 LLM = "$HOME/llm"
 PY = "~/llmenv/bin/python"
 V = "VLLM=$HOME/vllm ETX_TORCH_HEADERS=$HOME/rocm-headers/pytorch ETX_ROCM_HEADERS=$HOME/rocm-headers/inc"
+RES = r"^RESULT|generated tokens match|per-token latency|CHECK-DSL|beyond 2 ulps|GATE|BITCMP"
 M, HF = "qwen3-30b-a3b", "Qwen/Qwen3-30B-A3B"
 S = "$HOME/sess"
 LOGS = "${ETX_SESS_LOGDIR:-$HOME/sess}"
@@ -67,13 +70,19 @@ job(name="etx_env", lane="cpu", after="apt", timeout=600,
     cmd=".venv/bin/python -c 1 2>/dev/null || { rm -rf .venv; python3 -m venv --system-site-packages .venv; }; "
         ".venv/bin/python -c 'import yaml' 2>/dev/null || .venv/bin/pip install -q pyyaml; .venv/bin/python -c 'import etx; print(\"etx ok\")'")
 
+job(name="prep", gpu=0, after=["dl", "etx_env"], timeout=2400, quiet_s=600,
+    cmd=f"{PY} examples/vllm_llm/prep.py --src {LLM}/{M}/hf --out {LLM}/{M} --maxlen 1072 && "
+        f"cp examples/llm/results/golden_c1024_{M}.txt {LLM}/{M}/golden_c1024.txt && ls -la {LLM}/{M}/vl.bin", summary=[r"wrote .*vl.bin"])
+
 job(name="record", lane="cpu", after="dl", timeout=120,
     cmd="set -e; rocm-smi --showproductname; cat /opt/rocm/.info/version; uname -r; nproc; "
         "(lspci -nn | grep -iE 'mi300|74b5' || echo 'lspci: no MI300 line (0x74b5 is the VF device id)'); "
         f"{PY} -c \"from huggingface_hub import model_info; print('HF_REV', model_info('{HF}').sha)\" || echo 'HF_REV unknown (the hub lookup failed: no network or no local copy)'")
 
+job(name="golden_sha", lane="cpu", after="prep", timeout=120,
+    cmd=f'echo "bab2f1fbe12f70179711ec40a215c74710845b73169b1cc6a3a6ca50e0a19484  {LLM}/{M}/golden_c1024.txt" | sha256sum -c')
 ALL = "-DETX_DSL_WSUM -DETX_DSL_SCALAR -DETX_DSL_GU1 -DETX_DSL_RBATCH"
-for b in ("chk1",):
+for b in ("all", "chk1"):
     job(name=f"build_{b}", lane="cpu", after=["etx_env", "dl"], timeout=2400, quiet_s=900,
         cmd=f"set -o pipefail; {V} ETX_VL_CHECK={int(b != 'all')} "
             f"{'ETX_VL_XCD=0 ' if b == 'chk1' else ''}ETX_HIPCC_FLAGS='{ALL}' "
@@ -87,15 +96,20 @@ for b in ("chk1",):
             f"test -x {S}/b_{b}/run", summary=[r"tasks=|megakernel|SPILL"])
 
 
-
 def run(b="all", extra=""):
     return f"{S}/b_{b}/run {LLM}/{M} {S}/b_{b}/vl_plan.txt {extra}"
 
 
+job(name="gate_all", gpu=0, after=["build_all", "prep", "golden_sha"], timeout=600,
+    cmd=f"set -o pipefail; rm -rf {S}/dump_all; mkdir -p {S}/dump_all; ETX_DUMP={S}/dump_all ETX_DUMP_STEP=1040 "
+        f"ETX_TOKTRACE={S}/tok_all.txt ETX_VL_PROGRESS=256 stdbuf -oL {run(extra='--repeat 1 --check-dsl')} 2>&1 | tee {S}/gate_all.txt; "
+        f"grep -q '^RESULT .*matched=32 gen=32' {S}/gate_all.txt && grep -q '^CHECK-DSL OK' {S}/gate_all.txt && "
+        f"test -s {S}/dump_all/logits.bin && echo GATE-OK", summary=[RES])
+
 ENV = 'set -o pipefail; echo "ETX_ENV ETX_UNFUSED_SYNC=${ETX_UNFUSED_SYNC:-} ETX_UNFUSED_NOGRAPH=${ETX_UNFUSED_NOGRAPH:-}"; '
 DEPS = {
-    "check": ["build_chk1", "record"],
-    "vendor": ["docker_pull", "etx_env", "record"],
+    "check": ["build_chk1", "prep", "golden_sha", "record"],
+    "vendor": ["docker_pull", "etx_env", "record", "gate_all"],
 }
 
 # Success dependencies gate usable inputs; completion barriers preserve order
@@ -135,7 +149,7 @@ job(name=name, gpu=0, lane="gpu", after=DEPS["vendor"], after_any=["check_full"]
 # requested final report cannot also be its prerequisite (a dependency cycle).
 job(name="trace1", gpu=0, after="report", timeout=300,
     cmd=f"ETX_TRACE=1 ETX_TRACE_RAW={S}/tr_nvref2.bin stdbuf -oL {run(extra='--repeat 1')}")
-job(name="floors_trace", lane="cpu", after="trace1", timeout=300,
+job(name="floors_trace", lane="cpu", after=["trace1", "build_all", "gate_all"], timeout=300,
     cmd=f".venv/bin/python -m etx.tools.floors --trace {S}/b_all/plan.json {S}/tr_nvref2.bin "
         f"> {S}/floors_nvref2.txt && cat {S}/floors_nvref2.txt")
 job(name="evx", gpu=0, after="floors_trace", timeout=300,
@@ -145,12 +159,12 @@ job(name="evx", gpu=0, after="floors_trace", timeout=300,
 for entry in JOBS:
     entry["machine"] = "A"  # The reference sessions use the runner's A default.
     if entry["name"] == "trace1":
-        entry["after"] = ["etx_env", "record"]
+        entry["after"] = ["etx_env", "record", "build_all", "gate_all"]
         entry["after_any"] = ["check_full", "kcmp_boundary"]
 
 job(name="report", lane="cpu", machine="A", after_any=[j["name"] for j in JOBS], timeout=120,
     cmd=f'logs="{LOGS}"; echo "NVCOV EVIDENCE BEGIN $logs"; '
-        'for name in record build_chk1 check_full kcmp_boundary trace1 floors_trace evx; do '
+        'for name in record prep golden_sha build_all gate_all build_chk1 check_full kcmp_boundary trace1 floors_trace evx; do '
         'echo "--- $name ---"; '
         'if [ -f "$logs/$name.log" ]; then '
         "grep -E 'CHECK|instance|identical|DIFFERS|BOUNDARY-|VENDOR-EXIT|overhang_us|kernel_end_us|marker_end_us|label|in_range|kernel|RESULT|TRACE|FLOOR|evx|EVX|GB/s|TB/s|us|ms|ERROR|Error|error|FAILED|REFUSED|SPILL|gfx942|MI300|HF_REV' "
