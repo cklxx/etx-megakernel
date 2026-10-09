@@ -14,17 +14,17 @@ Session specification (2026-10-08, evidence fixes based on `423c040`). The sessi
 ## 1. Timing basis (decided): host wall time per decode step, batch 1
 It is the only basis vLLM's harness yields (`examples/llm/vllm_bench.py:4-5,74`), and it includes the per-step host
 cost a user pays. **vLLM stays unchanged; ETX changes** from the device span (`median_ms`, kernel stamps,
-`examples/vllm_llm/host.hip:693`) to host wall time, measured the same way:
+`examples/vllm_llm/host.hip:704`) to host wall time, measured the same way:
 - vLLM: `(t(32 new) - t(1 new)) / 31`, wall time around `llm.generate` (`vllm_bench.py:63-67,74`): a 31-step mean.
-- ETX: the `std::chrono::steady_clock` window `host.hip:625` -> `:647` around `vl_set_params` + `hst.run()`
+- ETX: the `std::chrono::steady_clock` window `host.hip:636` -> `:658` around `vl_set_params` + `hst.run()`
   (`run()` = reset, residency check, launch, wait: `etx/runtime/include/etx/host.h:424-429`). With `ETX_VL_PROGRESS=1`
-  each step prints `  step <t>: <ms> ms wall` (`host.hip:649`) after the window closes. **The ETX figure is the mean of
+  each step prints `  step <t>: <ms> ms wall` (`host.hip:660`) after the window closes. **The ETX figure is the mean of
   t = 1024..1054 in the last run**: the 31 steps after the first generated token, as in vLLM's difference (prompt 1024,
-  steps 1055, `host.hip:207`; the default `--repeat 2` keeps the last run, `host.hip:116,621`).
-- Cross-check: RESULT `wall_ms` (median of 32 steps, `host.hip:648,878,885`) within 0.020 ms of that mean, otherwise
+  steps 1055, `host.hip:222`; the default `--repeat 2` keeps the last run, `host.hip:117,632`).
+- Cross-check: RESULT `wall_ms` (median of 32 steps, `host.hip:659,889-890,896-897`) within 0.020 ms of that mean, otherwise
   the report prints `BASIS-MISMATCH` and both values.
 - Residual, not measured: vLLM's window also holds sampling, output processing and scheduling; ETX keeps tokens on
-  the device until the end (`host.hip:655`), which favours ETX.
+  the device until the end (`host.hip:666`), which favours ETX.
 
 ## 2. Prompt set (decided): the committed golden, not ShareGPT
 - `examples/llm/results/golden_c1024_qwen3-30b-a3b.txt`, sha256
@@ -98,7 +98,7 @@ Expected: `VLLM label=default aiter=0 … batch=1 version=0.27.1 context=1024 me
   Each job uses `after_any` for all preceding timing jobs and the initial gates/checks. This includes adjacent
   round barriers and prevents an immediately skipped neighbour from allowing a later round to overtake an
   unfinished earlier round. A failed unfused branch does not skip vLLM or fused ETX timing.
-  ETX command (timeout 300, as `tiles.py:104`), `--unfused` only in `etxu_r` (same-tiles HIP graph, `host.hip:122,882`):
+  ETX command (timeout 300, as `tiles.py:104`), `--unfused` only in `etxu_r` (same-tiles HIP graph, `host.hip:123,893`):
   `set -o pipefail; echo "ETX_ENV ETX_UNFUSED_SYNC=${ETX_UNFUSED_SYNC:-} ETX_UNFUSED_NOGRAPH=${ETX_UNFUSED_NOGRAPH:-}";
   ETX_VL_PROGRESS=1 stdbuf -oL $HOME/sess/b_all/run $HOME/llm/qwen3-30b-a3b $HOME/sess/b_all/vl_plan.txt [--unfused]`
   (the ETX_ENV line is what `examples/vllm_llm/pairs.py:6-10` parses).
@@ -164,8 +164,10 @@ their tok/s includes prefill or TTFT (their methodology page could not be fetche
   the AGENTS.md section 1 claim rests only on the fused-against-unfused pair.
 
 ## 7. Go/no-go, fixed before the run
-Δ_R = ETX fused 31-step mean - vLLM per-token, same round. Threshold 0.050 ms, over twice the largest observed spread
-(vLLM 0.020, `VLLM-LADDER:15`; ETX wall 0.022, `results_tiles/ab1..3_all_x.log:8`).
+Δ_R = ETX fused 31-step mean - vLLM per-token, same round. Threshold 0.050 ms is a decision rule, not an observed noise bound. The cited graph-enabled vLLM
+spreads range from 0.020 to 0.083 ms (0.020 default and 0.052 custom ops, `docs/VLLM-LADDER-2026-10-01.md:15-16`;
+0.083, `results_2026-09-27/vlnext/vllm_moe_b1.log:65`); ETX wall spread is 0.022 ms
+(`results_tiles/ab1..3_all_x.log:8`). The ladder's non-graph controls have still larger spreads, 0.960 and 1.216 ms (`docs/VLLM-LADDER-2026-10-01.md:17-18`).
 - The primary verdict uses only fused ETX versus vLLM; unavailable fusion evidence does not change it.
 - **LEAD:** all five Δ_R < 0, median <= -0.050. **LOSS:** all five > 0, median >= +0.050. **TIE:** |median| < 0.050.
   **INSUFFICIENT:** otherwise. If AITER's median is > 0.050 below default, recompute against AITER and print both.
@@ -174,6 +176,20 @@ their tok/s includes prefill or TTFT (their methodology page could not be fetche
   the ratio of the median to the spread. When the median is no larger than the spread the sign of the paired
   difference is not stable, so the verdict becomes `INSUFFICIENT` whatever the median says; otherwise the
   verdict stands and the ratio tells the reader how far it is from the noise.
+
+For the actions below, F and U are the fused and unfused host-wall 31-step medians, and X is the
+HOST-EXCESS excess(fused - unfused) defined in section 5. The restored host-work branch is
+`(U - F + X) / U > 2%`: if removing X would clear that bar, investigate per-step host work using section 11;
+otherwise return to the device levers (`docs/FLOORS-2026-10-08.md:288-293`). This is a counterfactual screening
+rule, not the measured fusion verdict (`examples/vllm_llm/pairs.py:33-34`); unavailable U or X leaves it undecided.
+- **LEAD action:** write `docs/NVREF-<date>.md`, index the evidence in `docs/DATA.md`, and update the README comparison;
+  retain the separate fusion gate and leave NVIDIA validation open (`fff11e6:docs/SPEC-nv-reference-2026-10-08.md:116-118`).
+- **TIE action:** report the null result and apply the host-work branch above, then section 11's diagnostic split
+  (`fff11e6:docs/SPEC-nv-reference-2026-10-08.md:119-120`; `docs/VLLM-LADDER-2026-10-01.md:62-66`).
+- **LOSS action:** report no lead, check the machine record, and apply the same host-work branch
+  (`fff11e6:docs/SPEC-nv-reference-2026-10-08.md:120-121`).
+- **INSUFFICIENT action:** make no lead/loss claim; inspect the machine record and paired spread before treating the
+  host-work branch as actionable (`fff11e6:docs/SPEC-nv-reference-2026-10-08.md:120-121`; `docs/ROADMAP.md:141-144`).
 
 ## 8. Before provisioning (CPU), then the session
 P1 `.venv/bin/python -m pytest -q`, including `tests/test_nvref_report.py` (synthetic pass, 31/32 refusal, missing run,
@@ -207,8 +223,8 @@ unknown for 1x). Ceiling 60 min / $3.00. **Hard stop:** delete the VM at 55 min 
 | Invalid required evidence leaks partial numbers | Validation precedes output; `tests/test_nvref_report.py:215` (`test_missing_required_with_missing_fusion_refuses`), required 32/32 and step-count tests retain refusal checks. |
 | Failed nice-to-have job or pairs table loses the primary report | `hostprof`, `etx_noprog`, `vllm_aiter_r1..3`, `report` wait via `after_any`; `report` preserves the optional pairs output without requiring success; optional parsers catch invalid/incorrect results and print unavailable (`test_optional_failure_never_refuses`). |
 
-Host line references above describe the base `423c040` unless stated otherwise; this change adds eleven
-lines after the import-check setup. The final CHECK summary is now `host.hip:614`, and the DSL predicate is
+Host line references describe `83f80b3`. The import-check change added eleven lines after its setup
+relative to `423c040`. The final CHECK summary is `host.hip:614`, and the DSL predicate is
 `host.hip:554`; the legacy per-XCD refusal remains at `:515`. The `chk1` compile observation above predates
 this fix and does not establish that the modified GPU path runs correctly. Local CPU dispatch tests use stubs;
 full GPU launch comparisons, CHECK-DSL and 32/32 model correctness remain session-time validation.
@@ -231,7 +247,20 @@ checked against this section; a miss is a finding, not a reason to re-run.
   The six tile builds were bit-identical (`bitcmp.log:19-24`), so a failure means the binary or machine changed.
   `gate_unf`: 32/32 `[E]`; this build never ran unfused. `build_all`: spill 9 / scratch 40 `[M, buildlog_all.txt:27]`.
 - `record`: rocm-smi product name, `/opt/rocm/.info/version`, `uname -r`, `nproc`, an `lspci` line and an `HF_REV` line.
+  Expected MI300X, ROCm 7.2.4, bare metal `[M-derived, docs/DATA.md:60]` for the planned Hot Aisle box;
+  VF / ROCm 7.14 is the historical alternate, not that expectation (`docs/DATA.md:61`). No sourced expectation
+  for `uname -r`, `nproc` or the exact HF SHA; record them, do not invent values.
   The hub lookup falls back to `HF_REV unknown (...)`, so a hub failure cannot refuse the report.
+- `IMAGE`: expected `vllm/vllm-openai-rocm@sha256:<digest>` `[E, examples/sessions/nvref.py:47-49]` from the
+  pulled v0.27.1 image. No pinned digest is sourced; record the actual digest, not a guessed hash.
+- `build_chk` / `build_chk1`: both print compiled resources and the informational 9 / 40 comparison
+  (`examples/sessions/nvref.py:53-64`). Timing-build prior: VGPR 128, spill 9, scratch 40 B/lane, LDS 29736 B/block
+  `[M, results_tiles/buildlog_all.txt:27]`. No measured resource expectation for either check variant is sourced;
+  linking originals and removing XCD replicas need not preserve the timing build's resources. Section 8's
+  container spill 7 / scratch 32 is a different build observation, not a VM check-build prediction.
+- `check_imp`: expected refusal `--check needs a plan without per-XCD replicas (build without ETX_VL_XCD)`
+  `[E, examples/vllm_llm/host.hip:515; examples/sessions/nvref.py:55-56,79-84]`; this is the NR>1 demonstration,
+  not a successful byte comparison. The job accepts that refusal.
 - `check_imp1`. `--check` is parsed at `host.hip:140` and the instance loop breaks at `:551`. Layers 0-1 hold 19
   instances `[M, results_tiles/vlplan_all.txt:3-21]`: 14 `dsl_*`, 5 imported (`rms_norm_2d`, `attn_mfma16_g8` x2,
   `attn_reduce` x2). `ETX_VL_XCD` changes only rep, stride and copyoff (`model.py:371-388`), so the NR=1 plan holds the
@@ -240,6 +269,14 @@ checked against this section; a miss is a finding, not a reason to re-run.
   `CHECK OK: 0 launch(es) differ` (`:614`), exit 0. The same three kernels were byte-identical on 2026-09-28
   (`results_2026-09-28/moe_check.log:54`). `CHECK FAILED` refuses. A count other than 14 means the plan differs from this
   section: the report prints NOT MET and a LEAD carries no byte-identity claim.
+  Import-overhead control: per-launch `original / imported us` and per-kernel `(+%)` are printed at
+  `examples/vllm_llm/host.hip:597-598,609-612`. Priors `[M]` for the surviving imported kernels are
+  rms_norm_2d 766.2 / 8.9 us (-99%), attn_mfma16_g8 summed 2515.9 / 23.8 us (-99%), and attn_reduce
+  summed 16.5 / 18.6 us (+13%) (`results_2026-09-28/moe_check.log:39-40,46`). Per-launch attention was
+  2507.4 / 12.3 and 8.5 / 11.4 us; reduce 9.5 / 9.1 and 7.0 / 9.5 us (`:10-11,26-27`). These one-launch
+  event timings include very large first-original costs and a different build: no defensible steady-state
+  expected overhead range or pass threshold is sourced for chk1. They are diagnostic evidence toward the
+  roadmap's import-overhead control (`docs/ROADMAP.md:134`), not its native-operators-in-a-Graph measurement.
 - vLLM default: 4.83-4.91 per run `[M-derived: VLLM-LADDER:15, results_2026-09-28b/vllm1_b1_default.log:67,
   results_2026-09-27/vlnext/vllm_moe_b1.log:65; this image was never measured on this box]`.
 - ETX fused wall: 4.53-4.56 `[M, ab1..3_all_x.log:8]`; device 4.39-4.42 `[M]`. Unfused: 4.61-4.65 `[E: 4.405 + device
@@ -247,22 +284,42 @@ checked against this section; a miss is a finding, not a reason to re-run.
 - DELTA: median about -0.31, each round -0.38 to -0.27 `[E]`. Expected verdict LEAD. A median above -0.25 is a new fact
   about this box. The verdict is against vLLM default only: `enable_qk_norm_rope_fusion` ran 0.167 ms faster on the dev
   image (`vllm1_b1_qknr.log:68`) and this session does not run it.
-- RESOLUTION: expected spread 0.02-0.05 `[E]`. Observed vLLM spreads reach 0.052 (`VLLM-LADDER:16`) and 0.083
-  (`vllm_moe_b1.log:65`), so the line may print. The verdict becomes unusable only when spread >= |median|. Five rounds
+- RESOLUTION: expected spread 0.02-0.05 `[E]`. Observed graph-enabled vLLM spreads range 0.020-0.083 ms
+  (0.020 / 0.052, `docs/VLLM-LADDER-2026-10-01.md:15-16`; 0.083,
+  `results_2026-09-27/vlnext/vllm_moe_b1.log:65`); the 0.050 ms decision rule is not an observed noise bound, so the line may print. The verdict becomes unusable only when spread >= |median|. Five rounds
   cannot bound the tails: one outlier sets the range and the sign test reaches p = 1/32 one-sided at best.
 - FUSION: gain 1.4-2.1% `[E]`; round 18 measured 1.7% on the wall basis (`round18/FINDING.md:55`). Expected `not met`.
   `met` requires unfused - fused > 0.093 ms at fused 4.548, all five gains positive and gain spread < median / 2
   (`pairs.py:33-34`). `not met` with a device margin near 0.2 ms leaves the claim open: fusion wins on the device and the
   megakernel's own host work eats the win on the wall. A median gain <= 0 refutes it for this build.
+- `fusion_pairs.txt` device gains: about 3.8-4.3% `[E]`, from a 0.172-0.200 ms device margin
+  (`docs/BUDGET-2026-10-01.md:355-356`, `docs/VLLM-LADDER-2026-10-01.md:48`) and fused device 4.405 ms
+  (`results_tiles/ab2_all_x.log:8`), using margin / (4.405 + margin). This transfers an older margin to a new
+  build, not a measurement. The table prints both bases (`examples/vllm_llm/pairs.py:152-155`;
+  `examples/sessions/nvref.py:139-140`); it does not decide the primary system verdict.
+- `BASIS-MISMATCH`: expected absent `[E]`, i.e. RESULT wall median within 0.020 ms of the 31-step mean
+  (section 1's rule; `examples/vllm_llm/nvref_report.py:240-243`). No measured distribution of that difference
+  is sourced. If present, retain both values; do not switch the verdict basis.
 - HOST-EXCESS: fused 0.140 `[M, ab1..3 line 8: 0.140 / 0.143 / 0.139]`; unfused 0.036-0.042 `[E]`; excess about 0.10 `[E]`.
   Round 18 cut the fused figure from 0.276 to 0.135 (`round18/FINDING.md:34`); above 0.16 means that fix regressed here.
 - HOSTPROF (stderr; `hostprof.log` only, the report does not parse it): steps 2110; reset about 64 us, residency 0.6,
   launch 18 `[M-derived, round18/FINDING.md:10-12]`; wait about device + 71 us `[E, :13]`.
+- Report `hostprof wall_ms=... (31-step mean)`: about 4.53-4.56 ms `[E]`, transferring the unprofiled
+  RESULT wall prior (`results_tiles/ab1..3_all_x.log:8`) to the diagnostic; no measured profiled 31-step mean
+  for this build is sourced. The report prints it at `examples/vllm_llm/nvref_report.py:287-289`.
 - AITER: median about 4.92 `[M, results_2026-09-27/extra/etx/examples/llm/results/vllm_aiter1_qwen3-30b-a3b.json: 4.916 against 4.836 with aiter off (vllm_aiter0_...json)]`: AITER measured *slower* on this model, so the 0.050 ms recompute rule does not fire. `etx_noprog`: RESULT wall within
   0.022 ms of the fused RESULT wall `[E]`; a larger gap means the progress print leaks into the timing basis.
 - Next step, decided by this run. X = excess(fused - unfused); E_f = fused HOST-EXCESS; P + O = HOSTPROF reset +
   residency + launch + (wait - device). X < 0.050: no host work, return to the device levers (`FLOORS:288-293`).
   X >= 0.050 and P + O >= E_f - 0.050: async enqueue, done when X < 0.050. X >= 0.050 and P + O < E_f - 0.050: resident
-  kernel (`ETX_Technical_Design.md:724-726`). The 0.050 is section 7's threshold; the repository fixes no other.
+  kernel (`ETX_Technical_Design.md:724-726`). The 0.050 is section 7's threshold; the repository fixes no other for this split.
+  **This split is indicative, not a strict decision.** HOSTPROF averages all 2 x 1055 steps, including prompt
+  steps and the slow first step (46.837 ms wall in `results_tiles/gate_all.txt:2`), because every profiled run
+  accumulates into one counter (`etx/runtime/include/etx/host.h:431-441`). RESULT `median_ms` covers only the
+  last repeat's 32 decode steps (`examples/vllm_llm/host.hip:703-705,889-890`). Thus O = wait - device mixes
+  populations and mean with median. Its bias has unknown size and sign relative to 0.050 ms; do not silently
+  reinterpret it as measured overshoot. The strict fix is for the host to print a per-step device mean over
+  exactly the same steps as HOSTPROF, then subtract matching means. That requires a CPU code change, outside
+  this documentation-only task; the existing rule and threshold remain unchanged.
 - Waste checks: a failure of `record`, `golden_sha`, `gate_all`, `docker_pull` or `vllm_r1` makes the report
   NOT-COMPLETE and shows by about minute 12. Let `check_imp1`, `gate_unf` and `hostprof` finish, then delete the VM.
