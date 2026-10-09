@@ -66,8 +66,10 @@ def proof(text, cfg):
     if any(c in components for c in ('S4', 'S5', 'S6')):
         if 'Disabling fuse_qk_norm_rope_kvcache' in text:
             return 'Disabling fuse_qk_norm_rope_kvcache'
-        for pattern in (r'Enabled custom fusions: [^\r\n]*qk_norm_rope_kvcache',
-                        r'QK-Norm\+RoPE\+KVCache fusion: replaced 48 pattern\(s\)',
+        # Replacement is the primary proof; require all 48 Qwen layers.
+        # The enabled list is secondary and must stay on the same line.
+        for pattern in (r'QK-Norm\+RoPE\+KVCache fusion: replaced 48 pattern\(s\)',
+                        r'Enabled custom fusions: [^\n]*qk_norm_rope_kvcache',
                         r'Capturing CUDA graphs \(decode, FULL\)'):
             if not re.search(pattern, text):
                 return pattern

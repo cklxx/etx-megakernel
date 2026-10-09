@@ -18,7 +18,7 @@ def log(arm='S0', ms=5, cfg=None):
     lines = [r.CONFIG_PREFIX + json.dumps(echo), 'VLLM-SAMPLING detok=0']
     if 'attention_backend' in cfg['kw']:
         lines += [f"Using {cfg['kw']['attention_backend']} backend (selected via --attention-backend)"]
-    lines += ['Enabled custom fusions: qk_norm_rope_kvcache',
+    lines += ['Enabled custom fusions: norm_quant, act_quant, qk_norm_rope_kvcache',
               'QK-Norm+RoPE+KVCache fusion: replaced 48 pattern(s)',
               'Capturing CUDA graphs (decode, FULL)', 'Using TritonExperts MoE backend', "rms_norm=['native']"]
     if 'VLLM_TUNED_CONFIG_FOLDER' in env:
@@ -36,7 +36,7 @@ def test_proven(arm):
 @pytest.mark.parametrize('arm,remove', [
     ('S0', '"async_scheduling": true, '),
     ('S4', 'Using ROCM_AITER_FA backend (selected via --attention-backend)'),
-    ('S4', 'Enabled custom fusions: qk_norm_rope_kvcache'),
+    ('S4', 'Enabled custom fusions: norm_quant, act_quant, qk_norm_rope_kvcache'),
     ('S4', 'QK-Norm+RoPE+KVCache fusion: replaced 48 pattern(s)'),
     ('S4', 'Capturing CUDA graphs (decode, FULL)'),
     ('S5', 'Using TritonExperts MoE backend'),
@@ -242,16 +242,29 @@ def test_captured_disabled_fusion():
         r.observation(text, r.config('S4f'))
 
 
-def test_fusion_banner_newline_regression():
-    # The letter n in rms_norm kills [^\\n]*, but is legal on the banner line.
-    text = log('S4f').replace('fusions: qk_', 'fusions: rms_norm, qk_')
+@pytest.mark.parametrize('brackets', [False, True])
+def test_fusion_banner_newline_regression(brackets):
+    text = log('S4f')
+    if brackets:
+        text = text.replace('fusions: norm_quant, act_quant, qk_norm_rope_kvcache',
+                            'fusions: [norm_quant, act_quant, qk_norm_rope_kvcache]')
     assert r.proof(text, r.config('S4f')) is None
-    assert r.proof(text.replace('rms_norm, qk_', 'rms_norm,\nqk_'), r.config('S4f')) is not None
+    assert r.proof(text.replace('act_quant, qk_', 'act_quant,\nqk_'), r.config('S4f')) is not None
+
+
+@pytest.mark.parametrize('count', [0, 1, 47])
+def test_fusion_replacement_is_primary(count):
+    text = log('S4f').replace('replaced 48', f'replaced {count}')
+    # Even with the enabled banner, zero or partial replacement is not proof.
+    assert r.proof(text, r.config('S4f')) == r'QK-Norm\+RoPE\+KVCache fusion: replaced 48 pattern\(s\)'
+    # If both positive proofs are absent, report the missing replacement first.
+    text = text.replace('Enabled custom fusions:', 'Other fusions:')
+    assert r.proof(text, r.config('S4f')) == r'QK-Norm\+RoPE\+KVCache fusion: replaced 48 pattern\(s\)'
 
 
 @pytest.mark.parametrize('arm', ['S4f', 'S5f', 'S6f'])
 @pytest.mark.parametrize('remove', [
-    'Enabled custom fusions: qk_norm_rope_kvcache',
+    'Enabled custom fusions: norm_quant, act_quant, qk_norm_rope_kvcache',
     'QK-Norm+RoPE+KVCache fusion: replaced 48 pattern(s)',
     'Capturing CUDA graphs (decode, FULL)',
 ])
@@ -279,8 +292,8 @@ def test_fusion_guard_mutations(monkeypatch):
     cases = [
         ("if 'Disabling fuse_qk_norm_rope_kvcache' in text:", 'if False:',
          lambda: test_fixed_disabling_warning_overrides_positive('S4f')),
-        (r'[^\r\n]*qk_norm_rope_kvcache', r'[^\\n]*qk_norm_rope_kvcache',
-         test_fusion_banner_newline_regression),
+        (r'[^\n]*qk_norm_rope_kvcache', r'[^\\r\\n]*qk_norm_rope_kvcache',
+         lambda: test_fusion_banner_newline_regression(False)),
     ]
     for old, new, oracle in cases:
         assert old in source
