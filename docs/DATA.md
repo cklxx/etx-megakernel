@@ -37,6 +37,8 @@ Restore with `gh release download data-2026-09-27 --repo cklxx/etx-data && shasu
 
 | `results_nvref2_2026-10-09` | `examples/sessions/nvref2.py`; AMD Developer Cloud MI300X VF, ROCm 7.14.0; successful runner `session-7de5pood` | 89 regular files / 40 top-level entries / 1,800,281 bytes (local inventory; `docs/NVREF2-2026-10-09.md`, Data inventory) | tar.gz stream SHA256 (gzip timestamp disabled): `26d508936f9c0708b7892d8b0d95c2fe0a2ba6e28a1e6d72916c8e169cd5e8c9` (not a manifest hash; command in session record) | Re-rendered LEAD, one VF session; wall fusion rule met again; §12 spread prediction MISSED; top-level status/runner/record belong to aborted attempt; correct evidence in `session-7de5pood` | `docs/NVREF2-2026-10-09.md`, `docs/GAINS-TABLE.md`, SPEC §12 outcome, `docs/GAINS-LEDGER.md` |
 
+| `results_vlbest_2026-10-09` (`~/code/etx/results_vlbest_2026-10-09/`, outside git) | `examples/sessions/vlbest.py`; AMD Developer Cloud MI300X VF; finished runner `session-iv3fdc3m` | 201 regular files / 20134708 file-content bytes (local filesystem inventory; session document, Data inventory) | No SHA256SUMS manifest present; not checksum-verified | Strongest tested legal vLLM search and paired host-wall comparison: LEAD, fusion ESTABLISHED, timed-build CERT OK (`session-iv3fdc3m/report.log:6-16`); raw arm logs/JSON, certificate, build artefacts and earlier attempts retained | `docs/VLLM-STRONGEST-2026-10-09.md`, `AGENTS.md` §1; future search of dropped or untested levers |
+
 
 Earlier sets (2026-09-22 .. 26) are summarized in the design document (section 15) and `examples/*/results/`; their raw
 traces were not kept.
