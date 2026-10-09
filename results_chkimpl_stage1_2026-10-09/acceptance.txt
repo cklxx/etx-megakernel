@@ -1,0 +1,200 @@
+Stage 1 acceptance: BLOCKED. Stages 2 and 3 were not started.
+Output below is the complete combined stdout/stderr of each command.
+
+$ .venv/bin/python -m pytest -q
+.....................................................ss.....s........... [  9%]
+......................................................s.sss............. [ 18%]
+........................................................................ [ 27%]
+..................F...........................................s......ss. [ 36%]
+........................................................................ [ 45%]
+...s.................................................................... [ 54%]
+..........s............................................................. [ 63%]
+........................................................................ [ 72%]
+...................................s..................ss................ [ 81%]
+........................................................................ [ 90%]
+........................................................................ [ 99%]
+......                                                                   [100%]
+=================================== FAILURES ===================================
+___________ test_model_py_builds_what_the_entry_prints[mixtral-8x7b] ___________
+
+name = 'mixtral-8x7b'
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x103c06e10>
+
+    @pytest.mark.parametrize("name", decode.KNOWN)
+    def test_model_py_builds_what_the_entry_prints(name, monkeypatch):
+        """Every plan instance of model.py has the export that the printed selection names for its phase."""
+        _, cfg = decode.resolve(name)
+        monkeypatch.setenv("ETX_LLM_CONFIG", str(cfg))
+        from examples.vllm_llm import model as M
+        p = decode.select(cfg)
+        seen = set()
+>       for i in M.instances(load_dims(str(cfg))):
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_decode_entry.py:42: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+d = Dims(name='mixtral-8x7b', H=4096, NH=32, NKV=8, HD=128, INTER=14336, L=32, V=32000, eps=1e-05, theta=1000000.0, tie=Fa...=False, moe=True, E=8, TOPK=2, MI=14336, norm_topk=True, ln_norm=False, sparsemixer=False, bias_o=False, bias_lm=False)
+
+    def instances(d) -> list[dict]:
+        """The launches of one decode step, in vLLM's order."""
+        parts = math.ceil(MAXLEN / PART)
+        FOLD_TOPK = fold_topk(d)
+        global DSL_ATTNHEAD
+        DSL_ATTNHEAD = _attn_head(d)
+        out = []
+        moe_specs = {role: launch_for(d, role) for role in ("up", "down")} if d.moe and not DSL_GEMV else {}
+        # The norm folds live in dsl_gemv_fold, which is written for the MoE model (host.hip:394 stops it at E == 0), and
+        # PhiMoE needs them (no imported LayerNorm). A dense model keeps its norm phases (etx.select default_structure).
+        FOLD = DSL_FOLD and (bool(d.moe) or bool(getattr(d, "ln_norm", False)))
+        # etx.select (section 6.2): the planner's variant for each GEMV phase. A phase whose shape is outside every DSL
+        # GEMV variant (Qwen3-8B down: K = 12288 > 4096, host.hip:358) gets wvSplitK instead of a run that stops.
+        gemv_sel = {}
+        if DSL_GEMV:
+            try:
+                gemv_sel = etx_select.plan(
+                    d, "gfx942", None, variants=[v for v in etx_select.REGISTRY if v.phase in etx_select.GEMV_PHASES],
+                    structure=etx_select.Structure(fold_norms=FOLD, fold_topk=FOLD_TOPK, attn_head=DSL_ATTNHEAD)).phases
+            except etx_select.NoLegalVariant:
+                gemv_sel = {}                                    # no override: host.hip keeps its checks
+    
+        def add(export, layer, role, grid=None, **kw):
+            if export in OPERATORS:
+                expected = grid_for(export, d, role=role, cu=CU, parts=parts)
+                if grid is not None and grid != expected:
+                    raise ValueError(f"{export}: grid conflicts with operator specification")
+                grid = expected
+            out.append({"export": export, "layer": layer, "role": role, "grid": grid, **kw})
+    
+        def gemv(layer, role, m, k):
+            key = role + "@0" if layer == 0 and role + "@0" in gemv_sel else role
+            if DSL_GEMV and (key not in gemv_sel or gemv_sel[key].kind == "dsl"):   # else: the planner's fallback
+                # rows per task = ceil(M / CU): at 304, 17 (qkv), 7 (o_proj), 1 (router)
+                fold = FOLD and (role in ("router", "lm_head") or (role == "qkv" and (layer > 0 or getattr(d, "ln_norm", False))))
+                add("dsl_gemv_fold" if fold else "dsl_gemv", layer, role, (CU, 1, 1), M=m, K=k, wvprgrp=0)
+                return
+            y = wvsplitk_ytile(m)
+            waves = mindiv(m, CU * y, 16)
+            validate_wvsplitk(grid=(CU, 1, 1), cu_count=CU, rows=m, ytile=y, wave_groups=waves)
+            add(f"wvsplitk_y{y}", layer, role, None, M=m, K=k, wvprgrp=waves)
+    
+        attn = {4: "attn_mfma4_g4", 6: "attn_mfma16_g6", 8: "attn_mfma16_g8"}[d.G]
+        for L in range(d.L):
+            if not (FOLD and (L > 0 or getattr(d, "ln_norm", False))):
+                if getattr(d, "ln_norm", False):
+                    raise SystemExit("ln_norm (PhiMoE) needs the DSL fold path: there is no imported LayerNorm kernel "
+                                     "(set ETX_VL_DSL_GEMV=1 ETX_VL_DSL_FOLD=1, the defaults)")
+                add("rms_norm_2d" if L == 0 else "fused_add_rms_norm", L, "in_norm")
+            gemv(L, "qkv", d.NQKV, d.H)
+            if DSL_ATTN:
+                # prep + cache + attention in one block per (partition, kv head). NOTE (round 9, 2026-10-01): this shape
+                # cannot be built correctly as written, and it is not the way to shorten the attention block.
+                #  * dsl_attnprep transforms qkv IN PLACE (reads row, rms-norms + ropes it, writes the same row), so it is
+                #    not idempotent: any decomposition that runs it in more than one task per kv head applies norm+rope
+                #    twice and is simply wrong. That also rules out Pass 3's prologue recomputation (p3_event_elim, which
+                #    gates on grid.pure -- prep is not marked pure, so P3 never fires on it today; marking it pure would
+                #    silently miscompile, since P3 checks purity by declaration, not by inspecting in-place writes).
+                #  * Making it idempotent (Q to a separate buffer) costs parts x prep per head -- 5 x 6.06 = 30 us/layer
+                #    here -- to delete one ~1.2 us hand-off: round 7's folded-top-k mistake at 25x the ratio.
+                #  * Letting only partition 0 do the prep does not remove the edge, it relabels it: partitions 1..parts-1
+                #    would wait on task (0, h), whose event is published after its WHOLE body, so they wait prep + attn
+                #    (6.06 + 1.91) instead of prep (6.06). Strictly worse by attn's body.
+                # The serialization is semantic: attn(p, h) needs all G q rows plus the k/v cache rows of head h, and those
+                # are a function of this step's qkv. Shortening the block means shortening prep's own dependent chain
+                # (8.8 hops measured, ~3-4 necessary), not re-drawing the task boundaries.
+                add("dsl_attn", L, "attn", (1, parts, d.NKV))
+            elif DSL_ATTNHEAD:
+                if not d.qk_norm or d.G + 2 > THREADS // 64:
+>                   raise SystemExit("ETX_VL_DSL_ATTN=head needs q/k norm and G + 2 waves per workgroup (etx/ops/attnprep.py)")
+E                   SystemExit: ETX_VL_DSL_ATTN=head needs q/k norm and G + 2 waves per workgroup (etx/ops/attnprep.py)
+
+examples/vllm_llm/model.py:318: SystemExit
+=========================== short test summary info ============================
+FAILED tests/test_decode_entry.py::test_model_py_builds_what_the_entry_prints[mixtral-8x7b]
+1 failed, 782 passed, 15 skipped in 257.11s (0:04:17)
+
+[exit status: 1]
+
+$ bash examples/vllm_llm/local_matrix.sh
+[qwen3-8b uc_s1] rc=0   tasks=40622 events=364 eliminated=[] megakernel_d0 vgpr 117 spill 0 lds 41336; unfused_d0 vgpr 104 spill 0 lds 41304;  UC plan ok: all 364 grids static, 108 KV-cache grids entirely on XCD 0 
+[qwen3-8b xcd_s1] rc=0   tasks=40622 events=364 eliminated=[] megakernel_d0 vgpr 118 spill 0 lds 41336; unfused_d0 vgpr 104 spill 0 lds 41304;   
+[qwen3-8b uc] rc=0   tasks=38534 events=364 eliminated=[] megakernel_d0 vgpr 122 spill 0 lds 41448; unfused_d0 vgpr 100 spill 0 lds 41416;  UC plan ok: all 364 grids static, 108 KV-cache grids entirely on XCD 0 
+[qwen3-8b chain] rc=0   tasks=37771 events=364 eliminated=[] megakernel_d0 vgpr 121 spill 0 lds 41448; unfused_d0 vgpr 100 spill 0 lds 41416;   
+[qwen3-8b xcd] rc=0   tasks=38534 events=364 eliminated=[] megakernel_d0 vgpr 122 spill 0 lds 41448; unfused_d0 vgpr 100 spill 0 lds 41416;   
+[qwen3-8b base] rc=0   tasks=37915 events=472 eliminated=[] megakernel_d0 vgpr 123 spill 0 lds 41448; unfused_d0 vgpr 100 spill 0 lds 41416;   
+[qwen2.5-1.5b uc_s1] rc=0   tasks=30254 events=284 eliminated=[] megakernel_d0 vgpr 123 spill 0 lds 41364; unfused_d0 vgpr 106 spill 0 lds 41332;  UC plan ok: all 284 grids static, 84 KV-cache grids entirely on XCD 0 
+[qwen2.5-1.5b xcd_s1] rc=0   tasks=30254 events=284 eliminated=[] megakernel_d0 vgpr 123 spill 0 lds 41364; unfused_d0 vgpr 106 spill 0 lds 41332;   
+[qwen2.5-1.5b xcd] rc=0   tasks=29778 events=284 eliminated=[] megakernel_d0 vgpr 121 spill 0 lds 41448; unfused_d0 vgpr 104 spill 0 lds 41416;   
+[qwen2.5-1.5b chain] rc=0   tasks=29183 events=284 eliminated=[] megakernel_d0 vgpr 121 spill 0 lds 41448; unfused_d0 vgpr 104 spill 0 lds 41416;   
+[qwen2.5-1.5b uc] rc=0   tasks=29778 events=284 eliminated=[] megakernel_d0 vgpr 121 spill 0 lds 41448; unfused_d0 vgpr 104 spill 0 lds 41416;  UC plan ok: all 284 grids static, 84 KV-cache grids entirely on XCD 0 
+[qwen2.5-1.5b base] rc=0   tasks=29211 events=312 eliminated=[] megakernel_d0 vgpr 121 spill 0 lds 41448; unfused_d0 vgpr 104 spill 0 lds 41416;   
+[qwen3-30b-a3b chain] rc=0   tasks=59683 events=628 eliminated=[] megakernel_d0 vgpr 123 spill 0 lds 41448; unfused_d0 vgpr 104 spill 0 lds 41416;   
+[qwen3-30b-a3b base] rc=0   tasks=59875 events=772 eliminated=[] megakernel_d0 vgpr 123 spill 0 lds 41448; unfused_d0 vgpr 104 spill 0 lds 41416;   
+[mixtral-8x7b chain] rc=0   tasks=156579 events=420 eliminated=[] megakernel_d0 vgpr 123 spill 0 lds 41384; unfused_d0 vgpr 100 spill 0 lds 41352;   
+[mixtral-8x7b base] rc=0   tasks=156611 events=452 eliminated=[] megakernel_d0 vgpr 123 spill 0 lds 41384; unfused_d0 vgpr 100 spill 0 lds 41352;   
+
+[exit status: 0]
+
+$ A='-DETX_DSL_WSUM -DETX_DSL_SCALAR -DETX_DSL_GU1 -DETX_DSL_RBATCH'
+ETX_CFLAGS="$A" bash examples/vllm_llm/rocm_build_check.sh qwen3-30b-a3b default ~/code/etx/build/rocm22/q_t
+== import (attn_mfma16_g8,attn_reduce,rms_norm_2d,silu_and_mul)
+attn_mfma16_g8         (256, 1, 1) slots=1 args=160B lds=8192B barriers=7
+attn_reduce            (128, 1, 1) slots=8 args=80B lds=2176B barriers=1
+rms_norm_2d            (256, 1, 1) slots=4 args=100B lds=320B barriers=2
+silu_and_mul           (96, 1, 1) slots=1 args=48B lds=0B barriers=0
+Traceback (most recent call last):
+  File "<string>", line 2, in <module>
+AttributeError: 'Dims' object has no attribute 'model_type'
+dsl ops gemv,topk,attnprep: /code/etx/build/rocm22/q_t/dsl_tiles.hip; /code/etx/build/rocm22/q_t/imp/imports.json updated
+== plan
+  tasks=60362 events=436 eliminated=[]
+== device code (ROCm clang 22)
+== host.hip, device pass (etx/host.h is compiled in both passes)
+host.hip device pass ok
+Function Name: etx_megakernel_d0	VGPRs: 128	AGPRs: 0	ScratchSize [bytes/lane]: 24	Occupancy [waves/SIMD]: 4	VGPRs Spill: 5	LDS Size [bytes/block]: 29736
+Function Name: etx_unfused_d0	VGPRs: 103	AGPRs: 0	ScratchSize [bytes/lane]: 0	Occupancy [waves/SIMD]: 4	VGPRs Spill: 0	LDS Size [bytes/block]: 29704
+
+[exit status: 0]
+
+$ ETX_CFLAGS="$A -DETX_VL_CHECK" bash examples/vllm_llm/rocm_build_check.sh qwen3-30b-a3b default ~/code/etx/build/rocm22/q_tc
+== import (attn_mfma16_g8,attn_reduce,rms_norm_2d,silu_and_mul)
+attn_mfma16_g8         (256, 1, 1) slots=1 args=160B lds=8192B barriers=7
+attn_reduce            (128, 1, 1) slots=8 args=80B lds=2176B barriers=1
+rms_norm_2d            (256, 1, 1) slots=4 args=100B lds=320B barriers=2
+silu_and_mul           (96, 1, 1) slots=1 args=48B lds=0B barriers=0
+Traceback (most recent call last):
+  File "<string>", line 2, in <module>
+AttributeError: 'Dims' object has no attribute 'model_type'
+dsl ops gemv,topk,attnprep: /code/etx/build/rocm22/q_tc/dsl_tiles.hip; /code/etx/build/rocm22/q_tc/imp/imports.json updated
+== plan
+  tasks=60362 events=436 eliminated=[]
+== device code (ROCm clang 22)
+== host.hip, device pass (etx/host.h is compiled in both passes)
+host.hip device pass ok
+Function Name: etx_megakernel_d0	VGPRs: 128	AGPRs: 0	ScratchSize [bytes/lane]: 24	Occupancy [waves/SIMD]: 4	VGPRs Spill: 5	LDS Size [bytes/block]: 29736
+Function Name: etx_unfused_d0	VGPRs: 103	AGPRs: 0	ScratchSize [bytes/lane]: 0	Occupancy [waves/SIMD]: 4	VGPRs Spill: 0	LDS Size [bytes/block]: 29704
+
+[exit status: 0]
+
+$ diff ~/code/etx/build/rocm22/q_t/mk.s ~/code/etx/build/rocm22/q_tc/mk.s
+155356c155356
+< 	.type	__hip_cuid_57677f646b067604,@object ; @__hip_cuid_57677f646b067604
+---
+> 	.type	__hip_cuid_786ffc90afd493c4,@object ; @__hip_cuid_786ffc90afd493c4
+155358,155359c155358,155359
+< 	.globl	__hip_cuid_57677f646b067604
+< __hip_cuid_57677f646b067604:
+---
+> 	.globl	__hip_cuid_786ffc90afd493c4
+> __hip_cuid_786ffc90afd493c4:
+155361c155361
+< 	.size	__hip_cuid_57677f646b067604, 1
+---
+> 	.size	__hip_cuid_786ffc90afd493c4, 1
+155367c155367
+< 	.addrsig_sym __hip_cuid_57677f646b067604
+---
+> 	.addrsig_sym __hip_cuid_786ffc90afd493c4
+
+[exit status: 1]
+

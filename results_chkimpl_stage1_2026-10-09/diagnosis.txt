@@ -1,0 +1,115 @@
+After the non-empty ISA diff, implementation stopped as requested.
+The only raw assembly differences are __hip_cuid symbol names; the literal diff gate did not pass. No normalization was used to waive it.
+The new test leaves the model module loaded with fixture settings, causing the subsequent Mixtral test failure. This test isolation defect remains unresolved at the stop gate.
+Both ROCm scripts exit 0 despite printing a Dims.model_type AttributeError.
+The unchanged local_matrix.sh runs 16 builds, not the stated 12.
+
+$ .venv/bin/python -m pytest -q 'tests/test_decode_entry.py::test_model_py_builds_what_the_entry_prints[mixtral-8x7b]'
+.                                                                        [100%]
+1 passed in 0.05s
+
+[exit status: 0]
+
+$ .venv/bin/python -m pytest -q tests/test_check_replicas.py 'tests/test_decode_entry.py::test_model_py_builds_what_the_entry_prints[mixtral-8x7b]'
+..F                                                                      [100%]
+=================================== FAILURES ===================================
+___________ test_model_py_builds_what_the_entry_prints[mixtral-8x7b] ___________
+
+name = 'mixtral-8x7b'
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x102cb5350>
+
+    @pytest.mark.parametrize("name", decode.KNOWN)
+    def test_model_py_builds_what_the_entry_prints(name, monkeypatch):
+        """Every plan instance of model.py has the export that the printed selection names for its phase."""
+        _, cfg = decode.resolve(name)
+        monkeypatch.setenv("ETX_LLM_CONFIG", str(cfg))
+        from examples.vllm_llm import model as M
+        p = decode.select(cfg)
+        seen = set()
+>       for i in M.instances(load_dims(str(cfg))):
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_decode_entry.py:42: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+d = Dims(name='mixtral-8x7b', H=4096, NH=32, NKV=8, HD=128, INTER=14336, L=32, V=32000, eps=1e-05, theta=1000000.0, tie=Fa...=False, moe=True, E=8, TOPK=2, MI=14336, norm_topk=True, ln_norm=False, sparsemixer=False, bias_o=False, bias_lm=False)
+
+    def instances(d) -> list[dict]:
+        """The launches of one decode step, in vLLM's order."""
+        parts = math.ceil(MAXLEN / PART)
+        FOLD_TOPK = fold_topk(d)
+        global DSL_ATTNHEAD
+        DSL_ATTNHEAD = _attn_head(d)
+        out = []
+        moe_specs = {role: launch_for(d, role) for role in ("up", "down")} if d.moe and not DSL_GEMV else {}
+        # The norm folds live in dsl_gemv_fold, which is written for the MoE model (host.hip:394 stops it at E == 0), and
+        # PhiMoE needs them (no imported LayerNorm). A dense model keeps its norm phases (etx.select default_structure).
+        FOLD = DSL_FOLD and (bool(d.moe) or bool(getattr(d, "ln_norm", False)))
+        # etx.select (section 6.2): the planner's variant for each GEMV phase. A phase whose shape is outside every DSL
+        # GEMV variant (Qwen3-8B down: K = 12288 > 4096, host.hip:358) gets wvSplitK instead of a run that stops.
+        gemv_sel = {}
+        if DSL_GEMV:
+            try:
+                gemv_sel = etx_select.plan(
+                    d, "gfx942", None, variants=[v for v in etx_select.REGISTRY if v.phase in etx_select.GEMV_PHASES],
+                    structure=etx_select.Structure(fold_norms=FOLD, fold_topk=FOLD_TOPK, attn_head=DSL_ATTNHEAD)).phases
+            except etx_select.NoLegalVariant:
+                gemv_sel = {}                                    # no override: host.hip keeps its checks
+    
+        def add(export, layer, role, grid=None, **kw):
+            if export in OPERATORS:
+                expected = grid_for(export, d, role=role, cu=CU, parts=parts)
+                if grid is not None and grid != expected:
+                    raise ValueError(f"{export}: grid conflicts with operator specification")
+                grid = expected
+            out.append({"export": export, "layer": layer, "role": role, "grid": grid, **kw})
+    
+        def gemv(layer, role, m, k):
+            key = role + "@0" if layer == 0 and role + "@0" in gemv_sel else role
+            if DSL_GEMV and (key not in gemv_sel or gemv_sel[key].kind == "dsl"):   # else: the planner's fallback
+                # rows per task = ceil(M / CU): at 304, 17 (qkv), 7 (o_proj), 1 (router)
+                fold = FOLD and (role in ("router", "lm_head") or (role == "qkv" and (layer > 0 or getattr(d, "ln_norm", False))))
+                add("dsl_gemv_fold" if fold else "dsl_gemv", layer, role, (CU, 1, 1), M=m, K=k, wvprgrp=0)
+                return
+            y = wvsplitk_ytile(m)
+            waves = mindiv(m, CU * y, 16)
+            validate_wvsplitk(grid=(CU, 1, 1), cu_count=CU, rows=m, ytile=y, wave_groups=waves)
+            add(f"wvsplitk_y{y}", layer, role, None, M=m, K=k, wvprgrp=waves)
+    
+        attn = {4: "attn_mfma4_g4", 6: "attn_mfma16_g6", 8: "attn_mfma16_g8"}[d.G]
+        for L in range(d.L):
+            if not (FOLD and (L > 0 or getattr(d, "ln_norm", False))):
+                if getattr(d, "ln_norm", False):
+                    raise SystemExit("ln_norm (PhiMoE) needs the DSL fold path: there is no imported LayerNorm kernel "
+                                     "(set ETX_VL_DSL_GEMV=1 ETX_VL_DSL_FOLD=1, the defaults)")
+                add("rms_norm_2d" if L == 0 else "fused_add_rms_norm", L, "in_norm")
+            gemv(L, "qkv", d.NQKV, d.H)
+            if DSL_ATTN:
+                # prep + cache + attention in one block per (partition, kv head). NOTE (round 9, 2026-10-01): this shape
+                # cannot be built correctly as written, and it is not the way to shorten the attention block.
+                #  * dsl_attnprep transforms qkv IN PLACE (reads row, rms-norms + ropes it, writes the same row), so it is
+                #    not idempotent: any decomposition that runs it in more than one task per kv head applies norm+rope
+                #    twice and is simply wrong. That also rules out Pass 3's prologue recomputation (p3_event_elim, which
+                #    gates on grid.pure -- prep is not marked pure, so P3 never fires on it today; marking it pure would
+                #    silently miscompile, since P3 checks purity by declaration, not by inspecting in-place writes).
+                #  * Making it idempotent (Q to a separate buffer) costs parts x prep per head -- 5 x 6.06 = 30 us/layer
+                #    here -- to delete one ~1.2 us hand-off: round 7's folded-top-k mistake at 25x the ratio.
+                #  * Letting only partition 0 do the prep does not remove the edge, it relabels it: partitions 1..parts-1
+                #    would wait on task (0, h), whose event is published after its WHOLE body, so they wait prep + attn
+                #    (6.06 + 1.91) instead of prep (6.06). Strictly worse by attn's body.
+                # The serialization is semantic: attn(p, h) needs all G q rows plus the k/v cache rows of head h, and those
+                # are a function of this step's qkv. Shortening the block means shortening prep's own dependent chain
+                # (8.8 hops measured, ~3-4 necessary), not re-drawing the task boundaries.
+                add("dsl_attn", L, "attn", (1, parts, d.NKV))
+            elif DSL_ATTNHEAD:
+                if not d.qk_norm or d.G + 2 > THREADS // 64:
+>                   raise SystemExit("ETX_VL_DSL_ATTN=head needs q/k norm and G + 2 waves per workgroup (etx/ops/attnprep.py)")
+E                   SystemExit: ETX_VL_DSL_ATTN=head needs q/k norm and G + 2 waves per workgroup (etx/ops/attnprep.py)
+
+examples/vllm_llm/model.py:318: SystemExit
+=========================== short test summary info ============================
+FAILED tests/test_decode_entry.py::test_model_py_builds_what_the_entry_prints[mixtral-8x7b]
+1 failed, 2 passed in 0.39s
+
+[exit status: 1]
+
