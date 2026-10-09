@@ -27,6 +27,7 @@ jobs, their last log line, and a warning for any job silent past quiet_s), and a
 <logdir>/status.json is atomically refreshed on every transition (including skipped jobs). Exit code 0 only if every job that ran finished OK.
 The runner exclusively creates <logdir>/runner.log. If it already exists (or status.json exists),
 the new session uses a unique session-* subdirectory for runner, status and job logs; the selected path is printed.
+Every job receives that directory as ETX_SESS_LOGDIR.
 """
 from __future__ import annotations
 
@@ -158,6 +159,7 @@ class Runner:
         if gpu is not None:
             env["HIP_VISIBLE_DEVICES"] = str(gpu)
             env["GPU"] = str(gpu)
+        env["ETX_SESS_LOGDIR"] = str(self.logdir.resolve())
         env["PYTHONUNBUFFERED"] = "1"
         cwd = os.path.expanduser(j.cwd)
         fh = open(j.log, "w")

@@ -31,6 +31,7 @@ def job(**kw):
 
 
 S = '$HOME/sess'
+LOGS = "${ETX_SESS_LOGDIR:-$HOME/sess}"
 MODEL = '$HOME/llm/qwen3-30b-a3b'
 IMAGE = 'vllm/vllm-openai-rocm:v0.27.1'
 finished = []
@@ -50,4 +51,4 @@ for arm, rnd in [('etx', 1), ('vnd', 1), ('vnd', 2), ('etx', 2), ('etx', 3), ('v
         quiet_s=60, cmd=cmd, summary=[r'^RESULT|^KC|REFUSED'])
     finished.append(name)
 job(name='kc_report', lane='cpu', after_any=list(finished), timeout=60,
-    cmd=f'.venv/bin/python -m examples.vllm_llm.kcmp_report {S}', summary=[r'.'])
+    cmd=f'.venv/bin/python -m examples.vllm_llm.kcmp_report {LOGS}', summary=[r'.'])
