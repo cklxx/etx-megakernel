@@ -5,11 +5,11 @@ Session specification (2026-10-08, evidence fixes based on `423c040`). The sessi
 
 ## 0. Why 227 tok/s does not answer the question yet
 - 4.405 ms is a device span: `~/code/etx/results_tiles/ab2_all_x.log:8` reads `median_ms=4.405 wall_ms=4.548` (32/32;
-  rounds 1 and 3 in `ab1_all_x.log:8`, `ab3_all_x.log:8`; the set is not yet in `docs/DATA.md`). vLLM's figures are
+  rounds 1 and 3 in `ab1_all_x.log:8`, `ab3_all_x.log:8`; the set is archived in `results_tiles.tgz` and indexed in `docs/DATA.md`). vLLM's figures are
   host time (`docs/VLLM-LADDER-2026-10-01.md:30-31`): ETX read 0.045 ms (0.9%) behind on the device basis and 0.242 ms
   (5.0%) on the wall basis (`:49`), from 0.197 ms of per-step host work the device timer excludes (`:38,41`; 0.143 ms
   in the tile session). The ladder ran on an MI300X VF, ROCm 7.14 (`:3`), the tiles on a Hot Aisle box, and absolute
-  ms/token does not transfer between machines (`docs/DATA.md:64`). Both arms therefore run in one session, on one GPU.
+  ms/token does not transfer between machines (`docs/DATA.md:66`). Both arms therefore run in one session, on one GPU.
 
 ## 1. Timing basis (decided): host wall time per decode step, batch 1
 It is the only basis vLLM's harness yields (`examples/llm/vllm_bench.py:4-5,74`), and it includes the per-step host
@@ -44,7 +44,7 @@ cost a user pays. **vLLM stays unchanged; ETX changes** from the device span (`m
   The separate `record` job prints `HF_REV` from `huggingface_hub.model_info('Qwen/Qwen3-30B-A3B').sha`.
 
 ## 3. vLLM arm: `examples/llm/vllm_bench.py`, unchanged
-Image `vllm/vllm-openai-rocm:v0.27.1`, vLLM 0.27.1 (`docs/DATA.md:69-70`). Default flags, AITER off, the strongest
+Image `vllm/vllm-openai-rocm:v0.27.1`, vLLM 0.27.1 (`docs/DATA.md:71-72`). Default flags, AITER off, the strongest
 measured: default 4.862 vs `--custom-ops all` 4.889 (`VLLM-LADDER:15-16`); AITER off 4.836 vs on 4.916
 (`examples/llm/results/vllm_aiter0_qwen3-30b-a3b.json:6`, `vllm_aiter1_….json:6`). Batch 1 only; 32 greedy tokens,
 `ignore_eos` (`vllm_bench.py:35,64`); warm-up `gen(32)` + `gen(1)` per invocation (`:69`); 5 runs, one invocation per
@@ -159,9 +159,9 @@ their tok/s includes prefill or TTFT (their methodology page could not be fetche
 - **Not supported:** anything about H200 or B200, including "matches or beats NVIDIA": checkpoint, prompts, output
   length, software and basis differ, so no ratio chaining. Their stock-vLLM MI300X 6.16 against our vLLM 4.862
   (`VLLM-LADDER:15`) already shows protocol and version moving the number about 27% (uncontrolled observation). Also
-  not: batch > 1, serving latency, other machines (`DATA.md:64`). The ETX GEMVs and MoE are ETX's own DSL tiles
-  (`build.sh:31-35`; only attention, reduce, rms_norm, silu are vLLM's, `:36-39`), so a lead is an ETX-system result;
-  the AGENTS.md section 1 claim rests only on the fused-against-unfused pair.
+  not: batch > 1, serving latency, other machines (`DATA.md:66`). The ETX GEMVs and MoE are ETX's own DSL tiles
+  (GEMV, MoE, top-k, attention prologue), with vLLM's attention, attention-reduce and RMSNorm kernels; a lead against vLLM is an ETX-system result.
+  AGENTS.md section 1 claims this mixed-kernel megakernel beats a HIP-graph replay of the same kernels on one MI300X, Qwen3-30B-A3B batch-1 decode: `examples/vllm_llm/pairs.py` must return ESTABLISHED on host wall time (five interleaved pairs in one session on one GPU, every gain positive, median above 2% and twice the spread), with every imported launch `host --check` OK and 32/32 tokens equal to HF greedy. Status 2026-10-09: not established (best 1.7%, `results_2026-10-01/round18/FINDING.md:55`). vLLM-only fusion loses (-0.171 and -0.284 ms, `results_2026-10-01/round24/FINDING.md:27-28`) and is not claimed. Kernel quality is not ETX's claim; tuning ETX tiles to win still needs the owner's request.
 
 ## 7. Go/no-go, fixed before the run
 Δ_R = ETX fused 31-step mean - vLLM per-token, same round. Threshold 0.050 ms is a decision rule, not an observed noise bound. The cited graph-enabled vLLM
@@ -189,7 +189,7 @@ rule, not the measured fusion verdict (`examples/vllm_llm/pairs.py:33-34`); unav
 - **LOSS action:** report no lead, check the machine record, and apply the same host-work branch
   (`fff11e6:docs/SPEC-nv-reference-2026-10-08.md:120-121`).
 - **INSUFFICIENT action:** make no lead/loss claim; inspect the machine record and paired spread before treating the
-  host-work branch as actionable (`fff11e6:docs/SPEC-nv-reference-2026-10-08.md:120-121`; `docs/ROADMAP.md:141-144`).
+  host-work branch as actionable (`fff11e6:docs/SPEC-nv-reference-2026-10-08.md:120-121`; `docs/ROADMAP.md:146-149`).
 
 ## 8. Before provisioning (CPU), then the session
 P1 `.venv/bin/python -m pytest -q`, including `tests/test_nvref_report.py` (synthetic pass, 31/32 refusal, missing run,
@@ -206,7 +206,7 @@ examples/sessions/nvref.py --dry-run`. P5 `shasum -a 256` of the golden equals s
 `status` every 5 min; `fetch <ip> ~/code/etx/results_nvref_<date>`; delete the VM; confirm "No virtual machines".
 
 ## 9. Cost (estimates from `results_tiles/runner.log` and `vllm_ladder/driver.log`)
-Setup to the first gate 6.5 min (`runner.log:66`); image pull 5-10 min in parallel (`DATA.md:54`); a vLLM run about 71 s
+Setup to the first gate 6.5 min (`runner.log:66`); image pull 5-10 min in parallel (`DATA.md:56`); a vLLM run about 71 s
 (`driver.log:1-3`), an ETX run about 23 s (`runner.log` status table). Rounds 5 x (71 + 23 + 23) s = 9.8 min; gates
 1.5 min; nice to have 4.5 min. GPU busy about 19 min, runner 25 min, VM life 35 min. At $2.99/h for one MI300X: $1.74
 billed per minute, $2.99 under a 1-hour minimum (recorded for 2x: `tools/hotaisle_grab.sh:4`, `docs/PLAN-v3.md:178`;
@@ -247,8 +247,8 @@ checked against this section; a miss is a finding, not a reason to re-run.
   The six tile builds were bit-identical (`bitcmp.log:19-24`), so a failure means the binary or machine changed.
   `gate_unf`: 32/32 `[E]`; this build never ran unfused. `build_all`: spill 9 / scratch 40 `[M, buildlog_all.txt:27]`.
 - `record`: rocm-smi product name, `/opt/rocm/.info/version`, `uname -r`, `nproc`, an `lspci` line and an `HF_REV` line.
-  Expected MI300X, ROCm 7.2.4, bare metal `[M-derived, docs/DATA.md:60]` for the planned Hot Aisle box;
-  VF / ROCm 7.14 is the historical alternate, not that expectation (`docs/DATA.md:61`). No sourced expectation
+  Expected MI300X, ROCm 7.2.4, bare metal `[M-derived, docs/DATA.md:62]` for the planned Hot Aisle box;
+  VF / ROCm 7.14 is the historical alternate, not that expectation (`docs/DATA.md:63`). No sourced expectation
   for `uname -r`, `nproc` or the exact HF SHA; record them, do not invent values.
   The hub lookup falls back to `HF_REV unknown (...)`, so a hub failure cannot refuse the report.
 - `IMAGE`: expected `vllm/vllm-openai-rocm@sha256:<digest>` `[E, examples/sessions/nvref.py:47-49]` from the
@@ -276,7 +276,7 @@ checked against this section; a miss is a finding, not a reason to re-run.
   2507.4 / 12.3 and 8.5 / 11.4 us; reduce 9.5 / 9.1 and 7.0 / 9.5 us (`:10-11,26-27`). These one-launch
   event timings include very large first-original costs and a different build: no defensible steady-state
   expected overhead range or pass threshold is sourced for chk1. They are diagnostic evidence toward the
-  roadmap's import-overhead control (`docs/ROADMAP.md:134`), not its native-operators-in-a-Graph measurement.
+  roadmap's import-overhead control (`docs/ROADMAP.md:139`), not its native-operators-in-a-Graph measurement.
 - vLLM default: 4.83-4.91 per run `[M-derived: VLLM-LADDER:15, results_2026-09-28b/vllm1_b1_default.log:67,
   results_2026-09-27/vlnext/vllm_moe_b1.log:65; this image was never measured on this box]`.
 - ETX fused wall: 4.53-4.56 `[M, ab1..3_all_x.log:8]`; device 4.39-4.42 `[M]`. Unfused: 4.61-4.65 `[E: 4.405 + device
