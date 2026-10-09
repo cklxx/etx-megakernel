@@ -1,0 +1,18 @@
+155356c155356
+< 	.type	__hip_cuid_57677f646b067604,@object ; @__hip_cuid_57677f646b067604
+---
+> 	.type	__hip_cuid_786ffc90afd493c4,@object ; @__hip_cuid_786ffc90afd493c4
+155358,155359c155358,155359
+< 	.globl	__hip_cuid_57677f646b067604
+< __hip_cuid_57677f646b067604:
+---
+> 	.globl	__hip_cuid_786ffc90afd493c4
+> __hip_cuid_786ffc90afd493c4:
+155361c155361
+< 	.size	__hip_cuid_57677f646b067604, 1
+---
+> 	.size	__hip_cuid_786ffc90afd493c4, 1
+155367c155367
+< 	.addrsig_sym __hip_cuid_57677f646b067604
+---
+> 	.addrsig_sym __hip_cuid_786ffc90afd493c4

@@ -1,0 +1,5 @@
+2c2
+< s_mov_b32 s0, 0
+---
+> s_mov_b32 s0, 1
+Non-hip_cuid mutation exit status: 1

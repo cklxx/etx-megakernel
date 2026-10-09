@@ -1,0 +1,26 @@
+F.                                                                       [100%]
+=================================== FAILURES ===================================
+___________ test_replicated_imports_are_single_task_without_precopy ____________
+
+tmp_path = PosixPath('/private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-520/test_replicated_imports_are_si0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x1039e69e0>
+isolated_model = None
+
+    def test_replicated_imports_are_single_task_without_precopy(tmp_path, monkeypatch, isolated_model):
+        _build(tmp_path, monkeypatch, str(ROOT / "examples/llm/configs/qwen3-30b-a3b.json"), "head")
+        rows = [line.split() for line in (tmp_path / "vl_plan.txt").read_text().splitlines()[2:]]
+        replicated = [r for r in rows if not r[1].startswith("dsl_") and int(r[12]) > 1]
+        replicated[0][8] = "2"  # mutation: break the plan invariant
+        assert replicated, "fixture must exercise the replicated original-launch branch"
+        for r in replicated:
+>           assert int(r[8]) == 1 and int(r[14]) == -1, r
+E           AssertionError: ['0', 'rms_norm_2d', '0', 'in_norm', '1', '1', ...]
+E           assert (2 == 1)
+E            +  where 2 = int('2')
+
+tests/test_check_replicas.py:31: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_check_replicas.py::test_replicated_imports_are_single_task_without_precopy
+1 failed, 1 passed in 0.12s
+
+exit status: 1

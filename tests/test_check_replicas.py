@@ -1,8 +1,27 @@
 """The original-replay branch is valid only for replicated x-form imports."""
+import sys
+
+import pytest
+
 from test_moe_mapping import ROOT, _build
 
 
-def test_replicated_imports_are_single_task_without_precopy(tmp_path, monkeypatch):
+@pytest.fixture
+def isolated_model():
+    # _build reloads this shared module and build() also derives DSL_ATTNHEAD.
+    # Restore the whole namespace, including cached/derived values, not just env.
+    path = sys.path[:]
+    from examples.vllm_llm import model
+    saved = vars(model).copy()
+    try:
+        yield
+    finally:
+        vars(model).clear()
+        vars(model).update(saved)
+        sys.path[:] = path
+
+
+def test_replicated_imports_are_single_task_without_precopy(tmp_path, monkeypatch, isolated_model):
     _build(tmp_path, monkeypatch, str(ROOT / "examples/llm/configs/qwen3-30b-a3b.json"), "head")
     rows = [line.split() for line in (tmp_path / "vl_plan.txt").read_text().splitlines()[2:]]
     replicated = [r for r in rows if not r[1].startswith("dsl_") and int(r[12]) > 1]

@@ -1,0 +1,53 @@
+Stage 1 revised acceptance, 2026-10-09
+
+ISA acceptance (bash; no other normalization is permitted):
+  diff ~/code/etx/build/rocm22/q_t/mk.s ~/code/etx/build/rocm22/q_tc/mk.s
+  diff <(sed 's/__hip_cuid_[0-9a-f]*/__hip_cuid_X/g' ~/code/etx/build/rocm22/q_t/mk.s) <(sed 's/__hip_cuid_[0-9a-f]*/__hip_cuid_X/g' ~/code/etx/build/rocm22/q_tc/mk.s)
+The raw command returns 1 with 18 lines (isa_raw.diff); the acceptance command
+returns 0 with 0 lines (isa_normalized.diff). Each file is 5,094,835 bytes.
+Any non-hip_cuid difference fails acceptance. isa_mutation.txt demonstrates
+an instruction mutation returning 1. These are the retained stage-1 builds;
+this fix changes only test isolation and acceptance notes, not host/device code.
+Complete original build outputs: ../results_chkimpl_stage1_2026-10-09/acceptance.txt.
+
+Isolation: _build reloads examples.vllm_llm.model with environment-derived state,
+then build() changes DSL_ATTNHEAD. The fixture now restores the entire module
+namespace and sys.path in finally; monkeypatch restores the environment.
+No shared reload-isolation fixture was found in the repository tests.
+No pre-existing assertion was changed or relaxed; the Mixtral test is untouched.
+The replica-invariant mutation still fails (mutation.txt), then was restored.
+
+Both orders in one command (orders.txt):
+  bash -c '.venv/bin/python -m pytest -q tests/test_check_replicas.py "tests/test_decode_entry.py::test_model_py_builds_what_the_entry_prints[mixtral-8x7b]" && .venv/bin/python -m pytest -q "tests/test_decode_entry.py::test_model_py_builds_what_the_entry_prints[mixtral-8x7b]" tests/test_check_replicas.py'
+
+Clean-main comparison: detached clean worktree at b935419,
+/Users/ckl/code/.wt/etx-chkimpl-main. Command (rocm_main.txt):
+  ETX_CFLAGS='-DETX_DSL_WSUM -DETX_DSL_SCALAR -DETX_DSL_GU1 -DETX_DSL_RBATCH' bash examples/vllm_llm/rocm_build_check.sh qwen3-30b-a3b default /Users/ckl/code/etx/build/rocm22/q_main
+Used the already-present etx-rocm22 image; no pull, network request or GPU.
+The script asks cfg model_type although Dims has no such field. The command
+substitution fails inside a test/AND list, so bash does not exit under set -e;
+the empty string is != qwen2, selecting attnprep. For THIS Qwen3 qk_norm=True
+configuration, attnprep is the correct selection. The traceback predates this
+change. The compiler's resource report describes the successfully compiled
+actual source and remains trustworthy for this configuration; this does not
+validate the broken model-type probe for other models. No unrelated fix made.
+
+Rule drift (AGENTS.md unchanged): "examples/vllm_llm/local_matrix.sh, all 12 builds"
+(the source wraps that phrase in parentheses). The actual matrix has 16 builds.
+
+Specification precedence retained: Opus wins for stage 1 replica handling and
+position 1040 (not 1024); stage 3 is examples/sessions/nvchk.py with ETX_SYNC=block
+triplets, not import_complete.py or the host-attribution experiment. No merge
+of those alternatives and no change to the default synchronization mode.
+
+Clean-main result: exit 0, same traceback, fused VGPRs 128 / spill 5 / scratch 24,
+unfused VGPRs 103 / spill 0 / scratch 0. Normalized main-vs-q_t ISA diff:
+0 lines, exit 0 (main_isa_normalized.diff). Clean worktree status was empty.
+
+.venv/bin/python -m pytest -q: exit 0; full output in pytest.txt:
+783 passed, 15 skipped in 287.53s (0:04:47)
+Both-order command: exit 0; 3 passed in 0.10s; 3 passed in 0.12s.
+Read git diff main...HEAD -- tests/: only the new test_check_replicas.py;
+no pre-existing assertion changed. tests.diff captures the fixed version.
+
+bash examples/vllm_llm/local_matrix.sh: exit 0; 16/16 lines rc=0 (matrix.txt).
