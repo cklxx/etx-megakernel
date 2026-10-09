@@ -20,6 +20,7 @@ A session may define MAX_SESSION_SECONDS for an aggregate hard stop from runner
 start, including setup. At expiry all running process groups are killed and
 pending jobs skipped; the runner exits nonzero. VM deletion remains the operator's
 responsibility; start earlier to respect an allocation-time budget.
+ETX_SESS_MAX_SECONDS overrides MAX_SESSION_SECONDS for one run and must be finite and positive.
 
 Every GPU job gets HIP_VISIBLE_DEVICES=$GPU, so a single-GPU program runs on the lane's GPU; a docker command passes
 `-e HIP_VISIBLE_DEVICES=$GPU` itself. Order the list by priority (microbenchmarks and correctness first, captures last):
@@ -77,6 +78,17 @@ class Job:
     note: str = ""
 
 
+def session_limit(limit: float | None) -> float | None:
+    if "ETX_SESS_MAX_SECONDS" in os.environ:
+        try:
+            limit = float(os.environ["ETX_SESS_MAX_SECONDS"])
+        except ValueError:
+            raise SystemExit("MAX_SESSION_SECONDS must be finite and positive") from None
+    if limit is not None and (not isinstance(limit, (int, float)) or not math.isfinite(limit) or limit <= 0):
+        raise SystemExit("MAX_SESSION_SECONDS must be finite and positive")
+    return limit
+
+
 def load_session(path: str | Path) -> tuple[list[Job], float | None]:
     spec = importlib.util.spec_from_file_location("etx_session", path)
     mod = importlib.util.module_from_spec(spec)
@@ -102,9 +114,7 @@ def load_session(path: str | Path) -> tuple[list[Job], float | None]:
                 raise SystemExit(f"job {j.name}: unknown dependency {dep!r}")
         if j.lane not in ("gpu", "cpu"):
             raise SystemExit(f"job {j.name}: lane must be gpu or cpu")
-    limit = getattr(mod, "MAX_SESSION_SECONDS", None)
-    if limit is not None and (not isinstance(limit, (int, float)) or not math.isfinite(limit) or limit <= 0):
-        raise SystemExit("MAX_SESSION_SECONDS must be finite and positive")
+    limit = session_limit(getattr(mod, "MAX_SESSION_SECONDS", None))
     return jobs, limit
 
 
