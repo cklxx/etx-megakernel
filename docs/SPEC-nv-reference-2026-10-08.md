@@ -369,6 +369,18 @@ stalled-call sample; it does not guarantee this spread if drift or repeated/corr
 The earlier 0.049 ms is the non-outlier range, not the complete previous arm's spread. Retain every raw
 `full_ms`, `one_ms` and per-token sample, including outliers, and report whether this prediction held.
 
+**MISSED — outcome, 2026-10-09.** The §12 prediction missed: **0.032 ms** against **≤0.020 ms**.
+**4.920, 4.921, 4.911, 4.899, 4.889 ms** are the five reported default medians
+(`results_nvref2_2026-10-09/session-7de5pood/vllm_r1.log` through `vllm_r5.log`).
+**LEAD resolved this session:** paired-delta spread **0.036 ms**, inside §7's **0.050 ms** criterion
+(`results_nvref2_2026-10-09/report.log`, re-rendered from the runner's own directory).
+**NOT-COMPLETE** in the runner's report read the aborted attempt's status; the logdir fix is in review.
+**0.032632 ms** is the full-precision JSON spread; the report uses rounded log medians, and both miss.
+**ROCm 7.14.0** replaces the earlier **7.2.4** environment; **10 spills / 44 bytes scratch** replace **9 / 40**
+(`results_nvref2_2026-10-09/session-7de5pood/record.log`, `build_all.log`; earlier `results_nvref_2026-10-09/build_all.log`).
+**Clang 23** is owner-reported; this is not a rebuild of the same binary.
+**One LEAD on a VF**, with import coverage unchanged, is the scope; see [reconciliation](NVREF2-2026-10-09.md).
+
 **Go/no-go, unchanged.** Section 7's primary system rule, verbatim:
 
 - The primary verdict uses only fused ETX versus vLLM; unavailable fusion evidence does not change it.

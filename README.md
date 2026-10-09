@@ -39,13 +39,25 @@ See design section 15.9.
 
 ## Status: ETX at batch 1 (2026-10-09)
 
-Qwen3-30B-A3B bf16 decode, batch 1, one Hot Aisle MI300X VF: ETX megakernel **4.526 ms/token wall, 4.393 device** (`results_nvref_2026-10-09/report.log:3,7,9`), 32/32 tokens, `CHECK-DSL OK` (`results_nvref_2026-10-09/gate_all.txt:20-23`). A same-machine comparison now exists; its verdict is **INSUFFICIENT** (`results_nvref_2026-10-09/report.log:20`; [session record](docs/NVREF-2026-10-09.md)).
+**LEAD — one session on an AMD Developer Cloud MI300X VF**, ROCm 7.14.0.
+**Qwen3-30B-A3B bf16, batch 1, prompt 1024, 32 greedy tokens**, GPU 0.
+**-0.449 ms** is the paired wall delta against vLLM default; spread **0.036 ms**.
+**LEAD** comes from re-rendering the runner's own directory, not its erroneous NOT-COMPLETE report job
+(`results_nvref2_2026-10-09/report.log`; [reconciliation](docs/NVREF2-2026-10-09.md)).
 
 | | ms/token wall | Basis / source |
 |---|---|---|
-| **ETX megakernel** | **4.526** (4.393 device) | Supersedes 4.548 (4.405 device); same-session MI300X VF; `results_nvref_2026-10-09/report.log:7,9` |
-| vLLM 0.27.1 default | 4.809 | Supersedes the earlier VF-box 4.862; same session; `results_nvref_2026-10-09/report.log:6` |
-| vLLM + AITER | 4.942 | Supersedes the historical 4.975; same session; `results_nvref_2026-10-09/report.log:21` |
+| **ETX megakernel** | **4.463** | Median of five final 31-step means; `results_nvref2_2026-10-09/report.log` |
+| vLLM 0.27.1 default | 4.911 | Median of five round medians, five samples each; same report |
+| vLLM + AITER | 4.982 | Median of three one-sample jobs; same report |
+
+**3.51% / +0.162 ms** wall fusion against the same kernels in a HIP graph passes again (same report).
+**3.50%** is the independent `pairs.py` RESULT-median wall gain; both bases pass ([commands and sources](docs/NVREF2-2026-10-09.md#measurements-m)).
+**32/32 tokens** and `CHECK-DSL OK` passed; import identity still covers only **5 of 97 instances**, in chk1.
+**MISSED:** §12 predicted ≤0.020 ms vLLM round spread; the report measured **0.032 ms**.
+**INSUFFICIENT** remains the first session's system verdict (`results_nvref_2026-10-09/report.log`).
+**One LEAD on a VF** covers only default/AITER vLLM configurations, not its strongest possible configuration.
+**No absolute milliseconds are compared across sessions.** See the [gains table](docs/GAINS-TABLE.md).
 
 The comparison rows for `**ETX megakernel** | **4.823**` and 4.998 unfused are withdrawn for having no raw logs (`docs/DOC-AUDIT-2026-10-03.md:149`).
 
@@ -65,7 +77,8 @@ Asynchronous host work per step saved −0.152. Non-temporal weight loads saved 
 The coherent paths previously issued one memory request per lane per 2-byte element.
 Vector accesses saved −0.105 in the folded norm and −0.074 in the attention prologue.
 
-The former 0.8% claim used withdrawn rows; the superseding same-session verdict is INSUFFICIENT (`results_nvref_2026-10-09/report.log:20`).
+**INSUFFICIENT** was the first reference verdict; **LEAD** occurred once in nvref2 on a VF (`results_nvref_2026-10-09/report.log:20`; `results_nvref2_2026-10-09/report.log`).
+**0.8%** remains withdrawn because its rows had no raw logs.
 The budget explains the remaining time.
 Handoff is at the event protocol's floor. Workgroup start delay is below the hardware dispatcher's own jitter.
 Fused host work is 0.133 ms (`results_nvref_2026-10-09/report.log:18`). The instruction cache hit rate is 99.90%.
