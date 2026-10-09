@@ -3,12 +3,14 @@
 # (jobs tagged machine="A" / "B" in the session file), fully detached from ssh, logging to ~/sess.
 #
 #   tools/session.sh push   <ip>                     rsync etx, fleet-mi300x, vLLM csrc, pytorch headers (no .git/.venv/build)
+#   tools/session.sh preflight <ip>                check pushed tree, ROCm, dry run and Docker (no pull)
+#   tools/session.sh postmortem <ip> <dest>          fetch and report failed/skipped jobs and runner minutes
 #   tools/session.sh start  <ip> <session.py> [gpus] [machine]   start the runner (gpus default: all the VM has)
 #   tools/session.sh status <ip>                     runner alive?, last 25 lines of its log
 #   tools/session.sh fetch  <ip> <dest>              pull ~/sess (small files; *.bin traces too) into <dest>
 set -uo pipefail
 # ETX_SESS_USER overrides the login (Hot Aisle VMs use hotaisle; other providers may give root)
-CMD=${1:?push|start|status|fetch}; IP=${2:?ip}; H=${ETX_SESS_USER:-hotaisle}@$IP
+CMD=${1:?push|preflight|start|status|fetch|postmortem}; IP=${2:?ip}; H=${ETX_SESS_USER:-hotaisle}@$IP
 SSH="ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new $H"
 case $CMD in
   push)
@@ -21,6 +23,45 @@ case $CMD in
     rsync -azL rocm-headers/inc $H:~/rocm-headers/ &&
     { [ ! -d ~/code/etx-cache/fleet_ref ] || rsync -az ~/code/etx-cache/fleet_ref/ $H:~/fleet-mi300x/; } &&   # kept reference outputs
     $SSH 'rocm-smi --showproductname | grep -c "Card Series" | sed "s/^/GPUs: /"; nproc | sed "s/^/cores: /"; df -h ~ | tail -1' ;;
+  preflight)
+    $SSH bash -s <<'REMOTE'
+failed=0
+check() {
+    if ! eval "$2"; then
+        printf 'PREFLIGHT FAIL %s: %s\n' "$1" "$2"
+        failed=1
+    fi
+}
+check pushed-tree 'test -f ~/rocm-headers/inc/hip/hip_runtime.h && test -d ~/rocm-headers/pytorch && test -f ~/etx/etx/tools/gpu_jobs.py && echo PUSH-OK'
+version_cmd='cat /opt/rocm/.info/version 2>/dev/null || cat /opt/rocm/core-*/.info/version 2>/dev/null || hipconfig --version 2>/dev/null'
+version=$(eval "$version_cmd")
+if [ -z "$version" ]; then
+    echo 'PREFLIGHT WAIT rocm-version: retry in 300 s'
+    sleep 300
+    version=$(eval "$version_cmd")
+fi
+if [ -z "$version" ]; then
+    printf 'PREFLIGHT FAIL rocm-version: %s\n' "$version_cmd"
+    failed=1
+fi
+check dry-run 'cd ~/etx && python3 -m examples.sessions.vlbest --dry-run'
+check container 'sudo docker info >/dev/null && echo DOCKER-OK'
+[ "$failed" = 0 ] || exit 1
+printf 'PREFLIGHT OK\nROCM-VERSION %s\n' "$version"
+REMOTE
+    ;;
+  postmortem)
+    DEST=${3:?dest}
+    # Always inspect partial captures, but never hide a failed transfer.
+    fetch_rc=0
+    bash "$0" fetch "$IP" "$DEST" || fetch_rc=$?
+    if [ "$fetch_rc" != 0 ]; then
+      printf 'UNCAPTURED %s (fetch failed)\n' "$DEST"
+    fi
+    python3 "$(dirname "$0")/session_postmortem.py" "$DEST"
+    report_rc=$?
+    [ "$fetch_rc" = 0 ] && [ "$report_rc" = 0 ]
+    ;;
   start)
     SESS=${3:?session file (path inside the etx repo)}; GPUS=${4:-}; M=${5:-A}
     REMOTE_BASH=bash
@@ -45,10 +86,18 @@ REMOTE
     $SSH 'pgrep -f etx.tools.gpu_jobs >/dev/null && echo RUNNING || echo "runner not running"; find ~/sess -name runner.log -print -exec tail -25 {} \;' ;;
   fetch)
     DEST=${3:?dest}; mkdir -p "$DEST"
-    rsync -az --exclude 'b_*' $H:~/sess/ "$DEST/" && ls "$DEST" | head -50
+    rsync -az --exclude 'b_*/' $H:~/sess/ "$DEST/" || exit 1
+    ls "$DEST" | head -50
     # keep the fleet reference outputs (goldens, KV caches) for the next VM: no reference re-run (docs/DATA.md)
     mkdir -p ~/code/etx-cache/fleet_ref/build ~/code/etx-cache/fleet_ref/build_r1
-    rsync -az $H:'fleet-mi300x/build/golden*' $H:fleet-mi300x/build/fleet_cache.bin ~/code/etx-cache/fleet_ref/build/ 2>/dev/null
-    rsync -az $H:fleet-mi300x/build_r1/ ~/code/etx-cache/fleet_ref/build_r1/ 2>/dev/null; du -sh ~/code/etx-cache/fleet_ref ;;
+    capture_rc=0
+    rsync -az $H:'fleet-mi300x/build/golden*' $H:fleet-mi300x/build/fleet_cache.bin ~/code/etx-cache/fleet_ref/build/ || {
+      echo "UNCAPTURED $H:fleet-mi300x/build/golden* or fleet_cache.bin"; capture_rc=1;
+    }
+    rsync -az $H:fleet-mi300x/build_r1/ ~/code/etx-cache/fleet_ref/build_r1/ || {
+      echo "UNCAPTURED $H:fleet-mi300x/build_r1/"; capture_rc=1;
+    }
+    du -sh ~/code/etx-cache/fleet_ref
+    exit "$capture_rc" ;;
   *) echo "unknown command $CMD"; exit 2 ;;
 esac
