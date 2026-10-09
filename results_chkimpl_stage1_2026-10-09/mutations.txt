@@ -1,0 +1,79 @@
+Mutations applied only to a temporary copy of tests/test_check_replicas.py, after _build generated the plan fixture. The repository plan and kernels were never edited.
+
+$ PYTHONPATH="$PWD/tests:$PWD" .venv/bin/python -m pytest -q /tmp/etx-chkimpl-acceptance/test_check_replicas.py # copyoff -1 -> 0
+F.                                                                       [100%]
+=================================== FAILURES ===================================
+___________ test_replicated_imports_are_single_task_without_precopy ____________
+
+tmp_path = PosixPath('/private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-511/test_replicated_imports_are_si0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x107f7a3f0>
+
+    def test_replicated_imports_are_single_task_without_precopy(tmp_path, monkeypatch):
+        _build(tmp_path, monkeypatch, str(ROOT / "examples/llm/configs/qwen3-30b-a3b.json"), "head")
+        plan = tmp_path / "vl_plan.txt"
+        lines = plan.read_text().splitlines()
+        for i, line in enumerate(lines[2:], 2):
+            row = line.split()
+            if not row[1].startswith("dsl_") and int(row[12]) > 1:
+                row[14] = "0"  # mutation: forbidden pre-copy on a replicated import
+                lines[i] = " ".join(row)
+                break
+        plan.write_text("\n".join(lines) + "\n")
+        rows = [line.split() for line in (tmp_path / "vl_plan.txt").read_text().splitlines()[2:]]
+        replicated = [r for r in rows if not r[1].startswith("dsl_") and int(r[12]) > 1]
+        assert replicated, "fixture must exercise the replicated original-launch branch"
+        for r in replicated:
+>           assert int(r[8]) == 1 and int(r[14]) == -1, r
+E           AssertionError: ['0', 'rms_norm_2d', '0', 'in_norm', '1', '1', ...]
+E           assert (1 == 1 and 0 == -1)
+E            +  where 1 = int('1')
+E            +  and   0 = int('0')
+
+/tmp/etx-chkimpl-acceptance/test_check_replicas.py:20: AssertionError
+=========================== short test summary info ============================
+FAILED ../../../../../tmp/etx-chkimpl-acceptance/test_check_replicas.py::test_replicated_imports_are_single_task_without_precopy
+1 failed, 1 passed in 0.45s
+
+[exit status: 1]
+
+$ PYTHONPATH="$PWD/tests:$PWD" .venv/bin/python -m pytest -q /tmp/etx-chkimpl-acceptance/test_check_replicas.py # tasks 1 -> 2
+F.                                                                       [100%]
+=================================== FAILURES ===================================
+___________ test_replicated_imports_are_single_task_without_precopy ____________
+
+tmp_path = PosixPath('/private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-513/test_replicated_imports_are_si0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10447a3f0>
+
+    def test_replicated_imports_are_single_task_without_precopy(tmp_path, monkeypatch):
+        _build(tmp_path, monkeypatch, str(ROOT / "examples/llm/configs/qwen3-30b-a3b.json"), "head")
+        plan = tmp_path / "vl_plan.txt"
+        lines = plan.read_text().splitlines()
+        for i, line in enumerate(lines[2:], 2):
+            row = line.split()
+            if not row[1].startswith("dsl_") and int(row[12]) > 1:
+                row[8] = "2"  # mutation: multiple tasks in the replicated branch
+                lines[i] = " ".join(row)
+                break
+        plan.write_text("\n".join(lines) + "\n")
+        rows = [line.split() for line in (tmp_path / "vl_plan.txt").read_text().splitlines()[2:]]
+        replicated = [r for r in rows if not r[1].startswith("dsl_") and int(r[12]) > 1]
+        assert replicated, "fixture must exercise the replicated original-launch branch"
+        for r in replicated:
+>           assert int(r[8]) == 1 and int(r[14]) == -1, r
+E           AssertionError: ['0', 'rms_norm_2d', '0', 'in_norm', '1', '1', ...]
+E           assert (2 == 1)
+E            +  where 2 = int('2')
+
+/tmp/etx-chkimpl-acceptance/test_check_replicas.py:20: AssertionError
+=========================== short test summary info ============================
+FAILED ../../../../../tmp/etx-chkimpl-acceptance/test_check_replicas.py::test_replicated_imports_are_single_task_without_precopy
+1 failed, 1 passed in 0.11s
+
+[exit status: 1]
+
+$ PYTHONPATH="$PWD/tests:$PWD" .venv/bin/python -m pytest -q /tmp/etx-chkimpl-acceptance/test_check_replicas.py # restored
+..                                                                       [100%]
+2 passed in 0.07s
+
+[exit status: 0]
+

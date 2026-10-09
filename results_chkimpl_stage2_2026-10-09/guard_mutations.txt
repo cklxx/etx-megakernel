@@ -1,0 +1,631 @@
+line 64: Refusal('build/model fingerprint changed'); exit=1
+.....................................F.............                      [100%]
+=================================== FAILURES ===================================
+___________________ test_runtime_rehash_and_compiler_capture ___________________
+
+tmp_path = PosixPath('/private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-547/test_runtime_rehash_and_compil0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10412a780>
+
+    def test_runtime_rehash_and_compiler_capture(tmp_path, monkeypatch):
+        build = tmp_path / 'b'; model = tmp_path / 'm'
+        build.mkdir(); model.mkdir(); (build / 'imp').mkdir()
+        for name in ('run', 'vl_plan.txt', 'imports.bc', 'plan_data.h', 'plan.json', 'hipcc.log',
+                     'megakernel_d0.hip', 'dsl_tiles.hip', 'imp_tiles.hip', 'compiler_version.txt', 'imp/imports.json'):
+            (build / name).write_text(name)
+        for name in ('vl.manifest', 'golden_c1024.txt'): (model / name).write_text(name)
+        monkeypatch.setenv('ETX_VL_CHECK', '1')
+        identity = cert.write_build(build, model)
+        assert identity['compiler'] == 'compiler_version.txt'
+        assert cert.verified_build(build, model) == identity
+        (build / 'run').write_text('different executable')
+>       with pytest.raises(Refusal, match='fingerprint changed'):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE Refusal
+
+tests/test_import_certificate.py:158: Failed
+=========================== short test summary info ============================
+FAILED tests/test_import_certificate.py::test_runtime_rehash_and_compiler_capture
+1 failed, 50 passed in 0.31s
+
+line 84: Refusal('build identity changed during run'); exit=1
+.................................................F.                      [100%]
+=================================== FAILURES ===================================
+___________________ test_capture_identity_changes_during_run ___________________
+
+tmp_path = PosixPath('/private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-548/test_capture_identity_changes_0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x1060fa780>
+
+    def test_capture_identity_changes_during_run(tmp_path, monkeypatch):
+        versions = iter([{'files': {'executable': 'a'}}, {'files': {'executable': 'b'}}])
+        monkeypatch.setattr(cert, 'verified_build', lambda *_: next(versions))
+        monkeypatch.setattr(cert.subprocess, 'call', lambda *_: 0)
+>       with pytest.raises(Refusal, match='build identity changed during run'):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE Refusal
+
+tests/test_import_certificate.py:214: Failed
+----------------------------- Captured stdout call -----------------------------
+BUILD-IDENTITY phase=before sha256=1d7ec31b6d9240de7afb3eb91ebf8c205a64bc20a38180002a834c376643cb75
+ETX_ENV ETX_UNFUSED_SYNC= ETX_UNFUSED_NOGRAPH=
+BUILD-IDENTITY phase=after sha256=1d7ec31b6d9240de7afb3eb91ebf8c205a64bc20a38180002a834c376643cb75
+=========================== short test summary info ============================
+FAILED tests/test_import_certificate.py::test_capture_identity_changes_during_run
+1 failed, 50 passed in 0.33s
+
+line 113: Refusal('zero planned imports'); exit=1
+...........................................F.......                      [100%]
+=================================== FAILURES ===================================
+___________________________ test_zero_imports_guard ____________________________
+
+    def test_zero_imports_guard():
+>       with pytest.raises(Refusal, match='zero planned imports'):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE Refusal
+
+tests/test_import_certificate.py:176: Failed
+=========================== short test summary info ============================
+FAILED tests/test_import_certificate.py::test_zero_imports_guard - Failed: DI...
+1 failed, 50 passed in 0.38s
+
+line 121: Refusal('missing or mismatched build fingerprints'); exit=1
+......................................F............                      [100%]
+=================================== FAILURES ===================================
+____ test_guard_diagnostics[stamp-missing or mismatched build fingerprints] ____
+
+evidence = PosixPath('/private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-550/test_guard_diagnostics_stamp_m0')
+mutation = 'stamp', reason = 'missing or mismatched build fingerprints'
+
+    @pytest.mark.parametrize('mutation,reason', [
+        ('stamp', 'missing or mismatched build fingerprints'),
+        ('envelope', 'evidence outside fingerprint envelope'),
+        ('compiler', 'incomplete CHECK build identity'),
+        ('plan', 'archived plan/import metadata hash mismatch'),
+        ('mode', 'wrong certified timing arm'),
+    ])
+    def test_guard_diagnostics(evidence, mutation, reason):
+        mutate(evidence, mutation)
+        with pytest.raises(Refusal, match=reason):
+>           cert.validate(evidence)
+
+tests/test_import_certificate.py:172: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+examples/vllm_llm/import_certificate.py:175: in validate
+    check_output(read(f'check_p{pos}', '.txt'), expected, pos, identity)
+examples/vllm_llm/import_certificate.py:130: in check_output
+    stamped(text, identity)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+text = 'BUILD-IDENTITY phase=before sha256=318a8eda03a46d174b681c6c5e3f45f5201ce42893ac154d6af880087fd1ade2\nCHECK-INSTANCE {...launch(es) differ\nBUILD-IDENTITY phase=before sha256=318a8eda03a46d174b681c6c5e3f45f5201ce42893ac154d6af880087fd1ade2'
+identity = {'schema': 1, 'check_enabled': True, 'compiler': 'AMD clang version fixture', 'files': {'executable': 'aaaaaaaaaaaaaaa...aaaaaaaaaaaaaaaaaaaaaaaa', 'import_metadata': 'bd30e72660b75514e9798d89eb314b13284366b70eb0abc5f579b324365c1c16', ...}}
+
+    def stamped(text, identity):
+        stamps = re.findall(r'^BUILD-IDENTITY phase=(\w+) sha256=(\S+)$', text, re.M)
+        tag = digest(identity)
+        if stamps != [('before', tag), ('after', tag)]:
+            pass # mutation: remove refusal
+        lines = text.splitlines()
+        before = lines.index(f'BUILD-IDENTITY phase=before sha256={tag}')
+>       after = lines.index(f'BUILD-IDENTITY phase=after sha256={tag}')
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       ValueError: 'BUILD-IDENTITY phase=after sha256=318a8eda03a46d174b681c6c5e3f45f5201ce42893ac154d6af880087fd1ade2' is not in list
+
+examples/vllm_llm/import_certificate.py:124: ValueError
+=========================== short test summary info ============================
+FAILED tests/test_import_certificate.py::test_guard_diagnostics[stamp-missing or mismatched build fingerprints]
+1 failed, 50 passed in 0.34s
+
+line 126: Refusal('evidence outside fingerprint envelope'); exit=1
+.......................................F...........                      [100%]
+=================================== FAILURES ===================================
+____ test_guard_diagnostics[envelope-evidence outside fingerprint envelope] ____
+
+evidence = PosixPath('/private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-551/test_guard_diagnostics_envelop0')
+mutation = 'envelope', reason = 'evidence outside fingerprint envelope'
+
+    @pytest.mark.parametrize('mutation,reason', [
+        ('stamp', 'missing or mismatched build fingerprints'),
+        ('envelope', 'evidence outside fingerprint envelope'),
+        ('compiler', 'incomplete CHECK build identity'),
+        ('plan', 'archived plan/import metadata hash mismatch'),
+        ('mode', 'wrong certified timing arm'),
+    ])
+    def test_guard_diagnostics(evidence, mutation, reason):
+        mutate(evidence, mutation)
+>       with pytest.raises(Refusal, match=reason):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AssertionError: Regex pattern did not match.
+E         Expected regex: 'evidence outside fingerprint envelope'
+E         Actual message: 'missing or failed CHECK result'
+
+tests/test_import_certificate.py:171: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_import_certificate.py::test_guard_diagnostics[envelope-evidence outside fingerprint envelope]
+1 failed, 50 passed in 0.32s
+
+line 134: Refusal(f'position {position}: incomplete/duplicate/out-of-order instances {len(records)}/{len(expected)}'); exit=1
+..F................................................                      [100%]
+=================================== FAILURES ===================================
+___________________ test_evidence_mutations_refuse[5_of_97] ____________________
+
+evidence = PosixPath('/private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-552/test_evidence_mutations_refuse0')
+capsys = <_pytest.capture.CaptureFixture object at 0x105ee8050>
+mutation = '5_of_97'
+
+    @pytest.mark.parametrize('mutation', MUTATIONS)
+    def test_evidence_mutations_refuse(evidence, capsys, mutation):
+        mutate(evidence, mutation)
+>       assert cert.main([str(evidence), '--require-positions', '0,1040']) == 2
+E       AssertionError: assert 0 == 2
+E        +  where 0 = <function main at 0x105e93ba0>(['/private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-552/test_evidence_mutations_refuse0', '--require-positions', '0,1040'])
+E        +    where <function main at 0x105e93ba0> = cert.main
+
+tests/test_import_certificate.py:122: AssertionError
+----------------------------- Captured stdout call -----------------------------
+IMPORT-CERTIFICATE {"build_sha256": "318a8eda03a46d174b681c6c5e3f45f5201ce42893ac154d6af880087fd1ade2", "checked": 97, "eligible": true, "planned": 97, "positions": [0, 1040]}
+=========================== short test summary info ============================
+FAILED tests/test_import_certificate.py::test_evidence_mutations_refuse[5_of_97]
+1 failed, 50 passed in 0.33s
+
+line 145: Refusal('missing or inconsistent coverage summary'); exit=1
+................F..................................                      [100%]
+=================================== FAILURES ===================================
+___________________ test_evidence_mutations_refuse[summary] ____________________
+
+evidence = PosixPath('/private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-553/test_evidence_mutations_refuse14')
+capsys = <_pytest.capture.CaptureFixture object at 0x10660cd10>
+mutation = 'summary'
+
+    @pytest.mark.parametrize('mutation', MUTATIONS)
+    def test_evidence_mutations_refuse(evidence, capsys, mutation):
+        mutate(evidence, mutation)
+>       assert cert.main([str(evidence), '--require-positions', '0,1040']) == 2
+E       AssertionError: assert 0 == 2
+E        +  where 0 = <function main at 0x10657bb00>(['/private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-553/test_evidence_mutations_refuse14', '--require-positions', '0,1040'])
+E        +    where <function main at 0x10657bb00> = cert.main
+
+tests/test_import_certificate.py:122: AssertionError
+----------------------------- Captured stdout call -----------------------------
+IMPORT-CERTIFICATE {"build_sha256": "318a8eda03a46d174b681c6c5e3f45f5201ce42893ac154d6af880087fd1ade2", "checked": 97, "eligible": true, "planned": 97, "positions": [0, 1040]}
+=========================== short test summary info ============================
+FAILED tests/test_import_certificate.py::test_evidence_mutations_refuse[summary]
+1 failed, 50 passed in 0.33s
+
+line 147: Refusal('missing or failed CHECK result'); exit=1
+..........F......F.................................                      [100%]
+=================================== FAILURES ===================================
+____________________ test_evidence_mutations_refuse[failed] ____________________
+
+evidence = PosixPath('/private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-554/test_evidence_mutations_refuse8')
+capsys = <_pytest.capture.CaptureFixture object at 0x101e87e50>
+mutation = 'failed'
+
+    @pytest.mark.parametrize('mutation', MUTATIONS)
+    def test_evidence_mutations_refuse(evidence, capsys, mutation):
+        mutate(evidence, mutation)
+>       assert cert.main([str(evidence), '--require-positions', '0,1040']) == 2
+E       AssertionError: assert 0 == 2
+E        +  where 0 = <function main at 0x101f1bb00>(['/private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-554/test_evidence_mutations_refuse8', '--require-positions', '0,1040'])
+E        +    where <function main at 0x101f1bb00> = cert.main
+
+tests/test_import_certificate.py:122: AssertionError
+----------------------------- Captured stdout call -----------------------------
+IMPORT-CERTIFICATE {"build_sha256": "318a8eda03a46d174b681c6c5e3f45f5201ce42893ac154d6af880087fd1ade2", "checked": 97, "eligible": true, "planned": 97, "positions": [0, 1040]}
+__________________ test_evidence_mutations_refuse[missing_ok] __________________
+
+evidence = PosixPath('/private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-554/test_evidence_mutations_refuse15')
+capsys = <_pytest.capture.CaptureFixture object at 0x101f7cad0>
+mutation = 'missing_ok'
+
+    @pytest.mark.parametrize('mutation', MUTATIONS)
+    def test_evidence_mutations_refuse(evidence, capsys, mutation):
+        mutate(evidence, mutation)
+>       assert cert.main([str(evidence), '--require-positions', '0,1040']) == 2
+E       AssertionError: assert 0 == 2
+E        +  where 0 = <function main at 0x101f1bb00>(['/private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-554/test_evidence_mutations_refuse15', '--require-positions', '0,1040'])
+E        +    where <function main at 0x101f1bb00> = cert.main
+
+tests/test_import_certificate.py:122: AssertionError
+----------------------------- Captured stdout call -----------------------------
+IMPORT-CERTIFICATE {"build_sha256": "318a8eda03a46d174b681c6c5e3f45f5201ce42893ac154d6af880087fd1ade2", "checked": 97, "eligible": true, "planned": 97, "positions": [0, 1040]}
+=========================== short test summary info ============================
+FAILED tests/test_import_certificate.py::test_evidence_mutations_refuse[failed]
+FAILED tests/test_import_certificate.py::test_evidence_mutations_refuse[missing_ok]
+2 failed, 49 passed in 0.33s
+
+line 149: Refusal('failed checker output'); exit=1
+.............................................F.....                      [100%]
+=================================== FAILURES ===================================
+________________________ test_error_after_success_guard ________________________
+
+evidence = PosixPath('/private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-555/test_error_after_success_guard0')
+
+    def test_error_after_success_guard(evidence):
+        p = evidence / 'check_p1040.txt'
+        p.write_text(p.read_text().replace('BUILD-IDENTITY phase=after', 'ERROR: late failure\nBUILD-IDENTITY phase=after'))
+>       with pytest.raises(Refusal, match='failed checker output'):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE Refusal
+
+tests/test_import_certificate.py:190: Failed
+=========================== short test summary info ============================
+FAILED tests/test_import_certificate.py::test_error_after_success_guard - Fai...
+1 failed, 50 passed in 0.32s
+
+line 161: Refusal('incomplete CHECK build identity'); exit=1
+........................................F..........                      [100%]
+=================================== FAILURES ===================================
+_______ test_guard_diagnostics[compiler-incomplete CHECK build identity] _______
+
+evidence = PosixPath('/private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-556/test_guard_diagnostics_compile0')
+mutation = 'compiler', reason = 'incomplete CHECK build identity'
+
+    @pytest.mark.parametrize('mutation,reason', [
+        ('stamp', 'missing or mismatched build fingerprints'),
+        ('envelope', 'evidence outside fingerprint envelope'),
+        ('compiler', 'incomplete CHECK build identity'),
+        ('plan', 'archived plan/import metadata hash mismatch'),
+        ('mode', 'wrong certified timing arm'),
+    ])
+    def test_guard_diagnostics(evidence, mutation, reason):
+        mutate(evidence, mutation)
+>       with pytest.raises(Refusal, match=reason):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AssertionError: Regex pattern did not match.
+E         Expected regex: 'incomplete CHECK build identity'
+E         Actual message: 'missing or mismatched build fingerprints'
+
+tests/test_import_certificate.py:171: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_import_certificate.py::test_guard_diagnostics[compiler-incomplete CHECK build identity]
+1 failed, 50 passed in 0.33s
+
+line 163: Refusal('archived plan/import metadata hash mismatch'); exit=1
+.........................................F.........                      [100%]
+=================================== FAILURES ===================================
+___ test_guard_diagnostics[plan-archived plan/import metadata hash mismatch] ___
+
+evidence = PosixPath('/private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-557/test_guard_diagnostics_plan_ar0')
+mutation = 'plan', reason = 'archived plan/import metadata hash mismatch'
+
+    @pytest.mark.parametrize('mutation,reason', [
+        ('stamp', 'missing or mismatched build fingerprints'),
+        ('envelope', 'evidence outside fingerprint envelope'),
+        ('compiler', 'incomplete CHECK build identity'),
+        ('plan', 'archived plan/import metadata hash mismatch'),
+        ('mode', 'wrong certified timing arm'),
+    ])
+    def test_guard_diagnostics(evidence, mutation, reason):
+        mutate(evidence, mutation)
+>       with pytest.raises(Refusal, match=reason):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AssertionError: Regex pattern did not match.
+E         Expected regex: 'archived plan/import metadata hash mismatch'
+E         Actual message: 'missing or mismatched build fingerprints'
+
+tests/test_import_certificate.py:171: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_import_certificate.py::test_guard_diagnostics[plan-archived plan/import metadata hash mismatch]
+1 failed, 50 passed in 0.32s
+
+line 166: Refusal('invalid required positions'); exit=1
+.................................FF................                      [100%]
+=================================== FAILURES ===================================
+_______________ test_required_positions_fail_closed[positions0] ________________
+
+evidence = PosixPath('/private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-558/test_required_positions_fail_c0')
+positions = ()
+
+    @pytest.mark.parametrize('positions', [(), (0, 0), (-1, 0), (0, 1024)])
+    def test_required_positions_fail_closed(evidence, positions):
+>       with pytest.raises((Refusal, OSError)):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE any of (Refusal, OSError)
+
+tests/test_import_certificate.py:142: Failed
+_______________ test_required_positions_fail_closed[positions1] ________________
+
+evidence = PosixPath('/private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-558/test_required_positions_fail_c1')
+positions = (0, 0)
+
+    @pytest.mark.parametrize('positions', [(), (0, 0), (-1, 0), (0, 1024)])
+    def test_required_positions_fail_closed(evidence, positions):
+>       with pytest.raises((Refusal, OSError)):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE any of (Refusal, OSError)
+
+tests/test_import_certificate.py:142: Failed
+=========================== short test summary info ============================
+FAILED tests/test_import_certificate.py::test_required_positions_fail_closed[positions0]
+FAILED tests/test_import_certificate.py::test_required_positions_fail_closed[positions1]
+2 failed, 49 passed in 0.33s
+
+line 173: Refusal('check_timed did not complete'); exit=1
+........................F..........................                      [100%]
+=================================== FAILURES ===================================
+__________________ test_evidence_mutations_refuse[job_failed] __________________
+
+evidence = PosixPath('/private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-559/test_evidence_mutations_refuse22')
+capsys = <_pytest.capture.CaptureFixture object at 0x10604d1d0>
+mutation = 'job_failed'
+
+    @pytest.mark.parametrize('mutation', MUTATIONS)
+    def test_evidence_mutations_refuse(evidence, capsys, mutation):
+        mutate(evidence, mutation)
+>       assert cert.main([str(evidence), '--require-positions', '0,1040']) == 2
+E       AssertionError: assert 0 == 2
+E        +  where 0 = <function main at 0x1060c7b00>(['/private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-559/test_evidence_mutations_refuse22', '--require-positions', '0,1040'])
+E        +    where <function main at 0x1060c7b00> = cert.main
+
+tests/test_import_certificate.py:122: AssertionError
+----------------------------- Captured stdout call -----------------------------
+IMPORT-CERTIFICATE {"build_sha256": "318a8eda03a46d174b681c6c5e3f45f5201ce42893ac154d6af880087fd1ade2", "checked": 97, "eligible": true, "planned": 97, "positions": [0, 1040]}
+=========================== short test summary info ============================
+FAILED tests/test_import_certificate.py::test_evidence_mutations_refuse[job_failed]
+1 failed, 50 passed in 0.32s
+
+line 45: Refusal(f'missing generated source {required}'); exit=1
+...............................................F...                      [100%]
+=================================== FAILURES ===================================
+__________________________ test_missing_source_guard ___________________________
+
+tmp_path = PosixPath('/private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-560/test_missing_source_guard0')
+
+    def test_missing_source_guard(tmp_path):
+        with pytest.raises(Refusal, match='missing generated source'):
+>           cert.fingerprint(tmp_path, tmp_path)
+
+tests/test_import_certificate.py:202: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+examples/vllm_llm/import_certificate.py:48: in fingerprint
+    return {name: sha(path) for name, path in paths.items()}
+                  ^^^^^^^^^
+examples/vllm_llm/import_certificate.py:26: in sha
+    with Path(path).open('rb') as stream:
+         ^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = PosixPath('/private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-560/test_missing_source_guard0/run')
+mode = 'rb', buffering = -1, encoding = None, errors = None, newline = None
+
+    def open(self, mode='r', buffering=-1, encoding=None,
+             errors=None, newline=None):
+        """
+        Open the file pointed to by this path and return a file object, as
+        the built-in open() function does.
+        """
+        if "b" not in mode:
+            encoding = io.text_encoding(encoding)
+>       return io.open(self, mode, buffering, encoding, errors, newline)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       FileNotFoundError: [Errno 2] No such file or directory: '/private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-560/test_missing_source_guard0/run'
+
+/opt/homebrew/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/pathlib/_local.py:537: FileNotFoundError
+=========================== short test summary info ============================
+FAILED tests/test_import_certificate.py::test_missing_source_guard - FileNotF...
+1 failed, 50 passed in 0.35s
+
+line 74: Refusal(f'unsupported certified host option {arg}'); exit=1
+................................................F..                      [100%]
+=================================== FAILURES ===================================
+__________________________ test_capture_option_guard ___________________________
+
+tmp_path = PosixPath('/private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-561/test_capture_option_guard0')
+
+    def test_capture_option_guard(tmp_path):
+        with pytest.raises(Refusal, match='unsupported certified host option'):
+>           cert.capture(tmp_path, tmp_path, ['--golden', 'other.txt'])
+
+tests/test_import_certificate.py:207: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+examples/vllm_llm/import_certificate.py:75: in capture
+    identity = verified_build(build, model)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+examples/vllm_llm/import_certificate.py:62: in verified_build
+    identity = json.loads((build / 'build_identity.json').read_text())
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/opt/homebrew/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/pathlib/_local.py:546: in read_text
+    return PathBase.read_text(self, encoding, errors, newline)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/opt/homebrew/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/pathlib/_abc.py:632: in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors, newline=newline) as f:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = PosixPath('/private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-561/test_capture_option_guard0/build_identity.json')
+mode = 'r', buffering = -1, encoding = 'locale', errors = None, newline = None
+
+    def open(self, mode='r', buffering=-1, encoding=None,
+             errors=None, newline=None):
+        """
+        Open the file pointed to by this path and return a file object, as
+        the built-in open() function does.
+        """
+        if "b" not in mode:
+            encoding = io.text_encoding(encoding)
+>       return io.open(self, mode, buffering, encoding, errors, newline)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       FileNotFoundError: [Errno 2] No such file or directory: '/private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-561/test_capture_option_guard0/build_identity.json'
+
+/opt/homebrew/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/pathlib/_local.py:537: FileNotFoundError
+=========================== short test summary info ============================
+FAILED tests/test_import_certificate.py::test_capture_option_guard - FileNotF...
+1 failed, 50 passed in 0.35s
+
+line 106: Refusal('duplicate plan instance ID'); exit=1
+............................................F......                      [100%]
+=================================== FAILURES ===================================
+__________________________ test_duplicate_plan_guard ___________________________
+
+evidence = PosixPath('/private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-562/test_duplicate_plan_guard0')
+
+    def test_duplicate_plan_guard(evidence):
+        plan = (evidence / 'vl_plan.txt').read_text()
+        plan += plan.splitlines()[2] + '\n'
+>       with pytest.raises(Refusal, match='duplicate plan instance ID'):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE Refusal
+
+tests/test_import_certificate.py:183: Failed
+=========================== short test summary info ============================
+FAILED tests/test_import_certificate.py::test_duplicate_plan_guard - Failed: ...
+1 failed, 50 passed in 0.32s
+
+line 137: Refusal(f'position {position}: instance metadata mismatch'); exit=1
+.............F.....................................                      [100%]
+=================================== FAILURES ===================================
+___________________ test_evidence_mutations_refuse[metadata] ___________________
+
+evidence = PosixPath('/private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-563/test_evidence_mutations_refuse11')
+capsys = <_pytest.capture.CaptureFixture object at 0x106973770>
+mutation = 'metadata'
+
+    @pytest.mark.parametrize('mutation', MUTATIONS)
+    def test_evidence_mutations_refuse(evidence, capsys, mutation):
+        mutate(evidence, mutation)
+>       assert cert.main([str(evidence), '--require-positions', '0,1040']) == 2
+E       AssertionError: assert 0 == 2
+E        +  where 0 = <function main at 0x106943b00>(['/private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-563/test_evidence_mutations_refuse11', '--require-positions', '0,1040'])
+E        +    where <function main at 0x106943b00> = cert.main
+
+tests/test_import_certificate.py:122: AssertionError
+----------------------------- Captured stdout call -----------------------------
+IMPORT-CERTIFICATE {"build_sha256": "318a8eda03a46d174b681c6c5e3f45f5201ce42893ac154d6af880087fd1ade2", "checked": 97, "eligible": true, "planned": 97, "positions": [0, 1040]}
+=========================== short test summary info ============================
+FAILED tests/test_import_certificate.py::test_evidence_mutations_refuse[metadata]
+1 failed, 50 passed in 0.32s
+
+line 139: Refusal('invalid position/compared-byte count'); exit=1
+............F.F....................................                      [100%]
+=================================== FAILURES ===================================
+________________ test_evidence_mutations_refuse[wrong_position] ________________
+
+evidence = PosixPath('/private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-564/test_evidence_mutations_refuse10')
+capsys = <_pytest.capture.CaptureFixture object at 0x101f8e210>
+mutation = 'wrong_position'
+
+    @pytest.mark.parametrize('mutation', MUTATIONS)
+    def test_evidence_mutations_refuse(evidence, capsys, mutation):
+        mutate(evidence, mutation)
+>       assert cert.main([str(evidence), '--require-positions', '0,1040']) == 2
+E       AssertionError: assert 0 == 2
+E        +  where 0 = <function main at 0x101f7fb00>(['/private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-564/test_evidence_mutations_refuse10', '--require-positions', '0,1040'])
+E        +    where <function main at 0x101f7fb00> = cert.main
+
+tests/test_import_certificate.py:122: AssertionError
+----------------------------- Captured stdout call -----------------------------
+IMPORT-CERTIFICATE {"build_sha256": "318a8eda03a46d174b681c6c5e3f45f5201ce42893ac154d6af880087fd1ade2", "checked": 97, "eligible": true, "planned": 97, "positions": [0, 1040]}
+____________________ test_evidence_mutations_refuse[bytes] _____________________
+
+evidence = PosixPath('/private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-564/test_evidence_mutations_refuse12')
+capsys = <_pytest.capture.CaptureFixture object at 0x101fb3a10>
+mutation = 'bytes'
+
+    @pytest.mark.parametrize('mutation', MUTATIONS)
+    def test_evidence_mutations_refuse(evidence, capsys, mutation):
+        mutate(evidence, mutation)
+>       assert cert.main([str(evidence), '--require-positions', '0,1040']) == 2
+E       AssertionError: assert 0 == 2
+E        +  where 0 = <function main at 0x101f7fb00>(['/private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-564/test_evidence_mutations_refuse12', '--require-positions', '0,1040'])
+E        +    where <function main at 0x101f7fb00> = cert.main
+
+tests/test_import_certificate.py:122: AssertionError
+----------------------------- Captured stdout call -----------------------------
+IMPORT-CERTIFICATE {"build_sha256": "318a8eda03a46d174b681c6c5e3f45f5201ce42893ac154d6af880087fd1ade2", "checked": 97, "eligible": true, "planned": 97, "positions": [0, 1040]}
+=========================== short test summary info ============================
+FAILED tests/test_import_certificate.py::test_evidence_mutations_refuse[wrong_position]
+FAILED tests/test_import_certificate.py::test_evidence_mutations_refuse[bytes]
+2 failed, 49 passed in 0.33s
+
+line 141: Refusal('failed byte comparison'); exit=1
+...............F...................................                      [100%]
+=================================== FAILURES ===================================
+__________________ test_evidence_mutations_refuse[first_byte] __________________
+
+evidence = PosixPath('/private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-565/test_evidence_mutations_refuse13')
+capsys = <_pytest.capture.CaptureFixture object at 0x104b66b60>
+mutation = 'first_byte'
+
+    @pytest.mark.parametrize('mutation', MUTATIONS)
+    def test_evidence_mutations_refuse(evidence, capsys, mutation):
+        mutate(evidence, mutation)
+>       assert cert.main([str(evidence), '--require-positions', '0,1040']) == 2
+E       AssertionError: assert 0 == 2
+E        +  where 0 = <function main at 0x104babb00>(['/private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-565/test_evidence_mutations_refuse13', '--require-positions', '0,1040'])
+E        +    where <function main at 0x104babb00> = cert.main
+
+tests/test_import_certificate.py:122: AssertionError
+----------------------------- Captured stdout call -----------------------------
+IMPORT-CERTIFICATE {"build_sha256": "318a8eda03a46d174b681c6c5e3f45f5201ce42893ac154d6af880087fd1ade2", "checked": 97, "eligible": true, "planned": 97, "positions": [0, 1040]}
+=========================== short test summary info ============================
+FAILED tests/test_import_certificate.py::test_evidence_mutations_refuse[first_byte]
+1 failed, 50 passed in 0.32s
+
+line 170: Refusal(f'{name}: job {statuses[name]}'); exit=1
+..............................................F....                      [100%]
+=================================== FAILURES ===================================
+_______________________ test_failed_timing_status_guard ________________________
+
+evidence = PosixPath('/private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-566/test_failed_timing_status_guar0')
+
+    def test_failed_timing_status_guard(evidence):
+        (evidence / 'status.json').write_text(json.dumps([dict(name='etx_r1', status='fail')]))
+>       with pytest.raises(Refusal, match='etx_r1: job fail'):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE Refusal
+
+tests/test_import_certificate.py:196: Failed
+=========================== short test summary info ============================
+FAILED tests/test_import_certificate.py::test_failed_timing_status_guard - Fa...
+1 failed, 50 passed in 0.32s
+
+line 186: Refusal('missing CHECK-DSL gate'); exit=1
+.........................F.........................                      [100%]
+=================================== FAILURES ===================================
+_____________________ test_evidence_mutations_refuse[gate] _____________________
+
+evidence = PosixPath('/private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-567/test_evidence_mutations_refuse23')
+capsys = <_pytest.capture.CaptureFixture object at 0x1046d07d0>
+mutation = 'gate'
+
+    @pytest.mark.parametrize('mutation', MUTATIONS)
+    def test_evidence_mutations_refuse(evidence, capsys, mutation):
+        mutate(evidence, mutation)
+>       assert cert.main([str(evidence), '--require-positions', '0,1040']) == 2
+E       AssertionError: assert 0 == 2
+E        +  where 0 = <function main at 0x104753b00>(['/private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-567/test_evidence_mutations_refuse23', '--require-positions', '0,1040'])
+E        +    where <function main at 0x104753b00> = cert.main
+
+tests/test_import_certificate.py:122: AssertionError
+----------------------------- Captured stdout call -----------------------------
+IMPORT-CERTIFICATE {"build_sha256": "318a8eda03a46d174b681c6c5e3f45f5201ce42893ac154d6af880087fd1ade2", "checked": 97, "eligible": true, "planned": 97, "positions": [0, 1040]}
+=========================== short test summary info ============================
+FAILED tests/test_import_certificate.py::test_evidence_mutations_refuse[gate]
+1 failed, 50 passed in 0.32s
+
+line 196: Refusal('wrong certified timing arm'); exit=1
+..........................................F........                      [100%]
+=================================== FAILURES ===================================
+___________ test_guard_diagnostics[mode-wrong certified timing arm] ____________
+
+evidence = PosixPath('/private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-568/test_guard_diagnostics_mode_wr0')
+mutation = 'mode', reason = 'wrong certified timing arm'
+
+    @pytest.mark.parametrize('mutation,reason', [
+        ('stamp', 'missing or mismatched build fingerprints'),
+        ('envelope', 'evidence outside fingerprint envelope'),
+        ('compiler', 'incomplete CHECK build identity'),
+        ('plan', 'archived plan/import metadata hash mismatch'),
+        ('mode', 'wrong certified timing arm'),
+    ])
+    def test_guard_diagnostics(evidence, mutation, reason):
+        mutate(evidence, mutation)
+>       with pytest.raises(Refusal, match=reason):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AssertionError: Regex pattern did not match.
+E         Expected regex: 'wrong certified timing arm'
+E         Actual message: 'pair 5 (jobs etx_r5, etxu_r5) is not interleaved: arms fused, fused'
+
+tests/test_import_certificate.py:171: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_import_certificate.py::test_guard_diagnostics[mode-wrong certified timing arm]
+1 failed, 50 passed in 0.32s

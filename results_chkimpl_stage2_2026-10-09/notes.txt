@@ -1,0 +1,66 @@
+Stage 2: BLOCKED at acceptance; Stage 3 NOT STARTED.
+
+Implemented (not accepted):
+- Structured CHECK-INSTANCE records, retaining legacy instance lines.
+- Complete hipcc output via tee with pipefail (compiler failure cannot fall
+  through to reuse a stale executable), and actual hipcc --version output.
+- SHA-256 identities for executable, actual plan/plan header/plan JSON, imports,
+  generated device sources, available original objects/table, weights manifest,
+  golden and compiler output. CHECK builds require packed manifest and golden.
+- Fingerprint-verifying capture wrapper, portable evidence export, certificate
+  with --require-positions (default 0,1040), nonzero exact ordered plan coverage,
+  matching metadata, byte-success records, two complete decode arms and the
+  unchanged pairs.py rule. --checks-only explicitly does not grant eligibility.
+- Report separates timing observations from full-claim eligibility; a legacy
+  five-instance pass renders INCOMPLETE 5/97, different build. Missing instance
+  records render ?/97 rather than inventing a count.
+
+Acceptance attempted:
+.venv/bin/python -m pytest -q tests/test_import_certificate.py tests/test_nvref_report.py
+Exact output: report_certificate.txt; pytest exit 1:
+1 failed, 106 passed in 0.71s
+The outer logging command also ran cat, so its shell exit was 0; pytest itself
+failed (shown in the preserved output). This is NOT a green acceptance.
+
+Failure: test_compiler_failure_cannot_reuse_stale_executable invokes local
+macOS bash (3.2) with set -u and empty arrays. ROCMINC[@] is treated as unbound,
+so the shell returns 1 before the stub hipcc can return 7. The test expected 7.
+The Linux build script uses bash's array expansion on the VM; this test did
+not reach the behavior it intended to prove. Stopped at this failed stage as
+requested, without changing the test or starting Stage 3.
+
+Earlier checks (before the final compiler-failure test was added):
+.venv/bin/python -m pytest -q tests/test_host_import_check.py tests/test_import_certificate.py tests/test_nvref_report.py tests/test_pairs.py
+119 passed, 1 skipped in 1.16s (targeted.txt, exit 0).
+bash -n examples/vllm_llm/build.sh: no output, exit 0.
+git diff --check: no output, exit 0.
+No Stage 2 full-suite acceptance, device compile, real CHECK-enabled host link,
+GPU check, timing run or certificate was performed after the acceptance failure.
+
+Mutation proof: guard_mutations.txt removes each of the 22 Refusal statements
+in import_certificate.py, one at a time, runs tests/test_import_certificate.py,
+and restores the complete original source in finally. All 22 test invocations
+exit 1; full failure outputs retained. The report extension also removes the
+1040 evidence after a successful synthetic certificate and requires the next
+render to be ineligible. Negative evidence fixtures cover 29 corruption cases.
+
+Pre-existing assertions changed in Stage 2 (none in Stage 1):
+- tests/test_nvref_report.py::test_passing: expected verdict import label changes
+  from OK to INCOMPLETE (uncertified legacy check); assertion for IMPORT-CHECK OK
+  becomes an assertion that it is absent, with FULL-CLAIM NOT ELIGIBLE required.
+- test_check_imp1_ok_wins_over_legacy_na is renamed to
+  test_check_imp1_ok_cannot_mask_current_refusal; its expected IMPORT-CHECK OK
+  becomes INCOMPLETE 5/97, different build, absence of OK, and ineligibility.
+  Its synthetic fixture now actually contains five legacy instance records.
+These three assertion replacements implement the expressly requested report
+behavior; they do not relax correctness or numerical assertions. This is the
+necessary Stage 2 override of Opus's Stage 1 instruction to leave those old
+report fixtures unchanged. No Mixtral test/assertion changed. No nvref.py,
+nvref2.py, tests/test_nvref2.py, nvcov.py, pairs.py, AGENTS.md, plan, tile,
+scheduling, imported arithmetic, numerical tolerance or verdict rule changed.
+
+No network, image pull, push, provisioned VM, GPU execution or paid action.
+The original Opus/GPT conflicts retain the user's resolution: narrow Opus
+replica handling; position 1040; nvchk.py with ETX_SYNC=block triplets. The
+broader copy/alias test redesign, position 1024, import_complete.py and host
+attribution experiment were not merged into this task.

@@ -46,10 +46,11 @@ def session(tmp_path):
 def test_passing(session, capsys):
     assert nr.main([str(session)]) == 0
     out = capsys.readouterr().out
-    assert "VERDICT LEAD | import-check OK | image vllm/image@sha256:abcdef" in out
+    assert "VERDICT LEAD | import-check INCOMPLETE (uncertified legacy check) | image vllm/image@sha256:abcdef" in out
     assert "median=-0.200 spread=0.000" in out
     assert "FUSION (unfused - fused) median=+0.400" in out
-    assert "IMPORT-CHECK OK" in out
+    assert "IMPORT-CHECK OK" not in out
+    assert "FULL-CLAIM NOT ELIGIBLE" in out
     assert "4.801, 4.802, 4.803, 4.804, 4.805" in out
     assert out.count("third party eliovp.com 2025-09-26, not reproduced") == 4
     assert "BASIS-MISMATCH" not in out
@@ -183,13 +184,16 @@ def test_fusion_missing_still_verdict(session, capsys, missing):
     assert "DELTA r1..r5" in out and "VERDICT LEAD" in out
 
 
-def test_check_imp1_ok_wins_over_legacy_na(session, capsys):
-    """The single-XCD check supplies the evidence; the legacy per-XCD refusal is not reported."""
-    write(session, "check_imp1", "CHECK OK: 0 launch(es) differ")
+def test_check_imp1_ok_cannot_mask_current_refusal(session, capsys):
+    """A legacy different-build pass cannot certify the refused timed build."""
+    write(session, "check_imp1", "  in_norm L0 rms_norm_2d identical  original 1.0 us  imported 1.0 us\n" * 5
+          + "CHECK OK: 0 launch(es) differ")
     write(session, "check_imp", "ERROR: --check needs a plan without per-XCD replicas (build without ETX_VL_XCD)")
     assert nr.main([str(session)]) == 0
     out = capsys.readouterr().out
-    assert "IMPORT-CHECK OK" in out
+    assert "IMPORT-CHECK INCOMPLETE 5/97, different build" in out
+    assert "IMPORT-CHECK OK" not in out
+    assert "FULL-CLAIM NOT ELIGIBLE" in out
 
 
 def test_legacy_check_failed_refuses_even_when_new_check_passed(session, capsys):
@@ -336,3 +340,18 @@ def test_tail_needs_builds_not_gates(tmp_path):
             by_name[dep].status = "fail"
             assert runner._deps_state(j) == "skip"
             by_name[dep].status = "ok"
+
+
+def test_certificate_required_and_revalidated(session, capsys):
+    from tests.test_import_certificate import fixture_session
+    fixture_session(session)
+    assert nr.main([str(session)]) == 0
+    out = capsys.readouterr().out
+    assert "IMPORT-CHECK OK (certified 97/97, positions 0,1040)" in out
+    assert "FULL-CLAIM ELIGIBLE" in out
+    (session / "check_p1040.txt").unlink()
+    assert nr.main([str(session)]) == 0
+    out = capsys.readouterr().out
+    assert "IMPORT-CHECK OK" not in out
+    assert "FULL-CLAIM NOT ELIGIBLE" in out
+    assert "FUSION (unfused" in out

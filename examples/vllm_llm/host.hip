@@ -114,7 +114,7 @@ struct Args {
 int main(int argc, char** argv) {
   if (argc < 3) die("usage: run <packed-dir> <plan.txt> [--golden F] [--gen N] [--repeat R] [--teacher] [--unfused] [--check-coverage]");
   const std::string dir = argv[1], plan_path = argv[2];
-  int gen = -1, repeat = 2, check_layers = 0, max_steps = 0; bool teacher = false, unfused = false, check_dsl = false, check_coverage = false; std::string golden_name = "golden_c1024.txt"; std::vector<std::string> extra_goldens;
+  int gen = -1, repeat = 2, check_layers = 0, check_pos = 0, max_steps = 0; bool teacher = false, unfused = false, check_dsl = false, check_coverage = false; std::string golden_name = "golden_c1024.txt"; std::vector<std::string> extra_goldens;
   for (int i = 3; i < argc; ++i) {
     const std::string a = argv[i];
     if (a == "--gen" && i + 1 < argc) gen = atoi(argv[++i]);
@@ -137,6 +137,7 @@ int main(int argc, char** argv) {
     // lm_head stale through weeks of green --check and 32/32 runs). Implies --teacher.
     else if (a == "--check-coverage") { check_coverage = true; teacher = true; }
     else if (a == "--check-dsl") check_dsl = true;   // the DSL GEMVs of the last layer against a CPU reference (bf16 tolerance)   // traces: stop after N steps (no token check)
+    else if (a == "--check-pos" && i + 1 < argc) check_pos = atoi(argv[++i]);
     else if (a == "--check" && i + 1 < argc) check_layers = atoi(argv[++i]);   // compare each imported launch with vLLM's original, layers < N
   }
   const Manifest m = read_manifest(dir + "/vl.manifest");
@@ -512,35 +513,50 @@ int main(int argc, char** argv) {
   }
   VlParams& vp = vps[0];
 
-  if (check_layers > 0 && NR > 1) die("--check needs a plan without per-XCD replicas (build without ETX_VL_XCD)");
+  std::vector<std::vector<int32_t>> seqs(nreq);
+  for (int r = 0; r < nreq; ++r) { seqs[r] = prompts[r]; seqs[r].insert(seqs[r].end(), goldens[r].begin(), goldens[r].end()); }
   if (check_layers > 0 && nreq > 1) die("--check needs a one-request plan (build without ETX_VL_REQUESTS)");
   if (check_layers > 0) {
     ETX_VL_BIND(reqs[0])
 #ifndef ETX_VL_CHECK
     die("--check needs a build with ETX_VL_CHECK=1 (the original kernels linked in)");
 #else
-    // one decode step at position 0 of the prompt, launch by launch: vLLM's original kernel and the imported one
+    // one decode step at check_pos of the teacher-forced sequence, launch by launch: vLLM's original kernel and the imported one
     // on the same inputs (a snapshot of every buffer they can touch), compared byte for byte
-    std::vector<std::pair<void*, size_t>> bufs = {{resid, H * 2}, {hn, H * 2}, {qkv, NQKV * 2}, {qn, NH * HD * 2}, {kn, NKV * HD * 2}, {attn_out, NH * HD * 2},
+    if (check_pos < 0 || check_pos >= steps) die("--check-pos must be >= 0 and < steps");
+    printf("CHECK position %d partitions %d\n", check_pos, (check_pos + 1 + 255) / 256);
+    std::vector<std::pair<void*, size_t>> bufs = {{resid, n_resid * 2}, {hn, n_hn * 2}, {qkv, NQKV * 2}, {qn, NH * HD * 2}, {kn, NKV * HD * 2}, {attn_out, NH * HD * 2},
       {o, H * 2}, {gu, 4 * I}, {act, 2 * I}, {dn, H * 2}, {logits, (size_t)V * 2}, {exp_sums, (size_t)NH * parts * 4}, {max_logits, (size_t)NH * parts * 4},
-      {tmp_out, (size_t)NH * parts * HD * 2}, {rlog, (size_t)std::max(E, 1) * 2}, {topk_w, (size_t)std::max(TOPK, 1) * 4},
-      {topk_ids, (size_t)std::max(TOPK, 1) * 4}, {tei, (size_t)std::max(TOPK, 1) * 4}, {mc1, (size_t)std::max(TOPK, 1) * 4 * MI},
-      {mc2, (size_t)std::max(TOPK, 1) * 2 * MI}, {mc3, (size_t)std::max(TOPK, 1) * 2 * H}};
+      {tmp_out, (size_t)NH * parts * HD * 2}, {rlog, (size_t)std::max(E, 1) * 2}, {topk_w, n_tk * 4},
+      {topk_ids, n_tk * 4}, {tei, n_tk * 4}, {mc1, (size_t)std::max(TOPK, 1) * 4 * MI},
+      {mc2, (size_t)std::max(TOPK, 1) * 2 * MI}, {mc3, (size_t)std::max(TOPK, 1) * 2 * H},
+      {resid2, n_resid2 * 2}, {dx, n_dx * 2}, {ox, n_ox * 2}, {actx, n_actx * 2}};
     const char* names[] = {"resid", "hn", "qkv", "qn", "kn", "attn_out", "o", "gu", "act", "dn", "logits", "exp_sums", "max_logits", "tmp_out",
-                           "router_logits", "topk_weights", "topk_ids", "token_expert_indices", "moe_cache1", "moe_cache2", "moe_cache3"};
+                           "router_logits", "topk_weights", "topk_ids", "token_expert_indices", "moe_cache1", "moe_cache2", "moe_cache3", "resid2", "dx", "ox", "actx"};
     const size_t NB = sizeof(names) / sizeof(names[0]);
     for (int l = 0; l < std::min(L, check_layers); ++l) { bufs.push_back({kc[l], cache_elems * 2}); bufs.push_back({vc[l], cache_elems * 2}); }
     std::vector<void*> save(bufs.size()), ref(bufs.size());
     for (size_t b = 0; b < bufs.size(); ++b) { save[b] = dalloc<char>(bufs[b].second); ref[b] = dalloc<char>(bufs[b].second); }
-    std::vector<int32_t> tin(steps + 2, 0); for (size_t i = 0; i < prompt.size(); ++i) tin[i] = prompt[i];
+    std::vector<int32_t> tin(steps + 2, 0); for (size_t i = 0; i < seqs[0].size(); ++i) tin[i] = seqs[0][i];
     ETX_CHECK(hipMemcpy(token_in, tin.data(), tin.size() * 4, hipMemcpyHostToDevice));
-    vp.tok = 0; vp.pos = 0; vp.write_next = 0; vl_set_params(&vp, 1, hst.stream);
+    for (int t = 0; t < check_pos; ++t) {
+      vp.tok = t; vp.pos = t; vp.write_next = 0;
+      vl_set_params(&vp, 1, hst.stream);
+      if (!hst.run(60.0)) { printf("check prefix step %d: ETX step failed\n", t); return 2; }
+      if (t % 64 == 0) { printf("CHECK prefix step %d/%d\n", t, check_pos); fflush(stdout); }
+    }
+    vp.tok = check_pos; vp.pos = check_pos; vp.write_next = 0; vl_set_params(&vp, 1, hst.stream);
     auto launch_imported = [&](int li) {
       int32_t first = etx_launch_first[li]; void* kargs[] = {&hst.p, &first};
       ETX_CHECK(hipLaunchKernel(hst.unfused_kernel, dim3(etx_launch_count[li]), dim3(ETX_THREADS), kargs, 0, hst.stream));
     };
     launch_imported(0);                                              // prologue: embedding row, positions, lengths
     if (!wait_stream(hst.stream, 5.0)) die("prologue hung");
+    int checked = 0, planned = 0, replicas = 0;
+    for (const Inst& x : insts) {
+      if (x.layer >= check_layers || (x.layer < 0 && check_layers < L)) break;
+      if (x.exp.rfind("dsl_", 0) != 0) { ++planned; replicas += x.rep; }
+    }
     int bad = 0, not_imported = 0;
     std::string not_imported_names;
     hipEvent_t e0, e1; ETX_CHECK(hipEventCreate(&e0)); ETX_CHECK(hipEventCreate(&e1));
@@ -570,13 +586,19 @@ int main(int argc, char** argv) {
       const int xtasks = x.tasks == 1 && x.rep > 1 ? x.rep : x.tasks;         // an x-form instance runs one task per XCD
       if (etx_launch_count[x.n + 1] != xtasks) die("launch table does not follow the plan at instance " + std::to_string(x.n));
       for (size_t b = 0; b < bufs.size(); ++b) ETX_CHECK(hipMemcpyAsync(save[b], bufs[b].first, bufs[b].second, hipMemcpyDeviceToDevice, hst.stream));
-      std::vector<void*> av(d->nparams); for (int k = 0; k < d->nparams; ++k) av[k] = ab.data() + x.off + d->off[k];
-      ETX_CHECK(hipEventRecord(e0, hst.stream));
-      if (fn) ETX_CHECK(hipLaunchKernel(fn, dim3(x.gx, x.gy, x.gz), dim3(d->block[0], d->block[1], d->block[2]), av.data(), 0, hst.stream));
-      else ETX_CHECK(hipModuleLaunchKernel(tri, x.gx, x.gy, x.gz, d->block[0], d->block[1], d->block[2], tri_shared, hst.stream, av.data(), nullptr));
-      ETX_CHECK(hipEventRecord(e1, hst.stream));
-      if (!wait_stream(hst.stream, 5.0)) { printf("HANG original %s L%d %s\n", x.role.c_str(), x.layer, x.exp.c_str()); return 3; }
-      const double us_o = elapsed_us();
+      if (x.rep > 1 && !(x.tasks == 1 && x.copyoff < 0))
+        die("unsupported replicated imported instance " + std::to_string(x.n) + " (" + x.exp + ")");
+      double us_o = 0;
+      for (int rr = 0; rr < x.rep; ++rr) {
+        std::vector<void*> av(d->nparams);
+        for (int k = 0; k < d->nparams; ++k) av[k] = ab.data() + x.off + rr * x.stride + d->off[k];
+        ETX_CHECK(hipEventRecord(e0, hst.stream));
+        if (fn) ETX_CHECK(hipLaunchKernel(fn, dim3(x.gx, x.gy, x.gz), dim3(d->block[0], d->block[1], d->block[2]), av.data(), 0, hst.stream));
+        else ETX_CHECK(hipModuleLaunchKernel(tri, x.gx, x.gy, x.gz, d->block[0], d->block[1], d->block[2], tri_shared, hst.stream, av.data(), nullptr));
+        ETX_CHECK(hipEventRecord(e1, hst.stream));
+        if (!wait_stream(hst.stream, 5.0)) { printf("HANG original %s L%d %s\n", x.role.c_str(), x.layer, x.exp.c_str()); return 3; }
+        us_o += elapsed_us();
+      }
       for (size_t b = 0; b < bufs.size(); ++b) {
         ETX_CHECK(hipMemcpyAsync(ref[b], bufs[b].first, bufs[b].second, hipMemcpyDeviceToDevice, hst.stream));
         ETX_CHECK(hipMemcpyAsync(bufs[b].first, save[b], bufs[b].second, hipMemcpyDeviceToDevice, hst.stream));
@@ -588,14 +610,24 @@ int main(int argc, char** argv) {
       const double us_i = elapsed_us();
       by_kernel[x.exp].first += us_o; by_kernel[x.exp].second += us_i; sum_o += us_o; sum_i += us_i;
       std::string diff;
+      size_t compared_bytes = 0; long long first_byte = -1;
       for (size_t b = 0; b < bufs.size(); ++b) {
         std::vector<uint8_t> A(bufs[b].second), B(bufs[b].second);
         ETX_CHECK(hipMemcpy(A.data(), bufs[b].first, A.size(), hipMemcpyDeviceToHost)); ETX_CHECK(hipMemcpy(B.data(), ref[b], B.size(), hipMemcpyDeviceToHost));
         size_t n = 0, first = 0; for (size_t k = 0; k < A.size(); ++k) if (A[k] != B[k]) { if (!n) first = k; ++n; }
+        if (n && first_byte < 0) first_byte = (long long)(compared_bytes + first);
+        compared_bytes += A.size();
         if (n) diff += std::string(" ") + (b < NB ? names[b] : (((b - NB) % 2) ? "vc" : "kc")) + ":" + std::to_string(n) + "B@" + std::to_string(first);
       }
       printf("  %-10s L%-3d %-20s %s%s  original %6.1f us  imported %6.1f us\n", x.role.c_str(), x.layer, x.exp.c_str(),
              diff.empty() ? "identical" : "DIFFERS", diff.c_str(), us_o, us_i);
+      // Machine-readable evidence supplements (never replaces) the legacy line.
+      printf("CHECK-INSTANCE {\"id\":%d,\"layer\":%d,\"export\":\"%s\",\"replicas\":%d,"
+             "\"grid\":[%d,%d,%d],\"block\":[%d,%d,%d],\"position\":%d,\"bytes\":%zu,"
+             "\"result\":\"%s\",\"first_byte\":%lld}\n", x.n, x.layer, x.exp.c_str(), x.rep,
+             x.gx, x.gy, x.gz, d->block[0], d->block[1], d->block[2], check_pos, compared_bytes,
+             diff.empty() ? "identical" : "DIFFERS", first_byte);
+      ++checked;
       if (!diff.empty()) ++bad;
     }
     {   // the ETX tiles with no vLLM counterpart (vLLM uses torch's embedding and argmax kernels)
@@ -610,13 +642,12 @@ int main(int argc, char** argv) {
     for (auto& kv : by_kernel) printf("  %-20s original %8.1f us  imported %8.1f us  (%+.0f%%)\n", kv.first.c_str(), kv.second.first, kv.second.second,
                                       100.0 * (kv.second.second / std::max(kv.second.first, 1e-9) - 1.0));
     printf("  %-20s original %8.1f us  imported %8.1f us\n", "total", sum_o, sum_i);
+    printf("CHECK-IMPORTED checked=%d planned=%d replicas=%d position=%d\n", checked, planned, replicas, check_pos);
     printf("CHECK NOT-IMPORTED: %d instance(s): %s%s\n", not_imported, not_imported_names.c_str(), not_imported > 5 ? ", ..." : "");
     printf("CHECK %s: %d launch(es) differ\n", bad ? "FAILED" : "OK", bad);
     return bad ? 4 : 0;
 #endif
   }
-  std::vector<std::vector<int32_t>> seqs(nreq);
-  for (int r = 0; r < nreq; ++r) { seqs[r] = prompts[r]; seqs[r].insert(seqs[r].end(), goldens[r].begin(), goldens[r].end()); }
   std::vector<int32_t> out(steps + 1); std::vector<uint64_t> tt(2 * (steps + 1));
   std::vector<double> step_ms, wall_ms;
   const int progress = getenv("ETX_VL_PROGRESS") ? atoi(getenv("ETX_VL_PROGRESS")) : 0;   // print every N-th step's wall time

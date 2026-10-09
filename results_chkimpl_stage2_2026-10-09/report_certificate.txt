@@ -1,0 +1,25 @@
+...................................................F.................... [ 67%]
+...................................                                      [100%]
+=================================== FAILURES ===================================
+_____________ test_compiler_failure_cannot_reuse_stale_executable ______________
+
+tmp_path = PosixPath('/private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-569/test_compiler_failure_cannot_r0')
+
+    def test_compiler_failure_cannot_reuse_stale_executable(tmp_path):
+        import subprocess
+        script = Path('examples/vllm_llm/build.sh').read_text()
+        tail = script[script.index('hipcc -O3'):script.index('# CHECK builds require')]
+        stale = tmp_path / 'run'; stale.write_text('old executable'); stale.chmod(0o755)
+        prefix = r'''set -euo pipefail
+    hipcc() { echo 'unfiltered diagnostic'; echo 'compiler failed' >&2; return 7; }
+    OUT="$1"; ROOT="$1"; ROCMINC=(); CHK=(); NTF=(); VNF=(); ABL=(); PREPF=()
+    '''
+        run = subprocess.run(['bash', '-c', prefix + tail, 'bash', str(tmp_path)], capture_output=True, text=True)
+>       assert run.returncode == 7
+E       AssertionError: assert 1 == 7
+E        +  where 1 = CompletedProcess(args=['bash', '-c', 'set -euo pipefail\nhipcc() { echo \'unfiltered diagnostic\'; echo \'compiler fai...-569/test_compiler_failure_cannot_r0'], returncode=1, stdout='', stderr='bash: line 3: ROCMINC[@]: unbound variable\n').returncode
+
+tests/test_import_certificate.py:235: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_import_certificate.py::test_compiler_failure_cannot_reuse_stale_executable
+1 failed, 106 passed in 0.71s
