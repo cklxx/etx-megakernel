@@ -21,6 +21,19 @@ import time
 from pathlib import Path
 
 
+CONFIG_PREFIX = "VLLM-CONFIG "
+
+
+def encode_config(config):
+    return CONFIG_PREFIX + json.dumps(config, default=str, sort_keys=True)
+
+
+def decode_config(line):
+    if not line.startswith(CONFIG_PREFIX):
+        raise ValueError("missing VLLM config prefix")
+    return json.loads(line[len(CONFIG_PREFIX):])
+
+
 def read_golden(path: Path):
     lines = path.read_text().splitlines()
     prompt = [int(x) for x in lines[0].split()[1:]]
@@ -30,6 +43,9 @@ def read_golden(path: Path):
 
 def main() -> None:
     ap = argparse.ArgumentParser()
+    ap.add_argument("--engine-kw", type=json.loads, default={}, help="extra LLM keyword arguments as JSON")
+    ap.add_argument("--no-detok", action="store_true")
+    ap.add_argument("--echo-config", action="store_true")
     ap.add_argument("--model", required=True)
     ap.add_argument("--golden", type=Path, required=True)
     ap.add_argument("--tokens", type=int, default=32)
@@ -54,23 +70,38 @@ def main() -> None:
     prompt_ids, golden = read_golden(a.golden)
     cc = ({"custom_ops": [a.custom_ops]} if a.custom_ops else {}) | ({"pass_config": json.loads(a.pass_config)} if a.pass_config else {}) \
          | ({"cudagraph_mode": a.cudagraph_mode} if a.cudagraph_mode else {}) | ({"mode": a.compile_mode} if a.compile_mode is not None else {})
-    kw = {"compilation_config": cc} if cc else {}
+    kw = dict(a.engine_kw)
+    if cc:
+        kw["compilation_config"] = dict(kw.get("compilation_config", {})) | cc
     llm = LLM(model=a.model, dtype="bfloat16", trust_remote_code=True,
               max_model_len=len(prompt_ids) + a.tokens + 16, gpu_memory_utilization=0.85, enforce_eager=a.eager, **kw)
+    if a.echo_config:
+        config = llm.llm_engine.vllm_config
+        print(encode_config({
+            "async_scheduling": config.scheduler_config.async_scheduling,
+            "cudagraph_mode": config.compilation_config.cudagraph_mode,
+            "pass_config": config.compilation_config.pass_config,
+            "kernel_config": config.kernel_config,
+            "attention_backend": config.attention_config.backend,
+            "env": {k: v for k, v in sorted(os.environ.items()) if k.startswith(("VLLM_", "HIP_"))},
+        }), flush=True)
+    print(f"VLLM-SAMPLING detok={int(not a.no_detok)}", flush=True)
     plen = len(prompt_ids)
     prompts = [TokensPrompt(prompt_token_ids=prompt_ids[(97 * i) % plen:] + prompt_ids[:(97 * i) % plen]) for i in range(a.batch)]
 
     def gen(n_new: int):
-        sp = SamplingParams(temperature=0.0, max_tokens=n_new, ignore_eos=True)
+        sp = SamplingParams(temperature=0.0, max_tokens=n_new, ignore_eos=True, detokenize=not a.no_detok)
         t0 = time.perf_counter()
         outs = llm.generate(prompts, sp, use_tqdm=False)
         return (time.perf_counter() - t0) * 1e3, list(outs[0].outputs[0].token_ids)
 
     gen(a.tokens); gen(1)                                   # warm-up (graph capture, autotuning)
     full, one, toks = [], [], []
-    for _ in range(a.repeats):
+    for sample in range(a.repeats):
         dt, toks = gen(a.tokens); full.append(dt)
         d1, _ = gen(1); one.append(d1)
+        matched = next((i for i, (g, t) in enumerate(zip(golden, toks)) if g != t), min(len(golden), len(toks)))
+        print(f"VLLM-SAMPLE sample={sample} first_divergence={matched}/{len(toks)}", flush=True)
     per_tok = [(f - o) / (a.tokens - 1) for f, o in zip(full, one)]
     med = statistics.median(per_tok)
     n = min(len(golden), len(toks))

@@ -1,0 +1,200 @@
+MUTATION prefix-plus-one exit=1
+F                                                                        [100%]
+=================================== FAILURES ===================================
+______________________ test_harness_flags_and_all_samples ______________________
+
+tmp_path = PosixPath('/private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-596/test_harness_flags_and_all_sam0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x104961e00>
+capsys = <_pytest.capture.CaptureFixture object at 0x104900ad0>
+
+    def test_harness_flags_and_all_samples(tmp_path, monkeypatch, capsys):
+        import types
+        from examples.llm import vllm_bench as bench
+        calls, sampling = [], []
+        cc = types.SimpleNamespace(cudagraph_mode='FULL', pass_config={})
+        cfg = types.SimpleNamespace(scheduler_config=types.SimpleNamespace(async_scheduling=True),
+                                    compilation_config=cc, kernel_config={}, attention_config=types.SimpleNamespace(backend='TEST'))
+        class LLM:
+            def __init__(self, **kw):
+                calls.append(kw)
+                self.llm_engine = types.SimpleNamespace(vllm_config=cfg)
+                self.n = 0
+            def generate(self, prompts, sp, **kw):
+                self.n += 1
+                # The first measured sample fails; the last succeeds.
+                toks = [9 if self.n == 3 else 1] * sp['max_tokens']
+                return [types.SimpleNamespace(outputs=[types.SimpleNamespace(token_ids=toks)])]
+        def params(**kw):
+            sampling.append(kw)
+            return kw
+        monkeypatch.setitem(sys.modules, 'vllm', types.SimpleNamespace(LLM=LLM, SamplingParams=params, __version__='0.27.1'))
+        monkeypatch.setitem(sys.modules, 'vllm.inputs', types.SimpleNamespace(TokensPrompt=lambda **kw: kw))
+        golden = tmp_path / 'golden'
+        golden.write_text('prompt ' + ' '.join(['1']*1024) + '\ngen ' + ' '.join(['1']*32))
+        monkeypatch.setattr(sys, 'argv', ['bench', '--model', 'model', '--golden', str(golden), '--repeats', '5',
+                                        '--engine-kw', '{"attention_backend":"TEST"}', '--no-detok', '--echo-config'])
+        monkeypatch.setenv('VLLM_TEST', 'yes')
+        ticks = iter(range(100))
+        monkeypatch.setattr(bench.time, 'perf_counter', lambda: next(ticks))
+        # Full and one calls need distinct elapsed times to avoid a zero median.
+        ticks = iter([0, 32, 32, 33] * 6)
+        bench.main()
+        text = capsys.readouterr().out
+        assert calls[0]['attention_backend'] == 'TEST'
+        assert all(p['detokenize'] is False for p in sampling)
+        assert 'VLLM-SAMPLE sample=0 first_divergence=0/32' in text
+        assert 'VLLM-SAMPLE sample=4 first_divergence=32/32' in text
+>       assert bench.CONFIG_PREFIX == 'VLLM-CONFIG '
+E       AssertionError: assert 'VLLM-CONFIG  ' == 'VLLM-CONFIG '
+E         
+E         - VLLM-CONFIG 
+E         + VLLM-CONFIG  
+E         ?             +
+
+tests/test_vlbest_report.py:175: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_vlbest_report.py::test_harness_flags_and_all_samples - Asse...
+1 failed in 0.30s
+
+MUTATION prefix-minus-one exit=1
+F                                                                        [100%]
+=================================== FAILURES ===================================
+______________________ test_harness_flags_and_all_samples ______________________
+
+tmp_path = PosixPath('/private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-597/test_harness_flags_and_all_sam0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x104b79e00>
+capsys = <_pytest.capture.CaptureFixture object at 0x104b1cad0>
+
+    def test_harness_flags_and_all_samples(tmp_path, monkeypatch, capsys):
+        import types
+        from examples.llm import vllm_bench as bench
+        calls, sampling = [], []
+        cc = types.SimpleNamespace(cudagraph_mode='FULL', pass_config={})
+        cfg = types.SimpleNamespace(scheduler_config=types.SimpleNamespace(async_scheduling=True),
+                                    compilation_config=cc, kernel_config={}, attention_config=types.SimpleNamespace(backend='TEST'))
+        class LLM:
+            def __init__(self, **kw):
+                calls.append(kw)
+                self.llm_engine = types.SimpleNamespace(vllm_config=cfg)
+                self.n = 0
+            def generate(self, prompts, sp, **kw):
+                self.n += 1
+                # The first measured sample fails; the last succeeds.
+                toks = [9 if self.n == 3 else 1] * sp['max_tokens']
+                return [types.SimpleNamespace(outputs=[types.SimpleNamespace(token_ids=toks)])]
+        def params(**kw):
+            sampling.append(kw)
+            return kw
+        monkeypatch.setitem(sys.modules, 'vllm', types.SimpleNamespace(LLM=LLM, SamplingParams=params, __version__='0.27.1'))
+        monkeypatch.setitem(sys.modules, 'vllm.inputs', types.SimpleNamespace(TokensPrompt=lambda **kw: kw))
+        golden = tmp_path / 'golden'
+        golden.write_text('prompt ' + ' '.join(['1']*1024) + '\ngen ' + ' '.join(['1']*32))
+        monkeypatch.setattr(sys, 'argv', ['bench', '--model', 'model', '--golden', str(golden), '--repeats', '5',
+                                        '--engine-kw', '{"attention_backend":"TEST"}', '--no-detok', '--echo-config'])
+        monkeypatch.setenv('VLLM_TEST', 'yes')
+        ticks = iter(range(100))
+        monkeypatch.setattr(bench.time, 'perf_counter', lambda: next(ticks))
+        # Full and one calls need distinct elapsed times to avoid a zero median.
+        ticks = iter([0, 32, 32, 33] * 6)
+        bench.main()
+        text = capsys.readouterr().out
+        assert calls[0]['attention_backend'] == 'TEST'
+        assert all(p['detokenize'] is False for p in sampling)
+        assert 'VLLM-SAMPLE sample=0 first_divergence=0/32' in text
+        assert 'VLLM-SAMPLE sample=4 first_divergence=32/32' in text
+>       assert bench.CONFIG_PREFIX == 'VLLM-CONFIG '
+E       AssertionError: assert 'VLLM-CONFIG' == 'VLLM-CONFIG '
+E         
+E         - VLLM-CONFIG 
+E         ?            -
+E         + VLLM-CONFIG
+
+tests/test_vlbest_report.py:175: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_vlbest_report.py::test_harness_flags_and_all_samples - Asse...
+1 failed in 0.10s
+
+MUTATION spread-cap-removed exit=1
+..F...                                                                   [100%]
+=================================== FAILURES ===================================
+_________________ test_spread_bound_diagnostic[deltas2-False] __________________
+
+deltas = [-0.1, -0.1, -0.1, -0.1, -0.049], want = False
+
+    @pytest.mark.parametrize('deltas,want', [
+        ([-.1]*5, True), ([-.1, -.1, -.1, -.1, -.05], True),
+        ([-.1, -.1, -.1, -.1, -.049], False),
+        ([-.01]*5, True), ([0]*5, False),
+        ([-.05, -.025, -.025, -.025, -.025], False),
+    ])
+    def test_spread_bound_diagnostic(deltas, want):
+>       assert r.spread_bound(deltas) is want
+E       assert True is False
+E        +  where True = <function spread_bound at 0x101ead1c0>([-0.1, -0.1, -0.1, -0.1, -0.049])
+E        +    where <function spread_bound at 0x101ead1c0> = r.spread_bound
+
+tests/test_vlbest_report.py:200: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_vlbest_report.py::test_spread_bound_diagnostic[deltas2-False]
+1 failed, 5 passed in 0.04s
+
+MUTATION spread-strictness-removed exit=1
+....FF                                                                   [100%]
+=================================== FAILURES ===================================
+_________________ test_spread_bound_diagnostic[deltas4-False] __________________
+
+deltas = [0, 0, 0, 0, 0], want = False
+
+    @pytest.mark.parametrize('deltas,want', [
+        ([-.1]*5, True), ([-.1, -.1, -.1, -.1, -.05], True),
+        ([-.1, -.1, -.1, -.1, -.049], False),
+        ([-.01]*5, True), ([0]*5, False),
+        ([-.05, -.025, -.025, -.025, -.025], False),
+    ])
+    def test_spread_bound_diagnostic(deltas, want):
+>       assert r.spread_bound(deltas) is want
+E       assert True is False
+E        +  where True = <function spread_bound at 0x104785260>([0, 0, 0, 0, 0])
+E        +    where <function spread_bound at 0x104785260> = r.spread_bound
+
+tests/test_vlbest_report.py:200: AssertionError
+_________________ test_spread_bound_diagnostic[deltas5-False] __________________
+
+deltas = [-0.05, -0.025, -0.025, -0.025, -0.025], want = False
+
+    @pytest.mark.parametrize('deltas,want', [
+        ([-.1]*5, True), ([-.1, -.1, -.1, -.1, -.05], True),
+        ([-.1, -.1, -.1, -.1, -.049], False),
+        ([-.01]*5, True), ([0]*5, False),
+        ([-.05, -.025, -.025, -.025, -.025], False),
+    ])
+    def test_spread_bound_diagnostic(deltas, want):
+>       assert r.spread_bound(deltas) is want
+E       assert True is False
+E        +  where True = <function spread_bound at 0x104785260>([-0.05, -0.025, -0.025, -0.025, -0.025])
+E        +    where <function spread_bound at 0x104785260> = r.spread_bound
+
+tests/test_vlbest_report.py:200: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_vlbest_report.py::test_spread_bound_diagnostic[deltas4-False]
+FAILED tests/test_vlbest_report.py::test_spread_bound_diagnostic[deltas5-False]
+2 failed, 4 passed in 0.04s
+
+MUTATION vendor-byte-changed exit=1
+F                                                                        [100%]
+=================================== FAILURES ===================================
+___________________________ test_vendor_pinned_bytes ___________________________
+
+    def test_vendor_pinned_bytes():
+        source = Path(__file__).resolve().parents[1] / 'examples/vllm_llm/vendor/benchmark_moe.py'
+>       assert hashlib.sha256(source.read_bytes()).hexdigest() == '230151de56d177ac22920ff9dada010f4361933b34b54e18d5981367723a8bcf'
+E       AssertionError: assert 'ea4fd8f9cb87...19596dff4a599' == '230151de56d1...81367723a8bcf'
+E         
+E         - 230151de56d177ac22920ff9dada010f4361933b34b54e18d5981367723a8bcf
+E         + ea4fd8f9cb879a9f88181495c95ba2edb65e526bc773f1fe19219596dff4a599
+
+tests/test_vlbest_report.py:190: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_vlbest_report.py::test_vendor_pinned_bytes - AssertionError...
+1 failed in 0.03s
+

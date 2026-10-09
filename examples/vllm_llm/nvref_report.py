@@ -103,9 +103,9 @@ def etx(text: str, name: str, arm: str, steps=True) -> Timing:
     return Timing(mean(ms for _, ms in last), device, wall)
 
 
-def vllm(text: str, name: str, aiter="0") -> Timing:
+def vllm(text: str, name: str, aiter="0", label="default") -> Timing:
     f = kv(one_line(text, "VLLM ", name))
-    expected = dict(label="default", aiter=aiter, batch="1", version="0.27.1", context="1024", first_divergence="32/32")
+    expected = dict(label=label, aiter=aiter, batch="1", version="0.27.1", context="1024", first_divergence="32/32")
     for key, value in expected.items():
         if f.get(key) != value:
             raise Refusal(f"{name}: expected {key}={value}, got {f.get(key, 'missing')}")
