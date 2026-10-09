@@ -241,7 +241,7 @@ def main(argv=None):
             if rc:
                 print('KC_PROFILER_TEARDOWN', lib, rc, 'worker completed; checking full CSV coverage', flush=True)
             data = json.loads((out / 'metadata.json').read_text())
-            results[lib] = vendor(out / 'trace', data)
+            results[lib] = vendor(out / 'trace', data, lib)
         for shape, result in results[lib].items():
             print('KC_ROW', lib, shape, json.dumps(result), flush=True)
     payload = {'complete': True, 'arms': results}

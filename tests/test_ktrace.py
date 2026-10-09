@@ -159,3 +159,65 @@ def test_vendor_device_architecture(name, arch, accepted, capsys):
         assert f'name={name!r}' in str(error.value)
         assert f'arch={arch!r}' in str(error.value)
         assert capsys.readouterr().out == ''
+
+
+def test_vendor_clean_boundary_summary(tmp_path, capsys):
+    write_csv(tmp_path / 'x_kernel_trace.csv', [
+        dict(Start_Timestamp=1100, End_Timestamp=4000, Kernel_Name='ends_at_boundary')])
+    write_csv(tmp_path / 'x_marker_api_trace.csv', [
+        dict(Start_Timestamp=1000, End_Timestamp=4000, Function='kcmp:o_proj:0:0')])
+    got = ktrace.vendor(tmp_path, {'o_proj': dict(check_ok=True, bytes=1, iters=1, copies=1)})
+    assert got['o_proj']['median_us'] == 2.9
+    assert capsys.readouterr().out == (
+        'BOUNDARY-SUMMARY lib= ranges=1 crossings=0 max_overhang_us=0.0\n')
+
+
+@pytest.fixture
+def boundary_trace(tmp_path):
+    nested = tmp_path / 'nested'
+    nested.mkdir()
+    write_csv(nested / 'x_kernel_trace.csv', [
+        dict(Start_Timestamp=1100, End_Timestamp=4250, Kernel_Name='first_crossing'),
+        dict(Start_Timestamp=1200, End_Timestamp=2000, Kernel_Name='contained'),
+        dict(Start_Timestamp=2200, End_Timestamp=5670, Kernel_Name='worst_kernel'),
+        dict(Start_Timestamp=7100, End_Timestamp=11160, Kernel_Name='later_worst')])
+    write_csv(nested / 'x_marker_api_trace.csv', [
+        dict(Start_Timestamp=1000, End_Timestamp=4000, Function='kcmp:o_proj:2:21'),
+        dict(Start_Timestamp=7000, End_Timestamp=8000, Function='kcmp:o_proj:2:22')])
+    return tmp_path
+
+
+def test_vendor_worst_crossing(boundary_trace, capsys):
+    with pytest.raises(ValueError) as error:
+        ktrace.vendor(boundary_trace, {}, 'hipblaslt')
+    assert str(error.value) == 'kernel crosses vendor range boundary: kcmp:o_proj:2:21'
+    assert capsys.readouterr().out.splitlines() == [
+        'BOUNDARY-CROSS label=kcmp:o_proj:2:21 in_range=3 overhang_us=1.7 '
+        'kernel=worst_kernel kernel_end_us=5.7 marker_end_us=4.0',
+        'BOUNDARY-SUMMARY lib=hipblaslt ranges=2 crossings=2 max_overhang_us=3.2']
+
+
+def test_boundary_report_cli(boundary_trace):
+    result = subprocess.run([sys.executable, '-m', 'etx.tools.ktrace', '--trace-dir',
+                             str(boundary_trace), '--boundaries'],
+                            text=True, capture_output=True)
+    assert result.returncode == 0, result.stderr
+    payload, summary = result.stdout.split('BOUNDARY-SUMMARY ')
+    assert json.loads(payload) == [
+        dict(label='kcmp:o_proj:2:22', in_range=1, overhang_us=3.2,
+             kernel='later_worst', kernel_end_us=11.2, marker_end_us=8.0),
+        dict(label='kcmp:o_proj:2:21', in_range=3, overhang_us=1.7,
+             kernel='worst_kernel', kernel_end_us=5.7, marker_end_us=4.0)]
+    assert summary == 'lib= ranges=2 crossings=2 max_overhang_us=3.2\n'
+    assert 'duration' not in result.stdout
+    assert 'median_us' not in result.stdout
+    assert result.stderr == ''
+
+
+def test_etx_cli_preserved(historical):
+    result = subprocess.run([sys.executable, '-m', 'etx.tools.ktrace',
+                             str(historical / 'imported.csv'), '--plan',
+                             str(historical / 'imported-plan.txt')],
+                            check=True, text=True, capture_output=True)
+    assert json.loads(result.stdout) == ktrace.etx(
+        historical / 'imported.csv', historical / 'imported-plan.txt')
