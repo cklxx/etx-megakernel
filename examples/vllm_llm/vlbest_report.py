@@ -103,10 +103,30 @@ def screening(values, brackets):
     return ('WINNER' if win else 'NO-WINNER'), deltas
 
 
+def not_applied(directory, stage):
+    """Read explicit session decisions even when gates omitted all arm jobs."""
+    def lines(name):
+        path = directory / f'{name}.log'
+        return path.read_text().splitlines() if path.exists() else []
+    excluded = {}
+    if stage == 'a':
+        if 'MOE-TUNE ray=no' in lines('docker_pull'):
+            excluded['S9'] = 'NOT-APPLIED S9: ray missing in image'
+        for line in lines('moe_budget'):
+            if line.startswith('MOE-TUNE SKIPPED budget '):
+                for arm in ('S1', 'S9'):
+                    excluded[arm] = f'NOT-APPLIED {arm}: {line}'
+    if stage == 'b':
+        for line in lines('b_budget'):
+            if line.startswith('STAGE-B SKIPPED budget '):
+                excluded['C'] = f'NOT-APPLIED C: {line}'
+    return excluded
+
+
 def screen(directory, stage='a', candidates=None):
     session = Session(directory)
     candidates = candidates or [config(f'S{i}') for i in range(1, 10)]
-    result = dict(winners={}, excluded={}, tested=['S0'], brackets=[])
+    result = dict(winners={}, excluded=not_applied(directory, stage), tested=['S0'], brackets=[])
     try:
         result['brackets'] = [[observation(session.read(f'{stage}_r{r}_S0_{end}'), config('S0'))
                                for end in ('open', 'close')] for r in (1, 2)]
@@ -115,6 +135,8 @@ def screen(directory, stage='a', candidates=None):
         return result
     for cfg in candidates:
         arm = cfg['id']
+        if arm in result['excluded']:
+            continue
         try:
             values = [observation(session.read(f'{stage}_r{r}_{arm}'), cfg) for r in (1, 2)]
             state, deltas = screening(values, result['brackets'])

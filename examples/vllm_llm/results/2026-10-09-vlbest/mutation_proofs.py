@@ -18,7 +18,7 @@ cases = [
  ('certificate-dependency', 'examples/sessions/vlbest.py', "after=['select_final', 'check_certificate']", "after=['select_final']", 'tests/test_vlbest_session.py::test_correctness_and_screening_dependencies'),
  ('vendor-byte-changed', 'examples/vllm_llm/vendor/benchmark_moe.py', '# SPDX', '# mutated SPDX', 'test_vendor_pinned_bytes'),
 ]
-out = Path('artifacts/vlbest/stage-t-mutations.txt')
+out = Path('examples/vllm_llm/results/2026-10-09-vlbest/stage-t-mutations.txt')
 with out.open('w') as log:
  for label, filename, old, new, test in cases:
   p = Path(filename); original = p.read_text(); assert old in original

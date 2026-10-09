@@ -1,0 +1,425 @@
+=== REMOVED: failed tune cannot mark complete ===
+F                                                                        [100%]
+=================================== FAILURES ===================================
+____________________ test_failed_tune_never_marks_complete _____________________
+
+    def test_failed_tune_never_marks_complete():
+        import os
+        tune = next(j for j in s.JOBS if j['name'] == 'moe_tune')
+        # Exercise the actual shell, replacing only Docker execution.
+        cmd = 'sudo() { return 7; }; ' + tune['cmd']
+        proc = subprocess.run(['bash', '-c', cmd], env=dict(os.environ, GPU='0'),
+                              capture_output=True, text=True)
+>       assert proc.returncode == 7
+E       assert 0 == 7
+E        +  where 0 = CompletedProcess(args=['bash', '-c', 'sudo() { return 7; }; sudo docker run --rm --device=/dev/kfd --device=/dev/dri -...e --save-dir "$HOME/moecfg/tuned"; echo \'MOE-TUNE COMPLETE\''], returncode=0, stdout='MOE-TUNE COMPLETE\n', stderr='').returncode
+
+tests/test_vlbest_session.py:241: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_vlbest_session.py::test_failed_tune_never_marks_complete - ...
+1 failed in 0.07s
+exit=1
+=== RESTORED: failed tune cannot mark complete ===
+.                                                                        [100%]
+1 passed in 0.02s
+exit=0
+=== REMOVED: ray probe reports absence ===
+.F                                                                       [100%]
+=================================== FAILURES ===================================
+____________________________ test_ray_probe[False] _____________________________
+
+available = False
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x105d269e0>
+capsys = <_pytest.capture.CaptureFixture object at 0x105cb9950>
+
+    @pytest.mark.parametrize('available', [True, False])
+    def test_ray_probe(available, monkeypatch, capsys):
+        import importlib
+        def load(name):
+            assert name == 'ray'
+            if not available:
+                raise ModuleNotFoundError('ray')
+        monkeypatch.setattr(importlib, 'import_module', load)
+        assert s.main(['--probe-ray']) == 0
+>       assert capsys.readouterr().out == f"MOE-TUNE ray={'yes' if available else 'no'}\n"
+E       AssertionError: assert 'MOE-TUNE ray=yes\n' == 'MOE-TUNE ray=no\n'
+E         
+E         - MOE-TUNE ray=no
+E         ?              ^^
+E         + MOE-TUNE ray=yes
+E         ?              ^^^
+
+tests/test_vlbest_session.py:133: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_vlbest_session.py::test_ray_probe[False] - AssertionError: ...
+1 failed, 1 passed in 0.03s
+exit=1
+=== RESTORED: ray probe reports absence ===
+..                                                                       [100%]
+2 passed in 0.02s
+exit=0
+=== REMOVED: tune admission budget ===
+F.                                                                       [100%]
+=================================== FAILURES ===================================
+__________________ test_budget_guard[moe-6240-3660-MOE-TUNE] ___________________
+
+stage = 'moe', threshold = 6240, reserve = 3660, label = 'MOE-TUNE'
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10618a8b0>
+capsys = <_pytest.capture.CaptureFixture object at 0x106140ad0>
+
+    @pytest.mark.parametrize('stage,threshold,reserve,label', [
+        ('moe', 6240, 3660, 'MOE-TUNE'), ('b', 1680, 1140, 'STAGE-B'),
+    ])
+    def test_budget_guard(stage, threshold, reserve, label, monkeypatch, capsys):
+        for remaining in (0, threshold - 1, threshold):
+            monkeypatch.setenv('ETX_SESS_REMAINING_SECONDS', str(remaining))
+            assert s.main(['--budget-guard', stage]) == 0
+>           assert capsys.readouterr().out == (
+                f'{label} SKIPPED budget remaining={remaining} reserve={reserve}\n'
+                if remaining < threshold else f'{label} GO\n')
+E           AssertionError: assert 'MOE-TUNE GO\n' == 'MOE-TUNE SKI...eserve=3660\n'
+E             
+E             - MOE-TUNE SKIPPED budget remaining=0 reserve=3660
+E             + MOE-TUNE GO
+
+tests/test_vlbest_session.py:143: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_vlbest_session.py::test_budget_guard[moe-6240-3660-MOE-TUNE]
+1 failed, 1 passed in 0.04s
+exit=1
+=== RESTORED: tune admission budget ===
+..                                                                       [100%]
+2 passed in 0.02s
+exit=0
+=== REMOVED: stage B admission budget ===
+.F                                                                       [100%]
+=================================== FAILURES ===================================
+____________________ test_budget_guard[b-1680-1140-STAGE-B] ____________________
+
+stage = 'b', threshold = 1680, reserve = 1140, label = 'STAGE-B'
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x1028963f0>
+capsys = <_pytest.capture.CaptureFixture object at 0x102829950>
+
+    @pytest.mark.parametrize('stage,threshold,reserve,label', [
+        ('moe', 6240, 3660, 'MOE-TUNE'), ('b', 1680, 1140, 'STAGE-B'),
+    ])
+    def test_budget_guard(stage, threshold, reserve, label, monkeypatch, capsys):
+        for remaining in (0, threshold - 1, threshold):
+            monkeypatch.setenv('ETX_SESS_REMAINING_SECONDS', str(remaining))
+            assert s.main(['--budget-guard', stage]) == 0
+>           assert capsys.readouterr().out == (
+                f'{label} SKIPPED budget remaining={remaining} reserve={reserve}\n'
+                if remaining < threshold else f'{label} GO\n')
+E           AssertionError: assert 'STAGE-B GO\n' == 'STAGE-B SKIP...eserve=1140\n'
+E             
+E             - STAGE-B SKIPPED budget remaining=0 reserve=1140
+E             + STAGE-B GO
+
+tests/test_vlbest_session.py:143: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_vlbest_session.py::test_budget_guard[b-1680-1140-STAGE-B]
+1 failed, 1 passed in 0.04s
+exit=1
+=== RESTORED: stage B admission budget ===
+..                                                                       [100%]
+2 passed in 0.02s
+exit=0
+=== REMOVED: missing budget fails closed ===
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+__________________ test_budget_guard[moe-6240-3660-MOE-TUNE] ___________________
+
+stage = 'moe', threshold = 6240, reserve = 3660, label = 'MOE-TUNE'
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x1043c28b0>
+capsys = <_pytest.capture.CaptureFixture object at 0x104374ad0>
+
+    @pytest.mark.parametrize('stage,threshold,reserve,label', [
+        ('moe', 6240, 3660, 'MOE-TUNE'), ('b', 1680, 1140, 'STAGE-B'),
+    ])
+    def test_budget_guard(stage, threshold, reserve, label, monkeypatch, capsys):
+        for remaining in (0, threshold - 1, threshold):
+            monkeypatch.setenv('ETX_SESS_REMAINING_SECONDS', str(remaining))
+            assert s.main(['--budget-guard', stage]) == 0
+            assert capsys.readouterr().out == (
+                f'{label} SKIPPED budget remaining={remaining} reserve={reserve}\n'
+                if remaining < threshold else f'{label} GO\n')
+        monkeypatch.delenv('ETX_SESS_REMAINING_SECONDS')
+        assert s.main(['--budget-guard', stage]) == 0
+>       assert 'SKIPPED budget remaining=0' in capsys.readouterr().out
+E       AssertionError: assert 'SKIPPED budget remaining=0' in 'MOE-TUNE GO\n'
+E        +  where 'MOE-TUNE GO\n' = CaptureResult(out='MOE-TUNE GO\n', err='').out
+E        +    where CaptureResult(out='MOE-TUNE GO\n', err='') = readouterr()
+E        +      where readouterr = <_pytest.capture.CaptureFixture object at 0x104374ad0>.readouterr
+
+tests/test_vlbest_session.py:148: AssertionError
+____________________ test_budget_guard[b-1680-1140-STAGE-B] ____________________
+
+stage = 'b', threshold = 1680, reserve = 1140, label = 'STAGE-B'
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x1043c1f30>
+capsys = <_pytest.capture.CaptureFixture object at 0x104355950>
+
+    @pytest.mark.parametrize('stage,threshold,reserve,label', [
+        ('moe', 6240, 3660, 'MOE-TUNE'), ('b', 1680, 1140, 'STAGE-B'),
+    ])
+    def test_budget_guard(stage, threshold, reserve, label, monkeypatch, capsys):
+        for remaining in (0, threshold - 1, threshold):
+            monkeypatch.setenv('ETX_SESS_REMAINING_SECONDS', str(remaining))
+            assert s.main(['--budget-guard', stage]) == 0
+            assert capsys.readouterr().out == (
+                f'{label} SKIPPED budget remaining={remaining} reserve={reserve}\n'
+                if remaining < threshold else f'{label} GO\n')
+        monkeypatch.delenv('ETX_SESS_REMAINING_SECONDS')
+        assert s.main(['--budget-guard', stage]) == 0
+>       assert 'SKIPPED budget remaining=0' in capsys.readouterr().out
+E       AssertionError: assert 'SKIPPED budget remaining=0' in 'STAGE-B GO\n'
+E        +  where 'STAGE-B GO\n' = CaptureResult(out='STAGE-B GO\n', err='').out
+E        +    where CaptureResult(out='STAGE-B GO\n', err='') = readouterr()
+E        +      where readouterr = <_pytest.capture.CaptureFixture object at 0x104355950>.readouterr
+
+tests/test_vlbest_session.py:148: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_vlbest_session.py::test_budget_guard[moe-6240-3660-MOE-TUNE]
+FAILED tests/test_vlbest_session.py::test_budget_guard[b-1680-1140-STAGE-B]
+2 failed in 0.04s
+exit=1
+=== RESTORED: missing budget fails closed ===
+..                                                                       [100%]
+2 passed in 0.02s
+exit=0
+=== REMOVED: ray gate omits tune/S9 ===
+.F                                                                       [100%]
+=================================== FAILURES ===================================
+______________________ test_ray_omits_tune_and_s9[False] _______________________
+
+tmp_path = PosixPath('/private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-634/test_ray_omits_tune_and_s9_Fal0')
+ray = False
+
+    @pytest.mark.parametrize('ray', [True, False])
+    def test_ray_omits_tune_and_s9(tmp_path, ray):
+        runner = decision_runner(tmp_path, ray=ray)
+        assert runner.jobs[0].name == 'docker_pull'
+        assert '--probe-ray' in runner.jobs[0].cmd
+        names = ['moe_tune', 'a_r1_S9', 'a_r2_S9']
+        states = propagate(runner, names)
+>       assert set(states.values()) == ({'ready'} if ray else {'skip'})
+E       AssertionError: assert {'ready'} == {'skip'}
+E         
+E         Extra items in the left set:
+E         'ready'
+E         Extra items in the right set:
+E         'skip'
+E         Use -v to get more diff
+
+tests/test_vlbest_session.py:186: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_vlbest_session.py::test_ray_omits_tune_and_s9[False] - Asse...
+1 failed, 1 passed in 0.04s
+exit=1
+=== RESTORED: ray gate omits tune/S9 ===
+..                                                                       [100%]
+2 passed in 0.04s
+exit=0
+=== REMOVED: budget gate omits configs/S1/S9 ===
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_______________________ test_budget_omits_configs_s1_s9 ________________________
+
+tmp_path = PosixPath('/private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-636/test_budget_omits_configs_s1_s0')
+
+    def test_budget_omits_configs_s1_s9(tmp_path):
+        runner = decision_runner(tmp_path, budget=False)
+        names = ['moe_configs', 'moe_tune', 'a_r1_S1', 'a_r1_S9', 'a_r2_S1', 'a_r2_S9']
+>       assert set(propagate(runner, names).values()) == {'skip'}
+E       AssertionError: assert {'ready'} == {'skip'}
+E         
+E         Extra items in the left set:
+E         'ready'
+E         Extra items in the right set:
+E         'skip'
+E         Use -v to get more diff
+
+tests/test_vlbest_session.py:198: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_vlbest_session.py::test_budget_omits_configs_s1_s9 - Assert...
+1 failed in 0.04s
+exit=1
+=== RESTORED: budget gate omits configs/S1/S9 ===
+.                                                                        [100%]
+1 passed in 0.02s
+exit=0
+=== REMOVED: completion gate rejects partial tune ===
+F                                                                        [100%]
+=================================== FAILURES ===================================
+____________________ test_incomplete_tune_never_screens_s9 _____________________
+
+tmp_path = PosixPath('/private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-638/test_incomplete_tune_never_scr0')
+
+    def test_incomplete_tune_never_screens_s9(tmp_path):
+        runner = decision_runner(tmp_path, complete=False)
+        for rnd in (1, 2):
+>           assert runner._deps_state(runner.by_name[f'a_r{rnd}_S9']) == 'skip'
+E           AssertionError: assert 'ready' == 'skip'
+E             
+E             - skip
+E             + ready
+
+tests/test_vlbest_session.py:208: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_vlbest_session.py::test_incomplete_tune_never_screens_s9 - ...
+1 failed in 0.04s
+exit=1
+=== RESTORED: completion gate rejects partial tune ===
+.                                                                        [100%]
+1 passed in 0.03s
+exit=0
+=== REMOVED: stage B gate preserves stage C ===
+.F                                                                       [100%]
+=================================== FAILURES ===================================
+________________________ test_stage_b_reserves_c[False] ________________________
+
+tmp_path = PosixPath('/private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-640/test_stage_b_reserves_c_False_0')
+stage_b = False
+
+    @pytest.mark.parametrize('stage_b', [True, False])
+    def test_stage_b_reserves_c(tmp_path, stage_b):
+        runner = decision_runner(tmp_path, stage_b=stage_b)
+        names = [j.name for j in runner.jobs if j.name.startswith('b_r')]
+        assert len(names) == 6
+>       assert set(propagate(runner, names).values()) == ({'ready'} if stage_b else {'skip'})
+E       AssertionError: assert {'ready'} == {'skip'}
+E         
+E         Extra items in the left set:
+E         'ready'
+E         Extra items in the right set:
+E         'skip'
+E         Use -v to get more diff
+
+tests/test_vlbest_session.py:216: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_vlbest_session.py::test_stage_b_reserves_c[False] - Asserti...
+1 failed, 1 passed in 0.04s
+exit=1
+=== RESTORED: stage B gate preserves stage C ===
+..                                                                       [100%]
+2 passed in 0.03s
+exit=0
+=== REMOVED: report retains ray reason ===
+.F                                                                       [100%]
+=================================== FAILURES ===================================
+______________________ test_ray_omits_tune_and_s9[False] _______________________
+
+tmp_path = PosixPath('/private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-642/test_ray_omits_tune_and_s9_Fal0')
+ray = False
+
+    @pytest.mark.parametrize('ray', [True, False])
+    def test_ray_omits_tune_and_s9(tmp_path, ray):
+        runner = decision_runner(tmp_path, ray=ray)
+        assert runner.jobs[0].name == 'docker_pull'
+        assert '--probe-ray' in runner.jobs[0].cmd
+        names = ['moe_tune', 'a_r1_S9', 'a_r2_S9']
+        states = propagate(runner, names)
+        assert set(states.values()) == ({'ready'} if ray else {'skip'})
+        assert runner._deps_state(runner.by_name['a_r1_S1']) == 'ready'
+        excluded = r.screen(tmp_path)['excluded']
+        if ray:
+            assert 'S9' not in excluded
+        else:
+>           assert excluded['S9'] == 'NOT-APPLIED S9: ray missing in image'
+                   ^^^^^^^^^^^^^^
+E           KeyError: 'S9'
+
+tests/test_vlbest_session.py:192: KeyError
+=========================== short test summary info ============================
+FAILED tests/test_vlbest_session.py::test_ray_omits_tune_and_s9[False] - KeyE...
+1 failed, 1 passed in 0.04s
+exit=1
+=== RESTORED: report retains ray reason ===
+..                                                                       [100%]
+2 passed in 0.03s
+exit=0
+=== REMOVED: report retains tune budget reason ===
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_______________________ test_budget_omits_configs_s1_s9 ________________________
+
+tmp_path = PosixPath('/private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-644/test_budget_omits_configs_s1_s0')
+
+    def test_budget_omits_configs_s1_s9(tmp_path):
+        runner = decision_runner(tmp_path, budget=False)
+        names = ['moe_configs', 'moe_tune', 'a_r1_S1', 'a_r1_S9', 'a_r2_S1', 'a_r2_S9']
+        assert set(propagate(runner, names).values()) == {'skip'}
+        excluded = r.screen(tmp_path)['excluded']
+        for arm in ('S1', 'S9'):
+>           assert excluded[arm].startswith(f'NOT-APPLIED {arm}: MOE-TUNE SKIPPED budget')
+                   ^^^^^^^^^^^^^
+E           KeyError: 'S1'
+
+tests/test_vlbest_session.py:201: KeyError
+=========================== short test summary info ============================
+FAILED tests/test_vlbest_session.py::test_budget_omits_configs_s1_s9 - KeyErr...
+1 failed in 0.04s
+exit=1
+=== RESTORED: report retains tune budget reason ===
+.                                                                        [100%]
+1 passed in 0.03s
+exit=0
+=== REMOVED: report retains stage B reason ===
+.F                                                                       [100%]
+=================================== FAILURES ===================================
+________________________ test_stage_b_reserves_c[False] ________________________
+
+tmp_path = PosixPath('/private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-646/test_stage_b_reserves_c_False_0')
+stage_b = False
+
+    @pytest.mark.parametrize('stage_b', [True, False])
+    def test_stage_b_reserves_c(tmp_path, stage_b):
+        runner = decision_runner(tmp_path, stage_b=stage_b)
+        names = [j.name for j in runner.jobs if j.name.startswith('b_r')]
+        assert len(names) == 6
+        assert set(propagate(runner, names).values()) == ({'ready'} if stage_b else {'skip'})
+        for j in runner.jobs:
+            if j.name.startswith(('S0_r', 'F_r', 'etx_r', 'etxu_r')):
+                assert runner._deps_state(j) == 'ready'
+        if not stage_b:
+>           assert 'NOT-APPLIED C: STAGE-B SKIPPED budget' in r.screen(tmp_path, 'b')['excluded']['C']
+                                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E           KeyError: 'C'
+
+tests/test_vlbest_session.py:221: KeyError
+=========================== short test summary info ============================
+FAILED tests/test_vlbest_session.py::test_stage_b_reserves_c[False] - KeyErro...
+1 failed, 1 passed in 0.04s
+exit=1
+=== RESTORED: report retains stage B reason ===
+..                                                                       [100%]
+2 passed in 0.03s
+exit=0
+=== REMOVED: excluded arm cannot become timed ===
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_______________________ test_omission_overrides_arm_logs _______________________
+
+tmp_path = PosixPath('/private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-648/test_omission_overrides_arm_lo0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x106126520>
+
+    def test_omission_overrides_arm_logs(tmp_path, monkeypatch):
+        # Even an otherwise valid arm must never be counted after explicit omission.
+        decision_runner(tmp_path, ray=False)
+        monkeypatch.setattr(r.Session, 'read', lambda *a, **kw: 'synthetic valid log')
+        monkeypatch.setattr(r, 'observation', lambda *a, **kw: 5.0)
+        result = r.screen(tmp_path, candidates=[r.config('S9')])
+>       assert result['tested'] == ['S0']
+E       AssertionError: assert ['S0', 'S9'] == ['S0']
+E         
+E         Left contains one more item: 'S9'
+E         Use -v to get more diff
+
+tests/test_vlbest_session.py:230: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_vlbest_session.py::test_omission_overrides_arm_logs - Asser...
+1 failed in 0.04s
+exit=1
+=== RESTORED: excluded arm cannot become timed ===
+.                                                                        [100%]
+1 passed in 0.03s
+exit=0

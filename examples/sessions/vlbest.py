@@ -4,7 +4,13 @@ VM life is capped at 150 minutes, including provisioning, push and ssh.
 The runner cap is 140 minutes, derived by reserving a 10-minute setup allowance.
 The operator must delete the VM at its life deadline or immediately on completion;
 MAX_SESSION_SECONDS bounds the runner and does not enforce VM deletion.
-At $1.99/GPU-hour the VM-life ceiling costs about $4.98 (estimate).
+At $1.99/GPU-hour, the plan is about 130 minutes / $4.31 and the ceiling
+is 160 minutes / $5.31 (estimates); the hard stop is 150 minutes of VM life
+($4.98). The 160-minute ceiling cannot fit inside the 150-minute hard stop:
+it bounds dollar risk, not the schedule.
+The previous comparable session ran 2.1x its estimate (108 minutes against 51),
+so the ceiling is the budget and the plan is not.
+Drop order: moe_tune, then group 3, then stage B; never stage C.
 
 Host wall, batch 1, context 1024, 32 greedy tokens. Before timing, certify all
 imported instances at positions 0 and 1040 in the same CHECK-enabled build.
@@ -42,6 +48,13 @@ def job(**kw):
     JOBS.append(kw)
 
 
+job(name='docker_pull', lane='cpu', timeout=1200,
+    cmd=f'set -euo pipefail; sudo docker pull {IMAGE}; '
+        f"printf 'IMAGE '; sudo docker inspect --format '{{{{index .RepoDigests 0}}}}' {IMAGE}; "
+        f'sudo docker run --rm -v "$HOME:$HOME" -w "$HOME/etx" --entrypoint timeout '
+        f'{IMAGE} -k 5 30 python3 -m examples.sessions.vlbest --probe-ray')
+
+
 job(name='budget', lane='cpu', timeout=10, cmd=f"printf '%s\\n' '{BUDGET}'")
 for original in nvchk.JOBS:
     if original['name'] == 'etx_r1':
@@ -50,10 +63,6 @@ for original in nvchk.JOBS:
     deps = entry.get('after', [])
     entry['after'] = ([deps] if isinstance(deps, str) else deps) + ['budget']
     job(**entry)
-
-job(name='docker_pull', lane='cpu', after='budget', timeout=1200,
-    cmd=f'set -euo pipefail; sudo docker pull {IMAGE}; '
-        f"printf 'IMAGE '; sudo docker inspect --format '{{{{index .RepoDigests 0}}}}' {IMAGE}")
 
 
 def container_prefix():
@@ -75,11 +84,18 @@ def arm_command(cfg, name):
 
 # Configuration creation is bounded and archived before the search. The tuning
 # script is the pinned upstream file; no ETX kernel tuning is performed here.
-job(name='moe_configs', gpu=0, after=['docker_pull', 'check_certificate'], timeout=180,
+# Budget is evaluated after setup/certification, immediately before stage 0.
+job(name='moe_budget', gpu=0, after=['docker_pull', 'check_certificate', 'dl'], timeout=10,
+    cmd='python3 -m examples.sessions.vlbest --budget-guard moe')
+job(name='moe_configs', gpu=0, after='moe_budget', timeout=180,
+    gate=('moe_budget', r'^MOE-TUNE GO$'),
     cmd=container_prefix() + f'{IMAGE} -k 5 150 python3 -m examples.sessions.vlbest --prepare-moe')
-job(name='moe_tune', gpu=0, after=['moe_configs', 'dl'], timeout=1230,
-    cmd=container_prefix() + f'{IMAGE} -k 5 1200 python3 examples/vllm_llm/vendor/benchmark_moe.py '
-        f'--model {nvchk.MODEL}/hf --batch-size 1 --tune --save-dir "$HOME/moecfg/tuned"')
+job(name='moe_tune', gpu=0, after=['moe_configs', 'dl'], timeout=2400,
+    gate=('docker_pull', r'^MOE-TUNE ray=yes$'),
+    cmd='set -euo pipefail; ' + container_prefix() +
+        f'{IMAGE} -k 5 2340 python3 examples/vllm_llm/vendor/benchmark_moe.py '
+        f'--model {nvchk.MODEL}/hf --batch-size 1 --tune --save-dir "$HOME/moecfg/tuned"; '
+        "echo 'MOE-TUNE COMPLETE'")
 
 finished = ['moe_tune']
 for rnd in (1, 2):
@@ -92,15 +108,20 @@ for rnd in (1, 2):
         if arm == 'S9':
             deps += ['moe_tune']
         job(name=name, gpu=0, after=deps, after_any=list(finished), timeout=390,
+            gate=('moe_tune', r'^MOE-TUNE COMPLETE$') if arm == 'S9' else None,
             cmd=arm_command(report.config(arm.split('_')[0]), name))
         finished.append(name)
 job(name='select_screen', lane='cpu', after=['etx_env'], after_any=list(finished), timeout=60,
     cmd=f'.venv/bin/python -m examples.vllm_llm.vlbest_report {LOGS} --select screen')
 finished.append('select_screen')
+job(name='b_budget', lane='cpu', after='select_screen', timeout=10,
+    cmd='python3 -m examples.sessions.vlbest --budget-guard b')
+finished.append('b_budget')
 for rnd in (1, 2):
     for arm in ('S0_open', 'C', 'S0_close'):
         name = f'b_r{rnd}_{arm}'
         job(name=name, gpu=0, after=['select_screen', 'check_certificate'], after_any=list(finished), timeout=390,
+            gate=('b_budget', r'^STAGE-B GO$'),
             cmd=f'.venv/bin/python -m examples.sessions.vlbest --run-selected combination --arm {arm} --name {name} --directory {LOGS}')
         finished.append(name)
 job(name='select_final', lane='cpu', after='select_screen', after_any=list(finished), timeout=60,
@@ -116,6 +137,30 @@ for rnd in range(1, 6):
         finished.append(name)
 job(name='report', lane='cpu', after_any=[j['name'] for j in JOBS], timeout=120,
     cmd=f'.venv/bin/python -m examples.vllm_llm.vlbest_report {LOGS}')
+
+
+def probe_ray():
+    import importlib
+    try:
+        importlib.import_module('ray')
+    except ImportError:
+        available = False
+    else:
+        available = True
+    print('MOE-TUNE ray=' + ('yes' if available else 'no'), flush=True)
+
+
+def budget_guard(stage):
+    # Missing runner budget fails closed. Reserve the config job's 180s too;
+    # the remaining stages A/B/C need 33/9/19 min.
+    remaining = int(os.environ.get('ETX_SESS_REMAINING_SECONDS', '0'))
+    cost, reserve = (2400 + 180, (33 + 9 + 19) * 60) if stage == 'moe' else (9 * 60, 19 * 60)
+    label = 'MOE-TUNE' if stage == 'moe' else 'STAGE-B'
+    if remaining < cost + reserve:
+        print(f'{label} SKIPPED budget remaining={remaining} reserve={reserve}', flush=True)
+        return 0
+    print(f'{label} GO', flush=True)
+    return 0
 
 
 def prepare_moe(root=None, target=None):
@@ -139,6 +184,8 @@ def main(argv=None):
     mode = ap.add_mutually_exclusive_group(required=True)
     mode.add_argument('--dry-run', action='store_true')
     mode.add_argument('--prepare-moe', action='store_true')
+    mode.add_argument('--probe-ray', action='store_true')
+    mode.add_argument('--budget-guard', choices=['moe', 'b'])
     mode.add_argument('--run-selected', choices=['combination', 'final'])
     ap.add_argument('--arm')
     ap.add_argument('--name')
@@ -148,6 +195,11 @@ def main(argv=None):
         from etx.tools.gpu_jobs import main as runner
         print(BUDGET, flush=True)
         return runner([__file__, '--dry-run'])
+    if a.probe_ray:
+        probe_ray()
+        return 0
+    if a.budget_guard:
+        return budget_guard(a.budget_guard)
     if a.prepare_moe:
         prepare_moe()
         return 0
