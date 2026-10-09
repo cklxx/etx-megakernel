@@ -39,13 +39,13 @@ See design section 15.9.
 
 ## Status: ETX at batch 1 (2026-10-09)
 
-Qwen3-30B-A3B bf16 decode, batch 1, one Hot Aisle MI300X: ETX megakernel **4.548 ms/token wall, 4.405 device**, 32/32 tokens, `CHECK-DSL OK`. No current same-machine comparison with vLLM exists; `docs/SPEC-nv-reference-2026-10-08.md` measures both in one session. The latest recorded comparison, on another machine, put ETX 0.076 ms behind vLLM default on wall time (`results_2026-10-01/round24/FINDING.md:29,32`).
+Qwen3-30B-A3B bf16 decode, batch 1, one Hot Aisle MI300X VF: ETX megakernel **4.526 ms/token wall, 4.393 device** (`results_nvref_2026-10-09/report.log:3,7,9`), 32/32 tokens, `CHECK-DSL OK` (`results_nvref_2026-10-09/gate_all.txt:20-23`). A same-machine comparison now exists; its verdict is **INSUFFICIENT** (`results_nvref_2026-10-09/report.log:20`; [session record](docs/NVREF-2026-10-09.md)).
 
 | | ms/token wall | Basis / source |
 |---|---|---|
-| **ETX megakernel** | **4.548** (4.405 device) | Hot Aisle MI300X; `results_tiles/ab1..3_all_x.log:8`, archived in `results_tiles.tgz` |
-| vLLM 0.27.1 default | 4.862 | VF box, not comparable; `results_2026-10-01/vllm_ladder/default_r1..3.log:64` |
-| vLLM + AITER | 4.975 | Historical +2.3% entry; not a current same-machine comparison |
+| **ETX megakernel** | **4.526** (4.393 device) | Supersedes 4.548 (4.405 device); same-session MI300X VF; `results_nvref_2026-10-09/report.log:7,9` |
+| vLLM 0.27.1 default | 4.809 | Supersedes the earlier VF-box 4.862; same session; `results_nvref_2026-10-09/report.log:6` |
+| vLLM + AITER | 4.942 | Supersedes the historical 4.975; same session; `results_nvref_2026-10-09/report.log:21` |
 
 The comparison rows for `**ETX megakernel** | **4.823**` and 4.998 unfused are withdrawn for having no raw logs (`docs/DOC-AUDIT-2026-10-03.md:149`).
 
@@ -65,12 +65,12 @@ Asynchronous host work per step saved −0.152. Non-temporal weight loads saved 
 The coherent paths previously issued one memory request per lane per 2-byte element.
 Vector accesses saved −0.105 in the folded norm and −0.074 in the attention prologue.
 
-ETX is ahead of vLLM by 0.8% in interleaved runs with non-overlapping ranges.
+The former 0.8% claim used withdrawn rows; the superseding same-session verdict is INSUFFICIENT (`results_nvref_2026-10-09/report.log:20`).
 The budget explains the remaining time.
 Handoff is at the event protocol's floor. Workgroup start delay is below the hardware dispatcher's own jitter.
-Host work is 0.135 ms. The instruction cache hit rate is 99.90%.
+Fused host work is 0.133 ms (`results_nvref_2026-10-09/report.log:18`). The instruction cache hit rate is 99.90%.
 
-**The orchestration budget is exhausted. Our own hand-written tiles account for 1.29 ms of the step.**
+Host excess X is 0.094 ms (`results_nvref_2026-10-09/report.log:18`), above the 0.050 ms host screen in `docs/SPEC-nv-reference-2026-10-08.md` §11 (threshold also recorded in `results_nvref_2026-10-09/report.log:16`). The host profile points to async enqueue as a recoverable lever (`results_nvref_2026-10-09/hostprof.log:2117-2120`), but the strict async/resident decision needs a matching-step device mean. **Our own hand-written tiles account for 1.29 ms of the step.**
 Tile quality was never ETX's claim. Generality on 2026-10-02: Mixtral-8x7B runs 32/32 through the same compiler with zero compiler changes.
 Its shape is top-2 of 8, G=4, K=14336.
 Every failure came from host-side shape glue. Shape keys now make unknown shapes fail with an explicit import error.

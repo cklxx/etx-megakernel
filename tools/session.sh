@@ -27,12 +27,15 @@ SESS=$1; G=$2; M=$3; [ "$G" = auto ] && G=""
 cd ~/etx || exit 1
 [ -n "$G" ] || G=$(rocm-smi --showproductname | grep -c "Card Series" | awk '{for (i = 0; i < $1; i++) printf "%s%d", (i ? "," : ""), i}')
 mkdir -p ~/sess
-setsid nohup python3 -m etx.tools.gpu_jobs "$SESS" --gpus "$G" --logdir ~/sess --machine "$M" > ~/sess/runner.log 2>&1 < /dev/null &
-sleep 2; echo "runner started: machine $M, GPUs $G"; head -5 ~/sess/runner.log
+# The Python runner reserves runner.log and selects a fresh directory on reuse.
+# Keep startup errors too, without truncating any earlier session's output.
+STARTUP=$(mktemp "$HOME/sess/startup.XXXXXX") || exit 1
+setsid nohup python3 -m etx.tools.gpu_jobs "$SESS" --gpus "$G" --logdir ~/sess --machine "$M" > "$STARTUP" 2>&1 < /dev/null &
+sleep 2; echo "runner started: machine $M, GPUs $G; startup log: $STARTUP"; head -5 "$STARTUP"
 REMOTE
     ;;
   status)
-    $SSH 'pgrep -f etx.tools.gpu_jobs >/dev/null && echo RUNNING || echo "runner not running"; tail -25 ~/sess/runner.log' ;;
+    $SSH 'pgrep -f etx.tools.gpu_jobs >/dev/null && echo RUNNING || echo "runner not running"; find ~/sess -name runner.log -print -exec tail -25 {} \;' ;;
   fetch)
     DEST=${3:?dest}; mkdir -p "$DEST"
     rsync -az --exclude 'b_*' $H:~/sess/ "$DEST/" && ls "$DEST" | head -50
