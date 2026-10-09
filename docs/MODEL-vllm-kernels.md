@@ -713,3 +713,87 @@ argument path and barriers were already covered (or never exposed); ~0.24 ms apa
 the exposed share, as the 2026-09-28b spread suggested. Build 5 fused < 5.660 (build 3's unfused) flips the
 fusion penalty. A BAR2 hang or token mismatch indicts the two-barrier loop's broadcast fold (the parity-slot
 argument above), not the coherence design.
+
+## 21. Fixed 2026-10-08 tile profile (CPU validation, 2026-10-09)
+
+The default `2026-09-30` profile is unchanged. On the current
+`build/rocm22/qwen3-30b-a3b_default/plan.json` it predicts 5.476 ms and a fusion gain of
+-179.5 us, against 4.393 ms device time and +225 us measured gain. Its constants describe
+older builds. `--profile 2026-10-08` adds a separate profile; no constant is refitted to
+this session. The same kernels in a HIP graph remain the fusion baseline; the system
+baseline remains vLLM 0.27.1 default, whose pre-registered verdict is INSUFFICIENT
+(see [NVREF](NVREF-2026-10-09.md), including the explicitly post hoc healthy-window estimate).
+
+Conditions: one MI300X VF, Qwen3-30B-A3B bf16, batch 1, prompt 1024, 32 greedy tokens.
+Predictions below are CPU simulations, not new GPU measurements. Device references are
+`results_nvref_2026-10-09/report.log:9` and `fusion_pairs.txt:2-6`; wall references are
+`report.log:7-8`. The validator requires lines 2 onward of the plan's `vl_plan.txt` to
+match `results_nvref_2026-10-09/vlplan_all.txt`, otherwise it fails with `plan differs`.
+
+| Quantity (ms) | Model | Measured | Model minus measured | Gate |
+|---|---:|---:|---:|---|
+| Tiles fused, device | 4.058 | 4.393 | -0.335 (-7.6%) | within 10% |
+| Tiles unfused, device | 4.246 | 4.617 | -0.371 (-8.0%) | within 10% |
+| Fusion gain, unfused minus fused | 0.188 | 0.225 | -0.037 | absolute error < 0.093 |
+| Tiles fused, host wall | 4.198 | 4.526 | -0.328 | information only |
+| Tiles unfused, host wall | 4.282 | 4.657 | -0.375 | information only |
+
+The measured gain is the paired statistic, not subtraction of rounded aggregate times.
+The eight historical validation rows retain their old profile and are the only rows
+included in `--fit`.
+
+### Constants fixed before this validation
+
+- ETX overhead `e = 0`, ignoring `etx_us`, `fused_us` and `coh_save_us`; no touch is applied.
+  The existing width-scaled hardware floor remains (`phase.FLOOR_US = 3.0 us`).
+- Streaming roles `qkv`, `o_proj`, `router`, `moe_up`, `moe_down`, `lm_head` with positive
+  bytes use `phase.BW_HBM = 3.55e6 bytes/us` and `cu_rate = 1e9 bytes/us` (a nonbinding
+  per-CU limit). These reuse the existing hardware bandwidth constant, not a new fit.
+- Narrow `chain_us`: prep 6.04, reduce 5.58, topk 8.35, prologue 11.3, in_norm 5.6,
+  argmax 10.1 us. Sources: round11 critical bodies in `docs/FLOORS-2026-10-08.md:99,101,104`
+  and tail times at lines 116,117,119. These are from another build; the current build
+  is predicted out of sample. Attention retains its existing 1.9 us chain plus its
+  existing stream cost, not a 1.9 us total body.
+- Fused handoffs retain 0.4 us DOMAIN / 1.8 us DEVICE. Unfused uses 1.61 us for both,
+  the existing `hw_bench launch` measurement.
+- Host excess: fused 140 us, the median of wall minus device median in
+  `results_tiles/ab{1,2,3}_all_x.log:8`; unfused 36 us from
+  `docs/VLLM-LADDER-2026-10-01.md:39`. Both predate NVREF. `wall_ms` adds the appropriate
+  excess to the simulated step (the legacy `step_us` function returns milliseconds).
+
+### Per-phase check against the current trace
+
+Measured mean bodies below are means over layers 1-45 from `results_tiles/tr_all.bin`,
+recomputed by `etx.tools.floors.round11_from_trace`; the readable evidence is
+`results_tiles/tr_all.log:7-442`. The trace plan matches the session plan as described
+above. These current-build measurements are validation data, not the source of the
+narrow-body constants.
+
+| Phase | Model component (us) | Current measured mean body (us) | Component meaning |
+|---|---:|---:|---|
+| qkv | 8.907 | 8.933 | full floor + role bytes / HBM |
+| o_proj | 7.726 | 5.347 | full floor + role bytes / HBM |
+| router | 3.148 | 2.760 | full floor + role bytes / HBM |
+| moe_up | 17.178 | 16.964 | full floor + role bytes / HBM |
+| moe_down | 10.089 | 9.887 | full floor + role bytes / HBM |
+| prep | 6.040 | 3.837 | chain only |
+| reduce | 5.580 | 5.336 | chain only |
+| topk | 8.350 | 7.697 | chain only |
+| attn | 1.900 | 5.315 | chain only; stream cost is additional |
+
+This component check is not an additive decomposition of the simulated makespan: the
+simulator also accounts for width scaling, placement, contention and handoffs. The
+three stream checks required here (qkv, moe_up, moe_down) agree within 3% using the
+full-floor expression. The other rows expose limitations rather than new fit targets.
+
+**Unexplained residual:** the fused prediction still has -335 us error (4.058 minus
+4.393 ms). Its cause is unknown; no compensating constant is added. Correct fusion
+gain sign and a passing tolerance do not establish a causal decomposition or full
+predictive accuracy. The wall estimates are informational only.
+
+**Pending GPU measurements:** replicated, interleaved fused/unfused timing with the
+same build; byte-identical import checks for all 97 imported instances in that timed
+build (the existing check covers only 5, in another build); phase body/start/handoff
+traces and host/device excess from the same build to locate the residual; and nvref2
+with `--repeats 5` under the unchanged rule to resolve the vLLM system comparison.
+None of these GPU measurements was run for this CPU-only implementation.

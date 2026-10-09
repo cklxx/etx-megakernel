@@ -34,6 +34,14 @@ from pathlib import Path
 from etx.sim import phase
 from etx.sim.xcd import Cost, Hw, simulate
 
+PROFILES = ("2026-09-30", "2026-10-08")
+STREAM_ROLES = {"qkv", "o_proj", "router", "moe_up", "moe_down", "lm_head"}
+# Round11 critical bodies, from another build (docs/FLOORS-2026-10-08.md).
+NARROW_BODY_US = {"prep": 6.04, "reduce": 5.58, "topk": 8.35, "prologue": 11.3,
+                  "in_norm": 5.6, "argmax": 10.1}
+# Pre-session host excess: results_tiles/ab{1,2,3}_all_x.log; VLLM-LADDER-2026-10-01.md.
+HOST_US = {"fused": 140.0, "unfused": 36.0}
+
 ETX_US = 7.5            # fitted: ETX's per-phase-width cost on top of the hardware floor, paid in both forms
 FUSED_US = 1.8          # fitted: what the megakernel costs on top of that, over the same tile launched as its own
                         # kernel. It is positive: build 3 measures 5.895 ms fused and 5.660 unfused, and the qknr
@@ -89,9 +97,11 @@ def _role(name: str) -> str:
 
 def cost_fn(plan: dict, cfg: dict, mapping: str = "contig", etx_us: float = ETX_US, ctx: int = 1024,
             variant: dict | None = None, fused: bool = True, fused_us: float = FUSED_US,
-            coh_save_us: float = 0.0, coh_touch: bool = False):
+            coh_save_us: float = 0.0, coh_touch: bool = False, profile: str = "2026-09-30"):
     """Cost of every task of `plan`: the phase floor, ETX's per-task cost, and the bytes this task's phase moves
     divided by the tasks the plan gives it."""
+    if profile not in PROFILES:
+        raise ValueError(f"unknown profile: {profile}")
     names = {t["id"]: n for n, t in plan["types"].items()}
     ntask: dict[str, int] = {}
     for d in plan["descs"]:
@@ -121,9 +131,16 @@ def cost_fn(plan: dict, cfg: dict, mapping: str = "contig", etx_us: float = ETX_
         e = etx_us + (fused_us if fused else 0.0)
         if coh_save_us > 0.0 and fused and r in COH_ROLES:      # ETX_VL_COH: the acquire inv and (for all-coherent
             e = max(e - coh_save_us, 0.0)                        # producers) the wbl2 arrive are gone
+        if profile == "2026-10-08":
+            e = 0.0
         c = Cost(floor_us=phase.FLOOR_US * w, etx_us=e * w, stream_bytes=per,
                  cu_rate=phase.cu_rate(mapping), agg_bw=phase.agg_bw(per, mapping) if per > 0 else 0.0)
-        if coh_touch and fused and r in TOUCH_ROLES and per > 0:  # the touch survives only without the inv
+        if profile == "2026-10-08":
+            if r in STREAM_ROLES and per > 0:
+                c = Cost(**{**c.__dict__, "agg_bw": phase.BW_HBM, "cu_rate": 1e9})
+            if r in NARROW_BODY_US:
+                c = Cost(**{**c.__dict__, "chain_us": NARROW_BODY_US[r]})
+        if profile == "2026-09-30" and coh_touch and fused and r in TOUCH_ROLES and per > 0:  # the touch survives only without the inv
             c = Cost(**{**c.__dict__, "touch_bytes": min(TOUCH_BYTES, per)})
         if r == "attn":                       # the attention partitions carry their own dependent chain
             c = Cost(**{**c.__dict__, "chain_us": 1.9})
@@ -142,11 +159,18 @@ def hw(handoff_domain: float = 0.4, handoff_device: float = 1.8) -> Hw:
 
 def step_us(plan_path: str | Path, cfg: dict, mapping: str = "contig", etx_us: float = ETX_US,
             variant: dict | None = None, fused: bool = True, coh_save_us: float = 0.0, coh_touch: bool = False,
-            **kw) -> float:
+            profile: str = "2026-09-30", **kw) -> float:
     plan = json.load(open(plan_path))
     rows, st = simulate(plan, cost_fn(plan, cfg, mapping, etx_us, variant=variant, fused=fused,
-                                      coh_save_us=coh_save_us, coh_touch=coh_touch), hw(**kw))
+                                      coh_save_us=coh_save_us, coh_touch=coh_touch, profile=profile), hw(**kw))
     return st["makespan_us"] / 1e3
+
+
+def wall_ms(plan: str | Path, cfg: dict, fused: bool, profile: str) -> float:
+    """Step plus pre-session host excess; step_us returns milliseconds despite its legacy name."""
+    handoffs = {} if fused else {"handoff_domain": 1.61, "handoff_device": 1.61}
+    return step_us(plan, cfg, fused=fused, profile=profile, **handoffs) + HOST_US[
+        "fused" if fused else "unfused"] / 1e3
 
 
 def predict_coh(plan_path: str | Path, cfg: dict, mapping: str = "contig") -> dict:
@@ -194,6 +218,8 @@ def main():
     ap.add_argument("plan")
     ap.add_argument("--config", default=str(ROOT / "examples/llm/configs/qwen3-30b-a3b.json"))
     ap.add_argument("--mapping", default="contig", choices=["contig", "rows"])
+    ap.add_argument("--profile", choices=PROFILES, default=PROFILES[0])
+    ap.add_argument("--unfused", action="store_true", help="separate launches with 1.61 us handoffs")
     ap.add_argument("--etx-us", type=float, default=ETX_US)
     ap.add_argument("--coh", action="store_true", help="the ETX_VL_COH range (section 20)")
     ap.add_argument("--all", dest="all_", action="store_true", help="the COH + ARGPF + BAR2 range (build 5)")
@@ -210,9 +236,13 @@ def main():
         print(f"base {r['base']:.3f} ms; coh overhead only {r['coh_hi']:.3f}-{r['coh_lo']:.3f}; "
               f"with touch {r['coh_touch_hi']:.3f}-{r['coh_touch_lo']:.3f}   (save {COH_SAVE_LO}-{COH_SAVE_HI} us)")
         return
-    print(f"{step_us(a.plan, cfg, a.mapping, a.etx_us):.3f} ms   (mapping {a.mapping}, etx {a.etx_us} us, "
+    handoffs = {} if not a.unfused else {"handoff_domain": 1.61, "handoff_device": 1.61}
+    ms = step_us(a.plan, cfg, a.mapping, a.etx_us, fused=not a.unfused, profile=a.profile, **handoffs)
+    print(f"{ms:.3f} ms   (mapping {a.mapping}, etx {a.etx_us} us, "
           f"floor {phase.FLOOR_US} us, HBM {phase.BW_HBM / 1e6:.2f} TB/s)")
 
+    if a.profile == "2026-10-08":
+        print(f"wall {ms + HOST_US['unfused' if a.unfused else 'fused'] / 1e3:.3f} ms")
 
 
 if __name__ == "__main__":
