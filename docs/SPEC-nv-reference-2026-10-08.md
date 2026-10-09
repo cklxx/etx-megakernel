@@ -323,3 +323,15 @@ checked against this section; a miss is a finding, not a reason to re-run.
   this documentation-only task; the existing rule and threshold remain unchanged.
 - Waste checks: a failure of `record`, `golden_sha`, `gate_all`, `docker_pull` or `vllm_r1` makes the report
   NOT-COMPLETE and shows by about minute 12. Let `check_imp1`, `gate_unf` and `hostprof` finish, then delete the VM.
+
+**Post-session observation, 2026-10-09 (pre-registered rule unchanged):** this machine's five-round result is
+INSUFFICIENT (`results_nvref_2026-10-09/report.log:20`). Default vLLM returned 4.849, 3.840, 4.825,
+4.809 and 4.800 ms, arm spread 1.009 ms (`results_nvref_2026-10-09/report.log:6`); the resulting paired
+DELTA spread is 1.013 ms against the 0.050 ms threshold, exceeding the median magnitude 0.283 ms
+(`results_nvref_2026-10-09/report.log:15-16`). The follow-up returned 4.811794, 4.829696, 4.812703,
+5.375439, 4.839390 and 4.801095 ms (`results_nvref_2026-10-09/vs_summary.log:19-24`). Thus nine of eleven
+same-configuration rounds cluster, with opposite outliers; the five-round rule did not resolve this sample.
+A future session must either identify/control the trigger in the separately recorded full/single-token windows,
+or pre-register more paired rounds with a rule that can tolerate exceptions and quantify uncertainty.
+Merely adding rounds cannot outvote an exception under the unchanged unanimity/range rule. Conditional sample-count
+calculations and evidence limits are in `docs/NVREF-2026-10-09.md` §4; none changes this session's verdict or the predictions above.
