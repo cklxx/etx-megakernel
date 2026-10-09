@@ -422,3 +422,32 @@ establish byte identity for every timed imported launch. The question of vLLM's 
 also remains open: this is the best measured default/AITER comparison, not a configuration search
 (`docs/NVREF-2026-10-09.md:82-84`; untested configuration: section 11). Neither limitation is fixed by
 more samples, and a resolved timing verdict must retain both qualifications.
+
+
+**Optional model diagnostics, pre-registered [E].** Append `trace1` (GPU 0), `floors_trace` (CPU),
+then `evx` (GPU 0), each with a 300 s deadline and a successful-predecessor dependency starting at
+`report`. They cannot affect any preceding measurement or the report; the rules above stay unchanged.
+Sources below are `/Users/ckl/.hermes/cache/scratch/o55-model.json:1`, `result`, sections A and C
+("Out of scope"). These are predictions for the same MI300X, batch 1, context 1024 build, not new results.
+
+- **Trace:** one `--repeat 1` run saves `$HOME/sess/tr_nvref2.bin`; `floors_trace` uses the session's
+  `$HOME/sess/b_all/plan.json` and saves and prints `$HOME/sess/floors_nvref2.txt`. Expect narrow-phase
+  bodies of about **3.85-7.95 us [E]**, rather than the old width-scaled sub-microsecond costs
+  (analysis A, "The three largest errors", item 2, from `results_tiles/tr_all.log:7-442`). The table
+  separates mean/critical body, start delay and phase delta, testing the missing narrow-body term
+  and the delay/tail contribution to the approximately 335 us residual. Cost: under one GPU minute,
+  **about $0.05 at $2.99/hour [E]** (analysis A item 2 and C, "Out of scope"). The verbatim analysis
+  command traces fused execution: `host.hip:888` suppresses phase reporting with `--unfused`.
+  If these bodies do not reproduce, the profile's transferred narrow-body costs are not validated
+  for this build; inspect the per-phase discrepancy before attributing the residual to event waits.
+- **Event protocol:** compile `bench/hw/hw_bench.hip` using the VM's `hipcc` and run `evx`, using the
+  form in `examples/sessions/moe_fix.py:66-74`. Expect the complete-event wait (acquire + barrier)
+  to be about **0.52 us [E]**, a per-task cost missing from the simulator (analysis A, paragraph
+  "What remains after all three", citing `docs/MODEL-vllm-kernels.md:330`; command in C,
+  "Out of scope"). Cost: about five VM minutes, **about $0.25 at $2.99/hour [E]**. This tests the
+  event-protocol explanation; it does not establish that multiplying one wait explains all 335 us,
+  or independently isolate COH's effect. If it does not reproduce, leave that explanation unvalidated
+  and retain the residual rather than fitting a replacement constant.
+
+Both are optional under the unchanged 55-minute hard stop. Preserve full logs; a timeout, missing trace
+or incomplete benchmark is NOT-COMPLETE for that diagnostic, not evidence for either expected value.
