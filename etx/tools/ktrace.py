@@ -1,5 +1,6 @@
 """Unadjusted rocprof device durations; never subtract profiler overhead.
 
+Boundary report mode measures clock disagreement across ranges, never vendor per-kernel durations.
 Plan text parsing is shared with compare; timeline reads a different JSON/raw format.
 Sampling specification: /Users/ckl/.hermes/cache/scratch/o55-kernel-compare.json:1.
 """
@@ -95,8 +96,7 @@ def vllm(path):
     return summarize(groups)
 
 
-def vendor(trace_dir, metadata):
-    """Sum device durations inside synchronized ROCTx row ranges, excluding gaps."""
+def _vendor_ranges(trace_dir):
     kernels, markers = [], []
     for p in Path(trace_dir).rglob('*kernel_trace.csv'):
         kernels.extend(read_csv(p))
@@ -104,21 +104,57 @@ def vendor(trace_dir, metadata):
         markers.extend(read_csv(p))
     kernels.sort(key=lambda k: k['Start_Timestamp'])
     starts = [k['Start_Timestamp'] for k in kernels]
-    groups, names = defaultdict(list), defaultdict(set)
-    seen = set()
+    ranges = []
     for r in markers:
         label = r.get('Function', r.get('Name', ''))
-        if not label.startswith('kcmp:'):
-            continue
+        if label.startswith('kcmp:'):
+            left = bisect_left(starts, r['Start_Timestamp'])
+            right = bisect_right(starts, r['End_Timestamp'])
+            ranges.append((label, r, kernels[left:right]))
+    return ranges
+
+
+def _boundary_crossing(label, marker, inside):
+    worst = max(inside, key=lambda k: k['End_Timestamp'], default=None)
+    if worst is None or worst['End_Timestamp'] <= marker['End_Timestamp']:
+        return None
+    return dict(label=label, in_range=len(inside),
+                overhang_us=(worst['End_Timestamp'] - marker['End_Timestamp']) / 1000,
+                kernel=worst['Kernel_Name'], kernel_end_us=worst['End_Timestamp'] / 1000,
+                marker_end_us=marker['End_Timestamp'] / 1000)
+
+
+def _boundary_summary(lib, ranges, crossings):
+    overhang = max((c['overhang_us'] for c in crossings), default=0)
+    print(f'BOUNDARY-SUMMARY lib={lib} ranges={len(ranges)} '
+          f'crossings={len(crossings)} max_overhang_us={overhang:.1f}', flush=True)
+
+
+def vendor(trace_dir, metadata, lib=''):
+    """Sum device durations inside synchronized ROCTx row ranges, excluding gaps."""
+    ranges, crossings = [], []
+    try:
+        ranges = _vendor_ranges(trace_dir)
+        crossings = [c for args in ranges if (c := _boundary_crossing(*args)) is not None]
+        return _vendor_measure(ranges, metadata)
+    finally:
+        _boundary_summary(lib, ranges, crossings)
+
+
+def _vendor_measure(ranges, metadata):
+    groups, names = defaultdict(list), defaultdict(set)
+    seen = set()
+    for label, r, inside in ranges:
         _, shape, it, layer = label.split(':')
         key = (shape, int(it), int(layer))
         if key in seen:
             raise ValueError('duplicate vendor range')
         seen.add(key)
-        left = bisect_left(starts, r['Start_Timestamp'])
-        right = bisect_right(starts, r['End_Timestamp'])
-        inside = kernels[left:right]
-        if any(k['End_Timestamp'] > r['End_Timestamp'] for k in inside):
+        crossing = _boundary_crossing(label, r, inside)
+        if crossing is not None:
+            fields = ' '.join(f'{key}={value:.1f}' if key.endswith('_us') else f'{key}={value}'
+                              for key, value in crossing.items())
+            print(f'BOUNDARY-CROSS {fields}', flush=True)
             raise ValueError(f'kernel crosses vendor range boundary: {label}')
         if not inside:
             raise ValueError(f'empty vendor range: {label}')
@@ -146,9 +182,23 @@ def vendor(trace_dir, metadata):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument('csv')
+    ap.add_argument('csv', nargs='?')
+    ap.add_argument('--trace-dir')
+    ap.add_argument('--boundaries', action='store_true')
     ap.add_argument('--plan')
     a = ap.parse_args(argv)
+    if a.boundaries:
+        if not a.trace_dir or a.csv or a.plan:
+            ap.error('--boundaries requires --trace-dir and cannot be used with csv or --plan')
+        ranges = _vendor_ranges(a.trace_dir)
+        crossings = [c for args in ranges if (c := _boundary_crossing(*args)) is not None]
+        crossings.sort(key=lambda c: c['overhang_us'], reverse=True)
+        print(json.dumps([{k: round(v, 1) if k.endswith('_us') else v for k, v in c.items()}
+                          for c in crossings], indent=2))
+        _boundary_summary('', ranges, crossings)
+        return
+    if not a.csv or a.trace_dir:
+        ap.error('csv is required unless using --trace-dir with --boundaries')
     print(json.dumps(etx(a.csv, a.plan) if a.plan else vllm(a.csv), indent=2))
 
 
