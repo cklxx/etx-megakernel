@@ -14,11 +14,11 @@ from etx.importer.slice_device import slice_device
 
 ROOT = Path(__file__).resolve().parents[1]
 LLVM = Path(os.environ.get("ETX_LLVM", "/opt/homebrew/opt/llvm/bin"))
-VLLM = Path(os.environ.get("ETX_VLLM", Path.home() / "code/vllm"))
-HDRS = Path(os.environ.get("ETX_ROCM_HEADERS", Path.home() / "code/rocm-headers"))
+VLLM = Path(os.environ.get("ETX_VLLM", ROOT / "build/external/vllm"))
+HDRS = Path(os.environ.get("ETX_ROCM_HEADERS", ROOT / "build/external/rocm-headers"))
 ASSEMBLER = LLVM / ("llvm-as" if (LLVM / "llvm-as").exists() else "llvm-link")
 need = pytest.mark.skipif(not ((LLVM / "clang++").exists() and (VLLM / "csrc/rocm/skinny_gemms.cu").exists() and (HDRS / "inc/hip").exists()),
-                          reason="local LLVM / vLLM / ROCm headers not available")
+                          reason="local toolchain unavailable; set ETX_LLVM, ETX_VLLM and ETX_ROCM_HEADERS")
 
 INST = ("\ntemplate __global__ void wvSplitK_hf_sml_<__hip_bfloat16, 64, 2, 16, 8, 2, 1>(const int, const int, const int, const int, "
         "const int, const int, const __hip_bfloat16*, const __hip_bfloat16* __restrict__, const __hip_bfloat16* __restrict__, "

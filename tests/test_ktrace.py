@@ -1,5 +1,7 @@
-"""Trace regressions: /Users/ckl/.hermes/cache/scratch/o55-kernel-compare.json:1."""
+"""Trace regressions for the committed kernel-comparison pre-registration."""
 import csv
+import gzip
+import hashlib
 import json
 from pathlib import Path
 import subprocess
@@ -8,17 +10,22 @@ import sys
 import pytest
 
 from etx.tools import ktrace
-from examples.vllm_llm.kcmp_report import HISTORICAL, decide
+from examples.vllm_llm.kcmp_report import decide
 from etx.tools.gpu_jobs import load_jobs
 
-ROOT = Path.home() / 'code/etx'
+ROOT = Path(__file__).resolve().parents[1]
 
 
-def historical(relative):
-    p = ROOT / relative
-    if not p.exists():
-        pytest.skip(f'external historical trace absent: {p}')
-    return p
+@pytest.fixture(scope='module')
+def historical(tmp_path_factory):
+    fixtures = ROOT / 'tests/fixtures/ktrace'
+    output = tmp_path_factory.mktemp('ktrace')
+    for name, info in json.loads((fixtures / 'provenance.json').read_text()).items():
+        data = gzip.decompress((fixtures / (name + '.gz')).read_bytes())
+        assert len(data) == info['bytes']
+        assert hashlib.sha256(data).hexdigest() == info['sha256']
+        (output / name).write_bytes(data)
+    return output
 
 
 @pytest.mark.parametrize('label,expected', [
@@ -27,15 +34,15 @@ def historical(relative):
     ('C', {'wvSplitK_all': 6.98, 'moe_up': 17.84, 'moe_down': 9.82,
            'topk': 8.06, 'attn': 7.50, 'reduce': 4.05, 'router': 4.01}),
 ])
-def test_historical_vllm(label, expected):
-    got = ktrace.vllm(historical(HISTORICAL[label]))
+def test_historical_vllm(historical, label, expected):
+    got = ktrace.vllm(historical / f'vllm-{label}.csv')
     for phase, us in expected.items():
         assert got[phase]['median_us'] == pytest.approx(us, abs=0.005)
 
 
-def test_historical_imported():
-    trace = historical('results_2026-09-28/rocprof_moe_base/kt_kernel_trace.csv')
-    plan = historical('results_2026-09-28/vlplan_b_moe_base.txt')
+def test_historical_imported(historical):
+    trace = historical / 'imported.csv'
+    plan = historical / 'imported-plan.txt'
     got = ktrace.etx(trace, plan)
     for phase, us in {'qkv': 8.38, 'o_proj': 7.66, 'router': 4.01, 'topk': 9.98,
                       'moe_up': 24.42, 'moe_down': 12.71, 'lm_head': 135.83}.items():
@@ -109,10 +116,7 @@ def test_vendor_cpu_dry_run():
 def test_thresholds_are_verbatim_and_reported(tmp_path, capsys):
     from examples.sessions import kcmp
     from examples.vllm_llm import kcmp_report
-    design = Path('/Users/ckl/.hermes/cache/scratch/o55-kernel-compare.json')
-    if not design.exists():
-        pytest.skip(f'external design absent: {design}')
-    text = json.loads(design.read_text())['result']
+    text = (ROOT / 'docs/KCMP-THRESHOLDS.md').read_text()
     thresholds = text.split('## 4. Thresholds, written before the run\n\n')[1].split('\n## 5.')[0]
     assert thresholds in kcmp.__doc__
     kcmp_report.main([str(tmp_path), '--historical-root', str(tmp_path)])

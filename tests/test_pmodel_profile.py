@@ -1,4 +1,6 @@
 """Fixed, out-of-sample profile; the historical fit remains the default."""
+import gzip
+import hashlib
 import json
 from pathlib import Path
 
@@ -9,9 +11,19 @@ from etx.tools.floors import round11_from_trace
 from examples.vllm_llm import pmodel
 
 ROOT = Path(__file__).resolve().parents[1]
-PLAN = ROOT / "build/rocm22/qwen3-30b-a3b_default/plan.json"
-TRACE = ROOT / "results_tiles/tr_all.bin"
 CFG = json.loads((ROOT / "examples/llm/configs/qwen3-30b-a3b.json").read_text())
+
+
+@pytest.fixture(scope="module")
+def historical(tmp_path_factory):
+    fixtures = ROOT / "tests/fixtures/pmodel"
+    output = tmp_path_factory.mktemp("pmodel")
+    for name, info in json.loads((fixtures / "provenance.json").read_text()).items():
+        data = gzip.decompress((fixtures / (name + ".gz")).read_bytes())
+        assert len(data) == info["bytes"]
+        assert hashlib.sha256(data).hexdigest() == info["sha256"]
+        (output / name).write_bytes(data)
+    return output / "plan.json", output / "tr_all.bin"
 
 
 def synthetic_plan():
@@ -40,20 +52,19 @@ def test_new_profile_costs():
     assert cost("attn_0", {}).chain_us == 1.9
 
 
-@pytest.mark.skipif(not PLAN.exists() or not TRACE.exists(),
-                    reason="current plan or results_tiles/tr_all.bin missing")
-def test_stream_bodies_against_trace():
-    measured = round11_from_trace(PLAN, TRACE)
+def test_stream_bodies_against_trace(historical):
+    plan, trace = historical
+    measured = round11_from_trace(plan, trace)
     rb = pmodel.role_bytes(CFG)
     for role in ("qkv", "moe_up", "moe_down"):
         predicted = phase.FLOOR_US + rb[role] / phase.BW_HBM
         assert predicted == pytest.approx(measured[role]["mean_body"], rel=0.03), role
 
 
-@pytest.mark.skipif(not PLAN.exists(), reason="current rocm22 plan missing; full simulation needs it")
-def test_current_plan_prediction():
-    fused = pmodel.step_us(PLAN, CFG, profile="2026-10-08")
-    unfused = pmodel.step_us(PLAN, CFG, fused=False, profile="2026-10-08",
+def test_current_plan_prediction(historical):
+    plan, _ = historical
+    fused = pmodel.step_us(plan, CFG, profile="2026-10-08")
+    unfused = pmodel.step_us(plan, CFG, fused=False, profile="2026-10-08",
                              handoff_domain=1.61, handoff_device=1.61)
     assert fused == pytest.approx(4.058, abs=0.01)
     assert unfused == pytest.approx(4.246, abs=0.01)

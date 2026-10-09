@@ -10,7 +10,7 @@ from etx.tools import timeline as tl
 from examples.vllm_llm import bw_spec
 
 ROOT = Path(__file__).resolve().parents[1]
-ROUND11 = Path(os.environ.get("ETX_DATA_ROOT", str(Path.home() / "code/etx"))) / "results_2026-10-01/round11"
+ROUND11 = Path(os.environ.get("ETX_DATA_ROOT", ROOT)) / "results_2026-10-01/round11"
 PLAN = ROUND11 / "plan_r8base.json"
 RAW = ROUND11 / "trace_r11_decode.bin"
 CONFIG = ROOT / "examples/llm/configs/qwen3-30b-a3b.json"
