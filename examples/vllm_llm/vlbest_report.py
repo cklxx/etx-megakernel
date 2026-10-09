@@ -44,7 +44,7 @@ def config(arm):
         env['VLLM_ENABLE_V1_MULTIPROCESSING'] = '0'
     if arm == 'S8':
         flags = ['--no-detok']
-    if original != arm:
+    if arm in ('S4', 'S5', 'S6'):
         kw['compilation_config'] = {'use_inductor_graph_partition': True}
     return dict(id=original, env=env, kw=kw, flags=flags, components=[original])
 
