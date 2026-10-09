@@ -136,3 +136,26 @@ def test_vstability_summary_uses_current_logdir(tmp_path):
                             capture_output=True, timeout=10,
                             env=dict(os.environ, HOME=str(home), ETX_SESS_LOGDIR=str(current)))
     assert 'VSTAB 1.000000 6.000000 5.000000 3.500000' in result.stdout
+
+
+def test_vlbest_new_entry_points_and_logdirs():
+    jobs = {j.name: j for j in load_jobs(ROOT / 'examples/sessions/vlbest.py')}
+    for name in ('build_identity', 'a_r1_S4f', 'b_r1_C2', 'F_r1'):
+        command = jobs[name].cmd
+        assert list(local_python_references(command)) == [Path('examples/sessions/vlbest.py')]
+        assert '--directory ${ETX_SESS_LOGDIR:-$HOME/sess}' in command
+    assert list(local_python_references(jobs['sync_report'].cmd)) == [Path('examples/sessions/nvchk.py')]
+    assert list(local_python_references(jobs['report'].cmd)) == [Path('examples/vllm_llm/vlbest_report.py')]
+
+
+def test_vlbest_entry_point_mutation_is_detected(monkeypatch):
+    real = load_jobs
+    def changed(path):
+        jobs = real(path)
+        for job in jobs:
+            if job.name == 'build_identity':
+                job.cmd = job.cmd.replace('examples.sessions.vlbest', 'examples.sessions.missing')
+        return jobs
+    monkeypatch.setattr(sys.modules[__name__], 'load_jobs', changed)
+    with pytest.raises(AssertionError):
+        test_vlbest_new_entry_points_and_logdirs()
