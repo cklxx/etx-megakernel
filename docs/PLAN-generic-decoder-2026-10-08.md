@@ -125,7 +125,7 @@ All rows use batch 1, bf16 and one MI300X. Times are wall time per token.
 Sources and methods:
 1. Qwen3-30B-A3B bytes: `docs/BANDWIDTH-2026-10-07.md:21`. The ledger counts known traffic only. Thus, the utilization is a lower bound.
 2. Qwen3-8B bytes: an estimate from `examples/llm/configs/qwen3-8b.json`. The estimate counts all weights except the embedding table, which contributes one row per token. It adds 0.15 GB of KV cache at a 1024-token context. No GPU measurement confirms it.
-3. Qwen3-8B times: `README.md:130`, dated 2026-09-25.
+3. Qwen3-8B times: `README.md:127`, dated 2026-09-25.
 4. Mixtral floor and times: `docs/GENERALITY-2026-10-02.md:258-260`. The README gives the floor without a byte count. The utilization column divides the floor by the time.
 
 ### 2.4 NVIDIA references
@@ -148,6 +148,18 @@ The MoE target on NVIDIA is "to be measured". The measurement uses the same mode
 4. On Mixtral-8x7B, vLLM runs near the floor. The same rule applies.
 
 ## 3. Priority
+
+### Lever rule (owner decision, 2026-10-09)
+
+**Lever rule.** (1) *Bound.* Every lever states B in ms/token on the current reference trace (today `results_tiles/tr_all.bin`, build `all`). For body levers, B = 48 x (critical body - serial floor) of the phases it changes (`etx/tools/floors.py`). For queue levers, B = 48 x (start delay - dispatcher jitter). A bound on an older trace does not count. (2) *Pursue.* B >= 0.050: build it, CPU gates first. 0.030 <= B < 0.050: build only as a passenger in a session already planned. B < 0.030: closed without a build, because an A/B cannot resolve it. (3) *Test.* At least 3 interleaved pairs on one GPU, bit-identical output or 32/32 + CHECK, device median, with wall printed beside it. The verdict follows `examples/vllm_llm/tile_ab.py`: KEEP when every pair is faster and the mean is <= -0.030; NEUTRAL when |mean| < 0.030; SLOWER at >= +0.030; MIXED otherwise. (4) *Act.* KEEP: make it a default in the next commit, then rebase every bound on the new trace. NEUTRAL or SLOWER: close it and record it in the settled list. MIXED: one more session with 5 pairs, then close it unless KEEP. At most two GPU sessions per lever. (5) *The 0.030-0.050 band.* A KEEP in this band is real on the device basis (above the 0.017-0.028 same-binary spread, `examples/vllm_llm/tile_ab.py:25`) but below the 0.050 system threshold (`docs/SPEC-nv-reference-2026-10-08.md:167`). Ship it, but do not quote it against vLLM on its own; only the sum of kept levers, measured in one session against vLLM, is quoted.
+
+PLAN means this document; FLOORS means `docs/FLOORS-2026-10-08.md`; BUDGET means `docs/BUDGET-2026-10-01.md`.
+
+- **topk KEY32, a large lever.** B = 0.324 [E], so pursue. It is already built and off by default (`PLAN:207`); next comes a 3-pair A/B. KEEP makes it the default. NEUTRAL closes topk selection and falsifies the claim at `FLOORS:336`.
+- **qkv start-spread queue reorder, a small lever.** It was 0.048 on round11 (`BUDGET:178,213`). Today the qkv start delay is 2.39 us [E, `results_tiles/tr_all.bin`], below the 2.90 us dispatcher jitter (`BUDGET:178`), so B is about 0 and it closes without a build.
+- **o_proj stage.** Its 0.117-0.171 (`PLAN:219`) leaves out TOUCH (`PLAN:472`), so it does not count until it is rebased on the current trace.
+
+### Historical round11 analysis
 
 The analysis uses the round11 trace of Qwen3-30B-A3B. Source: `docs/LATENCY-2026-10-07.md`.
 The device span is 5,081 us. The bandwidth floor at 4.3 TB/s is 1,439 us. The excess is about 3.6 ms.
@@ -207,6 +219,17 @@ Before new work on lever 3, explain the TOUCH result and the BAR2 result. `docs/
 The o_proj stage into LDS predicts 0.117 to 0.171 ms. This gain is small against the 3.6 ms excess. Appendix A keeps it at low priority.
 That value is an upper bound. In round11, TOUCH already loads 61,440 of the 65,536 B of each o_proj slice into L2 during the wait. The true gain can be below the 0.030 ms KEEP threshold. See "Review, 2026-10-08" in `docs/STAGE-oproj-2026-10-07.md`.
 
+### Settled bounds on the current trace (2026-10-09)
+
+All values below are upper bounds, computed from `results_tiles/tr_all.bin` with the method of `etx/tools/floors.py:359-386` against the round11 floors (`docs/FLOORS-2026-10-08.md:239-247`).
+
+- Router: 0.168 [E] (not 0.28; `BUDGET:47`, `PLAN:190`).
+- topk: 0.324 [E], superseding 0.34 (`PLAN:190`).
+- qkv folded body: 0.086 [E], superseding 0.20 (`PLAN:193`), with the fold kept (+0.013 net, `BUDGET:191-193`).
+- attn: 0.125 [E], superseding 0.17 (`PLAN:190`); reduce: 0.123 [E], superseding 0.13 (`PLAN:190`) (vLLM kernels; the owner decides).
+- MoE bodies: 0.158 [E] (moe_up 0.139, moe_down 0.019), superseding 0.43 (`PLAN:191`).
+- ETX-owned part of old lever 1: topk + router + prep = 0.604 [E], replacing the 1.14 at `PLAN:190`.
+
 ## 4. Current state
 
 All rows use batch 1, bf16 and one MI300X.
@@ -217,12 +240,12 @@ The rows of Table A differ in date, tiles and context length. Do not compare one
 
 | Model | Tiles | Date | ETX ms/token | Baseline ms/token | Source |
 |---|---|---|---|---|---|
-| Qwen3-30B-A3B | DSL tiles | 2026-10-02 | 4.823 | vLLM default 4.863 | `README.md:46-50` |
+| Qwen3-30B-A3B | DSL tiles | 2026-10-02 | 4.823 | vLLM default 4.863 | `176a691:README.md:46-50` |
 | Mixtral-8x7B | DSL tiles | 2026-10-02 | 10.365 | vLLM 8.686 | `docs/GENERALITY-2026-10-02.md:258` |
-| DeepSeek-Coder-V2-Lite | fleet hand-written tiles | 2026-09-25 | 3.78 | vLLM AITER 4.12, fleet 3.57 | `README.md:132` |
-| Qwen3-8B | generic, untuned tiles | 2026-09-25 | 10.07 | vLLM best 4.91 | `README.md:130` |
+| DeepSeek-Coder-V2-Lite | fleet hand-written tiles | 2026-09-25 | 3.78 | vLLM AITER 4.12, fleet 3.57 | `README.md:129` |
+| Qwen3-8B | generic, untuned tiles | 2026-09-25 | 10.07 | vLLM best 4.91 | `README.md:127` |
 
-Table B gives the generic, untuned tiles at a 1024-token context. Source: `README.md:123-135`.
+Table B gives the generic, untuned tiles at a 1024-token context. Source: `README.md:120-132`.
 
 | Model | vLLM, best of default and AITER | ETX tiles without fusion | ETX megakernel |
 |---|---|---|---|
@@ -237,8 +260,8 @@ Table B gives three facts:
 Qwen3-30B-A3B changed from 10.48 ms to 4.823 ms between the two tables.
 This is the only measured evidence of a large gain from tuned tiles in this repository.
 The same change also added the coherence design. Thus, the tiles do not own all of the gain.
-DeepSeek-Coder-V2-Lite with tuned fleet tiles is 8% faster than vLLM. Source: `README.md:134`.
-The fleet runtime runs the same tiles at 3.57 ms. ETX is 6% slower than fleet on this model. Source: `README.md:132`.
+DeepSeek-Coder-V2-Lite with tuned fleet tiles is 8% faster than vLLM. Source: `README.md:131`.
+The fleet runtime runs the same tiles at 3.57 ms. ETX is 6% slower than fleet on this model. Source: `README.md:129`.
 
 The Mixtral trace attributes the gap to MoE task widths that use Qwen values.
 The `moe_up` phase has 896 tasks on 304 workers. It needs three serial waves.

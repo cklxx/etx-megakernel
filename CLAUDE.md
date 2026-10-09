@@ -4,7 +4,7 @@ These rules come from what went wrong in 2026-09 (weeks spent tuning our own til
 
 ## 1. The claim decides the experiment
 
-- The claim ETX has to prove: **the kernels production actually runs (vLLM's, or the best available), fused into one ETX megakernel, are faster than the same kernels launched one by one.** Kernel quality is not ETX's claim; do not tune our own tiles to win a comparison unless the user asks for it.
+- **The claim ETX has to prove:** on one MI300X, Qwen3-30B-A3B decode at batch 1, the ETX megakernel built from ETX's DSL tiles (GEMV, MoE, top-k, attention prologue) and vLLM's attention, attention-reduce and RMSNorm kernels is faster than the same kernels replayed one by one through a HIP graph: `examples/vllm_llm/pairs.py` returns ESTABLISHED on host wall time (five interleaved pairs in one session on one GPU, every gain positive, median gain above 2% and above twice the spread), with `host --check` OK for every imported launch and 32/32 tokens equal to HF greedy. **Status 2026-10-09: not established** (best 1.7%, `results_2026-10-01/round18/FINDING.md:55`). With vLLM's kernels only, fusion loses (`results_2026-10-01/round24/FINDING.md:27-28`, -0.171 and -0.284 ms) and is not claimed. Kernel quality is not ETX's claim; tuning our own tiles to win a comparison still needs the owner's request.
 - Every comparison has two baselines: the same kernels launched one by one (isolates fusion), and the strongest real system (vLLM's best configuration, measured the same way). Report both.
 - Follow the user's stated direction. If you think it is wrong, say so once with evidence; do not drift away from it silently.
 

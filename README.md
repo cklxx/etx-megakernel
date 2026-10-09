@@ -37,22 +37,19 @@ See design section 15.9.
     VLLM=~/vllm bash examples/vllm_llm/build.sh ~/llm/qwen3-8b            # on the GPU host
     nohup bash examples/vllm_llm/vm_run.sh > ~/vl.log 2>&1 &              # the whole comparison on a fresh VM
 
-## Status: ETX beats vLLM at batch 1 (2026-10-02)
+## Status: ETX at batch 1 (2026-10-09)
 
-Conditions: Qwen3-30B-A3B bf16 decode, batch 1, one MI300X, wall clock.
-The run matches 32/32 tokens against HF greedy.
-Every DSL operator of the last layer is within 2 bf16 ulps of a CPU reference:
+Qwen3-30B-A3B bf16 decode, batch 1, one Hot Aisle MI300X: ETX megakernel **4.548 ms/token wall, 4.405 device**, 32/32 tokens, `CHECK-DSL OK`. No current same-machine comparison with vLLM exists; `docs/SPEC-nv-reference-2026-10-08.md` measures both in one session. The latest recorded comparison, on another machine, put ETX 0.076 ms behind vLLM default on wall time (`results_2026-10-01/round24/FINDING.md:29,32`).
 
-| | ms/token | vs vLLM |
+| | ms/token wall | Basis / source |
 |---|---|---|
-| vLLM 0.27.1 default | 4.863 | — |
-| vLLM + AITER | 4.975 | +2.3% |
-| **ETX megakernel** | **4.823** | **−0.8% — ahead** |
-| ETX unfused — same tiles, HIP-graph replay | 4.998 | +2.8% |
+| **ETX megakernel** | **4.548** (4.405 device) | Hot Aisle MI300X; `results_tiles/ab1..3_all_x.log:8`, archived in `results_tiles.tgz` |
+| vLLM 0.27.1 default | 4.862 | VF box, not comparable; `results_2026-10-01/vllm_ladder/default_r1..3.log:64` |
+| vLLM + AITER | 4.975 | Historical +2.3% entry; not a current same-machine comparison |
 
-**The recorded round23 comparison shows a 1.2% fusion benefit for the same DSL tiles: 4.937 versus 4.998 ms/token.**
-This percentage does not describe the newer 4.823 entry above.
-The corresponding newer paired raw logs are absent from the inspected archive. Thus, a new fusion percentage remains unverified.
+The comparison rows for `**ETX megakernel** | **4.823**` and 4.998 unfused are withdrawn for having no raw logs (`docs/DOC-AUDIT-2026-10-03.md:149`).
+
+**Historical: the recorded round23 comparison shows a 1.2% fusion benefit for the same DSL tiles: 4.937 versus 4.998 ms/token.**
 The previous claim of a 4.2% loss refers to the day before.
 
 The system improved 17.5% against itself, with confirmation on a second machine.
@@ -205,8 +202,8 @@ build/splitk_sum/run 50
 
 * CUDA emission is untested (no NVIDIA machine was available).
 * The Triton host-DSL emitter produces a skeleton, not a runnable kernel.
-* The tiles are correctness references (per-token GEMVs), so there is no
-  fusion-gain figure against a tuned unfused baseline yet.
+* Fusion against a HIP-graph replay of the same tiles: +1.3% wall
+  (`results_2026-10-01/round24/FINDING.md:29`), below the 2% bar of `examples/vllm_llm/pairs.py:33`.
 
 ## Layout
 

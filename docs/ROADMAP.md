@@ -1,5 +1,10 @@
 # ETX: project scope and evolution roadmap
 
+**Success.** ETX succeeds when, in one session on one MI300X, Qwen3-30B-A3B bf16 decode at batch 1 (the committed 1024-token golden prompt, 32 greedy tokens) runs **more than 2% faster in host wall time per decode step** fused than with the same kernels replayed one by one through a HIP graph, as judged by `examples/vllm_llm/pairs.py`; vLLM's best configuration, measured in the same session on the same basis, is reported beside it.
+*Validity:* five interleaved pairs on one GPU, with the machine recorded; each pair is the mean of steps 1024-1054 (`docs/SPEC-nv-reference-2026-10-08.md:21-26`); `host --check` OK on every imported launch; 32/32 tokens; no debug environment variables (`examples/vllm_llm/pairs.py:20-23`). *Tolerance:* every pair's gain is positive and the median exceeds twice the gain spread (`pairs.py:34`) - more than 0.093 ms at 4.548 ms (`SPEC:292`). *Measurable today:* yes, with the `nvref` session and its fusion arm; the expectation is "not met", at 1.4-2.1% [E]. *Needs an NVIDIA machine:* the same sentence on H100 or B200, which first needs a tested CUDA emission (`README:203`), an importer that reads more than AMDGPU IR (`PLAN:273`) and the owner's choice of GPU (`PLAN:465`); BabelStream on both GPUs plus the same-model vLLM or SGLang reference (`PLAN:458-459`) would set the cross-GPU utilisation target, which has no number today.
+
+SPEC means `docs/SPEC-nv-reference-2026-10-08.md`; PLAN means `docs/PLAN-generic-decoder-2026-10-08.md`; README means `README.md`; pairs.py means `examples/vllm_llm/pairs.py`.
+
 Proposed direction, 2026-10-03. Repository evidence reviewed at
 [`5ef3882`](https://github.com/cklxx/etx-megakernel/commit/5ef3882c7030e6095f3fa308969790fabafd33fa)
 (committed 2026-10-02). This is a documentation update, not an implementation or
