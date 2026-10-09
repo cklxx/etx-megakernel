@@ -33,7 +33,7 @@ def session(tmp_path):
     write(tmp_path, "gate_all", etx(4.8) + "\nCHECK-DSL OK: 0 values beyond 2 bf16 ulps\nGATE-OK")
     write(tmp_path, "gate_unf", etx(5.2, "graph") + "\nGATE-OK")
     write(tmp_path, "check_imp", "CHECK OK: 0 launch(es) differ")
-    write(tmp_path, "golden_sha", "/home/llm/golden_c1024.txt: OK", "None")
+    write(tmp_path, "golden_sha", "/models/golden_c1024.txt: OK", "None")
     write(tmp_path, "record", "MI300X VF\n7.2.4\nLinux test\nHF_REV abcdef", "None")
     write(tmp_path, "docker_pull", "IMAGE vllm/image@sha256:abcdef", "None")
     for r in range(1, 6):

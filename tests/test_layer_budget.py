@@ -30,7 +30,7 @@ def require_round11(candidates):
 def round11():
     root = Path(__file__).resolve().parents[1]
     candidates = ([Path(os.environ["ETX_DATA_ROOT"])] if "ETX_DATA_ROOT" in os.environ
-                  else [root, Path.home() / "code/etx"])
+                  else [root])
     directory = require_round11(candidates)
     rows = tl.read_raw(directory / "trace_r11_decode.bin")
     # Match task count and grid-instance count, then check every task in analyze.

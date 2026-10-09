@@ -447,9 +447,9 @@ def test_violation_exit_code(tmp_path, capsys):
     assert "VIOLATION:" in out and "FAIL:" in out and "PASS" not in out
 
 
-# The imported builds of the main checkout (examples/vllm_llm/build.sh, ROCm 7.2.4 device libraries). Built without
+# Optional imported builds (examples/vllm_llm/build.sh, ROCm 7.2.4 device libraries). Built without
 # ETX_VL_CHECK, so the device flags were build.sh's defaults.
-REAL = Path(os.environ.get("ETX_CONTRACT_BUILDS", Path.home() / "code/etx/build/rocm22"))
+REAL = Path(os.environ.get("ETX_CONTRACT_BUILDS", ROOT / "build/rocm22"))
 
 
 @pytest.mark.parametrize("name, pairs", [("qwen3-30b-a3b_xcd_qknr", 48), ("mixtral-8x7b_imported", 32)])

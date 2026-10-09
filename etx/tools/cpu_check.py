@@ -17,6 +17,7 @@ from etx.tools.bench_sim import ROOT, provenance, write_json, digest
 
 # Known optional tests need artifacts/toolchains beyond the source-only CPU suite.
 EXTERNAL_TESTS = {
+    # Import toolchain: ETX_LLVM, ETX_VLLM and ETX_ROCM_HEADERS.
     "tests.test_importer.test_wvsplitk_import_links_and_inlines",
     "tests.test_importer.test_triton_downgrade_hex_literals_parse_back",
     "tests.test_codegen.test_generated_hip_compiles",
@@ -26,8 +27,10 @@ EXTERNAL_TESTS = {
     "tests.test_coh_model.test_coh_not_applied_unfused",
     "tests.test_phase_model.test_reproduces_the_measured_builds",
     "tests.test_phase_model.test_folding_narrow_phases_away_is_worth_almost_nothing",
+    # Imported builds: ETX_CONTRACT_BUILDS and ETX_LLVM.
     "tests.test_acquire_contract.test_real_imported_build[qwen3-30b-a3b_xcd_qknr-48]",
     "tests.test_acquire_contract.test_real_imported_build[mixtral-8x7b_imported-32]",
+    # Round48 archive: ETX_DATA_ROOT.
     "tests.test_pairs.test_round48_interleave_log_is_refused",
     # Round11 archive gates: skipped without ETX_DATA_ROOT, failures when ETX_REQUIRE_DATA=1.
     "tests.test_layer_budget.test_round11_host_correspondence",

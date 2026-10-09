@@ -1,0 +1,22 @@
+{
+  "vllm-A.csv": {
+    "source": "results_2026-09-27/vlnext/moe/prof/8f2e8af04e27/7_kernel_trace.csv",
+    "sha256": "4d961c84dc72e12922c480ea2bd0d06ad0db33e9e7f1d6db3091d6eda7ac4d20",
+    "bytes": 54495159
+  },
+  "vllm-C.csv": {
+    "source": "results_2026-09-28b/vprof_qknr/1b7d92084d3f/7_kernel_trace.csv",
+    "sha256": "40e67fdbf554eb1727d80d8ca95f7252f477029158c692de79eec114536fb67b",
+    "bytes": 49358539
+  },
+  "imported.csv": {
+    "source": "results_2026-09-28/rocprof_moe_base/kt_kernel_trace.csv",
+    "sha256": "ff63a04d8155031240bff656edcc50f0cbf87316c0a9ef14c9b959383f0d0f7c",
+    "bytes": 826973
+  },
+  "imported-plan.txt": {
+    "source": "results_2026-09-28/vlplan_b_moe_base.txt",
+    "sha256": "743eb0a60232bb8eaba9b16079fd93ae35c53e7d93ec33d4c14c5df0b47e7632",
+    "bytes": 44963
+  }
+}

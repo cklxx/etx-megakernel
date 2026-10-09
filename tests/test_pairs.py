@@ -1,4 +1,5 @@
 """Paired fused / HIP-graph results: the candidate 1 verdict and every refusal."""
+import os
 from pathlib import Path
 
 import pytest
@@ -8,7 +9,8 @@ from examples.vllm_llm import pairs as pr
 FUSED = "mode: ETX megakernel (vLLM kernels imported)"
 GRAPH = "mode: unfused (same imported kernels, one launch per grid, HIP graph)"
 ENV = "ETX_ENV ETX_UNFUSED_SYNC= ETX_UNFUSED_NOGRAPH="
-ROUND48 = Path.home() / "code/etx/results_2026-10-01/round48/interleave.log"
+ROOT = Path(__file__).resolve().parents[1]
+ROUND48 = Path(os.environ.get("ETX_DATA_ROOT", ROOT)) / "results_2026-10-01/round48/interleave.log"
 
 
 def run(mode, wall, dev=None, gpu="0", job="j", env=ENV, matched=32, gen=32):
@@ -157,7 +159,7 @@ def test_refuses_missing_log_and_empty_log(tmp_path, capsys):
     assert "no runs found" in refused(tmp_path, capsys, ["nothing here"])
 
 
-@pytest.mark.skipif(not ROUND48.is_file(), reason=f"round48 log not present at {ROUND48}")
+@pytest.mark.skipif(not ROUND48.is_file(), reason=f"round48 log not present at {ROUND48} (set ETX_DATA_ROOT)")
 def test_round48_interleave_log_is_refused(capsys):
     """round48 printed RESULT lines without mode or ETX_ENV lines and ran no HIP-graph arm: no verdict from it."""
     assert pr.main([str(ROUND48)]) == 2

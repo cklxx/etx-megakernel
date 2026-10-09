@@ -1,0 +1,12 @@
+{
+  "plan.json": {
+    "source": "build/rocm22/qwen3-30b-a3b_default/plan.json",
+    "sha256": "66a10309effaf34c4119eadb9cae293b35835735a0c5d147182e49c99b17c52e",
+    "bytes": 10988545
+  },
+  "tr_all.bin": {
+    "source": "results_tiles/tr_all.bin",
+    "sha256": "44e589fd599a94c142424064ee3ec28175dc0e5297bb9e8d3b97d4ca6f476a9c",
+    "bytes": 4346064
+  }
+}

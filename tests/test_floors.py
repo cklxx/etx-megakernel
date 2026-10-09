@@ -231,7 +231,7 @@ def test_vllm_evidence_lines():
 
 
 def test_round11_table_matches_the_raw_trace():
-    base = Path(os.environ.get('ETX_DATA_ROOT', str(Path.home() / 'code/etx'))) / 'results_2026-10-01/round11'
+    base = Path(os.environ.get('ETX_DATA_ROOT', ROOT)) / 'results_2026-10-01/round11'
     plan, raw = base / 'plan_r8base.json', base / 'trace_r11_decode.bin'
     if not (plan.is_file() and raw.is_file()):
         message = 'Round11 floors check needs ETX_DATA_ROOT with the archived pair'
