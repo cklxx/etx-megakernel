@@ -131,6 +131,7 @@ env "${DSLT[@]}" ETX_VL_IMPORTS="$OUT/imp/imports.json" ETX_VL_ADAPTERS="$OUT/im
 grep -E "tasks=|workers/domain" "$OUT/compile.log" || true
 if [ "${ETX_VL_UC:-0}" = 1 ]; then "$PY" "$ROOT/examples/vllm_llm/check_uc_plan.py" "$OUT/plan.json" || exit 1; fi
 echo "== hipcc"
+hipcc --version 2>&1 | tee "$OUT/compiler_version.txt"
 # ETX_ROCM_HEADERS: a HIP include tree for ROCm installs that ship no headers (see etx/importer/vllm_kernels.py)
 ROCMINC=(); [ -n "${ETX_ROCM_HEADERS:-}" ] && ROCMINC=(-isystem "$ETX_ROCM_HEADERS")
 # ETX_VL_NB and ETX_VL_REQUESTS are published by the manifest; the host reads the plan's values, not a -D it could
@@ -146,6 +147,11 @@ ABL=(); [ -n "${ETX_VL_ABLATE:-}" ] && ABL=(-DDSL_ABLATE_$(echo "$ETX_VL_ABLATE"
 hipcc -O3 -std=c++17 --offload-arch=gfx942 "${ROCMINC[@]}" -I "$ROOT/etx/runtime/include" -I "$OUT" -I "$ROOT" \
   -Xclang -mlink-builtin-bitcode -Xclang "$OUT/imports.bc" -Rpass-analysis=kernel-resource-usage \
   "${CHK[@]}" "${NTF[@]}" "${VNF[@]}" "${ABL[@]}" "${PREPF[@]}" ${ETX_HIPCC_FLAGS:-} "$OUT/megakernel_d0.hip" "$ROOT/examples/vllm_llm/host.hip" $([ "${ETX_VL_CHECK:-0}" = 1 ] && echo "$OUT/imp/orig_table.hip -x none $OUT/imp/orig_*.o") -o "$OUT/run" 2>&1 \
-  | grep -E "Function Name|VGPRs:|ScratchSize|VGPRs Spill|LDS Size|error" | sed -E "s/.*remark: +//; s/ \[-Rpass.*//" | paste - - - - - || true
+  | tee "$OUT/hipcc.log"
 [ -x "$OUT/run" ] || { echo "build failed: no $OUT/run"; exit 1; }
+# CHECK builds require packed inputs and a golden before certification. Ordinary
+# pre-prep builds remain supported; they cannot supply a certificate until rebuilt.
+if [ "${ETX_VL_CHECK:-0}" = 1 ] || { [ -f "$DIR/vl.manifest" ] && [ -f "$DIR/golden_c1024.txt" ]; }; then
+  "$PY" -m examples.vllm_llm.import_certificate --write-build "$OUT" --model "$DIR"
+fi
 echo "built $OUT/run (plan $OUT/vl_plan.txt)"

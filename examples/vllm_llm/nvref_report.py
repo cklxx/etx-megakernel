@@ -159,9 +159,12 @@ def report(directory: Path):
     t1, s1 = texts.get("check_imp1", (None, None))
     t0, s0 = texts.get("check_imp", (None, None))
     if t1 and ok.search(t1) and s1 == "ok":
-        imported = "OK"
+        count = len(re.findall(r"^\s+\S+\s+L-?\d+\s+\S+\s+identical\s+original ", t1, re.M))
+        # This reporter is Qwen3-30B-A3B-specific (97 planned imports). An old
+        # summary without instance records must not manufacture five checks.
+        imported = f"INCOMPLETE {count if count else '?'}/97, different build"
     elif t1 is None and t0 and ok.search(t0) and s0 == "ok":
-        imported = "OK"          # only the legacy check ran, and it passed
+        imported = "INCOMPLETE (uncertified legacy check)"
     elif t1 is not None:
         # The real check ran (or was attempted): never hide its state behind the legacy refusal.
         imported = f"NOT MET (check_imp1: {s1})"
@@ -170,6 +173,21 @@ def report(directory: Path):
     else:
         reasons = ", ".join(f"{n}: {st}" for n, (_t, st) in texts.items()) or "no check job ran"
         imported = f"NOT MET ({reasons})"
+
+    # Revalidate evidence, not a saved success label. Legacy timing statistics
+    # remain timing-only; only this executable's complete certificate can qualify.
+    from examples.vllm_llm.import_certificate import validate
+    eligible = False
+    certificate_reason = "no same-executable certificate"
+    if (directory / "build_identity.json").exists():
+        try:
+            certificate = validate(directory, (0, 1040))
+            imported = f"OK (certified {certificate['checked']}/{certificate['planned']}, positions 0,1040)"
+            eligible = certificate['eligible']
+            certificate_reason = "wall timing rule not met"
+        except (Refusal, OSError, ValueError, KeyError, TypeError, IndexError) as exc:
+            imported = f"INCOMPLETE (certificate: {exc})"
+            certificate_reason = str(exc)
 
     golden = session.read("golden_sha", "None")
     if not re.search(r"(?:^|/)golden_c1024.txt: OK$", golden, re.M):
@@ -265,6 +283,7 @@ def report(directory: Path):
         print(f"FUSION unavailable ({fusion_unavailable})")
         print(f"HOST-EXCESS unavailable ({fusion_unavailable})")
     print(f"IMPORT-CHECK {imported}")
+    print("FULL-CLAIM " + ("ELIGIBLE" if eligible else f"NOT ELIGIBLE ({certificate_reason}); timing-only observations"))
     result = verdict(deltas)
     if unresolved and med_abs <= spread:
         # The sign of the paired delta is not stable: no verdict can rest on it.

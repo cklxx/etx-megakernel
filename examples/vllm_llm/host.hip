@@ -610,14 +610,23 @@ int main(int argc, char** argv) {
       const double us_i = elapsed_us();
       by_kernel[x.exp].first += us_o; by_kernel[x.exp].second += us_i; sum_o += us_o; sum_i += us_i;
       std::string diff;
+      size_t compared_bytes = 0; long long first_byte = -1;
       for (size_t b = 0; b < bufs.size(); ++b) {
         std::vector<uint8_t> A(bufs[b].second), B(bufs[b].second);
         ETX_CHECK(hipMemcpy(A.data(), bufs[b].first, A.size(), hipMemcpyDeviceToHost)); ETX_CHECK(hipMemcpy(B.data(), ref[b], B.size(), hipMemcpyDeviceToHost));
         size_t n = 0, first = 0; for (size_t k = 0; k < A.size(); ++k) if (A[k] != B[k]) { if (!n) first = k; ++n; }
+        if (n && first_byte < 0) first_byte = (long long)(compared_bytes + first);
+        compared_bytes += A.size();
         if (n) diff += std::string(" ") + (b < NB ? names[b] : (((b - NB) % 2) ? "vc" : "kc")) + ":" + std::to_string(n) + "B@" + std::to_string(first);
       }
       printf("  %-10s L%-3d %-20s %s%s  original %6.1f us  imported %6.1f us\n", x.role.c_str(), x.layer, x.exp.c_str(),
              diff.empty() ? "identical" : "DIFFERS", diff.c_str(), us_o, us_i);
+      // Machine-readable evidence supplements (never replaces) the legacy line.
+      printf("CHECK-INSTANCE {\"id\":%d,\"layer\":%d,\"export\":\"%s\",\"replicas\":%d,"
+             "\"grid\":[%d,%d,%d],\"block\":[%d,%d,%d],\"position\":%d,\"bytes\":%zu,"
+             "\"result\":\"%s\",\"first_byte\":%lld}\n", x.n, x.layer, x.exp.c_str(), x.rep,
+             x.gx, x.gy, x.gz, d->block[0], d->block[1], d->block[2], check_pos, compared_bytes,
+             diff.empty() ? "identical" : "DIFFERS", first_byte);
       ++checked;
       if (!diff.empty()) ++bad;
     }
