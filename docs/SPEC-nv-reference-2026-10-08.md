@@ -335,3 +335,90 @@ A future session must either identify/control the trigger in the separately reco
 or pre-register more paired rounds with a rule that can tolerate exceptions and quantify uncertainty.
 Merely adding rounds cannot outvote an exception under the unchanged unanimity/range rule. Conditional sample-count
 calculations and evidence limits are in `docs/NVREF-2026-10-09.md` §4; none changes this session's verdict or the predictions above.
+
+
+## 12. Pre-registration amendment: nvref2 (CPU preparation, 2026-10-09)
+
+**Question.** Does ETX fused beat vLLM's best measured configuration on host wall time at batch 1 on one
+MI300X, for Qwen3-30B-A3B bf16 and the same 1024-token prompt and 32 greedy tokens? Section 7's paired
+rule is unchanged. This amendment applies only to the next run, `examples/sessions/nvref2.py`; section 11
+and `examples/sessions/nvref.py` remain the record and reproducible protocol of the previous run.
+
+**Measurement change and reason.** The primary default vLLM jobs use `--repeats 5` instead of `--repeats 1`
+(`examples/sessions/nvref.py:107`; option: `examples/llm/vllm_bench.py:36`). Each round reports the median
+of five `(gen(32) - gen(1)) / 31` samples (`examples/llm/vllm_bench.py:71-75`). The engine is constructed
+once per invocation, outside the repeat loop, and warm-up remains once per invocation
+(`examples/llm/vllm_bench.py:58-59,69-75`): engine start still happens once per round, not once per sample.
+All other job commands, dependencies, lanes, deadlines, ordering and gates stay byte-identical, including
+fused/unfused ETX, hostprof, noprog and the AITER tail (which retains `--repeats 1`).
+
+The previous verdict was INSUFFICIENT (`results_nvref_2026-10-09/report.log:20`). Two of eleven default
+rounds had opposite window excursions (`docs/NVREF-2026-10-09.md:100-130`): `one_ms` reached 48.57 ms
+(`results_nvref_2026-10-09/vllm_r2.json:19`) against the usual 17.18-18.12 ms
+(`results_nvref_2026-10-09/vs_r5.json:19`, `results_nvref_2026-10-09/vllm_r4.json:19`), while `full_ms`
+reached 184.75 ms (`results_nvref_2026-10-09/vs_r4.json:16`) against the usual 166.6-167.7 ms
+(`results_nvref_2026-10-09/vllm_r5.json:16`, `results_nvref_2026-10-09/vllm_r1.json:16`). With one sample,
+either excursion determines the entire round. Independent audit: `/Users/ckl/.hermes/cache/scratch/o55-completion.json:1`,
+`result`, sections 3 and 4; the raw windows establish the estimator's sensitivity, not the cause of the stalls.
+
+**Prediction [E].** The vLLM per-round spread (max minus min across the five default round medians) should
+fall from the nine non-outlier rounds' 0.049 ms (derived from `results_nvref_2026-10-09/vllm_r1.json:11`
+and `results_nvref_2026-10-09/vllm_r5.json:11`; the complete set is cited at
+`docs/NVREF-2026-10-09.md:100-116`) to **at most 0.020 ms [E]**. A median of five discards one extreme
+stalled-call sample; it does not guarantee this spread if drift or repeated/correlated stalls persist.
+The earlier 0.049 ms is the non-outlier range, not the complete previous arm's spread. Retain every raw
+`full_ms`, `one_ms` and per-token sample, including outliers, and report whether this prediction held.
+
+**Go/no-go, unchanged.** Section 7's primary system rule, verbatim:
+
+- The primary verdict uses only fused ETX versus vLLM; unavailable fusion evidence does not change it.
+- **LEAD:** all five Δ_R < 0, median <= -0.050. **LOSS:** all five > 0, median >= +0.050. **TIE:** |median| < 0.050.
+  **INSUFFICIENT:** otherwise. If AITER's median is > 0.050 below default, recompute against AITER and print both.
+- Print the five paired deltas and their spread (max minus min).
+  A paired delta spread above 0.050 ms, or a median inside that spread, prints the `RESOLUTION` line above with
+  the ratio of the median to the spread. When the median is no larger than the spread the sign of the paired
+  difference is not stable, so the verdict becomes `INSUFFICIENT` whatever the median says; otherwise the
+  verdict stands and the ratio tells the reader how far it is from the noise.
+
+
+The separate fusion requirement remains: "five interleaved pairs in one session on one GPU, every gain
+positive, median gain above 2% and above twice the spread" (`CLAUDE.md:7`; constants:
+`examples/vllm_llm/pairs.py:33-34`). This is the fused-versus-unfused rule, not section 7's vLLM LEAD rule;
+no criterion or report implementation is changed by this amendment. Correctness gates remain required,
+and the import-check limitation below remains explicit even if the timing rules pass.
+
+Outcome branches (section 7, unchanged):
+
+- **LEAD:** write `docs/NVREF-<date>.md`, index the evidence in `docs/DATA.md`, update the README comparison;
+  retain the separate fusion gate and leave NVIDIA validation open. Limit the claim to tested configurations.
+- **TIE:** report the null result; apply section 7's host-work branch, then section 11's diagnostic split.
+- **LOSS:** report no lead, check the machine record and apply the same host-work branch.
+- **INSUFFICIENT:** make no lead/loss claim; inspect the machine record and paired spread before treating
+  the host-work branch as actionable. Record a failed spread prediction if applicable; do not relax the rule.
+
+**Budget [E].** Five primary vLLM rounds at about 125 s of engine time each (about two minutes per round),
+plus setup, ETX arms, gates, the unchanged diagnostic tail and fetch: about **30 GPU minutes / 0.5 hours**,
+about **$1.50 at $2.99 per hour** (planning rate; estimate, not a new billing measurement). These are the
+requested planning estimates, also proposed in `/Users/ckl/.hermes/cache/scratch/o55-completion.json:1`,
+`result`, section 3. They are not a guaranteed runtime for the full unchanged job list. The operator's
+**55-minute VM hard stop** remains binding (section 9); drop nice-to-have jobs first, fetch full unfiltered
+logs into a fresh `results_nvref2_<date>` directory, then delete the VM by the hard stop. Do not overwrite
+the preceding session's runner log or status. Before any later provisioning, complete section 8's remaining
+preflight and balance checks and ensure the committed session is in the checkout copied by `session.sh`.
+This preparation authorizes no GPU or VM use.
+
+If cut short, preserve completed correctness checks, individual full/single-token samples and completed
+paired host-wall observations, with their actual count and missing jobs. They are partial diagnostic
+evidence only: fewer than five complete required pairs is NOT-COMPLETE, with no LEAD/TIE/LOSS verdict
+and no substitution of a shorter run. If all required pairs and gates complete but only the optional tail
+is cut, report the primary rule, explicitly mark missing fusion/AITER/hostprof/noprog evidence unavailable,
+and limit any best-measured-configuration claim accordingly.
+
+**Out of scope.** Import-check coverage remains 5 of 97 imported instances and in a different build from
+the timed one (check evidence: `results_nvref_2026-10-09/check_imp1.txt:2-6,14-15`; full timed-plan inventory:
+`results_nvref_2026-10-09/vlplan_all.txt:3-430`; audit count and build distinction:
+`/Users/ckl/.hermes/cache/scratch/o55-completion.json:1`, `result`, sections 1 and 5). This session does not
+establish byte identity for every timed imported launch. The question of vLLM's truly best configuration
+also remains open: this is the best measured default/AITER comparison, not a configuration search
+(`docs/NVREF-2026-10-09.md:82-84`; untested configuration: section 11). Neither limitation is fixed by
+more samples, and a resolved timing verdict must retain both qualifications.
