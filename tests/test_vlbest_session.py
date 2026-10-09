@@ -14,6 +14,24 @@ from examples.vllm_llm import vlbest_report as r
 SESSION = Path(__file__).resolve().parents[1] / 'examples/sessions/vlbest.py'
 
 
+@pytest.mark.parametrize('override,cap', [(None, 8400), ('6000', 6000)])
+def test_effective_budget_print(monkeypatch, override, cap):
+    monkeypatch.delenv('ETX_SESS_MAX_SECONDS', raising=False)
+    if override is not None:
+        monkeypatch.setenv('ETX_SESS_MAX_SECONDS', override)
+    budget = f'BUDGET vm-life=150m runner-cap={cap / 60:g}m'
+    if override is not None:
+        budget += ' override=ETX_SESS_MAX_SECONDS'
+    jobs, limit = load_session(SESSION)
+    assert limit == cap
+    assert next(j.cmd for j in jobs if j.name == 'budget') == f"printf '%s\\n' '{budget}'"
+    proc = subprocess.run([sys.executable, '-m', 'examples.sessions.vlbest', '--dry-run'],
+                          capture_output=True, text=True)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert proc.stdout.splitlines()[:2] == [
+        budget, f'Session hard stop: {cap}s from runner start (includes setup)']
+
+
 def test_budget_and_graph(capsys):
     jobs, limit = load_session(SESSION)
     graph = {j.name: j for j in jobs}

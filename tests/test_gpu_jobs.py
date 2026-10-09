@@ -167,8 +167,29 @@ def test_session_hard_stop_kills_all_lanes_and_skips_tail(tmp_path):
 
 
 @pytest.mark.parametrize('limit', ['0', '-1', "float('inf')", "float('nan')", "'2400'"])
-def test_invalid_session_budget_refused(tmp_path, limit):
+def test_invalid_session_budget_refused(tmp_path, monkeypatch, limit):
+    monkeypatch.delenv('ETX_SESS_MAX_SECONDS', raising=False)
     path = tmp_path / 'session.py'
     path.write_text(f'JOBS = []\nMAX_SESSION_SECONDS = {limit}\n')
     with pytest.raises(SystemExit, match='finite and positive'):
         gj.load_jobs(path)
+
+
+@pytest.mark.parametrize('override,expected', [(None, 8400), ('6000', 6000)])
+def test_session_budget_override(tmp_path, monkeypatch, override, expected):
+    monkeypatch.delenv('ETX_SESS_MAX_SECONDS', raising=False)
+    if override is not None:
+        monkeypatch.setenv('ETX_SESS_MAX_SECONDS', override)
+    path = tmp_path / 'session.py'
+    path.write_text('JOBS = []\nMAX_SESSION_SECONDS = 8400\n')
+    assert gj.load_session(path)[1] == expected
+
+
+@pytest.mark.parametrize('override', ['nope', '', '0', '-1', 'inf', 'nan'])
+def test_invalid_session_budget_override_refused(tmp_path, monkeypatch, override):
+    monkeypatch.setenv('ETX_SESS_MAX_SECONDS', override)
+    path = tmp_path / 'session.py'
+    path.write_text('JOBS = []\nMAX_SESSION_SECONDS = 8400\n')
+    with pytest.raises(SystemExit) as exc:
+        gj.main([str(path), '--dry-run'])
+    assert exc.value.code == 'MAX_SESSION_SECONDS must be finite and positive'

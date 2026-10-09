@@ -30,6 +30,7 @@ from pathlib import Path
 import shlex
 import subprocess
 
+from etx.tools.gpu_jobs import session_limit
 from examples.sessions import nvchk
 from examples.vllm_llm import vlbest_report as report
 
@@ -37,6 +38,9 @@ VM_LIFE_SECONDS = 150 * 60
 SETUP_ALLOWANCE_SECONDS = 10 * 60
 MAX_SESSION_SECONDS = VM_LIFE_SECONDS - SETUP_ALLOWANCE_SECONDS
 BUDGET = f'BUDGET vm-life={VM_LIFE_SECONDS // 60}m runner-cap={MAX_SESSION_SECONDS // 60}m'
+if 'ETX_SESS_MAX_SECONDS' in os.environ:
+    BUDGET = (f'BUDGET vm-life={VM_LIFE_SECONDS // 60}m '
+              f'runner-cap={session_limit(MAX_SESSION_SECONDS) / 60:g}m override=ETX_SESS_MAX_SECONDS')
 LOGS = nvchk.LOGS
 IMAGE = report.IMAGE
 JOBS = []
