@@ -25,6 +25,8 @@ a free lane takes the first ready job in list order.
 Output: one line per start / end with the elapsed session time, a progress block every --progress-s seconds (running
 jobs, their last log line, and a warning for any job silent past quiet_s), and at the end a status table.
 <logdir>/status.json is atomically refreshed on every transition (including skipped jobs). Exit code 0 only if every job that ran finished OK.
+The runner exclusively creates <logdir>/runner.log. If it already exists (or status.json exists),
+the new session uses a unique session-* subdirectory for runner, status and job logs; the selected path is printed.
 """
 from __future__ import annotations
 
@@ -94,6 +96,20 @@ def load_jobs(path: str | Path) -> list[Job]:
         if j.lane not in ("gpu", "cpu"):
             raise SystemExit(f"job {j.name}: lane must be gpu or cpu")
     return jobs
+
+
+class _Tee:
+    def __init__(self, *streams):
+        self.streams = streams
+
+    def write(self, text):
+        for stream in self.streams:
+            stream.write(text)
+        return len(text)
+
+    def flush(self):
+        for stream in self.streams:
+            stream.flush()
 
 
 class Runner:
@@ -201,6 +217,27 @@ class Runner:
     # -------------------------------------------------------------- main loop
     def run(self) -> int:
         self.logdir.mkdir(parents=True, exist_ok=True)
+        # Exclusive creation is the reservation, including for simultaneous starts.
+        # A status-only directory may belong to an older runner; preserve it too.
+        root = self.logdir
+        while True:
+            try:
+                if (self.logdir / "status.json").exists():
+                    raise FileExistsError
+                log = (self.logdir / "runner.log").open("x")
+                break
+            except FileExistsError:
+                self.logdir = Path(tempfile.mkdtemp(prefix="session-", dir=root))
+        out = self.out
+        with log:
+            self.out = _Tee(out, log)
+            try:
+                self.say(f"session logs: {self.logdir}")
+                return self._run()
+            finally:
+                self.out = out
+
+    def _run(self) -> int:
         self._write_status()
         last_progress = time.time()
         try:

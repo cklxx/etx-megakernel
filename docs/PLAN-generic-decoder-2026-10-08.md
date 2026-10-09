@@ -113,8 +113,8 @@ All rows use batch 1, bf16 and one MI300X. Times are wall time per token.
 
 | Model | Bytes per token | Bandwidth floor at 4.3 / 3.5 TB/s | System | ms/token | Utilization at 4.3 / 3.5 TB/s |
 |---|---|---|---|---|---|
-| Qwen3-30B-A3B | 6.1875 GB, ledger, lower bound | 1.439 / 1.768 ms | ETX megakernel, DSL tiles | 4.823 | 29.8% / 36.7% |
-| Qwen3-30B-A3B | same | same | vLLM default | 4.863 | 29.6% / 36.4% |
+| Qwen3-30B-A3B | 6.1875 GB, ledger, lower bound | 1.439 / 1.768 ms | ETX megakernel, DSL tiles | 4.526 (supersedes withdrawn 4.823; `results_nvref_2026-10-09/report.log:7`) | 31.8% / 39.1% (floor / new wall time; `results_nvref_2026-10-09/report.log:7`) |
+| Qwen3-30B-A3B | same | same | vLLM default | 4.809 (supersedes 4.863; `results_nvref_2026-10-09/report.log:6`) | 29.9% / 36.8% (floor / new wall time; `results_nvref_2026-10-09/report.log:6`) |
 | Qwen3-8B | 15.29 GB, estimate | 3.556 / 4.369 ms | vLLM best | 4.91 | 72.4% / 89.0% |
 | Qwen3-8B | same | same | ETX, generic tiles, without fusion | 9.45 | 37.6% / 46.2% |
 | Qwen3-8B | same | same | ETX megakernel, generic tiles | 10.07 | 35.3% / 43.4% |
@@ -240,7 +240,7 @@ The rows of Table A differ in date, tiles and context length. Do not compare one
 
 | Model | Tiles | Date | ETX ms/token | Baseline ms/token | Source |
 |---|---|---|---|---|---|
-| Qwen3-30B-A3B | DSL tiles | 2026-10-02 | 4.823 | vLLM default 4.863 | `176a691:README.md:46-50` |
+| Qwen3-30B-A3B | DSL tiles | 2026-10-09 | 4.526 wall (supersedes withdrawn 4.823) | vLLM default 4.809 wall; INSUFFICIENT | `results_nvref_2026-10-09/report.log:6-7,20` |
 | Mixtral-8x7B | DSL tiles | 2026-10-02 | 10.365 | vLLM 8.686 | `docs/GENERALITY-2026-10-02.md:258` |
 | DeepSeek-Coder-V2-Lite | fleet hand-written tiles | 2026-09-25 | 3.78 | vLLM AITER 4.12, fleet 3.57 | `README.md:129` |
 | Qwen3-8B | generic, untuned tiles | 2026-09-25 | 10.07 | vLLM best 4.91 | `README.md:127` |
@@ -257,7 +257,7 @@ Table B gives three facts:
 2. With the generic tiles, the megakernel is 6.6% slower than the same tiles without fusion. The fusion benefit is negative for Qwen3-8B at this time.
 3. The README trace attributes the gap to the tiles, not to synchronization.
 
-Qwen3-30B-A3B changed from 10.48 ms to 4.823 ms between the two tables.
+The former Qwen3-30B-A3B endpoint of 4.823 ms was withdrawn; the superseding measurement is 4.526 ms wall (`results_nvref_2026-10-09/report.log:7`), versus the earlier table's 10.48 ms.
 This is the only measured evidence of a large gain from tuned tiles in this repository.
 The same change also added the coherence design. Thus, the tiles do not own all of the gain.
 DeepSeek-Coder-V2-Lite with tuned fleet tiles is 8% faster than vLLM. Source: `README.md:131`.
@@ -442,7 +442,7 @@ All items run on CPU.
 7. The `wave_sum` primitive with gfx942 and sm_90 lowerings. The gfx942 source must stay equal.
 8. One entry point for the three GQA models.
 9. Cost model validation. The `cost` field of each variant predicts Qwen3-30B-A3B
-   at 4.823 ms/token (the measured ground truth). If the prediction error exceeds
+   at 4.526 ms/token wall (supersedes the withdrawn 4.823; `results_nvref_2026-10-09/report.log:7`). If the prediction error exceeds
    10%, the planner falls back to rule-based selection (minimize wave count) and
    does not use the cost model for joint selection.
 

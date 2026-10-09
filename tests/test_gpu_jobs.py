@@ -89,3 +89,38 @@ def test_status_atomic_replace(tmp_path, monkeypatch):
     runner._write_status()
     assert len(calls) == 1 and not calls[0].exists()
     assert json.loads((tmp_path / "status.json").read_text())[0]["status"] == "fail"
+
+
+def test_follow_on_session_preserves_parent_logs(tmp_path):
+    import os
+    from pathlib import Path
+    import subprocess
+    import sys
+
+    session = tmp_path / "session.py"
+    logdir = tmp_path / "logs"
+    env = dict(os.environ, PYTHONPATH=str(Path(gj.__file__).resolve().parents[2]))
+
+    def start(marker):
+        # Same job name deliberately exercises job-log preservation as well.
+        session.write_text(f'JOBS = [dict(name="probe", lane="cpu", cmd="echo {marker}")]\n')
+        result = subprocess.run(
+            [sys.executable, "-m", "etx.tools.gpu_jobs", str(session),
+             "--gpus", "", "--logdir", str(logdir)],
+            env=env, capture_output=True, text=True, timeout=15)
+        assert result.returncode == 0, result.stdout + result.stderr
+        return result.stdout
+
+    start("parent")
+    originals = {name: (logdir / name).read_bytes()
+                 for name in ("runner.log", "status.json", "probe.log")}
+    output = start("follow_on")
+    for name, contents in originals.items():
+        assert (logdir / name).read_bytes() == contents
+    children = list(logdir.glob("session-*/runner.log"))
+    assert len(children) == 1
+    child = children[0].parent
+    assert str(child) in output
+    assert "session done" in children[0].read_text()
+    assert "follow_on" in (child / "probe.log").read_text()
+    assert json.loads((child / "status.json").read_text())[0]["status"] == "ok"
