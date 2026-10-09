@@ -134,3 +134,28 @@ def test_nvref_command_echo_is_not_evidence(tmp_path):
         '# echo RESULT matched=32 gen=32 requests=1 CHECK-DSL OK GATE-OK\n')
     with pytest.raises((Refusal, ValueError)):
         nvref_evidence(tmp_path)
+
+
+@pytest.mark.parametrize('name,arch,accepted', [
+    ('', 'gfx942:sramecc+:xnack-', True),
+    ('', 'gfx1100', False),
+    ('AMD Instinct MI300X', '', True),
+])
+def test_vendor_device_architecture(name, arch, accepted, capsys):
+    from types import SimpleNamespace
+    from examples.vllm_llm.vendor_gemv import check_device
+
+    properties = SimpleNamespace(name=name, gcnArchName=arch)
+    torch = SimpleNamespace(
+        __version__='test',
+        cuda=SimpleNamespace(get_device_name=lambda index: properties.name,
+                             get_device_properties=lambda index: properties))
+    if accepted:
+        check_device(torch)
+        assert capsys.readouterr().out == f"KC_DEVICE {name or '-'} {arch.split(':')[0]} torch test\n"
+    else:
+        with pytest.raises(RuntimeError) as error:
+            check_device(torch)
+        assert f'name={name!r}' in str(error.value)
+        assert f'arch={arch!r}' in str(error.value)
+        assert capsys.readouterr().out == ''

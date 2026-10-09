@@ -5,6 +5,7 @@ Shapes, repetitions, copies, peak-bandwidth guard and MoE proxy:
 /Users/ckl/.hermes/cache/scratch/o55-kernel-compare.json:1, result sections 1 and 3.
 The nvref dump cannot validate folded qkv: host.hip:372,417,649-650,723-724.
 Run --dry-run for CPU-only validation, before importing torch or starting a child.
+A VF reports an empty marketing name; the protocol's real requirement is gfx942.
 """
 from __future__ import annotations
 
@@ -64,6 +65,14 @@ def packed(torch, model, name, n, k):
     return torch.frombuffer(bytearray(data), dtype=torch.bfloat16).clone().reshape(n, k)
 
 
+def check_device(torch):
+    device = torch.cuda.get_device_name(0)
+    arch = torch.cuda.get_device_properties(0).gcnArchName.split(':', 1)[0]
+    if arch != 'gfx942' and 'MI300X' not in device:
+        raise RuntimeError(f'protocol requires gfx942 or MI300X, got name={device!r} arch={arch!r}')
+    print('KC_DEVICE', device or '-', arch, 'torch', torch.__version__, flush=True)
+
+
 def worker(a):
     os.environ['PYTORCH_TUNABLEOP_ENABLED'] = str(int(a.lib == 'tunable'))
     os.environ['PYTORCH_TUNABLEOP_TUNING'] = str(int(a.lib == 'tunable'))
@@ -71,10 +80,7 @@ def worker(a):
     import torch.nn.functional as F
     if not torch.version.hip or not torch.cuda.is_available():
         raise RuntimeError('ROCm GPU required')
-    device = torch.cuda.get_device_name()
-    if 'MI300X' not in device:
-        raise RuntimeError(f'protocol requires MI300X, got {device}')
-    print('KC_DEVICE', device, 'torch', torch.__version__, flush=True)
+    check_device(torch)
     preferred = getattr(torch.backends.cuda, 'preferred_blas_library', None)
     if preferred is None:
         raise RuntimeError('preferred_blas_library unavailable; cannot select requested arm')

@@ -17,6 +17,7 @@ V = "VLLM=$HOME/vllm ETX_TORCH_HEADERS=$HOME/rocm-headers/pytorch ETX_ROCM_HEADE
 RES = r"^RESULT|generated tokens match|per-token latency|CHECK-DSL|beyond 2 ulps|GATE|BITCMP"
 M, HF = "qwen3-30b-a3b", "Qwen/Qwen3-30B-A3B"
 S = "$HOME/sess"
+LOGS = "${ETX_SESS_LOGDIR:-$HOME/sess}"
 
 job(name="apt", lane="cpu", timeout=600,
     cmd="python3 -c 'import ensurepip' 2>/dev/null || { sudo apt-get update -qq; sudo apt-get install -y -qq python3.12-venv; }")
@@ -121,7 +122,7 @@ for rnd in range(1, 6):
             cmd=vllm(name) if is_vllm else ENV + f"ETX_VL_PROGRESS=1 stdbuf -oL {run(extra='--unfused' if arm == 'etxu' else '')}",
             summary=[r"^VLLM|^RESULT"])
         if not is_vllm:
-            pair_logs.append(f"{S}/{name}.log")
+            pair_logs.append(f"{LOGS}/{name}.log")
         finished.append(name)
 
 for name, env in (("hostprof", "ETX_HOST_PROF=1 ETX_VL_PROGRESS=1 "), ("etx_noprog", "")):
@@ -135,6 +136,6 @@ for rnd in range(1, 4):
     finished.append(name)
 # pairs' separate verdict is not this experiment's verdict; retain only its table.
 job(name="report", lane="cpu", after_any=list(finished), timeout=120,
-    cmd=f".venv/bin/python -m examples.vllm_llm.nvref_report {S} && "
+    cmd=f".venv/bin/python -m examples.vllm_llm.nvref_report {LOGS} && "
         f"{{ .venv/bin/python -m examples.vllm_llm.pairs {' '.join(pair_logs)} --pairs 5 --basis wall "
         f"> {S}/fusion_pairs.txt; sed '/^VERDICT/,$d' {S}/fusion_pairs.txt; }}", summary=[r"."])

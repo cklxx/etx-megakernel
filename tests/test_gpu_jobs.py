@@ -4,6 +4,8 @@ import io
 import json
 import time
 
+import pytest
+
 from etx.tools import gpu_jobs as gj
 
 
@@ -124,3 +126,25 @@ def test_follow_on_session_preserves_parent_logs(tmp_path):
     assert "session done" in children[0].read_text()
     assert "follow_on" in (child / "probe.log").read_text()
     assert json.loads((child / "status.json").read_text())[0]["status"] == "ok"
+
+
+@pytest.mark.parametrize('reuse', [False, True])
+@pytest.mark.parametrize('lane', ['cpu', 'gpu'])
+def test_job_environment_uses_actual_logdir(tmp_path, monkeypatch, reuse, lane):
+    logdir = tmp_path / 'logs'
+    logdir.mkdir()
+    if reuse:
+        (logdir / 'status.json').write_text('[]')
+    monkeypatch.setenv('ETX_SESS_LOGDIR', '/stale/parent')
+    job = gj.Job(name='probe', lane=lane, cwd=str(tmp_path),
+                 env={'ETX_SESS_LOGDIR': '/stale/job'},
+                 cmd='printf "%s\\n" "$ETX_SESS_LOGDIR"; test -f "$ETX_SESS_LOGDIR/status.json"')
+    runner = gj.Runner([job], [0], 1, logdir, out=io.StringIO(), poll_s=.01)
+    assert runner.run() == 0
+    assert job.log.read_text().splitlines()[-1] == str(runner.logdir)
+    if reuse:
+        assert runner.logdir.parent == logdir
+        assert runner.logdir.name.startswith('session-')
+        assert (logdir / 'status.json').read_text() == '[]'
+    else:
+        assert runner.logdir == logdir

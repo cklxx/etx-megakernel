@@ -102,3 +102,37 @@ def test_return_from_external_checkout():
     assert list(local_python_references(command, "~/fleet-mi300x")) == [
         Path("examples/dsv2lite/isolate_report.py")
     ]
+
+
+@pytest.mark.parametrize("session", SESSIONS, ids=lambda p: p.relative_to(ROOT).as_posix())
+def test_session_reports_use_current_logdir(session):
+    modules = {'examples.vllm_llm.nvref_report', 'examples.vllm_llm.kcmp_report',
+               'examples.vllm_llm.pairs'}
+    for job in load_jobs(session):
+        for parts in _shell_commands(job.cmd):
+            if not modules.intersection(parts):
+                continue
+            # Redirection targets are job outputs, not report inputs.
+            inputs = ' '.join(parts).split('>', 1)[0]
+            inputs = inputs.replace('${ETX_SESS_LOGDIR:-$HOME/sess}', '')
+            assert '$HOME/sess' not in inputs, f'{session.name}:{job.name}: {inputs}'
+
+
+def test_vstability_summary_uses_current_logdir(tmp_path):
+    import json
+    import os
+    import subprocess
+
+    home = tmp_path / 'home'
+    stale = home / 'sess'
+    current = stale / 'session-current'
+    current.mkdir(parents=True)
+    for rnd in range(1, 7):
+        (stale / f'vs_r{rnd}.json').write_text(json.dumps({'median_ms': 99}))
+        (current / f'vs_r{rnd}.json').write_text(json.dumps({'median_ms': rnd}))
+    jobs = load_jobs(ROOT / 'examples/sessions/vstability.py')
+    assert all('--json ${ETX_SESS_LOGDIR:-$HOME/sess}/' in job.cmd for job in jobs[:-1])
+    result = subprocess.run(['bash', '-c', jobs[-1].cmd], check=True, text=True,
+                            capture_output=True, timeout=10,
+                            env=dict(os.environ, HOME=str(home), ETX_SESS_LOGDIR=str(current)))
+    assert 'VSTAB 1.000000 6.000000 5.000000 3.500000' in result.stdout

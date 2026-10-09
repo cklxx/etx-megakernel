@@ -11,7 +11,7 @@ def job(**kw):
 
 LLM = "$HOME/llm"
 M = "qwen3-30b-a3b"
-S = "$HOME/sess"
+S = "${ETX_SESS_LOGDIR:-$HOME/sess}"
 IMAGE = "vllm/vllm-openai-rocm:v0.27.1"
 
 
@@ -30,12 +30,13 @@ for rnd in range(1, 7):
         timeout=420, quiet_s=240, cmd=vllm(name), summary=[r"^VLLM|^RESULT"])
 
 job(name="vs_summary", lane="cpu", after="vs_r6", timeout=120,
-    cmd="""python3 - <<'PY'
+    cmd="""python3 - "${ETX_SESS_LOGDIR:-$HOME/sess}" <<'PY'
 import json
 import statistics
+import sys
 from pathlib import Path
 
-paths = sorted((Path.home() / "sess").glob("vs_r*.json"))
+paths = sorted(Path(sys.argv[1]).glob("vs_r*.json"))
 assert [p.name for p in paths] == [f"vs_r{i}.json" for i in range(1, 7)], paths
 values = []
 for path in paths:
