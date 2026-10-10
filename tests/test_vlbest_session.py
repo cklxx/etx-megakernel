@@ -371,7 +371,7 @@ def test_vlbest3_graph():
     assert r.config('M1')['kw'] == r.config('S3')['kw']
     assert len([j for j in jobs if j.name.startswith('a_r')]) == 8
     assert len([j for j in jobs if j.name.startswith(('F_r', 'S0_r', 'etx_r', 'etxu_r'))]) == 20
-    assert graph['moe_tune'].timeout == 1200
+    assert graph['moe_tune'].timeout == 2700
     assert graph['g0'].lane == 'cpu'
     assert '--network=none' in graph['g0'].cmd and '--device' not in graph['g0'].cmd
     assert all(j.timeout == 390 for j in jobs if j.name.startswith('a_r'))
@@ -405,6 +405,7 @@ def test_vlbest3_table_gate(tmp_path, monkeypatch, capsys, data):
     target.parent.mkdir(parents=True)
     if data is not None:
         target.write_text(json.dumps(data))
+        target.with_suffix('.progress.json').write_text(json.dumps({'configs_done':25}))
         (tmp_path / 'moe_tuned.json').write_text(json.dumps({'sha256': hashlib.sha256(target.read_bytes()).hexdigest()}))
     if data and data.get('1'):
         assert v3.tune_gate(tmp_path) == 0
@@ -412,7 +413,9 @@ def test_vlbest3_table_gate(tmp_path, monkeypatch, capsys, data):
         with pytest.raises(r.Refusal, match='NOT-COMPLETE'):
             v3.tune_gate(tmp_path)
     output = capsys.readouterr().out
-    assert str(target.parent) in output and target.name in output and 'key_1=' in output
+    assert str(target.resolve()) in output and 'key_1=' in output
+    expected_count = 25 if data is not None else 'unknown'
+    assert f'configs_tuned={expected_count}' in output
 
 
 def test_vlbest3_tuner_cpu_adapter(tmp_path):
@@ -426,7 +429,13 @@ class BenchmarkWorker:
         self.device_id = int(ray.get_gpu_ids()[0])
     def tune(self, *args):
         calls.append(args)
-        return {'BLOCK_SIZE_M': 16}
+        search_space = args[9][:3]
+        best_config = None
+        for idx, config in enumerate(tqdm(search_space)):
+            if idx == 1:
+                continue
+            best_config = {'BLOCK_SIZE_M': 16}
+        return best_config
 def main(args):
     ray.init()
 if __name__ == '__main__':
@@ -451,8 +460,8 @@ if __name__ == '__main__':
     assert calls[0][:6] == (1,128,1536,2048,8,dtype)
     assert len(calls[0][9]) == 8000
     assert all(p['BLOCK_SIZE_M'] == 16 for p in calls[0][9])
-    assert saves[0][0] == {1:{'BLOCK_SIZE_M':16}}
-    assert saves[0][1:6] == (128,1536,2048,8,dtype)
+    assert json.loads((tmp_path / r.MOE_FILENAME).read_text()) == {'1':{'BLOCK_SIZE_M':16}}
+    assert json.loads((tmp_path / r.MOE_FILENAME).with_suffix('.progress.json').read_text())['configs_done'] == 3
     assert ns['resolve_dtype'](None) is dtype
     with pytest.raises(ValueError):
         t.adapted_source(source.replace('import ray', 'import ray\nray.init()'))
@@ -521,3 +530,40 @@ def test_g0_value_rejections(change, monkeypatch, tmp_path):
     expected = dict(version='torch <', layername='_USE_LAYERNAME', file='missing benchmarks',
                     folder='value mismatch', filename='filename mismatch')[change]
     assert any(expected in error for error in errors)
+
+
+def test_vlbest3_checkpoint_budget_and_interruption(tmp_path, monkeypatch, capsys):
+    from examples.vllm_llm import vlbest3_tuner as t
+    now = [0.0]
+    monkeypatch.setattr(t.time, 'monotonic', lambda: now[0])
+    target = tmp_path / r.MOE_FILENAME
+    checkpoint = t.Checkpoints(target, lambda c:c, 0, budget=100)
+    items = checkpoint.progress(list(range(704)))
+    for i in range(25):
+        assert next(items) == i
+        now[0] += 2
+        checkpoint.checkpoint({'winner': i})
+    assert checkpoint.limit == 47  # 50 seconds left, 2 s/config + 10% margin
+    assert json.loads(target.read_text()) == {'1': {'winner':24}}
+    output = capsys.readouterr().out
+    assert 'configs_done=25' in output and 'estimated_total_seconds=1408.000' in output
+    assert 'TUNER prune old=704 new=47' in output
+    # A kill before atomic replacement preserves the last complete winner.
+    def killed(src, dst):
+        raise KeyboardInterrupt
+    monkeypatch.setattr(Path, 'replace', killed)
+    with pytest.raises(KeyboardInterrupt):
+        checkpoint.checkpoint({'winner':25})
+    assert json.loads(target.read_text()) == {'1': {'winner':24}}
+    assert json.loads(target.with_suffix('.progress.json').read_text())['configs_done'] == 25
+
+
+def test_vlbest3_adapts_real_tuning_loop():
+    from examples.vllm_llm import vlbest3_tuner as t
+    source = Path('examples/vllm_llm/vendor/benchmark_moe.py').read_text()
+    tree = t.adapted_source(source)
+    compile(tree, '<pinned tuner>', 'exec')
+    import ast
+    assert ast.unparse(tree).count('_checkpoint(best_config)') == 1
+    with pytest.raises(ValueError, match='tuning loop contract'):
+        t.adapted_source(source.replace('enumerate(tqdm(search_space))', 'enumerate(search_space)'))
