@@ -39,7 +39,12 @@ mkdir -p "$OUT"
 # paths as the container sees them: $HOME/code -> /code
 C_ROOT=/code/${ROOT#$HOME/code/}; C_OUT=/code/${OUT#$HOME/code/}
 case "$OUT" in "$HOME/code/"*) ;; *) echo "outdir must be under ~/code (mounted into the container)"; exit 1;; esac
-docker run --rm --platform linux/amd64 -v "$HOME/code:/code" -v "$HOME/code:$HOME/code" -e M="$M" -e E="$E" -e ROOT="$C_ROOT" -e OUT="$C_OUT" -e CFLAGS="${ETX_CFLAGS:-}" etx-rocm22 bash -c '
+# Forward caller instructions as well as the named variant (the latter wins).
+ENV_ARGS=()
+for name in ${!ETX_VL_@} ${!ETX_DSL_@} ETX_DEV_RESET; do
+  [ -z "${!name+x}" ] || ENV_ARGS+=(-e "$name=${!name}")
+done
+docker run --rm --pull=never --network=none ${ENV_ARGS[@]+"${ENV_ARGS[@]}"} --platform linux/amd64 -v "$HOME/code:/code" -v "$HOME/code:$HOME/code" -e M="$M" -e E="$E" -e ROOT="$C_ROOT" -e OUT="$C_OUT" -e CFLAGS="${ETX_CFLAGS:-}" etx-rocm22 bash -c '
 set -euo pipefail
 R=/code/rocm-headers; RL=$R/rocm-llvm/opt/rocm-7.2.4/lib/llvm; DL=$R/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode
 mkdir -p /tmp/bin
@@ -50,54 +55,24 @@ exec $RL/bin/clang++ -nogpuinc -isystem $R/inc -include __clang_hip_runtime_wrap
 EOF
 chmod +x /tmp/bin/hipcc; export PATH=/tmp/bin:$PATH ETX_LLVM=$RL/bin ETX_TORCH_HEADERS=$R/pytorch
 cd $ROOT; CFG=examples/llm/configs/$M.json
-# Dims via load_dims, the ONE derivation (round 28 fixed num_experts-only detection and the Mixtral expert
-# width there; this script kept its own copy and re-broke both for any non-Qwen MoE -- the round-31 lesson).
-cfg() { PYTHONPATH=. python3 -c "from examples.llm.model import load_dims
-d = load_dims(\"$CFG\"); print(getattr(d, \"$1\"))"; }
-H=$(cfg H); NKV=$(cfg NKV); NH=$(cfg NH); HD=$(cfg HD)
-G=$((NH / NKV)); case $G in 4) ATTN=attn_mfma4_g4;; 6) ATTN=attn_mfma16_g6;; 8) ATTN=attn_mfma16_g8;; esac
-DSLOPS_PRE=""; case " $E " in *ETX_VL_IMPORTED=1*) ;; *ETX_VL_DSL_ATTN=head*) DSLOPS_PRE=attnprep;;
-  *ETX_VL_DSL_ATTN=*) ;; *) [ "$(cfg qk_norm)" = "True" ] && DSLOPS_PRE=attnprep;; esac
-# Import only what the plan instantiates: ETX_IMPORT_LDS is the MAX over every imported kernel and the megakernel
-# carries that arena in every phase, so importing the wvsplitk pair the DSL GEMV replaces cost 11648 B of LDS and
-# capped occupancy (round 16). build.sh prunes them; this check must prune identically or its resource report lies.
-DG=1; DT=1; case " $E " in *ETX_VL_IMPORTED=1*|*ETX_VL_DSL_GEMV=0*) DG=0;; esac
-case " $E " in *ETX_VL_IMPORTED=1*|*ETX_VL_DSL_TOPK=0*) DT=0;; esac
-EXP="$ATTN,attn_reduce,rms_norm_2d,silu_and_mul"
-[ "$DG" = 1 ] || EXP="wvsplitk_y2,$EXP"
-[ -n "$DSLOPS_PRE" ] || EXP="$EXP,fused_add_rms_norm,rope_neox,reshape_and_cache"
-case $M in qwen3*) [ -n "$DSLOPS_PRE" ] || EXP="$EXP,rms_norm_3d";; esac
-case " $E " in *ETX_VL_QKNR=1*|*ETX_VL_QKNR=grid*) EXP="$EXP,qknorm_rope";; esac   # as build.sh: any value but 0
-BLK=(--block rms_norm_2d=$((H / 8)) --block reshape_and_cache=$((NKV * HD / 8))); SL=""
-if [ "$(cfg moe)" = "True" ]; then
-  MOESFX=$([ "$(cfg E)" = 128 ] && echo "" || echo "_e$(cfg E)")   # shape-keyed fused_moe (round 39)
-  [ "$DG" = 1 ] || EXP="$EXP,wvsplitk_y1,fused_moe_up$MOESFX,fused_moe_down$MOESFX"
-  [ "$DT" = 1 ] || EXP="$EXP,topk_softmax_e$(cfg E)"
-  case " $E " in *ETX_VL_IMPORTED=1*|*ETX_VL_DSL_FOLD=0*) EXP="$EXP,moe_sum_k$(cfg TOPK)";; esac
-  BLK+=(--block silu_and_mul=$(( $(cfg MI) / 8 > 1024 ? 1024 : $(cfg MI) / 8 ))); SL="fused_moe_up$MOESFX=1,fused_moe_down$MOESFX=1,silu_and_mul=1"
+# Apply the exact same environment to selection, tile emission and compilation.
+[ -z "$E" ] || export $E
+if [ "${ETX_VL_BATCH:-0}" = 1 ]; then
+  [ "${ETX_VL_REQUESTS:-1}" -gt 1 ] || { echo "ETX_VL_BATCH=1 needs ETX_VL_REQUESTS > 1" >&2; exit 1; }
+  export ETX_VL_NB="${ETX_VL_REQUESTS}"
 fi
-echo "== import ($EXP)"
-XS=$(echo "$E" | tr " " "\n" | sed -n "s/^ETX_VL_SLOTS=//p"); SL="${XS:+$XS,}$SL"; SL="${SL%,}"
-# attnprep needs the attention at one block per task and the reduce at one block per kv head, exactly as build.sh
-# derives it; without this the default variant planned a different attention grid and the event groups shifted.
-case " $DSLOPS_PRE " in *attnprep*) SL="${SL:+$SL,}$ATTN=1,attn_reduce=$G";; esac
-python3 -m etx.importer.vllm_kernels --vllm /code/vllm --out $OUT/imp --compiler hipcc --only "$EXP" --slots "$SL" "${BLK[@]}"
-# The DSL tiles are the default (docs/OPTIMISATIONS.md); only ETX_VL_IMPORTED=1 or an explicit =0 turns one off.
-# Mirrors the derivation in build.sh -- when the two diverged, a variant silently built without the tiles its
-# plan expected, which is the class of bug rounds 14, 19 and 20 all hit.
-DSLON=1; case " $E " in *ETX_VL_IMPORTED=1*) DSLON=0;; esac
-# PhiMoE-class layout (bias / LayerNorm-bias pointers): the ONE derivation is load_dims (build.sh reads the same
-# facts from the manifest prep wrote from load_dims); the plan asserts layout and codegen agree either way.
-export ETX_VL_DSL_EXT=$([ "$(cfg ln_norm)" = "True" ] || [ "$(cfg bias_o)" = "True" ] || [ "$(cfg bias_lm)" = "True" ] && echo 1 || echo 0)
-DSLOPS=""
-case " $E " in *ETX_VL_DSL_GEMV=0*) ;; *ETX_VL_DSL_GEMV=1*) DSLOPS="gemv";; *) [ "$DSLON" = 1 ] && DSLOPS="gemv";; esac
-case " $E " in *ETX_VL_DSL_TOPK=0*) ;; *ETX_VL_DSL_TOPK=1*) DSLOPS="${DSLOPS:+$DSLOPS,}topk";; *) [ "$DSLON" = 1 ] && DSLOPS="${DSLOPS:+$DSLOPS,}topk";; esac
-case " $E " in *ETX_VL_DSL_ATTN=head*) DSLOPS="${DSLOPS:+$DSLOPS,}attnprep";;
-               *ETX_VL_DSL_ATTN=*) ;; *) [ "$DSLON" = 1 ] && [ "$(cfg model_type)" != "qwen2" ] && DSLOPS="${DSLOPS:+$DSLOPS,}attnprep";; esac
-case " $E " in *ETX_VL_NB=*) export ETX_VL_NB="${E##*ETX_VL_NB=}"; export ETX_VL_NB="${ETX_VL_NB%% *}";; esac   # the emitter needs it too
+if [ "${ETX_VL_UC:-0}" = 1 ]; then export ETX_VL_PIN=1; fi
+SETTINGS="$(python3 -m examples.vllm_llm.plan_exports "$CFG" --shell)"
+eval "$SETTINGS"
+echo "== import ($EXPORTS)"
+# Imports are merged by the capture/emitter tools. A check must validate only
+# the current run closure, even when OUT contains captures from another build.
+# Keep deliberate reuse in build.sh; discard only the old check manifest.
+python3 -c "from pathlib import Path; Path(\"$OUT/imp/imports.json\").unlink(missing_ok=True)"
+python3 -m etx.importer.vllm_kernels --vllm /code/vllm --out $OUT/imp --compiler hipcc --only "$EXPORTS" --slots "$SLOTS" "${BLK[@]}"
 DSLT=""; if [ -n "$DSLOPS" ]; then python3 -m etx.ops.emit $OUT/imp/imports.json --tiles $OUT/dsl_tiles.hip --ops $DSLOPS; DSLT="ETX_VL_DSL_TILES=$OUT/dsl_tiles.hip"; fi
 python3 -m etx.importer.adapter $OUT/imp/imports.json --tiles $OUT/imp_tiles.hip --header $OUT/imports.h
-python3 -m etx.importer.bundle --imports $OUT/imp --exports "$EXP" --devlibs $DL -o $OUT/imports.bc
+python3 -m etx.importer.bundle --imports $OUT/imp --exports "$EXPORTS" --devlibs $DL -o $OUT/imports.bc
 echo "== plan"
 env $E $DSLT ETX_VL_IMPORTS=$OUT/imp/imports.json ETX_VL_ADAPTERS=$OUT/imp_tiles.hip ETX_VL_PLAN=$OUT/vl_plan.txt ETX_VL_CHAINS=$OUT/chain_tiles.hip ETX_LLM_CONFIG=$CFG \
   python3 -m etx compile examples/vllm_llm/model.py --arch gfx942 --out $OUT --inline-tiles > $OUT/compile.log 2>&1 || { tail -20 $OUT/compile.log; exit 1; }

@@ -230,7 +230,7 @@ def _gen(export, phase, shape, rule, cost=floor_cost):
 
 
 # Imported LDS that the CPU registry knows: build.sh records that wvsplitk_y1/y2 declare 32768 B each (round 16).
-IMPORTED_LDS = {"wvsplitk_y1": 32768, "wvsplitk_y2": 32768}
+IMPORTED_LDS = {"wvsplitk_y1": 32768, "wvsplitk_y2": 32768, "wvsplitk_l40_y2": 40960}
 
 
 def _imp(export, phase, shape, rule, cost=floor_cost):
@@ -265,8 +265,11 @@ for _ph in GEMV_PHASES:
     # model.py wvsplitk_ytile: y = 1 when ceil(M / (CU * 4)) <= 1; the spec allows K <= 16384
     _imp("wvsplitk_y1", _ph, lambda s: s["fold"] == 0 and s["K"] <= 16384 and s["M"] <= CU * 4,
          "spec: K <= 16384; model.py wvsplitk_ytile == 1", gemv_cost)
-    _imp("wvsplitk_y2", _ph, lambda s: s["fold"] == 0 and s["K"] <= 16384 and s["M"] > CU * 4,
+    _imp("wvsplitk_y2", _ph, lambda s: s["fold"] == 0 and s["K"] <= 16384 and s["M"] > CU * 4 and s["M"] % 2 == 0,
          "spec: K <= 16384; model.py wvsplitk_ytile == 2", gemv_cost)
+    _imp("wvsplitk_l40_y2", _ph,
+         lambda s: s["fold"] == 0 and 16384 < s["K"] <= 20480 and s["K"] % 8 == 0 and s["M"] > CU * 4 and s["M"] % 2 == 0,
+         "SG:357,383,394-395,449-455 K-vector in LDS; SG:1199 K % 8; SG:1217 M % YTILE; lds_cap 40 KB", gemv_cost)
 
 _dsl("dsl_topk", "topk", lambda s: s["E"] <= 128, "host.hip:382 E <= 128 (one wave, 2 logits per lane)")
 for _e in (128, 8):
@@ -299,8 +302,10 @@ for _k in (8, 2):
 _dsl("dsl_attnprep", "prep",
      lambda s: s["HD"] == 128 and s["NH"] % s["NKV"] == 0 and s["G"] + 2 <= THREADS // 64 and s["qk_norm"],
      "host.hip:378 HD 128, NH % NKV == 0, G + 2 <= waves per workgroup, q/k norm")
-for _g, _exp in ((4, "attn_mfma4_g4"), (6, "attn_mfma16_g6"), (8, "attn_mfma16_g8")):
-    _imp(_exp, "attn", lambda s, g=_g: s["HD"] == 128 and s["G"] == g, f"spec: HD == 128, G == {_g}")
+for _g in range(1, 17):
+    _exp = f"attn_mfma4_g{_g}" if _g <= 4 else f"attn_mfma16_g{_g}"
+    _imp(_exp, "attn", lambda s, g=_g: s["HD"] == 128 and s["G"] == g,
+         "AT:3295-3346 G 1..16; AT:3620-3629 HEAD_SIZE 64/128 (128 here)")
 _gen("llm_attn", "attn", lambda s: s["HD"] % 8 == 0 and s["HD"] <= 192 and s["G"] <= 16,
      "examples/llm/tiles.hip:138 HD <= 192; :199 dot8 requires HD % 8 == 0; :203 G <= 16")
 _imp("attn_reduce", "reduce", lambda s: True, "")

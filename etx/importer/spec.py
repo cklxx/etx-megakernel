@@ -35,6 +35,8 @@ SOURCES = [
         Kernel("wvsplitk_y2", "wvSplitK_hf_sml_I14__hip_bfloat16Li64ELi2ELi16ELi8ELi2ELi1E",
                f"wvSplitK_hf_sml_<{BF}, 64, 2, 16, 8, 2, 1>", (64, 16, 1), lds_cap=32 * 1024,
                note="M > 1216 (every projection and lm_head); LDS holds the K-vector, K <= 16384"),
+        Kernel("wvsplitk_l40_y2", "wvSplitK_hf_sml_I14__hip_bfloat16Li64ELi2ELi16ELi8ELi2ELi1E",
+               f"wvSplitK_hf_sml_<{BF}, 64, 2, 16, 8, 2, 1>", (64, 16, 1), lds_cap=40 * 1024),
         Kernel("wvsplitk_y1", "wvSplitK_hf_sml_I14__hip_bfloat16Li64ELi1ELi16ELi8ELi4ELi1E",
                f"wvSplitK_hf_sml_<{BF}, 64, 1, 16, 8, 4, 1>", (64, 16, 1), lds_cap=32 * 1024,
                note="M <= 1216 (the MoE router, 128 rows)"),
@@ -51,6 +53,32 @@ SOURCES = [
         Kernel("attn_mfma16_g8", "QKV_mfma16_kernelI14__hip_bfloat16S0_LN4vllm18Fp8KVCacheDataTypeE0ES0_Li16ELi128ELi256ELb0ELi8E",
                f"paged_attention_ll4mi_QKV_mfma16_kernel<{BF}, {BF}, vllm::Fp8KVCacheDataType::kAuto, {BF}, 16, 128, 256, false, 8, MFMAType::F16>", (256, 1, 1),
                note="Qwen3-30B-A3B (32/4 heads)"),
+        Kernel("attn_mfma4_g1", "_Z38paged_attention_ll4mi_QKV_mfma4_kernelI14__hip_bfloat16S0_LN4vllm18Fp8KVCacheDataTypeE0ES0_Li16ELi128ELi256ELb0ELi1EEvPKT_PKT0_S8_ifPKiSA_SA_iPKfiiiPfSD_PS3_PT2_iSC_SC_",
+               f"paged_attention_ll4mi_QKV_mfma4_kernel<{BF}, {BF}, vllm::Fp8KVCacheDataType::kAuto, {BF}, 16, 128, 256, false, 1>", (256, 1, 1)),
+        Kernel("attn_mfma4_g2", "_Z38paged_attention_ll4mi_QKV_mfma4_kernelI14__hip_bfloat16S0_LN4vllm18Fp8KVCacheDataTypeE0ES0_Li16ELi128ELi256ELb0ELi2EEvPKT_PKT0_S8_ifPKiSA_SA_iPKfiiiPfSD_PS3_PT2_iSC_SC_",
+               f"paged_attention_ll4mi_QKV_mfma4_kernel<{BF}, {BF}, vllm::Fp8KVCacheDataType::kAuto, {BF}, 16, 128, 256, false, 2>", (256, 1, 1)),
+        Kernel("attn_mfma4_g3", "_Z38paged_attention_ll4mi_QKV_mfma4_kernelI14__hip_bfloat16S0_LN4vllm18Fp8KVCacheDataTypeE0ES0_Li16ELi128ELi256ELb0ELi3EEvPKT_PKT0_S8_ifPKiSA_SA_iPKfiiiPfSD_PS3_PT2_iSC_SC_",
+               f"paged_attention_ll4mi_QKV_mfma4_kernel<{BF}, {BF}, vllm::Fp8KVCacheDataType::kAuto, {BF}, 16, 128, 256, false, 3>", (256, 1, 1)),
+        Kernel("attn_mfma16_g5", "_Z39paged_attention_ll4mi_QKV_mfma16_kernelI14__hip_bfloat16S0_LN4vllm18Fp8KVCacheDataTypeE0ES0_Li16ELi128ELi256ELb0ELi5EL8MFMAType0EEvPKT_PKT0_S9_ifPKiSB_SB_iPKfiiiPfSE_PS4_PT2_iSD_SD_",
+               f"paged_attention_ll4mi_QKV_mfma16_kernel<{BF}, {BF}, vllm::Fp8KVCacheDataType::kAuto, {BF}, 16, 128, 256, false, 5, MFMAType::F16>", (256, 1, 1)),
+        Kernel("attn_mfma16_g7", "_Z39paged_attention_ll4mi_QKV_mfma16_kernelI14__hip_bfloat16S0_LN4vllm18Fp8KVCacheDataTypeE0ES0_Li16ELi128ELi256ELb0ELi7EL8MFMAType0EEvPKT_PKT0_S9_ifPKiSB_SB_iPKfiiiPfSE_PS4_PT2_iSD_SD_",
+               f"paged_attention_ll4mi_QKV_mfma16_kernel<{BF}, {BF}, vllm::Fp8KVCacheDataType::kAuto, {BF}, 16, 128, 256, false, 7, MFMAType::F16>", (256, 1, 1)),
+        Kernel("attn_mfma16_g9", "_Z39paged_attention_ll4mi_QKV_mfma16_kernelI14__hip_bfloat16S0_LN4vllm18Fp8KVCacheDataTypeE0ES0_Li16ELi128ELi256ELb0ELi9EL8MFMAType0EEvPKT_PKT0_S9_ifPKiSB_SB_iPKfiiiPfSE_PS4_PT2_iSD_SD_",
+               f"paged_attention_ll4mi_QKV_mfma16_kernel<{BF}, {BF}, vllm::Fp8KVCacheDataType::kAuto, {BF}, 16, 128, 256, false, 9, MFMAType::F16>", (256, 1, 1)),
+        Kernel("attn_mfma16_g10", "_Z39paged_attention_ll4mi_QKV_mfma16_kernelI14__hip_bfloat16S0_LN4vllm18Fp8KVCacheDataTypeE0ES0_Li16ELi128ELi256ELb0ELi10EL8MFMAType0EEvPKT_PKT0_S9_ifPKiSB_SB_iPKfiiiPfSE_PS4_PT2_iSD_SD_",
+               f"paged_attention_ll4mi_QKV_mfma16_kernel<{BF}, {BF}, vllm::Fp8KVCacheDataType::kAuto, {BF}, 16, 128, 256, false, 10, MFMAType::F16>", (256, 1, 1)),
+        Kernel("attn_mfma16_g11", "_Z39paged_attention_ll4mi_QKV_mfma16_kernelI14__hip_bfloat16S0_LN4vllm18Fp8KVCacheDataTypeE0ES0_Li16ELi128ELi256ELb0ELi11EL8MFMAType0EEvPKT_PKT0_S9_ifPKiSB_SB_iPKfiiiPfSE_PS4_PT2_iSD_SD_",
+               f"paged_attention_ll4mi_QKV_mfma16_kernel<{BF}, {BF}, vllm::Fp8KVCacheDataType::kAuto, {BF}, 16, 128, 256, false, 11, MFMAType::F16>", (256, 1, 1)),
+        Kernel("attn_mfma16_g12", "_Z39paged_attention_ll4mi_QKV_mfma16_kernelI14__hip_bfloat16S0_LN4vllm18Fp8KVCacheDataTypeE0ES0_Li16ELi128ELi256ELb0ELi12EL8MFMAType0EEvPKT_PKT0_S9_ifPKiSB_SB_iPKfiiiPfSE_PS4_PT2_iSD_SD_",
+               f"paged_attention_ll4mi_QKV_mfma16_kernel<{BF}, {BF}, vllm::Fp8KVCacheDataType::kAuto, {BF}, 16, 128, 256, false, 12, MFMAType::F16>", (256, 1, 1)),
+        Kernel("attn_mfma16_g13", "_Z39paged_attention_ll4mi_QKV_mfma16_kernelI14__hip_bfloat16S0_LN4vllm18Fp8KVCacheDataTypeE0ES0_Li16ELi128ELi256ELb0ELi13EL8MFMAType0EEvPKT_PKT0_S9_ifPKiSB_SB_iPKfiiiPfSE_PS4_PT2_iSD_SD_",
+               f"paged_attention_ll4mi_QKV_mfma16_kernel<{BF}, {BF}, vllm::Fp8KVCacheDataType::kAuto, {BF}, 16, 128, 256, false, 13, MFMAType::F16>", (256, 1, 1)),
+        Kernel("attn_mfma16_g14", "_Z39paged_attention_ll4mi_QKV_mfma16_kernelI14__hip_bfloat16S0_LN4vllm18Fp8KVCacheDataTypeE0ES0_Li16ELi128ELi256ELb0ELi14EL8MFMAType0EEvPKT_PKT0_S9_ifPKiSB_SB_iPKfiiiPfSE_PS4_PT2_iSD_SD_",
+               f"paged_attention_ll4mi_QKV_mfma16_kernel<{BF}, {BF}, vllm::Fp8KVCacheDataType::kAuto, {BF}, 16, 128, 256, false, 14, MFMAType::F16>", (256, 1, 1)),
+        Kernel("attn_mfma16_g15", "_Z39paged_attention_ll4mi_QKV_mfma16_kernelI14__hip_bfloat16S0_LN4vllm18Fp8KVCacheDataTypeE0ES0_Li16ELi128ELi256ELb0ELi15EL8MFMAType0EEvPKT_PKT0_S9_ifPKiSB_SB_iPKfiiiPfSE_PS4_PT2_iSD_SD_",
+               f"paged_attention_ll4mi_QKV_mfma16_kernel<{BF}, {BF}, vllm::Fp8KVCacheDataType::kAuto, {BF}, 16, 128, 256, false, 15, MFMAType::F16>", (256, 1, 1)),
+        Kernel("attn_mfma16_g16", "_Z39paged_attention_ll4mi_QKV_mfma16_kernelI14__hip_bfloat16S0_LN4vllm18Fp8KVCacheDataTypeE0ES0_Li16ELi128ELi256ELb0ELi16EL8MFMAType0EEvPKT_PKT0_S9_ifPKiSB_SB_iPKfiiiPfSE_PS4_PT2_iSD_SD_",
+               f"paged_attention_ll4mi_QKV_mfma16_kernel<{BF}, {BF}, vllm::Fp8KVCacheDataType::kAuto, {BF}, 16, 128, 256, false, 16, MFMAType::F16>", (256, 1, 1)),
         Kernel("attn_reduce", "reduce_kernelI14__hip_bfloat16S0_Li128ELi128ELi256ELi1E",
                f"paged_attention_ll4mi_reduce_kernel<{BF}, {BF}, 128, 128, 256, 1>", (128, 1, 1),
                note="npar_loops = ceil(partitions / 64) = 1 up to 16K tokens"),
@@ -224,6 +252,8 @@ ARGUMENTS = {
     'fused_add': [('ptr', 'in'), ('i64', 'H'), ('ptr', 'res_r'), ('ptr', 'w'), ('f32', 'eps'), ('i32', '1'), ('i32', 'H'), ('i64', 'H')],
 }
 
+KERNELS = {k.export: k for source in SOURCES for k in source.kernels}
+
 OPERATORS = {}
 for source in SOURCES:
     for kernel in source.kernels:
@@ -237,12 +267,12 @@ for source in SOURCES:
         if e.startswith("wvsplitk"):
             y = int(e[-1])
             grid = ("CU", "1", "1")
-            shape += ", N=1, M>=YTILE, K<=16384"
+            shape += f", N=1, M>=YTILE, K<={kernel.lds_cap // 2}"
             constants = dict(YTILE=y, THRDS=64, WVPRGRP=16, N=1)
             checks = ((0, "K", "p1"), (2, "K", "p1"), (5, "N", "1"), (11, "CuCount", "gx"))
             reads = ("weights", "input", "bias")
         elif e.startswith("attn_mfma"):
-            g = int(e[-1])
+            g = int(e.rsplit("_g", 1)[1])
             grid = ("1", "parts", "NKV")
             shape += f", HD=128, G={g}, BS=16, PART=256"
             constants = dict(HD=128, G=g, BS=16, PART=256)
@@ -370,7 +400,7 @@ def validate_values(export, values, grid):
     if spec.name.startswith('wvsplitk'):
         validate_wvsplitk(grid=grid, cu_count=values[11], rows=values[3],
                          ytile=spec.constants['YTILE'], wave_groups=values[10])
-        if not 0 < values[1] <= 16384:
+        if not 0 < values[1] <= KERNELS[spec.name].lds_cap // 2:
             raise ValueError(f'{spec.name}: K exceeds supported shape')
     if spec.name.startswith('fused_moe') and tuple(grid) != spec.grid():
         raise ValueError(f'{spec.name}: grid conflicts with BLOCK_SIZE_N/MOE_BN={spec.constants["MOE_BN"]}')
@@ -398,7 +428,7 @@ def emit_validation(imports):
             out += ['    if (gx <= 0 || gy != 1 || gz != 1) return "grid conflicts with one-dimensional wvSplitK";',
                     f'    if (p3 < {spec.constants["YTILE"]}) return "M conflicts with YTILE";',
                     '    if (p10 < 1 || p10 > 16) return "wave_groups conflicts with WVPRGRP";',
-                    '    if (p1 <= 0 || p1 > 16384) return "K exceeds supported shape";']
+                    f'    if (p1 <= 0 || p1 > {KERNELS[spec.name].lds_cap // 2}) return "K exceeds supported shape";']
         if e.startswith('fused_moe'):
             gx, gy, gz = spec.grid()
             out.append(f'    if (gx != {gx} || gy != {gy} || gz != {gz}) return "grid conflicts with BLOCK_SIZE_N/MOE_BN={spec.constants["MOE_BN"]}";')

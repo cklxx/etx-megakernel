@@ -82,3 +82,14 @@ def test_llm_sliced_graph(name, monkeypatch):
             continue                                                  # (X, W) GEMV grids: one task per worker
         per_w = collections.Counter(t.worker for t in plan.tasks if t.grid == g.name)
         assert max(per_w.values()) == 1, g.name
+
+
+@pytest.mark.parametrize("name,message", [
+    ("olmo-2-13b", "olmo2 full-width q/k norm and norms after attention and after the MLP"),
+    ("qwen1.5-moe-a2.7b", "shared experts"),
+])
+def test_day0_unsupported_model_semantics_are_refused(name, message):
+    from examples.llm.model import load_dims
+    path = Path(__file__).parent / "fixtures/unseen" / name / "config.json"
+    with pytest.raises(ValueError, match=message):
+        load_dims(str(path))

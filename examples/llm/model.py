@@ -97,6 +97,8 @@ def load_dims(path: str | None = None) -> Dims:
     c = json.loads(Path(path).read_text())
     rope_kind(c, str(path))
     mt = c.get("model_type", "")
+    if mt == "olmo2":
+        raise ValueError(f"{path}: olmo2 full-width q/k norm and norms after attention and after the MLP are not supported")
     H, NH = c["hidden_size"], c["num_attention_heads"]
     # Expert count: Qwen spells it num_experts, Mixtral num_local_experts, DeepSeek n_routed_experts. Reading only
     # the first made Mixtral load as a DENSE model with no error and no expert phases -- a silently wrong plan, so
@@ -110,9 +112,10 @@ def load_dims(path: str | None = None) -> Dims:
     if moe and not 1 <= topk <= min(E, 16):
         raise ValueError(f"{path}: num_experts_per_tok={topk} must be between 1 and {min(E, 16)} for the supported Top-K kernels")
     if moe and (c.get("mlp_only_layers") or c.get("decoder_sparse_step", 1) != 1
-                or c.get("first_k_dense_replace", 0) or c.get("n_shared_experts", 0)):
-        # first_k_dense_replace / n_shared_experts are DeepSeek's spellings of a mixed layout and of always-on
-        # shared experts; planning those layers as plain MoE would be silently wrong, so they are refused.
+                or c.get("first_k_dense_replace", 0) or c.get("n_shared_experts", 0)
+                or c.get("shared_expert_intermediate_size", 0)):
+        # DeepSeek and Qwen2 MoE use different shared-expert keys; planning either shared experts
+        # or mixed dense / MoE layers as plain MoE would be silently wrong, so they are refused.
         raise ValueError("mixed dense / MoE layer layouts (or shared experts) are not supported by this example")
     # q/k norm has no config key, so it is read from the architecture. The list is what has been verified, and an
     # unrecognised architecture gets False -- which only costs a slower plan, never a wrong one (model.py's
