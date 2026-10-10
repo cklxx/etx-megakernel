@@ -40,6 +40,9 @@ Restore with `gh release download data-2026-09-27 --repo cklxx/etx-data && shasu
 | `results_vlbest_2026-10-09` (`~/code/etx/results_vlbest_2026-10-09/`, outside git) | `examples/sessions/vlbest.py`; AMD Developer Cloud MI300X VF; finished runner `session-iv3fdc3m` | 201 regular files / 20134708 file-content bytes (local filesystem inventory; session document, Data inventory) | No SHA256SUMS manifest present; not checksum-verified | Strongest tested legal vLLM search and paired host-wall comparison: LEAD, fusion ESTABLISHED, timed-build CERT OK (`session-iv3fdc3m/report.log:6-16`); raw arm logs/JSON, certificate, build artefacts and earlier attempts retained | `docs/VLLM-STRONGEST-2026-10-09.md`, `AGENTS.md` §1; future search of dropped or untested levers |
 
 
+| `results_vlbest2_2026-10-10` (`~/code/etx/results_vlbest2_2026-10-10/`, outside git) | `examples/sessions/vlbest.py`; MI300X VF, ROCm 7.14.0 (`record.log:7,18`) | Raw arm logs, saved selections, status and runner logs; build identity and transferred checks | No SHA256SUMS manifest present; not checksum-verified | Answers whether the expanded search changes the strongest tested reference: S3 remains strongest; paired LEAD and fusion ESTABLISHED on both stated bases (`report.log:6-11`). S1 donor loses; f-arms enable the pass but replace no patterns; C2 lacks compatible winners. Import checks transfer between identical build identities (`build_identity.log:3`), not a fresh import check | `docs/VLBEST2-2026-10-10.md`, `AGENTS.md` §1; corrected offline `vlbest_report.py`; reuse for future applied-fusion and MoE search decisions |
+
+
 Earlier sets (2026-09-22 .. 26) are summarized in the design document (section 15) and `examples/*/results/`; their raw
 traces were not kept.
 

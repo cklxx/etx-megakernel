@@ -243,7 +243,7 @@ def test_optional_budget_guard(tmp_path, stage, threshold, label, arm, monkeypat
 @pytest.mark.parametrize('failure', ['Disabling fuse_qk_norm_rope_kvcache',
     'ValueError: use_inductor_graph_partition requires torch >= 2.9.0.dev', 'unrelated error'])
 def test_fallback_preserves_full_logs(tmp_path, monkeypatch, capsys, failure):
-    from tests.test_vlbest_report import log
+    from tests.test_vlbest_report import log, PLAN
     calls = []
     def command(cfg, name, timeout=360):
         calls.append(cfg.copy() | {'kw': dict(cfg['kw'])})
@@ -261,7 +261,7 @@ def test_fallback_preserves_full_logs(tmp_path, monkeypatch, capsys, failure):
         assert len(calls) == 2
         assert calls[1]['kw']['compilation_config'] == {'splitting_ops': []}
         assert failure not in output
-        assert r.observation(output, r.config('S6f')) == 5
+        assert r.observation(output, r.config('S6f'), expected=r.expected_replacements(PLAN)) == 5
         actual = json.loads((tmp_path / 'a_r1_S6f.config.json').read_text())
         assert actual['kw']['compilation_config'] == {'splitting_ops': []}
         assert s.run_arm(r.config('S6f'), 'a_r2_S6f', tmp_path) == 0

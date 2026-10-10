@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from examples.vllm_llm import vlbest_report as r
-from test_vlbest_report import log
+from test_vlbest_report import log, PLAN
 
 FIXTURES = Path(__file__).parent / 'fixtures/vlbest'
 FACTS = json.loads((FIXTURES / 'vllm_v0.27.1.json').read_text())
@@ -60,5 +60,5 @@ def test_proof_replay(arm):
     positive = log(arm).replace(
         'norm_quant, act_quant, qk_norm_rope_kvcache',
         'norm_quant, act_quant, mla_dual_rms_norm, qk_norm_rope_kvcache')
-    missing = r.proof(positive, cfg)
+    missing = r.proof(positive, cfg, expected=r.expected_replacements(PLAN))
     assert missing is None, f"PROOF {missing!r} absent in synthetic {arm}:1; expected acceptance"
