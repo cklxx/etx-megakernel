@@ -1,5 +1,6 @@
 """Portable session acceptance: only synthetic paths and stub processes."""
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -338,3 +339,185 @@ def test_fallback_deadline_mutation(tmp_path, monkeypatch):
     monkeypatch.setattr(s, 'run_arm', namespace['run_arm'])
     with pytest.raises(AssertionError):
         test_fallback_deadline(tmp_path, monkeypatch)
+
+
+def test_g0_local_source_baseline(monkeypatch, tmp_path):
+    from examples.vllm_llm import vlbest3_g0 as g0
+    source_root = os.environ.get('ETX_VLLM_SOURCE_ROOT')
+    if not source_root:
+        pytest.skip('set ETX_VLLM_SOURCE_ROOT to inject a vLLM source checkout')
+    root = Path(source_root)
+    monkeypatch.setenv('HOME', str(tmp_path))
+    if not (root / g0.TUNER).exists():
+        pytest.skip('local source baseline unavailable')
+    sources = {key: (root / path).read_text() for key, path in dict(
+        envs='vllm/envs.py', moe='vllm/model_executor/layers/fused_moe/fused_moe.py',
+        unquantized='vllm/model_executor/layers/fused_moe/oracle/unquantized.py',
+        tuner=g0.TUNER).items()}
+    filename = g0.source_function(sources['moe'], 'get_config_file_name',
+        {'get_device_name_as_file_name': lambda: 'AMD_Instinct_MI300X'})(128, 768, None, None)
+    values = dict(torch='2.12.0', layername=True, tuner_exists=True,
+                  folder=str(tmp_path / 'moecfg/tuned'), filename=filename)
+    assert g0.validate(values, sources) == []
+
+
+def test_vlbest3_graph():
+    from examples.sessions import vlbest3 as v3
+    jobs, limit = load_session(SESSION.with_name('vlbest3.py'))
+    graph = {j.name: j for j in jobs}
+    assert limit == 8400
+    assert r.config('M0') == r.config('S3')
+    assert r.config('M1')['env'] == r.config('S9')['env']
+    assert r.config('M1')['kw'] == r.config('S3')['kw']
+    assert len([j for j in jobs if j.name.startswith('a_r')]) == 8
+    assert len([j for j in jobs if j.name.startswith(('F_r', 'S0_r', 'etx_r', 'etxu_r'))]) == 20
+    assert graph['moe_tune'].timeout == 1200
+    assert graph['g0'].lane == 'cpu'
+    assert '--network=none' in graph['g0'].cmd and '--device' not in graph['g0'].cmd
+    assert all(j.timeout == 390 for j in jobs if j.name.startswith('a_r'))
+    seen = set()
+    for job in jobs:
+        assert set(job.after + job.after_any) <= seen
+        seen.add(job.name)
+        assert subprocess.run(['bash', '-n', '-c', job.cmd], capture_output=True).returncode == 0
+    assert 'ps -eo pid,args' in __import__('inspect').getsource(v3.cleanup_tuner)
+
+
+@pytest.mark.parametrize('failure', ['g0', 'moe_tune', 'moe_gate', 'a_r1_M1', 'F_r1', 'etx_r1'])
+def test_vlbest3_red_stop(tmp_path, failure):
+    from etx.tools.gpu_jobs import Runner
+    jobs, _ = load_session(SESSION.with_name('vlbest3.py'))
+    for job in jobs:
+        job.cmd = 'exit 2' if job.name == failure else 'true'
+    runner = Runner(jobs, [0], 4, tmp_path, poll_s=.001)
+    assert runner.run() != 0
+    failed_index = next(i for i, j in enumerate(jobs) if j.name == failure)
+    assert all(j.status == 'skipped' for j in jobs[failed_index+1:] if j.lane == 'gpu')
+
+
+@pytest.mark.parametrize('data', [None, {}, {'2': {'BLOCK_SIZE_M': 16}}, {'1': {}}, {'1': {'BLOCK_SIZE_M': 16}}])
+def test_vlbest3_table_gate(tmp_path, monkeypatch, capsys, data):
+    import hashlib
+    from examples.sessions import vlbest3 as v3
+    monkeypatch.setenv('HOME', str(tmp_path))
+    monkeypatch.setattr(v3, 'cleanup_tuner', lambda d: None)
+    target = v3.target_table()
+    target.parent.mkdir(parents=True)
+    if data is not None:
+        target.write_text(json.dumps(data))
+        (tmp_path / 'moe_tuned.json').write_text(json.dumps({'sha256': hashlib.sha256(target.read_bytes()).hexdigest()}))
+    if data and data.get('1'):
+        assert v3.tune_gate(tmp_path) == 0
+    else:
+        with pytest.raises(r.Refusal, match='NOT-COMPLETE'):
+            v3.tune_gate(tmp_path)
+    output = capsys.readouterr().out
+    assert str(target.parent) in output and target.name in output and 'key_1=' in output
+
+
+def test_vlbest3_tuner_cpu_adapter(tmp_path):
+    from examples.vllm_llm import vlbest3_tuner as t
+    source = '''
+import ray
+from ray.experimental.tqdm_ray import tqdm
+@ray.remote(num_gpus=1)
+class BenchmarkWorker:
+    def __init__(self, seed):
+        self.device_id = int(ray.get_gpu_ids()[0])
+    def tune(self, *args):
+        calls.append(args)
+        return {'BLOCK_SIZE_M': 16}
+def main(args):
+    ray.init()
+if __name__ == '__main__':
+    main(None)
+'''
+    calls, saves = [], []
+    ns = {'calls': calls}
+    exec(compile(t.adapted_source(source), '<synthetic>', 'exec'), ns)
+    dtype = object()
+    ranges = dict(BLOCK_SIZE_M=[16,32,64,128,256], BLOCK_SIZE_N=[16,32,64,128,256],
+                  BLOCK_SIZE_K=[16,32,64,128,256], GROUP_SIZE_M=[1,4,8,16,32],
+                  num_warps=[1,2,4,8], num_stages=[2], waves_per_eu=[0,1,2,4],
+                  matrix_instr_nonkdim=[16,32], kpack=[1,2])
+    ns.update(torch=types.SimpleNamespace(bfloat16=dtype), get_config=lambda **kw: None,
+              get_model_params=lambda cfg:(128,8,768,2048),
+              current_platform=types.SimpleNamespace(is_rocm=lambda:True),
+              get_rocm_tuning_space=lambda flag:ranges.copy(),
+              get_config_file_name=lambda *a:r.MOE_FILENAME, sort_config=lambda c:c,
+              _get_config_dtype_str=lambda *a, **kw:None, save_configs=lambda *a:saves.append(a))
+    args = types.SimpleNamespace(model='synthetic', tp_size=1, batch_size=1, save_dir=str(tmp_path))
+    assert t.run(args, ns) == 0
+    assert calls[0][:6] == (1,128,1536,2048,8,dtype)
+    assert len(calls[0][9]) == 8000
+    assert all(p['BLOCK_SIZE_M'] == 16 for p in calls[0][9])
+    assert saves[0][0] == {1:{'BLOCK_SIZE_M':16}}
+    assert saves[0][1:6] == (128,1536,2048,8,dtype)
+    assert ns['resolve_dtype'](None) is dtype
+    with pytest.raises(ValueError):
+        t.adapted_source(source.replace('import ray', 'import ray\nray.init()'))
+
+
+def test_g0_records_failure(monkeypatch, capsys):
+    from examples.vllm_llm import vlbest3_g0 as g0
+    monkeypatch.setitem(sys.modules, 'torch', types.SimpleNamespace(__version__='2.10.0'))
+    monkeypatch.setitem(sys.modules, 'vllm', None)
+    assert g0.probe() == 1
+    output = capsys.readouterr().out
+    for name in ('torch.__version__', 'vllm.utils.torch_utils._USE_LAYERNAME', 'tuner', 'config'):
+        assert f'G0 {name}=' in output
+    assert 'PREFLIGHT FAIL g0:' in output
+
+
+@pytest.mark.parametrize('outcome', ['timeout', 'deadline', 'missing', 'success'])
+def test_vlbest3_tune_failures(tmp_path, monkeypatch, capsys, outcome):
+    from examples.sessions import vlbest3 as v3
+    monkeypatch.setenv('HOME', str(tmp_path))
+    cleanup = []
+    monkeypatch.setattr(v3, 'cleanup_tuner', lambda d: cleanup.append(d))
+    target = v3.target_table()
+    target.parent.mkdir(parents=True)
+    target.write_text('{"1":{"stale":1}}')
+    receipt = tmp_path / 'moe_tuned.json'
+    receipt.write_text('{}')
+    waits = []
+    class Process:
+        def wait(self, timeout=None):
+            waits.append(timeout)
+            if len(waits) == 1:
+                assert not target.exists() and not receipt.exists()
+                raise subprocess.TimeoutExpired('tune', timeout)
+            if outcome == 'success':
+                target.write_text('{"1":{"BLOCK_SIZE_M":16}}')
+            return 124 if outcome == 'timeout' else 0
+        def kill(self):
+            cleanup.append('killed-client')
+    ticks = iter([0, 2701 if outcome == 'deadline' else 60])
+    monkeypatch.setattr(v3.time, 'monotonic', lambda:next(ticks))
+    monkeypatch.setattr(v3.subprocess, 'Popen', lambda *a, **kw:Process())
+    if outcome == 'success':
+        assert v3.tune(tmp_path) == 0 and receipt.exists()
+    else:
+        with pytest.raises((r.Refusal, FileNotFoundError)):
+            v3.tune(tmp_path)
+        assert not receipt.exists()
+    assert cleanup and waits[0] == 60
+    assert 'TUNER-PROGRESS' in capsys.readouterr().out
+    if outcome == 'deadline':
+        assert 'killed-client' in cleanup
+
+
+@pytest.mark.parametrize('change', ['version', 'layername', 'file', 'folder', 'filename'])
+def test_g0_value_rejections(change, monkeypatch, tmp_path):
+    from examples.vllm_llm import vlbest3_g0 as g0
+    monkeypatch.setenv('HOME', str(tmp_path))
+    values = dict(torch='2.12.0', layername=True, tuner_exists=True,
+                  folder=str(tmp_path / 'moecfg/tuned'), filename=r.MOE_FILENAME)
+    key, value = dict(version=('torch', '2.10'), layername=('layername', False),
+                      file=('tuner_exists', False), folder=('folder', '/wrong'),
+                      filename=('filename', 'wrong.json'))[change]
+    values[key] = value
+    errors = g0.validate(values, dict(envs='', moe='', tuner=''))
+    expected = dict(version='torch <', layername='_USE_LAYERNAME', file='missing benchmarks',
+                    folder='value mismatch', filename='filename mismatch')[change]
+    assert any(expected in error for error in errors)
