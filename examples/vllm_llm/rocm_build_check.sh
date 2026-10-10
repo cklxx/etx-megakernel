@@ -55,7 +55,11 @@ cd $ROOT; CFG=examples/llm/configs/$M.json
 cfg() { PYTHONPATH=. python3 -c "from examples.llm.model import load_dims
 d = load_dims(\"$CFG\"); print(getattr(d, \"$1\"))"; }
 H=$(cfg H); NKV=$(cfg NKV); NH=$(cfg NH); HD=$(cfg HD)
-G=$((NH / NKV)); case $G in 4) ATTN=attn_mfma4_g4;; 6) ATTN=attn_mfma16_g6;; 8) ATTN=attn_mfma16_g8;; esac
+G=$((NH / NKV)); if [ "$G" -ge 1 ] && [ "$G" -le 16 ]; then
+  ATTN=attn_mfma$([ $G -le 4 ] && echo 4 || echo 16)_g$G
+else
+  echo "no attention import for GQA $G"; exit 1
+fi
 DSLOPS_PRE=""; case " $E " in *ETX_VL_IMPORTED=1*) ;; *ETX_VL_DSL_ATTN=head*) DSLOPS_PRE=attnprep;;
   *ETX_VL_DSL_ATTN=*) ;; *) [ "$(cfg qk_norm)" = "True" ] && DSLOPS_PRE=attnprep;; esac
 # Import only what the plan instantiates: ETX_IMPORT_LDS is the MAX over every imported kernel and the megakernel

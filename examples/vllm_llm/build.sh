@@ -21,7 +21,11 @@ else
 v = {'H': d.H, 'NH': d.NH, 'NKV': d.NKV, 'HD': d.HD, 'qk_norm': int(d.qk_norm), 'moe': int(d.moe), 'MI': d.MI}['$1']; print(v)"); }
 fi
 H=$(cfg H); NH=$(cfg NH); NKV=$(cfg NKV); HD=$(cfg HD); QKN=$(cfg qk_norm); G=$((NH / NKV))
-case $G in 4) ATTN=attn_mfma4_g4;; 6) ATTN=attn_mfma16_g6;; 8) ATTN=attn_mfma16_g8;; *) echo "no attention import for GQA $G"; exit 1;; esac
+if [ "$G" -ge 1 ] && [ "$G" -le 16 ]; then
+  ATTN=attn_mfma$([ $G -le 4 ] && echo 4 || echo 16)_g$G
+else
+  echo "no attention import for GQA $G"; exit 1
+fi
 # Import only what the plan will actually instantiate: ETX_IMPORT_LDS is the MAX over every imported kernel's LDS, and
 # the megakernel's workgroup carries that arena whether or not a task uses it. wvsplitk_y1/y2 declare 32768 B each --
 # the largest of any tile -- and ETX_VL_DSL_GEMV=1 replaces them with etx.ops.gemv (21120 B), so importing them anyway
