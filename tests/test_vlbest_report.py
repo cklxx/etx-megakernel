@@ -264,7 +264,13 @@ def test_captured_disabled_fusion():
     captured = Path(__file__).parent / 'fixtures/vlbest/a_r1_S4.log'
     text = captured.read_text()
     assert 'Disabling fuse_qk_norm_rope_kvcache' in text
-    assert proof(text, r.config('S4f')) == 'Disabling fuse_qk_norm_rope_kvcache'
+    # This historical capture predates VLLM_USE_LAYERNAME; env requirements
+    # are checked before component disabling, so preserve both refusal checks.
+    captured_config = r.config('S4f')
+    captured_config['env'] = captured_config['env'].copy()
+    captured_config['env'].pop('VLLM_USE_LAYERNAME')
+    assert proof(text, captured_config) == 'Disabling fuse_qk_norm_rope_kvcache'
+    assert proof(text, r.config('S4f')) == 'env VLLM_USE_LAYERNAME'
     with pytest.raises(Refusal, match='NOT-APPLIED'):
         observation(text, r.config('S4f'))
 
