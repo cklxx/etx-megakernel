@@ -437,3 +437,38 @@ def test_survival_and_machine():
     assert r.machine('GPU[0] : Card Series: Another GPU\nROCM-VERSION 9.1') == 'Another GPU | ROCm 9.1'
     with pytest.raises(Refusal):
         r.machine('GPU[0] : Card Series: Another GPU')
+
+
+@pytest.mark.parametrize('extra', ['', '\nUsing AiterExperts MoE backend', '\nUsing AITER MoE backend'])
+def test_vlbest3_exact_tuned_hit(extra):
+    cfg = r.config('M1')
+    text = log('M1', cfg=cfg).replace(' for MoE layer', ' for MoE layer.')
+    assert (r.proof(text + extra, cfg) is None) is (not extra)
+    for wrong in ('E=128,N=768,device_name=AMD_Instinct_MI300X.json.bak',
+                  'E=128,N=768,device_name=AMD_Instinct_MI300X,dtype=float16.json'):
+        assert r.proof(text.replace(r.MOE_FILENAME, wrong), cfg)
+    assert r.proof(text.replace('/synthetic/moecfg/tuned/' + r.MOE_FILENAME,
+                                '/other/moecfg/tuned/' + r.MOE_FILENAME), cfg)
+
+
+@pytest.mark.parametrize('deltas,won', [([-.05, -.05], True), ([-.1, .001], False),
+                                        ([-.049, -.049], False), ([-.08, -.04], True)])
+def test_vlbest3_selection(tmp_path, deltas, won):
+    from examples.sessions import vlbest3 as v3
+    for rnd, delta in enumerate(deltas, 1):
+        for arm, ms in [('S0_open', 5), ('S3', 4.8), ('M1', 4.8+delta), ('S0_close', 5)]:
+            name = f'a_r{rnd}_{arm}'
+            cfg = r.config(arm.split('_')[0])
+            text = log(cfg['id'], ms, cfg).replace(' for MoE layer', ' for MoE layer.')
+            (tmp_path / f'{name}.log').write_text(f'# job {name} gpu=0\n' + text)
+    data = v3.select(tmp_path)
+    assert data['final']['id'] == ('S9' if won else 'S3')
+    assert 'S9' in data['search']['tested']
+    assert r.recompute_search(tmp_path) == data['search']
+    assert r.finalist(data['search']['winners']) == data['final']
+    if not won:
+        assert 'tested-and-not-won' in data['search']['excluded']['S9']
+    target = tmp_path / 'a_r2_M1.log'
+    target.write_text(target.read_text().replace('sample=0 first_divergence=32/32', 'sample=0 first_divergence=31/32'))
+    with pytest.raises(Refusal, match='32/32'):
+        v3.select(tmp_path)

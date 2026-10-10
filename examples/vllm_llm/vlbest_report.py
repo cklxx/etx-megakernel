@@ -19,6 +19,9 @@ from examples.vllm_llm.nvref_report import Session, etx, one_line, verdict, vllm
 from examples.vllm_llm.pairs import Refusal, verdict as fusion_verdict
 
 IMAGE = 'vllm/vllm-openai-rocm@sha256:bb44b39aea26798cce43030a98bf48efd0322ca7147367db86e38b96bd80f0e7'
+MOE_FILENAME = 'E=128,N=768,device_name=AMD_Instinct_MI300X.json'
+MOE_PROOF = 'Using configuration from %s for MoE layer.'
+
 GROUP3 = ['V2 model runner', 'AITER MoE dispatch policy', 'AITER fmoe tuning',
           'block-size 32', 'compile_sizes=[1] + max_autotune', 'skinny GEMM off',
           'shuffle KV cache', 'stream-interval >1']
@@ -27,6 +30,13 @@ PREDICTIONS = 'S1 -0.05…-0.25; S5f/S6f -0.1…-0.4; S4f worse than S6f; triple
 
 
 def config(arm):
+    if arm in ('M0', 'M1'):
+        cfg = config('S3')
+        if arm == 'M1':
+            cfg['id'] = 'M1'
+            cfg['components'] = ['S3', 'S9']
+            cfg['env'].update(config('S9')['env'])
+        return cfg
     original = arm
     arm = arm[:-1] if arm in ('S4f', 'S5f', 'S6f') else arm
     env, kw, flags = {}, {}, []
@@ -100,6 +110,13 @@ def proof(text, cfg, expected=None):
         for line in ('Using TritonExperts MoE backend', "rms_norm=['native']"):
             if line not in text:
                 return line
+    if 'S9' in components and 'S3' in components:
+        if re.search(r'(?im)^.*(?:aiter[^\n]*\bmoe\b|\bmoe\b[^\n]*aiter).*$', text):
+            return 'AITER MoE line present'
+        folder_value = echoed['env'].get('VLLM_TUNED_CONFIG_FOLDER', '')
+        hit = f'Using configuration from {folder_value}/{MOE_FILENAME} for MoE layer.'
+        if not folder_value.startswith('/') or hit not in text:
+            return 'exact tuned MoE file hit'
     folder = cfg['env'].get('VLLM_TUNED_CONFIG_FOLDER')
     if folder:
         suffix = re.escape(folder.removeprefix('$HOME'))
@@ -250,6 +267,9 @@ def spread_bound(deltas):
 def recompute_search(directory):
     # Saved selection supplies the candidate configuration, never its verdicts.
     saved = json.loads((directory / 'screen.json').read_text())
+    if saved.get('design') == 'vlbest3':
+        from examples.sessions.vlbest3 import select
+        return select(directory, write=False)['search']
     search = screen(directory)
     cfg = saved['combination']
     if cfg:
@@ -294,7 +314,7 @@ def report(directory):
         if path.exists() and json.loads(path.read_text()) != cfg:
             raise Refusal('NOT-COMPLETE: finalist configuration changed')
     final = default if cfg['id'] == 'S0' else [observation(session.read(f'F_r{r}'), cfg, expected=expected) for r in range(1, 6)]
-    rid = reference(default, final, cfg['id'])
+    rid = cfg['id'] if selected.get('design') == 'vlbest3' else reference(default, final, cfg['id'])
     rv = default if rid == 'S0' else final
     fused = [etx(session.read(f'etx_r{r}'), f'etx_r{r}', 'fused').wall for r in range(1, 6)]
     unfused = [etx(session.read(f'etxu_r{r}'), f'etxu_r{r}', 'graph').wall for r in range(1, 6)]
@@ -318,7 +338,7 @@ def report(directory):
         ('ETX fused', 'timed build', fused, 'CERT OK'),
         ('ETX unfused', 'same kernels, HIP graph', unfused, 'CERT OK'),
         ('vLLM default (S0)', 'none', default, 'proof OK'),
-        ('vLLM strongest tested (R)', json.dumps(config('S0') if rid == 'S0' else cfg, sort_keys=True), rv, 'proof OK')):
+        ('vLLM selected (R)' if selected.get('design') == 'vlbest3' else 'vLLM strongest tested (R)', json.dumps(config('S0') if rid == 'S0' else cfg, sort_keys=True), rv, 'proof OK')):
         print(f'| {arm} | {desc} | {vals} | {median(vals):.3f} | {max(vals)-min(vals):.3f} | 5/5 | {proof_text} |')
     gains = [(u-f)/u for f, u in zip(fused, unfused)]
     fusion = fusion_verdict(gains)
@@ -332,7 +352,11 @@ def report(directory):
           f"{ {k:v for k,v in search['excluded'].items() if 'NOT-APPLIED' in v} } | failed 32/32 "
           f"{ {k:v for k,v in search['excluded'].items() if '32/32' in v} } | untested: {GROUP3}")
     print('SEARCH exclusions ' + json.dumps(search['excluded'], sort_keys=True))
-    print('Predictions ' + PREDICTIONS)
+    if selected.get('design') == 'vlbest3':
+        print('S9 tested: tuned Triton table; AITER MoE tuning remains untested.')
+        print('S9 decision ' + json.dumps(search.get('excluded', {}), sort_keys=True))
+    else:
+        print('Predictions ' + PREDICTIONS)
     print(survival(ds))
     print(f"FULL-CLAIM {'ELIGIBLE' if certificate['eligible'] else 'NOT ELIGIBLE'}; strongest only among tested, lever-proven, 32/32 arms.")
 
