@@ -108,12 +108,13 @@ def test_plan_accepts_a_config_dict():
     assert plan(cfg).manifest() == plan(CFG.format("mixtral-8x7b")).manifest()
 
 
-def test_g5_attention_has_a_generic_plan_but_no_vllm_host_abi():
+@pytest.mark.parametrize("hd", [64, 96, 192])
+def test_unsupported_head_size_has_a_generic_plan_but_no_vllm_host_abi(hd):
     from dataclasses import replace
     from examples.llm.model import load_dims
     from examples.vllm_llm import model as M
-    d = replace(load_dims(CFG.format("qwen3-8b")), NH=40)
-    p = plan(d)
+    d = replace(load_dims(CFG.format("qwen3-8b")), HD=hd, qk_norm=False)
+    p = plan(d, "gfx942", None)
     assert (p.phases["attn"].export, p.phases["attn"].kind) == ("llm_attn", "generic")
     with pytest.raises(SystemExit, match="phase attn: only the generic tile llm_attn is legal; the vLLM host cannot launch it"):
         M.instances(d)
@@ -132,3 +133,83 @@ def test_generic_is_only_selected_without_a_legal_specialized_variant():
 def test_generic_attention_shape_bounds(hd, g, legal):
     generic = next(v for v in REGISTRY if v.kind == "generic")
     assert generic.shape({"HD": hd, "G": g}) is legal
+
+
+@pytest.mark.parametrize("g", range(1, 17))
+def test_day0_attention_imports(g):
+    from dataclasses import replace
+    from examples.llm.model import load_dims
+    d = load_dims(CFG.format("qwen3-8b"))
+    selected = plan(replace(d, NH=d.NKV * g)).phases["attn"]
+    assert selected.export == f"attn_mfma{4 if g <= 4 else 16}_g{g}"
+    assert selected.kind == "imported"
+
+
+@pytest.mark.parametrize("qk_norm", [False, True])
+def test_g17_attention_has_no_legal_variant(qk_norm):
+    from dataclasses import replace
+    from examples.llm.model import load_dims
+    d = load_dims(CFG.format("qwen3-8b"))
+    d = replace(d, NH=d.NKV * 17, qk_norm=qk_norm)
+    with pytest.raises(NoLegalVariant, match="phase 'attn'"):
+        plan(d, "gfx942", None)
+
+
+@pytest.mark.parametrize("hd", [128, 256])
+def test_attention_head_size_without_qk_norm(hd):
+    from dataclasses import replace
+    from examples.llm.model import load_dims
+    d = replace(load_dims(CFG.format("qwen3-8b")), HD=hd, qk_norm=False)
+    if hd == 256:
+        with pytest.raises(NoLegalVariant, match="phase 'attn'"):
+            plan(d, "gfx942", None)
+    else:
+        selected = plan(d, "gfx942", None).phases["attn"]
+        assert (selected.export, selected.kind) == ("attn_mfma4_g4", "imported")
+
+
+@pytest.mark.parametrize("k,export", [(16384, "wvsplitk_y2"), (16392, "wvsplitk_l40_y2"),
+                                     (20480, "wvsplitk_l40_y2"), (20488, None), (17412, None)])
+def test_day0_down_lds_bounds(k, export):
+    from dataclasses import replace
+    from examples.llm.model import load_dims
+    d = replace(load_dims(CFG.format("qwen3-8b")), INTER=k)
+    if export is None:
+        with pytest.raises(NoLegalVariant, match="down"):
+            plan(d)
+    else:
+        assert plan(d).phases["down"].export == export
+
+
+@pytest.mark.parametrize("export,k", [("wvsplitk_y2", 16384), ("wvsplitk_l40_y2", 16392)])
+def test_y2_requires_even_rows(export, k):
+    variant = next(v for v in variants_for("down") if v.export == export)
+    assert variant.shape(dict(fold=0, K=k, M=4096))
+    assert not variant.shape(dict(fold=0, K=k, M=4097))
+
+
+@pytest.mark.parametrize("name,count,refusal", [
+    ("mistral-7b-v0.3", 354, None), ("qwen3-14b", 402, None), ("qwen2.5-7b", 310, None),
+    ("phi-3.5-mini", None, "phase attn: only the generic tile llm_attn"),
+    ("olmo-2-13b", None, "olmo2 full-width q/k norm"),
+    ("qwen1.5-moe-a2.7b", None, "shared experts"),
+])
+def test_unseen_day0_configs(name, count, refusal):
+    import subprocess
+    import sys
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[1]
+    env = {k: v for k, v in os.environ.items() if not k.startswith(("ETX_VL_", "ETX_LLM_", "ETX_DSL_"))}
+    env["PYTHONPATH"] = str(root)
+    code = ("import sys; from examples.llm.model import load_dims; "
+            "from examples.vllm_llm import model as M; "
+            "print(len(M.instances(load_dims(sys.argv[1]))))")
+    result = subprocess.run([sys.executable, "-c", code,
+                             str(root / "tests/fixtures/unseen" / name / "config.json")],
+                            cwd=root, env=env, capture_output=True, text=True)
+    if refusal:
+        assert result.returncode != 0
+        assert refusal in result.stderr
+    else:
+        assert result.returncode == 0, result.stderr
+        assert int(result.stdout.strip()) == count

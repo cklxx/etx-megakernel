@@ -334,3 +334,25 @@ def test_old_block_guidance_does_not_change_compiled_abi():
     info['operator_spec'] = asdict(OPERATORS[name]) | {
         'block_rule': ['min(MI//8,1024) if moe else 1024', '1', '1']}
     validate_import(name, info)
+
+
+def test_double_digit_attention_group_constant():
+    assert OPERATORS["attn_mfma16_g12"].constants["G"] == 12
+
+
+@pytest.mark.parametrize("name,k,valid", [
+    ("wvsplitk_y2", 16384, True), ("wvsplitk_y2", 16392, False),
+    ("wvsplitk_l40_y2", 16392, True), ("wvsplitk_l40_y2", 20480, True),
+    ("wvsplitk_l40_y2", 20488, False),
+])
+def test_wvsplitk_export_lds_cap(name, k, valid):
+    from etx.importer.spec import emit_validation, validate_values
+    values = values_for("wvsplitk_y2")
+    values[0] = values[1] = values[2] = k
+    if valid:
+        validate_values(name, values, (256, 1, 1))
+    else:
+        with pytest.raises(ValueError, match="K exceeds supported shape"):
+            validate_values(name, values, (256, 1, 1))
+    cap = 20480 if name == "wvsplitk_l40_y2" else 16384
+    assert f"p1 > {cap}" in emit_validation({name: gemv_info()})
