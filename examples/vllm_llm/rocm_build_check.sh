@@ -68,7 +68,14 @@ DSLOPS_PRE=""; case " $E " in *ETX_VL_IMPORTED=1*) ;; *ETX_VL_DSL_ATTN=head*) DS
 DG=1; DT=1; case " $E " in *ETX_VL_IMPORTED=1*|*ETX_VL_DSL_GEMV=0*) DG=0;; esac
 case " $E " in *ETX_VL_IMPORTED=1*|*ETX_VL_DSL_TOPK=0*) DT=0;; esac
 EXP="$ATTN,attn_reduce,rms_norm_2d,silu_and_mul"
-[ "$DG" = 1 ] || EXP="wvsplitk_y2,$EXP"
+if [ "$DG" != 1 ]; then
+  K=$(cfg INTER)
+  if [ "$K" -gt 16384 ] && [ "$K" -le 20480 ] && [ "$((K % 8))" = 0 ]; then
+    EXP="wvsplitk_l40_y2,$EXP"
+  else
+    EXP="wvsplitk_y2,$EXP"
+  fi
+fi
 [ -n "$DSLOPS_PRE" ] || EXP="$EXP,fused_add_rms_norm,rope_neox,reshape_and_cache"
 case $M in qwen3*) [ -n "$DSLOPS_PRE" ] || EXP="$EXP,rms_norm_3d";; esac
 case " $E " in *ETX_VL_QKNR=1*|*ETX_VL_QKNR=grid*) EXP="$EXP,qknorm_rope";; esac   # as build.sh: any value but 0
