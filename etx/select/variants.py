@@ -42,7 +42,7 @@ Shape = Mapping[str, int]
 class Variant:
     export: str                                   # tile symbol, for example "dsl_gemv"
     phase: str                                    # phase key, for example "qkv" or "qkv@0"
-    kind: str                                     # "dsl" | "imported"
+    kind: str                                     # "dsl" | "imported" | "generic"
     backend: tuple[str, ...]                      # machine names, for example ("gfx942",)
     dtype: str                                    # "bf16"
     shape: Callable[[Shape], bool]                # applicability predicate on the phase shape
@@ -52,8 +52,8 @@ class Variant:
     rule: str = ""                                # the host.hip rule that `shape` replaces, as text
 
     def __post_init__(self):
-        if self.kind not in ("dsl", "imported"):
-            raise ValueError(f"{self.export}: kind must be 'dsl' or 'imported', not {self.kind!r}")
+        if self.kind not in ("dsl", "imported", "generic"):
+            raise ValueError(f"{self.export}: kind must be 'dsl', 'imported' or 'generic', not {self.kind!r}")
 
     def legal(self, machine: str, shape: Shape, budget: Budget) -> bool:
         """Rule 1 of docs/SEC7-interface-fix.md section 5."""
@@ -222,6 +222,13 @@ def _dsl(export, phase, shape, rule, res=DSL_RES, cost=floor_cost, params=None):
     register(Variant(export, phase, "dsl", GFX942, "bf16", shape, res, cost, params or {}, rule))
 
 
+def _gen(export, phase, shape, rule, cost=floor_cost):
+    # Reserve the full LDS budget conservatively. The LlmParams ABI is not yet
+    # supported by the vLLM host; this declaration is for selection only.
+    register(Variant(export, phase, "generic", GFX942, "bf16", shape,
+                     Resources(vgpr=DSL_VGPR, lds=65536, threads=THREADS), cost, {}, rule))
+
+
 # Imported LDS that the CPU registry knows: build.sh records that wvsplitk_y1/y2 declare 32768 B each (round 16).
 IMPORTED_LDS = {"wvsplitk_y1": 32768, "wvsplitk_y2": 32768}
 
@@ -294,6 +301,8 @@ _dsl("dsl_attnprep", "prep",
      "host.hip:378 HD 128, NH % NKV == 0, G + 2 <= waves per workgroup, q/k norm")
 for _g, _exp in ((4, "attn_mfma4_g4"), (6, "attn_mfma16_g6"), (8, "attn_mfma16_g8")):
     _imp(_exp, "attn", lambda s, g=_g: s["HD"] == 128 and s["G"] == g, f"spec: HD == 128, G == {_g}")
+_gen("llm_attn", "attn", lambda s: s["HD"] % 8 == 0 and s["HD"] <= 192 and s["G"] <= 16,
+     "examples/llm/tiles.hip:138 HD <= 192; :199 dot8 requires HD % 8 == 0; :203 G <= 16")
 _imp("attn_reduce", "reduce", lambda s: True, "")
 _imp("rms_norm_2d", "in_norm@0", lambda s: not s["ln_norm"], "RMSNorm only (no imported LayerNorm, model.py:277)")
 _imp("rms_norm_2d", "in_norm", lambda s: s["first_only"] == 1 and not s["ln_norm"], "layer 0 only: no residual add")

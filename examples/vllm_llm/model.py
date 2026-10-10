@@ -264,6 +264,10 @@ def instances(d) -> list[dict]:
                 fold_norms=FOLD, fold_topk=FOLD_TOPK, attn_head=DSL_ATTNHEAD)).phases
     except etx_select.NoLegalVariant as exc:
         raise SystemExit(str(exc)) from exc
+    for key, variant in selected.items():
+        if variant.kind == "generic":
+            raise SystemExit(f"phase {key}: only the generic tile {variant.export} is legal; "
+                             "the vLLM host cannot launch it")
 
     def phase_key(layer, role):
         return role + "@0" if layer == 0 and role + "@0" in selected else role

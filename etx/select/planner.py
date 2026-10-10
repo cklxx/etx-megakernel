@@ -59,10 +59,13 @@ def _select_level(shapes, machine, budget, variants):
     chosen = {}
     for phase, s in shapes.items():
         cands = [v for v in variants if v.phase == phase]
-        legal = [(v.cost(s, budget), 0 if v.kind == "dsl" else 1, i, v)
+        legal = [(v.cost(s, budget), {"dsl": 0, "imported": 1, "generic": 2}[v.kind], i, v)
                  for i, v in enumerate(cands) if v.legal(machine, s, budget)]
         if not legal:
             return None, phase
+        # Generic is a last resort even if a future cost model makes it cheaper.
+        specialized = [t for t in legal if t[3].kind != "generic"]
+        legal = specialized or legal
         c, _, _, v = min(legal, key=lambda t: t[:3])          # cost, then dsl first, then declaration order
         dsl_ok = any(t[3].kind == "dsl" for t in legal)
         dsl_any = any(x.kind == "dsl" for x in cands)
@@ -71,7 +74,7 @@ def _select_level(shapes, machine, budget, variants):
         elif len(legal) == 1:
             why = f"only legal variant ({c:.2f} us)"
         else:
-            why = f"cheapest of {len(legal)} legal variants ({c:.2f} us; ties: dsl, then declaration order)"
+            why = f"cheapest of {len(legal)} legal variants ({c:.2f} us; ties: dsl, imported, generic, then declaration order)"
         chosen[phase] = (v, c, why)
     return chosen, None
 
