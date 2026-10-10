@@ -5,6 +5,8 @@ Source contracts fail closed before executing the adapted module.
 """
 import argparse
 import ast
+import json
+import os
 from itertools import product
 from pathlib import Path
 import time
@@ -36,6 +38,14 @@ def adapted_source(source):
             if ast.unparse(assign.value) != 'int(ray.get_gpu_ids()[0])':
                 raise ValueError('worker device contract changed')
             assign.value = ast.Constant(0)
+            tune = next(n for n in node.body if isinstance(n, ast.FunctionDef) and n.name == 'tune')
+            loops = [n for n in ast.walk(tune) if isinstance(n, ast.For)
+                     and ast.unparse(n.iter) == 'enumerate(tqdm(search_space))']
+            if len(loops) != 1 or ast.unparse(loops[0].target) != '(idx, config)':
+                raise ValueError('tuning loop contract changed')
+            loop = loops[0]
+            loop.body = [ast.Try(body=loop.body, handlers=[], orelse=[], finalbody=
+                ast.parse('_checkpoint(best_config)').body)]
             found.add('worker')
         body.append(node)
     if found != {'ray', 'tqdm', 'main', 'worker'}:
@@ -53,18 +63,55 @@ def tuning_space(original):
     return [dict(zip(ranges, values)) for values in product(*ranges.values())]
 
 
-def progress(items):
-    start = last = time.monotonic()
-    print(f'TUNER pruned_points={len(items)}', flush=True)
-    for index, item in enumerate(items):
-        now = time.monotonic()
-        if now - last >= 60:
-            print(f'TUNER point={index}/{len(items)} elapsed={now-start:.0f}s', flush=True)
-            last = now
-        yield item
+def atomic_json(path, data):
+    temporary = path.with_suffix(path.suffix + '.tmp')
+    with temporary.open('w') as output:
+        json.dump(data, output, indent=2)
+        output.write('\n')
+        output.flush()
+        os.fsync(output.fileno())
+    temporary.replace(path)
+
+
+class Checkpoints:
+    def __init__(self, target, sort_config, started, budget=2580):
+        self.target, self.sort_config = target, sort_config
+        self.started, self.budget = started, budget
+        self.done = self.total = self.limit = 0
+
+    def progress(self, items):
+        self.total = self.limit = len(items)
+        print(f'TUNER pruned_points={self.total}', flush=True)
+        for index, item in enumerate(items):
+            if index >= self.limit or time.monotonic() - self.started >= self.budget:
+                print(f'TUNER budget stop configs_done={self.done} planned={self.limit}', flush=True)
+                break
+            yield item
+
+    def checkpoint(self, winner):
+        self.done += 1
+        elapsed = time.monotonic() - self.started
+        if winner:
+            atomic_json(self.target, {'1': self.sort_config(winner)})
+        atomic_json(self.target.with_suffix('.progress.json'),
+                    dict(configs_done=self.done, pruned_points=self.total,
+                         planned_points=self.limit, elapsed_seconds=elapsed))
+        if self.done % 25 == 0:
+            cost = elapsed / self.done
+            remaining = max(0, self.budget - elapsed)
+            estimated = cost * self.limit
+            print(f'TUNER projection configs_done={self.done} elapsed_seconds={elapsed:.3f} '
+                  f'estimated_total_seconds={estimated:.3f} seconds_per_config={cost:.3f} '
+                  f'remaining_budget_seconds={remaining:.3f}', flush=True)
+            if cost * (self.limit - self.done) > remaining:
+                old = self.limit
+                # Reserve 10% of the observed average for variable compile cost.
+                self.limit = min(old, self.done + int(remaining / (cost * 1.1)))
+                print(f'TUNER prune old={old} new={self.limit} reason=wall-clock-budget', flush=True)
 
 
 def run(args, namespace):
+    started = time.monotonic()
     torch = namespace['torch']
     config = namespace['get_config'](model=args.model, trust_remote_code=False)
     shape = namespace['get_model_params'](config)
@@ -80,22 +127,20 @@ def run(args, namespace):
     filename = namespace['get_config_file_name'](128, 768, None, None)
     if filename != MOE_FILENAME:
         raise ValueError(f'filename mismatch: {filename}')
-    worker = namespace['BenchmarkWorker'](0)
-    # Upstream tune computes is_fp16 from the three quantization switches;
-    # all false includes bf16. shard_intermediate_size includes both projections.
-    winner = worker.tune(1, 128, 1536, 2048, 8, dtype, False, False, False, space, None, False)
-    if not winner:
-        raise ValueError('no tuning winner')
-    row = namespace['sort_config'](winner)
     folder = Path(args.save_dir)
     folder.mkdir(parents=True, exist_ok=True)
-    # Use the upstream writer, but verify its bf16 filename before writing.
     dtype_str = namespace['_get_config_dtype_str'](dtype, use_int8_w8a16=False,
         use_fp8_w8a8=False, use_int4_w4a16=False)
     if dtype_str is not None:
         raise ValueError(f'bf16 must have no dtype filename segment: {dtype_str}')
-    namespace['save_configs']({1: row}, 128, 1536, 2048, 8, dtype,
-                              False, False, False, None, str(folder))
+    checkpoints = Checkpoints(folder / filename, namespace['sort_config'], started)
+    namespace['tqdm'] = checkpoints.progress
+    namespace['_checkpoint'] = checkpoints.checkpoint
+    worker = namespace['BenchmarkWorker'](0)
+    # Upstream validity pruning, benchmark and winner selection are unchanged.
+    winner = worker.tune(1, 128, 1536, 2048, 8, dtype, False, False, False, space, None, False)
+    if not winner:
+        raise ValueError('no tuning winner')
     return 0
 
 
@@ -108,7 +153,7 @@ def main(argv=None):
     args = parser.parse_args(argv)
     import vllm
     path = find_tuner(Path(vllm.__file__).resolve().parent)
-    namespace = {'__name__': 'vlbest3_adapted_tuner', '__file__': str(path), 'tqdm': progress}
+    namespace = {'__name__': 'vlbest3_adapted_tuner', '__file__': str(path)}
     exec(compile(adapted_source(path.read_text()), str(path), 'exec'), namespace)
     return run(args, namespace)
 

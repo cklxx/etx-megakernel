@@ -44,32 +44,45 @@ The new adapter parses the upstream source, removes Ray imports and decoration,
 sets the worker's local device index to zero, omits the Ray-driven main/CLI,
 and invokes the original worker's `tune` method directly. ROCm dtype is bf16;
 the original `is_fp16` branch already includes bf16 and is unchanged. It checks
-(E, topk, N, H) = (128, 8, 768, 2048). The upstream worker and writer receive
+(E, topk, N, H) = (128, 8, 768, 2048). The upstream worker receives
 1536 for the doubled intermediate projection, producing filename N=768.
-The upstream writer is used with no dtype segment, verified before writing.
+The adapter writes the same batch-key schema atomically with no dtype segment,
+verified before writing; upstream winner selection is unchanged.
 
 **The requested approximately 200 points cannot be obtained by pinning M alone.**
 The source has 40,000 raw Cartesian points. Pinning `BLOCK_SIZE_M=16`, preserving
 all other dimensions, leaves **8,000**. The unchanged upstream ROCm pruning for
 batch 1, top-k 8, N=768, H=2048 leaves **704** candidates. These counts were
 computed locally from the source; G0 source contracts and the VM tuner logs
-provide image-side evidence. Additional reductions would change the requested
-other dimensions, so none are introduced. The time cap may therefore stop
-this search before it writes a table; such a run is NOT-COMPLETE.
+provide image-side evidence. No additional dimension is pinned: no local evidence
+proves that another pin preserves the gain under test. The VM per-config cost is **unknown**, not measured
+under the no-network/no-hardware restriction. No fixed cost is assumed.
 
-The GPU job has `timeout=1200`; the daemon-owned container has a stricter
-1170-second timeout plus five-second kill grace. The wrapper prints progress
-every 60 seconds even if compilation stalls. A 2700-second hard deadline is
-also checked by the wrapper, but the 1200-second runner cap normally stops it
-first. The CPU gate runs after **any** tuning outcome, kills any remaining
-adapter by PID (`ps -eo pid,args | awk` inside the named container), and removes
-the container. Thus the 45-minute ceiling is superseded by an earlier cap,
-not permission to retry or extend tuning. Cleanup has bounded subprocess waits.
+The GPU job has `timeout=2700`; the daemon-owned container has a 2670-second
+timeout plus five-second kill grace. The wrapper retains its 60-second progress
+line and 2700-second hard deadline. The adapter stops launching configs after
+2580 seconds from adapter startup, leaving cleanup margin. Every 25 completed
+config attempts it projects total wall time from elapsed/count (including setup),
+compares the projected remaining work with remaining budget, and truncates the
+remaining prefix to fit with a 10% per-config margin. The actual final count is
+therefore determined on the VM, not asserted to be 704 or 300.
+
+After each config attempt (including out-of-resource skips), the adapter atomically
+replaces the best-so-far batch-1 table, once a valid winner exists, and a progress
+sidecar recording completed attempts. A kill during replacement preserves the
+previous valid table. A kill before the first valid config cannot produce a measured
+winner; the gate fails closed. Interrupted tuning remains NOT-COMPLETE even when
+its partial table survives; the successful receipt requirement is unchanged.
+The CPU gate records the resolved table path, key "1" presence, and completed
+config-attempt count (unknown if no progress file exists). It runs after **any**
+tuning outcome, kills any remaining adapter by PID (`ps -eo pid,args | awk` inside the named container), and removes
+the container. Cleanup has bounded subprocess waits; there is no retry or budget
+extension.
 
 A stale target/receipt is deleted before tuning. A successful tuner must write
 a nonempty `"1"` row before a SHA-256 receipt is issued. CPU job `moe_gate`
-prints resolved folder, filename, and key presence in `moe_gate.log`, then GO
-or NOT-APPLIED. Missing table/key/receipt or an unsuccessful tuner is a red
+prints resolved path, key presence, and completed count in `moe_gate.log`, then
+GO or NOT-APPLIED. Missing table/key/receipt/count or an unsuccessful tuner is a red
 NOT-COMPLETE stop, not an optional skipped lever.
 
 ## Screening, red stops, and finals
@@ -114,3 +127,14 @@ at its deadline. This change does not rent, start, or delete hardware.
   **LEAD**, **4.015%** step-mean fusion and **3.98%** RESULT-wall fusion,
   unchanged. Both fusion rules remain ESTABLISHED.
 - No network, image execution, hardware rental, tuning or performance run.
+
+## Round 5 local acceptance (2026-10-10)
+
+- Full suite: **1072 passed, 16 skipped, 0 failed**, 275.84 seconds.
+- `tests/test_vlbest_session.py`: **70 passed, 1 skipped**; injected local vLLM
+  source-contract check separately: **1 passed, 70 deselected**.
+- Dry-run clean with the virtualenv Python; historical vlbest2 replay unchanged:
+  **−0.278 ms**, **0.015 ms**, **LEAD**, **4.015%**, **3.98%**.
+- No VM/container per-config cost measurement; no additional pin; no network,
+  hardware, or GPU tuning performed. Runtime projection determines the final
+  attempt count from the initial 704 valid-space candidates.

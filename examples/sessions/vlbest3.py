@@ -66,7 +66,7 @@ for original in nvchk.JOBS:
         job(name='build_identity', lane='cpu', after='build_chkx', timeout=120,
             cmd=command('--verify-build'))
 
-job(name='moe_tune', gpu=0, after=['gate_unf', 'build_identity', 'g0'], timeout=1200,
+job(name='moe_tune', gpu=0, after=['gate_unf', 'build_identity', 'g0'], timeout=2700,
     cmd=command('--tune'))
 # Always runs, including when the runner killed the tuner client. Removes any
 # daemon-owned process by PID before checking the receipt; no orphan tuning.
@@ -101,7 +101,7 @@ def tuner_command(directory):
     return (base.container_prefix().replace('--rm ', '--rm --pull=never --network=none ')
             .replace('--entrypoint timeout ', '-e HOME="$HOME" -e HF_HUB_OFFLINE=1 '
                      f'--name {container_name(directory)} --entrypoint timeout ')
-            + f'{IMAGE} -k 5 1170 python3 -m examples.vllm_llm.vlbest3_tuner '
+            + f'{IMAGE} -k 5 2670 python3 -m examples.vllm_llm.vlbest3_tuner '
             f'--model {nvchk.MODEL}/hf --tp-size 1 --batch-size 1 --save-dir "$HOME/moecfg/tuned"')
 
 
@@ -131,6 +131,7 @@ def tune(directory):
     target = target_table()
     target.parent.mkdir(parents=True, exist_ok=True)
     target.unlink(missing_ok=True)
+    target.with_suffix('.progress.json').unlink(missing_ok=True)
     receipt = directory / 'moe_tuned.json'
     receipt.unlink(missing_ok=True)
     started = time.monotonic()
@@ -142,7 +143,7 @@ def tune(directory):
                 break
             except subprocess.TimeoutExpired:
                 elapsed = time.monotonic() - started
-                print(f'TUNER-PROGRESS elapsed={elapsed:.0f}s job-cap=1200s hard-deadline=2700s', flush=True)
+                print(f'TUNER-PROGRESS elapsed={elapsed:.0f}s job-cap=2700s hard-deadline=2700s', flush=True)
                 if elapsed >= 2700:
                     cleanup_tuner(directory)
                     proc.kill()
@@ -165,8 +166,15 @@ def tune_gate(directory):
         has_key = isinstance(json.loads(target.read_text()).get('1'), dict)
     except (OSError, ValueError, AttributeError):
         pass
-    print(f'TABLE folder={target.parent} filename={target.name} key_1={has_key}', flush=True)
+    count = 'unknown'
     try:
+        count = json.loads(target.with_suffix('.progress.json').read_text())['configs_done']
+    except (OSError, ValueError, KeyError, TypeError):
+        pass
+    print(f'TABLE path={target.resolve()} key_1={has_key} configs_tuned={count}', flush=True)
+    try:
+        if type(count) is not int or count <= 0:
+            raise Refusal('missing/invalid completed config count')
         validate_table(target)
         receipt = json.loads((directory / 'moe_tuned.json').read_text())
         if receipt['sha256'] != hashlib.sha256(target.read_bytes()).hexdigest():
