@@ -1,0 +1,116 @@
+{
+  "date": "2026-10-11",
+  "step": "B4",
+  "kind": "CPU-only unseen-model dry runs",
+  "code_commit": "ae1f748",
+  "gpu_executed": false,
+  "network_used": false,
+  "python": "/Users/ckl/code/etx/.venv/bin/python",
+  "exit_capture": "Each command ran without a pipe; $? was captured immediately after redirection.",
+  "known_fingerprints_default_and_check": {
+    "qwen3-30b-a3b": [
+      434,
+      "e68e856650430532"
+    ],
+    "qwen3-8b": [
+      362,
+      "c586df49f38d5c3d"
+    ],
+    "mixtral-8x7b": [
+      322,
+      "14bbfbe336a339c0"
+    ]
+  },
+  "models": [
+    {
+      "name": "mistral-7b-v0.3",
+      "config_path": "build/unseen/mistral-7b-v0.3/hf/config.json",
+      "config_sha256": "12e538ce041f41aa6887e217e6e2c133932ab12b5b84dcae51c3a966e16794e8",
+      "config": {
+        "architectures": [
+          "MistralForCausalLM"
+        ],
+        "attention_dropout": 0.0,
+        "bos_token_id": 1,
+        "eos_token_id": 2,
+        "hidden_act": "silu",
+        "hidden_size": 4096,
+        "initializer_range": 0.02,
+        "intermediate_size": 14336,
+        "max_position_embeddings": 32768,
+        "model_type": "mistral",
+        "num_attention_heads": 32,
+        "num_hidden_layers": 32,
+        "num_key_value_heads": 8,
+        "rms_norm_eps": 1e-05,
+        "rope_theta": 1000000.0,
+        "sliding_window": null,
+        "tie_word_embeddings": false,
+        "torch_dtype": "bfloat16",
+        "transformers_version": "4.42.0.dev0",
+        "use_cache": true,
+        "vocab_size": 32768
+      },
+      "dry": {
+        "exit_code": 0,
+        "output": "model mistral-7b-v0.3: H 4096, NH 32, NKV 8 (G 4), HD 128, layers 32, dense INTER 14336, q/k norm 0\nselection: budget Budget(threads=1024, vgpr=128, lds=65536), cost 200.83 us per layer (placeholder costs until GPU data)\n  in_norm@0  rms_norm_2d          imported\n  in_norm    fused_add_rms_norm   imported\n  qkv        dsl_gemv             dsl\n  rope       rope_neox            imported\n  cache      reshape_and_cache    imported\n  attn       attn_mfma4_g4        imported\n  reduce     attn_reduce          imported\n  o_proj     dsl_gemv             dsl\n  post_norm  fused_add_rms_norm   imported\n  gate_up    dsl_gemv             dsl\n  act        silu_and_mul         imported\n  down       wvsplitk_y2          imported\n  final_norm fused_add_rms_norm   imported\n  lm_head    dsl_gemv             dsl\n[prep] /Users/ckl/code/.wt/etx-cpuwork/.venv/bin/python /Users/ckl/code/.wt/etx-cpuwork/examples/vllm_llm/prep.py --src build/unseen/mistral-7b-v0.3/hf --out /Users/ckl/llm/mistral-7b-v0.3 --maxlen 1072\n[build] bash /Users/ckl/code/.wt/etx-cpuwork/examples/vllm_llm/build.sh /Users/ckl/llm/mistral-7b-v0.3\n[run] /Users/ckl/code/.wt/etx-cpuwork/build/vl/mistral-7b-v0.3/run /Users/ckl/llm/mistral-7b-v0.3 /Users/ckl/code/.wt/etx-cpuwork/build/vl/mistral-7b-v0.3/vl_plan.txt --repeat 2\n[run] note: the repository has no golden file for mistral-7b-v0.3. The host reads /Users/ckl/llm/mistral-7b-v0.3/golden_c1024.txt and stops without it. Put the HF greedy tokens there first.\n"
+      },
+      "fp": {
+        "exit_code": 0,
+        "output": "FP build/unseen/mistral-7b-v0.3/hf/config.json 354 352f24a784c67a1a\n"
+      },
+      "classification": "pass"
+    },
+    {
+      "name": "qwen3-14b",
+      "config_path": "build/unseen/qwen3-14b/hf/config.json",
+      "config_sha256": "6407e6482d2f75012bc39f2b88164080a86304c4a14b282c56e8c27bbb6fa8e4",
+      "config": {
+        "architectures": [
+          "Qwen3ForCausalLM"
+        ],
+        "attention_bias": false,
+        "attention_dropout": 0.0,
+        "bos_token_id": 151643,
+        "eos_token_id": 151645,
+        "head_dim": 128,
+        "hidden_act": "silu",
+        "hidden_size": 5120,
+        "initializer_range": 0.02,
+        "intermediate_size": 17408,
+        "max_position_embeddings": 40960,
+        "max_window_layers": 40,
+        "model_type": "qwen3",
+        "num_attention_heads": 40,
+        "num_hidden_layers": 40,
+        "num_key_value_heads": 8,
+        "rms_norm_eps": 1e-06,
+        "rope_scaling": null,
+        "rope_theta": 1000000,
+        "sliding_window": null,
+        "tie_word_embeddings": false,
+        "torch_dtype": "bfloat16",
+        "transformers_version": "4.51.0",
+        "use_cache": true,
+        "use_sliding_window": false,
+        "vocab_size": 151936
+      },
+      "dry": {
+        "exit_code": 1,
+        "output": "Traceback (most recent call last):\n  File \"<frozen runpy>\", line 198, in _run_module_as_main\n  File \"<frozen runpy>\", line 88, in _run_code\n  File \"/Users/ckl/code/.wt/etx-cpuwork/examples/vllm_llm/decode.py\", line 144, in <module>\n    sys.exit(main())\n             ~~~~^^\n  File \"/Users/ckl/code/.wt/etx-cpuwork/examples/vllm_llm/decode.py\", line 117, in main\n    p = select(config, a.machine)\n  File \"/Users/ckl/code/.wt/etx-cpuwork/examples/vllm_llm/decode.py\", line 68, in select\n    return plan(str(config), machine)\n  File \"/Users/ckl/code/.wt/etx-cpuwork/etx/select/planner.py\", line 112, in plan\n    raise NoLegalVariant(f\"no legal variant on {m}: \" + \"; \".join(fails))\netx.select.planner.NoLegalVariant: no legal variant on gfx942: phase 'down' at Budget(threads=1024, vgpr=128, lds=65536)\n"
+      },
+      "fp": {
+        "exit_code": 1,
+        "output": "no legal variant on gfx942: phase 'down' at Budget(threads=1024, vgpr=128, lds=65536)\n"
+      },
+      "classification": "refused"
+    }
+  ],
+  "finding": "The spec's estimated Qwen3-14B dry-run success is not established. Once attention has a generic fallback, down is the next missing phase: K=INTER=17408 exceeds the imported wvSplitK predicate's 16384 limit and the DSL GEMV predicate's 4096 limit. Its FP also refuses with the phase name. No code or config was changed to make an unseen model pass.",
+  "limits": [
+    "Planning only; no weights loaded or GPU correctness measured.",
+    "Mistral has no repository golden file; 32/32 HF greedy agreement remains unknown.",
+    "Qwen3-14B is refused and must not be counted as a model pass.",
+    "B6 is out of scope."
+  ]
+}

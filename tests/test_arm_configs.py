@@ -13,6 +13,19 @@ FACTS = json.loads((FIXTURES / 'vllm_v0.27.1.json').read_text())
 ARMS = [f'S{i}' for i in range(10)] + ['S4f', 'S5f', 'S6f']
 
 
+@pytest.mark.parametrize('arm', ARMS)
+def test_literal_layer_names_for_fusion(arm):
+    cfg = r.config(arm)
+    if arm.removesuffix('f') in ('S4', 'S5', 'S6'):
+        assert cfg['env']['VLLM_USE_LAYERNAME'] == '0'
+        positive = log(arm)
+        assert r.proof(positive, cfg, expected=r.expected_replacements(PLAN)) is None
+        missing = positive.replace('"VLLM_USE_LAYERNAME": "0"', '"VLLM_USE_LAYERNAME": "1"')
+        assert r.proof(missing, cfg, expected=r.expected_replacements(PLAN)) == 'env VLLM_USE_LAYERNAME'
+    else:
+        assert 'VLLM_USE_LAYERNAME' not in cfg['env']
+
+
 def merged_compilation(cfg):
     # Same CLI overlay and right-biased merge as examples/llm/vllm_bench.py:71-75.
     parser = argparse.ArgumentParser()
@@ -54,7 +67,7 @@ def test_proof_replay(arm):
         assert captured, f'UNCAPTURED {historical}'
     # S1/S9 were budget-dropped: no captured positive proof exists.
     for path in captured:
-        expected = 'Disabling fuse_qk_norm_rope_kvcache' if historical in ('S4', 'S5', 'S6') else None
+        expected = 'env VLLM_USE_LAYERNAME' if historical in ('S4', 'S5', 'S6') else None
         missing = r.proof(path.read_text(), cfg)
         assert missing == expected, f"PROOF {missing!r} absent in {path}:1; expected refusal reason: {expected}"
     positive = log(arm).replace(

@@ -79,9 +79,23 @@ class Dims:
         return (self.NH + 2 * self.NKV) * self.HD
 
 
+def rope_kind(c: dict, path: str = "<config>") -> str:
+    """Refuse RoPE schemes whose scaling math this example does not implement."""
+    kind = "default"
+    for key in ("rope_scaling", "rope_parameters"):
+        params = c.get(key) or {}
+        current = params.get("rope_type") or params.get("type") or "default"
+        if current not in ("default", "longrope"):
+            raise ValueError(f"{path}: unsupported rope type {current}")
+        if params:
+            kind = current
+    return kind
+
+
 def load_dims(path: str | None = None) -> Dims:
     path = path or os.environ.get("ETX_LLM_CONFIG") or str(HERE / "configs" / "qwen3-8b.json")
     c = json.loads(Path(path).read_text())
+    rope_kind(c, str(path))
     mt = c.get("model_type", "")
     H, NH = c["hidden_size"], c["num_attention_heads"]
     # Expert count: Qwen spells it num_experts, Mixtral num_local_experts, DeepSeek n_routed_experts. Reading only
@@ -108,7 +122,8 @@ def load_dims(path: str | None = None) -> Dims:
     return Dims(name=Path(path).parent.name if Path(path).name == "config.json" else Path(path).stem,
                 H=H, NH=NH, NKV=c.get("num_key_value_heads", NH), HD=c.get("head_dim", H // NH),
                 INTER=c.get("intermediate_size", 0), L=min(nl, c["num_hidden_layers"]), V=c["vocab_size"],
-                eps=float(c.get("rms_norm_eps", 1e-6)), theta=float(c.get("rope_theta", 10000.0)),
+                eps=float(c.get("rms_norm_eps", 1e-6)),
+                theta=float((c.get("rope_parameters") or {}).get("rope_theta", c.get("rope_theta", 10000.0))),
                 tie=bool(c.get("tie_word_embeddings", False)), bias=mt == "qwen2" or bool(c.get("attention_bias", False)),
                 qk_norm=qk_norm, moe=moe, E=E, TOPK=topk,
                 # Qwen separates moe_intermediate_size from the dense intermediate_size; Mixtral has only the latter

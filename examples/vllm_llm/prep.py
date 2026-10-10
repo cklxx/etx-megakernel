@@ -30,7 +30,7 @@ def longrope_cos_sin_cache(theta: float, rot: int, maxlen: int, cfg: dict) -> to
     short factors below original_max_position_embeddings and the long ones above; cos/sin scaled by the config's
     explicit short_mscale / long_mscale (Phi-3.5-MoE carries both; no derived formula is used when they are given).
     The cache layout matches cos_sin_cache: maxlen rows of cos (rot/2) | sin (rot/2)."""
-    rs = cfg["rope_scaling"]
+    rs = cfg.get("rope_parameters") or cfg["rope_scaling"]
     orig = int(rs.get("original_max_position_embeddings") or cfg.get("original_max_position_embeddings"))
     dev = "cpu"
     t = torch.arange(maxlen, dtype=torch.float, device=dev)
@@ -96,7 +96,7 @@ def main():
     if not d.tie:
         put("lm_head", get("lm_head.weight"))
     cfg_json = json.load(open(src / "config.json"))
-    if (cfg_json.get("rope_scaling") or {}).get("type") == "longrope":
+    if M.rope_kind(cfg_json, str(src / "config.json")) == "longrope":
         put("cos_sin", longrope_cos_sin_cache(d.theta, d.HD, a.maxlen, cfg_json))
     else:
         put("cos_sin", cos_sin_cache(d.theta, d.HD, a.maxlen))

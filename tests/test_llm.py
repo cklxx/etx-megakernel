@@ -11,6 +11,29 @@ from etx.passes import compile_graph
 CONFIGS = ["qwen2.5-1.5b", "qwen3-8b", "qwen3-30b-a3b"]
 
 
+def test_unknown_rope_type_is_refused(tmp_path):
+    from examples.llm.model import load_dims, rope_kind
+    configs = Path(__file__).resolve().parents[1] / "examples/llm/configs"
+    for name, kind in (("phi-3.5-moe", "longrope"), ("qwen3-30b-a3b", "default")):
+        path = configs / f"{name}.json"
+        assert rope_kind(json.loads(path.read_text())) == kind
+        load_dims(str(path))
+    c = dict(model_type="llama", hidden_size=4096, num_attention_heads=32,
+             num_key_value_heads=8, intermediate_size=14336, num_hidden_layers=32,
+             vocab_size=128256, rope_theta=500000)
+    path = tmp_path / "llama3.1-8b.json"
+    for field in ("rope_scaling", "rope_parameters"):
+        for key in ("type", "rope_type"):
+            candidate = c | {field: {key: "llama3", "factor": 8}}
+            path.write_text(json.dumps(candidate))
+            with pytest.raises(ValueError, match=rf"{path.name}.*rope.*llama3"):
+                load_dims(str(path))
+    for params in (None, {}, {"rope_type": "default", "rope_theta": 123456}):
+        path.write_text(json.dumps(c | {"rope_parameters": params}))
+        assert rope_kind(c | {"rope_parameters": params}) == "default"
+        assert load_dims(str(path)).theta == (123456 if params else 500000)
+
+
 def test_llm_rejects_topk_above_kernel_limit(tmp_path):
     source = Path(__file__).resolve().parents[1] / "examples" / "llm" / "configs" / "qwen3-30b-a3b.json"
     config = json.loads(source.read_text())

@@ -1,5 +1,7 @@
 """Tile primitives (etx/ops/prims.py, PLAN section 6.4, Friday item 7): the wave_sum lowerings for gfx942 and sm_90."""
 import re
+import shutil
+import subprocess
 from pathlib import Path
 
 import numpy as np
@@ -16,7 +18,7 @@ def test_gfx942_gemv_source_is_unchanged():
     """The emitted gemv source for gfx942 equals the source with the inline text from before the change."""
     before = gemv.STREAM.replace(prims.MARK.format("wave_sum0") + "\n", BEFORE)
     assert before != gemv.STREAM
-    expected = gemv.emit_tiles().replace(prims.expand(gemv.STREAM, None), before)
+    expected = gemv.emit_tiles().replace(prims.expand(gemv.STREAM, None), prims.expand(before, None))
     assert gemv.emit_tiles() == expected
     assert prims.lower("gfx942", "wave_sum0") + "\n" == BEFORE
     assert gemv.emit_tiles() == gemv.emit_tiles(machine="gfx942") == gemv.emit_tiles(machine=load_machine("gfx942"))
@@ -31,17 +33,48 @@ def test_gfx942_wave_sum_is_the_runtime_header_text():
 def test_each_lowering_defines_its_function(arch):
     for name, fn in prims.PRIMITIVES.items():
         text = prims.lower(arch, name)
-        assert re.search(rf"\bfloat {fn}\(float v\)", text), (arch, name)
+        ty = "int" if name == "uniform" else "float"
+        assert re.search(rf"\b{ty} {fn}\({ty} v\)", text), (arch, name)
         size = load_machine(arch).wave_size
         assert f"static_assert(ETX_WAVE_SIZE == {size}" in text or name == "wave_sum" and arch == "gfx942"
 
 
 def test_sm_90_source_has_no_amd_code():
     src = gemv.emit_tiles(machine="sm_90")
+    assert "__builtin_amdgcn" not in src
     blk = src[src.index("#ifdef ETX_DSL_WSUM"):src.index("#endif", src.index("#ifdef ETX_DSL_WSUM"))]
     assert "__builtin_amdgcn" not in blk and "__shfl_xor_sync(0xffffffffu, v, 16)" in blk
     for name in prims.PRIMITIVES:
         assert "amdgcn" not in prims.lower("sm_90", name) and "__shfl_xor(" not in prims.lower("sm_90", name)
+
+
+def test_sm_90_lowerings_compile(tmp_path):
+    clang = "/opt/homebrew/opt/llvm/bin/clang"
+    if not Path(clang).exists():
+        clang = shutil.which("clang")
+    if not clang:
+        pytest.skip("clang with nvptx64 is unavailable")
+    targets = subprocess.run([clang, "--print-targets"], capture_output=True, text=True, check=True)
+    if "nvptx64" not in targets.stdout:
+        pytest.skip("clang lacks nvptx64")
+    # Four-line shim: compile the primitive bodies without CUDA headers.
+    shim = """#define __device__ __attribute__((device))
+#define __forceinline__ inline __attribute__((always_inline))
+#define __shfl_xor_sync(mask, v, lane) __nvvm_shfl_sync_bfly_f32(mask, v, lane, 31)
+#define __shfl_sync(mask, v, lane) __nvvm_shfl_sync_idx_i32(mask, v, lane, 31)
+"""
+    source = tmp_path / "primitives.cu"
+    source.write_text(shim + "#define ETX_WAVE_SIZE 32\n" +
+                      "\n".join(prims.lower("sm_90", name) for name in prims.PRIMITIVES) +
+                      '\nextern "C" __attribute__((global)) void probe(float* f, int* i) {\n'
+                      '  f[0] = etx_wave_sum(f[0]); f[1] = dsl_wave_sum0(f[1]); i[0] = etx_uniform(i[0]);\n}\n')
+    output = tmp_path / "primitives.ptx"
+    proc = subprocess.run([clang, "-x", "cuda", "--cuda-gpu-arch=sm_90", "--cuda-device-only",
+                           "-nocudainc", "-nocudalib", "-Xclang", "-target-feature", "-Xclang", "+ptx80",
+                           "-S", str(source), "-o", str(output)], capture_output=True, text=True)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    ptx = output.read_text()
+    assert ".target sm_90" in ptx and "shfl.sync.bfly" in ptx and "shfl.sync.idx" in ptx
 
 
 def _warp32_butterfly(v):

@@ -108,6 +108,7 @@ def import_entries(threads: int = 1024) -> dict:
 
 
 STREAM = r'''
+@@ETX_PRIM:uniform@@
 // ---- the stream loop (examples/llm/gemv.h): segments of 64 lanes x EPL bf16 inside one row, U loads per lane in flight
 #ifndef DSL_U32X4_DEFINED                                 // also defined by etx/ops/coh.py, whichever is emitted first
 #define DSL_U32X4_DEFINED
@@ -174,8 +175,8 @@ static __device__ __forceinline__ void dsl_gemv_rows_nb(const __hip_bfloat16* __
   const dsl_lds_f* xl = (const dsl_lds_f*)xs;
   dsl_lds_fw* pl = (dsl_lds_fw*)part;
 #ifdef ETX_DSL_SCALAR                                    // all of these are the same in every lane: say so to the compiler
-  K = __builtin_amdgcn_readfirstlane(K); r0 = __builtin_amdgcn_readfirstlane(r0); r1 = __builtin_amdgcn_readfirstlane(r1);
-  const int lane = etx_lane(), wv = __builtin_amdgcn_readfirstlane(etx_wave()), nw = etx_nwaves(), nrt = r1 - r0;
+  K = etx_uniform(K); r0 = etx_uniform(r0); r1 = etx_uniform(r1);
+  const int lane = etx_lane(), wv = etx_uniform(etx_wave()), nw = etx_nwaves(), nrt = r1 - r0;
 #else
   const int lane = etx_lane(), wv = etx_wave(), nw = etx_nwaves(), nrt = r1 - r0;
 #endif
@@ -749,7 +750,7 @@ BODIES = {
   // readfirstlane: d.K is one value per task, but without ETX_DSL_SCALAR it is a flat load into a VGPR, so the compiler
   // took this branch as divergent and structurised both paths together. In the one-function megakernel that pushed
   // Mixtral (the only BIGK model) from 2 to 60 spilled VGPRs, all of them in the inlined attention (mixtral_spill).
-  if (__builtin_amdgcn_readfirstlane(d.K) > DSL_K_MAX) {   // K > the staged window (host allows it for the MoE forms only):
+  if (etx_uniform(d.K) > DSL_K_MAX) {   // K > the staged window (host allows it for the MoE forms only):
     float* gb = xs + DSL_K_MAX; float* pb = gb + 2 * d.rpt;      // fixed LDS bases -- xs + d.K would overflow the block
     const __hip_bfloat16* xr = d.x + (size_t)rq * d.sx;
     dsl_gemv_bigk(We, xr, d.K, xs, r0, r1, pb, [&](int r, float v) { gb[r - r0] = dsl_bfr(v); });
@@ -808,7 +809,7 @@ BODIES = {
   const int dsl_eid = d.mode >= 2 ? lids[s] : dsl_a_ldi(d.ids + (size_t)rq * d.srows + s);
   const __hip_bfloat16* We = d.W + (size_t)dsl_eid * d.estride;
 #if ETX_EMIT_DSL_BIGK
-  if (__builtin_amdgcn_readfirstlane(d.K) > DSL_K_MAX) {   // chunked staging, uniform branch; fixed LDS bases (see silu_mul)
+  if (etx_uniform(d.K) > DSL_K_MAX) {   // chunked staging, uniform branch; fixed LDS bases (see silu_mul)
     float* pb = xs + DSL_K_MAX;
     const float wsb = d.mode >= 2 ? lwts[s] : dsl_a_ldf(d.wts + (size_t)rq * d.srin + s);
     __hip_bfloat16* outb = d.out + (size_t)rq * d.sout + (size_t)s * d.M;
@@ -850,7 +851,7 @@ def emit_tiles(lds_floats: int = 8192, machine=None) -> str:
         out.append(f"// ---- {e}: {form}")
         out.append(f"static __device__ __attribute__((always_inline)) void dsl_run_{e}(const unsigned char* a, int blk) {{")
         out.append("#ifdef ETX_DSL_SCALAR")
-        out.append("  blk = __builtin_amdgcn_readfirstlane(blk);")
+        out.append("  blk = etx_uniform(blk);")
         out.append(f"  const int nblk = *(const int DSL_ARG_AS*)(uintptr_t)(a + {GRID_OFF + 12});")
         out.append("#else")
         out.append(f"  const int nblk = *(const int*)(a + {GRID_OFF + 12});")

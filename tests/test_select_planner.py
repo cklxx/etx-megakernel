@@ -85,7 +85,8 @@ def test_declarations_are_well_formed():
     from etx.ops import gemv
     assert GEMV_LDS == gemv.LDS_BYTES or gemv.DSL_NB != 1
     for v in REGISTRY:
-        assert v.kind == ("dsl" if v.export.startswith("dsl_") else "imported"), v
+        assert v.kind == ("dsl" if v.export.startswith("dsl_") else
+                          "generic" if v.export.startswith("llm_") else "imported"), v
         assert v.backend == ("gfx942",)
     for name in ("qwen3-30b-a3b", "qwen3-8b", "mixtral-8x7b", "phi-3.5-moe", "qwen2.5-1.5b"):
         for ph in phase_shapes(CFG.format(name)):
@@ -105,3 +106,29 @@ def test_plan_accepts_a_config_dict():
     from pathlib import Path
     cfg = json.loads(Path(CFG.format("mixtral-8x7b")).read_text())
     assert plan(cfg).manifest() == plan(CFG.format("mixtral-8x7b")).manifest()
+
+
+def test_g5_attention_has_a_generic_plan_but_no_vllm_host_abi():
+    from dataclasses import replace
+    from examples.llm.model import load_dims
+    from examples.vllm_llm import model as M
+    d = replace(load_dims(CFG.format("qwen3-8b")), NH=40)
+    p = plan(d)
+    assert (p.phases["attn"].export, p.phases["attn"].kind) == ("llm_attn", "generic")
+    with pytest.raises(SystemExit, match="phase attn: only the generic tile llm_attn is legal; the vLLM host cannot launch it"):
+        M.instances(d)
+
+
+def test_generic_is_only_selected_without_a_legal_specialized_variant():
+    from dataclasses import replace
+    generic = next(v for v in REGISTRY if v.kind == "generic")
+    cheap = replace(generic, cost=lambda s, b: 0.0)
+    p = plan(CFG.format("qwen3-8b"), variants=[v for v in REGISTRY if v is not generic] + [cheap])
+    assert p.phases["attn"].kind == "imported"
+
+
+@pytest.mark.parametrize("hd,g,legal", [(128, 5, True), (192, 16, True), (130, 5, False),
+                                       (200, 5, False), (128, 17, False)])
+def test_generic_attention_shape_bounds(hd, g, legal):
+    generic = next(v for v in REGISTRY if v.kind == "generic")
+    assert generic.shape({"HD": hd, "G": g}) is legal

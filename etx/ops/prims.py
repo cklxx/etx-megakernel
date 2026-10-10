@@ -7,15 +7,16 @@ A tile generator calls a primitive by name. The C definition of the primitive co
 |-------------|-----------------|-----------------------------------------|
 | `wave_sum`  | `etx_wave_sum`  | the sum of `v` over the wave, every lane |
 | `wave_sum0` | `dsl_wave_sum0` | the same sum, defined in lane 0 only     |
+| `uniform`  | `etx_uniform`  | broadcast lane 0's integer to the wave   |
 
 The gfx942 text of `wave_sum0` is the ETX_DSL_WSUM reduction that etx/ops/gemv.py had inline before this module.
-The emitted gemv source for gfx942 is byte-identical to the source before the change (tests/test_prims.py).
+The gfx942 reduction text is preserved (tests/test_prims.py).
 """
 from __future__ import annotations
 
 from etx.machine.model import MachineModel, load_machine
 
-PRIMITIVES = {"wave_sum": "etx_wave_sum", "wave_sum0": "dsl_wave_sum0"}
+PRIMITIVES = {"wave_sum": "etx_wave_sum", "wave_sum0": "dsl_wave_sum0", "uniform": "etx_uniform"}
 DEFAULT_MACHINE = "gfx942"          # the machine of every measured build; a caller passes another model explicitly
 MARK = "@@ETX_PRIM:{}@@"
 

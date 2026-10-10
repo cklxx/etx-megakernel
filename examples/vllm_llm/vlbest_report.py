@@ -42,6 +42,7 @@ def config(arm):
     env, kw, flags = {}, {}, []
     if arm in ('S4', 'S5', 'S6'):
         env['VLLM_ROCM_USE_AITER'] = '1'
+        env['VLLM_USE_LAYERNAME'] = '0'
         kw['attention_backend'] = 'ROCM_AITER_UNIFIED_ATTN' if arm == 'S6' else 'ROCM_AITER_FA'
         flags = ['--pass-config', '{"fuse_qk_norm_rope_kvcache":true}']
     if arm in ('S5', 'S6'):
