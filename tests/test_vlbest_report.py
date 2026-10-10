@@ -10,6 +10,22 @@ from examples.vllm_llm import vlbest_report as r
 from examples.vllm_llm.pairs import Refusal
 
 
+PLAN = '\n'.join(f'{i} attn {i} attn 1 1 1 0 1 0 0 0 1 0 -1 0 1' for i in range(48))
+
+
+def proof(text, cfg):
+    return r.proof(text, cfg, expected=r.expected_replacements(PLAN))
+
+
+def observation(text, cfg):
+    return r.observation(text, cfg, expected=r.expected_replacements(PLAN))
+
+
+@pytest.fixture(autouse=True)
+def graph_fixture(tmp_path):
+    (tmp_path / 'vl_plan.txt').write_text(PLAN)
+
+
 def log(arm='S0', ms=5, cfg=None):
     cfg = cfg or r.config(arm)
     env = {k: v.replace('$' + 'HOME', '/synthetic') for k, v in cfg['env'].items()}
@@ -30,7 +46,7 @@ def log(arm='S0', ms=5, cfg=None):
 
 @pytest.mark.parametrize('arm', [f'S{i}' for i in range(10)])
 def test_proven(arm):
-    assert r.observation(log(arm), r.config(arm)) == 5
+    assert observation(log(arm), r.config(arm)) == 5
 
 
 @pytest.mark.parametrize('arm,remove', [
@@ -50,25 +66,25 @@ def test_missing_proof(arm, remove):
     text = log(arm)
     assert remove in text
     with pytest.raises(Refusal, match='NOT-APPLIED'):
-        r.observation(text.replace(remove, ''), r.config(arm))
+        observation(text.replace(remove, ''), r.config(arm))
 
 
 @pytest.mark.parametrize('arm,extra', [('S7', '(EngineCore pid=123)'), ('S1', 'Using default MoE config')])
 def test_contradictory_proof(arm, extra):
     with pytest.raises(Refusal, match='NOT-APPLIED'):
-        r.observation(log(arm) + '\n' + extra, r.config(arm))
+        observation(log(arm) + '\n' + extra, r.config(arm))
 
 
 @pytest.mark.parametrize('bad', ['31/32', '31/31', '32/33', '0/32'])
 def test_every_sample(bad):
     text = log().replace('sample=0 first_divergence=32/32', 'sample=0 first_divergence=' + bad)
     with pytest.raises(Refusal, match='failed 32/32'):
-        r.observation(text, r.config('S0'))
+        observation(text, r.config('S0'))
 
 
 def test_missing_sample():
     with pytest.raises(Refusal, match='failed 32/32'):
-        r.observation(log().replace('VLLM-SAMPLE sample=0 first_divergence=32/32', ''), r.config('S0'))
+        observation(log().replace('VLLM-SAMPLE sample=0 first_divergence=32/32', ''), r.config('S0'))
 
 
 @pytest.mark.parametrize('values,brackets,want', [
@@ -107,7 +123,7 @@ def test_combination():
     assert cfg['env']['VLLM_ROCM_USE_AITER_MOE'] == '0'
     assert cfg['env']['VLLM_TUNED_CONFIG_FOLDER'].endswith('/tuned')
     assert '--no-detok' in cfg['flags']
-    assert r.observation(log('C', cfg=cfg), cfg) == 5
+    assert observation(log('C', cfg=cfg), cfg) == 5
 
 
 def test_finalist():
@@ -132,7 +148,7 @@ def test_paired_resolution():
 
 def test_label():
     with pytest.raises(Refusal, match='label=S4'):
-        r.observation(log('S4').replace('label=S4', 'label=default'), r.config('S4'))
+        observation(log('S4').replace('label=S4', 'label=default'), r.config('S4'))
 
 
 def test_harness_flags_and_all_samples(tmp_path, monkeypatch, capsys):
@@ -214,6 +230,13 @@ def test_report_spread_diagnostic_roundtrip(tmp_path, capsys):
     (tmp_path / 'final.json').write_text(json.dumps(dict(final=r.config('S0'), search=search)))
     write(tmp_path, 'docker_pull', 'IMAGE ' + r.IMAGE, 'None')
     write(tmp_path, 'golden_sha', '/synthetic/golden_c1024.txt: OK', 'None')
+    write(tmp_path, 'record', 'GPU[0] : Card Series: Synthetic GPU\nROCM-VERSION test-version', 'None')
+    (tmp_path / 'screen.json').write_text(json.dumps({'combination': None}))
+    for rnd in (1, 2):
+        for end in ('open', 'close'):
+            write(tmp_path, f'a_r{rnd}_S0_{end}', log())
+        for arm in r.SCREEN_ARMS:
+            write(tmp_path, f'a_r{rnd}_{arm}', log(arm, ms=6))
     for rnd in range(1, 6):
         write(tmp_path, f'S0_r{rnd}', log(ms=5 if rnd < 5 else 4.9))
     assert r.main([str(tmp_path)]) == 0
@@ -221,6 +244,10 @@ def test_report_spread_diagnostic_roundtrip(tmp_path, capsys):
     assert 'SPREAD-BOUND fused−R: False' in output
     assert '→ LEAD' in output
     assert 'FULL-CLAIM ELIGIBLE' in output
+    assert 'ETX: step mean; vLLM: sample median' in output
+    assert 'FUSION step-mean basis' in output
+    assert 'FUSION RESULT wall_ms basis (pairs.py)' in output
+    assert 'Synthetic GPU | ROCm test-version' in output
 
 
 @pytest.mark.parametrize('arm', ['S4f', 'S5f', 'S6f'])
@@ -230,16 +257,16 @@ def test_fixed_fusion_positive(arm):
     base = r.config(arm[:-1])
     assert cfg['env'] == base['env'] and cfg['flags'] == base['flags']
     assert cfg['kw']['attention_backend'] == base['kw']['attention_backend']
-    assert r.observation(log(arm), cfg) == 5
+    assert observation(log(arm), cfg) == 5
 
 
 def test_captured_disabled_fusion():
     captured = Path(__file__).parent / 'fixtures/vlbest/a_r1_S4.log'
     text = captured.read_text()
     assert 'Disabling fuse_qk_norm_rope_kvcache' in text
-    assert r.proof(text, r.config('S4f')) == 'Disabling fuse_qk_norm_rope_kvcache'
+    assert proof(text, r.config('S4f')) == 'Disabling fuse_qk_norm_rope_kvcache'
     with pytest.raises(Refusal, match='NOT-APPLIED'):
-        r.observation(text, r.config('S4f'))
+        observation(text, r.config('S4f'))
 
 
 @pytest.mark.parametrize('brackets', [False, True])
@@ -248,18 +275,18 @@ def test_fusion_banner_newline_regression(brackets):
     if brackets:
         text = text.replace('fusions: norm_quant, act_quant, qk_norm_rope_kvcache',
                             'fusions: [norm_quant, act_quant, qk_norm_rope_kvcache]')
-    assert r.proof(text, r.config('S4f')) is None
-    assert r.proof(text.replace('act_quant, qk_', 'act_quant,\nqk_'), r.config('S4f')) is not None
+    assert proof(text, r.config('S4f')) is None
+    assert proof(text.replace('act_quant, qk_', 'act_quant,\nqk_'), r.config('S4f')) is not None
 
 
 @pytest.mark.parametrize('count', [0, 1, 47])
 def test_fusion_replacement_is_primary(count):
     text = log('S4f').replace('replaced 48', f'replaced {count}')
     # Even with the enabled banner, zero or partial replacement is not proof.
-    assert r.proof(text, r.config('S4f')) == r'QK-Norm\+RoPE\+KVCache fusion: replaced 48 pattern\(s\)'
+    assert proof(text, r.config('S4f')) == ('replaced 0 patterns' if count == 0 else f'replacement counts [{count}]; expected 48 per full graph')
     # If both positive proofs are absent, report the missing replacement first.
     text = text.replace('Enabled custom fusions:', 'Other fusions:')
-    assert r.proof(text, r.config('S4f')) == r'QK-Norm\+RoPE\+KVCache fusion: replaced 48 pattern\(s\)'
+    assert proof(text, r.config('S4f')) == ('replaced 0 patterns' if count == 0 else f'replacement counts [{count}]; expected 48 per full graph')
 
 
 @pytest.mark.parametrize('arm', ['S4f', 'S5f', 'S6f'])
@@ -270,20 +297,20 @@ def test_fusion_replacement_is_primary(count):
 ])
 def test_fixed_missing_fusion_proof(arm, remove):
     with pytest.raises(Refusal, match='NOT-APPLIED'):
-        r.observation(log(arm).replace(remove, ''), r.config(arm))
+        observation(log(arm).replace(remove, ''), r.config(arm))
 
 
 @pytest.mark.parametrize('arm', ['S4f', 'S5f', 'S6f'])
 def test_fixed_disabling_warning_overrides_positive(arm):
-    assert r.proof(log(arm) + '\nDisabling fuse_qk_norm_rope_kvcache', r.config(arm)) is not None
+    assert proof(log(arm) + '\nDisabling fuse_qk_norm_rope_kvcache', r.config(arm)) is not None
 
 
 def test_c2_union():
     cfg = r.combination({a: winner(a, -.1) for a in ('S1', 'S6f')})
     assert cfg['id'] == 'C2'
     assert set(cfg['components']) == {'S1', 'S6f'}
-    assert r.proof(log('C2', cfg=cfg), cfg) is None
-    assert r.proof(log('C2', cfg=cfg) + '\nDisabling fuse_qk_norm_rope_kvcache', cfg)
+    assert proof(log('C2', cfg=cfg), cfg) is None
+    assert proof(log('C2', cfg=cfg) + '\nDisabling fuse_qk_norm_rope_kvcache', cfg)
 
 
 def test_fusion_guard_mutations(monkeypatch):
@@ -365,3 +392,48 @@ def test_budget_omission_mutation(tmp_path, monkeypatch):
     monkeypatch.setattr(r, 'not_applied', namespace['not_applied'])
     with pytest.raises(AssertionError):
         test_budget_omission_overrides_evidence(tmp_path, monkeypatch)
+
+
+def test_graph_count_and_counter_semantics():
+    plan = '\n'.join(PLAN.splitlines()[:3])
+    assert r.expected_replacements(plan) == 3
+    text = log('S4f').replace('replaced 48', 'replaced 3')
+    assert r.proof(text, r.config('S4f'), expected=3) is None
+    assert r.proof(text, r.config('S4f')) == 'no graph coverage count'
+    # Separate pass invocations must not be summed into full coverage.
+    text = text.replace('replaced 3', 'replaced 1')
+    text += '\nQK-Norm+RoPE+KVCache fusion: replaced 2 pattern(s)'
+    assert 'expected 3' in r.proof(text, r.config('S4f'), expected=3)
+    text = log('S4f').replace('QK-Norm+RoPE+KVCache fusion: replaced 48 pattern(s)', '')
+    assert r.proof(text, r.config('S4f'), expected=3) == 'no replacement-count line'
+
+
+def test_recompute_stale_search_and_both_round_failures(tmp_path):
+    from tests.test_nvref_report import write
+    (tmp_path / 'screen.json').write_text(json.dumps({'combination': None, 'search': {'winners': {'S1': {}}}}))
+    for rnd in (1, 2):
+        for end in ('open', 'close'):
+            write(tmp_path, f'a_r{rnd}_S0_{end}', log(ms=5))
+        write(tmp_path, f'a_r{rnd}_S1', log('S1', ms=5.3))
+        write(tmp_path, f'a_r{rnd}_S3', log('S3', ms=4.8))
+        for arm in ('S4f', 'S5f', 'S6f'):
+            text = log(arm).replace('replaced 48', 'replaced 0')
+            if rnd == 2:
+                text = text.replace('QK-Norm+RoPE+KVCache fusion: replaced 0 pattern(s)', '')
+            write(tmp_path, f'a_r{rnd}_{arm}', text)
+        write(tmp_path, f'b_r{rnd}_C2', 'NOT-APPLIED C2: fewer than two compatible winning axes')
+    search = r.recompute_search(tmp_path)
+    assert list(search['winners']) == ['S3']
+    assert search['excluded']['S1'] == 'NO-WINNER'
+    assert 'fewer than two compatible' in search['excluded']['C2']
+    assert 'r1: NOT-APPLIED S4f: replaced 0 patterns' in search['excluded']['S4f']
+    assert 'r2: NOT-APPLIED S4f: no replacement-count line' in search['excluded']['S4f']
+
+
+def test_survival_and_machine():
+    assert '0.228 ms' in r.survival([-.278] * 5)
+    assert 'uniform reference improvement only' in r.survival([-.278] * 5)
+    assert 'recomputing every pair' in r.survival([-.278] * 5)
+    assert r.machine('GPU[0] : Card Series: Another GPU\nROCM-VERSION 9.1') == 'Another GPU | ROCm 9.1'
+    with pytest.raises(Refusal):
+        r.machine('GPU[0] : Card Series: Another GPU')

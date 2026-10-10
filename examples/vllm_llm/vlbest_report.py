@@ -14,7 +14,7 @@ import re
 from statistics import mean, median
 
 from examples.llm.vllm_bench import CONFIG_PREFIX, decode_config
-from examples.vllm_llm import import_certificate as cert
+from examples.vllm_llm import import_certificate as cert, pairs as pair_report
 from examples.vllm_llm.nvref_report import Session, etx, one_line, verdict, vllm
 from examples.vllm_llm.pairs import Refusal, verdict as fusion_verdict
 
@@ -23,7 +23,7 @@ GROUP3 = ['V2 model runner', 'AITER MoE dispatch policy', 'AITER fmoe tuning',
           'block-size 32', 'compile_sizes=[1] + max_autotune', 'skinny GEMM off',
           'shuffle KV cache', 'stream-interval >1']
 SCREEN_ARMS = ('S1', 'S3', 'S4f', 'S5f', 'S6f')
-PREDICTIONS = 'S1 -0.05…-0.25; S5f/S6f -0.1…-0.4; S4f worse than S6f; triplets |block−poll| ≤0.010 ms [E]. LEAD survives if F gains <0.30 ms on S3. S9 dead-by-ray (session-iv3fdc3m/docker_pull.log:8).'
+PREDICTIONS = 'S1 -0.05…-0.25; S5f/S6f -0.1…-0.4; S4f worse than S6f; triplets |block−poll| ≤0.010 ms [E]. S9 dead-by-ray (session-iv3fdc3m/docker_pull.log:8).'
 
 
 def config(arm):
@@ -49,7 +49,22 @@ def config(arm):
     return dict(id=original, env=env, kw=kw, flags=flags, components=[original])
 
 
-def proof(text, cfg):
+def expected_replacements(plan):
+    """One match consumes q/k norm, RoPE and the KV update for one layer.
+
+    The pinned vLLM pass logs patterns.apply(graph), not a count of operators
+    or ETX worker replicas. Count attention sites in the saved full-model plan.
+    Do not add counters across graphs: separate compilations can repeat sites.
+    """
+    sites = set()
+    for line in plan.splitlines():
+        fields = line.split()
+        if len(fields) >= 17 and fields[0].isdigit() and fields[3] == 'attn':
+            sites.add((int(fields[2]), int(fields[15])))  # layer, request
+    return len(sites) or None
+
+
+def proof(text, cfg, expected=None):
     """Return the missing proof, without interpreting any timings."""
     echoed = decode_config(one_line(text, CONFIG_PREFIX, cfg['id']))
     for key in ('async_scheduling', 'cudagraph_mode', 'pass_config', 'kernel_config', 'attention_backend', 'env'):
@@ -66,10 +81,18 @@ def proof(text, cfg):
     if any(c in components for c in ('S4', 'S5', 'S6')):
         if 'Disabling fuse_qk_norm_rope_kvcache' in text:
             return 'Disabling fuse_qk_norm_rope_kvcache'
-        # Replacement is the primary proof; require all 48 Qwen layers.
+        counts = [int(n) for n in re.findall(
+            r'QK-Norm\+RoPE\+KVCache fusion: replaced (\d+) pattern\(s\)', text)]
+        if not counts:
+            return 'no replacement-count line'
+        if not any(counts):
+            return 'replaced 0 patterns'
+        if expected is None:
+            return 'no graph coverage count'
+        if any(n != expected for n in counts):
+            return f'replacement counts {counts}; expected {expected} per full graph'
         # The enabled list is secondary and must stay on the same line.
-        for pattern in (r'QK-Norm\+RoPE\+KVCache fusion: replaced 48 pattern\(s\)',
-                        r'Enabled custom fusions: [^\n]*qk_norm_rope_kvcache',
+        for pattern in (r'Enabled custom fusions: [^\n]*qk_norm_rope_kvcache',
                         r'Capturing CUDA graphs \(decode, FULL\)'):
             if not re.search(pattern, text):
                 return pattern
@@ -89,9 +112,9 @@ def proof(text, cfg):
     return None
 
 
-def observation(text, cfg, label=None):
+def observation(text, cfg, label=None, expected=None):
     try:
-        missing = proof(text, cfg)
+        missing = proof(text, cfg, expected)
     except (Refusal, ValueError, TypeError, KeyError):
         missing = 'config echo'
     if missing:
@@ -131,6 +154,10 @@ def not_applied(directory, stage):
                 for arm in ('S1', 'S9'):
                     excluded[arm] = f'NOT-APPLIED {arm}: {line}'
     if stage == 'b':
+        for rnd in (1, 2):
+            for line in lines(f'b_r{rnd}_C2'):
+                if line.startswith('NOT-APPLIED C2:'):
+                    excluded['C2'] = line
         for line in lines('b_budget'):
             if line.startswith('STAGE-B SKIPPED budget '):
                 excluded['C2'] = f'NOT-APPLIED C2: {line}'
@@ -139,6 +166,8 @@ def not_applied(directory, stage):
 
 def screen(directory, stage='a', candidates=None):
     session = Session(directory)
+    plan = directory / 'vl_plan.txt'
+    expected = expected_replacements(plan.read_text()) if plan.exists() else None
     candidates = candidates or [config(arm) for arm in SCREEN_ARMS]
     result = dict(winners={}, excluded=not_applied(directory, stage), tested=['S0'], brackets=[])
     try:
@@ -159,7 +188,14 @@ def screen(directory, stage='a', candidates=None):
             if resolved[0] != resolved[1]:
                 raise Refusal(f'NOT-APPLIED {arm}: configuration changed between rounds')
             cfg = resolved[0]
-            values = [observation(session.read(f'{stage}_r{r}_{arm}'), cfg) for r in (1, 2)]
+            values, failures = [], []
+            for rnd in (1, 2):
+                try:
+                    values.append(observation(session.read(f'{stage}_r{rnd}_{arm}'), cfg, expected=expected))
+                except (Refusal, OSError) as exc:
+                    failures.append(f'r{rnd}: {exc}')
+            if failures:
+                raise Refusal('; '.join(failures))
             state, deltas = screening(values, result['brackets'])
             result['tested'].append(arm)
             if state == 'WINNER':
@@ -211,17 +247,53 @@ def spread_bound(deltas):
     return spread <= .050 + 1e-12 and spread < abs(median(deltas))
 
 
+def recompute_search(directory):
+    # Saved selection supplies the candidate configuration, never its verdicts.
+    saved = json.loads((directory / 'screen.json').read_text())
+    search = screen(directory)
+    cfg = saved['combination']
+    if cfg:
+        second = screen(directory, 'b', [cfg])
+        for key in ('winners', 'excluded'):
+            search[key].update(second[key])
+        search['tested'] += [a for a in second['tested'] if a != 'S0']
+    else:
+        search['excluded'].update(not_applied(directory, 'b'))
+    return search
+
+
+def machine(record):
+    cards = re.findall(r'^GPU\[\d+\]\s*: Card Series:\s*(.+)$', record, re.M)
+    version = one_line(record, 'ROCM-VERSION ', 'record').removeprefix('ROCM-VERSION ').strip()
+    if not cards or not version or version == 'unknown':
+        raise Refusal('missing hardware/ROCm provenance')
+    return ' / '.join(dict.fromkeys(cards)) + ' | ROCm ' + version
+
+
+def survival(deltas):
+    allowance = -median(deltas) - .050
+    if paired(deltas) != 'LEAD':
+        return 'SURVIVAL no current LEAD'
+    return (f'SURVIVAL uniform reference improvement allowance {allowance:.3f} ms '
+            '(paired lead magnitude minus required 0.050 ms; rounded). '
+            f'Every pair must remain negative (improvement < {-max(deltas):.3f} ms, rounded). '
+            'The paired resolution rule must still hold. '
+            'This covers a uniform reference improvement only; '
+            'a nonuniform improvement requires recomputing every pair.')
+
+
 def report(directory):
     session = Session(directory)
     selected = json.loads((directory / 'final.json').read_text())
     cfg = selected['final']
+    expected = expected_replacements((directory / 'vl_plan.txt').read_text())
     certificate = cert.validate(directory, (0, 1040))
     default = [observation(session.read(f'S0_r{r}'), config('S0')) for r in range(1, 6)]
     for rnd in range(1, 6):
         path = directory / f'F_r{rnd}.config.json'
         if path.exists() and json.loads(path.read_text()) != cfg:
             raise Refusal('NOT-COMPLETE: finalist configuration changed')
-    final = default if cfg['id'] == 'S0' else [observation(session.read(f'F_r{r}'), cfg) for r in range(1, 6)]
+    final = default if cfg['id'] == 'S0' else [observation(session.read(f'F_r{r}'), cfg, expected=expected) for r in range(1, 6)]
     rid = reference(default, final, cfg['id'])
     rv = default if rid == 'S0' else final
     fused = [etx(session.read(f'etx_r{r}'), f'etx_r{r}', 'fused').wall for r in range(1, 6)]
@@ -231,8 +303,16 @@ def report(directory):
         raise Refusal('wrong image digest')
     if not re.search(r'(?:^|/)golden_c1024.txt: OK$', session.read('golden_sha', 'None'), re.M):
         raise Refusal('golden SHA not checked')
-    print(f'SYSTEM  Qwen3-30B-A3B bf16 | MI300X VF | ROCm 7.14.0 | bs1 ctx1024 | host wall | 5 rounds | image {digest}')
-    print('| arm | config | round medians | median | spread | 32/32 | proof/cert |')
+    hardware = machine(session.read('record', 'None'))
+    search = recompute_search(directory)
+    if finalist(search['winners']) != cfg:
+        raise Refusal('saved finalist differs from recomputed search')
+    result_log = pair_report.parse([line for rnd in range(1, 6)
+                                   for arm in ('etx', 'etxu')
+                                   for line in (directory / f'{arm}_r{rnd}.log').read_text().splitlines()])
+    result_pairs = pair_report.pairs(result_log, 5)
+    print(f'SYSTEM  Qwen3-30B-A3B bf16 | {hardware} | bs1 ctx1024 | host wall | 5 rounds | image {digest}')
+    print('| arm | config | round values (ETX: step mean; vLLM: sample median) | median | spread | 32/32 | proof/cert |')
     print('|---|---|---|---|---|---|---|')
     for arm, desc, vals, proof_text in (
         ('ETX fused', 'timed build', fused, 'CERT OK'),
@@ -242,16 +322,18 @@ def report(directory):
         print(f'| {arm} | {desc} | {vals} | {median(vals):.3f} | {max(vals)-min(vals):.3f} | 5/5 | {proof_text} |')
     gains = [(u-f)/u for f, u in zip(fused, unfused)]
     fusion = fusion_verdict(gains)
-    print(f"FUSION  unfused−fused: gains {gains}, median {fusion['median']:.2%}, spread {fusion['spread']:.2%} → {'ESTABLISHED' if fusion['established'] else 'NOT'}")
+    print(f"FUSION step-mean basis, unfused−fused: gains {gains}, median {fusion['median']:.3%}, spread {fusion['spread']:.2%} → {'ESTABLISHED' if fusion['established'] else 'NOT'}")
+    print('FUSION RESULT wall_ms basis (pairs.py):')
+    pair_report.report(result_pairs, result_log, 'wall')
     ds, d0 = ([f-v for f, v in zip(fused, vv)] for vv in (rv, default))
-    print(f'DELTA   fused−R: {ds} median {median(ds):+.3f} spread {max(ds)-min(ds):.3f} → {paired(ds)}   (vs S0: {d0} → {paired(d0)})')
+    print(f'DELTA ETX step-mean − vLLM sample-median basis, fused−R: {ds} median {median(ds):+.3f} spread {max(ds)-min(ds):.3f} → {paired(ds)}   (vs S0: {d0} → {paired(d0)})')
     print(f'SPREAD-BOUND fused−R: {spread_bound(ds)} (spread ≤ 0.050 ms and < |median|; diagnostic only)')
-    search = selected['search']
     print(f"SEARCH  tested {search['tested']} | winners {list(search['winners'])} | NOT-APPLIED "
           f"{ {k:v for k,v in search['excluded'].items() if 'NOT-APPLIED' in v} } | failed 32/32 "
           f"{ {k:v for k,v in search['excluded'].items() if '32/32' in v} } | untested: {GROUP3}")
     print('SEARCH exclusions ' + json.dumps(search['excluded'], sort_keys=True))
     print('Predictions ' + PREDICTIONS)
+    print(survival(ds))
     print(f"FULL-CLAIM {'ELIGIBLE' if certificate['eligible'] else 'NOT ELIGIBLE'}; strongest only among tested, lever-proven, 32/32 arms.")
 
 
