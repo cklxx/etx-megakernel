@@ -26,6 +26,25 @@ def test_fixture_artifacts(tmp_path):
     assert specs['mixtral-8x7b']['up']['grid'][0] == 3584
 
 
+def test_vllm_source_skip_is_external_but_other_skips_and_failures_are_not(tmp_path):
+    xml = tmp_path / 'results.xml'
+    xml.write_text('''<testsuites><testsuite>
+      <testcase classname="tests.test_vlbest_session" name="test_g0_local_source_baseline"><skipped message="set ETX_VLLM_SOURCE_ROOT to inject a vLLM source checkout"/></testcase>
+      <testcase classname="tests.test_vlbest_session" name="test_g0_other"><skipped message="unexpected"/></testcase>
+    </testsuite></testsuites>''')
+    result = parse_results(xml)
+    assert len(result['skipped']) == 2  # External checks remain pending, never counted as passes.
+    assert result['passed'] == 0 and result['failed'] == []
+    assert result['unexpected_skips'] == [
+        {'test': 'tests.test_vlbest_session.test_g0_other', 'reason': 'unexpected'}]
+    xml.write_text('''<testsuites><testsuite>
+      <testcase classname="tests.test_vlbest_session" name="test_g0_local_source_baseline"><failure message="invalid source baseline"/></testcase>
+    </testsuite></testsuites>''')
+    result = parse_results(xml)
+    assert result['failed'] == ['tests.test_vlbest_session.test_g0_local_source_baseline']
+    assert result['skipped'] == [] and result['passed'] == 0
+
+
 def test_subprocess_failures_keep_full_logs(tmp_path):
     result = command_step('bad', [sys.executable, '-c', 'print("diagnostic"); raise SystemExit(7)'], tmp_path)
     assert result['returncode'] == 7
