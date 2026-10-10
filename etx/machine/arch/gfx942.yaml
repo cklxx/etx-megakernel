@@ -103,6 +103,11 @@ notes:
 # wave_sum is the text of etx_wave_sum in etx/runtime/include/etx/tile_util.h (a test keeps the two equal).
 # wave_sum0 is the ETX_DSL_WSUM reduction of etx/ops/gemv.py.
 primitives:
+  uniform: |
+    static_assert(ETX_WAVE_SIZE == 64, "etx_uniform (gfx942 lowering) is written for wave64");
+    static __device__ __forceinline__ int etx_uniform(int v) {
+      return __builtin_amdgcn_readfirstlane(v);
+    }
   wave_sum: |
     static __device__ __forceinline__ float etx_wave_sum(float v) {
       for (int off = ETX_WAVE_SIZE / 2; off > 0; off >>= 1) v += __shfl_xor(v, off, ETX_WAVE_SIZE);

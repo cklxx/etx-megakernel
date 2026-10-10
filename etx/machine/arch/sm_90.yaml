@@ -61,6 +61,11 @@ lowering:
 # etx/ops/prims.py emits for this machine. The tile generators call the primitive by name only.
 # No device ran these lowerings. No CUDA compiler checked them on this machine.
 primitives:
+  uniform: |
+    static_assert(ETX_WAVE_SIZE == 32, "etx_uniform (sm_90 lowering) is written for warp32");
+    static __device__ __forceinline__ int etx_uniform(int v) {
+      return __shfl_sync(0xffffffffu, v, 0);
+    }
   wave_sum: |
     // warp32 butterfly: lane distances 16, 8, 4, 2, 1. Every lane gets the sum. All 32 lanes must call it.
     static_assert(ETX_WAVE_SIZE == 32, "etx_wave_sum (sm_90 lowering) is written for warp32");

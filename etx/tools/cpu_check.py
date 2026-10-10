@@ -17,6 +17,8 @@ from etx.tools.bench_sim import ROOT, provenance, write_json, digest
 
 # Known optional tests need artifacts/toolchains beyond the source-only CPU suite.
 EXTERNAL_TESTS = {
+    # CPU-only CUDA lowering compile requires clang's nvptx64 backend.
+    "tests.test_prims.test_sm_90_lowerings_compile",
     # Import toolchain: ETX_LLVM, ETX_VLLM and ETX_ROCM_HEADERS.
     "tests.test_importer.test_wvsplitk_import_links_and_inlines",
     "tests.test_importer.test_triton_downgrade_hex_literals_parse_back",
