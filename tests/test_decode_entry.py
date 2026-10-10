@@ -48,6 +48,35 @@ def test_model_py_builds_what_the_entry_prints(name, monkeypatch):
 
 
 @pytest.mark.parametrize("name", decode.KNOWN)
+def test_instances_use_every_planner_export(name, monkeypatch):
+    from dataclasses import replace
+    from examples.vllm_llm import model as M
+    _, cfg = decode.resolve(name)
+    calls = []
+
+    def select(*args, **kwargs):
+        calls.append(kwargs)
+        p = plan(*args, **kwargs)
+        return replace(p, phases={k: replace(v, export=f"selected_{k}") for k, v in p.phases.items()})
+
+    monkeypatch.setattr(M.etx_select, "plan", select)
+    instances = M.instances(load_dims(str(cfg)))
+    assert len(calls) == 1 and "variants" not in calls[0]
+    assert all(i["export"].startswith("selected_") for i in instances)
+
+
+def test_instances_report_the_planners_missing_phase(monkeypatch):
+    from examples.vllm_llm import model as M
+
+    def refuse(*args, **kwargs):
+        raise M.etx_select.NoLegalVariant("no legal variant on gfx942: phase 'attn'")
+
+    monkeypatch.setattr(M.etx_select, "plan", refuse)
+    with pytest.raises(SystemExit, match="phase 'attn'"):
+        M.instances(load_dims(str(decode.resolve("qwen3-8b")[1])))
+
+
+@pytest.mark.parametrize("name", decode.KNOWN)
 def test_steps_are_the_same_for_every_model(name, tmp_path):
     hf, work = tmp_path / "hf", tmp_path / name
     st = decode.steps(name, hf, work)

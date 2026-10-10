@@ -257,18 +257,21 @@ def instances(d) -> list[dict]:
     # The norm folds live in dsl_gemv_fold, which is written for the MoE model (host.hip:394 stops it at E == 0), and
     # PhiMoE needs them (no imported LayerNorm). A dense model keeps its norm phases (etx.select default_structure).
     FOLD = DSL_FOLD and (bool(d.moe) or bool(getattr(d, "ln_norm", False)))
-    # etx.select (section 6.2): the planner's variant for each GEMV phase. A phase whose shape is outside every DSL
-    # GEMV variant (Qwen3-8B down: K = 12288 > 4096, host.hip:358) gets wvSplitK instead of a run that stops.
-    gemv_sel = {}
-    if DSL_GEMV:
-        try:
-            gemv_sel = etx_select.plan(
-                d, "gfx942", None, variants=[v for v in etx_select.REGISTRY if v.phase in etx_select.GEMV_PHASES],
-                structure=etx_select.Structure(fold_norms=FOLD, fold_topk=FOLD_TOPK, attn_head=DSL_ATTNHEAD)).phases
-        except etx_select.NoLegalVariant:
-            gemv_sel = {}                                    # no override: host.hip keeps its checks
+    # Select every phase once; explicit A/B paths below retain their launch ABI.
+    try:
+        selected = etx_select.plan(
+            d, "gfx942", structure=etx_select.Structure(
+                fold_norms=FOLD, fold_topk=FOLD_TOPK, attn_head=DSL_ATTNHEAD)).phases
+    except etx_select.NoLegalVariant as exc:
+        raise SystemExit(str(exc)) from exc
 
-    def add(export, layer, role, grid=None, **kw):
+    def phase_key(layer, role):
+        return role + "@0" if layer == 0 and role + "@0" in selected else role
+
+    def add(export, layer, role, grid=None, *, override=False, **kw):
+        key = phase_key(layer, role)
+        if key in selected and not override:
+            export = selected[key].export
         if export in OPERATORS:
             expected = grid_for(export, d, role=role, cu=CU, parts=parts)
             if grid is not None and grid != expected:
@@ -277,8 +280,8 @@ def instances(d) -> list[dict]:
         out.append({"export": export, "layer": layer, "role": role, "grid": grid, **kw})
 
     def gemv(layer, role, m, k):
-        key = role + "@0" if layer == 0 and role + "@0" in gemv_sel else role
-        if DSL_GEMV and (key not in gemv_sel or gemv_sel[key].kind == "dsl"):   # else: the planner's fallback
+        key = phase_key(layer, role)
+        if DSL_GEMV and selected[key].kind == "dsl":   # else: the planner's fallback
             # rows per task = ceil(M / CU): at 304, 17 (qkv), 7 (o_proj), 1 (router)
             fold = FOLD and (role in ("router", "lm_head") or (role == "qkv" and (layer > 0 or getattr(d, "ln_norm", False))))
             add("dsl_gemv_fold" if fold else "dsl_gemv", layer, role, (CU, 1, 1), M=m, K=k, wvprgrp=0)
@@ -286,9 +289,9 @@ def instances(d) -> list[dict]:
         y = wvsplitk_ytile(m)
         waves = mindiv(m, CU * y, 16)
         validate_wvsplitk(grid=(CU, 1, 1), cu_count=CU, rows=m, ytile=y, wave_groups=waves)
-        add(f"wvsplitk_y{y}", layer, role, None, M=m, K=k, wvprgrp=waves)
+        add(f"wvsplitk_y{y}", layer, role, None, override=not DSL_GEMV, M=m, K=k, wvprgrp=waves)
 
-    attn = {4: "attn_mfma4_g4", 6: "attn_mfma16_g6", 8: "attn_mfma16_g8"}[d.G]
+    attn = selected["attn"].export
     for L in range(d.L):
         if not (FOLD and (L > 0 or getattr(d, "ln_norm", False))):
             if getattr(d, "ln_norm", False):
@@ -312,7 +315,7 @@ def instances(d) -> list[dict]:
             # The serialization is semantic: attn(p, h) needs all G q rows plus the k/v cache rows of head h, and those
             # are a function of this step's qkv. Shortening the block means shortening prep's own dependent chain
             # (8.8 hops measured, ~3-4 necessary), not re-drawing the task boundaries.
-            add("dsl_attn", L, "attn", (1, parts, d.NKV))
+            add("dsl_attn", L, "attn", (1, parts, d.NKV), override=True)
         elif DSL_ATTNHEAD:
             if not d.qk_norm or d.G + 2 > THREADS // 64:
                 raise SystemExit("ETX_VL_DSL_ATTN=head needs q/k norm and G + 2 waves per workgroup (etx/ops/attnprep.py)")
@@ -346,15 +349,16 @@ def instances(d) -> list[dict]:
             # tasks all read copy 0, which is the host's rr = 0 block (host.hip addresses copies as rr * TOPK).
             noaff = XCD and d.TOPK % NX != 0
             if not FOLD or not FOLD_TOPK:
-                add("dsl_topk" if (DSL or DSL_TOPK) else f"topk_softmax_e{d.E}", L, "topk", (1, 1, 1), noaff=noaff)
+                add("dsl_topk" if (DSL or DSL_TOPK) else f"topk_softmax_e{d.E}", L, "topk", (1, 1, 1),
+                    override=DSL or IMPORTED or "ETX_VL_DSL_TOPK" in os.environ, noaff=noaff)
             if DSL_GEMV:                                      # 32 gate + 32 up rows (256 KB) per task; 64 down rows (96 KB)
                 add("dsl_moe_up_fold" if FOLD else "dsl_moe_up", L, "moe_up", (d.TOPK * (d.MI // 32), 1, 1), M=d.MI, K=d.H, noaff=noaff)
                 add("dsl_moe_down_fold" if FOLD else "dsl_moe_down", L, "moe_down", (d.TOPK * (d.H // 64), 1, 1), M=d.H, K=d.MI, noaff=noaff)
             else:
                 up, down = moe_specs["up"], moe_specs["down"]
-                add(up.export, L, "moe_up", None, noaff=noaff)
+                add(up.export, L, "moe_up", None, override=True, noaff=noaff)
                 add("silu_and_mul", L, "moe_act", None, noaff=noaff)
-                add(down.export, L, "moe_down", None, noaff=noaff)
+                add(down.export, L, "moe_down", None, override=True, noaff=noaff)
             if not DSL and not FOLD:                           # DSL: the next in_norm reads the 8 expert rows itself
                 add(f"moe_sum_k{d.TOPK}", L, "moe_sum", None, noaff=noaff)
             continue
