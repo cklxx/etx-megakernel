@@ -1,7 +1,7 @@
 # Vision gap, 2026-10-11
 
 Question: how much of the ETX vision does this repository hold today, and how much remains?
-Baseline: commit `13c7af0`, branch `wf/o55vision`. The vision is the owner's text in `VISION.txt` (not committed).
+Baseline: commit `13c7af0`, branch `wf/o55vision`. The vision is the owner's text, kept at `docs/VISION-2026-10-11.md`.
 This file makes no new performance claim. Each entry carries `[measured]`, `[estimated]` or `[unknown]`.
 `[measured]` here also covers a fact read from code or from a results file.
 The `results_*` directories cited below are in the main checkout `~/code/etx/`, not in this worktree.
@@ -72,7 +72,7 @@ Next step: route `readfirstlane` through `etx/ops/prims.py` and compile `gemv.em
 
 ## Part 3. Distance to the done-criterion
 
-The criterion: "two unseen models run with minimal intervention and they match or beat TileRT" (`VISION.txt:36-37`).
+The criterion: "two unseen models run with minimal intervention and they match or beat TileRT" (`docs/VISION-2026-10-11.md:36-37`).
 
 **Measured today.**
 - Correctness on one GPU, 32 tokens equal to HF greedy: Qwen3-30B-A3B (`results_vlbest2_2026-10-10/report.log:6-9`), Mixtral-8x7B (`docs/GENERALITY-2026-10-02.md:185`), Phi-3.5-MoE (`docs/GENERALITY-2026-10-02.md:347`) [measured].
@@ -88,7 +88,7 @@ The criterion: "two unseen models run with minimal intervention and they match o
 **Unknown today.**
 - U1. Does an unseen in-scope model reach 32/32 with no code change? No unseen model has run since Phi-3.5-MoE [unknown].
 - U2. Does such a model match or beat a baseline on time? [unknown].
-- U3. Where does TileRT stand? The repository has no TileRT measurement, reference, or mention outside `VISION.txt` [unknown].
+- U3. Where does TileRT stand? The repository has no TileRT measurement, reference, or mention outside `docs/VISION-2026-10-11.md` [unknown].
 - Public TileRT pages report results on 8x NVIDIA B200 for DeepSeek-V3.2 and GLM-5 (web search, 2026-10-11; not verified here) [unknown].
 - Those models use MLA, which `decode.py:13` refuses. TileRT has no MI300X result to compare against [unknown].
 
