@@ -30,6 +30,9 @@ struct etx_host {
   int32_t gq_init[2] = {0, -1};             // persistent source for the global-queue head/tail copy
   std::vector<int32_t> lq_heads, lq_tails;   // persistent: hipMemcpyAsync sources must outlive the call          // ETX_EXEC_COUNT / ETX_TRACE: per-task execution counter (fused path only)
   uint64_t* d_trace_time = nullptr;
+#if defined(ETX_INBODY) && ETX_INBODY
+  uint64_t *d_inbody_poll = nullptr, *d_inbody_event = nullptr, *d_inbody_wave = nullptr;
+#endif
   int32_t* d_ev_sub = nullptr;
   int32_t* d_mirror = nullptr;             // relay mirrors [n_domains][event words]
   std::vector<int32_t> mirror_init;
@@ -131,6 +134,15 @@ struct etx_host {
     p.task_remaining = d_remaining;
     p.trace_time = nullptr;
     if (getenv("ETX_TRACE")) { ETX_CHECK(hipMalloc(&d_trace_time, (size_t)ETX_N_TASKS * 4 * sizeof(uint64_t))); p.trace_time = d_trace_time; }
+#if defined(ETX_INBODY) && ETX_INBODY
+    if (getenv("ETX_INBODY_RAW")) {
+      if (!d_trace_time) { ETX_CHECK(hipMalloc(&d_trace_time, (size_t)ETX_N_TASKS * 4 * sizeof(uint64_t))); p.trace_time = d_trace_time; }
+      ETX_CHECK(hipMalloc(&d_inbody_poll, (size_t)ETX_N_TASKS * sizeof(uint64_t)));
+      ETX_CHECK(hipMalloc(&d_inbody_event, (size_t)ETX_EVENT_WORDS * 2 * sizeof(uint64_t)));
+      ETX_CHECK(hipMalloc(&d_inbody_wave, (size_t)ETX_N_TASKS * (ETX_THREADS / 64) * 2 * sizeof(uint64_t)));
+      p.inbody_poll = d_inbody_poll; p.inbody_event = d_inbody_event; p.inbody_wave = d_inbody_wave;
+    }
+#endif
     // last-arriver flush tables: this device's share rows and zeroed sub-counters
     p.event_words = ETX_EVENT_WORDS;
     p.ev_share = upload(etx_ev_share + (size_t)device * ETX_N_DOMAINS * ETX_EVENT_WORDS, (size_t)ETX_N_DOMAINS * ETX_EVENT_WORDS);
@@ -224,6 +236,16 @@ struct etx_host {
   // reset per-step state (events if owned, queues, ctrl, slots, counters)
   void reset_step() {
     ETX_CHECK(hipSetDevice(device));
+#if defined(ETX_INBODY) && ETX_INBODY
+    // Host-only diagnostic reset, including when the production device reset
+    // is active. Never add diagnostic buffers to the timed reset tail.
+    if (d_inbody_poll) {
+      ETX_CHECK(hipMemsetAsync(d_trace_time, 0, (size_t)ETX_N_TASKS * 4 * sizeof(uint64_t), stream));
+      ETX_CHECK(hipMemsetAsync(d_inbody_poll, 0, (size_t)ETX_N_TASKS * sizeof(uint64_t), stream));
+      ETX_CHECK(hipMemsetAsync(d_inbody_event, 0, (size_t)ETX_EVENT_WORDS * 2 * sizeof(uint64_t), stream));
+      ETX_CHECK(hipMemsetAsync(d_inbody_wave, 0, (size_t)ETX_N_TASKS * (ETX_THREADS / 64) * 2 * sizeof(uint64_t), stream));
+    }
+#endif
     ETX_CHECK(hipMemsetAsync(d_ctrl, 0, 64, stream));      // never device-side: the host reads ctrl_done after the kernel
     if (dev_reset && dev_reset_valid) {                    // the kernel rewrote everything else on its way out
       if (exec_count) ETX_CHECK(hipMemsetAsync(d_trace, 0, ETX_N_TASKS * sizeof(int32_t), stream));
@@ -460,6 +482,27 @@ struct etx_host {
   // (grid) the mean wait (taken -> deps ready) and body (ready -> done) time, and the
   // phase span (first task taken -> last task done). Ticks are ETX_TIMER units
   // (100 MHz on AMD: 10 ns). `type_names[t]` labels the types (nullptr -> ids).
+#if defined(ETX_INBODY) && ETX_INBODY
+  void write_inbody(const char* path) {
+    if (!d_inbody_poll) { fprintf(stderr, "inbody disabled\n"); exit(1); }
+    // Versioned little-endian u64 header, then complete legacy/task/event/wave
+    // arrays. Reader resolves task arrival brackets from plan event instances.
+    uint64_t header[6] = {0x3142444f424e4954ull, 1, ETX_N_TASKS, ETX_EVENT_WORDS, ETX_THREADS / 64, 10};
+    FILE* f = fopen(path, "wb");
+    if (!f) { perror(path); exit(1); }
+    if (fwrite(header, sizeof(header), 1, f) != 1) { perror("inbody header"); exit(1); }
+    auto write = [&](uint64_t* d, size_t n) {
+      std::vector<uint64_t> h(n);
+      ETX_CHECK(hipMemcpy(h.data(), d, n * sizeof(uint64_t), hipMemcpyDeviceToHost));
+      if (fwrite(h.data(), sizeof(uint64_t), n, f) != n) { perror("inbody records"); exit(1); }
+    };
+    write(d_trace_time, (size_t)ETX_N_TASKS * 4);
+    write(d_inbody_poll, ETX_N_TASKS);
+    write(d_inbody_event, (size_t)ETX_EVENT_WORDS * 2);
+    write(d_inbody_wave, (size_t)ETX_N_TASKS * (ETX_THREADS / 64) * 2);
+    if (fclose(f)) { perror("inbody close"); exit(1); }
+  }
+#endif
   void report_phases(const char* const* type_names, int n_types, double tick_ns = 10.0, FILE* out = stdout) {
     if (!d_trace_time) return;
     ETX_CHECK(hipSetDevice(device));

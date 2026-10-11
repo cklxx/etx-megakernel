@@ -936,6 +936,9 @@ int main(int argc, char** argv) {
     printf("CHECK-DSL %s: %d values beyond 2 bf16 ulps of the CPU reference (layer %d)\n", bad_total ? "FAILED" : "OK", bad_total, Lc);
   }
   // ETX_TRACE=1: per-type wait / body / span of the last step, and the raw per-task stamps (ETX_TRACE_RAW=<file>)
+#if defined(ETX_INBODY) && ETX_INBODY
+  if (const char* path = getenv("ETX_INBODY_RAW")) hst.write_inbody(path);
+#endif
   if (getenv("ETX_TRACE") && !unfused) hst.report_phases(etx_type_names, ETX_N_TYPES);
   std::vector<double> s(step_ms), w(wall_ms); std::sort(s.begin(), s.end()); std::sort(w.begin(), w.end());
   const double med = s.empty() ? 0 : s[s.size() / 2], wmed = w.empty() ? 0 : w[w.size() / 2];

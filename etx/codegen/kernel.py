@@ -466,7 +466,7 @@ def emit_kernel(plan: Plan, device: int = 0) -> str:
         out.append("}")
         out.append("")
         out.extend(_emit_unfused(plan, device, grids, symbols, max_pro))
-        return "\n".join(out)
+        return _diagnostic_source("\n".join(out))
     out.append("  int32_t ticket_local = -1, ticket_global = -1;   // ticket-ring reservations, see etx_try_pop")
     out.append("  uint32_t spins = 0;")
     out.append("  for (;;) {")
@@ -496,7 +496,17 @@ def emit_kernel(plan: Plan, device: int = 0) -> str:
     out.append("}")
     out.append("")
     out.extend(_emit_unfused(plan, device, grids, symbols, max_pro))
-    return "\n".join(out)
+    return _diagnostic_source("\n".join(out))
+
+
+def _diagnostic_source(source):
+    # An independent diagnostic TU. Ordinary emission remains byte-for-byte
+    # unchanged; host and device must both compile with ETX_INBODY=1.
+    import os
+    if os.environ.get("ETX_INBODY_EMIT") == "1":
+        from .inbody import instrument
+        source = instrument(source)
+    return source
 
 
 def _reset_tail() -> list[str]:
