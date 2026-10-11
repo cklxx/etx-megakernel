@@ -12,8 +12,13 @@ static __device__ __forceinline__ uint64_t etx_inbody_tick() {
 
 #if defined(ETX_PRODUCER_LEDGER) && ETX_PRODUCER_LEDGER
 static __device__ __forceinline__ int etx_arrival_slot(const etx_params& p, int task, int word) {
-  if (!p.arrival_stamps) return -1;
-  for (int i = p.arrival_offsets[task]; i < p.arrival_offsets[task + 1]; ++i)
+  if (!p.arrival_stamps || !p.arrival_offsets || !p.arrival_words ||
+      task < 0 || task >= p.arrival_tasks) return -1;
+  const int begin = p.arrival_offsets[task], end = p.arrival_offsets[task + 1];
+  // Refuse malformed CSR rows before dereferencing words or stamp pairs.
+  // Missing diagnostics remain missing; never clamp an invalid row into one.
+  if (begin < 0 || end < begin || end > p.arrival_slots) return -1;
+  for (int i = begin; i < end; ++i)
     if (p.arrival_words[i] == word && p.arrival_stamps[(size_t)i * 2] == 0) return i;
   return -1;
 }

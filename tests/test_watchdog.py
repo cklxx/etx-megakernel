@@ -1,8 +1,62 @@
 import json
+import shutil
 import struct
+import subprocess
 from pathlib import Path
 import pytest
 from etx.tools import inbody,watchdog
+
+
+def test_arrival_lookup_rejects_indices_outside_allocated_csr(tmp_path):
+    """Execute the real lookup on CPU, including empty and malformed rows."""
+    compiler = shutil.which('c++')
+    if not compiler:
+        pytest.skip('C++ compiler unavailable')
+    root = Path(__file__).resolve().parents[1]
+    header = (root/'etx/runtime/include/etx/inbody.h').read_text()
+    # Compile the lookup verbatim; the separate gfx942 test covers the timer asm.
+    lookup = header[header.index('static __device__ __forceinline__ int etx_arrival_slot'):header.index('#define ETX_LEDGER_BEFORE')]
+    source = tmp_path/'ledger.cpp'
+    source.write_text(r'''
+#define ETX_INBODY 1
+#define ETX_PRODUCER_LEDGER 1
+#define __device__
+#define __forceinline__ inline
+#include "etx/abi.h"
+#define assert(condition) do { if (!(condition)) return __LINE__; } while (0)
+''' + lookup + r'''
+int main() {
+  int32_t offsets[] = {0, 2, 2}, words[] = {7, 7};
+  uint64_t stamps[] = {0, 0, 0, 0};
+  etx_params p{};
+  p.arrival_offsets = offsets; p.arrival_words = words; p.arrival_stamps = stamps;
+  p.arrival_tasks = 2; p.arrival_slots = 2;
+  assert(etx_arrival_slot(p, 0, 7) == 0);
+  stamps[0] = 100;
+  assert(etx_arrival_slot(p, 0, 7) == 1);
+  stamps[2] = 110;
+  assert(etx_arrival_slot(p, 0, 7) == -1);
+  assert(etx_arrival_slot(p, 0, 8) == -1);
+  assert(etx_arrival_slot(p, 1, 7) == -1); // empty row
+  assert(etx_arrival_slot(p, -1, 7) == -1);
+  assert(etx_arrival_slot(p, 2, 7) == -1); // offsets[3] does not exist
+  stamps[0] = 0;
+  offsets[0] = -1;
+  assert(etx_arrival_slot(p, 0, 7) == -1);
+  offsets[0] = 1; offsets[1] = 0;
+  assert(etx_arrival_slot(p, 0, 7) == -1);
+  offsets[0] = 0; offsets[1] = 3; // words[2] and stamps[4] do not exist
+  assert(etx_arrival_slot(p, 0, 7) == -1);
+  offsets[1] = 2; p.arrival_slots = 0;
+  assert(etx_arrival_slot(p, 0, 7) == -1);
+  p.arrival_slots = 2; p.arrival_words = nullptr;
+  assert(etx_arrival_slot(p, 0, 7) == -1);
+}
+''')
+    exe = tmp_path/'ledger'
+    subprocess.run([compiler, '-std=c++17', '-O2', '-I', str(root/'etx/runtime/include'),
+                    str(source), '-o', str(exe)], check=True, capture_output=True, timeout=60)
+    subprocess.run([str(exe)], check=True, capture_output=True, timeout=60)
 
 
 def fixture():

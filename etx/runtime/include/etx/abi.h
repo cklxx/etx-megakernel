@@ -112,6 +112,8 @@ struct etx_params {
   const int32_t* arrival_offsets;      // CSR [task+1]
   const int32_t* arrival_words;        // original event words for every arrival
   uint64_t* arrival_stamps;            // [incidence][before, after original call]
+  int32_t arrival_tasks;               // global task-id capacity of arrival_offsets
+  int32_t arrival_slots;               // logical capacity of words and stamp pairs
 #endif
 #endif
 };
