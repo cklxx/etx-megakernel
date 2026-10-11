@@ -263,6 +263,8 @@ def test_b_each_pair_has_gate_and_failed_arm_does_not_hide_next(tmp_path, monkey
 def test_first_stop_does_not_spend_rest_on_missing_deciding_pools(tmp_path, monkeypatch):
     s = session(tmp_path)
     monkeypatch.setattr(h, 'preflight', lambda s: None)
+    from examples.vllm_llm import x5
+    monkeypatch.setattr(x5, 'run', lambda s: None)
     monkeypatch.setattr(h, 'tranche_a', lambda s: h.first_stop(s, None))
     monkeypatch.setattr(h, 'tranche_b', lambda s: pytest.fail('B must not run after stop'))
     h.execute(s)
@@ -420,6 +422,8 @@ def test_s2_combines_gap_attention_and_attributable_host(tmp_path, g, r2, host, 
 def test_execute_obeys_both_stops_with_time_remaining(tmp_path, monkeypatch, g, runs_b, runs_cd):
     s = session(tmp_path); s.certified.add('kept'); calls = []
     monkeypatch.setattr(h, 'preflight', lambda s: None)
+    from examples.vllm_llm import x5
+    monkeypatch.setattr(x5, 'run', lambda s: None)
     monkeypatch.setattr(h, 'tranche_a', lambda s: h.first_stop(s, dict(G_ms=g)))
     def b(s):
         assert s.rows['B.stop']['status'] == 'PASS'
@@ -480,7 +484,7 @@ def test_140_minute_cap_and_22_minute_b_deadline(tmp_path, monkeypatch):
     assert h.MAX_SESSION_SECONDS == h.JOBS[0]['timeout'] == 8400
     assert s.end-s.start == 8390  # existing ten-second reporting margin
     assert h.tranche_b(s) == []
-    assert s.deadline == 1420
+    assert s.deadline == 1300  # X5 already reserved 120s of the 1320s B tranche
     limited = h.Session({}, tmp_path/'limited', seconds=1000)
     assert limited.end-limited.start == 990
 

@@ -117,7 +117,7 @@ struct Args {
 int main(int argc, char** argv) {
   if (argc < 3) die("usage: run <packed-dir> <plan.txt> [--golden F] [--gen N] [--repeat R] [--teacher] [--unfused] [--check-coverage]");
   const std::string dir = argv[1], plan_path = argv[2];
-  int gen = -1, repeat = 2, check_layers = 0, check_pos = 0, max_steps = 0; bool teacher = false, unfused = false, check_dsl = false, check_coverage = false; std::string golden_name = "golden_c1024.txt"; std::vector<std::string> extra_goldens;
+  int gen = -1, repeat = 2, check_layers = 0, check_pos = 0, max_steps = 0; bool teacher = false, unfused = false, check_dsl = false, check_coverage = false, price_attention = false; std::string golden_name = "golden_c1024.txt"; std::vector<std::string> extra_goldens;
   for (int i = 3; i < argc; ++i) {
     const std::string a = argv[i];
     if (a == "--gen" && i + 1 < argc) gen = atoi(argv[++i]);
@@ -141,11 +141,14 @@ int main(int argc, char** argv) {
     else if (a == "--check-coverage") { check_coverage = true; teacher = true; }
     else if (a == "--check-dsl") check_dsl = true;   // the DSL GEMVs of the last layer against a CPU reference (bf16 tolerance)   // traces: stop after N steps (no token check)
     else if (a == "--check-pos" && i + 1 < argc) check_pos = atoi(argv[++i]);
+    else if (a == "--price-attention") price_attention = true;
     else if (a == "--check" && i + 1 < argc) check_layers = atoi(argv[++i]);   // compare each imported launch with vLLM's original, layers < N
   }
   const Manifest m = read_manifest(dir + "/vl.manifest");
   const int H = m.geti("H"), NH = m.geti("NH"), NKV = m.geti("NKV"), HD = m.geti("HD"), I = m.geti("INTER"), L = m.geti("L"), V = m.geti("V");
   const bool tie = m.geti("tie"), bias = m.geti("bias"), qk_norm = m.geti("qk_norm");
+  if (price_attention && (check_layers != 48 || check_pos != 1024 || H != 2048 || NH != 32 || NKV != 4 || HD != 128 || L != 48))
+    die("X5 requires --check 48 --check-pos 1024 and exact Qwen3-30B-A3B shape");
   const int MAXLEN = m.geti("maxlen"), NQKV = (NH + 2 * NKV) * HD;
   const float eps = (float)m.cfg.at("eps"), scale = 1.0f / sqrtf((float)HD);
   auto cfg0 = [&](const char* k) { auto it = m.cfg.find(k); return it == m.cfg.end() ? 0 : (int)it->second; };
@@ -671,6 +674,33 @@ int main(int argc, char** argv) {
              "\"result\":\"%s\",\"first_byte\":%lld}\n", x.n, x.layer, x.exp.c_str(), x.rep,
              x.gx, x.gy, x.gz, d->block[0], d->block[1], d->block[2], check_pos, compared_bytes,
              diff.empty() ? "identical" : "DIFFERS", first_byte);
+      if (price_attention && (x.role == "attn" || x.role == "reduce")) {
+        if (!diff.empty() || x.rep != 1) die("X5 original/import byte or replica gate failed");
+        std::vector<void*> av(d->nparams);
+        for (int k = 0; k < d->nparams; ++k) av[k] = ab.data() + x.off + d->off[k];
+        auto original = [&]() {
+          if (fn) ETX_CHECK(hipLaunchKernel(fn, dim3(x.gx, x.gy, x.gz), dim3(d->block[0], d->block[1], d->block[2]), av.data(), 0, hst.stream));
+          else ETX_CHECK(hipModuleLaunchKernel(tri, x.gx, x.gy, x.gz, d->block[0], d->block[1], d->block[2], tri_shared, hst.stream, av.data(), nullptr));
+        };
+        for (int w = 0; w < 10; ++w) { original(); launch_imported(x.n + 1); }
+        if (!wait_stream(hst.stream, 5.0)) die("X5 warmup hung");
+        for (int sample = 0; sample < 3; ++sample) {
+          double values[2];
+          for (int order = 0; order < 2; ++order) {
+            const int who = (sample % 2) ? 1-order : order;
+            ETX_CHECK(hipEventRecord(e0, hst.stream));
+            for (int replay = 0; replay < 100; ++replay) {
+              if (who == 0) original(); else launch_imported(x.n + 1);
+            }
+            ETX_CHECK(hipEventRecord(e1, hst.stream));
+            if (!wait_stream(hst.stream, 5.0)) die("X5 sample hung");
+            values[who] = elapsed_us()/100;
+          }
+          printf("X5-SAMPLE {\"layer\":%d,\"role\":\"%s\",\"sample\":%d,\"position\":%d,\"replays\":100,\"bytes_equal\":true,\"original_us\":%.9f,\"imported_us\":%.9f}\n",
+                 x.layer, x.role.c_str(), sample, check_pos, values[0], values[1]);
+          fflush(stdout);
+        }
+      }
       ++checked;
       if (!diff.empty()) ++bad;
     }

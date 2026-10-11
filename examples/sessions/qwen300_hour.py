@@ -66,6 +66,7 @@ def template():
                 builds={name: '/absolute/prepared/'+name for name in
                         ('kept', 'reset', 'stamps', 'stages', 'C1', 'C5', 'C1_C5', 'NO_TOUCH',
                          'NO_TOUCH_stamps', 'ISOLATE_POLLER', 'C6')},
+                x5_builds=['kept'],
                 isolation_probe=None,  # sealed offline probe: {argv: [...], sha256: executable SHA256}
                 source_commit='REQUIRED full commit of pushed tree', build_commits={}, build_seals={},
                 combinations=[dict(id='C1_C5', build='C1_C5', members=['C1', 'C5'], enabled=True,
@@ -292,7 +293,8 @@ REGISTERED = {
     'RESET.keep': '3 adjacent pinned pairs, all faster, median >=0.030 ms, median >2*spread; only ETX_DEV_RESET changes',
     'A4.reset': 'pursue only >0.030 ms/step, host and device separately',
     'A.stop': 'S1 at <=15 minutes: G >=0.088 ms (1.833 us/layer) in named above-floor gap atoms, else close target route',
-    'B.stop': 'S2 after A, before B: G + R2 + H >=0.324 ms (whole-target 6.743 us/layer), else close target route; unknowns count zero',
+    'X5': '3 x 100 warmed isolated replays/role/layer, ctx1024; legal pair <=7.69 us/layer; incomplete inventory stays [U]',
+    'B.stop': 'S2 after X5, before body pairs: G + R2 + H >=0.324 ms (whole-target 6.743 us/layer), else close target route; unknowns count zero',
     'B.keep': '3 pairs, all faster, median >=0.030 ms, median >2*spread',
     'C.fusion': 'net >=1.042 us/layer; VGPR <=128; LDS <=29752 B',
     'C.body': '3 pairs, all faster, median >=0.030 ms, median >2*spread',
@@ -312,6 +314,7 @@ THRESHOLD_SOURCES = {
     'RESET.keep': 'docs/VERIFY-PLAN-2026-10-12.md; KEEP from PLAN-300TOKS-2026-10-11.md:322',
     'A4.reset': 'docs/PLAN-generic-decoder-2026-10-08.md:154',
     'A.stop': 'docs/PLAN-300TOKS-2026-10-11.md:301-302 (main 9f91f3a)',
+    'X5': 'docs/PLAN-300TOKS-2026-10-11.md:307; REVIEW-POOL-ANALYSIS-2026-10-11.md:123',
     'B.stop': 'docs/PLAN-300TOKS-2026-10-11.md:306-308 (main 9f91f3a)',
     'B.keep': 'docs/PLAN-300TOKS-2026-10-11.md:314,322 (main 9f91f3a)',
     'C.fusion': 'docs/PLAN-300TOKS-2026-10-11.md:315,331 (main 9f91f3a)',
@@ -735,7 +738,7 @@ def candidate_pairs(s, a, tranche, publish=True):
 
 def tranche_b(s):
     # Tranche B: plan section 7, line 304 (main 9f91f3a).
-    s.deadline = min(time.monotonic()+TRANCHE_SECONDS['B'], s.end)
+    s.deadline = min(time.monotonic()+TRANCHE_SECONDS['B']-120, s.end)
     if 'kept' not in s.certified:
         print('B SKIP: kept fresh correctness gate failed', flush=True); return []
     from examples.vllm_llm import reset_pair
@@ -1062,7 +1065,12 @@ def execute(s):
                      'D.target', 'D.fusion', 'D.system'):
             s.row(name, None, 'NOT-RUN', REGISTERED[name])
         return
-    # B cannot change G, H or the unmeasured R2 (zero); decide before spending it.
+    # X5 can change R2. Spend only its bounded isolated probes before S2,
+    # never the C1/C5 wall pairs when the route has already closed.
+    from examples.vllm_llm import x5
+    s.deadline = min(time.monotonic()+120, s.end)
+    if s.attempt('X5', lambda: x5.run(s)) is None:
+        s.row('X5', None, 'NOT-COMPLETE', REGISTERED['X5'])
     if not second_stop(s):
         print('STOP after A: S2 closes target route', flush=True)
         for name in ('B.keep', 'C.fusion', 'C.body', 'C.NO_TOUCH', 'C.ISOLATE_POLLER', 'D.target', 'D.fusion', 'D.system'):

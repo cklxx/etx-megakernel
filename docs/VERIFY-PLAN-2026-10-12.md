@@ -134,3 +134,98 @@ The full native stamps build check is recorded in section 5.
 Retained `raw/inbody.bin`: reader OK, v1, 60362 tasks [M CPU]; load analysis
 refuses "missing load-phase stamps: rebuild ... (inbody v3/v4)". Its unfixed
 clock cannot support **any** timing number here.
+
+## 3. X5: CPU inventory executed; isolated probe registered
+
+CPU command:
+
+```sh
+.venv/bin/python -m examples.vllm_llm.x5 \
+  --inventory /Users/ckl/code/vllm \
+  --retained results_qwen300_2026-10-11/bf16_pricing.json \
+  --output docs/evidence/verify-x5-2026-10-12.json
+```
+
+Observed vLLM source revision **f46a9dfe2c5f57bebbd29556cbbb25eabd874226** [M].
+The evidence JSON retains hashes and knob-bearing lines of the installed
+sources. A cached AITER unified_attention.py is byte matched by Git blob SHA
+against the cached tree at **cdb1950e1dc4d864cae54c8a86a61cde999ce1e7** [M CPU].
+It exposes TILE_SIZE, BLOCK_M/Q, num_segments, warps/stages, K_WIDTH and
+SHUFFLED_KV_CACHE. **No full AITER installation/source tree or the pinned
+image's dispatcher is present on this Mac** [U for their exact candidate
+universe]. Matching the local vLLM/current cached AITER to the old pinned
+image is also [U]. Completeness is therefore explicitly false; the following
+is the source-visible family inventory, not a fabricated exhaustive binary
+catalogue. No GPU vendor sweep is repeated.
+
+The retained vendor result is 6.7686176 attention + 4.6516855 reduce =
+**11.4203031 us/layer [M intervals, E mean]**, 48 layers × 31 decode samples,
+from `bf16_pricing.json` and `job1_pricing.log:47-95`. The task calls it a
+22-minute search; that was a budget, not the retained elapsed time:
+`status.json` records Job 1 **274.041 s [M]**, including image/download/bench/
+trace work. It is S3's AITER pair, not a sweep of all backend knobs.
+Its 32/32 full-system gate is retained in bf16_bar.log. This proves that
+candidate is slower on the historical cross-basis comparison; nothing else
+gets a measured pre-price from it.
+
+| Candidate / source-visible knobs | Pre-price us/layer | Exact-condition legality and next action |
+|---|---:|---|
+| Native ROCM_ATTN `attn_mfma16_g8` + `attn_reduce`; PART=256, block=16, HD=128, MFMAType::F16 | 10.645 [E critical body] | Legal control, already exported in importer/spec.py; sole currently executable survivor. Measure in isolated harness; not a new vendor win. |
+| Native GQA 1..7, 9..16, HD=64, or mfma4 G1..4 | [U] | Excluded: real NH/NKV=32/4=8 and HD=128. Changing template GQA misaddresses heads. Native dispatcher chooses mfma16 for G8; mfma4 G8 is not a registered vendor dispatch/export. |
+| Native PART=128 or 512 via host parts | [U] | Excluded: T_PAR_SIZE remains 256 inside body. 128 just adds early-exit tasks; 512 fails maxlen coverage. model.py:74-78 and native attention.cu:362 (retained slice). |
+| Native block=32 | [U] | bf16/G8 shape supported, but **not legal under current block-16 import contract**; must repack KV writer/cache strides and tables, change specialization and certify. No ready adapter. |
+| Generic paged v1 (no reduce) / v2 (partitioned + reduce) | [U] | Potential bf16 shape candidates; different symbols, Q-head grids, outputs/partials and numerics. Existing ETX export/host contract does not implement them; legality [U], not an exclusion by speed. |
+| vLLM TRITON_ATTN 2D / 3D | [U] | Source `ops/triton_unified_attention.py`: num_par_softmax_segments=None vs segmented path, tile sizes, BLOCK_M/Q, launch warps/stages. Flash K/V layout and reduction order require new adapters/independent original checks. No executable contract here. |
+| AITER unified 2D / 3D, unshuffled / shuffled KV, TILE_SIZE, BLOCK_M/Q, segment count, warps/stages, K_WIDTH | 11.4203 [M/E] for retained dispatch only; other tuples [U] | Current wrapper `rocm_aiter_unified_attn.py`, cached kernel blob; compatible bf16 GQA family but full dispatch/allowed tuning tuples are [U]. Shuffled/flash layouts are not interchangeable with current KV buffers. |
+| AITER `paged_attention_common` HIP/ASM / `pa_fwd_asm` | [U] | `_aiter_ops.py:3000-3087` forwards scales, strides, temporary outputs. Implementations and allowed bf16 dispatch knobs absent: [U]. Must export immutable original and pass byte/32-token gates before becoming a survivor. |
+| AITER FA `flash_attn_varlen_func` (bf16), split-K variants | [U] | Ordinary GQA family, but metadata/layout and entry point differ. Wrapper alone proves no exact import eligibility; dispatch and adapter [U]. |
+| MLA / sparse MLA / distributed-context / prefix-cascade changes | [U] | Excluded for this ordinary GQA single-request causal contract; no MLA latent, sparsity, distributed context or shared-prefix test is present. |
+| CUDA-only FlashAttention/FlashInfer/CUTLASS, XPU, Navi WMMA | [U] | Excluded: wrong hardware target for gfx942 CDNA; platform/rocm.py selects native/AITER/Triton families. |
+| FP8 attention/KV/out, TurboQuant/INT4, sinks, ALiBi, sliding window | [U] | Excluded: changes precision or attention semantics of this bf16 workload. MFMAType::F16 is the existing vendor path despite bf16 storage; enabling its FP8 alternate is not legal. |
+
+A knob is not an independently legal candidate until its dispatcher supports
+this shape and its exact immutable-original import contract is staged. This
+CPU cannot assert the remaining numerical/ABI legality. In particular,
+**"no ready adapter" is not "no legal faster implementation exists"**.
+`inventory.complete=false` prevents an incomplete list from closing B1.
+The next pre-staging task must pin the full AITER source/export inventory and
+stage any additional adapters **before** starting the paid session; absent
+ones remain [U] in this session. Existing nine recipes stay unchanged.
+
+### Registered for the session: X5, before S2
+
+`x5_builds=['kept']` is the runnable inventory now; additional source-pinned
+survivors use separate sealed artifacts, never mutate the nine directories.
+Exact native command for each staged survivor:
+
+```sh
+.venv/bin/python -m examples.vllm_llm.import_certificate \
+  --run-build BUILD --model MODEL -- \
+  --check 48 --check-pos 1024 --price-attention
+```
+
+`host.hip` prices only attn/reduce after that launch's byte check: 10 warmup
+launches of each original/import, then three alternating original/import
+batches of 100 isolated replays per role per layer, HIP events. Watchdog is
+5 s per batch; runner bounds **30 s per survivor**, **120 s total** within
+B's existing 1320 s. That is **0.5 min/$0.0166 each [E]**, at most
+2 min/$0.0663 for the registered probe slot. No downloads/container engine
+startup. Fresh 0/1040 checks and 32/32 CHECK-DSL certification precede pricing;
+new adapter correctness work must also fit B, or remain NOT-COMPLETE.
+This replaces the speculative 20-minute vendor sweep; it adds no B minutes.
+
+`x5.prices` requires all **288 records** (48 × 2 × 3), exact position and
+100 replays, finite positive durations and bytes_equal. Average of each
+layer's sum of role medians must reach **<=7.69 us/layer**. A passing isolated
+price gives `R2=max(0,48*(10.645-price)/1000)` [E, cross-basis], never a
+certified fused wall gain. Whole-grid replay includes import-wrapper work,
+whereas 10.645 is critical bodies. An eventual model-level pair/certificate
+must validate transfer. Incomplete population fails closed; warm reuse is
+reported as a limitation, not a cold-HBM price.
+
+Runner now measures X5 **after S1 and before S2**, so R2 can influence
+`G+R2+H >=0.324`; C1/C5 body pairs remain after S2. If all legal candidates
+have been certified/enumerated and none reaches the bar, **B1=0, R2=0**,
+then re-evaluate S2. Today's missing dispatch/adapters mean **B1 [U]**, with
+zero R2 for spending decisions, not an exhaustive CLOSED verdict. Failed
+byte/token gates disqualify a candidate; missing coverage is NOT-COMPLETE.

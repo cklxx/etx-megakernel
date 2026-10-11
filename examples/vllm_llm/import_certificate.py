@@ -70,7 +70,7 @@ def verified_build(build, model):
 def capture(build, model, args):
     # The wrapper fixes executable, plan, model and golden; alternate golden or
     # truncated/teacher-forced timing must not inherit their fingerprints.
-    allowed = {'--check', '--check-pos', '--repeat', '--unfused', '--check-dsl'}
+    allowed = {'--check', '--check-pos', '--repeat', '--unfused', '--check-dsl', '--price-attention'}
     for arg in args:
         if arg.startswith('-') and arg not in allowed:
             raise Refusal(f'unsupported certified host option {arg}')
