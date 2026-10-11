@@ -697,6 +697,9 @@ int main(int argc, char** argv) {
   const int progress = getenv("ETX_VL_PROGRESS") ? atoi(getenv("ETX_VL_PROGRESS")) : 0;   // print every N-th step's wall time
   setvbuf(stdout, nullptr, _IOLBF, 0);
   std::vector<int> matched(nreq, 0);
+#ifdef ETX_HOUR_PROFILE
+  hst.hour_profile_init();
+#endif
   int cov_hard = 0;
   for (int run = 0; run < repeat; ++run) {
     for (int r = 0; r < nreq; ++r) {
@@ -710,8 +713,15 @@ int main(int argc, char** argv) {
       for (VlParams& v : vps) { v.tok = t; v.pos = t; v.write_next = (!teacher && t + 1 >= (int)prompt.size()) ? 1 : 0; }
       const auto w0 = std::chrono::steady_clock::now();
       vl_set_params(vps.data(), nreq, hst.stream);
+#ifdef ETX_HOUR_PROFILE
+      const auto hour_upload_end = std::chrono::steady_clock::now();
+#endif
       if (unfused) { if (!hst.run_unfused()) { printf("step %d: unfused step failed\n", t); return 2; } }
+#ifdef ETX_HOUR_PROFILE
+      else if (!hst.hour_profile_run(5.0)) { printf("step %d: ETX profile step failed\n", t); return 2; }
+#else
       else if (!hst.run(60.0)) { printf("step %d: ETX step failed\n", t); return 2; }
+#endif
       // ETX_DUMP=<dir>: after step ETX_DUMP_STEP (default 0), write the stage buffers to files (ETX_LLM_LAYERS=1
       // keeps layer 0's values in them). Diffed against a torch forward of the HF weights to bisect by stage (round 42).
       if (getenv("ETX_DUMP") && t == (getenv("ETX_DUMP_STEP") ? atoi(getenv("ETX_DUMP_STEP")) : 0)) {
@@ -731,6 +741,14 @@ int main(int argc, char** argv) {
         printf("  dumped step-%d stage buffers to %s\n", t, dir.c_str());
       }
       const double wms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - w0).count();
+#ifdef ETX_HOUR_PROFILE
+      if (t + 1 >= (int)prompt.size()) {
+        const double upload = std::chrono::duration<double, std::micro>(hour_upload_end-w0).count();
+        const double other = wms*1000-upload-hst.hour_reset_us-hst.hour_resid_us-hst.hour_launch_us-hst.hour_wait_us-hst.hour_retire_us;
+        printf("HOUR-STAGE {\"run\":%d,\"step\":%d,\"upload_us\":%.6f,\"reset_submit_us\":%.6f,\"residency_us\":%.6f,\"launch_us\":%.6f,\"wait_us\":%.6f,\"retire_readback_us\":%.6f,\"instrument_other_us\":%.6f,\"reset_device_us\":%.6f,\"kernel_device_us\":%.6f,\"wall_us\":%.6f,\"device_tail_reset\":%d}\n",
+               run, t, upload, hst.hour_reset_us, hst.hour_resid_us, hst.hour_launch_us, hst.hour_wait_us, hst.hour_retire_us, other, hst.hour_reset_device_us, hst.last_ms*1000, wms*1000, hst.dev_reset);
+      }
+#endif
       if (t + 1 >= (int)prompt.size()) wall_ms.push_back(wms);
       if (progress && (t % progress == 0 || t < 3)) { printf("  step %d: %.3f ms wall\n", t, wms); fflush(stdout); }
     }

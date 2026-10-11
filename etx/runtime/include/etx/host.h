@@ -334,6 +334,13 @@ struct etx_host {
   }
   // everything the host checks once the kernel has retired; shared by the polling and blocking waits
   bool after_wait() {
+#ifdef ETX_HOUR_PROFILE
+    const auto hour_retire_begin = std::chrono::steady_clock::now();
+    struct HourRetireTimer {
+      double& value; std::chrono::steady_clock::time_point begin;
+      ~HourRetireTimer() { value = std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now()-begin).count(); }
+    } hour_retire_timer{hour_retire_us, hour_retire_begin};
+#endif
     dev_reset_valid = false;          // a failed step leaves the state half-written; the host resets it fully
     float ms = 0.f; ETX_CHECK(hipEventElapsedTime(&ms, ev_start, ev_stop));   // device timestamps: launch to kernel end, no host polling jitter
     last_ms = ms;
@@ -436,6 +443,34 @@ struct etx_host {
     return true;
   }
   // single-device convenience
+#ifdef ETX_HOUR_PROFILE
+  // Diagnostic only: queued reset events perturb submission. Never use this
+  // path for candidate/target wall timing; report the perturbation separately.
+  double hour_reset_us = 0, hour_resid_us = 0, hour_launch_us = 0;
+  double hour_wait_us = 0, hour_retire_us = 0, hour_reset_device_us = 0;
+  hipEvent_t hour_reset_start = nullptr, hour_reset_stop = nullptr;
+  void hour_profile_init() {
+    ETX_CHECK(hipEventCreate(&hour_reset_start)); ETX_CHECK(hipEventCreate(&hour_reset_stop));
+  }
+  bool hour_profile_run(double timeout_s) {
+    using C = std::chrono::steady_clock;
+    ETX_CHECK(hipEventRecord(hour_reset_start, stream));
+    const auto a = C::now(); reset_step();
+    const auto b = C::now();
+    ETX_CHECK(hipEventRecord(hour_reset_stop, stream));
+    const auto c = C::now(); if (!check_residency()) return false;
+    const auto d = C::now(); launch();
+    const auto e = C::now(); const bool ok = wait(timeout_s, d);
+    const auto f = C::now();
+    hour_reset_us = std::chrono::duration<double, std::micro>(b-a).count();
+    hour_resid_us = std::chrono::duration<double, std::micro>(d-c).count();
+    hour_launch_us = std::chrono::duration<double, std::micro>(e-d).count();
+    hour_wait_us = std::chrono::duration<double, std::micro>(f-e).count()-hour_retire_us;
+    float ms = 0; ETX_CHECK(hipEventElapsedTime(&ms, hour_reset_start, hour_reset_stop));
+    hour_reset_device_us = ms*1000;
+    return ok;
+  }
+#endif
   bool run(double timeout_s = 5.0) {
     static const bool use_graph = getenv("ETX_VL_GRAPH") != nullptr;
     if (use_graph) {
