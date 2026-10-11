@@ -39,7 +39,10 @@ def manifest(path=MANIFEST):
 
 def template():
     return dict(model='/absolute/prepared/qwen3-30b-a3b',
-                builds={name: '/absolute/prepared/'+name for name in ('kept', 'stamps', 'stages', 'C1', 'C5', 'C1_C5')},
+                builds={name: '/absolute/prepared/'+name for name in
+                        ('kept', 'stamps', 'stages', 'C1', 'C5', 'C1_C5', 'NO_TOUCH',
+                         'NO_TOUCH_stamps', 'ISOLATE_POLLER')},
+                isolation_probe=None,  # sealed offline probe: {argv: [...], sha256: executable SHA256}
                 source_commit='REQUIRED full commit of pushed tree', build_commits={}, build_seals={},
                 combinations=[dict(id='C1_C5', build='C1_C5', members=['C1', 'C5'], enabled=True,
                                    flags={'ETX_VL_ROUTER_NARROW': '1'}, defines=['ETX_DSL_NORM_HOIST'])],
@@ -77,18 +80,25 @@ def prepare(config_path):
     if not re.fullmatch('[a-f0-9]{40}', c['source_commit']): raise ValueError('full source commit required')
     gates = json.loads(Path(c['cpu_gates']).read_text())
     if gates.get('source_hashes') != source_hashes(): raise ValueError('CPU gates belong to different source')
-    env = {k: v for k, v in os.environ.items() if not k.startswith(('ETX_VL_', 'ETX_DSL_', 'ETX_LLM_', 'DSL_ABLATE_', 'ETX_INBODY_', 'ETX_BF16_'))}
-    env.update(ETX_VL_CHECK='1', ETX_TOPK_KEY32='1', ETX_DEV_RESET='0', ETX_VL_REQUESTS='1', ETX_VL_CU='256')
+    env = {k: v for k, v in os.environ.items() if not k.startswith(('ETX_VL_', 'ETX_DSL_', 'ETX_LLM_', 'DSL_ABLATE_', 'ETX_INBODY_', 'ETX_BF16_'))
+           and k != 'ETX_PREFETCH_ISOLATE_POLLER'}
+    env.update(ETX_VL_CHECK='1', ETX_TOPK_KEY32='1', ETX_DEV_RESET='0', ETX_VL_REQUESTS='1',
+               ETX_VL_CU='256', ETX_VL_TOUCH='1', ETX_PREFETCH_ISOLATE_POLLER='0')
     # Optional C prototypes are NOT built here: integrate and prove before use.
     variants = dict(kept={}, stamps={'ETX_INBODY_BUILD': '1'}, stages={'profile': True},
                     C1={'ETX_VL_ROUTER_NARROW': '1'}, C5={'hoist': True},
-                    C1_C5={'ETX_VL_ROUTER_NARROW': '1', 'hoist': True})
+                    C1_C5={'ETX_VL_ROUTER_NARROW': '1', 'hoist': True},
+                    NO_TOUCH={'no_touch': True},
+                    NO_TOUCH_stamps={'no_touch': True, 'ETX_INBODY_BUILD': '1'},
+                    ISOLATE_POLLER={'ETX_PREFETCH_ISOLATE_POLLER': '1'})
     for arm, toggles in variants.items():
         if arm not in c['builds']: continue
         b = Path(c['builds'][arm]).resolve()
         if b.exists(): raise ValueError('fresh staging output required: '+str(b))
         b.mkdir(parents=True)
-        flags = BASE_FLAGS+(' -DETX_HOUR_PROFILE' if toggles.get('profile') else '')+(' -DETX_DSL_NORM_HOIST' if toggles.get('hoist') else '')
+        flags = (BASE_FLAGS+(' -DETX_HOUR_PROFILE' if toggles.get('profile') else '')
+                 +(' -DETX_DSL_NORM_HOIST' if toggles.get('hoist') else '')
+                 +(' -DETX_NO_TOUCH' if toggles.get('no_touch') else ''))
         use = dict(env, ETX_OUT=str(b), ETX_HIPCC_FLAGS=flags,
                    **{k: v for k, v in toggles.items() if k.startswith('ETX_')})
         print(f'CPU-STAGE {arm} build only; no GPU invocation', flush=True)
@@ -140,7 +150,8 @@ class Session:
         self.env['HIP_VISIBLE_DEVICES'] = os.environ.get('GPU', '0')
 
     def row(self, name, value, status, rule):
-        source = THRESHOLD_SOURCES.get(name, THRESHOLD_SOURCES.get(name.split('.')[0]+'.keep', 'manifest/prototype registration'))
+        arm = next((a for a in self.m['B']+self.m['C'] if name == 'C.'+a['id']), {})
+        source = THRESHOLD_SOURCES.get(name, arm.get('source', THRESHOLD_SOURCES.get(name.split('.')[0]+'.keep', 'manifest/prototype registration')))
         self.rows[name] = dict(value=value, status=status, rule=rule, source=source)
         print(f'THRESHOLD {name} {status} value={json.dumps(value)} rule={rule}', flush=True)
 
@@ -231,6 +242,8 @@ REGISTERED = {
     'B.keep': '3 pairs, all faster, median >=0.030 ms, median >2*spread',
     'C.fusion': 'net >=1.042 us/layer; VGPR <=128; LDS <=29752 B',
     'C.body': '3 pairs, all faster, median >=0.030 ms, median >2*spread',
+    'C.NO_TOUCH': '3 complete adjacent pinned pairs; every wall gain >0; median >=0.030 ms; median >2*(max-min); no additional KEEP threshold',
+    'C.ISOLATE_POLLER': '3 complete adjacent pinned pairs; every wall gain >0; median >=0.030 ms; median >2*(max-min); fresh measured round trip <2.0 us',
     'D.target': '5 complete rounds, host-wall step <=3.3333 ms, all fresh correctness gates',
     'D.fusion': '5 adjacent pinned pairs; every gain >0; median >2%; median >2*spread',
     'D.system': '5 adjacent pinned pairs; LEAD all deltas <0, median <=-0.050 ms',
@@ -247,6 +260,8 @@ THRESHOLD_SOURCES = {
     'B.keep': 'docs/PLAN-300TOKS-2026-10-11.md:314,322 (main 9f91f3a)',
     'C.fusion': 'docs/PLAN-300TOKS-2026-10-11.md:315,331 (main 9f91f3a)',
     'C.body': 'docs/PLAN-300TOKS-2026-10-11.md:314,322 (main 9f91f3a)',
+    'C.NO_TOUCH': 'docs/PLAN-300TOKS-2026-10-11.md:310,314; docs/XCD-PREFETCH-2026-10-11.md:76,125',
+    'C.ISOLATE_POLLER': 'docs/VERIFY-GAPS-2026-10-11.md:141-193; examples/vllm_llm/prefetch_isolation_cpu.py',
     'D.target': 'docs/PLAN-300TOKS-2026-10-11.md:318 (main 9f91f3a)',
     'D.fusion': 'examples/vllm_llm/pairs.py:33-34,138-143',
     'D.system': 'examples/vllm_llm/nvref_report.py:115-125',
@@ -627,7 +642,7 @@ def eligible_arm(s, a):
     return a
 
 
-def candidate_pairs(s, a, tranche):
+def candidate_pairs(s, a, tranche, publish=True):
     arm = a['build']; ident = a['id']
     certify(s, arm)
     rounds = []
@@ -637,9 +652,12 @@ def candidate_pairs(s, a, tranche):
             row[who] = timing(host(s, who, f'{tranche}_{ident}_r{rnd}_{who}', ['--repeat', '1']))
         rounds.append(row)
     result = keep([r['kept']['wall_ms']-r[arm]['wall_ms'] for r in rounds])
-    result.update(status='KEEP' if result['keep'] else 'REJECT', rounds=rounds, overlap=a.get('overlap'))
+    result.update(status='KEEP' if result['keep'] else 'REJECT', rounds=rounds, overlap=a.get('overlap'),
+                  registered_keep_threshold=a.get('keep_threshold'))
     s.arms[ident] = result
-    s.row(tranche+'.'+ident, result, result['status'], REGISTERED['B.keep' if tranche == 'B' else 'C.body'])
+    if publish:
+        s.row(tranche+'.'+ident, result, result['status'],
+              REGISTERED.get(tranche+'.'+ident, REGISTERED['B.keep' if tranche == 'B' else 'C.body']))
     return result
 
 
@@ -667,6 +685,12 @@ def tranche_b(s):
 
 def c_eligibility(s, a):
     eligible_arm(s, a)
+    if a['id'] in ('NO_TOUCH', 'ISOLATE_POLLER'):
+        # Existing switches, not a fusion prototype. Fresh exhaustive checks
+        # and DSL/token gates run below, before any performance population.
+        verify_wait_variant(s, a)
+        if a.get('diagnostic_build'): verify_wait_variant(s, a, diagnostic=True)
+        return a
     from examples.vllm_llm import import_certificate as cert
     from examples.vllm_llm.nvref_report import correctness
     proof = Path(a['prototype_certificate'])
@@ -699,6 +723,77 @@ def c_eligibility(s, a):
     return a
 
 
+def verify_wait_variant(s, a, diagnostic=False):
+    """Only the registered switch (and diagnostic stamps) may differ from kept."""
+    from examples.vllm_llm import import_certificate as cert
+    build = a.get('diagnostic_build') if diagnostic else a['build']
+    seal = verify_seal(s, build)
+    b = Path(s.c['builds'][build])
+    kept = Path(s.c['builds']['kept'])
+    actual = cert.verified_build(b, Path(s.c['model']))
+    base = cert.verified_build(kept, Path(s.c['model']))
+    if not actual['check_enabled'] or not base['check_enabled']: raise ValueError('CHECK required')
+    if base['hipcc_flags'].split() != BASE_FLAGS.split(): raise ValueError('kept compiler switches changed')
+    if json.loads((b/'plan.json').read_text()) != json.loads((kept/'plan.json').read_text()):
+        raise ValueError('wait arm requires identical full plan')
+    if actual['files']['imports'] != base['files']['imports']:
+        raise ValueError('wait arm changed imported math')
+    expected = dict(base['overrides'], ETX_PREFETCH_ISOLATE_POLLER='1' if a['id'] == 'ISOLATE_POLLER' else '0')
+    if base['overrides'].get('ETX_VL_TOUCH') != '1': raise ValueError('kept TOUCH must be ON')
+    if base['overrides'].get('ETX_PREFETCH_ISOLATE_POLLER') != '0': raise ValueError('kept isolation must be OFF')
+    # Output locations are provenance, not experiment switches.
+    paths = {'ETX_VL_IMPORTS', 'ETX_VL_ADAPTERS', 'ETX_VL_PLAN', 'ETX_VL_CHAINS', 'ETX_VL_DSL_TILES'}
+    clean = lambda d: {k: v for k, v in d.items() if k not in paths}
+    if clean(actual['overrides']) != clean(expected): raise ValueError('unregistered wait-arm override')
+    flags = base['hipcc_flags'].split()
+    if a['id'] == 'NO_TOUCH': flags.append('-DETX_NO_TOUCH')
+    if actual['hipcc_flags'].split() != flags: raise ValueError('unregistered wait-arm compiler flags')
+    if seal['flags'].get('ETX_INBODY_BUILD', '0') != ('1' if diagnostic else '0'):
+        raise ValueError('wait-arm stamp build mismatch')
+    return actual
+
+
+def no_touch_diagnostic(s, a):
+    """Independent ON-stamp observation, never used as a wall sample/correction."""
+    verify_wait_variant(s, a, diagnostic=True)
+    arm = a['diagnostic_build']
+    certify(s, arm)
+    raw = s.out/'C_NO_TOUCH_inbody.bin'
+    text = token_gate(host(s, arm, 'C_NO_TOUCH_stamp', ['--repeat', '1'],
+                          {'ETX_INBODY_RAW': str(raw), 'ETX_HOUR_TRACE_STEP': '1024'}))
+    if 'HOUR-SNAPSHOT run=0 step=1024' not in text: raise ValueError('ctx1024 snapshot missing')
+    output = s.out/'C_NO_TOUCH_edges.json'
+    s.step('C_NO_TOUCH_analysis', [sys.executable, '-u', '-m', 'examples.sessions.qwen300_hour',
+           '--analyze', Path(s.c['builds'][arm])/'plan.json', raw, output], timeout=45, expected=15)
+    return dict(path=str(output), basis='diagnostic stamps ON; no removable-time credit or subtraction')
+
+
+def isolation_round_trip(s, a):
+    """Run a preprepared measurement, never accept an offline/historical scalar.
+
+    Probe stdout must contain exactly three POLLER-ROUND-TRIP JSON rows, bound
+    to the candidate identity and this session. Missing probe/evidence leaves
+    acceptance NOT-COMPLETE, even when all wall pairs pass.
+    """
+    from examples.vllm_llm import import_certificate as cert
+    probe = s.c.get('isolation_probe')
+    if not probe: raise ValueError('future isolated round-trip probe not staged; no KEEP')
+    argv = probe['argv']
+    if not argv or not Path(argv[0]).is_absolute() or cert.sha(Path(argv[0])) != probe['sha256']:
+        raise ValueError('unsealed isolation probe executable')
+    identity = cert.digest(cert.verified_build(Path(s.c['builds'][a['build']]), Path(s.c['model'])))
+    nonce = str(s.out)
+    text = s.step('C_ISOLATE_POLLER_round_trip', argv, dict(ETX_HOUR_SESSION=nonce,
+                  ETX_HOUR_BUILD_SHA256=identity, ETX_PREFETCH_ISOLATE_POLLER='1'), timeout=120, expected=60)
+    rows = [json.loads(l.split(' ', 1)[1]) for l in text.splitlines() if l.startswith('POLLER-ROUND-TRIP ')]
+    if [r['sample'] for r in rows] != [0, 1, 2]: raise ValueError('NOT-COMPLETE round-trip population')
+    if any(r['session'] != nonce or r['build_sha256'] != identity or r['isolate_poller'] != 1 for r in rows):
+        raise ValueError('round-trip measurement belongs to another condition/session')
+    xs = [r['round_trip_us'] for r in rows]
+    if any(not math.isfinite(x) or x <= 0 for x in xs): raise ValueError('invalid measured round trip')
+    return dict(samples=rows, median_us=st.median(xs), pass_lt_2us=st.median(xs) < 2.0)
+
+
 def qualify_c(s):
     qualified = []
     for a in s.m['C']:
@@ -721,9 +816,36 @@ def tranche_c(s):
         s.row('C.body', None, 'SKIP', REGISTERED['C.body'])
         return [], 1200
     s.deadline = min(time.monotonic()+1200, s.end)
+    tranche_end = s.deadline
+    budget = [dict(id=a['id'], allocated_s=a.get('budget_s', 0),
+                   estimated_required_s=a.get('estimated_required_s')) for a in qualified]
+    required = sum(a.get('estimated_required_s', 0) for a in qualified)
+    s.row('C.budget', dict(available_s=1200, arms=budget, estimated_required_s=required,
+                         fits_estimate=required <= 1200, basis='estimate: cold host invocation expected=120s; not GPU measurement'),
+          'OVER-BUDGET' if required > 1200 else 'ESTIMATE', 'C remains 1200s; no time borrowed from D')
     survivors = []
     for a in qualified:
-        result = s.attempt(a['id'], lambda a=a: candidate_pairs(s, a, 'C'))
+        s.deadline = min(time.monotonic()+a.get('budget_s', 1200), tranche_end)
+        key = 'C.'+a['id']
+        rule = REGISTERED.get(key, REGISTERED['C.body'])
+        def run(a=a):
+            diagnostic = no_touch_diagnostic(s, a) if a['id'] == 'NO_TOUCH' else None
+            result = candidate_pairs(s, a, 'C', publish=False)
+            result['diagnostic'] = diagnostic
+            if a['id'] == 'ISOLATE_POLLER':
+                try:
+                    rt = isolation_round_trip(s, a)
+                except (OSError, ValueError, KeyError, TimeoutError, RuntimeError) as exc:
+                    result.update(keep=False, status='NOT-COMPLETE', round_trip=dict(status='NOT-COMPLETE', reason=str(exc)))
+                else:
+                    result['round_trip'] = rt
+                    result['keep'] = result['keep'] and rt['pass_lt_2us']
+                    result['status'] = 'KEEP' if result['keep'] else 'REJECT'
+            s.row(key, result, result['status'], rule)
+            return result
+        result = s.attempt(a['id'], run)
+        if result is None:
+            s.row(key, None, 'NOT-COMPLETE', rule)
         if not result: continue
         if a['kind'] == 'fusion':
             net = result['median_ms']*1000/48
@@ -857,13 +979,14 @@ def execute(s):
     preflight(s)
     if not tranche_a(s):
         print('STOP after A: S1 closes target route', flush=True)
-        for name in ('B.keep', 'B.stop', 'C.fusion', 'C.body', 'D.target', 'D.fusion', 'D.system'):
+        for name in ('B.keep', 'B.stop', 'C.fusion', 'C.body', 'C.NO_TOUCH', 'C.ISOLATE_POLLER',
+                     'D.target', 'D.fusion', 'D.system'):
             s.row(name, None, 'NOT-RUN', REGISTERED[name])
         return
     b = tranche_b(s)
     if not second_stop(s):
         print('STOP after B: S2 closes target route', flush=True)
-        for name in ('C.fusion', 'C.body', 'D.target', 'D.fusion', 'D.system'):
+        for name in ('C.fusion', 'C.body', 'C.NO_TOUCH', 'C.ISOLATE_POLLER', 'D.target', 'D.fusion', 'D.system'):
             s.row(name, None, 'NOT-RUN', REGISTERED[name])
         return
     c, extra = tranche_c(s)

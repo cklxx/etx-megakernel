@@ -130,6 +130,7 @@ def session(tmp_path):
 
 def test_disabled_c_lends_exactly_twenty_minutes(tmp_path):
     s = session(tmp_path)
+    s.m['C'] = [a for a in s.m['C'] if not a['enabled']]
     assert h.tranche_c(s) == ([], 1200)
     assert s.rows['C.fusion']['status'] == 'SKIP'
 
@@ -296,7 +297,7 @@ def test_c_positive_body_keep_cannot_bypass_net_fusion_bar(tmp_path, monkeypatch
     a = dict(id='proto', build='proto', kind='fusion', native_resources=dict(vgpr=128, lds_bytes=29736),
              expected_vgpr=128, expected_lds_bytes=29736)
     s.qualified_c = [a]
-    def fake_pairs(s, a, tranche):
+    def fake_pairs(s, a, tranche, publish=True):
         result = dict(h.keep([.040, .040, .040]), status='KEEP')
         s.arms[a['id']] = result
         return result
@@ -414,3 +415,109 @@ def test_s2_does_not_attribute_pending_reset_device_work_to_host(tmp_path):
     s.rows['A3.host'] = dict(value=h.stage_prices(stage_text()))
     assert not h.second_stop(s)
     assert s.rows['B.stop']['value']['H_ms'] == pytest.approx(.046)
+
+
+def wait_arms():
+    return [a for a in h.manifest()['C'] if a['id'] in ('NO_TOUCH', 'ISOLATE_POLLER')]
+
+
+def test_wait_arms_are_registered_staged_and_budgeted():
+    a, b = wait_arms()
+    assert a['defines'] == ['ETX_NO_TOUCH']
+    assert b['flags']['ETX_PREFETCH_ISOLATE_POLLER'] == '1'
+    assert a['diagnostic_build'] in h.template()['builds']
+    assert all(x['build'] in h.template()['builds'] for x in (a, b))
+    assert sum(x['budget_s'] for x in (a, b)) == 1200
+    assert sum(x['estimated_required_s'] for x in (a, b)) > 1200
+    for x in (a, b):
+        assert x['keep_threshold']['complete_adjacent_pinned_pairs'] == 3
+        assert x['keep_threshold']['median_wall_gain_ms_ge'] == .030
+        assert 'C.'+x['id'] in h.REGISTERED
+
+
+@pytest.mark.parametrize('partial', [False, True])
+def test_c_wait_pairs_are_adjacent_and_partial_never_has_aggregate(tmp_path, monkeypatch, partial):
+    s = session(tmp_path); s.certified.add('kept'); s.qualified_c = wait_arms()
+    calls = []; diagnostics = []
+    monkeypatch.setattr(h, 'certify', lambda s, arm: s.certified.add(arm))
+    monkeypatch.setattr(h, 'no_touch_diagnostic', lambda s, a: diagnostics.append(a['id']))
+    monkeypatch.setattr(h, 'isolation_round_trip', lambda s, a: dict(median_us=1.9, pass_lt_2us=True))
+    def fake_host(s, arm, name, args):
+        calls.append((arm, s.deadline))
+        if partial and name == 'C_NO_TOUCH_r2_NO_TOUCH': raise TimeoutError('missing final sample')
+        return host_text(cost=4.18 if arm == 'kept' else 4.14)
+    monkeypatch.setattr(h, 'host', fake_host)
+    survivors, extra = h.tranche_c(s)
+    assert extra == 0
+    assert diagnostics == ['NO_TOUCH']
+    assert [arm for arm, _ in calls] == ['kept', 'NO_TOUCH', 'NO_TOUCH', 'kept', 'kept', 'NO_TOUCH',
+                                        'kept', 'ISOLATE_POLLER', 'ISOLATE_POLLER', 'kept', 'kept', 'ISOLATE_POLLER']
+    assert max(t for _, t in calls) <= s.start+1200+1
+    assert s.rows['C.budget']['status'] == 'OVER-BUDGET'
+    assert [x['id'] for x in survivors] == (['ISOLATE_POLLER'] if partial else ['NO_TOUCH', 'ISOLATE_POLLER'])
+    if partial:
+        assert s.rows['C.NO_TOUCH']['status'] == 'NOT-COMPLETE'
+        assert s.rows['C.NO_TOUCH']['value'] is None
+        assert 'median_ms' not in s.arms['NO_TOUCH']
+    else:
+        assert len(s.rows['C.NO_TOUCH']['value']['rounds']) == 3
+        assert s.rows['C.NO_TOUCH']['status'] == 'KEEP'
+
+
+@pytest.mark.parametrize('rt,status', [(1.999, 'KEEP'), (2.0, 'REJECT'), (2.01, 'REJECT'), (None, 'NOT-COMPLETE')])
+def test_isolation_cannot_keep_on_wall_gain_alone(tmp_path, monkeypatch, rt, status, capsys):
+    s = session(tmp_path); s.certified.add('kept'); s.qualified_c = [wait_arms()[1]]
+    monkeypatch.setattr(h, 'certify', lambda *args: None)
+    monkeypatch.setattr(h, 'host', lambda s, arm, name, args: host_text(cost=4.18 if arm == 'kept' else 4.14))
+    def trip(s, a):
+        if rt is None: raise ValueError('probe not staged')
+        return dict(median_us=rt, pass_lt_2us=rt < 2.)
+    monkeypatch.setattr(h, 'isolation_round_trip', trip)
+    survivors, _ = h.tranche_c(s)
+    assert s.rows['C.ISOLATE_POLLER']['status'] == status
+    assert bool(survivors) == (status == 'KEEP')
+    assert 'round trip <2.0 us' in s.rows['C.ISOLATE_POLLER']['rule']
+    if status != 'KEEP': assert 'THRESHOLD C.ISOLATE_POLLER KEEP' not in capsys.readouterr().out
+
+
+@pytest.mark.parametrize('mutation', ['none', 'partial', 'session', 'build', 'flag', 'nan'])
+def test_isolation_requires_fresh_complete_probe_output(tmp_path, monkeypatch, mutation):
+    from examples.vllm_llm import import_certificate as cert
+    s = session(tmp_path); a = wait_arms()[1]; s.c['builds'][a['build']] = '/unused'
+    exe = tmp_path/'probe'; exe.write_bytes(b'prepared probe')
+    s.c['isolation_probe'] = dict(argv=[str(exe)], sha256=cert.sha(exe))
+    monkeypatch.setattr(cert, 'verified_build', lambda *args: dict(frozen='candidate'))
+    identity = cert.digest(dict(frozen='candidate'))
+    rows = [dict(sample=i, session=str(s.out), build_sha256=identity, isolate_poller=1, round_trip_us=1.9) for i in range(3)]
+    if mutation == 'partial': rows.pop()
+    if mutation == 'session': rows[0]['session'] = 'old'
+    if mutation == 'build': rows[0]['build_sha256'] = 'other'
+    if mutation == 'flag': rows[0]['isolate_poller'] = 0
+    if mutation == 'nan': rows[0]['round_trip_us'] = float('nan')
+    monkeypatch.setattr(s, 'step', lambda *args, **kw: '\n'.join('POLLER-ROUND-TRIP '+json.dumps(r) for r in rows))
+    if mutation == 'none': assert h.isolation_round_trip(s, a)['pass_lt_2us']
+    else:
+        with pytest.raises(ValueError): h.isolation_round_trip(s, a)
+
+
+@pytest.mark.parametrize('mutation', ['none', 'plan', 'workers', 'precision', 'flag', 'imports', 'touch_off', 'profile'])
+def test_wait_variant_rejects_changed_plan_math_or_flags(tmp_path, monkeypatch, mutation):
+    from examples.vllm_llm import import_certificate as cert
+    s = session(tmp_path); a = wait_arms()[1]
+    for arm in ('kept', a['build']):
+        b = tmp_path/arm; b.mkdir(); s.c['builds'][arm] = str(b)
+        (b/'plan.json').write_text(json.dumps(dict(workers_per_domain=32, precision='bf16')))
+    base = dict(check_enabled=True, hipcc_flags=h.BASE_FLAGS,
+                overrides=dict(ETX_VL_TOUCH='1', ETX_PREFETCH_ISOLATE_POLLER='0'), files=dict(imports='same'))
+    actual = copy.deepcopy(base); actual['overrides']['ETX_PREFETCH_ISOLATE_POLLER'] = '1'
+    if mutation in ('plan', 'workers', 'precision'):
+        (tmp_path/a['build']/'plan.json').write_text(json.dumps(dict(workers_per_domain=31, precision='fp8' if mutation == 'precision' else 'bf16')))
+    if mutation == 'flag': actual['overrides']['ETX_VL_UC'] = '1'
+    if mutation == 'imports': actual['files']['imports'] = 'changed'
+    if mutation == 'touch_off': base['overrides']['ETX_VL_TOUCH'] = '0'
+    if mutation == 'profile': actual['hipcc_flags'] += ' -DETX_HOUR_PROFILE'
+    monkeypatch.setattr(h, 'verify_seal', lambda *args: dict(flags=dict(ETX_INBODY_BUILD='0')))
+    monkeypatch.setattr(cert, 'verified_build', lambda b, m: base if b.name == 'kept' else actual)
+    if mutation == 'none': assert h.verify_wait_variant(s, a) == actual
+    else:
+        with pytest.raises(ValueError): h.verify_wait_variant(s, a)
