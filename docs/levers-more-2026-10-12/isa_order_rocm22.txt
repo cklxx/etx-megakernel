@@ -1,0 +1,72 @@
+AMD clang version 22.0.0git (https://github.com/RadeonOpenCompute/llvm-project roc-7.2.4 26084 f58b06dce1f9c15707c5f808fd002e18c2accf7e)
+dsl_tiles.hip sha256 a0bcc2dc | flags -DETX_DSL_COH -DETX_DSL_NT -DETX_DSL_VECNORM -DETX_DSL_WSUM -DETX_DSL_SCALAR -DETX_DSL_GU1 -DETX_DSL_RBATCH -DETX_TOPK_KEY32
+assembly /Users/ckl/code/etx/build/lv_isa22/wrap.s sha256 92b71bf9
+== k_topk_rep: global loads, vmcnt waits and barriers before the first NT weight load (static order)
+  L1432: flat_load_dword v14                          | const unsigned nbsv = *(const unsigned*)(a + 44);
+  L1433: s_waitcnt vmcnt(0) lgkmcnt(0)                | const int nb = nbsv & 0xff ? (int)(nbsv & 0xff) : 1, sv = (int)(nbsv >
+  L1436: flat_load_dwordx3 v[10:12]                   | const int E = *(const int*)(a + 32), K = *(const int*)(a + 36), mode =
+  L1437: flat_load_dwordx4 v[2:5]                     | const __hip_bfloat16* logits = *(const __hip_bfloat16* const*)(a + 0) 
+  L1439: flat_load_dwordx4 v[6:9]                     | int* ids = *(int* const*)(a + 16) + (size_t)w * sv; int* tei = *(int* 
+  L1437: s_waitcnt vmcnt(0) lgkmcnt(0)                | const __hip_bfloat16* logits = *(const __hip_bfloat16* const*)(a + 0) 
+  L26: global_load_ushort v1                        | const unsigned short u = __hip_atomic_load((const DSL_COH_G unsigned s
+  L240: s_waitcnt vmcnt(0)                           | (other file, line 240)
+  L26: global_load_ushort v0                        | const unsigned short u = __hip_atomic_load((const DSL_COH_G unsigned s
+  L240: s_waitcnt vmcnt(0)                           | (other file, line 240)
+  L33: global_store_dword v[2:3]                    | static __device__ __forceinline__ void dsl_a_sti(int* p, int v) { __hi
+  L33: global_store_dword v[2:3]                    | static __device__ __forceinline__ void dsl_a_sti(int* p, int v) { __hi
+  L35: global_store_dword v[0:1]                    | static __device__ __forceinline__ void dsl_a_stf(float* p, float v) { 
+  L33: global_store_dword v[2:3]                    | static __device__ __forceinline__ void dsl_a_sti(int* p, int v) { __hi
+  L33: global_store_dword v[4:5]                    | static __device__ __forceinline__ void dsl_a_sti(int* p, int v) { __hi
+  L35: global_store_dword v[0:1]                    | static __device__ __forceinline__ void dsl_a_stf(float* p, float v) { 
+  L11: s_waitcnt vmcnt(0)                           | (other file, line 11)
+  L692: s_barrier                                    | (other file, line 692)
+== k_moe_up_x_fold: global loads, vmcnt waits and barriers before the first NT weight load (static order)
+  L32: global_load_dword v1                         | static __device__ __forceinline__ int dsl_a_ldi(const int* p) { return
+  L32: s_waitcnt vmcnt(0)                           | static __device__ __forceinline__ int dsl_a_ldi(const int* p) { return
+  L26: global_load_ushort v2                        | const unsigned short u = __hip_atomic_load((const DSL_COH_G unsigned s
+  L240: s_waitcnt vmcnt(0)                           | (other file, line 240)
+  L26: global_load_ushort v1                        | const unsigned short u = __hip_atomic_load((const DSL_COH_G unsigned s
+  L240: s_waitcnt vmcnt(0)                           | (other file, line 240)
+  L692: s_barrier                                    | (other file, line 692)
+  L0: global_load_ushort v6                        | 
+  L655: s_waitcnt vmcnt(0)                           | for (int i = (int)threadIdx.x; i < K / 8; i += blockDim.x) {
+  L37: global_load_dwordx2 v[12:13]                 | static __device__ __forceinline__ unsigned long long dsl_a_ld64(const 
+  L37: global_load_dwordx2 v[16:17]                 | static __device__ __forceinline__ unsigned long long dsl_a_ld64(const 
+  L666: s_waitcnt vmcnt(1)                           | for (int j = 0; j < 4; ++j) { xs[8 * i + 2 * j] = __uint_as_float(v[j]
+  L666: s_waitcnt vmcnt(0)                           | for (int j = 0; j < 4; ++j) { xs[8 * i + 2 * j] = __uint_as_float(v[j]
+  L692: s_barrier                                    | (other file, line 692)
+  L264: global_load_ushort v1                        | (other file, line 264)
+  L1263: s_waitcnt vmcnt(0)                           | const int gp1 = (gn * gspr + gnw - 1) / gnw, gp2 = (2 * gn * gspr + gn
+  L692: s_barrier                                    | (other file, line 692)
+  L692: s_barrier                                    | (other file, line 692)
+  L506: global_load_dwordx2 v[16:17]                 | for (int u = 0; u < U; ++u) w[u] = dsl_wload(DSL_WP(s0 + u));
+  L506: global_load_dwordx2 v[6:7]                   | for (int u = 0; u < U; ++u) w[u] = dsl_wload(DSL_WP(s0 + u));
+  L506: global_load_dwordx2 v[4:5]                   | for (int u = 0; u < U; ++u) w[u] = dsl_wload(DSL_WP(s0 + u));
+  L506: global_load_dwordx2 v[2:3]                   | for (int u = 0; u < U; ++u) w[u] = dsl_wload(DSL_WP(s0 + u));
+  L398: s_waitcnt vmcnt(3)                           | return __uint_as_float(w.x << 16) * x[0] + __uint_as_float(w.x & 0xfff
+  L398: s_waitcnt vmcnt(2)                           | return __uint_as_float(w.x << 16) * x[0] + __uint_as_float(w.x & 0xfff
+== k_moe_down_x_fold: global loads, vmcnt waits and barriers before the first NT weight load (static order)
+  L32: global_load_dword v1                         | static __device__ __forceinline__ int dsl_a_ldi(const int* p) { return
+  L32: s_waitcnt vmcnt(0)                           | static __device__ __forceinline__ int dsl_a_ldi(const int* p) { return
+  L26: global_load_ushort v2                        | const unsigned short u = __hip_atomic_load((const DSL_COH_G unsigned s
+  L240: s_waitcnt vmcnt(0)                           | (other file, line 240)
+  L26: global_load_ushort v1                        | const unsigned short u = __hip_atomic_load((const DSL_COH_G unsigned s
+  L240: s_waitcnt vmcnt(0)                           | (other file, line 240)
+  L692: s_barrier                                    | (other file, line 692)
+  L37: global_load_dwordx2 v[8:9]                   | static __device__ __forceinline__ unsigned long long dsl_a_ld64(const 
+  L37: global_load_dwordx2 v[12:13]                 | static __device__ __forceinline__ unsigned long long dsl_a_ld64(const 
+  L666: s_waitcnt vmcnt(1)                           | for (int j = 0; j < 4; ++j) { xs[8 * i + 2 * j] = __uint_as_float(v[j]
+  L666: s_waitcnt vmcnt(0)                           | for (int j = 0; j < 4; ++j) { xs[8 * i + 2 * j] = __uint_as_float(v[j]
+  L692: s_barrier                                    | (other file, line 692)
+  L34: global_load_dword v1                         | static __device__ __forceinline__ float dsl_a_ldf(const float* p) { re
+  L1341: s_waitcnt vmcnt(0)                           | const float ws = d.mode >= 2 ? lwts[s] : dsl_a_ldf(d.wts + (size_t)rq 
+  L692: s_barrier                                    | (other file, line 692)
+  L692: s_barrier                                    | (other file, line 692)
+  L506: global_load_dwordx2 v[16:17]                 | for (int u = 0; u < U; ++u) w[u] = dsl_wload(DSL_WP(s0 + u));
+  L506: global_load_dwordx2 v[6:7]                   | for (int u = 0; u < U; ++u) w[u] = dsl_wload(DSL_WP(s0 + u));
+  L506: global_load_dwordx2 v[4:5]                   | for (int u = 0; u < U; ++u) w[u] = dsl_wload(DSL_WP(s0 + u));
+  L506: global_load_dwordx2 v[2:3]                   | for (int u = 0; u < U; ++u) w[u] = dsl_wload(DSL_WP(s0 + u));
+  L398: s_waitcnt vmcnt(3)                           | return __uint_as_float(w.x << 16) * x[0] + __uint_as_float(w.x & 0xfff
+  L398: s_waitcnt vmcnt(2)                           | return __uint_as_float(w.x << 16) * x[0] + __uint_as_float(w.x & 0xfff
+  L398: s_waitcnt vmcnt(1)                           | return __uint_as_float(w.x << 16) * x[0] + __uint_as_float(w.x & 0xfff
+  L485: s_waitcnt vmcnt(0)                           | if (++seg == spr) { seg = 0; ++row; }

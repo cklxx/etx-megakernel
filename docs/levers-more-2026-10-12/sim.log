@@ -1,0 +1,39 @@
+BASE span 4067.290 us (measured 4067.290)
+L1 rtt=0.30 sites=topk                                     span  4052.890  delta  -14.400 us = -0.0144 ms
+L1 rtt=0.30 sites=moe_up+moe_down                          span  4024.090  delta  -43.200 us = -0.0432 ms
+L1 rtt=0.30 sites=topk+moe_up+moe_down                     span  4009.690  delta  -57.600 us = -0.0576 ms
+L1 rtt=0.50 sites=topk                                     span  4043.290  delta  -24.000 us = -0.0240 ms
+L1 rtt=0.50 sites=moe_up+moe_down                          span  3995.290  delta  -72.000 us = -0.0720 ms
+L1 rtt=0.50 sites=topk+moe_up+moe_down                     span  3971.290  delta  -96.000 us = -0.0960 ms
+L1 rtt=0.69 sites=topk                                     span  4034.170  delta  -33.120 us = -0.0331 ms
+L1 rtt=0.69 sites=moe_up+moe_down                          span  3967.930  delta  -99.360 us = -0.0994 ms
+L1 rtt=0.69 sites=topk+moe_up+moe_down                     span  3934.810  delta -132.480 us = -0.1325 ms
+L2 fold-up F=2.1 h=0.0                                     span  3975.480  delta  -91.810 us = -0.0918 ms
+L2 fold-up F=2.1 h=0.5                                     span  3999.480  delta  -67.810 us = -0.0678 ms
+L2 fold-up F=2.1 h=1.0                                     span  4023.480  delta  -43.810 us = -0.0438 ms
+L2 fold-up F=2.4 h=0.0                                     span  3989.880  delta  -77.410 us = -0.0774 ms
+L2 fold-up F=2.4 h=0.5                                     span  4013.880  delta  -53.410 us = -0.0534 ms
+L2 fold-up F=2.4 h=1.0                                     span  4037.880  delta  -29.410 us = -0.0294 ms
+L2 fold-up F=2.7 h=0.0                                     span  4004.280  delta  -63.010 us = -0.0630 ms
+L2 fold-up F=2.7 h=0.5                                     span  4028.280  delta  -39.010 us = -0.0390 ms
+L2 fold-up F=2.7 h=1.0                                     span  4052.280  delta  -15.010 us = -0.0150 ms
+L3 instances 192; producers per instance 256.0
+L3 rl=0.2 sv=10ns med_d=-0.47 min=-1.60                    span  4152.140  delta  +84.850 us = +0.0849 ms
+L3 rl=0.2 sv=28ns med_d=-4.87 min=-6.19                    span  4886.700  delta +819.410 us = +0.8194 ms
+L3 rl=0.2 sv=50ns med_d=-10.34 min=-11.80                  span  5886.380  delta +1819.090 us = +1.8191 ms
+L3 rl=0.4 sv=10ns med_d=-0.27 min=-1.40                    span  4114.040  delta  +46.750 us = +0.0467 ms
+L3 rl=0.4 sv=28ns med_d=-4.67 min=-5.99                    span  4848.300  delta +781.010 us = +0.7810 ms
+L3 rl=0.4 sv=50ns med_d=-10.14 min=-11.60                  span  5847.980  delta +1780.690 us = +1.7807 ms
+L4 prep-in-qkv A=0.7 X=0.3                                 span  4037.800  delta  -29.490 us = -0.0295 ms
+L4 prep-in-qkv A=0.9 X=0.3                                 span  4047.400  delta  -19.890 us = -0.0199 ms
+L4 prep-in-qkv A=1.2 X=0.4                                 span  4066.600  delta   -0.690 us = -0.0007 ms
+L3 spread last32 median 0.42 us, all-256 median 2.29 us
+L3 rl=0.2 sv=2ns med_d=+0.20                               span  4029.270  delta  -38.020 us = -0.0380 ms
+L3 rl=0.2 sv=4ns med_d=+0.20                               span  4035.490  delta  -31.800 us = -0.0318 ms
+L3 rl=0.2 sv=6ns med_d=+0.20                               span  4057.640  delta   -9.650 us = -0.0097 ms
+L3 rl=0.4 sv=2ns med_d=+0.40                               span  3993.270  delta  -74.020 us = -0.0740 ms
+L3 rl=0.4 sv=4ns med_d=+0.40                               span  3998.920  delta  -68.370 us = -0.0684 ms
+L3 rl=0.4 sv=6ns med_d=+0.40                               span  4020.370  delta  -46.920 us = -0.0469 ms
+L1(down)+L2 F=2.4 h=0.5 rtt=0.5                            span  3965.880  delta -101.410 us = -0.1014 ms
+L1(down)+L2 F=2.1 h=0.0 rtt=0.69                           span  3909.240  delta -158.050 us = -0.1580 ms
+L1(down)+L2 F=2.7 h=1.0 rtt=0.3                            span  4023.480  delta  -43.810 us = -0.0438 ms
