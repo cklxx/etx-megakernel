@@ -1,4 +1,4 @@
-"""One pinned, offline, 67-minute deciding session; importing is CPU only.
+"""One pinned, offline, 74-minute deciding session; importing is CPU only.
 
 python -m examples.sessions.qwen300_hour --template prepared.json
 python -m examples.sessions.qwen300_hour --dry-run
@@ -26,9 +26,9 @@ from examples.vllm_llm.pairs import Refusal
 ROOT = Path(__file__).resolve().parents[2]
 MANIFEST = Path(__file__).with_name('qwen300_hour_arms.json')
 # Registration: main 9f91f3a, docs/PLAN-300TOKS-2026-10-11.md:297,304,310,318,320.
-MAX_SESSION_SECONDS = 4020
+MAX_SESSION_SECONDS = 4440
 if not 0 < float(os.environ.get('ETX_SESS_MAX_SECONDS', MAX_SESSION_SECONDS)) <= MAX_SESSION_SECONDS:
-    raise ValueError('qwen300-hour cap must be positive and <=4020 seconds')
+    raise ValueError('qwen300-hour cap must be positive and <=4440 seconds')
 JOBS = [dict(name='qwen300_hour', gpu=0, machine='A', timeout=MAX_SESSION_SECONDS, quiet_s=180,
              cmd='stdbuf -oL -eL python3 -u -m examples.sessions.qwen300_hour --run')]
 
@@ -811,21 +811,21 @@ def qualify_c(s):
 def tranche_c(s):
     qualified = s.qualified_c if hasattr(s, 'qualified_c') else qualify_c(s)
     if not qualified:
-        print('C SKIP: no already-correct committed full-model prototype qualifies; add 1200s to D', flush=True)
+        print('C SKIP: no already-correct committed full-model prototype qualifies; add 1620s to D', flush=True)
         s.row('C.fusion', None, 'SKIP', REGISTERED['C.fusion'])
         s.row('C.body', None, 'SKIP', REGISTERED['C.body'])
-        return [], 1200
-    s.deadline = min(time.monotonic()+1200, s.end)
+        return [], 1620
+    s.deadline = min(time.monotonic()+1620, s.end)
     tranche_end = s.deadline
     budget = [dict(id=a['id'], allocated_s=a.get('budget_s', 0),
                    estimated_required_s=a.get('estimated_required_s')) for a in qualified]
     required = sum(a.get('estimated_required_s', 0) for a in qualified)
-    s.row('C.budget', dict(available_s=1200, arms=budget, estimated_required_s=required,
-                         fits_estimate=required <= 1200, basis='estimate: cold host invocation expected=120s; not GPU measurement'),
-          'OVER-BUDGET' if required > 1200 else 'ESTIMATE', 'C remains 1200s; no time borrowed from D')
+    s.row('C.budget', dict(available_s=1620, arms=budget, estimated_required_s=required,
+                         fits_estimate=required <= 1620, basis='estimate: cold host invocation expected=120s; not GPU measurement'),
+          'OVER-BUDGET' if required > 1620 else 'ESTIMATE', 'C is 1620s; no time borrowed from D')
     survivors = []
     for a in qualified:
-        s.deadline = min(time.monotonic()+a.get('budget_s', 1200), tranche_end)
+        s.deadline = min(time.monotonic()+a.get('budget_s', 1620), tranche_end)
         key = 'C.'+a['id']
         rule = REGISTERED.get(key, REGISTERED['C.body'])
         def run(a=a):
@@ -1007,7 +1007,7 @@ def dry_run():
     """Exercise CPU logic, shell syntax and runner registration; never spawn GPU commands."""
     for j in JOBS:
         subprocess.run(['bash', '-n', '-c', j['cmd']], check=True)
-    assert sum((900, 1320, 1200, 600)) == MAX_SESSION_SECONDS
+    assert sum((900, 1320, 1620, 600)) == MAX_SESSION_SECONDS
     assert keep([.030, .031, .030])['keep']
     assert not keep([.030, -.001, .030])['keep']
     try:
@@ -1017,7 +1017,7 @@ def dry_run():
     else:
         raise AssertionError('missing critical-body coverage must refuse')
     assert len({a['id'] for a in manifest()['B']+manifest()['C']}) == len(manifest()['B']+manifest()['C'])
-    print(json.dumps(dict(budgets_s=dict(A=900, B=1320, C=1200, D=600),
+    print(json.dumps(dict(budgets_s=dict(A=900, B=1320, C=1620, D=600),
                           manifest=manifest(), thresholds=REGISTERED), indent=2))
     from etx.tools.gpu_jobs import main as runner
     return runner([str(Path(__file__)), '--dry-run'])
