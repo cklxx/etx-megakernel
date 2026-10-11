@@ -1,0 +1,143 @@
+span 4067.3 us, 304 workers (8 XCDs), bytes 6.1904 GB, floor 1439.6 us at 4.3 TB/s = 35.4% of the span; RTT 0.5 us
+
+machine worker-time by class (us summed over workers; share of workers x span)
+  start      (d)         366.5 worker-us    0.03%
+  between    (d)       80869.4 worker-us    6.54%
+  dep        (b)      533153.9 worker-us   43.12%
+  handoff    (b)       95322.9 worker-us    7.71%
+  bytes      (a)      369959.5 worker-us   29.92%
+  machinery  (c)      145473.3 worker-us   11.77%
+  none       (e)       11310.6 worker-us    0.91%
+  taxonomy: (a) 29.92%  (b) 50.83%  (c) 11.77%  (d) 6.57%  (e) 0.91%
+
+per XCD: share of its workers x span (38 workers per XCD); any body = at least one body running
+  XCD     start   between       dep   handoff     bytes machinery      none  any body mean busy
+    0     0.04%     6.77%    39.88%     7.78%    30.64%    14.08%     0.81%    82.27%     16.99
+    1     0.05%     6.44%    39.74%     7.90%    30.64%    14.32%     0.91%    82.33%     17.09
+    2     0.03%     6.78%    39.55%     8.02%    30.64%    14.07%     0.91%    81.99%     16.99
+    3     0.03%     6.50%    39.83%     7.86%    30.62%    14.17%     0.98%    81.91%     17.02
+    4     0.02%     6.58%    46.40%     7.54%    29.21%     9.31%     0.94%    57.81%     14.64
+    5     0.03%     6.37%    46.40%     7.57%    29.21%     9.53%     0.90%    58.15%     14.72
+    6     0.02%     6.46%    46.54%     7.56%    29.21%     9.32%     0.90%    58.05%     14.64
+    7     0.01%     6.44%    46.62%     7.45%    29.20%     9.32%     0.96%    58.17%     14.64
+
+per XCD and phase kind: body worker-us (bytes + machinery), whole step
+  kind           XCD 0     XCD 1     XCD 2     XCD 3     XCD 4     XCD 5     XCD 6     XCD 7
+  prologue         3.9       0.0       0.0       0.0       0.0       0.0       0.0       0.0
+  in_norm          4.0       3.8       3.8       4.0       3.8       3.8       3.7       4.0
+  qkv          14036.1   14019.8   13907.7   14002.6   13948.4   13987.8   13887.1   14021.2
+  prep           194.0     190.1     192.7     190.6       0.0       0.0       0.0       0.0
+  attn          1268.6    1268.1    1270.4    1273.2       0.0       0.0       0.0       0.0
+  reduce         250.9     252.7     252.2     250.0       0.0       0.0       0.0       0.0
+  o_proj        7928.2    7898.4    7885.1    7898.1    7807.8    7851.7    7925.9    7973.7
+  router        8401.9    8503.1    8336.2    8365.3     502.3     499.6     499.0     501.6
+  topk           148.0     149.0     145.7     145.0     136.6     137.0     144.2     145.8
+  moe_up       18100.6   18256.0   18142.3   18148.1   18128.6   18291.6   18166.7   18154.1
+  moe_down     13980.4   14141.8   14189.8   14288.3   14261.0   14279.6   14090.9   13992.6
+  lm_head       4784.1    4807.8    4772.5    4664.6    4757.4    4820.3    4837.7    4738.0
+  argmax           9.5       0.0       0.0       0.0       0.0       0.0       0.0       0.0
+
+critical path: 436 tasks, 4067.3 us (span 4067.3)
+  kind       tasks  bytes bw bytes hop machinery   dep gap queue gap     total
+  moe_up        48     561.8      49.0     159.5      52.2       0.0     822.5
+  qkv           48     234.1      20.0     179.0     183.2       0.0     616.3
+  moe_down      48     280.9      49.0     105.5     139.1       0.0     574.4
+  router        48       5.9      49.0     210.5     129.2       0.0     394.6
+  o_proj        48     187.3      20.0      56.2      96.7       0.0     360.2
+  attn          48      24.1     130.0     105.6      52.5       0.0     312.2
+  reduce        48       0.6     130.0     123.7      56.6       0.0     310.8
+  prep          48       0.0      49.0     145.8      81.1       0.0     275.9
+  topk          48       0.0      34.0     112.3      74.6       0.0     220.9
+  lm_head        1     144.7       0.0       7.2       1.7       0.0     153.6
+  argmax         1       0.1       0.6       8.8       1.7       0.0      11.2
+  in_norm        1       0.0       3.6       0.1       4.4       0.0       8.1
+  prologue       1       0.0       0.4       3.5       2.6       0.0       6.5
+  TOTAL               1439.6     534.4    1217.8     875.5       0.0    4067.3
+  machinery in streaming phases (body above floor + hops) 507.4 us, in latency phases 710.4 us
+  shares of the span: bytes_bw 35.4%  bytes_hops 13.1%  machinery 29.9%  dep_gap 21.5%  queue_gap 0.0%
+
+critical-path gaps by edge (producer -> consumer; the first step's gap from the window start is not an edge)
+  late = consumer taken after the producer's body done; before taken = median of that part of the gap
+  producer   consumer   XCD   edges producers   sum us  median    max  late same wkr before taken
+  moe_up     moe_down   same     48        24    139.1    2.92   3.76    47       18         2.24
+  moe_down   qkv        cross    32       256    120.9    3.74   4.69    31        0         1.66
+  o_proj     router     cross    32       256     80.3    2.43   3.71    17        0         0.68
+  reduce     o_proj     cross    36         4     72.5    1.97   2.43     0        0         0.00
+  qkv        prep       cross    43       256     72.0    1.68   2.34     0        0         0.00
+  router     topk       cross    39       256     60.3    1.56   1.87     0        0         0.00
+  moe_down   qkv        same     15       256     58.4    3.88   4.44    15       11         1.92
+  attn       reduce     same     48         5     56.6    1.24   1.44     0        0         0.00
+  prep       attn       same     48         1     52.5    1.08   2.16     0        0         0.00
+  topk       moe_up     same     48         1     52.2    1.12   1.24     0        0         0.00
+  o_proj     router     same     16       256     48.9    3.32   3.68    13       10         2.08
+  reduce     o_proj     same     12         4     24.2    1.96   2.32     0        0         0.00
+  router     topk       same      9       256     14.3    1.60   1.92     0        0         0.00
+  qkv        prep       same      5       256      9.0    1.72   2.60     0        0         0.00
+  prologue   in_norm    cross     1         1      4.4    4.35   4.35     0        0         0.00
+  in_norm    qkv        same      1         1      3.9    3.88   3.88     0        0         0.00
+  lm_head    argmax     cross     1       256      1.7    1.68   1.68     0        0         0.00
+  moe_down   lm_head    cross     1       256      1.7    1.65   1.65     0        0         0.00
+  TOTAL edges 435, gaps 872.9 us, of which before taken 231.3 us on 123 late edges
+
+layer 24: which XCD runs which phase, us from the step start
+  type           XCD tasks first ready last done mean body
+  qkv_24           6    32     1955.76   1966.68      8.72
+  qkv_24           0    32     1955.81   1966.45      8.46
+  qkv_24           5    32     1955.85   1965.69      8.84
+  qkv_24           1    32     1955.91   1966.47      8.66
+  qkv_24           4    32     1955.92   1966.20      8.67
+  qkv_24           7    32     1955.93   1967.37      8.83
+  qkv_24           2    32     1956.00   1966.64      8.73
+  qkv_24           3    32     1956.03   1966.03      9.03
+  prep_24          0     1     1968.61   1973.53      4.92
+  prep_24          3     1     1969.31   1973.15      3.84
+  prep_24          2     1     1969.40   1973.64      4.24
+  prep_24          1     1     1969.43   1973.31      3.88
+  attn_24          3     5     1974.03   1979.83      5.65
+  attn_24          1     5     1974.55   1980.07      5.42
+  attn_24          2     5     1974.80   1980.44      5.55
+  attn_24          0     5     1974.81   1980.33      5.34
+  reduce_24        3     1     1980.91   1985.91      5.00
+  reduce_24        1     1     1981.55   1986.59      5.04
+  reduce_24        0     1     1981.57   1986.57      5.00
+  reduce_24        2     1     1981.80   1986.96      5.16
+  o_proj_24        4    32     1988.44   1993.64      4.87
+  o_proj_24        5    32     1988.45   1993.77      5.04
+  o_proj_24        7    32     1988.53   1993.89      5.03
+  o_proj_24        3    32     1988.55   1993.91      5.17
+  o_proj_24        6    32     1988.56   1993.88      5.07
+  o_proj_24        2    32     1988.60   1994.16      5.06
+  o_proj_24        1    32     1988.67   1994.03      5.06
+  o_proj_24        0    32     1988.73   1994.09      5.19
+  router_24        6    32     1996.00   1997.04      0.32
+  router_24        2    32     1996.04   2002.16      5.34
+  router_24        5    32     1996.05   1996.57      0.32
+  router_24        7    32     1996.05   1996.45      0.32
+  router_24        4    32     1996.08   1996.68      0.32
+  router_24        3    32     1996.11   2002.19      5.43
+  router_24        0    32     1996.13   2002.29      5.42
+  router_24        1    32     1996.19   2002.23      5.34
+  topk_24_x        6     1     2003.60   2006.56      2.96
+  topk_24_x        1     1     2003.63   2006.87      3.24
+  topk_24_x        3     1     2003.63   2006.63      3.00
+  topk_24_x        5     1     2003.65   2006.69      3.04
+  topk_24_x        4     1     2003.84   2006.64      2.80
+  topk_24_x        2     1     2003.88   2006.68      2.80
+  topk_24_x        7     1     2003.93   2007.13      3.20
+  topk_24_x        0     1     2003.97   2006.93      2.96
+  moe_up_24        4    24     2007.32   2023.84     15.99
+  moe_up_24        6    24     2007.32   2023.80     16.01
+  moe_up_24        5    24     2007.37   2024.17     16.15
+  moe_up_24        3    24     2007.43   2023.59     15.78
+  moe_up_24        2    24     2007.48   2023.84     15.88
+  moe_up_24        1    24     2007.75   2024.27     16.04
+  moe_up_24        0    24     2007.81   2024.13     15.90
+  moe_up_24        7    24     2007.93   2024.09     15.93
+  moe_down_24      2    32     2025.04   2035.32      9.39
+  moe_down_24      4    32     2025.04   2035.40      9.42
+  moe_down_24      6    32     2025.04   2035.44      9.38
+  moe_down_24      5    32     2025.13   2035.57      9.43
+  moe_down_24      3    32     2025.19   2035.43      9.42
+  moe_down_24      7    32     2025.57   2035.49      8.98
+  moe_down_24      1    32     2025.91   2035.83      9.01
+  moe_down_24      0    32     2026.13   2035.89      8.87
