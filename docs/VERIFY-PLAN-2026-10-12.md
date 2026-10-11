@@ -202,8 +202,14 @@ Exact native command for each staged survivor:
 ```sh
 .venv/bin/python -m examples.vllm_llm.import_certificate \
   --run-build BUILD --model MODEL -- \
-  --check 48 --check-pos 1024 --price-attention
+  --check 48 --check-pos 1023 --price-attention
 ```
+
+`vl_tiles.hip:36` writes seq_lens=pos+1: position1023 is exactly1024
+KV tokens. X5 reads back and checks that metadata before replay. The existing
+A stamps snapshot remains step1024, whose KV length is1025; it is the first
+post-first-token snapshot of the1024-token prompt. The retained vendor
+31-sample means likewise span growing decode lengths, a cross-basis limit.
 
 `host.hip` prices only attn/reduce after that launch's byte check: 10 warmup
 launches of each original/import, then three alternating original/import
@@ -215,7 +221,7 @@ startup. Fresh 0/1040 checks and 32/32 CHECK-DSL certification precede pricing;
 new adapter correctness work must also fit B, or remain NOT-COMPLETE.
 This replaces the speculative 20-minute vendor sweep; it adds no B minutes.
 
-`x5.prices` requires all **288 records** (48 × 2 × 3), exact position and
+`x5.prices` requires all **288 records** (48 × 2 × 3), position1023, actual context1024 and
 100 replays, finite positive durations and bytes_equal. Average of each
 layer's sum of role medians must reach **<=7.69 us/layer**. A passing isolated
 price gives `R2=max(0,48*(10.645-price)/1000)` [E, cross-basis], never a

@@ -78,7 +78,7 @@ def prices(text):
     expected={(layer,role,sample) for layer in range(48) for role in ('attn','reduce') for sample in range(3)}
     if len(rows)!=len(expected) or {(r['layer'],r['role'],r['sample']) for r in rows}!=expected:
         raise ValueError('X5 NOT-COMPLETE isolated sample population')
-    if any(r['position']!=1024 or r['replays']!=100 or r['bytes_equal'] is not True or
+    if any(r['position']!=1023 or r.get('context')!=1024 or r['replays']!=100 or r['bytes_equal'] is not True or
            any(not math.isfinite(r[k]) or r[k]<=0 for k in ('original_us','imported_us')) for r in rows):
         raise ValueError('X5 invalid condition/correctness/timing')
     per_layer=[]
@@ -106,15 +106,15 @@ def run(s):
         h.certify(s,arm)
         end=s.deadline; s.deadline=min(end,h.time.monotonic()+30)
         try:
-            text=h.host(s,arm,'X5_'+arm,['--check','48','--check-pos','1024','--price-attention'])
+            text=h.host(s,arm,'X5_'+arm,['--check','48','--check-pos','1023','--price-attention'])
             from examples.vllm_llm import import_certificate as cert
-            # Parse the fresh position-1024 check as well as requiring its
+            # Parse the fresh position-1023/context-1024 check as well as requiring its
             # immutable build stamps. Full 0/1040 + token gates preceded it.
             build = Path(s.c['builds'][arm])
             ident = cert.verified_build(build,Path(s.c['model']))
             expected = cert.expected_instances((build/'vl_plan.txt').read_text(),
                                                json.loads((build/'imp/imports.json').read_text()))
-            cert.check_output(text,expected,1024,ident)
+            cert.check_output(text,expected,1023,ident)
             if 'CHECK OK:' not in text: raise ValueError('X5 import check incomplete')
             return prices(text)
         finally: s.deadline=end

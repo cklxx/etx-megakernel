@@ -147,8 +147,8 @@ int main(int argc, char** argv) {
   const Manifest m = read_manifest(dir + "/vl.manifest");
   const int H = m.geti("H"), NH = m.geti("NH"), NKV = m.geti("NKV"), HD = m.geti("HD"), I = m.geti("INTER"), L = m.geti("L"), V = m.geti("V");
   const bool tie = m.geti("tie"), bias = m.geti("bias"), qk_norm = m.geti("qk_norm");
-  if (price_attention && (check_layers != 48 || check_pos != 1024 || H != 2048 || NH != 32 || NKV != 4 || HD != 128 || L != 48))
-    die("X5 requires --check 48 --check-pos 1024 and exact Qwen3-30B-A3B shape");
+  if (price_attention && (check_layers != 48 || check_pos != 1023 || H != 2048 || NH != 32 || NKV != 4 || HD != 128 || L != 48))
+    die("X5 requires --check 48 --check-pos 1023 (seq_len 1024) and exact Qwen3-30B-A3B shape");
   const int MAXLEN = m.geti("maxlen"), NQKV = (NH + 2 * NKV) * HD;
   const float eps = (float)m.cfg.at("eps"), scale = 1.0f / sqrtf((float)HD);
   auto cfg0 = [&](const char* k) { auto it = m.cfg.find(k); return it == m.cfg.end() ? 0 : (int)it->second; };
@@ -574,6 +574,11 @@ int main(int argc, char** argv) {
     hipEvent_t e0, e1; ETX_CHECK(hipEventCreate(&e0)); ETX_CHECK(hipEventCreate(&e1));
     auto elapsed_us = [&]() { float ms = 0.f; ETX_CHECK(hipEventElapsedTime(&ms, e0, e1)); return 1000.0 * ms; };
     std::map<std::string, std::pair<double, double>> by_kernel;      // export -> (original us, imported us), summed
+    if (price_attention) {
+      int actual_context = 0;
+      ETX_CHECK(hipMemcpy(&actual_context, seq_lens, sizeof(actual_context), hipMemcpyDeviceToHost));
+      if (actual_context != 1024) die("X5 requires actual seq_lens=1024");
+    }
     double sum_o = 0, sum_i = 0;
     for (const Inst& x : insts) {
       if (x.layer >= check_layers || (x.layer < 0 && check_layers < L)) break;
@@ -698,7 +703,7 @@ int main(int argc, char** argv) {
             if (!wait_stream(hst.stream, 5.0)) die("X5 sample hung");
             values[who] = elapsed_us()/100;
           }
-          printf("X5-SAMPLE {\"layer\":%d,\"role\":\"%s\",\"sample\":%d,\"position\":%d,\"replays\":100,\"bytes_equal\":true,\"original_us\":%.9f,\"imported_us\":%.9f}\n",
+          printf("X5-SAMPLE {\"layer\":%d,\"role\":\"%s\",\"sample\":%d,\"position\":%d,\"context\":1024,\"replays\":100,\"bytes_equal\":true,\"original_us\":%.9f,\"imported_us\":%.9f}\n",
                  x.layer, x.role.c_str(), sample, check_pos, values[0], values[1]);
           fflush(stdout);
         }
