@@ -215,6 +215,8 @@ The new tool `examples/vllm_llm/xcd_account.py` adds the per-worker class partit
 
 `examples/sessions/qwen300.py` is on `main` (merge `9b7f16a`). The brief calls the session running. Its results are not in `~/code/etx/` at the time of writing.
 
+Retry policy (2026-10-11): before rerunning a step, archive its stale log under `log_history/<log stem>/attempt<N>/<filename>` in the same session directory; the canonical log holds the latest full, unfiltered run. This also covers retained compiler logs and `compiler_version.txt`. Certificate and routing directories use `mkdir(exist_ok=True)`, preserving existing contents without deleting or borrowing another step's data. Commands, deadlines, timeouts, ordering and pass/fail rules are unchanged. See `docs/KEY32-MEASURED-2026-10-11.md` for the retry regression evidence and measured KEY32 decision.
+
 **It adds:**
 1. **Two traces of the timed builds.** Job 2 builds KEY32 off and on, checks that both have the same plan (`qwen300.py:377-378`) and traces each to `tr_off.bin` and `tr_on.bin` (`qwen300.py:397`). The same session times both builds in five pinned pairs. So the account of this report can run on the build whose wall time the session reports. That removes error 2 of section 0.
 2. **A direct test of the top-k body.** It prints the body change on minus off for topk, attn, reduce, prep, moe_up and moe_down (`qwen300.py:399-405`). topk is the largest latency phase on the path: 371.6 us of body [M].

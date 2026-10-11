@@ -8,6 +8,13 @@ No provisioning, billing API, GPU access or image pull on import / dry-run.
 
 Two serial jobs: bf16 MoE phase pricing, then the KEY32 decision.
 Job 2 runs last even if Job 1 fails. Nothing is silently dropped.
+Retries in the same log directory rerun every step. Before writing a log,
+move its previous contents to log_history/<log stem>/attempt<N>/<filename>,
+using the first unused per-log attempt directory. The canonical path holds the
+latest full, unfiltered log; older logs remain readable under the same session
+directory. This also applies to retained compiler logs and compiler_version.txt.
+Per-step certificate and routing directories are created with exist_ok=True;
+no other step's data is deleted or borrowed.
 The job timeouts total 70 minutes.
 The runner cap is 110 minutes; VM life is at most 120 minutes including setup.
 At the historical $1.99/GPU-hour rate: estimated ceiling $3.98 (not a quote).
@@ -104,14 +111,27 @@ def container(args, seconds, gpu=True):
 DEADLINE = float('inf')
 
 
+def prepare_log(path):
+    """Archive this log alone before a retry; keep the canonical reader path."""
+    if path.exists():
+        history = root() / 'log_history' / path.stem
+        attempt = 1
+        while (history / f'attempt{attempt}').exists():
+            attempt += 1
+        directory = history / f'attempt{attempt}'
+        directory.mkdir(parents=True, exist_ok=True)
+        archived = directory / path.name
+        path.rename(archived)
+        print(f'ARCHIVE {path} -> {archived}', flush=True)
+    return path
+
+
 def step(name, cmd, seconds, env=None):
-    """Unfiltered substep logs, heartbeat, silence probe, bounded process group."""
+    """Archive stale logs, then run with unfiltered output and the same bounds."""
     limit = min(seconds, int(DEADLINE - time.monotonic()) - 5)
     if limit <= 0:
         raise RuntimeError(f'{name}: NOT-COMPLETE session deadline')
-    path = root() / f'{name}.log'
-    if path.exists():
-        raise RuntimeError(f'refuse to overwrite {path}')
+    path = prepare_log(root() / f'{name}.log')
     print(f'COMMAND {name} deadline={limit}s {shlex.join(cmd)}', flush=True)
     started = time.monotonic()
     with path.open('w') as f:
@@ -371,18 +391,18 @@ def job2():
             for filename in ('compile.log', 'hipcc.log', 'compiler_version.txt'):
                 source = root()/f'b_{arm}'/filename
                 if source.exists():
-                    (root()/f'{arm}_{filename}').write_bytes(source.read_bytes())
+                    prepare_log(root()/f'{arm}_{filename}').write_bytes(source.read_bytes())
     with ThreadPoolExecutor(max_workers=2) as pool:
         list(pool.map(build, ('off', 'on')))
     if (root()/'b_off/vl_plan.txt').read_bytes() != (root()/'b_on/vl_plan.txt').read_bytes():
         raise RuntimeError('KEY32 changed the plan: invalid switch-only comparison')
     for arm in ('off', 'on'):
         certificate = root()/f'certificate_{arm}'
-        certificate.mkdir()
+        certificate.mkdir(exist_ok=True)
         cert.export_build(root()/f'b_{arm}', model('bf16'), certificate)
         for pos in (0, 1040):
             audit = root()/f'routing_{arm}_p{pos}'
-            audit.mkdir()
+            audit.mkdir(exist_ok=True)
             text = etx_capture(arm, f'--check 48 --check-pos {pos}',
                                env={'ETX_CHECK_TOPK_DUMP':str(audit)}, name=f'{arm}_check_p{pos}')
             (certificate/f'check_p{pos}.txt').write_text(text)
