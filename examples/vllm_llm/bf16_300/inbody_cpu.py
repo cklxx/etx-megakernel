@@ -7,6 +7,7 @@ optimized device IR AND ISA bytes, not just source anchors/resource counts.
 import argparse
 import json
 import os
+import re
 from pathlib import Path
 import subprocess
 import types
@@ -19,6 +20,18 @@ from .pack import sha
 from etx.codegen.lowering import emit_lowering_header
 from etx.machine.model import load_machine
 from etx.ops import gemv
+
+
+def normalize_ir(s):
+    locations=set(re.findall(r'!srcloc !(\d+)',s))
+    # Inline asm may carry a list of i32 OR i64 packed source locations.
+    # Only explicitly referenced !srcloc nodes are normalized; instructions,
+    # constants, ranges, TBAA and all resource metadata remain untouched.
+    s=re.sub(r'(?m)^!(\d+) = !\{([^\n}]*)\}$',
+        lambda m: '!'+m[1]+' = !{'+re.sub(r'(i\d+) [-+]?\d+',r'\1 0',m[2])+'}'
+        if m[1] in locations else m[0],s)
+    s=re.sub(r'__hip_cuid_[0-9a-f]+','__hip_cuid_NORMALIZED',s)
+    return re.sub(r"(?m)^; ModuleID = .*\n",'',s)
 
 
 def check(out, model_build=None):
@@ -66,12 +79,7 @@ def check(out, model_build=None):
     # assembly .file diagnostic. All instructions/resource metadata still match.
     import re
     def ir(name):
-        s=(out/(name+'.ll')).read_text()
-        locations=set(re.findall(r'!srcloc !(\d+)',s))
-        for loc in locations:
-            s=re.sub(rf'(?m)^!{loc} = !\{{i64 \d+\}}$',f'!{loc} = !{{i64 0}}',s)
-        s=re.sub(r'__hip_cuid_[0-9a-f]+','__hip_cuid_NORMALIZED',s)
-        return re.sub(r"(?m)^; ModuleID = .*\n",'',s)
+        return normalize_ir((out/(name+'.ll')).read_text())
     def isa(name):
         s=re.sub(r'__hip_cuid_[0-9a-f]+','__hip_cuid_NORMALIZED',(out/(name+'.s')).read_text())
         return re.sub(r'(?m)^\s*\.file\s+.*\n','',s)
@@ -141,9 +149,7 @@ for arm in ('original','off'):
     def normalize(name,suffix):
         s=(out/(name+'.'+suffix)).read_text()
         if suffix=='ll':
-            for loc in set(re.findall(r'!srcloc !(\d+)',s)):
-                s=re.sub(rf'(?m)^!{loc} = !\{{i64 \d+\}}$',f'!{loc} = !{{i64 0}}',s)
-            s=re.sub(r"(?m)^; ModuleID = .*\n",'',s)
+            return normalize_ir(s)
         else: s=re.sub(r'(?m)^\s*\.file\s+.*\n','',s)
         return re.sub(r'__hip_cuid_[0-9a-f]+','__hip_cuid_NORMALIZED',s)
     result=dict(start_commit='4a39f92',off_ir_code_equal=normalize('original','ll')==normalize('off','ll'),

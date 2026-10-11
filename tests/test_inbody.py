@@ -171,3 +171,11 @@ def test_session_report_requires_all_five_full_runs():
     assert perturbation(s,s,s)['off_within_spread']
     with pytest.raises(ValueError): samples(text.replace('"matched": 32','"matched": 31',1))
     assert MAX_SESSION_SECONDS==900 and len(JOBS)==1 and JOBS[0]['timeout']==900
+
+
+def test_off_identity_normalizes_only_source_locations():
+    from examples.vllm_llm.bf16_300.inbody_cpu import normalize_ir
+    source='call void asm "", ""(), !srcloc !1\n!1 = !{i32 123, i64 456}\n!2 = !{i64 789}\nadd i64 456, 1\n'
+    result=normalize_ir(source)
+    assert '!1 = !{i32 0, i64 0}' in result
+    assert '!2 = !{i64 789}' in result and 'add i64 456, 1' in result

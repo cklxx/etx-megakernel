@@ -55,6 +55,7 @@ def analyze(plan, raw, byte_rules=None, hop_us=None, bandwidth=4.3):
     if bandwidth <= 0 or len(raw['legacy']) != len(plan['descs']):
         raise ValueError('incomplete plan/trace or invalid bandwidth')
     names = {v['id']: k for k, v in plan['types'].items()}
+    types = {v['id']: v for v in plan['types'].values()}
     words = event_words(plan)
     legacy = []
     tasks = []
@@ -88,8 +89,14 @@ def analyze(plan, raw, byte_rules=None, hop_us=None, bandwidth=4.3):
         drain = max(b for a, b in waves)
         name = names[d['type']]
         match = re.search(r'_(\d+)(?:_x)?$', name)
+        ty=types[d['type']]
+        coord=d['coord']
+        tile_block=None
+        if 'dsl_moe_' in ty.get('symbol',''):
+            tile_block=coord[0]*ty['grid'][1]+coord[1] if ty['symbol'].startswith('etx_tile_x_') else coord[0]
         task = dict(task=i, phase=re.sub(r'_\d+(?:_x)?$', '', name),
                     layer=int(match[1]) if match else None, type=name,
+                    coord=coord, tile_block=tile_block, body_symbol=ty.get('symbol'),
                     record=[*r, hi, poll], arrive_bounds_ticks=[lo, hi],
                     arrive_is_synthetic=not dependencies,
                     arrive_producer_tasks=sorted({owner for _, b, owner in brackets if b == hi}),
