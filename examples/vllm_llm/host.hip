@@ -117,7 +117,7 @@ struct Args {
 int main(int argc, char** argv) {
   if (argc < 3) die("usage: run <packed-dir> <plan.txt> [--golden F] [--gen N] [--repeat R] [--teacher] [--unfused] [--check-coverage]");
   const std::string dir = argv[1], plan_path = argv[2];
-  int gen = -1, repeat = 2, check_layers = 0, check_pos = 0, max_steps = 0; bool teacher = false, unfused = false, check_dsl = false, check_coverage = false; std::string golden_name = "golden_c1024.txt"; std::vector<std::string> extra_goldens;
+  int gen = -1, repeat = 2, check_layers = 0, check_pos = 0, max_steps = 0; bool teacher = false, unfused = false, check_dsl = false, check_coverage = false, price_attention = false; std::string golden_name = "golden_c1024.txt"; std::vector<std::string> extra_goldens;
   for (int i = 3; i < argc; ++i) {
     const std::string a = argv[i];
     if (a == "--gen" && i + 1 < argc) gen = atoi(argv[++i]);
@@ -141,11 +141,14 @@ int main(int argc, char** argv) {
     else if (a == "--check-coverage") { check_coverage = true; teacher = true; }
     else if (a == "--check-dsl") check_dsl = true;   // the DSL GEMVs of the last layer against a CPU reference (bf16 tolerance)   // traces: stop after N steps (no token check)
     else if (a == "--check-pos" && i + 1 < argc) check_pos = atoi(argv[++i]);
+    else if (a == "--price-attention") price_attention = true;
     else if (a == "--check" && i + 1 < argc) check_layers = atoi(argv[++i]);   // compare each imported launch with vLLM's original, layers < N
   }
   const Manifest m = read_manifest(dir + "/vl.manifest");
   const int H = m.geti("H"), NH = m.geti("NH"), NKV = m.geti("NKV"), HD = m.geti("HD"), I = m.geti("INTER"), L = m.geti("L"), V = m.geti("V");
   const bool tie = m.geti("tie"), bias = m.geti("bias"), qk_norm = m.geti("qk_norm");
+  if (price_attention && (check_layers != 48 || check_pos != 1023 || H != 2048 || NH != 32 || NKV != 4 || HD != 128 || L != 48))
+    die("X5 requires --check 48 --check-pos 1023 (seq_len 1024) and exact Qwen3-30B-A3B shape");
   const int MAXLEN = m.geti("maxlen"), NQKV = (NH + 2 * NKV) * HD;
   const float eps = (float)m.cfg.at("eps"), scale = 1.0f / sqrtf((float)HD);
   auto cfg0 = [&](const char* k) { auto it = m.cfg.find(k); return it == m.cfg.end() ? 0 : (int)it->second; };
@@ -208,6 +211,8 @@ int main(int argc, char** argv) {
     if (parts * ETX_SPEC_PART < MAXLEN) die("attention partitions (" + std::to_string(parts) + " x 256) do not cover maxlen " + std::to_string(MAXLEN));
     break;
   }
+
+  if (price_attention && nreq != 1) die("X5 requires batch/request count 1");
 
   // ---- golden: request 0 from --golden, request r from --golden<r>; the prompts have one length
   std::vector<std::vector<int>> prompts, goldens;
@@ -569,6 +574,11 @@ int main(int argc, char** argv) {
     hipEvent_t e0, e1; ETX_CHECK(hipEventCreate(&e0)); ETX_CHECK(hipEventCreate(&e1));
     auto elapsed_us = [&]() { float ms = 0.f; ETX_CHECK(hipEventElapsedTime(&ms, e0, e1)); return 1000.0 * ms; };
     std::map<std::string, std::pair<double, double>> by_kernel;      // export -> (original us, imported us), summed
+    if (price_attention) {
+      int actual_context = 0;
+      ETX_CHECK(hipMemcpy(&actual_context, seq_lens, sizeof(actual_context), hipMemcpyDeviceToHost));
+      if (actual_context != 1024) die("X5 requires actual seq_lens=1024");
+    }
     double sum_o = 0, sum_i = 0;
     for (const Inst& x : insts) {
       if (x.layer >= check_layers || (x.layer < 0 && check_layers < L)) break;
@@ -671,6 +681,33 @@ int main(int argc, char** argv) {
              "\"result\":\"%s\",\"first_byte\":%lld}\n", x.n, x.layer, x.exp.c_str(), x.rep,
              x.gx, x.gy, x.gz, d->block[0], d->block[1], d->block[2], check_pos, compared_bytes,
              diff.empty() ? "identical" : "DIFFERS", first_byte);
+      if (price_attention && (x.role == "attn" || x.role == "reduce")) {
+        if (!diff.empty() || x.rep != 1) die("X5 original/import byte or replica gate failed");
+        std::vector<void*> av(d->nparams);
+        for (int k = 0; k < d->nparams; ++k) av[k] = ab.data() + x.off + d->off[k];
+        auto original = [&]() {
+          if (fn) ETX_CHECK(hipLaunchKernel(fn, dim3(x.gx, x.gy, x.gz), dim3(d->block[0], d->block[1], d->block[2]), av.data(), 0, hst.stream));
+          else ETX_CHECK(hipModuleLaunchKernel(tri, x.gx, x.gy, x.gz, d->block[0], d->block[1], d->block[2], tri_shared, hst.stream, av.data(), nullptr));
+        };
+        for (int w = 0; w < 10; ++w) { original(); launch_imported(x.n + 1); }
+        if (!wait_stream(hst.stream, 5.0)) die("X5 warmup hung");
+        for (int sample = 0; sample < 3; ++sample) {
+          double values[2];
+          for (int order = 0; order < 2; ++order) {
+            const int who = (sample % 2) ? 1-order : order;
+            ETX_CHECK(hipEventRecord(e0, hst.stream));
+            for (int replay = 0; replay < 100; ++replay) {
+              if (who == 0) original(); else launch_imported(x.n + 1);
+            }
+            ETX_CHECK(hipEventRecord(e1, hst.stream));
+            if (!wait_stream(hst.stream, 5.0)) die("X5 sample hung");
+            values[who] = elapsed_us()/100;
+          }
+          printf("X5-SAMPLE {\"layer\":%d,\"role\":\"%s\",\"sample\":%d,\"position\":%d,\"context\":1024,\"replays\":100,\"bytes_equal\":true,\"original_us\":%.9f,\"imported_us\":%.9f}\n",
+                 x.layer, x.role.c_str(), sample, check_pos, values[0], values[1]);
+          fflush(stdout);
+        }
+      }
       ++checked;
       if (!diff.empty()) ++bad;
     }
@@ -714,6 +751,12 @@ int main(int argc, char** argv) {
 #ifdef ETX_INBODY_REPORT
       printf("HOUR-STEP-BEGIN run=%d step=%d\n", run, t); fflush(stdout);
 #endif
+#if defined(ETX_INBODY) && ETX_INBODY
+      // Load-group stores only at the existing registered snapshot. No extra
+      // decode run, no diagnostic traffic during the other 1054 steps.
+      if (const char* selected = getenv("ETX_HOUR_TRACE_STEP"))
+        hst.p.inbody_load = (run == 0 && t == atoi(selected)) ? hst.d_inbody_load : nullptr;
+#endif
       const auto w0 = std::chrono::steady_clock::now();
       vl_set_params(vps.data(), nreq, hst.stream);
 #ifdef ETX_HOUR_PROFILE
@@ -756,6 +799,7 @@ int main(int argc, char** argv) {
 #endif
       if (t + 1 >= (int)prompt.size()) wall_ms.push_back(wms);
 #ifdef ETX_INBODY_REPORT
+      if (t >= (int)prompt.size()) printf("HOUR-KERNEL {\"run\":%d,\"step\":%d,\"ms\":%.9f}\n", run, t, hst.last_ms);
       if (t >= (int)prompt.size()) printf("HOUR-WALL {\"run\":%d,\"step\":%d,\"ms\":%.9f}\n", run, t, wms);
 #endif
 #if defined(ETX_INBODY) && ETX_INBODY
@@ -771,6 +815,9 @@ int main(int argc, char** argv) {
       if (progress && (t % progress == 0 || t < 3)) { printf("  step %d: %.3f ms wall\n", t, wms); fflush(stdout); }
     }
     if (nsteps < steps) { printf("run %d: stopped after %d of %d steps (--max-steps): no token check\n", run, nsteps, steps); continue; }
+#ifdef ETX_INBODY_REPORT
+    printf("HOUR-RESET enabled=%d checked=%d valid=%d\n", hst.dev_reset, hst.dev_reset_checked, hst.dev_reset_valid);
+#endif
     // a step starts at the first request's prologue and ends at the last request's argmax
     std::vector<uint64_t> t0(steps, ~0ull), t1(steps, 0);
     for (int r = 0; r < nreq; ++r) {

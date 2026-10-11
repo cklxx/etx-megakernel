@@ -9,6 +9,10 @@ import re
 def instrument(source):
     source = source.replace('#include "etx/primitives.h"',
         '#include "etx/primitives.h"\n#if defined(ETX_INBODY) && ETX_INBODY\n#include "etx/inbody.h"\n#endif', 1)
+    # Standalone import checks use the unfused call path and have no selected
+    # task diagnostics. Initialize that ctx too, before any tile entry point.
+    anchor = 'ctx.cst[0] = ctx.cst[1] = ctx.cst[2] = ctx.cst[3] = 0;'
+    source = source.replace(anchor, anchor+'\n#if defined(ETX_INBODY) && ETX_INBODY\n  ctx.inbody_load = nullptr;\n#endif')
     start = source.index('static __device__ __forceinline__ void etx_run_task(')
     end = source.index('#ifndef ETX_MIN_WG_PER_CU', start)
     prefix, suffix, source = source[:start], source[end:], source[start:end]
@@ -39,6 +43,8 @@ def instrument(source):
     source = re.sub(r'(?m)^#define ETX_TARGET\(idx\) .*etx_arrive.*$', arrival, source)
     insert('  int sym = -1;',
            '  if (threadIdx.x == 0 && p.inbody_poll) p.inbody_poll[tid] = 0;', before=True)
+    insert('  etx_call_body(sym, &ctx);   // phase 2: the only call site of each body',
+           '  ctx.inbody_load = p.inbody_load && p.inbody_load_offsets[tid+1] > p.inbody_load_offsets[tid] ? p.inbody_load + p.inbody_load_offsets[tid] : nullptr;', before=True)
     insert('  etx_call_body(sym, &ctx);   // phase 2: the only call site of each body',
            '  if (p.inbody_wave && (threadIdx.x % ETX_WAVE_SIZE) == 0) {\n'
            '    size_t iw = ((size_t)tid * (ETX_THREADS / ETX_WAVE_SIZE) + threadIdx.x / ETX_WAVE_SIZE) * 2;\n'

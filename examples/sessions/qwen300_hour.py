@@ -11,12 +11,12 @@ occurs during the measurement budget. Fresh checks are never transferred.
 
 Deadlines (including each tranche's fresh correctness work): A=900s (885s
 commands + 15s first-stop decision), B=1320s, C=4020s (NO_TOUCH=1620s,
-ISOLATE_POLLER=1200s, C6=1200s), D>=2150s of remaining time, report=10s.
-900 + 1320 + 4020 + 2150 + 10 = 8400s; no head arm or pair is shortened.
+ISOLATE_POLLER=1200s, C6=1200s), guard=240s, D>=1910s of remaining time, report=10s.
+240 + 900 + 1320 + 4020 + 1910 + 10 = 8400s; no head arm or pair is shortened.
 C estimates: 1575 + 1140 + 1085 = 3800s, with 220s margin. C6's estimate
 is 9 expected 120s host calls plus 5s ancestry; adapter eligibility remains
 mandatory. D's warm-call upper estimate is 933s + 3*28s = 1017s, including
-fresh certification of a new final combination (PREFLIGHT Q4); it has 1133s
+fresh certification of a new final combination (PREFLIGHT Q4); it has 893s
 margin. Prewarm/staging finish before the clock. These are estimates, not
 runtime guarantees: missed gates/deadlines stay NOT-COMPLETE with full logs.
 The runner stops at 8400s, 600s below the 150-minute machine life.
@@ -49,7 +49,8 @@ ROOT = Path(__file__).resolve().parents[2]
 MANIFEST = Path(__file__).with_name('qwen300_hour_arms.json')
 # Registration: main 9f91f3a, docs/PLAN-300TOKS-2026-10-11.md:297,304,310,318,320.
 MAX_SESSION_SECONDS = 8400
-TRANCHE_SECONDS = dict(A=900, B=1320, C=4020, D=2150)
+ENVIRONMENT_GUARD_SECONDS = 240
+TRANCHE_SECONDS = dict(A=900, B=1320, C=4020, D=1910)
 REPORT_SECONDS = 10
 if not 0 < float(os.environ.get('ETX_SESS_MAX_SECONDS', MAX_SESSION_SECONDS)) <= MAX_SESSION_SECONDS:
     raise ValueError('qwen300-hour cap must be positive and <=8400 seconds')
@@ -64,8 +65,17 @@ def manifest(path=MANIFEST):
 def template():
     return dict(model='/absolute/prepared/qwen3-30b-a3b',
                 builds={name: '/absolute/prepared/'+name for name in
-                        ('kept', 'stamps', 'stages', 'C1', 'C5', 'C1_C5', 'NO_TOUCH',
+                        ('kept', 'reset', 'stamps', 'stages', 'C1', 'C5', 'C1_C5', 'NO_TOUCH',
                          'NO_TOUCH_stamps', 'ISOLATE_POLLER', 'C6')},
+                environment_guard=dict(
+                    trees={name: dict(build='/absolute/prepared/guard-'+commit,
+                        source_tree='/absolute/prepared/source-'+commit,
+                        normalized_device_ir='/absolute/prepared/guard-'+commit+'/normalized.ll',
+                        cpu_gates='/absolute/prepared/guard-'+commit+'/cpu-gates.json',
+                        identity_sha256='REQUIRED', seal_sha256='REQUIRED')
+                        for name, commit in (('old', '7c85efb'), ('hour', 'e068e47'))},
+                    weight_sha256={}),
+                x5_builds=['kept'],
                 isolation_probe=None,  # sealed offline probe: {argv: [...], sha256: executable SHA256}
                 source_commit='REQUIRED full commit of pushed tree', build_commits={}, build_seals={},
                 combinations=[dict(id='C1_C5', build='C1_C5', members=['C1', 'C5'], enabled=True,
@@ -109,7 +119,7 @@ def prepare(config_path):
     env.update(ETX_VL_CHECK='1', ETX_TOPK_KEY32='1', ETX_DEV_RESET='0', ETX_VL_REQUESTS='1',
                ETX_VL_CU='256', ETX_VL_TOUCH='1', ETX_PREFETCH_ISOLATE_POLLER='0')
     # Optional C prototypes are NOT built here: integrate and prove before use.
-    variants = dict(kept={}, stamps={'ETX_INBODY_BUILD': '1'}, stages={'profile': True},
+    variants = dict(kept={}, reset={'ETX_DEV_RESET': '1'}, stamps={'ETX_INBODY_BUILD': '1'}, stages={'profile': True},
                     C1={'ETX_VL_ROUTER_NARROW': '1'}, C5={'hoist': True},
                     C1_C5={'ETX_VL_ROUTER_NARROW': '1', 'hoist': True},
                     NO_TOUCH={'no_touch': True},
@@ -182,6 +192,10 @@ def prewarm(config_path):
             if p.returncode: raise RuntimeError(f'CPU-PREWARM rc={p.returncode}')
         finally:
             if p.poll() is None: p.kill(); p.wait()
+    if 'environment_guard' in c:
+        from examples.vllm_llm.import_certificate import sha
+        c['environment_guard']['weight_sha256'] = {str(path): sha(path) for path in files}
+        config_path.write_text(json.dumps(c, indent=2)+'\n')
     print(f'CPU-PREWARM complete elapsed={time.monotonic()-begin:.1f}s; start runner next', flush=True)
 
 
@@ -283,14 +297,18 @@ class Session:
 
 
 REGISTERED = {
+    'GUARD': 'two pinned old/hour kept pairs abs(delta)<0.030 ms; original attn p0 <=7.9 us; kept anchor <=4.210 ms; sealed weights and IR',
     'A1.busy': 'instrument classification only: real >=0.100 ms; dead <0.050 ms',
     'A1.free': 'instrument classification only: real >=0.050 ms',
     'A1.floor': '1.00 us/edge; retain below-floor count/min, never clip raw gaps',
+    'A.loads': 'logical load-phase rate >=4.0 TB/s: non-byte work; <=3.3: memory path; requires perturbation gate, no extra run',
     'A2.route': 'available body headroom >=0.142 ms / 2.96 us/layer; estimate, no removal proof',
     'A3.host': 'name stages accounting for unexplained 0.086 ms beyond priced 0.049 ms',
+    'RESET.keep': '3 adjacent pinned pairs, all faster, median >=0.030 ms, median >2*spread; only ETX_DEV_RESET changes',
     'A4.reset': 'pursue only >0.030 ms/step, host and device separately',
     'A.stop': 'S1 at <=15 minutes: G >=0.088 ms (1.833 us/layer) in named above-floor gap atoms, else close target route',
-    'B.stop': 'S2 after A, before B: G + R2 + H >=0.324 ms (whole-target 6.743 us/layer), else close target route; unknowns count zero',
+    'X5': '3 x 100 warmed isolated replays/role/layer, ctx1024; legal pair <=7.69 us/layer; incomplete inventory stays [U]',
+    'B.stop': 'S2 after X5, before body pairs: G + R2 + H >=0.324 ms (whole-target 6.743 us/layer), else close target route; unknowns count zero',
     'B.keep': '3 pairs, all faster, median >=0.030 ms, median >2*spread',
     'C.fusion': 'net >=1.042 us/layer; VGPR <=128; LDS <=29752 B',
     'C.body': '3 pairs, all faster, median >=0.030 ms, median >2*spread',
@@ -301,13 +319,17 @@ REGISTERED = {
     'D.system': '5 adjacent pinned pairs; LEAD all deltas <0, median <=-0.050 ms',
 }
 THRESHOLD_SOURCES = {
+    'GUARD': 'docs/LEVERS-MORE-2026-10-12.md:section 1; PLAN-300-CERTAIN-2026-10-12.md F0',
     'A1.busy': 'docs/qwen300-hour-2026-10-11.md:39',
     'A1.free': 'docs/qwen300-hour-2026-10-11.md:40',
     'A1.floor': 'docs/X7-SCHEDULE-WHATIF-2026-10-11.md:164',
+    'A.loads': 'docs/VERIFY-PLAN-2026-10-12.md; MASTER-TABLE-2026-10-11.md QK6/OP3/M.J',
     'A2.route': 'docs/qwen300-hour-2026-10-11.md:42',
     'A3.host': 'docs/MASTER-TABLE-2026-10-11.md:60',
+    'RESET.keep': 'docs/VERIFY-PLAN-2026-10-12.md; KEEP from PLAN-300TOKS-2026-10-11.md:322',
     'A4.reset': 'docs/PLAN-generic-decoder-2026-10-08.md:154',
     'A.stop': 'docs/PLAN-300TOKS-2026-10-11.md:301-302 (main 9f91f3a)',
+    'X5': 'docs/PLAN-300TOKS-2026-10-11.md:307; REVIEW-POOL-ANALYSIS-2026-10-11.md:123',
     'B.stop': 'docs/PLAN-300TOKS-2026-10-11.md:306-308 (main 9f91f3a)',
     'B.keep': 'docs/PLAN-300TOKS-2026-10-11.md:314,322 (main 9f91f3a)',
     'C.fusion': 'docs/PLAN-300TOKS-2026-10-11.md:315,331 (main 9f91f3a)',
@@ -454,7 +476,7 @@ def first_stop(s, gap_atoms):
                         decision='END SESSION: NOT-COMPLETE' if incomplete else
                                  'CONTINUE to S2' if passes else 'STOP-SPEND: close target route'),
           'NOT-COMPLETE' if incomplete else 'PASS' if passes else 'STOP', REGISTERED['A.stop'])
-    print(f'FIRST-STOP elapsed={time.monotonic()-s.start:.1f}s (<=900s)', flush=True)
+    print(f'FIRST-STOP elapsed={time.monotonic()-s.start:.1f}s (guard + A <=1140s)', flush=True)
     return passes
 
 
@@ -555,7 +577,9 @@ def certify(s, arm):
         text = host(s, arm, f'{arm}_check_p{pos}', ['--check', '48', '--check-pos', str(pos)])
         (archive/f'check_p{pos}.txt').write_text(text)
     result = cert.validate(archive, timing=False)
-    text = token_gate(host(s, arm, arm+'_token_gate', ['--repeat', '1', '--check-dsl']))
+    extra = {'ETX_INBODY_RAW': str(s.out/'stamps_load_off.bin'), 'ETX_INBODY_LOADS': '0',
+             'ETX_HOUR_TRACE_STEP': '1024'} if arm == 'stamps' else None
+    text = token_gate(host(s, arm, arm+'_token_gate', ['--repeat', '1', '--check-dsl'], extra))
     if 'CHECK-DSL OK' not in text: raise ValueError('CHECK-DSL missing')
     (archive/'gate_chkx.log').write_text(text)
     s.certified.add(arm)
@@ -600,11 +624,6 @@ def preflight(s):
                 (s.out/(arm+'_'+name)).write_bytes(src.read_bytes())
         if arm == 'stamps' and seal['flags'].get('ETX_INBODY_BUILD') != '1': raise ValueError('stamp build missing')
         if arm != 'stamps' and seal['flags'].get('ETX_INBODY_BUILD', '0') != '0': raise ValueError('stamps contaminate timing')
-    hardware = s.step('hardware', ['rocm-smi', '--showproductname'], timeout=15, expected=5)
-    if 'MI300X' not in hardware.upper(): raise ValueError('registered MI300X product identity not present')
-    cards = set(re.findall(r'GPU\[(\d+)\]', hardware))
-    if cards and len(cards) != 1: raise ValueError('one-GPU VM required; do not leave other GPUs idle')
-    s.qualified_c = qualify_c(s)  # eligibility is frozen at session start
 
 
 def tranche_a(s):
@@ -624,12 +643,15 @@ def tranche_a(s):
                                  Path(s.c['builds']['stamps'])/'plan.json', raw, output], timeout=45, expected=15)
             summary = output.with_suffix('.summary.json')
             result = json.loads(summary.read_text())
+            # Control comes from the already-budgeted stamps correctness gate.
+            # Analyze under the same bounded subprocess, not a parent rewrite.
             result['diagnostic_control'] = dict(
                 on_wall=timing(text), kept_off_wall=s.arms.get('kept', {}).get('gate_wall'),
                 stamps_null_wall=s.arms.get('stamps', {}).get('gate_wall'),
                 basis='single noninterleaved complete controls; report movement, no correction/subtraction or perturbation pass',
                 warning='ON allocations/stores/spills perturb the schedule; pools are ON observations, not certified OFF savings')
             summary.write_text(json.dumps(result, indent=2)+'\n')
+            s.row('A.loads', result.get('load_phases'), 'RECORDED-UNVERIFIED' if result.get('load_phases', {}).get('totals') else 'NOT-COMPLETE', REGISTERED['A.loads'])
             pools = result['critical_pools']; busy = pools['busy']['above_floor_lower_ms']; free = pools['free']['above_floor_lower_ms']
             s.row('A1.busy', pools['busy'], 'PASS' if busy >= .100 else 'DEAD' if pools['busy']['above_floor_upper_ms'] < .050 and not pools['ambiguous']['count'] else 'UNRESOLVED', REGISTERED['A1.busy'])
             s.row('A1.free', pools['free'], 'PASS' if free >= .050 else 'UNRESOLVED', REGISTERED['A1.free'])
@@ -656,6 +678,8 @@ def tranche_a(s):
             reset = {k: result['mean_us'][k]/1000 for k in ('reset_submit_us', 'reset_device_us')}
             s.row('A4.reset', reset, 'PURSUE' if max(reset.values()) > .030 else 'CLOSED', REGISTERED['A4.reset'])
         s.attempt('A3/A4', stages)
+    if 'kept' in s.certified:
+        registered_reset(s)  # requested price is collected even if S1/S2 later stops
     return first_stop(s, gap_atoms)
 
 
@@ -669,7 +693,17 @@ def timing(text, mode='fused'):
         raise ValueError('NOT-COMPLETE: 31 post-first-token steps required')
     if any(not math.isfinite(r['ms']) or r['ms'] <= 0 for r in rows): raise ValueError('invalid timing')
     return dict(wall_ms=st.mean(r['ms'] for r in rows), samples=rows,
-                result_wall_ms=runs[0].wall_ms, device_ms=runs[0].device_ms)
+                result_wall_ms=runs[0].wall_ms, device_ms=runs[0].device_ms,
+                kernel_event_ms=kernel_mean(text))
+
+
+def kernel_mean(text):
+    rows = [json.loads(l.split(' ', 1)[1]) for l in text.splitlines() if l.startswith('HOUR-KERNEL ')]
+    if not rows: return None  # historical hosts; never synthesize a tail price
+    if [(r['run'], r['step']) for r in rows] != [(0, t) for t in range(1024, 1055)]:
+        raise ValueError('NOT-COMPLETE kernel-event population')
+    if any(not math.isfinite(r['ms']) or r['ms'] <= 0 for r in rows): raise ValueError('invalid kernel event')
+    return st.mean(r['ms'] for r in rows)
 
 
 def keep(gains, count=3, threshold=.030):
@@ -712,7 +746,10 @@ def candidate_pairs(s, a, tranche, publish=True):
     for rnd in range(3):
         row = {}
         for who in (('kept', arm) if rnd % 2 == 0 else (arm, 'kept')):
-            row[who] = timing(host(s, who, f'{tranche}_{ident}_r{rnd}_{who}', ['--repeat', '1']))
+            text = host(s, who, f'{tranche}_{ident}_r{rnd}_{who}', ['--repeat', '1'])
+            if who == 'reset' and 'HOUR-RESET enabled=1 checked=1 valid=1' not in text:
+                raise ValueError('reset tail not confirmed; fallback cannot be a KEEP arm')
+            row[who] = timing(text)
         rounds.append(row)
     result = keep([r['kept']['wall_ms']-r[arm]['wall_ms'] for r in rounds])
     result.update(status='KEEP' if result['keep'] else 'REJECT', rounds=rounds, overlap=a.get('overlap'),
@@ -724,9 +761,22 @@ def candidate_pairs(s, a, tranche, publish=True):
     return result
 
 
+def registered_reset(s):
+    from examples.vllm_llm import reset_pair
+    end = s.deadline
+    s.deadline = min(time.monotonic()+210, end)
+    try:
+        result = s.attempt('RESET.keep', lambda: reset_pair.run(s))
+        if result is None:
+            s.row('RESET.keep', None, 'NOT-COMPLETE', REGISTERED['RESET.keep'])
+        return result
+    finally:
+        s.deadline = end
+
+
 def tranche_b(s):
     # Tranche B: plan section 7, line 304 (main 9f91f3a).
-    s.deadline = min(time.monotonic()+TRANCHE_SECONDS['B'], s.end)
+    s.deadline = min(time.monotonic()+TRANCHE_SECONDS['B']-120, s.end)
     if 'kept' not in s.certified:
         print('B SKIP: kept fresh correctness gate failed', flush=True); return []
     survivors = []
@@ -1039,15 +1089,31 @@ def tranche_d(s, survivors, extra_seconds):
         s.arms['D'] = dict(status='NOT-COMPLETE', reason='missing final pairs; no shortened-run aggregate')
 
 
+def environment_guard(s):
+    from examples.vllm_llm.environment_guard import run
+    return run(s)
+
+
 def execute(s):
-    preflight(s)
+    preflight(s)  # CPU/file checks only; guard owns the first VM command.
+    if s.attempt('GUARD', lambda: environment_guard(s)) is not True:
+        if 'GUARD' not in s.rows:
+            s.row('GUARD', None, 'NOT-COMPLETE', REGISTERED['GUARD'])
+        print('END before timed tranches: environment guard did not pass', flush=True)
+        return
+    s.qualified_c = qualify_c(s)
     if not tranche_a(s):
         print('END after A: '+s.rows['A.stop']['value']['decision'], flush=True)
         for name in ('B.keep', 'B.stop', 'C.fusion', 'C.body', 'C.NO_TOUCH', 'C.ISOLATE_POLLER',
                      'D.target', 'D.fusion', 'D.system'):
             s.row(name, None, 'NOT-RUN', REGISTERED[name])
         return
-    # B cannot change G, H or the unmeasured R2 (zero); decide before spending it.
+    # X5 can change R2. Spend only its bounded isolated probes before S2,
+    # never the C1/C5 wall pairs when the route has already closed.
+    from examples.vllm_llm import x5
+    s.deadline = min(time.monotonic()+120, s.end)
+    if s.attempt('X5', lambda: x5.run(s)) is None:
+        s.row('X5', None, 'NOT-COMPLETE', REGISTERED['X5'])
     if not second_stop(s):
         print('STOP after A: S2 closes target route', flush=True)
         for name in ('B.keep', 'C.fusion', 'C.body', 'C.NO_TOUCH', 'C.ISOLATE_POLLER', 'D.target', 'D.fusion', 'D.system'):
@@ -1055,7 +1121,8 @@ def execute(s):
         return
     b = tranche_b(s)
     c, extra = tranche_c(s)
-    tranche_d(s, b+c, extra)
+    resets = [dict(id='DEV_RESET', build='reset', enabled=True, kind='reset', flags={'ETX_DEV_RESET':'1'})] if s.rows.get('RESET.keep', {}).get('status') == 'KEEP' else []
+    tranche_d(s, b+c+resets, extra)
 
 
 def vllm_entry(args):
@@ -1073,7 +1140,7 @@ def dry_run():
     for j in JOBS:
         subprocess.run(['bash', '-n', '-c', j['cmd']], check=True)
     assert MAX_SESSION_SECONDS == 8400
-    assert sum(TRANCHE_SECONDS.values()) + REPORT_SECONDS == MAX_SESSION_SECONDS
+    assert sum(TRANCHE_SECONDS.values()) + ENVIRONMENT_GUARD_SECONDS + REPORT_SECONDS == MAX_SESSION_SECONDS
     c_arms = manifest()['C']
     assert all(a['enabled'] for a in manifest()['B']+c_arms)
     assert sum(a['budget_s'] for a in c_arms) == TRANCHE_SECONDS['C']
@@ -1087,7 +1154,7 @@ def dry_run():
     else:
         raise AssertionError('missing critical-body coverage must refuse')
     assert len({a['id'] for a in manifest()['B']+manifest()['C']}) == len(manifest()['B']+manifest()['C'])
-    print(json.dumps(dict(budgets_s=dict(TRANCHE_SECONDS, D='remaining session time (>=2150s)', report=REPORT_SECONDS),
+    print(json.dumps(dict(budgets_s=dict(TRANCHE_SECONDS, guard=ENVIRONMENT_GUARD_SECONDS, D='remaining session time (>=1910s)', report=REPORT_SECONDS),
                           manifest=manifest(), thresholds=REGISTERED), indent=2))
     from etx.tools.gpu_jobs import main as runner
     return runner([str(Path(__file__)), '--dry-run'])
@@ -1101,13 +1168,33 @@ def main(argv=None):
         from etx.tools import inbody
         print('CPU ANALYSIS begin: lossless edge/body records', flush=True)
         result = edge_prices(json.loads(Path(args[1]).read_text()), inbody.read_raw(args[2]))
+        # Load analysis is independent: absent load stamps must not erase G.
+        try:
+            plan = json.loads(Path(args[1]).read_text())
+            on = inbody.read_raw(args[2])
+            loads = inbody.load_phases(plan, on)
+            off_path = Path(args[2]).with_name('stamps_load_off.bin')
+            if off_path.is_file():
+                off_report = inbody.analyze(plan, inbody.read_raw(off_path))
+                on_report = result['inbody']
+                critical = set(off_report['critical_task_ids']) | set(on_report['critical_task_ids'])
+                changes = [abs(on_report['tasks'][i]['body_us']-off_report['tasks'][i]['body_us'])
+                           for i in critical if on_report['tasks'][i]['phase'] in inbody.LOAD_ROLES]
+                if not changes: raise ValueError('missing load-phase perturbation population')
+                loads['perturbation'] = dict(sampled_bodies=len(changes), max_abs_body_change_us=max(changes),
+                    pass_le_0_5_us=max(changes) <= .5, basis='one matched snapshot ON/OFF, same stamp executable; original/OFF spread remains [U]')
+                loads['validity'] = 'NOT-COMPLETE: original/OFF spread not established' if max(changes) <= .5 else 'INVALID: load stamps exceed 0.5 us/body'
+
+        except ValueError as exc:
+            loads = dict(status='NOT-COMPLETE', reason=str(exc))
+        result['load_phases'] = loads
         output = Path(args[3])
         output.write_text(json.dumps(result, indent=2)+'\n')
         # The parent must not parse/rewrite the large lossless report after
         # its subprocess deadline. Its small decision view is emitted HERE,
         # under the same deadline as all raw analysis and serialization.
         summary = dict(critical_pools=result['critical_pools'], floor_us=result['floor_us'], gap_atoms=result['gap_atoms'],
-                       basis=result['basis'], inbody=dict(phases=result['inbody']['phases']))
+                       basis=result['basis'], load_phases=result['load_phases'], inbody=dict(phases=result['inbody']['phases']))
         output.with_suffix('.summary.json').write_text(json.dumps(summary, indent=2)+'\n')
         print('CPU ANALYSIS complete', flush=True)
         return 0

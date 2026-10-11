@@ -54,7 +54,7 @@ def write_build(build, model):
                     compiler=(build / 'compiler_version.txt').read_text().strip(),
                     overrides={k: v for k, v in os.environ.items()
                                if k.startswith(('ETX_VL_', 'ETX_DSL_'))
-                               or k == 'ETX_PREFETCH_ISOLATE_POLLER'},
+                               or k in ('ETX_PREFETCH_ISOLATE_POLLER', 'ETX_DEV_RESET')},
                     files=fingerprint(build, model))
     (build / 'build_identity.json').write_text(json.dumps(identity, indent=2, sort_keys=True) + '\n')
     return identity
@@ -70,7 +70,7 @@ def verified_build(build, model):
 def capture(build, model, args):
     # The wrapper fixes executable, plan, model and golden; alternate golden or
     # truncated/teacher-forced timing must not inherit their fingerprints.
-    allowed = {'--check', '--check-pos', '--repeat', '--unfused', '--check-dsl'}
+    allowed = {'--check', '--check-pos', '--repeat', '--unfused', '--check-dsl', '--price-attention'}
     for arg in args:
         if arg.startswith('-') and arg not in allowed:
             raise Refusal(f'unsupported certified host option {arg}')

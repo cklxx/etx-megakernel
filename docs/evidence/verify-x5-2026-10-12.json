@@ -1,0 +1,402 @@
+{
+  "condition": {
+    "precision": "bf16",
+    "batch": 1,
+    "context": 1024,
+    "NH": 32,
+    "NKV": 4,
+    "HD": 128
+  },
+  "vllm_revision": "f46a9dfe2c5f57bebbd29556cbbb25eabd874226",
+  "sources": {
+    "vllm/platforms/rocm.py": {
+      "sha256": "7154cf5936e8cc294c4e33ec5851384bd293a0b4bbd09d544bdc05116fa3f516",
+      "knobs": []
+    },
+    "vllm/v1/attention/backends/rocm_attn.py": {
+      "sha256": "1b6ee62a95c94542c345cdc676bec6e8a653bf703f2fbce96af7bf2319d08ce7",
+      "knobs": []
+    },
+    "vllm/v1/attention/backends/rocm_aiter_unified_attn.py": {
+      "sha256": "2f693310e0b7d76bd23cf9a8f1bd1bb26af944e65afbb82f0de8afc0293fde1e",
+      "knobs": []
+    },
+    "vllm/v1/attention/backends/rocm_aiter_fa.py": {
+      "sha256": "ef5c582e23223fa5a80a7d0151b4223c7c81123b4fa199a5f5b7833cd6e615b8",
+      "knobs": [
+        {
+          "line": 36,
+          "text": "_PARTITION_SIZE_ROCM = 256"
+        }
+      ]
+    },
+    "vllm/_aiter_ops.py": {
+      "sha256": "df55d254f239f46573d5f5716e44da505e1eee97f6dd1139f833146b9650cbfd",
+      "knobs": []
+    },
+    "vllm/v1/attention/ops/triton_unified_attention.py": {
+      "sha256": "992a2bc892e2e2b43fbd3c8163816ccf7e97ced56cb542bd827adb0ddb2df9fa",
+      "knobs": [
+        {
+          "line": 301,
+          "text": "BLOCK_SIZE % TILE_SIZE == 0,"
+        },
+        {
+          "line": 324,
+          "text": "if segm_idx * tiles_per_segment * TILE_SIZE >= seq_len:"
+        },
+        {
+          "line": 430,
+          "text": "# physical block (guaranteed by ``BLOCK_SIZE % TILE_SIZE == 0``"
+        },
+        {
+          "line": 536,
+          "text": "S = tl.zeros(shape=(BLOCK_M, TILE_SIZE), dtype=tl.float32)"
+        },
+        {
+          "line": 820,
+          "text": "num_par_softmax_segments=None,"
+        },
+        {
+          "line": 890,
+          "text": "num_par_softmax_segments=num_par_softmax_segments,"
+        },
+        {
+          "line": 938,
+          "text": "launch_num_warps: int | None = None"
+        },
+        {
+          "line": 939,
+          "text": "launch_num_stages: int | None = None"
+        },
+        {
+          "line": 954,
+          "text": "launch_num_warps = 8"
+        },
+        {
+          "line": 955,
+          "text": "launch_num_stages = 2"
+        },
+        {
+          "line": 978,
+          "text": "TILE_SIZE_PREFILL = _get_tile_size("
+        },
+        {
+          "line": 981,
+          "text": "TILE_SIZE_DECODE = _get_tile_size("
+        },
+        {
+          "line": 988,
+          "text": "TILE_SIZE_PREFILL = 128"
+        },
+        {
+          "line": 990,
+          "text": "# USE_TD requires BLOCK_SIZE % TILE_SIZE == 0 (enforced by a"
+        },
+        {
+          "line": 995,
+          "text": "TILE_SIZE_PREFILL = min(TILE_SIZE_PREFILL, block_size)"
+        },
+        {
+          "line": 996,
+          "text": "TILE_SIZE_DECODE = min(TILE_SIZE_DECODE, block_size)"
+        },
+        {
+          "line": 1043,
+          "text": "or num_par_softmax_segments is None"
+        },
+        {
+          "line": 1074,
+          "text": "num_segments = num_par_softmax_segments if use_3d else 1"
+        },
+        {
+          "line": 1081,
+          "text": "grid = (total_num_q_blocks, num_kv_heads, num_par_softmax_segments)"
+        },
+        {
+          "line": 1120,
+          "text": "TILE_SIZE=tile_size,"
+        },
+        {
+          "line": 1182,
+          "text": "TILE_SIZE=TILE_SIZE_DECODE,"
+        },
+        {
+          "line": 1187,
+          "text": "NUM_SEGMENTS_PER_SEQ=num_par_softmax_segments,"
+        }
+      ]
+    },
+    "csrc/rocm/attention.cu": {
+      "sha256": "a2d0af86509d95fc488cfd3fcbf7a08c30defd0e0a8b73c7778b8112b8f886a7",
+      "knobs": [
+        {
+          "line": 358,
+          "text": "constexpr int T_PAR_SIZE = 256;  // token partition size set to 256"
+        },
+        {
+          "line": 1761,
+          "text": "constexpr int T_PAR_SIZE = 256;  // token partition size set to 256"
+        },
+        {
+          "line": 2539,
+          "text": "constexpr int T_PAR_SIZE = 256;  // token partition size set to 256"
+        },
+        {
+          "line": 3283,
+          "text": "constexpr int PARTITION_SIZE = 256;"
+        },
+        {
+          "line": 3342,
+          "text": "case 16:"
+        },
+        {
+          "line": 3432,
+          "text": "constexpr int PARTITION_SIZE = 256;"
+        },
+        {
+          "line": 3490,
+          "text": "case 16:"
+        },
+        {
+          "line": 3550,
+          "text": "case 16:"
+        },
+        {
+          "line": 3609,
+          "text": "case 16:                                                                \\"
+        },
+        {
+          "line": 3612,
+          "text": "case 32:                                                                \\"
+        }
+      ]
+    },
+    "csrc/attention/paged_attention_v1.cu": {
+      "status": "[U] missing source"
+    },
+    "csrc/attention/paged_attention_v2.cu": {
+      "status": "[U] missing source"
+    }
+  },
+  "aiter_sources": {},
+  "complete": false,
+  "completeness": "[U] pinned image AITER dispatcher/compiled exports and exact adapters not certified; no exhaustive closure",
+  "candidates": [
+    {
+      "id": "ROCM_ATTN_G8",
+      "status": "legal control",
+      "reason": "PART=256, block=16, HD=128, GQA=8, MFMA16; existing importer",
+      "preprice_us": 10.645,
+      "preprice_basis": "[E] critical-body or cross-basis retained estimate"
+    },
+    {
+      "id": "ROCM_ATTN_PART128",
+      "status": "excluded",
+      "reason": "imported body hard-codes 256; extra early-exit tasks are not a new specialization",
+      "preprice_us": null,
+      "preprice_basis": "[U]"
+    },
+    {
+      "id": "ROCM_ATTN_PART512",
+      "status": "excluded",
+      "reason": "host PART change does not change kernel 256 stride; misses context tokens",
+      "preprice_us": null,
+      "preprice_basis": "[U]"
+    },
+    {
+      "id": "ROCM_ATTN_G1_7_G9_16_HD64",
+      "status": "excluded",
+      "reason": "changes GQA/head-size specialization; actual NH/NKV=8 and HD=128",
+      "preprice_us": null,
+      "preprice_basis": "[U]"
+    },
+    {
+      "id": "ROCM_ATTN_BLOCK32",
+      "status": "[U] adapter required",
+      "reason": "shape supported; existing block-16 K/V writer, strides and block table must change together",
+      "preprice_us": null,
+      "preprice_basis": "[U]"
+    },
+    {
+      "id": "PAGED_V1",
+      "status": "[U] adapter required",
+      "reason": "bf16 generic paged attention; different export/grid, no existing compatible output/partial contract",
+      "preprice_us": null,
+      "preprice_basis": "[U]"
+    },
+    {
+      "id": "PAGED_V2",
+      "status": "[U] adapter required",
+      "reason": "generic partitioned decode; partition/reduce numerics and adapter need independent checks",
+      "preprice_us": null,
+      "preprice_basis": "[U]"
+    },
+    {
+      "id": "TRITON_ATTN_2D",
+      "status": "[U] adapter required",
+      "reason": "num_par_softmax_segments=None/2D; flash K/V layout, grid/softmax order differ",
+      "preprice_us": null,
+      "preprice_basis": "[U]"
+    },
+    {
+      "id": "TRITON_ATTN_3D",
+      "status": "[U] adapter required",
+      "reason": "num_par_softmax_segments, TILE_SIZE, BLOCK_M, warps/stages; not arbitrary external backend knobs",
+      "preprice_us": null,
+      "preprice_basis": "[U]"
+    },
+    {
+      "id": "AITER_UNIFIED",
+      "status": "[U] adapter required",
+      "reason": "retained 2-kernel result slower; segments/tile/warps/stages and shuffled cache require source-pinned export/layout",
+      "preprice_us": 11.42030309139785,
+      "preprice_basis": "[E] critical-body or cross-basis retained estimate"
+    },
+    {
+      "id": "AITER_PA_COMMON",
+      "status": "[U] adapter required",
+      "reason": "paged_attention_common wrapper; HIP/ASM internal dispatch implementation not installed here",
+      "preprice_us": null,
+      "preprice_basis": "[U]"
+    },
+    {
+      "id": "AITER_PA_ASM",
+      "status": "[U] adapter required",
+      "reason": "pa_fwd_asm wrapper; Q/K/V scales, layout and implementation legality unverified",
+      "preprice_us": null,
+      "preprice_basis": "[U]"
+    },
+    {
+      "id": "AITER_FA",
+      "status": "[U] adapter required",
+      "reason": "flash_attn_varlen_func bf16 family; dense/flash cache and metadata differ; no ready import",
+      "preprice_us": null,
+      "preprice_basis": "[U]"
+    },
+    {
+      "id": "MLA_SPARSE",
+      "status": "excluded",
+      "reason": "Qwen uses ordinary GQA, not MLA or sparse attention",
+      "preprice_us": null,
+      "preprice_basis": "[U]"
+    },
+    {
+      "id": "CUDA_XPU_RDNA",
+      "status": "excluded",
+      "reason": "CUDA-only, XPU or Navi/WMMA kernels do not target gfx942 CDNA",
+      "preprice_us": null,
+      "preprice_basis": "[U]"
+    },
+    {
+      "id": "QUANTIZED_ATTENTION",
+      "status": "excluded",
+      "reason": "FP8/INT4/TurboQuant changes bf16 KV/output algorithm contract",
+      "preprice_us": null,
+      "preprice_basis": "[U]"
+    },
+    {
+      "id": "SINK_ALIBI_WINDOW_DCP",
+      "status": "excluded",
+      "reason": "new sinks, ALiBi, sliding window or distributed context changes this workload",
+      "preprice_us": null,
+      "preprice_basis": "[U]"
+    }
+  ],
+  "retained": {
+    "attention_us": 6.768617607526882,
+    "reduce_us": 4.651685483870968,
+    "pair_us": 11.42030309139785,
+    "source": "results_qwen300_2026-10-11/bf16_pricing.json",
+    "samples_per_layer": 31
+  },
+  "survivor_builds": [
+    "kept"
+  ],
+  "cached_aiter_unified": {
+    "commit": "cdb1950e1dc4d864cae54c8a86a61cde999ce1e7",
+    "matching_blob_paths": [
+      "aiter/ops/triton/_triton_kernels/attention/unified_attention.py"
+    ],
+    "sha256": "316615adc9558ce52abab9a8f066a744ba39f68cf27237ff88953414391ad3ea",
+    "status": "[M] CPU blob match; installed pinned image match [U]",
+    "knobs": [
+      {
+        "line": 107,
+        "text": "TILE_SIZE: tl.constexpr,  # int must be power of 2"
+      },
+      {
+        "line": 128,
+        "text": "BLOCK_M: tl.constexpr,  # int"
+      },
+      {
+        "line": 132,
+        "text": "SHUFFLED_KV_CACHE: tl.constexpr = False,  # bool"
+      },
+      {
+        "line": 134,
+        "text": "K_WIDTH: tl.constexpr = 0,  # int"
+      },
+      {
+        "line": 182,
+        "text": "if SHUFFLED_KV_CACHE:"
+      },
+      {
+        "line": 387,
+        "text": "if SHUFFLED_KV_CACHE:"
+      },
+      {
+        "line": 433,
+        "text": "if SHUFFLED_KV_CACHE:"
+      },
+      {
+        "line": 454,
+        "text": "if SHUFFLED_KV_CACHE:"
+      },
+      {
+        "line": 604,
+        "text": "TILE_SIZE: tl.constexpr,  # int, must be power of 2"
+      },
+      {
+        "line": 625,
+        "text": "BLOCK_M: tl.constexpr,  # int"
+      },
+      {
+        "line": 626,
+        "text": "num_warps: tl.constexpr,  # int"
+      },
+      {
+        "line": 628,
+        "text": "num_stages: tl.constexpr,  # int"
+      },
+      {
+        "line": 631,
+        "text": "SHUFFLED_KV_CACHE: tl.constexpr = False,  # bool"
+      },
+      {
+        "line": 632,
+        "text": "K_WIDTH: tl.constexpr = 0,  # int"
+      },
+      {
+        "line": 682,
+        "text": "if SHUFFLED_KV_CACHE:"
+      },
+      {
+        "line": 801,
+        "text": "if SHUFFLED_KV_CACHE:"
+      },
+      {
+        "line": 847,
+        "text": "if SHUFFLED_KV_CACHE:"
+      },
+      {
+        "line": 868,
+        "text": "if SHUFFLED_KV_CACHE:"
+      },
+      {
+        "line": 998,
+        "text": "TILE_SIZE: tl.constexpr,  # int"
+      }
+    ]
+  }
+}
