@@ -159,6 +159,25 @@ def session(tmp_path):
     return h.Session(dict(manifest=str(h.MANIFEST), builds={'kept': '/unused'}, model='/unused'), tmp_path)
 
 
+@pytest.mark.parametrize('missing', [None, 'packed', 'hf'])
+def test_prewarm_reads_staged_weights_before_any_session_clock(tmp_path, monkeypatch, capsys, missing):
+    model = tmp_path/'model'; model.mkdir()
+    hf = model/'hf'; hf.mkdir()
+    if missing != 'packed': (model/'vl.bin').write_bytes(b'packed weights')
+    if missing != 'hf': (hf/'model-00001.safetensors').write_bytes(b'HF weights')
+    config = tmp_path/'prepared.json'
+    config.write_text(json.dumps(dict(model=str(model), hf=str(hf))))
+    monkeypatch.setattr(h, 'Session', lambda *args: pytest.fail('prewarm must precede session clock'))
+    if missing:
+        with pytest.raises(ValueError, match='weight'): h.main(['--prewarm', str(config)])
+        assert 'CPU-PREWARM begin' not in capsys.readouterr().out
+    else:
+        assert h.main(['--prewarm', str(config)]) == 0
+        out = capsys.readouterr().out
+        assert str(model/'vl.bin') in out and str(hf/'model-00001.safetensors') in out
+        assert 'CPU-PREWARM complete' in out
+
+
 def test_disabled_c_lends_exactly_twenty_seven_minutes(tmp_path):
     s = session(tmp_path)
     s.m['C'] = [a for a in s.m['C'] if not a['enabled']]

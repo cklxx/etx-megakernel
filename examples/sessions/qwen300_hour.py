@@ -2,6 +2,7 @@
 
 python -m examples.sessions.qwen300_hour --template prepared.json
 python -m examples.sessions.qwen300_hour --dry-run
+python -m examples.sessions.qwen300_hour --prewarm prepared.json
 python -m etx.tools.gpu_jobs examples/sessions/qwen300_hour.py --gpus 0 --machine A --logdir OUT
 
 The VM must have prepared.json at ~/etx/qwen300-hour.json, or set
@@ -131,6 +132,34 @@ def verify_seal(s, arm):
     if seal['build_sha256'] != cert.digest(cert.verified_build(b, Path(s.c['model']))):
         raise ValueError('build changed after staging seal')
     return seal
+
+
+def prewarm(config_path):
+    """CPU-only setup before starting gpu_jobs and its 74-minute clock."""
+    c = json.loads(config_path.read_text())
+    hf_weights = sorted(Path(c['hf']).glob('*.safetensors'))
+    if not hf_weights: raise ValueError('staged HF weight shards missing')
+    files = [Path(c['model'])/'vl.bin', *hf_weights]
+    for path in files:
+        if not path.is_file() or path.stat().st_size <= 0:
+            raise ValueError('staged weight file missing/empty: '+str(path))
+    print('CPU-PREWARM begin; separate staging budget, timeout=600s; files='+
+          json.dumps(list(map(str, files))), flush=True)
+    begin = time.monotonic()
+    with open(os.devnull, 'wb') as sink:
+        p = subprocess.Popen(['cat', *map(str, files)], stdout=sink)
+        try:
+            while p.poll() is None:
+                remaining = 600-(time.monotonic()-begin)
+                if remaining <= 0: raise TimeoutError('CPU-PREWARM staging deadline')
+                try:
+                    p.wait(timeout=min(5, remaining))
+                except subprocess.TimeoutExpired:
+                    print(f'CPU-PREWARM progress elapsed={time.monotonic()-begin:.0f}s pid={p.pid}', flush=True)
+            if p.returncode: raise RuntimeError(f'CPU-PREWARM rc={p.returncode}')
+        finally:
+            if p.poll() is None: p.kill(); p.wait()
+    print(f'CPU-PREWARM complete elapsed={time.monotonic()-begin:.1f}s; start runner next', flush=True)
 
 
 class Session:
@@ -556,7 +585,7 @@ def preflight(s):
 
 
 def tranche_a(s):
-    """900s including fresh correctness, cold loads and all deciding probes."""
+    """900s including fresh correctness and all deciding probes, after cache setup."""
     gap_atoms = None
     for arm in ('kept', 'stamps', 'stages'):
         if s.attempt('A.gate.'+arm, lambda arm=arm: certify(s, arm)) is None and arm not in s.certified:
@@ -1061,10 +1090,12 @@ def main(argv=None):
     g.add_argument('--dry-run', action='store_true')
     g.add_argument('--run', action='store_true')
     g.add_argument('--prepare', type=Path)
+    g.add_argument('--prewarm', type=Path)
     a = ap.parse_args(args)
     if a.template: a.template.write_text(json.dumps(template(), indent=2)+'\n'); return 0
     if a.dry_run: return dry_run()
     if a.prepare: prepare(a.prepare); return 0
+    if a.prewarm: prewarm(a.prewarm); return 0
     s = Session(dict(manifest=str(MANIFEST)), os.environ['ETX_SESS_LOGDIR'], float(os.environ.get('ETX_SESS_REMAINING_SECONDS', MAX_SESSION_SECONDS)))
     try:
         s.c = json.loads(Path(os.environ.get('ETX_QWEN300_CONFIG', ROOT/'qwen300-hour.json')).read_text())
