@@ -1,0 +1,392 @@
+{
+  "pytest": true,
+  "gfx942": true,
+  "dry_run": true,
+  "shell": true,
+  "local_matrix_16": true,
+  "rocm_build_check": true,
+  "prepared_from": "bff0279",
+  "source_hashes": {
+    "etx/__init__.py": "3adad2edaeb788f8b71e448839418ee74bf1c8caa49c73c6011c76a9a0411c18",
+    "etx/__main__.py": "808a87f3e9035d5e89734b0efa1a1047edfe145014faa6502f711c3ed23da914",
+    "etx/bench/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "etx/bench/numerical.py": "0ce1924ed868e8a92688183ffbd3a1642024a4d709d71ea7463d249bcb9c4832",
+    "etx/codegen/__init__.py": "a7764206959fbb7676fadae969058ab64a6e4badba4ef3bc9a3dd5b6eabcab96",
+    "etx/codegen/inbody.py": "5474db73d33cf9976c79df1415a27a670c93ec0317fc819e5d52028e5850d8a2",
+    "etx/codegen/kernel.py": "e6c738035ff218dce33252a35fc84f483c0260e96389cecb04186b2cfa0b4c78",
+    "etx/codegen/lowering.py": "0a4615a37a7386b31b79f3ffb2cebf50b85111d5d38fa641d144e0c15b7c96c5",
+    "etx/codegen/manifest.py": "733fd08e054f480825f1a3cf89029542b44e8e9d39bd75b83e3530e0af2168ae",
+    "etx/codegen/plan_header.py": "3d6e67d2e182fda55f9a80ad8395c19afc92fe3ec4b0b33f2b3bca4184f45213",
+    "etx/frontends/__init__.py": "2fe165054320e8762b40fdcd0fb6d7d33c9e678cf8649af9ecec11e16ffefefc",
+    "etx/frontends/linkmode.py": "29a8b30b148aa06c013b97c3ff07dc4473925e8425472450cc15ed65704d06ce",
+    "etx/frontends/tileop.py": "7a2d755ace1ff9d1e2c25016c1b888633d14d401f241b5a9f2d6da8aa91a656f",
+    "etx/frontends/triton_host.py": "077d714fc2d164c78bc796a25b907f33b541c13935b6baa9d948d01b0e4121e5",
+    "etx/importer/adapter.py": "04f26db2038cd5ccc4afe0fcca82d7f5bb51f21526867b507dc8876a6f4a930a",
+    "etx/importer/argblock.py": "1d7d9aa7f481e48134e20b31bb005f30270d1ba7b32722b226db968b2bba6af8",
+    "etx/importer/bundle.py": "23a4680744cbf3f553ea06b17995bd6c5310588b8d568173cba9be7e192bda5c",
+    "etx/importer/hip_ir_local.sh": "6769dd8eb030237ae137facba7d2a2238d75424170cebf7d23722db8564f89b7",
+    "etx/importer/ir_import.py": "e7295f7baec58c03292b42e5274754c1265e78a9c68ebaa3b8d32c15549f4fa8",
+    "etx/importer/launch_spec.py": "c24010f7b185c687b4a6d1d2e2526e956f7d770a4cbfe20fe53bcf7449ded8c4",
+    "etx/importer/shim/ATen/cuda/CUDAContext.h": "b3adf106d95b8934f690943f2921308b90be5b766c4c8ba250c792de56400201",
+    "etx/importer/shim/ATen/hip/HIPContext.h": "b3adf106d95b8934f690943f2921308b90be5b766c4c8ba250c792de56400201",
+    "etx/importer/shim/c10/cuda/CUDAGuard.h": "b3adf106d95b8934f690943f2921308b90be5b766c4c8ba250c792de56400201",
+    "etx/importer/shim/cuda.h": "7edd1fbcaefd415a87ccd009bc30d5bf5d429f8a3f95ffff347ac5d63416adf6",
+    "etx/importer/shim/cuda_bf16.h": "28284ff7a42143bd6ef82953c60dbe32f2acc83a10176fc2fa04b35f60a5e2df",
+    "etx/importer/shim/cuda_fp16.h": "5864a3c6a57debde2e84b83702a1467a01130dd1d2cdb70d75695931ca1582cc",
+    "etx/importer/shim/cuda_runtime.h": "738b1af3811f95704e3a9e57db672dc1f07646c796fedbe4f9ca25f99d53c189",
+    "etx/importer/shim/etx_cuda2hip.h": "665f08991b3ee96caa8288d19dba67d0ccb6550d1b2b1a432318f68dcc32140a",
+    "etx/importer/shim/mac/TargetConditionals.h": "5c61537ceed0dc3b705fa0f5012f8740bce104e0927c77d87972838727593f81",
+    "etx/importer/shim/thrust/complex.h": "a08799e4cbb54b4a5df629b5590793758bbacbd12c191bb431b13b94e2e75aed",
+    "etx/importer/shim/torch/all.h": "b3adf106d95b8934f690943f2921308b90be5b766c4c8ba250c792de56400201",
+    "etx/importer/slice_device.py": "16b05a5c6ce51477b48f5eeeab9f476b4c395330288cb6916098a390dbb54aca",
+    "etx/importer/spec.py": "9e0f8925bbde7f3e5e0bdd24482901781c2b3e82c79284715780dc5ceeeec20a",
+    "etx/importer/triton_import.py": "02cfb01cd29dc31a653d408c47e90c94726ab815d8873fb44bc58dc29a262040",
+    "etx/importer/vllm_kernels.py": "7787b9796555b9ed4e922ded5f5c7c2c6ae1ff51a452c911be4a02b3bb33397e",
+    "etx/ir/__init__.py": "4c58950f27f5597fc70f49d8b0803bb80042d2a2db051a82dd5baa5a088d8a9a",
+    "etx/ir/dims.py": "4f9761559fc1755a1774d784f314dde81cc2d4748cdc37db29c2467c17b8a054",
+    "etx/ir/edgemap.py": "7ed55adb714f06913c3f4c6300e91b65fae47dda21aca8e498eeeb3e99a5c770",
+    "etx/ir/instantiate.py": "b6848b49f690e59500c2f1d48aac0486afd85bd8ffe95604dfc1b1fd0629203d",
+    "etx/ir/types.py": "9cce7391e6d60d626f83563ce95779789a45e2d4bbc74f0d1b18904d427d87e6",
+    "etx/ir/verify.py": "20738006b52cc30a0fa799c0b79210474cfcce7645c14edb50845717015166d1",
+    "etx/machine/__init__.py": "462380c2e4d4d63787787818488d28e4e481f15c4198c89d7acc266abf04b5d3",
+    "etx/machine/model.py": "1a3ac60fcca59ceecf6369bd6aa46c2246e68447fa0241e4e887d90395975572",
+    "etx/ops/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "etx/ops/attnprep.py": "7208952b730df9738e3f70b256cfc35a0297a6058cffa096f2e3c26a035bac91",
+    "etx/ops/coh.py": "b3cb2358132dbb3505296afe198822d1341ea2e7489c7fe41367089619db686d",
+    "etx/ops/emit.py": "0823c577e1b2bc8f3890595ec6d2cfad46815aeebabf30490972f79eb9b8c7eb",
+    "etx/ops/gemv.py": "f359ba5cd2020207ef9c2e03761efe307dd0fe8478437ff85f827bee02db0a28",
+    "etx/ops/prims.py": "88b252036c16ce1931cb813375b80421e0cc63620f55ea10944a7017d87ef88c",
+    "etx/ops/topk.py": "a02d551f3de416087cc4ff2fdb9454f391420b75d4ad80a1b504bf500f4c174c",
+    "etx/ops/topk_key32.py": "8caaa3a184f9db41f7488d8acb715575a76e08a051c56bce2fafdd2b7aef2483",
+    "etx/passes/__init__.py": "287dc5ad18cd692024a0c1b396ee30641a998815203c83e46d56ae6258d80c40",
+    "etx/passes/p1_tiling.py": "dd1808a4bf01384cdd9711946384f5ab23ec825a242b8397f06f43745b034f6f",
+    "etx/passes/p2_affinity.py": "8210fe077c273160b8d42f1de14ab404da492e1763889abb6b0bf73937e2ae7f",
+    "etx/passes/p3_event_elim.py": "75f416b37faba05520fdaf9191a3f8e89cf285f79007d5aeb3dcaeddbbcbbdd7",
+    "etx/passes/p4_schedule_mode.py": "020017a2bac5ee449bd0c0e52aabab9ba7bfc97b3eff75f1dd9f240e90ea2de7",
+    "etx/passes/p5_queues.py": "a5dc4bb844d88f10cd85470ad6f74a67ba0af74beb9574cbac657ffefbf2add1",
+    "etx/passes/p6_memory.py": "b0473406dc107b4ce2a7680588e881bc4385bb16558471ec8a3d7b50325b9a90",
+    "etx/passes/p7_prefetch.py": "af60716e4e99ad429326f20ae7b0220a0fac2068133318b3c665f7a76159e45d",
+    "etx/passes/pipeline.py": "74525bea67eabf055ea7f887fded41eeca59edb2cc5b2156f5138b0fa58d5b7f",
+    "etx/passes/plan.py": "9518acb0c3d6ba012844a7019eafd36ac6b2906f07eee1dcc9acbe09d5a9c880",
+    "etx/runtime/include/etx/abi.h": "e07634a85c3d00e60f1d397de033b440d75cf87c74481b0e4162f9272b075579",
+    "etx/runtime/include/etx/host.h": "a4a12d4b63b4ab6e44c5cf7d519cea1a121a91ba8aee2069b1ba757f210b05f3",
+    "etx/runtime/include/etx/import.h": "79f237ad6e1c962e1c28bc7907b541d49ff1b206f9338523bbe602561fbdf3ca",
+    "etx/runtime/include/etx/inbody.h": "d98fb8f6333b25e7c19f94ff83a234449f52a5da35d2705e17fc6126c10517c8",
+    "etx/runtime/include/etx/primitives.h": "beeee7dd773c6cf27051ef7251766504e401fff05f89b942abd9623a92e1a99e",
+    "etx/runtime/include/etx/primitives_amdgcn.h": "cb7703b330d6af98b411b9629311e2253ea007402486c164dadda601db1a514b",
+    "etx/runtime/include/etx/primitives_nvptx.h": "d8f720916bae3ae9c6304149097af25417795be0d026cdecc6d7e8bd2f1b76c6",
+    "etx/runtime/include/etx/selection.h": "a389ed938ce9bdb8b3336a5d88f1ce43dc8d5dd0cde8739e52d13d917e8d65ac",
+    "etx/runtime/include/etx/tile_util.h": "85ec95e41fff47b33fb36e06e6536bd41af53bdd86dcd04c1004d0b7f0e63da0",
+    "etx/select/__init__.py": "2658bfa850b567b112bb7b8e4ec536c19b9a2255b87cb416d50a59e3d616b3dc",
+    "etx/select/__main__.py": "8527353da758c2344a4c2a52c8541791771086246ba50788afbe736cd8590980",
+    "etx/select/planner.py": "304fe83b90d0fc0c65ab5d786ed1338e4905d64453d0df7500eddb23fe719c66",
+    "etx/select/variants.py": "5fc0dd116c7a1673dcedd89e7958fed39ef4e9fe1ae0efcda84d502f4868e2b2",
+    "etx/sim/__init__.py": "3c584f5a7855fd46a36ed86a497aee0e48c3a9bf3605745bf9892bc546a6fc27",
+    "etx/sim/phase.py": "754e2fe2920b452fd709d0bc4810ab77447bdfe6375fa73547596fb490a193a4",
+    "etx/sim/protocol.py": "373f466955c22655e12a61236e49539d4131af4c1a06ce9a4a7fe9c53d535ea9",
+    "etx/sim/xcd.py": "f2ab4054f3a999fdc294a98613dd33592447d87b94c83579802f120b4bafdfe4",
+    "etx/tools/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "etx/tools/acquire_contract.py": "0bae8da4a912da16b0feb8d5e05db359a9da201c5a6f6db5715cf5709eda3f9e",
+    "etx/tools/bench_sim.py": "25bddd7166025bc3e6c41f108485df9f5dcfbda4ae9297ea6be9cde2d37c8588",
+    "etx/tools/cli.py": "4ce2872668f363a4fe2575823d23ab5c086ce76f9f6540adbee60523c8fd214a",
+    "etx/tools/cpu_check.py": "5ab85a469b91401e367fc1fc8105e7bf68046b811711c5b0bafcf969eaff3f62",
+    "etx/tools/floors.py": "3004e1814b7e228c5a6900ce20b044c42b221f197e80ced0ca64944875d35a38",
+    "etx/tools/fresh_handoff.py": "bef91e01657f564dd14a10dc6f4651951855028e34ad7de5cfbda7d0816a2f6f",
+    "etx/tools/fresh_sim.py": "6ea0ebf9b73475efa2d09c028e9d795876cce67b3a225217e43d0512a3459ea5",
+    "etx/tools/gpu_jobs.py": "274fde055017efec51f1a4ceab9297900a96683ec5ccb7ea9e84d63c33102651",
+    "etx/tools/inbody.py": "4ef22e123c30c8fcadca6bcc43b8176ee3f151f3444803196a0e8f76b6c53ee8",
+    "etx/tools/isa_hops.py": "733d7e9604f56ddeb08d684fa7ebe962df6ad144d7e4941a4900d4aa9e408428",
+    "etx/tools/isa_phases.py": "cf4ef857bd5a922703cba1b2875f1253e612d8a9e4423b79b519b7a1dc8723ad",
+    "etx/tools/ktrace.py": "86057b63086d5117ee973f6fc6454e031ee38c8958ad8cd06d1be701b54aa63d",
+    "etx/tools/layer_budget.py": "b0b6a270fc53487b7b34219a24bd91fec97f189dcd7bf6fcbfaf5aa3d6a97ed8",
+    "etx/tools/pytest_acceptance.py": "5244adffddb85b66aa5b6832c55367ec5fe83a87e0bc253b7cdc1c9adb4a1db6",
+    "etx/tools/shared_state.py": "2330232588af4147a7914caff8eb941b95df2c0bd18ddb3eef66574925578da5",
+    "etx/tools/source_control.py": "d286c06bfd7751de1b7e275939698053670c3110bed38659e9fc80527d8dfc99",
+    "etx/tools/stage_sim.py": "14db49eeba4a2bb8fe7d80c39c172ea392b99b986d514e2de1a99d8849183243",
+    "etx/tools/timeline.py": "a8b2e2063585a30778bb513fafbe3da449f7fa7d0e76edd27d10b7ba51f84824",
+    "examples/llm/configs/qwen3-30b-a3b.json": "c214108014d8495d762a4009ff74f9548d7a9e215cda85f941147011f56ae7ba",
+    "examples/llm/vllm_bench.py": "214bd8e43d26292ba3f4adfcef52b0fd36fc66b1d4cf47be092034c676d76397",
+    "examples/sessions/qwen300.py": "4d1118ced06d26082056a243be9586ec41c711cbb5bb49f56dfafdb55388c24c",
+    "examples/sessions/qwen300_hour.py": "9322a06fb29cbd8ec48e4ead528f59c77d994afd4c4c9c66e8f53354a43a028c",
+    "examples/sessions/qwen300_hour_arms.json": "1563ad24b51c494a2fb95bf0a6d37a49237203f8423b7cf42cef2904135dea8b",
+    "examples/vllm_llm/autoconf.py": "37de76e668ce9641e90ad645cb03905f74805dea6b6e90286139521c14dc8c33",
+    "examples/vllm_llm/batch_pp.py": "6b5738abda3735f2fd99d4e59b455682e37e78df4250859d584d6e2db80336bd",
+    "examples/vllm_llm/bench_params.py": "4b26435b192b99f797a04a51c2b2e4aeab26b76ee69a4b90fc28142261619bb2",
+    "examples/vllm_llm/bf16_300/__init__.py": "e3614d07b70efbaaf5f8e36ed074fb677007e63153e43e2207768c5d8f8869a1",
+    "examples/vllm_llm/bf16_300/attribution.py": "63434998f4507bb47e388ad9a7b15853dada1ab7627deab8cb3d14af292d8d05",
+    "examples/vllm_llm/bf16_300/build.py": "e51545af34fced6ca9231a55d938b356a2805bdce0678e37e3099c7abc90ae2a",
+    "examples/vllm_llm/bf16_300/capture.h": "26c3ef28df0ae931ea69ba453123b480f92978728085ad729dbede9be145db2f",
+    "examples/vllm_llm/bf16_300/check.py": "92a3dc28e784cbc19792a016974c689e8fa4aa3c8b4acabe910c799525a8a246",
+    "examples/vllm_llm/bf16_300/dispatcher.py": "e9237eb9db2faaf949d32563239786cef2cfb52def3d6a2678ee0747bf73a7d1",
+    "examples/vllm_llm/bf16_300/fusion.hip": "ed580aa87f87923fc8d8d0625cc4b8714845dc3735cce47a8c55b9e13c4d8efe",
+    "examples/vllm_llm/bf16_300/inbody_cpu.py": "a5d2a1c7b23e55414221f318c439bf42955f7a8c878918a6c57eb35f1841584c",
+    "examples/vllm_llm/bf16_300/launch.py": "ac0e940ebf0cd40e0f17c5453b645e95d131154cc514a66222de1c52e9d80fa6",
+    "examples/vllm_llm/bf16_300/launch_build.py": "0a7c4e99ed2a8ac331c8e3750117a3b01b68c8b01d2487c3b7d957799145ab43",
+    "examples/vllm_llm/bf16_300/launch_source.py": "2f4709a463e91575951cdf1390877ac4d5175f6c8de0a47d681ee8be4f9bd5d5",
+    "examples/vllm_llm/bf16_300/launcher.hip": "d1f6e14a4d291d5107bc6babeba895e886baaca2cb9a8fdbb42b10f5be73980b",
+    "examples/vllm_llm/bf16_300/mutations.py": "7d9fc413dfc146b085cb9b2ed42d454e808fd010f674a42125b47c58a797bd2b",
+    "examples/vllm_llm/bf16_300/pack.py": "5e3970d891b5a1fa647164b9e6122cd08f9e203e56c409ee3c84cb76e0ce0458",
+    "examples/vllm_llm/bf16_300/protocol.py": "45c30eb504b0bad13302f9f1b8c1798c761f969f460688554555db11f7c0f210",
+    "examples/vllm_llm/bf16_300/source.py": "b70952bbbf5c2b5874ffb3cc2f2c213fd97ed0247558b1bef5bb3061f78c7e93",
+    "examples/vllm_llm/build.sh": "f795d1c5615c4b8927d5c31b55e955d69d81ffdf0748090eb0bf2cb49ad483cf",
+    "examples/vllm_llm/bw_spec.py": "d4b670450f881fda43e6475b507cfa324dbf9674d7b376788e2131ebbea6a1ec",
+    "examples/vllm_llm/byte_ledger.py": "e431e4a86654c4298c6e211f94899315664093a3d86f6b6e54780045d656546c",
+    "examples/vllm_llm/check_uc_plan.py": "f348032212b2cd782a8f29556c54a0b85fae57fd560c143ffdd0c9d86def7a00",
+    "examples/vllm_llm/compare.py": "b32547630a0c878cd45164d33eba2278a39912c947ca3d846afef48538b3fb67",
+    "examples/vllm_llm/decode.py": "3114c896b913b4518930ab1a7fc23c4707b017b9dff9ec8b7525559b2ca87e37",
+    "examples/vllm_llm/dsl_ceiling.py": "71550db92e41ef6ba22ddf950bc58e2502464731711da36533ba2248253b654d",
+    "examples/vllm_llm/folds.py": "7b4929dbb2dae6b5fad62705066c3894bcb941ecf6013f887481e6ba4601027b",
+    "examples/vllm_llm/head_local_protocol.py": "64731b942c78979f77c4f8795c4705b302ac777831e1feca1cb8330d4b5f2917",
+    "examples/vllm_llm/host.hip": "82cc3a24aad5565a3c4615cddb01a4f6127accda96860045d35c90254e55d8bf",
+    "examples/vllm_llm/import_certificate.py": "10e6e8fd398505d395fcc6f65d164014d80e678df5c551d42f980689b8fa5b80",
+    "examples/vllm_llm/isa_build.sh": "de0c5ea6f0cb1cfcd8384429ca011027756d76e89834b308ba452645694fbf5f",
+    "examples/vllm_llm/isa_inventory.py": "96f46747c4cfdabee3abc55052704dd190eb7a0acd6d0e03beb966bae2460085",
+    "examples/vllm_llm/kcmp_report.py": "4380a40c41a6887520c8a11e267aceb2a765a5d62be34dda97fe8507291395e4",
+    "examples/vllm_llm/kmodel.py": "e44e01e25e473f7f5d4af5971f10e49a515c18c098530f9639557473b6946bfd",
+    "examples/vllm_llm/layer_trace.py": "99d73d1d9273cb8e84bf1aa38cbfcbc33b5c4c86ed8b6ae2f9dc5937d23f98aa",
+    "examples/vllm_llm/local_matrix.sh": "4c39d5f3f56cc17e6d026b0936dd80284aa9429163140db68a1c2f811e6c9756",
+    "examples/vllm_llm/measured.py": "2c0c612843aecf7de7fb82d35570e4b6e7967eb82b2dbd470d222eb24466653b",
+    "examples/vllm_llm/model.py": "fb2984c57e75ab0984727ef43118e1b13a7fd233f1a02bdca4aadd84b6e9484e",
+    "examples/vllm_llm/moe_predict.py": "2abcdc40c76f227257136642e770dc2225f3df085479eb0d506e4ef8f0d89e7b",
+    "examples/vllm_llm/nvref_report.py": "7996a44b323960b243e9c8e1e8717e3813b1f1c1beae8787b90e75a43fec4256",
+    "examples/vllm_llm/pairs.py": "f59c8c8114003fde02aa4784c3d888bcc70980d2fd1b7f6a759cb0a4e10ddab1",
+    "examples/vllm_llm/plan_exports.py": "704f396326020ae3b85bd4a6a8cde9a9264f6cffcff08ffbc7826421e7b2dd9b",
+    "examples/vllm_llm/plan_imports.py": "d8590d28d7caa4f839075012df9ed512498379eb6b9172892184e30e5b65fa19",
+    "examples/vllm_llm/pmodel.py": "01e3420133e5057c764eabb0b5ba66c7a08203a39679892b13b59c99e9ed5302",
+    "examples/vllm_llm/prep.py": "417ae88ad7bc141ae507cf0cf7e1aeaf852f85cb65b5be1978e12a2343947d7d",
+    "examples/vllm_llm/results/2026-10-09-check-certificate/stage2/guard_mutations.py": "2e45534894acc763385530e535eab7567ee4451d90aec21f01228f42e41099da",
+    "examples/vllm_llm/results/2026-10-09-vlbest/mutation_proofs.py": "19d833da0e76bb0212ccdfefc54849ada2ece5725a7686c503d22b7cc31523e8",
+    "examples/vllm_llm/results/2026-10-09-vlbest/round3_mutations.py": "647aae3e4e00ef31f998c93f611a4be0aa7b886dfdcb261fc60676608d71ccc4",
+    "examples/vllm_llm/rocm_build_check.sh": "7fc6c47e942431d1fd301827228bec99c2ce8f6401eba1ef15ef4af9966c57d3",
+    "examples/vllm_llm/sensitivity.py": "bbf5d87cb02e0285cf2518c7cc5854ffca522339be29049592af9fe1980dbfe5",
+    "examples/vllm_llm/sim_fit.py": "200b8f121f9748998e7a6c37166c907d7f7dbee5ea92372805c96f26444524ef",
+    "examples/vllm_llm/tile_ab.py": "e497740d83b148113a2b2eb08e69da8f25ac142b15c764349781b57a47c60dd4",
+    "examples/vllm_llm/validate.py": "15bdc49fbaf669ba75aad77f47e94b227c8acc7d59f756ce1deacae8ce21ec45",
+    "examples/vllm_llm/vendor/benchmark_moe.py": "230151de56d177ac22920ff9dada010f4361933b34b54e18d5981367723a8bcf",
+    "examples/vllm_llm/vendor_gemv.py": "0361e1142e0e929a04320d55c160b714cd2446219ec978bb8fb765e82993a657",
+    "examples/vllm_llm/vl_tiles.hip": "dc5841fffad4edf4a606df7ce2dd9335c1d66f507e07214c3271132af46efd0e",
+    "examples/vllm_llm/vlbest3_g0.py": "d1a9eb94c2a3713e9e09f40a8d82332c11d601b55fb0e2096072f3e75d3c5a04",
+    "examples/vllm_llm/vlbest3_tuner.py": "5636ab33eda654daaf5dcac260cc18dc952d4903fa8309dd890174ab0421f27a",
+    "examples/vllm_llm/vlbest_report.py": "04153061af82650017b93454e026ba50970a7b6080353e91d9923f4732e93928",
+    "examples/vllm_llm/vllm_profile.py": "4285bc43f9ed45bfa8ae9e94ede837a1a41954617eaf3bf6af13a71ee5a4957d",
+    "examples/vllm_llm/vm_check.sh": "94c75c6ebabc778f5c1e6702f3b787d62185c970e06670c1e51cddf1e97ddc30",
+    "examples/vllm_llm/vm_next.sh": "895ec677d9a7a6fd639aee84ca714ccebb413b4681eff218009a8d4a2194244d",
+    "examples/vllm_llm/vm_run.sh": "17b0d153e187145bb1872dc5c42d38d4d6174649d2e1ca4875ecb48f771b3c93",
+    "examples/vllm_llm/whatif_sim.py": "c25aff9cfb108340ca8f6dad4d776f4322f22558efef582a4f124c8d1a5041e1",
+    "examples/vllm_llm/xcd_account.py": "a774f32c664714d7dc4a71ecf1ca2c1aa86d3caa1c4b00dd72f2dcdd9c536a7c",
+    "examples/vllm_llm/xcd_run.py": "fa400fb672bfb0fe2fa66d4758d045b67360f4ce59fc4600aa9a8813d828d926"
+  },
+  "execution": "CPU only; no GPU, provisioning, download or network spend",
+  "results": {
+    "pytest": {
+      "command": ".venv/bin/python -m pytest -q",
+      "output": "1356 passed, 14 skipped in 192.83s (0:03:12)",
+      "log": "pytest_basis.log"
+    },
+    "initial_pytest": {
+      "output": "1322 passed, 14 skipped in 248.95s",
+      "log": "pytest_initial.log"
+    },
+    "focused": {
+      "command": ".venv/bin/python -m pytest -q tests/test_qwen300_hour.py",
+      "output": "32 passed in 0.88s",
+      "log": "hour_tests_basis.log"
+    },
+    "gfx942": {
+      "command": ".venv/bin/python results_qwen300_hour_cpu_20261011/local_build.py",
+      "output": "LOCAL VARIANT PASS: kept, stamps, stages, C1, C5, C1_C5",
+      "ETX_DEVLIBS": "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode",
+      "compiler": "local LLVM 23",
+      "log": "local_build.log"
+    },
+    "local_matrix_16": {
+      "command": "ETX_DEVLIBS=<path above> bash examples/vllm_llm/local_matrix.sh results_qwen300_hour_cpu_20261011/matrix",
+      "output": "16 entries rc=0",
+      "log": "matrix.log"
+    },
+    "rocm_build_check": {
+      "command": ".venv/bin/python results_qwen300_hour_cpu_20261011/native_build.py (six matching-flag calls to examples/vllm_llm/rocm_build_check.sh qwen3-30b-a3b default <out>)",
+      "output": "six NATIVE VARIANT rc=0; six host.hip device pass ok",
+      "compiler": "ROCm 7.2.4 clang 22, x86 CPU Docker",
+      "image": "etx-rocm22@sha256:e8958ce54391229087b63d0e8636df58b14f160f1444246c8c6cb58f8b872a6b",
+      "log": "native_build.log"
+    },
+    "dry_run": {
+      "commands": [
+        ".venv/bin/python -m examples.sessions.qwen300_hour --dry-run",
+        ".venv/bin/python -m etx.tools.gpu_jobs examples/sessions/qwen300_hour.py --gpus 0 --machine A --dry-run"
+      ],
+      "output": "Session hard stop: 3600s from runner start (includes setup)\n  0 qwen300_hour                     GPU 0    timeout  3600s  after: -",
+      "exit_code": 0
+    },
+    "shell": {
+      "command": "bash -n examples/vllm_llm/build.sh examples/vllm_llm/local_matrix.sh examples/vllm_llm/rocm_build_check.sh tools/session.sh; dry-run also bash -n checks the job cmd",
+      "output": "empty; exit 0"
+    },
+    "python_compile": {
+      "command": ".venv/bin/python -m py_compile examples/sessions/qwen300_hour.py examples/llm/vllm_bench.py tests/test_qwen300_hour.py",
+      "output": "empty; exit 0"
+    },
+    "host_syntax": {
+      "output": "six local variants and final profile/stamp syntax: exit 0"
+    },
+    "schedule_signatures": {
+      "output": "all six identical; 60362 tasks, 436 events"
+    },
+    "diff_check": {
+      "command": "git diff --check",
+      "output": "empty; exit 0"
+    }
+  },
+  "native_resources": {
+    "kept": {
+      "vgpr": 128,
+      "vgpr_spills": 6,
+      "sgpr_spills": 255,
+      "lds_bytes": 29736,
+      "occupancy_waves_per_simd": 4
+    },
+    "stages": {
+      "vgpr": 128,
+      "vgpr_spills": 6,
+      "sgpr_spills": 255,
+      "lds_bytes": 29736,
+      "occupancy_waves_per_simd": 4
+    },
+    "stamps": {
+      "vgpr": 128,
+      "vgpr_spills": 21,
+      "sgpr_spills": 1002,
+      "lds_bytes": 29736,
+      "occupancy_waves_per_simd": 4
+    },
+    "C1": {
+      "vgpr": 128,
+      "vgpr_spills": 6,
+      "sgpr_spills": 261,
+      "lds_bytes": 29736,
+      "occupancy_waves_per_simd": 4
+    },
+    "C5": {
+      "vgpr": 128,
+      "vgpr_spills": 8,
+      "sgpr_spills": 255,
+      "lds_bytes": 29736,
+      "occupancy_waves_per_simd": 4
+    },
+    "C1_C5": {
+      "vgpr": 128,
+      "vgpr_spills": 8,
+      "sgpr_spills": 261,
+      "lds_bytes": 29736,
+      "occupancy_waves_per_simd": 4
+    }
+  },
+  "limitations": [
+    "Native CHECK executable link/model staging not run on macOS; complete Linux CPU staging still required.",
+    "No GPU import checks, 32-token validation, timing, or session execution.",
+    "Initial gfx942 compile failed on a container absolute /code include path; closure regenerated locally and six final builds passed. Earlier mismatched-flag native checks excluded."
+  ],
+  "logs": {
+    "results_qwen300_hour_cpu_20261011/pytest_initial.log": {
+      "bytes": 1565,
+      "sha256": "5c6fe66d3799160bdc3f9070c500481e118c1bddb1454c74635dcdc04293dd58"
+    },
+    "results_qwen300_hour_cpu_20261011/pytest_basis.log": {
+      "bytes": 1645,
+      "sha256": "d97c027866f3ee02ce8b29ce0c3a9401a386c2caa59004d73ee708b90851ae22"
+    },
+    "results_qwen300_hour_cpu_20261011/hour_tests_basis.log": {
+      "bytes": 99,
+      "sha256": "c1a2be3e4d05d1df6b331d6a94eb38eefca46fd0d24aca785279b4ad12098303"
+    },
+    "results_qwen300_hour_cpu_20261011/local_build.log": {
+      "bytes": 502784,
+      "sha256": "f655d12d09906f22620422b1b0b64392252d3bd0c0aa7de7dd887970ad769310"
+    },
+    "results_qwen300_hour_cpu_20261011/matrix.log": {
+      "bytes": 2630,
+      "sha256": "98282d046b75e15717fb057dcd35f75ea64b2d87c5e6c4e5a7973ede397598d4"
+    },
+    "results_qwen300_hour_cpu_20261011/native_build.log": {
+      "bytes": 151,
+      "sha256": "39d8cdd30cdf4517ebf3897dbc379718f1c49c744047c7c3ab2cc03ee06c343e"
+    },
+    "results_qwen300_hour_cpu_20261011/dry_run_final.log": {
+      "bytes": 2139,
+      "sha256": "ea312e93df6770e07a5ce1023b22e2478f84b59119992b87d92552d7bd001b19"
+    },
+    "results_qwen300_hour_cpu_20261011/gpu_jobs_dry_run_final.log": {
+      "bytes": 131,
+      "sha256": "024c6d2d617bd96ba3d50d535bd8b68835fb87db52185edc6faf0c2161583ff8"
+    },
+    "results_qwen300_hour_cpu_20261011/profile_host_syntax_final.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "results_qwen300_hour_cpu_20261011/stamp_host_syntax_final.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "results_qwen300_hour_cpu_20261011/gfx942.log": {
+      "bytes": 334,
+      "sha256": "2056b8527e530fc7149bac90ed3b9a6f5df954c029fedfc2aea0e022d6c04c7f"
+    },
+    "results_qwen300_hour_cpu_20261011/local_build.py": {
+      "bytes": 2827,
+      "sha256": "2c064dae3c5b40f007aecefd276364f18eaad8ffe30ffe6c0e202ca15cf7c7e7"
+    },
+    "results_qwen300_hour_cpu_20261011/native_build.py": {
+      "bytes": 1210,
+      "sha256": "6fa4dcdcb500707df03567516e085bc80e4c4af653912c376896359597197b19"
+    },
+    "results_qwen300_hour_cpu_20261011/native/kept.log": {
+      "bytes": 938,
+      "sha256": "49032d671e619a688cbe52b071eb98258b56e78a08449df5a9cc93604f407dce"
+    },
+    "results_qwen300_hour_cpu_20261011/native/stamps.log": {
+      "bytes": 943,
+      "sha256": "ed89084d75b49638d36ab44cea249a1977e37de0802266f77a00286ace0c79b7"
+    },
+    "results_qwen300_hour_cpu_20261011/native/stages.log": {
+      "bytes": 942,
+      "sha256": "6bd11f34f11aab8ab76bbe371519d5b0722703dbd830634c4b82756bd75a37ef"
+    },
+    "results_qwen300_hour_cpu_20261011/native/C1.log": {
+      "bytes": 934,
+      "sha256": "47ce6542923a595ca016bcfacaa89fc6ad1d5bb88ddddab4d1321beac3cbf923"
+    },
+    "results_qwen300_hour_cpu_20261011/native/C5.log": {
+      "bytes": 934,
+      "sha256": "24022186fbfc297f95bc3fdcda99fe8eb5c09405dbd0c98273c61298db9a83b4"
+    },
+    "results_qwen300_hour_cpu_20261011/native/C1_C5.log": {
+      "bytes": 940,
+      "sha256": "73467ca9bb2cde5e8fba41ba0c140b890bffae6e252ebe76218c05e2e6d6499e"
+    },
+    "results_qwen300_hour_cpu_20261011/native/kept/resource.log": {
+      "bytes": 3553,
+      "sha256": "1be59093ff04684a4596ee74641668316e1d8686438e1b1681f7405ae3e5e62a"
+    },
+    "results_qwen300_hour_cpu_20261011/native/stamps/resource.log": {
+      "bytes": 3595,
+      "sha256": "840e319e7b84ab1bcd83c8ffe23cd5fdf0fcc06e40b420ee4eab918fcc902b0d"
+    },
+    "results_qwen300_hour_cpu_20261011/native/stages/resource.log": {
+      "bytes": 3593,
+      "sha256": "75ca14aea1641589962646f56905ab6beb903ce85cff9a636daa72925a26c14b"
+    },
+    "results_qwen300_hour_cpu_20261011/native/C1/resource.log": {
+      "bytes": 3513,
+      "sha256": "2236119ecb07445ee384278a422cf0d4b95bd5a653ff1b3f7d28ae1da0111ff8"
+    },
+    "results_qwen300_hour_cpu_20261011/native/C5/resource.log": {
+      "bytes": 3513,
+      "sha256": "a8148393ccbde81fd7990c4a36f37423062e82c47151f8f49a70b7cfd2e4e7a2"
+    },
+    "results_qwen300_hour_cpu_20261011/native/C1_C5/resource.log": {
+      "bytes": 3573,
+      "sha256": "e34817792dfa772c6f02cbe768737796f87f8f9a04191956d344fc860a14c900"
+    }
+  }
+}

@@ -46,6 +46,7 @@ def main() -> None:
     ap.add_argument("--engine-kw", type=json.loads, default={}, help="extra LLM keyword arguments as JSON")
     ap.add_argument("--no-detok", action="store_true")
     ap.add_argument("--echo-config", action="store_true")
+    ap.add_argument("--gate-warmup", action="store_true", help="check the full warmup before timing; print burst progress outside timers")
     ap.add_argument("--model", required=True)
     ap.add_argument("--golden", type=Path, required=True)
     ap.add_argument("--tokens", type=int, default=32)
@@ -91,11 +92,19 @@ def main() -> None:
 
     def gen(n_new: int):
         sp = SamplingParams(temperature=0.0, max_tokens=n_new, ignore_eos=True, detokenize=not a.no_detok)
+        if a.gate_warmup: print(f"VLLM-GENERATE-BEGIN tokens={n_new}", flush=True)
         t0 = time.perf_counter()
         outs = llm.generate(prompts, sp, use_tqdm=False)
-        return (time.perf_counter() - t0) * 1e3, list(outs[0].outputs[0].token_ids)
+        elapsed = (time.perf_counter() - t0) * 1e3
+        if a.gate_warmup: print(f"VLLM-GENERATE-END tokens={n_new}", flush=True)
+        return elapsed, list(outs[0].outputs[0].token_ids)
 
-    gen(a.tokens); gen(1)                                   # warm-up (graph capture, autotuning)
+    _, warm_tokens = gen(a.tokens)                         # warm-up (graph capture, autotuning)
+    if a.gate_warmup:
+        if warm_tokens != golden[:a.tokens] or len(warm_tokens) != a.tokens:
+            raise RuntimeError("VLLM warmup token gate failed; timing not started")
+        print(f"VLLM-WARMUP-GATE OK {a.tokens}/{a.tokens}", flush=True)
+    gen(1)
     full, one, toks = [], [], []
     for sample in range(a.repeats):
         dt, toks = gen(a.tokens); full.append(dt)

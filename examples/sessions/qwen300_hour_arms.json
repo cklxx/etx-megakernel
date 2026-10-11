@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "B": [
-    {"id": "C1", "build": "C1", "kind": "shape", "flags": {"ETX_VL_ROUTER_NARROW": "1"}, "source": "docs/ISA-FIXES-2026-10-11.md:33", "overlap": "router-body", "enabled": true},
+    {"id": "C1", "build": "C1", "kind": "shape", "flags": {"ETX_VL_ROUTER_NARROW": "1"}, "source": "docs/ISA-FIXES-2026-10-11.md:31", "overlap": "router-body", "enabled": true},
     {"id": "C5", "build": "C5", "kind": "shape", "defines": ["ETX_DSL_NORM_HOIST"], "source": "docs/ISA-FIXES-2026-10-11.md:135", "overlap": "router-body", "enabled": true}
   ],
   "C": [
