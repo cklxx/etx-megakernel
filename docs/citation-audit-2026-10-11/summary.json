@@ -2,28 +2,36 @@
   "total": 486,
   "explicit": 447,
   "implicit": 39,
-  "resolved": 482,
+  "resolved": 486,
   "verdicts": {
-    "UNREVIEWED": 482,
-    "MISSING": 4
+    "PASS": 205,
+    "STALE": 17,
+    "BASIS": 8,
+    "MISMATCH": 2,
+    "UNREVIEWED": 254
   },
   "documents": {
     "DEP-GAP-LEDGER": {
-      "UNREVIEWED": 102
+      "PASS": 88,
+      "STALE": 11,
+      "BASIS": 2,
+      "MISMATCH": 1
     },
     "XCD-TIMELINE": {
-      "UNREVIEWED": 91
+      "PASS": 84,
+      "STALE": 6,
+      "BASIS": 1
     },
     "XCD-PREFETCH": {
-      "UNREVIEWED": 39
+      "PASS": 33,
+      "BASIS": 5,
+      "MISMATCH": 1
     },
     "MOE-BODY-ANATOMY": {
-      "UNREVIEWED": 149,
-      "MISSING": 1
+      "UNREVIEWED": 150
     },
     "REVIEW-POOL-ANALYSIS": {
-      "UNREVIEWED": 101,
-      "MISSING": 3
+      "UNREVIEWED": 104
     }
   }
 }

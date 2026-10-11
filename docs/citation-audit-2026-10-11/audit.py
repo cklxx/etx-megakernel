@@ -19,7 +19,7 @@ ARCHIVE = Path('/Users/ckl/code/etx')
 FLEET = Path('/Users/ckl/code/fleet-mi300x')
 NAMES = ['DEP-GAP-LEDGER', 'XCD-TIMELINE', 'XCD-PREFETCH',
          'MOE-BODY-ANATOMY', 'REVIEW-POOL-ANALYSIS']
-RX = re.compile(r'(?<![\w/:-])(?P<path>[~A-Za-z_][\w./~-]*):(?P<spec>\d+(?:-\d+)?(?:,\d+(?:-\d+)?)*)')
+RX = re.compile(r'(?<![\w/:-])(?P<path>[~A-Za-z_][\w./~-]*):(?P<spec>\d+(?:-\d+)?(?:(?:,|\s*/\s*)\d+(?:-\d+)?)*)')
 IMPLICIT = re.compile(r'(?<![\w/:-]):(?P<spec>\d+(?:-\d+)?(?:,\d+(?:-\d+)?)*)')
 COMMON = {
     'kernel.py': 'etx/codegen/kernel.py',
@@ -89,7 +89,8 @@ def location(path):
 
 def indices(spec):
     result = []
-    for part in spec.split(','):
+    for part in re.split(r'[,/]', spec):
+        part = part.strip()
         a, _, b = part.partition('-')
         result.extend(range(int(a), int(b or a) + 1))
     return result
@@ -109,7 +110,7 @@ def extract():
                 path = last_path if implicit else expand(m['path'], name, line)
                 # These explicitly named revision references name a file in prose.
                 if not implicit and m['path'] == 'a312354':
-                    path = 'docs/PLAN-300TOKS-2026-10-11.md' if n == 139 else 'docs/XCD-TIMELINE-2026-10-11.md'
+                    path = 'docs/XCD-TIMELINE-2026-10-11.md' if 'XCD report' in line else 'docs/PLAN-300TOKS-2026-10-11.md'
                 # MOE paragraph 13 switches between archived and canonical observations.
                 if name == NAMES[3] and n == 13 and implicit:
                     before = line[:m.start()]
@@ -118,7 +119,9 @@ def extract():
                     elif 'archive reports' in before and 'four flags' not in before:
                         path = 'results_qwen300_2026-10-11/attempt1/tr_off.log'
                 # Explicit historical continuation in MOE section 3.2.
-                if name == NAMES[3] and n == 139 and implicit:
+                if name == NAMES[3] and 'Upstream update' in line and implicit:
+                    path = 'docs/PLAN-300TOKS-2026-10-11.md'
+                if name == NAMES[4] and 'The 0.254 ms sum' in line and implicit:
                     path = 'docs/PLAN-300TOKS-2026-10-11.md'
                 last_path = path
                 start, end = n-1, n
@@ -150,6 +153,7 @@ def extract():
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--show', nargs=2, type=int)
+    parser.add_argument('--new-lines', action='store_true', help='Display each source line once; TSV always retains all lines')
     args = parser.parse_args()
     rows, inputs = extract()
     decisions = json.loads((OUT / 'decisions.json').read_text()) if (OUT / 'decisions.json').exists() else {}
@@ -165,12 +169,18 @@ def main():
             if not re.search(pattern, text):
                 raise AssertionError(f"{row['id']}: failed regex {pattern!r}")
     if args.show:
+        seen = {(r['path'], i) for r in rows if r['id'] < args.show[0] for i, _ in r['source_lines']} if args.new_lines else set()
+        claims_seen = set()
         for row in rows:
             if args.show[0] <= row['id'] <= args.show[1]:
                 print(f"\n[{row['id']}] {row['document']}:{row['document_line']} {row['citation']} => {row['path']}:{row['spec']}")
-                print('CLAIM: ' + row['sentence'])
+                if (row['document'], row['document_line']) not in claims_seen:
+                    print('CLAIM: ' + row['sentence'])
+                    claims_seen.add((row['document'], row['document_line']))
                 for i, s in row['source_lines']:
-                    print(f'{i}: {s}')
+                    if not args.new_lines or (row['path'], i) not in seen:
+                        print(f'{i}: {s}')
+                    seen.add((row['path'], i))
                 for error in row['missing']:
                     print('MISSING: ' + error)
         return
