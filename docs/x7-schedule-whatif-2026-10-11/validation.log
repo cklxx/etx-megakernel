@@ -1,0 +1,8 @@
+measured: all bodies and dependency gates preserved for 60362 tasks
+main: all bodies and dependency gates preserved for 60362 tasks
+secondary: all bodies and dependency gates preserved for 60362 tasks
+branch: all bodies and dependency gates preserved for 60362 tasks
+oracle: all bodies and dependency gates preserved for 60362 tasks
+finalist: all bodies and dependency gates preserved for 60362 tasks
+201 candidate critical-path ledgers reconcile to their whole-step deltas
+Report <=200 lines; compressed input hashes match; validation complete
