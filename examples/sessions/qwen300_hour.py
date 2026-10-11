@@ -923,7 +923,8 @@ def select_final(s, survivors):
 def tranche_d(s, survivors, extra_seconds):
     from examples.vllm_llm.pairs import verdict as fusion_verdict, parse, pairs
     from examples.vllm_llm.nvref_report import verdict as system_verdict
-    s.deadline = min(time.monotonic()+600+extra_seconds, s.end)
+    # D inherits all unused A/B/C time, including when C ran successfully.
+    s.deadline = s.end
     if 'kept' not in s.certified:
         print('D NOT-COMPLETE: kept correctness gate failed', flush=True); return
     arm = s.attempt('D.selection', lambda: select_final(s, survivors))
@@ -1007,7 +1008,8 @@ def dry_run():
     """Exercise CPU logic, shell syntax and runner registration; never spawn GPU commands."""
     for j in JOBS:
         subprocess.run(['bash', '-n', '-c', j['cmd']], check=True)
-    assert sum((900, 1320, 1620, 600)) == MAX_SESSION_SECONDS
+    assert MAX_SESSION_SECONDS == 4440
+    assert sum((900, 1320, 1620)) < MAX_SESSION_SECONDS
     assert keep([.030, .031, .030])['keep']
     assert not keep([.030, -.001, .030])['keep']
     try:
@@ -1017,7 +1019,7 @@ def dry_run():
     else:
         raise AssertionError('missing critical-body coverage must refuse')
     assert len({a['id'] for a in manifest()['B']+manifest()['C']}) == len(manifest()['B']+manifest()['C'])
-    print(json.dumps(dict(budgets_s=dict(A=900, B=1320, C=1620, D=600),
+    print(json.dumps(dict(budgets_s=dict(A=900, B=1320, C=1620, D='remaining session time'),
                           manifest=manifest(), thresholds=REGISTERED), indent=2))
     from etx.tools.gpu_jobs import main as runner
     return runner([str(Path(__file__)), '--dry-run'])

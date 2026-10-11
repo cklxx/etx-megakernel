@@ -155,10 +155,12 @@ def test_attempt_catches_certificate_refusal_and_keeps_working(tmp_path):
 
 
 @pytest.mark.parametrize('partial', [False, True])
-def test_d_runs_five_adjacent_pinned_pairs_per_baseline(tmp_path, monkeypatch, partial):
+@pytest.mark.parametrize('extra', [0, 1620])
+def test_d_runs_five_adjacent_pinned_pairs_per_baseline(tmp_path, monkeypatch, partial, extra):
     s = session(tmp_path); s.certified.add('kept'); calls = []
     monkeypatch.setattr(h, 'certify', lambda *args: None)
     def fake_host(s, arm, name, args):
+        assert s.deadline == s.end
         mode = 'graph' if '--unfused' in args else 'fused'; calls.append(mode)
         if partial and name == 'D_fusion_r4_graph': raise TimeoutError('synthetic deadline')
         text = host_text(mode, 3.4 if mode == 'graph' else 3.3)
@@ -167,7 +169,8 @@ def test_d_runs_five_adjacent_pinned_pairs_per_baseline(tmp_path, monkeypatch, p
     monkeypatch.setattr(h, 'host', fake_host)
     def fake_system(s, name): calls.append('S3'); return dict(wall_ms=3.5)
     monkeypatch.setattr(h, 'system', fake_system)
-    h.tranche_d(s, [], 1620)
+    h.tranche_d(s, [], extra)
+    assert s.deadline == s.end
     assert calls[1:] == ['fused', 'graph', 'fused', 'S3', 'graph', 'fused', 'S3', 'fused',
                          'fused', 'graph', 'fused', 'S3', 'graph', 'fused', 'S3', 'fused',
                          'fused', 'graph', 'fused', 'S3']
