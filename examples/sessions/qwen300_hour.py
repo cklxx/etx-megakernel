@@ -360,13 +360,17 @@ def gap_atom_prices(report):
 
     Intersect each stamp with its critical gap to avoid crediting parallel/body
     time twice. P1 fetch and P7 alone are not stamped; they get no invented time.
-    Observation uses the conservative upper idle price, 0.951 us. Combined
-    setup has no isolated idle price, hence zero per the registration.
+    Observation keeps the conservative upper idle price, 0.951 us.
+    Arrive/setup use the owner's preflight fix 6 pricing decision: 0.30/0.15 us
+    from the 1.00 us floor decomposition in
+    docs/PREFLIGHT-QWEN300-HOUR-2026-10-11.md:20,55 (pre 0.05, arrive 0.30,
+    observation 0.50, setup 0.15). These are pricing estimates, not new measured
+    idle latencies; the observation price remains gfx942.yaml:69-72's 0.951 us.
     """
     scale = report['raw']['tick_ns']/1000
-    atoms = {'P10.arrive': dict(idle_us=0., intervals_us=[]),
+    atoms = {'P10.arrive': dict(idle_us=.30, intervals_us=[]),
              'P5/P11.observation': dict(idle_us=.951, intervals_us=[]),
-             'P4/P6/P7.setup': dict(idle_us=0., intervals_us=[])}
+             'P4/P6/P7.setup': dict(idle_us=.15, intervals_us=[])}
     for t in report['tasks']:
         if not t.get('critical') or t['arrive_is_synthetic']: continue
         # The two booked attention boundaries are outside gap rows 9-10.

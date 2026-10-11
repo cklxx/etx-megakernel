@@ -428,15 +428,31 @@ def test_gap_atoms_clip_to_critical_gap_and_apply_class_floor():
     report = dict(raw=dict(tick_ns=100), tasks=[task() for _ in range(48)])
     # Gap starts at tick 100: only 2 us of arrive, 5 of observation, 3 of setup.
     result = h.gap_atom_prices(report)
-    assert result['atoms']['P10.arrive']['above_floor_ms'] == pytest.approx(.096)
+    assert result['atoms']['P10.arrive']['above_floor_ms'] == pytest.approx(48*(2-.30)/1000)
     assert result['atoms']['P5/P11.observation']['above_floor_ms'] == pytest.approx(48*(5-.951)/1000)
-    assert result['atoms']['P4/P6/P7.setup']['above_floor_ms'] == pytest.approx(.144)
+    assert result['atoms']['P4/P6/P7.setup']['above_floor_ms'] == pytest.approx(48*(3-.15)/1000)
     report['tasks'] += [task('attn'), task('reduce'), task(critical=False)]
     assert h.gap_atom_prices(report) == result  # booked boundaries/parallel bodies excluded
     report['tasks'] = [task()]
     result = h.gap_atom_prices(report)
     assert result['G_ms'] == 0.  # every class below 0.625 us/layer; raw excess retained
     assert result['atoms']['P10.arrive']['above_floor_ms'] > 0.
+
+
+@pytest.mark.parametrize('excess_ticks,passes', [(0, False), (20, False), (30, True)])
+def test_s1_stops_at_protocol_floor_and_counts_only_excess(tmp_path, excess_ticks, passes):
+    # 339 critical edges: pre .05, arrive .30, observation .50, setup .15 us.
+    task = dict(critical=True, arrive_is_synthetic=False, phase='qkv',
+                record=[0, 100+excess_ticks, 200+excess_ticks, 0, 35+excess_ticks, 85+excess_ticks],
+                arrive_bounds_ticks=[5, 35+excess_ticks], gap_us=1.+excess_ticks*.01)
+    result = h.gap_atom_prices(dict(raw=dict(tick_ns=10), tasks=[task for _ in range(339)]))
+    assert result['G_ms'] == pytest.approx(339*excess_ticks*.01/1000)
+    assert result['atoms']['P10.arrive']['idle_us'] == .30
+    assert result['atoms']['P4/P6/P7.setup']['idle_us'] == .15
+    assert result['atoms']['P5/P11.observation']['idle_us'] == .951
+    s = session(tmp_path); s.certified.add('kept')
+    assert h.first_stop(s, result) is passes
+    assert s.rows['A.stop']['status'] == ('PASS' if passes else 'STOP')
 
 
 def test_74_minute_cap_and_22_minute_b_deadline(tmp_path, monkeypatch):
