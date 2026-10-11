@@ -9,7 +9,7 @@ from etx.sim.xcd import Cost,Hw,ReplayTiming,simulate
 
 O=Path(__file__).resolve().parent
 p=json.loads(gzip.decompress((O/'original-plan.json.gz').read_bytes()))
-raw=s.tl.read_raw(s.RAW); tr,basecp=s.cp_account(p,raw)
+raw=s.load_raw(); tr,basecp=s.cp_account(p,raw)
 i=json.loads((O/'inputs.json').read_text())
 names={v['id']:k for k,v in p['types'].items()}; groups=defaultdict(list); values=defaultdict(lambda:[[],[],[]])
 for d in p['descs']:
@@ -32,7 +32,7 @@ def run(label,c,timing,legal=True,reason='same tasks and dependencies',nominal=T
         queue_cost_sum_us=sum(timing.queue_after_us),ready_cost_sum_us=sum(timing.ready_after_us))
  records.append(r);s.dump(O/'secondary-results.json',records)
  with gzip.open(O/f'edges-{label}.csv.gz','wt',newline='') as f:
-  w=csv.writer(f);w.writerow(['task','event','gap_before_us','gap_after_us','delta_us'])
+  w=csv.writer(f,lineterminator='\n');w.writerow(['task','event','gap_before_us','gap_after_us','delta_us'])
   oldlatest=[max(raw[z][7] for z in e[2]) for e in p['ev_inst']]
   for t in sorted({a['task'].id for a in s.tl.critical_path(tr)}|{a['task'].id for a in s.tl.critical_path(ctr)}):
    for e in p['task_in'][t]:

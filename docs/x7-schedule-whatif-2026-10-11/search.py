@@ -18,6 +18,14 @@ PLAN = ARCH / 'results_vlbest2_2026-10-10/b_all/plan.json'
 RAW = ARCH / 'results_qwen300_2026-10-11/tr_on.bin'
 ROLES = ['qkv', 'prep', 'attn', 'reduce', 'o_proj', 'router', 'topk', 'moe_up', 'moe_down']
 
+def source_bytes(archive, snapshot):
+    # Retained snapshots are immutable inputs to subsequent reproductions.
+    return gzip.decompress((OUT/snapshot).read_bytes()) if (OUT/snapshot).exists() else archive.read_bytes()
+
+def load_raw():
+    data=array('q');data.frombytes(source_bytes(RAW,'measured.bin.gz'))
+    return [tuple(data[t:t+9]) for t in range(0,len(data),9)]
+
 def stem(name):
     return re.sub(r'_\d+(?:_x)?$', '', name)
 
@@ -71,7 +79,8 @@ def cp_account(p, rows, deps=None):
 
 def main():
     space = json.loads((OUT / 'search-space.json').read_text())
-    p = json.loads(PLAN.read_text()); raw = tl.read_raw(RAW)
+    plan_bytes=source_bytes(PLAN,'original-plan.json.gz');raw_bytes=source_bytes(RAW,'measured.bin.gz')
+    p = json.loads(plan_bytes); raw = load_raw()
     tr, measured_cp = cp_account(p, raw)
     assert len(raw) == len(p['descs']) == 60362
     names = {t['id']: n for n,t in p['types'].items()}
@@ -103,18 +112,18 @@ def main():
     profile = defaultdict(list)
     for t,d in enumerate(p['descs']): profile[(stem(names[d['type']]),tuple(d['coord']))].append(body[t])
     profile = {k:statistics.median(v) for k,v in profile.items()}
-    inputs = dict(base_commit='e31bf04', plan_sha256=hashlib.sha256(PLAN.read_bytes()).hexdigest(),
-                  trace_sha256=hashlib.sha256(RAW.read_bytes()).hexdigest(), plan_source=str(PLAN), trace_source=str(RAW),
+    inputs = dict(base_commit='e31bf04', plan_sha256=hashlib.sha256(plan_bytes).hexdigest(),
+                  trace_sha256=hashlib.sha256(raw_bytes).hexdigest(), plan_source=str(PLAN), trace_source=str(RAW),
                   measured_span_us=tr.span, task_count=len(raw), mismatches=0, dependency_pairs=sum(len(x) for x in tr.deps),
                   boundary_events=len(p['events']), event_instances=len(p['ev_inst']),
                   queue_tail_imputed_task_ids=missing, queue_tail_rule='same type median, unused by baseline successors',
                   body_us=body, queue_after_us=queue_after, ready_after_us=ready_after, initial_taken_us=initial)
     dump(OUT/'inputs.json', inputs)
-    with gzip.GzipFile(filename=str(OUT/'original-plan.json.gz'),mode='wb',mtime=0) as f: f.write(PLAN.read_bytes())
+    with gzip.GzipFile(filename=str(OUT/'original-plan.json.gz'),mode='wb',mtime=0) as f: f.write(plan_bytes)
     write_rows(OUT/'measured.bin.gz',raw)
     results = []; best = None
     edgefile = gzip.open(OUT/'candidate-edge-deltas.csv.gz','wt',newline='')
-    edgewriter = csv.writer(edgefile)
+    edgewriter = csv.writer(edgefile,lineterminator='\n')
     edgewriter.writerow(['candidate','task','event','baseline_path','candidate_path','gap_before_us','gap_after_us','delta_us'])
     basepath={x['task'].id for x in tl.critical_path(tr)}
     base_latest=[max(raw[z][7] for z in ev[2]) for ev in p['ev_inst']]
@@ -209,7 +218,7 @@ def main():
     write_rows(OUT/'best.bin.gz',rows)
     # Same consumer+event identity before/after, including edges not on either critical path.
     with gzip.open(OUT/'edge-deltas.csv.gz','wt',newline='') as f:
-        writer=csv.writer(f);writer.writerow(['task','type','event','latest_producer_before','latest_producer_after','gap_before_us','gap_after_us','delta_us','queue_delay_before_us','queue_delay_after_us'])
+        writer=csv.writer(f,lineterminator='\n');writer.writerow(['task','type','event','latest_producer_before','latest_producer_after','gap_before_us','gap_after_us','delta_us','queue_delay_before_us','queue_delay_after_us'])
         for t,ins in enumerate(c['task_in']):
             for e in ins:
                 producers=c['ev_inst'][e][2];b=max(producers,key=lambda z:raw[z][7]);a=max(producers,key=lambda z:rows[z][7])
@@ -217,7 +226,7 @@ def main():
                 writer.writerow([t,names[c['descs'][t]['type']],c['ev_inst'][e][0],b,a,round(before,3),round(after,3),round(after-before,3),
                                  round(max(0,(raw[t][5]-raw[b][7])*.01),3),round(max(0,(rows[t][5]-rows[a][7])*.01),3)])
     with (OUT/'candidates.csv').open('w',newline='') as f:
-        fields=[k for k in results[0] if k!='cp'];w=csv.DictWriter(f,fieldnames=fields);w.writeheader()
+        fields=[k for k in results[0] if k!='cp'];w=csv.DictWriter(f,fieldnames=fields,lineterminator='\n');w.writeheader()
         w.writerows({k:v for k,v in r.items() if k!='cp'} for r in results)
     with (OUT/'summary.txt').open('w') as f:
         print(f'M input: span {tr.span:.3f} us; 60362 tasks; 436 events; {len(p["ev_inst"])} instances; zero mismatches',file=f)
@@ -232,6 +241,6 @@ def main():
         print(f'E residual conservation: queue {sum(queue_after):.3f} us (worker-summed) unchanged; ready {sum(ready_after):.3f} -> {entry["ready_cost_sum_us"]:.3f}',file=f)
         for r in sorted(results,key=lambda r:r['period_delta_us'])[:12]:
             print(f'E rank {r["id"]}: period_delta={r["period_delta_us"]:+.6f}; step_delta={r["step_delta_us"]:+.3f}',file=f)
-    print((OUT/'summary.txt').read_text(),flush=True)
+    print((OUT/'summary.txt').read_text(),end='',flush=True)
 
 if __name__=='__main__':main()

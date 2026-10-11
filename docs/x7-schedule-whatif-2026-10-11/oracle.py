@@ -4,7 +4,7 @@ from collections import defaultdict
 from pathlib import Path
 import search as s
 from etx.sim.xcd import Cost,Hw,ReplayTiming,simulate
-O=Path(__file__).resolve().parent;p=json.loads(gzip.decompress((O/'original-plan.json.gz').read_bytes()));raw=s.tl.read_raw(s.RAW)
+O=Path(__file__).resolve().parent;p=json.loads(gzip.decompress((O/'original-plan.json.gz').read_bytes()));raw=s.load_raw()
 tr,basecp=s.cp_account(p,raw);i=json.loads((O/'inputs.json').read_text());space=json.loads((O/'oracle-space.json').read_text())
 names={v['id']:k for k,v in p['types'].items()};groups=defaultdict(list)
 for d in p['descs']:groups[d['type']].append(d['id'])
@@ -45,7 +45,7 @@ for model in space['models']:
   r=dict(id=label,model=model,legal=True,clairvoyant=True,period_us=period,period_delta_us=period-baseperiod,span_us=ctr.span,step_delta_us=ctr.span-tr.span,wall_ms_est=4.180+(ctr.span-tr.span)/1000,cp=cp,queue_cost_sum_us=sum(timing.queue_after_us),local_cost_sum_us=sum(local),notification_cost_sum_us=sum(notif or []))
   results.append(r);s.dump(O/'oracle-results.json',results)
   with gzip.open(O/f'oracle-edges-{label}-{model}.csv.gz','wt',newline='') as f:
-   w=csv.writer(f);w.writerow(['task','event','gap_before_us','gap_after_us','delta_us'])
+   w=csv.writer(f,lineterminator='\n');w.writerow(['task','event','gap_before_us','gap_after_us','delta_us'])
    for t in sorted({a['task'].id for a in s.tl.critical_path(tr)}|{a['task'].id for a in s.tl.critical_path(ctr)}):
     for e in p['task_in'][t]:
      b=(raw[t][6]-oldlatest[e])*.01;a=(rows[t][6]-latest[e])*.01

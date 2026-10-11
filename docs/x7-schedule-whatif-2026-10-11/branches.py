@@ -5,7 +5,7 @@ from pathlib import Path
 import search as s
 from etx.sim.xcd import Cost,Hw,ReplayTiming,simulate
 O=Path(__file__).resolve().parent
-p=json.loads(gzip.decompress((O/'original-plan.json.gz').read_bytes()));raw=s.tl.read_raw(s.RAW)
+p=json.loads(gzip.decompress((O/'original-plan.json.gz').read_bytes()));raw=s.load_raw()
 tr,basecp=s.cp_account(p,raw);inputs=json.loads((O/'inputs.json').read_text());space=json.loads((O/'branch-space.json').read_text())
 names={v['id']:k for k,v in p['types'].items()};groups=defaultdict(list); profiles=defaultdict(lambda:[[],[],[]])
 for t,d in enumerate(p['descs']):
@@ -58,7 +58,7 @@ for local_floor in space['common_local_setup_floor_us']:
   r=dict(id=label,local_floor_us=local_floor,period_us=period,period_delta_us=period-baseperiod,span_us=ctr.span,step_delta_us=ctr.span-tr.span,wall_ms_est=4.180+(ctr.span-tr.span)/1000,cp=cp,queue_cost_sum_us=sum(timing.queue_after_us),local_cost_sum_us=sum(local),notification_cost_sum_us=sum(notification))
   records.append(r);s.dump(O/'branch-results.json',records)
   with gzip.open(O/f'branch-edges-{label}-f{local_floor}.csv.gz','wt',newline='') as f:
-   w=csv.writer(f);w.writerow(['task','event','gap_before_us','gap_after_us','delta_us'])
+   w=csv.writer(f,lineterminator='\n');w.writerow(['task','event','gap_before_us','gap_after_us','delta_us'])
    oldlatest=[max(raw[z][7] for z in ev[2]) for ev in p['ev_inst']]
    for t in sorted({a['task'].id for a in s.tl.critical_path(tr)}|{a['task'].id for a in s.tl.critical_path(ctr)}):
     for e in p['task_in'][t]:

@@ -1,0 +1,45 @@
+M trace /Users/ckl/code/etx/results_qwen300_2026-10-11/tr_on.bin sha256=aa68468246acde1a8d0e19ad0fbc6d5913bc37c7a3f352f44cecec8c0bdef320
+M plan /Users/ckl/code/etx/results_vlbest2_2026-10-10/b_all/plan.json sha256=b32c3299d4165ba8d68c7b04461d9ed050818d397c7d99082928922836f9f315
+M rows=60362 mismatch=0 dependency_pairs=6794632 event_names=436 instances=1403
+M baseline stamp differences: all 181086 stamp errors 0.000 us; span 4067.290 us
+M body/ready residual sums; E queue sum including imputation: body=515432.800 us; ready residual=95322.920 us; queue residual + terminal imputation=81246.400 us
+M period entry max(in_norm.done)=14.760 us; tail last(moe_down.done)->argmax.done=164.770 us
+M span reconciliation: 14.760 + 48*80.995000 + 164.770 = 4067.290 us
+E best nominal: exact_body_plus_ready_desc additive; period 80.175000 us; reduction 0.820000 us/layer > 0.625
+E nominal step: 14.760 + 48*80.175000 + 164.770 = 4027.930 us; delta -39.360 us; estimated wall 4.140640 ms
+E critical-path ledger (us): role body_before body_after delta_body gap_before gap_after delta_gap delta_total
+prologue +3.920 +3.920 +0.000 +2.610 +2.610 +0.000 +0.000
+in_norm +3.720 +3.720 +0.000 +4.350 +4.350 +0.000 +0.000
+qkv +433.160 +440.640 +7.480 +183.150 +157.150 -26.000 -18.520
+prep +194.800 +194.800 -0.000 +81.090 +81.090 +0.000 -0.000
+attn +259.720 +259.720 -0.000 +52.520 +52.520 +0.000 +0.000
+reduce +254.280 +254.280 +0.000 +56.560 +56.560 -0.000 +0.000
+o_proj +263.480 +263.480 -0.000 +96.740 +96.740 -0.000 -0.000
+router +265.360 +288.680 +23.320 +129.220 +102.240 -26.980 -3.660
+topk +146.280 +145.280 -1.000 +74.640 +74.420 -0.220 -1.220
+moe_up +770.280 +771.680 +1.400 +52.200 +51.680 -0.520 +0.880
+moe_down +435.360 +435.120 -0.240 +139.080 +122.480 -16.600 -16.840
+lm_head +151.920 +151.920 +0.000 +1.650 +1.650 +0.000 +0.000
+argmax +9.520 +9.520 +0.000 +1.680 +1.680 +0.000 +0.000
+TOTAL +3191.800 +3222.760 +30.960 +875.490 +805.170 -70.320 -39.360
+E same frozen table, alternative exact baseline fit: branch0 and branch052 period 80.463750 us; reduction 0.531250 < 0.625; step cut 25.500 us; wall 4.154500 ms
+E profile-median body+ready policy: additive +0.031250 us/layer, +1.500 us/step; branch models +0.296667 us/layer, +14.240 us/step
+E oracle reoptimized for branch0: -0.686875 us/layer; branch052: -0.631667 us/layer; these are different worker tables, not sensitivity of the frozen best
+E terminal queue tax extrema 0..4.32 us: frozen nominal period unchanged; step reduction 37.050..39.360 us
+E family minima: map candidate delta_period delta_step span_us estimated_wall_ms
+original original-reverse-s6-p0.3 +1.386667 +71.230 4138.520 4.251230
+rotate_heads rotate_heads-reverse-s6-p0.3 +1.377500 +70.790 4138.080 4.250790
+dense_balance dense_balance-reverse-s6-p0.3 +1.805208 +91.140 4158.430 4.271140
+attention_wide attention_wide-reverse-s6-p0.3 +1.986667 +100.030 4167.320 4.280030
+greedy_coord +1.190625 +57.150 4124.440 4.237150
+narrow6 +265.067292 +13491.540 17558.830 17.671540
+narrow14 +100.864792 +5148.250 9215.540 9.328250
+one_xcd_domain +300.264375 +15320.960 19388.250 19.500960
+serial_head_optimistic +20.857917 +1001.180 5068.470 5.181180
+owner_prep_optimistic +5.366042 +257.570 4324.860 4.437570
+E matched-edge examples: task type event before_us after_us delta_us (same consumer and event)
+14026 qkv_11 E_99 4.38 2.42 -1.96
+7307 moe_down_5 E_53 1.36 2.32 0.96
+VERDICT WEAK: nominal same-cost layout passes; other exact baseline timing fit fails KEEP; profile-only policy fails; no measured GPU win or proof of structural impossibility
+E pool accounting: gap -70.320 us, body-path +30.960 us, net -39.360 us; no total task work or dependency removed
+E practical-policy search CLOSED below KEEP; rows 9/10 structural classification remains unproven, conditional oracle gain only 3.0%-4.6% of 0.847 ms need
