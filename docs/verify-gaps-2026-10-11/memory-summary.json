@@ -1,0 +1,758 @@
+{
+  "baseline": {
+    "etx_megakernel_d0": {
+      "resources": {
+        "TotalNumSgprs": 106,
+        "NumVgprs": 128,
+        "ScratchSize": 28,
+        "LDSByteSize": 29736,
+        "Occupancy": 4
+      },
+      "lds": {
+        "objects": [
+          {
+            "symbol": "etx_lds_arena",
+            "field": 0,
+            "bytes": 21120,
+            "range": [
+              0,
+              21120
+            ],
+            "padding_before": 0,
+            "construct": "etx/import.h: __shared__ aligned(16) unsigned char etx_lds_arena[ETX_IMPORT_LDS]",
+            "mapping_basis": "before/after amdgpu-lower-module-lds instruction matching; unique-size bijection for unmatched fields"
+          },
+          {
+            "symbol": "_ZZL12etx_run_taskRK10etx_params8etx_taskjjiE7etx_lds",
+            "field": 1,
+            "bytes": 8448,
+            "range": [
+              21120,
+              29568
+            ],
+            "padding_before": 0,
+            "construct": "generated etx_run_task/etx_unfused: __shared__ aligned(16) unsigned char etx_lds[ETX_LDS_USED]",
+            "mapping_basis": "before/after amdgpu-lower-module-lds instruction matching; unique-size bijection for unmatched fields"
+          },
+          {
+            "symbol": "etx_imp_nbar",
+            "field": 2,
+            "bytes": 64,
+            "range": [
+              29568,
+              29632
+            ],
+            "padding_before": 0,
+            "construct": "etx/import.h: __shared__ uint32_t etx_imp_nbar[16]",
+            "mapping_basis": "before/after amdgpu-lower-module-lds instruction matching; unique-size bijection for unmatched fields"
+          },
+          {
+            "symbol": "etx_imp_bar_count",
+            "field": 3,
+            "bytes": 32,
+            "range": [
+              29632,
+              29664
+            ],
+            "padding_before": 0,
+            "construct": "etx/import.h: __shared__ uint32_t etx_imp_bar_count[ETX_IMPORT_SLOTS]",
+            "mapping_basis": "before/after amdgpu-lower-module-lds instruction matching; unique-size bijection for unmatched fields"
+          },
+          {
+            "symbol": "etx_imp_bar_gen",
+            "field": 4,
+            "bytes": 32,
+            "range": [
+              29664,
+              29696
+            ],
+            "padding_before": 0,
+            "construct": "etx/import.h: __shared__ uint32_t etx_imp_bar_gen[ETX_IMPORT_SLOTS]",
+            "mapping_basis": "before/after amdgpu-lower-module-lds instruction matching; unique-size bijection for unmatched fields"
+          },
+          {
+            "symbol": "_ZZ17etx_megakernel_d0E6s_task",
+            "field": 5,
+            "bytes": 20,
+            "range": [
+              29696,
+              29716
+            ],
+            "padding_before": 0,
+            "construct": "generated etx_megakernel: __shared__ etx_task s_task",
+            "mapping_basis": "before/after amdgpu-lower-module-lds instruction matching; unique-size bijection for unmatched fields"
+          },
+          {
+            "symbol": "_ZZ17etx_megakernel_d0E5s_tid",
+            "field": 6,
+            "bytes": 4,
+            "range": [
+              29716,
+              29720
+            ],
+            "padding_before": 0,
+            "construct": "generated etx_megakernel: __shared__ int32_t s_tid",
+            "mapping_basis": "before/after amdgpu-lower-module-lds instruction matching; unique-size bijection for unmatched fields"
+          },
+          {
+            "symbol": "_ZZ17etx_megakernel_d0E8s_domain",
+            "field": 7,
+            "bytes": 4,
+            "range": [
+              29720,
+              29724
+            ],
+            "padding_before": 0,
+            "construct": "generated etx_megakernel: __shared__ int32_t s_domain",
+            "mapping_basis": "before/after amdgpu-lower-module-lds instruction matching; unique-size bijection for unmatched fields"
+          },
+          {
+            "symbol": "_ZZ17etx_megakernel_d0E8s_worker",
+            "field": 8,
+            "bytes": 4,
+            "range": [
+              29724,
+              29728
+            ],
+            "padding_before": 0,
+            "construct": "generated etx_megakernel: __shared__ int32_t s_worker",
+            "mapping_basis": "before/after amdgpu-lower-module-lds instruction matching; unique-size bijection for unmatched fields"
+          },
+          {
+            "symbol": "etx_imp_done",
+            "field": 9,
+            "bytes": 4,
+            "range": [
+              29728,
+              29732
+            ],
+            "padding_before": 0,
+            "construct": "etx/import.h: __shared__ uint32_t etx_imp_done",
+            "mapping_basis": "before/after amdgpu-lower-module-lds instruction matching; unique-size bijection for unmatched fields"
+          },
+          {
+            "symbol": "etx_imp_exit",
+            "field": 10,
+            "bytes": 4,
+            "range": [
+              29732,
+              29736
+            ],
+            "padding_before": 0,
+            "construct": "etx/import.h: __shared__ uint32_t etx_imp_exit",
+            "mapping_basis": "before/after amdgpu-lower-module-lds instruction matching; unique-size bijection for unmatched fields"
+          }
+        ],
+        "total_bytes": 29736,
+        "compiler_promoted_objects": [],
+        "range_convention": "half-open byte ranges; alignment padding explicit"
+      },
+      "register_independent_load_sites": 106
+    },
+    "etx_unfused_d0": {
+      "resources": {
+        "TotalNumSgprs": 99,
+        "NumVgprs": 103,
+        "ScratchSize": 0,
+        "LDSByteSize": 29704,
+        "Occupancy": 4
+      },
+      "lds": {
+        "objects": [
+          {
+            "symbol": "etx_lds_arena",
+            "field": 0,
+            "bytes": 21120,
+            "range": [
+              0,
+              21120
+            ],
+            "padding_before": 0,
+            "construct": "etx/import.h: __shared__ aligned(16) unsigned char etx_lds_arena[ETX_IMPORT_LDS]",
+            "mapping_basis": "before/after amdgpu-lower-module-lds instruction matching; unique-size bijection for unmatched fields"
+          },
+          {
+            "symbol": "_ZZ14etx_unfused_d0E7etx_lds",
+            "field": 1,
+            "bytes": 8448,
+            "range": [
+              21120,
+              29568
+            ],
+            "padding_before": 0,
+            "construct": "generated etx_run_task/etx_unfused: __shared__ aligned(16) unsigned char etx_lds[ETX_LDS_USED]",
+            "mapping_basis": "before/after amdgpu-lower-module-lds instruction matching; unique-size bijection for unmatched fields"
+          },
+          {
+            "symbol": "etx_imp_nbar",
+            "field": 2,
+            "bytes": 64,
+            "range": [
+              29568,
+              29632
+            ],
+            "padding_before": 0,
+            "construct": "etx/import.h: __shared__ uint32_t etx_imp_nbar[16]",
+            "mapping_basis": "before/after amdgpu-lower-module-lds instruction matching; unique-size bijection for unmatched fields"
+          },
+          {
+            "symbol": "etx_imp_bar_count",
+            "field": 3,
+            "bytes": 32,
+            "range": [
+              29632,
+              29664
+            ],
+            "padding_before": 0,
+            "construct": "etx/import.h: __shared__ uint32_t etx_imp_bar_count[ETX_IMPORT_SLOTS]",
+            "mapping_basis": "before/after amdgpu-lower-module-lds instruction matching; unique-size bijection for unmatched fields"
+          },
+          {
+            "symbol": "etx_imp_bar_gen",
+            "field": 4,
+            "bytes": 32,
+            "range": [
+              29664,
+              29696
+            ],
+            "padding_before": 0,
+            "construct": "etx/import.h: __shared__ uint32_t etx_imp_bar_gen[ETX_IMPORT_SLOTS]",
+            "mapping_basis": "before/after amdgpu-lower-module-lds instruction matching; unique-size bijection for unmatched fields"
+          },
+          {
+            "symbol": "etx_imp_done",
+            "field": 5,
+            "bytes": 4,
+            "range": [
+              29696,
+              29700
+            ],
+            "padding_before": 0,
+            "construct": "etx/import.h: __shared__ uint32_t etx_imp_done",
+            "mapping_basis": "before/after amdgpu-lower-module-lds instruction matching; unique-size bijection for unmatched fields"
+          },
+          {
+            "symbol": "etx_imp_exit",
+            "field": 6,
+            "bytes": 4,
+            "range": [
+              29700,
+              29704
+            ],
+            "padding_before": 0,
+            "construct": "etx/import.h: __shared__ uint32_t etx_imp_exit",
+            "mapping_basis": "before/after amdgpu-lower-module-lds instruction matching; unique-size bijection for unmatched fields"
+          }
+        ],
+        "total_bytes": 29704,
+        "compiler_promoted_objects": [],
+        "range_convention": "half-open byte ranges; alignment padding explicit"
+      },
+      "register_independent_load_sites": 92
+    }
+  },
+  "c1": {
+    "etx_megakernel_d0": {
+      "resources": {
+        "TotalNumSgprs": 106,
+        "NumVgprs": 128,
+        "ScratchSize": 28,
+        "LDSByteSize": 29736,
+        "Occupancy": 4
+      },
+      "lds": {
+        "objects": [
+          {
+            "symbol": "etx_lds_arena",
+            "field": 0,
+            "bytes": 21120,
+            "range": [
+              0,
+              21120
+            ],
+            "padding_before": 0,
+            "construct": "etx/import.h: __shared__ aligned(16) unsigned char etx_lds_arena[ETX_IMPORT_LDS]",
+            "mapping_basis": "before/after amdgpu-lower-module-lds instruction matching; unique-size bijection for unmatched fields"
+          },
+          {
+            "symbol": "_ZZL12etx_run_taskRK10etx_params8etx_taskjjiE7etx_lds",
+            "field": 1,
+            "bytes": 8448,
+            "range": [
+              21120,
+              29568
+            ],
+            "padding_before": 0,
+            "construct": "generated etx_run_task/etx_unfused: __shared__ aligned(16) unsigned char etx_lds[ETX_LDS_USED]",
+            "mapping_basis": "before/after amdgpu-lower-module-lds instruction matching; unique-size bijection for unmatched fields"
+          },
+          {
+            "symbol": "etx_imp_nbar",
+            "field": 2,
+            "bytes": 64,
+            "range": [
+              29568,
+              29632
+            ],
+            "padding_before": 0,
+            "construct": "etx/import.h: __shared__ uint32_t etx_imp_nbar[16]",
+            "mapping_basis": "before/after amdgpu-lower-module-lds instruction matching; unique-size bijection for unmatched fields"
+          },
+          {
+            "symbol": "etx_imp_bar_count",
+            "field": 3,
+            "bytes": 32,
+            "range": [
+              29632,
+              29664
+            ],
+            "padding_before": 0,
+            "construct": "etx/import.h: __shared__ uint32_t etx_imp_bar_count[ETX_IMPORT_SLOTS]",
+            "mapping_basis": "before/after amdgpu-lower-module-lds instruction matching; unique-size bijection for unmatched fields"
+          },
+          {
+            "symbol": "etx_imp_bar_gen",
+            "field": 4,
+            "bytes": 32,
+            "range": [
+              29664,
+              29696
+            ],
+            "padding_before": 0,
+            "construct": "etx/import.h: __shared__ uint32_t etx_imp_bar_gen[ETX_IMPORT_SLOTS]",
+            "mapping_basis": "before/after amdgpu-lower-module-lds instruction matching; unique-size bijection for unmatched fields"
+          },
+          {
+            "symbol": "_ZZ17etx_megakernel_d0E6s_task",
+            "field": 5,
+            "bytes": 20,
+            "range": [
+              29696,
+              29716
+            ],
+            "padding_before": 0,
+            "construct": "generated etx_megakernel: __shared__ etx_task s_task",
+            "mapping_basis": "before/after amdgpu-lower-module-lds instruction matching; unique-size bijection for unmatched fields"
+          },
+          {
+            "symbol": "_ZZ17etx_megakernel_d0E5s_tid",
+            "field": 6,
+            "bytes": 4,
+            "range": [
+              29716,
+              29720
+            ],
+            "padding_before": 0,
+            "construct": "generated etx_megakernel: __shared__ int32_t s_tid",
+            "mapping_basis": "before/after amdgpu-lower-module-lds instruction matching; unique-size bijection for unmatched fields"
+          },
+          {
+            "symbol": "_ZZ17etx_megakernel_d0E8s_domain",
+            "field": 7,
+            "bytes": 4,
+            "range": [
+              29720,
+              29724
+            ],
+            "padding_before": 0,
+            "construct": "generated etx_megakernel: __shared__ int32_t s_domain",
+            "mapping_basis": "before/after amdgpu-lower-module-lds instruction matching; unique-size bijection for unmatched fields"
+          },
+          {
+            "symbol": "_ZZ17etx_megakernel_d0E8s_worker",
+            "field": 8,
+            "bytes": 4,
+            "range": [
+              29724,
+              29728
+            ],
+            "padding_before": 0,
+            "construct": "generated etx_megakernel: __shared__ int32_t s_worker",
+            "mapping_basis": "before/after amdgpu-lower-module-lds instruction matching; unique-size bijection for unmatched fields"
+          },
+          {
+            "symbol": "etx_imp_done",
+            "field": 9,
+            "bytes": 4,
+            "range": [
+              29728,
+              29732
+            ],
+            "padding_before": 0,
+            "construct": "etx/import.h: __shared__ uint32_t etx_imp_done",
+            "mapping_basis": "before/after amdgpu-lower-module-lds instruction matching; unique-size bijection for unmatched fields"
+          },
+          {
+            "symbol": "etx_imp_exit",
+            "field": 10,
+            "bytes": 4,
+            "range": [
+              29732,
+              29736
+            ],
+            "padding_before": 0,
+            "construct": "etx/import.h: __shared__ uint32_t etx_imp_exit",
+            "mapping_basis": "before/after amdgpu-lower-module-lds instruction matching; unique-size bijection for unmatched fields"
+          }
+        ],
+        "total_bytes": 29736,
+        "compiler_promoted_objects": [],
+        "range_convention": "half-open byte ranges; alignment padding explicit"
+      },
+      "register_independent_load_sites": 106
+    },
+    "etx_unfused_d0": {
+      "resources": {
+        "TotalNumSgprs": 99,
+        "NumVgprs": 103,
+        "ScratchSize": 0,
+        "LDSByteSize": 29704,
+        "Occupancy": 4
+      },
+      "lds": {
+        "objects": [
+          {
+            "symbol": "etx_lds_arena",
+            "field": 0,
+            "bytes": 21120,
+            "range": [
+              0,
+              21120
+            ],
+            "padding_before": 0,
+            "construct": "etx/import.h: __shared__ aligned(16) unsigned char etx_lds_arena[ETX_IMPORT_LDS]",
+            "mapping_basis": "before/after amdgpu-lower-module-lds instruction matching; unique-size bijection for unmatched fields"
+          },
+          {
+            "symbol": "_ZZ14etx_unfused_d0E7etx_lds",
+            "field": 1,
+            "bytes": 8448,
+            "range": [
+              21120,
+              29568
+            ],
+            "padding_before": 0,
+            "construct": "generated etx_run_task/etx_unfused: __shared__ aligned(16) unsigned char etx_lds[ETX_LDS_USED]",
+            "mapping_basis": "before/after amdgpu-lower-module-lds instruction matching; unique-size bijection for unmatched fields"
+          },
+          {
+            "symbol": "etx_imp_nbar",
+            "field": 2,
+            "bytes": 64,
+            "range": [
+              29568,
+              29632
+            ],
+            "padding_before": 0,
+            "construct": "etx/import.h: __shared__ uint32_t etx_imp_nbar[16]",
+            "mapping_basis": "before/after amdgpu-lower-module-lds instruction matching; unique-size bijection for unmatched fields"
+          },
+          {
+            "symbol": "etx_imp_bar_count",
+            "field": 3,
+            "bytes": 32,
+            "range": [
+              29632,
+              29664
+            ],
+            "padding_before": 0,
+            "construct": "etx/import.h: __shared__ uint32_t etx_imp_bar_count[ETX_IMPORT_SLOTS]",
+            "mapping_basis": "before/after amdgpu-lower-module-lds instruction matching; unique-size bijection for unmatched fields"
+          },
+          {
+            "symbol": "etx_imp_bar_gen",
+            "field": 4,
+            "bytes": 32,
+            "range": [
+              29664,
+              29696
+            ],
+            "padding_before": 0,
+            "construct": "etx/import.h: __shared__ uint32_t etx_imp_bar_gen[ETX_IMPORT_SLOTS]",
+            "mapping_basis": "before/after amdgpu-lower-module-lds instruction matching; unique-size bijection for unmatched fields"
+          },
+          {
+            "symbol": "etx_imp_done",
+            "field": 5,
+            "bytes": 4,
+            "range": [
+              29696,
+              29700
+            ],
+            "padding_before": 0,
+            "construct": "etx/import.h: __shared__ uint32_t etx_imp_done",
+            "mapping_basis": "before/after amdgpu-lower-module-lds instruction matching; unique-size bijection for unmatched fields"
+          },
+          {
+            "symbol": "etx_imp_exit",
+            "field": 6,
+            "bytes": 4,
+            "range": [
+              29700,
+              29704
+            ],
+            "padding_before": 0,
+            "construct": "etx/import.h: __shared__ uint32_t etx_imp_exit",
+            "mapping_basis": "before/after amdgpu-lower-module-lds instruction matching; unique-size bijection for unmatched fields"
+          }
+        ],
+        "total_bytes": 29704,
+        "compiler_promoted_objects": [],
+        "range_convention": "half-open byte ranges; alignment padding explicit"
+      },
+      "register_independent_load_sites": 92
+    }
+  },
+  "c5": {
+    "etx_megakernel_d0": {
+      "resources": {
+        "TotalNumSgprs": 106,
+        "NumVgprs": 128,
+        "ScratchSize": 36,
+        "LDSByteSize": 29736,
+        "Occupancy": 4
+      },
+      "lds": {
+        "objects": [
+          {
+            "symbol": "etx_lds_arena",
+            "field": 0,
+            "bytes": 21120,
+            "range": [
+              0,
+              21120
+            ],
+            "padding_before": 0,
+            "construct": "etx/import.h: __shared__ aligned(16) unsigned char etx_lds_arena[ETX_IMPORT_LDS]",
+            "mapping_basis": "before/after amdgpu-lower-module-lds instruction matching; unique-size bijection for unmatched fields"
+          },
+          {
+            "symbol": "_ZZL12etx_run_taskRK10etx_params8etx_taskjjiE7etx_lds",
+            "field": 1,
+            "bytes": 8448,
+            "range": [
+              21120,
+              29568
+            ],
+            "padding_before": 0,
+            "construct": "generated etx_run_task/etx_unfused: __shared__ aligned(16) unsigned char etx_lds[ETX_LDS_USED]",
+            "mapping_basis": "before/after amdgpu-lower-module-lds instruction matching; unique-size bijection for unmatched fields"
+          },
+          {
+            "symbol": "etx_imp_nbar",
+            "field": 2,
+            "bytes": 64,
+            "range": [
+              29568,
+              29632
+            ],
+            "padding_before": 0,
+            "construct": "etx/import.h: __shared__ uint32_t etx_imp_nbar[16]",
+            "mapping_basis": "before/after amdgpu-lower-module-lds instruction matching; unique-size bijection for unmatched fields"
+          },
+          {
+            "symbol": "etx_imp_bar_count",
+            "field": 3,
+            "bytes": 32,
+            "range": [
+              29632,
+              29664
+            ],
+            "padding_before": 0,
+            "construct": "etx/import.h: __shared__ uint32_t etx_imp_bar_count[ETX_IMPORT_SLOTS]",
+            "mapping_basis": "before/after amdgpu-lower-module-lds instruction matching; unique-size bijection for unmatched fields"
+          },
+          {
+            "symbol": "etx_imp_bar_gen",
+            "field": 4,
+            "bytes": 32,
+            "range": [
+              29664,
+              29696
+            ],
+            "padding_before": 0,
+            "construct": "etx/import.h: __shared__ uint32_t etx_imp_bar_gen[ETX_IMPORT_SLOTS]",
+            "mapping_basis": "before/after amdgpu-lower-module-lds instruction matching; unique-size bijection for unmatched fields"
+          },
+          {
+            "symbol": "_ZZ17etx_megakernel_d0E6s_task",
+            "field": 5,
+            "bytes": 20,
+            "range": [
+              29696,
+              29716
+            ],
+            "padding_before": 0,
+            "construct": "generated etx_megakernel: __shared__ etx_task s_task",
+            "mapping_basis": "before/after amdgpu-lower-module-lds instruction matching; unique-size bijection for unmatched fields"
+          },
+          {
+            "symbol": "_ZZ17etx_megakernel_d0E5s_tid",
+            "field": 6,
+            "bytes": 4,
+            "range": [
+              29716,
+              29720
+            ],
+            "padding_before": 0,
+            "construct": "generated etx_megakernel: __shared__ int32_t s_tid",
+            "mapping_basis": "before/after amdgpu-lower-module-lds instruction matching; unique-size bijection for unmatched fields"
+          },
+          {
+            "symbol": "_ZZ17etx_megakernel_d0E8s_domain",
+            "field": 7,
+            "bytes": 4,
+            "range": [
+              29720,
+              29724
+            ],
+            "padding_before": 0,
+            "construct": "generated etx_megakernel: __shared__ int32_t s_domain",
+            "mapping_basis": "before/after amdgpu-lower-module-lds instruction matching; unique-size bijection for unmatched fields"
+          },
+          {
+            "symbol": "_ZZ17etx_megakernel_d0E8s_worker",
+            "field": 8,
+            "bytes": 4,
+            "range": [
+              29724,
+              29728
+            ],
+            "padding_before": 0,
+            "construct": "generated etx_megakernel: __shared__ int32_t s_worker",
+            "mapping_basis": "before/after amdgpu-lower-module-lds instruction matching; unique-size bijection for unmatched fields"
+          },
+          {
+            "symbol": "etx_imp_done",
+            "field": 9,
+            "bytes": 4,
+            "range": [
+              29728,
+              29732
+            ],
+            "padding_before": 0,
+            "construct": "etx/import.h: __shared__ uint32_t etx_imp_done",
+            "mapping_basis": "before/after amdgpu-lower-module-lds instruction matching; unique-size bijection for unmatched fields"
+          },
+          {
+            "symbol": "etx_imp_exit",
+            "field": 10,
+            "bytes": 4,
+            "range": [
+              29732,
+              29736
+            ],
+            "padding_before": 0,
+            "construct": "etx/import.h: __shared__ uint32_t etx_imp_exit",
+            "mapping_basis": "before/after amdgpu-lower-module-lds instruction matching; unique-size bijection for unmatched fields"
+          }
+        ],
+        "total_bytes": 29736,
+        "compiler_promoted_objects": [],
+        "range_convention": "half-open byte ranges; alignment padding explicit"
+      },
+      "register_independent_load_sites": 112
+    },
+    "etx_unfused_d0": {
+      "resources": {
+        "TotalNumSgprs": 99,
+        "NumVgprs": 103,
+        "ScratchSize": 0,
+        "LDSByteSize": 29704,
+        "Occupancy": 4
+      },
+      "lds": {
+        "objects": [
+          {
+            "symbol": "etx_lds_arena",
+            "field": 0,
+            "bytes": 21120,
+            "range": [
+              0,
+              21120
+            ],
+            "padding_before": 0,
+            "construct": "etx/import.h: __shared__ aligned(16) unsigned char etx_lds_arena[ETX_IMPORT_LDS]",
+            "mapping_basis": "before/after amdgpu-lower-module-lds instruction matching; unique-size bijection for unmatched fields"
+          },
+          {
+            "symbol": "_ZZ14etx_unfused_d0E7etx_lds",
+            "field": 1,
+            "bytes": 8448,
+            "range": [
+              21120,
+              29568
+            ],
+            "padding_before": 0,
+            "construct": "generated etx_run_task/etx_unfused: __shared__ aligned(16) unsigned char etx_lds[ETX_LDS_USED]",
+            "mapping_basis": "before/after amdgpu-lower-module-lds instruction matching; unique-size bijection for unmatched fields"
+          },
+          {
+            "symbol": "etx_imp_nbar",
+            "field": 2,
+            "bytes": 64,
+            "range": [
+              29568,
+              29632
+            ],
+            "padding_before": 0,
+            "construct": "etx/import.h: __shared__ uint32_t etx_imp_nbar[16]",
+            "mapping_basis": "before/after amdgpu-lower-module-lds instruction matching; unique-size bijection for unmatched fields"
+          },
+          {
+            "symbol": "etx_imp_bar_count",
+            "field": 3,
+            "bytes": 32,
+            "range": [
+              29632,
+              29664
+            ],
+            "padding_before": 0,
+            "construct": "etx/import.h: __shared__ uint32_t etx_imp_bar_count[ETX_IMPORT_SLOTS]",
+            "mapping_basis": "before/after amdgpu-lower-module-lds instruction matching; unique-size bijection for unmatched fields"
+          },
+          {
+            "symbol": "etx_imp_bar_gen",
+            "field": 4,
+            "bytes": 32,
+            "range": [
+              29664,
+              29696
+            ],
+            "padding_before": 0,
+            "construct": "etx/import.h: __shared__ uint32_t etx_imp_bar_gen[ETX_IMPORT_SLOTS]",
+            "mapping_basis": "before/after amdgpu-lower-module-lds instruction matching; unique-size bijection for unmatched fields"
+          },
+          {
+            "symbol": "etx_imp_done",
+            "field": 5,
+            "bytes": 4,
+            "range": [
+              29696,
+              29700
+            ],
+            "padding_before": 0,
+            "construct": "etx/import.h: __shared__ uint32_t etx_imp_done",
+            "mapping_basis": "before/after amdgpu-lower-module-lds instruction matching; unique-size bijection for unmatched fields"
+          },
+          {
+            "symbol": "etx_imp_exit",
+            "field": 6,
+            "bytes": 4,
+            "range": [
+              29700,
+              29704
+            ],
+            "padding_before": 0,
+            "construct": "etx/import.h: __shared__ uint32_t etx_imp_exit",
+            "mapping_basis": "before/after amdgpu-lower-module-lds instruction matching; unique-size bijection for unmatched fields"
+          }
+        ],
+        "total_bytes": 29704,
+        "compiler_promoted_objects": [],
+        "range_convention": "half-open byte ranges; alignment padding explicit"
+      },
+      "register_independent_load_sites": 95
+    }
+  }
+}
