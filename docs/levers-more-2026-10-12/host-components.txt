@@ -1,0 +1,21 @@
+source /Users/ckl/code/etx/results_qwen300_hour_20261011/session-wklfw6bc/report.json
+sha256 2c160b4ec54c4c6103f0d1b040f2002bfc452940f1c08dbf7840856cdac192f9
+hour session [M], diagnostic host profile; not the KEY32 anchor
+upload_us 3.990281250
+reset_submit_us 38.634125000
+residency_us 1.046375000
+launch_us 6.040031250
+wait_us 4922.802156250
+retire_readback_us 18.867125000
+instrument_other_us 3.797625000
+reset_device_us 74.980469000
+kernel_device_us 4869.703456781
+wall_us 4995.177718750
+upload_us 0.003990281
+reset_submit_us 0.038634125
+residency_us 0.001046375
+launch_us 0.006040031
+retire_readback_us 0.018867125
+wait_minus_kernel_ms 0.053098699
+kernel_outside_token_timers_ms 0.035837207
+instrument_other_ms 0.003797625

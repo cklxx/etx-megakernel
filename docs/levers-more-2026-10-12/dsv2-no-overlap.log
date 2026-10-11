@@ -1,0 +1,23 @@
+fleet layer 5: 129.3 us = latency-bound phases 73.2 us + expert stream 56.1 us; token 3.6 ms, 26 MoE layers
+byte floor 167 MB / 4.3 TB/s = 39 us per layer
+
+layout      condition                         layer us   token ms   faster by  per-request latency   throughput
+base        fleet today                           129.3       3.60                                    1.00x
+shared      f=1.00 event 1.4 us bg 2 TB/s       126.5       3.53     +2.0%
+shared      f=1.00 event 1.4 us bg 4 TB/s       122.3       3.42     +5.1%
+shared      f=1.15 event 1.4 us bg 2 TB/s       127.6       3.56     +1.2%
+shared      f=1.15 event 1.4 us bg 4 TB/s       123.4       3.45     +4.3%
+shared      f=1.30 event 1.4 us bg 2 TB/s       128.8       3.59     +0.4%
+shared      f=1.30 event 1.4 us bg 4 TB/s       124.5       3.48     +3.4%
+shared      f=1.50 event 1.4 us bg 2 TB/s       130.3       3.63     -0.7%
+shared      f=1.50 event 1.4 us bg 4 TB/s       126.1       3.52     +2.3%
+shared      f=2.00 event 1.4 us bg 2 TB/s       134.1       3.72     -3.5%
+shared      f=2.00 event 1.4 us bg 4 TB/s       129.9       3.61     -0.4%
+interleave  f=1.00 (2 requests)                  146.4       4.04                +12% per token        1.78x
+interleave  f=1.15 (2 requests)                  168.4       4.62                +28% per token        1.56x
+interleave  f=1.30 (2 requests)                  190.3       5.19                +44% per token        1.39x
+interleave  f=1.50 (2 requests)                  219.6       5.95                +65% per token        1.21x
+interleave  f=2.00 (2 requests)                  292.8       7.85               +118% per token        0.92x
+batch2      union 11.4+2 units (uniform routing)     167.4       4.59                +28% per token        1.57x
+
+Reading: interleave beats batch2 only while f stays below 1.14; compare both against vLLM at batch 2 (vllm_bench --batch 2) before building either.

@@ -1,0 +1,10 @@
+Traceback (most recent call last):
+  File "/Users/ckl/code/.wt/etx-levers2/docs/levers-more-2026-10-12/simulate.py", line 242, in <module>
+    main()
+    ~~~~^^
+  File "/Users/ckl/code/.wt/etx-levers2/docs/levers-more-2026-10-12/simulate.py", line 137, in main
+    mechanisms = mechanism_oracles()
+  File "/Users/ckl/code/.wt/etx-levers2/docs/levers-more-2026-10-12/simulate.py", line 114, in mechanism_oracles
+    assert partitions == 5
+           ^^^^^^^^^^^^^^^
+AssertionError
