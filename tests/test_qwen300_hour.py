@@ -355,14 +355,18 @@ def test_s2_combines_gap_attention_and_attributable_host(tmp_path, g, r2, host, 
     assert ':306-308' in s.rows['B.stop']['source']
 
 
-@pytest.mark.parametrize('g,runs_b,runs_cd', [(.087, False, False), (.100, True, False), (.324, True, True)])
+@pytest.mark.parametrize('g,runs_b,runs_cd', [(.087, False, False), (.100, False, False), (.324, True, True)])
 def test_execute_obeys_both_stops_with_time_remaining(tmp_path, monkeypatch, g, runs_b, runs_cd):
     s = session(tmp_path); s.certified.add('kept'); calls = []
     monkeypatch.setattr(h, 'preflight', lambda s: None)
     monkeypatch.setattr(h, 'tranche_a', lambda s: h.first_stop(s, dict(G_ms=g)))
-    def b(s): calls.append('B'); return ['body-keep']
+    def b(s):
+        assert s.rows['B.stop']['status'] == 'PASS'
+        calls.append('B'); return ['body-keep']
     def c(s): calls.append('C'); return [], 1620
-    def d(s, survivors, extra): calls.append('D')
+    def d(s, survivors, extra):
+        assert survivors == ['body-keep']
+        calls.append('D')
     monkeypatch.setattr(h, 'tranche_b', b)
     monkeypatch.setattr(h, 'tranche_c', c)
     monkeypatch.setattr(h, 'tranche_d', d)
@@ -371,7 +375,8 @@ def test_execute_obeys_both_stops_with_time_remaining(tmp_path, monkeypatch, g, 
     assert s.end-h.time.monotonic() > 3900
     if not runs_cd:
         assert all(s.rows[k]['status'] == 'NOT-RUN' for k in ('C.fusion', 'C.body', 'D.target', 'D.fusion', 'D.system'))
-    if runs_b: assert s.rows['B.stop']['status'] == ('PASS' if runs_cd else 'STOP')
+    if g >= .088: assert s.rows['B.stop']['status'] == ('PASS' if runs_cd else 'STOP')
+    if not runs_b: assert s.rows['B.keep']['status'] == 'NOT-RUN'
 
 
 def test_gap_atoms_clip_to_critical_gap_and_apply_class_floor():

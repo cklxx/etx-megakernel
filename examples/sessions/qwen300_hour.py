@@ -238,7 +238,7 @@ REGISTERED = {
     'A3.host': 'name stages accounting for unexplained 0.086 ms beyond priced 0.049 ms',
     'A4.reset': 'pursue only >0.030 ms/step, host and device separately',
     'A.stop': 'S1 at <=15 minutes: G >=0.088 ms (1.833 us/layer) in named above-floor gap atoms, else close target route',
-    'B.stop': 'S2 after B: G + R2 + H >=0.324 ms (whole-target 6.743 us/layer), else close target route; unknowns count zero',
+    'B.stop': 'S2 after A, before B: G + R2 + H >=0.324 ms (whole-target 6.743 us/layer), else close target route; unknowns count zero',
     'B.keep': '3 pairs, all faster, median >=0.030 ms, median >2*spread',
     'C.fusion': 'net >=1.042 us/layer; VGPR <=128; LDS <=29752 B',
     'C.body': '3 pairs, all faster, median >=0.030 ms, median >2*spread',
@@ -394,7 +394,7 @@ def first_stop(s, gap_atoms):
     passes = g is not None and math.isfinite(g) and (g >= .088 or math.isclose(g, .088, rel_tol=0., abs_tol=1e-12))
     passes = passes and 'kept' in s.certified
     s.row('A.stop', dict(G_ms=g, gap_atoms=gap_atoms,
-                        decision='CONTINUE to B' if passes else 'STOP-SPEND: close target route'),
+                        decision='CONTINUE to S2' if passes else 'STOP-SPEND: close target route'),
           'PASS' if passes else 'STOP', REGISTERED['A.stop'])
     print(f'FIRST-STOP elapsed={time.monotonic()-s.start:.1f}s (<=900s)', flush=True)
     return passes
@@ -421,7 +421,7 @@ def second_stop(s):
     total = g+r2+h
     passes = total >= .324 or math.isclose(total, .324, rel_tol=0., abs_tol=1e-12)
     s.row('B.stop', dict(G_ms=g, R2_ms=r2, H_ms=h, total_ms=total,
-                        decision='CONTINUE to C/D' if passes else 'STOP-SPEND: close target route'),
+                        decision='CONTINUE to B/C/D' if passes else 'STOP-SPEND: close target route'),
           'PASS' if passes else 'STOP', REGISTERED['B.stop'])
     return passes
 
@@ -984,12 +984,13 @@ def execute(s):
                      'D.target', 'D.fusion', 'D.system'):
             s.row(name, None, 'NOT-RUN', REGISTERED[name])
         return
-    b = tranche_b(s)
+    # B cannot change G, H or the unmeasured R2 (zero); decide before spending it.
     if not second_stop(s):
-        print('STOP after B: S2 closes target route', flush=True)
-        for name in ('C.fusion', 'C.body', 'C.NO_TOUCH', 'C.ISOLATE_POLLER', 'D.target', 'D.fusion', 'D.system'):
+        print('STOP after A: S2 closes target route', flush=True)
+        for name in ('B.keep', 'C.fusion', 'C.body', 'C.NO_TOUCH', 'C.ISOLATE_POLLER', 'D.target', 'D.fusion', 'D.system'):
             s.row(name, None, 'NOT-RUN', REGISTERED[name])
         return
+    b = tranche_b(s)
     c, extra = tranche_c(s)
     tranche_d(s, b+c, extra)
 
