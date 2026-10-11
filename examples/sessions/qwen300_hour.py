@@ -412,7 +412,7 @@ def candidate_pairs(s, a, tranche):
 
 
 def tranche_b(s):
-    s.deadline = min(s.start+1800, s.end)
+    s.deadline = min(time.monotonic()+900, s.end)
     if 'kept' not in s.certified:
         print('B SKIP: kept fresh correctness gate failed', flush=True); return []
     survivors = []
@@ -426,6 +426,64 @@ def tranche_b(s):
           'PASS' if survivors else 'NO-KEEP', REGISTERED['B.keep'])
     print('B ceilings overlap router body: do not add C1/C5 gains; D must measure any combination', flush=True)
     return survivors
+
+
+def c_eligibility(s, a):
+    eligible_arm(s, a)
+    from examples.vllm_llm import import_certificate as cert
+    from examples.vllm_llm.nvref_report import correctness
+    proof = Path(a['prototype_certificate'])
+    info = cert.validate(proof, timing=False)
+    identity = cert.verified_build(Path(s.c['builds'][a['build']]), Path(s.c['model']))
+    if info['build_sha256'] != cert.digest(identity): raise ValueError('prototype correctness belongs to another build')
+    correctness((proof/'gate_chkx.log').read_text(), a['id'])
+    if 'CHECK-DSL OK' not in (proof/'gate_chkx.log').read_text(): raise ValueError('prototype CHECK-DSL missing')
+    commit = a['prototype_commit']
+    if not re.fullmatch('[a-f0-9]{40}', commit): raise ValueError('prototype full commit required')
+    subprocess.run(['git', 'merge-base', '--is-ancestor', commit, 'HEAD'], cwd=ROOT, check=True,
+                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    if commit != s.c['build_commits'].get(a['build']): raise ValueError('prototype build/source commit mismatch')
+    if a['kind'] == 'fusion':
+        if a['expected_vgpr'] > 128 or a['expected_lds_bytes'] > 29752:
+            raise ValueError('expected fusion resources exceed 128 VGPR / 29752 B LDS')
+        log = (Path(s.c['builds'][a['build']])/'hipcc.log').read_text()
+        blocks = re.split(r'Function Name:', log)
+        native = [b for b in blocks if re.match(r'\s*etx_megakernel_d0\b', b)]
+        if len(native) != 1: raise ValueError('whole-kernel native compiler resources missing')
+        def value(label):
+            match = re.search(label+r':\s*(\d+)', native[0])
+            if not match: raise ValueError('native resource field missing: '+label)
+            return int(match[1])
+        if value('VGPRs') > 128 or value('LDS Size') > 29752:
+            raise ValueError('native fusion resources exceed budget')
+    return a
+
+
+def tranche_c(s):
+    qualified = []
+    for a in s.m['C']:
+        result = s.attempt('C.eligibility.'+a['id'], lambda a=a: c_eligibility(s, a))
+        if result: qualified.append(result)
+    if not qualified:
+        print('C SKIP: no already-correct committed full-model prototype qualifies; add 1200s to D', flush=True)
+        s.row('C.fusion', None, 'SKIP', REGISTERED['C.fusion'])
+        s.row('C.body', None, 'SKIP', REGISTERED['C.body'])
+        return [], 1200
+    s.deadline = min(time.monotonic()+1200, s.end)
+    survivors = []
+    for a in qualified:
+        result = s.attempt(a['id'], lambda a=a: candidate_pairs(s, a, 'C'))
+        if not result: continue
+        if a['kind'] == 'fusion':
+            net = result['median_ms']*1000/48
+            accepted = result['keep'] and net >= 1.042
+            s.row('C.fusion.'+a['id'], dict(net_us_layer=net, pairs=result), 'PASS' if accepted else 'FAIL', REGISTERED['C.fusion'])
+            result['keep'] = accepted
+        if result['keep']: survivors.append(a)
+    for kind, key in (('fusion', 'C.fusion'), ('body', 'C.body')):
+        s.row(key, {a['id']: s.arms.get(a['id']) for a in qualified if a['kind'] == kind},
+              'PASS' if any(a['kind'] == kind for a in survivors) else 'NO-KEEP', REGISTERED[key])
+    return survivors, 0
 
 
 def dry_run():
