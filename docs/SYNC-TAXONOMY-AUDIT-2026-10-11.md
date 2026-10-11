@@ -48,6 +48,84 @@ device**. Host excess (wall − device): fused **0.135 ms**, graph **0.034 ms**.
 
 ## 2. Numbers in the taxonomy that the artifacts contradict
 
+### 2a. "500 launches × 5-10 us = 2.5-5 ms, the bulk of the +4%": refuted
+
+The number is the project's own: `docs/ETX_Brief.md:29` and TD:50 say "launch gaps are 5-10 us". No artifact of
+this build supports it.
+
+1. **The baseline does not launch from the host per kernel.** The graph arm replays 434 kernels (G:5) from one
+   captured graph (H:393-401). Its whole host excess is 4.357 − 4.323 = **0.034 ms** [M] (J:146-147), 0.08 us per
+   kernel [E]. At 5-10 us per launch the 434 launches alone would be 2.2-4.3 ms [E], against a 4.357 ms wall that
+   also holds 3.19 ms of task bodies (MT:18). vLLM runs 843 kernels per token (`results_2026-09-27/next.log:313`);
+   at 5-10 us each that is 4.2-8.4 ms [E], against S3's whole 4.749 ms step
+   (`results_vlbest2_2026-10-10/report.log:9`, a different session).
+2. **What a kernel boundary costs on the device**, measured inside a 200-kernel HIP graph: **1.60-1.62 us** empty,
+   **1.78-2.39 us** with 304 workgroups doing 0-4 dependent loads [M, bare metal] (HW:41-56). For 434 boundaries:
+   0.69-1.04 ms of device time [E].
+3. **What ETX pays instead.** 435 event edges on the path, **875.5 us** [M], mean 2.01 us/edge; free edges alone
+   1.51 us/edge (470.1 us / 312, MT:36; MTD:150-151). Per edge this is not clearly cheaper than a graph boundary.
+4. **Where the +4.1% comes from.** Device 0.278 ms minus a host penalty of 0.135 − 0.034 = **0.101 ms** (J:144-147).
+   The launch layer's contribution to the fusion gain is therefore **−0.101 ms**: the one megakernel launch costs
+   more host time than the graph's 434. The 0.278 ms device gain cannot be split between boundary cost and body
+   speed [U]: no trace of the graph arm exists. The one measured switch that turned fusion from a loss into a
+   gain on one box and day is COH, a cache-continuity change: fused 5.224 → 4.907 ms against the unfused 5.107
+   [M, device, older build] (R1:31,70). That points at caches surviving the phase boundary, not at launches or
+   barriers [E].
+
+**Corrected number:** launch removal is worth **−0.101 ms** wall to the kept build's fusion gain; the gain is
+**0.278 ms of device time**, of unknown split.
+
+### 2b. "Sentinel 0.8 us vs 7.6 us for counter plus fence, about 10x": refuted for ETX
+
+The pair is Kog's: TD:490 records it as a **whole-card phase switch** on 256 CUs. The repository reproduces the
+large side: a whole-GPU counter barrier of 304 workgroups costs **8.6 us** [M] (Y:75). ETX never pays that per
+edge. Its edges are per-word counters with a per-domain last-arriver flush (PR:42-58), and their measured cost is:
+
+| Quantity | us | Basis | Source |
+|---|---:|---|---|
+| Same-XCD one-way, DOMAIN counter | 0.642 | [M] microbenchmark, idle | Y:69 |
+| Cross-XCD one-way | 0.742 | [M] microbenchmark, idle | Y:70 |
+| DEVICE flag with payload, one-way | 0.916-0.951 | [M] microbenchmark, 0 stale in 10k | Y:71-72 |
+| Kog's sentinel, point-to-point | 0.80-0.93 | public, not reproduced | TD:490; Y:77 |
+| Repository's sentinel test (coherent store + poll), median | 2.98-3.75 | [M] bare metal | HW:111-115 |
+| Repository's event, same test harness, DEVICE, median | 2.61-4.12 | [M] bare metal | HW:82-86 |
+| Kept path, single-producer same-XCD edges, median | 1.08-1.12 | [M] trace | ACC:70-71 |
+| Kept path, cross-XCD DEVICE free edges, median | 1.56-1.97 | [M] trace | ACC:65-67 |
+
+Against the counter ETX actually uses, the sentinel's 0.80-0.93 us is 0.84-1.45x of 0.642-0.951 us, not 10x. The
+repository's own sentinel test found no gain; it scanned a whole 4 KB vector per round, which
+`docs/RESULTS-2026-09-30.md:91-92` names as unfair, so the test does not prove the sentinel is slower either. The
+sentinel only applies point-to-point: the 256-producer events would need one sentinel per producer, which is the
+shape the test measured. On the kept path the single-producer edges (prep → attn, topk → moe_up) carry 104.7 us on
+96 edges (ACC:70-71); at 0.80 us each the ceiling is 104.7 − 76.8 = **27.9 us** [E], below the 30 us bar
+(MTD:369-371). **Corrected number:** at most ~1.4x per point-to-point edge and **≤ 0.028 ms** per step.
+
+### 2c. "Nine handoffs per layer, the source of the 2.84 ms serial wall": qualified
+
+**Nine agrees.** Events `E_{9L+1}..E_{9L+9}` per layer (DEP:90-91); 435 path edges = 48 × 9 + 3 (ACC:80).
+
+**2.84 ms is not the cost of the handoffs.** It appears in neither MTD nor DEP. Its source is FL:212, the serial
+floor at 4.3 TB/s and 0.50 us per round trip, computed on the round-11 trace with a 5.08 ms span (FL:21,94,211),
+not on the kept build. Its formula is `48 × (Σ phases max(bytes/BW, chain floor) + handoffs) + tails`
+(`etx/tools/floors.py:16`); `python -m etx.tools.floors --table` prints 2837.8 us. Split [E]:
+
+| Part of the 2.84 ms | us | Source |
+|---|---:|---|
+| 48 × phase floors (bytes at 4.3 TB/s or dependent-load chains, whichever is larger) | 2255.0 | MT:51 |
+| 48 × 9 handoffs at 1.00 us | 433.0 | FL:78; `docs/BUDGET-2026-10-01.md:161` |
+| Tails (prologue, in_norm, lm_head, argmax) | 149.8 | difference |
+
+Handoffs are 15% of it. Of the rest, FL:213,299 put 1.40 ms in weight streams that depend on no event, so the
+floor model itself does not call it a dependency wall; the measured attempts to overlap it gave nothing
+(FL:303-304,310).
+
+**On the kept build** (MT:18,36): the dependency gaps are **875.5 us** [M] (DEP's KEY32-off trace: 871.0 us,
+DEP:122-124). Of that, 231.3 us [M] is the consumer worker still finishing its previous task's arrive and queue
+fetch, 470.1 us [M] free notification, 171.4 us [R] the rest of the late edges, 2.6 us the window start. The
+protocol floor at the measured 1.00 us/edge is **0.435 ms** [E] (MTD:403). **Corrected number:** the
+nine-per-layer data dependency costs **0.876 ms** of device time on the kept path, of which about **0.435 ms** is
+the floor; the 2.84 ms is a different quantity.
+
 ## 3. Mechanisms without a counterpart in the repository
 
 ## 4. What the critical path spends that the taxonomy omits
