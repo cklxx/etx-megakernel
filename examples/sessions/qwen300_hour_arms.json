@@ -10,12 +10,13 @@
      "budget_s": 1620, "estimated_required_s": 1575,
      "keep_threshold": {"complete_adjacent_pinned_pairs": 3, "every_wall_gain_ms_gt": 0, "median_wall_gain_ms_ge": 0.030, "median_gt_spread_multiplier": 2, "additional": null},
      "source": "docs/PLAN-300TOKS-2026-10-11.md:310,314; docs/XCD-PREFETCH-2026-10-11.md:71-76,125; etx/codegen/kernel.py:297"},
-    {"id": "ISOLATE_POLLER", "build": "ISOLATE_POLLER", "kind": "body", "enabled": false,
-     "reason": "19-minute arm cost against C's 27 minutes; together with NO_TOUCH's 26.25 minutes both exceed C; runs in a later session",
+    {"id": "ISOLATE_POLLER", "build": "ISOLATE_POLLER", "kind": "body", "enabled": true,
      "flags": {"ETX_VL_TOUCH": "1", "ETX_PREFETCH_ISOLATE_POLLER": "1"},
-     "budget_s": 600, "estimated_required_s": 1140,
+     "budget_s": 1200, "estimated_required_s": 1140,
      "keep_threshold": {"complete_adjacent_pinned_pairs": 3, "every_wall_gain_ms_gt": 0, "median_wall_gain_ms_ge": 0.030, "median_gt_spread_multiplier": 2, "round_trip_median_us_lt": 2.0},
      "source": "docs/VERIFY-GAPS-2026-10-11.md:141-193; examples/vllm_llm/prefetch_isolation_cpu.py"},
-    {"id": "C6", "build": "C6", "kind": "fusion", "enabled": false, "reason": "Contract/hook only; no correct committed full-model prototype", "source": "docs/ISA-FIXES-2026-10-11.md:246"}
+    {"id": "C6", "build": "C6", "kind": "fusion", "enabled": true,
+     "budget_s": 1200, "estimated_required_s": 1085,
+     "prerequisites": "Contract/hook only today; requires a sealed committed full-model adapter, prototype_certificate, prototype_commit, expected_vgpr and expected_lds_bytes before qualification", "source": "docs/ISA-FIXES-2026-10-11.md:246"}
   ]
 }
