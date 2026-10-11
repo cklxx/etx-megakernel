@@ -115,7 +115,7 @@ class Session:
     def attempt(self, name, fn):
         try:
             return fn()
-        except (OSError, ValueError, RuntimeError, TimeoutError, KeyError) as exc:
+        except (OSError, ValueError, RuntimeError, TimeoutError, KeyError, subprocess.SubprocessError) as exc:
             print(f'ARM {name} NOT-COMPLETE: {type(exc).__name__}: {exc}', flush=True)
             self.arms[name] = dict(status='NOT-COMPLETE', reason=str(exc))
             return None
@@ -486,6 +486,124 @@ def tranche_c(s):
     return survivors, 0
 
 
+def system(s, name):
+    """Existing S3 engine/host basis; local pinned image, no pull or downloads."""
+    from examples.vllm_llm.vlbest_report import config, proof
+    from examples.vllm_llm.nvref_report import vllm
+    cfg = config('S3')
+    output = s.out/(name+'.json')
+    cmd = ['sudo', 'docker', 'run', '--rm', '--pull=never', '--network=none',
+           '--device=/dev/kfd', '--device=/dev/dri', '--group-add=video', '--ipc=host',
+           '-e', 'HIP_VISIBLE_DEVICES='+os.environ.get('GPU', '0'),
+           '-e', 'HF_HUB_OFFLINE=1', '-e', 'TRANSFORMERS_OFFLINE=1',
+           '-v', f'{Path.home()}:{Path.home()}', '-w', str(ROOT), '--entrypoint', 'python3',
+           s.c['image'], '-u', '-m', 'examples.sessions.qwen300_hour', '--vllm',
+           '--model', s.c['hf'], '--golden', str(Path(s.c['model'])/'golden_c1024.txt'),
+           '--tokens', '32', '--repeats', '1', '--batch', '1', '--label', 'S3', '--echo-config',
+           '--engine-kw', json.dumps(cfg['kw']), '--json', str(output)]
+    text = s.step(name, cmd, timeout=240, expected=180)
+    if proof(text, cfg): raise ValueError('S3 lever proof failed: '+str(proof(text, cfg)))
+    if re.findall(r'^VLLM-SAMPLE sample=(\d+) first_divergence=(\S+)', text, re.M) != [('0', '32/32')]:
+        raise ValueError('S3 full token gate missing')
+    vllm(text, name, '0', 'S3')
+    data = json.loads(output.read_text())
+    if len(data['per_token_ms']) != 1 or data['golden_prefix_match'] != 32 or len(data['tokens_out']) != 32:
+        raise ValueError('S3 NOT-COMPLETE population')
+    cost = data['per_token_ms'][0]
+    if not math.isfinite(cost) or cost <= 0: raise ValueError('invalid S3 wall cost')
+    return dict(wall_ms=cost, basis='(generate(32)-generate(1))/31 host wall', config=cfg)
+
+
+def select_final(s, survivors):
+    """Only prebuilt combinations; no summing overlapping singleton ceilings."""
+    if not survivors: return 'kept'
+    ids = {a['id'] for a in survivors}
+    combined = [a for a in s.c.get('combinations', []) if set(a['members']) == ids]
+    if len(ids) > 1 and combined:
+        a = combined[0]
+        eligible_arm(s, a)
+        certify(s, a['build'])
+        # D measures the combination afresh; singleton gains confer no KEEP.
+        print('FINAL-COMBINATION prebuilt '+a['build']+' members='+','.join(sorted(ids)), flush=True)
+        return a['build']
+    if len(ids) > 1:
+        print('FINAL-COMBINATION unavailable: no prebuilt compatible combination; use strongest measured singleton', flush=True)
+    return max(survivors, key=lambda a: s.arms[a['id']]['median_ms'])['build']
+
+
+def tranche_d(s, survivors, extra_seconds):
+    from examples.vllm_llm.pairs import verdict as fusion_verdict, parse, pairs
+    from examples.vllm_llm.nvref_report import verdict as system_verdict
+    s.deadline = min(time.monotonic()+600+extra_seconds, s.end)
+    if 'kept' not in s.certified:
+        print('D NOT-COMPLETE: kept correctness gate failed', flush=True); return
+    arm = s.attempt('D.selection', lambda: select_final(s, survivors))
+    if arm is None: return
+    # Fresh certificate from this session even for prequalified prototype builds.
+    if s.attempt('D.certify', lambda: (certify(s, arm), True)[1]) is None: return
+    if s.attempt('D.graph_gate', lambda: token_gate(host(s, arm, 'D_graph_gate', ['--repeat', '1', '--unfused']))) is None: return
+    records = []; fusion_logs = []
+    for rnd in range(5):
+        row = {}
+        # Two independent adjacent pinned pairs per round. F is remeasured
+        # next to S3; F/G is not a nonadjacent triplet pretending to be a pair.
+        for comparison in ('fusion', 'system'):
+            order = ('fused', 'graph' if comparison == 'fusion' else 'S3')
+            if rnd % 2: order = order[::-1]
+            pair = {}
+            for mode in order:
+                name = f'D_{comparison}_r{rnd}_{mode}'
+                def sample(mode=mode, name=name):
+                    if mode == 'S3': return system(s, name)
+                    text = host(s, arm, name, ['--repeat', '1']+(['--unfused'] if mode == 'graph' else []))
+                    result = timing(text, mode)
+                    if comparison == 'fusion': fusion_logs.extend((s.out/(name+'.log')).read_text().splitlines())
+                    return result
+                result = s.attempt(name, sample)
+                if result is not None: pair[mode] = result
+            row[comparison] = pair
+        records.append(row)
+    (s.out/'D_rounds.json').write_text(json.dumps(records, indent=2)+'\n')
+    complete_fusion = all(set(r['fusion']) == {'fused', 'graph'} for r in records)
+    complete_system = all(set(r['system']) == {'fused', 'S3'} for r in records)
+    if complete_fusion:
+        ps = pairs(parse(fusion_logs), 5)
+        vf = fusion_verdict([(g.wall_ms-f.wall_ms)/g.wall_ms for f, g in ps])
+        primary = fusion_verdict([(r['fusion']['graph']['wall_ms']-r['fusion']['fused']['wall_ms'])/r['fusion']['graph']['wall_ms'] for r in records])
+        s.row('D.fusion', dict(result_wall_basis=vf, step_mean_wall_basis=primary),
+              'ESTABLISHED' if vf['established'] and primary['established'] else 'NOT-ESTABLISHED', REGISTERED['D.fusion'])
+    if complete_system:
+        deltas = [r['system']['fused']['wall_ms']-r['system']['S3']['wall_ms'] for r in records]
+        s.row('D.system', dict(deltas_ms=deltas, median_ms=st.median(deltas), spread_ms=max(deltas)-min(deltas), reference='S3 strongest previously tested legal configuration'),
+              system_verdict(deltas), REGISTERED['D.system'])
+    if complete_fusion and complete_system:
+        values = [r['fusion']['fused']['wall_ms'] for r in records]
+        s.row('D.target', dict(arm=arm, rounds_ms=values, median_ms=st.median(values),
+                              system_pair_fused_ms=[r['system']['fused']['wall_ms'] for r in records]),
+              'PASS' if st.median(values) <= 3.3333 else 'FAIL', REGISTERED['D.target'])
+        s.arms['D'] = dict(status='COMPLETE', final=arm)
+    else:
+        s.arms['D'] = dict(status='NOT-COMPLETE', reason='missing final pairs; no shortened-run aggregate')
+
+
+def execute(s):
+    preflight(s)
+    tranche_a(s)
+    b = tranche_b(s)
+    c, extra = tranche_c(s)
+    tranche_d(s, b+c, extra)
+
+
+def vllm_entry(args):
+    import torch
+    if torch.cuda.device_count() != 1 or 'gfx942' not in torch.cuda.get_device_properties(0).gcnArchName:
+        raise RuntimeError('one visible MI300X gfx942 required')
+    print('HARDWARE '+str(torch.cuda.get_device_name(0))+' ROCm='+str(torch.version.hip), flush=True)
+    from examples.llm import vllm_bench
+    sys.argv = ['vllm_bench', *args]
+    vllm_bench.main()
+
+
 def dry_run():
     """Exercise CPU logic, shell syntax and runner registration; never spawn GPU commands."""
     for j in JOBS:
@@ -498,20 +616,26 @@ def dry_run():
 
 
 def main(argv=None):
+    args = list(sys.argv[1:] if argv is None else argv)
+    if args and args[0] == '--vllm': vllm_entry(args[1:]); return 0
     ap = argparse.ArgumentParser(description=__doc__)
     g = ap.add_mutually_exclusive_group(required=True)
     g.add_argument('--template', type=Path)
     g.add_argument('--dry-run', action='store_true')
     g.add_argument('--run', action='store_true')
-    a = ap.parse_args(argv)
+    a = ap.parse_args(args)
     if a.template: a.template.write_text(json.dumps(template(), indent=2)+'\n'); return 0
     if a.dry_run: return dry_run()
     c = json.loads(Path(os.environ.get('ETX_QWEN300_CONFIG', ROOT/'qwen300-hour.json')).read_text())
     s = Session(c, os.environ['ETX_SESS_LOGDIR'], float(os.environ.get('ETX_SESS_REMAINING_SECONDS', 3600)))
     try:
-        raise RuntimeError('Harness skeleton: tranches not installed yet')
+        execute(s)
+    except (OSError, ValueError, RuntimeError, TimeoutError, KeyError, subprocess.SubprocessError) as exc:
+        s.arms['session'] = dict(status='NOT-COMPLETE', reason=str(exc))
+        print('SESSION NOT-COMPLETE '+str(exc), flush=True)
     finally:
         s.finish()
+    return 0 if s.arms.get('D', {}).get('status') == 'COMPLETE' else 2
 
 
 if __name__ == '__main__':
