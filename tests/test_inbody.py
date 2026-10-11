@@ -100,6 +100,24 @@ def test_missing_completion_never_counts_as_zero(mutation):
     with pytest.raises(ValueError): inbody.analyze(p,r)
 
 
+@pytest.mark.parametrize('sentinel', [0, 1])
+def test_unwritten_poll_buffer_has_specific_refusal(tmp_path, sentinel):
+    plan, raw = fixture()
+    raw['poll'] = [[sentinel] for _ in raw['poll']]
+    path = tmp_path/'unwritten.bin'
+    path.write_bytes(binary(raw))
+    with pytest.raises(ValueError, match='poll buffer not written.*task 1'):
+        inbody.analyze(plan, inbody.read_raw(path))
+
+
+@pytest.mark.parametrize('poll', [200, 214, 241, (1 << 64)-1])
+def test_strict_success_order_still_refuses_non_sentinel_corruption(poll):
+    plan, raw = fixture()
+    raw['poll'][1] = [poll]
+    with pytest.raises(ValueError, match='invalid success order/clock for task 1'):
+        inbody.analyze(plan, raw)
+
+
 def test_success_can_precede_producer_after_stamp():
     p,r=fixture(); r['events'][0]=[215,235,0]
     # Consumer can observe zero before the producer's diagnostic write.

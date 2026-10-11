@@ -93,6 +93,10 @@ def analyze(plan, raw, byte_rules=None, hop_us=None, bandwidth=4.3):
         lo = max((a for a, b, _ in brackets), default=taken)
         hi = max((b for a, b, _ in brackets), default=taken)
         poll = raw['poll'][i][0] if dependencies else taken
+        # Zero is the reset value; one is also a missing/stale stamp when the
+        # task was taken later. Do not turn either into a synthetic success.
+        if dependencies and poll <= 1 and poll < taken:
+            raise ValueError(f'poll buffer not written with a valid timestamp for task {i}: poll={poll}')
         if not taken <= poll <= body or lo > poll:
             raise ValueError(f'invalid success order/clock for task {i}')
         nw = raw['waves_per_task']
