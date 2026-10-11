@@ -185,7 +185,7 @@ def main():
                     claims_seen.add((row['document'], row['document_line']))
                 for i, s in row['source_lines']:
                     if not args.new_lines or (row['path'], i) not in seen:
-                        print(f'{i}: {s}')
+                        print(f'{i}:' + (f' {s}' if s else ''))
                     seen.add((row['path'], i))
                 for error in row['missing']:
                     print('MISSING: ' + error)

@@ -1,0 +1,91 @@
+{
+  "hashed_text_inputs_unchanged": 80,
+  "tracked_changes_confined_to_audit_deliverables": true,
+  "tsv_rows_and_full_source_lines_roundtrip": 486,
+  "selected_lines": 2926,
+  "unique_path_line_locations": 1669,
+  "unique_path_selections": 393,
+  "failure_sections_with_complete_quotations": 34,
+  "report_lines": 250,
+  "raw_trace_rebase_byte_identical": true,
+  "raw_trace_plan_rows_matched": {
+    "tr_off": 60362,
+    "tr_on": 60362
+  },
+  "raw_trace_and_plan_sha256": {
+    "results_tiles/tr_all.bin": "44e589fd599a94c142424064ee3ec28175dc0e5297bb9e8d3b97d4ca6f476a9c",
+    "results_qwen300_2026-10-11/tr_off.bin": "5e3a64b30f5b596ddcec0a7b255e1fe8a3b3b26e5420cd64daf203ed73e7fb7e",
+    "results_qwen300_2026-10-11/tr_on.bin": "aa68468246acde1a8d0e19ad0fbc6d5913bc37c7a3f352f44cecec8c0bdef320",
+    "results_vlbest2_2026-10-10/b_all/plan.json": "b32c3299d4165ba8d68c7b04461d9ed050818d397c7d99082928922836f9f315"
+  },
+  "serialized_body_rows_rederived": 864,
+  "body_sums_us": {
+    "results_qwen300_2026-10-11/attempt1/tr_off.log": {
+      "qkv": 429.76,
+      "prep": 178.73,
+      "attn": 251.95,
+      "reduce": 251.38,
+      "o_proj": 248.75,
+      "router": 136.44,
+      "topk": 383.41,
+      "moe_up": 761.5,
+      "moe_down": 445.04
+    },
+    "results_qwen300_2026-10-11/tr_off.log": {
+      "qkv": 433.59,
+      "prep": 181.27,
+      "attn": 254.37,
+      "reduce": 250.49,
+      "o_proj": 248.6,
+      "router": 136.98,
+      "topk": 383.5,
+      "moe_up": 761.37,
+      "moe_down": 442.8
+    }
+  },
+  "prefetch_elapsed_time_repricing": {
+    "6": {
+      "cold_TB_s": 3.43,
+      "mall_TB_s": 3.74,
+      "rate_gain": 0.09037900874635563,
+      "time_fraction_saved": 0.08288770053475936,
+      "702.3_us_repriced_saving_us": 58.21203208556149
+    },
+    "8": {
+      "cold_TB_s": 3.61,
+      "mall_TB_s": 4.23,
+      "rate_gain": 0.17174515235457077,
+      "time_fraction_saved": 0.14657210401891263,
+      "702.3_us_repriced_saving_us": 102.93758865248233
+    }
+  },
+  "KEY32_completed_five_pair_wall_ms": {
+    "savings": [
+      0.23099999999999987,
+      0.23000000000000043,
+      0.2450000000000001,
+      0.23399999999999999,
+      0.2290000000000001
+    ],
+    "median": 0.23099999999999987,
+    "spread": 0.016000000000000014
+  },
+  "bf16_300_tracked_package_inventory": [
+    "examples/vllm_llm/bf16_300/README.md",
+    "examples/vllm_llm/bf16_300/__init__.py",
+    "examples/vllm_llm/bf16_300/attribution.py",
+    "examples/vllm_llm/bf16_300/build.py",
+    "examples/vllm_llm/bf16_300/check.py",
+    "examples/vllm_llm/bf16_300/dispatcher.py",
+    "examples/vllm_llm/bf16_300/fusion.hip",
+    "examples/vllm_llm/bf16_300/mutations.py",
+    "examples/vllm_llm/bf16_300/protocol.py",
+    "examples/vllm_llm/bf16_300/source.py"
+  ],
+  "unverified": [
+    "fresh GPU correctness/performance",
+    "floor attainability",
+    "unseen external tools and measurements",
+    "complete historical semantic search"
+  ]
+}
