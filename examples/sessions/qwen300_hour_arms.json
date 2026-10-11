@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "B": [
+    {"id": "C1", "build": "C1", "kind": "shape", "flags": {"ETX_VL_ROUTER_NARROW": "1"}, "source": "docs/ISA-FIXES-2026-10-11.md:31", "overlap": "router-body", "enabled": true},
+    {"id": "C5", "build": "C5", "kind": "shape", "defines": ["ETX_DSL_NORM_HOIST"], "source": "docs/ISA-FIXES-2026-10-11.md:135", "overlap": "router-body", "enabled": true}
+  ],
+  "C": [
+    {"id": "C6", "build": "C6", "kind": "fusion", "enabled": false, "reason": "Contract/hook only; no correct committed full-model prototype", "source": "docs/ISA-FIXES-2026-10-11.md:246"}
+  ]
+}

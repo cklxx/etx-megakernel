@@ -697,6 +697,9 @@ int main(int argc, char** argv) {
   const int progress = getenv("ETX_VL_PROGRESS") ? atoi(getenv("ETX_VL_PROGRESS")) : 0;   // print every N-th step's wall time
   setvbuf(stdout, nullptr, _IOLBF, 0);
   std::vector<int> matched(nreq, 0);
+#ifdef ETX_HOUR_PROFILE
+  hst.hour_profile_init();
+#endif
   int cov_hard = 0;
   for (int run = 0; run < repeat; ++run) {
     for (int r = 0; r < nreq; ++r) {
@@ -708,10 +711,22 @@ int main(int argc, char** argv) {
     const int nsteps = max_steps > 0 ? std::min(steps, max_steps) : steps;
     for (int t = 0; t < nsteps; ++t) {
       for (VlParams& v : vps) { v.tok = t; v.pos = t; v.write_next = (!teacher && t + 1 >= (int)prompt.size()) ? 1 : 0; }
+#ifdef ETX_INBODY_REPORT
+      printf("HOUR-STEP-BEGIN run=%d step=%d\n", run, t); fflush(stdout);
+#endif
       const auto w0 = std::chrono::steady_clock::now();
       vl_set_params(vps.data(), nreq, hst.stream);
+#ifdef ETX_HOUR_PROFILE
+      const auto hour_upload_end = std::chrono::steady_clock::now();
+#endif
       if (unfused) { if (!hst.run_unfused()) { printf("step %d: unfused step failed\n", t); return 2; } }
+#ifdef ETX_HOUR_PROFILE
+      else if (!hst.hour_profile_run(5.0)) { printf("step %d: ETX profile step failed\n", t); return 2; }
+#elif defined(ETX_INBODY_REPORT)
+      else if (!hst.run(5.0)) { printf("step %d: ETX report step failed\n", t); return 2; }
+#else
       else if (!hst.run(60.0)) { printf("step %d: ETX step failed\n", t); return 2; }
+#endif
       // ETX_DUMP=<dir>: after step ETX_DUMP_STEP (default 0), write the stage buffers to files (ETX_LLM_LAYERS=1
       // keeps layer 0's values in them). Diffed against a torch forward of the HF weights to bisect by stage (round 42).
       if (getenv("ETX_DUMP") && t == (getenv("ETX_DUMP_STEP") ? atoi(getenv("ETX_DUMP_STEP")) : 0)) {
@@ -731,7 +746,28 @@ int main(int argc, char** argv) {
         printf("  dumped step-%d stage buffers to %s\n", t, dir.c_str());
       }
       const double wms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - w0).count();
+#ifdef ETX_HOUR_PROFILE
+      if (t + 1 >= (int)prompt.size()) {
+        const double upload = std::chrono::duration<double, std::micro>(hour_upload_end-w0).count();
+        const double other = wms*1000-upload-hst.hour_reset_us-hst.hour_resid_us-hst.hour_launch_us-hst.hour_wait_us-hst.hour_retire_us;
+        printf("HOUR-STAGE {\"run\":%d,\"step\":%d,\"upload_us\":%.6f,\"reset_submit_us\":%.6f,\"residency_us\":%.6f,\"launch_us\":%.6f,\"wait_us\":%.6f,\"retire_readback_us\":%.6f,\"instrument_other_us\":%.6f,\"reset_device_us\":%.6f,\"kernel_device_us\":%.6f,\"wall_us\":%.6f,\"device_tail_reset\":%d}\n",
+               run, t, upload, hst.hour_reset_us, hst.hour_resid_us, hst.hour_launch_us, hst.hour_wait_us, hst.hour_retire_us, other, hst.hour_reset_device_us, hst.last_ms*1000, wms*1000, hst.dev_reset);
+      }
+#endif
       if (t + 1 >= (int)prompt.size()) wall_ms.push_back(wms);
+#ifdef ETX_INBODY_REPORT
+      if (t >= (int)prompt.size()) printf("HOUR-WALL {\"run\":%d,\"step\":%d,\"ms\":%.9f}\n", run, t, wms);
+#endif
+#if defined(ETX_INBODY) && ETX_INBODY
+      // Diagnostic snapshot at a registered decode context, outside wall time.
+      // Still finish the entire prompt and 32-token gate before using the file.
+      if (const char* selected = getenv("ETX_HOUR_TRACE_STEP")) {
+        if (run == 0 && t == atoi(selected)) {
+          if (const char* path = getenv("ETX_INBODY_RAW")) hst.write_inbody(path);
+          printf("HOUR-SNAPSHOT run=%d step=%d\n", run, t);
+        }
+      }
+#endif
       if (progress && (t % progress == 0 || t < 3)) { printf("  step %d: %.3f ms wall\n", t, wms); fflush(stdout); }
     }
     if (nsteps < steps) { printf("run %d: stopped after %d of %d steps (--max-steps): no token check\n", run, nsteps, steps); continue; }
@@ -785,6 +821,9 @@ int main(int argc, char** argv) {
     }
     step_ms.clear();
     for (int i = 0; i < gen; ++i) { const int t = (int)prompt.size() - 1 + i; step_ms.push_back((t1[t] - t0[t]) * 1e-5); }
+#ifdef ETX_INBODY_REPORT
+    for (int i = 0; i < gen; ++i) printf("HOUR-DEVICE {\"run\":%d,\"step\":%d,\"ms\":%.9f}\n", run, (int)prompt.size()-1+i, step_ms[i]);
+#endif
   }
   // --check-dsl: the last layer's DSL GEMVs against a CPU reference from the same device inputs and the packed weights.
   // The tiles accumulate in fp32 in a different order than vLLM's kernels (and than this loop): a bf16 output may differ
@@ -969,7 +1008,7 @@ int main(int argc, char** argv) {
   }
   // ETX_TRACE=1: per-type wait / body / span of the last step, and the raw per-task stamps (ETX_TRACE_RAW=<file>)
 #if defined(ETX_INBODY) && ETX_INBODY
-  if (const char* path = getenv("ETX_INBODY_RAW")) hst.write_inbody(path);
+  if (!getenv("ETX_HOUR_TRACE_STEP")) { if (const char* path = getenv("ETX_INBODY_RAW")) hst.write_inbody(path); }
 #endif
   if (getenv("ETX_TRACE") && !unfused) hst.report_phases(etx_type_names, ETX_N_TYPES);
   std::vector<double> s(step_ms), w(wall_ms); std::sort(s.begin(), s.end()); std::sort(w.begin(), w.end());
