@@ -21,7 +21,7 @@ def read_raw(path):
     if len(data) < 48 or len(data) % 8:
         raise ValueError('truncated inbody header/word')
     magic, version, nt, ne, nw, tick_ns = struct.unpack_from('<6Q', data)
-    if magic != MAGIC or version not in (1, 2) or not nt or not ne or not 0 < nw <= 16 or tick_ns != 10:
+    if magic != MAGIC or version not in (1, 2, 3, 4) or not nt or not ne or not 0 < nw <= 16 or tick_ns != 10:
         raise ValueError('invalid inbody header')
     count = 6 + nt * 5 + ne * 3 + nt * nw * 2
     if len(data) < count*8 or (version==1 and len(data)!=count*8):
@@ -35,11 +35,11 @@ def read_raw(path):
         return rows
     result=dict(version=version, tick_ns=tick_ns, legacy=take(nt, 4),
                 poll=take(nt, 1), events=take(ne, 3), waves=take(nt*nw, 2), waves_per_task=nw)
-    if version==2:
+    if version in (2, 4):
         if len(words)<pos+3: raise ValueError('truncated ledger header')
         ni,nc,nd=words[pos:pos+3];pos+=3
         expected=count+3+(nt+1)+ni*3+nc*(nd+1)
-        if nc!=ne or not nd or len(words)!=expected: raise ValueError('truncated/extra ledger records')
+        if nc!=ne or not nd or (len(words)!=expected if version==2 else len(words)<expected): raise ValueError('truncated/extra ledger records')
         offsets=[r[0] for r in take(nt+1,1)]; event_words=[r[0] for r in take(ni,1)]
         stamps=take(ni,2)
         if offsets[0]!=0 or offsets[-1]!=ni or offsets!=sorted(offsets) or any(w>=ne for w in event_words):
@@ -48,6 +48,16 @@ def read_raw(path):
         remaining=[signed(r[0]) for r in take(nc,1)]
         sub=[[signed(v) for v in r] for r in take(nd,nc)]
         result['producer_ledger']=dict(offsets=offsets,words=event_words,stamps=stamps,remaining=remaining,sub=sub)
+    if version in (3, 4):
+        if len(words) < pos+2: raise ValueError('missing load-phase header')
+        capacity, size = words[pos:pos+2]; pos += 2
+        if not 0 < capacity <= 64 or len(words) != pos+nt+1+size:
+            raise ValueError('truncated/extra load-phase records')
+        offsets = [r[0] for r in take(nt+1, 1)]
+        width = nw*(1+capacity*3)
+        if offsets[0] or offsets[-1] != size or any(b-a not in (0, width) for a,b in zip(offsets,offsets[1:])):
+            raise ValueError('invalid load-phase CSR')
+        result['loads'] = dict(capacity=capacity, offsets=offsets, data=list(words[pos:]))
     return result
 
 
@@ -171,6 +181,83 @@ def analyze(plan, raw, byte_rules=None, hop_us=None, bandwidth=4.3):
                 acceptance=dict(verdict='NOT-ESTABLISHED', exclusive_attributed_fraction=0.,
                     largest_removable_item=None,
                     reason='issue intervals and byte/hop estimates do not prove exclusive removable atomic work'))
+
+
+
+# Logical streamed weight bytes per full task at the registered exact shape.
+# MASTER-TABLE: QK6, OP3 and M.J. Touch reads, activations and cache hits are
+# not HBM traffic; this is a logical stream rate, not a hardware counter.
+LOAD_ROLES = {'moe_up': (192, 262144), 'moe_down': (256, 98304),
+              'qkv': (256, 81920), 'o_proj': (256, 65536)}
+
+
+def union_ticks(intervals):
+    end = None; total = 0
+    for a, b in sorted(intervals):
+        total += b-a if end is None or a >= end else max(0, b-end)
+        end = b if end is None else max(end, b)
+    return total
+
+
+def load_phases(plan, raw, layers=range(48)):
+    """Complete load groups across the grid; no whole-body denominator.
+
+    Union within each layer/role to count concurrent waves once. Sum layer
+    durations, never sum parallel task durations or divide all-grid bytes by
+    one critical task's duration. Missing records/bytes fail closed.
+    """
+    if 'loads' not in raw:
+        raise ValueError('missing load-phase stamps: rebuild stamps with load-group begin/ready/bytes (inbody v3/v4)')
+    load = raw['loads']; nw = raw['waves_per_task']; cap = load['capacity']; width = 1+cap*3
+    names = {v['id']: name for name, v in plan['types'].items()}
+    groups = defaultdict(list); populations = defaultdict(list)
+    for i, d in enumerate(plan['descs']):
+        name = names[d['type']]
+        match = re.fullmatch(r'(moe_up|moe_down|qkv|o_proj)_(\d+)(?:_x)?', name)
+        if not match: continue
+        role, layer = match[1], int(match[2]); key = (layer, role)
+        begin, end = load['offsets'][i:i+2]
+        if end-begin != nw*width:
+            raise ValueError(f'missing load-phase stamps for {name} task {i}')
+        body, done = raw['legacy'][i][1:3]
+        byte_count = 0
+        for wave in range(nw):
+            row = load['data'][begin+wave*width:begin+(wave+1)*width]
+            count = row[0]
+            if not 0 < count <= cap:
+                raise ValueError(f'missing/overflow load-phase groups for {name} task {i} wave {wave}: {count}')
+            last = body
+            for j in range(count):
+                a, b, n = row[1+j*3:4+j*3]
+                wave_return = raw['waves'][i*nw+wave][0]
+                if not 0 < body <= last <= a < b <= wave_return <= done or not n:
+                    raise ValueError(f'missing/invalid load-phase stamp for {name} task {i} wave {wave} group {j}')
+                groups[key].append((a,b)); byte_count += n; last = b
+        if byte_count != LOAD_ROLES[role][1]:
+            raise ValueError(f'load-phase byte coverage for {name} task {i}: {byte_count} != {LOAD_ROLES[role][1]}')
+        populations[key].append(byte_count)
+    rows = []
+    for layer in layers:
+        for role, (nt, _) in LOAD_ROLES.items():
+            key = (layer, role)
+            if len(populations[key]) != nt:
+                raise ValueError(f'incomplete load-phase {role} layer {layer}: {len(populations[key])}/{nt} tasks')
+            us = union_ticks(groups[key])*raw['tick_ns']/1000
+            size = sum(populations[key]); rate = size/(us*1e6)
+            rows.append(dict(layer=layer, role=role, tasks=nt, groups=len(groups[key]),
+                             bytes=size, load_union_us=us, logical_TB_s=rate))
+    totals = []
+    for role in LOAD_ROLES:
+        rs = [r for r in rows if r['role']==role]
+        us = sum(r['load_union_us'] for r in rs); size = sum(r['bytes'] for r in rs)
+        rate = size/(us*1e6)
+        totals.append(dict(role=role, layers=len(rs), bytes=size, load_union_us=us,
+            logical_TB_s=rate, decision='non-byte body work' if rate >= 4.0 else
+            'memory path' if rate <= 3.3 else 'UNRESOLVED between 3.3 and 4.0',
+            actionable=False))
+    return dict(layers=rows, totals=totals,
+        basis='logical streamed weights / union of load issue-to-ready groups per layer; ON diagnostic, not exclusive HBM latency',
+        validity='UNVERIFIED perturbation: decisions actionable only after unchanged OFF/ON <=0.5 us sampled-body gate')
 
 
 def main():

@@ -286,6 +286,7 @@ REGISTERED = {
     'A1.busy': 'instrument classification only: real >=0.100 ms; dead <0.050 ms',
     'A1.free': 'instrument classification only: real >=0.050 ms',
     'A1.floor': '1.00 us/edge; retain below-floor count/min, never clip raw gaps',
+    'A.loads': 'logical load-phase rate >=4.0 TB/s: non-byte work; <=3.3: memory path; requires perturbation gate, no extra run',
     'A2.route': 'available body headroom >=0.142 ms / 2.96 us/layer; estimate, no removal proof',
     'A3.host': 'name stages accounting for unexplained 0.086 ms beyond priced 0.049 ms',
     'RESET.keep': '3 adjacent pinned pairs, all faster, median >=0.030 ms, median >2*spread; only ETX_DEV_RESET changes',
@@ -305,6 +306,7 @@ THRESHOLD_SOURCES = {
     'A1.busy': 'docs/qwen300-hour-2026-10-11.md:39',
     'A1.free': 'docs/qwen300-hour-2026-10-11.md:40',
     'A1.floor': 'docs/X7-SCHEDULE-WHATIF-2026-10-11.md:164',
+    'A.loads': 'docs/VERIFY-PLAN-2026-10-12.md; MASTER-TABLE-2026-10-11.md QK6/OP3/M.J',
     'A2.route': 'docs/qwen300-hour-2026-10-11.md:42',
     'A3.host': 'docs/MASTER-TABLE-2026-10-11.md:60',
     'RESET.keep': 'docs/VERIFY-PLAN-2026-10-12.md; KEEP from PLAN-300TOKS-2026-10-11.md:322',
@@ -557,7 +559,9 @@ def certify(s, arm):
         text = host(s, arm, f'{arm}_check_p{pos}', ['--check', '48', '--check-pos', str(pos)])
         (archive/f'check_p{pos}.txt').write_text(text)
     result = cert.validate(archive, timing=False)
-    text = token_gate(host(s, arm, arm+'_token_gate', ['--repeat', '1', '--check-dsl']))
+    extra = {'ETX_INBODY_RAW': str(s.out/'stamps_load_off.bin'), 'ETX_INBODY_LOADS': '0',
+             'ETX_HOUR_TRACE_STEP': '1024'} if arm == 'stamps' else None
+    text = token_gate(host(s, arm, arm+'_token_gate', ['--repeat', '1', '--check-dsl'], extra))
     if 'CHECK-DSL OK' not in text: raise ValueError('CHECK-DSL missing')
     (archive/'gate_chkx.log').write_text(text)
     s.certified.add(arm)
@@ -626,12 +630,15 @@ def tranche_a(s):
                                  Path(s.c['builds']['stamps'])/'plan.json', raw, output], timeout=45, expected=15)
             summary = output.with_suffix('.summary.json')
             result = json.loads(summary.read_text())
+            # Control comes from the already-budgeted stamps correctness gate.
+            # Analyze under the same bounded subprocess, not a parent rewrite.
             result['diagnostic_control'] = dict(
                 on_wall=timing(text), kept_off_wall=s.arms.get('kept', {}).get('gate_wall'),
                 stamps_null_wall=s.arms.get('stamps', {}).get('gate_wall'),
                 basis='single noninterleaved complete controls; report movement, no correction/subtraction or perturbation pass',
                 warning='ON allocations/stores/spills perturb the schedule; pools are ON observations, not certified OFF savings')
             summary.write_text(json.dumps(result, indent=2)+'\n')
+            s.row('A.loads', result.get('load_phases'), 'RECORDED-UNVERIFIED' if result.get('load_phases', {}).get('totals') else 'NOT-COMPLETE', REGISTERED['A.loads'])
             pools = result['critical_pools']; busy = pools['busy']['above_floor_lower_ms']; free = pools['free']['above_floor_lower_ms']
             s.row('A1.busy', pools['busy'], 'PASS' if busy >= .100 else 'DEAD' if pools['busy']['above_floor_upper_ms'] < .050 and not pools['ambiguous']['count'] else 'UNRESOLVED', REGISTERED['A1.busy'])
             s.row('A1.free', pools['free'], 'PASS' if free >= .050 else 'UNRESOLVED', REGISTERED['A1.free'])
@@ -1109,13 +1116,33 @@ def main(argv=None):
         from etx.tools import inbody
         print('CPU ANALYSIS begin: lossless edge/body records', flush=True)
         result = edge_prices(json.loads(Path(args[1]).read_text()), inbody.read_raw(args[2]))
+        # Load analysis is independent: absent load stamps must not erase G.
+        try:
+            plan = json.loads(Path(args[1]).read_text())
+            on = inbody.read_raw(args[2])
+            loads = inbody.load_phases(plan, on)
+            off_path = Path(args[2]).with_name('stamps_load_off.bin')
+            if off_path.is_file():
+                off_report = inbody.analyze(plan, inbody.read_raw(off_path))
+                on_report = result['inbody']
+                critical = set(off_report['critical_task_ids']) | set(on_report['critical_task_ids'])
+                changes = [abs(on_report['tasks'][i]['body_us']-off_report['tasks'][i]['body_us'])
+                           for i in critical if on_report['tasks'][i]['phase'] in inbody.LOAD_ROLES]
+                if not changes: raise ValueError('missing load-phase perturbation population')
+                loads['perturbation'] = dict(sampled_bodies=len(changes), max_abs_body_change_us=max(changes),
+                    pass_le_0_5_us=max(changes) <= .5, basis='one matched snapshot ON/OFF, same stamp executable; original/OFF spread remains [U]')
+                loads['validity'] = 'NOT-COMPLETE: original/OFF spread not established' if max(changes) <= .5 else 'INVALID: load stamps exceed 0.5 us/body'
+
+        except ValueError as exc:
+            loads = dict(status='NOT-COMPLETE', reason=str(exc))
+        result['load_phases'] = loads
         output = Path(args[3])
         output.write_text(json.dumps(result, indent=2)+'\n')
         # The parent must not parse/rewrite the large lossless report after
         # its subprocess deadline. Its small decision view is emitted HERE,
         # under the same deadline as all raw analysis and serialization.
         summary = dict(critical_pools=result['critical_pools'], floor_us=result['floor_us'], gap_atoms=result['gap_atoms'],
-                       basis=result['basis'], inbody=dict(phases=result['inbody']['phases']))
+                       basis=result['basis'], load_phases=result['load_phases'], inbody=dict(phases=result['inbody']['phases']))
         output.with_suffix('.summary.json').write_text(json.dumps(summary, indent=2)+'\n')
         print('CPU ANALYSIS complete', flush=True)
         return 0

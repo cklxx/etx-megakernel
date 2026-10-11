@@ -32,6 +32,8 @@ struct etx_host {
   uint64_t* d_trace_time = nullptr;
 #if defined(ETX_INBODY) && ETX_INBODY
   uint64_t *d_inbody_poll = nullptr, *d_inbody_event = nullptr, *d_inbody_wave = nullptr;
+  uint64_t* d_inbody_load = nullptr;
+  std::vector<int32_t> inbody_load_offsets;
 #if defined(ETX_PRODUCER_LEDGER) && ETX_PRODUCER_LEDGER
   uint64_t* d_arrival_stamps = nullptr;
 #endif
@@ -144,6 +146,16 @@ struct etx_host {
       ETX_CHECK(hipMalloc(&d_inbody_event, (size_t)ETX_EVENT_WORDS * 3 * sizeof(uint64_t)));
       ETX_CHECK(hipMalloc(&d_inbody_wave, (size_t)ETX_N_TASKS * (ETX_THREADS / 64) * 2 * sizeof(uint64_t)));
       p.inbody_poll = d_inbody_poll; p.inbody_event = d_inbody_event; p.inbody_wave = d_inbody_wave;
+      inbody_load_offsets.assign(ETX_N_TASKS + 1, 0);
+      for (int i = 0; i < ETX_N_TASKS; ++i) {
+        const char* name = etx_type_names[etx_descs[i].type];
+        const bool selected = !(getenv("ETX_INBODY_LOADS") && !strcmp(getenv("ETX_INBODY_LOADS"), "0")) &&
+            (strstr(name, "moe_up_") || strstr(name, "moe_down_") || strstr(name, "qkv_") || strstr(name, "o_proj_"));
+        inbody_load_offsets[i+1] = inbody_load_offsets[i] + (selected ? (ETX_THREADS / 64) * ETX_LOAD_RECORD_WORDS : 0);
+      }
+      p.inbody_load_offsets = upload(inbody_load_offsets.data(), inbody_load_offsets.size());
+      if (inbody_load_offsets.back()) ETX_CHECK(hipMalloc(&d_inbody_load, (size_t)inbody_load_offsets.back() * sizeof(uint64_t)));
+      p.inbody_load = d_inbody_load;
 #if defined(ETX_PRODUCER_LEDGER) && ETX_PRODUCER_LEDGER
       p.arrival_offsets = upload(etx_arrival_offsets, (size_t)ETX_N_TASKS + 1);
       p.arrival_words = upload(etx_arrival_words, (size_t)(ETX_ARRIVAL_SLOTS ? ETX_ARRIVAL_SLOTS : 1));
@@ -254,6 +266,7 @@ struct etx_host {
       ETX_CHECK(hipMemsetAsync(d_inbody_poll, 0, (size_t)ETX_N_TASKS * sizeof(uint64_t), stream));
       ETX_CHECK(hipMemsetAsync(d_inbody_event, 0, (size_t)ETX_EVENT_WORDS * 3 * sizeof(uint64_t), stream));
       ETX_CHECK(hipMemsetAsync(d_inbody_wave, 0, (size_t)ETX_N_TASKS * (ETX_THREADS / 64) * 2 * sizeof(uint64_t), stream));
+      if (p.inbody_load) ETX_CHECK(hipMemsetAsync(d_inbody_load, 0, (size_t)inbody_load_offsets.back() * sizeof(uint64_t), stream));
 #if defined(ETX_PRODUCER_LEDGER) && ETX_PRODUCER_LEDGER
       ETX_CHECK(hipMemsetAsync(d_arrival_stamps, 0, (size_t)(ETX_ARRIVAL_SLOTS ? ETX_ARRIVAL_SLOTS : 1) * 2 * sizeof(uint64_t), stream));
 #endif
@@ -541,9 +554,9 @@ struct etx_host {
     if (!d_inbody_poll) { fprintf(stderr, "inbody disabled\n"); exit(1); }
     // Versioned little-endian u64 header, then complete legacy/task/event/wave
     // arrays. Reader resolves task arrival brackets from plan event instances.
-    uint64_t version = 1;
+    uint64_t version = 3;
 #if defined(ETX_PRODUCER_LEDGER) && ETX_PRODUCER_LEDGER
-    version = 2;
+    version = 4;
 #endif
     uint64_t header[6] = {0x3142444f424e4954ull, version, ETX_N_TASKS, ETX_EVENT_WORDS, ETX_THREADS / 64, 10};
     FILE* f = fopen(path, "wb");
@@ -577,6 +590,11 @@ struct etx_host {
     ETX_CHECK(hipMemcpy(sub.data(), d_ev_sub, sub.size() * sizeof(int32_t), hipMemcpyDeviceToHost));
     write_words(sub.data(), sub.size());
 #endif
+    uint64_t load_header[2] = {ETX_LOAD_GROUP_CAPACITY, (uint64_t)inbody_load_offsets.back()};
+    if (fwrite(load_header, sizeof(load_header), 1, f) != 1) { perror("load header"); exit(1); }
+    std::vector<uint64_t> offsets(inbody_load_offsets.begin(), inbody_load_offsets.end());
+    if (fwrite(offsets.data(), sizeof(uint64_t), offsets.size(), f) != offsets.size()) { perror("load offsets"); exit(1); }
+    if (d_inbody_load) write(d_inbody_load, inbody_load_offsets.back());
     if (fclose(f)) { perror("inbody close"); exit(1); }
   }
 #endif

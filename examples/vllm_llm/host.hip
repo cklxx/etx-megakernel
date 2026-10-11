@@ -714,6 +714,12 @@ int main(int argc, char** argv) {
 #ifdef ETX_INBODY_REPORT
       printf("HOUR-STEP-BEGIN run=%d step=%d\n", run, t); fflush(stdout);
 #endif
+#if defined(ETX_INBODY) && ETX_INBODY
+      // Load-group stores only at the existing registered snapshot. No extra
+      // decode run, no diagnostic traffic during the other 1054 steps.
+      if (const char* selected = getenv("ETX_HOUR_TRACE_STEP"))
+        hst.p.inbody_load = (run == 0 && t == atoi(selected)) ? hst.d_inbody_load : nullptr;
+#endif
       const auto w0 = std::chrono::steady_clock::now();
       vl_set_params(vps.data(), nreq, hst.stream);
 #ifdef ETX_HOUR_PROFILE

@@ -42,6 +42,11 @@ struct etx_queue {                     // ring of task ids, single-producer-many
   int32_t* tail;                       // push cursor
 };
 
+#if defined(ETX_INBODY) && ETX_INBODY
+#define ETX_LOAD_GROUP_CAPACITY 8
+#define ETX_LOAD_RECORD_WORDS (1 + ETX_LOAD_GROUP_CAPACITY * 3)
+#endif
+
 struct etx_ctx {
   int32_t         coord[4];
   const int32_t*  shape;               // symbolic scalars of this step, in graph.symbols order
@@ -52,6 +57,9 @@ struct etx_ctx {
   uint32_t        domain;
   uint32_t        worker;
   void*           lds;
+#if defined(ETX_INBODY) && ETX_INBODY
+  uint64_t* inbody_load;              // task-local [wave][count, {begin,end,bytes} x capacity]
+#endif
   int32_t         cst[4];              // per-grid compile-time constants (TaskGrid.consts): immediates, no load after the wait
 };
 
@@ -105,6 +113,8 @@ struct etx_params {
   int32_t          n_reset_ops;
 #if defined(ETX_INBODY) && ETX_INBODY
   // Diagnostic ABI only. No fields or changed offsets in ordinary builds.
+  const int32_t* inbody_load_offsets; // task CSR word offsets; unselected rows have zero width
+  uint64_t* inbody_load;
   uint64_t* inbody_poll;              // [task], post-success issue ticks
   uint64_t* inbody_event;             // [event word][before, after final arrive, producer task]
   uint64_t* inbody_wave;              // [task][wave][tile return, DOMAIN drain]
