@@ -247,6 +247,8 @@ def fold_topk(d) -> bool:
 
 
 def instances(d) -> list[dict]:
+    from examples.vllm_llm.head_local_protocol import check_opt_in
+    check_opt_in()
     """The launches of one decode step, in vLLM's order."""
     parts = math.ceil(MAXLEN / PART)
     FOLD_TOPK = fold_topk(d)
