@@ -183,6 +183,58 @@ a large term on this path [E].
 
 ## 5. The single most valuable item
 
+**The taxonomy's own items cannot close the 0.847 ms need.** Their ceilings, without overlap: TOUCH ≤ 0.285 ms
+[R] (sign unknown), L3 resident loop ≤ 0.135 ms [M] (epoch's ≤ 0.049 sits inside it), sentinel ≤ 0.028 ms [E],
+ordering 0, recompute 0 (§1-§3). Sum ≤ **0.448 ms**, 53% of the need, if every ceiling were reached. Fleet's
+evidence puts L3's realistic value near 0.005 ms (FS:175-176).
+
+**The single most valuable item is the latency of the five small roles, which the taxonomy omits.** prep, attn,
+reduce, router and topk hold 1120.5 us of path body with 30.6 us of bytes (MT:8-10,12-13); their critical body
+above the round-11 floor is **0.647 ms** [E] (MT:43-45,47-48), 76% of the need and the largest term on the path
+that is not the bandwidth floor. Achievability is **[U]**: no lever on it has been measured. The tried moves found nothing (PREP_EARLY
+neutral, `docs/OPTIMISATIONS.md:26`; BAR2 +0.095 ms loss, MTD:394; forcing registers down spilled catastrophically,
+MTD:404). prep measures 8.8 dependent hops where about 3-4 are necessary (model.py:329-330). Even all of it
+leaves 0.200 ms to find, for example in the 437.9 us of gaps above the 1.00 us/edge floor [E] (MTD:403).
+
+**Next step, ranked by cost per decision:** X1 + X6 in one traced session, 25 minutes, $0.83 [E] (MTD:380,385).
+X1 settles the sign of TOUCH's 0.285 ms. X6 stamps inside the DSL bodies and shows which atoms of the 0.647 ms are
+exposed. Go/no-go per atom: ≥ 0.625 us/layer exposed (MTD:385).
+
 ## 6. Errors in project documents and in the brief
 
+| # | Where | Claim | What the artifacts say |
+|---|---|---|---|
+| 1 | `docs/ETX_Brief.md:29`, TD:50 | launch gaps are 5-10 us, so launch overhead dominates | 1.60-2.39 us per in-graph boundary (HW:41-56); graph host excess 0.034 ms for 434 kernels (J:146-147; G:5) |
+| 2 | TD:162,254 | sentinel 0.8 us vs 7.6 us "for atomics", per link | 7.6 us is a whole-card phase switch (TD:490, TD:1024, Y:75); ETX's per-edge counter is 0.642-0.951 us (Y:69-72); TD:254 itself prices a link at 0.2-0.8 us |
+| 3 | brief | 0.64-0.74 us is XCD-internal | 0.642 is same-XCD, 0.742 is **cross**-XCD (Y:69-70) |
+| 4 | brief | 2.84 ms serial wall is in MTD/DEP | it is in neither; it is FL:212, on the round-11 trace (§2c) |
+| 5 | brief | about 500 launches | 434 grid instances in the graph arm (G:5); vLLM 843 kernels/token (`results_2026-09-27/next.log:313`) |
+| 6 | MTD:411 (QK2) | VECNORM −0.105 ms at `build.sh:59` | line 59 is the COH comment; the flag and its −0.105 ms note are at `examples/vllm_llm/build.sh:65-68` |
+| 7 | DEP, when used for the kept build | 871.0 us of gaps (DEP:122-124) | DEP is the KEY32-off trace `tr_off.bin` (DEP:5); the kept build's trace has 875.5 us (MT:18) |
+
+Rows 3-5 are in the task brief, not in a repository file. This audit edits none of the cited documents.
+
 ## 7. Reproduce
+
+CPU only, from the repository root; `results_*` paths are under `~/code/etx/`.
+
+```
+.venv/bin/python docs/master-table-2026-10-11/master.py          # MT, 2 s
+.venv/bin/python -m examples.vllm_llm.xcd_account ~/code/etx/results_vlbest2_2026-10-10/b_all/plan.json \
+    ~/code/etx/results_qwen300_2026-10-11/tr_on.bin --bytes docs/xcd-timeline-2026-10-11/bytes.json --out /tmp/acc
+.venv/bin/python -m etx.tools.floors --table                    # 2837.8 us serial floor (§2c)
+grep -n ETX_EMIT_DEV_RESET build/qwen300-rocm-on/plan_data.h     # 0 (4.1)
+```
+
+`master.py` uses the plan borrowed from vlbest2, row-checked 0/60362 mismatches
+(`docs/master-table-2026-10-11/master.py:6-8`). Inputs, sha256 prefix:
+
+| File | sha256 |
+|---|---|
+| `results_qwen300_2026-10-11/job2_run4.log` (J) | `ac88d81e2e36d14d` |
+| `results_qwen300_2026-10-11/tr_on.bin` | `aa68468246acde1a` |
+| `results_qwen300_2026-10-11/r1_on_graph.log` (G) | `53a2f64f9dd7ebcb` |
+| `results_qwen300_2026-10-11/on_hipcc.log` | `374c2a10a09c9d15` |
+| `results_2026-10-01/baremetal/hw_all.log` (HW) | `8205d388378c0f67` |
+| `results_nvref_2026-10-09/hostprof.log` | `d0177585a76ce051` |
+| `results_2026-09-27/next.log` | `1a6209f65e3ae502` |
