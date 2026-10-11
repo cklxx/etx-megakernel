@@ -161,10 +161,11 @@ catalogue. No GPU vendor sweep is repeated.
 
 The retained vendor result is 6.7686176 attention + 4.6516855 reduce =
 **11.4203031 us/layer [M intervals, E mean]**, 48 layers × 31 decode samples,
-from `bf16_pricing.json` and `job1_pricing.log:47-95`. The task calls it a
-22-minute search; that was a budget, not the retained elapsed time:
-`status.json` records Job 1 **274.041 s [M]**, including image/download/bench/
-trace work. It is S3's AITER pair, not a sweep of all backend knobs.
+from `bf16_pricing.json` and `job1_pricing.log:47-95`. The task refers to a
+22-minute search. The completed Job 1's `status.json` records **274.041 s [M]**,
+including its image/download/bench/trace work; whether the 22 minutes also
+include other attempts, staging or VM time is **[U]**. The registered B budget
+is separately 22 minutes; it is not this Job 1 elapsed measurement. It is S3's AITER pair, not a sweep of all backend knobs.
 Its 32/32 full-system gate is retained in bf16_bar.log. This proves that
 candidate is slower on the historical cross-basis comparison; nothing else
 gets a measured pre-price from it.
@@ -354,6 +355,206 @@ on a paid VM, allow **at most10 setup minutes/$0.3317** inside the existing
 **150min/$4.975 [E]**. Next balance, actual price and staging elapsed are [U]
 until that session; this CPU task makes no account/provisioning call.
 
-The full current-source pytest and dry-run outputs follow after final
-verification. Local/compiler checks are CPU-only; they do not certify GPU
+The full current-source pytest and dry-run outputs are pasted below. Local/compiler checks are CPU-only; they do not certify GPU
 correctness, clock validity, performance or the absent vendor adapters.
+
+### Final CPU checks (measured here; no GPU execution)
+
+Full outputs and source hashes are also retained in
+`docs/evidence/verify-cpu-2026-10-12.json`. The source commit for those hashes
+is 9933bf6; this final evidence-only commit changes no tested source.
+
+- `bash examples/vllm_llm/local_matrix.sh /tmp/etx-verify2-matrix`:
+  **16/16 rc=0**, real local gfx942 compilation/assembly and host syntax.
+- `ETX_INBODY_EMIT=1 ETX_CFLAGS='-DETX_INBODY=1 -DETX_DSL_WSUM
+  -DETX_DSL_SCALAR -DETX_DSL_GU1 -DETX_DSL_RBATCH -DETX_TOPK_KEY32'
+  bash examples/vllm_llm/rocm_build_check.sh qwen3-30b-a3b default
+  build/verify-load-rocm22-final`: **passed**, native ROCm7.2.4/clang22
+  CPU container, no GPU devices or kernel execution. Stamps compiler report:
+  **128 VGPR, 26 VGPR spills, 104 B scratch/lane, 29736 B LDS, four waves/SIMD**.
+- Same native check with `ETX_DEV_RESET=1`, CFLAGS four DSL flags + KEY32 +
+  INBODY_REPORT, output `build/verify-reset-rocm22`: **passed**. Reset compiler
+  report: **128 VGPR, four VGPR spills, 20 B scratch/lane, 29740 B LDS,
+  four waves/SIMD**. These are compiler facts, not runtime occupancy or gains.
+- Actual emitted up tile and full reset megakernel also compile locally to
+  gfx942 IR with LLVM23 and `ETX_DEVLIBS` using `hip_ir_local.sh`; include
+  paths in the native generated reset source were mapped back to this Mac.
+- Current host **host-pass syntax** checks with both `-DETX_INBODY=1` and
+  `-DETX_HOUR_PROFILE` passed in the same CPU container, in addition to the
+  native device-pass checks and ordinary-host matrix. No GPU Docker run.
+- Shell syntax and `git diff --check` passed. AGENTS.md was not edited.
+
+Analysis budget check [M CPU only]: a **165839792-byte synthetic v3 record**
+on the real **60362-task plan**, with its **304 actual static-worker queues**,
+produced all **192 layer/role load rows** via the exact tranche-A `--analyze`
+path in **10.16 s wall**, **3283173376 B maximum RSS**, and a roughly529 MiB
+lossless JSON plus295 KiB summary. It fits the registered45s analysis limit
+on this Mac. VM CPU/filesystem behavior remains [U]; no deadline is extended.
+The invented clocks are not GPU measurements and none of their durations,
+rates, G or R2 enter the ledger. This confirms reader/serialization coverage
+and cost, not instrumentation validity.
+
+Failures/cost: the first native check overlapped an intermediate host edit
+and caught an undeclared price_attention variable; the final native rerun
+and current host passes above succeeded. A direct host syntax command first
+missed the absolute build-symlink mount, then passed with both mount paths.
+An initial `/tmp` synthetic generator imported the shared base editable
+package instead of this worktree; fixing its import path resolved that.
+A deliberately serial synthetic worker assignment made the existing critical
+edge projection pathological and was stopped; the queue-faithful case above
+completed. Earlier full pytest runs were superseded while source changed;
+the complete final run below is the verification. All failures cost **$0 GPU**;
+CPU engineering elapsed is not metered here.
+
+### Full pytest output
+
+Command: `.venv/bin/python -m pytest -q` (exit0).
+
+```text
+........................................................................ [  4%]
+...........................s............................................ [  9%]
+........................................................................ [ 14%]
+.............................s.sss...................................... [ 19%]
+........................................................................ [ 24%]
+.............................................s......ss.................. [ 29%]
+........................................................................ [ 33%]
+..........................................................s............. [ 38%]
+........................................................................ [ 43%]
+....................................s................................... [ 48%]
+........................................................................ [ 53%]
+........................................................................ [ 58%]
+...................s..................ss................................ [ 62%]
+........................................................................ [ 67%]
+........................................................................ [ 72%]
+........................................................................ [ 77%]
+........................................................................ [ 82%]
+........................................................................ [ 87%]
+........................................................................ [ 91%]
+..........................................................s............. [ 96%]
+...............................................                          [100%]
+1473 passed, 14 skipped in 175.60s (0:02:55)
+```
+
+### Full session dry-run output
+
+Command: `.venv/bin/python -m examples.sessions.qwen300_hour --dry-run` (exit0).
+
+```text
+{
+  "budgets_s": {
+    "A": 900,
+    "B": 1320,
+    "C": 4020,
+    "D": "remaining session time (>=1910s)",
+    "guard": 240,
+    "report": 10
+  },
+  "manifest": {
+    "schema": 1,
+    "B": [
+      {
+        "id": "C1",
+        "build": "C1",
+        "kind": "shape",
+        "flags": {
+          "ETX_VL_ROUTER_NARROW": "1"
+        },
+        "source": "docs/ISA-FIXES-2026-10-11.md:31",
+        "overlap": "router-body",
+        "enabled": true
+      },
+      {
+        "id": "C5",
+        "build": "C5",
+        "kind": "shape",
+        "defines": [
+          "ETX_DSL_NORM_HOIST"
+        ],
+        "source": "docs/ISA-FIXES-2026-10-11.md:135",
+        "overlap": "router-body",
+        "enabled": true
+      }
+    ],
+    "C": [
+      {
+        "id": "NO_TOUCH",
+        "build": "NO_TOUCH",
+        "diagnostic_build": "NO_TOUCH_stamps",
+        "kind": "body",
+        "enabled": true,
+        "defines": [
+          "ETX_NO_TOUCH"
+        ],
+        "flags": {
+          "ETX_VL_TOUCH": "1",
+          "ETX_PREFETCH_ISOLATE_POLLER": "0"
+        },
+        "budget_s": 1620,
+        "estimated_required_s": 1575,
+        "keep_threshold": {
+          "complete_adjacent_pinned_pairs": 3,
+          "every_wall_gain_ms_gt": 0,
+          "median_wall_gain_ms_ge": 0.03,
+          "median_gt_spread_multiplier": 2,
+          "additional": null
+        },
+        "source": "docs/PLAN-300TOKS-2026-10-11.md:310,314; docs/XCD-PREFETCH-2026-10-11.md:71-76,125; etx/codegen/kernel.py:297"
+      },
+      {
+        "id": "ISOLATE_POLLER",
+        "build": "ISOLATE_POLLER",
+        "kind": "body",
+        "enabled": true,
+        "flags": {
+          "ETX_VL_TOUCH": "1",
+          "ETX_PREFETCH_ISOLATE_POLLER": "1"
+        },
+        "budget_s": 1200,
+        "estimated_required_s": 1140,
+        "keep_threshold": {
+          "complete_adjacent_pinned_pairs": 3,
+          "every_wall_gain_ms_gt": 0,
+          "median_wall_gain_ms_ge": 0.03,
+          "median_gt_spread_multiplier": 2,
+          "round_trip_median_us_lt": 2.0
+        },
+        "source": "docs/VERIFY-GAPS-2026-10-11.md:141-193; examples/vllm_llm/prefetch_isolation_cpu.py"
+      },
+      {
+        "id": "C6",
+        "build": "C6",
+        "kind": "fusion",
+        "enabled": true,
+        "budget_s": 1200,
+        "estimated_required_s": 1085,
+        "prerequisites": "Contract/hook only today; requires a sealed committed full-model adapter, prototype_certificate, prototype_commit, expected_vgpr and expected_lds_bytes before qualification",
+        "source": "docs/ISA-FIXES-2026-10-11.md:246"
+      }
+    ]
+  },
+  "thresholds": {
+    "GUARD": "two pinned old/hour kept pairs abs(delta)<0.030 ms; original attn p0 <=7.9 us; kept anchor <=4.210 ms; sealed weights and IR",
+    "A1.busy": "instrument classification only: real >=0.100 ms; dead <0.050 ms",
+    "A1.free": "instrument classification only: real >=0.050 ms",
+    "A1.floor": "1.00 us/edge; retain below-floor count/min, never clip raw gaps",
+    "A.loads": "logical load-phase rate >=4.0 TB/s: non-byte work; <=3.3: memory path; requires perturbation gate, no extra run",
+    "A2.route": "available body headroom >=0.142 ms / 2.96 us/layer; estimate, no removal proof",
+    "A3.host": "name stages accounting for unexplained 0.086 ms beyond priced 0.049 ms",
+    "RESET.keep": "3 adjacent pinned pairs, all faster, median >=0.030 ms, median >2*spread; only ETX_DEV_RESET changes",
+    "A4.reset": "pursue only >0.030 ms/step, host and device separately",
+    "A.stop": "S1 at <=15 minutes: G >=0.088 ms (1.833 us/layer) in named above-floor gap atoms, else close target route",
+    "X5": "3 x 100 warmed isolated replays/role/layer, ctx1024; legal pair <=7.69 us/layer; incomplete inventory stays [U]",
+    "B.stop": "S2 after X5, before body pairs: G + R2 + H >=0.324 ms (whole-target 6.743 us/layer), else close target route; unknowns count zero",
+    "B.keep": "3 pairs, all faster, median >=0.030 ms, median >2*spread",
+    "C.fusion": "net >=1.042 us/layer; VGPR <=128; LDS <=29752 B",
+    "C.body": "3 pairs, all faster, median >=0.030 ms, median >2*spread",
+    "C.NO_TOUCH": "3 complete adjacent pinned pairs; every wall gain >0; median >=0.030 ms; median >2*(max-min); no additional KEEP threshold",
+    "C.ISOLATE_POLLER": "3 complete adjacent pinned pairs; every wall gain >0; median >=0.030 ms; median >2*(max-min); fresh measured round trip <2.0 us",
+    "D.target": "5 complete rounds, host-wall step <=3.3333 ms, all fresh correctness gates",
+    "D.fusion": "5 adjacent pinned pairs; every gain >0; median >2%; median >2*spread",
+    "D.system": "5 adjacent pinned pairs; LEAD all deltas <0, median <=-0.050 ms"
+  }
+}
+Session hard stop: 8400s from runner start (includes setup)
+  0 qwen300_hour                     GPU 0    timeout  8400s  after: -
+```
