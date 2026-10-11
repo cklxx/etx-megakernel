@@ -1,0 +1,1 @@
+WATCHDOG {"completed_calls_observed": 2, "coord": [0], "event": "ready", "expected": 3, "remaining": 1, "unobserved_producer_tasks": [2]}

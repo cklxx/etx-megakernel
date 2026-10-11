@@ -1,0 +1,5 @@
+In file included from /tmp/etx-verifygaps/watchdog/kernel.hip:49:
+/tmp/etx-verifygaps/watchdog/tiles.hip:15:16: error: static assertion failed due to requirement '21120 <= 8448': etx.ops.gemv: LDS_BYTES exceeds ETX_IMPORT_LDS (raise the arena or lower ETX_VL_NB)
+   15 | _Static_assert(21120 <= ETX_IMPORT_LDS, "etx.ops.gemv: LDS_BYTES exceeds ETX_IMPORT_LDS (raise the arena or lower ETX_VL_NB)");
+      |                ^~~~~~~~~~~~~~~~~~~~~~~
+1 error generated when compiling for gfx942.

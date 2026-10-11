@@ -108,5 +108,14 @@ struct etx_params {
   uint64_t* inbody_poll;              // [task], post-success issue ticks
   uint64_t* inbody_event;             // [event word][before, after final arrive, producer task]
   uint64_t* inbody_wave;              // [task][wave][tile return, DOMAIN drain]
+#if defined(ETX_PRODUCER_LEDGER) && ETX_PRODUCER_LEDGER
+  const int32_t* arrival_offsets;      // CSR [task+1]
+  const int32_t* arrival_words;        // original event words for every arrival
+  uint64_t* arrival_stamps;            // [incidence][before, after original call]
+#endif
 #endif
 };
+
+#if defined(ETX_PRODUCER_LEDGER) && ETX_PRODUCER_LEDGER && !(defined(ETX_INBODY) && ETX_INBODY)
+#error "producer ledger requires the diagnostic ETX_INBODY build"
+#endif

@@ -1,0 +1,4 @@
+POLLING CPU original stage=0 DRY_RUN
+POLLING CPU original stage=1 DRY_RUN
+POLLING CPU isolated stage=0 DRY_RUN
+POLLING CPU isolated stage=1 DRY_RUN

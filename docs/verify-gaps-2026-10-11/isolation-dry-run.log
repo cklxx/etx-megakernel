@@ -1,0 +1,13 @@
+ISOLATION source_off_identical=True tasks=60362 workers=304
+ISOLATION CPU original stage=0 DRY_RUN
+ISOLATION CPU original stage=1 DRY_RUN
+ISOLATION CPU original stage=2 DRY_RUN
+ISOLATION CPU original stage=3 DRY_RUN
+ISOLATION CPU off stage=0 DRY_RUN
+ISOLATION CPU off stage=1 DRY_RUN
+ISOLATION CPU off stage=2 DRY_RUN
+ISOLATION CPU off stage=3 DRY_RUN
+ISOLATION CPU on stage=0 DRY_RUN
+ISOLATION CPU on stage=1 DRY_RUN
+ISOLATION CPU on stage=2 DRY_RUN
+ISOLATION CPU on stage=3 DRY_RUN

@@ -1,0 +1,78 @@
+{
+  "types": {
+    "gemv_0": {
+      "id": 0
+    },
+    "consumer_0": {
+      "id": 1
+    }
+  },
+  "descs": [
+    {
+      "id": 0,
+      "type": 0,
+      "coord": [
+        0
+      ],
+      "worker": 0,
+      "domain": 0
+    },
+    {
+      "id": 1,
+      "type": 0,
+      "coord": [
+        1
+      ],
+      "worker": 1,
+      "domain": 0
+    },
+    {
+      "id": 2,
+      "type": 0,
+      "coord": [
+        2
+      ],
+      "worker": 2,
+      "domain": 0
+    },
+    {
+      "id": 3,
+      "type": 1,
+      "coord": [
+        3
+      ],
+      "worker": 3,
+      "domain": 0
+    }
+  ],
+  "events": [
+    {
+      "name": "ready",
+      "offset": 0,
+      "shape": [
+        1
+      ]
+    }
+  ],
+  "ev_inst": [
+    [
+      "ready",
+      [
+        0
+      ],
+      [
+        0,
+        1,
+        2
+      ]
+    ]
+  ],
+  "task_in": [
+    [],
+    [],
+    [],
+    [
+      0
+    ]
+  ]
+}

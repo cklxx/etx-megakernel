@@ -1,0 +1,14 @@
+ISOLATION source_off_identical=True tasks=60362 workers=304
+ISOLATION CPU original stage=0 BUILD
+ISOLATION CPU original stage=1 BUILD
+ISOLATION CPU original stage=2 BUILD
+ISOLATION CPU original stage=3 BUILD
+ISOLATION CPU off stage=0 BUILD
+ISOLATION CPU off stage=1 BUILD
+ISOLATION CPU off stage=2 BUILD
+ISOLATION CPU off stage=3 BUILD
+ISOLATION CPU on stage=0 BUILD
+ISOLATION CPU on stage=1 BUILD
+ISOLATION CPU on stage=2 BUILD
+ISOLATION CPU on stage=3 BUILD
+ISOLATION {"flag": "ETX_PREFETCH_ISOLATE_POLLER=1 at emission", "gpu_validation": "NOT_RUN_CPU_ONLY", "keep_threshold": {"round_trip_us_lt": 2.0, "total_gain_ms_per_step_ge": 0.03}, "off_source_identical": true, "off_text_identical": true, "resources": {"off": {"etx_megakernel_d0": {"LDSByteSize": 29736, "NumVgprs": 128, "Occupancy": 4, "ScratchSize": 28, "TotalNumSgprs": 106}, "etx_unfused_d0": {"LDSByteSize": 29704, "NumVgprs": 103, "Occupancy": 4, "ScratchSize": 0, "TotalNumSgprs": 99}}, "on": {"etx_megakernel_d0": {"LDSByteSize": 29736, "NumVgprs": 128, "Occupancy": 4, "ScratchSize": 28, "TotalNumSgprs": 106}, "etx_unfused_d0": {"LDSByteSize": 29704, "NumVgprs": 103, "Occupancy": 4, "ScratchSize": 0, "TotalNumSgprs": 99}}, "original": {"etx_megakernel_d0": {"LDSByteSize": 29736, "NumVgprs": 128, "Occupancy": 4, "ScratchSize": 28, "TotalNumSgprs": 106}, "etx_unfused_d0": {"LDSByteSize": 29704, "NumVgprs": 103, "Occupancy": 4, "ScratchSize": 0, "TotalNumSgprs": 99}}}, "start_commit": "9f91f3a", "text_sha256": {"off": "0c65425003800f4db327ce1508433a5c1a368c3b7b286e421e03cf026da3b0a2", "on": "aaadb2712504d5508f672ad287d36edaf8ae42c92c6e4d4b7d633b01bb58ce7a", "original": "0c65425003800f4db327ce1508433a5c1a368c3b7b286e421e03cf026da3b0a2"}}

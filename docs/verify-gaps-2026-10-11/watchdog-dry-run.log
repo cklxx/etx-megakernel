@@ -1,0 +1,5 @@
+WATCHDOG SYNTHETIC {"cause": null, "completed_calls_observed": 2, "event": "ready", "expected": 3, "last_stamp_ticks": 140, "remaining": 1, "removability_evidence": false, "unobserved_producer_tasks": [2]}
+WATCHDOG CPU stage=0 DRY_RUN
+WATCHDOG CPU stage=1 DRY_RUN
+WATCHDOG CPU stage=2 DRY_RUN
+WATCHDOG CPU DRY_RUN_OK

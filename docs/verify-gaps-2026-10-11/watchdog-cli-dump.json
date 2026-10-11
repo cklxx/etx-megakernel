@@ -1,0 +1,201 @@
+{
+  "schema": 1,
+  "events": [
+    {
+      "event": "ready",
+      "coord": [
+        0
+      ],
+      "word": 0,
+      "expected": 3,
+      "producer_incidence_count": 3,
+      "runtime_obligation_unknown": false,
+      "remaining": 1,
+      "globally_accounted_arrivals": 2,
+      "completed_calls_observed": 2,
+      "subcounters": [
+        0
+      ],
+      "producers": [
+        {
+          "task": 0,
+          "occurrence": 0,
+          "type": "gemv_0",
+          "phase": "gemv",
+          "coord": [
+            0
+          ],
+          "observed_worker": 0,
+          "planned_worker": 0,
+          "domain": 0,
+          "arrival_status": "arrival_complete_observed",
+          "arrival_bracket": [
+            150,
+            160
+          ],
+          "last_stamp": {
+            "kind": "arrive_after",
+            "ticks": 160
+          },
+          "cause": null
+        },
+        {
+          "task": 1,
+          "occurrence": 0,
+          "type": "gemv_0",
+          "phase": "gemv",
+          "coord": [
+            1
+          ],
+          "observed_worker": 1,
+          "planned_worker": 1,
+          "domain": 0,
+          "arrival_status": "arrival_complete_observed",
+          "arrival_bracket": [
+            180,
+            190
+          ],
+          "last_stamp": {
+            "kind": "arrive_after",
+            "ticks": 190
+          },
+          "cause": null
+        },
+        {
+          "task": 2,
+          "occurrence": 0,
+          "type": "gemv_0",
+          "phase": "gemv",
+          "coord": [
+            2
+          ],
+          "observed_worker": 2,
+          "planned_worker": 2,
+          "domain": 0,
+          "arrival_status": "arrival_not_observed",
+          "arrival_bracket": [
+            0,
+            0
+          ],
+          "last_stamp": {
+            "kind": "body_entry",
+            "ticks": 140
+          },
+          "cause": null
+        }
+      ],
+      "unobserved_producer_tasks": [
+        2
+      ]
+    }
+  ],
+  "raw": {
+    "version": 2,
+    "tick_ns": 10,
+    "legacy": [
+      [
+        100,
+        110,
+        140,
+        0
+      ],
+      [
+        105,
+        115,
+        170,
+        1
+      ],
+      [
+        130,
+        140,
+        0,
+        2
+      ],
+      [
+        0,
+        0,
+        0,
+        0
+      ]
+    ],
+    "poll": [
+      [
+        0
+      ],
+      [
+        0
+      ],
+      [
+        0
+      ],
+      [
+        0
+      ]
+    ],
+    "events": [
+      [
+        0,
+        0,
+        0
+      ]
+    ],
+    "waves": [
+      [
+        120,
+        130
+      ],
+      [
+        150,
+        160
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        0
+      ]
+    ],
+    "waves_per_task": 1,
+    "producer_ledger": {
+      "offsets": [
+        0,
+        1,
+        2,
+        3,
+        3
+      ],
+      "words": [
+        0,
+        0,
+        0
+      ],
+      "stamps": [
+        [
+          150,
+          160
+        ],
+        [
+          180,
+          190
+        ],
+        [
+          0,
+          0
+        ]
+      ],
+      "remaining": [
+        1
+      ],
+      "sub": [
+        [
+          0
+        ]
+      ]
+    }
+  },
+  "cause": null,
+  "removability_evidence": false,
+  "limitation": "non-atomic snapshot; diagnostic writes can lag arrival. Global count can batch domain arrivals; subcounters and per-call observations are separate. Missing stamp means not observed, never a cause."
+}

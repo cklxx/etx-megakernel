@@ -1,0 +1,66 @@
+{
+  "start_commit": "9f91f3a",
+  "off_source_identical": true,
+  "off_text_identical": true,
+  "text_sha256": {
+    "original": "0c65425003800f4db327ce1508433a5c1a368c3b7b286e421e03cf026da3b0a2",
+    "off": "0c65425003800f4db327ce1508433a5c1a368c3b7b286e421e03cf026da3b0a2",
+    "on": "aaadb2712504d5508f672ad287d36edaf8ae42c92c6e4d4b7d633b01bb58ce7a"
+  },
+  "resources": {
+    "original": {
+      "etx_megakernel_d0": {
+        "TotalNumSgprs": 106,
+        "NumVgprs": 128,
+        "ScratchSize": 28,
+        "LDSByteSize": 29736,
+        "Occupancy": 4
+      },
+      "etx_unfused_d0": {
+        "TotalNumSgprs": 99,
+        "NumVgprs": 103,
+        "ScratchSize": 0,
+        "LDSByteSize": 29704,
+        "Occupancy": 4
+      }
+    },
+    "off": {
+      "etx_megakernel_d0": {
+        "TotalNumSgprs": 106,
+        "NumVgprs": 128,
+        "ScratchSize": 28,
+        "LDSByteSize": 29736,
+        "Occupancy": 4
+      },
+      "etx_unfused_d0": {
+        "TotalNumSgprs": 99,
+        "NumVgprs": 103,
+        "ScratchSize": 0,
+        "LDSByteSize": 29704,
+        "Occupancy": 4
+      }
+    },
+    "on": {
+      "etx_megakernel_d0": {
+        "TotalNumSgprs": 106,
+        "NumVgprs": 128,
+        "ScratchSize": 28,
+        "LDSByteSize": 29736,
+        "Occupancy": 4
+      },
+      "etx_unfused_d0": {
+        "TotalNumSgprs": 99,
+        "NumVgprs": 103,
+        "ScratchSize": 0,
+        "LDSByteSize": 29704,
+        "Occupancy": 4
+      }
+    }
+  },
+  "flag": "ETX_PREFETCH_ISOLATE_POLLER=1 at emission",
+  "gpu_validation": "NOT_RUN_CPU_ONLY",
+  "keep_threshold": {
+    "round_trip_us_lt": 2.0,
+    "total_gain_ms_per_step_ge": 0.03
+  }
+}

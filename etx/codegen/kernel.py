@@ -14,6 +14,7 @@ from __future__ import annotations
 from . import manifest
 
 import json
+import os
 from typing import Any
 
 from ..ir.edgemap import EdgeMap
@@ -147,6 +148,7 @@ def _setup_body(plan: Plan, g: TaskGrid, symbols: list[str]) -> list[str]:
 
 
 def emit_kernel(plan: Plan, device: int = 0) -> str:
+    isolate_poller = os.environ.get("ETX_PREFETCH_ISOLATE_POLLER", "0") == "1"
     m = plan.machine
     is_hip = m.vendor == "amd"
     grids = [g for g in plan.graph.grids if g.device == device]
@@ -275,10 +277,18 @@ def emit_kernel(plan: Plan, device: int = 0) -> str:
         out.append(f"    case {plan.type_ids[g.name]}: {{ // {g.name} [{mode}] grid={g.grid}")
         out.extend(_setup_consts(g))
         if g.body.prefetch and plan.options.prefetch and plan.machine.capabilities.get("async_copy_to_lds", "none") != "none":
-            out.append(f"      {g.body.prefetch}(&ctx);   // lever 3: weights do not depend on events; warm them before waiting")
+            if isolate_poller:
+                out.append(f"      if (threadIdx.x >= 64) {g.body.prefetch}(&ctx);   // isolate polling wave 0")
+            else:
+                out.append(f"      {g.body.prefetch}(&ctx);   // lever 3: weights do not depend on events; warm them before waiting")
         if g.body.pre_wait and g.in_edges:
             out.append("#ifndef ETX_NO_PRE_WAIT")
-            out.append(f"      if (threadIdx.x < 64) {g.body.pre_wait}(&ctx);   // before the wait: does not depend on the event")
+            if isolate_poller:
+                # Exactly one non-polling wave warms the immutable argument block.
+                # A one-wave launch has no spare wave and omits this optional hook.
+                out.append(f"      if (threadIdx.x >= 64 && threadIdx.x < 128) {g.body.pre_wait}(&ctx);   // wave 1; wave 0 only polls")
+            else:
+                out.append(f"      if (threadIdx.x < 64) {g.body.pre_wait}(&ctx);   // before the wait: does not depend on the event")
             out.append("#endif")
         if g.body.touch and g.in_edges:
             # the waves that are not waiting are idle until the barrier after this switch: they pull the task's first
