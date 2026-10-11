@@ -1,0 +1,8 @@
+{
+  "registered_before_secondary_results": true,
+  "offset_preserving_original": {"orders": ["coord", "reverse", "long_first", "short_first"], "strides": [0, 6, 14, 19, 26, 32]},
+  "profile_guided": ["greedy_long_first", "greedy_short_first", "greedy_coord"],
+  "narrow_width": [6, 14],
+  "boundaries": ["one_xcd_domain", "serial_head_optimistic", "owner_prep_optimistic"],
+  "illegal": ["domain_all_on_original", "delete_prep_dependency", "delete_reduce_dependency", "delete_moe_fold_dependency", "delete_layer_dependency"]
+}

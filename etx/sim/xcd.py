@@ -170,7 +170,22 @@ def _rates(active: dict, hw: Hw, pool_of: dict) -> dict:
     return rate
 
 
-def simulate(plan: dict, cost_of: Callable[[str, dict], Cost], hw: Hw, max_tasks: int | None = None):
+@dataclass
+class ReplayTiming:
+    """Trace-calibrated timing residuals, in us; not a hardware timing model.
+
+    Keep untimed arrive/fetch work with its producer, and ready overhead with its
+    consumer. Fixed-body what-ifs may move these costs, but must not delete them.
+    Event publication still starts at body-done, before the worker's next fetch.
+    """
+    queue_after_us: list[float]
+    ready_after_us: list[float]
+    initial_taken_us: dict[int, float] = field(default_factory=dict)
+    event_after_us: list[float] | None = None  # optional notification branch before max(event, worker)
+
+
+def simulate(plan: dict, cost_of: Callable[[str, dict], Cost], hw: Hw, max_tasks: int | None = None,
+             *, replay: ReplayTiming | None = None):
     """Returns (rows, stats): rows in ETX_TRACE_RAW layout for every executed task."""
     names = {t["id"]: n for n, t in plan["types"].items()}
     descs = plan["descs"]
@@ -196,7 +211,7 @@ def simulate(plan: dict, cost_of: Callable[[str, dict], Cost], hw: Hw, max_tasks
     owner = {t: w for w, q in queues.items() for t in q}
     cost = {}
     taken, ready, done = [0.0] * n, [None] * n, [None] * n
-    worker_free = {w: 0.0 for w in queues}
+    worker_free = {w: replay.initial_taken_us.get(w, 0.0) if replay else 0.0 for w in queues}
     rng = random.Random(hw.seed)
 
     def ready_time(t):
@@ -239,7 +254,11 @@ def simulate(plan: dict, cost_of: Callable[[str, dict], Cost], hw: Hw, max_tasks
         if r is None:
             return                                            # woken when its last event fires
         taken[t] = worker_free[w]
+        if replay and replay.event_after_us is not None:
+            r += replay.event_after_us[t]
         ready[t] = max(r, worker_free[w])
+        if replay:
+            ready[t] += replay.ready_after_us[t]
         push(ready[t] + c.fixed_us, "stream", t)
 
     def part_done(t) -> bool:
@@ -314,7 +333,7 @@ def simulate(plan: dict, cost_of: Callable[[str, dict], Cost], hw: Hw, max_tasks
             done[t] = now
             w = owner[t]
             pos[w] += 1
-            worker_free[w] = now
+            worker_free[w] = now + (replay.queue_after_us[t] if replay else 0.0)
             woken = set()
             for e in produces[t]:
                 remaining[e] -= 1
@@ -335,7 +354,8 @@ def simulate(plan: dict, cost_of: Callable[[str, dict], Cost], hw: Hw, max_tasks
         if t >= n or done[t] is None:
             rows.append((d["type"], *coord[:4], 0, 0, 0, 0))
             continue
-        rows.append((d["type"], *coord[:4], int(taken[t] / TICK_US) + 1, int(ready[t] / TICK_US) + 1, int(done[t] / TICK_US) + 1,
+        tick = round if replay else int
+        rows.append((d["type"], *coord[:4], tick(taken[t] / TICK_US) + 1, tick(ready[t] / TICK_US) + 1, tick(done[t] / TICK_US) + 1,
                      owner[t]))
     unfinished = sum(1 for t in range(n) if done[t] is None)
     busy = sum(done[t] - ready[t] for t in range(n) if done[t] is not None)

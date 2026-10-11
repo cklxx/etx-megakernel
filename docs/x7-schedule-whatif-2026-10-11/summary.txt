@@ -1,0 +1,32 @@
+M input: span 4067.290 us; 60362 tasks; 436 events; 1403 instances; zero mismatches
+M calibrated baseline: all 181086 stamps identical; no residual dropped
+E layer period baseline 80.995000 us; definition: (last moe_down - last in_norm) / 48
+E best nominal: rotate_heads-reverse-s6-p0.3; period 82.372500; delta 1.377500 us/layer
+E best span 4138.080 us; delta 70.790; wall 4.250790 ms
+E critical-path reconciliation: role body_before body_after dbody gap_before gap_after dgap total_delta_us
+argmax     9.520 9.520 -0.000 1.680 1.680 +0.000 +0.000
+attn       259.720 259.440 -0.280 52.520 52.800 +0.280 -0.000
+in_norm    3.720 3.720 +0.000 4.350 4.350 +0.000 +0.000
+lm_head    151.920 151.280 -0.640 1.650 2.870 +1.220 +0.580
+moe_down   435.360 441.960 +6.600 139.080 122.520 -16.560 -9.960
+moe_up     770.280 772.560 +2.280 52.200 50.440 -1.760 +0.520
+o_proj     263.480 263.480 -0.000 96.740 96.740 -0.000 -0.000
+prep       194.800 195.480 +0.680 81.090 81.240 +0.150 +0.830
+prologue   3.920 3.920 +0.000 2.610 2.610 +0.000 +0.000
+qkv        433.160 435.600 +2.440 183.150 218.150 +35.000 +37.440
+reduce     254.280 254.120 -0.160 56.560 56.440 -0.120 -0.280
+router     265.360 265.360 +0.000 129.220 129.220 -0.000 +0.000
+topk       146.280 147.920 +1.640 74.640 114.660 +40.020 +41.660
+E residual conservation: queue 81246.400 us (worker-summed) unchanged; ready 95322.920 -> 95322.920
+E rank baseline: period_delta=+0.000000; step_delta=+0.000
+E rank rotate_heads-reverse-s6-p0.3: period_delta=+1.377500; step_delta=+70.790
+E rank original-reverse-s6-p0.3: period_delta=+1.386667; step_delta=+71.230
+E rank attention_wide-reverse-s6-p0.0: period_delta=+1.386667; step_delta=+71.230
+E rank dense_balance-reverse-s6-p0.3: period_delta=+1.805208; step_delta=+91.140
+E rank attention_wide-reverse-s6-p0.3: period_delta=+1.986667; step_delta=+100.030
+E rank attention_wide-reverse-s6-p0.6: period_delta=+2.586667; step_delta=+128.830
+E rank original-short_first-s6-p0.3: period_delta=+2.707500; step_delta=+134.280
+E rank attention_wide-short_first-s6-p0.0: period_delta=+2.707500; step_delta=+134.280
+E rank rotate_heads-short_first-s6-p0.3: period_delta=+2.735417; step_delta=+135.620
+E rank dense_balance-short_first-s6-p0.3: period_delta=+2.836875; step_delta=+140.260
+E rank original-coord-s6-p0.3: period_delta=+2.879792; step_delta=+142.320

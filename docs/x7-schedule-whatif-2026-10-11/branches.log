@@ -1,0 +1,13 @@
+E floor=0.0 baseline: period_delta=+0.000000 us/layer step_delta=+0.000
+E floor=0.0 preserve-reverse-s0: period_delta=+1.246875 us/layer step_delta=+59.850
+E floor=0.0 preserve-reverse-s6: period_delta=+1.232292 us/layer step_delta=+59.150
+E floor=0.0 greedy_long_first: period_delta=+1.116042 us/layer step_delta=+53.570
+E floor=0.0 greedy_short_first: period_delta=+1.101875 us/layer step_delta=+53.080
+E floor=0.0 greedy_coord: period_delta=+1.248125 us/layer step_delta=+59.910
+E floor=0.52 baseline: period_delta=+0.000000 us/layer step_delta=+0.000
+E floor=0.52 preserve-reverse-s0: period_delta=+1.262083 us/layer step_delta=+60.580
+E floor=0.52 preserve-reverse-s6: period_delta=+1.321667 us/layer step_delta=+63.440
+E floor=0.52 greedy_long_first: period_delta=+1.116042 us/layer step_delta=+53.570
+E floor=0.52 greedy_short_first: period_delta=+1.123333 us/layer step_delta=+54.110
+E floor=0.52 greedy_coord: period_delta=+1.248125 us/layer step_delta=+59.910
+BEST {"id": "baseline", "local_floor_us": 0.0, "period_us": 80.995, "period_delta_us": 0.0, "span_us": 4067.29, "step_delta_us": 0.0, "wall_ms_est": 4.18, "cp": {"prologue": {"body": 3.9200000000000004, "gap": 2.61, "tasks": 1}, "in_norm": {"body": 3.719999999999999, "gap": 4.3500000000000005, "tasks": 1}, "qkv": {"body": 433.1600000000002, "gap": 183.15, "tasks": 48}, "prep": {"body": 194.80000000000177, "gap": 81.08999999999844, "tasks": 48}, "attn": {"body": 259.7200000000009, "gap": 52.51999999999869, "tasks": 48}, "reduce": {"body": 254.27999999999773, "gap": 56.56000000000137, "tasks": 48}, "o_proj": {"body": 263.48000000000127, "gap": 96.73999999999997, "tasks": 48}, "router": {"body": 265.36000000000007, "gap": 129.21999999999917, "tasks": 48}, "topk": {"body": 146.28000000000094, "gap": 74.63999999999982, "tasks": 48}, "moe_up": {"body": 770.2799999999995, "gap": 52.20000000000002, "tasks": 48}, "moe_down": {"body": 435.35999999999973, "gap": 139.08000000000033, "tasks": 48}, "lm_head": {"body": 151.92000000000007, "gap": 1.650000000000091, "tasks": 1}, "argmax": {"body": 9.519999999999982, "gap": 1.6799999999998363, "tasks": 1}}, "queue_cost_sum_us": 81246.4, "local_cost_sum_us": 34165.6, "notification_cost_sum_us": 77352.38}

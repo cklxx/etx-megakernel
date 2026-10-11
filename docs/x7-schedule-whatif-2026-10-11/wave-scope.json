@@ -1,0 +1,17 @@
+{
+  "wave_order": {
+    "id": "phase1_poll_wave15",
+    "legal_in_principle": true,
+    "body_calls": "unchanged; phase-1 poll/acquire moves from lane 0 to lane 960, touch uses a corresponding logical-wave permutation, ready barrier retained",
+    "fixed_residual_prediction_period_delta_us": 0.0,
+    "fixed_residual_prediction_step_delta_us": 0.0,
+    "actual_prediction": "UNKNOWN: no within-phase stamps or wave-level cost shape in this trace",
+    "output_trace": "measured.bin.gz (same frozen residuals)",
+    "build": "change phase-1 waiting-thread condition and touch logical-wave index; retain all-wave body drain, barrier and thread-0 publication",
+    "scope": "every event scope unchanged"
+  },
+  "in_body_wave_instruction_order": {
+    "status": "unpriced",
+    "reason": "the individual body is the finest measured cost shape; changing its wave instruction schedule needs finer stamps and cannot be priced without inventing sub-bodies"
+  }
+}
