@@ -4,11 +4,10 @@
   "implicit": 39,
   "resolved": 486,
   "verdicts": {
-    "PASS": 205,
-    "STALE": 17,
-    "BASIS": 8,
-    "MISMATCH": 2,
-    "UNREVIEWED": 254
+    "PASS": 452,
+    "STALE": 23,
+    "BASIS": 9,
+    "MISMATCH": 2
   },
   "documents": {
     "DEP-GAP-LEDGER": {
@@ -28,10 +27,13 @@
       "MISMATCH": 1
     },
     "MOE-BODY-ANATOMY": {
-      "UNREVIEWED": 150
+      "PASS": 146,
+      "STALE": 4
     },
     "REVIEW-POOL-ANALYSIS": {
-      "UNREVIEWED": 104
+      "PASS": 101,
+      "STALE": 2,
+      "BASIS": 1
     }
   }
 }
