@@ -30,3 +30,12 @@ def test_replay_initial_take_and_ready_delay_do_not_vanish():
                            replay=ReplayTiming([4, 0], [1, 2], {0: 3}))
     assert stats["makespan_us"] == 14
     assert rows[0][5:8] == (301, 401, 601)
+
+
+def test_notification_can_overlap_busy_worker_fetch():
+    # Same four us of worker work and two us of notification; max, not sum.
+    rows, stats = simulate(fixture(0), lambda *_: Cost(chain_us=2),
+                           Hw(handoff_us={"DOMAIN": 0}),
+                           replay=ReplayTiming([4, 0], [0, 0], event_after_us=[0, 2]))
+    assert stats["makespan_us"] == 8
+    assert rows[1][6] == 601

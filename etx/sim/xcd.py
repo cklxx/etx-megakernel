@@ -181,6 +181,7 @@ class ReplayTiming:
     queue_after_us: list[float]
     ready_after_us: list[float]
     initial_taken_us: dict[int, float] = field(default_factory=dict)
+    event_after_us: list[float] | None = None  # optional notification branch before max(event, worker)
 
 
 def simulate(plan: dict, cost_of: Callable[[str, dict], Cost], hw: Hw, max_tasks: int | None = None,
@@ -253,6 +254,8 @@ def simulate(plan: dict, cost_of: Callable[[str, dict], Cost], hw: Hw, max_tasks
         if r is None:
             return                                            # woken when its last event fires
         taken[t] = worker_free[w]
+        if replay and replay.event_after_us is not None:
+            r += replay.event_after_us[t]
         ready[t] = max(r, worker_free[w])
         if replay:
             ready[t] += replay.ready_after_us[t]
