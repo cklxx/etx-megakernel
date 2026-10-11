@@ -115,6 +115,17 @@ def emit_plan_header(plan: Plan, device: int = 0) -> str:
         counts.extend(e.counts)
     out.append(_arr("etx_ev_counts", counts, dims="ETX_EVENT_WORDS"))
     out.append(_arr("etx_ev_runtime_init", [1 if e.runtime_init else 0 for e in evs]))
+    # Diagnostic-only CSR: one slot for each original producer arrival.
+    arrival_offsets=[0]; arrival_words=[]
+    for task in plan.tasks:
+        for event,coord in plan.inst.task_out[(task.grid,task.coord)]:
+            arrival_words.append(plan.events[event].offset + plan.linear(event,coord))
+        arrival_offsets.append(len(arrival_words))
+    out.append("#if defined(ETX_PRODUCER_LEDGER) && ETX_PRODUCER_LEDGER")
+    out.append(f"#define ETX_ARRIVAL_SLOTS {len(arrival_words)}")
+    out.append(_arr("etx_arrival_offsets",arrival_offsets))
+    out.append(_arr("etx_arrival_words",arrival_words))
+    out.append("#endif")
     # per (device, domain) producer share of every event word: DEVICE-scope events with a share > 1
     # use the last-arriver flush; runtime-initialised events keep 0 (plain arrives)
     share_flat: list[int] = []

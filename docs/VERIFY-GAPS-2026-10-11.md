@@ -199,3 +199,100 @@ exited 0; all 12 full-plan native build/assemble/extract stages exited 0.
 Both new driver dry runs exited 0 (stdout saved). No shell script added;
 `bash -n etx/importer/hip_ir_local.sh` on the reused compiler helper exited 0.
 No CHECK-DSL, imported-launch byte check, HF tokens or GPU timing was run.
+
+## Gap 4 — name producers whose arrival was not observed
+
+**CPU instrumentation/verification closed.** `python -m etx.tools.watchdog
+PLAN SNAPSHOT --output JSON` accepts incomplete snapshots (the completed-run
+attribution reader still rejects incomplete tasks). It prints every non-zero
+event's name/coordinate, remaining count, static expected count, observed
+completed calls, all producer IDs, phase, coordinates, observed/planned worker,
+domain and last observed stamp. It distinguishes no observed entry, entry
+without observed return, and observed completion. It never supplies a cause.
+Runtime-initialized event obligations remain unknown rather than assuming all
+mapped producers must arrive. The diagnostic capture is intended for the
+one-device target; it is not a merged multi-device trace.
+
+The old record only stamps the **final** arriver. It cannot name missing
+producers in a partially arrived event. The new **opt-in**, default-OFF
+`ETX_PRODUCER_LEDGER=1` (hipcc `-D`, requires `ETX_INBODY=1`) therefore adds
+one sparse CSR slot per original producer/event incidence, including repeated
+incidences. A diagnostic bracket surrounds the **original call once**. No
+poll, protocol fence or barrier is added; consumers never wait for diagnostic
+stores. The host allocates/resets only diagnostic buffers; ordinary ABI and
+code are guarded out. This instrumentation can perturb a diagnostic ON run;
+no time effect or overhead is measured here.
+
+Build through the existing `ETX_INBODY_BUILD=1` path with
+`ETX_HIPCC_FLAGS=-DETX_PRODUCER_LEDGER=1`. At run time, `ETX_INBODY_RAW=FILE`
+allocates diagnostic storage; `ETX_WATCHDOG_RAW=SNAPSHOT` asks the existing
+failure/timeout dump to save the version-2 snapshot for the decoder. Device
+capture on a GPU was **not run**. The host's existing copying mechanism
+cannot guarantee completion for a GPU that never responds.
+
+Version 1 is still losslessly readable and is emitted without the ledger.
+Version 2 preserves its six-word header and all original arrays, then appends
+`{arrival_slots,event_words,domains}` (u64), CSR offsets `[task+1]`, event words
+`[slot]`, brackets `[slot][before,after]`, logical unstrided event counters and
+per-domain subcounters. Int32 counters are sign-extended to u64 and recovered
+by the reader. Counter totals and observed completed calls stay separate:
+last-arriver flushing can batch several logical arrivals into one global
+counter decrement. Snapshots are non-atomic; a missing diagnostic store means
+**not observed**, not proof that no atomic executed or an explanation of why.
+
+The CPU synthetic counter is **remaining 1 / expected 3**, with **2 observed
+completed calls**. It names **task 2**, phase **gemv**, worker **2**, whose last
+stamp is **body_entry at tick 140**. It prints:
+
+```text
+WATCHDOG {"completed_calls_observed": 2, "coord": [0], "event": "ready", "expected": 3, "remaining": 1, "unobserved_producer_tasks": [2]}
+```
+
+`watchdog-synthetic-dump.json` retains every producer/stamp plus all raw words;
+`cause: null`, `removability_evidence: false`. Tests cover the un-arrived
+counter, an in-flight call, legacy inability to identify partial producers,
+CSR/plan mismatch, corrupt/truncated records, invalid brackets, and unknown
+runtime obligations. **No mechanism-removability evidence is claimed.**
+
+CPU gates: the local LLVM 23 gfx942 device compile with explicit ETX_DEVLIBS,
+its final llc assembly, and native ROCm 7.2.4 host-only syntax check all exited
+0. The driver prints `WATCHDOG CPU stage=0 BUILD`, `stage=1 BUILD`,
+`stage=2 BUILD`, then `WATCHDOG CPU COMPILE_OK`; full stdout and individual
+stage logs are retained. Its non-GPU dry run exited 0 and printed the same
+three stages with `DRY_RUN`, then `WATCHDOG CPU DRY_RUN_OK`, plus the synthetic
+result. The watchdog CLI dry run exited 0 with the line above.
+
+First fixture compile failed: its test wrapper specified an 8,448-byte import
+arena although the unchanged standalone tile requires **21,120** bytes. The
+compiler refused at its existing static assertion. The wrapper now uses
+`gemv.LDS_BYTES`, as the existing in-body CPU fixture does; unchanged tile
+math was then compiled successfully. Both failure logs are retained. No
+baseline/C1/C5 arm failed, no substitute estimate was used, and no GPU money
+was spent. Shell scripts added: **none**; reused compiler-helper `bash -n`
+exited 0. No GPU correctness or timing gate could run in this CPU-only task.
+
+## Final CPU gates and remaining verification
+
+Exact final full-suite output (`.venv/bin/python -m pytest -q`):
+
+```text
+1344 passed, 14 skipped in 179.98s (0:02:59)
+```
+
+All compiler, assembler, host syntax and new-script non-GPU dry-run gates above
+exited **0** after the documented fixture correction. Shell syntax is not
+applicable to new files (all new scripts are Python); the reused bash compiler
+helper also passed. GPU correctness, imported-launch checking, token checking,
+actual critical-path attribution, isolated round trip and total step timing
+remain **NOT_RUN_CPU_ONLY**. CPU/GPU network spend and provisioning: **0**.
+
+Gap 1 remains open for the *legal-overlap* certification, with LDS inventory
+and static ordering/counts delivered. Gap 2 remains open for *actual critical
+chain* certainty, with every pair and the identical-definition MAY counts
+delivered. Gaps 3 and 4 are closed at the requested static/code and synthetic
+CPU level; the isolation flag's GPU keep rule remains pending. The brief's
+LDS premise is contradicted here (**C5 added zero LDS**) and its self-vmcnt
+prefetch explanation is not established for the scalar argument hook.
+Existing final-arriver stamps alone were insufficient for partial-producer
+identity; the new ledger supplies the missing observation without guessing a
+cause. All five checkpoints are on this branch; no push was performed.

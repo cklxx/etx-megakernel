@@ -21,20 +21,34 @@ def read_raw(path):
     if len(data) < 48 or len(data) % 8:
         raise ValueError('truncated inbody header/word')
     magic, version, nt, ne, nw, tick_ns = struct.unpack_from('<6Q', data)
-    if magic != MAGIC or version != 1 or not nt or not ne or not 0 < nw <= 16 or tick_ns != 10:
+    if magic != MAGIC or version not in (1, 2) or not nt or not ne or not 0 < nw <= 16 or tick_ns != 10:
         raise ValueError('invalid inbody header')
     count = 6 + nt * 5 + ne * 3 + nt * nw * 2
-    if len(data) != count * 8:
+    if len(data) < count*8 or (version==1 and len(data)!=count*8):
         raise ValueError('truncated/extra inbody records')
-    words = struct.unpack('<' + 'Q' * count, data)
+    words = struct.unpack('<' + 'Q' * (len(data)//8), data)
     pos = 6
     def take(n, width):
         nonlocal pos
         rows = [list(words[i:i+width]) for i in range(pos, pos + n * width, width)]
         pos += n * width
         return rows
-    return dict(version=version, tick_ns=tick_ns, legacy=take(nt, 4),
+    result=dict(version=version, tick_ns=tick_ns, legacy=take(nt, 4),
                 poll=take(nt, 1), events=take(ne, 3), waves=take(nt*nw, 2), waves_per_task=nw)
+    if version==2:
+        if len(words)<pos+3: raise ValueError('truncated ledger header')
+        ni,nc,nd=words[pos:pos+3];pos+=3
+        expected=count+3+(nt+1)+ni*3+nc*(nd+1)
+        if nc!=ne or not nd or len(words)!=expected: raise ValueError('truncated/extra ledger records')
+        offsets=[r[0] for r in take(nt+1,1)]; event_words=[r[0] for r in take(ni,1)]
+        stamps=take(ni,2)
+        if offsets[0]!=0 or offsets[-1]!=ni or offsets!=sorted(offsets) or any(w>=ne for w in event_words):
+            raise ValueError('invalid producer ledger CSR')
+        signed=lambda v:v-(1<<64) if v>=(1<<63) else v
+        remaining=[signed(r[0]) for r in take(nc,1)]
+        sub=[[signed(v) for v in r] for r in take(nd,nc)]
+        result['producer_ledger']=dict(offsets=offsets,words=event_words,stamps=stamps,remaining=remaining,sub=sub)
+    return result
 
 
 def event_words(plan):

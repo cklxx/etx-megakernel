@@ -1,0 +1,18 @@
+WATCHDOG SYNTHETIC {"cause": null, "completed_calls_observed": 2, "event": "ready", "expected": 3, "last_stamp_ticks": 140, "remaining": 1, "removability_evidence": false, "unobserved_producer_tasks": [2]}
+WATCHDOG CPU stage=0 BUILD
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/Users/ckl/code/.wt/etx-verifygaps/examples/vllm_llm/watchdog_cpu.py", line 76, in <module>
+    if __name__=='__main__':main()
+                            ~~~~^^
+  File "/Users/ckl/code/.wt/etx-verifygaps/examples/vllm_llm/watchdog_cpu.py", line 73, in main
+    p.add_argument('--dry-run',action='store_true');a=p.parse_args();run(a.out,a.dry_run)
+                                                                     ~~~^^^^^^^^^^^^^^^^^
+  File "/Users/ckl/code/.wt/etx-verifygaps/examples/vllm_llm/watchdog_cpu.py", line 67, in run
+    with (out/f'stage-{n}.log').open('w') as log:subprocess.run(cmd,cwd=ROOT,env=env,stdout=log,stderr=subprocess.STDOUT,check=True,timeout=180)
+                                                 ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/subprocess.py", line 577, in run
+    raise CalledProcessError(retcode, process.args,
+                             output=stdout, stderr=stderr)
+subprocess.CalledProcessError: Command '['bash', '/Users/ckl/code/.wt/etx-verifygaps/etx/importer/hip_ir_local.sh', '/tmp/etx-verifygaps/watchdog/kernel.hip', '/tmp/etx-verifygaps/watchdog/ledger.ll', '-DETX_INBODY=1', '-DETX_PRODUCER_LEDGER=1', '-DETX_DSL_NT', '-DETX_DSL_VECNORM', '-DETX_DSL_WSUM', '-DETX_DSL_SCALAR', '-DETX_DSL_GU1', '-DETX_DSL_RBATCH', '-DETX_TOPK_KEY32', '-I/tmp/etx-verifygaps/watchdog', '-I/Users/ckl/code/.wt/etx-verifygaps/etx/runtime/include', '-I/Users/ckl/code/.wt/etx-verifygaps/etx/runtime', '-I/Users/ckl/code/.wt/etx-verifygaps']' returned non-zero exit status 1.

@@ -32,6 +32,9 @@ struct etx_host {
   uint64_t* d_trace_time = nullptr;
 #if defined(ETX_INBODY) && ETX_INBODY
   uint64_t *d_inbody_poll = nullptr, *d_inbody_event = nullptr, *d_inbody_wave = nullptr;
+#if defined(ETX_PRODUCER_LEDGER) && ETX_PRODUCER_LEDGER
+  uint64_t* d_arrival_stamps = nullptr;
+#endif
 #endif
   int32_t* d_ev_sub = nullptr;
   int32_t* d_mirror = nullptr;             // relay mirrors [n_domains][event words]
@@ -141,6 +144,12 @@ struct etx_host {
       ETX_CHECK(hipMalloc(&d_inbody_event, (size_t)ETX_EVENT_WORDS * 3 * sizeof(uint64_t)));
       ETX_CHECK(hipMalloc(&d_inbody_wave, (size_t)ETX_N_TASKS * (ETX_THREADS / 64) * 2 * sizeof(uint64_t)));
       p.inbody_poll = d_inbody_poll; p.inbody_event = d_inbody_event; p.inbody_wave = d_inbody_wave;
+#if defined(ETX_PRODUCER_LEDGER) && ETX_PRODUCER_LEDGER
+      p.arrival_offsets = upload(etx_arrival_offsets, (size_t)ETX_N_TASKS + 1);
+      p.arrival_words = upload(etx_arrival_words, (size_t)(ETX_ARRIVAL_SLOTS ? ETX_ARRIVAL_SLOTS : 1));
+      ETX_CHECK(hipMalloc(&d_arrival_stamps, (size_t)(ETX_ARRIVAL_SLOTS ? ETX_ARRIVAL_SLOTS : 1) * 2 * sizeof(uint64_t)));
+      p.arrival_stamps = d_arrival_stamps;
+#endif
     }
 #endif
     // last-arriver flush tables: this device's share rows and zeroed sub-counters
@@ -244,6 +253,9 @@ struct etx_host {
       ETX_CHECK(hipMemsetAsync(d_inbody_poll, 0, (size_t)ETX_N_TASKS * sizeof(uint64_t), stream));
       ETX_CHECK(hipMemsetAsync(d_inbody_event, 0, (size_t)ETX_EVENT_WORDS * 3 * sizeof(uint64_t), stream));
       ETX_CHECK(hipMemsetAsync(d_inbody_wave, 0, (size_t)ETX_N_TASKS * (ETX_THREADS / 64) * 2 * sizeof(uint64_t), stream));
+#if defined(ETX_PRODUCER_LEDGER) && ETX_PRODUCER_LEDGER
+      ETX_CHECK(hipMemsetAsync(d_arrival_stamps, 0, (size_t)(ETX_ARRIVAL_SLOTS ? ETX_ARRIVAL_SLOTS : 1) * 2 * sizeof(uint64_t), stream));
+#endif
     }
 #endif
     ETX_CHECK(hipMemsetAsync(d_ctrl, 0, 64, stream));      // never device-side: the host reads ctrl_done after the kernel
@@ -477,6 +489,12 @@ struct etx_host {
     }
     if (shown > 32) fprintf(stderr, "  ... %d non-zero events\n", shown);
     if (shown == 0) fprintf(stderr, "  all events reached zero\n");
+#if defined(ETX_PRODUCER_LEDGER) && ETX_PRODUCER_LEDGER
+    if (const char* path = getenv("ETX_WATCHDOG_RAW")) {
+      write_inbody(path);
+      fprintf(stderr, "  producer snapshot: %s (observations only; cause unknown)\n", path);
+    }
+#endif
   }
   // Per-phase attribution from the timestamp trace (ETX_TRACE=1): for every task type
   // (grid) the mean wait (taken -> deps ready) and body (ready -> done) time, and the
@@ -487,7 +505,11 @@ struct etx_host {
     if (!d_inbody_poll) { fprintf(stderr, "inbody disabled\n"); exit(1); }
     // Versioned little-endian u64 header, then complete legacy/task/event/wave
     // arrays. Reader resolves task arrival brackets from plan event instances.
-    uint64_t header[6] = {0x3142444f424e4954ull, 1, ETX_N_TASKS, ETX_EVENT_WORDS, ETX_THREADS / 64, 10};
+    uint64_t version = 1;
+#if defined(ETX_PRODUCER_LEDGER) && ETX_PRODUCER_LEDGER
+    version = 2;
+#endif
+    uint64_t header[6] = {0x3142444f424e4954ull, version, ETX_N_TASKS, ETX_EVENT_WORDS, ETX_THREADS / 64, 10};
     FILE* f = fopen(path, "wb");
     if (!f) { perror(path); exit(1); }
     if (fwrite(header, sizeof(header), 1, f) != 1) { perror("inbody header"); exit(1); }
@@ -500,6 +522,25 @@ struct etx_host {
     write(d_inbody_poll, ETX_N_TASKS);
     write(d_inbody_event, (size_t)ETX_EVENT_WORDS * 3);
     write(d_inbody_wave, (size_t)ETX_N_TASKS * (ETX_THREADS / 64) * 2);
+#if defined(ETX_PRODUCER_LEDGER) && ETX_PRODUCER_LEDGER
+    uint64_t extra[3] = {ETX_ARRIVAL_SLOTS, ETX_EVENT_WORDS, ETX_N_DOMAINS};
+    if (fwrite(extra, sizeof(extra), 1, f) != 1) { perror("ledger header"); exit(1); }
+    auto write_words = [&](const int32_t* a, size_t n) {
+      std::vector<uint64_t> h(n);
+      for (size_t i = 0; i < n; ++i) h[i] = (uint64_t)(int64_t)a[i];
+      if (fwrite(h.data(), sizeof(uint64_t), n, f) != n) { perror("ledger words"); exit(1); }
+    };
+    write_words(etx_arrival_offsets, (size_t)ETX_N_TASKS + 1);
+    write_words(etx_arrival_words, ETX_ARRIVAL_SLOTS);
+    write(d_arrival_stamps, (size_t)ETX_ARRIVAL_SLOTS * 2);
+    std::vector<int32_t> counters((size_t)ETX_EVENT_WORDS * ETX_EV_STRIDE), logical(ETX_EVENT_WORDS);
+    ETX_CHECK(hipMemcpy(counters.data(), d_events, counters.size() * sizeof(int32_t), hipMemcpyDeviceToHost));
+    for (int i = 0; i < ETX_EVENT_WORDS; ++i) logical[i] = counters[(size_t)ETX_EVW(i)];
+    write_words(logical.data(), logical.size());
+    std::vector<int32_t> sub((size_t)ETX_N_DOMAINS * ETX_EVENT_WORDS);
+    ETX_CHECK(hipMemcpy(sub.data(), d_ev_sub, sub.size() * sizeof(int32_t), hipMemcpyDeviceToHost));
+    write_words(sub.data(), sub.size());
+#endif
     if (fclose(f)) { perror("inbody close"); exit(1); }
   }
 #endif
