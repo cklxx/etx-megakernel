@@ -1,0 +1,39 @@
+{
+  "total": 486,
+  "explicit": 447,
+  "implicit": 39,
+  "resolved": 486,
+  "verdicts": {
+    "PASS": 452,
+    "STALE": 23,
+    "BASIS": 9,
+    "MISMATCH": 2
+  },
+  "documents": {
+    "DEP-GAP-LEDGER": {
+      "PASS": 88,
+      "STALE": 11,
+      "BASIS": 2,
+      "MISMATCH": 1
+    },
+    "XCD-TIMELINE": {
+      "PASS": 84,
+      "STALE": 6,
+      "BASIS": 1
+    },
+    "XCD-PREFETCH": {
+      "PASS": 33,
+      "BASIS": 5,
+      "MISMATCH": 1
+    },
+    "MOE-BODY-ANATOMY": {
+      "PASS": 146,
+      "STALE": 4
+    },
+    "REVIEW-POOL-ANALYSIS": {
+      "PASS": 101,
+      "STALE": 2,
+      "BASIS": 1
+    }
+  }
+}
