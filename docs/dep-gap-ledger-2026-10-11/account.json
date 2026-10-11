@@ -1,0 +1,1835 @@
+{
+ "span_us": 4303.54,
+ "workers": 304,
+ "xcds": 8,
+ "bw_tbs": 4.3,
+ "rtt_us": 0.5,
+ "bytes_total": 6190408720.0,
+ "floor_us": 1439.6299348837208,
+ "machine_worker_us": {
+  "start": 478.5200000000004,
+  "between": 81632.67999999892,
+  "dep": 604653.560000001,
+  "handoff": 94145.59999999928,
+  "bytes": 369844.424841185,
+  "machinery": 146415.8951590728,
+  "none": 11105.479999999967
+ },
+ "machine_share": {
+  "start": 0.00036576375434373154,
+  "between": 0.0623971318104573,
+  "dep": 0.4621757840485307,
+  "handoff": 0.07196156505672265,
+  "bytes": 0.2826959904560097,
+  "machinery": 0.11191512895799677,
+  "none": 0.008488635916135603
+ },
+ "taxonomy_share": {
+  "a": 0.2826959904560097,
+  "b": 0.5341373491052533,
+  "c": 0.11191512895799677,
+  "d": 0.06276289556480104,
+  "e": 0.008488635916135603
+ },
+ "per_xcd": [
+  {
+   "xcd": 0,
+   "workers": 38,
+   "share": {
+    "start": 0.0002842213374888679,
+    "between": 0.06402611509790014,
+    "dep": 0.43195106452142323,
+    "handoff": 0.07363417827624355,
+    "bytes": 0.289373732224857,
+    "machinery": 0.13303298655231963,
+    "none": 0.007697701989769484
+   },
+   "worker_us": {
+    "start": 46.48000000000001,
+    "between": 10470.479999999852,
+    "dep": 70638.90999999997,
+    "handoff": 12041.729999999916,
+    "bytes": 47322.59440000052,
+    "machinery": 21755.485600000044,
+    "none": 1258.8399999999974
+   },
+   "by_kind_worker_us": {
+    "prologue": {
+     "start": 0.78,
+     "between": 0.0,
+     "dep": 0.0,
+     "handoff": 1.24,
+     "bytes": 0.4169525581395348,
+     "machinery": 2.2630474418604654,
+     "none": 0.0
+    },
+    "attn": {
+     "start": 7.06,
+     "between": 313.16000000000196,
+     "dep": 4400.360000000002,
+     "handoff": 251.7599999999955,
+     "bytes": 770.5138604650974,
+     "machinery": 494.6061395349037,
+     "none": 0.0
+    },
+    "router": {
+     "start": 0.0,
+     "between": 2020.4000000000042,
+     "dep": 3441.760000000006,
+     "handoff": 2411.5999999999963,
+     "bytes": 1755.4636799999425,
+     "machinery": 6502.096320000039,
+     "none": 0.0
+    },
+    "moe_up": {
+     "start": 0.0,
+     "between": 1468.1199999999897,
+     "dep": 12111.959999999965,
+     "handoff": 1120.2400000000002,
+     "bytes": 14659.23965023282,
+     "machinery": 3513.4403497675016,
+     "none": 0.0
+    },
+    "moe_down": {
+     "start": 0.0,
+     "between": 2161.4399999999846,
+     "dep": 17019.60000000001,
+     "handoff": 1658.8799999999972,
+     "bytes": 10556.186433488001,
+     "machinery": 3473.4535665116923,
+     "none": 0.0
+    },
+    "qkv": {
+     "start": 35.56,
+     "between": 2071.560000000003,
+     "dep": 3612.139999999987,
+     "handoff": 3571.7799999999975,
+     "bytes": 8131.630675348949,
+     "machinery": 5776.249324651089,
+     "none": 0.0
+    },
+    "o_proj": {
+     "start": 0.0,
+     "between": 2191.7199999999834,
+     "dep": 28272.960000000025,
+     "handoff": 2755.1200000000126,
+     "bytes": 6631.95362232575,
+     "machinery": 1356.1663776743299,
+     "none": 0.0
+    },
+    "prep": {
+     "start": 2.2600000000000002,
+     "between": 61.19999999999881,
+     "dep": 627.5999999999998,
+     "handoff": 78.20000000000041,
+     "bytes": 48.98863627906611,
+     "machinery": 132.57136372093552,
+     "none": 0.0
+    },
+    "reduce": {
+     "start": 0.0,
+     "between": 76.48000000000145,
+     "dep": 585.9599999999983,
+     "handoff": 52.000000000000675,
+     "bytes": 130.54696186046309,
+     "machinery": 117.2930381395349,
+     "none": 0.0
+    },
+    "argmax": {
+     "start": 0.0,
+     "between": 1.1199999999998909,
+     "dep": 150.22000000000025,
+     "handoff": 1.5,
+     "bytes": 0.6746716279067186,
+     "machinery": 8.445328372093172,
+     "none": 0.0
+    },
+    "in_norm": {
+     "start": 0.8200000000000001,
+     "between": 0.0,
+     "dep": 3.88,
+     "handoff": 3.920000000000001,
+     "bytes": 3.6049525581395354,
+     "machinery": 0.635047441860463,
+     "none": 0.0
+    },
+    "topk": {
+     "start": 0.0,
+     "between": 62.720000000000276,
+     "dep": 343.6499999999999,
+     "handoff": 72.87000000000118,
+     "bytes": 34.01543441860694,
+     "machinery": 355.58456558139227,
+     "none": 0.0
+    },
+    "lm_head": {
+     "start": 0.0,
+     "between": 42.5600000000004,
+     "dep": 68.82000000000517,
+     "handoff": 62.61999999999716,
+     "bytes": 4599.3588688372165,
+     "machinery": 22.68113116277891,
+     "none": 0.0
+    }
+   }
+  },
+  {
+   "xcd": 1,
+   "workers": 38,
+   "share": {
+    "start": 0.00044247538684798784,
+    "between": 0.061326501585107475,
+    "dep": 0.4306975677061942,
+    "handoff": 0.07410056298816911,
+    "bytes": 0.2895333253443163,
+    "machinery": 0.13554830268137882,
+    "none": 0.008351264307988293
+   },
+   "worker_us": {
+    "start": 72.36,
+    "between": 10028.999999999789,
+    "dep": 70433.91999999997,
+    "handoff": 12118.0,
+    "bytes": 47348.6933841866,
+    "machinery": 22166.826615813996,
+    "none": 1365.7199999999975
+   },
+   "by_kind_worker_us": {
+    "in_norm": {
+     "start": 1.36,
+     "between": 0.0,
+     "dep": 3.34,
+     "handoff": 3.9400000000000004,
+     "bytes": 3.6049525581395354,
+     "machinery": 0.5550474418604647,
+     "none": 0.0
+    },
+    "attn": {
+     "start": 11.399999999999999,
+     "between": 298.23999999999836,
+     "dep": 4375.399999999996,
+     "handoff": 254.3200000000096,
+     "bytes": 770.5138604650977,
+     "machinery": 498.0061395348956,
+     "none": 0.0
+    },
+    "router": {
+     "start": 0.0,
+     "between": 1919.3200000000045,
+     "dep": 3401.440000000007,
+     "handoff": 2474.1999999999944,
+     "bytes": 1755.463679999943,
+     "machinery": 6614.136320000042,
+     "none": 0.0
+    },
+    "moe_up": {
+     "start": 0.0,
+     "between": 1397.7199999999998,
+     "dep": 12223.239999999994,
+     "handoff": 1133.9200000000046,
+     "bytes": 14659.239650232823,
+     "machinery": 3657.560349767497,
+     "none": 0.0
+    },
+    "moe_down": {
+     "start": 0.0,
+     "between": 2128.1599999999903,
+     "dep": 17183.960000000014,
+     "handoff": 1658.4800000000146,
+     "bytes": 10556.186433488001,
+     "machinery": 3619.693566511688,
+     "none": 0.0
+    },
+    "qkv": {
+     "start": 56.75999999999999,
+     "between": 1962.599999999998,
+     "dep": 3426.229999999984,
+     "handoff": 3601.89000000002,
+     "bytes": 8131.63067534895,
+     "machinery": 5789.5693246510655,
+     "none": 0.0
+    },
+    "o_proj": {
+     "start": 0.0,
+     "between": 2093.0799999999945,
+     "dep": 28197.19999999999,
+     "handoff": 2717.0800000000377,
+     "bytes": 6631.95362232575,
+     "machinery": 1327.9263776743032,
+     "none": 0.0
+    },
+    "topk": {
+     "start": 0.0,
+     "between": 60.44000000000021,
+     "dep": 348.4099999999996,
+     "handoff": 72.39000000000118,
+     "bytes": 34.01543441860694,
+     "machinery": 358.0245655813919,
+     "none": 0.0
+    },
+    "reduce": {
+     "start": 0.0,
+     "between": 72.43999999999892,
+     "dep": 590.7199999999982,
+     "handoff": 56.000000000002245,
+     "bytes": 130.54696186046309,
+     "machinery": 119.5730381395358,
+     "none": 0.0
+    },
+    "prep": {
+     "start": 2.84,
+     "between": 57.27999999999943,
+     "dep": 612.6399999999987,
+     "handoff": 81.52000000000169,
+     "bytes": 48.98863627906611,
+     "machinery": 133.41136372093248,
+     "none": 0.0
+    },
+    "lm_head": {
+     "start": 0.0,
+     "between": 39.71999999999662,
+     "dep": 71.34000000000287,
+     "handoff": 64.25999999999567,
+     "bytes": 4626.5494772093125,
+     "machinery": 48.370522790685754,
+     "none": 0.0
+    }
+   }
+  },
+  {
+   "xcd": 2,
+   "workers": 38,
+   "share": {
+    "start": 0.0004435760718898982,
+    "between": 0.06454148029419031,
+    "dep": 0.4302237227956517,
+    "handoff": 0.07344852939917555,
+    "bytes": 0.28945076306740014,
+    "machinery": 0.13340552440022782,
+    "none": 0.00848640397146728
+   },
+   "worker_us": {
+    "start": 72.53999999999999,
+    "between": 10554.759999999871,
+    "dep": 70356.42999999995,
+    "handoff": 12011.37000000006,
+    "bytes": 47335.191601861006,
+    "machinery": 21816.408398139545,
+    "none": 1387.8199999999952
+   },
+   "by_kind_worker_us": {
+    "in_norm": {
+     "start": 1.29,
+     "between": 0.0,
+     "dep": 3.41,
+     "handoff": 4.19,
+     "bytes": 3.6049525581395354,
+     "machinery": 0.3950474418604646,
+     "none": 0.0
+    },
+    "attn": {
+     "start": 11.440000000000001,
+     "between": 312.16000000000275,
+     "dep": 4402.599999999991,
+     "handoff": 249.5200000000068,
+     "bytes": 770.5138604650977,
+     "machinery": 509.0461395349002,
+     "none": 0.0
+    },
+    "router": {
+     "start": 0.0,
+     "between": 2030.5600000000015,
+     "dep": 3412.6600000000058,
+     "handoff": 2460.6600000000194,
+     "bytes": 1755.463679999943,
+     "machinery": 6387.256320000008,
+     "none": 0.0
+    },
+    "moe_up": {
+     "start": 0.0,
+     "between": 1481.6399999999926,
+     "dep": 12023.320000000018,
+     "handoff": 1142.6000000000101,
+     "bytes": 14659.239650232823,
+     "machinery": 3602.6403497674983,
+     "none": 0.0
+    },
+    "moe_down": {
+     "start": 0.0,
+     "between": 2160.9600000000064,
+     "dep": 17033.640000000007,
+     "handoff": 1643.1599999999885,
+     "bytes": 10556.186433488001,
+     "machinery": 3657.7735665116857,
+     "none": 0.0
+    },
+    "qkv": {
+     "start": 56.99999999999999,
+     "between": 2087.5600000000136,
+     "dep": 3601.789999999985,
+     "handoff": 3553.8900000000162,
+     "bytes": 8131.63067534895,
+     "machinery": 5739.089324651053,
+     "none": 0.0
+    },
+    "o_proj": {
+     "start": 0.0,
+     "between": 2232.280000000007,
+     "dep": 28256.479999999996,
+     "handoff": 2682.2800000000198,
+     "bytes": 6631.95362232575,
+     "machinery": 1298.6063776743179,
+     "none": 0.0
+    },
+    "topk": {
+     "start": 0.0,
+     "between": 62.92000000000013,
+     "dep": 348.969999999999,
+     "handoff": 71.4299999999999,
+     "bytes": 34.01543441860694,
+     "machinery": 348.8645655813935,
+     "none": 0.0
+    },
+    "reduce": {
+     "start": 0.0,
+     "between": 77.92000000000002,
+     "dep": 589.9199999999996,
+     "handoff": 52.28000000000003,
+     "bytes": 130.54696186046309,
+     "machinery": 120.85303813953729,
+     "none": 0.0
+    },
+    "prep": {
+     "start": 2.81,
+     "between": 62.95999999999948,
+     "dep": 620.8399999999991,
+     "handoff": 80.00000000000176,
+     "bytes": 48.98863627906611,
+     "machinery": 132.49136372093224,
+     "none": 0.0
+    },
+    "lm_head": {
+     "start": 0.0,
+     "between": 45.799999999996544,
+     "dep": 62.80000000000109,
+     "handoff": 71.36000000000604,
+     "bytes": 4613.047694883727,
+     "machinery": 19.392305116271928,
+     "none": 0.0
+    }
+   }
+  },
+  {
+   "xcd": 3,
+   "workers": 38,
+   "share": {
+    "start": 0.00038609585303457655,
+    "between": 0.062128778682322625,
+    "dep": 0.430618012637331,
+    "handoff": 0.07404241012845478,
+    "bytes": 0.28932520574605247,
+    "machinery": 0.1347327851906661,
+    "none": 0.008766711762140467
+   },
+   "worker_us": {
+    "start": 63.140000000000015,
+    "between": 10160.199999999862,
+    "dep": 70420.90999999986,
+    "handoff": 12108.48999999999,
+    "bytes": 47314.65864558193,
+    "machinery": 22033.461354418687,
+    "none": 1433.6599999999953
+   },
+   "by_kind_worker_us": {
+    "in_norm": {
+     "start": 1.03,
+     "between": 0.0,
+     "dep": 3.67,
+     "handoff": 3.9699999999999998,
+     "bytes": 3.6049525581395354,
+     "machinery": 0.6350474418604648,
+     "none": 0.0
+    },
+    "attn": {
+     "start": 11.04,
+     "between": 300.7200000000039,
+     "dep": 4383.720000000002,
+     "handoff": 248.11999999999534,
+     "bytes": 770.5138604650977,
+     "machinery": 504.44613953490665,
+     "none": 0.0
+    },
+    "router": {
+     "start": 0.0,
+     "between": 1946.8400000000215,
+     "dep": 3429.3700000000063,
+     "handoff": 2478.7099999999728,
+     "bytes": 1755.463679999943,
+     "machinery": 6493.816320000068,
+     "none": 0.0
+    },
+    "moe_up": {
+     "start": 0.0,
+     "between": 1410.880000000001,
+     "dep": 12076.760000000007,
+     "handoff": 1123.7999999999772,
+     "bytes": 14659.239650232817,
+     "machinery": 3617.400349767507,
+     "none": 0.0
+    },
+    "moe_down": {
+     "start": 0.0,
+     "between": 2147.6399999999876,
+     "dep": 17095.559999999987,
+     "handoff": 1664.440000000016,
+     "bytes": 10556.186433488001,
+     "machinery": 3769.693566511683,
+     "none": 0.0
+    },
+    "qkv": {
+     "start": 48.36000000000001,
+     "between": 1994.2000000000023,
+     "dep": 3578.4800000000027,
+     "handoff": 3625.6800000000044,
+     "bytes": 8131.63067534895,
+     "machinery": 5749.249324651068,
+     "none": 0.0
+    },
+    "o_proj": {
+     "start": 0.0,
+     "between": 2126.3600000000024,
+     "dep": 28224.88000000002,
+     "handoff": 2695.3599999999747,
+     "bytes": 6631.95362232575,
+     "machinery": 1288.7663776743482,
+     "none": 0.0
+    },
+    "topk": {
+     "start": 0.0,
+     "between": 60.56000000000086,
+     "dep": 352.48999999999893,
+     "handoff": 71.95000000000086,
+     "bytes": 34.01543441860694,
+     "machinery": 349.1045655813934,
+     "none": 0.0
+    },
+    "reduce": {
+     "start": 0.0,
+     "between": 74.23999999999997,
+     "dep": 589.1600000000001,
+     "handoff": 51.52000000000019,
+     "bytes": 130.54696186046309,
+     "machinery": 122.05303813953651,
+     "none": 0.0
+    },
+    "prep": {
+     "start": 2.71,
+     "between": 58.48000000000016,
+     "dep": 619.3999999999994,
+     "handoff": 80.44000000000207,
+     "bytes": 48.98863627906611,
+     "machinery": 130.65136372093352,
+     "none": 0.0
+    },
+    "lm_head": {
+     "start": 0.0,
+     "between": 40.280000000001564,
+     "dep": 67.4200000000028,
+     "handoff": 64.49999999999818,
+     "bytes": 4592.514738604658,
+     "machinery": 7.645261395342459,
+     "none": 0.0
+    }
+   }
+  },
+  {
+   "xcd": 4,
+   "workers": 38,
+   "share": {
+    "start": 0.0005185449530777968,
+    "between": 0.0628346846892013,
+    "dep": 0.4922925752923619,
+    "handoff": 0.07008336833104085,
+    "bytes": 0.27594314421939886,
+    "machinery": 0.08966260067165406,
+    "none": 0.008665081843270755
+   },
+   "worker_us": {
+    "start": 84.80000000000001,
+    "between": 10275.639999999883,
+    "dep": 80506.83000000026,
+    "handoff": 11461.049999999967,
+    "bytes": 45126.22963721016,
+    "machinery": 14662.930362790623,
+    "none": 1417.0399999999981
+   },
+   "by_kind_worker_us": {
+    "in_norm": {
+     "start": 1.68,
+     "between": 0.0,
+     "dep": 3.0200000000000005,
+     "handoff": 4.06,
+     "bytes": 3.6049525581395354,
+     "machinery": 0.5550474418604647,
+     "none": 0.0
+    },
+    "o_proj": {
+     "start": 14.44,
+     "between": 2221.079999999987,
+     "dep": 32394.80000000003,
+     "handoff": 2721.7599999999907,
+     "bytes": 6631.953622325756,
+     "machinery": 1291.0063776743407,
+     "none": 0.0
+    },
+    "router": {
+     "start": 0.0,
+     "between": 2096.680000000012,
+     "dep": 7442.200000000004,
+     "handoff": 2155.679999999984,
+     "bytes": 506.8800000000083,
+     "machinery": 0.0,
+     "none": 0.0
+    },
+    "moe_up": {
+     "start": 0.0,
+     "between": 1575.5200000000032,
+     "dep": 16503.800000000003,
+     "handoff": 1133.6800000000028,
+     "bytes": 14659.239650232823,
+     "machinery": 3570.6803497674896,
+     "none": 0.0
+    },
+    "moe_down": {
+     "start": 0.0,
+     "between": 2205.959999999996,
+     "dep": 20077.640000000003,
+     "handoff": 1672.6399999999826,
+     "bytes": 10556.186433488001,
+     "machinery": 3743.773566511697,
+     "none": 0.0
+    },
+    "qkv": {
+     "start": 68.68,
+     "between": 2069.159999999998,
+     "dep": 3657.949999999992,
+     "handoff": 3638.3300000000067,
+     "bytes": 8131.630675348951,
+     "machinery": 5687.3693246511175,
+     "none": 0.0
+    },
+    "topk": {
+     "start": 0.0,
+     "between": 64.8000000000003,
+     "dep": 352.1299999999992,
+     "handoff": 73.11000000000054,
+     "bytes": 34.01543441860694,
+     "machinery": 342.06456558139286,
+     "none": 0.0
+    },
+    "lm_head": {
+     "start": 0.0,
+     "between": 42.440000000005966,
+     "dep": 75.29000000000087,
+     "handoff": 61.78999999999451,
+     "bytes": 4602.718868837215,
+     "machinery": 27.48113116278273,
+     "none": 0.0
+    }
+   }
+  },
+  {
+   "xcd": 5,
+   "workers": 38,
+   "share": {
+    "start": 9.294673687243525e-06,
+    "between": 0.060686147487392025,
+    "dep": 0.4930485013194773,
+    "handoff": 0.07040929340178448,
+    "bytes": 0.2760755502476741,
+    "machinery": 0.09130156377082686,
+    "none": 0.00846964909916264
+   },
+   "worker_us": {
+    "start": 1.5199999999999998,
+    "between": 9924.27999999986,
+    "dep": 80630.45000000008,
+    "handoff": 11514.349999999991,
+    "bytes": 45147.88259348926,
+    "machinery": 14930.957406511561,
+    "none": 1385.0799999999945
+   },
+   "by_kind_worker_us": {
+    "in_norm": {
+     "start": 0.04,
+     "between": 0.0,
+     "dep": 4.66,
+     "handoff": 4.06,
+     "bytes": 3.6049525581395354,
+     "machinery": 0.4350474418604655,
+     "none": 0.0
+    },
+    "o_proj": {
+     "start": 0.64,
+     "between": 2116.559999999995,
+     "dep": 32349.560000000034,
+     "handoff": 2706.200000000002,
+     "bytes": 6631.953622325756,
+     "machinery": 1276.4463776743435,
+     "none": 0.0
+    },
+    "router": {
+     "start": 0.0,
+     "between": 2018.6399999999928,
+     "dep": 7433.840000000006,
+     "handoff": 2203.8400000000106,
+     "bytes": 510.1599999999889,
+     "machinery": 0.0,
+     "none": 0.0
+    },
+    "moe_up": {
+     "start": 0.0,
+     "between": 1496.3599999999963,
+     "dep": 16580.479999999978,
+     "handoff": 1117.1600000000037,
+     "bytes": 14659.239650232823,
+     "machinery": 3793.9203497675016,
+     "none": 0.0
+    },
+    "moe_down": {
+     "start": 0.0,
+     "between": 2170.640000000006,
+     "dep": 20202.120000000017,
+     "handoff": 1658.2799999999957,
+     "bytes": 10556.186433488001,
+     "machinery": 3716.0935665117076,
+     "none": 0.0
+    },
+    "qkv": {
+     "start": 0.8399999999999999,
+     "between": 2019.679999999995,
+     "dep": 3628.759999999991,
+     "handoff": 3693.3200000000215,
+     "bytes": 8131.630675348951,
+     "machinery": 5758.809324651069,
+     "none": 0.0
+    },
+    "topk": {
+     "start": 0.0,
+     "between": 62.999999999999766,
+     "dep": 354.28999999999985,
+     "handoff": 72.2700000000001,
+     "bytes": 34.01543441860694,
+     "machinery": 341.5045655813926,
+     "none": 0.0
+    },
+    "lm_head": {
+     "start": 0.0,
+     "between": 39.400000000001455,
+     "dep": 76.74000000000251,
+     "handoff": 59.219999999997526,
+     "bytes": 4621.0918251162875,
+     "machinery": 43.74817488371173,
+     "none": 0.0
+    }
+   }
+  },
+  {
+   "xcd": 6,
+   "workers": 38,
+   "share": {
+    "start": 0.0005279619251030301,
+    "between": 0.0619431298052537,
+    "dep": 0.4937182681674782,
+    "handoff": 0.07058705403605336,
+    "bytes": 0.276027691984235,
+    "machinery": 0.08858817015912651,
+    "none": 0.008607723922753406
+   },
+   "worker_us": {
+    "start": 86.33999999999997,
+    "between": 10129.839999999856,
+    "dep": 80739.97999999982,
+    "handoff": 11543.42000000005,
+    "bytes": 45140.05611534971,
+    "machinery": 14487.223884651077,
+    "none": 1407.6599999999953
+   },
+   "by_kind_worker_us": {
+    "in_norm": {
+     "start": 1.75,
+     "between": 0.0,
+     "dep": 2.95,
+     "handoff": 4.13,
+     "bytes": 3.6049525581395354,
+     "machinery": 0.47504744186046466,
+     "none": 0.0
+    },
+    "o_proj": {
+     "start": 14.75,
+     "between": 2161.0,
+     "dep": 32413.120000000006,
+     "handoff": 2664.599999999991,
+     "bytes": 6631.953622325756,
+     "machinery": 1334.2863776743454,
+     "none": 0.0
+    },
+    "router": {
+     "start": 0.0,
+     "between": 2032.3199999999943,
+     "dep": 7426.910000000009,
+     "handoff": 2198.0900000000006,
+     "bytes": 511.23999999999853,
+     "machinery": 0.0,
+     "none": 0.0
+    },
+    "moe_up": {
+     "start": 0.0,
+     "between": 1548.6800000000035,
+     "dep": 16697.59999999999,
+     "handoff": 1129.4000000000124,
+     "bytes": 14659.239650232825,
+     "machinery": 3587.6803497675114,
+     "none": 0.0
+    },
+    "moe_down": {
+     "start": 0.0,
+     "between": 2234.5599999999963,
+     "dep": 20178.47999999998,
+     "handoff": 1710.4400000000098,
+     "bytes": 10556.186433488001,
+     "machinery": 3523.973566511691,
+     "none": 0.0
+    },
+    "qkv": {
+     "start": 69.83999999999999,
+     "between": 2041.5199999999877,
+     "dep": 3567.130000000001,
+     "handoff": 3708.4300000000176,
+     "bytes": 8131.630675348951,
+     "machinery": 5651.129324651097,
+     "none": 0.0
+    },
+    "topk": {
+     "start": 0.0,
+     "between": 64.71999999999932,
+     "dep": 352.0100000000002,
+     "handoff": 72.0300000000007,
+     "bytes": 34.01543441860694,
+     "machinery": 349.704565581392,
+     "none": 0.0
+    },
+    "lm_head": {
+     "start": 0.0,
+     "between": 47.04000000000087,
+     "dep": 101.7800000000052,
+     "handoff": 56.299999999992906,
+     "bytes": 4612.185346976753,
+     "machinery": 39.97465302324963,
+     "none": 0.0
+    }
+   }
+  },
+  {
+   "xcd": 7,
+   "workers": 38,
+   "share": {
+    "start": 0.00031393983362044904,
+    "between": 0.06169021684229059,
+    "dep": 0.49485655994832245,
+    "handoff": 0.06938712389286394,
+    "bytes": 0.27583851081262034,
+    "machinery": 0.08904909823775456,
+    "none": 0.008864550432532503
+   },
+   "worker_us": {
+    "start": 51.33999999999999,
+    "between": 10088.479999999907,
+    "dep": 80926.13000000014,
+    "handoff": 11347.190000000035,
+    "bytes": 45109.11846325667,
+    "machinery": 14562.601536744038,
+    "none": 1449.6599999999953
+   },
+   "by_kind_worker_us": {
+    "in_norm": {
+     "start": 0.89,
+     "between": 0.0,
+     "dep": 3.81,
+     "handoff": 4.2299999999999995,
+     "bytes": 3.6049525581395354,
+     "machinery": 0.27504744186046537,
+     "none": 0.0
+    },
+    "o_proj": {
+     "start": 11.93,
+     "between": 2164.920000000005,
+     "dep": 32408.68000000006,
+     "handoff": 2692.4799999999955,
+     "bytes": 6631.953622325756,
+     "machinery": 1411.606377674337,
+     "none": 0.0
+    },
+    "router": {
+     "start": 0.0,
+     "between": 2049.5599999999963,
+     "dep": 7424.450000000003,
+     "handoff": 2080.0300000000066,
+     "bytes": 511.83999999998787,
+     "machinery": 0.0,
+     "none": 0.0
+    },
+    "moe_up": {
+     "start": 0.0,
+     "between": 1513.079999999996,
+     "dep": 16778.080000000005,
+     "handoff": 1122.2000000000078,
+     "bytes": 14659.239650232823,
+     "machinery": 3569.3603497674862,
+     "none": 0.0
+    },
+    "moe_down": {
+     "start": 0.0,
+     "between": 2200.3199999999993,
+     "dep": 20176.959999999995,
+     "handoff": 1659.2799999999932,
+     "bytes": 10556.186433488001,
+     "machinery": 3403.1735665116944,
+     "none": 0.0
+    },
+    "qkv": {
+     "start": 38.519999999999996,
+     "between": 2051.2000000000085,
+     "dep": 3675.5799999999936,
+     "handoff": 3656.659999999998,
+     "bytes": 8131.630675348951,
+     "machinery": 5795.129324651089,
+     "none": 0.0
+    },
+    "topk": {
+     "start": 0.0,
+     "between": 62.44000000000135,
+     "dep": 350.2499999999985,
+     "handoff": 73.42999999999964,
+     "bytes": 34.01543441860694,
+     "machinery": 350.344565581394,
+     "none": 0.0
+    },
+    "lm_head": {
+     "start": 0.0,
+     "between": 46.960000000001855,
+     "dep": 108.32000000000517,
+     "handoff": 58.88000000000466,
+     "bytes": 4580.647694883724,
+     "machinery": 32.71230511626527,
+     "none": 0.0
+    }
+   }
+  }
+ ],
+ "busy": [
+  {
+   "xcd": 0,
+   "any_body_us": 3577.1599999999985,
+   "any_body_share": 0.8312133731765009,
+   "mean_workers_in_body": 16.051455313532585
+  },
+  {
+   "xcd": 1,
+   "any_body_us": 3588.439999999993,
+   "any_body_share": 0.8338344711563022,
+   "mean_workers_in_body": 16.15310186497627
+  },
+  {
+   "xcd": 2,
+   "any_body_us": 3560.8399999999992,
+   "any_body_share": 0.8274211463121057,
+   "mean_workers_in_body": 16.068538923769715
+  },
+  {
+   "xcd": 3,
+   "any_body_us": 3576.7999999999997,
+   "any_body_share": 0.831129721113316,
+   "mean_workers_in_body": 16.114203655595166
+  },
+  {
+   "xcd": 4,
+   "any_body_us": 2606.3600000000033,
+   "any_body_share": 0.6056316427871016,
+   "mean_workers_in_body": 13.893018305859833
+  },
+  {
+   "xcd": 5,
+   "any_body_us": 2612.1999999999953,
+   "any_body_share": 0.6069886651454374,
+   "mean_workers_in_body": 13.960330332702846
+  },
+  {
+   "xcd": 6,
+   "any_body_us": 2608.4799999999964,
+   "any_body_share": 0.6061242604925239,
+   "mean_workers_in_body": 13.855402761447557
+  },
+  {
+   "xcd": 7,
+   "any_body_us": 2608.5199999999977,
+   "any_body_share": 0.6061335551662115,
+   "mean_workers_in_body": 13.865729143914072
+  }
+ ],
+ "critical": {
+  "steps": 436,
+  "total": {
+   "bytes_bw": 1439.6299348837165,
+   "bytes_hops": 534.3520000000001,
+   "machinery": 1458.5380651162689,
+   "dep_gap": 871.0200000000075,
+   "queue_gap": 0.0
+  },
+  "sum_us": 4303.539999999993,
+  "span_us": 4303.54,
+  "by_kind": {
+   "prologue": {
+    "tasks": 1,
+    "bytes_bw": 0.0009525581395348837,
+    "bytes_hops": 0.416,
+    "machinery": 2.2630474418604654,
+    "dep_gap": 2.02,
+    "queue_gap": 0.0
+   },
+   "in_norm": {
+    "tasks": 1,
+    "bytes_bw": 0.0009525581395348837,
+    "bytes_hops": 3.604,
+    "machinery": 0.5550474418604652,
+    "dep_gap": 4.06,
+    "queue_gap": 0.0
+   },
+   "qkv": {
+    "tasks": 48,
+    "bytes_bw": 234.1454586046511,
+    "bytes_hops": 19.968000000000018,
+    "machinery": 184.72654139534728,
+    "dep_gap": 187.1300000000009,
+    "queue_gap": 0.0
+   },
+   "prep": {
+    "tasks": 48,
+    "bytes_bw": 0.028636279069767418,
+    "bytes_hops": 48.96000000000004,
+    "machinery": 135.45136372092807,
+    "dep_gap": 84.77000000000237,
+    "queue_gap": 0.0
+   },
+   "attn": {
+    "tasks": 48,
+    "bytes_bw": 24.11877209302327,
+    "bytes_hops": 129.98399999999995,
+    "machinery": 104.9372279069756,
+    "dep_gap": 52.400000000000844,
+    "queue_gap": 0.0
+   },
+   "reduce": {
+    "tasks": 48,
+    "bytes_bw": 0.5629618604651159,
+    "bytes_hops": 129.98399999999995,
+    "machinery": 124.33303813953447,
+    "dep_gap": 57.68000000000188,
+    "queue_gap": 0.0
+   },
+   "o_proj": {
+    "tasks": 48,
+    "bytes_bw": 187.28055069767427,
+    "bytes_hops": 19.968000000000018,
+    "machinery": 58.391449302325924,
+    "dep_gap": 91.11000000000035,
+    "queue_gap": 0.0
+   },
+   "router": {
+    "tasks": 48,
+    "bytes_bw": 5.898240000000004,
+    "bytes_hops": 48.96000000000004,
+    "machinery": 200.78175999999925,
+    "dep_gap": 135.8499999999995,
+    "queue_gap": 0.0
+   },
+   "topk": {
+    "tasks": 48,
+    "bytes_bw": 0.031434418604651196,
+    "bytes_hops": 33.983999999999966,
+    "machinery": 353.14456558139403,
+    "dep_gap": 73.99000000000089,
+    "queue_gap": 0.0
+   },
+   "moe_up": {
+    "tasks": 48,
+    "bytes_bw": 561.8416520930236,
+    "bytes_hops": 48.95999999999992,
+    "machinery": 167.27834790697625,
+    "dep_gap": 51.160000000000835,
+    "queue_gap": 0.0
+   },
+   "moe_down": {
+    "tasks": 48,
+    "bytes_bw": 280.9208260465118,
+    "bytes_hops": 48.95999999999992,
+    "machinery": 115.5591739534888,
+    "dep_gap": 126.79999999999961,
+    "queue_gap": 0.0
+   },
+   "lm_head": {
+    "tasks": 1,
+    "bytes_bw": 144.7288260465116,
+    "bytes_hops": 0.0,
+    "machinery": 2.6711739534880223,
+    "dep_gap": 2.550000000000182,
+    "queue_gap": 0.0
+   },
+   "argmax": {
+    "tasks": 1,
+    "bytes_bw": 0.07067162790697674,
+    "bytes_hops": 0.604,
+    "machinery": 8.445328372092915,
+    "dep_gap": 1.5,
+    "queue_gap": 0.0
+   }
+  }
+ },
+ "critical_edges": [
+  {
+   "producer": "moe_up",
+   "consumer": "moe_down",
+   "xcd": "same",
+   "edges": 48,
+   "producers": 24,
+   "sum_us": 126.79999999999961,
+   "median_us": 2.6000000000000227,
+   "max_us": 3.480000000000018,
+   "late_taken": 48,
+   "same_worker": 13,
+   "median_before_taken_us": 2.0,
+   "before_taken_sum_us": 95.72000000000136
+  },
+  {
+   "producer": "moe_down",
+   "consumer": "qkv",
+   "xcd": "cross",
+   "edges": 29,
+   "producers": 256,
+   "sum_us": 111.85000000000122,
+   "median_us": 3.7800000000002,
+   "max_us": 4.670000000000073,
+   "late_taken": 29,
+   "same_worker": 0,
+   "median_before_taken_us": 1.7699999999999818,
+   "before_taken_sum_us": 44.890000000001635
+  },
+  {
+   "producer": "o_proj",
+   "consumer": "router",
+   "xcd": "cross",
+   "edges": 33,
+   "producers": 256,
+   "sum_us": 91.16999999999973,
+   "median_us": 2.6700000000000728,
+   "max_us": 3.8600000000000136,
+   "late_taken": 18,
+   "same_worker": 0,
+   "median_before_taken_us": 1.0500000000000114,
+   "before_taken_sum_us": 33.92000000000024
+  },
+  {
+   "producer": "reduce",
+   "consumer": "o_proj",
+   "xcd": "cross",
+   "edges": 44,
+   "producers": 4,
+   "sum_us": 83.79000000000019,
+   "median_us": 1.8600000000001273,
+   "max_us": 2.330000000000382,
+   "late_taken": 0,
+   "same_worker": 0,
+   "median_before_taken_us": 0.0,
+   "before_taken_sum_us": 0.0
+  },
+  {
+   "producer": "qkv",
+   "consumer": "prep",
+   "xcd": "cross",
+   "edges": 44,
+   "producers": 256,
+   "sum_us": 77.41000000000224,
+   "median_us": 1.7799999999999727,
+   "max_us": 2.1900000000000546,
+   "late_taken": 0,
+   "same_worker": 0,
+   "median_before_taken_us": 0.0,
+   "before_taken_sum_us": 0.0
+  },
+  {
+   "producer": "moe_down",
+   "consumer": "qkv",
+   "xcd": "same",
+   "edges": 18,
+   "producers": 256,
+   "sum_us": 71.7199999999997,
+   "median_us": 4.120000000000346,
+   "max_us": 4.640000000000327,
+   "late_taken": 18,
+   "same_worker": 12,
+   "median_before_taken_us": 2.0399999999999636,
+   "before_taken_sum_us": 31.520000000000394
+  },
+  {
+   "producer": "router",
+   "consumer": "topk",
+   "xcd": "cross",
+   "edges": 38,
+   "producers": 256,
+   "sum_us": 59.11000000000026,
+   "median_us": 1.5300000000002,
+   "max_us": 1.8500000000000227,
+   "late_taken": 0,
+   "same_worker": 0,
+   "median_before_taken_us": 0.0,
+   "before_taken_sum_us": 0.0
+  },
+  {
+   "producer": "attn",
+   "consumer": "reduce",
+   "xcd": "same",
+   "edges": 48,
+   "producers": 5,
+   "sum_us": 57.68000000000188,
+   "median_us": 1.2000000000002728,
+   "max_us": 1.4800000000000182,
+   "late_taken": 0,
+   "same_worker": 0,
+   "median_before_taken_us": 0.0,
+   "before_taken_sum_us": 0.0
+  },
+  {
+   "producer": "prep",
+   "consumer": "attn",
+   "xcd": "same",
+   "edges": 48,
+   "producers": 1,
+   "sum_us": 52.400000000000844,
+   "median_us": 1.0799999999999272,
+   "max_us": 2.480000000000018,
+   "late_taken": 0,
+   "same_worker": 0,
+   "median_before_taken_us": 0.0,
+   "before_taken_sum_us": 0.0
+  },
+  {
+   "producer": "topk",
+   "consumer": "moe_up",
+   "xcd": "same",
+   "edges": 48,
+   "producers": 1,
+   "sum_us": 51.160000000000835,
+   "median_us": 1.0799999999999272,
+   "max_us": 1.2800000000002,
+   "late_taken": 0,
+   "same_worker": 0,
+   "median_before_taken_us": 0.0,
+   "before_taken_sum_us": 0.0
+  },
+  {
+   "producer": "o_proj",
+   "consumer": "router",
+   "xcd": "same",
+   "edges": 15,
+   "producers": 256,
+   "sum_us": 44.679999999999794,
+   "median_us": 3.2800000000002,
+   "max_us": 3.759999999999991,
+   "late_taken": 13,
+   "same_worker": 11,
+   "median_before_taken_us": 1.9599999999995816,
+   "before_taken_sum_us": 24.559999999999313
+  },
+  {
+   "producer": "router",
+   "consumer": "topk",
+   "xcd": "same",
+   "edges": 10,
+   "producers": 256,
+   "sum_us": 14.88000000000062,
+   "median_us": 1.400000000000091,
+   "max_us": 1.8800000000001091,
+   "late_taken": 0,
+   "same_worker": 0,
+   "median_before_taken_us": 0.0,
+   "before_taken_sum_us": 0.0
+  },
+  {
+   "producer": "qkv",
+   "consumer": "prep",
+   "xcd": "same",
+   "edges": 4,
+   "producers": 256,
+   "sum_us": 7.360000000000127,
+   "median_us": 1.9600000000000364,
+   "max_us": 2.400000000000091,
+   "late_taken": 0,
+   "same_worker": 0,
+   "median_before_taken_us": 0.0,
+   "before_taken_sum_us": 0.0
+  },
+  {
+   "producer": "reduce",
+   "consumer": "o_proj",
+   "xcd": "same",
+   "edges": 4,
+   "producers": 4,
+   "sum_us": 7.320000000000164,
+   "median_us": 1.8800000000001091,
+   "max_us": 2.2400000000002365,
+   "late_taken": 0,
+   "same_worker": 0,
+   "median_before_taken_us": 0.0,
+   "before_taken_sum_us": 0.0
+  },
+  {
+   "producer": "prologue",
+   "consumer": "in_norm",
+   "xcd": "cross",
+   "edges": 1,
+   "producers": 1,
+   "sum_us": 4.06,
+   "median_us": 4.06,
+   "max_us": 4.06,
+   "late_taken": 0,
+   "same_worker": 0,
+   "median_before_taken_us": 0.0,
+   "before_taken_sum_us": 0.0
+  },
+  {
+   "producer": "in_norm",
+   "consumer": "qkv",
+   "xcd": "same",
+   "edges": 1,
+   "producers": 1,
+   "sum_us": 3.5600000000000005,
+   "median_us": 3.5600000000000005,
+   "max_us": 3.5600000000000005,
+   "late_taken": 0,
+   "same_worker": 0,
+   "median_before_taken_us": 0.0,
+   "before_taken_sum_us": 0.0
+  },
+  {
+   "producer": "moe_down",
+   "consumer": "lm_head",
+   "xcd": "cross",
+   "edges": 1,
+   "producers": 256,
+   "sum_us": 2.550000000000182,
+   "median_us": 2.550000000000182,
+   "max_us": 2.550000000000182,
+   "late_taken": 1,
+   "same_worker": 0,
+   "median_before_taken_us": 0.6300000000001091,
+   "before_taken_sum_us": 0.6300000000001091
+  },
+  {
+   "producer": "lm_head",
+   "consumer": "argmax",
+   "xcd": "cross",
+   "edges": 1,
+   "producers": 256,
+   "sum_us": 1.5,
+   "median_us": 1.5,
+   "max_us": 1.5,
+   "late_taken": 0,
+   "same_worker": 0,
+   "median_before_taken_us": 0.0,
+   "before_taken_sum_us": 0.0
+  }
+ ],
+ "layer": 24,
+ "layer_table": [
+  {
+   "type": "qkv_24",
+   "xcd": 6,
+   "tasks": 32,
+   "first_ready": 2078.19,
+   "last_done": 2089.19,
+   "body_sum": 278.2800000000025
+  },
+  {
+   "type": "qkv_24",
+   "xcd": 4,
+   "tasks": 32,
+   "first_ready": 2078.2,
+   "last_done": 2089.2,
+   "body_sum": 272.60000000000446
+  },
+  {
+   "type": "qkv_24",
+   "xcd": 2,
+   "tasks": 32,
+   "first_ready": 2078.25,
+   "last_done": 2089.45,
+   "body_sum": 278.1199999999976
+  },
+  {
+   "type": "qkv_24",
+   "xcd": 7,
+   "tasks": 32,
+   "first_ready": 2078.25,
+   "last_done": 2089.17,
+   "body_sum": 276.1599999999985
+  },
+  {
+   "type": "qkv_24",
+   "xcd": 0,
+   "tasks": 32,
+   "first_ready": 2078.26,
+   "last_done": 2088.86,
+   "body_sum": 272.0399999999995
+  },
+  {
+   "type": "qkv_24",
+   "xcd": 3,
+   "tasks": 32,
+   "first_ready": 2078.27,
+   "last_done": 2088.95,
+   "body_sum": 283.31999999999834
+  },
+  {
+   "type": "qkv_24",
+   "xcd": 5,
+   "tasks": 32,
+   "first_ready": 2078.32,
+   "last_done": 2089.12,
+   "body_sum": 273.3199999999988
+  },
+  {
+   "type": "qkv_24",
+   "xcd": 1,
+   "tasks": 32,
+   "first_ready": 2078.36,
+   "last_done": 2089.52,
+   "body_sum": 276.0799999999981
+  },
+  {
+   "type": "prep_24",
+   "xcd": 0,
+   "tasks": 1,
+   "first_ready": 2091.26,
+   "last_done": 2095.46,
+   "body_sum": 4.199999999999818
+  },
+  {
+   "type": "prep_24",
+   "xcd": 3,
+   "tasks": 1,
+   "first_ready": 2091.4700000000003,
+   "last_done": 2095.31,
+   "body_sum": 3.8399999999996908
+  },
+  {
+   "type": "prep_24",
+   "xcd": 2,
+   "tasks": 1,
+   "first_ready": 2091.53,
+   "last_done": 2095.13,
+   "body_sum": 3.599999999999909
+  },
+  {
+   "type": "prep_24",
+   "xcd": 1,
+   "tasks": 1,
+   "first_ready": 2091.6,
+   "last_done": 2095.2,
+   "body_sum": 3.599999999999909
+  },
+  {
+   "type": "attn_24",
+   "xcd": 1,
+   "tasks": 5,
+   "first_ready": 2096.2,
+   "last_done": 2101.64,
+   "body_sum": 25.680000000000746
+  },
+  {
+   "type": "attn_24",
+   "xcd": 3,
+   "tasks": 5,
+   "first_ready": 2096.27,
+   "last_done": 2101.71,
+   "body_sum": 26.800000000000637
+  },
+  {
+   "type": "attn_24",
+   "xcd": 2,
+   "tasks": 5,
+   "first_ready": 2096.29,
+   "last_done": 2101.81,
+   "body_sum": 26.440000000000964
+  },
+  {
+   "type": "attn_24",
+   "xcd": 0,
+   "tasks": 5,
+   "first_ready": 2096.42,
+   "last_done": 2102.06,
+   "body_sum": 27.719999999999345
+  },
+  {
+   "type": "reduce_24",
+   "xcd": 1,
+   "tasks": 1,
+   "first_ready": 2102.76,
+   "last_done": 2108.04,
+   "body_sum": 5.279999999999745
+  },
+  {
+   "type": "reduce_24",
+   "xcd": 2,
+   "tasks": 1,
+   "first_ready": 2102.81,
+   "last_done": 2107.73,
+   "body_sum": 4.920000000000073
+  },
+  {
+   "type": "reduce_24",
+   "xcd": 3,
+   "tasks": 1,
+   "first_ready": 2102.95,
+   "last_done": 2108.27,
+   "body_sum": 5.320000000000164
+  },
+  {
+   "type": "reduce_24",
+   "xcd": 0,
+   "tasks": 1,
+   "first_ready": 2103.54,
+   "last_done": 2108.7,
+   "body_sum": 5.1599999999998545
+  },
+  {
+   "type": "o_proj_24",
+   "xcd": 4,
+   "tasks": 32,
+   "first_ready": 2110.48,
+   "last_done": 2115.8,
+   "body_sum": 160.6800000000021
+  },
+  {
+   "type": "o_proj_24",
+   "xcd": 5,
+   "tasks": 32,
+   "first_ready": 2110.48,
+   "last_done": 2115.92,
+   "body_sum": 164.8000000000029
+  },
+  {
+   "type": "o_proj_24",
+   "xcd": 2,
+   "tasks": 32,
+   "first_ready": 2110.53,
+   "last_done": 2116.29,
+   "body_sum": 162.7199999999948
+  },
+  {
+   "type": "o_proj_24",
+   "xcd": 6,
+   "tasks": 32,
+   "first_ready": 2110.55,
+   "last_done": 2116.15,
+   "body_sum": 167.2799999999952
+  },
+  {
+   "type": "o_proj_24",
+   "xcd": 7,
+   "tasks": 32,
+   "first_ready": 2110.57,
+   "last_done": 2116.09,
+   "body_sum": 165.8399999999956
+  },
+  {
+   "type": "o_proj_24",
+   "xcd": 3,
+   "tasks": 32,
+   "first_ready": 2110.59,
+   "last_done": 2116.19,
+   "body_sum": 165.43999999999642
+  },
+  {
+   "type": "o_proj_24",
+   "xcd": 0,
+   "tasks": 32,
+   "first_ready": 2110.7,
+   "last_done": 2116.2200000000003,
+   "body_sum": 167.20000000000027
+  },
+  {
+   "type": "o_proj_24",
+   "xcd": 1,
+   "tasks": 32,
+   "first_ready": 2110.7200000000003,
+   "last_done": 2116.16,
+   "body_sum": 164.83999999999423
+  },
+  {
+   "type": "router_24",
+   "xcd": 1,
+   "tasks": 32,
+   "first_ready": 2118.52,
+   "last_done": 2124.56,
+   "body_sum": 173.60000000000082
+  },
+  {
+   "type": "router_24",
+   "xcd": 4,
+   "tasks": 32,
+   "first_ready": 2118.52,
+   "last_done": 2119.04,
+   "body_sum": 11.440000000004147
+  },
+  {
+   "type": "router_24",
+   "xcd": 5,
+   "tasks": 32,
+   "first_ready": 2118.52,
+   "last_done": 2119.04,
+   "body_sum": 11.80000000000382
+  },
+  {
+   "type": "router_24",
+   "xcd": 0,
+   "tasks": 32,
+   "first_ready": 2118.54,
+   "last_done": 2124.38,
+   "body_sum": 165.76000000000113
+  },
+  {
+   "type": "router_24",
+   "xcd": 7,
+   "tasks": 32,
+   "first_ready": 2118.57,
+   "last_done": 2119.09,
+   "body_sum": 11.760000000000673
+  },
+  {
+   "type": "router_24",
+   "xcd": 6,
+   "tasks": 32,
+   "first_ready": 2118.59,
+   "last_done": 2119.75,
+   "body_sum": 11.359999999998763
+  },
+  {
+   "type": "router_24",
+   "xcd": 2,
+   "tasks": 32,
+   "first_ready": 2118.61,
+   "last_done": 2124.4900000000002,
+   "body_sum": 172.4799999999982
+  },
+  {
+   "type": "router_24",
+   "xcd": 3,
+   "tasks": 32,
+   "first_ready": 2118.67,
+   "last_done": 2124.39,
+   "body_sum": 172.27999999999747
+  },
+  {
+   "type": "topk_24_x",
+   "xcd": 5,
+   "tasks": 1,
+   "first_ready": 2125.96,
+   "last_done": 2133.96,
+   "body_sum": 8.0
+  },
+  {
+   "type": "topk_24_x",
+   "xcd": 6,
+   "tasks": 1,
+   "first_ready": 2125.9900000000002,
+   "last_done": 2133.87,
+   "body_sum": 7.879999999999654
+  },
+  {
+   "type": "topk_24_x",
+   "xcd": 7,
+   "tasks": 1,
+   "first_ready": 2126.01,
+   "last_done": 2134.21,
+   "body_sum": 8.199999999999818
+  },
+  {
+   "type": "topk_24_x",
+   "xcd": 3,
+   "tasks": 1,
+   "first_ready": 2126.15,
+   "last_done": 2134.27,
+   "body_sum": 8.11999999999989
+  },
+  {
+   "type": "topk_24_x",
+   "xcd": 4,
+   "tasks": 1,
+   "first_ready": 2126.2400000000002,
+   "last_done": 2134.0,
+   "body_sum": 7.7599999999997635
+  },
+  {
+   "type": "topk_24_x",
+   "xcd": 2,
+   "tasks": 1,
+   "first_ready": 2126.25,
+   "last_done": 2134.25,
+   "body_sum": 8.0
+  },
+  {
+   "type": "topk_24_x",
+   "xcd": 1,
+   "tasks": 1,
+   "first_ready": 2126.36,
+   "last_done": 2134.56,
+   "body_sum": 8.199999999999818
+  },
+  {
+   "type": "topk_24_x",
+   "xcd": 0,
+   "tasks": 1,
+   "first_ready": 2126.38,
+   "last_done": 2134.34,
+   "body_sum": 7.960000000000036
+  },
+  {
+   "type": "moe_up_24",
+   "xcd": 6,
+   "tasks": 24,
+   "first_ready": 2134.67,
+   "last_done": 2151.27,
+   "body_sum": 388.5200000000018
+  },
+  {
+   "type": "moe_up_24",
+   "xcd": 4,
+   "tasks": 24,
+   "first_ready": 2134.68,
+   "last_done": 2151.2400000000002,
+   "body_sum": 387.079999999999
+  },
+  {
+   "type": "moe_up_24",
+   "xcd": 5,
+   "tasks": 24,
+   "first_ready": 2134.68,
+   "last_done": 2151.44,
+   "body_sum": 389.8399999999997
+  },
+  {
+   "type": "moe_up_24",
+   "xcd": 2,
+   "tasks": 24,
+   "first_ready": 2135.01,
+   "last_done": 2151.4900000000002,
+   "body_sum": 380.7999999999988
+  },
+  {
+   "type": "moe_up_24",
+   "xcd": 7,
+   "tasks": 24,
+   "first_ready": 2135.01,
+   "last_done": 2151.61,
+   "body_sum": 387.5199999999977
+  },
+  {
+   "type": "moe_up_24",
+   "xcd": 3,
+   "tasks": 24,
+   "first_ready": 2135.07,
+   "last_done": 2151.43,
+   "body_sum": 381.0399999999968
+  },
+  {
+   "type": "moe_up_24",
+   "xcd": 0,
+   "tasks": 24,
+   "first_ready": 2135.2200000000003,
+   "last_done": 2151.78,
+   "body_sum": 384.35999999999603
+  },
+  {
+   "type": "moe_up_24",
+   "xcd": 1,
+   "tasks": 24,
+   "first_ready": 2135.44,
+   "last_done": 2151.8,
+   "body_sum": 383.5600000000027
+  },
+  {
+   "type": "moe_down_24",
+   "xcd": 4,
+   "tasks": 32,
+   "first_ready": 2152.2400000000002,
+   "last_done": 2162.68,
+   "body_sum": 304.3599999999992
+  },
+  {
+   "type": "moe_down_24",
+   "xcd": 2,
+   "tasks": 32,
+   "first_ready": 2152.57,
+   "last_done": 2162.93,
+   "body_sum": 301.0799999999995
+  },
+  {
+   "type": "moe_down_24",
+   "xcd": 5,
+   "tasks": 32,
+   "first_ready": 2152.64,
+   "last_done": 2163.0,
+   "body_sum": 301.08000000000175
+  },
+  {
+   "type": "moe_down_24",
+   "xcd": 3,
+   "tasks": 32,
+   "first_ready": 2152.95,
+   "last_done": 2163.27,
+   "body_sum": 300.84000000000015
+  },
+  {
+   "type": "moe_down_24",
+   "xcd": 7,
+   "tasks": 32,
+   "first_ready": 2153.05,
+   "last_done": 2163.37,
+   "body_sum": 295.28000000000065
+  },
+  {
+   "type": "moe_down_24",
+   "xcd": 6,
+   "tasks": 32,
+   "first_ready": 2153.07,
+   "last_done": 2163.35,
+   "body_sum": 298.28000000000065
+  },
+  {
+   "type": "moe_down_24",
+   "xcd": 0,
+   "tasks": 32,
+   "first_ready": 2153.2200000000003,
+   "last_done": 2163.34,
+   "body_sum": 291.83999999999924
+  },
+  {
+   "type": "moe_down_24",
+   "xcd": 1,
+   "tasks": 32,
+   "first_ready": 2153.2400000000002,
+   "last_done": 2163.28,
+   "body_sum": 293.5199999999959
+  }
+ ]
+}
