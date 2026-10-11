@@ -57,8 +57,10 @@ def validate(p, base):
     scopes = {e['name']: e['scope'] for e in p['events']}
     assert all(scopes[n] == 'DEVICE' or required[n] == 1 for n in scopes)
 
-def cp_account(p, rows):
-    tr = tl.build_trace(p, rows)
+def cp_account(p, rows, deps=None):
+    view = {k:v for k,v in p.items() if k not in ('ev_inst','task_in')} if deps is not None else p
+    tr = tl.build_trace(view, rows)
+    if deps is not None: tr.deps = deps
     a = defaultdict(lambda: {'body': 0., 'gap': 0., 'tasks': 0})
     for s in tl.critical_path(tr):
         r = stem(s['task'].name)
@@ -111,6 +113,11 @@ def main():
     with gzip.GzipFile(filename=str(OUT/'original-plan.json.gz'),mode='wb',mtime=0) as f: f.write(PLAN.read_bytes())
     write_rows(OUT/'measured.bin.gz',raw)
     results = []; best = None
+    edgefile = gzip.open(OUT/'candidate-edge-deltas.csv.gz','wt',newline='')
+    edgewriter = csv.writer(edgefile)
+    edgewriter.writerow(['candidate','task','event','baseline_path','candidate_path','gap_before_us','gap_after_us','delta_us'])
+    basepath={x['task'].id for x in tl.critical_path(tr)}
+    base_latest=[max(raw[z][7] for z in ev[2]) for ev in p['ev_inst']]
     baseline_rows = None
     layouts = [('baseline', 'original', 'original', 0, .3)]
     for mapping in space['maps']:
@@ -161,11 +168,16 @@ def main():
         rows,stats=simulate(c,lambda name,d:Cost(chain_us=body[d['id']]),
                             Hw(handoff_us={'DOMAIN':0.,'DEVICE':0.}),replay=tt)
         assert stats['unfinished']==0
-        ctr,cp=cp_account(c,rows)
+        ctr,cp=cp_account(c,rows,tr.deps)
         # Individual bodies and every event's producer completion gate are preserved.
         assert all((r[7]-r[6])==(raw[t][7]-raw[t][6]) for t,r in enumerate(rows))
-        assert all(rows[t][6]>=max((rows[z][7] for e in c['task_in'][t] for z in c['ev_inst'][e][2]),default=0)
-                   for t in range(len(rows)))
+        latest=[max(rows[z][7] for z in ev[2]) for ev in c['ev_inst']]
+        assert all(rows[t][6]>=max((latest[e] for e in ins),default=0) for t,ins in enumerate(c['task_in']))
+        cpath={x['task'].id for x in tl.critical_path(ctr)}
+        for t in sorted(basepath|cpath):
+            for e in c['task_in'][t]:
+                before=(raw[t][6]-base_latest[e])*.01; after=(rows[t][6]-latest[e])*.01
+                edgewriter.writerow([label,t,c['ev_inst'][e][0],int(t in basepath),int(t in cpath),round(before,3),round(after,3),round(after-before,3)])
         if index==0:
             baseline_rows=rows
             stamp_error=max(abs(rows[t][k]-(raw[t][k]-origin+1))*.01 for t in range(len(rows)) for k in (5,6,7))
@@ -179,6 +191,7 @@ def main():
                    layer_period_us=layer_period,cp=cp,queue_cost_sum_us=sum(queue_after),
                    ready_cost_sum_us=sum(tt.ready_after_us),legal=True)
         results.append(entry)
+        dump(OUT/'partial-results.json',results)
         if index==0: baseperiod=layer_period
         entry['period_delta_us']=layer_period-baseperiod
         # Rank nominal .3-us promotion estimate; optimistic premiums remain sensitivities.
@@ -186,7 +199,9 @@ def main():
             best=(entry,c,rows)
         if index%12==0 or index+1==len(layouts):
             print(f'PROGRESS {index+1}/{len(layouts)} best={best[0]["id"] if best else "none"}',flush=True)
+    edgefile.close()
     dump(OUT/'results.json',results)
+    (OUT/'partial-results.json').unlink()
     entry,c,rows=best
     dump(OUT/'best-layout.json',dict(id=entry['id'],domains=[d['domain'] for d in c['descs']],
                                    workers=[d['worker'] for d in c['descs']],events=c['events'],static_queues=c['static_queues']))
