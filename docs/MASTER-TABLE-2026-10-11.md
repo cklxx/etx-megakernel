@@ -171,7 +171,7 @@ one task of the grid; the role's path cost is the slowest-path task per layer.
 | P7 | Phase-1 barrier, then stamp `tr[1]` | K:313-314 | bare 0.0612 us [E, MOE:65] |
 | P8 | Body call (the role tables below) | K:323 | body [M] |
 | P9 | All-wave drain `ETX_RELEASE_DOMAIN`, barrier, stamp `tr[2]` | K:324-333 | inside the body interval [M] |
-| P10 | Arrive. DEVICE events: last-arriver flush with compile-time share 32 (qkv, o_proj, router, moe_down) or share 1 with an L2 write-back per task (reduce). DOMAIN events: release + atomic add (prep, attn, topk, moe_up) | K:335-358, PR:35-45 | inside the next gap [U] |
+| P10 | Arrive. DEVICE events: last-arriver flush with compile-time share 32 (qkv, o_proj, router, moe_down) or share 1 with an L2 write-back per task (reduce). DOMAIN events: release + atomic add (prep, attn, topk, moe_up) | K:335-358, PR:34-45 | inside the next gap [U] |
 | P11 | Visibility and poll latency of the arrive: same-XCD 642 ns, cross-XCD 742 ns one-way; DEVICE flag 916-951 ns | Y:69-72 | in the gap; the measured floor is 1.00 us/edge [M, `docs/BUDGET-2026-10-01.md:161`] |
 | P12 | Register spills of the whole megakernel on the VM compiler: 128 VGPR, 11 VGPR and 265 SGPR spilled, 48 B/lane scratch, 4 waves/SIMD; which tile's path code reloads them is [U] | R/on_hipcc.log:5-11 | inside machinery [R] |
 
@@ -193,7 +193,7 @@ before-taken [M] and 2.12 after the take [R]. The path task is never block 0 (0/
 | QK10 | Static ISA: 2,174 instructions, 33 vector loads, 11 barriers, 58 VGPR, no spill (local compiler); runtime divisions `sb/spr`, `(S+nw-1)/nw` | IS:6,14,30-46 | [E] |
 
 All 256 tasks recompute the full RMSNorm (QK2-QK4); only block 0 stores it (QK5). Bytes [E] count the weights
-once; Q2's 36 KB per task is reread by every task (9.4 MB/layer of coherent reads, `256 × 36,864`) [E].
+once; QK2's 36 KB per task is reread by every task (9.4 MB/layer of coherent reads, `256 × 36,864`) [E].
 
 **prep** (`etx_tile_dsl_attnprep`; 4 tasks on XCD 0-3, one per KV head). Path per layer: body 4.06 = hops 1.02
 [E] + machinery 3.04 [R]; gap 1.69, all free [M]. Bytes are nil (2.8 KB stored per task).
@@ -204,12 +204,12 @@ once; Q2's 36 KB per task is reread by every task (9.4 MB/layer of coherent read
 | PP2 | Waves 0-7 (q heads) and 8 (k head): 2 coherent 8-B loads per active lane (lanes 0-15) | AP:100-116 | 2,304 B coherent |
 | PP3 | RMS: wave sum (shuffles) and `rsqrtf` | AP:124-125 | 1 wave sum per wave |
 | PP4 | Position: lane-0 coherent scalar load → cos/sin address | AP:78-84, 126 | 1 dependent coherent trip |
-| PP5 | Norm weights and cos/sin: cached 2-B loads, issued after R4 | AP:127-140 | 8 + 8 per lane |
+| PP5 | Norm weights and cos/sin: cached 2-B loads, issued after PP4 | AP:127-140 | 8 + 8 per lane |
 | PP6 | RoPE math, pack, store q/k in place | AP:143-145 | 2,304 B coherent |
 | PP7 | k and v waves: slot_mapping coherent scalar load, then `slot / BS`, `slot % BS` (64-bit, runtime BS) | AP:141, 154; B/dsl_tiles.hip:204,214 | 1 dependent coherent trip |
 | PP8 | The 64-bit divide: ~150 static instructions per site, but a 32-bit bypass branch skips them when the high words are zero, as for slot < 2^32 | IS:67-68; ISA `v_cmp_ne_u32 vcc, 0, ...` before the long path | [E] small |
 | PP9 | K cache: 2 × 8-B coherent stores per lane; V cache: wave 9, 2 loads + 8 strided 2-B stores per lane | AP:146-167 | 256 + 256 B; 128 scalar requests |
-| PP10 | Occupancy: 10 of 16 waves, 16 of 64 lanes active; no barrier, no LDS | AP:100-111, 22 | [M from source] |
+| PP10 | Occupancy: 10 of 16 waves, 16 of 64 lanes active; no barrier, no LDS | AP:100-111, 22 | source |
 
 **attn** (`paged_attention_ll4mi_QKV_mfma16_kernel` imported, 20 tasks on XCD 0-3 = 4 KV heads × 5 partitions of
 256 tokens). Path per layer: body 5.41 = bytes 0.50 + hops 2.71 [E] + machinery 2.20 [R]; gap 1.09, all free.
@@ -366,8 +366,8 @@ bf16 lever exists and was never measured. **NO-structural**: removing the atom c
 correctness or needs a different schedule than this plan. **UNKNOWN**: the trace and the source cannot say
 whether the atom costs path time.
 
-**Kill bar.** KEEP is 0.030 ms per step (`docs/PLAN-generic-decoder-2026-10-08.md:154`, PLAN:107), so a per-layer atom must be worth **0.625 us/layer**
-(0.030 / 48) and a once-per-step atom 30 us; a row whose ceiling is below that is closed by the bar, whatever its
+**Kill bar.** KEEP is 0.030 ms per step (`docs/PLAN-generic-decoder-2026-10-08.md:154`, PLAN:107), so a
+per-layer atom must be worth **0.625 us/layer** (0.030 / 48) and a once-per-step atom 30 us; a row whose ceiling is below that is closed by the bar, whatever its
 status. Where a document registered a sharper threshold, that one is given.
 
 **Ceiling.** The most the atom could return if it vanished, from section 2 [E]. The role's B (MT:42-50) caps the
@@ -378,7 +378,7 @@ sum of all body atoms of that role; the gap rows cap the protocol atoms.
 | ID | Experiment | Minutes, $ | Registered threshold | Source |
 |---|---|---|---|---|
 | X1 | NO_TOUCH traced A/B + arrive and poll-success stamps | 20, $0.66 [E] | busy rows shrink ≥ 0.5 us/edge median; arrive+visibility ≥ 80% of free medians → floor | DEP:259-271 |
-| X2 | Head-local protocol microbenchmark (tranche A); needs an 8-16 h CPU prototype | 15, $0.50 [E] | net ≥ 1.042 us/layer | PLAN:84,144,155 |
+| X2 | Head-local protocol microbenchmark (tranche A); needs an 8-16 h CPU prototype | 15, $0.50 [E] | net ≥ 1.042 us/layer | PLAN:84,157-158 |
 | X3 | MoE anatomy diagnostic | 30, $1.00 [E] | KEEP 0.030 ms | MOE:242 |
 | X4 | Prefetch phase 1, arms A-D | 20, $0.66 [E] | PF's own arms | PF:112 |
 | X5 | Price candidate attention+reduce pairs with the Job 1 harness | 20, $0.66 [E, this document's allocation: 8 min setup [M, `results_tiles/status.json`] + runs [U]] | ≤ 7.69 us/layer for the pair | REV:123 |
@@ -399,8 +399,8 @@ sum of all body atoms of that role; the gap rows cap the protocol atoms.
 | P6 | NO-structural | imported loads are cached; the acquire is their correctness (K:296-307) | 44-181 ns × 3 imported roles | — |
 | P7 | NO-structural | orders the other waves' loads after the wait (K:293-295) | 0.06 us/task | — |
 | P9 | NO-structural | each wave drains its own stores before publication (K:324-326) | — | — |
-| P10 | YES-tried | last-arriver flush (13 → 6 us/layer, PR:30-31), share as an immediate (PR:36-37), event stride 32 (Y:88-91), relay controls (PLAN:48, zero credited); its duration is unstamped [U] | inside every gap | X1 (arrive stamp) |
-| P11 | NO-structural at this boundary count | free edges sit at 1.08-1.96 us vs the 1.00 us floor (DEP §6); only fewer boundaries remove it | 435 edges × 1.00 = 435 us floor; 437.9 us above it [E] | X2, X7 |
+| P10 | YES-tried | last-arriver flush (13 → 6 us/layer, PR:34), share as an immediate (PR:40-41), event stride 32 (Y:88-91), relay controls (PLAN:48, zero credited); its duration is unstamped [U] | inside every gap | X1 (arrive stamp) |
+| P11 | NO-structural at this boundary count | free edges sat at 1.08-1.96 us medians vs the 1.00 us floor on tr_off (DEP §6); 1.34 and 2.10 us means here; only fewer boundaries remove it | 435 edges × 1.00 = 435 us floor; 437.9 us above it [E] | X2, X7 |
 | P12 | UNKNOWN | forcing registers down spilled catastrophically (PLAN:51; GV:345-359); location of today's 11 VGPR spills unknown | [U] | X9 |
 
 **Layer roles.** Ceilings in us/layer unless noted; B per layer = MT:42-50 / 48.
@@ -426,7 +426,7 @@ sum of all body atoms of that role; the gap rows cap the protocol atoms.
 | PP9 | NO-structural | KV cache layout fixed by the imported attention (PLAN:50) | — | — |
 | PP10 | UNKNOWN | 6 idle waves cost nothing unless the chain is issue-bound | prep B 2.61 caps PP1-PP10 | X6 |
 | AT1 | YES-tried | `ETX_VL_ATTN_WIDE`: +0.008 ms (PLAN:50) | — | closed |
-| AT2, AT3, RD2-RD4 | YES-untried (as a kernel replacement) | the dependent chain of the imported kernels: 5 acquired trips each (hop model 2.71/layer each) | attn+reduce B 4.93/layer = 0.236 ms (RB:7-8) | X5 |
+| AT2, AT3, RD2-RD4 | YES-untried (as a kernel replacement) | the dependent chain of the imported kernels: 5 acquired trips each (hop model 2.71/layer each) | attn+reduce B 4.91/layer = 0.236 ms (RB:7-8) | X5 |
 | AT4-AT9, RD5 | NO-structural inside this kernel | bytes 0.50/layer; MFMA and softmax math | KV in MALL 15.4 us/step < bar (XT:165) | — |
 | AT10, RD6 | YES-tried | software slot barrier 0.2-0.26 us vs 77 ns hardware rounds (IM:26-28); rounds end ≥ 1 extra barrier + 2 LDS atomics | ~0.15 × 2 = 0.3 < bar | closed by bar |
 | AT11 | NO-structural | the clamped loads keep the kernel byte-identical to vLLM's (`host --check`) | ~1-3 KV blocks | — |
@@ -438,12 +438,12 @@ sum of all body atoms of that role; the gap rows cap the protocol atoms.
 | RT4 | NO (no path time) | block 0 is 5.84 vs 5.44 us but never on the path (MT:72) | 0 | — |
 | RT5 | YES-untried | the stream (`load.nt`) starts after the norm's final barrier and the partial clear (IS:22); issuing the one weight load per wave before the norm overlaps an L2 hit with the chain | ~0.1-0.3 [E] | X6 |
 | RT6 | NO-structural | one row: dot, reduction, store | — | — |
-| TK1 | YES-untried | topk reads its arguments through generic pointer loads, not the scalar path the GEMV tiles use | ≤ one plain trip, 0.1-0.5 < bar | closed by bar |
+| TK1 | YES-untried | topk reads its arguments with vector global loads (IS:25), not the scalar path the GEMV tiles use | ≤ one plain trip, 0.1-0.5 < bar | closed by bar |
 | TK2-TK6 | YES-tried | KEY32 shipped: 0.231 ms KEEP (R/job2_run4.log:138); residual unsplit | topk B 1.93 (0.093 ms, RB:11) | X6 |
 | TK7 | NO | the dead mode-2 branch is not executed | 0 | — |
 | M.C, M.D, M.J, M.N, M.R, M.T, M.U | NO-structural | MOE class I (MOE:60-80) | — | — |
 | M.A, M.E (up), M.F, M.I, M.K, M.M1 | YES-tried | MOE class III: SCALAR, GU1, WSUM shipped | — | closed |
-| M.B, M.E (down), M.G, M.H, M.L, M.M2, M.O, M.P, M.Q, M.S | YES-untried | MOE class II; gross service of the removable skeleton 0.015-0.023 ms (MOE:121) | below the 0.030 bar | closed by bar; X3 only if a new mechanism appears |
+| M.B, M.E (down), M.G, M.H, M.L, M.M2, M.O, M.P, M.Q, M.S | YES-untried | MOE class II; gross service of the removable skeleton 0.015-0.023 ms (MOE:121-125) | below the 0.030 bar | closed by bar; X3 only if a new mechanism appears |
 | LM1-LM3 | closed by bar | lm_head machinery 7.2 us per step | < 30 us | — |
 | AX1-AX3, PL1-PL2, IN1 | closed by bar | bodies 9.5, 3.9, 3.7 us per step; argmax machinery 8.8 | each < 30 us | — |
 
@@ -460,7 +460,9 @@ sum of all body atoms of that role; the gap rows cap the protocol atoms.
    scratch and 4 VGPR spills; the VM's report for the same sources is 48 B/lane and 11 spills
    (R/on_hipcc.log:7-11). IS counts per-tile wrappers with no spills; they are [E] for the timed build.
 4. **REV-reported, still open:** DEP:26-27 claims no untraced run exists (it is R/job2_run4.log:139-147); PLAN:130-132
-   still carry tr_all allowances (REV:131).
+   still carry tr_all allowances (REV:131). New: DEP:265-267 cites PLAN:144 for tranche A's cost and `:155`
+   for the CPU prototype; those lines are the plan's argument and a blank line; the items are PLAN:158 and
+   PLAN:157 (the 1.042 us/layer threshold at `:84` is correct).
 5. **The brief's closure requirement.** Only the body view closes on independent measurements. The wait view
    and the ledger close because one row in each is defined as a remainder (machinery and the correction); this
    document names both rather than claiming three independent closures.
