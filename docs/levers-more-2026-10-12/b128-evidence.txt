@@ -1,0 +1,43 @@
+source /Users/ckl/code/etx/build/lv_isa22/wrap.s
+sha256 92b71bf9d86c091b303e01bc4356c0d0e53dc973d89755d10eec4bcf5c74dda7
+local ISA existence evidence only; NOT timed-build identity
+k_moe_up_x_fold line 11633: ds_read_b128 v[24:27], v13
+k_moe_up_x_fold line 11728: ds_read_b128 v[24:27], v14
+k_moe_up_x_fold line 11824: ds_read_b128 v[24:27], v14
+k_moe_up_x_fold line 11923: ds_read_b128 v[24:27], v14
+k_moe_up_x_fold line 12113: ds_read_b128 v[24:27], v13
+k_moe_up_x_fold line 12213: ds_read_b128 v[24:27], v8
+k_moe_up_x_fold line 12316: ds_read_b128 v[4:7], v4
+k_moe_up_x_fold line 12398: ds_read_b128 v[6:9], v6
+k_moe_up_x_fold line 12784: ds_read_b128 v[24:27], v14
+k_moe_up_x_fold line 12794: ds_read_b128 v[6:9], v14 offset:16
+k_moe_up_x_fold line 12901: ds_read_b128 v[24:27], v7
+k_moe_up_x_fold line 12902: ds_read_b128 v[28:31], v7 offset:16
+k_moe_up_x_fold line 13077: ds_read_b128 v[24:27], v14
+k_moe_up_x_fold line 13087: ds_read_b128 v[6:9], v14 offset:16
+k_moe_up_x_fold line 13188: ds_read_b128 v[6:9], v14
+k_moe_up_x_fold line 13197: ds_read_b128 v[2:5], v14 offset:16
+k_moe_up_x_fold line 13620: ds_read_b128 v[24:27], v13
+k_moe_up_x_fold line 13715: ds_read_b128 v[24:27], v14
+k_moe_up_x_fold line 13811: ds_read_b128 v[24:27], v14
+k_moe_up_x_fold line 13910: ds_read_b128 v[24:27], v14
+k_moe_up_x_fold line 14100: ds_read_b128 v[24:27], v13
+k_moe_up_x_fold line 14200: ds_read_b128 v[24:27], v8
+k_moe_up_x_fold line 14303: ds_read_b128 v[4:7], v4
+k_moe_up_x_fold line 14385: ds_read_b128 v[6:9], v6
+k_moe_up_x_fold line 14773: ds_read_b128 v[24:27], v23
+k_moe_up_x_fold line 14783: ds_read_b128 v[6:9], v23 offset:16
+k_moe_up_x_fold line 14890: ds_read_b128 v[24:27], v7
+k_moe_up_x_fold line 14891: ds_read_b128 v[28:31], v7 offset:16
+k_moe_up_x_fold line 15064: ds_read_b128 v[24:27], v14
+k_moe_up_x_fold line 15074: ds_read_b128 v[6:9], v14 offset:16
+k_moe_up_x_fold line 15175: ds_read_b128 v[6:9], v14
+k_moe_up_x_fold line 15184: ds_read_b128 v[2:5], v14 offset:16
+k_moe_up_x_fold line 15630: ds_read_b128 v[20:23], v13
+k_moe_up_x_fold line 15640: ds_read_b128 v[6:9], v13 offset:16
+k_moe_up_x_fold line 15747: ds_read_b128 v[20:23], v7
+k_moe_up_x_fold line 15748: ds_read_b128 v[24:27], v7 offset:16
+k_moe_up_x_fold line 15926: ds_read_b128 v[18:21], v13
+k_moe_up_x_fold line 15936: ds_read_b128 v[6:9], v13 offset:16
+k_moe_up_x_fold line 16037: ds_read_b128 v[6:9], v16
+k_moe_up_x_fold line 16046: ds_read_b128 v[2:5], v16 offset:16

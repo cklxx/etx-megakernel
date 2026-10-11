@@ -1,0 +1,36 @@
+ORACLE exact index reuse/transpose: K=2048,768; bitonic 512/512, stages=28; clamped-address positions=33
+BANK scalar-only {"4": {"scalar_original_conflict": 4, "transpose_conflict": 1}, "8": {"scalar_original_conflict": 8, "transpose_conflict": 1}}
+DAG rtt=0.50 distance=0 cut_us={"attn": 0.0, "prep": 0.0, "reduce": 0.0}
+DAG rtt=0.50 distance=1 cut_us={"attn": 1.0, "prep": 1.2, "reduce": 0.5}
+DAG rtt=0.50 distance=2 cut_us={"attn": 1.0, "prep": 1.2, "reduce": 1.0}
+DAG rtt=0.50 distance=4 cut_us={"attn": 1.0, "prep": 1.2, "reduce": 1.0}
+DAG rtt=0.69 distance=0 cut_us={"attn": 0.0, "prep": 0.0, "reduce": 0.0}
+DAG rtt=0.69 distance=1 cut_us={"attn": 1.38, "prep": 1.58, "reduce": 0.69}
+DAG rtt=0.69 distance=2 cut_us={"attn": 1.38, "prep": 1.58, "reduce": 1.38}
+DAG rtt=0.69 distance=4 cut_us={"attn": 1.38, "prep": 1.58, "reduce": 1.38}
+DAG rtt=0.73 distance=0 cut_us={"attn": 0.0, "prep": 0.0, "reduce": 0.0}
+DAG rtt=0.73 distance=1 cut_us={"attn": 1.46, "prep": 1.66, "reduce": 0.73}
+DAG rtt=0.73 distance=2 cut_us={"attn": 1.46, "prep": 1.66, "reduce": 1.46}
+DAG rtt=0.73 distance=4 cut_us={"attn": 1.46, "prep": 1.66, "reduce": 1.46}
+BASELINE tasks=60362 all_stamp_error_ticks=0 span_us=4067.290
+SIM baseline span=4067.290 gain=+0.000 us body=3191.800 gap=875.490
+SIM P-half span=4029.370 gain=+37.920 us body=3153.880 gap=875.490
+SIM P span=3991.450 gain=+75.840 us body=3115.960 gap=875.490
+SIM R-half span=4034.170 gain=+33.120 us body=3158.680 gap=875.490
+SIM R span=4001.050 gain=+66.240 us body=3125.560 gap=875.490
+SIM A-half span=4034.170 gain=+33.120 us body=3158.680 gap=875.490
+SIM A span=4001.050 gain=+66.240 us body=3125.560 gap=875.490
+SIM S-half span=4049.740 gain=+17.550 us body=3174.250 gap=875.490
+SIM S span=4032.820 gain=+34.470 us body=3156.740 gap=876.080
+SIM X-half span=4049.740 gain=+17.550 us body=3174.250 gap=875.490
+SIM X span=4032.820 gain=+34.470 us body=3156.740 gap=876.080
+SIM combined span=3824.500 gain=+242.790 us body=2948.420 gap=876.080
+SIM width6-original-promotion0 span=17830.000 gain=-13762.710 us body=13128.960 gap=4701.040
+SIM width6-rotate_heads-promotion0 span=17803.820 gain=-13736.530 us body=13130.880 gap=4672.940
+SIM width6-attention_wide-promotion0 span=17830.920 gain=-13763.630 us body=13126.200 gap=4704.720
+SIM width14-original-promotion0 span=9575.020 gain=-5507.730 us body=7017.200 gap=2557.820
+SIM width14-rotate_heads-promotion0 span=9536.290 gain=-5469.000 us body=7011.600 gap=2524.690
+SIM width14-attention_wide-promotion0 span=9571.930 gain=-5504.640 us body=7021.680 gap=2550.250
+SIM width38-original-promotion0 span=4469.030 gain=-401.740 us body=3182.840 gap=1286.190
+SIM width38-rotate_heads-promotion0 span=4404.840 gain=-337.550 us body=3191.800 gap=1213.040
+SIM width38-attention_wide-promotion0 span=4467.210 gain=-399.920 us body=3181.280 gap=1285.930

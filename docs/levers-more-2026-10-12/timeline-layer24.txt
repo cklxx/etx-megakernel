@@ -1,0 +1,61 @@
+window 1817.8 .. 1892.2 us (span 74.4 us), 1252 tasks, 8 XCDs x 38 workers
+
+per type (us, relative to the window start)
+  type                      tasks    wait    body  1st ready  last ready  last done       MB
+  qkv_24                      256    4.33    8.74        0.0         2.6       11.6    20.98
+  prep_24                       4   14.41    2.64       12.8        13.7       16.3     0.00
+  attn_24                      20   18.53    4.11       16.7        17.6       21.7     2.16
+  reduce_24                     4   10.97    3.67       22.2        23.1       26.9     0.05
+  o_proj_24                   256   17.79    5.06       28.3        28.6       34.1    16.78
+  router_24                   256    4.48    2.85       35.9        37.3       42.2     0.53
+  topk_24_x                     8    8.62    2.31       43.5        43.9       46.3     0.00
+  moe_up_24                   192    7.74   15.23       46.5        47.5       62.8    50.33
+  moe_down_24                 256   10.55    9.24       63.5        65.7       74.4    25.17
+
+per XCD: share of worker time in bodies / waiting for events / idle (no task taken)
+  XCD 0   38 workers  body  45.5%  wait  44.0%  idle  10.5%      14.8 MB
+  XCD 1   38 workers  body  45.8%  wait  44.2%  idle  10.0%      14.8 MB
+  XCD 2   38 workers  body  46.2%  wait  42.9%  idle  10.9%      14.8 MB
+  XCD 3   38 workers  body  46.7%  wait  42.6%  idle  10.6%      14.8 MB
+  XCD 4   38 workers  body  39.4%  wait  50.0%  idle  10.6%      14.2 MB
+  XCD 5   38 workers  body  40.0%  wait  49.5%  idle  10.6%      14.2 MB
+  XCD 6   38 workers  body  39.7%  wait  50.5%  idle   9.9%      14.2 MB
+  XCD 7   38 workers  body  39.2%  wait  51.2%  idle   9.6%      14.2 MB
+
+XCD finish skew per type (last XCD done - first XCD done)
+  qkv_24                     1.68 us  (first XCD 5, last XCD 7, 8 XCDs)
+  prep_24                    0.49 us  (first XCD 3, last XCD 2, 4 XCDs)
+  attn_24                    0.61 us  (first XCD 3, last XCD 2, 4 XCDs)
+  reduce_24                  1.05 us  (first XCD 3, last XCD 2, 4 XCDs)
+  o_proj_24                  0.52 us  (first XCD 4, last XCD 2, 8 XCDs)
+  router_24                  5.84 us  (first XCD 7, last XCD 0, 8 XCDs)
+  topk_24_x                  0.57 us  (first XCD 6, last XCD 7, 8 XCDs)
+  moe_up_24                  0.68 us  (first XCD 3, last XCD 1, 8 XCDs)
+  moe_down_24                0.57 us  (first XCD 2, last XCD 0, 8 XCDs)
+
+critical path: 9 tasks, 57.0 us in bodies + 17.3 us in gaps = 74.4 us (span 74.4)
+  type                      tasks     body  dep gap  queue gap
+  qkv_24                        1     9.00     2.61       0.00
+  prep_24                       1     2.66     2.03       0.00
+  attn_24                       1     4.26     1.16       0.00
+  reduce_24                     1     3.78     1.36       0.00
+  o_proj_24                     1     5.56     1.64       0.00
+  router_24                     1     5.40     2.73       0.00
+  topk_24_x                     1     2.27     1.68       0.00
+  moe_up_24                     1    15.43     1.04       0.00
+  moe_down_24                   1     8.68     3.08       0.00
+
+memory: 116.0 MB in the window, floor 27.0 us at 4.3 TB/s (36% of the span); mean demand 36% of the bandwidth
+  below 25% of the bandwidth for 35.5 us (48% of the span); running then (by task kind, all layers):
+    router                       7.0 us  (19.7%)
+    attn                         5.5 us  (15.5%)
+    reduce                       5.0 us  (14.1%)
+    (no task)                    4.0 us  (11.3%)
+    prep                         4.0 us  (11.3%)
+    qkv                          3.5 us  ( 9.9%)
+    topk                         3.0 us  ( 8.5%)
+    o_proj                       1.5 us  ( 4.2%)
+    moe_down                     1.5 us  ( 4.2%)
+    moe_up                       0.5 us  ( 1.4%)
+
+wrote /Users/ckl/code/.wt/etx-levers2/docs/levers-more-2026-10-12/timeline-layer24.html

@@ -1,0 +1,28 @@
+fleet layer 5: 129.3 us = latency-bound phases 73.2 us + expert stream 56.1 us; token 3.6 ms, 26 MoE layers
+byte floor 167 MB / 4.3 TB/s = 39 us per layer
+
+measured fold slowdown with a streaming workgroup on the same CU (overlap_bench fold place=same):
+  background 0.67 TB/s -> fold x1.02
+  background 1.23 TB/s -> fold x1.04
+  background 1.71 TB/s -> fold x1.02
+  background 3.34 TB/s -> fold x1.00
+  fold alone (8 workgroups) 1.12 us; all CUs folding, nothing streaming 3.24 us
+stream rates (overlap_bench stream): MB  cold / warm / Infinity Cache, TB/s
+    10.0  1.59 / 1.16 / 1.17
+    17.3  2.32 / 2.11 / 1.72
+    34.6  3.03 / 3.78 / 2.45
+    64.0  3.30 / 3.27 / 3.20
+   104.0  3.43 / 3.66 / 3.74
+   128.0  3.81 / 3.77 / 3.80
+   192.0  3.61 / 4.23 / 4.23
+
+layout      condition                         layer us   token ms   faster by  per-request latency   throughput
+base        fleet today                           129.3       3.60                                    1.00x
+shared      f=1.00 event 1.4 us bg 2 TB/s       126.5       3.53     +2.0%
+shared      f=1.00 event 1.4 us bg 4 TB/s       122.3       3.42     +5.1%
+interleave  f=1.00 (2 requests)                  146.4       4.04                +12% per token        1.78x
+interleave  f=1.02 (2 requests)                  149.3       4.12                +14% per token        1.75x
+interleave  f=1.04 (2 requests)                  152.3       4.20                +17% per token        1.72x
+batch2      union 11.4+2 units (uniform routing)     167.4       4.59                +28% per token        1.57x
+
+Reading: interleave beats batch2 only while f stays below 1.14; compare both against vLLM at batch 2 (vllm_bench --batch 2) before building either.

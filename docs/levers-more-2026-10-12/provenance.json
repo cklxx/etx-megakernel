@@ -1,0 +1,35 @@
+{
+  "base_commit": "d33a3b8f2bd53541c4eecdbc7f8d14ecfdfe5d80",
+  "cpu_only": true,
+  "inputs": {
+    "docs/x7-schedule-whatif-2026-10-11/inputs.json": "b814845031c382db563d3fc54e97f60da9df0cb4e81f4f8ed04ab8a76e6f6a74",
+    "docs/x7-schedule-whatif-2026-10-11/original-plan.json.gz": "6a627f9a573c5b99a7cea946edd251ff42fb75db5228567cc9d55086dff31d4d",
+    "docs/x7-schedule-whatif-2026-10-11/measured.bin.gz": "1b1f270f372eeea128e1b63573feca82f2146624aa24e8ad0fd0bf6ff7a11239",
+    "/Users/ckl/code/etx/results_vlbest2_2026-10-10/b_all/imp/attention.hip": "759c3e026b360627ad8d727351466464b2d1d62cf22e6e8860bd5c0f0a068b41",
+    "/Users/ckl/code/etx/results_2026-09-27/vlnext/overlap.log": "389d0a78e214c7c7d6ed0f8dcbaf18357a62cea41f5b111ef223816b91554d88"
+  },
+  "artifacts": {
+    "simulate.py": "65df825ec4f0ff40a68bba0a6c00302ebabc2a47a83e000fce2e553785fb7e39",
+    "simulate.log": "1b39c69097f783236302ad7b7c3b622d8a151194031d0f88bf019824bd2d83fd",
+    "results.json": "2d08b1566e8c606ba256d0a3b4f69309bac564baf2e7ad885ab221144bd920ea",
+    "timeline_check.py": "9f7526985ac67d0f9b80b49a2c3f0b5bed06d30b0d3332a2565ac7ba3430b4f7",
+    "timeline.log": "bf982367ed1357e841b6258a6104c36fcd7db24fb3764208207b2947cd50cc34",
+    "timeline-full.json": "0f8173228f7d6107e27b6e09eabb81861d4d18af9b6a17ec1ab5e8d21f01a024",
+    "timeline-full.txt": "0c7af1efb8b453a652a5e5123bff80014fa2a4ba52e905ffefa8cc86bfc5f798",
+    "timeline-layer24.html": "8ac885b33afaa7f77ab1bf01133a1cf9b99978b4e1a73df1ba1386285a117042",
+    "timeline-layer24.txt": "636d0a145046a76aad89fb941cc77a4541903541aec276c4dfa4bac1f4b53fca",
+    "combined-plan.json.gz": "4c03c9128dfa37b5273218285c3c244d669d970c61185f3fadf033a58f6cc5a2",
+    "combined.bin.gz": "4e3166783ac97ea88323808784a851867d5f55581ca5c5b491baecb7490c3be7",
+    "initial-failure.log": "c8127bf33eca260962c4549c07ede6529a08610e99da620f137eded7272c5b39",
+    "scalar-sensitivity.log": "09db1140abbe6d9a3c965d0f806561a8cd45edf750ff8d1bcda1ad63cee0375d",
+    "dsv2-no-overlap.log": "73859137ecd634a553ede3025be55bd5925121bedcf8bd5a45bcd200e4415068",
+    "dsv2-whatif.log": "a89d3422a07ca59e278a74c9b2be3e6fc463680e3625614938520383fb397efe",
+    "host-components.txt": "2b1017c36a4a3bda6af47eb29bd5963aecb1a97044eeed37a6cccc78901bcf4d",
+    "b128-evidence.txt": "9554483c1685ebf6e3d63eaf34cc7a201352ff19932f0e4b39ab84812d4641af"
+  },
+  "validation": {
+    "command": ".venv/bin/python -m pytest -q",
+    "summary": "1453 passed, 14 skipped in 178.51s (0:02:58)",
+    "log_sha256": "6472cc61ca54c8cb57619d3c8386a660552f988a6cf9f5283bf9bc4d14a539bd"
+  }
+}
