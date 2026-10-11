@@ -87,6 +87,7 @@ def main() -> None:
     per = collections.defaultdict(collections.Counter)
     lines = collections.defaultdict(collections.Counter)
     meta: dict[str, dict[str, str]] = collections.defaultdict(dict)
+    order: dict[str, list[str]] = collections.defaultdict(list)
     for ln in asm:
         m = re.match(r'\s*\.file\s+(\d+)\s+"([^"]*)"\s+"([^"]+)"', ln)
         if m:
@@ -115,6 +116,12 @@ def main() -> None:
             per[func]["total"] += 1
             if cur:
                 lines[func][cur] += 1
+            here = f"{Path(cur[0]).name.split('.')[0]}:{cur[1]}" if cur else "?"
+            if op == "s_barrier":
+                order[func].append("BARRIER")
+            elif re.match(r"(global|buffer|flat)_(load|store)", op):
+                order[func].append(f"{op.split('_')[1]}{'.nt' if ' nt' in ln else ''}{'.coh' if 'sc0 sc1' in ln else ''}"
+                                   f"@{here}")
         if ln.startswith("\t.size\tk_"):
             func = None
     cols = ["total", "valu", "salu", "mfma", "dpp", "vmem_load", "vmem_store", "vmem_atomic", "smem", "lds",
@@ -126,6 +133,9 @@ def main() -> None:
     print("\nRESOURCES (local compiler)")
     for k, _ in TILES:
         print(f"{k:20s} " + " ".join(f"{a}={b}" for a, b in meta[k].items()))
+    print("\nPROGRAM ORDER of barriers and global loads/stores (static, layout order of the ISA; first 40)")
+    for k, _ in TILES:
+        print(f"-- {k}: " + " ".join(order[k][:40]))
     print("\nTOP SOURCE LINES per tile by static instruction count (file:line count source); static, not executed")
     for k, _ in TILES:
         byfile = collections.Counter()

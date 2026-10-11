@@ -34,7 +34,66 @@ all-wave drain and the barrier, K:333). The producer's arrive (K:335-358) and th
 happen after done and are invisible: they sit inside the next gap. Nothing inside a body is stamped. Every
 "L3" split of a body below is therefore source and ISA, not time, unless it says [M].
 
-[Part 3 summary tables are in section 1 (added after Parts 1 and 2).]
+## 1. Part 3: the two summary tables
+
+### 1.1 Known, estimated and unknown, per role (us on the critical path)
+
+[M]: before-taken waits and free gaps into non-touch grids, intervals with one cause. [E]: bytes at 4.3 TB/s
+plus exposed hops. [R]: body machinery, late after-take, free gaps into touch grids, the window start (MT:77-96).
+
+| Role | [M] | [E] | [R] | Total | What the [R] holds (atoms) |
+|---|---:|---:|---:|---:|---|
+| qkv | 74.5 | 254.1 | 287.7 | 616.3 | norm chain QK2-QK4, flushes, after-take with the touch P4 |
+| moe_up | 52.2 | 610.8 | 159.5 | 822.5 | MOE skeleton M.B-M.S |
+| moe_down | 108.3 | 329.9 | 136.2 | 574.4 | MOE skeleton; after-take 30.8 |
+| router | 50.9 | 54.9 | **288.8** | 394.6 | norm chain RT2-RT3, stream start RT5, after-take and touch |
+| o_proj | 0.0 | 207.2 | 153.0 | 360.2 | stage OP1, free gap into a touch grid 96.7 |
+| attn | 52.5 | 154.1 | 105.6 | 312.2 | barriers and softmax AT7-AT10 |
+| reduce | 56.6 | 130.5 | 123.7 | 310.8 | RD3-RD6 |
+| prep | 81.1 | 49.0 | 145.8 | 275.9 | PP4-PP10 |
+| topk | 74.6 | 34.0 | 112.3 | 220.9 | TK3-TK6 after KEY32 |
+| lm_head | 0.0 | 144.7 | 8.8 | 153.6 | LM1, LM3 |
+| argmax | 1.7 | 0.7 | 8.8 | 11.2 | AX2 |
+| in_norm | 4.4 | 3.6 | 0.1 | 8.1 | — |
+| prologue | 0.0 | 0.4 | 6.1 | 6.5 | launch skew 2.6 |
+| **Step** | **556.7 (13.7%)** | **1974.0 (48.5%)** | **1536.6 (37.8%)** | **4067.3** | |
+| Host (wall − device, outside the trace) | 0.135 ms total | 0.049 ms priced from an older profile (PLAN:46) | 0.086 ms [U] | 0.135 ms | X8 |
+
+What no existing artifact can split [U]: the arrive's duration (P10), visibility vs poll vs touch inside any
+gap (P4, P5, P11), the order and overlap of atoms inside any body, the location of the VM build's spills
+(P12), and 0.086 ms of host time.
+
+### 1.2 Opportunity table against 0.847 ms and 0.142 ms
+
+Ceilings are wall ms per step at the 1:1 device-to-wall transfer (section 2.1); a ceiling assumes the pool
+vanishes down to its floor, which no lever achieves. "In REV's 0.705" marks rows already in the rebased priced
+envelope (REV:67); 0.142 ms is what must come from outside it even if every priced row reaches its ceiling.
+
+| # | Pool | Ceiling ms | In REV's 0.705? | % of 0.847 | Alone ≥ 0.142? | Atoms | Status | Next, cost |
+|---|---|---:|---|---:|---|---|---|---|
+| 1 | Router body B | 0.193 [E] (RB:10) | yes | 23% | — | RT2-RT6 | largest [R]; unsplit chain | X6, $0.17 |
+| 2 | Attention + reduce body B | 0.236 [E] (RB:7-8) | **no** | 28% | yes, at ≥ 60% realised | AT2-AT3, RD2-RD4 | the AITER pair is slower (REV:97) | X5, $0.66 |
+| 3 | Prep body B | 0.126 [E] (RB:6) | yes | 15% | — | PP5, PP10 | PREP_EARLY neutral | X6 |
+| 4 | Fusion of the attention boundaries, gross | 0.096 [E] (PLAN:129) | yes | 11% | — | P11 on 2 edges/layer | prototype missing | X2, $0.50 |
+| 5 | Top-k residual B | 0.093 [E] (RB:11) | yes (uncredited) | 11% | — | TK2-TK6 | KEY32 kept | X6 |
+| 6 | MoE body B (up; down −0.020) | 0.075 [E] (RB:12-13) | yes | 9% | — | M.* | removable skeleton 0.015-0.023, below the bar | closed unless a new mechanism |
+| 7 | qkv body B | 0.073 [E] (RB:5) | yes | 9% | — | QK2, QK4 | QK4 untried, cheap | X6 or one A/B pair, $0.17 |
+| 8 | Host, priced | 0.049 [E] (PLAN:46) | yes | 6% | — | — | old profile | X8, $0.07 |
+| 9 | Gaps above 1.00 us/edge, late (busy) edges: 402.7 − 123 × 1.00 | 0.280 [E] | **no** | 33% | yes, at ≥ 51% | P1, P4, P10 | DEP §6: work conservation for this schedule | X1 $0.66, X7 $0 |
+| 10 | Gaps above 1.00 us/edge, free edges: 470.1 − 312 × 1.00, less 0.013 on the fused edges | 0.145 [E] | **no** | 17% | yes at 98% | P4, P10, P11 | cross-XCD flags alone are 0.92-0.95 us one-way (Y:71-72) | X1 |
+| 11 | Host, unexplained | 0.086 [U] | **no** | 10% | no | — | unprofiled | X8 |
+| 12 | o_proj B + non-layer machinery (lm_head 7.2, argmax 8.8, prologue 6.1, in_norm 0.1) | 0.030 [E] | no | 4% | no | OP*, LM*, AX*, PL*, IN1 | each below the bar | closed |
+
+**Sums** [E]: rows in REV's envelope 0.705 ms; rows outside it 0.236 + 0.280 + 0.145 + 0.086 + 0.030 =
+**0.777 ms**. Paper total 1.482 ms = 1.75 × the 0.847 ms need: the target needs 57% of every ceiling at once.
+Against the whole-target rule (≥ 0.324 ms outside the booked rows, PLAN:148), only the two gap rows together
+(0.425 ms) clear it on paper, and DEP §6 argues they are structural for this schedule.
+
+**What decides the target, in order of cost.** X7 ($0, CPU) and X9 ($0) first. Then one GPU session of X1 +
+X6 + X8 (27 min, $0.90 [E]): it splits rows 1, 3, 5, 7, 9 and 10 into stamped [M] parts. X5 ($0.66) decides
+row 2, the only body row outside the envelope. If rows 9-10 come back at their protocol floor (X1's 80% rule)
+and row 2 misses 7.69 us/layer, what is left outside the envelope is rows 11-12, 0.086 + 0.030 = 0.116 ms < 0.142,
+and 300 tok/s is out of reach on this architecture [E].
 
 ## 2. Part 1: the atomic decomposition
 
@@ -141,7 +200,7 @@ once; Q2's 36 KB per task is reread by every task (9.4 MB/layer of coherent read
 
 | ID | Atom | Source | Per task |
 |---|---|---|---|
-| PP1 | Arguments (scalar) | AP:86-99 | 112 B |
+| PP1 | Arguments: read with vector global loads, not scalar loads (local ISA, IS:24) | AP:86-99 | 112 B |
 | PP2 | Waves 0-7 (q heads) and 8 (k head): 2 coherent 8-B loads per active lane (lanes 0-15) | AP:100-116 | 2,304 B coherent |
 | PP3 | RMS: wave sum (shuffles) and `rsqrtf` | AP:124-125 | 1 wave sum per wave |
 | PP4 | Position: lane-0 coherent scalar load → cos/sin address | AP:78-84, 126 | 1 dependent coherent trip |
@@ -214,7 +273,7 @@ hops 0.71 [E] + machinery 2.34 [R]; gap 1.55, all free.
 
 | ID | Atom | Source | Per task |
 |---|---|---|---|
-| TK1 | Arguments through generic (non-scalar) pointer loads; waves 1-15 return | B/dsl_tiles.hip:1432-1440 | 64 B |
+| TK1 | Arguments through vector global loads (IS:25); waves 1-15 return | B/dsl_tiles.hip:1432-1440 | 64 B |
 | TK2 | 2 coherent 2-B logit loads per lane | B/dsl_tiles.hip:1448-1454 | 256 B; 1 trip |
 | TK3 | 32-bit keys; round 0 DPP wave max (6 DPP + readlane) | TU:39-46, 59-67, 84-90 | — |
 | TK4 | Softmax: 2 `expf`, butterfly wave sum (6 `ds_bpermute`), divide | TU:91-97, 19-22 | — |
@@ -351,14 +410,15 @@ sum of all body atoms of that role; the gap rows cap the protocol atoms.
 | QK1 | YES-tried | SCALAR shipped (PLAN:52) | — | closed |
 | QK2 | YES-tried | fold, VECNORM (−0.105 ms, `examples/vllm_llm/build.sh:59`) and RBATCH shipped; one-norm-per-XCD needs a new boundary or last-arriver (untried) | ≤ qkv B 1.51 | X6 |
 | QK3 | NO-structural | the norm's reduction | 2 × 0.06 = 0.12 < bar | — |
-| QK4 | YES-untried | the norm-weight load issues after the two block-sum barriers (local ISA: `global_load_dwordx4` at `dsl_tiles.hip:818` after both `s_barrier`s); hoisting it is bf16-exact | one cached trip, 0.10-0.73 us [E, MODEL:321] | X6, or one A/B pair (~5 min, $0.17) |
+| QK4 | YES-untried | the norm-weight load issues after the two block-sum barriers (local ISA program order, IS:22: `load@dsl_tiles:818` follows `BARRIER BARRIER`); hoisting it is bf16-exact | one cached trip, 0.10-0.73 us [E, MODEL:321] | X6, or one A/B pair (~5 min, $0.17) |
 | QK5 | NO (no path time) | block 0 is never the path task (0/48, MT:67) | 0 | — |
 | QK6 | NO-structural | weight bytes 4.88/layer at 4.3 TB/s; NT shipped, U4 a loss (GV:17-29) | — | — |
 | QK7 | NO-structural | bf16 math, no precision change | — | — |
 | QK8 | YES-tried | WSUM shipped | — | closed |
 | QK9 | YES-untried | as MoE's M.G/M.H/M.P/M.Q; MOE's price 0.155 us/task (MOE:121) | 0.155 < bar | closed by bar |
 | QK10 | YES-tried (SCALAR) | initial divisions remain; few hundred cycles [E] | ~0.1-0.2 < bar | closed by bar |
-| PP1, PP3, PP6 | NO-structural | arguments, RMS reduction, RoPE math | — | — |
+| PP1 | YES-untried | vector, not scalar, argument loads (IS:24); TK1 is the same | ≤ one plain trip, 0.1-0.5 < bar | closed by bar |
+| PP3, PP6 | NO-structural | RMS reduction, RoPE math | — | — |
 | PP2 | NO-structural | cross-XCD activations must bypass L2 (XT:166) | — | — |
 | PP4, PP7 | YES-tried | PREP_EARLY issued positions/slot with the row load: neutral or negative (`docs/OPTIMISATIONS.md:26`, `build.sh:63-65`), so the two scalar trips are not exposed [E] | ≤ 2 × 0.5 = 1.0, but the tried move found nothing | closed |
 | PP5 | UNKNOWN | cached weight and cos/sin loads after the position | ≤ 0.1-0.7 | X6 |
@@ -376,7 +436,7 @@ sum of all body atoms of that role; the gap rows cap the protocol atoms.
 | RT2 | YES-tried (fold, VECNORM, RBATCH) | the remaining chain is unsplit; router machinery is the largest [R] row, 210.5 us | router B **4.02** (0.193 ms) caps RT2-RT6 | X6 |
 | RT3 | YES-untried | same post-reduction norm-weight load as QK4 | 0.10-0.73 | with QK4 |
 | RT4 | NO (no path time) | block 0 is 5.84 vs 5.44 us but never on the path (MT:72) | 0 | — |
-| RT5 | YES-untried | the stream starts after the norm's final barrier (local ISA); issuing the one weight load per wave before the norm overlaps an L2 hit with the chain | ~0.1-0.3 [E] | X6 |
+| RT5 | YES-untried | the stream (`load.nt`) starts after the norm's final barrier and the partial clear (IS:22); issuing the one weight load per wave before the norm overlaps an L2 hit with the chain | ~0.1-0.3 [E] | X6 |
 | RT6 | NO-structural | one row: dot, reduction, store | — | — |
 | TK1 | YES-untried | topk reads its arguments through generic pointer loads, not the scalar path the GEMV tiles use | ≤ one plain trip, 0.1-0.5 < bar | closed by bar |
 | TK2-TK6 | YES-tried | KEY32 shipped: 0.231 ms KEEP (R/job2_run4.log:138); residual unsplit | topk B 1.93 (0.093 ms, RB:11) | X6 |
