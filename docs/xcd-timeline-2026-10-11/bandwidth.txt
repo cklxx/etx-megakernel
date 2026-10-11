@@ -1,0 +1,16 @@
+Phase bytes include only the specified traffic. Device time includes tails and handoffs.
+phase                    GB         us       GB/s   % of cap    wasted us
+topk                 0.0001      399.6        0.3        0.0        399.6
+qkv                  1.0068      624.2     1612.9       37.5        390.1
+moe_down             1.2080      661.3     1826.8       42.5        380.3
+reduce               0.0024      376.6        6.4        0.1        376.0
+router               0.0254      365.9       69.3        1.6        360.0
+moe_up               2.4159      890.3     2713.6       63.1        328.5
+attn                 0.1037      307.7      337.1        7.8        283.6
+prep                 0.0001      229.2        0.5        0.0        229.2
+o_proj               0.8053      374.2     2152.0       50.0        186.9
+lm_head              0.6223      160.3     3881.6       90.3         15.6
+argmax               0.0003        9.4       32.2        0.7          9.4
+prologue             0.0000        8.7        0.5        0.0          8.7
+in_norm              0.0000        4.6        0.9        0.0          4.6
+TOTAL known 6.1904 GB; device span 4412.1 us; floor 1439.6 us at 4.3 TB/s (estimate); achieved 32.6% (known bytes / full span)

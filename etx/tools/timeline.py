@@ -293,7 +293,7 @@ def memory_demand(tr: Trace, bw_tbs: float = 4.3, bin_us: float = 0.5, idle_frac
     for i in low:
         dom = max(active[i], key=active[i].get) if active[i] else "(no task)"
         by_type[dom] = by_type.get(dom, 0.0) + bin_us
-        kind = re.sub(r"_-?\d+$", "", dom)
+        kind = re.sub(r"_-?\d+(?:_x)?$", "", dom)          # replicated grids end in _x (topk_24_x)
         by_kind[kind] = by_kind.get(kind, 0.0) + bin_us
     total = sum(t.nbytes * _clip(t.ready, t.done, tr.t0, tr.t1) / max(1e-9, t.done - t.ready) for t in tr.tasks)
     return {"bins": util, "bin_us": bin_us, "bytes": total, "floor_us": total / (bw_tbs * 1e6),
@@ -494,9 +494,9 @@ def write_html(tr: Trace, path: str | Path, title: str = "ETX schedule", bw_tbs:
     types = sorted({t.name for t in tr.tasks}, key=lambda n: min(x.ready for x in tr.tasks if x.name == n))
     base = {}
     for n in types:
-        stem = re.sub(r"_?-?\d+$", "", n)
+        stem = re.sub(r"_?-?\d+(?:_x)?$", "", n)
         base.setdefault(stem, len(base))
-    color = {n: _PALETTE[base[re.sub(r'_?-?\d+$', '', n)] % len(_PALETTE)] for n in types}
+    color = {n: _PALETTE[base[re.sub(r'_?-?\d+(?:_x)?$', '', n)] % len(_PALETTE)] for n in types}
     workers = sorted({(t.domain, t.worker) for t in tr.tasks})
     row = {w: i for i, w in enumerate(workers)}
     crit = {s["task"].id for s in critical_path(tr)}

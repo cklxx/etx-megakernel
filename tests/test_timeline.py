@@ -65,6 +65,12 @@ def test_window_domain_shares_and_bytes(sim_trace):
     assert "critical path" in out.getvalue() and res["critical_span"] > 0
 
 
+def test_memory_demand_groups_replicated_grids():
+    ts = [tl.Task(i, 0, f"topk_{i}_x", 0, 0, 2.0 * i, 2.0 * i, 2.0 * i + 1.0) for i in range(3)]
+    tr = tl.Trace(ts, {t.id: t for t in ts}, ["topk"], 1, 1, None, 0.0, 6.0)
+    assert dict(tl.memory_demand(tr)["low_by_kind"])["topk"] == pytest.approx(3.0)
+
+
 def test_raw_roundtrip_and_html(sim_trace, tmp_path):
     _, _, pj, rows = sim_trace
     raw = tmp_path / "t.bin"
