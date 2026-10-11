@@ -40,3 +40,20 @@ def test_kernel_envelope_reports_without_new_timing_events():
     text='\n'.join('HOUR-KERNEL '+json.dumps(dict(run=0,step=t,ms=4.1)) for t in range(1024,1055))
     assert h.kernel_mean(text)==4.1
     with pytest.raises(ValueError,match='population'):h.kernel_mean(text.rsplit('\n',1)[0])
+
+
+def test_reset_measurement_precedes_s1_even_if_stamps_are_missing(tmp_path,monkeypatch):
+    from examples.sessions import qwen300_hour as h
+    s=h.Session(dict(manifest=str(h.MANIFEST),builds={'kept':'/unused'},model='/unused'),tmp_path)
+    calls=[]
+    def certify(s,arm):
+        if arm=='kept': s.certified.add(arm)
+        else: raise ValueError('missing stamps/stages')
+    monkeypatch.setattr(h,'certify',certify)
+    monkeypatch.setattr(h,'registered_reset',lambda s:calls.append('reset'))
+    stop=h.first_stop
+    def first_stop(s,g): calls.append('S1');return stop(s,g)
+    monkeypatch.setattr(h,'first_stop',first_stop)
+    assert not h.tranche_a(s)
+    assert calls==['reset','S1']
+    assert s.rows['A.stop']['status']=='NOT-COMPLETE'

@@ -58,7 +58,7 @@ adjacent kept/reset pairs (31 post-first-token wall steps each), using
 Measurement: ordinary wall gain, token-device delta and existing kernel-event
 envelope delta on the same pairs (the last exposes the tail outside token timers).
 Budget: **120 s / 2 min / $0.0663 [E]** for the pairs plus
-**90 s / 1.5 min / $0.0498 [E]** for fresh correctness, all inside B. A cold load or slow checks may exhaust this, yielding NOT-COMPLETE,
+**90 s / 1.5 min / $0.0498 [E]** for fresh correctness, all inside A, before S1. A cold load or slow checks may exhaust this, yielding NOT-COMPLETE,
 never a shortened population. Expected [E] direction on reset ON: fewer
 host enqueues, higher kernel-event time from the reset tail (outside the
 token timers), lower wall if reset removal dominates. Reverse the flag and
@@ -225,7 +225,8 @@ must validate transfer. Incomplete population fails closed; warm reuse is
 reported as a limitation, not a cold-HBM price.
 
 Runner now measures X5 **after S1 and before S2**, so R2 can influence
-`G+R2+H >=0.324`; C1/C5 body pairs remain after S2. If all legal candidates
+`G+R2+H >=0.324`; C1/C5 body pairs remain after S2; the requested reset price is collected
+in A4 before S1, so a later target stop cannot skip it. If all legal candidates
 have been certified/enumerated and none reaches the bar, **B1=0, R2=0**,
 then re-evaluate S2. Today's missing dispatch/adapters mean **B1 [U]**, with
 zero R2 for spending decisions, not an exhaustive CLOSED verdict. Failed
@@ -316,14 +317,14 @@ elapsed time, not later allocations. No GPU dollars were spent here.
 | Allocation | Seconds / minutes | Dollars [E] | Contents / stop |
 |---|---:|---:|---|
 | GUARD | 240 / 4 | 0.1327 | First; bad environment/data/evidence stops all timed work |
-| A | 900 / 15 | 0.4975 | Same stamps tranche, loads ride along free; S1 after guard+A, <=19 total min |
-| B total | 1320 / 22 | 0.7297 | X5 up to120s **before S2**; if S2 passes: reset correctness90s+pair120s, existing C1/C5 in remaining990s |
+| A | 900 / 15 | 0.4975 | Stamps/loads plus reset gate90s+pair120s in A4; S1 after guard+A, <=19 total min |
+| B total | 1320 / 22 | 0.7297 | X5 up to120s **before S2**; if S2 passes: existing C1/C5 in remaining1200s |
 | C | 4020 / 67 | 2.2222 | Existing NO_TOUCH1620 / ISOLATE_POLLER1200 / C6 1200; unchanged |
 | D minimum remaining allocation | 1910 / 31.8333 | 1.0558 | Five final fusion/system rounds; receives unused prior time |
 | Report margin | 10 / 0.1667 | 0.0055 | Sum including report is exactly8400s |
 
 RESET's **pair** is ~2 minutes [E]; its fresh correctness has a separate
-**90 s / $0.0498** allowance within B (total210s /3.5min/$0.1161).
+**90 s / $0.0498** allowance within A (total210s /3.5min/$0.1161).
 Six warm timing calls at17–28s require102–168s [E], so the120s slot may
 miss at the high end; no pair population is shortened. Kernel-event means
 now ride in ordinary timing logs without extra events (HOUR-KERNEL), and
@@ -331,9 +332,13 @@ HOUR-RESET confirms that the reset tail stayed enabled/checked/valid;
 fallback cannot be KEEP. Reset may be selected as D's best singleton; there
 is no prebuilt combination with it, so gains are never summed with body arms.
 
+Reset remains inside the 900s A cap. Retained A elapsed238s plus210s
+reset and up to30s additional analysis is **478s [E]**, leaving422s.
+Native next-VM completion/perturbation remain [U]; a slow load consumes this
+margin, never more GPU minutes.
+
 The four guard minutes come from D's old2150s minimum; D now has1910s.
-Its retained1017s upper warm-call estimate leaves893s margin [E]. X5/reset
-use B's existing time. A loads add **zero GPU minutes**. New artifacts are
+Its retained1017s upper warm-call estimate leaves893s margin [E]. X5 uses B's existing time; reset uses A's existing time. A loads add **zero GPU minutes**. New artifacts are
 one `reset` arm plus two historical guard controls. Nine existing build
 recipes/directories, their flags and C allocations remain unchanged; only
 stamps emission changes for the requested load experiment. Native staging,

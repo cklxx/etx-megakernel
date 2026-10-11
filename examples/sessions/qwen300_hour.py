@@ -678,6 +678,8 @@ def tranche_a(s):
             reset = {k: result['mean_us'][k]/1000 for k in ('reset_submit_us', 'reset_device_us')}
             s.row('A4.reset', reset, 'PURSUE' if max(reset.values()) > .030 else 'CLOSED', REGISTERED['A4.reset'])
         s.attempt('A3/A4', stages)
+    if 'kept' in s.certified:
+        registered_reset(s)  # requested price is collected even if S1/S2 later stops
     return first_stop(s, gap_atoms)
 
 
@@ -759,19 +761,25 @@ def candidate_pairs(s, a, tranche, publish=True):
     return result
 
 
+def registered_reset(s):
+    from examples.vllm_llm import reset_pair
+    end = s.deadline
+    s.deadline = min(time.monotonic()+210, end)
+    try:
+        result = s.attempt('RESET.keep', lambda: reset_pair.run(s))
+        if result is None:
+            s.row('RESET.keep', None, 'NOT-COMPLETE', REGISTERED['RESET.keep'])
+        return result
+    finally:
+        s.deadline = end
+
+
 def tranche_b(s):
     # Tranche B: plan section 7, line 304 (main 9f91f3a).
     s.deadline = min(time.monotonic()+TRANCHE_SECONDS['B']-120, s.end)
     if 'kept' not in s.certified:
         print('B SKIP: kept fresh correctness gate failed', flush=True); return []
-    from examples.vllm_llm import reset_pair
-    end = s.deadline
-    s.deadline = min(time.monotonic()+210, end)
-    reset_result = s.attempt('RESET.keep', lambda: reset_pair.run(s))
-    if reset_result is None:
-        s.row('RESET.keep', None, 'NOT-COMPLETE', REGISTERED['RESET.keep'])
-    s.deadline = end
-    survivors = [dict(id='DEV_RESET', build='reset', enabled=True, kind='reset', flags={'ETX_DEV_RESET':'1'})] if reset_result and reset_result['keep'] else []
+    survivors = []
     for a in s.m['B']:
         if not a.get('enabled'):
             s.arms[a['id']] = dict(status='SKIP', reason=a.get('reason', 'disabled'))
@@ -782,7 +790,7 @@ def tranche_b(s):
             return candidate_pairs(s, a, 'B')
         result = s.attempt(a['id'], run)
         if result and result['keep']: survivors.append(a)
-    s.row('B.keep', dict({a['id']: s.arms.get(a['id']) for a in s.m['B']}, RESET=reset_result),
+    s.row('B.keep', {a['id']: s.arms.get(a['id']) for a in s.m['B']},
           'PASS' if survivors else 'NO-KEEP', REGISTERED['B.keep'])
     print('B ceilings overlap router body: do not add C1/C5 gains; D must measure any combination', flush=True)
     return survivors
@@ -1113,7 +1121,8 @@ def execute(s):
         return
     b = tranche_b(s)
     c, extra = tranche_c(s)
-    tranche_d(s, b+c, extra)
+    resets = [dict(id='DEV_RESET', build='reset', enabled=True, kind='reset', flags={'ETX_DEV_RESET':'1'})] if s.rows.get('RESET.keep', {}).get('status') == 'KEEP' else []
+    tranche_d(s, b+c+resets, extra)
 
 
 def vllm_entry(args):

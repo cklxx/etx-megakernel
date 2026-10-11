@@ -50,6 +50,7 @@ def run(s):
     # profile-build event delta as a candidate wall saving.
     result['device_deltas_ms'] = [r['reset']['device_ms']-r['kept']['device_ms'] for r in result['rounds']]
     if any(r[who].get('kernel_event_ms') is None for r in result['rounds'] for who in ('reset', 'kept')):
+        result.update(keep=False, status='NOT-COMPLETE')
         raise ValueError('reset pair missing ordinary kernel-event envelope')
     result['kernel_event_deltas_ms'] = [r['reset']['kernel_event_ms']-r['kept']['kernel_event_ms'] for r in result['rounds']]
     s.row('RESET.keep', result, result['status'], h.REGISTERED['RESET.keep'])
