@@ -118,8 +118,8 @@ is a replay slice from a full-model pack, not a replacement for the full model.
 `bf16_300.launch_build --out DIR --pair PAIR --task T --wave W --row R`
 builds unchanged original and stamped modules plus `launcher.hip` with the VM's
 HIP compiler. `--local` instead emits gfx942 IR/ISA and checks host syntax.
-Use unique directories per pair/tuple. The original computation is unchanged;
-completion stores belong only to the diagnostic candidate.
+Use unique directories per pair/tuple; T is the local tile block, not global
+task ID (reader emits tile_block). Completion stores are diagnostic-only.
 
 Invocation (inside the existing session environment):
 ```sh

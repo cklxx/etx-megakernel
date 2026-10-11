@@ -1,0 +1,2 @@
+Session hard stop: 900s from runner start (includes setup)
+  0 inbody_attribution               GPU 0    timeout   900s  after: -

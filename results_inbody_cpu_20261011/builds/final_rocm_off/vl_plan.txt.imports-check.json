@@ -1,0 +1,17 @@
+{
+  "used": {
+    "attn_mfma16_g8": "ok",
+    "attn_reduce": "ok",
+    "rms_norm_2d": "ok",
+    "dsl_attnprep": "outside operator specification",
+    "dsl_gemv": "outside operator specification",
+    "dsl_gemv_fold": "outside operator specification",
+    "dsl_moe_up_fold": "outside operator specification",
+    "dsl_moe_down_fold": "outside operator specification",
+    "dsl_topk": "outside operator specification"
+  },
+  "unused": {
+    "dsl_moe_up": "outside operator specification",
+    "dsl_moe_down": "outside operator specification"
+  }
+}

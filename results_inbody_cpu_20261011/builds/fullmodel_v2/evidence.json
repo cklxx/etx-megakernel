@@ -1,0 +1,100 @@
+{
+  "off_ir_code_equal": true,
+  "off_isa_code_equal": true,
+  "off_device_text_byte_equal": true,
+  "resources": {
+    "original": [
+      {
+        "kernel": "etx_megakernel_d0",
+        "vgpr": 128,
+        "agpr": 0,
+        "vgpr_spills": 13011,
+        "sgpr_spills": 143,
+        "scratch_bytes_lane": 14752,
+        "lds_bytes": 29736,
+        "static_blocks_per_cu": 1,
+        "actual_co_residency": "UNVERIFIED_CPU_ONLY",
+        "numeric_gate": true
+      },
+      {
+        "kernel": "etx_unfused_d0",
+        "vgpr": 103,
+        "agpr": 0,
+        "vgpr_spills": 0,
+        "sgpr_spills": 0,
+        "scratch_bytes_lane": 0,
+        "lds_bytes": 29704,
+        "static_blocks_per_cu": 1,
+        "actual_co_residency": "UNVERIFIED_CPU_ONLY",
+        "numeric_gate": true
+      }
+    ],
+    "off": [
+      {
+        "kernel": "etx_megakernel_d0",
+        "vgpr": 128,
+        "agpr": 0,
+        "vgpr_spills": 13011,
+        "sgpr_spills": 143,
+        "scratch_bytes_lane": 14752,
+        "lds_bytes": 29736,
+        "static_blocks_per_cu": 1,
+        "actual_co_residency": "UNVERIFIED_CPU_ONLY",
+        "numeric_gate": true
+      },
+      {
+        "kernel": "etx_unfused_d0",
+        "vgpr": 103,
+        "agpr": 0,
+        "vgpr_spills": 0,
+        "sgpr_spills": 0,
+        "scratch_bytes_lane": 0,
+        "lds_bytes": 29704,
+        "static_blocks_per_cu": 1,
+        "actual_co_residency": "UNVERIFIED_CPU_ONLY",
+        "numeric_gate": true
+      }
+    ],
+    "on": [
+      {
+        "kernel": "etx_megakernel_d0",
+        "vgpr": 128,
+        "agpr": 0,
+        "vgpr_spills": 13212,
+        "sgpr_spills": 1007,
+        "scratch_bytes_lane": 14740,
+        "lds_bytes": 29736,
+        "static_blocks_per_cu": 1,
+        "actual_co_residency": "UNVERIFIED_CPU_ONLY",
+        "numeric_gate": true
+      },
+      {
+        "kernel": "etx_unfused_d0",
+        "vgpr": 103,
+        "agpr": 0,
+        "vgpr_spills": 0,
+        "sgpr_spills": 0,
+        "scratch_bytes_lane": 0,
+        "lds_bytes": 29704,
+        "static_blocks_per_cu": 1,
+        "actual_co_residency": "UNVERIFIED_CPU_ONLY",
+        "numeric_gate": true
+      }
+    ]
+  },
+  "hashes": {
+    "original.ll": "e2e8d76783e6ce4ebc0533da8ca9164ae38c3171ec4a0a1b722f03d2c876973a",
+    "original.s": "7f6b2d086de16f3d77c70cde262b12f0e9592acc9aabb558568b803c4ed30b5c",
+    "original.text.bin": "ca67dc907e1ab98d979905c8a8ac6ce19515771af8c14a4b546d322030a8c118",
+    "off.ll": "ede12019432ee1229664998d4d05d609ae4b853334cdbf8230c32c9cb2c97380",
+    "off.s": "8ae4bd002e6655ebd268774d88472019a7c1933acad768e645d9874132b4ad5e",
+    "off.text.bin": "ca67dc907e1ab98d979905c8a8ac6ce19515771af8c14a4b546d322030a8c118",
+    "on.ll": "fd61d6bf2e8eb3eb2e6260817f906311c94263fd32baa54f39d29d577a8ca815",
+    "on.s": "9f1830ae9c917f1e1972916e64373a2985552e87d5462eac3e3fe8ac1c4d4870",
+    "on.text.bin": "f4976d1d0436106408d5869518c279755618bbb88d59ca8eda9e1b72fe354ab2"
+  },
+  "compiler": "Homebrew clang version 23.1.1\nTarget: arm64-apple-darwin24.6.0\nThread model: posix\nInstalledDir: /opt/homebrew/Cellar/llvm/23.1.1_1/bin\nConfiguration file: /opt/homebrew/Cellar/llvm/23.1.1_1/etc/clang/arm64-apple-darwin24.cfg\n",
+  "basis": "completed optimized IR/ISA from inbody_cpu; assemble ISA with llvm-mc, avoiding repeated llc optimization",
+  "gpu_perturbation_ms": null,
+  "normalization": "Only ModuleID/.file, unused HIP CUID, explicitly referenced !srcloc packed i32/i64 metadata; all instructions and ELF .text preserved"
+}

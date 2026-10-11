@@ -1,0 +1,11 @@
+{
+  "original.text.bin": "057ff35ff4a86dffcde18574a69a39a7c446df44ece5cbe940f05261a3bf1f3a",
+  "kernel.hip": "68ddb39d4d2142690841567feae7674b3db97e4ede7c7b41d03df543fc0bca10",
+  "original.s": "0ea8edbf4a8cb0d3945bd5555688600c070ae395e29441a6d5488bbebb5140a2",
+  "off.ll": "f3c84d314772a9decb34cd8ba0777b1c43ef4b12df0da3f7540d3a0bf23d0d0d",
+  "original.hip": "b0ab9133fe86b832aeb0dad9aeca9746f7c48e3c2d76400fd16065b39b04af11",
+  "off.s": "f5c5ffc097cde8ada934f0d1c52e4cae176fc02441a842e8bc9a9990099df290",
+  "off.hip": "68ddb39d4d2142690841567feae7674b3db97e4ede7c7b41d03df543fc0bca10",
+  "original.ll": "e1f28f3de54d1d0d8befc5918465c6d8f50409a78ed9ade4ee52ab140e056663",
+  "off.text.bin": "057ff35ff4a86dffcde18574a69a39a7c446df44ece5cbe940f05261a3bf1f3a"
+}

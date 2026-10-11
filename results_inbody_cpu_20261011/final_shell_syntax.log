@@ -1,0 +1,8 @@
+COMMAND ['bash', '-n', 'examples/vllm_llm/build.sh']
+PASS
+COMMAND ['bash', '-n', 'examples/vllm_llm/local_matrix.sh']
+PASS
+COMMAND ['bash', '-n', 'examples/vllm_llm/rocm_build_check.sh']
+PASS
+COMMAND ['bash', '-n', 'tools/session.sh']
+PASS

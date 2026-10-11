@@ -1,0 +1,8 @@
+CPU BUILD original stage=0
+CPU BUILD original stage=1
+CPU BUILD off stage=0
+CPU BUILD off stage=1
+CPU BUILD on stage=0
+CPU BUILD on stage=1
+
+CPU follow-up: stop redundant IR-to-object optimization; extract .text from completed ISA with llvm-mc instead.

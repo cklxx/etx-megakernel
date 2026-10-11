@@ -57,6 +57,11 @@
       "phase": "moe_up",
       "layer": 0,
       "type": "moe_up_0",
+      "coord": [
+        0
+      ],
+      "tile_block": null,
+      "body_symbol": null,
       "record": [
         100,
         110,
@@ -102,6 +107,11 @@
       "phase": "moe_down",
       "layer": 0,
       "type": "moe_down_0",
+      "coord": [
+        0
+      ],
+      "tile_block": null,
+      "body_symbol": null,
       "record": [
         201,
         240,
@@ -153,7 +163,7 @@
     {
       "layer": 0,
       "phase": "moe_up",
-      "all_grid_byte_floor_estimate_us": 0.0,
+      "all_grid_byte_floor_estimate_us": null,
       "tasks": 1,
       "body_us": 0.9,
       "gap_us": 0.1,
@@ -199,5 +209,5 @@
     "largest_removable_item": null,
     "reason": "issue intervals and byte/hop estimates do not prove exclusive removable atomic work"
   },
-  "provenance": "SYNTHETIC CPU TEST FIXTURE; no GPU measurements; hop explicitly hypothetical"
+  "basis": "SYNTHETIC CPU fixture, NOT GPU measurement; supplied byte and hop estimates do not certify removable work"
 }

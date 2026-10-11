@@ -1,0 +1,194 @@
+CPU BUILD original stage=0
+CPU BUILD original stage=1
+CPU BUILD off stage=0
+CPU BUILD off stage=1
+CPU BUILD on stage=0
+CPU BUILD on stage=1
+{
+  "start_commit": "4a39f92",
+  "default_emitter_byte_equal": true,
+  "off_ir_code_equal": true,
+  "off_isa_code_equal": true,
+  "off_device_text_byte_equal": true,
+  "device_text_sha256": {
+    "original": "b189c34d73d32e669e3b602534a3b83c8d3115fa4a2e643f1a8f834a31c48872",
+    "off": "b189c34d73d32e669e3b602534a3b83c8d3115fa4a2e643f1a8f834a31c48872",
+    "on": "720b8fb95a617ed82b94519644aea3de38f4ee4247e5a89e18b1479596bec313"
+  },
+  "normalization": [
+    "unused __hip_cuid anchor",
+    "inline-asm !srcloc numbers",
+    "ModuleID and .file"
+  ],
+  "resources": {
+    "original": [
+      {
+        "kernel": "etx_megakernel_d0",
+        "vgpr": 128,
+        "agpr": 0,
+        "vgpr_spills": 0,
+        "sgpr_spills": 0,
+        "scratch_bytes_lane": 0,
+        "lds_bytes": 21148,
+        "static_blocks_per_cu": 1,
+        "actual_co_residency": "UNVERIFIED_CPU_ONLY",
+        "numeric_gate": true
+      },
+      {
+        "kernel": "etx_unfused_d0",
+        "vgpr": 54,
+        "agpr": 0,
+        "vgpr_spills": 0,
+        "sgpr_spills": 0,
+        "scratch_bytes_lane": 0,
+        "lds_bytes": 21120,
+        "static_blocks_per_cu": 2,
+        "actual_co_residency": "UNVERIFIED_CPU_ONLY",
+        "numeric_gate": true
+      }
+    ],
+    "off": [
+      {
+        "kernel": "etx_megakernel_d0",
+        "vgpr": 128,
+        "agpr": 0,
+        "vgpr_spills": 0,
+        "sgpr_spills": 0,
+        "scratch_bytes_lane": 0,
+        "lds_bytes": 21148,
+        "static_blocks_per_cu": 1,
+        "actual_co_residency": "UNVERIFIED_CPU_ONLY",
+        "numeric_gate": true
+      },
+      {
+        "kernel": "etx_unfused_d0",
+        "vgpr": 54,
+        "agpr": 0,
+        "vgpr_spills": 0,
+        "sgpr_spills": 0,
+        "scratch_bytes_lane": 0,
+        "lds_bytes": 21120,
+        "static_blocks_per_cu": 2,
+        "actual_co_residency": "UNVERIFIED_CPU_ONLY",
+        "numeric_gate": true
+      }
+    ],
+    "on": [
+      {
+        "kernel": "etx_megakernel_d0",
+        "vgpr": 127,
+        "agpr": 0,
+        "vgpr_spills": 0,
+        "sgpr_spills": 9,
+        "scratch_bytes_lane": 0,
+        "lds_bytes": 21148,
+        "static_blocks_per_cu": 1,
+        "actual_co_residency": "UNVERIFIED_CPU_ONLY",
+        "numeric_gate": true
+      },
+      {
+        "kernel": "etx_unfused_d0",
+        "vgpr": 54,
+        "agpr": 0,
+        "vgpr_spills": 0,
+        "sgpr_spills": 0,
+        "scratch_bytes_lane": 0,
+        "lds_bytes": 21120,
+        "static_blocks_per_cu": 2,
+        "actual_co_residency": "UNVERIFIED_CPU_ONLY",
+        "numeric_gate": true
+      }
+    ]
+  },
+  "compiler": "Homebrew clang version 23.1.1\nTarget: arm64-apple-darwin24.6.0\nThread model: posix\nInstalledDir: /opt/homebrew/Cellar/llvm/23.1.1_1/bin\nConfiguration file: /opt/homebrew/Cellar/llvm/23.1.1_1/etc/clang/arm64-apple-darwin24.cfg\n",
+  "device_libraries": "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode",
+  "devlib_hashes": {
+    "asanrtl.bc": "3ce3ea078d885eccdd900b6f689e8a5798edb04884fafc78c11d0ff81fd8f617",
+    "hip.bc": "2c8fbee76c21e76ea1fd0768c743f4eee62682c08109ccd148b3054fb9897f28",
+    "ockl.bc": "cf32a60cb9369f4869f822db0a4307a9a9f54315f5a7b8e74235760867d1e52a",
+    "oclc_abi_version_400.bc": "38da18c125178658df6ab3602e275450eeeca2a5b72e28c3b106d1ca0b311556",
+    "oclc_abi_version_500.bc": "d61b9f3a073c9b67a3f0997e5279f35426a392b7d03df6cd3ae98677b39cfccc",
+    "oclc_abi_version_600.bc": "ffe2160a4ce7f76b4fbe5a43be75ce9a5cd683e2d703373c0086b11eefe84d68",
+    "oclc_correctly_rounded_sqrt_off.bc": "2c8fbee76c21e76ea1fd0768c743f4eee62682c08109ccd148b3054fb9897f28",
+    "oclc_correctly_rounded_sqrt_on.bc": "2c8fbee76c21e76ea1fd0768c743f4eee62682c08109ccd148b3054fb9897f28",
+    "oclc_daz_opt_off.bc": "2c8fbee76c21e76ea1fd0768c743f4eee62682c08109ccd148b3054fb9897f28",
+    "oclc_daz_opt_on.bc": "2c8fbee76c21e76ea1fd0768c743f4eee62682c08109ccd148b3054fb9897f28",
+    "oclc_finite_only_off.bc": "f3138eeee65c1d83234260728d124f635f021abb37c495f4ed027dfe92bcb1dd",
+    "oclc_finite_only_on.bc": "18d0cdf6d766aec4a7f9d04af7e1849675150f3bebf9b75abc2419bb4210619f",
+    "oclc_isa_version_10-1-generic.bc": "7bdeb4e68940f990a90f95592462b12b349cc9d7eb9a226e8323773be560d112",
+    "oclc_isa_version_10-3-generic.bc": "2315cae4dfc16ff9738c6501a582245d5ecd6fe905cbf7a9d4c870942acb00e5",
+    "oclc_isa_version_1010.bc": "7bdeb4e68940f990a90f95592462b12b349cc9d7eb9a226e8323773be560d112",
+    "oclc_isa_version_1011.bc": "44d5619f2e5f6993cbe131ed63d79fa9deef8a572cce66ec3a3b1d5412cd683f",
+    "oclc_isa_version_1012.bc": "b378b3d3758fa96de50a282aea2a06aa0d5ce999def9ac9966df28481b9bc029",
+    "oclc_isa_version_1013.bc": "cdbfec83e91dd8602a5907f7a9fbdb2863ee546254803498ac73956b1d0a6cdb",
+    "oclc_isa_version_1030.bc": "2315cae4dfc16ff9738c6501a582245d5ecd6fe905cbf7a9d4c870942acb00e5",
+    "oclc_isa_version_1031.bc": "046fe5569f9a34e464ccbadbc66ef25772412cd79a8c5f4ac29b62c2183c0cba",
+    "oclc_isa_version_1032.bc": "f7cd661355cde31492909d374607128022a5f9b91abaf0981292962794f4a0e3",
+    "oclc_isa_version_1033.bc": "f0e427fc119d9c0d10748a74a964de1f9dec04c65b721d5e8a7b9990c8397e3f",
+    "oclc_isa_version_1034.bc": "662a572d87a603a9d90b81167c3bf48d0c5ad31ac2f50d80c2c6d568f56fca11",
+    "oclc_isa_version_1035.bc": "b1ea69df4a579f22b6ca0ab06e2920b9c4d2a1d46a1c0e738bc57523f38485aa",
+    "oclc_isa_version_1036.bc": "7bc5fc30ff0f2cb6ced3ac88256632f760ab9af6086299140a630dadcba4ac74",
+    "oclc_isa_version_11-generic.bc": "a8dc62ab661e7e14cc13922d7b883a00fac72c6bb449f4e0c81011d6dc43843c",
+    "oclc_isa_version_1100.bc": "12b874bc5d1c9afabe1dc7807babac9ff33bf3cbad2af35df6f67bbd54efdd48",
+    "oclc_isa_version_1101.bc": "837aa24a31995681cddd1039a3194063125b0f37de0ea72a284a41547261b3ac",
+    "oclc_isa_version_1102.bc": "8e9cd150288e59318ed2d78d5aacb5e2de304e7b3729221e890f1d8521d06ea6",
+    "oclc_isa_version_1103.bc": "a8dc62ab661e7e14cc13922d7b883a00fac72c6bb449f4e0c81011d6dc43843c",
+    "oclc_isa_version_1150.bc": "fa4d10e6924ee82a2e88e2dabe4ac2d7fb6e37fb1e6638494db9fca805f005b3",
+    "oclc_isa_version_1151.bc": "9b492b5360fb9c3b1ca6440c4e498c9d647c9aa4e8559b9fa27771dc919ca93e",
+    "oclc_isa_version_1152.bc": "6ca3260cacd1c810f4c2bcbfa8ff2edc6a8bd5ebcf2ce630760f2d79da2460c4",
+    "oclc_isa_version_1153.bc": "7478e3c0e22f97060a6aefb04054059992d317be250899ae792995f16ee62c1c",
+    "oclc_isa_version_12-generic.bc": "9bb6ba9193c08f126955bf36d6d9c98d60134a3cf04a715d24c638d600ba6d82",
+    "oclc_isa_version_1200.bc": "9bb6ba9193c08f126955bf36d6d9c98d60134a3cf04a715d24c638d600ba6d82",
+    "oclc_isa_version_1201.bc": "80bcdbce53b400ceb92e3c197720aa35f80622d12def1d34c1578cd97fd5b7a8",
+    "oclc_isa_version_1250.bc": "26638520b972ba3fa377cca902abf9d76050646941f1c1ba9fd0bc0263aafe23",
+    "oclc_isa_version_1251.bc": "07fcee4ec5cc078fb922a6b072d57df71fce59c5dbb92c7d86bfd240569d0e72",
+    "oclc_isa_version_600.bc": "c8d845fd0b0a1b46e7ee2a8ef0d1d2704845a1f597130cea6c4db3295ecd553f",
+    "oclc_isa_version_601.bc": "8b6c4d6932cf0ed3656ea9f76052a11fefa941af68fd3a52d4953abf5827d00d",
+    "oclc_isa_version_602.bc": "50a0297e8560560eb7424f5294092d02ba5ec596dc9ae9510537f84d1a3ccdf8",
+    "oclc_isa_version_700.bc": "e2ffe832453a69bffbf25827a8260a1d9cbbb2c943d9398183113829afaedfae",
+    "oclc_isa_version_701.bc": "ef20ebce98d5930d186af88975342e8c9b8bd18b96af0775665b622ac0509ac4",
+    "oclc_isa_version_702.bc": "0df0bcfab0c7c8326344caf24db52cf78521757246b97b154a4fd72633e3e86d",
+    "oclc_isa_version_703.bc": "e2b3715784496bcc22501b8b4d59f9db0245146bf96b38c48fe6d1587c32d499",
+    "oclc_isa_version_704.bc": "308f1707747b0ee487376857a88e62f69255d868a5463afc26971554f76312e1",
+    "oclc_isa_version_705.bc": "f714fb66e19906cd2afb37038bfef9883663c8dd2716126ecb6f3043282742de",
+    "oclc_isa_version_801.bc": "504f9f9467185c5dfb57d882ccba1e25f892f3ca3ded12ada1c903e4c14e134e",
+    "oclc_isa_version_802.bc": "718a93d77ef6d1fa46afa340f55d24335eb9a9c456a0590e3be650e516fe1887",
+    "oclc_isa_version_803.bc": "49a34d688eb42aab7b37b553552c80af0739f7acde0c4ae482f948e4ec57cc5a",
+    "oclc_isa_version_805.bc": "4cdcce926d73aca91037244d78906af85e09b67fdd52960294f595425a12457a",
+    "oclc_isa_version_810.bc": "bad28a81037c99bd76e8548581d0a4f203f96080b801bee18de3da78f5fc9868",
+    "oclc_isa_version_9-4-generic.bc": "580d540cc738c0f9554c8710575bbc9b51ebacdcbc29aa0074ed05d3691dea1d",
+    "oclc_isa_version_9-generic.bc": "b07f1f77ca6f312478dfb06f46d3d324256c4f9f395754e36af41c5adf141ba8",
+    "oclc_isa_version_900.bc": "b07f1f77ca6f312478dfb06f46d3d324256c4f9f395754e36af41c5adf141ba8",
+    "oclc_isa_version_902.bc": "0c2de298cc22736fa3b9fa78459a58aa88b1c8477b07295cfe70db06d3b6b990",
+    "oclc_isa_version_904.bc": "1aef3f12a61f89218f0de52aa4bca3168e76ca6e409b7fcf4be75ce94be0cb5a",
+    "oclc_isa_version_906.bc": "9d6ee2492562be709dd4aedc3d3998ee69df5b291857ff9fd0eba51fe91a544a",
+    "oclc_isa_version_908.bc": "fa2d1c2668822854a27daaf30956a588798ae4332ecb5447e7bb2c07f9b094d7",
+    "oclc_isa_version_909.bc": "4c24852ccb61a9e98b874a95902ec9850ec6889ded379404298f27e259518c05",
+    "oclc_isa_version_90a.bc": "538812a56bcb5efe5ef7fb5ee57327ba69d69812189e57d965822b0e03b12eec",
+    "oclc_isa_version_90c.bc": "99546d530e4a6bba705214a43d570c79fa584e2359ed9559e76d1d86982b2d14",
+    "oclc_isa_version_942.bc": "580d540cc738c0f9554c8710575bbc9b51ebacdcbc29aa0074ed05d3691dea1d",
+    "oclc_isa_version_950.bc": "b0962e1a370b559207c8e22fcba294952af3057658da75c94560e5970c6e8900",
+    "oclc_unsafe_math_off.bc": "22c799b9154389f050f8f3368762636b9954a2ea25622199c359366bbd84657f",
+    "oclc_unsafe_math_on.bc": "1b2772131f29a303ef8d448ccf0d84d9eb68bd76244af998510514938ec877ab",
+    "oclc_wavefrontsize64_off.bc": "c9b9ff0e9fdb1e41562a73c29e16094c9591bcddc57daa4bc10ab105647495ef",
+    "oclc_wavefrontsize64_on.bc": "476a9f2c767c7449612b158fc14f39b5d6c555c83775157521584984c9544dc8",
+    "ocml.bc": "cfe97fe9ee29379f522e5f20ae55aae1cdb96eb41d6aa250ea11c4941c54e019",
+    "opencl.bc": "98fd9fe8c711e6b46a9a5648bda18e5cacddad1e44f299215079ac60b9cdf7cb"
+  },
+  "gpu_perturbation_ms": null,
+  "gpu_checks": "NOT_RUN_CPU_ONLY",
+  "paths": {
+    "original": {
+      "ll": "457db074b85e05efc191452dd6f9ad4cf2f04dbb0a297297ac6c488006de9762",
+      "s": "a3b60330af2504b9ddb1d8eab0ffb5752d2d101c37f330bd5f1806084d1b9b38"
+    },
+    "off": {
+      "ll": "e2af52b88b96f083020dfc4467196fc6f7388f17874cd9cd4cfc7ba570541eeb",
+      "s": "196fed5ed479ee4c1624b4b9921168c2ca79653ce5b84208973c56d2714a0a0f"
+    },
+    "on": {
+      "ll": "f5650d39c377be415f84e093e29c29be7a6a6504b6c25682f1571aaab48b2550",
+      "s": "db5a1e68f01254965b980147a74e66cd96b69a7d621890a59d7b6d291e0df306"
+    }
+  }
+}

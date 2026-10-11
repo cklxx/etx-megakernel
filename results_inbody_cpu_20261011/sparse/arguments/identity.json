@@ -1,0 +1,157 @@
+{
+  "version": 1,
+  "pair": "arguments",
+  "sampling": {
+    "task": 0,
+    "wave": 0,
+    "row": 0
+  },
+  "capture_math": "bf16_batch1_moe_mode0",
+  "resources": {
+    "original": [
+      {
+        "kernel": "bf16_300_dsl_moe_up",
+        "vgpr": 56,
+        "agpr": 0,
+        "vgpr_spills": 0,
+        "sgpr_spills": 0,
+        "scratch_bytes_lane": 0,
+        "lds_bytes": 21256,
+        "static_blocks_per_cu": 2,
+        "actual_co_residency": "UNVERIFIED_CPU_ONLY",
+        "numeric_gate": true
+      },
+      {
+        "kernel": "bf16_300_dsl_moe_down",
+        "vgpr": 54,
+        "agpr": 0,
+        "vgpr_spills": 0,
+        "sgpr_spills": 0,
+        "scratch_bytes_lane": 0,
+        "lds_bytes": 21256,
+        "static_blocks_per_cu": 2,
+        "actual_co_residency": "UNVERIFIED_CPU_ONLY",
+        "numeric_gate": true
+      }
+    ],
+    "candidate": [
+      {
+        "kernel": "bf16_300_probe_dsl_moe_up",
+        "vgpr": 60,
+        "agpr": 0,
+        "vgpr_spills": 0,
+        "sgpr_spills": 0,
+        "scratch_bytes_lane": 0,
+        "lds_bytes": 21256,
+        "static_blocks_per_cu": 2,
+        "actual_co_residency": "UNVERIFIED_CPU_ONLY",
+        "numeric_gate": true
+      },
+      {
+        "kernel": "bf16_300_probe_dsl_moe_down",
+        "vgpr": 58,
+        "agpr": 0,
+        "vgpr_spills": 0,
+        "sgpr_spills": 0,
+        "scratch_bytes_lane": 0,
+        "lds_bytes": 21256,
+        "static_blocks_per_cu": 2,
+        "actual_co_residency": "UNVERIFIED_CPU_ONLY",
+        "numeric_gate": true
+      }
+    ]
+  },
+  "commands": [
+    [
+      "bash",
+      "/Users/ckl/code/.wt/etx-inbody/etx/importer/hip_ir_local.sh",
+      "/Users/ckl/code/.wt/etx-inbody/build/inbody/sparse/arguments/original.hip",
+      "/Users/ckl/code/.wt/etx-inbody/build/inbody/sparse/arguments/original.ll",
+      "-I/Users/ckl/code/.wt/etx-inbody/etx/runtime/include",
+      "-I/Users/ckl/code/.wt/etx-inbody/build/inbody/sparse/arguments",
+      "-I/Users/ckl/code/.wt/etx-inbody",
+      "-DETX_DSL_COH",
+      "-DETX_DSL_NT",
+      "-DETX_DSL_VECNORM",
+      "-DETX_DSL_WSUM",
+      "-DETX_DSL_SCALAR",
+      "-DETX_DSL_GU1",
+      "-DETX_DSL_RBATCH",
+      "-DETX_EMIT_DSL_BIGK=0",
+      "-DETX_EMIT_DSL_EXT=0",
+      "-DETX_EMIT_FOLD_TOPK=1"
+    ],
+    [
+      "/opt/homebrew/opt/llvm/bin/llc",
+      "-mtriple=amdgcn-amd-amdhsa",
+      "-mcpu=gfx942",
+      "-O3",
+      "/Users/ckl/code/.wt/etx-inbody/build/inbody/sparse/arguments/original.ll",
+      "-o",
+      "/Users/ckl/code/.wt/etx-inbody/build/inbody/sparse/arguments/original.s"
+    ],
+    [
+      "bash",
+      "/Users/ckl/code/.wt/etx-inbody/etx/importer/hip_ir_local.sh",
+      "/Users/ckl/code/.wt/etx-inbody/build/inbody/sparse/arguments/candidate.hip",
+      "/Users/ckl/code/.wt/etx-inbody/build/inbody/sparse/arguments/candidate.ll",
+      "-I/Users/ckl/code/.wt/etx-inbody/etx/runtime/include",
+      "-I/Users/ckl/code/.wt/etx-inbody/build/inbody/sparse/arguments",
+      "-I/Users/ckl/code/.wt/etx-inbody",
+      "-DETX_DSL_COH",
+      "-DETX_DSL_NT",
+      "-DETX_DSL_VECNORM",
+      "-DETX_DSL_WSUM",
+      "-DETX_DSL_SCALAR",
+      "-DETX_DSL_GU1",
+      "-DETX_DSL_RBATCH",
+      "-DETX_EMIT_DSL_BIGK=0",
+      "-DETX_EMIT_DSL_EXT=0",
+      "-DETX_EMIT_FOLD_TOPK=1"
+    ],
+    [
+      "/opt/homebrew/opt/llvm/bin/llc",
+      "-mtriple=amdgcn-amd-amdhsa",
+      "-mcpu=gfx942",
+      "-O3",
+      "/Users/ckl/code/.wt/etx-inbody/build/inbody/sparse/arguments/candidate.ll",
+      "-o",
+      "/Users/ckl/code/.wt/etx-inbody/build/inbody/sparse/arguments/candidate.s"
+    ],
+    [
+      "/opt/homebrew/opt/llvm/bin/clang++",
+      "-x",
+      "hip",
+      "--cuda-host-only",
+      "-fsyntax-only",
+      "-nogpuinc",
+      "-nogpulib",
+      "--offload-arch=gfx942",
+      "-std=c++17",
+      "-isystem",
+      "/Users/ckl/code/rocm-headers/clang",
+      "-isystem",
+      "/Users/ckl/code/rocm-headers/inc",
+      "-include",
+      "__clang_hip_runtime_wrapper.h",
+      "-isystem",
+      "/Users/ckl/code/.wt/etx-inbody/etx/importer/shim/mac",
+      "-D__HIP_PLATFORM_AMD__",
+      "/Users/ckl/code/.wt/etx-inbody/examples/vllm_llm/bf16_300/launcher.hip"
+    ]
+  ],
+  "compiler": "Homebrew clang version 23.1.1\nTarget: arm64-apple-darwin24.6.0\nThread model: posix\nInstalledDir: /opt/homebrew/Cellar/llvm/23.1.1_1/bin\nConfiguration file: /opt/homebrew/Cellar/llvm/23.1.1_1/etc/clang/arm64-apple-darwin24.cfg\n",
+  "hashes": {
+    "original.hip": "da7786ddfc2e5c6e55f8a7bd6842ce8cba3a045f393e7672a4c335f9ddeeb37e",
+    "candidate.hip": "eae7378b04d430f40f42b971f94bc8e361b6a380868cc062789e2b1c8b403df6",
+    "original.ll": "39469b8607d6a3112276d56fd219b1f26b63ac6220a0b665f2241aaec390c78c",
+    "candidate.ll": "91f1ea3df818cccdd385a9784e875c8e917435d387f9e1d3783a1caa43ab42f3",
+    "original.s": "2c427aeecb629123898f67376291c6266e93c224c26b08cbd6568544d78de1e4",
+    "candidate.s": "c885dcebcab4b6897e66fcb4426de7d12c9e6568a4a121b490a0691415b6d480"
+  },
+  "host_source_sha256": "d1f6e14a4d291d5107bc6babeba895e886baaca2cb9a8fdbb42b10f5be73980b",
+  "runnable": false,
+  "gpu_checks": "NOT_RUN",
+  "timing_eligible": false,
+  "resource_metadata_basis": "same-source IR/llc; inspect module resource attributes on device too"
+}

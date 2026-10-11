@@ -1,0 +1,12 @@
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/Users/ckl/code/.wt/etx-inbody/examples/vllm_llm/bf16_300/inbody_cpu.py", line 162, in <module>
+    if __name__=='__main__': main()
+                             ~~~~^^
+  File "/Users/ckl/code/.wt/etx-inbody/examples/vllm_llm/bf16_300/inbody_cpu.py", line 104, in main
+    print(json.dumps(vm_off(a.out,a.model_build) if a.vm_off else check(a.out,a.model_build),indent=2))
+                     ~~~~~~^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/ckl/code/.wt/etx-inbody/examples/vllm_llm/bf16_300/inbody_cpu.py", line 158, in vm_off
+    raise ValueError('VM disabled overlay changed code')
+ValueError: VM disabled overlay changed code
