@@ -101,6 +101,7 @@ All absolute predictions are conditional on preserving recorded task durations a
 | Prep+owner attention, optimistic bound | +5.36604 | +257.57 | 4.43757 |
 
 Sources A:8-9,25-39; every candidate is in the result JSONs and `candidate-ledgers.csv`.
+`build-requirements.json` records the required compiler, placement or wrapper changes per timed case.
 Reoptimizing the oracle for each branch model yields 0.686875 and 0.631667 us/layer saving (A:27), but those
 are **different worker tables**. They are not evidence that the frozen nominal winner clears KEEP robustly.
 The median policy has no foreknowledge of per-layer stamp jitter and fails the bar under every tested split.
@@ -166,7 +167,7 @@ Conservation of total work is not conservation of latency; the alternative repla
 promoting a nominal counterexample to a measured refutation. **WEAK** is the supported verdict (A:43-45).
 
 Run `search.py`, `secondary.py`, `branches.py`, `oracle.py`, `finalists.py`, `tails.py`, `report.py`, then
-`timeline_check.py` from the artifact directory with `.venv/bin/python`. Scripts use retained compressed
+`timeline_check.py`, then `build_requirements.py` with the workspace's `.venv/bin/python`. Scripts use retained compressed
 inputs, require no network; full run logs are retained. Timeline CLI outputs cover both full steps and layer 24.
 Validation: **18 passed** (`tests.log:2`); every timing body/dependency/completion and candidate reconciliation
 was checked. Artifact hashes are in `SHA256SUMS`; no generated output or future build hook is GPU evidence.
