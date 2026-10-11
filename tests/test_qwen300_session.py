@@ -129,8 +129,97 @@ def test_step_failure_retains_full_log(tmp_path, monkeypatch):
     with pytest.raises(RuntimeError, match='rc=7'):
         s.step('failure', ['bash','-c','echo full-output; exit 7'], 10)
     assert 'full-output' in (tmp_path/'failure.log').read_text()
-    with pytest.raises(RuntimeError, match='overwrite'):
-        s.step('failure', ['true'], 10)
+
+
+@pytest.mark.parametrize('first_rc', [0, 7])
+def test_step_retry_keeps_both_full_logs(tmp_path, monkeypatch, first_rc):
+    import time
+    monkeypatch.setenv('ETX_SESS_LOGDIR', str(tmp_path))
+    monkeypatch.setattr(s, 'DEADLINE', time.monotonic()+20)
+    unrelated = tmp_path/'other_step.log'
+    unrelated.write_bytes(b'other step evidence\n')
+    cmd = ['bash', '-c', f'echo first-stdout; echo first-stderr >&2; exit {first_rc}']
+    if first_rc:
+        with pytest.raises(RuntimeError, match=f'rc={first_rc}'):
+            s.step('retry', cmd, 10)
+    else:
+        s.step('retry', cmd, 10)
+    first = (tmp_path/'retry.log').read_bytes()
+
+    text = s.step('retry', ['bash', '-c', 'echo second-stdout; echo second-stderr >&2'], 10)
+    assert 'second-stdout\nsecond-stderr\n' in text
+    assert (tmp_path/'retry.log').read_text() == text
+    archived = tmp_path/'log_history/retry/attempt1/retry.log'
+    assert archived.read_bytes() == first
+    assert b'first-stdout\nfirst-stderr\n' in first
+    assert unrelated.read_bytes() == b'other step evidence\n'
+
+    s.step('retry', ['bash', '-c', 'echo third'], 10)
+    assert archived.read_bytes() == first
+    assert (tmp_path/'log_history/retry/attempt2/retry.log').read_text() == text
+    assert 'third' in (tmp_path/'retry.log').read_text()
+
+
+def test_job2_retry_keeps_directories_and_compiler_logs(tmp_path, monkeypatch):
+    import time
+    from examples.vllm_llm import import_certificate as cert
+    monkeypatch.setenv('ETX_SESS_LOGDIR', str(tmp_path))
+    monkeypatch.setenv('HOME', str(tmp_path))
+    monkeypatch.setattr(s, 'DEADLINE', time.monotonic()+2400)
+    s.model('bf16').mkdir(parents=True)
+    s.golden('bf16').write_bytes(s.GOLDEN.read_bytes())
+    captures = []
+    generation = 0
+    filenames = ('compile.log', 'hipcc.log', 'compiler_version.txt')
+
+    def step(name, cmd, seconds, env=None):
+        if name.startswith('build_'):
+            build = Path(env['ETX_OUT'])
+            build.mkdir(exist_ok=True)
+            (build/'vl_plan.txt').write_text('same plan')
+            for filename in filenames:
+                (build/filename).write_text(f'{name} {filename} generation={generation}\n')
+        return ''
+
+    def capture(arm, extra='', env=None, name=None):
+        captures.append(name)
+        return f'fresh {name} generation={generation}'
+
+    class ReachedRoutingGate(Exception):
+        pass
+
+    def stop_at_routing(directory):
+        raise ReachedRoutingGate
+
+    monkeypatch.setattr(s, 'step', step)
+    monkeypatch.setattr(s, 'etx_capture', capture)
+    monkeypatch.setattr(s, 'correct_etx', lambda *args: None)
+    monkeypatch.setattr(s, 'routing_gate', stop_at_routing)
+    monkeypatch.setattr(cert, 'export_build', lambda *args: None)
+    monkeypatch.setattr(cert, 'validate', lambda *args, **kw: {})
+    for generation in (1, 2):
+        with pytest.raises(ReachedRoutingGate):
+            s.job2()
+        if generation == 1:
+            for path in tmp_path.glob('certificate_*'):
+                (path/'keep.txt').write_text('previous certificate evidence')
+            for path in tmp_path.glob('routing_*'):
+                (path/'keep.bin').write_bytes(b'previous routing evidence')
+
+    expected = [f'{arm}_{name}' for arm in ('off', 'on')
+                for name in ('check_p0', 'check_p1040', 'gate_fused', 'gate_graph')]
+    assert captures == expected * 2
+    for arm in ('off', 'on'):
+        certificate = tmp_path/f'certificate_{arm}'
+        assert (certificate/'keep.txt').read_text() == 'previous certificate evidence'
+        for pos in (0, 1040):
+            assert (tmp_path/f'routing_{arm}_p{pos}/keep.bin').read_bytes() == b'previous routing evidence'
+            assert 'generation=2' in (certificate/f'check_p{pos}.txt').read_text()
+        for filename in filenames:
+            path = tmp_path/f'{arm}_{filename}'
+            assert 'generation=2' in path.read_text()
+            archived = tmp_path/'log_history'/path.stem/'attempt1'/path.name
+            assert 'generation=1' in archived.read_text()
 
 
 def test_ck_demangled_symbols_are_attributed_by_validated_order(tmp_path, monkeypatch):
