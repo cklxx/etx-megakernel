@@ -570,6 +570,26 @@ int main(int argc, char** argv) {
       if (x.exp.rfind("dsl_", 0) == 0) {
         launch_imported(x.n + 1);
         if (!wait_stream(hst.stream, 5.0)) die("DSL tile hung: " + x.exp);
+        // CPU-prepared KEY32 session: preserve each layer's actual routing
+        // output during the existing sequential import check. This is a host
+        // copy only, absent from the timed path and the device kernel.
+        if (const char* dir = getenv("ETX_CHECK_TOPK_DUMP")) {
+          if (x.role == "topk" && x.req == 0) {
+            for (int which = 0; which < 2; ++which) {
+              const void* ptr = which ? (const void*)topk_w : (const void*)topk_ids;
+              std::vector<unsigned char> bytes(n_tk * 4);
+              ETX_CHECK(hipMemcpy(bytes.data(), ptr, bytes.size(), hipMemcpyDeviceToHost));
+              const std::string name = std::string(dir) + "/L" + std::to_string(x.layer)
+                + (which ? "_weights.bin" : "_ids.bin");
+              FILE* f = fopen(name.c_str(), "wb");
+              if (!f) die("cannot write routing audit " + name);
+              if (fwrite(bytes.data(), 1, bytes.size(), f) != bytes.size()) die("short routing audit write");
+              fclose(f);
+            }
+            printf("ROUTING-AUDIT layer=%d position=%d replicas=%d\n", x.layer, check_pos, NR);
+            fflush(stdout);
+          }
+        }
         if (not_imported < 5) not_imported_names += (not_imported ? ", " : "") + x.exp;
         ++not_imported;
         continue;
