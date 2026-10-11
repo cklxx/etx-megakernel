@@ -1,0 +1,122 @@
+{
+  "compiler": "ROCm 7.2.4 LLVM 22, x86 offline container",
+  "import_bundle_sha256": "9c5d4de99add973441c2f065affacf82cb1e1f44acf1beeecc51d8d66c2e3683",
+  "modes": {
+    "baseline": {
+      "resources": {
+        "etx_megakernel_d0": {
+          "TotalNumSgprs": 106,
+          "NumVgprs": 128,
+          "ScratchSize": 28,
+          "LDSByteSize": 29736,
+          "Occupancy": 4,
+          "sgpr_spill_count": 255,
+          "vgpr_spill_count": 6
+        },
+        "etx_unfused_d0": {
+          "TotalNumSgprs": 99,
+          "NumVgprs": 103,
+          "ScratchSize": 0,
+          "LDSByteSize": 29704,
+          "Occupancy": 4,
+          "sgpr_spill_count": 0,
+          "vgpr_spill_count": 0
+        }
+      },
+      "sha256": {
+        "dsl_tiles.hip": "a0bcc2dc113fed1fe2e7d7144b66fa478ff935e3795b0cb4c2d98a3ce6b92852",
+        "megakernel_d0.hip": "b95ff3af143277fd258c4832a4d894d7bf759c504fcad17b09b452e26db5a266",
+        "plan.json": "66a10309effaf34c4119eadb9cae293b35835735a0c5d147182e49c99b17c52e",
+        "whole.ll": "f23a075dbccccbe2291fdf65e91160cf0c38485795bf40c96d0aa8518e8f7065",
+        "whole.s": "a2ea33ac89cb9f31aed077763c0d7395d65af2467183fe8fbabf3fc514c5a5de"
+      }
+    },
+    "c1": {
+      "resources": {
+        "etx_megakernel_d0": {
+          "TotalNumSgprs": 106,
+          "NumVgprs": 128,
+          "ScratchSize": 28,
+          "LDSByteSize": 29736,
+          "Occupancy": 4,
+          "sgpr_spill_count": 261,
+          "vgpr_spill_count": 6
+        },
+        "etx_unfused_d0": {
+          "TotalNumSgprs": 99,
+          "NumVgprs": 103,
+          "ScratchSize": 0,
+          "LDSByteSize": 29704,
+          "Occupancy": 4,
+          "sgpr_spill_count": 0,
+          "vgpr_spill_count": 0
+        }
+      },
+      "sha256": {
+        "dsl_tiles.hip": "1a5f6cecec9e42e733e8dc527152c03a10d6fd9cb7c47fdaaf4b7301dfe575da",
+        "megakernel_d0.hip": "bd317eb0008c6d568e453d609cbdef838de05d63e33b761aeb974024f55fe295",
+        "plan.json": "1c806a001cffded7e4a9182802894b7b733212568304ecb8af34ebaf7cc64bf5",
+        "whole.ll": "bcbc73824e4ec278ef0ec0ac15fb58e12817c58e9a3b00d7970b3f3725f3bfe2",
+        "whole.s": "4bfee3d45be0b62ed6236ae529091b51fe58dd26262fd83d2a55a496db29f291"
+      }
+    },
+    "c5": {
+      "resources": {
+        "etx_megakernel_d0": {
+          "TotalNumSgprs": 106,
+          "NumVgprs": 128,
+          "ScratchSize": 36,
+          "LDSByteSize": 29736,
+          "Occupancy": 4,
+          "sgpr_spill_count": 255,
+          "vgpr_spill_count": 8
+        },
+        "etx_unfused_d0": {
+          "TotalNumSgprs": 99,
+          "NumVgprs": 103,
+          "ScratchSize": 0,
+          "LDSByteSize": 29704,
+          "Occupancy": 4,
+          "sgpr_spill_count": 0,
+          "vgpr_spill_count": 0
+        }
+      },
+      "sha256": {
+        "dsl_tiles.hip": "29e5f2500c9096341608eec2f037dced39887c59190a007e0212fd8077ca0580",
+        "megakernel_d0.hip": "fe21a94e10704999257f543c532a0f5399b0a1822e713343c92b78150245ab81",
+        "plan.json": "66a10309effaf34c4119eadb9cae293b35835735a0c5d147182e49c99b17c52e",
+        "whole.ll": "e80b67c55c7d3480ec0b1400061e7eed27fc7db1bd3507311d284a68a83ab622",
+        "whole.s": "d99a87be916fe1fa3fe6c83f2c7ddd5d1050eceed8fd43e4bae73eaf1866e4d6"
+      }
+    },
+    "combined": {
+      "resources": {
+        "etx_megakernel_d0": {
+          "TotalNumSgprs": 106,
+          "NumVgprs": 128,
+          "ScratchSize": 36,
+          "LDSByteSize": 29736,
+          "Occupancy": 4,
+          "sgpr_spill_count": 261,
+          "vgpr_spill_count": 8
+        },
+        "etx_unfused_d0": {
+          "TotalNumSgprs": 99,
+          "NumVgprs": 103,
+          "ScratchSize": 0,
+          "LDSByteSize": 29704,
+          "Occupancy": 4,
+          "sgpr_spill_count": 0,
+          "vgpr_spill_count": 0
+        }
+      },
+      "sha256": {
+        "dsl_tiles.hip": "561b05f213147a6196258e902a66ccd0fcf2f2c48cf73ca1e5e7f29f23fd9057",
+        "megakernel_d0.hip": "d002371f986808c117fd723a8a6f6707025175aafd9ccbd203c57c1abc382c2c",
+        "plan.json": "1c806a001cffded7e4a9182802894b7b733212568304ecb8af34ebaf7cc64bf5",
+        "whole.ll": "19602daf55993e0cedcb3dee9ce4d40dc3701d3ada2c5fab0845e8cf5b3c8720",
+        "whole.s": "722609210911a6576e5b93e7ebf6cc70d3f6e16ee246ba483ecfc108fd8c57d2"
+      }
+    }
+  }
+}

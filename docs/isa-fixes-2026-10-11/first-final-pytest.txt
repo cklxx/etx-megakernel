@@ -1,0 +1,46 @@
+........................................................................ [  5%]
+...........................s............................................ [ 10%]
+........................................................................ [ 16%]
+.............................s.sss...................................... [ 21%]
+........................................................................ [ 26%]
+..........................................s......ss..................... [ 32%]
+........................................................................ [ 37%]
+......................................................s................. [ 43%]
+........................................................................ [ 48%]
+.........................s....................................F......... [ 53%]
+........................................................................ [ 59%]
+.......................................................................s [ 64%]
+..................ss.................................................... [ 70%]
+........................................................................ [ 75%]
+........................................................................ [ 80%]
+........................................................................ [ 86%]
+........................................................................ [ 91%]
+...................................................................s.... [ 97%]
+........................................                                 [100%]
+=================================== FAILURES ===================================
+______ test_every_macro_the_tiles_test_is_either_published_or_tile_local _______
+
+    def test_every_macro_the_tiles_test_is_either_published_or_tile_local():
+        """The audit that found the fifth: a macro a tile source tests must come from the manifest, or be local to the
+        tile with no plan or host counterpart. Anything else is the bug class waiting to happen."""
+        tile_local = {"ETX_DSL_NT", "ETX_DSL_VECNORM", "ETX_DSL_UNIFORM", "ETX_DSL_PREP_EARLY", "ETX_IMPORT_LDS",
+                      "ETX_DSL_COH_HELPERS", "DSL_G", "DSL_U32X4_DEFINED", "DSL_SPLIT_TAIL",
+                      "ETX_DSL_U4",   # load depth: only the tile's own instantiation changes (round 34)
+                      # tile code only, same argument layout and output bits (docs/TILES-2026-10-07.md)
+                      "ETX_DSL_WSUM", "ETX_DSL_SCALAR", "ETX_DSL_GU1", "ETX_DSL_RBATCH",
+                      # top-k selection on a 32-bit key: tile code only, same arguments and outputs (docs/TOPK-KEY32-2026-10-08.md)
+                      "ETX_TOPK_KEY32"}
+        published = {m for m, _, _ in manifest.FEATURES.values()}
+        tested = set()
+        for f in (ROOT / "etx/ops").glob("*.py"):
+            for m in re.finditer(r"#if(?:n?def)?\s+!?\s*([A-Z][A-Z_0-9]+)", f.read_text()):
+                tested.add(m.group(1))
+        unknown = {m for m in tested if m not in tile_local and m not in published and not m.startswith(("DSL_ABLATE_", "ETX_ABL_"))}
+>       assert not unknown, f"tile macros that are neither published nor tile-local: {sorted(unknown)}"
+E       AssertionError: tile macros that are neither published nor tile-local: ['ETX_DSL_NORM_HOIST']
+E       assert not {'ETX_DSL_NORM_HOIST'}
+
+tests/test_manifest_class.py:72: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_manifest_class.py::test_every_macro_the_tiles_test_is_either_published_or_tile_local
+1 failed, 1321 passed, 14 skipped in 184.25s (0:03:04)
