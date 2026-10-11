@@ -1,0 +1,29 @@
+{
+  "total": 486,
+  "explicit": 447,
+  "implicit": 39,
+  "resolved": 482,
+  "verdicts": {
+    "UNREVIEWED": 482,
+    "MISSING": 4
+  },
+  "documents": {
+    "DEP-GAP-LEDGER": {
+      "UNREVIEWED": 102
+    },
+    "XCD-TIMELINE": {
+      "UNREVIEWED": 91
+    },
+    "XCD-PREFETCH": {
+      "UNREVIEWED": 39
+    },
+    "MOE-BODY-ANATOMY": {
+      "UNREVIEWED": 149,
+      "MISSING": 1
+    },
+    "REVIEW-POOL-ANALYSIS": {
+      "UNREVIEWED": 101,
+      "MISSING": 3
+    }
+  }
+}
