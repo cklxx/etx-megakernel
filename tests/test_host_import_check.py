@@ -21,11 +21,17 @@ def check_dispatch(tmp_path_factory):
 #include <map>
 #include <cstdio>
 #include <cstdlib>
+#include <vector>
+#include <cstring>
 struct etx_imp_desc {};
 using hipFunction_t = void*;
 using hipModule_t = void*;
 struct { int stream; } hst;
 int launches = 0, lookups = 0;
+int topk_ids[64] = {17}, n_tk = 64, check_pos = 1040, NR = 8;
+float topk_w[64] = {0.5f};
+constexpr int hipMemcpyDeviceToHost = 1;
+int hipMemcpy(void* dst, const void* src, size_t n, int) { memcpy(dst, src, n); return 0; }
 void launch_imported(int) { ++launches; }
 bool wait_stream(int, double) { return true; }
 void die(const std::string& s) { fprintf(stderr, "%s\n", s.c_str()); exit(1); }
@@ -38,9 +44,9 @@ int hipModuleGetFunction(hipFunction_t*, hipModule_t, const char*) { return 0; }
 int main(int argc, char** argv) {
   int bad = getenv("CHECK_TEST_BAD") ? 1 : 0, not_imported = 0;
   std::string not_imported_names;
-  struct Inst { std::string exp; int n; };
+  struct Inst { std::string exp; int n; std::string role; int req; int layer; };
   for (int n = 1; n < argc; ++n) {
-    Inst x{argv[n], n};
+    Inst x{argv[n], n, std::string(argv[n]) == "dsl_topk" ? "topk" : "other", 0, n};
 ''' + dispatch + r'''
   }
 ''' + summary + r'''
@@ -87,3 +93,14 @@ def test_difference_summary_remains_failed(check_dispatch):
     assert run.returncode == 4
     assert "CHECK FAILED: 1 launch(es) differ\n" in run.stdout
     assert "CHECK OK" not in run.stdout
+
+
+def test_routing_audit_copies_actual_layer_bytes(check_dispatch, tmp_path):
+    import struct
+    run = subprocess.run([str(check_dispatch), "dsl_gemv", "dsl_topk"],
+                         env={**os.environ, "ETX_CHECK_TOPK_DUMP": str(tmp_path)}, capture_output=True, text=True)
+    assert run.returncode == 0
+    assert "ROUTING-AUDIT layer=2 position=1040 replicas=8" in run.stdout
+    assert (tmp_path / "L2_ids.bin").read_bytes() == struct.pack("64i", 17, *([0]*63))
+    assert (tmp_path / "L2_weights.bin").read_bytes() == struct.pack("64f", .5, *([0.]*63))
+    assert len(list(tmp_path.iterdir())) == 2
