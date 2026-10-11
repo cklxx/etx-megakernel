@@ -2,7 +2,7 @@
 
 **Finding:** the redundant partial matrix/gather is removable in source for both current shapes, but no qualified data prices its exclusive elapsed saving. The current evidence cannot certify a 0.3–0.5 ms pool. The report reconciles the measured bodies explicitly instead of assigning an ablation residual to unmeasured phases.
 
-Scope: Qwen3-30B-A3B, bf16, batch 1, context 1024, one MI300X (gfx942), ROCm 7.14.0. CPU-only source and evidence audit; no GPU run or provisioning. Work is on `wf/moeanat`.
+Scope: Qwen3-30B-A3B, bf16, batch 1, context 1024, one MI300X (gfx942), ROCm 7.14.0. CPU-only source and evidence audit; no GPU run or provisioning. Work is on `wf/moeanat`, based on **`a4ca716`**. Unless a commit is named explicitly, tracked source/file:line references use that worktree snapshot. This matters because `main` advanced during the audit; the version update is recorded in §3.2.
 
 Evidence convention: `[M]` is a measurement with a source location; `[E]` is an estimate with arithmetic; `[U]` is unknown and contributes nothing to a numeric total. Instruction counts are not phase latency measurements. In source references below, `G` is `etx/ops/gemv.py`, `MODEL` is `docs/MODEL-vllm-kernels.md`, and `PLAN-300TOKS` is `docs/PLAN-300TOKS-2026-10-11.md`. Overlapping costs must not be added as if serial.
 
@@ -134,6 +134,12 @@ There is also a whole-target ledger issue. **0.324 ms is the gap after already c
 
 On the **mean-body / ideal-4.3-TB/s bookkeeping basis alone**, only **0.363778 ms [E]** remains above weight service (§1.3), already smaller than **0.481667 ms [E]** before any essential work. This is a useful countercheck, **not a critical-path or wall-time impossibility proof**. Task mean is not critical-task body; mapping and achieved stream rate can change; their qualified effect is [U]. The evidence supports **“cannot presently carry the gap”**, not “a proof that every bf16 tile is capped at 0.158.”
 
+**Upstream update discovered at final verification.** At **`main=a312354`**, the protected plan has already replaced the KEY32 estimate with its **0.231 ms measured paired saving**, and its optimistic ledger is now **0.900 ms**, leaving **0.237667 ms** on the historical anchor (`docs/PLAN-300TOKS-2026-10-11.md` **at a312354:128,135-138**). It explicitly retains the original **0.324 ms / 6.743 us/layer** pursuit rule (**:138,148**). This report evaluates that requested rule; it does not describe 0.324 as the latest ledger's shortfall. Filling the *updated* accounting gap by replacing the MoE row would require `0.158+0.237667=0.395667 ms total [E]`, still no qualified pool here. KEY32 does not price any new MoE-body slice.
+
+The same main update annotates the XCD report's phase-specific bandwidth denominators, but retains its older raw trace and the quoted machinery taxonomy (`docs/XCD-TIMELINE-2026-10-11.md` **at a312354:13-21,275-290**). No newer intra-body stamps result from that correction. The ideal 4.3-TB/s convention here is labelled an optimistic weight-service bookkeeping model, not an achieved per-phase rate.
+
+The target **1.137667 ms** itself belongs to the plan's **4.471 ms** historical anchor: `4.471-1000/300=1.137667 ms [E]`. The specified trace's own wall is **4.474 ms**, so its standalone arithmetic gap is `4.474-1000/300=1.140667 ms [E]`; neither is a measured improvement against the other session. This small basis difference does not change the conclusion.
+
 ### 3.3 Largest item and the smallest removal
 
 **Largest timed removable item: [U].** Naming the **6.5 us residual** as that item would invent an attribution. The largest **provably redundant reduction data structure** is the partial matrix/gather above: no row in either audited shape has contributions from two waves. It is the smallest concrete experiment supported by this source anatomy.
@@ -264,8 +270,15 @@ Consulted existing work before naming a lever: `docs/DATA.md:32-35` inventories 
 4. **1785.1/1551.3 us** are another trace's estimated taxonomy; **6.5 us** is an older subtraction residual, and is not supported for both tasks (§1.2). NOVMEM keeps one weight-vector request per wave.
 5. The **0.158 ms** allowance is an older-trace ceiling under a serial-floor model, described as optimistic in the plan. It is not proved to be the true algorithmic ceiling (§3.2).
 6. Current down **does not straddle rows**: `per=12`, `spr=3`, hence whole-row ownership. The plan's generic warning that down *can* straddle (`PLAN-300TOKS:97`) is valid for other shapes, but cannot exclude this guarded shape (§2.1). No protected plan was edited.
-7. **0.324 ms** is additional to an already-credited MoE row; replacing that row needs about **0.482 ms total**, not merely 0.324 (§3.2).
+7. **0.324 ms** is the requested historical threshold, additional to an already-credited MoE row; meeting that threshold by replacing the row needs about **0.482 ms total**. The latest main ledger shortfall is **0.238 ms**, and its corresponding replacement requirement is **0.396 ms [E]**, as §3.2 records.
 8. **Largest removable phase by elapsed time, exact per-phase shares, actual shader/LDS/ALU/exp costs under this workload, full-model dynamic MoE spill cost, and net candidate saving are [U].** This is a complete source/operation anatomy with an explicit measured-body residual, **not a measured phase-price certificate**. The current inputs cannot supply that certificate under a CPU-only constraint. The existing probes also lack the launcher/integration and complete landmarks required to obtain it (§4).
+
+### 5.4 Local verification
+
+- Recomputed all **432 layer rows per log [E: 9 roles×48 layers]** for the archived and top-level traces; checked every stored source line, body, task count, aggregate and SHA256 against the raw files. Archived sum **3086.96 us**, top-level sum **3092.97 us [E from M]** are intentionally separate (`trace-sums.json:3-16,453-466`).
+- Enumerated every segment of the exact up/down shape; each of the **64 rows** has one owner, all row-local segments remain in order, and each wave has **8/3 full pipeline trips [E]** from §2.1. No tail executes.
+- Compiled both mapped original tile wrappers to gfx942 ISA with local device libraries. They have **56/54 VGPR**, **zero VGPR/SGPR spills and scratch**, **21120 B LDS [M local compiler metadata]** (`isa-audit.txt:73-79,133-139`). This verifies compilation/operation inventory, **not** runtime math, full-model allocation, or GPU speed.
+- Rechecked the weight-service reconciliation, gross service totals and dollar arithmetic (§§1.3,3.1,4.4); `git diff --check` passed. No full-model test or GPU correctness certificate was generated for the proposed rewrite.
 
 The requested document and its reproducible CPU evidence are committed on `wf/moeanat`. No production kernels or protected documents were changed; no GPU time, network spend or push occurred.
 
