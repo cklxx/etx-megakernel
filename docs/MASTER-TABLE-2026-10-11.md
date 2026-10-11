@@ -188,9 +188,9 @@ before-taken [M] and 2.12 after the take [R]. The path task is never block 0 (0/
 | QK5 | Block 0 only: store the new residual | GV:532 | 4,096 B coherent |
 | QK6 | Weight stream: 16 waves × (2 trips of U=2 + tail of 1) NT 16-B loads | GV:247-257, 129-133 | 81,920 B NT |
 | QK7 | Dot: 8 LDS reads + 8 FMA per vector | GV:140-146, 218-226 | 20 rows × 2048 |
-| QK8 | Row flush: wave sum (WSUM: 1 bpermute, 1 swizzle, 4 DPP) + lane-0 LDS add | GV:205-214; IS:22-38 | 20 flushes |
+| QK8 | Row flush: wave sum (WSUM: 1 bpermute, 1 swizzle, 4 DPP) + lane-0 LDS add | GV:205-214; IS:30-46 | 20 flushes |
 | QK9 | Partial clear + barrier; epilogue sums 16 partials per row; barrier; 20 × 2-B coherent stores; barrier | GV:185-186, 266-277 | 3 barriers, 40 B |
-| QK10 | Static ISA: 2,174 instructions, 33 vector loads, 11 barriers, 58 VGPR, no spill (local compiler); runtime divisions `sb/spr`, `(S+nw-1)/nw` | IS:6,14,22-38 | [E] |
+| QK10 | Static ISA: 2,174 instructions, 33 vector loads, 11 barriers, 58 VGPR, no spill (local compiler); runtime divisions `sb/spr`, `(S+nw-1)/nw` | IS:6,14,30-46 | [E] |
 
 All 256 tasks recompute the full RMSNorm (QK2-QK4); only block 0 stores it (QK5). Bytes [E] count the weights
 once; Q2's 36 KB per task is reread by every task (9.4 MB/layer of coherent reads, `256 × 36,864`) [E].
@@ -207,7 +207,7 @@ once; Q2's 36 KB per task is reread by every task (9.4 MB/layer of coherent read
 | PP5 | Norm weights and cos/sin: cached 2-B loads, issued after R4 | AP:127-140 | 8 + 8 per lane |
 | PP6 | RoPE math, pack, store q/k in place | AP:143-145 | 2,304 B coherent |
 | PP7 | k and v waves: slot_mapping coherent scalar load, then `slot / BS`, `slot % BS` (64-bit, runtime BS) | AP:141, 154; B/dsl_tiles.hip:204,214 | 1 dependent coherent trip |
-| PP8 | The 64-bit divide: ~150 static instructions per site, but a 32-bit bypass branch skips them when the high words are zero, as for slot < 2^32 | IS:59-60; ISA `v_cmp_ne_u32 vcc, 0, ...` before the long path | [E] small |
+| PP8 | The 64-bit divide: ~150 static instructions per site, but a 32-bit bypass branch skips them when the high words are zero, as for slot < 2^32 | IS:67-68; ISA `v_cmp_ne_u32 vcc, 0, ...` before the long path | [E] small |
 | PP9 | K cache: 2 × 8-B coherent stores per lane; V cache: wave 9, 2 loads + 8 strided 2-B stores per lane | AP:146-167 | 256 + 256 B; 128 scalar requests |
 | PP10 | Occupancy: 10 of 16 waves, 16 of 64 lanes active; no barrier, no LDS | AP:100-111, 22 | [M from source] |
 
@@ -279,7 +279,7 @@ hops 0.71 [E] + machinery 2.34 [R]; gap 1.55, all free.
 | TK4 | Softmax: 2 `expf`, butterfly wave sum (6 `ds_bpermute`), divide | TU:91-97, 19-22 | — |
 | TK5 | 7 more rounds of DPP wave max + clear | TU:98-109 | 7 wave maxes |
 | TK6 | Renormalise, lanes 0-7 store ids, slots and weights (coherent) | TU:110; B/dsl_tiles.hip:1487-1494 | 96 B |
-| TK7 | Static ISA: 706 instructions, 54 waits, no body barrier; the dead sparsemixer branch (mode 2) accounts for the largest dsl_tiles.hip lines | IS:9, 73-89 | [E] |
+| TK7 | Static ISA: 706 instructions, 54 waits, no body barrier; the dead sparsemixer branch (mode 2) accounts for the largest dsl_tiles.hip lines | IS:9, 81-97 | [E] |
 
 **moe_up** (`etx_tile_x_dsl_moe_up_fold`; 192 tasks, 24 per XCD; gate and up rows as one stream, GU1). Path per
 layer: body 16.05 = bytes 11.70 + hops 1.02 [E] + machinery 3.32 [R]; gap 1.09, all free. **moe_down**
@@ -446,3 +446,54 @@ sum of all body atoms of that role; the gap rows cap the protocol atoms.
 | M.B, M.E (down), M.G, M.H, M.L, M.M2, M.O, M.P, M.Q, M.S | YES-untried | MOE class II; gross service of the removable skeleton 0.015-0.023 ms (MOE:121) | below the 0.030 bar | closed by bar; X3 only if a new mechanism appears |
 | LM1-LM3 | closed by bar | lm_head machinery 7.2 us per step | < 30 us | — |
 | AX1-AX3, PL1-PL2, IN1 | closed by bar | bodies 9.5, 3.9, 3.7 us per step; argmax machinery 8.8 | each < 30 us | — |
+
+## 4. Defects found in the inputs and in the brief
+
+1. **REV's critical body is not the path body.** `round11_from_trace` averages the last-finishing task of
+   layers 1-45; the path takes other tasks and all 48 layers. On tr_on the difference is −15.2 us in total
+   (MT:42-51). It does not change any REV verdict (below the 0.030 ms bar), but the ledger only closes with it.
+2. **The hop model predates COH.** `examples/vllm_llm/xcd_account.py:36-56` takes hop counts from the round11
+   ISA (`docs/FLOORS-2026-10-08.md:127-140`); for example qkv counts 0 coherent trips, while today's fold reads
+   its 36 KB of norm inputs with coherent loads (QK2; IS:22 `load.coh`). Every [E] hop figure is therefore
+   stale per role; the error moves into machinery [R], and the totals still close.
+3. **The local build is not the timed ISA.** `build/qwen300-rocm-on/resource.log` (local LLVM) reports 20 B/lane
+   scratch and 4 VGPR spills; the VM's report for the same sources is 48 B/lane and 11 spills
+   (R/on_hipcc.log:7-11). IS counts per-tile wrappers with no spills; they are [E] for the timed build.
+4. **REV-reported, still open:** DEP:26-27 claims no untraced run exists (it is R/job2_run4.log:139-147); PLAN:130-132
+   still carry tr_all allowances (REV:131).
+5. **The brief's closure requirement.** Only the body view closes on independent measurements. The wait view
+   and the ledger close because one row in each is defined as a remainder (machinery and the correction); this
+   document names both rather than claiming three independent closures.
+6. **One body, two names.** `etx_tile_dsl_gemv` (o_proj) and `etx_tile_dsl_gemv_fold` (qkv, router, lm_head)
+   compile to the same 2,174-instruction body (IS:6-7); the fold is a runtime mode. Any change to the fold path
+   is also in o_proj's code.
+7. **Argument reads in prep and top-k are vector loads.** SCALAR moved the GEMV and MoE argument reads to the
+   scalar unit, but `dsl_attnprep` and `dsl_topk` still read theirs with global vector loads (IS:24-25). Below
+   the bar (PP1, TK1), recorded so nobody re-derives it.
+8. **Not determined here [U]:** the prologue's residual replica count; the instruction counts of the imported
+   bodies (no ISA audit of `imp_tiles.hip`); which XCD each [256]-task grid's tasks run on beyond the trace.
+
+## 5. Reproduce
+
+```
+cd <repo>
+.venv/bin/python docs/master-table-2026-10-11/master.py > docs/master-table-2026-10-11/master.txt   # 2 s, CPU
+.venv/bin/python docs/master-table-2026-10-11/isa.py    > docs/master-table-2026-10-11/isa.txt      # 1 s, local LLVM 23
+```
+
+`master.py` reads the trace, the plan and the byte spec below and reuses `etx/tools/timeline.py`,
+`etx/tools/floors.py` and `examples/vllm_llm/xcd_account.py`. `isa.py` needs `build/qwen300-rocm-on/` (the
+certificate build's tile sources), `/opt/homebrew/opt/llvm/bin` and the ROCm 7.2.4 headers and device libraries
+under `~/code/rocm-headers`.
+
+| File | SHA256 |
+|---|---|
+| `results_qwen300_2026-10-11/tr_on.bin` | `aa68468246acde1a8d0e19ad0fbc6d5913bc37c7a3f352f44cecec8c0bdef320` |
+| `results_qwen300_2026-10-11/tr_on.log` | `253f73e64a8d06242f3134c1b48f46286231e5eff3ee7716fd3f32f7b636e84d` |
+| `results_qwen300_2026-10-11/job2_run4.log` | `ac88d81e2e36d14d5217c840a45eacc68f0b6b23844eaf53b6cab81af49a520e` |
+| `results_vlbest2_2026-10-10/b_all/plan.json` | `b32c3299d4165ba8d68c7b04461d9ed050818d397c7d99082928922836f9f315` |
+| `docs/xcd-timeline-2026-10-11/bytes.json` | `95b217ad99b3e0d2561fcee2984d1054adeb94989ecbaea26d4b31b077b55c7b` |
+| `build/qwen300-rocm-on/dsl_tiles.hip` | `a0bcc2dc113fed1fe2e7d7144b66fa478ff935e3795b0cb4c2d98a3ce6b92852` |
+| `build/qwen300-rocm-on/imp_tiles.hip` | `d4bf266ae86001573f550586cc3dda518d1719e97590cc15db71681d171595eb` |
+| `docs/master-table-2026-10-11/master.txt` (output) | `021fdeb8f8e4d763232fbc0331d57d21a67c501b78634429b45daf4fc798c6e7` |
+| `docs/master-table-2026-10-11/isa.txt` (output) | `ed4fb86a30fa729c1652cc2081322c977c96810f653dce6860c33033c7675b51` |
