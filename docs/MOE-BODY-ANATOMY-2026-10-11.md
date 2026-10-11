@@ -157,7 +157,84 @@ After that structural deletion, the narrow next candidate is **constant/wave-uni
 
 ## 4. Probe coverage and decisive GPU measurement
 
-Pending: existing isolated timestamps, blind spots, exact commands, time and dollar budget. Commands are a future protocol, not executed here.
+### 4.1 Existing probe semantics
+
+`examples/vllm_llm/bf16_300/source.py:13-25,94-156` emits **twelve separate pair builds [M source inventory]**. Each selected task/wave retains two `s_memrealtime` stamps, then writes a **32 B record** (`:28-46`); **10 ns/tick** → `(end-begin)×0.01 us` (`attribution.py:22-23`). A compiler memory clobber constrains placement; it **does not retire global/LDS memory** (`source.py:35-39`). Its landmarks mean:
+
+| Pair | Actual interval / limitation |
+|---|---|
+| arguments | Before block/grid/argument reads → after dsl_args (`source.py:144-152`); wrapper import initialization precedes it. |
+| routing | Args complete → expert base We complete; includes slot/row/LDS-layout work, not just the id load (`:135-137`). |
+| stage | Expert base → original stage barrier completes (`:138-140`). |
+| zero | Before clear → after the original clear barrier (`:117-118`). Range arithmetic before the clear is excluded. |
+| pipeline | Before s0/w array → after final flush (`:119-120`). Includes weight issue/consume, dots, all transitions/flushes and tails. It is not a pure loop-control price. |
+| flush | Entry/exit of the **first selected named cur row** (`:125-127`); includes wave sum and partial deposit. It measures neither all flushes nor all rows. |
+| join | Pipeline end → after original all-wave partial join (`:121-122`); includes waiting for other waves. |
+| gather | After join → before reuse barrier (`:123-124`); selected wave 0 does gather and epilogue, other waves skip them. Up includes gate/up rounding/g writes; down includes multiply/round/output issue. |
+| reuse | Before → after helper final barrier (`:123-124`), including wave skew. |
+| publication | After body source → after original DOMAIN release and barrier (`:153`); excludes initial dispatch, but includes output drain. |
+| body | Before arguments → after publication, matching the body+drain convention better than tile return alone (`:144,153`). |
+| empty | Adjacent stamps after publication (`:154`); calibrates issue overhead, not resource-induced perturbation. |
+
+The important **uncovered intervals** are: stage end → zero begin (path selection/range setup); zero end → pipeline begin (weight base, cur division, accumulator/walk setup); reuse end → publication begin (**up's final SiLU/output**, or remaining body control). The current set cannot close the ledger even by adding non-overlapping issue pairs. Pipeline and flush overlap; body overlaps everything. A flush or join sample on an early-finishing wave is not the current path's exclusive slice.
+
+`dispatcher.py:18,34-72` emits **four separate dispatcher pair builds [M source inventory]** on a **two-task graph** (`:21-31`): descriptor/FIFO broadcast; wait/setup/acquire; exit/arrivals; empty. Note that the exit pair begins **after the body drain/barrier** at thread-0 return (`:67-71`): it does **not** include publication drainage already inside the body. This graph has neither the full model's task mix nor its contention; it is not a current MoE loop attribution.
+
+The qualification gate requires same session/compiler/math identity, equal **VGPR, AGPR, VGPR/SGPR spills, scratch, LDS and static block capacity**, **32/32** and all imports byte equal; **actual last task and last wave**, with body perturbation **≤0.5 us [acceptance threshold]** (`attribution.py:12-21`). It still returns `exclusive_removable_us_layer=None` (`:25`). The old local compile already shows differing allocations for many pairs (`README.md:99-115`). A small empty-pair duration cannot repair changed compiler allocation. No qualified GPU timestamps or exclusive-removal certificate are present in this package.
+
+### 4.2 Decisive experiment, registered before execution
+
+**Question to decide:** does eliminating the whole-row partial matrix expose a real correct saving, or merely delete hidden LDS work? This needs a legal original-vs-specialized A/B, accompanied by landmarks; a further wrong-output ablation cannot settle it.
+
+Use one MI300X VF, ROCm 7.14, bf16 Qwen batch 1/context 1024, cached existing weights/golden. Keep a **single host process with inputs resident** to avoid reloading the weight file for each sparse pair. First capture independent original outputs at selected decode positions and immutable up/down task inputs/IDs/weights, then run each original and candidate against the same inputs. Compare output bytes before timing the candidate; `host --check-dsl` is tolerance-based and is **not** a substitute for this new byte-equivalence gate (`G:30-31`). Full-model candidate must also have all imported-instance checks and **32/32**.
+
+Extend the pair set by the three uncovered intervals above. To separate setup, loop and reduction, select disjoint boundaries at **G:177/185**, **G:187/235**, **G:267/268**, **G:268/277**, and up **G:786 / task RELEASE_DOMAIN**. For the loop, sample one unrolled trip at a time, using the original order at **G:240,245,248,250,260** and separate transition flushes at **G:220/209**. Each build still keeps only one begin/end pair, saves records after the measured body, and includes an empty/control build with matched allocation. Do not sum the trip/flush observations into a new body until all executed trips and boundary gaps are covered. Forced `vmcnt/lgkmcnt` fences belong in a **separate labelled retirement diagnostic**; they change overlap and cannot price the original critical path.
+
+For path qualification, record actual **per-wave pre-join and pre-publication completion** along with the full task trace, using separate sparse builds with records indexed by `(task,wave)` after the body. The existing one-wave record pointer cannot be shared by simultaneously selected waves (`source.py:45,155`); allocate distinct records. Sweep all participating waves to detect a migrating slowest wave; gather/SiLU work is in wave 0 in the control. Validate last-task/last-wave evidence in the actual model run, not in a one-block replay. Repeat on representative early/middle/late layers and positions **0/1040**; use the current-plan body distribution to select tasks, not default task/wave zero. A representative isolated task is useful for cause, but cannot by itself certify the aggregate mean or wall saving.
+
+Run **five interleaved original/candidate pairs [E experiment design]**, with production timestamps disabled for the decisive saving; sparse instrumented runs qualify attribution separately. Measure untraced **host wall and device** time and per-layer/critical body changes. Also replay the candidate's **same kernels in a HIP graph** to preserve the fusion baseline. If quoting a new system lead, include the strongest tested legal vLLM S3 in that same session; its run is not necessary to answer the anatomy alone.
+
+**Go/no-go:** first require exact output and qualifying instrumentation. For a small skeleton continuation, use the existing **2.083 us/layer exclusive opportunity** pursuit bar (`PLAN-300TOKS:107`), then correct A/B net gain. To carry the brief's local threshold require `48×Δ(up+down)/1000 ≥0.324 ms [E]`, on actual critical/step time, every pair faster and spread reported. To repair the **whole-target ledger**, require **≥0.481667 ms total MoE saving [E]** (§3.2), and replace the old row rather than add a second one. If the measured result is small or hidden, close this deletion as a target-carrying route; retain any intermediate validated improvement under the existing KEEP rule. If it is large, recompute the full ledger and validate the new same-kernel graph/fused wall comparison (`pairs.py:138-163`).
+
+### 4.3 Commands: available interfaces versus missing driver
+
+The following **CPU commands exist today** and were used/read here; they launch no GPU. They emit/prove source and compiler resource differences, not phase latencies:
+
+```bash
+.venv/bin/python docs/moe-body-anatomy-2026-10-11/isa-audit.py
+.venv/bin/python -m examples.vllm_llm.bf16_300.build --task 0 --wave 0 --row 0
+# Compile the isolated prepared family locally, in an isolated output tree:
+ETX_DEVLIBS=/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode   .venv/bin/python -m examples.vllm_llm.bf16_300.build --compile --task 0 --wave 0 --row 0
+```
+
+Do **not** run the latter two against this worktree's shared `build` symlink: use an isolated ordinary output tree, as the original preparation did (`README.md:125-150`). This audit compiles under `/tmp` and leaves the shared build untouched. Preserve each selector's emitted identity before selecting another: the current build CLI has no output-directory argument (`build.py:105-108,175-181`). On a VM compile the generated independent probe TUs with **the VM's compiler**, rather than treating these local resource numbers as its result. The existing `rocm_build_check.sh` targets ROCm **7.2.4**, not the supplied session's **7.14** (`rocm_build_check.sh:2-5`).
+
+For a **future qualified full-model original and candidate build**, these GPU/check commands already exist. Here `ANAT_MODEL` is an already cached packed model directory and `ANAT_BUILD` a separately built `ETX_VL_CHECK=1` directory with its own run/plan/identity; no old certificate is transferred:
+
+```bash
+ANAT_MODEL=/root/llm/qwen3-30b-a3b
+ANAT_BUILD=/root/sess/moe_anatomy_original
+ANAT_LOG=/root/sess/moe_anatomy_evidence
+mkdir -p "$ANAT_LOG"
+timeout 240s stdbuf -oL -eL .venv/bin/python   -m examples.vllm_llm.import_certificate --run-build "$ANAT_BUILD"   --model "$ANAT_MODEL" -- --check 48 --check-pos 0 --repeat 1   > "$ANAT_LOG/check_p0.log" 2>&1
+timeout 240s stdbuf -oL -eL .venv/bin/python   -m examples.vllm_llm.import_certificate --run-build "$ANAT_BUILD"   --model "$ANAT_MODEL" -- --check 48 --check-pos 1040 --repeat 1   > "$ANAT_LOG/check_p1040.log" 2>&1
+ETX_TRACE=1 ETX_TRACE_RAW="$ANAT_LOG/task_trace.bin"   timeout 180s stdbuf -oL -eL .venv/bin/python   -m examples.vllm_llm.import_certificate --run-build "$ANAT_BUILD"   --model "$ANAT_MODEL" -- --repeat 1 > "$ANAT_LOG/task_trace.log" 2>&1
+```
+
+Repeat the checks with `ANAT_BUILD=/root/sess/moe_anatomy_candidate`. For each built arm, capture untraced fused and graph runs with the same certified interface; graph adds **`--unfused`**. Feed five interleaved fused/graph logs to:
+
+```bash
+.venv/bin/python -m examples.vllm_llm.pairs --basis wall --pairs 5   /root/sess/moe_anatomy_evidence/f1.log /root/sess/moe_anatomy_evidence/g1.log   /root/sess/moe_anatomy_evidence/f2.log /root/sess/moe_anatomy_evidence/g2.log   /root/sess/moe_anatomy_evidence/f3.log /root/sess/moe_anatomy_evidence/g3.log   /root/sess/moe_anatomy_evidence/f4.log /root/sess/moe_anatomy_evidence/g4.log   /root/sess/moe_anatomy_evidence/f5.log /root/sess/moe_anatomy_evidence/g5.log
+```
+
+**The missing executable matters:** `bf16_300` has **no GPU launcher, full-model pack or host record reader** (`README.md:131-150`). Those commands alone cannot run its timestamp probes or the new down specialization. There is **no existing exact “run the probes” command that closes this split**. Before any paid run, implement and CPU-check the resident-input host driver, record allocation/reading, additional landmarks, byte-equivalence capture, full-model sampling integration and a single `gpu_jobs.py` session job. Its required invocation contract is: select original/candidate and pair, original argument blocks and recorded `(layer, task, wave, row)`, iterations, deadline, output path, and independent original-output reference; return full raw records, resource identity, body perturbation, checks and task/wave completion evidence. An invented command against a nonexistent launcher would conceal the same readiness problem this audit found.
+
+### 4.4 Time and price, not spent
+
+**Estimated diagnostic session: 30 minutes [E planning budget]**, assuming cached image/model and a resident-input driver: **8 min** VM compiler/resource gates + **2 min** load/initialize + **8 min** import/token/byte-output checks + **5 min** sparse issue/retirement diagnostics + **5 min** interleaved untraced pairs + **2 min** evidence/cleanup. These are budget allocations, not measured durations; actual driver/build runtime is [U]. At the customer's **$1.99/hour**, `30/60×1.99 = $0.995 ≈ $1.00 [E]`. A hard **40 min** cap costs `40/60×1.99 = $1.327 [E]`; the extra `10/60×1.99 = $0.332` is a budget margin, not approval to spend it. A full new S3 system comparison/image setup is outside this cached diagnostic budget [U].
+
+Nothing was provisioned, downloaded, or run on a GPU here: **GPU minutes/spend = 0**. The future job must preserve full logs, print progress, enforce substep deadlines and probe silence, then delete its VM immediately and record the closing balance, per AGENTS §4. **Do not provision against the currently incomplete launcher/allocation gate.**
+
 
 ## 5. Counter-argument and unresolved evidence
 
