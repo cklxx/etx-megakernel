@@ -165,6 +165,12 @@ def main():
         for assertion in d.get('contains', []):
             if assertion not in text:
                 raise AssertionError(f"{row['id']}: missing assertion {assertion!r}")
+        for assertion in d.get('not_contains', []):
+            if assertion in text:
+                raise AssertionError(f"{row['id']}: unexpected attributed literal {assertion!r}")
+        for number, expected in d.get('line_equals', {}).items():
+            if dict(row['source_lines']).get(int(number)) != expected:
+                raise AssertionError(f"{row['id']}: changed line {number}")
         for pattern in d.get('regex', []):
             if not re.search(pattern, text):
                 raise AssertionError(f"{row['id']}: failed regex {pattern!r}")
@@ -187,7 +193,7 @@ def main():
     (OUT / 'inventory.json').write_text(json.dumps(rows, indent=2, ensure_ascii=False) + '\n')
     (OUT / 'inputs.sha256.json').write_text(json.dumps(inputs, indent=2) + '\n')
     with (OUT / 'citations.tsv').open('w', newline='') as f:
-        writer = csv.writer(f, delimiter='\t')
+        writer = csv.writer(f, delimiter='\t', lineterminator='\n')
         writer.writerow(['document', 'citation', 'verdict', 'evidence'])
         for row in rows:
             writer.writerow([row['document'], row['citation'], row['verdict'],

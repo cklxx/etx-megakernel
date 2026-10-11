@@ -30,6 +30,9 @@
     "note": "The cited line is an Infinity Cache counter item; session fetch is at line 211.",
     "corrected": [
       "docs/XCD-TIMELINE-2026-10-11.md:211"
+    ],
+    "not_contains": [
+      "Session fetch"
     ]
   },
   "4": {
@@ -63,6 +66,9 @@
     "note": "Line 30 is only a heading; the different-build caveat is at line 32.",
     "corrected": [
       "docs/XCD-TIMELINE-2026-10-11.md:32"
+    ],
+    "not_contains": [
+      "traced build is not"
     ]
   },
   "7": {
@@ -90,6 +96,9 @@
     "note": "Line 26 checks task execution; +0.008 ms/0.2% trace overhead is at line 28.",
     "corrected": [
       "docs/XCD-TIMELINE-2026-10-11.md:28"
+    ],
+    "not_contains": [
+      "0.008"
     ]
   },
   "9": {
@@ -208,25 +217,36 @@
   },
   "18": {
     "verdict": "PASS",
-    "contains": [],
+    "contains": [
+      "tr[0]",
+      "ETX_TIMER"
+    ],
     "claim": "A critical-path gap runs from the critical producer's body-done stamp to the consumer's deps-ready stamp.\nThe trace stamps three times per task: taken (`etx/codegen/kernel.py:264`), deps ready (`kernel.py:314`,\nimmediately after the phase-1 barrier at `kernel.py:313`), body done (`kernel.py:333`, after the per-wave\nstore drain at `kernel.py:324-326` and the barrier at `kernel.py:332`). The producer's **arrive is emitted\nafter the done stamp** (`kernel.py:335-359`), so it is untimed and lies inside the consumer's gap\n(`docs/XCD-TIMELINE-2026-10-11.md:73,204`).",
     "note": "Reviewed attributed fact/identifier and its stated conditions; assertions recheck the literal support. Derived values use the displayed arithmetic; associated citations can jointly supply inputs."
   },
   "19": {
     "verdict": "PASS",
-    "contains": [],
+    "contains": [
+      "tr[1]",
+      "ETX_TIMER"
+    ],
     "claim": "A critical-path gap runs from the critical producer's body-done stamp to the consumer's deps-ready stamp.\nThe trace stamps three times per task: taken (`etx/codegen/kernel.py:264`), deps ready (`kernel.py:314`,\nimmediately after the phase-1 barrier at `kernel.py:313`), body done (`kernel.py:333`, after the per-wave\nstore drain at `kernel.py:324-326` and the barrier at `kernel.py:332`). The producer's **arrive is emitted\nafter the done stamp** (`kernel.py:335-359`), so it is untimed and lies inside the consumer's gap\n(`docs/XCD-TIMELINE-2026-10-11.md:73,204`).",
     "note": "Reviewed attributed fact/identifier and its stated conditions; assertions recheck the literal support. Derived values use the displayed arithmetic; associated citations can jointly supply inputs."
   },
   "20": {
     "verdict": "PASS",
-    "contains": [],
+    "contains": [
+      "__syncthreads"
+    ],
     "claim": "A critical-path gap runs from the critical producer's body-done stamp to the consumer's deps-ready stamp.\nThe trace stamps three times per task: taken (`etx/codegen/kernel.py:264`), deps ready (`kernel.py:314`,\nimmediately after the phase-1 barrier at `kernel.py:313`), body done (`kernel.py:333`, after the per-wave\nstore drain at `kernel.py:324-326` and the barrier at `kernel.py:332`). The producer's **arrive is emitted\nafter the done stamp** (`kernel.py:335-359`), so it is untimed and lies inside the consumer's gap\n(`docs/XCD-TIMELINE-2026-10-11.md:73,204`).",
     "note": "Reviewed attributed fact/identifier and its stated conditions; assertions recheck the literal support. Derived values use the displayed arithmetic; associated citations can jointly supply inputs."
   },
   "21": {
     "verdict": "PASS",
-    "contains": [],
+    "contains": [
+      "tr[2]",
+      "ETX_TIMER"
+    ],
     "claim": "A critical-path gap runs from the critical producer's body-done stamp to the consumer's deps-ready stamp.\nThe trace stamps three times per task: taken (`etx/codegen/kernel.py:264`), deps ready (`kernel.py:314`,\nimmediately after the phase-1 barrier at `kernel.py:313`), body done (`kernel.py:333`, after the per-wave\nstore drain at `kernel.py:324-326` and the barrier at `kernel.py:332`). The producer's **arrive is emitted\nafter the done stamp** (`kernel.py:335-359`), so it is untimed and lies inside the consumer's gap\n(`docs/XCD-TIMELINE-2026-10-11.md:73,204`).",
     "note": "Reviewed attributed fact/identifier and its stated conditions; assertions recheck the literal support. Derived values use the displayed arithmetic; associated citations can jointly supply inputs."
   },
@@ -243,7 +263,9 @@
   },
   "23": {
     "verdict": "PASS",
-    "contains": [],
+    "contains": [
+      "__syncthreads"
+    ],
     "claim": "A critical-path gap runs from the critical producer's body-done stamp to the consumer's deps-ready stamp.\nThe trace stamps three times per task: taken (`etx/codegen/kernel.py:264`), deps ready (`kernel.py:314`,\nimmediately after the phase-1 barrier at `kernel.py:313`), body done (`kernel.py:333`, after the per-wave\nstore drain at `kernel.py:324-326` and the barrier at `kernel.py:332`). The producer's **arrive is emitted\nafter the done stamp** (`kernel.py:335-359`), so it is untimed and lies inside the consumer's gap\n(`docs/XCD-TIMELINE-2026-10-11.md:73,204`).",
     "note": "Reviewed attributed fact/identifier and its stated conditions; assertions recheck the literal support. Derived values use the displayed arithmetic; associated citations can jointly supply inputs."
   },
@@ -270,6 +292,9 @@
     "note": "Line 73 defines dependency wait and line 204 is blank; the untimed-arrive statement is at 80 and 206.",
     "corrected": [
       "docs/XCD-TIMELINE-2026-10-11.md:80,206"
+    ],
+    "not_contains": [
+      "tr[2]"
     ]
   },
   "26": {
@@ -379,6 +404,9 @@
     "note": "Line 124 describes seven smaller edges; the touch hook is discussed at 126.",
     "corrected": [
       "docs/XCD-TIMELINE-2026-10-11.md:126"
+    ],
+    "not_contains": [
+      "touch"
     ]
   },
   "36": {
@@ -739,7 +767,8 @@
     "corrected": [
       "docs/FLOORS-2026-10-08.md:319",
       "docs/RESULTS-2026-10-01.md:98"
-    ]
+    ],
+    "correction_limit": "No corrected citation supports the original causal claim. The listed sources support the slowdown and explicitly leave its cause unknown."
   },
   "67": {
     "verdict": "PASS",
@@ -828,6 +857,9 @@
     "note": "The current cited ledger says 0.238 ms, not 0.324; the historical 0.323667 and retained pursuit rule exist at 138/148.",
     "corrected": [
       "docs/PLAN-300TOKS-2026-10-11.md:138,148"
+    ],
+    "not_contains": [
+      "0.323667"
     ]
   },
   "74": {
@@ -841,7 +873,11 @@
   },
   "75": {
     "verdict": "PASS",
-    "contains": [],
+    "contains": [
+      "tr[0]",
+      "tr[1]",
+      "tr[2]"
+    ],
     "claim": "No gap sits **inside** a dependent chain. The trace stamps only taken / deps-ready / body-done\n(`kernel.py:264,314,333`); a body is one unbroken interval, and the dependent-chain cost (the acquired-load\nround trips) is in-body machinery, priced only by the [E] hop model (`examples/vllm_llm/xcd_account.py:41-56`,\n0.50 us per coherent trip from `docs/FLOORS-2026-10-08.md:76-88`).",
     "note": "Reviewed attributed fact/identifier and its stated conditions; assertions recheck the literal support. Derived values use the displayed arithmetic; associated citations can jointly supply inputs."
   },
@@ -909,7 +945,11 @@
   },
   "82": {
     "verdict": "PASS",
-    "contains": [],
+    "contains": [
+      "tr[0]",
+      "tr[1]",
+      "tr[2]"
+    ],
     "claim": "**The existing trace cannot resolve any of them.** Three stamps per task (`kernel.py:264,314,333`); the\nproducer's arrive is emitted after the done stamp (`kernel.py:335-359`), so its duration is inside the gap,\nunmeasured; the wait loop leaves no record of when the poll succeeded (`primitives.h:19-25`); nothing\ninside phase 1 is stamped, so the touch is invisible. This is the tooling gap already registered\n(`docs/XCD-TIMELINE-2026-10-11.md:204-206`, items 2-3).",
     "note": "Reviewed attributed fact/identifier and its stated conditions; assertions recheck the literal support. Derived values use the displayed arithmetic; associated citations can jointly supply inputs."
   },
@@ -945,6 +985,9 @@
     "note": "Range 204-206 includes items 1-2; the requested arrive/poll items 2-3 are at 206-207.",
     "corrected": [
       "docs/XCD-TIMELINE-2026-10-11.md:206-207"
+    ],
+    "not_contains": [
+      "poll-success"
     ]
   },
   "86": {
@@ -992,6 +1035,9 @@
     "note": "Line 397 checks plan equality; the ETX_TRACE_RAW environment pattern moved to 417.",
     "corrected": [
       "examples/sessions/qwen300.py:417"
+    ],
+    "not_contains": [
+      "ETX_TRACE_RAW"
     ]
   },
   "90": {
@@ -1014,6 +1060,9 @@
     "note": "Line 174 gives 23 s per run, not 483 s setup or 92 s build; these are at 176.",
     "corrected": [
       "docs/XCD-TIMELINE-2026-10-11.md:176"
+    ],
+    "not_contains": [
+      "483"
     ]
   },
   "92": {
@@ -1048,6 +1097,9 @@
     "note": "Line 144 is the architectural counterargument; the 15-minute $0.4975 measurement budget is at 146.",
     "corrected": [
       "docs/PLAN-300TOKS-2026-10-11.md:146"
+    ],
+    "not_contains": [
+      "0.4975"
     ]
   },
   "95": {
@@ -1070,7 +1122,10 @@
     "note": "Line 155 is blank; CPU preparation 8-16 hours is at 157.",
     "corrected": [
       "docs/PLAN-300TOKS-2026-10-11.md:157"
-    ]
+    ],
+    "line_equals": {
+      "155": ""
+    }
   },
   "97": {
     "verdict": "PASS",
@@ -1391,7 +1446,11 @@
   },
   "125": {
     "verdict": "PASS",
-    "contains": [],
+    "contains": [
+      "tr[0]",
+      "tr[1]",
+      "tr[2]"
+    ],
     "claim": "The trace stamps three times per task: taken, deps ready and body done (`etx/codegen/kernel.py:264,314,333`). The arrive after the body is not stamped. The table is consistent with `report.txt:443-450`: body 42.6-42.9% and 37.2-37.4%, wait 50.1-50.2% and 55.7-56.0%.",
     "note": "Reviewed attributed fact/identifier and its stated conditions; assertions recheck the literal support. Derived values use the displayed arithmetic; associated citations can jointly supply inputs."
   },
@@ -1795,6 +1854,9 @@
     "note": "Line 157 is CPU probe preparation; the 0.030 ms KEEP rule is at 159.",
     "corrected": [
       "docs/PLAN-300TOKS-2026-10-11.md:159"
+    ],
+    "not_contains": [
+      "0.030"
     ]
   },
   "160": {
@@ -1820,6 +1882,9 @@
     "note": "Line 441 prints KEY32 host-wall gains, not byte utilization on the 4.471 ms anchor; that arithmetic moved to 461.",
     "corrected": [
       "examples/sessions/qwen300.py:461"
+    ],
+    "not_contains": [
+      "6.1904"
     ]
   },
   "162": {
@@ -1970,6 +2035,9 @@
     "note": "The range describes ROW-sized int64 parsing, but never states ROW=9; the number is at 33.",
     "corrected": [
       "etx/tools/timeline.py:33,71-78"
+    ],
+    "not_contains": [
+      "ROW = 9"
     ]
   },
   "174": {
@@ -2006,13 +2074,18 @@
   },
   "177": {
     "verdict": "PASS",
-    "contains": [],
+    "contains": [
+      "_x",
+      "base.setdefault"
+    ],
     "claim": "1. **Intra-body stamps.** The bytes and machinery split of every body is an estimate (section 2.1). An optional second trace level could stamp, in the DSL tiles, the first weight load issued, the last weight load returned and the start of the store drain. The imported attention and reduce bodies cannot carry stamps without a change to the imported code [U].\n2. **An arrive stamp.** The arrive after `tr[2]` is not stamped (`etx/codegen/kernel.py:333-335`). It is inside the 233.8 us of late edges and inside every gap. One more int64 per trace row would measure it. The row is now 9 int64 (`etx/tools/timeline.py:71-78`, 72 B per task).\n3. **A poll-success stamp in phase 1.** It would split each gap into visibility and the rest: touch, acquire, context setup and the barrier. It would show whether the touch is exposed in the busy-consumer edges. A cheaper first test exists: an A/B of the `-DETX_NO_TOUCH` build (`etx/codegen/kernel.py:287`). `docs/OPTIMISATIONS.md:27` says the touch was never isolated after `ETX_VL_COH`.\n4. **Per-phase counters.** rocprofv3 reports one value per dispatch, and one dispatch is a whole step. No tool gives L2 hits per phase. rocprofv3 thread trace could time each wave's instructions. Its support on this VF is [U].\n5. **An Infinity Cache counter.** None of the data sets has one. Section 3 step 1 checks whether the VF exposes one.\n6. **Fixed in this report:** `etx.tools.timeline` grouped the low-bandwidth time by phase kind with a regex that kept the `_x` suffix of replicated grids. Each `topk_N_x` was a separate kind, so topk dropped out of the list. topk is in fact the largest low-bandwidth kind at 401.5 us. The fix is at `etx/tools/timeline.py:296`. The same suffix also gave each topk layer its own colour in the HTML page (`timeline.py:497-499`). A test covers the grouping (`tests/test_timeline.py`).\n7. **Session fetch.** `tools/session.sh:89` excludes `b_*/`, so a fetched session has no `plan.json` and no `vl_plan.txt`. This report had to borrow the plan of another session and check it row by row. A copy of both files to the session root, as `qwen300.py` already does for `compile.log`, `hipcc.log` and `compiler_version.txt`, would remove that step.\n8. **Trace every timed build.** The anchor session timed a build that it never traced. A session that traces the build it times removes the build caveat of section 0. qwen300 does this (section 6).",
     "note": "Reviewed attributed fact/identifier and its stated conditions; assertions recheck the literal support. Derived values use the displayed arithmetic; associated citations can jointly supply inputs."
   },
   "178": {
     "verdict": "PASS",
-    "contains": [],
+    "contains": [
+      "--exclude 'b_*/'"
+    ],
     "claim": "1. **Intra-body stamps.** The bytes and machinery split of every body is an estimate (section 2.1). An optional second trace level could stamp, in the DSL tiles, the first weight load issued, the last weight load returned and the start of the store drain. The imported attention and reduce bodies cannot carry stamps without a change to the imported code [U].\n2. **An arrive stamp.** The arrive after `tr[2]` is not stamped (`etx/codegen/kernel.py:333-335`). It is inside the 233.8 us of late edges and inside every gap. One more int64 per trace row would measure it. The row is now 9 int64 (`etx/tools/timeline.py:71-78`, 72 B per task).\n3. **A poll-success stamp in phase 1.** It would split each gap into visibility and the rest: touch, acquire, context setup and the barrier. It would show whether the touch is exposed in the busy-consumer edges. A cheaper first test exists: an A/B of the `-DETX_NO_TOUCH` build (`etx/codegen/kernel.py:287`). `docs/OPTIMISATIONS.md:27` says the touch was never isolated after `ETX_VL_COH`.\n4. **Per-phase counters.** rocprofv3 reports one value per dispatch, and one dispatch is a whole step. No tool gives L2 hits per phase. rocprofv3 thread trace could time each wave's instructions. Its support on this VF is [U].\n5. **An Infinity Cache counter.** None of the data sets has one. Section 3 step 1 checks whether the VF exposes one.\n6. **Fixed in this report:** `etx.tools.timeline` grouped the low-bandwidth time by phase kind with a regex that kept the `_x` suffix of replicated grids. Each `topk_N_x` was a separate kind, so topk dropped out of the list. topk is in fact the largest low-bandwidth kind at 401.5 us. The fix is at `etx/tools/timeline.py:296`. The same suffix also gave each topk layer its own colour in the HTML page (`timeline.py:497-499`). A test covers the grouping (`tests/test_timeline.py`).\n7. **Session fetch.** `tools/session.sh:89` excludes `b_*/`, so a fetched session has no `plan.json` and no `vl_plan.txt`. This report had to borrow the plan of another session and check it row by row. A copy of both files to the session root, as `qwen300.py` already does for `compile.log`, `hipcc.log` and `compiler_version.txt`, would remove that step.\n8. **Trace every timed build.** The anchor session timed a build that it never traced. A session that traces the build it times removes the build caveat of section 0. qwen300 does this (section 6).",
     "note": "Reviewed attributed fact/identifier and its stated conditions; assertions recheck the literal support. Derived values use the displayed arithmetic; associated citations can jointly supply inputs."
   },
@@ -2026,6 +2099,9 @@
     "note": "Lines 377-378 start a build and set its flags; plan equality is at 397-398.",
     "corrected": [
       "examples/sessions/qwen300.py:397-398"
+    ],
+    "not_contains": [
+      "read_bytes"
     ]
   },
   "180": {
@@ -2038,6 +2114,9 @@
     "note": "Line 397 checks plan equality; trace file/environment construction is at 417.",
     "corrected": [
       "examples/sessions/qwen300.py:417"
+    ],
+    "not_contains": [
+      "ETX_TRACE_RAW"
     ]
   },
   "181": {
@@ -2050,6 +2129,9 @@
     "note": "Lines 399-405 prepare certificates/routing directories; body deltas are at 419-425.",
     "corrected": [
       "examples/sessions/qwen300.py:419-425"
+    ],
+    "not_contains": [
+      "BODY-DELTA"
     ]
   },
   "182": {
@@ -2102,7 +2184,12 @@
   },
   "186": {
     "verdict": "PASS",
-    "contains": [],
+    "contains": [
+      "qkv",
+      "1.0068",
+      "moe_up",
+      "2.4159"
+    ],
     "claim": "Corrected table, recomputed from the JSON artefacts at full precision (`latency.json`, `bandwidth.json`; the rounded text columns are `latency.txt:5-15` and `bandwidth.txt:3-15`). \"Ceiling\" is `XCDs live x 0.5375 TB/s` [E]. \"Own share\" is `achieved GB/s / ceiling` [E]. The old column, the share of the whole-device 4.3 TB/s, is kept so the size of the correction is visible.",
     "note": "Reviewed attributed fact/identifier and its stated conditions; assertions recheck the literal support. Derived values use the displayed arithmetic; associated citations can jointly supply inputs."
   },
@@ -2121,13 +2208,25 @@
   },
   "188": {
     "verdict": "PASS",
-    "contains": [],
+    "contains": [
+      "83.75%",
+      "83.43%",
+      "83.96%",
+      "83.72%",
+      "62.13%",
+      "62.31%",
+      "62.09%",
+      "62.11%"
+    ],
     "claim": "The old headline, \"achieved 32.6% of the bandwidth\", prices the wrong resource. HBM is idle most of the step: known bytes cover only 32.6% of the span's byte capacity. The workers are not idle. The scarce-looking resource, and the one the 300 tok/s question turns on, is worker time. From the per-XCD `any body` shares (`docs/xcd-timeline-2026-10-11/account.txt:15-22`) [M]:",
     "note": "Reviewed attributed fact/identifier and its stated conditions; assertions recheck the literal support. Derived values use the displayed arithmetic; associated citations can jointly supply inputs."
   },
   "189": {
     "verdict": "PASS",
-    "contains": [],
+    "contains": [
+      "83.75%",
+      "62.13%"
+    ],
     "claim": "| Quantity | Value | Basis |\n|---|---|---|\n| Idle worker time per step | **1194 us** [E] of 8-XCD-equivalent time | traced build, device span 4412.1 us, `account.txt:15-22` |\n| Gap to 300 tok/s | **1138 us** [E] | anchor wall 4.471 ms vs 3.333333 ms (`docs/PLAN-300TOKS-2026-10-11.md:15`) |\n| Same idle share on the anchor's device median | 1174 us [E] | `0.2706 x 4340`; the anchor was never traced, so this transfers the share, it does not measure it |\n| Gap after the measured KEY32 cut | 846.7 us [E] | `4.180 - 3.3333` (`docs/KEY32-MEASURED-2026-10-11.md:66-67`) |",
     "note": "Reviewed attributed fact/identifier and its stated conditions; assertions recheck the literal support. Derived values use the displayed arithmetic; associated citations can jointly supply inputs."
   },
@@ -2199,7 +2298,14 @@
   },
   "196": {
     "verdict": "PASS",
-    "contains": [],
+    "contains": [
+      "qkv",
+      "1.0068",
+      "moe_up",
+      "2.4159",
+      "lm_head",
+      "0.6223"
+    ],
     "claim": "Per-layer bytes, from the per-phase byte spec divided by 48 (`bandwidth.json`; the text table rounds, `bandwidth.txt:3-15`) [E]:",
     "note": "Reviewed attributed fact/identifier and its stated conditions; assertions recheck the literal support. Derived values use the displayed arithmetic; associated citations can jointly supply inputs."
   },
@@ -2470,7 +2576,8 @@
     ],
     "claim": "- **Upper bound: 120.8 us [E]** = `702.3 x 0.172`, using the most favourable measured residency delta (+17.2% at 192 MB, `overlap.log:8`). That is 2.7% of the 4412.1 us span and 10.6% of the 1138 us gap.\n- **Central estimate: 63.2 us [E]** = `702.3 x 0.090`, at the layer-size point (+9.0% at 104 MB, `overlap.log:6`).\n- **Size-matched estimate: about 0 [E].** At the actual per-layer window sizes (17-51 MB) the measured cache-resident passes were slower than cold (`overlap.log:3-5`). If the bench's size dependence is real and not a ramp artefact, the mechanism gains nothing at these windows. Arm A of section 5 re-measures exactly these sizes.\n- **Hops: ~0 [E from M].** The 138.0 us of hops before the first weight load are load round trips; under load a round trip costs the same at every cache level (`docs/MODEL-vllm-kernels.md:321`), so residency does not shorten them.",
     "note": "The points are 17.3, 34.6 and 64.0 MB, not measurements at the actual 17-51 MB windows (25/51 MB are unmeasured here). No size-matched citation for those windows was located.",
-    "corrected": []
+    "corrected": [],
+    "correction_limit": "No corrected citation exists for size-matched 25/51 MB measurements; the source contains only 17.3, 34.6 and 64.0 MB points."
   },
   "219": {
     "verdict": "PASS",
@@ -2563,7 +2670,8 @@
       "cited": "split fold at 4.31 TB/s background",
       "claimed": "prefetch resource interference at about 0.67-2.0 TB/s",
       "other_numbers": "P1-P3 and experiment arm C use spare-rate windows, not full-tilt streaming."
-    }
+    },
+    "correction_limit": "The wider range contrasts two foreground placements and background rates; it is not a matched measurement of the proposed prefetch condition."
   },
   "227": {
     "verdict": "PASS",
@@ -2726,7 +2834,10 @@
   },
   "240": {
     "verdict": "PASS",
-    "contains": [],
+    "contains": [
+      "phase=before sha256=cd88dda618203c4dd8f8a13945dba6921e0eddd5915d4ba9a90b6bc9f23ec310",
+      "phase=after sha256=cd88dda618203c4dd8f8a13945dba6921e0eddd5915d4ba9a90b6bc9f23ec310"
+    ],
     "claim": "All external `results_*` paths below are relative to `/Users/ckl/code/etx`, not this worktree. The supplied numbers belong to **`results_qwen300_2026-10-11/attempt1/tr_off.log`**, not the current top-level file. The archive reports span **4295.4 us [M]** (`:26`), **32/32 [M]** (`:25`), device median **4.297 ms**, wall **4.474 ms**, **233 tok/s [M]** (`:464-466`). The four flags are recorded at `results_qwen300_2026-10-11/certificate_off/build_identity.json:23`. Its DSL-source hash at `:6` matches the available `build/qwen300-rocm-off/dsl_tiles.hip` (checked locally); the local full-model source/plan hashes do **not** match the certificate, so that local megakernel assembly is not treated as the timed ISA. Hardware is MI300X VF, gfx942, ROCm 7.14 (`results_qwen300_2026-10-11/record.log:7,15,18`). The current top-level log reports **4.299/4.471 ms [M]** (`:464-466`); do not silently substitute it. Both logs bracket the same build-identity hash (`:3,467`), but are different observations.",
     "note": "Reviewed attributed fact/identifier and its stated conditions; assertions recheck literal support. Derived values use displayed arithmetic; associated citations can jointly supply inputs."
   },
@@ -2768,6 +2879,10 @@
     "note": "The cited range has the body/gap arithmetic, but its line 12 is blank and 19 is a heading; the explicit tr_all provenance and 1785.1 machinery statement are at 21 and 14.",
     "corrected": [
       "docs/XCD-TIMELINE-2026-10-11.md:14,21,88-102"
+    ],
+    "not_contains": [
+      "1785.1",
+      "results_tiles/tr_all.bin"
     ]
   },
   "244": {
@@ -2841,6 +2956,9 @@
     "note": "The live cited ledger now says 0.237667/0.238 ms; the historical 0.323667/6.743 threshold is at 138 and 148. The report declares an older snapshot, which does not resolve the citation in the required live-file audit.",
     "corrected": [
       "docs/PLAN-300TOKS-2026-10-11.md:138,148"
+    ],
+    "not_contains": [
+      "0.323667"
     ]
   },
   "250": {
@@ -2919,7 +3037,10 @@
   },
   "256": {
     "verdict": "PASS",
-    "contains": [],
+    "contains": [
+      "#define DSL_UW 2",
+      "consume(s0 + u, w[u])"
+    ],
     "claim": "The path is one **combined GU1 pass** for up, not two streams in succession. Up: `SEG=64×8=512`, `spr=2048/512=4`, `nrt=64`, `S=256`, `per=256/16=16`, `sb=16×wave`, `se=sb+16 [E]` (`gemv.py:174-184,773-777`). Waves before the gate/up split read the gate base; waves after it add the gap `(768-32)×2048` bf16 elements (`:188-196,777`). Each wave consumes **four complete rows [E]**. Its default pipeline has **U=2**, **eight trips**, each issuing two **16 B/lane** loads, `16 waves×64 lanes×2×16 = 32768 B` in flight/task [E] (`:240-248,354-359`). This is half the old full-depth pipeline; do not use the comment's old 64 KB as today's depth.",
     "note": "Reviewed attributed fact/identifier and its stated conditions; assertions recheck literal support. Derived values use displayed arithmetic; associated citations can jointly supply inputs."
   },
@@ -3499,7 +3620,9 @@
   },
   "306": {
     "verdict": "PASS",
-    "contains": [],
+    "contains": [
+      "v[b] += pl[(w2 * nrt + r) * NB + b]"
+    ],
     "claim": "| Component removed per task | up | down | Nominal service price [E] |\n|---|---:|---:|---|\n| Partial clear (G:185) | 4096 B | 4096 B | 4096/(128×2100) = 0.015238 us each |\n| Partial read/add/deposit (G:209) | 512 B | 512 B | 512/(128×2100) = 0.001905 us each |\n| Cross-wave partial gather (G:274) | 4096 B | 4096 B | 4096/(128×2100) = 0.015238 us each |\n| Clear and partial-join barriers (G:186,267); retain G:277 | 2 | 2 | 2×0.0612 = 0.1224 us each, older bare-barrier measurement at `results_2026-09-28b/impbar_hw.log:4` |\n| **Gross service total** | | | **0.154781 us up + 0.154781 us down = 0.309562 us/layer**, `48×0.309562/1000 = 0.014859 ms/step [E]` |",
     "note": "Reviewed attributed fact/identifier and its stated conditions; assertions recheck literal support. Derived values use displayed arithmetic; associated citations can jointly supply inputs."
   },
@@ -3602,6 +3725,9 @@
     "note": "The live ledger sum/gap in 135-136 is 0.900/0.238, not the historical 0.814/0.324. The old gap and retained rule are preserved at 138/148.",
     "corrected": [
       "docs/PLAN-300TOKS-2026-10-11.md:132,138,148"
+    ],
+    "not_contains": [
+      "0.323667"
     ]
   },
   "316": {
@@ -3726,7 +3852,9 @@
   },
   "327": {
     "verdict": "PASS",
-    "contains": [],
+    "contains": [
+      "__float2bfloat16(v * ws)"
+    ],
     "claim": "1. Guard exact shape/participation and retain the generic fallback: up `K=2048, nrt=64 combined GU1, rpt=32, 16 waves/1024 threads`; down `K=768, nrt=rpt=64, 16 waves/1024 threads [E]` as §2.1. Also require valid original row bounds and no wave crossing the gate/up discontinuity. Up needs the existing gap/base handling unchanged (G:188-196,773-777).\n2. Delete **G:185-186** (partial zero/clear barrier). In **G:209**, keep `dsl_wave_sum0(acc)`, and let its lane 0 call the epilogue for `r0+cur` directly. Recreate `0.f+v` and the **w2=0..15** virtual-zero additions in the original order, with the nonzero at its owner index. Reset acc and retain the order of every `dsl_dot`/acc update (G:220-224).\n3. Delete the partial rendezvous/gather **G:267-276**; retain **G:277** as one all-wave join. Up still materializes rounded gate/up values in g before the original SiLU at **G:790**. Down calls the unchanged multiply/round/store epilogue at **G:832** from each row's owner wave. Keep the task's **all-wave publication drain/barrier** at `kernel.py:325,332`.",
     "note": "Reviewed attributed fact/identifier and its stated conditions; assertions recheck literal support. Derived values use displayed arithmetic; associated citations can jointly supply inputs."
   },
@@ -3754,7 +3882,10 @@
   },
   "330": {
     "verdict": "PASS",
-    "contains": [],
+    "contains": [
+      "d.K == 2048",
+      "else"
+    ],
     "claim": "The existing isolated up clone already implements this core edit (`bf16_300/source.py:73-81`) and falls back on the original path (`:85-91`). It is **prepared, not GPU validated** (`bf16_300/README.md:59-65`). Extending its proof to down requires a separate guarded path, not simply enabling the up template with EPL=4. This task changes no production tile.",
     "note": "Reviewed attributed fact/identifier and its stated conditions; assertions recheck literal support. Derived values use displayed arithmetic; associated citations can jointly supply inputs."
   },
@@ -3812,7 +3943,10 @@
   },
   "335": {
     "verdict": "PASS",
-    "contains": [],
+    "contains": [
+      "const int per",
+      "consume(s0 + u, w[u])"
+    ],
     "claim": "After that structural deletion, the narrow next candidate is **constant/wave-uniform range and pipeline specialization** at **G:183-184,201,218-224,240-260**, especially the still-vector up path in the CPU ISA. It removes no required bf16 arithmetic. Its exclusive latency and ranking against gather/publication are [U]; it cannot be named the largest item by time yet.",
     "note": "Reviewed attributed fact/identifier and its stated conditions; assertions recheck literal support. Derived values use displayed arithmetic; associated citations can jointly supply inputs."
   },
@@ -4085,31 +4219,47 @@
   },
   "359": {
     "verdict": "PASS",
-    "contains": [],
+    "contains": [
+      "ETX_DSL_SCALAR",
+      "pl[i] = 0.f"
+    ],
     "claim": "Extend the pair set by the three uncovered intervals above. To separate setup, loop and reduction, select disjoint boundaries at **G:177/185**, **G:187/235**, **G:267/268**, **G:268/277**, and up **G:786 / task RELEASE_DOMAIN**. For the loop, sample one unrolled trip at a time, using the original order at **G:240,245,248,250,260** and separate transition flushes at **G:220/209**. Each build still keeps only one begin/end pair, saves records after the measured body, and includes an empty/control build with matched allocation. Do not sum the trip/flush observations into a new body until all executed trips and boundary gaps are covered. Forced `vmcnt/lgkmcnt` fences belong in a **separate labelled retirement diagnostic**; they change overlap and cannot price the original critical path.",
     "note": "Reviewed attributed fact/identifier and its stated conditions; assertions recheck literal support. Derived values use displayed arithmetic; associated citations can jointly supply inputs."
   },
   "360": {
     "verdict": "PASS",
-    "contains": [],
+    "contains": [
+      "ETX_DSL_SCALAR",
+      "int s0 = sb"
+    ],
     "claim": "Extend the pair set by the three uncovered intervals above. To separate setup, loop and reduction, select disjoint boundaries at **G:177/185**, **G:187/235**, **G:267/268**, **G:268/277**, and up **G:786 / task RELEASE_DOMAIN**. For the loop, sample one unrolled trip at a time, using the original order at **G:240,245,248,250,260** and separate transition flushes at **G:220/209**. Each build still keeps only one begin/end pair, saves records after the measured body, and includes an empty/control build with matched allocation. Do not sum the trip/flush observations into a new body until all executed trips and boundary gaps are covered. Forced `vmcnt/lgkmcnt` fences belong in a **separate labelled retirement diagnostic**; they change overlap and cannot price the original critical path.",
     "note": "Reviewed attributed fact/identifier and its stated conditions; assertions recheck literal support. Derived values use displayed arithmetic; associated citations can jointly supply inputs."
   },
   "361": {
     "verdict": "PASS",
-    "contains": [],
+    "contains": [
+      "__syncthreads",
+      "for (int r"
+    ],
     "claim": "Extend the pair set by the three uncovered intervals above. To separate setup, loop and reduction, select disjoint boundaries at **G:177/185**, **G:187/235**, **G:267/268**, **G:268/277**, and up **G:786 / task RELEASE_DOMAIN**. For the loop, sample one unrolled trip at a time, using the original order at **G:240,245,248,250,260** and separate transition flushes at **G:220/209**. Each build still keeps only one begin/end pair, saves records after the measured body, and includes an empty/control build with matched allocation. Do not sum the trip/flush observations into a new body until all executed trips and boundary gaps are covered. Forced `vmcnt/lgkmcnt` fences belong in a **separate labelled retirement diagnostic**; they change overlap and cannot price the original critical path.",
     "note": "Reviewed attributed fact/identifier and its stated conditions; assertions recheck literal support. Derived values use displayed arithmetic; associated citations can jointly supply inputs."
   },
   "362": {
     "verdict": "PASS",
-    "contains": [],
+    "contains": [
+      "for (int r",
+      "__syncthreads"
+    ],
     "claim": "Extend the pair set by the three uncovered intervals above. To separate setup, loop and reduction, select disjoint boundaries at **G:177/185**, **G:187/235**, **G:267/268**, **G:268/277**, and up **G:786 / task RELEASE_DOMAIN**. For the loop, sample one unrolled trip at a time, using the original order at **G:240,245,248,250,260** and separate transition flushes at **G:220/209**. Each build still keeps only one begin/end pair, saves records after the measured body, and includes an empty/control build with matched allocation. Do not sum the trip/flush observations into a new body until all executed trips and boundary gaps are covered. Forced `vmcnt/lgkmcnt` fences belong in a **separate labelled retirement diagnostic**; they change overlap and cannot price the original critical path.",
     "note": "Reviewed attributed fact/identifier and its stated conditions; assertions recheck literal support. Derived values use displayed arithmetic; associated citations can jointly supply inputs."
   },
   "363": {
     "verdict": "PASS",
-    "contains": [],
+    "contains": [
+      "d.out",
+      "rq",
+      "d.sout"
+    ],
     "claim": "Extend the pair set by the three uncovered intervals above. To separate setup, loop and reduction, select disjoint boundaries at **G:177/185**, **G:187/235**, **G:267/268**, **G:268/277**, and up **G:786 / task RELEASE_DOMAIN**. For the loop, sample one unrolled trip at a time, using the original order at **G:240,245,248,250,260** and separate transition flushes at **G:220/209**. Each build still keeps only one begin/end pair, saves records after the measured body, and includes an empty/control build with matched allocation. Do not sum the trip/flush observations into a new body until all executed trips and boundary gaps are covered. Forced `vmcnt/lgkmcnt` fences belong in a **separate labelled retirement diagnostic**; they change overlap and cannot price the original critical path.",
     "note": "Reviewed attributed fact/identifier and its stated conditions; assertions recheck literal support. Derived values use displayed arithmetic; associated citations can jointly supply inputs."
   },
@@ -4220,7 +4370,8 @@
     "note": "The selection stops at the unfinished phrase No GPU launcher or; the explicit absence of a full-model pack finishes at 151. No cited line explicitly states host-record-reader absence; a package-source inventory is needed for that additional negative claim.",
     "corrected": [
       "examples/vllm_llm/bf16_300/README.md:131-152"
-    ]
+    ],
+    "correction_limit": "The corrected range completes the launcher/pack statement. The additional host-record-reader absence needs a package inventory, not this quotation."
   },
   "373": {
     "verdict": "PASS",
@@ -4782,6 +4933,9 @@
     "note": "The three background points are present, but the 3.24 us baseline used for +2.5-3.7% is outside the cited range, at line 10. These are place=same/304 foreground points, whereas the doubling uses place=split/64 foreground.",
     "corrected": [
       "results_2026-09-27/vlnext/overlap.log:10-13"
+    ],
+    "not_contains": [
+      "3.24"
     ]
   },
   "419": {
@@ -5301,6 +5455,9 @@
     "note": "PLAN:23 supports omitted LDS/internal barriers, but does not mention MFMA. PLAN:144 explicitly names omitted MFMA/VALU/LDS work.",
     "corrected": [
       "docs/PLAN-300TOKS-2026-10-11.md:23,144"
+    ],
+    "not_contains": [
+      "MFMA"
     ]
   },
   "466": {
@@ -5332,7 +5489,10 @@
       "cited": "Job 1 profiled vendor kernel dispatch end-minus-start / 1000; mean of 31 samples per layer",
       "claimed": "ETX critical task-body time / layer (body plus all-wave publication drain/barrier)",
       "other_numbers": "REVIEW uses tr_on critical bodies 5.360 + 5.285 = 10.645 us/layer and a 2.96 us/layer required cut, giving 7.69."
-    }
+    },
+    "not_contains": [
+      "critical body"
+    ]
   },
   "468": {
     "verdict": "PASS",
