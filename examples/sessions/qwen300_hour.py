@@ -64,7 +64,7 @@ def manifest(path=MANIFEST):
 def template():
     return dict(model='/absolute/prepared/qwen3-30b-a3b',
                 builds={name: '/absolute/prepared/'+name for name in
-                        ('kept', 'stamps', 'stages', 'C1', 'C5', 'C1_C5', 'NO_TOUCH',
+                        ('kept', 'reset', 'stamps', 'stages', 'C1', 'C5', 'C1_C5', 'NO_TOUCH',
                          'NO_TOUCH_stamps', 'ISOLATE_POLLER', 'C6')},
                 isolation_probe=None,  # sealed offline probe: {argv: [...], sha256: executable SHA256}
                 source_commit='REQUIRED full commit of pushed tree', build_commits={}, build_seals={},
@@ -109,7 +109,7 @@ def prepare(config_path):
     env.update(ETX_VL_CHECK='1', ETX_TOPK_KEY32='1', ETX_DEV_RESET='0', ETX_VL_REQUESTS='1',
                ETX_VL_CU='256', ETX_VL_TOUCH='1', ETX_PREFETCH_ISOLATE_POLLER='0')
     # Optional C prototypes are NOT built here: integrate and prove before use.
-    variants = dict(kept={}, stamps={'ETX_INBODY_BUILD': '1'}, stages={'profile': True},
+    variants = dict(kept={}, reset={'ETX_DEV_RESET': '1'}, stamps={'ETX_INBODY_BUILD': '1'}, stages={'profile': True},
                     C1={'ETX_VL_ROUTER_NARROW': '1'}, C5={'hoist': True},
                     C1_C5={'ETX_VL_ROUTER_NARROW': '1', 'hoist': True},
                     NO_TOUCH={'no_touch': True},
@@ -288,6 +288,7 @@ REGISTERED = {
     'A1.floor': '1.00 us/edge; retain below-floor count/min, never clip raw gaps',
     'A2.route': 'available body headroom >=0.142 ms / 2.96 us/layer; estimate, no removal proof',
     'A3.host': 'name stages accounting for unexplained 0.086 ms beyond priced 0.049 ms',
+    'RESET.keep': '3 adjacent pinned pairs, all faster, median >=0.030 ms, median >2*spread; only ETX_DEV_RESET changes',
     'A4.reset': 'pursue only >0.030 ms/step, host and device separately',
     'A.stop': 'S1 at <=15 minutes: G >=0.088 ms (1.833 us/layer) in named above-floor gap atoms, else close target route',
     'B.stop': 'S2 after A, before B: G + R2 + H >=0.324 ms (whole-target 6.743 us/layer), else close target route; unknowns count zero',
@@ -306,6 +307,7 @@ THRESHOLD_SOURCES = {
     'A1.floor': 'docs/X7-SCHEDULE-WHATIF-2026-10-11.md:164',
     'A2.route': 'docs/qwen300-hour-2026-10-11.md:42',
     'A3.host': 'docs/MASTER-TABLE-2026-10-11.md:60',
+    'RESET.keep': 'docs/VERIFY-PLAN-2026-10-12.md; KEEP from PLAN-300TOKS-2026-10-11.md:322',
     'A4.reset': 'docs/PLAN-generic-decoder-2026-10-08.md:154',
     'A.stop': 'docs/PLAN-300TOKS-2026-10-11.md:301-302 (main 9f91f3a)',
     'B.stop': 'docs/PLAN-300TOKS-2026-10-11.md:306-308 (main 9f91f3a)',
@@ -729,6 +731,12 @@ def tranche_b(s):
     s.deadline = min(time.monotonic()+TRANCHE_SECONDS['B'], s.end)
     if 'kept' not in s.certified:
         print('B SKIP: kept fresh correctness gate failed', flush=True); return []
+    from examples.vllm_llm import reset_pair
+    end = s.deadline
+    s.deadline = min(time.monotonic()+120, end)
+    if s.attempt('RESET.keep', lambda: reset_pair.run(s)) is None:
+        s.row('RESET.keep', None, 'NOT-COMPLETE', REGISTERED['RESET.keep'])
+    s.deadline = end
     survivors = []
     for a in s.m['B']:
         if not a.get('enabled'):
