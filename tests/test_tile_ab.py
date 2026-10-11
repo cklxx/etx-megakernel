@@ -56,4 +56,31 @@ def test_trace_bodies(tmp_path):
                  "  topk_0_x                    8      9.29      7.75        62.4        0.5        8.2\n"
                  "  lm_head                   256      4.91    157.79      4538.5        2.6      160.3\n")
     b = ta.trace_bodies(p)
-    assert abs(b["qkv"] - (7.78 + 11.26) / 2) < 1e-9 and b["lm_head"] == 157.79 and "topk" not in b
+    assert abs(b["qkv"] - (7.78 + 11.26) / 2) < 1e-9 and b["lm_head"] == 157.79 and b["topk"] == 7.75
+
+
+def test_trace_bodies_required_families(tmp_path):
+    p = tmp_path / "tr_off.log"
+    p.write_text("  type                    tasks      wait      body first-ready last-ready  last-done\n"
+                 "  topk_0_x                     8      9.59      8.02        61.2        0.3        8.5\n"
+                 "  attn_0                     20     24.22      5.59        28.8        0.7        6.2\n"
+                 "  reduce_0                    4     12.97      5.96        35.9        0.4        6.3\n"
+                 "  prep_0                      4     22.54      3.97        24.1        0.3        4.2\n"
+                 "  moe_up_0                  192     13.44     17.12        68.7        1.0       18.5\n"
+                 "  moe_down_0                256     13.62      9.77        87.3        1.9       11.7\n")
+    assert ta.trace_bodies(p) == {"topk": 8.02, "attn": 5.59, "reduce": 5.96,
+                                  "prep": 3.97, "moe_up": 17.12, "moe_down": 9.77}
+
+
+def test_trace_bodies_stems_and_filter(tmp_path):
+    p = tmp_path / "tr_ctl.log"
+    # Numbered types are unrestricted; the bare-name whitelist stays unchanged.
+    rows = [(f"{stem}{suffix}", body) for stem in ta.TYPES + ("topk", "in_norm", "custom_phase")
+            for suffix, body in (("", 3.0), ("_0", 6.0), ("_1_x", 9.0))]
+    rows += [("prologue", 100.0), ("argmax", 100.0), ("topk_2_y", 100.0), ("topk_2_x_more", 100.0)]
+    p.write_text("".join(f"  {name:22}      8      1.00 {body:9.2f}         1.0        0.3        8.5\n"
+                         for name, body in rows))
+    expected = {stem: 6.0 for stem in ta.TYPES}
+    expected.update(topk=7.5, in_norm=7.5, custom_phase=7.5)
+    assert ta.trace_bodies(p) == expected
+    assert ta.trace_bodies(tmp_path / "missing.log") == {}

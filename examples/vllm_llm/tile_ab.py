@@ -26,7 +26,7 @@ THRESH_MS = 0.030   # above the 0.017-0.028 ms same-binary spread of five fused 
 MIN_PAIRS = 3
 TYPES = ("qkv", "o_proj", "router", "moe_up", "moe_down", "lm_head")
 RESULT = re.compile(r"^RESULT .*\bmatched=(\d+) gen=(\d+) median_ms=([0-9.]+) wall_ms=([0-9.]+)")
-TRACE_ROW = re.compile(r"^\s+([a-z_]+?)_(\d+)\s+(\d+)\s+([0-9.]+)\s+([0-9.]+)\s")
+TRACE_ROW = re.compile(r"^\s+([a-z_]+?)_(\d+)(?:_x)?\s+(\d+)\s+([0-9.]+)\s+([0-9.]+)\s")
 TRACE_ROW1 = re.compile(r"^\s+([a-z_]+)\s+(\d+)\s+([0-9.]+)\s+([0-9.]+)\s")
 
 
