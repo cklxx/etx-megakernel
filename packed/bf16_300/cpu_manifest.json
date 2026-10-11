@@ -1,0 +1,14 @@
+{
+  "variant_family": "bf16_300",
+  "precision": "bf16",
+  "batch": 1,
+  "context": 1024,
+  "weights": null,
+  "golden": null,
+  "kv": null,
+  "timing_eligible": false,
+  "certificate": null,
+  "head_state_bytes": 40,
+  "domain_queue_bytes": 16,
+  "queue_contract": "five tickets per head-local XCD, owner first; reset only at launch quiescence"
+}
