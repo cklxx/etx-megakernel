@@ -94,6 +94,26 @@ def test_spill_reaching_store_merge_and_non_chain_scratch():
     assert r['unmatched_reload_indices']==[6]
 
 
+def test_prefetch_isolation_default_source_identity_and_on_wave_scope(monkeypatch):
+    import subprocess, types
+    from etx.codegen import emit_kernel
+    from examples.vllm_llm.bf16_300 import dispatcher
+    plan=dispatcher.graph('/tmp/gap_tiles.hip')
+    plan.graph.grids[1].body.pre_wait='etx_pre_dsl_moe_down'
+    baseline=types.ModuleType('etx.codegen.baseline');baseline.__package__='etx.codegen'
+    exec(compile(subprocess.check_output(['git','show','9f91f3a:etx/codegen/kernel.py'],text=True),'<baseline>','exec'),baseline.__dict__)
+    monkeypatch.delenv('ETX_PREFETCH_ISOLATE_POLLER',raising=False)
+    default=emit_kernel(plan)
+    assert default==baseline.emit_kernel(plan)
+    monkeypatch.setenv('ETX_PREFETCH_ISOLATE_POLLER','0')
+    assert emit_kernel(plan)==default
+    monkeypatch.setenv('ETX_PREFETCH_ISOLATE_POLLER','1')
+    isolated=emit_kernel(plan)
+    assert 'if (threadIdx.x >= 64 && threadIdx.x < 128) etx_pre_dsl_moe_down(&ctx)' in isolated
+    assert 'if (threadIdx.x < 64) etx_pre_dsl_moe_down' not in isolated
+    assert isolated.count('__syncthreads()')==default.count('__syncthreads()')
+
+
 def test_final_shuffle_add_across_branch_and_debug_labels():
     from etx.tools import spill_chain as sc
     s='''k:

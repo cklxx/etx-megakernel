@@ -1,0 +1,32 @@
+POLLING CPU original stage=0 BUILD
+POLLING CPU original stage=1 BUILD
+POLLING original MEMORY/WAIT ORDER
+  0: s_load_dwordx2 s[4:5], s[0:1], 0x130 scope={}
+  1: s_load_dwordx2 s[2:3], s[0:1], 0x20 scope={}
+  3: s_waitcnt lgkmcnt(0) scope={'lgkmcnt': 0}
+  4: s_load_dword s6, s[4:5], 0x9c scope={}
+  5: s_load_dword s7, s[4:5], 0x0 scope={}
+  6: s_load_dword s8, s[4:5], 0x40 scope={}
+  7: s_load_dword s9, s[4:5], 0x80 scope={}
+  8: s_waitcnt lgkmcnt(0) scope={'lgkmcnt': 0}
+  12: global_load_dword v1, v0, s[2:3] sc1 scope={}
+  14: s_waitcnt vmcnt(0) scope={'vmcnt': 0}
+  17: s_load_dwordx2 s[0:1], s[0:1], 0xe8 scope={}
+  28: s_waitcnt lgkmcnt(0) scope={'lgkmcnt': 0}
+  29: global_load_dword v1, v0, s[0:1] sc1 scope={}
+  30: s_waitcnt vmcnt(0) scope={'vmcnt': 0}
+  39: global_load_dword v1, v0, s[2:3] sc1 scope={}
+  40: s_waitcnt vmcnt(0) scope={'vmcnt': 0}
+POLLING CPU isolated stage=0 BUILD
+POLLING CPU isolated stage=1 BUILD
+POLLING isolated MEMORY/WAIT ORDER
+  0: s_load_dwordx2 s[2:3], s[0:1], 0x20 scope={}
+  3: s_waitcnt lgkmcnt(0) scope={'lgkmcnt': 0}
+  4: global_load_dword v1, v0, s[2:3] sc1 scope={}
+  5: s_waitcnt vmcnt(0) scope={'vmcnt': 0}
+  8: s_load_dwordx2 s[0:1], s[0:1], 0xe8 scope={}
+  19: s_waitcnt lgkmcnt(0) scope={'lgkmcnt': 0}
+  20: global_load_dword v1, v0, s[0:1] sc1 scope={}
+  21: s_waitcnt vmcnt(0) scope={'vmcnt': 0}
+  30: global_load_dword v1, v0, s[2:3] sc1 scope={}
+  31: s_waitcnt vmcnt(0) scope={'vmcnt': 0}

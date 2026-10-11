@@ -1,0 +1,1045 @@
+{
+  "schema": 1,
+  "basis": "static compiler evidence, not device execution or timing",
+  "assembly_sha256": "13015d237e16043763099520cb562225938979eb79ec7ae859d39d9e039441f7",
+  "kernels": {
+    "k_polling_wave0": {
+      "resources": {
+        "TotalNumSgprs": 16,
+        "NumVgprs": 2,
+        "ScratchSize": 0,
+        "LDSByteSize": 0,
+        "Occupancy": 8
+      },
+      "instructions": [
+        {
+          "index": 0,
+          "assembly_line": 16,
+          "mnemonic": "s_load_dwordx2",
+          "operands": [
+            "s[4:5]",
+            "s[0:1]",
+            "0x130"
+          ],
+          "modifiers": "",
+          "text": "s_load_dwordx2 s[4:5], s[0:1], 0x130",
+          "source": {
+            "file": "/tmp/etx-verifygaps/polling/poll.hip",
+            "line": 7
+          }
+        },
+        {
+          "index": 1,
+          "assembly_line": 17,
+          "mnemonic": "s_load_dwordx2",
+          "operands": [
+            "s[2:3]",
+            "s[0:1]",
+            "0x20"
+          ],
+          "modifiers": "",
+          "text": "s_load_dwordx2 s[2:3], s[0:1], 0x20",
+          "source": {
+            "file": "/tmp/etx-verifygaps/polling/poll.hip",
+            "line": 7
+          }
+        },
+        {
+          "index": 2,
+          "assembly_line": 18,
+          "mnemonic": "v_mov_b32_e32",
+          "operands": [
+            "v0",
+            "0"
+          ],
+          "modifiers": "",
+          "text": "v_mov_b32_e32 v0, 0",
+          "source": {
+            "file": "/tmp/etx-verifygaps/polling/poll.hip",
+            "line": 7
+          }
+        },
+        {
+          "index": 3,
+          "assembly_line": 22,
+          "mnemonic": "s_waitcnt",
+          "operands": [
+            "lgkmcnt(0)"
+          ],
+          "modifiers": "",
+          "text": "s_waitcnt lgkmcnt(0)",
+          "source": {
+            "file": "etx/runtime/include/etx/import.h",
+            "line": 114
+          }
+        },
+        {
+          "index": 4,
+          "assembly_line": 23,
+          "mnemonic": "s_load_dword",
+          "operands": [
+            "s6",
+            "s[4:5]",
+            "0x9c"
+          ],
+          "modifiers": "",
+          "text": "s_load_dword s6, s[4:5], 0x9c",
+          "source": {
+            "file": "etx/runtime/include/etx/import.h",
+            "line": 114
+          }
+        },
+        {
+          "index": 5,
+          "assembly_line": 25,
+          "mnemonic": "s_load_dword",
+          "operands": [
+            "s7",
+            "s[4:5]",
+            "0x0"
+          ],
+          "modifiers": "",
+          "text": "s_load_dword s7, s[4:5], 0x0",
+          "source": {
+            "file": "etx/runtime/include/etx/import.h",
+            "line": 115
+          }
+        },
+        {
+          "index": 6,
+          "assembly_line": 26,
+          "mnemonic": "s_load_dword",
+          "operands": [
+            "s8",
+            "s[4:5]",
+            "0x40"
+          ],
+          "modifiers": "",
+          "text": "s_load_dword s8, s[4:5], 0x40",
+          "source": {
+            "file": "etx/runtime/include/etx/import.h",
+            "line": 115
+          }
+        },
+        {
+          "index": 7,
+          "assembly_line": 27,
+          "mnemonic": "s_load_dword",
+          "operands": [
+            "s9",
+            "s[4:5]",
+            "0x80"
+          ],
+          "modifiers": "",
+          "text": "s_load_dword s9, s[4:5], 0x80",
+          "source": {
+            "file": "etx/runtime/include/etx/import.h",
+            "line": 115
+          }
+        },
+        {
+          "index": 8,
+          "assembly_line": 29,
+          "mnemonic": "s_waitcnt",
+          "operands": [
+            "lgkmcnt(0)"
+          ],
+          "modifiers": "",
+          "text": "s_waitcnt lgkmcnt(0)",
+          "source": {
+            "file": "etx/runtime/include/etx/import.h",
+            "line": 115
+          }
+        },
+        {
+          "index": 9,
+          "assembly_line": 30,
+          "mnemonic": "s_xor_b32",
+          "operands": [
+            "s4",
+            "s7",
+            "s6"
+          ],
+          "modifiers": "",
+          "text": "s_xor_b32 s4, s7, s6",
+          "source": {
+            "file": "etx/runtime/include/etx/import.h",
+            "line": 115
+          }
+        },
+        {
+          "index": 10,
+          "assembly_line": 31,
+          "mnemonic": "s_xor_b32",
+          "operands": [
+            "s4",
+            "s8",
+            "s4"
+          ],
+          "modifiers": "",
+          "text": "s_xor_b32 s4, s8, s4",
+          "source": {
+            "file": "etx/runtime/include/etx/import.h",
+            "line": 115
+          }
+        },
+        {
+          "index": 11,
+          "assembly_line": 32,
+          "mnemonic": "s_xor_b32",
+          "operands": [
+            "s4",
+            "s9",
+            "s4"
+          ],
+          "modifiers": "",
+          "text": "s_xor_b32 s4, s9, s4",
+          "source": {
+            "file": "etx/runtime/include/etx/import.h",
+            "line": 115
+          }
+        },
+        {
+          "index": 12,
+          "assembly_line": 39,
+          "mnemonic": "global_load_dword",
+          "operands": [
+            "v1",
+            "v0",
+            "s[2:3]"
+          ],
+          "modifiers": "sc1",
+          "text": "global_load_dword v1, v0, s[2:3] sc1",
+          "source": {
+            "file": "etx/runtime/include/etx/primitives.h",
+            "line": 30
+          }
+        },
+        {
+          "index": 13,
+          "assembly_line": 40,
+          "mnemonic": "s_mov_b32",
+          "operands": [
+            "s6",
+            "1"
+          ],
+          "modifiers": "",
+          "text": "s_mov_b32 s6, 1",
+          "source": {
+            "file": "etx/runtime/include/etx/primitives.h",
+            "line": 30
+          }
+        },
+        {
+          "index": 14,
+          "assembly_line": 41,
+          "mnemonic": "s_waitcnt",
+          "operands": [
+            "vmcnt(0)"
+          ],
+          "modifiers": "",
+          "text": "s_waitcnt vmcnt(0)",
+          "source": {
+            "file": "etx/runtime/include/etx/primitives.h",
+            "line": 30
+          }
+        },
+        {
+          "index": 15,
+          "assembly_line": 42,
+          "mnemonic": "v_cmp_gt_i32_e32",
+          "operands": [
+            "vcc",
+            "1",
+            "v1"
+          ],
+          "modifiers": "",
+          "text": "v_cmp_gt_i32_e32 vcc, 1, v1",
+          "source": {
+            "file": "etx/runtime/include/etx/primitives.h",
+            "line": 30
+          }
+        },
+        {
+          "index": 16,
+          "assembly_line": 43,
+          "mnemonic": "s_cbranch_vccnz",
+          "operands": [
+            ".LBB0_7"
+          ],
+          "modifiers": "",
+          "text": "s_cbranch_vccnz .LBB0_7",
+          "source": {
+            "file": "etx/runtime/include/etx/primitives.h",
+            "line": 30
+          }
+        },
+        {
+          "index": 17,
+          "assembly_line": 46,
+          "mnemonic": "s_load_dwordx2",
+          "operands": [
+            "s[0:1]",
+            "s[0:1]",
+            "0xe8"
+          ],
+          "modifiers": "",
+          "text": "s_load_dwordx2 s[0:1], s[0:1], 0xe8",
+          "source": {
+            "file": "etx/runtime/include/etx/primitives.h",
+            "line": 0
+          }
+        },
+        {
+          "index": 18,
+          "assembly_line": 47,
+          "mnemonic": "s_branch",
+          "operands": [
+            ".LBB0_3"
+          ],
+          "modifiers": "",
+          "text": "s_branch .LBB0_3",
+          "source": {
+            "file": "etx/runtime/include/etx/primitives.h",
+            "line": 0
+          }
+        },
+        {
+          "index": 19,
+          "assembly_line": 50,
+          "mnemonic": "s_and_b64",
+          "operands": [
+            "s[4:5]",
+            "s[4:5]",
+            "exec"
+          ],
+          "modifiers": "",
+          "text": "s_and_b64 s[4:5], s[4:5], exec",
+          "source": {
+            "file": "etx/runtime/include/etx/primitives.h",
+            "line": 0
+          }
+        },
+        {
+          "index": 20,
+          "assembly_line": 51,
+          "mnemonic": "s_cselect_b32",
+          "operands": [
+            "s4",
+            "1",
+            "0"
+          ],
+          "modifiers": "",
+          "text": "s_cselect_b32 s4, 1, 0",
+          "source": {
+            "file": "etx/runtime/include/etx/primitives.h",
+            "line": 0
+          }
+        },
+        {
+          "index": 21,
+          "assembly_line": 52,
+          "mnemonic": "s_cmp_lg_u32",
+          "operands": [
+            "s4",
+            "1"
+          ],
+          "modifiers": "",
+          "text": "s_cmp_lg_u32 s4, 1",
+          "source": {
+            "file": "etx/runtime/include/etx/primitives.h",
+            "line": 0
+          }
+        },
+        {
+          "index": 22,
+          "assembly_line": 53,
+          "mnemonic": "s_cbranch_scc0",
+          "operands": [
+            ".LBB0_7"
+          ],
+          "modifiers": "",
+          "text": "s_cbranch_scc0 .LBB0_7",
+          "source": {
+            "file": "etx/runtime/include/etx/primitives.h",
+            "line": 0
+          }
+        },
+        {
+          "index": 23,
+          "assembly_line": 56,
+          "mnemonic": "s_and_b32",
+          "operands": [
+            "s4",
+            "s6",
+            "0xff"
+          ],
+          "modifiers": "",
+          "text": "s_and_b32 s4, s6, 0xff",
+          "source": {
+            "file": "etx/runtime/include/etx/primitives.h",
+            "line": 30
+          }
+        },
+        {
+          "index": 24,
+          "assembly_line": 57,
+          "mnemonic": "s_cselect_b64",
+          "operands": [
+            "s[4:5]",
+            "-1",
+            "0"
+          ],
+          "modifiers": "",
+          "text": "s_cselect_b64 s[4:5], -1, 0",
+          "source": {
+            "file": "etx/runtime/include/etx/primitives.h",
+            "line": 30
+          }
+        },
+        {
+          "index": 25,
+          "assembly_line": 58,
+          "mnemonic": "s_and_b64",
+          "operands": [
+            "vcc",
+            "exec",
+            "s[4:5]"
+          ],
+          "modifiers": "",
+          "text": "s_and_b64 vcc, exec, s[4:5]",
+          "source": {
+            "file": "etx/runtime/include/etx/primitives.h",
+            "line": 30
+          }
+        },
+        {
+          "index": 26,
+          "assembly_line": 59,
+          "mnemonic": "s_sleep",
+          "operands": [
+            "8"
+          ],
+          "modifiers": "",
+          "text": "s_sleep 8",
+          "source": {
+            "file": "etx/runtime/include/etx/primitives.h",
+            "line": 30
+          }
+        },
+        {
+          "index": 27,
+          "assembly_line": 60,
+          "mnemonic": "s_cbranch_vccnz",
+          "operands": [
+            ".LBB0_5"
+          ],
+          "modifiers": "",
+          "text": "s_cbranch_vccnz .LBB0_5",
+          "source": {
+            "file": "etx/runtime/include/etx/primitives.h",
+            "line": 30
+          }
+        },
+        {
+          "index": 28,
+          "assembly_line": 62,
+          "mnemonic": "s_waitcnt",
+          "operands": [
+            "lgkmcnt(0)"
+          ],
+          "modifiers": "",
+          "text": "s_waitcnt lgkmcnt(0)",
+          "source": {
+            "file": "etx/runtime/include/etx/primitives.h",
+            "line": 30
+          }
+        },
+        {
+          "index": 29,
+          "assembly_line": 63,
+          "mnemonic": "global_load_dword",
+          "operands": [
+            "v1",
+            "v0",
+            "s[0:1]"
+          ],
+          "modifiers": "sc1",
+          "text": "global_load_dword v1, v0, s[0:1] sc1",
+          "source": {
+            "file": "etx/runtime/include/etx/primitives.h",
+            "line": 30
+          }
+        },
+        {
+          "index": 30,
+          "assembly_line": 64,
+          "mnemonic": "s_waitcnt",
+          "operands": [
+            "vmcnt(0)"
+          ],
+          "modifiers": "",
+          "text": "s_waitcnt vmcnt(0)",
+          "source": {
+            "file": "etx/runtime/include/etx/primitives.h",
+            "line": 30
+          }
+        },
+        {
+          "index": 31,
+          "assembly_line": 65,
+          "mnemonic": "v_readfirstlane_b32",
+          "operands": [
+            "s4",
+            "v1"
+          ],
+          "modifiers": "",
+          "text": "v_readfirstlane_b32 s4, v1",
+          "source": {
+            "file": "etx/runtime/include/etx/primitives.h",
+            "line": 30
+          }
+        },
+        {
+          "index": 32,
+          "assembly_line": 66,
+          "mnemonic": "s_cmp_eq_u32",
+          "operands": [
+            "s4",
+            "0"
+          ],
+          "modifiers": "",
+          "text": "s_cmp_eq_u32 s4, 0",
+          "source": {
+            "file": "etx/runtime/include/etx/primitives.h",
+            "line": 30
+          }
+        },
+        {
+          "index": 33,
+          "assembly_line": 67,
+          "mnemonic": "s_cselect_b64",
+          "operands": [
+            "s[4:5]",
+            "-1",
+            "0"
+          ],
+          "modifiers": "",
+          "text": "s_cselect_b64 s[4:5], -1, 0",
+          "source": {
+            "file": "etx/runtime/include/etx/primitives.h",
+            "line": 30
+          }
+        },
+        {
+          "index": 34,
+          "assembly_line": 71,
+          "mnemonic": "s_and_b64",
+          "operands": [
+            "s[4:5]",
+            "s[4:5]",
+            "exec"
+          ],
+          "modifiers": "",
+          "text": "s_and_b64 s[4:5], s[4:5], exec",
+          "source": {
+            "file": "etx/runtime/include/etx/primitives.h",
+            "line": 0
+          }
+        },
+        {
+          "index": 35,
+          "assembly_line": 72,
+          "mnemonic": "s_cselect_b32",
+          "operands": [
+            "s4",
+            "1",
+            "0"
+          ],
+          "modifiers": "",
+          "text": "s_cselect_b32 s4, 1, 0",
+          "source": {
+            "file": "etx/runtime/include/etx/primitives.h",
+            "line": 0
+          }
+        },
+        {
+          "index": 36,
+          "assembly_line": 73,
+          "mnemonic": "s_cmp_lg_u32",
+          "operands": [
+            "s4",
+            "1"
+          ],
+          "modifiers": "",
+          "text": "s_cmp_lg_u32 s4, 1",
+          "source": {
+            "file": "etx/runtime/include/etx/primitives.h",
+            "line": 0
+          }
+        },
+        {
+          "index": 37,
+          "assembly_line": 74,
+          "mnemonic": "s_mov_b64",
+          "operands": [
+            "s[4:5]",
+            "-1"
+          ],
+          "modifiers": "",
+          "text": "s_mov_b64 s[4:5], -1",
+          "source": {
+            "file": "etx/runtime/include/etx/primitives.h",
+            "line": 0
+          }
+        },
+        {
+          "index": 38,
+          "assembly_line": 75,
+          "mnemonic": "s_cbranch_scc1",
+          "operands": [
+            ".LBB0_2"
+          ],
+          "modifiers": "",
+          "text": "s_cbranch_scc1 .LBB0_2",
+          "source": {
+            "file": "etx/runtime/include/etx/primitives.h",
+            "line": 0
+          }
+        },
+        {
+          "index": 39,
+          "assembly_line": 78,
+          "mnemonic": "global_load_dword",
+          "operands": [
+            "v1",
+            "v0",
+            "s[2:3]"
+          ],
+          "modifiers": "sc1",
+          "text": "global_load_dword v1, v0, s[2:3] sc1",
+          "source": {
+            "file": "etx/runtime/include/etx/primitives.h",
+            "line": 30
+          }
+        },
+        {
+          "index": 40,
+          "assembly_line": 79,
+          "mnemonic": "s_waitcnt",
+          "operands": [
+            "vmcnt(0)"
+          ],
+          "modifiers": "",
+          "text": "s_waitcnt vmcnt(0)",
+          "source": {
+            "file": "etx/runtime/include/etx/primitives.h",
+            "line": 30
+          }
+        },
+        {
+          "index": 41,
+          "assembly_line": 80,
+          "mnemonic": "v_readfirstlane_b32",
+          "operands": [
+            "s4",
+            "v1"
+          ],
+          "modifiers": "",
+          "text": "v_readfirstlane_b32 s4, v1",
+          "source": {
+            "file": "etx/runtime/include/etx/primitives.h",
+            "line": 30
+          }
+        },
+        {
+          "index": 42,
+          "assembly_line": 81,
+          "mnemonic": "s_cmp_lt_i32",
+          "operands": [
+            "s4",
+            "1"
+          ],
+          "modifiers": "",
+          "text": "s_cmp_lt_i32 s4, 1",
+          "source": {
+            "file": "etx/runtime/include/etx/primitives.h",
+            "line": 30
+          }
+        },
+        {
+          "index": 43,
+          "assembly_line": 82,
+          "mnemonic": "s_cselect_b64",
+          "operands": [
+            "s[4:5]",
+            "-1",
+            "0"
+          ],
+          "modifiers": "",
+          "text": "s_cselect_b64 s[4:5], -1, 0",
+          "source": {
+            "file": "etx/runtime/include/etx/primitives.h",
+            "line": 30
+          }
+        },
+        {
+          "index": 44,
+          "assembly_line": 83,
+          "mnemonic": "s_add_i32",
+          "operands": [
+            "s6",
+            "s6",
+            "1"
+          ],
+          "modifiers": "",
+          "text": "s_add_i32 s6, s6, 1",
+          "source": {
+            "file": "etx/runtime/include/etx/primitives.h",
+            "line": 30
+          }
+        },
+        {
+          "index": 45,
+          "assembly_line": 84,
+          "mnemonic": "s_branch",
+          "operands": [
+            ".LBB0_2"
+          ],
+          "modifiers": "",
+          "text": "s_branch .LBB0_2",
+          "source": {
+            "file": "etx/runtime/include/etx/primitives.h",
+            "line": 30
+          }
+        },
+        {
+          "index": 46,
+          "assembly_line": 88,
+          "mnemonic": "s_endpgm",
+          "operands": [],
+          "modifiers": "",
+          "text": "s_endpgm",
+          "source": {
+            "file": "/tmp/etx-verifygaps/polling/poll.hip",
+            "line": 10
+          }
+        }
+      ],
+      "memory_order": {
+        "sequence": [
+          {
+            "index": 0,
+            "assembly_line": 16,
+            "mnemonic": "s_load_dwordx2",
+            "operands": [
+              "s[4:5]",
+              "s[0:1]",
+              "0x130"
+            ],
+            "modifiers": "",
+            "text": "s_load_dwordx2 s[4:5], s[0:1], 0x130",
+            "source": {
+              "file": "/tmp/etx-verifygaps/polling/poll.hip",
+              "line": 7
+            },
+            "wait_scope": {}
+          },
+          {
+            "index": 1,
+            "assembly_line": 17,
+            "mnemonic": "s_load_dwordx2",
+            "operands": [
+              "s[2:3]",
+              "s[0:1]",
+              "0x20"
+            ],
+            "modifiers": "",
+            "text": "s_load_dwordx2 s[2:3], s[0:1], 0x20",
+            "source": {
+              "file": "/tmp/etx-verifygaps/polling/poll.hip",
+              "line": 7
+            },
+            "wait_scope": {}
+          },
+          {
+            "index": 3,
+            "assembly_line": 22,
+            "mnemonic": "s_waitcnt",
+            "operands": [
+              "lgkmcnt(0)"
+            ],
+            "modifiers": "",
+            "text": "s_waitcnt lgkmcnt(0)",
+            "source": {
+              "file": "etx/runtime/include/etx/import.h",
+              "line": 114
+            },
+            "wait_scope": {
+              "lgkmcnt": 0
+            }
+          },
+          {
+            "index": 4,
+            "assembly_line": 23,
+            "mnemonic": "s_load_dword",
+            "operands": [
+              "s6",
+              "s[4:5]",
+              "0x9c"
+            ],
+            "modifiers": "",
+            "text": "s_load_dword s6, s[4:5], 0x9c",
+            "source": {
+              "file": "etx/runtime/include/etx/import.h",
+              "line": 114
+            },
+            "wait_scope": {}
+          },
+          {
+            "index": 5,
+            "assembly_line": 25,
+            "mnemonic": "s_load_dword",
+            "operands": [
+              "s7",
+              "s[4:5]",
+              "0x0"
+            ],
+            "modifiers": "",
+            "text": "s_load_dword s7, s[4:5], 0x0",
+            "source": {
+              "file": "etx/runtime/include/etx/import.h",
+              "line": 115
+            },
+            "wait_scope": {}
+          },
+          {
+            "index": 6,
+            "assembly_line": 26,
+            "mnemonic": "s_load_dword",
+            "operands": [
+              "s8",
+              "s[4:5]",
+              "0x40"
+            ],
+            "modifiers": "",
+            "text": "s_load_dword s8, s[4:5], 0x40",
+            "source": {
+              "file": "etx/runtime/include/etx/import.h",
+              "line": 115
+            },
+            "wait_scope": {}
+          },
+          {
+            "index": 7,
+            "assembly_line": 27,
+            "mnemonic": "s_load_dword",
+            "operands": [
+              "s9",
+              "s[4:5]",
+              "0x80"
+            ],
+            "modifiers": "",
+            "text": "s_load_dword s9, s[4:5], 0x80",
+            "source": {
+              "file": "etx/runtime/include/etx/import.h",
+              "line": 115
+            },
+            "wait_scope": {}
+          },
+          {
+            "index": 8,
+            "assembly_line": 29,
+            "mnemonic": "s_waitcnt",
+            "operands": [
+              "lgkmcnt(0)"
+            ],
+            "modifiers": "",
+            "text": "s_waitcnt lgkmcnt(0)",
+            "source": {
+              "file": "etx/runtime/include/etx/import.h",
+              "line": 115
+            },
+            "wait_scope": {
+              "lgkmcnt": 0
+            }
+          },
+          {
+            "index": 12,
+            "assembly_line": 39,
+            "mnemonic": "global_load_dword",
+            "operands": [
+              "v1",
+              "v0",
+              "s[2:3]"
+            ],
+            "modifiers": "sc1",
+            "text": "global_load_dword v1, v0, s[2:3] sc1",
+            "source": {
+              "file": "etx/runtime/include/etx/primitives.h",
+              "line": 30
+            },
+            "wait_scope": {}
+          },
+          {
+            "index": 14,
+            "assembly_line": 41,
+            "mnemonic": "s_waitcnt",
+            "operands": [
+              "vmcnt(0)"
+            ],
+            "modifiers": "",
+            "text": "s_waitcnt vmcnt(0)",
+            "source": {
+              "file": "etx/runtime/include/etx/primitives.h",
+              "line": 30
+            },
+            "wait_scope": {
+              "vmcnt": 0
+            }
+          },
+          {
+            "index": 17,
+            "assembly_line": 46,
+            "mnemonic": "s_load_dwordx2",
+            "operands": [
+              "s[0:1]",
+              "s[0:1]",
+              "0xe8"
+            ],
+            "modifiers": "",
+            "text": "s_load_dwordx2 s[0:1], s[0:1], 0xe8",
+            "source": {
+              "file": "etx/runtime/include/etx/primitives.h",
+              "line": 0
+            },
+            "wait_scope": {}
+          },
+          {
+            "index": 28,
+            "assembly_line": 62,
+            "mnemonic": "s_waitcnt",
+            "operands": [
+              "lgkmcnt(0)"
+            ],
+            "modifiers": "",
+            "text": "s_waitcnt lgkmcnt(0)",
+            "source": {
+              "file": "etx/runtime/include/etx/primitives.h",
+              "line": 30
+            },
+            "wait_scope": {
+              "lgkmcnt": 0
+            }
+          },
+          {
+            "index": 29,
+            "assembly_line": 63,
+            "mnemonic": "global_load_dword",
+            "operands": [
+              "v1",
+              "v0",
+              "s[0:1]"
+            ],
+            "modifiers": "sc1",
+            "text": "global_load_dword v1, v0, s[0:1] sc1",
+            "source": {
+              "file": "etx/runtime/include/etx/primitives.h",
+              "line": 30
+            },
+            "wait_scope": {}
+          },
+          {
+            "index": 30,
+            "assembly_line": 64,
+            "mnemonic": "s_waitcnt",
+            "operands": [
+              "vmcnt(0)"
+            ],
+            "modifiers": "",
+            "text": "s_waitcnt vmcnt(0)",
+            "source": {
+              "file": "etx/runtime/include/etx/primitives.h",
+              "line": 30
+            },
+            "wait_scope": {
+              "vmcnt": 0
+            }
+          },
+          {
+            "index": 39,
+            "assembly_line": 78,
+            "mnemonic": "global_load_dword",
+            "operands": [
+              "v1",
+              "v0",
+              "s[2:3]"
+            ],
+            "modifiers": "sc1",
+            "text": "global_load_dword v1, v0, s[2:3] sc1",
+            "source": {
+              "file": "etx/runtime/include/etx/primitives.h",
+              "line": 30
+            },
+            "wait_scope": {}
+          },
+          {
+            "index": 40,
+            "assembly_line": 79,
+            "mnemonic": "s_waitcnt",
+            "operands": [
+              "vmcnt(0)"
+            ],
+            "modifiers": "",
+            "text": "s_waitcnt vmcnt(0)",
+            "source": {
+              "file": "etx/runtime/include/etx/primitives.h",
+              "line": 30
+            },
+            "wait_scope": {
+              "vmcnt": 0
+            }
+          }
+        ],
+        "register_independent_load_sites": 4,
+        "candidates": [
+          {
+            "load": 4,
+            "wait": 3,
+            "independent_prior_loads": [
+              1
+            ],
+            "status": "register-independent candidate; alias/range/reorder legality not established"
+          },
+          {
+            "load": 5,
+            "wait": 3,
+            "independent_prior_loads": [
+              1
+            ],
+            "status": "register-independent candidate; alias/range/reorder legality not established"
+          },
+          {
+            "load": 6,
+            "wait": 3,
+            "independent_prior_loads": [
+              1
+            ],
+            "status": "register-independent candidate; alias/range/reorder legality not established"
+          },
+          {
+            "load": 7,
+            "wait": 3,
+            "independent_prior_loads": [
+              1
+            ],
+            "status": "register-independent candidate; alias/range/reorder legality not established"
+          }
+        ],
+        "proven_overlapable_loads": null,
+        "limitation": "layout order and same-block register independence do not establish legal hoisting or exposed time"
+      }
+    }
+  },
+  "ir_sha256": "afc7542b4e6f6d3a3247a2312a755af28e769a308973ee9f33f3ebd8b683cbd7"
+}

@@ -137,3 +137,65 @@ Raw CLI stdout is preserved in the three `*-report.log` files; it includes
 both per-kernel counts. New tests cover CFG spill-store merges, lane-spill
 classification, missing slot provenance, transitive address dependence,
 DPP/swizzle modifier parsing and a final reduction add across a branch.
+
+## Gap 3 — polling-wave prefetch isolation
+
+**Static/code verification closed; GPU acceptance pending and flag OFF.**
+Flag: `ETX_PREFETCH_ISOLATE_POLLER=1` **at emission**, e.g. on the environment
+of `build.sh`; it is not a hipcc `-D`. The default and explicit `=0` emit the
+starting commit's source byte-for-byte. With `=1`, the optional `pre_wait`
+argument-cache hook moves from `threadIdx.x < 64` (wave 0) to
+`64 <= threadIdx.x < 128` (wave 1). The generic weight-prefetch hook excludes
+wave 0 with `threadIdx.x >= 64`; the existing weight touch and next-task ARGPF
+hooks already exclude the poller. A one-wave launch omits the optional hook
+because no spare wave exists. No barrier, boundary, payload math, worker,
+precision or parameter is changed.
+
+Yes, wave 0 prefetches today: `etx_pre_*` calls `etx_imp_touch`, which issues
+**scalar argument-cache loads**, not VMEM weight loads. The exact wave-0
+primitive specialization in `polling-original.s` has four prefetch instructions:
+
+```text
+4: s_load_dword s6, s[4:5], 0x9c
+5: s_load_dword s7, s[4:5], 0x0
+6: s_load_dword s8, s[4:5], 0x40
+7: s_load_dword s9, s[4:5], 0x80
+8: s_waitcnt lgkmcnt(0)
+12: global_load_dword v1, v0, s[2:3] sc1
+14: s_waitcnt vmcnt(0)
+```
+
+Indices 0/1 are required kernel-argument loads; 17 is the abort-pointer load;
+29/39 are abort/event polls. Their scopes are printed without filtering in
+`polling-build.log` and `polling-{original,isolated}.json`. The specialization
+uses the **real runtime primitives**, removes outer dispatch/wave predicates
+and is **not an executed full-dispatch trace**. Full original/ON ISA is also
+retained as `isolation-{original,on}.s.gz` for inspecting those predicates.
+The isolated wave-0 specialization has **0 prefetch instructions**; event and
+abort polls and their vmcnt(0) waits remain. These scalar prefetched values
+are drained by **lgkmcnt(0) before the event poll**. A vmcnt(0) waiting on a
+VMEM prefetch is **not demonstrated on this argument-hook path**. The brief's
+co-running-stream interference evidence does not establish that mechanism.
+
+Full Qwen plan: **60,362 tasks / 304 workers**, OFF source identical to
+`9f91f3a`. Independently compiled `.text` files are committed for direct byte
+comparison. OFF `.text` byte identity **true**:
+`0c65425003800f4db327ce1508433a5c1a368c3b7b286e421e03cf026da3b0a2`
+for both original and OFF; ON hash
+`aaadb2712504d5508f672ad287d36edaf8ae42c92c6e4d4b7d633b01bb58ce7a`.
+All three arms: megakernel **128 VGPR / 28 scratch bytes per lane /
+29,736 LDS bytes / compiler occupancy 4**; unfused **103 / 0 / 29,704 / 4**.
+These are compiler resources, not executed correctness or residency evidence.
+
+Future keep rule **[E]** (registered decision threshold, not a measured effect):
+isolated round trip **strictly below 2.0 us** AND total gain **at least
+0.030 ms/step**. Basis: the brief's prescribed threshold and the separate
+co-running-stream observation in `XCD-PREFETCH-2026-10-11.md`; no time effect
+has been measured here. The flag remains OFF until a GPU session passes it.
+
+CPU gates: full suite **1342 passed, 14 skipped in 227.17s (0:03:47)**;
+local LLVM 23 gfx942 compile with explicit ETX_DEVLIBS for both polling arms
+exited 0; all 12 full-plan native build/assemble/extract stages exited 0.
+Both new driver dry runs exited 0 (stdout saved). No shell script added;
+`bash -n etx/importer/hip_ir_local.sh` on the reused compiler helper exited 0.
+No CHECK-DSL, imported-launch byte check, HF tokens or GPU timing was run.
