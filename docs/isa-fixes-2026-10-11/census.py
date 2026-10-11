@@ -22,11 +22,12 @@ from etx.ops import attnprep, gemv, topk
 from etx.ops.emit import HEADER
 
 
-def run(mode, out):
+def run(mode, out, compiler="local"):
+    out.mkdir(parents=True, exist_ok=True)
     os.environ['ETX_VL_ROUTER_NARROW'] = '1' if mode in ('c1', 'combined') else '0'
     # Load the emitter in isolation; never modify the shared kept-build symlink.
     g = types.ModuleType('candidate_gemv'); g.__file__ = str(ROOT / 'etx/ops/gemv.py')
-    code = subprocess.check_output(['git', 'show', '9af85ae:etx/ops/gemv.py'], text=True) if mode == 'baseline' else (ROOT / 'etx/ops/gemv.py').read_text()
+    code = subprocess.check_output(['git', 'show', '9af85ae:etx/ops/gemv.py'], text=True) if mode == 'baseline' else subprocess.check_output(['git', 'show', 'f8542bc:etx/ops/gemv.py'], text=True) if mode == 'c1' else (ROOT / 'etx/ops/gemv.py').read_text()
     exec(compile(code, g.__file__, 'exec'), g.__dict__)
     work = out / mode; work.mkdir(parents=True, exist_ok=True)
     src = list(HEADER)
@@ -43,14 +44,37 @@ def run(mode, out):
         census.TILES.append(('k_router_fold', 'etx_tile_dsl_gemv_router_fold'))
         census.WRAP += 'K(k_router_fold, etx_tile_dsl_gemv_router_fold)\n'
     original = census.compile_s
-    census.compile_s = lambda unused: original(work)
+    if compiler == 'rocm':
+        (work/'wrap.hip').write_text(census.WRAP)
+        headers = Path.home()/'code/rocm-headers'
+        llvm = headers/'rocm-llvm/opt/rocm-7.2.4/lib/llvm/bin'
+        libs = headers/'devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode'
+        docker = ['docker', 'run', '--rm', '--pull=never', '--network=none', '--platform', 'linux/amd64',
+                  '-v', f'{Path.home() / "code"}:{Path.home() / "code"}:ro',
+                  '-v', f'{out}:{out}', '-w', str(ROOT),
+                  '-e', f'ETX_ROCM_HEADERS={headers}', '-e', f'ETX_LLVM={llvm}',
+                  '-e', f'ETX_DEVLIBS={libs}', 'etx-rocm22']
+        commands = [docker+['bash', str(ROOT/'etx/importer/hip_ir_local.sh'), str(work/'wrap.hip'), str(work/'wrap.ll'),
+                           '-gline-tables-only', *census.FLAGS, '-I'+str(work), '-I'+str(ROOT/'etx/runtime/include'), '-I'+str(ROOT/'etx/runtime')],
+                    docker+[str(llvm/'llc'), '-mtriple=amdgcn-amd-amdhsa', '-mcpu=gfx942', '-O3', str(work/'wrap.ll'), '-o', str(work/'wrap.s')]]
+        for n, cmd in enumerate(commands):
+            print(f'ROCM BUILD {mode} stage={n}', flush=True)
+            with (out/f'{mode}-build-{n}.log').open('w') as log:
+                subprocess.run(cmd, stdout=log, stderr=subprocess.STDOUT, check=True)
+        census.compile_s = lambda unused: work/'wrap.s'
+    else:
+        census.compile_s = lambda unused: original(work)
     with (out/f'{mode}.txt').open('w') as f, contextlib.redirect_stdout(f):
         census.main()
+    if compiler == 'rocm':
+        result = out/f'{mode}.txt'
+        result.write_text(result.read_text().replace('local LLVM 23', 'ROCm 7.2.4 LLVM 22').replace('RESOURCES (local compiler)', 'RESOURCES (native ROCm compiler, x86 container)'))
     print(f'CENSUS {mode}: {out / (mode + ".txt")}', flush=True)
 
 
 if __name__ == '__main__':
     ap = argparse.ArgumentParser(); ap.add_argument('mode', choices=('baseline', 'c1', 'c5', 'combined'))
     ap.add_argument('--out', type=Path, default=Path('/tmp/etx-isafixes-isa'))
+    ap.add_argument('--compiler', choices=('local', 'rocm'), default='local')
     a = ap.parse_args(); a.out = a.out.resolve(); a.out.mkdir(parents=True, exist_ok=True)
-    run(a.mode, a.out)
+    run(a.mode, a.out, a.compiler)

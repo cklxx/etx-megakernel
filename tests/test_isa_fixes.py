@@ -73,3 +73,45 @@ else: raise AssertionError('wrong shape accepted')
     r = subprocess.run([sys.executable, '-c', code], env={**os.environ, 'ETX_VL_ROUTER_NARROW':'1'}, capture_output=True, text=True)
     assert r.returncode == 0, r.stderr
     assert 'dsl_gemv_router_fold' not in gemv.import_entries()
+
+
+def norm_vector(rows, residual, weights, hoist):
+    K = len(residual)
+    # Mirrors VECNORM: 8 consecutive elements per thread, same row/add rounds.
+    saved = weights.copy() if hoist else None
+    z = np.zeros(K, np.float32)
+    for row in rows:
+        z = (z + row).astype(np.float32)
+    if len(rows) > 1:
+        z = bf(z)
+    z = bf(z + residual)
+    ss = np.zeros(1024, np.float32)
+    for i in range((K // 8 + 1023) // 1024):
+        for j in range(8):
+            ix = (i * 1024 + np.arange(1024)) * 8 + j
+            active = ix < K
+            ss[active] = (ss[active] + z[ix[active]] * z[ix[active]]).astype(np.float32)
+    red = wave(ss.reshape(16, 64))
+    total = np.float32(0)
+    for v in red:
+        total = np.float32(total + v)
+    sv = np.float32(1) / np.sqrt(np.float32(total / K + np.float32(1e-6)))
+    # Same multiply order and bf16 rounding; only weight read time differs.
+    return bf((z * sv).astype(np.float32) * (saved if hoist else weights))
+
+
+@pytest.mark.parametrize('K,R', [(2048,1), (2048,8), (4096,8), (16384,1)])
+def test_norm_hoist_same_bits_and_reference_tolerance(K, R):
+    # Include the later-trip fallback at K > 8*1024; not a decoder shape claim.
+    rng = np.random.default_rng(K + R)
+    rows, rin, w = bf(rng.normal(size=(R,K))), bf(rng.normal(size=K)), bf(rng.uniform(.1,2,size=K))
+    before, after = norm_vector(rows,rin,w,False), norm_vector(rows,rin,w,True)
+    assert np.array_equal(before.view(np.uint32),after.view(np.uint32))
+    z = np.zeros(K,np.float32)
+    for row in rows: z = (z + row).astype(np.float32)
+    z = bf((bf(z) if R > 1 else z) + rin)
+    sv = np.float32(1 / np.sqrt(np.float32(np.mean(z.astype(np.float64)**2) + 1e-6)))
+    ref = ((z * sv).astype(np.float32) * w).astype(np.float32)
+    rounded = bf(ref)
+    tol = np.maximum(2 * np.abs(rounded) / 128, np.max(np.abs(ref)) / 4096)
+    assert np.all(np.abs(after - rounded) <= tol)

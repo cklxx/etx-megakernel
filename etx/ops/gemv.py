@@ -542,6 +542,16 @@ static __device__ __forceinline__ void dsl_stage_norm_at(const DslArgs& d, const
     for (int j = 0; j < 8; ++j) { xs[8 * i + j] = z[j]; ss += z[j] * z[j]; }
     if (store && rout != nullptr) dsl_a_st128(rout + 8 * i, ro);
   }
+#ifdef ETX_DSL_NORM_HOIST
+  // Immutable norm weights: one 16-byte vector per active thread, live across
+  // the block sum's two joins. A compiler memory fence prevents sinking;
+  // it emits no device fence and preserves the original cached load policy.
+  // Keep the original load for later trips when K > 8 * blockDim.x.
+  dsl_u32x4 norm_w = {};
+  if ((int)threadIdx.x < K / 8)
+    norm_w = *(const DSL_G dsl_u32x4*)(d.ln + 8 * (int)threadIdx.x);
+  asm volatile("" ::: "memory");
+#endif
 #if ETX_EMIT_DSL_EXT
   // mode 4: LayerNorm (PhiMoE): mean-centred, biased -- out = (z - mean) * rsqrt(var + eps) * w + b, fp32 inside,
   // one bf16 rounding, as torch's nn.LayerNorm on a bf16 tensor. mode 1 keeps the RMS path bit-for-bit.
@@ -561,7 +571,11 @@ static __device__ __forceinline__ void dsl_stage_norm_at(const DslArgs& d, const
   ss = etx_block_sum(ss, red);
   const float sv = rsqrtf(ss / (float)K + d.eps);
   for (int i = (int)threadIdx.x; i < K / 8; i += blockDim.x) {
+#ifdef ETX_DSL_NORM_HOIST
+    const dsl_u32x4 w = i == (int)threadIdx.x ? norm_w : *(const DSL_G dsl_u32x4*)(d.ln + 8 * i);
+#else
     const dsl_u32x4 w = *(const DSL_G dsl_u32x4*)(d.ln + 8 * i);          // the norm weight is read-only: stays cached
+#endif
     dsl_u32x4 o;
 #if ETX_EMIT_DSL_EXT
     if (d.mode == 4) {
