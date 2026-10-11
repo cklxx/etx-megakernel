@@ -5,13 +5,60 @@ import pytest
 from examples.sessions import qwen300 as s
 
 
-def test_three_serial_jobs():
-    assert [j['name'] for j in s.JOBS] == ['job1_bar', 'job2_pricing', 'job3_key32']
+def test_two_serial_bf16_jobs():
+    assert [j['name'] for j in s.JOBS] == ['job1_pricing', 'job2_key32']
+    assert [j['timeout'] for j in s.JOBS] == [1800, 2400]
     assert all(j['gpu'] == 0 and j['quiet_s'] <= 180 for j in s.JOBS)
-    assert s.JOBS[1]['after_any'] == ['job1_bar']
-    assert s.JOBS[2]['after_any'] == ['job2_pricing']
-    assert 'FP8, never the bf16' in s.HEADER
+    assert s.JOBS[0]['after_any'] == []
+    assert s.JOBS[1]['after_any'] == ['job1_pricing']
+    assert 'All configurations require bf16 and 32/32' in s.HEADER
     assert '<=21' in s.HEADER and '>24' in s.HEADER
+    assert s.HF == {'bf16': 'Qwen/Qwen3-30B-A3B'}
+
+
+@pytest.mark.parametrize('gate', ['ok', 'bad_golden', 'missing_trace_correctness'])
+def test_pricing_job_prepares_bf16_and_requires_gates(tmp_path, monkeypatch, gate):
+    import time
+    monkeypatch.setenv('ETX_SESS_LOGDIR', str(tmp_path))
+    monkeypatch.setenv('HOME', str(tmp_path))
+    monkeypatch.setattr(s, 'DEADLINE', time.monotonic()+1800)
+    calls, priced = [], []
+    def step(name, cmd, seconds):
+        calls.append((name, cmd))
+        return 'TRACE COMPLETE 32/32' if gate != 'missing_trace_correctness' else ''
+    monkeypatch.setattr(s, 'step', step)
+    monkeypatch.setattr(s, 'price_trace', lambda path, precision: priced.append((path, precision)))
+    if gate == 'bad_golden':
+        bad = tmp_path/'bad_golden.txt'
+        bad.write_text('corrupted reference')
+        monkeypatch.setattr(s, 'GOLDEN', bad)
+        with pytest.raises(RuntimeError, match='bf16 golden hash mismatch'):
+            s.job1()
+        assert [name for name, _ in calls] == ['image', 'record', 'bf16_download']
+        assert not s.golden('bf16').exists()
+    else:
+        if gate == 'missing_trace_correctness':
+            with pytest.raises(RuntimeError, match='trace correctness missing'):
+                s.job1()
+        else:
+            s.job1()
+        assert [name for name, _ in calls] == ['image', 'record', 'bf16_download', 'bf16_bar', 'trace_bf16']
+        assert s.golden('bf16').read_bytes() == s.GOLDEN.read_bytes()
+        cmd = calls[-1][1]
+        assert cmd[:3] == ['sudo', 'docker', 'run']
+        assert 'rocprofv3' in cmd and '--kernel-trace' in cmd
+        assert cmd[-4:] == ['--inside', 'trace', '--precision', 'bf16']
+    assert priced == ([(tmp_path/'trace_bf16', 'bf16')] if gate == 'ok' else [])
+
+
+@pytest.mark.parametrize('args', [
+    ['--job', '3'], ['--inside', 'hf'], ['--inside', 'probe'],
+    ['--inside', 'bench', '--precision', 'fp8'],
+])
+def test_removed_jobs_and_modes_refused(args):
+    with pytest.raises(SystemExit) as exc:
+        s.main(args)
+    assert exc.value.code == 2
 
 
 def trace(tmp_path, missing=False):
@@ -35,7 +82,7 @@ def trace(tmp_path, missing=False):
 
 def test_trace_layer_identity_and_units(tmp_path, monkeypatch):
     monkeypatch.setenv('ETX_SESS_LOGDIR', str(tmp_path))
-    rows = s.price_trace(trace(tmp_path), 'fp8')
+    rows = s.price_trace(trace(tmp_path), 'bf16')
     assert len(rows) == 48
     assert all(r['stage1'] + r['stage2'] == 21 for r in rows)
     assert all(r['attention'] == 3 and r['reduce'] == 1 for r in rows)
@@ -44,8 +91,8 @@ def test_trace_layer_identity_and_units(tmp_path, monkeypatch):
 def test_missing_stage_refuses(tmp_path, monkeypatch):
     monkeypatch.setenv('ETX_SESS_LOGDIR', str(tmp_path))
     with pytest.raises(RuntimeError, match='coverage'):
-        s.price_trace(trace(tmp_path, missing=True), 'fp8')
-    assert not (tmp_path/'fp8_pricing.json').exists()
+        s.price_trace(trace(tmp_path, missing=True), 'bf16')
+    assert not (tmp_path/'bf16_pricing.json').exists()
 
 
 def routing(tmp_path):

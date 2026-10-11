@@ -1,19 +1,21 @@
-"""The single Qwen3-30B-A3B / MI300X / batch-1 / ctx1024 decision session.
+"""Qwen3-30B-A3B bf16 MoE phase pricing and the KEY32 decision.
+
+One MI300X, batch-1, ctx1024; every configuration stays bf16.
 
 CPU inspection: python3 -m examples.sessions.qwen300 --dry-run
 Launch (after push): tools/session.sh start IP examples/sessions/qwen300.py 0 A
 No provisioning, billing API, GPU access or image pull on import / dry-run.
 
-Three serial jobs; failed FP8 serving is a first-class result, never a fallback.
-Job 2 reports missing FP8 evidence but still attempts the bf16 comparison.
-Job 3 runs last even if either earlier job fails. Nothing is silently dropped.
+Two serial jobs: bf16 MoE phase pricing, then the KEY32 decision.
+Job 2 runs last even if Job 1 fails. Nothing is silently dropped.
+The job timeouts total 70 minutes.
 The runner cap is 110 minutes; VM life is at most 120 minutes including setup.
 At the historical $1.99/GPU-hour rate: estimated ceiling $3.98 (not a quote).
 The operator must fetch results and delete the VM immediately on completion or
 at the allocation deadline. This script neither provisions nor deletes a VM.
 
-FP8 correctness means HF greedy from Qwen/Qwen3-30B-A3B-FP8, NOT bf16.
-No dequantization fallback, patched vLLM, donor tuning or checkpoint substitution.
+Correctness requires 32/32 greedy tokens equal to the HF bf16 reference.
+No reduced precision, patched vLLM, donor tuning or checkpoint substitution.
 KEY32 is scoped to the shipped unfolded Qwen plan. Section 8's folded
 configuration is not qualified by this session; no other-model jobs are included.
 The vLLM wall estimator is (generate(32)-generate(1))/31, five warm samples,
@@ -38,7 +40,7 @@ MAX_SESSION_SECONDS = 110 * 60
 if float(os.environ.get('ETX_SESS_MAX_SECONDS', MAX_SESSION_SECONDS)) > MAX_SESSION_SECONDS:
     raise ValueError('Qwen300 hard stop cannot be extended')
 IMAGE = 'vllm/vllm-openai-rocm@sha256:bb44b39aea26798cce43030a98bf48efd0322ca7147367db86e38b96bd80f0e7'
-HF = {'fp8': 'Qwen/Qwen3-30B-A3B-FP8', 'bf16': 'Qwen/Qwen3-30B-A3B'}
+HF = {'bf16': 'Qwen/Qwen3-30B-A3B'}
 GOLDEN = Path('examples/llm/results/golden_c1024_qwen3-30b-a3b.txt')
 FLAGS = '-DETX_DSL_WSUM -DETX_DSL_SCALAR -DETX_DSL_GU1 -DETX_DSL_RBATCH'
 MODULE = 'examples.sessions.qwen300'
@@ -46,24 +48,23 @@ HEADER = '''QWEN300 pre-registration: one MI300X, batch=1, context=1024, greedy=
 BUDGET estimated 1.5 hours / $2.99; runner HARD STOP 110 minutes;
 VM-life HARD STOP 2 hours / $3.98 at estimated $1.99/GPU-hour, setup included.
 Delete the VM immediately when finished; runner timeout does not delete a VM.
-FP8 reference is HF Qwen/Qwen3-30B-A3B-FP8, never the bf16 reference.
-Job 1: correctness 32/32 before host-wall timing; <=3.333333 ms meets 300 tok/s.
-Any FP8 load/serve failure: CHECKPOINT-UNSUPPORTED, preserve exception, no workaround.
-Job 2: device AITER stage1+stage2 mean over 48 layers and 31 decode steps:
+All configurations require bf16 and 32/32 greedy tokens equal to HF Qwen/Qwen3-30B-A3B.
+Job 1: correctness 32/32 before bf16 host-wall timing; <=3.333333 ms meets 300 tok/s.
+Then device AITER stage1+stage2 mean over 48 layers and 31 decode steps:
 <=21 us/layer: importing may recover >=0.28 ms; 300 remains a multi-week target.
->24 us/layer: MoE swap CLOSED; FP8 must ship its own MoE tile.
+>24 us/layer: MoE swap CLOSED; bf16 must ship its own MoE tile.
 (21,24] us/layer: unresolved. Missing stages/coverage: NOT-COMPLETE, never zero.
-The recovery is an estimate from the bf16 phase comparison, not an FP8 speed claim.
-Job 3: KEY32 estimate 0.03--0.145 ms; five alternating pinned off/on pairs.
+The recovery is an estimate from the bf16 phase comparison.
+Job 2: KEY32 estimate 0.03--0.145 ms; five alternating pinned off/on pairs.
 KEEP only if every wall saving >0, median >=0.03 ms and >2*(max-min).
 Require fresh same-build import checks at positions 0 and 1040, 32/32 on every run.
-Report fused and same-kernel HIP graph, device separately, and Job 2 bf16 vLLM.
+Report fused and same-kernel HIP graph, device separately, and Job 1 bf16 vLLM.
 No shorter-run numbers; missing/failed arms are explicitly NOT-COMPLETE.
 '''
 JOBS = [dict(name=f'job{i}_{name}', gpu=0, machine='A', quiet_s=180,
-             timeout=seconds, after_any=[] if i == 1 else [f'job{i-1}_{("bar", "pricing")[i-2]}'],
+             timeout=seconds, after_any=[] if i == 1 else ['job1_pricing'],
              cmd=f'stdbuf -oL -eL python3 -u -m {MODULE} --job {i}')
-        for i, name, seconds in [(1, 'bar', 2400), (2, 'pricing', 1800), (3, 'key32', 2400)]]
+        for i, name, seconds in [(1, 'pricing', 1800), (2, 'key32', 2400)]]
 
 
 def root():
@@ -71,7 +72,9 @@ def root():
 
 
 def model(precision):
-    return Path.home() / 'llm' / ('qwen3-30b-a3b' + ('-fp8' if precision == 'fp8' else ''))
+    if precision != 'bf16':
+        raise ValueError('Qwen300 requires bf16')
+    return Path.home() / 'llm' / 'qwen3-30b-a3b'
 
 
 def golden(precision):
@@ -162,28 +165,6 @@ def download(precision):
     print('DOWNLOAD COMPLETE', flush=True)
 
 
-def hf_reference(precision):
-    import torch
-    import transformers
-    from transformers import AutoModelForCausalLM
-    prompt = list(map(int, GOLDEN.read_text().splitlines()[0].split()[1:]))
-    assert len(prompt) == 1024
-    print(f'HF REFERENCE {HF[precision]} transformers={transformers.__version__} torch={torch.__version__}', flush=True)
-    m = AutoModelForCausalLM.from_pretrained(str(model(precision) / 'hf'), torch_dtype='auto', device_map='auto').eval()
-    # Native FP8 checkpoint loader. A failure is a failed gate, no bf16 fallback.
-    ids = torch.tensor([prompt], device='cuda')
-    out, past = [], None
-    with torch.inference_mode():
-        for n in range(32):
-            result = m(input_ids=ids, past_key_values=past, use_cache=True)
-            ids = torch.argmax(result.logits[:, -1, :], dim=-1, keepdim=True)
-            past = result.past_key_values
-            out.append(int(ids.item()))
-            print(f'HF-GREEDY step={n+1}/32 token={out[-1]}', flush=True)
-    golden(precision).write_text('prompt ' + ' '.join(map(str, prompt)) + '\ngenerated ' + ' '.join(map(str, out)) + '\n')
-    print(f'HF-REFERENCE OK precision={precision} sha256={hashlib.sha256(golden(precision).read_bytes()).hexdigest()}', flush=True)
-
-
 def vllm_run(precision, mode):
     import torch
     import vllm
@@ -215,10 +196,6 @@ def vllm_run(precision, mode):
             raise RuntimeError(f'CORRECTNESS FAILED precision={precision}: expected={expected}, actual={tokens}')
         print(f'CORRECTNESS OK 32/32 precision={precision} HF={HF[precision]}', flush=True)
     _, tokens = gen(32)
-    if mode == 'probe':
-        (root() / f'{precision}_probe.json').write_text(json.dumps(tokens))
-        print('CHECKPOINT SERVED; correctness and timing still pending', flush=True)
-        return
     check(tokens)  # gate before even starting the timing population
     gen(1)
     if mode == 'trace':
@@ -304,7 +281,7 @@ def price_trace(directory, precision):
         result.append(dict(layer=layer, **r))
         print(f'LAYER {condition(precision, "device kernels us")} layer={layer} {json.dumps(r)}', flush=True)
     total = statistics.mean(r['stage1'] + r['stage2'] for r in result)
-    decision = 'IMPORT-CANDIDATE >=0.28ms estimated recovery; multi-week target' if total <= 21 else 'CLOSED: own FP8 MoE tile required' if total > 24 else 'UNRESOLVED'
+    decision = 'IMPORT-CANDIDATE >=0.28ms estimated recovery; multi-week target' if total <= 21 else 'CLOSED: own bf16 MoE tile required' if total > 24 else 'UNRESOLVED'
     s1, b1, _ = stats(short); sn, bn, _ = stats(long)
     print(f'PRICING {condition(precision, "device")} moe_us_per_layer={total:.6f} {decision}', flush=True)
     print(f'CEILING {condition(precision, "device")} span_ms={(sn-s1)/31e6:.6f} busy_ms={(bn-b1)/31e6:.6f} gap_ms={(sn-s1-bn+b1)/31e6:.6f}', flush=True)
@@ -315,49 +292,20 @@ def price_trace(directory, precision):
 def job1():
     step('image', ['sudo', 'docker', 'pull', IMAGE], 720)
     step('record', ['bash', '-c', f'set -e; rocm-smi --showproductname; hipconfig --version; uname -a; sudo docker inspect {shlex.quote(IMAGE)}'], 30)
-    model('fp8').mkdir(parents=True, exist_ok=True)  # host owns parent; container writes checkpoint below it
-    step('fp8_download', inside('download', 'fp8', 720), 750)
-    try:
-        step('fp8_serve', inside('probe', 'fp8'), 500)
-    except RuntimeError:
-        print('JOB1 CHECKPOINT-UNSUPPORTED: vLLM failed loading/serving official FP8. NO WORKAROUND.', flush=True)
-        raise
-    step('fp8_hf', inside('hf', 'fp8', 600), 620)
-    probe = json.loads((root() / 'fp8_probe.json').read_text())
-    expected = list(map(int, golden('fp8').read_text().splitlines()[1].split()[1:]))
-    if probe != expected or len(probe) != 32:
-        raise RuntimeError('FP8 served but HF gate FAILED; no timing')
-    step('fp8_bar', inside('bench', 'fp8'), 500)
-
-
-def job2():
-    failures = []
-    for precision in ('fp8', 'bf16'):
-        try:
-            if precision == 'fp8':
-                data = json.loads((root() / 'fp8_bar.json').read_text())
-                if data['correct'] != 32:
-                    raise RuntimeError('Job 1 has no correct bar')
-            else:
-                model('bf16').mkdir(parents=True, exist_ok=True)
-                step('bf16_download', inside('download', 'bf16', 600), 620)
-                # Reuse the repository HF bf16 reference; never copy it to FP8.
-                if hashlib.sha256(GOLDEN.read_bytes()).hexdigest() != 'bab2f1fbe12f70179711ec40a215c74710845b73169b1cc6a3a6ca50e0a19484':
-                    raise RuntimeError('bf16 golden hash mismatch')
-                golden('bf16').write_bytes(GOLDEN.read_bytes())
-                step('bf16_bar', inside('bench', 'bf16'), 500)
-            path = root() / f'trace_{precision}'
-            cmd = container(['rocprofv3', '--kernel-trace', '--output-format', 'csv', '-d', str(path), '--',
-                             'python3', '-u', '-m', MODULE, '--inside', 'trace', '--precision', precision], 480)
-            text = step(f'trace_{precision}', cmd, 500)
-            if 'TRACE COMPLETE 32/32' not in text:
-                raise RuntimeError('trace correctness missing')
-            price_trace(path, precision)
-        except (RuntimeError, OSError, ValueError, KeyError) as exc:
-            failures.append(f'{precision}: {exc}')
-            print(f'JOB2 NOT-COMPLETE {failures[-1]}', flush=True)
-    if failures:
-        raise RuntimeError('; '.join(failures))
+    model('bf16').mkdir(parents=True, exist_ok=True)  # host owns parent; container writes checkpoint below it
+    step('bf16_download', inside('download', 'bf16', 600), 620)
+    # Reuse the repository HF bf16 reference.
+    if hashlib.sha256(GOLDEN.read_bytes()).hexdigest() != 'bab2f1fbe12f70179711ec40a215c74710845b73169b1cc6a3a6ca50e0a19484':
+        raise RuntimeError('bf16 golden hash mismatch')
+    golden('bf16').write_bytes(GOLDEN.read_bytes())
+    step('bf16_bar', inside('bench', 'bf16'), 500)
+    path = root() / 'trace_bf16'
+    cmd = container(['rocprofv3', '--kernel-trace', '--output-format', 'csv', '-d', str(path), '--',
+                     'python3', '-u', '-m', MODULE, '--inside', 'trace', '--precision', 'bf16'], 480)
+    text = step('trace_bf16', cmd, 500)
+    if 'TRACE COMPLETE 32/32' not in text:
+        raise RuntimeError('trace correctness missing')
+    price_trace(path, 'bf16')
 
 
 def etx_capture(arm, extra='', env=None, name=None):
@@ -394,12 +342,12 @@ def routing_gate(directory):
         print(f'ROUTING-AUDIT OK position={pos} layers=48 replicas=8 ids=identical weights=bit-identical', flush=True)
 
 
-def job3():
+def job2():
     from examples.vllm_llm import import_certificate as cert
     from examples.vllm_llm.pairs import parse, verdict
     from examples.vllm_llm.tile_ab import trace_bodies
     if not golden('bf16').exists():
-        raise RuntimeError('KEY32 NOT-COMPLETE: Job 2 bf16 preparation failed')
+        raise RuntimeError('KEY32 NOT-COMPLETE: Job 1 bf16 preparation failed')
     step('etx_env', ['bash', '-c', 'set -e; test -x .venv/bin/python || python3 -m venv --system-site-packages .venv; .venv/bin/python -c "import yaml" || .venv/bin/pip install pyyaml'], 120)
     step('pack', container(['python3', 'examples/vllm_llm/prep.py', '--src', str(model('bf16')/'hf'),
                            '--out', str(model('bf16')), '--maxlen', '1072'], 240), 260)
@@ -491,8 +439,6 @@ def dry_run():
     print(HEADER)
     print('ARITHMETIC measured bf16 wall 4.471 ms =>', 1000/4.471, 'tok/s; gap_ms=', 4.471-1000/300)
     print('ARITHMETIC estimated bf16 bytes=6.1904GB; 4.3TB/s utilization=', 6.1904/(4.471*4.3))
-    print('ARITHMETIC estimated FP8 bytes~=3.10GB => target utilization=', 3.10/((1000/300)*4.3),
-          '; KV/non-weight traffic and FP8 scales do not halve: not a measured FP8 byte spec')
     for j in JOBS:
         subprocess.run(['bash', '-n', '-c', j['cmd']], check=True)
     from etx.tools.gpu_jobs import main as runner
@@ -504,27 +450,25 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__)
     mode = ap.add_mutually_exclusive_group(required=True)
     mode.add_argument('--dry-run', action='store_true')
-    mode.add_argument('--job', type=int, choices=(1,2,3))
-    mode.add_argument('--inside', choices=('download','hf','probe','bench','trace'))
-    ap.add_argument('--precision', choices=('fp8','bf16'), default='fp8')
+    mode.add_argument('--job', type=int, choices=(1,2))
+    mode.add_argument('--inside', choices=('download','bench','trace'))
+    ap.add_argument('--precision', choices=('bf16',), default='bf16')
     a = ap.parse_args(argv)
     if a.dry_run:
         return dry_run()
     if a.inside:
         if a.inside == 'download': download(a.precision)
-        elif a.inside == 'hf': hf_reference(a.precision)
         else: vllm_run(a.precision, a.inside)
         return 0
     print(HEADER, flush=True)
     seconds = min(JOBS[a.job-1]['timeout']-30, int(os.environ['ETX_SESS_REMAINING_SECONDS'])-30)
     DEADLINE = time.monotonic() + seconds
     try:
-        (job1, job2, job3)[a.job-1]()
+        (job1, job2)[a.job-1]()
     except Exception as exc:
         print(f'JOB {a.job} NOT-COMPLETE: {type(exc).__name__}: {exc}', flush=True)
-        expected = ({1: ['fp8_serve', 'fp8_hf', 'fp8_bar'],
-                     2: ['bf16_bar', 'trace_fp8', 'trace_bf16'],
-                     3: [f'r{rnd}_{arm}_{mode}' for rnd in range(1,6)
+        expected = ({1: ['bf16_bar', 'trace_bf16'],
+                     2: [f'r{rnd}_{arm}_{mode}' for rnd in range(1,6)
                          for arm in ('off','on') for mode in ('fused','graph')]})[a.job]
         for name in expected:
             if not (root()/f'{name}.log').exists():
