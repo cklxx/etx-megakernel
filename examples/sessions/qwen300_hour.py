@@ -393,9 +393,11 @@ def first_stop(s, gap_atoms):
     g = gap_atoms['G_ms'] if gap_atoms is not None else None
     passes = g is not None and math.isfinite(g) and (g >= .088 or math.isclose(g, .088, rel_tol=0., abs_tol=1e-12))
     passes = passes and 'kept' in s.certified
+    incomplete = g is None or not math.isfinite(g) or 'kept' not in s.certified
     s.row('A.stop', dict(G_ms=g, gap_atoms=gap_atoms,
-                        decision='CONTINUE to S2' if passes else 'STOP-SPEND: close target route'),
-          'PASS' if passes else 'STOP', REGISTERED['A.stop'])
+                        decision='END SESSION: NOT-COMPLETE' if incomplete else
+                                 'CONTINUE to S2' if passes else 'STOP-SPEND: close target route'),
+          'NOT-COMPLETE' if incomplete else 'PASS' if passes else 'STOP', REGISTERED['A.stop'])
     print(f'FIRST-STOP elapsed={time.monotonic()-s.start:.1f}s (<=900s)', flush=True)
     return passes
 
@@ -979,7 +981,7 @@ def tranche_d(s, survivors, extra_seconds):
 def execute(s):
     preflight(s)
     if not tranche_a(s):
-        print('STOP after A: S1 closes target route', flush=True)
+        print('END after A: '+s.rows['A.stop']['value']['decision'], flush=True)
         for name in ('B.keep', 'B.stop', 'C.fusion', 'C.body', 'C.NO_TOUCH', 'C.ISOLATE_POLLER',
                      'D.target', 'D.fusion', 'D.system'):
             s.row(name, None, 'NOT-RUN', REGISTERED[name])

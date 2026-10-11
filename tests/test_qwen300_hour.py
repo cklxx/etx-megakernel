@@ -213,9 +213,11 @@ def test_b_each_pair_has_gate_and_failed_arm_does_not_hide_next(tmp_path, monkey
 def test_first_stop_does_not_spend_rest_on_missing_deciding_pools(tmp_path, monkeypatch):
     s = session(tmp_path)
     monkeypatch.setattr(h, 'preflight', lambda s: None)
-    monkeypatch.setattr(h, 'tranche_a', lambda s: False)
+    monkeypatch.setattr(h, 'tranche_a', lambda s: h.first_stop(s, None))
     monkeypatch.setattr(h, 'tranche_b', lambda s: pytest.fail('B must not run after stop'))
     h.execute(s)
+    assert s.rows['A.stop']['status'] == 'NOT-COMPLETE'
+    assert 'close target route' not in s.rows['A.stop']['value']['decision']
     assert s.rows['D.target']['status'] == 'NOT-RUN'
 
 
@@ -333,8 +335,17 @@ def test_s1_uses_gap_atoms_instead_of_pool_labels(tmp_path, g, passes, busy, fre
     s = session(tmp_path); s.certified.add('kept')
     s.rows.update({'A1.busy': dict(status=busy), 'A1.free': dict(status=free)})
     assert h.first_stop(s, None if g is None else dict(G_ms=g, atoms={})) is passes
-    assert s.rows['A.stop']['status'] == ('PASS' if passes else 'STOP')
+    assert s.rows['A.stop']['status'] == ('NOT-COMPLETE' if g is None else 'PASS' if passes else 'STOP')
     assert ':301-302' in s.rows['A.stop']['source']
+
+
+@pytest.mark.parametrize('certified,g', [(False, .324), (True, float('nan')), (True, float('inf'))])
+def test_s1_missing_correctness_or_measurement_does_not_close_route(tmp_path, certified, g):
+    s = session(tmp_path)
+    if certified: s.certified.add('kept')
+    assert not h.first_stop(s, dict(G_ms=g))
+    assert s.rows['A.stop']['status'] == 'NOT-COMPLETE'
+    assert s.rows['A.stop']['value']['decision'] == 'END SESSION: NOT-COMPLETE'
 
 
 @pytest.mark.parametrize('g,r2,host,passes', [
