@@ -73,6 +73,37 @@ def test_a2_prices_critical_body_and_is_not_attainability():
     with pytest.raises(ValueError): h.attention_price(dict(phases=rows[:-1]))
 
 
+@pytest.mark.parametrize('failure', ['none', 'certify', 'run', 'analysis', 'coverage'])
+def test_a2_failure_preserves_g_and_missing_a1_is_incomplete(tmp_path, monkeypatch, failure):
+    s = session(tmp_path); s.c['builds']['stamps'] = '/unused/stamps'
+    def certify(s, arm):
+        if arm == 'stages' or (arm == 'stamps' and failure == 'certify'):
+            raise ValueError('diagnostic certification failed')
+        s.certified.add(arm)
+    monkeypatch.setattr(h, 'certify', certify)
+    def host(*args):
+        if failure == 'run': raise RuntimeError('stamp run failed')
+        return host_text()+'HOUR-SNAPSHOT run=0 step=1024\n'
+    monkeypatch.setattr(h, 'host', host)
+    phases = [dict(layer=l, phase=p, body_us=5.) for l in range(48) for p in ('attn', 'reduce')]
+    if failure == 'coverage': phases.pop()
+    def analysis(name, cmd, **kw):
+        if failure == 'analysis': raise ValueError('analysis failed')
+        pool = dict(above_floor_lower_ms=.2, above_floor_upper_ms=.2, count=1)
+        result = dict(critical_pools=dict(busy=pool, free=pool, ambiguous=dict(count=0)),
+                      gap_atoms=dict(G_ms=.324), inbody=dict(phases=phases))
+        Path(cmd[-1]).with_suffix('.summary.json').write_text(json.dumps(result))
+    monkeypatch.setattr(s, 'step', analysis)
+    complete_g = failure in ('none', 'coverage')
+    assert h.tranche_a(s) is complete_g
+    assert s.rows['A.stop']['status'] == ('PASS' if complete_g else 'NOT-COMPLETE')
+    if complete_g:
+        assert s.rows['A.stop']['value']['G_ms'] == .324
+        assert h.second_stop(s)
+        assert s.rows['A2.route']['status'] == ('NOT-COMPLETE' if failure == 'coverage' else 'HEADROOM-PASS')
+        assert s.rows['B.stop']['value']['R2_ms'] == 0.
+
+
 def host_text(mode='fused', cost=4.18):
     text = 'ETX_ENV ETX_UNFUSED_SYNC= ETX_UNFUSED_NOGRAPH=\n'
     text += 'mode: '+('ETX megakernel' if mode == 'fused' else 'unfused HIP graph')+'\n'
@@ -128,6 +159,25 @@ def session(tmp_path):
     return h.Session(dict(manifest=str(h.MANIFEST), builds={'kept': '/unused'}, model='/unused'), tmp_path)
 
 
+@pytest.mark.parametrize('missing', [None, 'packed', 'hf'])
+def test_prewarm_reads_staged_weights_before_any_session_clock(tmp_path, monkeypatch, capsys, missing):
+    model = tmp_path/'model'; model.mkdir()
+    hf = model/'hf'; hf.mkdir()
+    if missing != 'packed': (model/'vl.bin').write_bytes(b'packed weights')
+    if missing != 'hf': (hf/'model-00001.safetensors').write_bytes(b'HF weights')
+    config = tmp_path/'prepared.json'
+    config.write_text(json.dumps(dict(model=str(model), hf=str(hf))))
+    monkeypatch.setattr(h, 'Session', lambda *args: pytest.fail('prewarm must precede session clock'))
+    if missing:
+        with pytest.raises(ValueError, match='weight'): h.main(['--prewarm', str(config)])
+        assert 'CPU-PREWARM begin' not in capsys.readouterr().out
+    else:
+        assert h.main(['--prewarm', str(config)]) == 0
+        out = capsys.readouterr().out
+        assert str(model/'vl.bin') in out and str(hf/'model-00001.safetensors') in out
+        assert 'CPU-PREWARM complete' in out
+
+
 def test_disabled_c_lends_exactly_twenty_seven_minutes(tmp_path):
     s = session(tmp_path)
     s.m['C'] = [a for a in s.m['C'] if not a['enabled']]
@@ -155,10 +205,12 @@ def test_attempt_catches_certificate_refusal_and_keeps_working(tmp_path):
 
 
 @pytest.mark.parametrize('partial', [False, True])
-def test_d_runs_five_adjacent_pinned_pairs_per_baseline(tmp_path, monkeypatch, partial):
+@pytest.mark.parametrize('extra', [0, 1620])
+def test_d_runs_five_adjacent_pinned_pairs_per_baseline(tmp_path, monkeypatch, partial, extra):
     s = session(tmp_path); s.certified.add('kept'); calls = []
     monkeypatch.setattr(h, 'certify', lambda *args: None)
     def fake_host(s, arm, name, args):
+        assert s.deadline == s.end
         mode = 'graph' if '--unfused' in args else 'fused'; calls.append(mode)
         if partial and name == 'D_fusion_r4_graph': raise TimeoutError('synthetic deadline')
         text = host_text(mode, 3.4 if mode == 'graph' else 3.3)
@@ -167,7 +219,8 @@ def test_d_runs_five_adjacent_pinned_pairs_per_baseline(tmp_path, monkeypatch, p
     monkeypatch.setattr(h, 'host', fake_host)
     def fake_system(s, name): calls.append('S3'); return dict(wall_ms=3.5)
     monkeypatch.setattr(h, 'system', fake_system)
-    h.tranche_d(s, [], 1620)
+    h.tranche_d(s, [], extra)
+    assert s.deadline == s.end
     assert calls[1:] == ['fused', 'graph', 'fused', 'S3', 'graph', 'fused', 'S3', 'fused',
                          'fused', 'graph', 'fused', 'S3', 'graph', 'fused', 'S3', 'fused',
                          'fused', 'graph', 'fused', 'S3']
@@ -210,9 +263,11 @@ def test_b_each_pair_has_gate_and_failed_arm_does_not_hide_next(tmp_path, monkey
 def test_first_stop_does_not_spend_rest_on_missing_deciding_pools(tmp_path, monkeypatch):
     s = session(tmp_path)
     monkeypatch.setattr(h, 'preflight', lambda s: None)
-    monkeypatch.setattr(h, 'tranche_a', lambda s: False)
+    monkeypatch.setattr(h, 'tranche_a', lambda s: h.first_stop(s, None))
     monkeypatch.setattr(h, 'tranche_b', lambda s: pytest.fail('B must not run after stop'))
     h.execute(s)
+    assert s.rows['A.stop']['status'] == 'NOT-COMPLETE'
+    assert 'close target route' not in s.rows['A.stop']['value']['decision']
     assert s.rows['D.target']['status'] == 'NOT-RUN'
 
 
@@ -330,8 +385,17 @@ def test_s1_uses_gap_atoms_instead_of_pool_labels(tmp_path, g, passes, busy, fre
     s = session(tmp_path); s.certified.add('kept')
     s.rows.update({'A1.busy': dict(status=busy), 'A1.free': dict(status=free)})
     assert h.first_stop(s, None if g is None else dict(G_ms=g, atoms={})) is passes
-    assert s.rows['A.stop']['status'] == ('PASS' if passes else 'STOP')
+    assert s.rows['A.stop']['status'] == ('NOT-COMPLETE' if g is None else 'PASS' if passes else 'STOP')
     assert ':301-302' in s.rows['A.stop']['source']
+
+
+@pytest.mark.parametrize('certified,g', [(False, .324), (True, float('nan')), (True, float('inf'))])
+def test_s1_missing_correctness_or_measurement_does_not_close_route(tmp_path, certified, g):
+    s = session(tmp_path)
+    if certified: s.certified.add('kept')
+    assert not h.first_stop(s, dict(G_ms=g))
+    assert s.rows['A.stop']['status'] == 'NOT-COMPLETE'
+    assert s.rows['A.stop']['value']['decision'] == 'END SESSION: NOT-COMPLETE'
 
 
 @pytest.mark.parametrize('g,r2,host,passes', [
@@ -352,14 +416,18 @@ def test_s2_combines_gap_attention_and_attributable_host(tmp_path, g, r2, host, 
     assert ':306-308' in s.rows['B.stop']['source']
 
 
-@pytest.mark.parametrize('g,runs_b,runs_cd', [(.087, False, False), (.100, True, False), (.324, True, True)])
+@pytest.mark.parametrize('g,runs_b,runs_cd', [(.087, False, False), (.100, False, False), (.324, True, True)])
 def test_execute_obeys_both_stops_with_time_remaining(tmp_path, monkeypatch, g, runs_b, runs_cd):
     s = session(tmp_path); s.certified.add('kept'); calls = []
     monkeypatch.setattr(h, 'preflight', lambda s: None)
     monkeypatch.setattr(h, 'tranche_a', lambda s: h.first_stop(s, dict(G_ms=g)))
-    def b(s): calls.append('B'); return ['body-keep']
+    def b(s):
+        assert s.rows['B.stop']['status'] == 'PASS'
+        calls.append('B'); return ['body-keep']
     def c(s): calls.append('C'); return [], 1620
-    def d(s, survivors, extra): calls.append('D')
+    def d(s, survivors, extra):
+        assert survivors == ['body-keep']
+        calls.append('D')
     monkeypatch.setattr(h, 'tranche_b', b)
     monkeypatch.setattr(h, 'tranche_c', c)
     monkeypatch.setattr(h, 'tranche_d', d)
@@ -368,7 +436,8 @@ def test_execute_obeys_both_stops_with_time_remaining(tmp_path, monkeypatch, g, 
     assert s.end-h.time.monotonic() > 3900
     if not runs_cd:
         assert all(s.rows[k]['status'] == 'NOT-RUN' for k in ('C.fusion', 'C.body', 'D.target', 'D.fusion', 'D.system'))
-    if runs_b: assert s.rows['B.stop']['status'] == ('PASS' if runs_cd else 'STOP')
+    if g >= .088: assert s.rows['B.stop']['status'] == ('PASS' if runs_cd else 'STOP')
+    if not runs_b: assert s.rows['B.keep']['status'] == 'NOT-RUN'
 
 
 def test_gap_atoms_clip_to_critical_gap_and_apply_class_floor():
@@ -378,15 +447,31 @@ def test_gap_atoms_clip_to_critical_gap_and_apply_class_floor():
     report = dict(raw=dict(tick_ns=100), tasks=[task() for _ in range(48)])
     # Gap starts at tick 100: only 2 us of arrive, 5 of observation, 3 of setup.
     result = h.gap_atom_prices(report)
-    assert result['atoms']['P10.arrive']['above_floor_ms'] == pytest.approx(.096)
+    assert result['atoms']['P10.arrive']['above_floor_ms'] == pytest.approx(48*(2-.30)/1000)
     assert result['atoms']['P5/P11.observation']['above_floor_ms'] == pytest.approx(48*(5-.951)/1000)
-    assert result['atoms']['P4/P6/P7.setup']['above_floor_ms'] == pytest.approx(.144)
+    assert result['atoms']['P4/P6/P7.setup']['above_floor_ms'] == pytest.approx(48*(3-.15)/1000)
     report['tasks'] += [task('attn'), task('reduce'), task(critical=False)]
     assert h.gap_atom_prices(report) == result  # booked boundaries/parallel bodies excluded
     report['tasks'] = [task()]
     result = h.gap_atom_prices(report)
     assert result['G_ms'] == 0.  # every class below 0.625 us/layer; raw excess retained
     assert result['atoms']['P10.arrive']['above_floor_ms'] > 0.
+
+
+@pytest.mark.parametrize('excess_ticks,passes', [(0, False), (20, False), (30, True)])
+def test_s1_stops_at_protocol_floor_and_counts_only_excess(tmp_path, excess_ticks, passes):
+    # 339 critical edges: pre .05, arrive .30, observation .50, setup .15 us.
+    task = dict(critical=True, arrive_is_synthetic=False, phase='qkv',
+                record=[0, 100+excess_ticks, 200+excess_ticks, 0, 35+excess_ticks, 85+excess_ticks],
+                arrive_bounds_ticks=[5, 35+excess_ticks], gap_us=1.+excess_ticks*.01)
+    result = h.gap_atom_prices(dict(raw=dict(tick_ns=10), tasks=[task for _ in range(339)]))
+    assert result['G_ms'] == pytest.approx(339*excess_ticks*.01/1000)
+    assert result['atoms']['P10.arrive']['idle_us'] == .30
+    assert result['atoms']['P4/P6/P7.setup']['idle_us'] == .15
+    assert result['atoms']['P5/P11.observation']['idle_us'] == .951
+    s = session(tmp_path); s.certified.add('kept')
+    assert h.first_stop(s, result) is passes
+    assert s.rows['A.stop']['status'] == ('PASS' if passes else 'STOP')
 
 
 def test_74_minute_cap_and_22_minute_b_deadline(tmp_path, monkeypatch):

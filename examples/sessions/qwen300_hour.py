@@ -2,6 +2,7 @@
 
 python -m examples.sessions.qwen300_hour --template prepared.json
 python -m examples.sessions.qwen300_hour --dry-run
+python -m examples.sessions.qwen300_hour --prewarm prepared.json
 python -m etx.tools.gpu_jobs examples/sessions/qwen300_hour.py --gpus 0 --machine A --logdir OUT
 
 The VM must have prepared.json at ~/etx/qwen300-hour.json, or set
@@ -133,6 +134,34 @@ def verify_seal(s, arm):
     return seal
 
 
+def prewarm(config_path):
+    """CPU-only setup before starting gpu_jobs and its 74-minute clock."""
+    c = json.loads(config_path.read_text())
+    hf_weights = sorted(Path(c['hf']).glob('*.safetensors'))
+    if not hf_weights: raise ValueError('staged HF weight shards missing')
+    files = [Path(c['model'])/'vl.bin', *hf_weights]
+    for path in files:
+        if not path.is_file() or path.stat().st_size <= 0:
+            raise ValueError('staged weight file missing/empty: '+str(path))
+    print('CPU-PREWARM begin; separate staging budget, timeout=600s; files='+
+          json.dumps(list(map(str, files))), flush=True)
+    begin = time.monotonic()
+    with open(os.devnull, 'wb') as sink:
+        p = subprocess.Popen(['cat', *map(str, files)], stdout=sink)
+        try:
+            while p.poll() is None:
+                remaining = 600-(time.monotonic()-begin)
+                if remaining <= 0: raise TimeoutError('CPU-PREWARM staging deadline')
+                try:
+                    p.wait(timeout=min(5, remaining))
+                except subprocess.TimeoutExpired:
+                    print(f'CPU-PREWARM progress elapsed={time.monotonic()-begin:.0f}s pid={p.pid}', flush=True)
+            if p.returncode: raise RuntimeError(f'CPU-PREWARM rc={p.returncode}')
+        finally:
+            if p.poll() is None: p.kill(); p.wait()
+    print(f'CPU-PREWARM complete elapsed={time.monotonic()-begin:.1f}s; start runner next', flush=True)
+
+
 class Session:
     def __init__(self, config, logdir, seconds=MAX_SESSION_SECONDS):
         self.c = config
@@ -238,7 +267,7 @@ REGISTERED = {
     'A3.host': 'name stages accounting for unexplained 0.086 ms beyond priced 0.049 ms',
     'A4.reset': 'pursue only >0.030 ms/step, host and device separately',
     'A.stop': 'S1 at <=15 minutes: G >=0.088 ms (1.833 us/layer) in named above-floor gap atoms, else close target route',
-    'B.stop': 'S2 after B: G + R2 + H >=0.324 ms (whole-target 6.743 us/layer), else close target route; unknowns count zero',
+    'B.stop': 'S2 after A, before B: G + R2 + H >=0.324 ms (whole-target 6.743 us/layer), else close target route; unknowns count zero',
     'B.keep': '3 pairs, all faster, median >=0.030 ms, median >2*spread',
     'C.fusion': 'net >=1.042 us/layer; VGPR <=128; LDS <=29752 B',
     'C.body': '3 pairs, all faster, median >=0.030 ms, median >2*spread',
@@ -360,13 +389,17 @@ def gap_atom_prices(report):
 
     Intersect each stamp with its critical gap to avoid crediting parallel/body
     time twice. P1 fetch and P7 alone are not stamped; they get no invented time.
-    Observation uses the conservative upper idle price, 0.951 us. Combined
-    setup has no isolated idle price, hence zero per the registration.
+    Observation keeps the conservative upper idle price, 0.951 us.
+    Arrive/setup use the owner's preflight fix 6 pricing decision: 0.30/0.15 us
+    from the 1.00 us floor decomposition in
+    docs/PREFLIGHT-QWEN300-HOUR-2026-10-11.md:20,55 (pre 0.05, arrive 0.30,
+    observation 0.50, setup 0.15). These are pricing estimates, not new measured
+    idle latencies; the observation price remains gfx942.yaml:69-72's 0.951 us.
     """
     scale = report['raw']['tick_ns']/1000
-    atoms = {'P10.arrive': dict(idle_us=0., intervals_us=[]),
+    atoms = {'P10.arrive': dict(idle_us=.30, intervals_us=[]),
              'P5/P11.observation': dict(idle_us=.951, intervals_us=[]),
-             'P4/P6/P7.setup': dict(idle_us=0., intervals_us=[])}
+             'P4/P6/P7.setup': dict(idle_us=.15, intervals_us=[])}
     for t in report['tasks']:
         if not t.get('critical') or t['arrive_is_synthetic']: continue
         # The two booked attention boundaries are outside gap rows 9-10.
@@ -393,9 +426,11 @@ def first_stop(s, gap_atoms):
     g = gap_atoms['G_ms'] if gap_atoms is not None else None
     passes = g is not None and math.isfinite(g) and (g >= .088 or math.isclose(g, .088, rel_tol=0., abs_tol=1e-12))
     passes = passes and 'kept' in s.certified
+    incomplete = g is None or not math.isfinite(g) or 'kept' not in s.certified
     s.row('A.stop', dict(G_ms=g, gap_atoms=gap_atoms,
-                        decision='CONTINUE to B' if passes else 'STOP-SPEND: close target route'),
-          'PASS' if passes else 'STOP', REGISTERED['A.stop'])
+                        decision='END SESSION: NOT-COMPLETE' if incomplete else
+                                 'CONTINUE to S2' if passes else 'STOP-SPEND: close target route'),
+          'NOT-COMPLETE' if incomplete else 'PASS' if passes else 'STOP', REGISTERED['A.stop'])
     print(f'FIRST-STOP elapsed={time.monotonic()-s.start:.1f}s (<=900s)', flush=True)
     return passes
 
@@ -421,7 +456,7 @@ def second_stop(s):
     total = g+r2+h
     passes = total >= .324 or math.isclose(total, .324, rel_tol=0., abs_tol=1e-12)
     s.row('B.stop', dict(G_ms=g, R2_ms=r2, H_ms=h, total_ms=total,
-                        decision='CONTINUE to C/D' if passes else 'STOP-SPEND: close target route'),
+                        decision='CONTINUE to B/C/D' if passes else 'STOP-SPEND: close target route'),
           'PASS' if passes else 'STOP', REGISTERED['B.stop'])
     return passes
 
@@ -550,7 +585,7 @@ def preflight(s):
 
 
 def tranche_a(s):
-    """900s including fresh correctness, cold loads and all deciding probes."""
+    """900s including fresh correctness and all deciding probes, after cache setup."""
     gap_atoms = None
     for arm in ('kept', 'stamps', 'stages'):
         if s.attempt('A.gate.'+arm, lambda arm=arm: certify(s, arm)) is None and arm not in s.certified:
@@ -576,12 +611,17 @@ def tranche_a(s):
             s.row('A1.busy', pools['busy'], 'PASS' if busy >= .100 else 'DEAD' if pools['busy']['above_floor_upper_ms'] < .050 and not pools['ambiguous']['count'] else 'UNRESOLVED', REGISTERED['A1.busy'])
             s.row('A1.free', pools['free'], 'PASS' if free >= .050 else 'UNRESOLVED', REGISTERED['A1.free'])
             s.row('A1.floor', dict(floor_us=1, distributions=pools, ambiguity=pools['ambiguous']), 'RECORDED', REGISTERED['A1.floor'])
-            a2 = attention_price(result['inbody'])
-            (s.out/'A_attention.json').write_text(json.dumps(a2, indent=2)+'\n')
-            s.row('A2.route', a2, 'HEADROOM-PASS' if a2['available_cut_estimate_ms'] >= .142 else 'FAIL', REGISTERED['A2.route'])
             return result
-        result = s.attempt('A1/A2', stamped)
-        if result is not None: gap_atoms = result['gap_atoms']
+        result = s.attempt('A1', stamped)
+        if result is not None:
+            gap_atoms = result['gap_atoms']
+            def attention():
+                a2 = attention_price(result['inbody'])
+                (s.out/'A_attention.json').write_text(json.dumps(a2, indent=2)+'\n')
+                s.row('A2.route', a2, 'HEADROOM-PASS' if a2['available_cut_estimate_ms'] >= .142 else 'FAIL', REGISTERED['A2.route'])
+                return a2
+            if s.attempt('A2', attention) is None:
+                s.row('A2.route', None, 'NOT-COMPLETE', REGISTERED['A2.route'])
     if 'stages' in s.certified:
         def stages():
             text = token_gate(host(s, 'stages', 'A_stages', ['--repeat', '1']))
@@ -923,7 +963,8 @@ def select_final(s, survivors):
 def tranche_d(s, survivors, extra_seconds):
     from examples.vllm_llm.pairs import verdict as fusion_verdict, parse, pairs
     from examples.vllm_llm.nvref_report import verdict as system_verdict
-    s.deadline = min(time.monotonic()+600+extra_seconds, s.end)
+    # D inherits all unused A/B/C time, including when C ran successfully.
+    s.deadline = s.end
     if 'kept' not in s.certified:
         print('D NOT-COMPLETE: kept correctness gate failed', flush=True); return
     arm = s.attempt('D.selection', lambda: select_final(s, survivors))
@@ -978,17 +1019,18 @@ def tranche_d(s, survivors, extra_seconds):
 def execute(s):
     preflight(s)
     if not tranche_a(s):
-        print('STOP after A: S1 closes target route', flush=True)
+        print('END after A: '+s.rows['A.stop']['value']['decision'], flush=True)
         for name in ('B.keep', 'B.stop', 'C.fusion', 'C.body', 'C.NO_TOUCH', 'C.ISOLATE_POLLER',
                      'D.target', 'D.fusion', 'D.system'):
             s.row(name, None, 'NOT-RUN', REGISTERED[name])
         return
-    b = tranche_b(s)
+    # B cannot change G, H or the unmeasured R2 (zero); decide before spending it.
     if not second_stop(s):
-        print('STOP after B: S2 closes target route', flush=True)
-        for name in ('C.fusion', 'C.body', 'C.NO_TOUCH', 'C.ISOLATE_POLLER', 'D.target', 'D.fusion', 'D.system'):
+        print('STOP after A: S2 closes target route', flush=True)
+        for name in ('B.keep', 'C.fusion', 'C.body', 'C.NO_TOUCH', 'C.ISOLATE_POLLER', 'D.target', 'D.fusion', 'D.system'):
             s.row(name, None, 'NOT-RUN', REGISTERED[name])
         return
+    b = tranche_b(s)
     c, extra = tranche_c(s)
     tranche_d(s, b+c, extra)
 
@@ -1007,7 +1049,8 @@ def dry_run():
     """Exercise CPU logic, shell syntax and runner registration; never spawn GPU commands."""
     for j in JOBS:
         subprocess.run(['bash', '-n', '-c', j['cmd']], check=True)
-    assert sum((900, 1320, 1620, 600)) == MAX_SESSION_SECONDS
+    assert MAX_SESSION_SECONDS == 4440
+    assert sum((900, 1320, 1620)) < MAX_SESSION_SECONDS
     assert keep([.030, .031, .030])['keep']
     assert not keep([.030, -.001, .030])['keep']
     try:
@@ -1017,7 +1060,7 @@ def dry_run():
     else:
         raise AssertionError('missing critical-body coverage must refuse')
     assert len({a['id'] for a in manifest()['B']+manifest()['C']}) == len(manifest()['B']+manifest()['C'])
-    print(json.dumps(dict(budgets_s=dict(A=900, B=1320, C=1620, D=600),
+    print(json.dumps(dict(budgets_s=dict(A=900, B=1320, C=1620, D='remaining session time'),
                           manifest=manifest(), thresholds=REGISTERED), indent=2))
     from etx.tools.gpu_jobs import main as runner
     return runner([str(Path(__file__)), '--dry-run'])
@@ -1047,10 +1090,12 @@ def main(argv=None):
     g.add_argument('--dry-run', action='store_true')
     g.add_argument('--run', action='store_true')
     g.add_argument('--prepare', type=Path)
+    g.add_argument('--prewarm', type=Path)
     a = ap.parse_args(args)
     if a.template: a.template.write_text(json.dumps(template(), indent=2)+'\n'); return 0
     if a.dry_run: return dry_run()
     if a.prepare: prepare(a.prepare); return 0
+    if a.prewarm: prewarm(a.prewarm); return 0
     s = Session(dict(manifest=str(MANIFEST)), os.environ['ETX_SESS_LOGDIR'], float(os.environ.get('ETX_SESS_REMAINING_SECONDS', MAX_SESSION_SECONDS)))
     try:
         s.c = json.loads(Path(os.environ.get('ETX_QWEN300_CONFIG', ROOT/'qwen300-hour.json')).read_text())
