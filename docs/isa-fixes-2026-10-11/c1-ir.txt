@@ -1,0 +1,3 @@
+Command: llvm-diff baseline/wrap.ll c1/wrap.ll k_gemv_fold k_gemv k_attnprep k_topk_rep k_moe_up_x_fold k_moe_down_x_fold
+Result: exit 0; no differences in six original optimized device kernel functions.
+Candidate k_router_fold has different IR; equality of that function is not claimed.

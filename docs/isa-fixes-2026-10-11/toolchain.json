@@ -1,0 +1,10 @@
+{
+  "image": "sha256:e8958ce54391229087b63d0e8636df58b14f160f1444246c8c6cb58f8b872a6b",
+  "compiler_sha256": {
+    "clang": "beaae27cf876812ec1d32f8731317ba837175536a847590f5e51c409c2831b48",
+    "llc": "eef2ea9381eb509222b7d7334b8fc24dd0c10ffd40bdf5896159cc8d06d6d88e"
+  },
+  "headers": "ROCm 7.2.4",
+  "GPU_execution": false,
+  "network_enabled_in_containers": false
+}

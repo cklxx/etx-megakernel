@@ -1,0 +1,52 @@
+{
+  "schema": "etx.head-local-probe.v1",
+  "implemented": false,
+  "enabled_by_default": false,
+  "shape": {
+    "heads": 4,
+    "partitions_per_head": 5,
+    "q_heads_per_kv_head": 8,
+    "head_size": 128,
+    "kv_block_size": 16,
+    "partition_tokens": 256,
+    "block_threads": 1024
+  },
+  "state": [
+    "epoch:u64",
+    "prep_owner:u32",
+    "prep_ready_epoch:u64",
+    "completion_count:u32",
+    "partition_seen_mask:u32",
+    "output_ready_epoch:u64"
+  ],
+  "placement": "all workers for a head on its discovered XCD; producers precede waiters",
+  "thresholds": {
+    "net_us_per_layer": 1.0416666666666667,
+    "net_us_per_step": 50,
+    "max_vgpr": 128,
+    "max_lds_bytes": 29752
+  },
+  "protocol": [
+    "One fixed prep owner (partition 0); epoch-scoped exact-once claim.",
+    "Run original prep; all writing waves drain, join, release prep-ready(epoch).",
+    "Every partition waits for matching epoch, acquires KV/Q visibility, joins all reading waves.",
+    "Run original imported attention; finish all slot rounds before arena reuse.",
+    "Each partition drains ALL producing waves, joins, release/acq_rel arrival exactly once.",
+    "Last arrival elects reducer; acquire ALL partition payloads before original imported reduce.",
+    "Preserve original partition order and global partials; sequentially reuse LDS arena.",
+    "All reducer waves drain and join before publishing normal output event for o_proj.",
+    "Reset only after output publication and participant quiescence; reject stale epochs.",
+    "Before u64 wrap, quiesce entire launch and clear epoch-tagged state; no in-flight reuse."
+  ],
+  "future_gpu_gate": [
+    "reused-cache-line payload stress, duplicates, epochs and rollover",
+    "host --check every imported constituent under new scheduling",
+    "CHECK-DSL, 32/32 greedy tokens, actual whole-kernel residency/spills",
+    "unchanged-body pinned interleaved wall pairs, net >=50 us/step"
+  ],
+  "budget_basis": {
+    "gross_boundary_us_per_layer_estimate": 2,
+    "exposed_attn_reduce_hops_us_per_layer_estimate": 5.416666666666667,
+    "hop_credit_in_boundary_budget": 0
+  }
+}

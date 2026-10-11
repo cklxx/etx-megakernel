@@ -247,6 +247,8 @@ def fold_topk(d) -> bool:
 
 
 def instances(d) -> list[dict]:
+    from examples.vllm_llm.head_local_protocol import check_opt_in
+    check_opt_in()
     """The launches of one decode step, in vLLM's order."""
     parts = math.ceil(MAXLEN / PART)
     FOLD_TOPK = fold_topk(d)
@@ -288,6 +290,13 @@ def instances(d) -> list[dict]:
         if DSL_GEMV and selected[key].kind == "dsl":   # else: the planner's fallback
             # rows per task = ceil(M / CU): at 304, 17 (qkv), 7 (o_proj), 1 (router)
             fold = FOLD and (role in ("router", "lm_head") or (role == "qkv" and (layer > 0 or getattr(d, "ln_norm", False))))
+            if role == "router" and os.environ.get("ETX_VL_ROUTER_NARROW", "0") == "1":
+                if not (fold and d.H == 2048 and d.E == 128 and CU >= 128
+                        and not BATCH and not getattr(d, "ln_norm", False)
+                        and not getattr(d, "bias_o", False) and not getattr(d, "bias_lm", False)):
+                    raise SystemExit("ETX_VL_ROUTER_NARROW needs folded H=2048 E=128 NB=1 router, CU>=128")
+                add("dsl_gemv_router_fold", layer, role, (CU, 1, 1), override=True, M=m, K=k, wvprgrp=0)
+                return
             add("dsl_gemv_fold" if fold else "dsl_gemv", layer, role, (CU, 1, 1), M=m, K=k, wvprgrp=0)
             return
         y = wvsplitk_ytile(m)
@@ -467,7 +476,7 @@ def build() -> Graph:
         return DSL_FILE if i["export"].startswith("dsl_") else adapters
 
     def touch_of(i, x):                                        # the touch hook of the dense DSL GEMVs (plain or x form)
-        return f"etx_touch_{'x_' if x else ''}{i['export']}" if TOUCH and i["export"] in ("dsl_gemv", "dsl_gemv_fold") else None
+        return f"etx_touch_{'x_' if x else ''}{i['export']}" if TOUCH and i["export"] in ("dsl_gemv", "dsl_gemv_fold", "dsl_gemv_router_fold") else None
 
     def coh_of(i):                                             # the DSL tiles are the coherent ones (their source is ours)
         return "coherent" if COH and i["export"].startswith("dsl_") else "imported"

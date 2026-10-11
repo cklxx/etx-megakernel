@@ -1,0 +1,151 @@
+dsl_tiles.hip sha256 1a5f6cecec9e42e733e8dc527152c03a10d6fd9cb7c47fdaaf4b7301dfe575da
+flags -DETX_DSL_COH -DETX_DSL_NT -DETX_DSL_VECNORM -DETX_DSL_WSUM -DETX_DSL_SCALAR -DETX_DSL_GU1 -DETX_DSL_RBATCH -DETX_TOPK_KEY32; local LLVM 23 + ROCm 7.2.4 headers; counts are static [E]
+
+STATIC INSTRUCTION CLASSES per tile wrapper (includes the inlined ETX_RELEASE_DOMAIN + final barrier)
+kernel                  total     valu     salu     mfma      dpp vmem_loa vmem_sto vmem_ato     smem      lds  waitcnt  barrier cache_ct   branch
+k_gemv_fold              2174     1116      553        0       56       33        6        0       20      110      120       11        0      149
+k_gemv                   2174     1116      553        0       56       33        6        0       20      110      120       11        0      149
+k_attnprep               1423     1098      188        0        0       30       18        0        5       20       37        1        0       26
+k_topk_rep                706      392      166        0       12        6        6        0        5       30       54        1        0       34
+k_moe_up_x_fold          3858     1986      926        0      168       33        1        0       19      239      246       18        0      222
+k_moe_down_x_fold        1873      690      713        0       92       18        2        0       19      103      116        9        0      111
+k_router_fold             522      322       86        0        4        6        5        0       14       24       32        6        0       23
+
+RESOURCES (local compiler)
+k_gemv_fold          NumVgprs=58 ScratchSize=0 LDSByteSize=21120 Occupancy=8
+k_gemv               NumVgprs=58 ScratchSize=0 LDSByteSize=21120 Occupancy=8
+k_attnprep           NumVgprs=44 ScratchSize=0 LDSByteSize=0 Occupancy=8
+k_topk_rep           NumVgprs=34 ScratchSize=0 LDSByteSize=0 Occupancy=8
+k_moe_up_x_fold      NumVgprs=56 ScratchSize=0 LDSByteSize=21120 Occupancy=8
+k_moe_down_x_fold    NumVgprs=40 ScratchSize=0 LDSByteSize=21120 Occupancy=8
+k_router_fold        NumVgprs=36 ScratchSize=0 LDSByteSize=21120 Occupancy=8
+
+PROGRAM ORDER of barriers and global loads/stores (static, layout order of the ISA; first 40)
+-- k_gemv_fold: load.coh@dsl_tiles:37 load.coh@dsl_tiles:37 BARRIER load.coh@dsl_tiles:37 load.coh@dsl_tiles:37 load.coh@dsl_tiles:37 load.coh@dsl_tiles:37 load.coh@dsl_tiles:37 load.coh@dsl_tiles:37 load.coh@dsl_tiles:37 load.coh@dsl_tiles:37 load.coh@dsl_tiles:37 load.coh@dsl_tiles:37 load.coh@dsl_tiles:37 load.coh@dsl_tiles:37 load.coh@dsl_tiles:37 load.coh@dsl_tiles:37 load.coh@dsl_tiles:37 load.coh@dsl_tiles:37 load.coh@dsl_tiles:37 load.coh@dsl_tiles:37 store.coh@dsl_tiles:38 store.coh@dsl_tiles:38 BARRIER BARRIER load@dsl_tiles:820 store.coh@dsl_tiles:38 store.coh@dsl_tiles:38 BARRIER BARRIER load.nt@dsl_tiles:375 load.nt@dsl_tiles:375 load.nt@dsl_tiles:375 load.nt@dsl_tiles:375 load.nt@dsl_tiles:375 load.nt@dsl_tiles:375 load.nt@dsl_tiles:375 load.nt@dsl_tiles:375 BARRIER store.coh@dsl_tiles:30
+-- k_gemv: load.coh@dsl_tiles:37 load.coh@dsl_tiles:37 BARRIER load.coh@dsl_tiles:37 load.coh@dsl_tiles:37 load.coh@dsl_tiles:37 load.coh@dsl_tiles:37 load.coh@dsl_tiles:37 load.coh@dsl_tiles:37 load.coh@dsl_tiles:37 load.coh@dsl_tiles:37 load.coh@dsl_tiles:37 load.coh@dsl_tiles:37 load.coh@dsl_tiles:37 load.coh@dsl_tiles:37 load.coh@dsl_tiles:37 load.coh@dsl_tiles:37 load.coh@dsl_tiles:37 load.coh@dsl_tiles:37 load.coh@dsl_tiles:37 load.coh@dsl_tiles:37 store.coh@dsl_tiles:38 store.coh@dsl_tiles:38 BARRIER BARRIER load@dsl_tiles:820 store.coh@dsl_tiles:38 store.coh@dsl_tiles:38 BARRIER BARRIER load.nt@dsl_tiles:375 load.nt@dsl_tiles:375 load.nt@dsl_tiles:375 load.nt@dsl_tiles:375 load.nt@dsl_tiles:375 load.nt@dsl_tiles:375 load.nt@dsl_tiles:375 load.nt@dsl_tiles:375 BARRIER store.coh@dsl_tiles:30
+-- k_attnprep: load@dsl_tiles:144 load@dsl_tiles:154 load@dsl_tiles:156 load@dsl_tiles:146 load@dsl_tiles:148 load@dsl_tiles:150 load@dsl_tiles:152 load.coh@dsl_tiles:36 load.coh@dsl_tiles:26 store.coh@dsl_tiles:30 load.coh@dsl_tiles:26 store.coh@dsl_tiles:30 load.coh@dsl_tiles:26 load.coh@dsl_tiles:26 load@amd_hip_bf16:240 load.coh@dsl_tiles:36 load@amd_hip_bf16:240 load@amd_hip_bf16:240 load@amd_hip_bf16:240 load@amd_hip_bf16:240 store.coh@dsl_tiles:30 store.coh@dsl_tiles:30 load.coh@dsl_tiles:36 store.coh@dsl_tiles:30 store.coh@dsl_tiles:30 load.coh@dsl_tiles:37 load.coh@dsl_tiles:37 load.coh@dsl_tiles:36 load@dsl_tiles:188 load@dsl_tiles:189 load@dsl_tiles:193 load@dsl_tiles:193 load.coh@dsl_tiles:36 store.coh@dsl_tiles:38 store.coh@dsl_tiles:38 store.coh@dsl_tiles:38 store.coh@dsl_tiles:38 load.coh@dsl_tiles:36 load.coh@dsl_tiles:37 load.coh@dsl_tiles:37
+-- k_topk_rep: load@dsl_tiles:1487 load@dsl_tiles:1491 load@dsl_tiles:1492 load@dsl_tiles:1494 load.coh@dsl_tiles:26 load.coh@dsl_tiles:26 store.coh@dsl_tiles:33 store.coh@dsl_tiles:33 store.coh@dsl_tiles:35 store.coh@dsl_tiles:33 store.coh@dsl_tiles:33 store.coh@dsl_tiles:35 BARRIER
+-- k_moe_up_x_fold: load.coh@dsl_tiles:32 load.coh@dsl_tiles:26 load.coh@dsl_tiles:26 BARRIER load.coh@dsl_tiles:37 load.coh@dsl_tiles:37 BARRIER BARRIER BARRIER load.nt@dsl_tiles:375 load.nt@dsl_tiles:375 load.nt@dsl_tiles:375 load.nt@dsl_tiles:375 load.nt@dsl_tiles:375 load.nt@dsl_tiles:375 load.nt@dsl_tiles:375 load.nt@dsl_tiles:375 BARRIER BARRIER BARRIER load.nt@dsl_tiles:375 load.nt@dsl_tiles:375 load.nt@dsl_tiles:375 load.nt@dsl_tiles:375 BARRIER BARRIER load.nt@dsl_tiles:375 load.nt@dsl_tiles:375 load.nt@dsl_tiles:375 load.nt@dsl_tiles:375 load.nt@dsl_tiles:375 load.nt@dsl_tiles:375 load.nt@dsl_tiles:375 load.nt@dsl_tiles:375 BARRIER BARRIER BARRIER load.nt@dsl_tiles:375 load.nt@dsl_tiles:375 load.nt@dsl_tiles:375
+-- k_moe_down_x_fold: load.coh@dsl_tiles:32 load.coh@dsl_tiles:26 load.coh@dsl_tiles:26 BARRIER load.coh@dsl_tiles:37 load.coh@dsl_tiles:37 BARRIER load.coh@dsl_tiles:34 BARRIER load.nt@dsl_tiles:375 load.nt@dsl_tiles:375 load.nt@dsl_tiles:375 load.nt@dsl_tiles:375 load.nt@dsl_tiles:375 load.nt@dsl_tiles:375 load.nt@dsl_tiles:375 load.nt@dsl_tiles:375 BARRIER store.coh@dsl_tiles:30 BARRIER BARRIER load.nt@dsl_tiles:375 load.nt@dsl_tiles:375 load.nt@dsl_tiles:375 load.nt@dsl_tiles:375 BARRIER store.coh@dsl_tiles:30 BARRIER BARRIER
+-- k_router_fold: load.coh@dsl_tiles:37 load.coh@dsl_tiles:37 load.coh@dsl_tiles:37 load.coh@dsl_tiles:37 store.coh@dsl_tiles:38 store.coh@dsl_tiles:38 BARRIER BARRIER load@dsl_tiles:820 store.coh@dsl_tiles:38 store.coh@dsl_tiles:38 BARRIER load.nt@dsl_tiles:375 BARRIER store.coh@dsl_tiles:30 BARRIER BARRIER
+
+TOP SOURCE LINES per tile by static instruction count (file:line count source); static, not executed
+-- k_gemv_fold: by file dsl_tiles.hip 1845, amd_hip_bf16.h 159, tile_util.h 65, amd_device_functions.h 53, amd_warp_functions.h 32, __clang_hip_math.h 12
+         dsl_tiles.hip:0  208  <line 0: compiler-generated, no source line>
+      amd_hip_bf16.h:214  134  __BF16_HOST_DEVICE__ __hip_bfloat16(const float val) : __x_bf16(static_cast<__bf16>(
+       dsl_tiles.hip:470  104  for (int b = 0; b < NB; ++b) { const float v = dsl_wave_sum0(acc[b]); if (lane == 0)
+       dsl_tiles.hip:775   99  z[2 * j] += __uint_as_float(rv[u][j] << 16); z[2 * j + 1] += __uint_as_float(rv[u][j
+       dsl_tiles.hip:389   99  for (int i = 0; i < 4; ++i) { s += __uint_as_float(w[i] << 16) * x[2 * i]; s += __ui
+       dsl_tiles.hip:529   80  for (int r = (int)threadIdx.x; r < nrt; r += blockDim.x) {
+       dsl_tiles.hip:398   77  return __uint_as_float(w.x << 16) * x[0] + __uint_as_float(w.x & 0xffff0000u) * x[1]
+       dsl_tiles.hip:792   59  const float a0 = R > 1 ? dsl_bfr(z[2 * j]) : z[2 * j], a1 = R > 1 ? dsl_bfr(z[2 * j 
+       dsl_tiles.hip:416   56  v += __int_as_float(__builtin_amdgcn_update_dpp(0, __float_as_int(v), 0xb1, 0xf, 0xf
+       dsl_tiles.hip:485   54  if (++seg == spr) { seg = 0; ++row; }
+       dsl_tiles.hip:772   53  for (int u = 0; u < DSL_RB; ++u) if (s0 + u < R) {
+       dsl_tiles.hip:462   46  int cur = sb / spr;
+        dsl_tiles.hip:37   42  static __device__ __forceinline__ unsigned long long dsl_a_ld64(const unsigned long 
+       dsl_tiles.hip:411   42  v += __int_as_float(__builtin_amdgcn_ds_bpermute((etx_lane() ^ 32) << 2, __float_as_
+       dsl_tiles.hip:412   42  v += __int_as_float(__builtin_amdgcn_ds_swizzle(__float_as_int(v), 0x401f));        
+       dsl_tiles.hip:758   39  for (int i = (int)threadIdx.x; i < K / 8; i += blockDim.x) {
+-- k_gemv: by file dsl_tiles.hip 1845, amd_hip_bf16.h 159, tile_util.h 65, amd_device_functions.h 53, amd_warp_functions.h 32, __clang_hip_math.h 12
+         dsl_tiles.hip:0  208  <line 0: compiler-generated, no source line>
+      amd_hip_bf16.h:214  134  __BF16_HOST_DEVICE__ __hip_bfloat16(const float val) : __x_bf16(static_cast<__bf16>(
+       dsl_tiles.hip:470  104  for (int b = 0; b < NB; ++b) { const float v = dsl_wave_sum0(acc[b]); if (lane == 0)
+       dsl_tiles.hip:775   99  z[2 * j] += __uint_as_float(rv[u][j] << 16); z[2 * j + 1] += __uint_as_float(rv[u][j
+       dsl_tiles.hip:389   99  for (int i = 0; i < 4; ++i) { s += __uint_as_float(w[i] << 16) * x[2 * i]; s += __ui
+       dsl_tiles.hip:529   80  for (int r = (int)threadIdx.x; r < nrt; r += blockDim.x) {
+       dsl_tiles.hip:398   77  return __uint_as_float(w.x << 16) * x[0] + __uint_as_float(w.x & 0xffff0000u) * x[1]
+       dsl_tiles.hip:792   59  const float a0 = R > 1 ? dsl_bfr(z[2 * j]) : z[2 * j], a1 = R > 1 ? dsl_bfr(z[2 * j 
+       dsl_tiles.hip:416   56  v += __int_as_float(__builtin_amdgcn_update_dpp(0, __float_as_int(v), 0xb1, 0xf, 0xf
+       dsl_tiles.hip:485   54  if (++seg == spr) { seg = 0; ++row; }
+       dsl_tiles.hip:772   53  for (int u = 0; u < DSL_RB; ++u) if (s0 + u < R) {
+       dsl_tiles.hip:462   46  int cur = sb / spr;
+        dsl_tiles.hip:37   42  static __device__ __forceinline__ unsigned long long dsl_a_ld64(const unsigned long 
+       dsl_tiles.hip:411   42  v += __int_as_float(__builtin_amdgcn_ds_bpermute((etx_lane() ^ 32) << 2, __float_as_
+       dsl_tiles.hip:412   42  v += __int_as_float(__builtin_amdgcn_ds_swizzle(__float_as_int(v), 0x401f));        
+       dsl_tiles.hip:758   39  for (int i = (int)threadIdx.x; i < K / 8; i += blockDim.x) {
+-- k_attnprep: by file dsl_tiles.hip 1188, amd_hip_bf16.h 101, amd_warp_functions.h 87, tile_util.h 25, __clang_hip_math.h 12, import.h 6
+       dsl_tiles.hip:262  152  const long long block = slot / BS, off = slot % BS;
+       dsl_tiles.hip:255  152  const long long block = slot / BS, off = slot % BS;
+       dsl_tiles.hip:214  151  const long long block = slot / BS, off = slot % BS;
+       dsl_tiles.hip:204  145  const long long block = slot / BS, off = slot % BS;
+      amd_hip_bf16.h:214   66  __BF16_HOST_DEVICE__ __hip_bfloat16(const float val) : __x_bf16(static_cast<__bf16>(
+         dsl_tiles.hip:0   50  <line 0: compiler-generated, no source line>
+       dsl_tiles.hip:256   48  __hip_bfloat16* kdst = kc + (((block * NKV + h) * (HD / X)) * BS) * X + off * X;
+       dsl_tiles.hip:205   44  __hip_bfloat16* kb = kc + (((block * NKV + h) * (HD / X)) * BS) * X + off * X;
+      amd_hip_bf16.h:240   35  __BF16_HOST_DEVICE__ operator float() const { return static_cast<float>(__x_bf16); }
+       dsl_tiles.hip:157   32  const int G = NH / NKV, h = blk;                       // this task's kv head; q hea
+  amd_warp_functions.h:494   31  index = index >= ((self + width) & ~(width - 1)) ? self : index;
+  amd_warp_functions.h:495   27  return __builtin_amdgcn_ds_bpermute(index << 2, var);
+          tile_util.h:20   23  for (int off = ETX_WAVE_SIZE / 2; off > 0; off >>= 1) v += __shfl_xor(v, off, ETX_WA
+       dsl_tiles.hip:257   23  dsl_a_stbf(kdst + (2 * lane) / X * BS * X + (2 * lane) % X, o0);
+       dsl_tiles.hip:207   22  dsl_a_st64((unsigned long long*)(kb + (size_t)(d0 / X) * BS * X + (d0 % X)), plo);
+       dsl_tiles.hip:258   21  dsl_a_stbf(kdst + (2 * lane + 1) / X * BS * X + (2 * lane + 1) % X, o1);
+-- k_topk_rep: by file dsl_tiles.hip 328, tile_util.h 205, __clang_hip_math.h 97, amd_warp_functions.h 60, import.h 6, amd_hip_bf16.h 6
+      dsl_tiles.hip:1526   72  if (ov > bv || (ov == bv && oi < bi)) { bv = ov; bi = oi; }
+  __clang_hip_math.h:431   64  float expf(float __x) { return __builtin_expf(__x); }
+         dsl_tiles.hip:0   58  <line 0: compiler-generated, no source line>
+      dsl_tiles.hip:1509   47  : -INFINITY; taken[k] = e >= E; m = fmaxf(m, p[k]); }
+  amd_warp_functions.h:495   42  return __builtin_amdgcn_ds_bpermute(index << 2, var);
+      dsl_tiles.hip:1533   38  for (int k = 0; k < 2; ++k) if (!taken[k] && !(((mt - raw[k]) / fmaxf(fabsf(raw[k]),
+          tile_util.h:54   24  static __device__ __forceinline__ unsigned etx_umax(unsigned a, unsigned b) { return
+          tile_util.h:20   24  for (int off = ETX_WAVE_SIZE / 2; off > 0; off >>= 1) v += __shfl_xor(v, off, ETX_WA
+  __clang_hip_math.h:454   24  float fmaxf(float __x, float __y) { return __builtin_fmaxf(__x, __y); }
+         tile_util.h:110   17  if constexpr (!kPerRound) { if (lane < K) put(lane, myid, renorm ? myw / sel : myw);
+          tile_util.h:98   14  for (int t = 0; t < K; ++t) {
+          tile_util.h:41   12  const unsigned u = x < 0.f ? 0x8000u - mag : 0x8000u + mag;          // -0 is not < 
+           tile_util.h:0   12  <line 0: compiler-generated, no source line>
+  amd_warp_functions.h:494   12  index = index >= ((self + width) & ~(width - 1)) ? self : index;
+          tile_util.h:94   12  const float inv = 1.f / s;
+      dsl_tiles.hip:1515   12  for (int t = 0; t < K; ++t) {
+-- k_moe_up_x_fold: by file dsl_tiles.hip 3337, tile_util.h 331, __clang_hip_math.h 54, amd_hip_bf16.h 47, amd_device_functions.h 42, amd_warp_functions.h 30
+         dsl_tiles.hip:0  505  <line 0: compiler-generated, no source line>
+       dsl_tiles.hip:389  297  for (int i = 0; i < 4; ++i) { s += __uint_as_float(w[i] << 16) * x[2 * i]; s += __ui
+       dsl_tiles.hip:470  246  for (int b = 0; b < NB; ++b) { const float v = dsl_wave_sum0(acc[b]); if (lane == 0)
+       dsl_tiles.hip:398  154  return __uint_as_float(w.x << 16) * x[0] + __uint_as_float(w.x & 0xffff0000u) * x[1]
+       dsl_tiles.hip:485  130  if (++seg == spr) { seg = 0; ++row; }
+       dsl_tiles.hip:416  129  v += __int_as_float(__builtin_amdgcn_update_dpp(0, __float_as_int(v), 0xb1, 0xf, 0xf
+       dsl_tiles.hip:462  121  int cur = sb / spr;
+       dsl_tiles.hip:535  110  for (int b = 0; b < NB; ++b) v[b] += pl[(w2 * nrt + r) * NB + b];
+       dsl_tiles.hip:411  100  v += __int_as_float(__builtin_amdgcn_ds_bpermute((etx_lane() ^ 32) << 2, __float_as_
+       dsl_tiles.hip:412  100  v += __int_as_float(__builtin_amdgcn_ds_swizzle(__float_as_int(v), 0x401f));        
+       dsl_tiles.hip:445   99  const int per = (S + nw - 1) / nw, sb = wv * per, se = min(S, sb + per);
+      dsl_tiles.hip:1266   84  if (d.K % (ETX_WAVE_SIZE * 8) == 0 && 2 * gn <= DSL_RCH && gp1 % gspr == 0 && gp2 % 
+       dsl_tiles.hip:516   84  for (int u = 0; u < U; ++u) if (s0 + u < se) w[u] = dsl_wload(DSL_WP(s0 + u));
+       dsl_tiles.hip:533   82  for (int w2 = 0; w2 < nw; ++w2)
+       dsl_tiles.hip:481   79  if (row != cur) { flush(); cur = row; }
+       dsl_tiles.hip:501   73  for (; s0 + U <= se; s0 += U) {
+-- k_moe_down_x_fold: by file dsl_tiles.hip 1430, tile_util.h 325, __clang_hip_math.h 45, amd_warp_functions.h 30, amd_hip_bf16.h 18, amd_device_functions.h 17
+         dsl_tiles.hip:0  174  <line 0: compiler-generated, no source line>
+       dsl_tiles.hip:470  118  for (int b = 0; b < NB; ++b) { const float v = dsl_wave_sum0(acc[b]); if (lane == 0)
+       dsl_tiles.hip:389   99  for (int i = 0; i < 4; ++i) { s += __uint_as_float(w[i] << 16) * x[2 * i]; s += __ui
+       dsl_tiles.hip:485   86  if (++seg == spr) { seg = 0; ++row; }
+          tile_util.h:54   66  static __device__ __forceinline__ unsigned etx_umax(unsigned a, unsigned b) { return
+       dsl_tiles.hip:398   63  return __uint_as_float(w.x << 16) * x[0] + __uint_as_float(w.x & 0xffff0000u) * x[1]
+       dsl_tiles.hip:675   56  for (int r = r0; r < r1; r += DSL_RCH) dsl_gemv(W, K, xs, r, min(r1, r + DSL_RCH), p
+       dsl_tiles.hip:416   56  v += __int_as_float(__builtin_amdgcn_update_dpp(0, __float_as_int(v), 0xb1, 0xf, 0xf
+       dsl_tiles.hip:462   47  int cur = sb / spr;
+       dsl_tiles.hip:535   46  for (int b = 0; b < NB; ++b) v[b] += pl[(w2 * nrt + r) * NB + b];
+       dsl_tiles.hip:411   42  v += __int_as_float(__builtin_amdgcn_ds_bpermute((etx_lane() ^ 32) << 2, __float_as_
+       dsl_tiles.hip:412   42  v += __int_as_float(__builtin_amdgcn_ds_swizzle(__float_as_int(v), 0x401f));        
+       dsl_tiles.hip:516   42  for (int u = 0; u < U; ++u) if (s0 + u < se) w[u] = dsl_wload(DSL_WP(s0 + u));
+  __clang_hip_math.h:431   34  float expf(float __x) { return __builtin_expf(__x); }
+       dsl_tiles.hip:445   34  const int per = (S + nw - 1) / nw, sb = wv * per, se = min(S, sb + per);
+      dsl_tiles.hip:1305   31  const int S0 = blk / d.tpe, j = blk - S0 * d.tpe;    // batched: S = s * nb + rq, as
+-- k_router_fold: by file dsl_tiles.hip 295, amd_hip_bf16.h 104, tile_util.h 64, amd_warp_functions.h 30, amd_device_functions.h 11, __clang_hip_math.h 10
+      amd_hip_bf16.h:214   88  __BF16_HOST_DEVICE__ __hip_bfloat16(const float val) : __x_bf16(static_cast<__bf16>(
+         tile_util.h:128   40  for (int w = 0; w < etx_nwaves(); ++w) t += red[w];
+       dsl_tiles.hip:758   35  for (int i = (int)threadIdx.x; i < K / 8; i += blockDim.x) {
+       dsl_tiles.hip:798   28  for (int j = 0; j < 8; ++j) { xs[8 * i + j] = z[j]; ss += z[j] * z[j]; }
+       dsl_tiles.hip:389   27  for (int i = 0; i < 4; ++i) { s += __uint_as_float(w[i] << 16) * x[2 * i]; s += __ui
+       dsl_tiles.hip:819   23  for (int i = (int)threadIdx.x; i < K / 8; i += blockDim.x) {
+       dsl_tiles.hip:838   18  const float v0 = dsl_bfr(xs[8 * i + 2 * j] * sv * __uint_as_float(w[j] << 16));
+      amd_hip_bf16.h:240   16  __BF16_HOST_DEVICE__ operator float() const { return static_cast<float>(__x_bf16); }
+       dsl_tiles.hip:775   14  z[2 * j] += __uint_as_float(rv[u][j] << 16); z[2 * j + 1] += __uint_as_float(rv[u][j
+          tile_util.h:20   13  for (int off = ETX_WAVE_SIZE / 2; off > 0; off >>= 1) v += __shfl_xor(v, off, ETX_WA
+  amd_warp_functions.h:494   12  index = index >= ((self + width) & ~(width - 1)) ? self : index;
+  amd_warp_functions.h:495   12  return __builtin_amdgcn_ds_bpermute(index << 2, var);
+         dsl_tiles.hip:0   11  <line 0: compiler-generated, no source line>
+       dsl_tiles.hip:840   11  xs[8 * i + 2 * j] = v0; xs[8 * i + 2 * j + 1] = v1;
+  __clang_hip_math.h:671   10  float rsqrtf(float __x) { return __ocml_rsqrt_f32(__x); }
+       dsl_tiles.hip:839   10  const float v1 = dsl_bfr(xs[8 * i + 2 * j + 1] * sv * __uint_as_float(w[j] & 0xffff0

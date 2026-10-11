@@ -401,7 +401,11 @@ int main(int argc, char** argv) {
     else if (x.exp == "dsl_topk" && x.nb > 1 && (size_t)n_tk >= (1u << 24)) die("dsl_topk: n_tk does not fit the packed stride");
     else if (x.exp == "dsl_topk") a.ptr(rlog).ptr(tw_r).ptr(ti_r).ptr(tei + (size_t)rr * TOPK).i32(E).i32(TOPK).i32(sparsemixer ? 2 : (norm_topk ? 1 : 0))
                                    .i32(x.nb > 1 ? (x.nb | ((int)n_tk << 8)) : 1);
-    else if (x.exp == "dsl_gemv_fold") {
+    else if (x.exp == "dsl_gemv_fold" || x.exp == "dsl_gemv_router_fold") {
+      if (x.exp == "dsl_gemv_router_fold" &&
+          !(r == "router" && x.K == 2048 && x.M == 128 && H == 2048 && E == 128 && x.nb == 1 && !ln_norm &&
+            x.gx >= 128 && x.gy == 1 && x.gz == 1))
+        die("dsl_gemv_router_fold: requires Qwen H=2048 E=128 NB=1 one-row router");
       // norm fold (mode 1): qkv (L > 0) = norm(residual + the 8 expert rows) with ln1; router = norm(residual + o) with ln2;
       // lm_head = norm(residual + the last layer's expert rows) with final_norm
       const int nblk = x.gx * x.gy * x.gz, rpt = (xM + nblk - 1) / nblk;
@@ -837,7 +841,7 @@ int main(int argc, char** argv) {
     };
     auto relaunch = [&](const char* role, const char* exp) {
       for (const Inst& x : insts) if (x.layer == Lc && x.role == role && x.req == 0) {
-        const std::string want = is_fold(role) ? std::string(exp) + "_fold" : std::string(exp);
+        const std::string want = (std::string(role) == "router" && x.exp == "dsl_gemv_router_fold") ? x.exp : is_fold(role) ? std::string(exp) + "_fold" : std::string(exp);
         if (x.exp != want) die(std::string("--check-dsl: ") + role + " is " + x.exp + ", not " + want);
         const int li = launch_of(x);
         if (etx_launch_count[li] != inst_tasks(x)) die(std::string("--check-dsl: launch ") + std::to_string(li) + " of " + role + " has " +

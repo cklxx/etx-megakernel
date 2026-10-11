@@ -92,8 +92,13 @@ PARAMS = [("W", "ptr addrspace(1)", 0, 8), ("x", "ptr addrspace(1)", 8, 8), ("ou
           ("nb", "i32", 120, 4), ("sx", "i32", 124, 4), ("sout", "i32", 128, 4), ("srows", "i32", 132, 4),
           ("srin", "i32", 136, 4), ("srout", "i32", 140, 4)] + (
          [("bias", "ptr addrspace(1)", 160, 8), ("lnb", "ptr addrspace(1)", 168, 8)] if DSL_EXT else [])
+DSL_ROUTER = _os.environ.get("ETX_VL_ROUTER_NARROW", "0") == "1"
 FORMS = {"dsl_gemv": "plain", "dsl_moe_up": "silu_mul", "dsl_moe_down": "scale",
          "dsl_gemv_fold": "plain", "dsl_moe_up_fold": "silu_mul", "dsl_moe_down_fold": "scale"}
+if DSL_ROUTER:
+    if DSL_NB != 1 or DSL_EXT:
+        raise ValueError("ETX_VL_ROUTER_NARROW requires NB=1 and no DSL_EXT")
+    FORMS["dsl_gemv_router_fold"] = "router"
 K_MAX, RCH, THREADS = 4096, 64, 1024                              # x (K floats) + 2 x RCH (moe_up's g) + 16 waves x RCH partials
 # NB columns scale x and the partials: B=1 21120 B, B=2 41600 B (megakernel 61928 of 65536), B=4 82560 -- over the limit.
 LDS_BYTES = 4 * (DSL_NB * K_MAX + 2 * RCH + DSL_NB * (THREADS // 64) * RCH + 32)
@@ -483,9 +488,11 @@ static __device__ __forceinline__ DslArgs dsl_args(const unsigned char* a) {
   return d;
 }
 // norm fold: xs = bf16(rms_norm(z)) as floats, z = bf16(bf16(sum of R rows) + resid_in) per element; task 0 stores z
+template <int FixedK = 0, int FixedR = -1>
 static __device__ __forceinline__ void dsl_stage_norm_at(const DslArgs& d, const __hip_bfloat16* rows, const __hip_bfloat16* rin,
                                                         __hip_bfloat16* rout, __hip_bfloat16* xout, float* xs, float* red, bool store) {
-  const int K = d.K;
+  const int K = FixedK ? FixedK : d.K;
+  const int R = FixedR >= 0 ? FixedR : d.R;
   float ss = 0.f;
 #ifdef ETX_DSL_VECNORM
   // 8 elements per thread per trip: the per-element accessors issue one coherent request each (K=2048 gives 4096 of
@@ -501,12 +508,12 @@ static __device__ __forceinline__ void dsl_stage_norm_at(const DslArgs& d, const
     // kept one row's pair of coherent loads in flight and waited for it (s_waitcnt vmcnt(0)) before issuing the
     // next: R + 1 serial round trips past L2 per trip, 9 for qkv's R = 8. Same additions, same order.
     const dsl_u32x4 ri = dsl_a_ld128(rin + 8 * i);
-    for (int s0 = 0; s0 < d.R; s0 += DSL_RB) {
+    for (int s0 = 0; s0 < R; s0 += DSL_RB) {
       dsl_u32x4 rv[DSL_RB];
 #pragma unroll
-      for (int u = 0; u < DSL_RB; ++u) if (s0 + u < d.R) rv[u] = dsl_a_ld128(rows + (size_t)(s0 + u) * K + 8 * i);
+      for (int u = 0; u < DSL_RB; ++u) if (s0 + u < R) rv[u] = dsl_a_ld128(rows + (size_t)(s0 + u) * K + 8 * i);
 #pragma unroll
-      for (int u = 0; u < DSL_RB; ++u) if (s0 + u < d.R) {
+      for (int u = 0; u < DSL_RB; ++u) if (s0 + u < R) {
 #pragma unroll
         for (int j = 0; j < 4; ++j) {
           z[2 * j] += __uint_as_float(rv[u][j] << 16); z[2 * j + 1] += __uint_as_float(rv[u][j] & 0xffff0000u);
@@ -514,7 +521,7 @@ static __device__ __forceinline__ void dsl_stage_norm_at(const DslArgs& d, const
       }
     }
 #else
-    for (int s = 0; s < d.R; ++s) {
+    for (int s = 0; s < R; ++s) {
       const dsl_u32x4 r = dsl_a_ld128(rows + (size_t)s * K + 8 * i);
 #pragma unroll
       for (int j = 0; j < 4; ++j) {
@@ -526,7 +533,7 @@ static __device__ __forceinline__ void dsl_stage_norm_at(const DslArgs& d, const
     dsl_u32x4 ro;
 #pragma unroll
     for (int j = 0; j < 4; ++j) {
-      const float a0 = d.R > 1 ? dsl_bfr(z[2 * j]) : z[2 * j], a1 = d.R > 1 ? dsl_bfr(z[2 * j + 1]) : z[2 * j + 1];
+      const float a0 = R > 1 ? dsl_bfr(z[2 * j]) : z[2 * j], a1 = R > 1 ? dsl_bfr(z[2 * j + 1]) : z[2 * j + 1];
       z[2 * j] = dsl_bfr(a0 + __uint_as_float(ri[j] << 16));
       z[2 * j + 1] = dsl_bfr(a1 + __uint_as_float(ri[j] & 0xffff0000u));
       ro[j] = (__float_as_uint(z[2 * j]) >> 16) | (__float_as_uint(z[2 * j + 1]) & 0xffff0000u);
@@ -535,6 +542,16 @@ static __device__ __forceinline__ void dsl_stage_norm_at(const DslArgs& d, const
     for (int j = 0; j < 8; ++j) { xs[8 * i + j] = z[j]; ss += z[j] * z[j]; }
     if (store && rout != nullptr) dsl_a_st128(rout + 8 * i, ro);
   }
+#ifdef ETX_DSL_NORM_HOIST
+  // Immutable norm weights: one 16-byte vector per active thread, live across
+  // the block sum's two joins. A compiler memory fence prevents sinking;
+  // it emits no device fence and preserves the original cached load policy.
+  // Keep the original load for later trips when K > 8 * blockDim.x.
+  dsl_u32x4 norm_w = {};
+  if ((int)threadIdx.x < K / 8)
+    norm_w = *(const DSL_G dsl_u32x4*)(d.ln + 8 * (int)threadIdx.x);
+  asm volatile("" ::: "memory");
+#endif
 #if ETX_EMIT_DSL_EXT
   // mode 4: LayerNorm (PhiMoE): mean-centred, biased -- out = (z - mean) * rsqrt(var + eps) * w + b, fp32 inside,
   // one bf16 rounding, as torch's nn.LayerNorm on a bf16 tensor. mode 1 keeps the RMS path bit-for-bit.
@@ -554,7 +571,11 @@ static __device__ __forceinline__ void dsl_stage_norm_at(const DslArgs& d, const
   ss = etx_block_sum(ss, red);
   const float sv = rsqrtf(ss / (float)K + d.eps);
   for (int i = (int)threadIdx.x; i < K / 8; i += blockDim.x) {
+#ifdef ETX_DSL_NORM_HOIST
+    const dsl_u32x4 w = i == (int)threadIdx.x ? norm_w : *(const DSL_G dsl_u32x4*)(d.ln + 8 * i);
+#else
     const dsl_u32x4 w = *(const DSL_G dsl_u32x4*)(d.ln + 8 * i);          // the norm weight is read-only: stays cached
+#endif
     dsl_u32x4 o;
 #if ETX_EMIT_DSL_EXT
     if (d.mode == 4) {
@@ -582,8 +603,8 @@ static __device__ __forceinline__ void dsl_stage_norm_at(const DslArgs& d, const
 #else
   for (int i = (int)threadIdx.x; i < K; i += blockDim.x) {
     float acc = 0.f;
-    for (int s = 0; s < d.R; ++s) acc += dsl_a_ldbf(rows + (size_t)s * K + i);
-    const float in = d.R > 1 ? dsl_bfr(acc) : acc;                                   // moe_sum rounds its fp32 sum once
+    for (int s = 0; s < R; ++s) acc += dsl_a_ldbf(rows + (size_t)s * K + i);
+    const float in = R > 1 ? dsl_bfr(acc) : acc;                                   // moe_sum rounds its fp32 sum once
     const float z = dsl_bfr(in + dsl_a_ldbf(rin + i));                        // the bf16 add of fused_add_rms_norm
     xs[i] = z; ss += z * z;
     if (store && rout != nullptr) dsl_a_stbf(rout + i, __float2bfloat16(z));
@@ -695,9 +716,42 @@ static __device__ __forceinline__ void dsl_touch_plain(const unsigned char* a, i
 }
 '''
 
-TOUCH_FORMS = ("plain",)     # the dense GEMVs: an expert task's rows are not known before its own wait (top-k)
+TOUCH_FORMS = ("plain", "router")     # the dense GEMVs: an expert task's rows are not known before its own wait (top-k)
+
+
+ROUTER_BODY = r"""
+  // Isolated Qwen3-30B-A3B router instantiation: one output row, four
+  // 512-element segments, R=1 norm. No generic chunk/tail/batch dispatch.
+  // Host and plan reject other shapes before launch; all waves take joins.
+  if (blk >= 128) return;
+  float* part = xs + DSL_K_MAX;
+  dsl_stage_norm_at<2048, 1>(d, d.rows, d.resid_in, d.resid_out,
+                            (__hip_bfloat16*)d.x, xs, part + 16 * DSL_RCH, blk == 0);
+  const int lane = etx_lane(), wv = etx_wave();
+  if (wv < 4) {
+    const int off = wv * 512 + lane * 8;
+    const dsl_u32x4 w = dsl_wload((const DSL_G dsl_u32x4*)(d.W + (size_t)blk * 2048 + off));
+    float acc = 0.f;
+    acc += dsl_dot(w, (const dsl_lds_f*)xs + off);
+#ifdef ETX_DSL_WSUM
+    const float v = dsl_wave_sum0(acc);
+#else
+    const float v = etx_wave_sum(acc);
+#endif
+    if (lane == 0) part[wv] = 0.f + v;   // original clear + deposit arithmetic
+  }
+  __syncthreads();                      // every producer's partial must be visible
+  if (threadIdx.x == 0) {
+    float v = 0.f;
+#pragma unroll
+    for (int w = 0; w < 16; ++w) v += w < 4 ? part[w] : 0.f;
+    dsl_a_stbf(d.out + blk, __float2bfloat16(v));
+  }
+  __syncthreads();                      // protect the arena until all consumers finish
+"""
 
 BODIES = {
+    "router": ROUTER_BODY,
     "plain": '''
   const int r0 = blk * d.rpt, r1 = min(d.M, r0 + d.rpt);
   if (r0 >= r1) return;

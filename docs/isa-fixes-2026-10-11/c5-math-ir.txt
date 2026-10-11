@@ -1,0 +1,3 @@
+Norm scaling/rounding/packing statements SHA256 6fa9a8d9305fed067ff6981b4e19f2db554e47b65fe4803c0f35e8dd9cc3af07
+llvm-diff before.ll after.ll k_norm_math: exit 0 (no differences)
+Scope: extracted arithmetic island only; whole hoisted function IR differs.
