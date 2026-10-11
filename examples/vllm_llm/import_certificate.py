@@ -52,7 +52,9 @@ def write_build(build, model):
     identity = dict(schema=1, check_enabled=os.environ.get('ETX_VL_CHECK') == '1',
                     hipcc_flags=os.environ.get('ETX_HIPCC_FLAGS', ''),
                     compiler=(build / 'compiler_version.txt').read_text().strip(),
-                    overrides={k: v for k, v in os.environ.items() if k.startswith(('ETX_VL_', 'ETX_DSL_'))},
+                    overrides={k: v for k, v in os.environ.items()
+                               if k.startswith(('ETX_VL_', 'ETX_DSL_'))
+                               or k == 'ETX_PREFETCH_ISOLATE_POLLER'},
                     files=fingerprint(build, model))
     (build / 'build_identity.json').write_text(json.dumps(identity, indent=2, sort_keys=True) + '\n')
     return identity

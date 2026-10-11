@@ -52,6 +52,13 @@ def test_complete_97(evidence, capsys):
     assert '"checked": 97' in out and '"eligible": true' in out
 
 
+def test_build_identity_records_emission_time_isolation_flag(tmp_path, monkeypatch):
+    (tmp_path/'compiler_version.txt').write_text('test compiler')
+    monkeypatch.setattr(cert, 'fingerprint', lambda *args: {})
+    monkeypatch.setenv('ETX_PREFETCH_ISOLATE_POLLER', '1')
+    assert cert.write_build(tmp_path, tmp_path)['overrides']['ETX_PREFETCH_ISOLATE_POLLER'] == '1'
+
+
 def test_count_comes_from_plan(tmp_path):
     assert cert.validate(fixture_session(tmp_path, 3))['checked'] == 3
 
