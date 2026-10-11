@@ -34,7 +34,7 @@ def instrument(source):
         end = line.index(' == 0', begin) if ' == 0' in line else len(line)
         expr = line[begin:end]
         word = re.search(r'(\d+) \+ \(idx\)', expr)[1]
-        new = line[:begin] + f'ETX_INBODY_ARRIVE(p, {word} + (idx), {expr})' + line[end:]
+        new = line[:begin] + f'ETX_INBODY_ARRIVE(p, {word} + (idx), tid, {expr})' + line[end:]
         return '#if defined(ETX_INBODY) && ETX_INBODY\n' + new + '\n#else\n' + line + '\n#endif'
     source = re.sub(r'(?m)^#define ETX_TARGET\(idx\) .*etx_arrive.*$', arrival, source)
     insert('  int sym = -1;',

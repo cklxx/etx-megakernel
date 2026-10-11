@@ -106,7 +106,7 @@ struct etx_params {
 #if defined(ETX_INBODY) && ETX_INBODY
   // Diagnostic ABI only. No fields or changed offsets in ordinary builds.
   uint64_t* inbody_poll;              // [task], post-success issue ticks
-  uint64_t* inbody_event;             // [event word][before, after final arrive]
+  uint64_t* inbody_event;             // [event word][before, after final arrive, producer task]
   uint64_t* inbody_wave;              // [task][wave][tile return, DOMAIN drain]
 #endif
 };

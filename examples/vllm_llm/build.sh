@@ -12,6 +12,15 @@ NAME="$(basename "$DIR")"; OUT="${ETX_OUT:-$ROOT/build/vl/$NAME}"; mkdir -p "$OU
 VLLM="${VLLM:-$HOME/vllm}"
 PY="$ROOT/.venv/bin/python"
 CONFIG="$DIR/hf/config.json"; [ -f "$CONFIG" ] || CONFIG="$DIR/config.json"
+# Independent diagnostic builds only. Ordinary source/ABI remain unchanged.
+IBF=()
+if [ "${ETX_INBODY_BUILD:-0}" = 1 ]; then
+  export ETX_INBODY_EMIT=1
+  IBF=(-DETX_INBODY=1)
+else
+  unset ETX_INBODY_EMIT
+fi
+[ "${ETX_BF16_CAPTURE_BUILD:-0}" = 1 ] && IBF+=(-DETX_BF16_CAPTURE)
 # Set plan-affecting environment before deriving imports or emitting tiles.
 if [ "${ETX_VL_BATCH:-0}" = 1 ]; then
   [ "${ETX_VL_REQUESTS:-1}" -gt 1 ] || { echo "ETX_VL_BATCH=1 needs ETX_VL_REQUESTS > 1" >&2; exit 1; }
@@ -90,7 +99,7 @@ ABL=(); [ -n "${ETX_VL_ABLATE:-}" ] && ABL=(-DDSL_ABLATE_$(echo "$ETX_VL_ABLATE"
 # ETX_EMIT_FOLD_TOPK, not a -D here -- the -D defaulted to "fold" and silently contradicted the plan (round 30).
 hipcc -O3 -std=c++17 --offload-arch=gfx942 ${ROCMINC[@]+"${ROCMINC[@]}"} -I "$ROOT/etx/runtime/include" -I "$OUT" -I "$ROOT" \
   -Xclang -mlink-builtin-bitcode -Xclang "$OUT/imports.bc" -Rpass-analysis=kernel-resource-usage \
-  ${CHK[@]+"${CHK[@]}"} ${NTF[@]+"${NTF[@]}"} ${VNF[@]+"${VNF[@]}"} ${ABL[@]+"${ABL[@]}"} ${PREPF[@]+"${PREPF[@]}"} ${ETX_HIPCC_FLAGS:-} "$OUT/megakernel_d0.hip" "$ROOT/examples/vllm_llm/host.hip" $([ "${ETX_VL_CHECK:-0}" = 1 ] && echo "$OUT/imp/orig_table.hip -x none $OUT/imp/orig_*.o") -o "$OUT/run" 2>&1 \
+  ${CHK[@]+"${CHK[@]}"} ${NTF[@]+"${NTF[@]}"} ${VNF[@]+"${VNF[@]}"} ${ABL[@]+"${ABL[@]}"} ${PREPF[@]+"${PREPF[@]}"} ${IBF[@]+"${IBF[@]}"} ${ETX_HIPCC_FLAGS:-} "$OUT/megakernel_d0.hip" "$ROOT/examples/vllm_llm/host.hip" $([ "${ETX_VL_CHECK:-0}" = 1 ] && echo "$OUT/imp/orig_table.hip -x none $OUT/imp/orig_*.o") -o "$OUT/run" 2>&1 \
   | tee "$OUT/hipcc.log"
 [ -x "$OUT/run" ] || { echo "build failed: no $OUT/run"; exit 1; }
 # CHECK builds require packed inputs and a golden before certification. Ordinary

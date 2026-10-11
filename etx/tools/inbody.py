@@ -23,7 +23,7 @@ def read_raw(path):
     magic, version, nt, ne, nw, tick_ns = struct.unpack_from('<6Q', data)
     if magic != MAGIC or version != 1 or not nt or not ne or not 0 < nw <= 16 or tick_ns != 10:
         raise ValueError('invalid inbody header')
-    count = 6 + nt * 5 + ne * 2 + nt * nw * 2
+    count = 6 + nt * 5 + ne * 3 + nt * nw * 2
     if len(data) != count * 8:
         raise ValueError('truncated/extra inbody records')
     words = struct.unpack('<' + 'Q' * count, data)
@@ -34,7 +34,7 @@ def read_raw(path):
         pos += n * width
         return rows
     return dict(version=version, tick_ns=tick_ns, legacy=take(nt, 4),
-                poll=take(nt, 1), events=take(ne, 2), waves=take(nt*nw, 2), waves_per_task=nw)
+                poll=take(nt, 1), events=take(ne, 3), waves=take(nt*nw, 2), waves_per_task=nw)
 
 
 def event_words(plan):
@@ -68,12 +68,14 @@ def analyze(plan, raw, byte_rules=None, hop_us=None, bandwidth=4.3):
         legacy.append((d['type'], *coords, *r))
         dependencies = plan['task_in'][i]
         brackets = [raw['events'][words[e]] for e in dependencies]
-        if any(not 0 < a <= b for a, b in brackets):
+        if any(not 0 < a <= b for a, b, owner in brackets):
             raise ValueError(f'missing final-arrival bracket for task {i}')
+        if any(owner not in plan['ev_inst'][e][2] for e, (_, _, owner) in zip(dependencies, brackets)):
+            raise ValueError(f'final arrival has invalid producer for task {i}')
         # Root tasks have no input poll: use taken as an explicitly synthetic
         # runnable origin. Never claim it is a producer timestamp.
-        lo = max((a for a, b in brackets), default=taken)
-        hi = max((b for a, b in brackets), default=taken)
+        lo = max((a for a, b, _ in brackets), default=taken)
+        hi = max((b for a, b, _ in brackets), default=taken)
         poll = raw['poll'][i][0] if dependencies else taken
         if not taken <= poll <= body or lo > poll:
             raise ValueError(f'invalid success order/clock for task {i}')
@@ -89,6 +91,7 @@ def analyze(plan, raw, byte_rules=None, hop_us=None, bandwidth=4.3):
                     layer=int(match[1]) if match else None, type=name,
                     record=[*r, hi, poll], arrive_bounds_ticks=[lo, hi],
                     arrive_is_synthetic=not dependencies,
+                    arrive_producer_tasks=sorted({owner for _, b, owner in brackets if b == hi}),
                     poll_minus_arrive_bounds_us=[max(0, poll-hi)*scale, (poll-lo)*scale],
                     acquire_setup_us=(body-poll)*scale,
                     tile_return_us=(compute-body)*scale,

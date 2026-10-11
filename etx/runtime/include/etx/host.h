@@ -138,7 +138,7 @@ struct etx_host {
     if (getenv("ETX_INBODY_RAW")) {
       if (!d_trace_time) { ETX_CHECK(hipMalloc(&d_trace_time, (size_t)ETX_N_TASKS * 4 * sizeof(uint64_t))); p.trace_time = d_trace_time; }
       ETX_CHECK(hipMalloc(&d_inbody_poll, (size_t)ETX_N_TASKS * sizeof(uint64_t)));
-      ETX_CHECK(hipMalloc(&d_inbody_event, (size_t)ETX_EVENT_WORDS * 2 * sizeof(uint64_t)));
+      ETX_CHECK(hipMalloc(&d_inbody_event, (size_t)ETX_EVENT_WORDS * 3 * sizeof(uint64_t)));
       ETX_CHECK(hipMalloc(&d_inbody_wave, (size_t)ETX_N_TASKS * (ETX_THREADS / 64) * 2 * sizeof(uint64_t)));
       p.inbody_poll = d_inbody_poll; p.inbody_event = d_inbody_event; p.inbody_wave = d_inbody_wave;
     }
@@ -242,7 +242,7 @@ struct etx_host {
     if (d_inbody_poll) {
       ETX_CHECK(hipMemsetAsync(d_trace_time, 0, (size_t)ETX_N_TASKS * 4 * sizeof(uint64_t), stream));
       ETX_CHECK(hipMemsetAsync(d_inbody_poll, 0, (size_t)ETX_N_TASKS * sizeof(uint64_t), stream));
-      ETX_CHECK(hipMemsetAsync(d_inbody_event, 0, (size_t)ETX_EVENT_WORDS * 2 * sizeof(uint64_t), stream));
+      ETX_CHECK(hipMemsetAsync(d_inbody_event, 0, (size_t)ETX_EVENT_WORDS * 3 * sizeof(uint64_t), stream));
       ETX_CHECK(hipMemsetAsync(d_inbody_wave, 0, (size_t)ETX_N_TASKS * (ETX_THREADS / 64) * 2 * sizeof(uint64_t), stream));
     }
 #endif
@@ -498,7 +498,7 @@ struct etx_host {
     };
     write(d_trace_time, (size_t)ETX_N_TASKS * 4);
     write(d_inbody_poll, ETX_N_TASKS);
-    write(d_inbody_event, (size_t)ETX_EVENT_WORDS * 2);
+    write(d_inbody_event, (size_t)ETX_EVENT_WORDS * 3);
     write(d_inbody_wave, (size_t)ETX_N_TASKS * (ETX_THREADS / 64) * 2);
     if (fclose(f)) { perror("inbody close"); exit(1); }
   }

@@ -23,6 +23,17 @@ def sha(path):
     return h.hexdigest()
 
 
+def sha_slice(path,offset,size):
+    h=hashlib.sha256()
+    with Path(path).open('rb') as f:
+        f.seek(offset)
+        while size:
+            b=f.read(min(size,8*1024*1024))
+            if not b: raise ValueError('truncated packed weight slice')
+            h.update(b); size-=len(b)
+    return h.hexdigest()
+
+
 def finalize(directory, host, plan, checks):
     directory, host, plan = map(Path, (directory, host, plan))
     log = Path(checks).read_text()
@@ -34,7 +45,7 @@ def finalize(directory, host, plan, checks):
         layer, position, first, count, total, offset, size = map(int, lines[0].split())
         weight_path, wo, wn = shlex.split(lines[1])
         weight_path = str(Path(weight_path).resolve())
-        buffers = [dict(file=weight_path, offset=int(wo), bytes=int(wn))]
+        buffers = [dict(file=weight_path, offset=int(wo), bytes=int(wn),slice_sha256=sha_slice(weight_path,int(wo),int(wn)))]
         for file in ('input.bin', 'output.bin', 'ids.bin', 'weights.bin'):
             p = base/file
             buffers.append(dict(file=str(p.resolve()), offset=0, bytes=p.stat().st_size, sha256=sha(p)))

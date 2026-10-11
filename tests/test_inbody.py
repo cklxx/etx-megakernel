@@ -18,7 +18,7 @@ def fixture():
         events=[dict(name='done',offset=0,shape=[1])],
         ev_inst=[['done',[0],[0]]],task_in=[[],[0]])
     raw = dict(version=1,tick_ns=10,waves_per_task=2,
-        legacy=[[100,110,200,0],[201,240,400,0]],poll=[[0],[230]],events=[[215,220]],
+        legacy=[[100,110,200,0],[201,240,400,0]],poll=[[0],[230]],events=[[215,220,0]],
         waves=[[180,190],[185,192],[350,380],[360,390]])
     return plan,raw
 
@@ -63,7 +63,7 @@ def test_corrupt_binary_rejected(tmp_path,mutation):
 @pytest.mark.parametrize('mutation', ['event','poll','wave','legacy'])
 def test_missing_completion_never_counts_as_zero(mutation):
     p,r=fixture()
-    if mutation=='event': r['events'][0]=[0,0]
+    if mutation=='event': r['events'][0]=[0,0,0]
     elif mutation=='poll': r['poll'][1]=[0]
     elif mutation=='wave': r['waves'][2]=[0,0]
     else: r['legacy'][1][2]=0
@@ -71,10 +71,15 @@ def test_missing_completion_never_counts_as_zero(mutation):
 
 
 def test_success_can_precede_producer_after_stamp():
-    p,r=fixture(); r['events'][0]=[215,235]
+    p,r=fixture(); r['events'][0]=[215,235,0]
     # Consumer can observe zero before the producer's diagnostic write.
     t=inbody.analyze(p,r)['tasks'][1]
     assert t['poll_minus_arrive_bounds_us']==[0,.15]
+
+
+def test_arrival_producer_identity_must_match_dependency():
+    p,r=fixture(); r['events'][0][2]=1
+    with pytest.raises(ValueError,match='invalid producer'): inbody.analyze(p,r)
 
 
 def test_hop_absent_and_impossible_floor_are_unknown():
@@ -93,7 +98,7 @@ def test_default_emission_unchanged(monkeypatch):
     monkeypatch.setenv('ETX_INBODY_EMIT','1')
     diagnostic=emit_kernel(p)
     assert diagnostic==instrument(original)
-    assert '#define ETX_TARGET(idx) (void)ETX_INBODY_ARRIVE(p, 0 + (idx),' in diagnostic
+    assert '#define ETX_TARGET(idx) (void)ETX_INBODY_ARRIVE(p, 0 + (idx), tid,' in diagnostic
     assert diagnostic.count('etx_call_body(sym, &ctx);   // phase 2: the only call site of each body')==1
 
 
@@ -146,3 +151,12 @@ def test_original_argument_mutation_rejected(tmp_path):
 def test_snapshot_finalizer_requires_completed_check(tmp_path):
     f=tmp_path/'failed.log'; f.write_text('CHECK FAILED: 1 launch(es) differ')
     with pytest.raises(ValueError,match='completed'): pack.finalize(tmp_path,'host','plan',f)
+
+
+def test_session_report_requires_all_five_full_runs():
+    from examples.sessions.inbody import samples,perturbation,MAX_SESSION_SECONDS,JOBS
+    text='\n'.join('INBODY-RUN '+json.dumps(dict(run=i,matched=32,gen=32,wall_ms=4+i*.001)) for i in range(5))
+    s=samples(text)
+    assert perturbation(s,s,s)['off_within_spread']
+    with pytest.raises(ValueError): samples(text.replace('"matched": 32','"matched": 31',1))
+    assert MAX_SESSION_SECONDS==900 and len(JOBS)==1 and JOBS[0]['timeout']==900

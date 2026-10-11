@@ -753,6 +753,14 @@ int main(int argc, char** argv) {
              matched[r], gen, teacher ? " (teacher-forced argmax)" : "");
       if (first_div >= 0) printf("; first divergence at %d (ours %d, HF %d)", first_div, out[(int)prompt.size() - 1 + first_div], goldens[r][first_div]);
       printf("\n");
+#ifdef ETX_INBODY_REPORT
+      // Outside the timed step, with correctness for EVERY repetition.
+      if (r == 0) {
+        std::vector<double> samples(wall_ms); std::sort(samples.begin(), samples.end());
+        printf("INBODY-RUN {\"run\":%d,\"matched\":%d,\"gen\":%d,\"wall_ms\":%.6f}\n",
+               run, matched[r], gen, samples.empty() ? 0. : samples[samples.size()/2]);
+      }
+#endif
       // --check-coverage: every position's argmax against the HF prefill. A mismatch whose HF top-1 margin is tiny is
       // an argmax tie flipped by bf16 rounding (the 32-token gate has the same property); one with a real margin means
       // a logits row the device never wrote or wrote wrongly. Gate: zero mismatches with margin > 0.5.

@@ -56,21 +56,36 @@ def check(out, model_build=None):
             with (out/f'{name}_{i}.log').open('w') as f:
                 subprocess.run(list(map(str,cmd)),cwd=ROOT,stdout=f,stderr=subprocess.STDOUT,check=True)
         report[name]=resources((out/(name+'.s')).read_text())
-    # llc's input file name changes its assembly .file directive; normalize ONLY
-    # that diagnostic directive. Compare all executable text and metadata.
+    # Source hashing changes HIP's unused TU anchor. New guarded source lines
+    # change inline-asm source-location metadata. Normalize ONLY these and the
+    # assembly .file diagnostic. All instructions/resource metadata still match.
     import re
     def ir(name):
-        return re.sub(r"(?m)^; ModuleID = .*\n",'',(out/(name+'.ll')).read_text())
+        s=(out/(name+'.ll')).read_text()
+        locations=set(re.findall(r'!srcloc !(\d+)',s))
+        for loc in locations:
+            s=re.sub(rf'(?m)^!{loc} = !\{{i64 \d+\}}$',f'!{loc} = !{{i64 0}}',s)
+        s=re.sub(r'__hip_cuid_[0-9a-f]+','__hip_cuid_NORMALIZED',s)
+        return re.sub(r"(?m)^; ModuleID = .*\n",'',s)
     def isa(name):
-        return re.sub(r'(?m)^\s*\.file\s+.*\n','',(out/(name+'.s')).read_text())
+        s=re.sub(r'__hip_cuid_[0-9a-f]+','__hip_cuid_NORMALIZED',(out/(name+'.s')).read_text())
+        return re.sub(r'(?m)^\s*\.file\s+.*\n','',s)
+    for name in ('original','off','on'):
+        subprocess.run([str(llvm/'llc'),'-mtriple=amdgcn-amd-amdhsa','-mcpu=gfx942','-O3','-filetype=obj',
+            str(out/(name+'.ll')),'-o',str(out/(name+'.o'))],check=True)
+        subprocess.run([str(llvm/'llvm-objcopy'),'-O','binary','--only-section=.text',
+            str(out/(name+'.o')),str(out/(name+'.text.bin'))],check=True)
     result=dict(start_commit='4a39f92',default_emitter_byte_equal=emitter_match,
-        off_ir_byte_equal=ir('original')==ir('off'),off_isa_byte_equal=isa('original')==isa('off'),
+        off_ir_code_equal=ir('original')==ir('off'),off_isa_code_equal=isa('original')==isa('off'),
+        off_device_text_byte_equal=(out/'original.text.bin').read_bytes()==(out/'off.text.bin').read_bytes(),
+        device_text_sha256={n:sha(out/(n+'.text.bin')) for n in ('original','off','on')},
+        normalization=['unused __hip_cuid anchor','inline-asm !srcloc numbers','ModuleID and .file'],
         resources=report,compiler=subprocess.check_output([llvm/'clang++','--version'],text=True),
         device_libraries=str(libs),devlib_hashes={p.name:sha(p) for p in sorted(libs.glob('*.bc'))},
         gpu_perturbation_ms=None,gpu_checks='NOT_RUN_CPU_ONLY',
-        paths={n:{s:sha(out/(n+'.'+s)) for s in ('ll','s')} for n in ('original','off','on'))
+        paths={n:{s:sha(out/(n+'.'+s)) for s in ('ll','s')} for n in ('original','off','on')})
     (out/'evidence.json').write_text(json.dumps(result,indent=2)+'\n')
-    if not result['off_ir_byte_equal'] or not result['off_isa_byte_equal']:
+    if not result['off_ir_code_equal'] or not result['off_isa_code_equal'] or not result['off_device_text_byte_equal']:
         raise ValueError('disabled overlay changed optimized code')
     return result
 

@@ -8,7 +8,7 @@ import struct
 import subprocess
 import time
 
-from .pack import sha
+from .pack import sha, sha_slice
 from .source import PAIRS
 
 RECORD = struct.Struct('<QQIIII')
@@ -36,6 +36,8 @@ def validate_pack(pack, reference, arguments, layer, task, wave, row):
             raise ValueError('truncated original buffer')
         if 'sha256' in b and sha(b['file']) != b['sha256']:
             raise ValueError('original buffer changed')
+        if 'slice_sha256' in b and sha_slice(b['file'],b['offset'],b['bytes']) != b['slice_sha256']:
+            raise ValueError('original packed weights changed')
     return block
 
 
@@ -62,6 +64,8 @@ def read_records(path, pack, iterations, task, wave, row):
 
 
 def run(a):
+    start=time.monotonic()
+    end=start+a.deadline
     pack = json.loads(a.pack.read_text())
     identity = json.loads((a.build/'identity.json').read_text())
     validate_pack(pack, a.reference, a.arguments, a.layer, a.task, a.wave, a.row)
@@ -72,10 +76,12 @@ def run(a):
             raise ValueError('probe/launcher identity changed')
     if identity['capture_math'] != 'bf16_unfolded_batch1':
         raise ValueError('unsupported math identity')
+    remaining=end-time.monotonic()
+    if remaining<=0: raise TimeoutError('NOT-COMPLETE input validation deadline')
     quoted = lambda v: json.dumps(str(v))
     prefix = a.output.resolve()
     fields = [a.build/'original.hsaco', a.build/'candidate.hsaco', 'dsl_'+pack['role'], prefix, a.reference, a.arguments]
-    config = ' '.join(quoted(v) for v in fields) + f' {pack["first"]} {pack["count"]} {a.iterations} {a.deadline} {int(a.selector == "candidate")} {pack["reference"]["output_offset"]} {pack["reference"]["bytes"]}\n'
+    config = ' '.join(quoted(v) for v in fields) + f' {pack["first"]} {pack["count"]} {a.iterations} {remaining} {int(a.selector == "candidate")} {pack["reference"]["output_offset"]} {pack["reference"]["bytes"]}\n'
     config += ''.join(f'{quoted(b["file"])} {b["offset"]} {b["bytes"]}\n' for b in pack['buffers'])
     command = [str((a.build/'launcher').resolve()), str(prefix)+'.config.txt']
     if a.dry_run:
@@ -88,10 +94,9 @@ def run(a):
     # OS-level outer deadline bounds module load/copies as well as stream waits.
     with log.open('w') as f:
         p = subprocess.Popen(command, stdout=f, stderr=subprocess.STDOUT, start_new_session=True)
-        start = time.monotonic()
         try:
             while p.poll() is None:
-                remaining = a.deadline-(time.monotonic()-start)
+                remaining = end-time.monotonic()
                 if remaining <= 0:
                     raise TimeoutError('NOT-COMPLETE launcher deadline')
                 try: p.wait(timeout=min(15, remaining))
