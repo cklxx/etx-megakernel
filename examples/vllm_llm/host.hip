@@ -50,6 +50,9 @@ static bool wait_stream(hipStream_t s, double seconds) {
 }
 
 static void die(const std::string& m) { fprintf(stderr, "error: %s\n", m.c_str()); exit(1); }
+#ifdef ETX_BF16_CAPTURE
+#include "examples/vllm_llm/bf16_300/capture.h"
+#endif
 // ETX_VL_UC builds: the tensors that cross XCDs inside a step live in uncached memory (MTYPE UC), which is what
 // lets the build use ETX_COHERENT_DEVICE_DATA (DOMAIN fences for DEVICE events). The KV cache stays cached: its
 // writer and its readers are pinned to one XCD (the build sets ETX_VL_PIN).
@@ -568,8 +571,25 @@ int main(int argc, char** argv) {
       // Same DSL namespace as model.py:src_of and plan_imports.py:planned_imports.
       // Execute to preserve downstream inputs, but CHECK-DSL owns correctness.
       if (x.exp.rfind("dsl_", 0) == 0) {
+#ifdef ETX_BF16_CAPTURE
+        Bf16Capture capture;
+        if (const char* base = getenv("ETX_BF16_CAPTURE_DIR")) {
+          if (x.req == 0 && x.layer == atoi(getenv("ETX_BF16_CAPTURE_LAYER") ? getenv("ETX_BF16_CAPTURE_LAYER") : "0")
+              && (x.exp == "dsl_moe_up" || x.exp == "dsl_moe_down" || x.exp == "dsl_moe_up_fold" || x.exp == "dsl_moe_down_fold")) {
+            const int selected = atoi(getenv("ETX_BF16_CAPTURE_TASK") ? getenv("ETX_BF16_CAPTURE_TASK") : "0");
+            const int per = x.tasks / x.rep, replica = selected / per;
+            if (per <= 0 || selected < 0 || selected >= x.tasks || replica >= x.rep) die("capture task out of range");
+            const auto weight = m.t.at("L" + std::to_string(x.layer) + (x.role == "moe_up" ? ".w13" : ".w2"));
+            capture.before(base, x.role, x.layer, check_pos, ab.data()+x.off+replica*x.stride,
+                dir+"/vl.bin", weight.first, weight.second*2, replica*per, per, x.tasks, TOPK);
+          }
+        }
+#endif
         launch_imported(x.n + 1);
         if (!wait_stream(hst.stream, 5.0)) die("DSL tile hung: " + x.exp);
+#ifdef ETX_BF16_CAPTURE
+        capture.after();
+#endif
         // CPU-prepared KEY32 session: preserve each layer's actual routing
         // output during the existing sequential import check. This is a host
         // copy only, absent from the timed path and the device kernel.
@@ -733,6 +753,14 @@ int main(int argc, char** argv) {
              matched[r], gen, teacher ? " (teacher-forced argmax)" : "");
       if (first_div >= 0) printf("; first divergence at %d (ours %d, HF %d)", first_div, out[(int)prompt.size() - 1 + first_div], goldens[r][first_div]);
       printf("\n");
+#ifdef ETX_INBODY_REPORT
+      // Outside the timed step, with correctness for EVERY repetition.
+      if (r == 0) {
+        std::vector<double> samples(wall_ms); std::sort(samples.begin(), samples.end());
+        printf("INBODY-RUN {\"run\":%d,\"matched\":%d,\"gen\":%d,\"wall_ms\":%.6f}\n",
+               run, matched[r], gen, samples.empty() ? 0. : samples[samples.size()/2]);
+      }
+#endif
       // --check-coverage: every position's argmax against the HF prefill. A mismatch whose HF top-1 margin is tiny is
       // an argmax tie flipped by bf16 rounding (the 32-token gate has the same property); one with a real margin means
       // a logits row the device never wrote or wrote wrongly. Gate: zero mismatches with margin > 0.5.
@@ -936,6 +964,9 @@ int main(int argc, char** argv) {
     printf("CHECK-DSL %s: %d values beyond 2 bf16 ulps of the CPU reference (layer %d)\n", bad_total ? "FAILED" : "OK", bad_total, Lc);
   }
   // ETX_TRACE=1: per-type wait / body / span of the last step, and the raw per-task stamps (ETX_TRACE_RAW=<file>)
+#if defined(ETX_INBODY) && ETX_INBODY
+  if (const char* path = getenv("ETX_INBODY_RAW")) hst.write_inbody(path);
+#endif
   if (getenv("ETX_TRACE") && !unfused) hst.report_phases(etx_type_names, ETX_N_TYPES);
   std::vector<double> s(step_ms), w(wall_ms); std::sort(s.begin(), s.end()); std::sort(w.begin(), w.end());
   const double med = s.empty() ? 0 : s[s.size() / 2], wmed = w.empty() ? 0 : w[w.size() / 2];

@@ -1,0 +1,13 @@
+{
+  "used": {
+    "wvsplitk_y2": "ok",
+    "attn_mfma16_g6": "ok",
+    "attn_reduce": "ok",
+    "rms_norm_2d": "ok",
+    "fused_add_rms_norm": "ok",
+    "rope_neox": "ok",
+    "reshape_and_cache": "ok",
+    "silu_and_mul": "ok"
+  },
+  "unused": {}
+}

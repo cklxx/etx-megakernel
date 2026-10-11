@@ -1,0 +1,28 @@
+CPU BUILD original_ir
+CPU BUILD original_isa
+CPU BUILD candidate_ir
+CPU BUILD candidate_isa
+CPU BUILD host_syntax
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/Users/ckl/code/.wt/etx-inbody/examples/vllm_llm/bf16_300/launch_build.py", line 79, in <module>
+    if __name__=='__main__': main()
+                             ~~~~^^
+  File "/Users/ckl/code/.wt/etx-inbody/examples/vllm_llm/bf16_300/launch_build.py", line 76, in main
+    print(json.dumps(prepare(a.out,a.pair,a.task,a.wave,a.row,a.local),indent=2))
+                     ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/ckl/code/.wt/etx-inbody/examples/vllm_llm/bf16_300/launch_build.py", line 50, in prepare
+    run([llvm/'clang++','-x','hip','--cuda-host-only','-fsyntax-only','-nogpuinc','-nogpulib',
+    ~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+         '--offload-arch=gfx942','-std=c++17','-isystem',headers/'clang','-isystem',headers/'inc',
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+         '-include','__clang_hip_runtime_wrapper.h','-isystem',ROOT/'etx/importer/shim/mac','-D__HIP_PLATFORM_AMD__',host], 'host_syntax')
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/ckl/code/.wt/etx-inbody/examples/vllm_llm/bf16_300/launch_build.py", line 37, in run
+    subprocess.run(list(map(str,cmd)), cwd=ROOT, stdout=f, stderr=subprocess.STDOUT, check=True)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/subprocess.py", line 577, in run
+    raise CalledProcessError(retcode, process.args,
+                             output=stdout, stderr=stderr)
+subprocess.CalledProcessError: Command '['/opt/homebrew/opt/llvm/bin/clang++', '-x', 'hip', '--cuda-host-only', '-fsyntax-only', '-nogpuinc', '-nogpulib', '--offload-arch=gfx942', '-std=c++17', '-isystem', '/Users/ckl/code/rocm-headers/clang', '-isystem', '/Users/ckl/code/rocm-headers/inc', '-include', '__clang_hip_runtime_wrapper.h', '-isystem', '/Users/ckl/code/.wt/etx-inbody/etx/importer/shim/mac', '-D__HIP_PLATFORM_AMD__', '/Users/ckl/code/.wt/etx-inbody/examples/vllm_llm/bf16_300/launcher.hip']' returned non-zero exit status 1.

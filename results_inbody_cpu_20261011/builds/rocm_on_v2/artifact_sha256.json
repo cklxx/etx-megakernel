@@ -1,0 +1,19 @@
+{
+  "megakernel_d0.hip": "451eb130c4de2be5b6fbbe3cfd77fbcda9f6572522ed819a8a5a8530b9c74f43",
+  "imports.bc": "9c5d4de99add973441c2f065affacf82cb1e1f44acf1beeecc51d8d66c2e3683",
+  "imp_tiles.hip": "d4bf266ae86001573f550586cc3dda518d1719e97590cc15db71681d171595eb",
+  "mk.s": "be94ffb022f3417043051ce179c3d7423d4291b7bdca56177e6cf544058824ec",
+  "dsl_tiles.hip": "a0bcc2dc113fed1fe2e7d7144b66fa478ff935e3795b0cb4c2d98a3ce6b92852",
+  "imports.linked.bc": "41393e4468874d0417195e6d743c5a3543a89fd3de489c39b9254fe64045b012",
+  "imports.imports.bc": "4c46bc63588143cea0c20010ee0d78f38140340b63b91dadccc448f1eb86d2d5",
+  "imp/layernorm_kernels.ll": "205507b5d4675712f5b0314c51dc9024e51501ac7f744f185cda385dfd2a124e",
+  "imp/attention.ll": "2a0295d7797464521f539296f04534e800b92539fd0a755253f21bcc2efe66a3",
+  "imp/rms_norm_2d.ll": "56f52f559c40e7a983069465fd21093fee2a9779be39f6d48a90236dc59fef6f",
+  "imp/attn_reduce.ll": "4ed70fec8430f5fd009b750014ba37d5bf374a59a19ccc388f98d21f14712241",
+  "imp/layernorm_kernels.hip": "479637269acf0727688496f8d7accd69c1c93c153fdaf1224ede5bbd66a21fa4",
+  "imp/attn_mfma16_g8.ll": "0d4d63774ecb938c04dee7f584410db1febfc95d645ba61b37e4af3040e269e6",
+  "imp/attn_mfma16_g8.bc": "59f253d4f9c5a593014553b9a2e1cfeb3a6f7816b029464bbbbc90c1a85890bb",
+  "imp/rms_norm_2d.bc": "c77d88f43d27c7c2c48113e00bb3aecdd479ab8902b0868be1854f899e941867",
+  "imp/attention.hip": "759c3e026b360627ad8d727351466464b2d1d62cf22e6e8860bd5c0f0a068b41",
+  "imp/attn_reduce.bc": "1aa70e34d4c4a6caec0254771db12f0d9cefa569b8b1509c50d45e2053f38206"
+}

@@ -103,4 +103,10 @@ struct etx_params {
   // NOT in it -- the host reads ctrl_done after the kernel, so resetting it on the device would race that read.
   const etx_reset_op* reset_ops;
   int32_t          n_reset_ops;
+#if defined(ETX_INBODY) && ETX_INBODY
+  // Diagnostic ABI only. No fields or changed offsets in ordinary builds.
+  uint64_t* inbody_poll;              // [task], post-success issue ticks
+  uint64_t* inbody_event;             // [event word][before, after final arrive, producer task]
+  uint64_t* inbody_wave;              // [task][wave][tile return, DOMAIN drain]
+#endif
 };

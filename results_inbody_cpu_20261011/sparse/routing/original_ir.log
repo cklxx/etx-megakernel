@@ -1,0 +1,4 @@
+/Users/ckl/code/.wt/etx-inbody/build/inbody/sparse/routing/original.hip:7:9: warning: #pragma once in main file [-Wpragma-once-outside-header]
+    7 | #pragma once
+      |         ^
+1 warning generated when compiling for gfx942.

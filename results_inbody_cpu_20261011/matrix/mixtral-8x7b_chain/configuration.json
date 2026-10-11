@@ -1,0 +1,9 @@
+{
+  "model": "mixtral-8x7b",
+  "model_config": "examples/llm/configs/mixtral-8x7b.json",
+  "overrides": {
+    "ETX_VL_CHAIN": "1",
+    "ETX_VL_IMPORTED": "1"
+  },
+  "variant": "chain"
+}

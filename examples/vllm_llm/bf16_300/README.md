@@ -204,3 +204,27 @@ arena, with the compiled complete fusion allocation at 8,344 B. The plan was
 not edited. Its 29,752-byte limit remains the gate. There is no other identified
 brief/plan conflict; the actual-co-residency requirement cannot be fulfilled
 under the task's CPU-only constraint and is reported as incomplete.
+
+## In-body follow-up, 2026-10-11
+
+The no-launcher/no-pack statements above describe the original preparation
+checkpoint. `launch_build.py`, `launcher.hip` and `launch.py` now build/replay
+the twelve sparse MoE probe pairs and read every raw sample and completion row.
+`pack.py` reuses the full-model `prep.py` weight format and exports portable
+original argument/input snapshots plus independent original-output references
+from the existing checking host (`ETX_BF16_CAPTURE_BUILD=1`). Nothing runs on a
+GPU during `--local` builds or `pack.py --dry-run`.
+
+The launcher accepts original/candidate selector, pair, captured argument block,
+layer/task/wave/row, iterations, deadline, output prefix and independent reference.
+It alternates unchanged original/stamped pairs; the selector chooses the primary
+reported arm, and all returned records identify the diagnostic companion.
+The unstamped original has no fabricated timestamps. Replay covers one expert's
+MoE up/down task group, including mode-zero `_fold` aliases; it does not implement
+the standalone fusion prototype, dispatcher probes or full-model token checking.
+
+See [the record/CPU evidence/session contract](../../../docs/INBODY-INSTRUMENT-2026-10-11.md)
+and `examples/sessions/inbody.py` for the single 900-second gpu_jobs attempt.
+GPU perturbation, full-model correctness and exclusive removable-work credit
+remain unmeasured. The enabled allocations differ; no historical certificate
+or performance eligibility is transferred to these probes.

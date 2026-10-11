@@ -1,0 +1,94 @@
+{
+  "start_commit": "4a39f92",
+  "off_ir_code_equal": true,
+  "off_isa_code_equal": true,
+  "off_device_text_byte_equal": true,
+  "compiler": "AMD clang version 22.0.0git (https://github.com/RadeonOpenCompute/llvm-project roc-7.2.4 26084 f58b06dce1f9c15707c5f808fd002e18c2accf7e)\nTarget: x86_64-unknown-linux-gnu\nThread model: posix\nInstalledDir: /code/rocm-headers/rocm-llvm/opt/rocm-7.2.4/lib/llvm/bin\nConfiguration file: /code/rocm-headers/rocm-llvm/opt/rocm-7.2.4/lib/llvm/bin/clang++.cfg\n",
+  "resources": {
+    "original": [
+      {
+        "kernel": "etx_megakernel_d0",
+        "vgpr": 128,
+        "agpr": 0,
+        "vgpr_spills": 6,
+        "sgpr_spills": 255,
+        "scratch_bytes_lane": 28,
+        "lds_bytes": 29736,
+        "static_blocks_per_cu": 1,
+        "actual_co_residency": "UNVERIFIED_CPU_ONLY",
+        "numeric_gate": true
+      },
+      {
+        "kernel": "etx_unfused_d0",
+        "vgpr": 103,
+        "agpr": 0,
+        "vgpr_spills": 0,
+        "sgpr_spills": 0,
+        "scratch_bytes_lane": 0,
+        "lds_bytes": 29704,
+        "static_blocks_per_cu": 1,
+        "actual_co_residency": "UNVERIFIED_CPU_ONLY",
+        "numeric_gate": true
+      }
+    ],
+    "off": [
+      {
+        "kernel": "etx_megakernel_d0",
+        "vgpr": 128,
+        "agpr": 0,
+        "vgpr_spills": 6,
+        "sgpr_spills": 255,
+        "scratch_bytes_lane": 28,
+        "lds_bytes": 29736,
+        "static_blocks_per_cu": 1,
+        "actual_co_residency": "UNVERIFIED_CPU_ONLY",
+        "numeric_gate": true
+      },
+      {
+        "kernel": "etx_unfused_d0",
+        "vgpr": 103,
+        "agpr": 0,
+        "vgpr_spills": 0,
+        "sgpr_spills": 0,
+        "scratch_bytes_lane": 0,
+        "lds_bytes": 29704,
+        "static_blocks_per_cu": 1,
+        "actual_co_residency": "UNVERIFIED_CPU_ONLY",
+        "numeric_gate": true
+      }
+    ]
+  },
+  "artifact_hashes": {
+    "original.hip": "b0ab9133fe86b832aeb0dad9aeca9746f7c48e3c2d76400fd16065b39b04af11",
+    "original.ll": "e1f28f3de54d1d0d8befc5918465c6d8f50409a78ed9ade4ee52ab140e056663",
+    "original.s": "0ea8edbf4a8cb0d3945bd5555688600c070ae395e29441a6d5488bbebb5140a2",
+    "original.text.bin": "057ff35ff4a86dffcde18574a69a39a7c446df44ece5cbe940f05261a3bf1f3a",
+    "off.hip": "68ddb39d4d2142690841567feae7674b3db97e4ede7c7b41d03df543fc0bca10",
+    "off.ll": "f3c84d314772a9decb34cd8ba0777b1c43ef4b12df0da3f7540d3a0bf23d0d0d",
+    "off.s": "f5c5ffc097cde8ada934f0d1c52e4cae176fc02441a842e8bc9a9990099df290",
+    "off.text.bin": "057ff35ff4a86dffcde18574a69a39a7c446df44ece5cbe940f05261a3bf1f3a"
+  },
+  "normalization": [
+    "ModuleID/.file",
+    "unused HIP CUID",
+    "inline-asm source-location metadata"
+  ],
+  "gpu_perturbation_ms": null,
+  "gpu_checks": "NOT_RUN_CPU_ONLY",
+  "docker_command": [
+    "docker",
+    "run",
+    "--rm",
+    "--pull=never",
+    "--network=none",
+    "--platform",
+    "linux/amd64",
+    "-v",
+    "/Users/ckl/code:/code",
+    "-v",
+    "/Users/ckl/code:/Users/ckl/code",
+    "--entrypoint",
+    "python3",
+    "etx-rocm22"
+  ]
+}

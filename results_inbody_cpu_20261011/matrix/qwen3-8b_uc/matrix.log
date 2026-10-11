@@ -1,0 +1,10 @@
+wvsplitk_y2            (64, 16, 1) slots=1 args=80B lds=32768B barriers=1
+attn_mfma4_g4          (256, 1, 1) slots=4 args=160B lds=21120B barriers=2
+attn_reduce            (128, 1, 1) slots=8 args=80B lds=2176B barriers=1
+rms_norm_2d            (512, 1, 1) slots=2 args=100B lds=160B barriers=2
+rms_norm_3d            (16, 1, 1) slots=16 args=100B lds=1280B barriers=2
+fused_add_rms_norm     (1024, 1, 1) slots=1 args=72B lds=80B barriers=2
+rope_neox              (512, 1, 1) slots=2 args=108B lds=0B barriers=0
+reshape_and_cache      (128, 1, 1) slots=8 args=96B lds=0B barriers=0
+silu_and_mul           (1024, 1, 1) slots=1 args=48B lds=0B barriers=0
+UC plan ok: all 364 grids static, 108 KV-cache grids entirely on XCD 0

@@ -1,0 +1,17 @@
+CPU BUILD original stage=0
+CPU BUILD original stage=1
+CPU BUILD off stage=0
+CPU BUILD off stage=1
+CPU BUILD on stage=0
+CPU BUILD on stage=1
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/Users/ckl/code/.wt/etx-inbody/examples/vllm_llm/bf16_300/inbody_cpu.py", line 93, in <module>
+  File "/Users/ckl/code/.wt/etx-inbody/examples/vllm_llm/bf16_300/inbody_cpu.py", line 90, in main
+    if not result['off_ir_code_equal'] or not result['off_isa_code_equal'] or not result['off_device_text_byte_equal']:
+                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/ckl/code/.wt/etx-inbody/examples/vllm_llm/bf16_300/inbody_cpu.py", line 82, in check
+    off_device_text_byte_equal=(out/'original.text.bin').read_bytes()==(out/'off.text.bin').read_bytes(),
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ValueError: disabled overlay changed optimized code

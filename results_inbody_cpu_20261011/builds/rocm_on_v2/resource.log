@@ -1,0 +1,24 @@
+/code/.wt/etx-inbody/build/inbody/rocm_on_v2/megakernel_d0.hip:15127:1: remark: Function Name: etx_megakernel_d0 [-Rpass-analysis=kernel-resource-usage]
+ 15127 | extern "C" __global__ void __launch_bounds__(ETX_THREADS, ETX_MIN_WG_PER_CU) etx_megakernel_d0(etx_params p) {
+       | ^
+/code/.wt/etx-inbody/build/inbody/rocm_on_v2/megakernel_d0.hip:15127:1: remark:     TotalSGPRs: 108 [-Rpass-analysis=kernel-resource-usage]
+/code/.wt/etx-inbody/build/inbody/rocm_on_v2/megakernel_d0.hip:15127:1: remark:     VGPRs: 128 [-Rpass-analysis=kernel-resource-usage]
+/code/.wt/etx-inbody/build/inbody/rocm_on_v2/megakernel_d0.hip:15127:1: remark:     AGPRs: 0 [-Rpass-analysis=kernel-resource-usage]
+/code/.wt/etx-inbody/build/inbody/rocm_on_v2/megakernel_d0.hip:15127:1: remark:     ScratchSize [bytes/lane]: 88 [-Rpass-analysis=kernel-resource-usage]
+/code/.wt/etx-inbody/build/inbody/rocm_on_v2/megakernel_d0.hip:15127:1: remark:     Dynamic Stack: False [-Rpass-analysis=kernel-resource-usage]
+/code/.wt/etx-inbody/build/inbody/rocm_on_v2/megakernel_d0.hip:15127:1: remark:     Occupancy [waves/SIMD]: 4 [-Rpass-analysis=kernel-resource-usage]
+/code/.wt/etx-inbody/build/inbody/rocm_on_v2/megakernel_d0.hip:15127:1: remark:     SGPRs Spill: 1002 [-Rpass-analysis=kernel-resource-usage]
+/code/.wt/etx-inbody/build/inbody/rocm_on_v2/megakernel_d0.hip:15127:1: remark:     VGPRs Spill: 21 [-Rpass-analysis=kernel-resource-usage]
+/code/.wt/etx-inbody/build/inbody/rocm_on_v2/megakernel_d0.hip:15127:1: remark:     LDS Size [bytes/block]: 29736 [-Rpass-analysis=kernel-resource-usage]
+/code/.wt/etx-inbody/build/inbody/rocm_on_v2/megakernel_d0.hip:15181:1: remark: Function Name: etx_unfused_d0 [-Rpass-analysis=kernel-resource-usage]
+ 15181 | extern "C" __global__ void __launch_bounds__(ETX_THREADS, ETX_MIN_WG_PER_CU) etx_unfused_d0(etx_params p, int32_t first) {
+       | ^
+/code/.wt/etx-inbody/build/inbody/rocm_on_v2/megakernel_d0.hip:15181:1: remark:     TotalSGPRs: 99 [-Rpass-analysis=kernel-resource-usage]
+/code/.wt/etx-inbody/build/inbody/rocm_on_v2/megakernel_d0.hip:15181:1: remark:     VGPRs: 103 [-Rpass-analysis=kernel-resource-usage]
+/code/.wt/etx-inbody/build/inbody/rocm_on_v2/megakernel_d0.hip:15181:1: remark:     AGPRs: 0 [-Rpass-analysis=kernel-resource-usage]
+/code/.wt/etx-inbody/build/inbody/rocm_on_v2/megakernel_d0.hip:15181:1: remark:     ScratchSize [bytes/lane]: 0 [-Rpass-analysis=kernel-resource-usage]
+/code/.wt/etx-inbody/build/inbody/rocm_on_v2/megakernel_d0.hip:15181:1: remark:     Dynamic Stack: False [-Rpass-analysis=kernel-resource-usage]
+/code/.wt/etx-inbody/build/inbody/rocm_on_v2/megakernel_d0.hip:15181:1: remark:     Occupancy [waves/SIMD]: 4 [-Rpass-analysis=kernel-resource-usage]
+/code/.wt/etx-inbody/build/inbody/rocm_on_v2/megakernel_d0.hip:15181:1: remark:     SGPRs Spill: 0 [-Rpass-analysis=kernel-resource-usage]
+/code/.wt/etx-inbody/build/inbody/rocm_on_v2/megakernel_d0.hip:15181:1: remark:     VGPRs Spill: 0 [-Rpass-analysis=kernel-resource-usage]
+/code/.wt/etx-inbody/build/inbody/rocm_on_v2/megakernel_d0.hip:15181:1: remark:     LDS Size [bytes/block]: 29704 [-Rpass-analysis=kernel-resource-usage]

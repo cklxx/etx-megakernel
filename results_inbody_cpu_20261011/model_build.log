@@ -1,0 +1,1 @@
+[qwen3-30b-a3b base] rc=0   tasks=59875 events=772 eliminated=[] megakernel_d0 vgpr 123 spill 0 lds 41448; unfused_d0 vgpr 104 spill 0 lds 41416;   

@@ -1,0 +1,17 @@
+CPU BUILD original stage=0
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/Users/ckl/code/.wt/etx-inbody/examples/vllm_llm/bf16_300/inbody_cpu.py", line 102, in <module>
+    if __name__=='__main__': main()
+                             ~~~~^^
+  File "/Users/ckl/code/.wt/etx-inbody/examples/vllm_llm/bf16_300/inbody_cpu.py", line 99, in main
+    a=p.parse_args(); print(json.dumps(check(a.out,a.model_build),indent=2))
+                                       ~~~~~^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/ckl/code/.wt/etx-inbody/examples/vllm_llm/bf16_300/inbody_cpu.py", line 59, in check
+    subprocess.run(list(map(str,cmd)),cwd=ROOT,stdout=f,stderr=subprocess.STDOUT,check=True)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/subprocess.py", line 577, in run
+    raise CalledProcessError(retcode, process.args,
+                             output=stdout, stderr=stderr)
+subprocess.CalledProcessError: Command '['bash', '/Users/ckl/code/.wt/etx-inbody/etx/importer/hip_ir_local.sh', '/Users/ckl/code/.wt/etx-inbody/build/inbody/final_fullmodel/kernel.hip', '/Users/ckl/code/.wt/etx-inbody/build/inbody/final_fullmodel/original.ll', '-I/Users/ckl/code/.wt/etx-inbody/etx/runtime/include', '-I/Users/ckl/code/.wt/etx-inbody/build/inbody/rocm_off', '-I/Users/ckl/code/.wt/etx-inbody', '-Xclang', '-mlink-builtin-bitcode', '-Xclang', '/Users/ckl/code/.wt/etx-inbody/build/inbody/rocm_off/imports.bc', '-DETX_DSL_WSUM', '-DETX_DSL_SCALAR', '-DETX_DSL_GU1', '-DETX_DSL_RBATCH', '-DETX_DSL_NT', '-DETX_DSL_VECNORM', '-DETX_TOPK_KEY32']' returned non-zero exit status 1.
