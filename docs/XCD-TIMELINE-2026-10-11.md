@@ -8,10 +8,12 @@ Paths that start with `results_` are under `~/code/etx/` and are outside git. Pa
 
 ## Summary
 
-1. **Useful fraction: 32.6% [E].** The step moves 6.1904 GB [E] in a device span of 4412.1 us [M]. The denominator is the span times the achievable 4.3 TB/s: `6.1904 / (4412.1e-6 x 4.3e3) = 6.1904 / 18.972 = 0.326`. Against the 5.3 TB/s peak, the fraction is `6.1904 / 23.384 = 26.5% [E]`.
+**Corrections of 2026-10-11, second pass, are in section 8.** They replace the headline metric (item 1) and re-base every per-phase bandwidth share on the phase's own ceiling. The rest of this report is unchanged.
+
+1. **Useful fraction: 32.6% [E].** The step moves 6.1904 GB [E] in a device span of 4412.1 us [M]. The denominator is the span times the achievable 4.3 TB/s: `6.1904 / (4412.1e-6 x 4.3e3) = 6.1904 / 18.972 = 0.326`. Against the 5.3 TB/s peak, the fraction is `6.1904 / 23.384 = 26.5% [E]`. **[Corrected as a headline by section 8.2: this stays as the byte-utility of the span, but the headline is the idle worker time, 1194 us of 8-XCD-equivalent time against a 1138 us gap to 300 tok/s. The per-phase bandwidth shares derived from this denominator are corrected in section 8.1.]**
 2. **Wait taxonomy on the critical path, 4412.1 us:** (a) bytes 1974.0 us, 44.7% [E]. (b) dependency handoff 653.1 us, 14.8% [M]. (c) machinery 1785.1 us, 40.5% [E]: 1551.3 us body residual [E] and 233.8 us arrive and queue fetch [M]. (d) launch 0 us inside the span [M]. Host work outside the span is 0.143 ms [E]. Section 2 has the derivation.
 3. **L2 and Infinity Cache: probably not a material factor [E].** The weights are 23.75 times the 256 MB Infinity Cache. They stream from memory once per step. The KV cache is the only large data set that can stay in a cache from one step to the next. The largest saving from it is about 15 us [E]. The current build has no cache counters. One measurement can close the question: about 20 minutes, `20/60 x 1.99 = $0.66 [E]`. Section 3 has the details.
-4. **Ranked reasons for the remaining 67.4%:** (1) bodies of the latency phases, 1304.4 us, 29.6% [E]. (2) dependency gaps, 886.9 us, 20.1% [M]. (3) streaming phases below full rate, 781.3 us, 17.7% [E].
+4. **Ranked reasons for the remaining 67.4%:** (1) bodies of the latency phases, 1304.4 us, 29.6% [E]. (2) dependency gaps, 886.9 us, 20.1% [M]. (3) streaming phases below full rate, 781.3 us, 17.7% [E]. **[Item (3)'s denominator is corrected in section 8.1: against their own ceilings the streaming phases run at 39.7 to 90.5%, not 37.5 to 90.3%. The 781.3 us time stands; what changes is that it is not unused device bandwidth.]**
 5. **Not determined [U]:** the split of each body into bytes and machinery, the split of each handoff gap into arrive, visibility, poll, touch and acquire, per-phase L2 hit rates on the current build, and any Infinity Cache hit count. Section 5 lists the tool changes that would measure them.
 
 ## 0. Sources and errors in the brief
@@ -160,7 +162,7 @@ The machine view and the path view answer different questions. On the machine, m
 The round-15 finding: 50.87 M requests for 6.08 GB is 119.5 B per request. So the L2 fetches each weight byte once, with no read amplification (`results_2026-10-01/round15/FINDING.md:55-56`). NT saved 0.106 ms on that build (`FINDING.md:72`) and is on by default now (`examples/vllm_llm/build.sh:52-55`). That was an older build in another session, so its counters describe the current build only approximately. The unfused path has a 26.9% L2 hit rate (`docs/BUDGET-2026-10-01.md:229`).
 
 **Upper bounds for the remaining cache levers [E].**
-1. **KV in the Infinity Cache.** The attention bytes at 4.3 TB/s take 24.1 us on the critical path (`account.txt:48`). At the Infinity Cache rate of 11.9 TB/s (`docs/SURVEY-2026-09-29.md:17`) they take `24.1 x 4.3 / 11.9 = 8.7 us`. The largest saving is `24.1 - 8.7 = 15.4 us`, 0.35% of the span. The streaming benchmark shows a smaller effect at 104 MB: 3.43 TB/s cold, 3.66 warm and 3.74 from the Infinity Cache (`results_2026-09-27/vlnext/overlap.log:6`). attn is latency-bound: its phase reaches 7.8% of the bandwidth (`bandwidth.txt:9`).
+1. **KV in the Infinity Cache.** The attention bytes at 4.3 TB/s take 24.1 us on the critical path (`account.txt:48`). At the Infinity Cache rate of 11.9 TB/s (`docs/SURVEY-2026-09-29.md:17`) they take `24.1 x 4.3 / 11.9 = 8.7 us`. The largest saving is `24.1 - 8.7 = 15.4 us`, 0.35% of the span. The streaming benchmark shows a smaller effect at 104 MB: 3.43 TB/s cold, 3.66 warm and 3.74 from the Infinity Cache (`results_2026-09-27/vlnext/overlap.log:6`). attn is latency-bound: its phase reaches 7.8% of the bandwidth (`bandwidth.txt:9`) **[17.1% of its own 3.67-XCD ceiling, section 8.1; the latency-bound conclusion is unchanged]**.
 2. **The latency phases' loads.** Their activation loads are coherent, so they go past the XCD's L2 by design (`etx/codegen/kernel.py:296-299`). Cross-XCD data must take that path, so a higher L2 hit rate cannot shorten these hops. The round trip under load is 0.69 to 0.73 us at every level, L2, MALL or HBM (`docs/MODEL-vllm-kernels.md:321`). Queueing sets it, not the cache level.
 3. **Cacheable weights.** fleet made the router and kv_b weights cacheable on the same GPU. The result was 18% slower, because the working set passed the 4 MB per-XCD L2 cliff (`~/code/fleet-mi300x/docs/STATUS.md:81,233`). fleet's idle-worker prefetch into the Infinity Cache gave no gain (`STATUS.md:72`).
 
@@ -179,7 +181,7 @@ Thresholds, registered before the run:
 
 ## 4. Utilisation and ranked reasons
 
-**The number: 32.6% [E]** of the achievable 4.3 TB/s over the traced device span. Arithmetic: `6.1904 GB / (4412.1 us x 4.3 TB/s) = 0.326`. `etx.tools.timeline` prints the same value (`docs/xcd-timeline-2026-10-11/bandwidth.txt:16`).
+**The number: 32.6% [E]** of the achievable 4.3 TB/s over the traced device span. Arithmetic: `6.1904 GB / (4412.1 us x 4.3 TB/s) = 0.326`. `etx.tools.timeline` prints the same value (`docs/xcd-timeline-2026-10-11/bandwidth.txt:16`). **[Second pass, section 8: this is the byte-utility of the span, not the headline. The headline is the idle worker time of section 8.2, and the per-phase shares below are re-based in section 8.1.]**
 
 Other denominators give these values [E]:
 - the untraced device median of the same build, 4.405 ms: `6.1904 / (4.405 x 4.3) = 32.7%`.
@@ -190,7 +192,7 @@ The remaining 67.4% of the span is 2972.5 us. Three disjoint terms explain it. W
 
 1. **Bodies of the latency phases: 1304.4 us, 29.6% [E].** topk, router, prep, attn, reduce, argmax, in_norm and the prologue have critical bodies of 371.6, 240.6, 184.7, 264.3, 258.4, 9.4, 3.8 and 2.2 us (`latency.txt:3-15`). Together they move 0.13 GB, 2.1% of the bytes (`bandwidth.txt:3-15`). The term is their exposed hops, 396.4 us [E], plus their residual machinery, 908.0 us [E] (`account.txt:42-57`). During these phases the machine draws less than 25% of the bandwidth. The low-bandwidth time by phase is topk 401.5, router 328.0, attn 310.0, reduce 308.5 and prep 225.0 us (`report.txt:1328-1338`). The router's 128 tasks with rows and the 4-, 20- and 4-task attention grids keep 300 workers idle, as section 1 shows.
 2. **Dependency gaps: 886.9 us, 20.1% [M].** The path has 435 handoffs, a mean of `886.9 / 435 = 2.04 us` [E]. The busy-consumer edges after the wide phases cost the most (section 2.2). In 138 edges the consumer's worker was still busy with its previous task. That part alone is 233.8 us [M].
-3. **Streaming phases below full rate: 781.3 us, 17.7% [E].** moe_up, moe_down, qkv, o_proj and lm_head have critical bodies of 835.8, 474.6, 445.2, 277.0 and 157.4 us (`latency.txt:5-14`). Their floors are 561.8, 280.9, 234.1, 187.3 and 144.7 us (`account.txt:42-54`). The phases reach 63.1%, 42.5%, 37.5%, 50.0% and 90.3% of the bandwidth (`bandwidth.txt:4-12`). The excess is 138.0 us of hops before the first weight load and 643.3 us of residual [E]. The residual holds the norm fold, the x staging into LDS, the reductions and the store drains. Per-task start costs matter because each task streams only 0.07 to 0.26 MB [E]: 16.777 MB / 256 for o_proj, 50.332 MB / 192 for moe_up.
+3. **Streaming phases below full rate: 781.3 us, 17.7% [E].** moe_up, moe_down, qkv, o_proj and lm_head have critical bodies of 835.8, 474.6, 445.2, 277.0 and 157.4 us (`latency.txt:5-14`). Their floors are 561.8, 280.9, 234.1, 187.3 and 144.7 us (`account.txt:42-54`). The phases reach 63.1%, 42.5%, 37.5%, 50.0% and 90.3% of the bandwidth (`bandwidth.txt:4-12`) **[of the whole-device 4.3 TB/s; against their own ceilings they reach 65.9%, 47.0%, 39.7%, 52.4% and 90.5%, section 8.1]**. The excess is 138.0 us of hops before the first weight load and 643.3 us of residual [E]. The residual holds the norm fold, the x staging into LDS, the reductions and the store drains. Per-task start costs matter because each task streams only 0.07 to 0.26 MB [E]: 16.777 MB / 256 for o_proj, 50.332 MB / 192 for moe_up.
 
 **Host work** adds 0.143 ms outside the span [E] (section 2.1).
 
@@ -269,3 +271,67 @@ Artefacts in `docs/xcd-timeline-2026-10-11/`:
 | `xcd_step.svg`, `xcd_series_step.json` | the same for the whole step, 5 us bins |
 
 Validation: `.venv/bin/python -m pytest -q tests/test_xcd_account.py tests/test_timeline.py`.
+
+## 8. Corrections of 2026-10-11, second pass
+
+Two choices in this report were wrong. This section corrects both. Nothing above is deleted; the affected lines carry a bracketed pointer here. Both corrections are CPU-only recomputations of the same artefacts; no GPU ran for them.
+
+### 8.1 The denominator: each phase has its own ceiling
+
+The per-phase bandwidth shares above divide each phase's achieved GB/s by the whole device's 4.3 TB/s. No phase runs on all eight XCDs. `latency.txt` already measures the per-phase `XCDs live` column (`docs/xcd-timeline-2026-10-11/latency.txt:5-14`). One XCD's share of the achievable 4.3 TB/s is `4.3 / 8 = 0.5375 TB/s` [E], so a phase's own ceiling is `XCDs live x 0.5375 TB/s`, and its share of that ceiling is the only bandwidth number that means anything for it. A phase on four XCDs could never have reached 4.3 TB/s; comparing it to 4.3 TB/s makes latency-bound phases look like they waste bandwidth they never had.
+
+Corrected table, recomputed from the JSON artefacts at full precision (`latency.json`, `bandwidth.json`; the rounded text columns are `latency.txt:5-15` and `bandwidth.txt:3-15`). "Ceiling" is `XCDs live x 0.5375 TB/s` [E]. "Own share" is `achieved GB/s / ceiling` [E]. The old column, the share of the whole-device 4.3 TB/s, is kept so the size of the correction is visible.
+
+| Phase | XCDs live [M] | Own ceiling TB/s [E] | Achieved GB/s [M] | **Share of own ceiling [E]** | Old: % of 4.3 TB/s [E] |
+|---|---|---|---|---|---|
+| lm_head | 7.98 | 4.288 | 3881.6 | **90.5%** | 90.3% |
+| moe_up | 7.67 | 4.120 | 2713.6 | **65.9%** | 63.1% |
+| o_proj | 7.63 | 4.104 | 2152.0 | **52.4%** | 50.0% |
+| moe_down | 7.23 | 3.884 | 1826.8 | **47.0%** | 42.5% |
+| qkv | 7.57 | 4.067 | 1612.9 | **39.7%** | 37.5% |
+| attn | 3.67 | 1.971 | 337.1 | **17.1%** | 7.8% |
+| argmax | 1.00 | 0.538 | 32.2 | **6.0%** | 0.7% |
+| router | 4.19 | 2.255 | 69.3 | **3.1%** | 1.6% |
+| reduce | 3.52 | 1.894 | 6.4 | **0.3%** | 0.1% |
+| prep | 3.60 | 1.937 | 0.5 | **0.03%** | 0.01% |
+| topk, in_norm, prologue | 7.54, 7.03, 1.00 | 4.053, 3.778, 0.538 | 0.3, 0.9, 0.5 | **0.01%, 0.02%, 0.09%** | 0.01%, 0.02%, 0.01% |
+
+Two properties of this table:
+
+1. The ceiling is still generous to the narrow phases. `XCDs live` counts an XCD as live when one task of the phase runs on it. attn runs 5 tasks per XCD on 4 XCDs and prep and reduce 1 (`account.txt:82-143`, section 1.1), so only a handful of each live XCD's 38 workers issue loads. The own-ceiling shares of the narrow phases are therefore upper bounds; their true ceilings are lower.
+2. Consistency consequence [E]: the 1439.6 us floor of section 2 prices every phase's bytes at 4.3 TB/s. Re-based on the own ceilings, the critical-path byte floor becomes `1551.8 us` [E]: the per-phase floors change from 234.1/24.1/0.6/187.3/5.9/561.8/280.9/144.7 us to 247.6/52.6/1.3/196.2/11.3/586.4/311.1/145.1 us for qkv/attn/reduce/o_proj/router/moe_up/moe_down/lm_head, an increase of 112.2 us. Section 2 is not rewritten; the 1439.6 us value stands as the whole-device pricing, and this note is the per-phase-ceiling pricing. Both are estimates; the split into bytes and machinery stays the weakest number either way.
+
+### 8.2 The headline: idle worker time, not bandwidth
+
+The old headline, "achieved 32.6% of the bandwidth", prices the wrong resource. HBM is idle most of the step: known bytes cover only 32.6% of the span's byte capacity. The workers are not idle. The scarce-looking resource, and the one the 300 tok/s question turns on, is worker time. From the per-XCD `any body` shares (`docs/xcd-timeline-2026-10-11/account.txt:15-22`) [M]:
+
+- XCD 0-3 average busy: `(83.75 + 83.43 + 83.96 + 83.72) / 4 = 83.72%` [E].
+- XCD 4-7 average busy: `(62.13 + 62.31 + 62.09 + 62.11) / 4 = 62.16%` [E].
+- Device busy: `(4 x 83.715 + 4 x 62.16) / 8 = 72.94%`; idle `27.06%` of the span [E].
+- In 8-XCD-equivalent time: `0.2706 x 4412.1 = 1194 us` [E] per step.
+
+Side by side with the gap to the target:
+
+| Quantity | Value | Basis |
+|---|---|---|
+| Idle worker time per step | **1194 us** [E] of 8-XCD-equivalent time | traced build, device span 4412.1 us, `account.txt:15-22` |
+| Gap to 300 tok/s | **1138 us** [E] | anchor wall 4.471 ms vs 3.333333 ms (`docs/PLAN-300TOKS-2026-10-11.md:15`) |
+| Same idle share on the anchor's device median | 1174 us [E] | `0.2706 x 4340`; the anchor was never traced, so this transfers the share, it does not measure it |
+| Gap after the measured KEY32 cut | 846.7 us [E] | `4.180 - 3.3333` (`docs/KEY32-MEASURED-2026-10-11.md:66-67`) |
+
+Basis caveat: the 1194 us is measured on the traced build's device span; the 1138 us gap is on the anchor build's wall time. The rules forbid comparing absolute milliseconds across sessions and these are different builds, so the side-by-side is indicative, not a same-build identity. It is the right comparison of kind: both numbers are per step, and the traced build's device span differs from the anchor's by 1.7%.
+
+One precision about what "idle" means here. `any body` marks an XCD busy when at least one of its 38 workers is in a task body. At worker granularity the busy share is lower: bodies cover 40.03% of worker-time (bytes 27.57% + machinery 12.46%, `account.txt:8-9`), and 53.00% of worker-time is dependency wait (`account.txt:6-7`). A worker in a dependency wait has already taken its next task and still occupies its CU; the 27.06% counts XCDs with no body at all, where all 38 workers are waiting or done. Both numbers matter below: the first says how much work could in principle be re-issued, the second says how much of the machine has nothing issued at all.
+
+### 8.3 What changes and what does not
+
+The device has approximately as much idle XCD time, 1194 us [E], as the whole remaining gap to 300 tok/s, 1138 us [E] (and more than the 846.7 us post-KEY32 gap). So the question "can this reach 300 tok/s" is not "is there more bandwidth" — HBM already stands idle for 67.4% of the span — but "is there independent work to put in the idle time". The experiment design for that question is `docs/XCD-PREFETCH-2026-10-11.md`.
+
+Rows of this report whose conclusion changes:
+
+1. **Summary item 1 and section 4's headline.** "32.6% of the bandwidth" stops being the headline. It remains as the byte-utility of the span. The headline is the 1194 us idle worker time against the 1138 us gap.
+2. **Summary item 4, rank 3, and section 4 item 3: "streaming phases below full rate".** The 781.3 us excess stands as a time, but "below full rate" was judged against a ceiling no phase can use. Against their own ceilings the streaming phases run at 39.7 to 90.5%. The excess is machinery and hops sitting on top of the byte time, not device bandwidth left on the table; recovering it is a body-cost problem, not a bandwidth problem.
+3. **Section 3 item 1's attn number.** attn reaches 17.1% of its own ceiling, not 7.8% of the device's. The conclusion (latency-bound, the cache lever is worth at most 15.4 us) is unchanged.
+4. **The floor readings.** The 1439.6 us floor and the "67.4% is not byte time" figure price bytes at the whole-device rate; the per-phase-ceiling pricing is 1551.8 us [E] (section 8.1). Any plan that adds the old floor to per-phase ceilings double-counts the difference.
+
+Rows that do not change: the whole timeline of section 1 [M]; the wait taxonomy of section 2, which is built from measured times, not from the bandwidth denominator; the dependency edge table; the L2/MALL account of section 3 apart from the one annotated number; the tooling gap of section 5; and sections 6 and 7. In particular the 886.9 us of dependency gaps and the 1304.4 us of latency-phase bodies, the two largest ranked terms, are untouched by both corrections.
