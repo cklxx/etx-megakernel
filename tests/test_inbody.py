@@ -148,6 +148,17 @@ def test_original_argument_mutation_rejected(tmp_path):
     with pytest.raises(ValueError,match='argument block changed'): launch.validate_pack(p,ref,args,0,0,0,0)
 
 
+def test_standalone_topk_fold_alias_ignores_logits_but_topk_recompute_is_rejected(tmp_path):
+    p,args,ref=portable_pack(tmp_path)
+    b=bytearray(args.read_bytes()); struct.pack_into('<Q',b,112,0x1234)
+    args.write_bytes(b); p['arguments_sha256']=pack.sha(args)
+    # The production _fold MoE exports use the SAME bodies at mode zero.
+    assert launch.validate_pack(p,ref,args,0,0,0,0)==b
+    struct.pack_into('<i',b,104,2)
+    args.write_bytes(b); p['arguments_sha256']=pack.sha(args)
+    with pytest.raises(ValueError,match='unfolded'): launch.validate_pack(p,ref,args,0,0,0,0)
+
+
 def test_snapshot_finalizer_requires_completed_check(tmp_path):
     f=tmp_path/'failed.log'; f.write_text('CHECK FAILED: 1 launch(es) differ')
     with pytest.raises(ValueError,match='completed'): pack.finalize(tmp_path,'host','plan',f)

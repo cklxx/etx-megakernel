@@ -40,12 +40,12 @@ def instrument(source):
     insert('  int sym = -1;',
            '  if (threadIdx.x == 0 && p.inbody_poll) p.inbody_poll[tid] = 0;', before=True)
     insert('  etx_call_body(sym, &ctx);   // phase 2: the only call site of each body',
-           '  uint64_t ib_return = p.inbody_wave ? etx_inbody_tick() : 0;')
-    insert('  if (tr && threadIdx.x == 0) { tr[2] = (uint64_t)ETX_TIMER(); tr[3] = worker; }',
            '  if (p.inbody_wave && (threadIdx.x % ETX_WAVE_SIZE) == 0) {\n'
            '    size_t iw = ((size_t)tid * (ETX_THREADS / ETX_WAVE_SIZE) + threadIdx.x / ETX_WAVE_SIZE) * 2;\n'
-           '    p.inbody_wave[iw] = ib_return; p.inbody_wave[iw + 1] = ib_drained;\n  }')
+           '    p.inbody_wave[iw] = etx_inbody_tick();\n  }')
     # No barrier added; the per-wave stamp brackets the RETAINED release.
     insert('  ETX_RELEASE_DOMAIN();   // every wave drains its own stores before the barrier: thread 0\'s release only covers wave 0',
-           '  uint64_t ib_drained = p.inbody_wave ? etx_inbody_tick() : 0;')
+           '  if (p.inbody_wave && (threadIdx.x % ETX_WAVE_SIZE) == 0) {\n'
+           '    size_t iw = ((size_t)tid * (ETX_THREADS / ETX_WAVE_SIZE) + threadIdx.x / ETX_WAVE_SIZE) * 2;\n'
+           '    p.inbody_wave[iw + 1] = etx_inbody_tick();\n  }')
     return prefix + source + suffix

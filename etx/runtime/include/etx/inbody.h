@@ -1,4 +1,7 @@
 #pragma once
+#ifdef ETX_NO_ALLWAVE_DRAIN
+#error "inbody diagnostics require the original all-wave drain"
+#endif
 static __device__ __forceinline__ uint64_t etx_inbody_tick() {
   uint64_t t;
   asm volatile("s_memrealtime %0" : "=s"(t) :: "memory");

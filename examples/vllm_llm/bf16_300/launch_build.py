@@ -20,6 +20,8 @@ from etx.ops import gemv
 
 
 def prepare(out, pair, task, wave, row, local=False):
+    if gemv.DSL_NB != 1 or gemv.DSL_EXT or gemv.ARG_BYTES != 160:
+        raise ValueError('probe build requires original bf16 batch-one 160-byte DSL layout')
     if pair not in PAIRS or task < 0 or not 0 <= wave < 16 or not 0 <= row < 64:
         raise ValueError('invalid probe selector')
     out = Path(out).resolve()
@@ -55,7 +57,7 @@ def prepare(out, pair, task, wave, row, local=False):
     files = ['original.hip','candidate.hip','original.ll','candidate.ll','original.s','candidate.s']
     if not local: files += ['original.hsaco','candidate.hsaco','launcher']
     identity = dict(version=1,pair=pair,sampling=dict(task=task,wave=wave,row=row),
-        capture_math='bf16_unfolded_batch1',resources=reports,commands=commands,
+        capture_math='bf16_batch1_moe_mode0',resources=reports,commands=commands,
         compiler=subprocess.check_output([llvm/'clang++','--version'],text=True),
         hashes={name:sha(out/name) for name in files}, host_source_sha256=sha(host),
         runnable=not local,gpu_checks='NOT_RUN',timing_eligible=False,

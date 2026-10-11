@@ -575,7 +575,7 @@ int main(int argc, char** argv) {
         Bf16Capture capture;
         if (const char* base = getenv("ETX_BF16_CAPTURE_DIR")) {
           if (x.req == 0 && x.layer == atoi(getenv("ETX_BF16_CAPTURE_LAYER") ? getenv("ETX_BF16_CAPTURE_LAYER") : "0")
-              && (x.exp == "dsl_moe_up" || x.exp == "dsl_moe_down")) {
+              && (x.exp == "dsl_moe_up" || x.exp == "dsl_moe_down" || x.exp == "dsl_moe_up_fold" || x.exp == "dsl_moe_down_fold")) {
             const int selected = atoi(getenv("ETX_BF16_CAPTURE_TASK") ? getenv("ETX_BF16_CAPTURE_TASK") : "0");
             const int per = x.tasks / x.rep, replica = selected / per;
             if (per <= 0 || selected < 0 || selected >= x.tasks || replica >= x.rep) die("capture task out of range");

@@ -25,7 +25,7 @@ def validate_pack(pack, reference, arguments, layer, task, wave, row):
     if sha(reference) != pack['reference']['sha256'] or Path(reference).stat().st_size != pack['reference']['bytes']:
         raise ValueError('independent original reference changed')
     block = Path(arguments).read_bytes()
-    if any(struct.unpack_from('<Q', block, i)[0] for i in POINTERS[5:]):
+    if any(struct.unpack_from('<Q', block, i)[0] for i in POINTERS[5:-1]):
         raise ValueError('folded/optional pointers unsupported')
     if struct.unpack_from('<i', block, 104)[0] or struct.unpack_from('<i', block, 120)[0] != 1:
         raise ValueError('only unfolded batch-one MoE supported')
@@ -74,7 +74,7 @@ def run(a):
     for name in ('original.hsaco', 'candidate.hsaco', 'launcher'):
         if sha(a.build/name) != identity['hashes'][name]:
             raise ValueError('probe/launcher identity changed')
-    if identity['capture_math'] != 'bf16_unfolded_batch1':
+    if identity['capture_math'] != 'bf16_batch1_moe_mode0':
         raise ValueError('unsupported math identity')
     remaining=end-time.monotonic()
     if remaining<=0: raise TimeoutError('NOT-COMPLETE input validation deadline')
@@ -117,6 +117,7 @@ def run(a):
         original_reference=pack['reference'], checks=dict(output_byte_equal=True, imports='see original capture check log',
         full_model_tokens='NOT_RUN_BY_SPARSE_LAUNCHER'), pairs=timings,
         body_perturbation_us=statistics.median(t['body_perturbation_us'] for t in timings),
+        selected_grid_us=statistics.median(t['candidate_us' if a.selector=='candidate' else 'original_us'] for t in timings),
         perturbation_basis='whole standalone constituent grid device span, not per-task body or full-model wall',
         exclusive_removable_us=None, timing_eligible=False)
     Path(str(prefix)+'.json').write_text(json.dumps(result, indent=2)+'\n')

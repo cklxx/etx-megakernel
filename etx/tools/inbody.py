@@ -60,6 +60,7 @@ def analyze(plan, raw, byte_rules=None, hop_us=None, bandwidth=4.3):
     tasks = []
     scale = raw['tick_ns'] / 1000
     nb = tl.bytes_spec(byte_rules)
+    known_bytes = [re.compile(p) for p in (byte_rules or {})]
     for i, (d, r) in enumerate(zip(plan['descs'], raw['legacy'])):
         taken, body, done, worker = r
         if not 0 < taken <= body <= done:
@@ -99,7 +100,8 @@ def analyze(plan, raw, byte_rules=None, hop_us=None, bandwidth=4.3):
                     barrier_tail_us=(done-drain)*scale,
                     last_return_waves=[w for w, (a, b) in enumerate(waves) if a == compute],
                     last_drain_waves=[w for w, (a, b) in enumerate(waves) if b == drain],
-                    bytes=nb(name), body_us=(done-body)*scale)
+                    bytes=nb(name) if any(p.search(name) for p in known_bytes) else None,
+                    body_us=(done-body)*scale)
         tasks.append(task)
     trace = tl.build_trace(plan, legacy, tick_ns=raw['tick_ns'])
     path = tl.critical_path(trace)
@@ -111,18 +113,18 @@ def analyze(plan, raw, byte_rules=None, hop_us=None, bandwidth=4.3):
         t['critical'] = True
         t['gap_us'] = step['gap']
         body = t['body_us']
-        floor = t['bytes'] / (bandwidth*1e6)
+        floor = t['bytes'] / (bandwidth*1e6) if t['bytes'] is not None else None
         hop = (hop_us or {}).get(t['type'])
         # Logical-byte floors are estimates; if they exceed measured body,
         # retain the discrepancy rather than silently clamp it to a proof.
-        valid = hop is not None and 0 <= floor + hop <= body
+        valid = floor is not None and hop is not None and 0 <= floor + hop <= body
         t['classes_us'] = dict(bytes_estimate=floor, gap=step['gap'],
             hop_estimate=hop if valid else None,
             machinery_residual_estimate=body-floor-hop if valid else None)
         t['exclusive_removable_us'] = None
         group = phases[(t['layer'], t['phase'])]
         group['tasks'] += 1
-        for key, val in [('body_us', body), ('gap_us', step['gap']), ('byte_floor_estimate_us', floor),
+        for key, val in [('body_us', body), ('gap_us', step['gap']), ('byte_floor_estimate_us', floor or 0.),
                          ('hop_estimate_us', hop if valid else 0.),
                          ('machinery_residual_estimate_us', body-floor-hop if valid else 0.),
                          ('unpriced_body_us', 0. if valid else body),
@@ -130,8 +132,14 @@ def analyze(plan, raw, byte_rules=None, hop_us=None, bandwidth=4.3):
                          ('barrier_tail_us', t['barrier_tail_us'])]:
             group[key] += val
         group['wait_bounds_us'] = [a+b for a, b in zip(group['wait_bounds_us'], t['poll_minus_arrive_bounds_us'])]
+    all_bytes=defaultdict(float)
+    for t in tasks:
+        if t['bytes'] is not None: all_bytes[(t['layer'],t['phase'])]+=t['bytes']
     return dict(raw=raw, tasks=tasks, critical_task_ids=[s['task'].id for s in path],
-                phases=[dict(layer=l, phase=p, **v) for (l, p), v in phases.items()],
+                phases=[dict(layer=l, phase=p, all_grid_byte_floor_estimate_us=all_bytes[(l,p)]/(bandwidth*1e6), **v)
+                        for (l, p), v in phases.items()],
+                global_known_byte_floor_estimate_us=sum(all_bytes.values())/(bandwidth*1e6),
+                byte_floor_limit='sum of per-critical-task full-bandwidth floors is NOT the full-grid/global byte floor',
                 span_us=trace.span, critical_us=sum(s['body']+s['gap'] for s in path),
                 acceptance=dict(verdict='NOT-ESTABLISHED', exclusive_attributed_fraction=0.,
                     largest_removable_item=None,
@@ -145,11 +153,17 @@ def main():
     p.add_argument('--bytes', type=Path)
     p.add_argument('--hops', type=Path, help='independent per-type estimates, never exclusive credit')
     p.add_argument('--output', type=Path, required=True)
+    p.add_argument('--legacy-output', type=Path, help='export unchanged nine-i64 rows for existing analyses')
     a = p.parse_args()
     result = analyze(json.loads(a.plan.read_text()), read_raw(a.raw),
         json.loads(a.bytes.read_text()) if a.bytes else None,
         json.loads(a.hops.read_text()) if a.hops else None)
     a.output.write_text(json.dumps(result, indent=2)+'\n')
+    if a.legacy_output:
+        rows=[]
+        for d,r in zip(json.loads(a.plan.read_text())['descs'],result['raw']['legacy']):
+            rows.append(struct.pack('<9q',d['type'],*(d['coord']+[0]*4)[:4],*r))
+        a.legacy_output.write_bytes(b''.join(rows))
     print(json.dumps(result['acceptance']))
 
 

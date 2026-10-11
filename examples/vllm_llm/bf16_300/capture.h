@@ -24,7 +24,9 @@ struct Bf16Capture {
     const int M = field<int>(a,48), K = field<int>(a,52), tpe = field<int>(a,60);
     if (field<int>(a,104) != 0 || field<int>(a,120) != 1 || first/tpe != (first+count-1)/tpe)
       die("capture supports one expert, unfolded batch-one DSL MoE only");
-    for (int off : {64,72,80,88,112}) if (field<void*>(a,off)) die("capture folded pointer");
+    for (int off : {64,72,80,88}) if (field<void*>(a,off)) die("capture norm-fold pointer");
+    // _fold MoE with standalone top-k has exactly the plain silu_mul/scale
+    // body (mode==0). Its logits pointer is present but never dereferenced.
     output = field<void*>(a,16);
     output_offset = (size_t)(first/tpe) * M * 2;
     output_bytes = (size_t)M * 2;

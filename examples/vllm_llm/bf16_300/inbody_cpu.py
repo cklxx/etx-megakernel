@@ -29,8 +29,13 @@ def check(out, model_build=None):
     if model_build:
         b=Path(model_build).resolve()
         source=(b/'megakernel_d0.hip').read_text()
+        # rocm_build_check emits container-mount paths. Map only that mount
+        # spelling to the identical local files; no source/body is rewritten.
+        source=source.replace('/code/',str(Path.home()/'code')+'/')
         common=['-I'+str(ROOT/'etx/runtime/include'),'-I'+str(b),'-I'+str(ROOT),
-                '-Xclang','-mlink-builtin-bitcode','-Xclang',str(b/'imports.bc')]
+                '-Xclang','-mlink-builtin-bitcode','-Xclang',str(b/'imports.bc'),
+                '-DETX_DSL_WSUM','-DETX_DSL_SCALAR','-DETX_DSL_GU1','-DETX_DSL_RBATCH',
+                '-DETX_DSL_NT','-DETX_DSL_VECNORM','-DETX_TOPK_KEY32']
         emitter_match=None # checked independently on the two-task fixture
     else:
         (out/'etx_lowering.h').write_text(emit_lowering_header(load_machine('gfx942')))
