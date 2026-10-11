@@ -4,7 +4,9 @@
 #endif
 static __device__ __forceinline__ uint64_t etx_inbody_tick() {
   uint64_t t;
-  asm volatile("s_memrealtime %0" : "=s"(t) :: "memory");
+  // Inline asm hides the asynchronous SMEM result from LLVM's wait insertion.
+  // Wait inside the asm before C++ can read or reuse either destination SGPR.
+  asm volatile("s_memrealtime %0\n\ts_waitcnt lgkmcnt(0)" : "=s"(t) :: "memory");
   return t;
 }
 
