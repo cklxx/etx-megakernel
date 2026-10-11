@@ -128,7 +128,58 @@ the floor; the 2.84 ms is a different quantity.
 
 ## 3. Mechanisms without a counterpart in the repository
 
+Three taxonomy entries have no implementation: 3.3 ordering (ceiling 0 on this schedule), 4.1 epoch (≤ 0.049 ms,
+inside the host row) and L3 resident loop (≤ 0.135 ms). The rows in §1 give their evidence. This section asks the
+question for 3.2: does any edge on the kept path have a recompute counterpart beyond the folds and Pass 3?
+
+Recompute replaces a wait with a second copy of the producer's work. It can pay only where the producer's input is
+small and every consumer can repeat it. On the nine per-layer edges (MT:5-17 for bytes; ACC:80 for edges):
+
+| Edge (consumer ← producer) | Producer MB/step | Why recompute fails here | Basis |
+|---|---:|---|---|
+| prep ← qkv, router ← o_proj, moe_down ← moe_up, next qkv ← moe_down | 805-2416 | each consumer would re-stream the producer's weights, which are the bandwidth floor | MT:7,11,14-15 [M] |
+| reduce ← attn | 104 | a merge of 20 partitions: one copy per consumer is the whole attention | MT:9 |
+| topk ← router | 25.4 | 8 top-k tasks/layer would each stream the router's 0.53 MB alone [E] | MT:12-13 |
+| o_proj ← reduce | 2.4 | each of 256 o_proj tasks would add the 5.3 us merge (MT:45) to save a 2.0 us/layer gap (96.7/48, MT:29) [E] | MT:10 |
+| attn ← prep | 0.12 | prep rewrites qkv in place, so it cannot run twice; idempotent prep costs 5 × 6.06 = 30 us/layer to delete a ~1.2 us edge | model.py:316-327 |
+| moe_up ← topk | 0.14 | **measured**: 448 expert tasks each recomputing top-k lost **0.231 ms** device | R1:71,82 [M] |
+
+**Result:** no 3.2 counterpart clears the 0.625 us/layer bar (MTD:369-370). The two small-input edges were tried
+or blocked, and the rest would re-stream weights. Pass 3 needs `grid.pure` (`etx/passes/p3_event_elim.py:51`), which
+`examples/vllm_llm/` sets nowhere, so P3 never fires on this model (model.py:320-322; the kept build's
+`decisions.log` has no P3 entry).
+
 ## 4. What the critical path spends that the taxonomy omits
+
+The taxonomy prices only the 875.5 us of gaps (21.5% of the 4067.3 us span). The path spends the other 78.5% in
+task bodies (MT:18). Split as in MT, with the source rows:
+
+| Item | us on the path | Basis | Source | Taxonomy layer that covers it |
+|---|---:|---|---|---|
+| Weight and activation bytes at 4.3 TB/s | 1439.6 | [E] | MT:18 | none (the floor) |
+| Exposed load round trips (hop model, 0.50 us each) | 534.4 | [E] | MT:18; `xcd_account.py:36-56` | none |
+| Body machinery: instructions, barriers, reductions, spills, everything not bytes or hops | 1217.8 | [R] | MT:18 | none |
+| … of which the five small roles prep, attn, reduce, router, topk | 697.9 | [R] | MT:8-10,12-13 | none |
+| Critical body above the round-11 floor, 48 layers (B) | 782.9 | [E] | MT:51 | none |
+| … of which the five small roles | 647.0 | [E] | MT:43-45,47-48 | none |
+| Before-taken: consumer's worker still on its previous task (arrive, queue fetch) | 231.3 | [M] | MT:36 | none (scheduling, not data) |
+| Late after-take and free gaps into touch grids (qkv 102.0 + router 38.7 + free 144.7) | 285.4 | [R] | MT:25,30,37 | 3.4 (TOUCH) |
+| Tails: prologue, in_norm, lm_head, argmax bodies | 169.1 | [M] | MT:52 | none |
+| Host excess of the fused arm (wall − device) | 135 | [M] | J:144-145 | L3 in part; event reset 49.466 [M, older build] (`hostprof.log:2120`) |
+| Register spills of `etx_megakernel_d0`: 11 VGPR, 265 SGPR | [U] | [M] count, location unknown | `results_qwen300_2026-10-11/on_hipcc.log:1,10-11` | none |
+
+**The largest omission is latency inside the small roles.** The path bodies of prep, attn, reduce, router and topk
+sum to **1120.5 us** [M], of which bytes at 4.3 TB/s are **30.6 us** [E] (MT:8-10,12-13). They are chains of
+dependent loads, block reductions and barriers in single tasks, not data movement and not synchronisation between
+tasks. The before-taken 231.3 us is also not a data dependency: the consumer's worker was busy with its own previous
+task (MT:21-38), which the taxonomy's L1 would book as a dependency wait.
+
+**Coherence on the critical path is mostly paid already.** COH removed the L2 write-back on coherent producers
+(K:109, −0.317 ms, R1:70). The residual coherence cost is the acquire on the imported grids, 44-181 ns × 3 roles
+[E] (MTD:399), and the per-domain last-arriver flush, whose duration is unstamped [U] (MTD:402). On free edges
+(no late consumer), the same event's same-XCD and cross-XCD medians differ by at most 0.04 us: qkv → prep 1.72 vs
+1.68, reduce → o_proj 1.96 vs 1.97, router → topk 1.60 vs 1.56 us (ACC:65-67,73-75). Crossing an XCD is not
+a large term on this path [E].
 
 ## 5. The single most valuable item
 
