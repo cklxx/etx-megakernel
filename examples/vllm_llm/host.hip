@@ -50,6 +50,9 @@ static bool wait_stream(hipStream_t s, double seconds) {
 }
 
 static void die(const std::string& m) { fprintf(stderr, "error: %s\n", m.c_str()); exit(1); }
+#ifdef ETX_BF16_CAPTURE
+#include "examples/vllm_llm/bf16_300/capture.h"
+#endif
 // ETX_VL_UC builds: the tensors that cross XCDs inside a step live in uncached memory (MTYPE UC), which is what
 // lets the build use ETX_COHERENT_DEVICE_DATA (DOMAIN fences for DEVICE events). The KV cache stays cached: its
 // writer and its readers are pinned to one XCD (the build sets ETX_VL_PIN).
@@ -568,8 +571,25 @@ int main(int argc, char** argv) {
       // Same DSL namespace as model.py:src_of and plan_imports.py:planned_imports.
       // Execute to preserve downstream inputs, but CHECK-DSL owns correctness.
       if (x.exp.rfind("dsl_", 0) == 0) {
+#ifdef ETX_BF16_CAPTURE
+        Bf16Capture capture;
+        if (const char* base = getenv("ETX_BF16_CAPTURE_DIR")) {
+          if (x.req == 0 && x.layer == atoi(getenv("ETX_BF16_CAPTURE_LAYER") ? getenv("ETX_BF16_CAPTURE_LAYER") : "0")
+              && (x.exp == "dsl_moe_up" || x.exp == "dsl_moe_down")) {
+            const int selected = atoi(getenv("ETX_BF16_CAPTURE_TASK") ? getenv("ETX_BF16_CAPTURE_TASK") : "0");
+            const int per = x.tasks / x.rep, replica = selected / per;
+            if (per <= 0 || selected < 0 || selected >= x.tasks || replica >= x.rep) die("capture task out of range");
+            const auto weight = m.t.at("L" + std::to_string(x.layer) + (x.role == "moe_up" ? ".w13" : ".w2"));
+            capture.before(base, x.role, x.layer, check_pos, ab.data()+x.off+replica*x.stride,
+                dir+"/vl.bin", weight.first, weight.second*2, replica*per, per, x.tasks, TOPK);
+          }
+        }
+#endif
         launch_imported(x.n + 1);
         if (!wait_stream(hst.stream, 5.0)) die("DSL tile hung: " + x.exp);
+#ifdef ETX_BF16_CAPTURE
+        capture.after();
+#endif
         // CPU-prepared KEY32 session: preserve each layer's actual routing
         // output during the existing sequential import check. This is a host
         // copy only, absent from the timed path and the device kernel.
