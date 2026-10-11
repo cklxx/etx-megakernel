@@ -178,10 +178,10 @@ def test_prewarm_reads_staged_weights_before_any_session_clock(tmp_path, monkeyp
         assert 'CPU-PREWARM complete' in out
 
 
-def test_disabled_c_lends_exactly_twenty_seven_minutes(tmp_path):
+def test_ineligible_c_lends_exactly_sixty_seven_minutes(tmp_path):
     s = session(tmp_path)
-    s.m['C'] = [a for a in s.m['C'] if not a['enabled']]
-    assert h.tranche_c(s) == ([], 1620)
+    s.m['C'] = []
+    assert h.tranche_c(s) == ([], 4020)
     assert s.rows['C.fusion']['status'] == 'SKIP'
 
 
@@ -205,7 +205,7 @@ def test_attempt_catches_certificate_refusal_and_keeps_working(tmp_path):
 
 
 @pytest.mark.parametrize('partial', [False, True])
-@pytest.mark.parametrize('extra', [0, 1620])
+@pytest.mark.parametrize('extra', [0, 4020])
 def test_d_runs_five_adjacent_pinned_pairs_per_baseline(tmp_path, monkeypatch, partial, extra):
     s = session(tmp_path); s.certified.add('kept'); calls = []
     monkeypatch.setattr(h, 'certify', lambda *args: None)
@@ -424,7 +424,7 @@ def test_execute_obeys_both_stops_with_time_remaining(tmp_path, monkeypatch, g, 
     def b(s):
         assert s.rows['B.stop']['status'] == 'PASS'
         calls.append('B'); return ['body-keep']
-    def c(s): calls.append('C'); return [], 1620
+    def c(s): calls.append('C'); return [], 4020
     def d(s, survivors, extra):
         assert survivors == ['body-keep']
         calls.append('D')
@@ -474,24 +474,24 @@ def test_s1_stops_at_protocol_floor_and_counts_only_excess(tmp_path, excess_tick
     assert s.rows['A.stop']['status'] == ('PASS' if passes else 'STOP')
 
 
-def test_74_minute_cap_and_22_minute_b_deadline(tmp_path, monkeypatch):
+def test_140_minute_cap_and_22_minute_b_deadline(tmp_path, monkeypatch):
     monkeypatch.setattr(h.time, 'monotonic', lambda: 100.)
     s = session(tmp_path); s.certified.add('kept'); s.m['B'] = []
-    assert h.MAX_SESSION_SECONDS == h.JOBS[0]['timeout'] == 4440
-    assert s.end-s.start == 4430  # existing ten-second reporting margin
+    assert h.MAX_SESSION_SECONDS == h.JOBS[0]['timeout'] == 8400
+    assert s.end-s.start == 8390  # existing ten-second reporting margin
     assert h.tranche_b(s) == []
     assert s.deadline == 1420
     limited = h.Session({}, tmp_path/'limited', seconds=1000)
     assert limited.end-limited.start == 990
 
 
-@pytest.mark.parametrize('seconds,accepted', [('4440', True), ('3600', True), ('4441', False), ('0', False), ('nan', False)])
+@pytest.mark.parametrize('seconds,accepted', [('8400', True), ('3600', True), ('8401', False), ('0', False), ('nan', False)])
 def test_cap_environment_validation(seconds, accepted):
     env = dict(os.environ, ETX_SESS_MAX_SECONDS=seconds)
     result = subprocess.run([sys.executable, '-c', 'from examples.sessions import qwen300_hour'],
                             env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     assert (result.returncode == 0) is accepted
-    if not accepted: assert 'cap must be positive and <=4440 seconds' in result.stdout
+    if not accepted: assert 'cap must be positive and <=8400 seconds' in result.stdout
 
 
 def test_s2_does_not_attribute_pending_reset_device_work_to_host(tmp_path):
@@ -514,10 +514,9 @@ def test_wait_arms_are_registered_staged_and_budgeted():
     assert all(x['build'] in h.template()['builds'] for x in (a, b))
     assert a['enabled'] is True and a['budget_s'] == 1620
     assert a['estimated_required_s'] == 1575 < a['budget_s']
-    assert b['enabled'] is False and b['estimated_required_s'] == 1140
-    assert '19-minute' in b['reason'] and '27 minutes' in b['reason']
-    assert 'later session' in b['reason']
-    assert sum(x['estimated_required_s'] for x in (a, b)) > 1620
+    assert b['enabled'] is True and b['estimated_required_s'] == 1140
+    assert b['budget_s'] == 1200
+    assert sum(x['estimated_required_s'] for x in (a, b)) < h.TRANCHE_SECONDS['C']
     for x in (a, b):
         assert x['keep_threshold']['complete_adjacent_pinned_pairs'] == 3
         assert x['keep_threshold']['median_wall_gain_ms_ge'] == .030
@@ -534,9 +533,8 @@ def test_c_wait_pairs_are_adjacent_and_partial_never_has_aggregate(tmp_path, mon
         return a
     monkeypatch.setattr(h, 'c_eligibility', eligible)
     s.qualified_c = h.qualify_c(s)
-    assert checked == ['NO_TOUCH']
-    assert s.arms['C.eligibility.ISOLATE_POLLER']['status'] == 'SKIP'
-    assert s.arms['C.eligibility.ISOLATE_POLLER']['reason'] == wait_arms()[1]['reason']
+    assert checked == ['NO_TOUCH', 'ISOLATE_POLLER', 'C6']
+    assert all(s.arms['C.eligibility.'+a]['status'] == 'QUALIFIED' for a in checked)
     calls = []; diagnostics = []
     monkeypatch.setattr(h, 'certify', lambda s, arm: s.certified.add(arm))
     monkeypatch.setattr(h, 'no_touch_diagnostic', lambda s, a: diagnostics.append(a['id']))
@@ -544,17 +542,17 @@ def test_c_wait_pairs_are_adjacent_and_partial_never_has_aggregate(tmp_path, mon
     def fake_host(s, arm, name, args):
         calls.append((arm, s.deadline))
         if partial and name == 'C_NO_TOUCH_r2_NO_TOUCH': raise TimeoutError('missing final sample')
-        return host_text(cost=4.18 if arm == 'kept' else 4.14)
+        return host_text(cost=4.18 if arm == 'kept' else 4.12 if arm == 'C6' else 4.14)
     monkeypatch.setattr(h, 'host', fake_host)
     survivors, extra = h.tranche_c(s)
     assert extra == 0
     assert diagnostics == ['NO_TOUCH']
-    assert [arm for arm, _ in calls] == ['kept', 'NO_TOUCH', 'NO_TOUCH', 'kept', 'kept', 'NO_TOUCH']
-    assert all(t == s.start+1620 for _, t in calls)
+    assert [arm for arm, _ in calls] == [who for arm in checked for who in ('kept', arm, arm, 'kept', 'kept', arm)]
+    assert [t-s.start for _, t in calls] == [1620]*6+[1200]*12
     assert s.rows['C.budget']['status'] == 'ESTIMATE'
-    assert s.rows['C.budget']['value']['available_s'] == 1620
+    assert s.rows['C.budget']['value']['available_s'] == 4020
     assert s.rows['C.budget']['value']['fits_estimate'] is True
-    assert [x['id'] for x in survivors] == ([] if partial else ['NO_TOUCH'])
+    assert [x['id'] for x in survivors] == (['ISOLATE_POLLER', 'C6'] if partial else checked)
     if partial:
         assert s.rows['C.NO_TOUCH']['status'] == 'NOT-COMPLETE'
         assert s.rows['C.NO_TOUCH']['value'] is None
@@ -621,3 +619,50 @@ def test_wait_variant_rejects_changed_plan_math_or_flags(tmp_path, monkeypatch, 
     if mutation == 'none': assert h.verify_wait_variant(s, a) == actual
     else:
         with pytest.raises(ValueError): h.verify_wait_variant(s, a)
+
+
+def test_all_c_arms_fit_full_checks_and_pairs_before_reserved_d(tmp_path, monkeypatch):
+    clock = [100.]
+    monkeypatch.setattr(h.time, 'monotonic', lambda: clock[0])
+    s = session(tmp_path)
+    s.certified.add('kept')
+    s.qualified_c = s.m['C']
+    clock[0] += h.TRANCHE_SECONDS['A'] + h.TRANCHE_SECONDS['B']
+    calls = []
+    def spend(seconds):
+        clock[0] += seconds
+        assert clock[0] <= s.deadline <= s.end
+    def certify(s, arm):
+        if arm not in s.certified:
+            for gate in ('p0', 'p1040', 'dsl_tokens'):
+                calls.append((arm, gate)); spend(120)
+            s.certified.add(arm)
+    monkeypatch.setattr(h, 'certify', certify)
+    def diagnostic(s, a):
+        certify(s, a['diagnostic_build'])
+        spend(120); spend(45)
+    monkeypatch.setattr(h, 'no_touch_diagnostic', diagnostic)
+    def host(s, arm, name, args):
+        calls.append((arm, name)); spend(120)
+        return host_text(cost=4.18 if arm == 'kept' else 4.12)
+    monkeypatch.setattr(h, 'host', host)
+    def round_trip(s, a):
+        spend(60)
+        return dict(median_us=1.9, pass_lt_2us=True)
+    monkeypatch.setattr(h, 'isolation_round_trip', round_trip)
+    survivors, _ = h.tranche_c(s)
+    assert [a['id'] for a in survivors] == ['NO_TOUCH', 'ISOLATE_POLLER', 'C6']
+    for a in survivors:
+        arm = a['build']
+        assert [gate for who, gate in calls if who == arm and not gate.startswith('C_')] == ['p0', 'p1040', 'dsl_tokens']
+        assert len(s.rows['C.'+a['id']]['value']['rounds']) == 3
+    assert s.end-clock[0] >= h.TRANCHE_SECONDS['D']
+
+
+def test_enabled_c6_without_staged_prototype_remains_incomplete(tmp_path):
+    s = session(tmp_path)
+    s.m['C'] = [a for a in s.m['C'] if a['id'] == 'C6']
+    assert s.m['C'][0]['enabled']
+    assert h.qualify_c(s) == []
+    assert s.arms['C.eligibility.C6']['status'] == 'NOT-COMPLETE'
+    assert 'C6' not in s.certified

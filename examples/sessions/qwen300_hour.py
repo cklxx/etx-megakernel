@@ -1,4 +1,4 @@
-"""One pinned, offline, 74-minute deciding session; importing is CPU only.
+"""One pinned, offline, 140-minute deciding session; importing is CPU only.
 
 python -m examples.sessions.qwen300_hour --template prepared.json
 python -m examples.sessions.qwen300_hour --dry-run
@@ -8,6 +8,18 @@ python -m etx.tools.gpu_jobs examples/sessions/qwen300_hour.py --gpus 0 --machin
 The VM must have prepared.json at ~/etx/qwen300-hour.json, or set
 ETX_QWEN300_CONFIG for a direct gpu_jobs invocation. No download/build/debug
 occurs during the measurement budget. Fresh checks are never transferred.
+
+Deadlines (including each tranche's fresh correctness work): A=900s (885s
+commands + 15s first-stop decision), B=1320s, C=4020s (NO_TOUCH=1620s,
+ISOLATE_POLLER=1200s, C6=1200s), D>=2150s of remaining time, report=10s.
+900 + 1320 + 4020 + 2150 + 10 = 8400s; no head arm or pair is shortened.
+C estimates: 1575 + 1140 + 1085 = 3800s, with 220s margin. C6's estimate
+is 9 expected 120s host calls plus 5s ancestry; adapter eligibility remains
+mandatory. D's warm-call upper estimate is 933s + 3*28s = 1017s, including
+fresh certification of a new final combination (PREFLIGHT Q4); it has 1133s
+margin. Prewarm/staging finish before the clock. These are estimates, not
+runtime guarantees: missed gates/deadlines stay NOT-COMPLETE with full logs.
+The runner stops at 8400s, 600s below the 150-minute machine life.
 """
 from __future__ import annotations
 
@@ -27,9 +39,11 @@ from examples.vllm_llm.pairs import Refusal
 ROOT = Path(__file__).resolve().parents[2]
 MANIFEST = Path(__file__).with_name('qwen300_hour_arms.json')
 # Registration: main 9f91f3a, docs/PLAN-300TOKS-2026-10-11.md:297,304,310,318,320.
-MAX_SESSION_SECONDS = 4440
+MAX_SESSION_SECONDS = 8400
+TRANCHE_SECONDS = dict(A=900, B=1320, C=4020, D=2150)
+REPORT_SECONDS = 10
 if not 0 < float(os.environ.get('ETX_SESS_MAX_SECONDS', MAX_SESSION_SECONDS)) <= MAX_SESSION_SECONDS:
-    raise ValueError('qwen300-hour cap must be positive and <=4440 seconds')
+    raise ValueError('qwen300-hour cap must be positive and <=8400 seconds')
 JOBS = [dict(name='qwen300_hour', gpu=0, machine='A', timeout=MAX_SESSION_SECONDS, quiet_s=180,
              cmd='stdbuf -oL -eL python3 -u -m examples.sessions.qwen300_hour --run')]
 
@@ -42,7 +56,7 @@ def template():
     return dict(model='/absolute/prepared/qwen3-30b-a3b',
                 builds={name: '/absolute/prepared/'+name for name in
                         ('kept', 'stamps', 'stages', 'C1', 'C5', 'C1_C5', 'NO_TOUCH',
-                         'NO_TOUCH_stamps', 'ISOLATE_POLLER')},
+                         'NO_TOUCH_stamps', 'ISOLATE_POLLER', 'C6')},
                 isolation_probe=None,  # sealed offline probe: {argv: [...], sha256: executable SHA256}
                 source_commit='REQUIRED full commit of pushed tree', build_commits={}, build_seals={},
                 combinations=[dict(id='C1_C5', build='C1_C5', members=['C1', 'C5'], enabled=True,
@@ -135,7 +149,7 @@ def verify_seal(s, arm):
 
 
 def prewarm(config_path):
-    """CPU-only setup before starting gpu_jobs and its 74-minute clock."""
+    """CPU-only setup before starting gpu_jobs and its 140-minute clock."""
     c = json.loads(config_path.read_text())
     hf_weights = sorted(Path(c['hf']).glob('*.safetensors'))
     if not hf_weights: raise ValueError('staged HF weight shards missing')
@@ -168,8 +182,8 @@ class Session:
         self.out = Path(logdir).resolve()
         self.out.mkdir(parents=True, exist_ok=True)
         self.start = time.monotonic()
-        self.end = self.start + min(MAX_SESSION_SECONDS-10, seconds-10)  # reserve report/outer-runner margin
-        self.deadline = min(self.start+885, self.end)  # leave room for the first-stop table
+        self.end = self.start + min(MAX_SESSION_SECONDS-REPORT_SECONDS, seconds-REPORT_SECONDS)  # reserve report/outer-runner margin
+        self.deadline = min(self.start+TRANCHE_SECONDS['A']-15, self.end)  # leave room for the first-stop table
         self.rows = {}
         self.arms = {}
         self.certified = set()
@@ -703,7 +717,7 @@ def candidate_pairs(s, a, tranche, publish=True):
 
 def tranche_b(s):
     # Tranche B: plan section 7, line 304 (main 9f91f3a).
-    s.deadline = min(time.monotonic()+1320, s.end)
+    s.deadline = min(time.monotonic()+TRANCHE_SECONDS['B'], s.end)
     if 'kept' not in s.certified:
         print('B SKIP: kept fresh correctness gate failed', flush=True); return []
     survivors = []
@@ -851,21 +865,21 @@ def qualify_c(s):
 def tranche_c(s):
     qualified = s.qualified_c if hasattr(s, 'qualified_c') else qualify_c(s)
     if not qualified:
-        print('C SKIP: no already-correct committed full-model prototype qualifies; add 1620s to D', flush=True)
+        print(f'C SKIP: no already-correct committed full-model prototype qualifies; add {TRANCHE_SECONDS["C"]}s to D', flush=True)
         s.row('C.fusion', None, 'SKIP', REGISTERED['C.fusion'])
         s.row('C.body', None, 'SKIP', REGISTERED['C.body'])
-        return [], 1620
-    s.deadline = min(time.monotonic()+1620, s.end)
+        return [], TRANCHE_SECONDS['C']
+    s.deadline = min(time.monotonic()+TRANCHE_SECONDS['C'], s.end)
     tranche_end = s.deadline
     budget = [dict(id=a['id'], allocated_s=a.get('budget_s', 0),
                    estimated_required_s=a.get('estimated_required_s')) for a in qualified]
     required = sum(a.get('estimated_required_s', 0) for a in qualified)
-    s.row('C.budget', dict(available_s=1620, arms=budget, estimated_required_s=required,
-                         fits_estimate=required <= 1620, basis='estimate: cold host invocation expected=120s; not GPU measurement'),
-          'OVER-BUDGET' if required > 1620 else 'ESTIMATE', 'C is 1620s; no time borrowed from D')
+    s.row('C.budget', dict(available_s=TRANCHE_SECONDS['C'], arms=budget, estimated_required_s=required,
+                         fits_estimate=required <= TRANCHE_SECONDS['C'], basis='estimate: cold host invocation expected=120s; not GPU measurement'),
+          'OVER-BUDGET' if required > TRANCHE_SECONDS['C'] else 'ESTIMATE', 'C is 4020s; no time borrowed from D')
     survivors = []
     for a in qualified:
-        s.deadline = min(time.monotonic()+a.get('budget_s', 1620), tranche_end)
+        s.deadline = min(time.monotonic()+a.get('budget_s', TRANCHE_SECONDS['C']), tranche_end)
         key = 'C.'+a['id']
         rule = REGISTERED.get(key, REGISTERED['C.body'])
         def run(a=a):
@@ -1049,8 +1063,12 @@ def dry_run():
     """Exercise CPU logic, shell syntax and runner registration; never spawn GPU commands."""
     for j in JOBS:
         subprocess.run(['bash', '-n', '-c', j['cmd']], check=True)
-    assert MAX_SESSION_SECONDS == 4440
-    assert sum((900, 1320, 1620)) < MAX_SESSION_SECONDS
+    assert MAX_SESSION_SECONDS == 8400
+    assert sum(TRANCHE_SECONDS.values()) + REPORT_SECONDS == MAX_SESSION_SECONDS
+    c_arms = manifest()['C']
+    assert all(a['enabled'] for a in manifest()['B']+c_arms)
+    assert sum(a['budget_s'] for a in c_arms) == TRANCHE_SECONDS['C']
+    assert all(a['estimated_required_s'] <= a['budget_s'] for a in c_arms)
     assert keep([.030, .031, .030])['keep']
     assert not keep([.030, -.001, .030])['keep']
     try:
@@ -1060,7 +1078,7 @@ def dry_run():
     else:
         raise AssertionError('missing critical-body coverage must refuse')
     assert len({a['id'] for a in manifest()['B']+manifest()['C']}) == len(manifest()['B']+manifest()['C'])
-    print(json.dumps(dict(budgets_s=dict(A=900, B=1320, C=1620, D='remaining session time'),
+    print(json.dumps(dict(budgets_s=dict(TRANCHE_SECONDS, D='remaining session time (>=2150s)', report=REPORT_SECONDS),
                           manifest=manifest(), thresholds=REGISTERED), indent=2))
     from etx.tools.gpu_jobs import main as runner
     return runner([str(Path(__file__)), '--dry-run'])
