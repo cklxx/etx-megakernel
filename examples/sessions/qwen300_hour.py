@@ -1,4 +1,4 @@
-"""One pinned, offline, 60-minute deciding session; importing is CPU only.
+"""One pinned, offline, 67-minute deciding session; importing is CPU only.
 
 python -m examples.sessions.qwen300_hour --template prepared.json
 python -m examples.sessions.qwen300_hour --dry-run
@@ -25,10 +25,11 @@ from examples.vllm_llm.pairs import Refusal
 
 ROOT = Path(__file__).resolve().parents[2]
 MANIFEST = Path(__file__).with_name('qwen300_hour_arms.json')
-MAX_SESSION_SECONDS = 3600
-if not 0 < float(os.environ.get('ETX_SESS_MAX_SECONDS', 3600)) <= 3600:
-    raise ValueError('qwen300-hour cap must be positive and <=3600 seconds')
-JOBS = [dict(name='qwen300_hour', gpu=0, machine='A', timeout=3600, quiet_s=180,
+# Registration: main 9f91f3a, docs/PLAN-300TOKS-2026-10-11.md:297,304,310,318,320.
+MAX_SESSION_SECONDS = 4020
+if not 0 < float(os.environ.get('ETX_SESS_MAX_SECONDS', MAX_SESSION_SECONDS)) <= MAX_SESSION_SECONDS:
+    raise ValueError('qwen300-hour cap must be positive and <=4020 seconds')
+JOBS = [dict(name='qwen300_hour', gpu=0, machine='A', timeout=MAX_SESSION_SECONDS, quiet_s=180,
              cmd='stdbuf -oL -eL python3 -u -m examples.sessions.qwen300_hour --run')]
 
 
@@ -123,12 +124,12 @@ def verify_seal(s, arm):
 
 
 class Session:
-    def __init__(self, config, logdir, seconds=3600):
+    def __init__(self, config, logdir, seconds=MAX_SESSION_SECONDS):
         self.c = config
         self.out = Path(logdir).resolve()
         self.out.mkdir(parents=True, exist_ok=True)
         self.start = time.monotonic()
-        self.end = self.start + min(3590, seconds-10)  # reserve report/outer-runner margin
+        self.end = self.start + min(MAX_SESSION_SECONDS-10, seconds-10)  # reserve report/outer-runner margin
         self.deadline = min(self.start+885, self.end)  # leave room for the first-stop table
         self.rows = {}
         self.arms = {}
@@ -219,13 +220,14 @@ class Session:
 
 
 REGISTERED = {
-    'A1.busy': 'real >=0.100 ms; dead <0.050 ms (frozen task registration)',
-    'A1.free': 'real >=0.050 ms (frozen task registration)',
+    'A1.busy': 'instrument classification only: real >=0.100 ms; dead <0.050 ms',
+    'A1.free': 'instrument classification only: real >=0.050 ms',
     'A1.floor': '1.00 us/edge; retain below-floor count/min, never clip raw gaps',
     'A2.route': 'available body headroom >=0.142 ms / 2.96 us/layer; estimate, no removal proof',
     'A3.host': 'name stages accounting for unexplained 0.086 ms beyond priced 0.049 ms',
     'A4.reset': 'pursue only >0.030 ms/step, host and device separately',
-    'A.stop': 'at <=15 minutes: no exclusive >=0.324 ms outside booked rows => close target route',
+    'A.stop': 'S1 at <=15 minutes: G >=0.088 ms (1.833 us/layer) in named above-floor gap atoms, else close target route',
+    'B.stop': 'S2 after B: G + R2 + H >=0.324 ms (whole-target 6.743 us/layer), else close target route; unknowns count zero',
     'B.keep': '3 pairs, all faster, median >=0.030 ms, median >2*spread',
     'C.fusion': 'net >=1.042 us/layer; VGPR <=128; LDS <=29752 B',
     'C.body': '3 pairs, all faster, median >=0.030 ms, median >2*spread',
@@ -234,17 +236,18 @@ REGISTERED = {
     'D.system': '5 adjacent pinned pairs; LEAD all deltas <0, median <=-0.050 ms',
 }
 THRESHOLD_SOURCES = {
-    'A1.busy': 'docs/qwen300-hour-2026-10-11.md:36',
-    'A1.free': 'docs/qwen300-hour-2026-10-11.md:37',
+    'A1.busy': 'docs/qwen300-hour-2026-10-11.md:39',
+    'A1.free': 'docs/qwen300-hour-2026-10-11.md:40',
     'A1.floor': 'docs/X7-SCHEDULE-WHATIF-2026-10-11.md:164',
-    'A2.route': 'docs/qwen300-hour-2026-10-11.md:39',
+    'A2.route': 'docs/qwen300-hour-2026-10-11.md:42',
     'A3.host': 'docs/MASTER-TABLE-2026-10-11.md:60',
     'A4.reset': 'docs/PLAN-generic-decoder-2026-10-08.md:154',
-    'A.stop': 'docs/PLAN-300TOKS-2026-10-11.md:148',
-    'B.keep': 'docs/qwen300-hour-2026-10-11.md:43',
-    'C.fusion': 'docs/ISA-FIXES-2026-10-11.md:196,203',
-    'C.body': 'docs/qwen300-hour-2026-10-11.md:43',
-    'D.target': 'docs/qwen300-hour-2026-10-11.md:45',
+    'A.stop': 'docs/PLAN-300TOKS-2026-10-11.md:301-302 (main 9f91f3a)',
+    'B.stop': 'docs/PLAN-300TOKS-2026-10-11.md:306-308 (main 9f91f3a)',
+    'B.keep': 'docs/PLAN-300TOKS-2026-10-11.md:314,322 (main 9f91f3a)',
+    'C.fusion': 'docs/PLAN-300TOKS-2026-10-11.md:315,331 (main 9f91f3a)',
+    'C.body': 'docs/PLAN-300TOKS-2026-10-11.md:314,322 (main 9f91f3a)',
+    'D.target': 'docs/PLAN-300TOKS-2026-10-11.md:318 (main 9f91f3a)',
     'D.fusion': 'examples/vllm_llm/pairs.py:33-34,138-143',
     'D.system': 'examples/vllm_llm/nvref_report.py:115-125',
 }
@@ -333,8 +336,79 @@ def edge_prices(plan, raw):
                 signed_excess_ms=sum(x-1 for x in xs)/1000)
         return out
     return dict(edges=edges, critical_edges=projection, all_edges=distribution(edges),
-                critical_pools=distribution(projection), floor_us=1., inbody=report,
+                critical_pools=distribution(projection), floor_us=1., gap_atoms=gap_atom_prices(report), inbody=report,
                 basis='legacy critical B-D gap (same basis as registered pools/floor); classify at final-arrival bracket; readiness B-A bounds separate; not a removable pool')
+
+
+def gap_atom_prices(report):
+    """Stamped G, not removable savings: plan section 7, lines 301-302 (main 9f91f3a).
+
+    Intersect each stamp with its critical gap to avoid crediting parallel/body
+    time twice. P1 fetch and P7 alone are not stamped; they get no invented time.
+    Observation uses the conservative upper idle price, 0.951 us. Combined
+    setup has no isolated idle price, hence zero per the registration.
+    """
+    scale = report['raw']['tick_ns']/1000
+    atoms = {'P10.arrive': dict(idle_us=0., intervals_us=[]),
+             'P5/P11.observation': dict(idle_us=.951, intervals_us=[]),
+             'P4/P6/P7.setup': dict(idle_us=0., intervals_us=[])}
+    for t in report['tasks']:
+        if not t.get('critical') or t['arrive_is_synthetic']: continue
+        # The two booked attention boundaries are outside gap rows 9-10.
+        if t['phase'] in ('attn', 'reduce'): continue
+        _, body, _, _, hi, poll = t['record']
+        lo = t['arrive_bounds_ticks'][0]
+        gap_start = body-t['gap_us']/scale
+        for name, begin, end in (('P10.arrive', lo, hi),
+                                 ('P5/P11.observation', hi, max(hi, poll)),
+                                 ('P4/P6/P7.setup', max(hi, poll), body)):
+            us = max(0., min(body, end)-max(gap_start, begin))*scale
+            if us: atoms[name]['intervals_us'].append(us)
+    for atom in atoms.values():
+        atom['above_floor_ms'] = sum(max(0., us-atom['idle_us']) for us in atom['intervals_us'])/1000
+        atom['us_layer'] = atom['above_floor_ms']*1000/48
+        atom['counted'] = atom['us_layer'] >= .625 or math.isclose(atom['us_layer'], .625, abs_tol=1e-12)
+    return dict(atoms=atoms, G_ms=sum(a['above_floor_ms'] for a in atoms.values() if a['counted']),
+                basis='stamped critical-gap atom excess; upper opportunity estimate, not certified savings',
+                unobserved=['P1.fetch', 'isolated P7.barrier', 'nonfinal producer arrivals'])
+
+
+def first_stop(s, gap_atoms):
+    # S1: plan section 7, line 302 (main 9f91f3a). Pool labels never decide S1.
+    g = gap_atoms['G_ms'] if gap_atoms is not None else None
+    passes = g is not None and math.isfinite(g) and (g >= .088 or math.isclose(g, .088, rel_tol=0., abs_tol=1e-12))
+    passes = passes and 'kept' in s.certified
+    s.row('A.stop', dict(G_ms=g, gap_atoms=gap_atoms,
+                        decision='CONTINUE to B' if passes else 'STOP-SPEND: close target route'),
+          'PASS' if passes else 'STOP', REGISTERED['A.stop'])
+    print(f'FIRST-STOP elapsed={time.monotonic()-s.start:.1f}s (<=900s)', flush=True)
+    return passes
+
+
+def second_stop(s):
+    # S2: plan section 7, lines 306-308 (main 9f91f3a). Unknown R2/H count zero.
+    g = s.rows['A.stop']['value']['G_ms']
+    attention = s.rows.get('A2.route', {}).get('value') or {}
+    r2 = attention.get('attainable_cut_ms') or 0.  # never substitute the body-floor ceiling
+    stages = s.rows.get('A3.host', {}).get('value') or {}
+    named = dict(stages.get('named_host_ms', {}))
+    # Pending reset work can be inside wait but outside the kernel envelope.
+    # Do not call that queued device time an attributable host round trip.
+    named['wait_minus_kernel_ms'] = max(0., named.get('wait_minus_kernel_ms', 0.)
+                                       -stages.get('mean_us', {}).get('reset_device_us', 0.)/1000)
+    # H prices the attributable remainder, not the host pursuit classification.
+    # Subtract the booked reset portion once; exclude device time/overhead.
+    h = min(.086, max(0., named.get('reset_submit_us', 0.)-.049)
+            +sum(max(0., named.get(k, 0.)) for k in
+                 ('upload_us', 'residency_us', 'launch_us', 'retire_readback_us', 'wait_minus_kernel_ms')))
+    if any(not math.isfinite(v) or v < 0 for v in (g, r2, h)):
+        raise ValueError('S2 nonfinite/negative attribution')
+    total = g+r2+h
+    passes = total >= .324 or math.isclose(total, .324, rel_tol=0., abs_tol=1e-12)
+    s.row('B.stop', dict(G_ms=g, R2_ms=r2, H_ms=h, total_ms=total,
+                        decision='CONTINUE to C/D' if passes else 'STOP-SPEND: close target route'),
+          'PASS' if passes else 'STOP', REGISTERED['B.stop'])
+    return passes
 
 
 def attention_price(report):
@@ -462,6 +536,7 @@ def preflight(s):
 
 def tranche_a(s):
     """900s including fresh correctness, cold loads and all deciding probes."""
+    gap_atoms = None
     for arm in ('kept', 'stamps', 'stages'):
         if s.attempt('A.gate.'+arm, lambda arm=arm: certify(s, arm)) is None and arm not in s.certified:
             continue
@@ -490,7 +565,8 @@ def tranche_a(s):
             (s.out/'A_attention.json').write_text(json.dumps(a2, indent=2)+'\n')
             s.row('A2.route', a2, 'HEADROOM-PASS' if a2['available_cut_estimate_ms'] >= .142 else 'FAIL', REGISTERED['A2.route'])
             return result
-        s.attempt('A1/A2', stamped)
+        result = s.attempt('A1/A2', stamped)
+        if result is not None: gap_atoms = result['gap_atoms']
     if 'stages' in s.certified:
         def stages():
             text = token_gate(host(s, 'stages', 'A_stages', ['--repeat', '1']))
@@ -502,17 +578,7 @@ def tranche_a(s):
             reset = {k: result['mean_us'][k]/1000 for k in ('reset_submit_us', 'reset_device_us')}
             s.row('A4.reset', reset, 'PURSUE' if max(reset.values()) > .030 else 'CLOSED', REGISTERED['A4.reset'])
         s.attempt('A3/A4', stages)
-    # Attributions fail closed. B/D may still price existing passenger arms;
-    # they cannot reopen the target campaign on a residual or gap alone.
-    pools_alive = all(s.rows.get(k, {}).get('status') == 'PASS' for k in ('A1.busy', 'A1.free'))
-    dead = s.rows.get('A1.busy', {}).get('status') == 'DEAD'
-    decision = ('STOP-SPEND: busy gap pool dead' if dead else
-                'CONTINUE registered passengers/baselines; target opportunity remains unproved' if pools_alive else
-                'STOP-SPEND: deciding gap pools unresolved or NOT-COMPLETE')
-    s.row('A.stop', dict(exclusive_new_opportunity_ms=None, pools_real=pools_alive, decision=decision),
-          'NOT-ESTABLISHED', REGISTERED['A.stop'])
-    print(f'FIRST-STOP elapsed={time.monotonic()-s.start:.1f}s (<=900s); stamps price intervals, not removals', flush=True)
-    return pools_alive and 'kept' in s.certified
+    return first_stop(s, gap_atoms)
 
 
 def timing(text, mode='fused'):
@@ -578,7 +644,8 @@ def candidate_pairs(s, a, tranche):
 
 
 def tranche_b(s):
-    s.deadline = min(time.monotonic()+900, s.end)
+    # Tranche B: plan section 7, line 304 (main 9f91f3a).
+    s.deadline = min(time.monotonic()+1320, s.end)
     if 'kept' not in s.certified:
         print('B SKIP: kept fresh correctness gate failed', flush=True); return []
     survivors = []
@@ -789,11 +856,16 @@ def tranche_d(s, survivors, extra_seconds):
 def execute(s):
     preflight(s)
     if not tranche_a(s):
-        print('STOP after A: no permission to spend remaining tranches on unresolved deciding probes', flush=True)
-        for name in ('B.keep', 'C.fusion', 'C.body', 'D.target', 'D.fusion', 'D.system'):
+        print('STOP after A: S1 closes target route', flush=True)
+        for name in ('B.keep', 'B.stop', 'C.fusion', 'C.body', 'D.target', 'D.fusion', 'D.system'):
             s.row(name, None, 'NOT-RUN', REGISTERED[name])
         return
     b = tranche_b(s)
+    if not second_stop(s):
+        print('STOP after B: S2 closes target route', flush=True)
+        for name in ('C.fusion', 'C.body', 'D.target', 'D.fusion', 'D.system'):
+            s.row(name, None, 'NOT-RUN', REGISTERED[name])
+        return
     c, extra = tranche_c(s)
     tranche_d(s, b+c, extra)
 
@@ -812,7 +884,7 @@ def dry_run():
     """Exercise CPU logic, shell syntax and runner registration; never spawn GPU commands."""
     for j in JOBS:
         subprocess.run(['bash', '-n', '-c', j['cmd']], check=True)
-    assert sum((900, 900, 1200, 600)) == MAX_SESSION_SECONDS
+    assert sum((900, 1320, 1200, 600)) == MAX_SESSION_SECONDS
     assert keep([.030, .031, .030])['keep']
     assert not keep([.030, -.001, .030])['keep']
     try:
@@ -822,7 +894,7 @@ def dry_run():
     else:
         raise AssertionError('missing critical-body coverage must refuse')
     assert len({a['id'] for a in manifest()['B']+manifest()['C']}) == len(manifest()['B']+manifest()['C'])
-    print(json.dumps(dict(budgets_s=dict(A=900, B=900, C=1200, D=600),
+    print(json.dumps(dict(budgets_s=dict(A=900, B=1320, C=1200, D=600),
                           manifest=manifest(), thresholds=REGISTERED), indent=2))
     from etx.tools.gpu_jobs import main as runner
     return runner([str(Path(__file__)), '--dry-run'])
@@ -841,7 +913,7 @@ def main(argv=None):
         # The parent must not parse/rewrite the large lossless report after
         # its subprocess deadline. Its small decision view is emitted HERE,
         # under the same deadline as all raw analysis and serialization.
-        summary = dict(critical_pools=result['critical_pools'], floor_us=result['floor_us'],
+        summary = dict(critical_pools=result['critical_pools'], floor_us=result['floor_us'], gap_atoms=result['gap_atoms'],
                        basis=result['basis'], inbody=dict(phases=result['inbody']['phases']))
         output.with_suffix('.summary.json').write_text(json.dumps(summary, indent=2)+'\n')
         print('CPU ANALYSIS complete', flush=True)
@@ -856,7 +928,7 @@ def main(argv=None):
     if a.template: a.template.write_text(json.dumps(template(), indent=2)+'\n'); return 0
     if a.dry_run: return dry_run()
     if a.prepare: prepare(a.prepare); return 0
-    s = Session(dict(manifest=str(MANIFEST)), os.environ['ETX_SESS_LOGDIR'], float(os.environ.get('ETX_SESS_REMAINING_SECONDS', 3600)))
+    s = Session(dict(manifest=str(MANIFEST)), os.environ['ETX_SESS_LOGDIR'], float(os.environ.get('ETX_SESS_REMAINING_SECONDS', MAX_SESSION_SECONDS)))
     try:
         s.c = json.loads(Path(os.environ.get('ETX_QWEN300_CONFIG', ROOT/'qwen300-hour.json')).read_text())
         s.m = manifest(s.c.get('manifest', MANIFEST))

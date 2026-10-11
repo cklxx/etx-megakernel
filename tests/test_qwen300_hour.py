@@ -1,6 +1,8 @@
 """CPU refusals, observations and end-to-end control flow; no GPU mocks are results."""
 import copy
 import json
+import os
+import subprocess
 from pathlib import Path
 import sys
 import struct
@@ -319,3 +321,96 @@ def test_analysis_cli_emits_small_decision_view_under_its_deadline(tmp_path):
     assert small['critical_pools'] == full['critical_pools']
     assert 'raw' not in small['inbody']
     assert small['inbody']['phases'] == full['inbody']['phases']
+
+
+@pytest.mark.parametrize('g,passes', [(None, False), (.087999, False), (.088, True), (.100, True), (.324, True)])
+@pytest.mark.parametrize('busy,free', [('PASS', 'PASS'), ('DEAD', 'UNRESOLVED')])
+def test_s1_uses_gap_atoms_instead_of_pool_labels(tmp_path, g, passes, busy, free):
+    s = session(tmp_path); s.certified.add('kept')
+    s.rows.update({'A1.busy': dict(status=busy), 'A1.free': dict(status=free)})
+    assert h.first_stop(s, None if g is None else dict(G_ms=g, atoms={})) is passes
+    assert s.rows['A.stop']['status'] == ('PASS' if passes else 'STOP')
+    assert ':301-302' in s.rows['A.stop']['source']
+
+
+@pytest.mark.parametrize('g,r2,host,passes', [
+    (.100, None, .030, False), (.088, .236, 0., True),
+    (.100, .193, .030, False), (.100, .194, .030, True),
+    (.324, None, 0., True), (.200, None, .135, False)])
+def test_s2_combines_gap_attention_and_attributable_host(tmp_path, g, r2, host, passes):
+    s = session(tmp_path); s.certified.add('kept')
+    assert h.first_stop(s, dict(G_ms=g))
+    s.rows['A2.route'] = dict(value=dict(attainable_cut_ms=r2, available_cut_estimate_ms=.900))
+    s.rows['A3.host'] = dict(value=dict(named_host_ms=dict(launch_us=host, reset_submit_us=.049,
+        kernel_outside_token_timers_ms=.900, instrument_other_ms=.900), accounted_beyond_priced_ms=.900))
+    assert h.second_stop(s) is passes
+    value = s.rows['B.stop']['value']
+    assert value['R2_ms'] == (r2 or 0.)
+    assert value['H_ms'] == pytest.approx(min(.086, host))
+    assert value['total_ms'] == pytest.approx(g+(r2 or 0.)+value['H_ms'])
+    assert ':306-308' in s.rows['B.stop']['source']
+
+
+@pytest.mark.parametrize('g,runs_b,runs_cd', [(.087, False, False), (.100, True, False), (.324, True, True)])
+def test_execute_obeys_both_stops_with_time_remaining(tmp_path, monkeypatch, g, runs_b, runs_cd):
+    s = session(tmp_path); s.certified.add('kept'); calls = []
+    monkeypatch.setattr(h, 'preflight', lambda s: None)
+    monkeypatch.setattr(h, 'tranche_a', lambda s: h.first_stop(s, dict(G_ms=g)))
+    def b(s): calls.append('B'); return ['body-keep']
+    def c(s): calls.append('C'); return [], 1200
+    def d(s, survivors, extra): calls.append('D')
+    monkeypatch.setattr(h, 'tranche_b', b)
+    monkeypatch.setattr(h, 'tranche_c', c)
+    monkeypatch.setattr(h, 'tranche_d', d)
+    h.execute(s)
+    assert calls == (['B', 'C', 'D'] if runs_cd else ['B'] if runs_b else [])
+    assert s.end-h.time.monotonic() > 3900
+    if not runs_cd:
+        assert all(s.rows[k]['status'] == 'NOT-RUN' for k in ('C.fusion', 'C.body', 'D.target', 'D.fusion', 'D.system'))
+    if runs_b: assert s.rows['B.stop']['status'] == ('PASS' if runs_cd else 'STOP')
+
+
+def test_gap_atoms_clip_to_critical_gap_and_apply_class_floor():
+    def task(phase='qkv', critical=True):
+        return dict(critical=critical, arrive_is_synthetic=False, phase=phase,
+                    record=[0, 200, 300, 0, 120, 170], arrive_bounds_ticks=[90, 120], gap_us=10.)
+    report = dict(raw=dict(tick_ns=100), tasks=[task() for _ in range(48)])
+    # Gap starts at tick 100: only 2 us of arrive, 5 of observation, 3 of setup.
+    result = h.gap_atom_prices(report)
+    assert result['atoms']['P10.arrive']['above_floor_ms'] == pytest.approx(.096)
+    assert result['atoms']['P5/P11.observation']['above_floor_ms'] == pytest.approx(48*(5-.951)/1000)
+    assert result['atoms']['P4/P6/P7.setup']['above_floor_ms'] == pytest.approx(.144)
+    report['tasks'] += [task('attn'), task('reduce'), task(critical=False)]
+    assert h.gap_atom_prices(report) == result  # booked boundaries/parallel bodies excluded
+    report['tasks'] = [task()]
+    result = h.gap_atom_prices(report)
+    assert result['G_ms'] == 0.  # every class below 0.625 us/layer; raw excess retained
+    assert result['atoms']['P10.arrive']['above_floor_ms'] > 0.
+
+
+def test_67_minute_cap_and_22_minute_b_deadline(tmp_path, monkeypatch):
+    monkeypatch.setattr(h.time, 'monotonic', lambda: 100.)
+    s = session(tmp_path); s.certified.add('kept'); s.m['B'] = []
+    assert h.MAX_SESSION_SECONDS == h.JOBS[0]['timeout'] == 4020
+    assert s.end-s.start == 4010  # existing ten-second reporting margin
+    assert h.tranche_b(s) == []
+    assert s.deadline == 1420
+    limited = h.Session({}, tmp_path/'limited', seconds=1000)
+    assert limited.end-limited.start == 990
+
+
+@pytest.mark.parametrize('seconds,accepted', [('4020', True), ('3600', True), ('4021', False), ('0', False), ('nan', False)])
+def test_cap_environment_validation(seconds, accepted):
+    env = dict(os.environ, ETX_SESS_MAX_SECONDS=seconds)
+    result = subprocess.run([sys.executable, '-c', 'from examples.sessions import qwen300_hour'],
+                            env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    assert (result.returncode == 0) is accepted
+    if not accepted: assert 'cap must be positive and <=4020 seconds' in result.stdout
+
+
+def test_s2_does_not_attribute_pending_reset_device_work_to_host(tmp_path):
+    s = session(tmp_path); s.certified.add('kept')
+    assert h.first_stop(s, dict(G_ms=.260))
+    s.rows['A3.host'] = dict(value=h.stage_prices(stage_text()))
+    assert not h.second_stop(s)
+    assert s.rows['B.stop']['value']['H_ms'] == pytest.approx(.046)
