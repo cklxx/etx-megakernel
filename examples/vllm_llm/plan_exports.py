@@ -20,7 +20,9 @@ from etx.select.variants import REGISTRY
 def exports(config):
     d = load_dims(config)
     selected = plan(d, "gfx942", None)
+    from etx.ops import gemv
     kinds = {v.export: v.kind for v in REGISTRY}
+    kinds.update({n: "dsl" for n in gemv.import_entries()})
     kinds.update({v.export: v.kind for v in selected.phases.values()})
     # A generic selection can be inspected, but cannot use the vLLM host ABI.
     if any(v.kind == "generic" for v in selected.phases.values()):

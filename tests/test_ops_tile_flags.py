@@ -114,7 +114,8 @@ def test_flags_are_preprocessor_gated():
         assert f"#ifdef {f}" in src, f
     # without the flags the original text is what compiles
     assert "const int row = sg / spr;" in src
-    assert "for (int s = 0; s < d.R; ++s) {" in src
+    assert "for (int s = 0; s < R; ++s) {" in src
+    assert "const int R = FixedR >= 0 ? FixedR : d.R;" in src
     assert "const float v = etx_wave_sum(acc[b]);" in src
     assert re.search(r"#else\n  const int nblk = \*\(const int\*\)\(a \+ 156\);\n#endif", src)
     # the scalar argument reads use the constant address space, as etx_imp_argblock's callers do
