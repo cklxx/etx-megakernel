@@ -16,6 +16,7 @@ Views printed, each of which must total the critical path (= the span):
 """
 from __future__ import annotations
 
+import collections
 import json
 import os
 import statistics
@@ -150,6 +151,22 @@ def main() -> int:
         x = r11[r]
         print(f"{r:9s} tasks/layer {x['tasks']:4d}  crit {x['crit_body']:.3f}  mean {x['mean_body']:.3f}  "
               f"crit-mean {x['crit_body'] - x['mean_body']:.3f}  start {x['start']:.3f}  period-share {x['delta']:.3f}")
+
+    # ---- which task of each grid is on the path: block 0 alone stores the residual / normed copies
+    descs = plan["descs"]
+
+    def blk(t) -> int:
+        c = descs[t.id]["coord"]
+        return c[0] if len(c) == 1 else c[0] * max(1, plan["types"][t.name]["grid"][1]) + c[1]
+
+    print("\nPATH TASK INDEX per layer role [M]: block 0 on the path, body of block 0 vs the other blocks (all layers)")
+    for r in LAYER_ROLES:
+        on_path = [blk(s["task"]) for s in steps if xa.stem(s["task"].name) == r]
+        b0 = [t.done - t.ready for t in allt[r] if blk(t) == 0]
+        rest = [t.done - t.ready for t in allt[r] if blk(t) != 0 and t.done - t.ready > 1.0]
+        common = collections.Counter(on_path).most_common(3)
+        print(f"{r:9s} path tasks with blk 0: {on_path.count(0):2d}/{len(on_path)}  most common path blks {common}  "
+              f"median body blk0 {statistics.median(b0):.3f}  others(>1us) {statistics.median(rest):.3f}")
 
     # ---- the [M]/[E]/[R] split of the step
     m = g["bt"] + free_plain

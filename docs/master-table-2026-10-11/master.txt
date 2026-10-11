@@ -63,6 +63,17 @@ topk      tasks/layer    8  crit 3.140  mean 3.000  crit-mean 0.141  start 0.283
 moe_up    tasks/layer  192  crit 16.223  mean 15.767  crit-mean 0.456  start 0.690  period-share 17.406
 moe_down  tasks/layer  256  crit 9.069  mean 9.221  crit-mean -0.151  start 2.174  period-share 12.976
 
+PATH TASK INDEX per layer role [M]: block 0 on the path, body of block 0 vs the other blocks (all layers)
+qkv       path tasks with blk 0:  0/48  most common path blks [(188, 3), (30, 3), (255, 3)]  median body blk0 9.280  others(>1us) 9.120
+prep      path tasks with blk 0: 14/48  most common path blks [(2, 19), (0, 14), (3, 8)]  median body blk0 3.960  others(>1us) 3.920
+attn      path tasks with blk 0:  3/48  most common path blks [(1, 7), (10, 7), (15, 5)]  median body blk0 5.280  others(>1us) 5.280
+reduce    path tasks with blk 0: 14/48  most common path blks [(2, 19), (0, 14), (3, 8)]  median body blk0 5.220  others(>1us) 5.220
+o_proj    path tasks with blk 0:  0/48  most common path blks [(255, 3), (191, 3), (91, 3)]  median body blk0 5.260  others(>1us) 5.160
+router    path tasks with blk 0:  0/48  most common path blks [(33, 5), (3, 3), (100, 2)]  median body blk0 5.840  others(>1us) 5.440
+topk      path tasks with blk 0:  3/48  most common path blks [(1, 12), (5, 7), (6, 7)]  median body blk0 3.080  others(>1us) 3.000
+moe_up    path tasks with blk 0:  0/48  most common path blks [(70, 3), (134, 2), (128, 2)]  median body blk0 15.600  others(>1us) 15.760
+moe_down  path tasks with blk 0:  0/48  most common path blks [(182, 3), (58, 2), (92, 2)]  median body blk0 9.120  others(>1us) 9.240
+
 KNOWN/ESTIMATED/RESIDUAL split of the span (L3 resolution)
 [M] before-taken 231.3 + free notification into non-touch grids 325.4 = 556.7 us (13.7%)
 [E] bytes at 4.3 TB/s 1439.6 + exposed hops 534.4 = 1974.0 us (48.5%)
