@@ -30,6 +30,8 @@ def test_session_prices_x5_before_s2_without_funding_body_pairs(tmp_path,monkeyp
     s=h.Session(dict(manifest=str(h.MANIFEST),builds={'kept':'/unused'},model='/unused'),tmp_path)
     s.certified.add('kept');calls=[]
     monkeypatch.setattr(h,'preflight',lambda s:None)
+    monkeypatch.setattr(h,'environment_guard',lambda s:True)
+    monkeypatch.setattr(h,'qualify_c',lambda s:[])
     monkeypatch.setattr(h,'tranche_a',lambda s:h.first_stop(s,dict(G_ms=.100)))
     def probe(s):
         calls.append('X5');s.rows['A2.route']=dict(value=dict(attainable_cut_ms=.236));return {}

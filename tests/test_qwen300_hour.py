@@ -263,6 +263,8 @@ def test_b_each_pair_has_gate_and_failed_arm_does_not_hide_next(tmp_path, monkey
 def test_first_stop_does_not_spend_rest_on_missing_deciding_pools(tmp_path, monkeypatch):
     s = session(tmp_path)
     monkeypatch.setattr(h, 'preflight', lambda s: None)
+    monkeypatch.setattr(h, 'environment_guard', lambda s: True)
+    monkeypatch.setattr(h, 'qualify_c', lambda s: [])
     from examples.vllm_llm import x5
     monkeypatch.setattr(x5, 'run', lambda s: None)
     monkeypatch.setattr(h, 'tranche_a', lambda s: h.first_stop(s, None))
@@ -422,6 +424,8 @@ def test_s2_combines_gap_attention_and_attributable_host(tmp_path, g, r2, host, 
 def test_execute_obeys_both_stops_with_time_remaining(tmp_path, monkeypatch, g, runs_b, runs_cd):
     s = session(tmp_path); s.certified.add('kept'); calls = []
     monkeypatch.setattr(h, 'preflight', lambda s: None)
+    monkeypatch.setattr(h, 'environment_guard', lambda s: True)
+    monkeypatch.setattr(h, 'qualify_c', lambda s: [])
     from examples.vllm_llm import x5
     monkeypatch.setattr(x5, 'run', lambda s: None)
     monkeypatch.setattr(h, 'tranche_a', lambda s: h.first_stop(s, dict(G_ms=g)))

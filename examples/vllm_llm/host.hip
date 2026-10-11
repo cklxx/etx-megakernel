@@ -212,6 +212,8 @@ int main(int argc, char** argv) {
     break;
   }
 
+  if (price_attention && nreq != 1) die("X5 requires batch/request count 1");
+
   // ---- golden: request 0 from --golden, request r from --golden<r>; the prompts have one length
   std::vector<std::vector<int>> prompts, goldens;
   for (int r = 0; r < nreq; ++r) {
@@ -792,6 +794,7 @@ int main(int argc, char** argv) {
 #endif
       if (t + 1 >= (int)prompt.size()) wall_ms.push_back(wms);
 #ifdef ETX_INBODY_REPORT
+      if (t >= (int)prompt.size()) printf("HOUR-KERNEL {\"run\":%d,\"step\":%d,\"ms\":%.9f}\n", run, t, hst.last_ms);
       if (t >= (int)prompt.size()) printf("HOUR-WALL {\"run\":%d,\"step\":%d,\"ms\":%.9f}\n", run, t, wms);
 #endif
 #if defined(ETX_INBODY) && ETX_INBODY
@@ -807,6 +810,9 @@ int main(int argc, char** argv) {
       if (progress && (t % progress == 0 || t < 3)) { printf("  step %d: %.3f ms wall\n", t, wms); fflush(stdout); }
     }
     if (nsteps < steps) { printf("run %d: stopped after %d of %d steps (--max-steps): no token check\n", run, nsteps, steps); continue; }
+#ifdef ETX_INBODY_REPORT
+    printf("HOUR-RESET enabled=%d checked=%d valid=%d\n", hst.dev_reset, hst.dev_reset_checked, hst.dev_reset_valid);
+#endif
     // a step starts at the first request's prologue and ends at the last request's argmax
     std::vector<uint64_t> t0(steps, ~0ull), t1(steps, 0);
     for (int r = 0; r < nreq; ++r) {

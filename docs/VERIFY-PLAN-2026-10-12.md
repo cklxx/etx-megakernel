@@ -55,9 +55,10 @@ Fresh host --check 48 at 0/1040 and CHECK-DSL/32/32 precede three alternating
 adjacent kept/reset pairs (31 post-first-token wall steps each), using
 `reset_pair.run` → `candidate_pairs`; no profile/stamps in timing.
 
-Measurement: ordinary wall gain and token-device delta on the same pairs.
-Budget: **120 s / 2 min / $0.0663 [E]**, reserved inside B; correctness is
-included. A cold load or slow checks may exhaust this, yielding NOT-COMPLETE,
+Measurement: ordinary wall gain, token-device delta and existing kernel-event
+envelope delta on the same pairs (the last exposes the tail outside token timers).
+Budget: **120 s / 2 min / $0.0663 [E]** for the pairs plus
+**90 s / 1.5 min / $0.0498 [E]** for fresh correctness, all inside B. A cold load or slow checks may exhaust this, yielding NOT-COMPLETE,
 never a shortened population. Expected [E] direction on reset ON: fewer
 host enqueues, higher kernel-event time from the reset tail (outside the
 token timers), lower wall if reset removal dominates. Reverse the flag and
@@ -229,3 +230,119 @@ have been certified/enumerated and none reaches the bar, **B1=0, R2=0**,
 then re-evaluate S2. Today's missing dispatch/adapters mean **B1 [U]**, with
 zero R2 for spending decisions, not an exhaustive CLOSED verdict. Failed
 byte/token gates disqualify a candidate; missing coverage is NOT-COMPLETE.
+
+## 4. Environment guard: implemented, first VM step
+
+Script: `examples/vllm_llm/environment_guard.py`; session `execute` performs
+CPU/file preflight, then GUARD, then optional prototype qualification, then
+A/X5/S2/body pairs/C/D. No hardware command or timed tranche precedes GUARD.
+Direct guard-only command (registered for a future VM, not executed here):
+
+```sh
+.venv/bin/python -m examples.vllm_llm.environment_guard \
+  --run qwen300-hour.json --output GUARD_LOGDIR
+```
+
+The first command is `rocm-smi --showproductname --showclocks --showpower
+--showperflevel`. Full logs retain clocks/power/perf state; there is no
+invented frequency or wattage kill bar. Two **external historical control
+artifacts**, built before the measurement clock from
+7c85efb405f4e1972bdf1c7770835d4ba2426a1f and
+e068e47644821c0f6654d6435a7c71d1b1fc70d3 with the **same kept flags**
+(BASE_FLAGS, KEY32 on, ETX_DEV_RESET=0), do not replace any of the nine
+prepared arms. Both require immutable build identities, independent CPU
+and native compilation gates, same compiler, and matching normalized
+device-IR hashes. They are control executables, not new claimed speed arms.
+Their next-VM executable/resource/correctness readiness is [U] here.
+
+CPU staging commands are `--seal-config qwen300-hour.json` on the guard
+script (binds already-built artifact identity, exact source commit, checked
+CPU-gates JSON and normalized IR), and the existing
+`qwen300_hour --prewarm qwen300-hour.json`. Prewarm now seals **vl.bin and
+all HF safetensors shards** with SHA256 in the configuration. The guard
+runs `sha256sum` over that exact list and rejects missing, duplicate,
+changed or unlisted files. This verifies staging immutability and same data
+across the two controls. Historical vl.bin/HF hashes were not retained [U];
+these checks cannot prove equality to the old VM's weights or explain its
+routing difference. The manifest/golden alone are insufficient.
+
+Each tree receives fresh original/import checks at **0 and 1040**, all
+97 instances, against its own unchanged vendor originals; the certificate
+validator verifies coverage, identities and bytes. Original-kernel medians
+use **layers 1..47 (47 observations per role per position)**, excluding
+cold layer 0 exactly as LEVERS-MORE did. Then **two complete alternating
+adjacent pairs**, old→hour and hour→old, run full CHECK-DSL and free-running
+32/32, using the same RESULT wall_ms (median decode-step wall) in both old
+hosts. Do not compare an old median with a new step mean.
+
+Registered thresholds/actions:
+
+| Reading | Decision / action |
+|---|---|
+| Original attention p0 **>7.9 us**, either tree | **SLOW-VM** (owner's registered +5% guard over 7.5). Record, fetch logs and reprovision before spending timed tranches. Cause remains [U]. |
+| Tree-pair absolute wall difference **>=0.030 ms** | **TREE-DRIFT**: falsifies current-tree equality at KEEP scale; stop and inspect source/data/IR before reprovisioning or repricing. Opposite signs cannot cancel into a fake pass. |
+| Hour-tree kept wall anchor **>4.210 ms** | **REBASE-REQUIRED** (F0: 4.180+KEEP). Even if standalone kernels pass, the historical need/rows are invalid. Stop; either reprovision or rebase **every** row with new conditions/evidence before another target session. |
+| Changed weights or mismatched device IR/compiler | **DATA-MISMATCH / NOT-COMPLETE**: stop before pricing; restage or investigate. |
+| Within tree bar, attention <=7.9, anchor <=4.210, all byte/token/data gates valid | **PASS**, continue to A. Equality rules out a current >=KEEP tree difference; it does not prove the old machine's root cause. |
+| Missing/failed checks, samples, hash or deadline | **NOT-COMPLETE**, stop. No result from fewer pairs. |
+
+Reduce/p1040 medians and clocks/power are diagnostic evidence only: no new
+threshold is invented for them. A VM classified slow may be reprovisioned
+by the next-session operator; the guard never provisions by itself. Its
+explicit default is to stop, not silently run A on rebased estimates. A
+rebase is a separate evidence update to all rows, not a uniform 20% scaling.
+S1/S2/atom/KEEP remain unchanged even after a rebase.
+
+Budget: **240 s / 4 min / $0.1327 [E]**, including eight host invocations,
+clocks and hashes. Warm host calls were 17–28 s in retained sessions [M,
+other conditions]; 8×(17–28)+5+20 = **161–249 s [E]**, so the high end can
+miss the four-minute cap. It then fails closed; no extra spend or hidden
+shortening. The 4-minute cap is a budget, not a promise of completion.
+
+CPU script execution on retained import logs returned old p0 originals
+**attn 7.5 / reduce 6.6 us**, hour W **8.5 / 7.5 us**, each 47 layers [M].
+Commands were `environment_guard --summarize .../certificate_on/check_p0.txt`
+and `--summarize .../session-wklfw6bc/kept_check_p0.log`, both with `--output`.
+This verifies the parser and reproduces the previously reported medians;
+it does not run or pass the future VM guard. CPU tests cover population,
+thresholds, data drift, opposite tree deltas and guard-before-tranches.
+
+## 5. Money, readiness and CPU verification
+
+Updated fixed measurement cap: **8400 s / 140 min / $4.6433 [E]** at the
+historical $1.99/GPU-hour (not a current quote). A stopped session pays only
+elapsed time, not later allocations. No GPU dollars were spent here.
+
+| Allocation | Seconds / minutes | Dollars [E] | Contents / stop |
+|---|---:|---:|---|
+| GUARD | 240 / 4 | 0.1327 | First; bad environment/data/evidence stops all timed work |
+| A | 900 / 15 | 0.4975 | Same stamps tranche, loads ride along free; S1 after guard+A, <=19 total min |
+| B total | 1320 / 22 | 0.7297 | X5 up to120s **before S2**; if S2 passes: reset correctness90s+pair120s, existing C1/C5 in remaining990s |
+| C | 4020 / 67 | 2.2222 | Existing NO_TOUCH1620 / ISOLATE_POLLER1200 / C6 1200; unchanged |
+| D minimum remaining allocation | 1910 / 31.8333 | 1.0558 | Five final fusion/system rounds; receives unused prior time |
+| Report margin | 10 / 0.1667 | 0.0055 | Sum including report is exactly8400s |
+
+RESET's **pair** is ~2 minutes [E]; its fresh correctness has a separate
+**90 s / $0.0498** allowance within B (total210s /3.5min/$0.1161).
+Six warm timing calls at17–28s require102–168s [E], so the120s slot may
+miss at the high end; no pair population is shortened. Kernel-event means
+now ride in ordinary timing logs without extra events (HOUR-KERNEL), and
+HOUR-RESET confirms that the reset tail stayed enabled/checked/valid;
+fallback cannot be KEEP. Reset may be selected as D's best singleton; there
+is no prebuilt combination with it, so gains are never summed with body arms.
+
+The four guard minutes come from D's old2150s minimum; D now has1910s.
+Its retained1017s upper warm-call estimate leaves893s margin [E]. X5/reset
+use B's existing time. A loads add **zero GPU minutes**. New artifacts are
+one `reset` arm plus two historical guard controls. Nine existing build
+recipes/directories, their flags and C allocations remain unchanged; only
+stamps emission changes for the requested load experiment. Native staging,
+prewarm and gate evidence must finish before the measurement job; if done
+on a paid VM, allow **at most10 setup minutes/$0.3317** inside the existing
+150-minute VM life, or abort before starting. Full VM-life upper account is
+**150min/$4.975 [E]**. Next balance, actual price and staging elapsed are [U]
+until that session; this CPU task makes no account/provisioning call.
+
+The full current-source pytest and dry-run outputs follow after final
+verification. Local/compiler checks are CPU-only; they do not certify GPU
+correctness, clock validity, performance or the absent vendor adapters.

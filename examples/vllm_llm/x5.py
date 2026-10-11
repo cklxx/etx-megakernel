@@ -99,8 +99,11 @@ def run(s):
     builds=s.c.get('x5_builds', ['kept'])
     if not builds or len(set(builds))!=len(builds): raise ValueError('X5 missing/duplicate survivors')
     results={}
-    for arm in builds:
-        h.verify_seal(s,arm); h.certify(s,arm)
+    def measure(arm):
+        seal = h.verify_seal(s,arm)
+        if seal['flags'].get('ETX_INBODY_BUILD','0') != '0' or '-DETX_HOUR_PROFILE' in seal['flags'].get('ETX_HIPCC_FLAGS',''):
+            raise ValueError('X5 timing requires stamps/profile OFF')
+        h.certify(s,arm)
         end=s.deadline; s.deadline=min(end,h.time.monotonic()+30)
         try:
             text=h.host(s,arm,'X5_'+arm,['--check','48','--check-pos','1024','--price-attention'])
@@ -113,11 +116,18 @@ def run(s):
                                                json.loads((build/'imp/imports.json').read_text()))
             cert.check_output(text,expected,1024,ident)
             if 'CHECK OK:' not in text: raise ValueError('X5 import check incomplete')
-            results[arm]=prices(text)
+            return prices(text)
         finally: s.deadline=end
-    best=max((r['R2_ms'] for r in results.values()),default=0.)
+    for arm in builds:
+        result=s.attempt('X5.'+arm,lambda arm=arm:measure(arm))
+        results[arm]=result if result is not None else dict(status='NOT-COMPLETE')
+    best=max((r.get('R2_ms',0.) for r in results.values()),default=0.)
     route=s.rows.get('A2.route',{}).get('value')
-    if route is not None: route['attainable_cut_ms']=best
+    if route is None:
+        s.rows.setdefault('A2.route',dict(status='NOT-COMPLETE',rule=h.REGISTERED['A2.route'],source=h.THRESHOLD_SOURCES['A2.route']))
+        route=dict(basis='X5 independent historical cross-basis pricing; A2 critical coverage unavailable')
+        s.rows['A2.route']['value']=route
+    route['attainable_cut_ms']=best
     # This tree cannot certify missing AITER implementations or adapters.
     # Do not accept a config boolean as an exhaustive legality certificate.
     complete=False

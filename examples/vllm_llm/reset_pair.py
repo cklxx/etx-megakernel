@@ -34,9 +34,23 @@ def run(s):
     b, c = (Path(s.c['builds'][name]) for name in ('kept', 'reset'))
     check_pair(cert.verified_build(b, Path(s.c['model'])), cert.verified_build(c, Path(s.c['model'])),
                json.loads((b/'plan.json').read_text()), json.loads((c/'plan.json').read_text()))
-    result = h.candidate_pairs(s, arm, 'RESET', publish=False)
+    # Fresh correctness has its own 90s slot; ~2 minutes is the pair slot.
+    end = s.deadline
+    s.deadline = min(h.time.monotonic()+90, end)
+    try:
+        h.certify(s, 'reset')
+    finally:
+        s.deadline = end
+    s.deadline = min(h.time.monotonic()+120, end)
+    try:
+        result = h.candidate_pairs(s, arm, 'RESET', publish=False)
+    finally:
+        s.deadline = end
     # Compare both directions on the identical populations. Do not reuse a
     # profile-build event delta as a candidate wall saving.
     result['device_deltas_ms'] = [r['reset']['device_ms']-r['kept']['device_ms'] for r in result['rounds']]
+    if any(r[who].get('kernel_event_ms') is None for r in result['rounds'] for who in ('reset', 'kept')):
+        raise ValueError('reset pair missing ordinary kernel-event envelope')
+    result['kernel_event_deltas_ms'] = [r['reset']['kernel_event_ms']-r['kept']['kernel_event_ms'] for r in result['rounds']]
     s.row('RESET.keep', result, result['status'], h.REGISTERED['RESET.keep'])
     return result
