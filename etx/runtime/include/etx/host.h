@@ -149,6 +149,7 @@ struct etx_host {
       p.arrival_words = upload(etx_arrival_words, (size_t)(ETX_ARRIVAL_SLOTS ? ETX_ARRIVAL_SLOTS : 1));
       ETX_CHECK(hipMalloc(&d_arrival_stamps, (size_t)(ETX_ARRIVAL_SLOTS ? ETX_ARRIVAL_SLOTS : 1) * 2 * sizeof(uint64_t)));
       p.arrival_stamps = d_arrival_stamps;
+      p.arrival_tasks = ETX_N_TASKS; p.arrival_slots = ETX_ARRIVAL_SLOTS;
 #endif
     }
 #endif

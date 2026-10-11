@@ -1,7 +1,10 @@
 """CPU gates: source isolation, lossless records, completion and provenance."""
 import json
+import os
 from pathlib import Path
+import re
 import struct
+import subprocess
 
 import pytest
 
@@ -9,6 +12,33 @@ from etx.codegen import emit_kernel
 from etx.codegen.inbody import instrument
 from etx.tools import inbody
 from examples.vllm_llm.bf16_300 import dispatcher, launch, launch_source, pack
+
+
+def test_tick_waits_before_using_async_scalar_result(tmp_path):
+    """Compile the real helper for gfx942; no device execution or GPU needed."""
+    root = Path(__file__).resolve().parents[1]
+    llvm = Path(os.environ.get('ETX_LLVM', '/opt/homebrew/opt/llvm/bin'))
+    if not all(p.exists() for p in (llvm/'clang++', llvm/'llc')):
+        pytest.skip('local gfx942 compiler unavailable')
+    source = tmp_path/'tick.cpp'
+    source.write_text('#include <stdint.h>\n#define __device__\n'
+                      '#define __forceinline__ inline __attribute__((always_inline))\n'
+                      '#include "etx/inbody.h"\n'
+                      'extern "C" __attribute__((amdgpu_kernel)) void stamp(uint64_t* out) '
+                      '{ out[0] = etx_inbody_tick(); }\n')
+    ir, assembly = tmp_path/'tick.ll', tmp_path/'tick.s'
+    for command in (
+        [str(llvm/'clang++'), '-target', 'amdgcn-amd-amdhsa', '-mcpu=gfx942',
+         '-nogpulib', '-ffreestanding', '-std=c++17', '-O3', '-S', '-emit-llvm',
+         '-I', str(root/'etx/runtime/include'), str(source), '-o', str(ir)],
+        [str(llvm/'llc'), '-mtriple=amdgcn-amd-amdhsa', '-mcpu=gfx942', '-O3',
+         str(ir), '-o', str(assembly)],
+    ):
+        subprocess.run(command, check=True, capture_output=True, text=True, timeout=60)
+    code = assembly.read_text()
+    # Old code copied stale SGPRs to VGPRs before its unrelated pointer-load wait.
+    assert re.search(r's_memrealtime s\[\d+:\d+\]\s+s_waitcnt lgkmcnt\(0\)', code)
+    assert 'global_store_dwordx2' in code
 
 
 def fixture():
@@ -68,6 +98,24 @@ def test_missing_completion_never_counts_as_zero(mutation):
     elif mutation=='wave': r['waves'][2]=[0,0]
     else: r['legacy'][1][2]=0
     with pytest.raises(ValueError): inbody.analyze(p,r)
+
+
+@pytest.mark.parametrize('sentinel', [0, 1])
+def test_unwritten_poll_buffer_has_specific_refusal(tmp_path, sentinel):
+    plan, raw = fixture()
+    raw['poll'] = [[sentinel] for _ in raw['poll']]
+    path = tmp_path/'unwritten.bin'
+    path.write_bytes(binary(raw))
+    with pytest.raises(ValueError, match='poll buffer not written.*task 1'):
+        inbody.analyze(plan, inbody.read_raw(path))
+
+
+@pytest.mark.parametrize('poll', [200, 214, 241, (1 << 64)-1])
+def test_strict_success_order_still_refuses_non_sentinel_corruption(poll):
+    plan, raw = fixture()
+    raw['poll'][1] = [poll]
+    with pytest.raises(ValueError, match='invalid success order/clock for task 1'):
+        inbody.analyze(plan, raw)
 
 
 def test_success_can_precede_producer_after_stamp():
