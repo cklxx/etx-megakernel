@@ -20,6 +20,15 @@ fresh certification of a new final combination (PREFLIGHT Q4); it has 1133s
 margin. Prewarm/staging finish before the clock. These are estimates, not
 runtime guarantees: missed gates/deadlines stay NOT-COMPLETE with full logs.
 The runner stops at 8400s, 600s below the 150-minute machine life.
+
+KEY32 acceptance is reused, never a new timing tranche:
+results_qwen300_2026-10-11/job2_run4.log:138,144 records 0.231ms paired
+saving (spread 0.016ms) and 4.180ms host wall = 239.23 tok/s, with checks
+at :47,60 and 32/32 in all timed logs (docs/KEY32-MEASURED-2026-10-11.md).
+This scheduling-only change leaves the KEY32 build recipe/identity unchanged.
+A new candidate/diagnostic/combination identity still buys fresh correctness
+inside its existing tranche before timing; it never adds KEY32 off/on pairs.
+An unchanged historical KEY32 arm buys no separate re-run.
 """
 from __future__ import annotations
 
