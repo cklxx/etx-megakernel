@@ -62,7 +62,7 @@ def run(config,logdir):
     c=json.loads(Path(config).read_text()); logdir=Path(logdir); logdir.mkdir(parents=True,exist_ok=True)
     deadline=time.monotonic()+900
     evidence=json.loads(Path(c['cpu_evidence']).read_text())
-    if not evidence['off_ir_code_equal'] or not evidence['off_isa_code_equal']:
+    if not evidence['off_ir_code_equal'] or not evidence['off_isa_code_equal'] or not evidence['off_device_text_byte_equal']:
         raise ValueError('OFF code-identity gate failed')
     for arm,b in c['builds'].items():
         path=Path(b['path'])

@@ -133,10 +133,12 @@ def analyze(plan, raw, byte_rules=None, hop_us=None, bandwidth=4.3):
             group[key] += val
         group['wait_bounds_us'] = [a+b for a, b in zip(group['wait_bounds_us'], t['poll_minus_arrive_bounds_us'])]
     all_bytes=defaultdict(float)
+    unknown_bytes=set()
     for t in tasks:
         if t['bytes'] is not None: all_bytes[(t['layer'],t['phase'])]+=t['bytes']
+        else: unknown_bytes.add((t['layer'],t['phase']))
     return dict(raw=raw, tasks=tasks, critical_task_ids=[s['task'].id for s in path],
-                phases=[dict(layer=l, phase=p, all_grid_byte_floor_estimate_us=all_bytes[(l,p)]/(bandwidth*1e6), **v)
+                phases=[dict(layer=l, phase=p, all_grid_byte_floor_estimate_us=None if (l,p) in unknown_bytes else all_bytes[(l,p)]/(bandwidth*1e6), **v)
                         for (l, p), v in phases.items()],
                 global_known_byte_floor_estimate_us=sum(all_bytes.values())/(bandwidth*1e6),
                 byte_floor_limit='sum of per-critical-task full-bandwidth floors is NOT the full-grid/global byte floor',
