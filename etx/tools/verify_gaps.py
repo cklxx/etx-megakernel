@@ -234,7 +234,7 @@ def annotate_sources(assembly, kernel):
         mapping[n]=source
     for row in kernel['instructions']: row['source']=mapping.get(row['assembly_line'])
 
-def report(assembly, ir=None, lds_dump=None):
+def report(assembly, ir=None, lds_dump=None, allocated_mir=None):
     assembly = Path(assembly)
     result = dict(schema=1, basis='static compiler evidence, not device execution or timing',
         assembly_sha256=digest(assembly), kernels=kernels(assembly.read_text()))
@@ -248,6 +248,12 @@ def report(assembly, ir=None, lds_dump=None):
             if kernel['lds']['total_bytes']!=kernel['resources']['LDSByteSize']:
                 raise ValueError('LDS inventory does not reconcile with assembly')
     if lds_dump: result['lds_dump_sha256']=digest(lds_dump)
+    if allocated_mir:
+        from . import spill_chain
+        mir=Path(allocated_mir).read_text()
+        for name,kernel in result['kernels'].items():
+            kernel['spills']=spill_chain.analyze(assembly.read_text(),name,spill_chain.reserved_from_mir(mir,name))
+        result['allocated_mir_sha256']=digest(allocated_mir)
     return result
 
 
@@ -256,13 +262,15 @@ def main():
     p.add_argument('assembly', type=Path)
     p.add_argument('--ir', type=Path)
     p.add_argument('--lds-dump', type=Path)
+    p.add_argument('--allocated-mir', type=Path)
     p.add_argument('--output', type=Path, required=True)
     a = p.parse_args()
-    result = report(a.assembly, a.ir, a.lds_dump)
+    result = report(a.assembly, a.ir, a.lds_dump, a.allocated_mir)
     a.output.write_text(json.dumps(result, indent=2) + '\n')
     print('VERIFY ' + json.dumps(dict(kernels=len(result['kernels']),
         instructions={k:len(v['instructions']) for k,v in result['kernels'].items()},
         register_independent_load_sites={k:v['memory_order']['register_independent_load_sites'] for k,v in result['kernels'].items()},
+        may_chain_reload_counts={k:v.get('spills',{}).get('may_chain_reload_counts') for k,v in result['kernels'].items()},
         output=str(a.output)), sort_keys=True))
 
 

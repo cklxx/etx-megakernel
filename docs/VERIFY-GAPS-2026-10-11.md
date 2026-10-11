@@ -89,3 +89,51 @@ Both exited 0. Each stage has a 180-second subprocess deadline and full logs.
 No shell script added. Full suite at this checkpoint:
 `1327 passed, 14 skipped in 207.60s (0:03:27)` (five generator/memory tests
 included). LLVM 23 gfx942/ETX_DEVLIBS baseline compile also exited 0 above.
+
+## Gap 2 — spill pairs and the reduction dependence slice
+
+Artifact: `etx/tools/spill_chain.py` and `{baseline,c1,c5}-spills.json.gz`.
+Every static spill store/reload has its instruction index, assembly line,
+physical-register value version, concrete lane or scratch-word slots, and
+all CFG-reaching spill stores. Store value/control definitions are named by
+instruction index rather than guessed C++ variable names. `allocated.mir`'s
+WWM-reserved VGPRs distinguish compiler SGPR spills from semantic broadcasts.
+Scratch slots are tracked per 4-byte word, including partial x2 reloads.
+**Unmatched reloads: 0 in every kernel/arm.**
+
+Definition, unchanged across arms: the conservative **MAY-dependence slice**
+from non-scratch global/scalar loads to the final lane-pair addition of every
+DSL `dsl_wave_sum0` reduction (`quad_perm:[1,0,3,2]`, including an addition
+moved into a successor's lane-zero branch). The slice includes explicit
+registers, implicit exec/vcc/scc, CFG-reaching definitions through backedges,
+SGPR lane spills, scratch words and branch control dependence up to the
+immediate postdominator. LDS aliases are conservatively joined. It is the
+intersection of load-descendant and final-reduction-ancestor sets.
+This is **not a longest executed timing path**. Alternative dispatch arms,
+loop trips and conservative LDS aliasing can give false positives.
+
+Megakernel static reload instructions (scratch / SGPR lane):
+**5 / 6327** baseline, **5 / 6349** C1, **10 / 6327** C5.
+On the defined MAY slice: **5 / 4482 = 4487**, **5 / 4497 = 4502**,
+**10 / 4482 = 4492**, respectively. Delta from baseline: C1 **+15**,
+C5 **+5**. Final reduction sites: **89 / 90 / 89**. No CFG block lacks an
+exit path. Both reload classes and slice counts are **0** in unfused in every
+arm. The native metadata's 6/8 VGPR and 255/261 SGPR spill counts describe
+allocated spills, not the number of static reload instructions. One reload
+can carry two dwords, and many branch sites can reload the same spill slot.
+Do not compare those different count bases as if they were equivalent.
+
+The pair inventory and repeatable static slice counts are closed. The brief's
+stronger assertion that a reload lies on **the actual critical chain** is
+still **open**: the tool prints `executed_critical_reload_count: null` and
+per-reload `executed_critical_chain: null`. No GPU or dynamic path was supplied.
+It does not replace that unknown with the MAY count. Source register versions
+also do not recover optimized-away C++ variable names.
+
+Full suite at this checkpoint: `1329 passed, 14 skipped in 281.13s (0:04:41)`.
+The native three-arm builds and local gfx942/ETX_DEVLIBS compile above exited
+0; this checkpoint adds Python analysis, no device logic or shell script.
+Raw CLI stdout is preserved in the three `*-report.log` files; it includes
+both per-kernel counts. New tests cover CFG spill-store merges, lane-spill
+classification, missing slot provenance, transitive address dependence,
+DPP/swizzle modifier parsing and a final reduction add across a branch.
