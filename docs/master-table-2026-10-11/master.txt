@@ -1,0 +1,84 @@
+trace tr_on.bin: span 4067.290 us, 60362 tasks, path 436 tasks
+
+L1 ROLES (all tasks of the step; path = critical path)
+role       tasks/step  XCDs        MB/step   mean body  median body | path: tasks  body[M]  bytes_bw[E]  hops[E]  mach[R]  gap[M]  total
+prologue            1  0              0.004      3.920       3.920 |          1      3.9         0.0      0.4      3.5     2.6     6.5
+in_norm             8  0-7            0.004      3.860       3.840 |          1      3.7         0.0      3.6      0.1     4.4     8.1
+qkv             12288  0-7         1006.825      9.099       9.120 |         48    433.2       234.1     20.0    179.0   183.2   616.3
+prep              192  0-3            0.123      3.996       3.960 |         48    194.8         0.0     49.0    145.8    81.1   275.9
+attn              960  0-3          103.711      5.292       5.280 |         48    259.7        24.1    130.0    105.6    52.5   312.2
+reduce            192  0-3            2.421      5.238       5.220 |         48    254.3         0.6    130.0    123.7    56.6   310.8
+o_proj          12288  0-7          805.306      5.141       5.160 |         48    263.5       187.3     20.0     56.2    96.7   360.2
+router          12288  0-7           25.362      2.898       2.640 |         48    265.4         5.9     49.0    210.5   129.2   394.6
+topk              384  0-7            0.135      2.998       3.040 |         48    146.3         0.0     34.0    112.3    74.6   220.9
+moe_up           9216  0-7         2415.919     15.776      15.760 |         48    770.3       561.8     49.0    159.5    52.2   822.5
+moe_down        12288  0-7         1207.960      9.214       9.240 |         48    435.4       280.9     49.0    105.5   139.1   574.4
+lm_head           256  0-7          622.334    149.150     150.120 |          1    151.9       144.7      0.0      7.2     1.7   153.6
+argmax              1  0              0.304      9.520       9.520 |          1      9.5         0.1      0.6      8.8     1.7    11.2
+TOTAL           60362              6190.409                        |        436   3191.8      1439.6    534.4   1217.8   875.5  4067.3
+check: body + gap = 4067.290 us vs span 4067.290 us
+
+GAP FATE (charged to the consumer role)
+role       gap[M]  window-start  before-taken[M] (late n)  late after-take  free (n)  free-into-touch?
+prologue      2.6           2.6              0.0 ( 0)              0.0      0.0 ( 0)  no
+in_norm       4.4           0.0              0.0 ( 0)              0.0      4.4 ( 1)  no
+qkv         183.2           0.0             74.5 (46)            102.0      6.7 ( 2)  yes
+prep         81.1           0.0              0.0 ( 0)              0.0     81.1 (48)  no
+attn         52.5           0.0              0.0 ( 0)              0.0     52.5 (48)  no
+reduce       56.6           0.0              0.0 ( 0)              0.0     56.6 (48)  no
+o_proj       96.7           0.0              0.0 ( 0)              0.0     96.7 (48)  yes
+router      129.2           0.0             50.9 (30)             38.7     39.6 (18)  yes
+topk         74.6           0.0              0.0 ( 0)              0.0     74.6 (48)  no
+moe_up       52.2           0.0              0.0 ( 0)              0.0     52.2 (48)  no
+moe_down    139.1           0.0            106.0 (47)             30.8      2.4 ( 1)  no
+lm_head       1.7           0.0              0.0 ( 0)              0.0      1.7 ( 1)  yes
+argmax        1.7           0.0              0.0 ( 0)              0.0      1.7 ( 1)  no
+TOTAL       875.5           2.6            231.3                 171.4    470.1
+free edges into touch grids 144.7 us, into non-touch grids 325.4 us
+check: window-start + before-taken + late after-take + free = 875.490 vs gap 875.490
+
+LEDGER VIEW (layer roles; B = 48 x (critical body - floor), docs/PLAN-generic-decoder-2026-10-08.md:154)
+role       floor  crit/layer  48xfloor[E]  B[E]     48xcrit  path body[M]  correction[R]
+qkv         7.55       9.061       362.4    72.5      434.9        433.2          -1.8
+prep        1.52       4.135        73.0   125.5      198.5        194.8          -3.7
+attn        2.92       5.360       140.2   117.1      257.3        259.7           2.4
+reduce      2.81       5.285       134.9   118.8      253.7        254.3           0.6
+o_proj      5.30       5.476       254.4     8.5      262.9        263.5           0.6
+router      1.52       5.540        73.0   192.9      265.9        265.4          -0.5
+topk        1.21       3.140        58.1    92.7      150.7        146.3          -4.5
+moe_up     14.67      16.223       704.2    74.5      778.7        770.3          -8.4
+moe_down    9.48       9.069       455.0   -19.7      435.3        435.4           0.0
+layers                            2255.0   782.9                                 -15.2
+non-layer bodies [M] (prologue, in_norm, lm_head, argmax) 169.1; gaps [M] 875.5
+check: 2255.0 + 782.9 + -15.2 + 169.1 + 875.5 = 4067.290 vs span 4067.290
+
+PER-LAYER ROLE STATS, layers 1-45 [M] (round11_from_trace): crit body, mean body, start skew of the last task
+qkv       tasks/layer  256  crit 9.061  mean 9.164  crit-mean -0.103  start 2.091  period-share 12.515
+prep      tasks/layer    4  crit 4.135  mean 3.993  crit-mean 0.142  start 0.402  period-share 4.937
+attn      tasks/layer   20  crit 5.360  mean 5.280  crit-mean 0.080  start 0.656  period-share 6.458
+reduce    tasks/layer    4  crit 5.285  mean 5.229  crit-mean 0.057  start 0.647  period-share 7.680
+o_proj    tasks/layer  256  crit 5.476  mean 5.132  crit-mean 0.344  start 0.267  period-share 7.664
+router    tasks/layer  256  crit 5.540  mean 2.892  crit-mean 2.647  start 0.745  period-share 7.644
+topk      tasks/layer    8  crit 3.140  mean 3.000  crit-mean 0.141  start 0.283  period-share 3.671
+moe_up    tasks/layer  192  crit 16.223  mean 15.767  crit-mean 0.456  start 0.690  period-share 17.406
+moe_down  tasks/layer  256  crit 9.069  mean 9.221  crit-mean -0.151  start 2.174  period-share 12.976
+
+KNOWN/ESTIMATED/RESIDUAL split of the span (L3 resolution)
+[M] before-taken 231.3 + free notification into non-touch grids 325.4 = 556.7 us (13.7%)
+[E] bytes at 4.3 TB/s 1439.6 + exposed hops 534.4 = 1974.0 us (48.5%)
+[R] machinery 1217.8 + late after-take 171.4 + free into touch grids 144.7 + window start 2.6 = 1536.6 us (37.8%)
+check: 556.7 + 1974.0 + 1536.6 = 4067.290 vs span 4067.290
+per role [M] / [E] / [R] us:
+  prologue      0.0     0.4     6.1  =     6.5
+  in_norm       4.4     3.6     0.1  =     8.1
+  qkv          74.5   254.1   287.7  =   616.3
+  prep         81.1    49.0   145.8  =   275.9
+  attn         52.5   154.1   105.6  =   312.2
+  reduce       56.6   130.5   123.7  =   310.8
+  o_proj        0.0   207.2   153.0  =   360.2
+  router       50.9    54.9   288.8  =   394.6
+  topk         74.6    34.0   112.3  =   220.9
+  moe_up       52.2   610.8   159.5  =   822.5
+  moe_down    108.3   329.9   136.2  =   574.4
+  lm_head       0.0   144.7     8.8  =   153.6
+  argmax        1.7     0.7     8.8  =    11.2
