@@ -750,6 +750,9 @@ int main(int argc, char** argv) {
       }
 #endif
       if (t + 1 >= (int)prompt.size()) wall_ms.push_back(wms);
+#ifdef ETX_INBODY_REPORT
+      if (t >= (int)prompt.size()) printf("HOUR-WALL {\"run\":%d,\"step\":%d,\"ms\":%.9f}\n", run, t, wms);
+#endif
       if (progress && (t % progress == 0 || t < 3)) { printf("  step %d: %.3f ms wall\n", t, wms); fflush(stdout); }
     }
     if (nsteps < steps) { printf("run %d: stopped after %d of %d steps (--max-steps): no token check\n", run, nsteps, steps); continue; }

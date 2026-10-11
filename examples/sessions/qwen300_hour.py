@@ -355,6 +355,79 @@ def tranche_a(s):
     print(f'FIRST-STOP elapsed={time.monotonic()-s.start:.1f}s (<=900s); stamps price intervals, not removals', flush=True)
 
 
+def timing(text, mode='fused'):
+    token_gate(text)
+    from examples.vllm_llm.pairs import parse
+    runs = parse(text.splitlines()).runs
+    if len(runs) != 1 or runs[0].arm != mode: raise ValueError('wrong timing mode')
+    rows = [json.loads(l.split(' ', 1)[1]) for l in text.splitlines() if l.startswith('HOUR-WALL ')]
+    if [(r['run'], r['step']) for r in rows] != [(0, t) for t in range(1024, 1055)]:
+        raise ValueError('NOT-COMPLETE: 31 post-first-token steps required')
+    if any(not math.isfinite(r['ms']) or r['ms'] <= 0 for r in rows): raise ValueError('invalid timing')
+    return dict(wall_ms=st.mean(r['ms'] for r in rows), samples=rows,
+                result_wall_ms=runs[0].wall_ms, device_ms=runs[0].device_ms)
+
+
+def keep(gains, count=3, threshold=.030):
+    if len(gains) != count: raise ValueError('NOT-COMPLETE pair population')
+    if any(not math.isfinite(g) for g in gains): raise ValueError('nonfinite paired gain')
+    med = st.median(gains); spread = max(gains)-min(gains)
+    return dict(gains_ms=gains, median_ms=med, spread_ms=spread,
+                keep=all(g > 0 for g in gains) and med >= threshold and med > 2*spread)
+
+
+def eligible_arm(s, a):
+    """No builder is called here: a candidate must be sealed before the clock."""
+    from examples.vllm_llm import import_certificate as cert
+    if not a.get('enabled'): raise ValueError(a.get('reason', 'disabled in manifest'))
+    b = Path(s.c['builds'][a['build']]); identity = cert.verified_build(b, Path(s.c['model']))
+    if not identity['check_enabled']: raise ValueError('candidate needs CHECK build')
+    flags = identity['hipcc_flags']
+    if '-DETX_INBODY_REPORT' not in flags or '-DETX_HOUR_PROFILE' in flags or '-DETX_INBODY=' in flags:
+        raise ValueError('candidate timing must be report-enabled, stamps/profile OFF')
+    for k, v in a.get('flags', {}).items():
+        if identity['overrides'].get(k) != v: raise ValueError('candidate flag missing: '+k)
+    for define in a.get('defines', []):
+        if '-D'+define not in flags: raise ValueError('candidate define missing: '+define)
+    p = json.loads((b/'plan.json').read_text())
+    kept = json.loads((Path(s.c['builds']['kept'])/'plan.json').read_text())
+    if schedule_signature(p) != schedule_signature(kept): raise ValueError('frozen workers/tasks/boundaries changed')
+    return a
+
+
+def candidate_pairs(s, a, tranche):
+    arm = a['build']; ident = a['id']
+    certify(s, arm)
+    rounds = []
+    for rnd in range(3):
+        row = {}
+        for who in (('kept', arm) if rnd % 2 == 0 else (arm, 'kept')):
+            row[who] = timing(host(s, who, f'{tranche}_{ident}_r{rnd}_{who}', ['--repeat', '1']))
+        rounds.append(row)
+    result = keep([r['kept']['wall_ms']-r[arm]['wall_ms'] for r in rounds])
+    result.update(status='KEEP' if result['keep'] else 'REJECT', rounds=rounds, overlap=a.get('overlap'))
+    s.arms[ident] = result
+    s.row(tranche+'.'+ident, result, result['status'], REGISTERED['B.keep' if tranche == 'B' else 'C.body'])
+    return result
+
+
+def tranche_b(s):
+    s.deadline = min(s.start+1800, s.end)
+    if 'kept' not in s.certified:
+        print('B SKIP: kept fresh correctness gate failed', flush=True); return []
+    survivors = []
+    for a in s.m['B']:
+        def run(a=a):
+            eligible_arm(s, a)
+            return candidate_pairs(s, a, 'B')
+        result = s.attempt(a['id'], run)
+        if result and result['keep']: survivors.append(a)
+    s.row('B.keep', {a['id']: s.arms.get(a['id']) for a in s.m['B']},
+          'PASS' if survivors else 'NO-KEEP', REGISTERED['B.keep'])
+    print('B ceilings overlap router body: do not add C1/C5 gains; D must measure any combination', flush=True)
+    return survivors
+
+
 def dry_run():
     """Exercise CPU logic, shell syntax and runner registration; never spawn GPU commands."""
     for j in JOBS:
