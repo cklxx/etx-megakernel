@@ -578,12 +578,17 @@ def tranche_a(s):
             s.row('A1.busy', pools['busy'], 'PASS' if busy >= .100 else 'DEAD' if pools['busy']['above_floor_upper_ms'] < .050 and not pools['ambiguous']['count'] else 'UNRESOLVED', REGISTERED['A1.busy'])
             s.row('A1.free', pools['free'], 'PASS' if free >= .050 else 'UNRESOLVED', REGISTERED['A1.free'])
             s.row('A1.floor', dict(floor_us=1, distributions=pools, ambiguity=pools['ambiguous']), 'RECORDED', REGISTERED['A1.floor'])
-            a2 = attention_price(result['inbody'])
-            (s.out/'A_attention.json').write_text(json.dumps(a2, indent=2)+'\n')
-            s.row('A2.route', a2, 'HEADROOM-PASS' if a2['available_cut_estimate_ms'] >= .142 else 'FAIL', REGISTERED['A2.route'])
             return result
-        result = s.attempt('A1/A2', stamped)
-        if result is not None: gap_atoms = result['gap_atoms']
+        result = s.attempt('A1', stamped)
+        if result is not None:
+            gap_atoms = result['gap_atoms']
+            def attention():
+                a2 = attention_price(result['inbody'])
+                (s.out/'A_attention.json').write_text(json.dumps(a2, indent=2)+'\n')
+                s.row('A2.route', a2, 'HEADROOM-PASS' if a2['available_cut_estimate_ms'] >= .142 else 'FAIL', REGISTERED['A2.route'])
+                return a2
+            if s.attempt('A2', attention) is None:
+                s.row('A2.route', None, 'NOT-COMPLETE', REGISTERED['A2.route'])
     if 'stages' in s.certified:
         def stages():
             text = token_gate(host(s, 'stages', 'A_stages', ['--repeat', '1']))

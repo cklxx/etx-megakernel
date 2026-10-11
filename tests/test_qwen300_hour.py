@@ -73,6 +73,37 @@ def test_a2_prices_critical_body_and_is_not_attainability():
     with pytest.raises(ValueError): h.attention_price(dict(phases=rows[:-1]))
 
 
+@pytest.mark.parametrize('failure', ['none', 'certify', 'run', 'analysis', 'coverage'])
+def test_a2_failure_preserves_g_and_missing_a1_is_incomplete(tmp_path, monkeypatch, failure):
+    s = session(tmp_path); s.c['builds']['stamps'] = '/unused/stamps'
+    def certify(s, arm):
+        if arm == 'stages' or (arm == 'stamps' and failure == 'certify'):
+            raise ValueError('diagnostic certification failed')
+        s.certified.add(arm)
+    monkeypatch.setattr(h, 'certify', certify)
+    def host(*args):
+        if failure == 'run': raise RuntimeError('stamp run failed')
+        return host_text()+'HOUR-SNAPSHOT run=0 step=1024\n'
+    monkeypatch.setattr(h, 'host', host)
+    phases = [dict(layer=l, phase=p, body_us=5.) for l in range(48) for p in ('attn', 'reduce')]
+    if failure == 'coverage': phases.pop()
+    def analysis(name, cmd, **kw):
+        if failure == 'analysis': raise ValueError('analysis failed')
+        pool = dict(above_floor_lower_ms=.2, above_floor_upper_ms=.2, count=1)
+        result = dict(critical_pools=dict(busy=pool, free=pool, ambiguous=dict(count=0)),
+                      gap_atoms=dict(G_ms=.324), inbody=dict(phases=phases))
+        Path(cmd[-1]).with_suffix('.summary.json').write_text(json.dumps(result))
+    monkeypatch.setattr(s, 'step', analysis)
+    complete_g = failure in ('none', 'coverage')
+    assert h.tranche_a(s) is complete_g
+    assert s.rows['A.stop']['status'] == ('PASS' if complete_g else 'NOT-COMPLETE')
+    if complete_g:
+        assert s.rows['A.stop']['value']['G_ms'] == .324
+        assert h.second_stop(s)
+        assert s.rows['A2.route']['status'] == ('NOT-COMPLETE' if failure == 'coverage' else 'HEADROOM-PASS')
+        assert s.rows['B.stop']['value']['R2_ms'] == 0.
+
+
 def host_text(mode='fused', cost=4.18):
     text = 'ETX_ENV ETX_UNFUSED_SYNC= ETX_UNFUSED_NOGRAPH=\n'
     text += 'mode: '+('ETX megakernel' if mode == 'fused' else 'unfused HIP graph')+'\n'
