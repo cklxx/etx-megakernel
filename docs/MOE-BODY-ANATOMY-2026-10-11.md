@@ -104,7 +104,56 @@ For comparison only, an additive **byte-service bookkeeping model** closes as `1
 
 ## 3. Removable pool and smallest change
 
-Pending: measured versus conditional removable pool, comparison with the requested 0.324 ms, largest item and correctness invariants.
+### 3.1 What can actually be summed
+
+**Qualified exclusive removable pool: 0 us/layer = 0 ms/step credited.** That is an evidence result: no current measurement qualifies any separate phase as removable. It does not assert that the physical opportunity is zero. Nothing supports a measured **0.3–0.5 ms** pool here [U].
+
+The one source-proven redundant structure is the **cross-wave partial matrix when every row has one owner**. Its removable **gross service work** is computable:
+
+| Component removed per task | up | down | Nominal service price [E] |
+|---|---:|---:|---|
+| Partial clear (G:185) | 4096 B | 4096 B | 4096/(128×2100) = 0.015238 us each |
+| Partial read/add/deposit (G:209) | 512 B | 512 B | 512/(128×2100) = 0.001905 us each |
+| Cross-wave partial gather (G:274) | 4096 B | 4096 B | 4096/(128×2100) = 0.015238 us each |
+| Clear and partial-join barriers (G:186,267); retain G:277 | 2 | 2 | 2×0.0612 = 0.1224 us each, older bare-barrier measurement at `results_2026-09-28b/impbar_hw.log:4` |
+| **Gross service total** | | | **0.154781 us up + 0.154781 us down = 0.309562 us/layer**, `48×0.309562/1000 = 0.014859 ms/step [E]` |
+
+Using the **0.106 us** older imported-round barrier value (`docs/MODEL-vllm-kernels.md:329`) instead gives `2×8704/(128×2100)+4×0.106 = 0.488762 us/layer`, `×48/1000 = 0.023461 ms/step [E]`. These two benchmark choices are a **sensitivity calculation, not a confidence interval or an upper bound**. LDS latency, scoreboard stalls, one-wave gather serialization and slowest-wave skew could make the observed interval larger; overlap with the stream could make net saving smaller. Newly distributed output stores or register pressure could make it negative. The virtual ordered zero additions must remain until bit-equivalence permits their removal; this arithmetic assigns no ALU saving to them.
+
+Thus the calculable instruction/memory service pool is **about 0.015–0.023 ms gross [E]**, with **net exposed saving [U]**. It plainly cannot carry **0.324 ms** on its priced terms: `0.014859/0.324=4.59%`, `0.023461/0.324=7.24% [E]`. An exclusive measured saving of `324/48=6.75 us/layer [E]` would need roughly **14–22 times** this nominal gross service: `6.75/0.488762=13.81`, `6.75/0.309562=21.80 [E]`. A large serial gather/loop/skew cost remains a hypothesis [U], not added to this total.
+
+### 3.2 The 0.158 ms is not an algorithmic ceiling
+
+The plan's **0.158 = 0.139 up + 0.019 down ms [E]** is a **body-minus-serial-floor ceiling on the older `results_tiles` trace**, using round11 hop assumptions (`docs/PLAN-generic-decoder-2026-10-08.md:224,230`; `PLAN-300TOKS:99,132`). The brief calls it conservative; the plan calls the allowances **generous ceilings** and the ledger **deliberately optimistic** (`PLAN-300TOKS:3,33`). It neither prices every current phase nor proves an algorithm-wide ceiling for a new mapping. Removing or overlapping a hop invalidates that serial-floor premise. This audit **does not establish that 0.158 is the true maximum**. It also does not supply evidence to replace it with 0.3–0.5 ms.
+
+Do not subtract old `streamw` times from today's body to claim a gain. The older pure-stream task medians were **14.08/8.20 us [M]** (`results_2026-10-01/round21/streamw.log:7,9`), in another session and mapping. They show why phase-shape achieved bandwidth matters. They are not a latency charge to current phases and do not certify the current candidate's floor.
+
+There is also a whole-target ledger issue. **0.324 ms is the gap after already crediting the MoE row's 0.158 ms** (`PLAN-300TOKS:132,135-136,146`). If a new anatomy replaces that row, total MoE saving must be approximately `0.158 + 0.323667 = 0.481667 ms [E]` to fill the old gap while other rows remain at their optimistic endpoints. A total **0.300 ms** row supplies only `0.300-0.158=0.142 ms additional [E]`; a **0.500 ms** row supplies `0.342 ms additional [E]`. Comparing a total 0.324 ms MoE pool directly with the remaining target gap double-counts the old row.
+
+On the **mean-body / ideal-4.3-TB/s bookkeeping basis alone**, only **0.363778 ms [E]** remains above weight service (§1.3), already smaller than **0.481667 ms [E]** before any essential work. This is a useful countercheck, **not a critical-path or wall-time impossibility proof**. Task mean is not critical-task body; mapping and achieved stream rate can change; their qualified effect is [U]. The evidence supports **“cannot presently carry the gap”**, not “a proof that every bf16 tile is capped at 0.158.”
+
+### 3.3 Largest item and the smallest removal
+
+**Largest timed removable item: [U].** Naming the **6.5 us residual** as that item would invent an attribution. The largest **provably redundant reduction data structure** is the partial matrix/gather above: no row in either audited shape has contributions from two waves. It is the smallest concrete experiment supported by this source anatomy.
+
+In **`dsl_gemv_rows_nb` (G:168-278)**, add a fixed whole-row-owned path:
+
+1. Guard exact shape/participation and retain the generic fallback: up `K=2048, nrt=64 combined GU1, rpt=32, 16 waves/1024 threads`; down `K=768, nrt=rpt=64, 16 waves/1024 threads [E]` as §2.1. Also require valid original row bounds and no wave crossing the gate/up discontinuity. Up needs the existing gap/base handling unchanged (G:188-196,773-777).
+2. Delete **G:185-186** (partial zero/clear barrier). In **G:209**, keep `dsl_wave_sum0(acc)`, and let its lane 0 call the epilogue for `r0+cur` directly. Recreate `0.f+v` and the **w2=0..15** virtual-zero additions in the original order, with the nonzero at its owner index. Reset acc and retain the order of every `dsl_dot`/acc update (G:220-224).
+3. Delete the partial rendezvous/gather **G:267-276**; retain **G:277** as one all-wave join. Up still materializes rounded gate/up values in g before the original SiLU at **G:790**. Down calls the unchanged multiply/round/store epilogue at **G:832** from each row's owner wave. Keep the task's **all-wave publication drain/barrier** at `kernel.py:325,332`.
+
+The existing isolated up clone already implements this core edit (`bf16_300/source.py:73-81`) and falls back on the original path (`:85-91`). It is **prepared, not GPU validated** (`bf16_300/README.md:59-65`). Extending its proof to down requires a separate guarded path, not simply enabling the up template with EPL=4. This task changes no production tile.
+
+Correctness risks, specifically:
+
+- **Wave sum:** WSUM lane 0 is the only defined result; retain its xor-tree order and lane mask (`gfx942.yaml:117-131`). Using another lane's partial or a sequential reduction changes dots.
+- **bf16 rounding:** up must round gate and up **separately before SiLU×up**, then round output; down must multiply fp32 dot by ws **before** the final bf16 rounding (`G:13-15,159-160,777,790,832`). No conversion to reduced precision is proposed.
+- **Partial order:** every original zero addition, including the deposit's initial +0, is part of the numerical reference. Dropping them without proof can change signed zero/exceptional behavior; test byte equivalence on captured finite model inputs and inspect compiler math flags. Preserve actual w2 order, never completion order.
+- **LDS lifetime:** up gate and up rows are owned by different waves. Keep the join before SiLU; no successor may reuse xs/g until all consumers finish. The down epilogue changes thread ownership but not row ownership.
+- **Payload visibility:** the original down output is emitted by wave 0's lanes; the rewrite emits from multiple waves. Every producing wave must drain before the existing publication barrier. A thread-0-only drain is unsafe (`kernel.py:324-332`). Coherent store flags must remain.
+
+After that structural deletion, the narrow next candidate is **constant/wave-uniform range and pipeline specialization** at **G:183-184,201,218-224,240-260**, especially the still-vector up path in the CPU ISA. It removes no required bf16 arithmetic. Its exclusive latency and ranking against gather/publication are [U]; it cannot be named the largest item by time yet.
+
 
 ## 4. Probe coverage and decisive GPU measurement
 
