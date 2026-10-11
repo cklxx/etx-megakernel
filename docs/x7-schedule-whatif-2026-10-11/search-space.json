@@ -1,0 +1,13 @@
+{
+  "registered_before_results": true,
+  "bar_us_per_layer": 0.625,
+  "body_model": "individual tr_on ready-to-done, fixed; no replacement math",
+  "timing_model": "producer queue-after and consumer ready-after residuals retained",
+  "orders": ["coord", "reverse", "long_first", "short_first"],
+  "worker_strides": [0, 6, 14, 19, 26, 32],
+  "maps": ["original", "rotate_heads", "dense_balance", "attention_wide"],
+  "scope_promotion_us": [0.0, 0.3, 0.6],
+  "boundary_probes": ["domain_all", "drop_prep_event", "drop_reduce_event", "drop_moe_fold_event", "drop_layer_event"],
+  "wave_probe": "reverse coords is task-wave order; actual in-body wave instruction order is fixed",
+  "limits": "frozen trace profiles; timings conditional on unchanged bodies and residual costs"
+}
