@@ -1123,21 +1123,37 @@ def execute(s):
         print('END before timed tranches: environment guard did not pass', flush=True)
         return
     s.qualified_c = qualify_c(s)
-    if not tranche_a(s):
-        print('END after A: '+s.rows['A.stop']['value']['decision'], flush=True)
-        if s.rows['A.stop']['status'] == 'NOT-COMPLETE':
-            s.arms['session'] = dict(status='NOT-COMPLETE', reason=s.rows['A.stop']['value']['decision'])
+    a_pass = tranche_a(s)
+    stop = s.rows['A.stop']
+    value = stop['value']
+    # INVALID stamps leave S1 unjudged; independent pairs do not need G.
+    unjudged = (stop['status'] == 'NOT-COMPLETE' and value['G_ms'] is None
+                and (value.get('stamp_perturbation') or {}).get('status') == 'INVALID'
+                and 'kept' in s.certified)
+    expired = time.monotonic() >= s.end
+    if expired or (not a_pass and not unjudged):
+        reason = 'session deadline reached' if expired else value['decision']
+        print(f'END after A: {reason}; G_ms={value["G_ms"]}', flush=True)
+        if expired or stop['status'] == 'NOT-COMPLETE':
+            s.arms['session'] = dict(status='NOT-COMPLETE', reason=reason)
         for name in ('X5', 'B.keep', 'B.stop', 'C.fusion', 'C.body', 'C.NO_TOUCH', 'C.ISOLATE_POLLER',
                      'D.target', 'D.fusion', 'D.system'):
             s.row(name, None, 'NOT-RUN', REGISTERED[name])
         return
+    if unjudged:
+        atoms = (value.get('gap_atoms') or {}).get('atoms')
+        raw = sum(a['above_floor_ms'] for a in atoms.values() if a['counted']) if atoms is not None else None
+        print(f'S1 verdict UNJUDGED: {value["stamp_perturbation"]["reason"]}; '
+              f'raw above-floor opportunity={raw} ms (uncertified); session continues to B/C/D', flush=True)
     # X5 can change R2. Spend only its bounded isolated probes before S2,
     # never the C1/C5 wall pairs when the route has already closed.
     from examples.vllm_llm import x5
     s.deadline = min(time.monotonic()+120, s.end)
     if s.attempt('X5', lambda: x5.run(s)) is None:
         s.row('X5', None, 'NOT-COMPLETE', REGISTERED['X5'])
-    if not second_stop(s):
+    if unjudged:
+        s.row('B.stop', None, 'NOT-COMPLETE', REGISTERED['B.stop'])
+    elif not second_stop(s):
         print('STOP after A: S2 closes target route', flush=True)
         for name in ('B.keep', 'C.fusion', 'C.body', 'C.NO_TOUCH', 'C.ISOLATE_POLLER', 'D.target', 'D.fusion', 'D.system'):
             s.row(name, None, 'NOT-RUN', REGISTERED[name])
