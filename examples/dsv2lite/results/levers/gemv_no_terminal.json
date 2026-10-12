@@ -1,0 +1,59 @@
+{
+  "arm": "gemv_no_terminal",
+  "arm_build": {
+    "isa_sha256": "58848b0e81e4f79ea79559134b1bf6e3a9235a4b9c267e8f242a7c82b6a50530",
+    "resources": {
+      "agpr": 48,
+      "lds": 26668,
+      "occupancy": 1,
+      "scratch": 0,
+      "sgpr": 108,
+      "vgpr": 256
+    },
+    "static": {
+      "asm_lines": 118194,
+      "nt_weight_loads": 384,
+      "vmcnt0_waits": 2775
+    }
+  },
+  "cpu_gates": {
+    "files": [
+      "tests/test_dsv2_lever_gemv_no_terminal.py",
+      "tests/test_dsv2_stamps.py"
+    ],
+    "summary": "8 passed in 0.98s"
+  },
+  "default": {
+    "isa_sha256": "a105cb16a414ee0f9f697c9de13205419d09674f5c69f6ee804cf36942377724",
+    "resources": {
+      "agpr": 48,
+      "lds": 26668,
+      "occupancy": 1,
+      "scratch": 0,
+      "sgpr": 108,
+      "vgpr": 256
+    },
+    "static": {
+      "asm_lines": 107990,
+      "nt_weight_loads": 252,
+      "vmcnt0_waits": 2750
+    }
+  },
+  "delta_vs_default": {
+    "agpr": 0,
+    "lds": 0,
+    "occupancy": 0,
+    "scratch": 0,
+    "sgpr": 0,
+    "vgpr": 0
+  },
+  "etx_commit": "b125ec4f87cdf6d373bc3c50f8f642a65266fe72",
+  "etx_dirty": false,
+  "fleet_commit": "3fb67a6",
+  "fleet_src_sha256": "28f5cbb4f39524df318883522341c48ca4162c18b71a3a6223c52eabb40ce4b3",
+  "static_delta": {
+    "asm_lines": 10204,
+    "nt_weight_loads": 132,
+    "vmcnt0_waits": 25
+  }
+}
