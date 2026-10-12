@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Offline device + host compilation using the already-local x86 ROCm 7.2.4 toolchain.
-# Usage: rocm_build_check.sh PINNED_FLEET_EXPORT [default|gemv_no_terminal|norm_gamma_early|norm_tree|both|stamps|all] [OUT]
+# Usage: rocm_build_check.sh PINNED_FLEET_EXPORT [default|stamps|<lever>[+<lever>...]|all] [OUT]
+#   all = default, stamps and every lever on this branch alone (examples/dsv2lite/levers/).
 # No GPU, pull or network. Fleet must be an export, never a checkout. Extra compiler
 # flags go in ETX_CFLAGS; ETX_DSV2_* graph settings are forwarded explicitly.
 set -euo pipefail
@@ -17,11 +18,14 @@ if ! docker image inspect etx-rocm22 >/dev/null 2>&1; then
   exit 2
 fi
 docker image inspect etx-rocm22 --format '{{.Id}}' > "$OUT/image.txt"
-case "$ARM" in
-  all) ARMS=(default gemv_no_terminal norm_gamma_early norm_tree both stamps);;
-  default|gemv_no_terminal|norm_gamma_early|norm_tree|both|stamps) ARMS=("$ARM");;
-  *) echo "unknown arm: $ARM" >&2; exit 2;;
-esac
+LEVERS=$(cd "$ROOT" && .venv/bin/python -c 'from examples.dsv2lite.patch_fleet import levers; print(" ".join(levers()))')
+if [ "$ARM" = all ]; then ARMS=(default stamps $LEVERS); else ARMS=("$ARM"); fi
+for arm in "${ARMS[@]}"; do
+  case "$arm" in default|stamps) continue;; esac
+  for lever in ${arm//+/ }; do
+    case " $LEVERS " in *" $lever "*) ;; *) echo "unknown arm $arm: lever $lever not on this branch ($LEVERS)" >&2; exit 2;; esac
+  done
+done
 ENV_ARGS=()
 while IFS= read -r name; do
   case "$name" in ETX_DSV2_*) ENV_ARGS+=(-e "$name=${!name}");; esac
@@ -45,9 +49,8 @@ SRC=/fleet/src
 PATCHES=(); FLAGS=()
 case "$ARM" in
   default) ;;
-  both) PATCHES=(gemv_no_terminal norm_tree);;
   stamps) FLAGS=(-DETX_DSV2_STAMPS2);;
-  *) PATCHES=("$ARM");;
+  *) read -ra PATCHES <<< "${ARM//+/ }";;
 esac
 if [ ${#PATCHES[@]} -gt 0 ] || [ "$ARM" = stamps ]; then
   rm -rf "$OUT/fleet_src"; mkdir -p "$OUT/fleet_src"

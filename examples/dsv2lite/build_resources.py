@@ -11,7 +11,6 @@ FIELDS = {
     "scratch": "ScratchSize [bytes/lane]", "lds": "LDS Size [bytes/block]",
     "occupancy": "Occupancy [waves/SIMD]",
 }
-ARMS = ("default", "gemv_no_terminal", "norm_gamma_early", "norm_tree", "both", "stamps")
 
 
 def parse(text: str) -> dict[str, int]:
@@ -33,10 +32,9 @@ def main(argv=None):
     p.add_argument("out", type=Path)
     args = p.parse_args(argv)
     rows = {}
-    for arm in ARMS:
-        path = args.out / arm / "resource.log"
-        if path.exists():
-            rows[arm] = parse(path.read_text())
+    # Every arm directory rocm_build_check.sh wrote (default first, so deltas read against it).
+    for path in sorted(args.out.glob("*/resource.log"), key=lambda p: (p.parent.name != "default", p.parent.name)):
+        rows[path.parent.name] = parse(path.read_text())
     base = rows.get("default")
     print("arm | VGPR | AGPR | SGPR | scratch B/lane | LDS B | waves/SIMD | delta vs default (same order)")
     for arm, row in rows.items():

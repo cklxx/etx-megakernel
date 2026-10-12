@@ -41,11 +41,9 @@ def test_stamps2_merges_and_monotonicity():
         ledger.subphase_intervals(row, "merge")
 
 
-@pytest.mark.parametrize("patches", [[], ["gemv_no_terminal"], ["norm_gamma_early"], ["norm_tree"], ["gemv_no_terminal", "norm_tree"]])
-def test_stamps_patch_composes_and_preserves_lds_copy(tmp_path, patches):
-    pinned = Path("/tmp/etx-dsv2/fleet-3fb67a6/src")
-    if not pinned.exists():
-        pytest.skip("requires exported fleet 3fb67a6; never reads working tree")
+@pytest.mark.parametrize("patches", [[]] + [[name] for name in patch_fleet.levers()])
+def test_stamps_patch_composes_and_preserves_lds_copy(tmp_path, pinned_src, patches):
+    pinned = pinned_src
     kernel = pinned / "kernels/fleet_kernel.hip"
     original = kernel.read_bytes()
     copy = tmp_path / "src"
