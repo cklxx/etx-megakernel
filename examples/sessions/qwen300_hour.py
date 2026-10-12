@@ -67,14 +67,10 @@ def template():
                 builds={name: '/absolute/prepared/'+name for name in
                         ('kept', 'reset', 'stamps', 'stages', 'C1', 'C5', 'C1_C5', 'NO_TOUCH',
                          'NO_TOUCH_stamps', 'ISOLATE_POLLER', 'C6')},
-                environment_guard=dict(
-                    trees={name: dict(build='/absolute/prepared/guard-'+commit,
-                        source_tree='/absolute/prepared/source-'+commit,
-                        normalized_device_ir='/absolute/prepared/guard-'+commit+'/normalized.ll',
-                        cpu_gates='/absolute/prepared/guard-'+commit+'/cpu-gates.json',
-                        identity_sha256='REQUIRED', seal_sha256='REQUIRED')
-                        for name, commit in (('old', '7c85efb'), ('hour', 'e068e47'))},
-                    weight_sha256={}),
+                environment_guard=dict(trees={}),  # optional historical controls; see guard --seal-config
+                weight_sha256={},  # --prewarm seals packed and all HF weights
+                normalized_device_ir='/absolute/prepared/kept/normalized.ll',
+                normalized_device_ir_sha256='REQUIRED SHA256 of current kept normalized IR',
                 x5_builds=['kept'],
                 isolation_probe=None,  # sealed offline probe: {argv: [...], sha256: executable SHA256}
                 source_commit='REQUIRED full commit of pushed tree', build_commits={}, build_seals={},
@@ -192,10 +188,11 @@ def prewarm(config_path):
             if p.returncode: raise RuntimeError(f'CPU-PREWARM rc={p.returncode}')
         finally:
             if p.poll() is None: p.kill(); p.wait()
+    from examples.vllm_llm.import_certificate import sha
+    c['weight_sha256'] = {str(path): sha(path) for path in files}
     if 'environment_guard' in c:
-        from examples.vllm_llm.import_certificate import sha
-        c['environment_guard']['weight_sha256'] = {str(path): sha(path) for path in files}
-        config_path.write_text(json.dumps(c, indent=2)+'\n')
+        c['environment_guard']['weight_sha256'] = c['weight_sha256']
+    config_path.write_text(json.dumps(c, indent=2)+'\n')
     print(f'CPU-PREWARM complete elapsed={time.monotonic()-begin:.1f}s; start runner next', flush=True)
 
 
@@ -298,7 +295,7 @@ class Session:
 
 
 REGISTERED = {
-    'GUARD': 'two pinned old/hour kept pairs abs(delta)<0.030 ms; original attn p0 <=7.9 us; kept anchor <=4.210 ms; sealed weights and IR',
+    'GUARD': 'when available: two pinned old/hour kept pairs abs(delta)<0.030 ms; otherwise pinned drift [U]; original attn p0 <=7.9 us; kept anchor <=4.210 ms; sealed weights and IR',
     'A1.busy': 'instrument classification only: real >=0.100 ms; dead <0.050 ms',
     'A1.free': 'instrument classification only: real >=0.050 ms',
     'A1.floor': '1.00 us/edge; retain below-floor count/min, never clip raw gaps',
