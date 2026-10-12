@@ -9,6 +9,12 @@
 // --unfused launches every grid as its own kernel (HIP graph): the same imported code, kernel boundaries
 // instead of ETX events.
 #include "plan_data.h"
+
+// moe_up rows per task. 32 fills 8 * MI/32 programs; a smaller value trades a wider
+// grid for a shorter per-program strip. Default reproduces the measured build.
+#ifndef ETX_VL_MOE_RPT
+#define ETX_VL_MOE_RPT 32
+#endif
 #include "etx/host.h"
 #include "etx/selection.h"   // the planner's variant per phase, published by plan_data.h
 #include "imports.h"
@@ -348,7 +354,7 @@ int main(int argc, char** argv) {
     }
     // coverage invariants the gate should never have to catch (the round-42 class): the written-output arithmetic
     // the host controls, asserted once at setup
-    if (x.exp.rfind("dsl_moe_up", 0) == 0 && x.tasks != std::max(x.nb, 1) * TOPK * (MI / 32))
+    if (x.exp.rfind("dsl_moe_up", 0) == 0 && x.tasks != std::max(x.nb, 1) * TOPK * (MI / ETX_VL_MOE_RPT))
       die(x.exp + ": tasks " + std::to_string(x.tasks) + " do not cover nb*TOPK*(MI/32) expert rows");
     if (x.exp.rfind("dsl_moe_down", 0) == 0 && x.tasks != std::max(x.nb, 1) * TOPK * (H / 64))
       die(x.exp + ": tasks " + std::to_string(x.tasks) + " do not cover nb*TOPK*(H/64) output rows");
@@ -452,10 +458,10 @@ int main(int argc, char** argv) {
     // (dsl_gemv_bigk) and 65536 is a sanity bound; without it the tiles have no chunked path compiled in, so the
     // original 4096 cap must hold -- the guard and the tile switch on the SAME macro and cannot disagree.
 #if ETX_EMIT_DSL_BIGK
-    else if ((x.exp == "dsl_moe_up_fold" || x.exp == "dsl_moe_down_fold") && (MI % 32 || H % 256 || H % 64 || MI % 256 || H > 65536 || MI > 65536 || E > 128))
+    else if ((x.exp == "dsl_moe_up_fold" || x.exp == "dsl_moe_down_fold") && (MI % ETX_VL_MOE_RPT || H % 256 || H % 64 || MI % 256 || H > 65536 || MI > 65536 || E > 128))
       die("dsl_moe_*_fold: needs MI % 32 == 0, H % 256 == 0, MI % 256 == 0, H and MI <= 65536, E <= 128");
 #else
-    else if ((x.exp == "dsl_moe_up_fold" || x.exp == "dsl_moe_down_fold") && (MI % 32 || H > 4096 || H % 256 || H % 64 || MI > 4096 || MI % 256 || E > 128))
+    else if ((x.exp == "dsl_moe_up_fold" || x.exp == "dsl_moe_down_fold") && (MI % ETX_VL_MOE_RPT || H > 4096 || H % 256 || H % 64 || MI > 4096 || MI % 256 || E > 128))
       die("dsl_moe_*_fold: needs MI % 32 == 0, H % 256 == 0, MI % 256 == 0, H and MI <= 4096, E <= 128");
 #endif
 // Folded top-k computes softmax-topk in LDS (dsl_topk_lds) -- sparsemixer has no fold (model.py fold_topk refuses).
@@ -467,7 +473,7 @@ int main(int argc, char** argv) {
     // batched MoE (x.nb > 1): one node, requests x slots tasks (S = s * nb + rq, etx/ops/gemv.py); the request strides
     // ride the dense fields -- sx: x, sout: out, srows: ids, srin: wts. Each task serves one column: the joins go, the
     // duplicated expert weight stream stays (the union dedup is a further step).
-    else if (x.exp == "dsl_moe_up_fold") a.ptr(W(pl + "w13")).ptr(ox).ptr(mc2).ptr(ti_r).ptr(nullptr).i64((long long)2 * MI * H).i32(MI).i32(H).i32(32).i32(MI / 32)
+    else if (x.exp == "dsl_moe_up_fold") a.ptr(W(pl + "w13")).ptr(ox).ptr(mc2).ptr(ti_r).ptr(nullptr).i64((long long)2 * MI * H).i32(MI).i32(H).i32(ETX_VL_MOE_RPT).i32(MI / ETX_VL_MOE_RPT)
                                            .ptr(nullptr).ptr(nullptr).ptr(nullptr).ptr(nullptr).i32(TOPK).f32(0.f).i32(0).i32(E).ptr(rlog)
                                            .i32(x.nb).i32(x.nb > 1 ? (int)n_ox : 0).i32(x.nb > 1 ? (int)n_mc2 : 0)
                                            .i32(x.nb > 1 ? (int)n_tk : 0).i32(x.nb > 1 ? (int)n_tk : 0).i32(0) ETX_VL_EXT2;
@@ -478,19 +484,19 @@ int main(int argc, char** argv) {
 #else
     else if ((x.exp == "dsl_moe_up_fold" || x.exp == "dsl_moe_down_fold") && x.nb > 1)
       die("ETX_VL_BATCH: a batched MoE needs the standalone top-k (the fold would recompute it per task per column)");
-    else if (x.exp == "dsl_moe_up_fold") a.ptr(W(pl + "w13")).ptr(ox).ptr(mc2).ptr(nullptr).ptr(nullptr).i64((long long)2 * MI * H).i32(MI).i32(H).i32(32).i32(MI / 32)
+    else if (x.exp == "dsl_moe_up_fold") a.ptr(W(pl + "w13")).ptr(ox).ptr(mc2).ptr(nullptr).ptr(nullptr).i64((long long)2 * MI * H).i32(MI).i32(H).i32(ETX_VL_MOE_RPT).i32(MI / ETX_VL_MOE_RPT)
                                            .ptr(nullptr).ptr(nullptr).ptr(nullptr).ptr(nullptr).i32(TOPK).f32(0.f).i32(norm_topk ? 3 : 2).i32(E).ptr(rlog) ETX_VL_NOBATCH ETX_VL_EXT2;
     else if (x.exp == "dsl_moe_down_fold") a.ptr(W(pl + "w2")).ptr(mc2).ptr(mc3).ptr(nullptr).ptr(nullptr).i64((long long)H * MI).i32(H).i32(MI).i32(64).i32(H / 64)
                                              .ptr(nullptr).ptr(nullptr).ptr(nullptr).ptr(nullptr).i32(TOPK).f32(0.f).i32(norm_topk ? 3 : 2).i32(E).ptr(rlog) ETX_VL_NOBATCH ETX_VL_EXT2;
 #endif
 #if ETX_EMIT_DSL_BIGK
-    else if (x.exp == "dsl_moe_up" && (MI % 32 || H % 256 || H > 65536)) die("dsl_moe_up: MI % 32 or H % 256 (K > 4096 is chunked: etx/ops/gemv.py dsl_gemv_bigk)");
+    else if (x.exp == "dsl_moe_up" && (MI % ETX_VL_MOE_RPT || H % 256 || H > 65536)) die("dsl_moe_up: MI % 32 or H % 256 (K > 4096 is chunked: etx/ops/gemv.py dsl_gemv_bigk)");
     else if (x.exp == "dsl_moe_down" && (H % 64 || MI % 256 || MI > 65536)) die("dsl_moe_down: H % 64 or MI % 256");
 #else
-    else if (x.exp == "dsl_moe_up" && (MI % 32 || H > 4096 || H % 256)) die("dsl_moe_up: MI % 32 or H > 4096 (etx/ops/gemv.py K_MAX, RCH)");
+    else if (x.exp == "dsl_moe_up" && (MI % ETX_VL_MOE_RPT || H > 4096 || H % 256)) die("dsl_moe_up: MI % 32 or H > 4096 (etx/ops/gemv.py K_MAX, RCH)");
     else if (x.exp == "dsl_moe_down" && (H % 64 || MI > 4096 || MI % 256)) die("dsl_moe_down: H % 64 or MI > 4096");
 #endif
-    else if (x.exp == "dsl_moe_up") a.ptr(W(pl + "w13")).ptr(o_norm).ptr(mc2).ptr(ti_r).ptr(nullptr).i64((long long)2 * MI * H).i32(MI).i32(H).i32(32).i32(MI / 32)
+    else if (x.exp == "dsl_moe_up") a.ptr(W(pl + "w13")).ptr(o_norm).ptr(mc2).ptr(ti_r).ptr(nullptr).i64((long long)2 * MI * H).i32(MI).i32(H).i32(ETX_VL_MOE_RPT).i32(MI / ETX_VL_MOE_RPT)
                                       .ptr(nullptr).ptr(nullptr).ptr(nullptr).ptr(nullptr).i32(0).f32(0.f).i32(0).i32(0).ptr(nullptr)
                                       .i32(x.nb).i32(x.nb > 1 ? (int)n_ox : 0).i32(x.nb > 1 ? (int)n_mc2 : 0)
                                       .i32(x.nb > 1 ? (int)n_tk : 0).i32(x.nb > 1 ? (int)n_tk : 0).i32(0) ETX_VL_EXT2;

@@ -12,6 +12,9 @@ from __future__ import annotations
 
 import json
 import os
+
+# moe_up rows per task. Must equal host.hip ETX_VL_MOE_RPT (default 32).
+MOE_UP_RPT = int(os.environ.get("ETX_VL_MOE_RPT", "32"))
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -279,14 +282,14 @@ for _e in (128, 8):
 _dsl("dsl_moe_up_fold", "moe_up",
      lambda s: s["fold"] == 1 and s["E"] <= 128 and s["MI"] % 256 == 0 and s["H"] % 256 == 0 and max(s["H"], s["MI"]) <= BIGK_MAX,
      "host.hip:431 MI % 32, H % 256, MI % 256, H and MI <= 65536 (DSL_BIGK), E <= 128",
-     GEMV_RES, expert_up_cost, {"rows_per_task": (32,), "tasks_per_expert": ("MI / 32",)})
+     GEMV_RES, expert_up_cost, {"rows_per_task": (MOE_UP_RPT,), "tasks_per_expert": (f"MI / {MOE_UP_RPT}",)})
 _dsl("dsl_moe_down_fold", "moe_down",
      lambda s: s["fold"] == 1 and s["E"] <= 128 and s["MI"] % 256 == 0 and s["H"] % 256 == 0 and max(s["H"], s["MI"]) <= BIGK_MAX,
      "host.hip:431 MI % 32, H % 256, MI % 256, H and MI <= 65536 (DSL_BIGK), E <= 128",
      GEMV_RES, expert_down_cost, {"rows_per_task": (64,), "tasks_per_expert": ("H / 64",)})
-_dsl("dsl_moe_up", "moe_up", lambda s: s["fold"] == 0 and s["MI"] % 32 == 0 and s["H"] % 256 == 0 and s["H"] <= BIGK_MAX,
-     "host.hip:463 MI % 32 == 0, H % 256 == 0, H <= 65536 (DSL_BIGK)",
-     GEMV_RES, expert_up_cost, {"rows_per_task": (32,), "tasks_per_expert": ("MI / 32",)})
+_dsl("dsl_moe_up", "moe_up", lambda s: s["fold"] == 0 and s["MI"] % MOE_UP_RPT == 0 and s["H"] % 256 == 0 and s["H"] <= BIGK_MAX,
+     f"host.hip:463 MI % {MOE_UP_RPT} == 0, H % 256 == 0, H <= 65536 (DSL_BIGK)",
+     GEMV_RES, expert_up_cost, {"rows_per_task": (MOE_UP_RPT,), "tasks_per_expert": (f"MI / {MOE_UP_RPT}",)})
 _dsl("dsl_moe_down", "moe_down", lambda s: s["fold"] == 0 and s["H"] % 64 == 0 and s["MI"] % 256 == 0 and s["MI"] <= BIGK_MAX,
      "host.hip:464 H % 64 == 0, MI % 256 == 0, MI <= 65536 (DSL_BIGK)",
      GEMV_RES, expert_down_cost, {"rows_per_task": (64,), "tasks_per_expert": ("H / 64",)})

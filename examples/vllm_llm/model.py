@@ -45,6 +45,11 @@ sys.path.insert(0, str(HERE.parents[1]))
 from etx.frontends import hip_link  # noqa: E402
 from etx.ir import Graph, Resource  # noqa: E402
 from examples.llm.model import load_dims  # noqa: E402
+import os
+
+# moe_up rows per task; must equal host.hip ETX_VL_MOE_RPT and variants.MOE_UP_RPT.
+MOE_UP_RPT = int(os.environ.get("ETX_VL_MOE_RPT", "32"))
+
 from etx.importer.spec import launch_for, validate_wvsplitk, grid_for, OPERATORS
 from examples.vllm_llm import folds  # noqa: E402
 from etx.codegen import manifest  # noqa: E402
@@ -365,7 +370,7 @@ def instances(d) -> list[dict]:
                 add("dsl_topk" if (DSL or DSL_TOPK) else f"topk_softmax_e{d.E}", L, "topk", (1, 1, 1),
                     override=DSL or IMPORTED or "ETX_VL_DSL_TOPK" in os.environ, noaff=noaff)
             if DSL_GEMV:                                      # 32 gate + 32 up rows (256 KB) per task; 64 down rows (96 KB)
-                add("dsl_moe_up_fold" if FOLD else "dsl_moe_up", L, "moe_up", (d.TOPK * (d.MI // 32), 1, 1), M=d.MI, K=d.H, noaff=noaff)
+                add("dsl_moe_up_fold" if FOLD else "dsl_moe_up", L, "moe_up", (d.TOPK * (d.MI // MOE_UP_RPT), 1, 1), M=d.MI, K=d.H, noaff=noaff)
                 add("dsl_moe_down_fold" if FOLD else "dsl_moe_down", L, "moe_down", (d.TOPK * (d.H // 64), 1, 1), M=d.H, K=d.MI, noaff=noaff)
             else:
                 up, down = moe_specs["up"], moe_specs["down"]
