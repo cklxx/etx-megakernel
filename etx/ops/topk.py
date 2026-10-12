@@ -50,6 +50,17 @@ static __device__ __attribute__((always_inline)) void dsl_run_dsl_topk(const uns
 #endif
   float p[2]; bool taken[2];
   float m = -INFINITY;
+// T: the two key-path logit loads are independent, but the retained ISA shows load -> vmcnt(0) -> load
+// -> vmcnt(0): the first value is consumed into m before the second address is even formed. Issue both
+// loads before either value is consumed. Same addresses, same values, same tie order.
+#if defined(ETX_TOPK_PAIRED_LOADS) && !defined(ETX_ABL_TOPK_NOLOAD)
+  { const int e0 = lane, e1 = lane + ETX_WAVE_SIZE;
+    const bool ok0 = e0 < E, ok1 = e1 < E;
+    p[0] = ok0 ? dsl_a_ldbf(logits + e0) : -INFINITY;
+    p[1] = ok1 ? dsl_a_ldbf(logits + e1) : -INFINITY;
+    taken[0] = !ok0; taken[1] = !ok1; }
+  m = fmaxf(p[0], p[1]);
+#else
 #pragma unroll
   for (int k = 0; k < 2; ++k) { const int e = lane + k * ETX_WAVE_SIZE; p[k] = e < E ?
 #ifdef ETX_ABL_TOPK_NOLOAD   // timing-only: synthetic logits, the two coherent loads removed (WRONG OUTPUT)
@@ -58,6 +69,7 @@ static __device__ __attribute__((always_inline)) void dsl_run_dsl_topk(const uns
     dsl_a_ldbf(logits + e)
 #endif
     : -INFINITY; taken[k] = e >= E; m = fmaxf(m, p[k]); }
+#endif
 #ifndef ETX_TOPK_KEY32       // the key path takes m from its round-0 winner; sparsemixer never reads this m
   m = etx_wave_max(m);
 #endif
