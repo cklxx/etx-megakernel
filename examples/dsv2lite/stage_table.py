@@ -87,35 +87,48 @@ def levers(m: dict) -> list[Lever]:
     }
     norm = m["gamma_rt_us"] + 7 * bar
     norm_f = f"gamma RT {m['gamma_rt_us']} us hidden + 10 -> 3 barriers x {bar * 1000:.0f} ns"
+    tree = 7 * bar
+    tree_f = f"pick tree 9 -> 2 barriers x {bar * 1000:.0f} ns, same pairings"
     term_risk = "re-reads the row cnt-1 the WG just loaded: L2 hits would leave only issue time (0 .. this bound)"
     rank_us = 12 * bp + m["lds_probe_us"]
     L = [
-        Lever("in_norm", "norm_tree", norm, "PHASE", norm_f, "+24 AGPR measured (verify record); 0 scratch"),
-        Lever("qkv", "gemv_no_terminal", t(term["qkv"][0]), "BYTES", term["qkv"][1], term_risk),
-        Lever("prep", "attn_prologue_live", 2 * m["gamma_rt_us"] + 8 * bar, "PHASE",
-              f"2 dependent RTs x {m['gamma_rt_us']} us (kv_a reload, cos/sin reload) + 8 barriers x {bar*1000:.0f} ns "
-              "(OPS:65-72)", "attention is the heaviest tile: retained values may spill"),
-        Lever("attn", "attn_cache_double_buffer", 2 * m["gamma_rt_us"], "PHASE",
-              f"wave 0's 3 serial cache batches -> 1 exposed RT: 2 x {m['gamma_rt_us']} us (OPS:74)",
-              "a second 16-load batch in flight per lane: register pressure"),
-        Lever("reduce", "gemv_no_terminal_all + wave_spread", t(term["merge"][0]) + 36 * bp, "BYTES+PHASE",
-              term["merge"][1] + f"; W_UV <8,1> on wave 0 only: 48 -> 12 serial bpermutes x {bp*1000:.0f} ns (OPS:82)",
-              term_risk),
+        Lever("in_norm", "norm_tree_all", norm, "PHASE", norm_f, "AGPR +40 for norm_tree_all, 0 scratch"),
+        Lever("qkv", "gemv_no_terminal_all", t(term["qkv"][0]), "BYTES", term["qkv"][1], term_risk),
+        Lever("prep", "attn_prologue_live", 2 * m["gamma_rt_us"] + tree, "PHASE",
+              f"2 of its 3 removed dependent RTs x {m['gamma_rt_us']} us (one of kv_post's may hide behind the q_absorb "
+              f"wait) + 10 -> 3 tree barriers x {bar*1000:.0f} ns (OPS:65-72)", "AGPR +14, 0 scratch"),
+        Lever("attn", "none passing (attn_cache_double_buffer REJECTED)", 0.0, "-",
+              "double-buffered cache batches: +160 B/lane scratch in 3 implementations (records/attn_cache_double_buffer)",
+              "no register-neutral lever found yet"),
+        Lever("reduce", "gemv_no_terminal_all", t(term["merge"][0]), "BYTES", term["merge"][1], term_risk),
         Lever("o_proj", "gemv_no_terminal_all", t(term["o_proj"][0]), "BYTES", term["o_proj"][1], term_risk),
-        Lever("router", "norm_tree + gemv_no_terminal_all + wave_spread", norm + t(term["router"][0]) + 6 * bp,
-              "PHASE+BYTES", norm_f + "; " + term["router"][1] + f"; 2 rows on wave 0 -> 2 waves: 6 bpermutes x {bp*1000:.0f} ns",
-              term_risk),
+        Lever("router", "norm_tree_all + gemv_no_terminal_all", norm + t(term["router"][0]), "PHASE+BYTES",
+              norm_f + "; " + term["router"][1], term_risk),
         Lever("topk", "topk_rank", m["routing_us"] - rank_us, "PHASE",
               f"{m['routing_bperms']} serial bpermutes ({m['routing_us']} us stamped) -> softmax max+sum 12 x "
-              f"{bp*1000:.0f} ns + one LDS rank pass ({m['lds_probe_us']*1000:.1f} ns probe)",
-              "selection must equal fleet's bit for bit (ties, NaN): host proof before any build"),
+              f"{bp*1000:.0f} ns + 64 independent readlanes (priced at the {m['lds_probe_us']*1000:.1f} ns LDS probe)",
+              "host proof: fleet's ids and weights bit for bit on 6,000 NaN-free inputs"),
         Lever("moe_up", "gemv_no_terminal_all", t(term["gate_up"][0]), "BYTES", term["gate_up"][1], term_risk),
         Lever("moe_down", "gemv_no_terminal_all", t(term["down"][0]), "BYTES", term["down"][1], term_risk),
-        Lever("lm_head", "gemv_no_terminal_all + norm_tree", t(term["lm_head"][0]) + norm, "BYTES+PHASE",
-              term["lm_head"][1] + "; final norm: " + norm_f, term_risk),
-        Lever("argmax", "argmax_tree", 6 * bar, "PHASE", f"9 -> 3 barriers x {bar*1000:.0f} ns (OPS:107)", "none known"),
+        Lever("lm_head", "gemv_no_terminal_all + norm_tree_all + argmax_tree", t(term["lm_head"][0]) + norm + tree,
+              "BYTES+PHASE", term["lm_head"][1] + "; final norm: " + norm_f + "; candidate pick: " + tree_f, term_risk),
+        Lever("argmax", "argmax_tree", tree, "PHASE", tree_f + " (OPS:107)", "host proof incl. ties / NaN / inf"),
+        # layer 0 only (counted in the prologue row): the dense post-norm and the dense gate_up's terminal pair
+        Lever("_dense_post_norm", "norm_tree_all", norm, "PHASE", norm_f, ""),
+        Lever("_dense_gate_up", "gemv_no_terminal_all", t(term["gate_up"][0]), "BYTES", term["gate_up"][1], term_risk),
     ]
     return L
+
+
+def status(lever: str) -> str:
+    """PASS / REJECTED per patch named in a lever string, from results/levers/<patch>.json on this branch."""
+    out = []
+    for name in re.findall(r"[a-z_]+", lever.split("(")[0]):
+        rec = ROOT / f"examples/dsv2lite/results/levers/{name}.json"
+        if name in ("none", "passing"):
+            continue
+        out.append(f"{name}: {json.loads(rec.read_text()).get('verdict', 'PASS')}" if rec.exists() else f"{name}: not on this branch")
+    return "; ".join(out) or "REJECTED (see lever)"
 
 
 def stage_of(layer: int, phase: str) -> str | None:
@@ -168,10 +181,11 @@ def main() -> int:
     L = {lv.stage: lv for lv in levers(m)}
     # Layer 0 and layer 26's tail carry the same per-instance levers as their core stages.
     l0 = ["in_norm", "qkv", "prep", "attn", "reduce", "o_proj"]
-    L["prologue"] = Lever("prologue", "layer-0 instances of " + ", ".join(l0) + " + dense post-norm",
-                          sum(L[s].per_instance_us for s in l0) + L["in_norm"].per_instance_us, "as rows",
-                          "one instance of each layer-0 stage lever + norm_tree on the dense post-norm",
-                          "as the rows it repeats")
+    L["prologue"] = Lever("prologue", "layer-0 instances of " + ", ".join(l0) + " + dense post-norm + dense gate_up",
+                          sum(L[s].per_instance_us for s in l0) + L["_dense_post_norm"].per_instance_us
+                          + L["_dense_gate_up"].per_instance_us, "as rows",
+                          "one instance of each layer-0 stage lever + norm_tree_all on the dense post-norm + "
+                          "gemv_no_terminal_all on the dense gate_up", "as the rows it repeats")
     tail = ["prep", "attn", "reduce", "o_proj", "router", "topk", "moe_up", "moe_down"]
     L["tail"] = Lever("tail", "layer-26 instances of " + ", ".join(tail), sum(L[s].per_instance_us for s in tail),
                       "as rows", "one instance of each post-qkv stage lever", "as the rows it repeats")
@@ -181,7 +195,8 @@ def main() -> int:
         save = inst[s] * L[s].per_instance_us
         rows.append(dict(stage=s, instances=inst[s], current_us=cur[s], expected_us=cur[s] - save, delta_us=-save,
                          lever=L[s].name, basis=L[s].basis, formula=L[s].formula, risk=L[s].risk,
-                         per_instance_us=L[s].per_instance_us))
+                         per_instance_us=L[s].per_instance_us,
+                         status=status(L[s].name) if s not in ("prologue", "tail") else "as the rows it repeats"))
     saving = -sum(r["delta_us"] for r in rows)
     # SIM: shrink each task body by its stage's per-instance saving (in_norm+qkv on qkv tasks, prep+attn on attn tasks,
     # topk+moe_up on gate_up tasks, the prologue/tail levers on their layer's tasks), replay, compare spans.
@@ -227,13 +242,13 @@ def main() -> int:
           "Generated by `python -m examples.dsv2lite.stage_table` (do not edit). Current = traced stride-32 token "
           f"(x1s, {span:.2f} us; [M] except the staging/prologue split [E]). Device step now {UNTRACED_DEVICE_US} us "
           f"= {1e6/UNTRACED_DEVICE_US:.1f} tok/s; byte limit {LIMIT_US:.1f} us = {1e6/LIMIT_US:.0f} tok/s.", "",
-          "| stage | n | current us | expected us | delta us | lever | basis | per instance | formula | risk |",
-          "|---|---:|---:|---:|---:|---|---|---:|---|---|"]
+          "| stage | n | current us | expected us | delta us | lever | local verification | basis | per instance | formula | risk |",
+          "|---|---:|---:|---:|---:|---|---|---|---:|---|---|"]
     for r in rows:
         md.append(f"| {r['stage']} | {r['instances']} | {r['current_us']:.2f} | {r['expected_us']:.2f} | "
-                  f"{r['delta_us']:.2f} | {r['lever']} | {r['basis']} | {r['per_instance_us']:.3f} | {r['formula']} | {r['risk']} |")
+                  f"{r['delta_us']:.2f} | {r['lever']} | {r['status']} | {r['basis']} | {r['per_instance_us']:.3f} | {r['formula']} | {r['risk']} |")
     a, s = summary["arithmetic"], summary["simulated"]
-    md += [f"| **sum** | | **{span:.2f}** | **{span - saving:.2f}** | **{-saving:.2f}** | | | | | |", "",
+    md += [f"| **sum** | | **{span:.2f}** | **{span - saving:.2f}** | **{-saving:.2f}** | | | | | | |", "",
            f"**Summary, arithmetic (rows add):** {UNTRACED_DEVICE_US} - {saving:.1f} = **{a['step_us']:.1f} us/token = "
            f"{a['tok_s']:.1f} tok/s**.",
            f"**Summary, simulated plan (replay what-if):** replay {s['replay_base_us']:.1f} -> {s['replay_what_if_us']:.1f} us, "

@@ -28,7 +28,9 @@ def test_every_stage_has_a_lever_and_the_rows_partition_the_token(data):
     assert list(rows) == st.ORDER and len(rows) == 14
     assert abs(sum(r["current_us"] for r in rows.values()) - out["summary"]["traced_token_us"]) < 1e-6
     for r in rows.values():
-        assert r["delta_us"] < 0 and r["lever"] and r["basis"] and r["formula"], r["stage"]
+        assert r["lever"] and r["formula"], r["stage"]
+        # every stage either has a priced lever, or says which lever was tried and why it was rejected
+        assert (r["delta_us"] < 0 and r["basis"] != "-") or "REJECTED" in r["lever"], r["stage"]
     saving = -sum(r["delta_us"] for r in rows.values())
     assert abs(out["summary"]["arithmetic"]["saving_us"] - saving) < 1e-6
     assert out["summary"]["simulated"]["saving_us"] <= saving + 1e-6
