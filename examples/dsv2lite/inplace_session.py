@@ -1,7 +1,13 @@
-"""Fail-closed implementation of the prepared ds_inplace.py GPU job protocol.
+"""Fail-closed implementation of the prepared ds_inplace.py GPU session: every lever measured as whole tokens.
 
-No invocation here provisions a GPU or downloads/regenerates reference data.
-Unfiltered subprocess output is streamed and retained in the runner's directory.
+Arms (ARMS): default, fleet (shipped 3fb67a6), each lever alone, and `all` (every lever that passed its local gate).
+  baseline        5 interleaved pairs default / fleet
+  full <arm>      5 interleaved pairs default / arm (/ fleet for `all`), every invocation 32/32 tokens + 27/27 layers
+  trace <arm>     one stamped token of the STAMPS2 build of default or `all`: the measured per-stage table
+  report          verdicts + measured per-stage table next to the expected one (stage_table.py)
+Decision (fixed before the run, for `all` only): every paired device gain > 0, median >= 70 us, median > 2 x spread.
+Single levers are attribution: median and spread are reported, no verdict (most are below 5 pairs' resolution).
+No invocation here provisions a GPU or downloads; inputs are prepared by the prep_* jobs. Unfiltered output is kept.
 """
 from __future__ import annotations
 
@@ -19,13 +25,17 @@ import subprocess
 import sys
 import time
 
-from etx.tools import timeline as tl
+from examples.dsv2lite.pinned import FLEET_SRC_SHA256 as PINNED_SRC_SHA256
+from examples.dsv2lite.pinned import source_sha
 
-PINNED_SRC_SHA256 = "28f5cbb4f39524df318883522341c48ca4162c18b71a3a6223c52eabb40ce4b3"
-PATCHES = {"default": "", "stamps": "", "Q": "gemv_no_terminal", "gamma": "norm_gamma_early",
-           "tree": "norm_tree", "both": "gemv_no_terminal norm_tree"}
-PHASES = ("qkv_5", "router_5")
+LEVERS_ALL = ("gemv_no_terminal_all", "norm_tree_all", "argmax_tree", "topk_rank", "attn_prologue_live")
+ARMS = {"default": (), "Q": ("gemv_no_terminal",), "Qall": ("gemv_no_terminal_all",), "N": ("norm_tree",),
+        "Nall": ("norm_tree_all",), "argmax": ("argmax_tree",), "topk": ("topk_rank",),
+        "prep": ("attn_prologue_live",), "all": LEVERS_ALL}
+SINGLE = ("Q", "Qall", "N", "Nall", "argmax", "topk", "prep")
+STAMPED = ("default", "all")
 DATA_FILES = ("weights.bin", "weights.bin.manifest", "fleet_cache.bin", "golden_tokens.txt", "golden_hidden.bin")
+GO_US = 70.0
 
 
 def sha(path: Path) -> str:
@@ -36,37 +46,18 @@ def sha(path: Path) -> str:
     return h.hexdigest()
 
 
-def source_sha(src: Path) -> str:
-    h = hashlib.sha256()
-    for path in sorted(src.rglob("*")):
-        if path.is_file():
-            h.update(path.relative_to(src).as_posix().encode() + b"\0" + bytes.fromhex(sha(path)))
-    return h.hexdigest()
-
-
 def write_json(path: Path, data: dict) -> None:
     path.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n")
 
 
-def paired_screen(qkv: list[float], router: list[float] | None = None) -> dict:
-    if len(qkv) != 5 or (router is not None and len(router) != 5):
-        raise ValueError("screen requires five complete pairs in every selected phase")
-    gains = [27 * q + (26 * router[i] if router is not None else 0) for i, q in enumerate(qkv)]
-    if not all(math.isfinite(v) for v in gains):
-        raise ValueError("nonfinite screen gain")
-    median = statistics.median(gains)
-    spread = max(gains) - min(gains)
-    go = min(gains) > 0 and median >= 50 and median > 2 * spread
-    return dict(go=go, gains_us=gains, median_us=median, spread_us=spread,
-                hundred_us_route=go and median >= 100)
-
-
-def full_gain(values: list[float]) -> dict:
-    if len(values) != 5 or not all(math.isfinite(v) for v in values):
-        raise ValueError("full decision requires five finite paired gains")
-    median = statistics.median(values); spread = max(values) - min(values)
-    return dict(candidate_gain_ms=values, median_ms=median, spread_ms=spread,
-                pass_70us=min(values) > 0 and median >= .070 and median > 2 * spread)
+def paired(gains_us: list[float]) -> dict:
+    """Five paired gains (reference minus candidate, us): median, full-range spread, and the decision rule."""
+    if len(gains_us) != 5 or not all(math.isfinite(v) for v in gains_us):
+        raise ValueError("a paired result needs five finite gains")
+    median = statistics.median(gains_us)
+    spread = max(gains_us) - min(gains_us)
+    return dict(gains_us=gains_us, median_us=median, spread_us=spread, every_positive=min(gains_us) > 0,
+                go=min(gains_us) > 0 and median >= GO_US and median > 2 * spread)
 
 
 def full_result(log: str) -> dict:
@@ -91,22 +82,11 @@ def full_result(log: str) -> dict:
     return result
 
 
-def phase_span(plan: Path, raw: Path, phase: str) -> float:
-    trace = tl.build_trace(tl.load_plan(str(plan)), tl.read_raw(str(raw)))
-    expected = f"iso0x0_r0_{phase}"
-    tasks = [task for task in trace.tasks if task.name == expected]
-    if len(tasks) != 296 or len(trace.tasks) != 296:
-        raise ValueError(f"expected one 296-task {expected} phase, got {len(tasks)}/{len(trace.tasks)}")
-    if any(t.ready < 0 or t.done <= t.ready for t in tasks):
-        raise ValueError("missing or invalid phase trace timestamps")
-    return max(t.done for t in tasks) - min(t.ready for t in tasks)
-
-
 class Session:
     def __init__(self):
         self.root = Path(__file__).resolve().parents[2]
         self.logs = Path(os.environ["ETX_SESS_LOGDIR"]).resolve()
-        self.fleet = Path(os.environ.get("ETX_DSV2_FLEET", "/tmp/etx-dsv2/fleet-3fb67a6")).resolve()
+        self.fleet = Path(os.environ["ETX_DSV2_FLEET"]).resolve()
         self.data = Path(os.environ["ETX_DSV2_DATA"]).resolve()
         self.logs.mkdir(parents=True, exist_ok=True)
 
@@ -124,17 +104,16 @@ class Session:
                 value = f"PROBE invocation={name} failed: {exc}\n"
             log.write(value); log.flush(); print(value, end="", flush=True)
 
-    def run(self, name: str, command: list[str], *, env: dict | None = None, timeout=180) -> tuple[str, float]:
-        """Fresh invocation, full stderr/stdout, independent deadline, 30-second progress."""
+    def run(self, name: str, command: list[str], *, env: dict | None = None, timeout=180) -> str:
+        """Fresh invocation, full stderr/stdout, independent deadline, 30-second progress, probe after 150 s silence."""
         path = self.logs / f"{name}.raw.log"
         if path.exists():
             raise RuntimeError(f"refusing to overwrite prior invocation: {path}")
         clean = {k: v for k, v in os.environ.items() if not k.startswith(("ETX_", "FLEET_"))}
-        # Prevent caller variant overrides from contaminating default or a candidate.
-        clean.update(PYTHONUNBUFFERED="1")
+        clean.update(PYTHONUNBUFFERED="1")         # no caller override may leak into default or a candidate
         clean.update(env or {})
         command = ["timeout", "--kill-after=5s", f"{timeout}s", "stdbuf", "-oL", "-eL", *map(str, command)]
-        text = ""; warm_start = None; started = heartbeat = last_output = last_probe = time.monotonic()
+        text = ""; started = heartbeat = last_output = last_probe = time.monotonic()
         with path.open("w") as log:
             line = "$ " + shlex.join(command) + "\n"
             print(line, end="", flush=True); log.write(line)
@@ -148,8 +127,6 @@ class Session:
                         part = chunk.decode(errors="replace"); text += part
                         last_output = time.monotonic()
                         log.write(part); log.flush(); print(part, end="", flush=True)
-                        if warm_start is None and "SNAPSHOT ready " in text:
-                            warm_start = time.monotonic()
                     now = time.monotonic()
                     if now - heartbeat >= 30:
                         print(f"PROGRESS invocation={name} elapsed_s={now-started:.1f} deadline_s={timeout}", flush=True)
@@ -163,15 +140,15 @@ class Session:
                     self.probe(log, name)
         if rc:
             raise RuntimeError(f"invocation {name} failed rc={rc}; full log {path}")
-        return text, time.monotonic() - (warm_start or started)
+        return text
 
-    def args(self, tokens=32) -> list[str]:
+    def args(self) -> list[str]:
         return ["--weights", str(self.data / "weights.bin"), "--cache", str(self.data / "fleet_cache.bin"),
                 "--golden", str(self.data / "golden_tokens.txt"), "--hidden", str(self.data / "golden_hidden.bin"),
-                "--tokens", str(tokens), "--context", "1024", "--repeat", "2" if tokens == 32 else "1"]
+                "--tokens", "32", "--context", "1024", "--repeat", "2"]
 
-    def out(self, arm: str, mode="full", phase="") -> Path:
-        return self.logs / f"b_{arm}_{mode}{'_' + phase if phase else ''}"
+    def out(self, arm: str, stamped: bool = False) -> Path:
+        return self.logs / f"b_{arm}{'_stamps' if stamped else ''}"
 
     def source_identity(self) -> str:
         """The pushed tree has no .git: stage_inplace.sh writes the clean commit it pushed to SOURCE_IDENTITY."""
@@ -189,9 +166,13 @@ class Session:
             raise RuntimeError("fleet source export must not follow symlinks into another tree")
         if source_sha(self.fleet / "src") != PINNED_SRC_SHA256:
             raise RuntimeError("fleet src is not the exact pinned 3fb67a6 export")
+        from examples.dsv2lite.patch_fleet import levers
+        missing = sorted({p for arm in ARMS.values() for p in arm} - set(levers()))
+        if missing:
+            raise RuntimeError(f"levers not on this branch: {missing}")
         identity = self.source_identity()
         write_json(self.logs / "source.json", dict(fleet_commit="3fb67a6", fleet_src_sha256=PINNED_SRC_SHA256,
-                                                   etx_identity=identity))
+                                                   etx_identity=identity, arms={k: list(v) for k, v in ARMS.items()}))
         self.run("environment", ["bash", "-c", "set -eu\nhipcc --version\nrocminfo\ncat SOURCE_IDENTITY"], timeout=60)
         print(f"SOURCE OK fleet export {PINNED_SRC_SHA256[:16]} etx {identity.split()[1][:12]}", flush=True)
 
@@ -214,13 +195,13 @@ class Session:
             raise RuntimeError("golden needs 33 tokens for 32 decode comparisons")
         if (self.data / "golden_hidden.bin").stat().st_size != 27 * 2048 * 4:
             raise RuntimeError("hidden golden is not 27 x 2048 fp32")
-        write_json(self.logs / "inputs.json", dict(fleet_commit="3fb67a6", fleet_src_sha256=PINNED_SRC_SHA256,
-                                                  data=str(self.data), sha256=actual))
+        write_json(self.logs / "inputs.json", dict(data=str(self.data), sha256=actual))
         print("PREFLIGHT OK inputs match their SHA256SUMS", flush=True)
 
-    def build(self, arm: str):
+    def build(self, arm: str, stamped: bool = False):
+        out = self.out(arm, stamped)
         if arm == "fleet":
-            out = self.out(arm); out.mkdir(parents=True)
+            out.mkdir(parents=True)
             self.run("build_fleet_graph", [sys.executable, self.fleet / "src/host/taskgraph.py", "--kv-chunks", "16",
                                            "--emit", out / "taskgraph_d16.bin"], timeout=60)
             self.run("build_fleet_compile", ["hipcc", "--offload-arch=gfx942", "-O3", "-std=c++17",
@@ -228,149 +209,114 @@ class Session:
                                               "-I" + str(self.fleet / "src"), self.fleet / "src/host/fleet_launch.hip",
                                               self.fleet / "src/kernels/fleet_kernel.hip", "-o", out / "run"], timeout=600)
         else:
-            specs = [("full", "")]
-            if arm == "default":
-                specs += [("capture", ph) for ph in PHASES]
-            if arm != "stamps":
-                specs += [("replay", ph) for ph in (("qkv_5",) if arm == "Q" else PHASES)]
-            for mode, phase in specs:
-                out = self.out(arm, mode, phase)
-                env = dict(ETX_OUT=str(out), ETX_FLEET_PATCH=PATCHES[arm], ETX_BUILD_VERBOSE="1")
-                flags = ["-Rpass-analysis=kernel-resource-usage"]
-                if mode != "full":
-                    env["ETX_DSV2_SNAPSHOT"] = f"{mode}:0:{phase}"
-                    flags += ["-DETX_DSV2_SNAPSHOT", "-DETX_EV_STRIDE=32", "-DETX_ACQUIRE_DOMAIN_RELAXED"]
-                if arm == "stamps":
-                    flags.append("-DETX_DSV2_STAMPS2")
-                text, _ = self.run(f"compile_{arm}_{mode}_{phase or 'all'}", ["bash", "examples/dsv2lite/build.sh", self.fleet, *flags],
-                                   env=env, timeout=600)
-                from examples.dsv2lite.build_resources import parse
-                resources = parse(text)
-                write_json(out / "resources.json", resources)
-                print(f"BUILD arm={arm} mode={mode} phase={phase or 'all'} resources={resources}", flush=True)
+            env = dict(ETX_OUT=str(out), ETX_FLEET_PATCH=" ".join(ARMS[arm]), ETX_BUILD_VERBOSE="1")
+            flags = ["-Rpass-analysis=kernel-resource-usage"] + (["-DETX_DSV2_STAMPS2"] if stamped else [])
+            text = self.run(f"compile_{arm}{'_stamps' if stamped else ''}",
+                            ["bash", "examples/dsv2lite/build.sh", self.fleet, *flags], env=env, timeout=900)
+            from examples.dsv2lite.build_resources import parse
+            resources = parse(text)
+            write_json(out / "resources.json", resources)
+            if resources["scratch"] > 0:
+                raise RuntimeError(f"arm {arm} spills to scratch on this box: {resources}")
+            print(f"BUILD arm={arm} stamped={int(stamped)} resources={resources}", flush=True)
         print(f"BUILD arm={arm} OK", flush=True)
 
     def full_invocation(self, arm: str, name: str) -> dict:
         command = [self.out(arm) / "run", *self.args()]
         if arm == "fleet":
             command += ["--graph", self.out(arm) / "taskgraph_d16.bin"]
-        text, _ = self.run(name, command)
-        return full_result(text)
+        return full_result(self.run(name, command))
 
-    def pairs(self, arm: str, baseline=False):
-        if not baseline:
-            screen = json.loads((self.logs / f"screen_{arm}.json").read_text())
-            if not screen["go"]:
-                raise RuntimeError(f"refusing unscreened full arm {arm}")
-        name = "baseline" if baseline else f"full_{arm}"
-        pairs = []
+    def pairs(self, arm: str):
+        """Five interleaved rounds; order reversed on odd rounds; every invocation a fresh process with all gates."""
+        if arm == "baseline":
+            order, refs, cand = ("default", "fleet"), ("default",), "fleet"
+        elif arm == "all":
+            order, refs, cand = ("default", "all", "fleet"), ("default", "fleet"), "all"
+            if not (self.out("fleet") / "run").exists():          # the decision is vs default; fleet is the context
+                print("PAIRS arm=all: fleet binary missing, measuring against default only", flush=True)
+                order, refs = ("default", "all"), ("default",)
+        else:
+            order, refs, cand = ("default", arm), ("default",), arm
+        rounds = []
         for i in range(5):
             result = {}
-            order = ("default", arm) if baseline else ("default", arm, "fleet")
-            if i % 2:
-                order = tuple(reversed(order))
-            for current in order:
-                result[current] = self.full_invocation(current, f"{name}_p{i}_{current}")
-            pairs.append(result)
-        report = dict(arm=arm, pairs=pairs, device_condition="one MI300X, batch 1, context 1024, 32 tokens, repeat 2",
-                      wall_condition="ETX per-token launch; fleet shipped default 32 tokens per launch")
+            for current in (order if i % 2 == 0 else tuple(reversed(order))):
+                result[current] = self.full_invocation(current, f"{arm}_r{i}_{current}")
+            rounds.append(result)
+        report = dict(arm=arm, rounds=rounds, condition="one MI300X, batch 1, context 1024, 32 tokens, repeat 2")
         for key in ("device_ms", "wall_ms"):
             report[key] = {}
-            for reference in (("default",) if baseline else ("default", "fleet")):
-                values = [p[reference][key] - p[arm][key] for p in pairs]
-                report[key][reference] = full_gain(values)
-        write_json(self.logs / f"{name}.json", report)
-        print(f"{'BASELINE' if baseline else 'FULL'} arm={arm} complete 5 pairs, every invocation 32/32 +27/27 "
-              f"device={report['device_ms']} wall={report['wall_ms']}", flush=True)
+            for ref in refs:
+                report[key][ref] = paired([1000 * (r[ref][key] - r[cand][key]) for r in rounds])
+        if arm != "all":
+            for basis in report["device_ms"].values():
+                basis["go"] = None          # attribution only: the decision belongs to `all`
+        write_json(self.logs / f"pairs_{arm}.json", report)
+        d = report["device_ms"]["default"]
+        print(f"PAIRS arm={arm} device gain vs default median {d['median_us']:.1f} us spread {d['spread_us']:.1f} "
+              f"every_positive={int(d['every_positive'])} GO={d['go']}", flush=True)
 
-    def snapshot_env(self, mode: str, phase: str, name: str) -> dict:
-        return dict(ETX_DSV2_SNAPSHOT_MODE=mode, ETX_DSV2_SNAPSHOT_PHASE=phase,
-                    ETX_DSV2_SNAPSHOT_FILE=str(self.logs / f"input_{phase}.bin"),
-                    ETX_DSV2_SNAPSHOT_OUTPUT=str(self.logs / f"{name}.output.bin"),
-                    ETX_TRACE="1", ETX_TRACE_RAW=str(self.logs / f"{name}.trace.bin"))
-
-    def capture(self):
-        snapshots = {}
-        for phase in PHASES:
-            name = f"capture_{phase}"
-            text, _ = self.run(name, [self.out("default", "capture", phase) / "run", *self.args(1)],
-                               env=self.snapshot_env("capture", phase, name))
-            if f"SNAPSHOT complete mode=capture phase={phase}" not in text:
-                raise RuntimeError("snapshot capture incomplete")
-            snapshots[phase] = sha(self.logs / f"input_{phase}.bin")
-        write_json(self.logs / "snapshot_inputs.json", snapshots)
-
-    def screen(self, arm: str):
-        phases = ("qkv_5",) if arm == "Q" else PHASES
-        snapshots = json.loads((self.logs / "snapshot_inputs.json").read_text())
-        deltas = {phase: [] for phase in phases}; pairs = []; warm_seconds = 0.0
-        for i in range(5):
-            samples = {}
-            for current in (("default", arm) if i % 2 == 0 else (arm, "default")):
-                samples[current] = {}
-                for phase in phases:
-                    if sha(self.logs / f"input_{phase}.bin") != snapshots[phase]:
-                        raise RuntimeError("saved phase input changed")
-                    name = f"screen_{arm}_p{i}_{current}_{phase}"
-                    out = self.out(current, "replay", phase)
-                    text, warm = self.run(name, [out / "run", *self.args(1)], env=self.snapshot_env("replay", phase, name))
-                    warm_seconds += warm
-                    if warm_seconds > 300:
-                        raise RuntimeError("five warm-GPU-minute decider cap exceeded")
-                    if f"SNAPSHOT complete mode=replay phase={phase}" not in text:
-                        raise RuntimeError("snapshot replay incomplete")
-                    span = phase_span(out / "plan.json", self.logs / f"{name}.trace.bin", phase)
-                    samples[current][phase] = dict(span_us=span, output_sha256=sha(self.logs / f"{name}.output.bin"))
-            for phase in phases:
-                ctl, cand = samples["default"][phase], samples[arm][phase]
-                if ctl["output_sha256"] != cand["output_sha256"]:
-                    raise RuntimeError(f"phase output byte mismatch arm={arm} phase={phase} pair={i}")
-                deltas[phase].append(ctl["span_us"] - cand["span_us"])
-            pairs.append(samples)
-        result = paired_screen(deltas["qkv_5"], deltas.get("router_5"))
-        result.update(arm=arm, pairs=pairs, delta_phase_us=deltas, snapshot_sha256=snapshots, warm_seconds=warm_seconds)
-        write_json(self.logs / f"screen_{arm}.json", result)
-        print(f"SCREEN arm={arm} GO={int(result['go'])} median_us={result['median_us']:.6f} "
-              f"spread_us={result['spread_us']:.6f} gains_us={result['gains_us']} "
-              f"hundred_us_route={int(result['hundred_us_route'])}", flush=True)
-
-    def trace(self):
-        env = dict(ETX_TRACE="1", ETX_TRACE_RAW=str(self.logs / "default.trace.bin"),
-                   ETX_DS_PROLOGUE=str(self.logs / "default.stamps.bin"))
-        text, _ = self.run("trace_default", [self.out("stamps") / "run", *self.args()], env=env)
+    def trace(self, arm: str):
+        """One stamped run of arm's STAMPS2 build (trace + prologue stamps), then the per-stage table of that token."""
+        name = f"trace_{arm}"
+        env = dict(ETX_TRACE="1", ETX_TRACE_RAW=str(self.logs / f"{name}.trace.bin"),
+                   ETX_DS_PROLOGUE=str(self.logs / f"{name}.stamps.bin"))
+        text = self.run(name, [self.out(arm, stamped=True) / "run", *self.args()], env=env)
         full_result(text)
-        self.run("trace_ledger", [sys.executable, "-m", "examples.dsv2lite.ledger", "--etx",
-                                  self.out("stamps") / "plan.json", self.logs / "default.trace.bin",
-                                  self.logs / "default.stamps.bin", "--fleet-src", self.fleet / "src"], timeout=60)
-        print("TRACE default completed 32/32 +27/27; instrumentation timing excluded from comparisons", flush=True)
+        from examples.dsv2lite import stage_table as st
+        us, n, span = st.measured(self.out(arm, stamped=True) / "plan.json", self.logs / f"{name}.trace.bin",
+                                  self.logs / f"{name}.stamps.bin")
+        write_json(self.logs / f"stages_{arm}.json", dict(arm=arm, span_us=span, stages_us=us, instances=n))
+        print(f"TRACE arm={arm} span {span:.1f} us; stages " + " ".join(f"{k}={us[k]:.1f}" for k in st.ORDER), flush=True)
 
     def report(self):
-        result = {}
-        for arm in ("Q", "gamma", "tree", "both"):
-            screen = json.loads((self.logs / f"screen_{arm}.json").read_text())
-            full = self.logs / f"full_{arm}.json"
-            if screen["go"] and not full.exists():
-                raise RuntimeError(f"passing arm {arm} is NOT COMPLETE (no full five-pair result)")
-            result[arm] = dict(screen=screen, full=json.loads(full.read_text()) if full.exists() else "REJECTED BY SCREEN")
-        write_json(self.logs / "report.json", result)
-        print("REPORT complete; raw and JSON evidence retained; screen estimates are not full-token claims", flush=True)
+        from examples.dsv2lite import stage_table as st
+        out = dict()
+        for arm in ("baseline", "all", *SINGLE):
+            path = self.logs / f"pairs_{arm}.json"
+            out[arm] = json.loads(path.read_text()) if path.exists() else "NOT COMPLETE"
+        if out["all"] == "NOT COMPLETE":
+            raise RuntimeError("the deciding arm `all` is NOT COMPLETE")
+        expected = json.loads((self.root / "examples/dsv2lite/results/stages/stage_table.json").read_text())
+        rows = []
+        stages = {a: json.loads((self.logs / f"stages_{a}.json").read_text()) for a in STAMPED
+                  if (self.logs / f"stages_{a}.json").exists()}
+        for r in expected["rows"]:
+            s = r["stage"]
+            row = dict(stage=s, expected_saving_us=-r["delta_us"])
+            if len(stages) == 2:
+                row.update(default_us=stages["default"]["stages_us"].get(s), all_us=stages["all"]["stages_us"].get(s))
+                row["measured_saving_us"] = row["default_us"] - row["all_us"]
+            rows.append(row)
+        out["stages"] = rows
+        write_json(self.logs / "report.json", out)
+        a = out["all"]["device_ms"]["default"]
+        print(f"REPORT all: median {a['median_us']:.1f} us spread {a['spread_us']:.1f} GO={a['go']}; "
+              f"stages measured: {len(stages) == 2}; raw logs and JSON kept in {self.logs}", flush=True)
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(__doc__)
-    ap.add_argument("operation", choices=("source", "preflight", "build", "baseline", "capture", "screen", "full", "trace", "report"))
-    ap.add_argument("arm", nargs="?", choices=("default", "fleet", "stamps", "Q", "gamma", "tree", "both"))
-    args = ap.parse_args(argv)
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("operation", choices=("source", "preflight", "build", "pairs", "trace", "report"))
+    ap.add_argument("arm", nargs="?")
+    ap.add_argument("--stamped", action="store_true")
+    a = ap.parse_args(argv)
     session = Session()
-    if args.operation in ("build", "screen", "full") and args.arm is None:
-        ap.error(f"{args.operation} requires arm")
-    if args.operation == "baseline":
-        session.pairs("fleet", baseline=True)
-    elif args.operation == "full":
-        session.pairs(args.arm)
+    if a.operation == "build":
+        if a.arm not in (*ARMS, "fleet"):
+            ap.error(f"build arm must be one of {sorted((*ARMS, 'fleet'))}")
+        session.build(a.arm, a.stamped)
+    elif a.operation == "pairs":
+        if a.arm not in ("baseline", "all", *SINGLE):
+            ap.error("pairs arm must be baseline, all or a single lever")
+        session.pairs(a.arm)
+    elif a.operation == "trace":
+        if a.arm not in STAMPED:
+            ap.error(f"trace arm must be one of {STAMPED}")
+        session.trace(a.arm)
     else:
-        method = getattr(session, args.operation)
-        method(args.arm) if args.operation in ("build", "screen") else method()
+        getattr(session, a.operation)()
 
 
 if __name__ == "__main__":

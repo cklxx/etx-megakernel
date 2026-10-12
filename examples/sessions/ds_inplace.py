@@ -1,51 +1,37 @@
 """PREPARED, NOT RUN. One MI300X, GPU 0 only. No provisioning; the model download and reference run happen on the box.
 
-Budget [planning cap, not a runtime prediction]: 120 allocated GPU minutes,
-$3.98 at $1.99/h or $5.98 at $2.99/h, including source builds, hash verification,
-31.4-GB weight uploads on each fresh invocation and all possible candidate arms.
-Each decider additionally has a five warm-GPU-minute cap (startup/upload excluded).
-Global deadline is 7200 s; every build/run has its own deadline and heartbeat.
+What it measures (examples/dsv2lite/inplace_session.py): the ETX DeepSeek port with every lever that passed its local
+gate (examples/dsv2lite/results/levers/*.json), as whole tokens, against default ETX and shipped fleet (3fb67a6).
+  1. baseline        5 interleaved rounds default / fleet
+  2. pairs all       5 interleaved rounds default / all / fleet: THE decision
+  3. trace default, trace all   one stamped token each (STAMPS2 builds): the measured per-stage table
+  4. pairs <lever>   5 rounds default / lever for Q, Qall, N, Nall, argmax, topk, prep: attribution, no verdict
+  5. report          verdict + measured per-stage savings next to stage_table.json's expected ones
+Every invocation is a fresh process and must show 32/32 HF-greedy tokens, 27/27 layers and a 32/32 warm-up.
 
-Reject every arm on missing inputs, byte-different phase outputs, missing/partial
-samples, deadline, nonfinite timing, any nonpositive weighted paired gain, median
-<= twice full-range spread, or median <50 us/token. Full arms additionally require
-32/32 HF greedy tokens AND 27/27 layers in EVERY invocation. Warmup must be 32/32.
-Q: spec 0:qkv_5, 27*d_qkv >=50. gamma/tree: independent 0:qkv_5 and 0:router_5,
-27*d_qkv+26*d_router >=50. Both uses that same weighted net, never summed standalone
-screen medians. Five interleaved pairs alternate control/candidate order. Full
-candidate rounds include default/candidate/fleet (reversed on alternate rounds),
-so both comparisons are paired; the final checkpoint is >=70 us/token, every gain
-positive and median >2*full-range spread, reported separately for wall and device.
-A >=100-us
-screen is labelled separately. A screen is diagnostic, never a token-speed claim.
-Only the default/fleet baseline and final default stamps run without a screen gate.
+Decision rule, fixed before the run (all vs default, device basis): every paired gain > 0, median >= 70 us/token,
+median > 2 x full-range spread. Expected from the local account: 531.1 us simulated / 533.4 us arithmetic
+(stage_table.md; BYTES rows are upper bounds). Reject `all` on any correctness gate, on scratch in its build, or on
+the rule; then the single-lever pairs say which lever fails. A run that does not finish is NOT COMPLETE.
 
-Control/candidate phase graphs use the prior decider flags EV_STRIDE=32 and
-ACQUIRE_DOMAIN_RELAXED. Full-token controls/candidates use today's default flags.
-Native-prefix capture creates fixed input files ONCE from unmodified ETX; separate
-fresh processes reload those same bytes before each single phase invocation.
-Outputs are byte-compared before the screen can pass. No appended repeated fold.
+Budget [planning cap]: 120 GPU minutes (MAX_SESSION_SECONDS), $5.98 at $2.99/h (Hot Aisle 1x; balance $6.29 on
+2026-10-13) or $3.98 at $1.99/h. Expected use [E]: ~25 min environments + inputs (builds run in parallel), then
+10 + 15 + 2 + 70 = 97 invocations x ~8 s (results_2026-09-27b runner: 7-8 s per 32-token invocation) = ~13 min,
+plus builds' tail: ~45-60 min total.
 
-Inputs are prepared ON THE BOX by the prep_* jobs below (the ds_gap.py recipes): docs/DATA.md:59-64
-says the fleet reference outputs (~70 MB, ~2 GPU minutes) and the packed weights (31 GB, ~1 min download +
-~1 min pack) were never kept, and 31 GB cannot be staged from the laptop. Both are produced from the PINNED
-fleet export (ETX_DSV2_FLEET, default ~/fleet-3fb67a6, src hash verified by `source`) with
-deepseek-ai/DeepSeek-Coder-V2-Lite-Base, into ETX_DSV2_DATA (default ~/dsv2-data), then SHA256SUMS is written
-and `preflight` re-verifies every file before the first timed run. A prep step is skipped when its outputs
-already exist (a re-run on the same box), never faked: the 32/32 gate checks the goldens against the model.
+Inputs are prepared ON THE BOX by the prep_* jobs (the ds_gap.py recipes): docs/DATA.md:59-64 says the fleet reference
+outputs (~70 MB, ~2 GPU minutes) and the packed weights (31 GB, ~1 min download + ~1 min pack) were never kept. Both
+come from the PINNED fleet export (ETX_DSV2_FLEET, default ~/fleet-3fb67a6, src hash verified by `source`) and
+deepseek-ai/DeepSeek-Coder-V2-Lite-Base, into ETX_DSV2_DATA (default ~/dsv2-data); SHA256SUMS is written and
+`preflight` re-verifies every file before the first timed run.
 
-Stage the box from the laptop with examples/dsv2lite/stage_inplace.sh <ip> (clean tree only; pushes the
-pinned export and SOURCE_IDENTITY), then start the runner.
-
-All stdout/stderr and raw traces stay under gpu_jobs.py's ETX_SESS_LOGDIR.
-Run (after local validation, balance check, and budget authorization):
-examples/dsv2lite/stage_inplace.sh <ip> && ETX_SESS_MAX_SECONDS=7200 tools/session.sh start <ip> examples/sessions/ds_inplace.py 0
-Use --dry-run locally. Delete the VM immediately after completion or deadline.
+Run (after local validation, balance check and budget authorization):
+  examples/dsv2lite/stage_inplace.sh <ip> && ETX_SESS_MAX_SECONDS=7200 tools/session.sh start <ip> examples/sessions/ds_inplace.py 0
+Use --dry-run locally. Fetch the session directory into the tree before deleting the VM; delete it right after.
 """
 MAX_SESSION_SECONDS = 7200
-ARMS = ("Q", "gamma", "tree", "both")
+SINGLE = ("Q", "Qall", "N", "Nall", "argmax", "topk", "prep")
 JOBS = []
-
 
 # The runner forwards only ETX_SESS_MAX_SECONDS, so the paths get their defaults in every job's shell.
 PATHS = (': "${ETX_DSV2_FLEET:=$HOME/fleet-3fb67a6}"; : "${ETX_DSV2_DATA:=$HOME/dsv2-data}"; '
@@ -62,7 +48,7 @@ def job(name, cmd, *, lane="cpu", after=(), gate=None, timeout=600, summary=()):
 
 def add(name, operation, **kw):
     job(name, f".venv/bin/python -u -m examples.dsv2lite.inplace_session {operation}",
-        summary=[r"^(SOURCE|PREFLIGHT|BUILD|BASELINE|SCREEN|FULL|TRACE|REPORT) "], **kw)
+        summary=[r"^(SOURCE|PREFLIGHT|BUILD|PAIRS|TRACE|REPORT) "], **kw)
 
 
 # ---------------------------------------------------------------- environments (cpu); recipes from ds_gap.py
@@ -102,20 +88,25 @@ job("prep_sums", 'cd "$ETX_DSV2_DATA" && sha256sum weights.bin weights.bin.manif
 add("preflight", "preflight", after=("prep_sums",), timeout=600)
 
 # ---------------------------------------------------------------- builds (cpu, while the inputs are prepared)
-for arm in ("default", "fleet", "stamps", *ARMS):
+for arm in ("default", "fleet", "all", *SINGLE):
     add(f"build_{arm}", f"build {arm}", after=("source",), timeout=1200)
-add("baseline", "baseline", lane="gpu", after=("preflight", "build_default", "build_fleet"), timeout=900)
-add("capture", "capture", lane="gpu", after=("baseline",), timeout=600)
-previous = "capture"
-for arm in ARMS:
-    add(f"screen_{arm}", f"screen {arm}", lane="gpu", after=(previous, f"build_{arm}"), timeout=1200)
-    previous = f"screen_{arm}"
-# All deciding microbenchmarks precede every candidate full-model run.
-for arm in ARMS:
-    add(f"full_{arm}", f"full {arm}", lane="gpu", after=(previous,),
-        gate=(f"screen_{arm}", rf"^SCREEN arm={arm} GO=1(?: |$)"), timeout=900)
-# A rejected screen skips its candidate but must not skip the final default trace.
-add("trace", "trace", lane="gpu", after=(previous, "build_stamps"), timeout=300)
-JOBS[-1]["after_any"] = [f"full_{arm}" for arm in ARMS]
-add("report", "report", after=("baseline", "trace"), timeout=60)
-JOBS[-1]["after_any"] = [f"full_{arm}" for arm in ARMS]
+for arm in ("default", "all"):
+    add(f"build_{arm}_stamps", f"build {arm} --stamped", after=("source",), timeout=1200)
+
+# ---------------------------------------------------------------- GPU, in order of importance
+add("baseline", "pairs baseline", lane="gpu", after=("preflight", "build_default", "build_fleet"), timeout=900)
+# A failed reference or decision must not cost the data that explain it: later GPU jobs follow "whatever the result".
+add("pairs_all", "pairs all", lane="gpu", after=("preflight", "build_default", "build_all"), timeout=1200)
+JOBS[-1]["after_any"] = ["baseline"]
+add("trace_default", "trace default", lane="gpu", after=("build_default_stamps",), timeout=300)
+JOBS[-1]["after_any"] = ["pairs_all"]
+add("trace_all", "trace all", lane="gpu", after=("build_all_stamps",), timeout=300)
+JOBS[-1]["after_any"] = ["trace_default"]
+previous = "trace_all"
+for arm in SINGLE:                       # attribution: each lever alone, after everything that decides
+    add(f"pairs_{arm}", f"pairs {arm}", lane="gpu", after=(previous, f"build_{arm}"), timeout=900)
+    JOBS[-1]["after_any"] = [previous]
+    JOBS[-1]["after"] = [f"build_{arm}"]
+    previous = f"pairs_{arm}"
+add("report", "report", after=("pairs_all",), timeout=120)
+JOBS[-1]["after_any"] = ["trace_default", "trace_all", *(f"pairs_{a}" for a in SINGLE)]

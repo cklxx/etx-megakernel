@@ -1,57 +1,19 @@
-"""Local-only protocol gates: truncated/mismatching runs cannot authorize an arm."""
-from array import array
+"""Local gates for the prepared ds_inplace GPU session: the job graph, the decision rule, and every GPU-side operation
+run end to end against stand-in binaries that replay RECORDED outputs (archived ETX and fleet logs, the stamped 09-27b
+trace), so the parsing, pairing, stage and report code paths are exercised on real data before any box exists."""
 import json
+import os
 from pathlib import Path
+import shutil
+import stat
 
 import pytest
 
-from etx.codegen import emit_plan_json
-from etx.passes import compile_graph, verify_plan
 from etx.tools.gpu_jobs import load_session
-from examples.dsv2lite.graph import build
-from examples.dsv2lite.inplace_session import full_gain, full_result, paired_screen, phase_span
+from examples.dsv2lite import inplace_session as ins
+from examples.dsv2lite.inplace_session import full_result, paired
 
-
-@pytest.mark.parametrize("mode,phase,last", [
-    ("capture", "qkv_5", "down_4"), ("capture", "router_5", "oproj_5"),
-    ("replay", "qkv_5", "iso0x0_r0_qkv_5"), ("replay", "router_5", "iso0x0_r0_router_5"),
-])
-def test_native_capture_and_single_phase_replay(monkeypatch, mode, phase, last):
-    monkeypatch.setenv("ETX_DSV2_SNAPSHOT", f"{mode}:0:{phase}")
-    g = build(); plan = compile_graph(g, "gfx942", {}, {})
-    assert verify_plan(plan) == []
-    assert g.grids[-1].name == last
-    if mode == "replay":
-        assert len(plan.tasks) == 296 and len(g.grids) == 1
-        assert not g.grids[0].in_edges
-    else:
-        assert phase not in [x.name for x in g.grids]
-        assert "argmax" not in [x.name for x in g.grids]
-
-
-@pytest.mark.parametrize("snapshot,extra", [
-    ("replay:0:qkv_6", {}), ("replay:1:qkv_5", {}),
-    ("replay:0:qkv_5", {"ETX_DSV2_ISOLATE": "0:qkv_5"}),
-    ("replay:0:qkv_5", {"ETX_DSV2_REQUESTS": "2"}),
-])
-def test_snapshot_rejects_unsupported_or_mutating_graph(monkeypatch, snapshot, extra):
-    monkeypatch.setenv("ETX_DSV2_SNAPSHOT", snapshot)
-    for key, value in extra.items():
-        monkeypatch.setenv(key, value)
-    with pytest.raises(ValueError):
-        build()
-
-
-def test_screen_uses_paired_weighted_net_not_independent_medians():
-    result = paired_screen([1, 2, 3, 4, 5], [4, 3, 2, 1, 0])
-    assert result["gains_us"] == [131, 132, 133, 134, 135]
-    assert result["go"] and result["hundred_us_route"]
-    assert not paired_screen([1] * 5)["go"]
-    assert not paired_screen([2, 2, 2, 2, -1])["go"]
-    assert not paired_screen([2, 2, 2, 2, 4])["go"]
-    for values in ([2] * 4, [float("nan")] * 5):
-        with pytest.raises(ValueError):
-            paired_screen(values)
+SESSION = Path("examples/sessions/ds_inplace.py")
 
 
 def good_log(fleet=False):
@@ -65,7 +27,7 @@ def good_log(fleet=False):
 
 
 @pytest.mark.parametrize("fleet", [False, True])
-def test_both_real_full_log_formats_require_all_gates(fleet):
+def test_both_log_formats_require_all_gates(fleet):
     assert full_result(good_log(fleet))["wall_ms"] == 3.0
     for old, new in [("27 of 27", "26 of 27"), ("tokens: 32/32", "tokens: 31/32"),
                      ("32/32 tokens match", "31/32 tokens match"), ("median 2.900", "median 0.000")]:
@@ -73,64 +35,46 @@ def test_both_real_full_log_formats_require_all_gates(fleet):
             full_result(good_log(fleet).replace(old, new))
 
 
-def test_full_checkpoint_is_separate_from_screen():
-    assert full_gain([.075] * 5)["pass_70us"]
-    assert not full_gain([.065] * 5)["pass_70us"]
-    assert not full_gain([.1, .1, .1, .1, -.001])["pass_70us"]
+@pytest.mark.parametrize("gains,go", [
+    ([75, 76, 74, 77, 75], True),             # every gain positive, median 75 >= 70, spread 3 < 37.5
+    ([75, 76, -1, 77, 75], False),            # one negative pair
+    ([65, 66, 64, 67, 65], False),            # median below 70
+    ([75, 160, 40, 100, 71], False),          # median 75 but spread 120 > median / 2
+])
+def test_decision_rule(gains, go):
+    assert paired(gains)["go"] is go
 
 
-def test_phase_trace_rejects_partial_samples_but_accepts_zero_relative_ready(monkeypatch, tmp_path):
-    monkeypatch.setenv("ETX_DSV2_SNAPSHOT", "replay:0:qkv_5")
-    plan = compile_graph(build(), "gfx942", {}, {})
-    p = tmp_path / "plan.json"; p.write_text(emit_plan_json(plan))
-    raw = tmp_path / "trace.bin"
-    rows = []
-    for task in plan.tasks:
-        coords = list(task.coord) + [0] * (4 - len(task.coord))
-        rows += [0, *coords, 100, 100, 2100, task.worker]
-    array("q", rows).tofile(raw.open("wb"))
-    assert phase_span(p, raw, "qkv_5") == 20
-    array("q", rows[:-9]).tofile(raw.open("wb"))
-    with pytest.raises((ValueError, SystemExit)):
-        phase_span(p, raw, "qkv_5")
-
-
-def test_prepared_session_pins_gpu_and_gates_every_candidate():
-    jobs, limit = load_session(Path("examples/sessions/ds_inplace.py"))
+def test_job_graph_order_and_inputs():
+    jobs, limit = load_session(SESSION)
+    by = {j.name: j for j in jobs}
     assert limit == 7200
-    by_name = {job.name: job for job in jobs}
-    assert all(j.gpu == 0 and j.quiet_s <= 90 for j in jobs if j.lane == "gpu")
-    for arm in ("Q", "gamma", "tree", "both"):
-        job = by_name[f"full_{arm}"]
-        assert job.gate == (f"screen_{arm}", rf"^SCREEN arm={arm} GO=1(?: |$)")
-        assert job.after == ["screen_both"]
-    assert set(by_name["trace"].after_any) == {f"full_{x}" for x in ("Q", "gamma", "tree", "both")}
-
-
-def test_inputs_are_prepared_on_the_box_before_the_first_timed_run():
-    """31 GB cannot be staged from the laptop (docs/DATA.md:59-64): prep jobs make the inputs, preflight re-checks
-    them, builds only wait for the source check, and the first GPU timing waits for both."""
-    jobs, _ = load_session(Path("examples/sessions/ds_inplace.py"))
-    by_name = {job.name: job for job in jobs}
-
-    def upstream(name, seen=None):
-        seen = set() if seen is None else seen
-        for dep in by_name[name].after:
-            if dep not in seen:
-                seen.add(dep)
-                upstream(dep, seen)
-        return seen
-
-    assert {"prep_ref", "prep_pack", "prep_sums", "source"} <= upstream("preflight")
-    assert by_name["prep_ref"].lane == "gpu" and "source" in by_name["prep_ref"].after
-    for arm in ("default", "fleet", "stamps", "Q", "gamma", "tree", "both"):
-        assert by_name[f"build_{arm}"].after == ["source"]
-    assert {"preflight", "build_default", "build_fleet"} <= set(by_name["baseline"].after)
-    # The runner forwards only ETX_SESS_MAX_SECONDS: every job sets the path defaults itself.
-    assert all("ETX_DSV2_DATA:=$HOME/dsv2-data" in j.cmd and "ETX_DSV2_FLEET:=$HOME/fleet-3fb67a6" in j.cmd
-               for j in jobs)
-    # Inputs come from the pinned export, never from a fleet checkout.
+    assert all(j.gpu == 0 for j in jobs if j.lane == "gpu")
+    gpu = [j.name for j in jobs if j.lane == "gpu"]
+    assert gpu[:5] == ["prep_ref", "baseline", "pairs_all", "trace_default", "trace_all"]   # decision before attribution
+    assert set(gpu[5:]) == {f"pairs_{a}" for a in ins.SINGLE}
+    for arm in (*ins.ARMS, "fleet"):
+        assert f"build_{arm}" in by and by[f"build_{arm}"].after == ["source"]
+    for arm in ins.STAMPED:
+        assert f"--stamped" in by[f"build_{arm}_stamps"].cmd
+    assert "preflight" in by["baseline"].after and "preflight" in by["pairs_all"].after
+    assert by["pairs_all"].after_any == ["baseline"] and by["trace_default"].after_any == ["pairs_all"]
+    assert "pairs_all" in by["report"].after
+    assert all("ETX_DSV2_DATA:=$HOME/dsv2-data" in j.cmd and "ETX_DSV2_FLEET:=$HOME/fleet-3fb67a6" in j.cmd for j in jobs)
     assert all("fleet-mi300x" not in j.cmd for j in jobs)
+
+
+def test_every_arm_names_levers_present_and_locally_passed():
+    from examples.dsv2lite.patch_fleet import levers
+    root = Path("examples/dsv2lite/results/levers")
+    for arm, names in ins.ARMS.items():
+        for name in names:
+            assert name in levers(), (arm, name)
+            record = json.loads((root / f"{name}.json").read_text())
+            assert record.get("verdict", "PASS") == "PASS", (arm, name)
+    combined = root / ("+".join(ins.LEVERS_ALL) + ".json")
+    rec = json.loads(combined.read_text())
+    assert rec["arm_build"]["resources"]["scratch"] == 0
 
 
 @pytest.mark.parametrize("identity,ok", [
@@ -140,10 +84,10 @@ def test_inputs_are_prepared_on_the_box_before_the_first_timed_run():
     (None, False),
 ])
 def test_source_identity_must_name_a_clean_commit(tmp_path, monkeypatch, identity, ok):
-    from examples.dsv2lite.inplace_session import Session
     monkeypatch.setenv("ETX_SESS_LOGDIR", str(tmp_path / "logs"))
     monkeypatch.setenv("ETX_DSV2_DATA", str(tmp_path / "data"))
-    session = Session()
+    monkeypatch.setenv("ETX_DSV2_FLEET", str(tmp_path / "fleet"))
+    session = ins.Session()
     session.root = tmp_path
     if identity is not None:
         (tmp_path / "SOURCE_IDENTITY").write_text(identity)
@@ -152,3 +96,69 @@ def test_source_identity_must_name_a_clean_commit(tmp_path, monkeypatch, identit
     else:
         with pytest.raises(RuntimeError, match="SOURCE_IDENTITY"):
             session.source_identity()
+
+
+def _exe(path: Path, body: str):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("#!/bin/bash\n" + body)
+    path.chmod(path.stat().st_mode | stat.S_IEXEC)
+
+
+@pytest.fixture
+def recorded(tmp_path, monkeypatch):
+    """A session directory whose arm binaries replay archived outputs, and GNU shims for timeout/stdbuf (macOS)."""
+    from examples.dsv2lite.pinned import data_sets
+    try:
+        data = data_sets()
+    except Exception as exc:
+        pytest.skip(f"archived data sets unavailable: {exc}")
+    b, d = data / "results_2026-09-27b", data / "results_2026-09-27d"
+    logs = tmp_path / "logs"
+    shims = tmp_path / "shims"
+    _exe(shims / "timeout", 'while [[ "$1" == --* ]]; do shift; done; shift; exec "$@"\n')
+    _exe(shims / "stdbuf", 'while [[ "$1" == -* ]]; do shift; done; exec "$@"\n')
+    monkeypatch.setenv("PATH", f"{shims}:{os.environ['PATH']}")
+    monkeypatch.setenv("ETX_SESS_LOGDIR", str(logs))
+    monkeypatch.setenv("ETX_DSV2_DATA", str(tmp_path / "data"))
+    monkeypatch.setenv("ETX_DSV2_FLEET", str(tmp_path / "fleet"))
+    etx_log, fleet_log = d / "sess2/t1_x1s.log", b / "t1_fleet.log"
+    for arm in ins.ARMS:
+        _exe(logs / f"b_{arm}" / "run", f'cat "{etx_log}"\n')
+    _exe(logs / "b_fleet" / "run", f'cat "{fleet_log}"\n')
+    for arm in ins.STAMPED:           # the stamped builds replay the stamped 09-27b token (trace + prologue stamps)
+        out = logs / f"b_{arm}_stamps"
+        _exe(out / "run", f'cp "{b / "etx_trace.bin"}" "$ETX_TRACE_RAW"; cp "{b / "etx_pro.bin"}" "$ETX_DS_PROLOGUE"; '
+                          f'cat "{b / "t1_relaxed.log"}"\n')
+        shutil.copy(b / "etx_plan.json", out / "plan.json")
+    return logs, etx_log
+
+
+def test_gpu_operations_run_end_to_end_on_recorded_outputs(recorded):
+    recorded, _ = recorded
+    s = ins.Session()
+    s.pairs("baseline")
+    s.pairs("all")
+    for arm in ins.STAMPED:
+        s.trace(arm)
+    for arm in ins.SINGLE:
+        s.pairs(arm)
+    s.report()
+    report = json.loads((recorded / "report.json").read_text())
+    # identical recorded logs on both sides: every paired gain is exactly zero, so no GO
+    assert report["all"]["device_ms"]["default"]["gains_us"] == [0.0] * 5
+    assert report["all"]["device_ms"]["default"]["go"] is False
+    assert report["baseline"]["device_ms"]["default"]["median_us"] == pytest.approx(1000 * (3.474 - 3.545))
+    assert all(report[a]["device_ms"]["default"]["go"] is None for a in ins.SINGLE)
+    stages = {r["stage"]: r for r in report["stages"]}
+    assert len(stages) == 14 and all(r["measured_saving_us"] == 0 for r in stages.values())
+    st = json.loads((recorded / "stages_default.json").read_text())
+    assert abs(sum(st["stages_us"].values()) - st["span_us"]) < 1e-6          # the stamped partition is exact
+    # every invocation kept its full log; nothing was overwritten
+    assert len(list(recorded.glob("*.raw.log"))) == 10 + 15 + 2 + 10 * len(ins.SINGLE)
+
+
+def test_pairs_refuses_a_failed_correctness_gate(recorded):
+    logs, etx_log = recorded
+    _exe(logs / "b_all" / "run", f'sed "s/27 of 27/26 of 27/" "{etx_log}"\n')
+    with pytest.raises(ValueError, match="27/27"):
+        ins.Session().pairs("all")
