@@ -304,7 +304,11 @@ static __device__ __forceinline__ void dsl_gemv_rows_rw(const __hip_bfloat16* __
 #else
   const int lane = etx_lane(), wv = etx_wave(), nw = etx_nwaves(), nrt = r1 - r0;
 #endif
+#ifdef ETX_DSL_ROW_WAVE_FIXED_SPR
+  constexpr int spr = ETX_DSL_ROW_WAVE_FIXED_SPR;
+#else
   const int spr = K / SEG;
+#endif
   const int per = (nrt + nw - 1) / nw, rb = wv * per, re2 = min(nrt, rb + per);
   const DSL_G V* base0 = (const DSL_G V*)(W + (size_t)r0 * K);
   for (int r = rb; r < re2; ++r) {
