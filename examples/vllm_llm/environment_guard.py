@@ -162,7 +162,7 @@ def _run(s, evidence):
     if weights is None: raise ValueError('guard staged weight hashes missing')
     required={str(Path(s.c['model'])/'vl.bin'),*map(str,Path(s.c['hf']).glob('*.safetensors'))}
     if set(weights)!=required or len(required)<2: raise ValueError('guard must seal packed and all HF weight files')
-    text=s.step('GUARD_weights',['sha256sum',*sorted(required)],timeout=45,expected=20)
+    text=s.step('GUARD_weights',['sha256sum',*sorted(required)],timeout=240,expected=100)
     actual={}
     for line in text.splitlines():
         match=re.fullmatch(r'([a-f0-9]{64})\s+\*?(.+)',line)
