@@ -2,6 +2,10 @@
 kill, every job's full output lands in its log."""
 import io
 import json
+import os
+from pathlib import Path
+import shlex
+import sys
 import time
 
 import pytest
@@ -53,6 +57,41 @@ def test_load_and_dry_run(tmp_path, capsys):
     assert jobs[1].after == ["x"]
     assert gj.main([str(f), "--dry-run", "--machine", "B"]) == 0
     assert "y" in capsys.readouterr().out
+
+
+def test_child_uses_runner_interpreter_environment(tmp_path, monkeypatch):
+    stale = tmp_path / 'system-bin'
+    stale.mkdir()
+    python = stale / 'python3'
+    python.write_text('#!/bin/sh\necho WRONG-INTERPRETER\nexit 99\n')
+    python.chmod(0o755)
+    inherited_path = str(stale) + os.pathsep + os.environ['PATH']
+    probe = 'import os, sys; print(sys.prefix); print(os.environ["JOB_MARKER"])'
+    commands = [f'python3 -u -c {shlex.quote(probe)}',
+                f'env python3 -u -c {shlex.quote(probe)}',
+                f'{shlex.quote(str(python))}']
+    spawned = []
+    popen = gj.subprocess.Popen
+
+    def capture(args, **kwargs):
+        spawned.append((args, kwargs['env']))
+        return popen(args, **kwargs)
+
+    monkeypatch.setattr(gj.subprocess, 'Popen', capture)
+    rc, jobs, _, _ = _run(tmp_path, [
+        dict(name=f'probe{i}', lane='cpu', cmd=cmd,
+             env=dict(PATH=inherited_path, JOB_MARKER='preserved'))
+        for i, cmd in enumerate(commands)
+    ], gpus=())
+    assert rc == 1  # the explicitly selected interpreter still exits 99
+    assert [j.status for j in jobs.values()] == ['ok', 'ok', 'fail']
+    for i in (0, 1):
+        assert f'{sys.prefix}\npreserved\n' in jobs[f'probe{i}'].log.read_text()
+    assert 'WRONG-INTERPRETER' in jobs['probe2'].log.read_text()
+    for (args, env), cmd in zip(spawned, commands):
+        assert args == ['bash', '-c', cmd]
+        assert env['PATH'] == str(Path(sys.executable).parent) + os.pathsep + inherited_path
+        assert env['JOB_MARKER'] == 'preserved'
 
 
 def test_pin_folds_onto_one_gpu(tmp_path):

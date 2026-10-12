@@ -44,16 +44,16 @@ import subprocess
 import sys
 import time
 from examples.vllm_llm.pairs import Refusal
+from examples.vllm_llm.qwen300_config import IMAGE, QWEN300_HOUR_MAX_SESSION_SECONDS, validate_cap
 
 ROOT = Path(__file__).resolve().parents[2]
 MANIFEST = Path(__file__).with_name('qwen300_hour_arms.json')
 # Registration: main 9f91f3a, docs/PLAN-300TOKS-2026-10-11.md:297,304,310,318,320.
-MAX_SESSION_SECONDS = 8400
+MAX_SESSION_SECONDS = QWEN300_HOUR_MAX_SESSION_SECONDS
 ENVIRONMENT_GUARD_SECONDS = 240
 TRANCHE_SECONDS = dict(A=900, B=1320, C=4020, D=1910)
 REPORT_SECONDS = 10
-if not 0 < float(os.environ.get('ETX_SESS_MAX_SECONDS', MAX_SESSION_SECONDS)) <= MAX_SESSION_SECONDS:
-    raise ValueError('qwen300-hour cap must be positive and <=8400 seconds')
+validate_cap(MAX_SESSION_SECONDS, 'qwen300-hour')
 JOBS = [dict(name='qwen300_hour', gpu=0, machine='A', timeout=MAX_SESSION_SECONDS, quiet_s=180,
              cmd='stdbuf -oL -eL python3 -u -m examples.sessions.qwen300_hour --run')]
 
@@ -83,6 +83,7 @@ def template():
 
 
 SOURCE_FILES = ('examples/sessions/qwen300_hour.py', 'examples/sessions/qwen300_hour_arms.json',
+                'examples/vllm_llm/qwen300_config.py',
                 'examples/vllm_llm/host.hip', 'etx/runtime/include/etx/host.h')
 BASE_FLAGS = '-DETX_DSL_WSUM -DETX_DSL_SCALAR -DETX_DSL_GU1 -DETX_DSL_RBATCH -DETX_INBODY_REPORT'
 
@@ -618,7 +619,6 @@ def preflight(s):
         raise ValueError('frozen Qwen3-30B-A3B shape changed')
     if hf.get('torch_dtype', hf.get('dtype')) != 'bfloat16': raise ValueError('bf16 weights required; no FP8')
     if hf.get('quantization_config') not in (None, {}): raise ValueError('quantized/FP8 checkpoint forbidden')
-    from examples.sessions.qwen300 import IMAGE
     if s.c['image'] != IMAGE: raise ValueError('strongest legal reference requires pinned vLLM image')
     if cert.sha(m/'golden_c1024.txt') != s.c['golden_sha256']: raise ValueError('independent HF golden changed')
     from examples.llm.vllm_bench import read_golden
