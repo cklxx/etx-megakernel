@@ -1,0 +1,59 @@
+{
+  "arm": "stamps",
+  "arm_build": {
+    "isa_sha256": "041f8aa706be1f97f857558e487fb9b2d872b4bd6897ce0f9b8956d729da48b8",
+    "resources": {
+      "agpr": 58,
+      "lds": 26668,
+      "occupancy": 1,
+      "scratch": 0,
+      "sgpr": 108,
+      "vgpr": 256
+    },
+    "static": {
+      "asm_lines": 125731,
+      "nt_weight_loads": 252,
+      "vmcnt0_waits": 2757
+    }
+  },
+  "cpu_gates": {
+    "files": [
+      "tests/test_dsv2_stamps.py"
+    ],
+    "summary": "13 passed in 0.11s"
+  },
+  "default": {
+    "isa_sha256": "a105cb16a414ee0f9f697c9de13205419d09674f5c69f6ee804cf36942377724",
+    "resources": {
+      "agpr": 48,
+      "lds": 26668,
+      "occupancy": 1,
+      "scratch": 0,
+      "sgpr": 108,
+      "vgpr": 256
+    },
+    "static": {
+      "asm_lines": 107990,
+      "nt_weight_loads": 252,
+      "vmcnt0_waits": 2750
+    }
+  },
+  "delta_vs_default": {
+    "agpr": 10,
+    "lds": 0,
+    "occupancy": 0,
+    "scratch": 0,
+    "sgpr": 0,
+    "vgpr": 0
+  },
+  "etx_commit": "95c64ff1ce6d469452ccf98655a5157f4f5918ae",
+  "etx_dirty": false,
+  "fleet_commit": "3fb67a6",
+  "fleet_src_sha256": "28f5cbb4f39524df318883522341c48ca4162c18b71a3a6223c52eabb40ce4b3",
+  "static_delta": {
+    "asm_lines": 17741,
+    "nt_weight_loads": 0,
+    "vmcnt0_waits": 7
+  },
+  "verdict": "PASS"
+}
