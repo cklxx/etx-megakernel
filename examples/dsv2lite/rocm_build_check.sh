@@ -21,9 +21,9 @@ docker image inspect etx-rocm22 --format '{{.Id}}' > "$OUT/image.txt"
 LEVERS=$(cd "$ROOT" && .venv/bin/python -c 'from examples.dsv2lite.patch_fleet import levers; print(" ".join(levers()))')
 if [ "$ARM" = all ]; then ARMS=(default stamps $LEVERS); else ARMS=("$ARM"); fi
 for arm in "${ARMS[@]}"; do
-  case "$arm" in default|stamps) continue;; esac
-  for lever in ${arm//+/ }; do
-    case " $LEVERS " in *" $lever "*) ;; *) echo "unknown arm $arm: lever $lever not on this branch ($LEVERS)" >&2; exit 2;; esac
+  case "$arm" in default) continue;; esac
+  for lever in ${arm//+/ }; do          # "stamps" combines with levers: stamps+<lever>+...
+    case " stamps $LEVERS " in *" $lever "*) ;; *) echo "unknown arm $arm: lever $lever not on this branch ($LEVERS)" >&2; exit 2;; esac
   done
 done
 ENV_ARGS=()
@@ -47,19 +47,18 @@ OUT=/out/$ARM
 python3 -m etx compile examples/dsv2lite/graph.py --arch gfx942 --out "$OUT" --inline-tiles --relay on > "$OUT/compile.log" 2>&1
 SRC=/fleet/src
 PATCHES=(); FLAGS=()
-case "$ARM" in
-  default) ;;
-  stamps) FLAGS=(-DETX_DSV2_STAMPS2);;
-  *) read -ra PATCHES <<< "${ARM//+/ }";;
-esac
-if [ ${#PATCHES[@]} -gt 0 ] || [ "$ARM" = stamps ]; then
+STAMPS=0
+for token in ${ARM//+/ }; do
+  case "$token" in default) ;; stamps) STAMPS=1; FLAGS=(-DETX_DSV2_STAMPS2);; *) PATCHES+=("$token");; esac
+done
+if [ ${#PATCHES[@]} -gt 0 ] || [ "$STAMPS" = 1 ]; then
   rm -rf "$OUT/fleet_src"; mkdir -p "$OUT/fleet_src"
   cp -r /fleet/src/. "$OUT/fleet_src/"; SRC="$OUT/fleet_src"
   if [ ${#PATCHES[@]} -gt 0 ]; then
     python3 -m examples.dsv2lite.patch_fleet "$SRC" "${PATCHES[@]}" > "$OUT/patch.log" 2>&1
   fi
-  if [ "$ARM" = stamps ]; then
-    python3 -m examples.dsv2lite.patch_stamps "$SRC" > "$OUT/patch.log" 2>&1
+  if [ "$STAMPS" = 1 ]; then
+    python3 -m examples.dsv2lite.patch_stamps "$SRC" >> "$OUT/patch.log" 2>&1
   fi
 fi
 # ETX_CFLAGS is a whitespace-separated compiler argument list, never evaluated as code.
