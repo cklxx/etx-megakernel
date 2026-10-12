@@ -77,10 +77,14 @@ def main(argv=None) -> int:
         record["delta_vs_default"] = {k: arm["resources"][k] - default["resources"][k] for k in default["resources"]}
         record["static_delta"] = {k: arm["static"][k] - default["static"][k] for k in default["static"]}
         if arm["resources"]["scratch"] > default["resources"]["scratch"]:
-            raise SystemExit(f"arm {a.arm} adds scratch: {arm['resources']['scratch']} B/lane")
+            record["verdict"] = f"REJECTED: adds scratch, {arm['resources']['scratch']} B/lane"
+    record.setdefault("verdict", "PASS")
     path = ROOT / f"examples/dsv2lite/results/levers/{a.arm}.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(record, indent=2, sort_keys=True) + "\n")
+    if record["verdict"] != "PASS":
+        print(f"wrote {path.relative_to(ROOT)}")
+        raise SystemExit(f"arm {a.arm} {record['verdict']}")
     print(f"VERIFY arm={a.arm} gates='{summary}' default_isa={default['isa_sha256'][:16]}")
     print("arm | VGPR | AGPR | SGPR | scratch | LDS | waves/SIMD | NT loads | vmcnt(0)")
     rows = [("default", default)] + ([(a.arm, record["arm_build"])] if levers else [])
