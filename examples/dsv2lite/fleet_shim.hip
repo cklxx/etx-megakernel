@@ -34,22 +34,36 @@ struct FleetParams {
 #ifndef ETX_DS_PRO
 #define ETX_DS_PRO 0
 #endif
+#ifndef ETX_DSV2_STAMPS2
+#define ETX_DSV2_STAMPS2 0
+#endif
 #define PRO_SLOT(L, kind, c) ((((int64_t)(L) + 1) * 32 + (kind)) * 1024 + (int64_t)(c)->coord[0] * 64 + (c)->coord[1])
 // compiled in only with -DETX_DS_PRO=1 (the stamps cost registers: 286 -> 292 total per lane), so timing builds are unchanged
 static __device__ __forceinline__ void pro_begin(const FleetParams* fp, fleet::TokenCtx& tc, fleet::Scratch& s, uint64_t& t0) {
-#if !ETX_DS_PRO
+#if !ETX_DS_PRO && !ETX_DSV2_STAMPS2
   return;
 #endif
   tc.trace = fp->pro_trace != nullptr;
   if (tc.trace && threadIdx.x == 0) { s.stamp = 0; s.stamp_stage = 0; t0 = __builtin_amdgcn_s_memrealtime(); }
+#if ETX_DSV2_STAMPS2
+  if (tc.trace && threadIdx.x == 0) for (int i = 0; i < 13; ++i) s.stamps2[i] = 0;
+#endif
 }
 static __device__ __forceinline__ void pro_end(const FleetParams* fp, const fleet::Scratch& s, int64_t slot, uint64_t t0) {
-#if !ETX_DS_PRO
+#if !ETX_DS_PRO && !ETX_DSV2_STAMPS2
   return;
 #endif
   if (fp->pro_trace != nullptr && threadIdx.x == 0) {
+#if ETX_DSV2_STAMPS2
+    uint64_t* r = fp->pro_trace + slot * 16;
+    r[0] = t0; r[1] = s.stamp_stage; r[2] = s.stamp;
+    const int kind = (slot / 1024) % 32;
+    for (int i = 0; i < 13; ++i)
+      r[3 + i] = (kind == fleet::TASK_QKV_FUSED || kind == fleet::TASK_NORM_ROUTER || kind == fleet::TASK_MERGE_UV) ? s.stamps2[i] : 0;
+#else
     uint64_t* r = fp->pro_trace + slot * 3;
     r[0] = t0; r[1] = s.stamp_stage; r[2] = s.stamp;
+#endif
   }
 }
 

@@ -194,9 +194,39 @@ def build(layers: int = LAYERS, routing_cached: bool | None = None, requests: in
                       consts=(-1, q.r), in_edges={n("E_lm"): "i->i"}, out_edges={n("E_argmax"): "i->i"}, duration_us=DUR["argmax"],
                       worker_map=q.wmap("i->(OFF)"))
     spec = os.environ.get("ETX_DSV2_ISOLATE", "")
+    snapshot = os.environ.get("ETX_DSV2_SNAPSHOT", "")
+    if snapshot:
+        if spec or requests != 1:
+            raise ValueError("snapshot requires one request and no appended ETX_DSV2_ISOLATE")
+        _snapshot(g, snapshot)
     if spec:
         _isolate(g, spec, int(os.environ.get("ETX_DSV2_ISOLATE_REPS", "8")), qs)
     return g
+
+
+def _snapshot(g: Graph, spec: str) -> None:
+    """Measurement only: save the native phase inputs, then replay one independently mutating phase.
+
+    ETX_DSV2_SNAPSHOT=capture:0:qkv_5 or replay:0:qkv_5 (router_5 also).
+    host.hip's -DETX_DSV2_SNAPSHOT path supplies the saved inputs; no token correctness
+    claim comes from these truncated graphs. The unisolated arms keep the full gate.
+    """
+    if spec not in {f"{mode}:0:{phase}" for mode in ("capture", "replay") for phase in ("qkv_5", "router_5")}:
+        raise ValueError("snapshot must be capture|replay:0:qkv_5|router_5")
+    mode, _, phase = spec.split(":")
+    src = g.grid(phase)
+    if mode == "capture":
+        g.grids = g.grids[:g.grids.index(src)]
+        used = {e for grid in g.grids for e in (*grid.in_edges, *grid.out_edges)}
+        g.events = {k: v for k, v in g.events.items() if k in used}
+    else:
+        src.name = f"iso0x0_r0_{phase}"
+        src.in_edges = {}
+        src.out_edges = {}
+        g.grids = [src]
+        g.events = {}
+    used_args = {a for grid in g.grids for a in grid.args}
+    g.tensors = {k: v for k, v in g.tensors.items() if k in used_args}
 
 
 def _all_map(grid) -> str:

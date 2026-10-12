@@ -5,21 +5,44 @@ FLEET="${1:?path to fleet-mi300x}"; shift || true
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 OUT="${ETX_OUT:-$ROOT/build/dsv2lite}"
 mkdir -p "$OUT"
+# Measurement mode patches only the private source copy. Isolate repetitions
+# reuse legacy (layer, kind, coordinate) slots, so reject them rather than
+# overwrite the native stamps with an appended task's data.
+STAMPS2=0
+for flag in "$@"; do
+  case "$flag" in -DETX_DSV2_STAMPS2|-DETX_DSV2_STAMPS2=1) STAMPS2=1 ;; esac
+done
+if [ "$STAMPS2" = 1 ] && [ -n "${ETX_DSV2_ISOLATE:-}" ]; then
+  echo "ETX_DSV2_STAMPS2 rejects ETX_DSV2_ISOLATE: repeated tasks share prologue slots" >&2
+  exit 2
+fi
 # ETX_FLEET_PATCH="gemv_noinline ...": build against a patched copy of fleet's sources (examples/dsv2lite/patch_fleet.py)
-if [ -n "${ETX_FLEET_PATCH:-}" ]; then
+if [ -n "${ETX_FLEET_PATCH:-}" ] || [ "$STAMPS2" = 1 ]; then
   rm -rf "$OUT/fleet_src"; mkdir -p "$OUT/fleet_src"; cp -r "$FLEET/src/." "$OUT/fleet_src/"
-  (cd "$ROOT" && "$ROOT/.venv/bin/python" -m examples.dsv2lite.patch_fleet "$OUT/fleet_src" $ETX_FLEET_PATCH) || exit 1
+  if [ -n "${ETX_FLEET_PATCH:-}" ]; then
+    (cd "$ROOT" && "$ROOT/.venv/bin/python" -m examples.dsv2lite.patch_fleet "$OUT/fleet_src" $ETX_FLEET_PATCH) || exit 1
+  fi
+  if [ "$STAMPS2" = 1 ]; then
+    (cd "$ROOT" && "$ROOT/.venv/bin/python" -m examples.dsv2lite.patch_stamps "$OUT/fleet_src") || exit 1
+  fi
   FLEET_SRC="$OUT/fleet_src"
 else
   FLEET_SRC="$FLEET/src"
 fi
 INLINE="${ETX_INLINE_TILES:-1}"
 RELAY="${ETX_RELAY_PLAN:-on}"   # on: reserve one CU per XCD like fleet's scheduler CU (3.72 vs 3.78 ms/token with 38 workers); the relay itself runs only with ETX_RELAY=1     # 1: single-TU kernel (tile bodies included and inlinable); 0: separate shim TU
+compile_plan() {
+  if [ "${ETX_BUILD_VERBOSE:-0}" = 1 ]; then
+    "$ROOT/.venv/bin/python" -m etx compile examples/dsv2lite/graph.py --arch gfx942 --out "$OUT" "$@" --relay "$RELAY"
+  else
+    "$ROOT/.venv/bin/python" -m etx compile examples/dsv2lite/graph.py --arch gfx942 --out "$OUT" "$@" --relay "$RELAY" | grep -E "tasks=|workers/domain"
+  fi
+}
 if [ "$INLINE" = "1" ]; then
-  "$ROOT/.venv/bin/python" -m etx compile examples/dsv2lite/graph.py --arch gfx942 --out "$OUT" --inline-tiles --relay "$RELAY" | grep -E "tasks=|workers/domain"
+  compile_plan --inline-tiles
   SHIM=""
 else
-  "$ROOT/.venv/bin/python" -m etx compile examples/dsv2lite/graph.py --arch gfx942 --out "$OUT" --relay "$RELAY" | grep -E "tasks=|workers/domain"
+  compile_plan
   SHIM="$ROOT/examples/dsv2lite/fleet_shim.hip"
 fi
 RDC="${ETX_RDC:-0}"                # 0 (default): whole-program device compile, as fleet builds (3.72 vs 3.90 ms/token, scratch 112 -> 0 B/lane); needs INLINE=1

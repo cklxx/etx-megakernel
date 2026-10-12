@@ -28,11 +28,12 @@ import re
 import struct
 import sys
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from etx.tools import timeline as tl
 from examples.dsv2lite.bytes import per_layer
+from examples.dsv2lite.pinned import fleet_export
 
 BW = 4.3e6          # bytes per us (4.3 TB/s)
 TICK_US = 0.01
@@ -42,6 +43,47 @@ DENSE_CHAIN = ["qkv", "attn", "merge", "oproj", "norm", "dense_gu", "dense_dn"]
 FLEET_KIND = {"EMBED": "embed", "QKV_FUSED": "qkv", "Q_ABSORB": "qabs", "ATTENTION": "attn", "MERGE_UV": "merge",
               "O_PROJ": "oproj", "NORM_ROUTER": "router", "EXPERT_GATE_UP": "gate_up", "EXPERT_DOWN": "down",
               "DENSE_GATE_UP": "dense_gu", "DENSE_DOWN": "dense_dn", "LM_HEAD": "lm_head", "ARGMAX": "argmax"}
+# fleet 3fb67a6 TaskKind, frozen rather than silently importing a working tree.
+STAMP_KINDS = {"qkv": 0, "attn": 1, "merge": 2, "oproj": 3, "router": 4, "norm": 4,
+               "gate_up": 5, "down": 6, "dense_gu": 8, "dense_dn": 9, "embed": 10,
+               "lm_head": 11, "argmax": 12, "qabs": 14}
+STAMPS2_MAGIC = 0x32504D4154535445
+STAMPS2_INTERVALS = {
+    "qkv": {"norm_tree": (4, 5), "gamma_apply": (6, 7), "norm": (3, 8), "q_gemv": (9, 10), "kv_a_gemv": (10, 11)},
+    "router": {"norm_tree": (4, 5), "gamma_apply": (6, 7), "norm": (3, 8)},
+    "norm": {"norm_tree": (4, 5), "gamma_apply": (6, 7), "norm": (3, 8)},
+    "merge": {"M1_coefficients": (12, 13), "M2_partial_fold": (13, 14), "M3_w_uv_gemv": (14, 15)},
+}
+
+
+def read_prologue(path: Path):
+    raw = path.read_bytes()
+    if len(raw) % 8:
+        raise ValueError("prologue file is not a whole number of u64 words")
+    words = struct.unpack(f"<{len(raw) // 8}Q", raw)
+    stride = 3
+    if words and words[0] == STAMPS2_MAGIC:
+        if len(words) < 4 or words[1:3] != (2, 16):
+            raise ValueError("unsupported STAMPS2 header")
+        _, _, stride, slots = words[:4]
+        words = words[4:]
+        if len(words) != slots * stride:
+            raise ValueError("STAMPS2 payload length does not match header")
+    elif len(words) % stride:
+        raise ValueError("legacy prologue file has a partial slot")
+    return words, stride
+
+
+def subphase_intervals(row, phase: str) -> dict[str, float]:
+    if len(row) != 16 or not row[0]:
+        return {}
+    values = {}
+    for label, (a, b) in STAMPS2_INTERVALS.get(phase, {}).items():
+        if row[a] and row[b]:
+            if row[b] < row[a]:
+                raise ValueError(f"nonmonotonic STAMPS2 interval {phase}/{label}")
+            values[label] = (row[b] - row[a]) * TICK_US
+    return values
 
 
 @dataclass
@@ -53,6 +95,7 @@ class T:
     done: float
     pro: float | None   # prologue us (None: not stamped)
     stage: float | None
+    subphases: dict[str, float] = field(default_factory=dict)
 
 
 def load_etx(plan: Path, trace: Path, prologue: Path | None) -> list[T]:
@@ -60,17 +103,10 @@ def load_etx(plan: Path, trace: Path, prologue: Path | None) -> list[T]:
     tr = tl.build_trace(p, tl.read_raw(trace))
     stamps = {}
     if prologue and prologue.exists():
-        raw = prologue.read_bytes()
-        words = struct.unpack(f"<{len(raw) // 8}Q", raw)
-        kinds = {"embed": 0, "qkv": 2, "qabs": 3, "attn": 4, "merge": 5, "oproj": 6, "router": 7, "norm": 7, "gate_up": 8,
-                 "down": 9, "dense_gu": 10, "dense_dn": 11, "lm_head": 12, "argmax": 13}
-        try:        # the fleet enum values, if its source is importable
-            sys.path.insert(0, str(Path.home() / "code/fleet-mi300x/src/host"))
-            from taskgraph import TaskKind
-            inv = {v: k for k, v in FLEET_KIND.items()}
-            kinds = {k: TaskKind[inv["router" if k == "norm" else k]].value for k in kinds}
-        except Exception:
-            pass
+        words, stride = read_prologue(prologue)
+        kinds = STAMP_KINDS
+        if stride == 16 and any(t.name.startswith("iso") for t in tr.tasks):
+            raise ValueError("STAMPS2 rejects isolate plans: repeated tasks collide with native slots")
         for t in tr.tasks:
             m = re.match(r"(?:r(\d)_)?([a-z_]+?)(?:_(-?\d+))?$", t.name)
             if not m or int(m.group(1) or 0) != 0 or m.group(2) not in kinds:
@@ -78,17 +114,21 @@ def load_etx(plan: Path, trace: Path, prologue: Path | None) -> list[T]:
             L = int(m.group(3)) if m.group(3) else -1
             c = p["descs"][t.id]["coord"] + [0, 0]
             slot = ((L + 1) * 32 + kinds[m.group(2)]) * 1024 + c[0] * 64 + c[1]
-            w0, stg, pro = words[3 * slot: 3 * slot + 3]
+            row = words[stride * slot: stride * slot + stride]
+            if len(row) != stride:
+                raise ValueError(f"prologue slot {slot} absent from file")
+            w0, stg, pro = row[:3]
             if w0:
-                stamps[t.id] = ((pro - w0) * TICK_US if pro else 0.0, (stg - w0) * TICK_US if stg else 0.0)
+                stamps[t.id] = ((pro - w0) * TICK_US if pro else 0.0, (stg - w0) * TICK_US if stg else 0.0,
+                                subphase_intervals(row, m.group(2)))
     out = []
     for t in tr.tasks:
         m = re.match(r"(?:r(\d)_)?([a-z_]+?)(?:_(-?\d+))?$", t.name)
         if not m:
             continue
         r, ph, L = int(m.group(1) or 0), m.group(2), int(m.group(3)) if m.group(3) else -1
-        pr, sg = stamps.get(t.id, (None, None))
-        out.append(T(r, L, ph, t.ready, t.done, pr, sg))
+        pr, sg, sub = stamps.get(t.id, (None, None, {}))
+        out.append(T(r, L, ph, t.ready, t.done, pr, sg, sub))
     return out
 
 
@@ -177,16 +217,37 @@ def summarize(rows, span, label):
     return tot, {ph: {k: moe[ph][k] / n[ph] for k in CATS} for ph in MOE_CHAIN}
 
 
+def subphase_summary(tasks: list[T], req: int = 0):
+    groups = defaultdict(list)
+    for task in tasks:
+        if task.req == req:
+            for label, value in task.subphases.items():
+                groups[(task.phase, label)].append(value)
+    return [{"phase": phase, "part": label, "tasks": len(values), "mean_us": sum(values) / len(values),
+             "min_us": min(values), "max_us": max(values)} for (phase, label), values in sorted(groups.items())]
+
+
+def print_subphases(tasks: list[T], req: int = 0):
+    rows = subphase_summary(tasks, req)
+    if rows:
+        print("\nSTAMPS2: thread-0 source intervals (us); instrumentation perturbs scheduling.")
+        print("gamma_apply includes gamma loads + scale/bf16/store in default, apply only in early-gamma arms.")
+        print("norm overlaps its tree/gamma_apply parts; do not add them. No workgroup completion fence is added.")
+        print(f"{'phase':8} {'part':20} {'tasks':>7} {'mean_us':>10} {'min_us':>10} {'max_us':>10}")
+        for row in rows:
+            print(f"{row['phase']:8} {row['part']:20} {row['tasks']:7d} {row['mean_us']:10.3f} {row['min_us']:10.3f} {row['max_us']:10.3f}")
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--etx", nargs="+", action="append", default=[], metavar="PLAN TRACE [PROLOGUE]")
     ap.add_argument("--fleet", nargs=2, action="append", default=[], metavar=("TRACE", "GRAPH"))
-    ap.add_argument("--fleet-src", type=Path, default=Path.home() / "code/fleet-mi300x/src")
+    ap.add_argument("--fleet-src", type=Path, default=None, help="default: the pinned 3fb67a6 export")
     ap.add_argument("--label", action="append", default=[])
     a = ap.parse_args(argv)
     labels = iter(a.label)
     for tr, gr in a.fleet:
-        rows, span = ledger(load_fleet(Path(tr), Path(gr), a.fleet_src), 0)
+        rows, span = ledger(load_fleet(Path(tr), Path(gr), a.fleet_src or fleet_export() / "src"), 0)
         summarize(rows, span, next(labels, f"fleet {tr}"))
     for e in a.etx:
         tasks = load_etx(Path(e[0]), Path(e[1]), Path(e[2]) if len(e) > 2 else None)
@@ -194,6 +255,7 @@ def main(argv=None) -> int:
         for r in sorted({t.req for t in tasks}):
             rows, span = ledger(tasks, r)
             summarize(rows, span, f"{lab} request {r}")
+            print_subphases(tasks, r)
     return 0
 
 

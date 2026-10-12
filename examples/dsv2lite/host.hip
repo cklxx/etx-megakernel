@@ -30,6 +30,9 @@ extern "C" void fleet_set_params(const void* host_fp, hipStream_t s, int r);   /
 #define ETX_DS_REQUESTS 1
 #endif
 extern "C" size_t fleet_scratch_bytes();
+#ifdef ETX_DSV2_SNAPSHOT
+#include "examples/dsv2lite/snapshot.h"
+#endif
 
 int main(int argc, char** argv) {
   std::string weights_path = "build/weights.bin", cache_path = "build/fleet_cache.bin";
@@ -141,7 +144,16 @@ int main(int argc, char** argv) {
     q.produced.assign(tokens, -1); q.times.assign((size_t)tokens * 2, 0); q.ms.assign(tokens, 0.f);
   }
   const char* pro_path = getenv("ETX_DS_PROLOGUE");   // prologue stamps: request 0 only (the slots carry no request)
-  const size_t pro_words = (size_t)28 * 32 * 1024 * 3;       // PRO_SLOT range (fleet_shim.hip) x 3 stamps
+#if defined(ETX_DSV2_STAMPS2) && ETX_DSV2_STAMPS2
+  // Fixed little-endian u64 header {magic, version, words/slot, slots};
+  // the first three words of each row retain the legacy meanings.
+  const size_t pro_stride = 16;
+  if (pro_path) for (int ty = 0; ty < ETX_N_TYPES; ++ty)
+    if (!strncmp(etx_type_names[ty], "iso", 3)) die("STAMPS2 cannot overwrite native slots with isolate tasks");
+#else
+  const size_t pro_stride = 3;
+#endif
+  const size_t pro_words = (size_t)28 * 32 * 1024 * pro_stride;
   if (pro_path) { HIP_CHECK(hipMalloc(&reqs[0].fp.pro_trace, pro_words * 8)); HIP_CHECK(hipMemset(reqs[0].fp.pro_trace, 0, pro_words * 8)); }
 
   // ---- ETX host: argument table = FleetParams pointer + per-grid layer ids
@@ -158,6 +170,10 @@ int main(int argc, char** argv) {
   std::printf("etx: %d tasks, %d event words, %d workers (%d domains x %d), lds %d B (fleet scratch %zu B)\n",
               ETX_N_TASKS, ETX_EVENT_WORDS, ETX_N_WORKERS, ETX_N_DOMAINS, ETX_WORKERS_PER_DOMAIN, (int)ETX_LDS_BYTES, fleet_scratch_bytes());
   if (fleet_scratch_bytes() > (size_t)ETX_LDS_BYTES) die("graph declares less LDS than fleet::Scratch needs");
+
+#ifdef ETX_DSV2_SNAPSHOT
+  return ds_snapshot_run(hst, reqs[0].fp, reqs[0].d_fp, reqs[0].first_token, tokens, repeat, unfused);
+#endif
 
   double wall_total = 0; std::vector<double> step_ms;
   for (int run = 0; run < repeat; ++run) {
@@ -216,7 +232,12 @@ int main(int argc, char** argv) {
   hst.report_phases(etx_type_names, ETX_N_TYPES);     // ETX_TRACE=1: per-type wait / body / span of the last token
   if (pro_path) {                                      // raw u64 x 3 per slot, slots as PRO_SLOT; zero = not run
     std::vector<uint64_t> pt(pro_words); HIP_CHECK(hipMemcpy(pt.data(), reqs[0].fp.pro_trace, pro_words * 8, hipMemcpyDeviceToHost));
-    std::ofstream f(pro_path, std::ios::binary); f.write((const char*)pt.data(), pt.size() * 8);
+    std::ofstream f(pro_path, std::ios::binary);
+#if defined(ETX_DSV2_STAMPS2) && ETX_DSV2_STAMPS2
+    const uint64_t header[4] = {0x32504d4154535445ull, 2, 16, (uint64_t)28 * 32 * 1024}; // "ETSTAMP2"
+    f.write((const char*)header, sizeof(header));
+#endif
+    f.write((const char*)pt.data(), pt.size() * 8);
     std::printf("wrote prologue stamps to %s\n", pro_path);
   }
   std::vector<double> ss(step_ms); std::sort(ss.begin(), ss.end());
