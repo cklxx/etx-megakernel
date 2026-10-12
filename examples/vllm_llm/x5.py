@@ -14,21 +14,22 @@ import subprocess
 
 BAR_US = 7.69
 BASELINE_US = 10.645
-# Shape eligibility is distinct from a runnable exact import contract.
+# Feasibility: docs/X5-FEASIBILITY-and-SIM-2026-10-12.md.
+# [U] BUILDABLE is an engineering verdict, not a staged/certified survivor.
 CANDIDATES = [
-    ('ROCM_ATTN_G8', 'legal control', 'PART=256, block=16, HD=128, GQA=8, MFMA16; existing importer', 10.645),
+    ('ROCM_ATTN_G8', 'READY control', 'PART=256, block=16, HD=128, GQA=8, MFMA16; existing importer', 10.645),
     ('ROCM_ATTN_PART128', 'excluded', 'imported body hard-codes 256; extra early-exit tasks are not a new specialization', None),
     ('ROCM_ATTN_PART512', 'excluded', 'host PART change does not change kernel 256 stride; misses context tokens', None),
     ('ROCM_ATTN_G1_7_G9_16_HD64', 'excluded', 'changes GQA/head-size specialization; actual NH/NKV=8 and HD=128', None),
-    ('ROCM_ATTN_BLOCK32', '[U] adapter required', 'shape supported; existing block-16 K/V writer, strides and block table must change together', None),
-    ('PAGED_V1', '[U] adapter required', 'bf16 generic paged attention; different export/grid, no existing compatible output/partial contract', None),
-    ('PAGED_V2', '[U] adapter required', 'generic partitioned decode; partition/reduce numerics and adapter need independent checks', None),
-    ('TRITON_ATTN_2D', '[U] adapter required', 'num_par_softmax_segments=None/2D; flash K/V layout, grid/softmax order differ', None),
-    ('TRITON_ATTN_3D', '[U] adapter required', 'num_par_softmax_segments, TILE_SIZE, BLOCK_M, warps/stages; not arbitrary external backend knobs', None),
-    ('AITER_UNIFIED', '[U] adapter required', 'retained 2-kernel result slower; segments/tile/warps/stages and shuffled cache require source-pinned export/layout', 11.42030309139785),
-    ('AITER_PA_COMMON', '[U] adapter required', 'paged_attention_common wrapper; HIP/ASM internal dispatch implementation not installed here', None),
-    ('AITER_PA_ASM', '[U] adapter required', 'pa_fwd_asm wrapper; Q/K/V scales, layout and implementation legality unverified', None),
-    ('AITER_FA', '[U] adapter required', 'flash_attn_varlen_func bf16 family; dense/flash cache and metadata differ; no ready import', None),
+    ('ROCM_ATTN_BLOCK32', '[U] BUILDABLE', 'bf16/G8 dispatch exists; specialize export/operator BS=32 and change K/V writer, strides and table together', None),
+    ('PAGED_V1', 'excluded', 'not in installed vLLM f46a9dfe source tree or custom-op API; restoring another revision is a separate candidate', None),
+    ('PAGED_V2', 'excluded', 'not in installed vLLM f46a9dfe source tree or custom-op API; restoring another revision is a separate candidate', None),
+    ('TRITON_ATTN_2D', '[U] BUILDABLE', 'flash K/V writer, source-pinned Triton export and one-stage plan/host/X5 identity and sample contract required', None),
+    ('TRITON_ATTN_3D', '[U] BUILDABLE', 'flash K/V writer, pinned main/reduce exports and segment buffers/metadata; dispatcher-derived tile/warps/stages', None),
+    ('AITER_UNIFIED', '[U] BUILDABLE', 'retained dispatch loses; other tuples require pinned dispatcher/IR, matching shuffled or unshuffled writer and stage contract', 11.42030309139785),
+    ('AITER_PA_COMMON', '[U] BUILDABLE', 'HIP path only: pin missing implementation, export main/reduce, adapt scales/layout/partials; standalone ASM excluded', None),
+    ('AITER_PA_ASM', 'excluded', 'standalone ASM/code-object dispatch is not an LLVM device body accepted by the registered megakernel importer', None),
+    ('AITER_FA', '[U] BUILDABLE', 'pin bf16 source and dispatched split-K main/combine exports; dense/flash KV metadata and one/multi-stage contract required', None),
     ('MLA_SPARSE', 'excluded', 'Qwen uses ordinary GQA, not MLA or sparse attention', None),
     ('CUDA_XPU_RDNA', 'excluded', 'CUDA-only, XPU or Navi/WMMA kernels do not target gfx942 CDNA', None),
     ('QUANTIZED_ATTENTION', 'excluded', 'FP8/INT4/TurboQuant changes bf16 KV/output algorithm contract', None),
