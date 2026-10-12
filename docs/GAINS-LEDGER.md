@@ -83,3 +83,20 @@ Paths under `results_*` refer to `~/code/etx/`, with `results_tiles` now archive
 | Compiler resources | Fused 128 VGPR / 44 B scratch / spill 10 / LDS 29736; unfused 104 / 0 / 0 / 29704; 60362 tasks | [M] | S2 `build_all.log`, `record.log`; prior `results_nvref_2026-10-09/build_all.log` | ROCm 7.14.0 vs earlier 7.2.4; clang 23 owner-reported | Informational, not a resource gate | Record compiler difference | Do not call it the same binary | Prior spill 9 / scratch 40; difference recorded |
 | Model transfer residual | 4.058−4.330 = -0.272 ms (-6.3%); 0.188−0.262 = -0.074 ms | [E] | `docs/MODEL-vllm-kernels.md` current profile table; S2 paired RESULT lines | Fixed profile vs S2 device values; optional trace/evx skipped in S2 `status.json` | Historical ±10%, gain error <0.093 ms | Record arithmetic only | Retain unexplained residual | 估计; no new mechanism validation |
 | kcmp vendor attribution | No usable measurement, two refusals | Owner report | Task brief; raw kcmp logs not in indexed set | Empty VF device name, then crossing marker boundary | Valid vendor attribution required | Only compare validated vendor data | No per-kernel result | 未定; timestamp-domain diagnosis owner-reported |
+
+## 2026-10-12, after the baseline refresh
+
+Rows use the column shape above. A source in a rented box's own log is named by the box's path; repository
+paths are the durable copy. The baseline refresh is `examples/vllm_llm/kept_build.py`: the router narrowing is
+in `KEPT_ENV`, the normalisation hoist is in `BASE_FLAGS`, so every later arm is measured from the refreshed
+baseline.
+
+| claim | number | [M]/[E] | source file:line | baseline build/trace | threshold | action on a hit | action on a miss | verdict |
+|---|---|---|---|---|---|---|---|---|
+| Step time after the baseline refresh | host wall **4.078 ms**, device **3.943 ms** = **254 tok/s** | [M] | `examples/vllm_llm/kept_build.py`; box pair report | kept build `45e1d36`, five interleaved rounds | target 3.3333 ms = 300 tok/s | continue | gap 0.61 ms on the device basis | gap **0.61 ms** |
+| Router narrowing + normalisation hoist | **0.0626 + 0.0556 = 0.118 ms** | [M] | box `report.json`, pair rows | same kept build | KEEP: every round faster, median >= 0.030 ms, median > 2x spread | absorbed into the baseline | - | KEEP, banked |
+| MoE rows per task, 24 / 16 / 16 with 304 workers | **-0.140 / -0.356 / -0.413 ms** against the 32 baseline | [M] | `ETX_VL_MOE_RPT` in `examples/vllm_llm/host.hip`; `etx/select/variants.py` | four arms, one flag set, five interleaved rounds, 32/32 each | same KEEP rule | - | closed | closed, all negative |
+| Single-wave row ownership, `ETX_DSL_ROW_WAVE` | barriers **168 -> 170**, LDS ops **1101 -> 1119**; with a constant segment count **170 / 1119** | [M] static | `etx/ops/gemv.py`, the row-wave tile | the real flag set (`BASE_FLAGS` plus the new `-D`) | must remove sync work, not add it | - | closed | closed, static negative |
+
+The marginal price of one extra workgroup is **about 40 ns** (the three deltas above divided by the
+workgroups they added agree to 15%), which bounds every fixed-cost-removal route.
