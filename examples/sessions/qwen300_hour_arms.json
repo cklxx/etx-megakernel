@@ -50,6 +50,21 @@
       "source": "examples/vllm_llm/host.hip ETX_VL_MOE_RPT; examples/vllm_llm/model.py grid; etx/select/variants.py",
       "overlap": "moe-up-body",
       "enabled": true
+    },
+    {
+      "id": "MOE16CU304",
+      "build": "MOE16CU304",
+      "kind": "shape",
+      "defines": [
+        "ETX_VL_MOE_RPT=16"
+      ],
+      "flags": {
+        "ETX_VL_MOE_RPT": "16",
+        "ETX_VL_CU": "304"
+      },
+      "source": "examples/vllm_llm/host.hip ETX_VL_MOE_RPT; ETX_VL_CU 304 workers on 8 XCDs",
+      "overlap": "moe-up-body",
+      "enabled": true
     }
   ],
   "C": [
