@@ -59,8 +59,9 @@ GAMMA_EARLY = """    // Keep the hidden dimension dynamic for the original squar
 """
 
 
-def norm_early(src: Path, tree: bool) -> None:
-    name = "norm_tree" if tree else "norm_gamma_early"
+def norm_early(src: Path, tree: bool, all_sites: bool = False) -> None:
+    """all_sites: also the dense layer's post-norm and lm_head's final norm (norm_tree_all), not only qkv + MoE router."""
+    name = "norm_tree_all" if all_sites else "norm_tree" if tree else "norm_gamma_early"
     kernel = src / "kernels/fleet_kernel.hip"
     k = kernel.read_text()
     if "void rms_norm_lds_gamma_early(" in k or "void rms_norm_lds_tree_early(" in k:
@@ -78,7 +79,11 @@ def norm_early(src: Path, tree: bool) -> None:
     k = _once(k, "rms_norm_lds(d, w.layer_norm_in[L], s.vec, s.smem);",
                 f"{helper}(d, w.layer_norm_in[L], s.vec, s.smem);", name)
     router = "rms_norm_lds(d, w.layer_norm_post[layer], s.vec, s.smem);"
-    k = _once(k, router, f"if (moe) {helper}(d, w.layer_norm_post[layer], s.vec, s.smem);\n    else {router}", name)
+    if all_sites:
+        k = _once(k, router, f"{helper}(d, w.layer_norm_post[layer], s.vec, s.smem);", name)
+        k = _once(k, "rms_norm_lds(d, w.final_norm, s.vec, s.smem);", f"{helper}(d, w.final_norm, s.vec, s.smem);", name)
+    else:
+        k = _once(k, router, f"if (moe) {helper}(d, w.layer_norm_post[layer], s.vec, s.smem);\n    else {router}", name)
     kernel.write_text(k)
 
 
