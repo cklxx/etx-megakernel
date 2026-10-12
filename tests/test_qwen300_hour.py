@@ -96,7 +96,7 @@ def test_a2_failure_preserves_g_and_missing_a1_is_incomplete(tmp_path, monkeypat
         pool = dict(above_floor_lower_ms=.2, above_floor_upper_ms=.2, count=1)
         result = dict(critical_pools=dict(busy=pool, free=pool, ambiguous=dict(count=0)),
                       gap_atoms=dict(G_ms=.324), stamp_perturbation=valid_perturbation(), inbody=dict(phases=phases))
-        Path(cmd[-1]).with_suffix('.summary.json').write_text(json.dumps(result))
+        Path(cmd[-2]).with_suffix('.summary.json').write_text(json.dumps(result))
     monkeypatch.setattr(s, 'step', analysis)
     complete_g = failure in ('none', 'coverage')
     assert h.tranche_a(s) is complete_g
@@ -106,6 +106,10 @@ def test_a2_failure_preserves_g_and_missing_a1_is_incomplete(tmp_path, monkeypat
         assert h.second_stop(s)
         assert s.rows['A2.route']['status'] == ('NOT-COMPLETE' if failure == 'coverage' else 'HEADROOM-PASS')
         assert s.rows['B.stop']['value']['R2_ms'] == 0.
+    if failure == 'certify':
+        control = s.rows['A.stop']['value']['stamp_perturbation']['original_off_control']
+        assert control['original_off_within_spread'] is None
+        assert 'stamps_OFF' in control['reason']
 
 
 def host_text(mode='fused', cost=4.18):
@@ -456,7 +460,7 @@ def test_s1_consumes_perturbation_before_any_later_tranche(tmp_path, monkeypatch
                       gap_atoms=dict(G_ms=None if status == 'INVALID' else .100,
                                      atoms={'raw': dict(above_floor_ms=.09274, counted=True)}),
                       stamp_perturbation=evidence, inbody=dict(phases=[]))
-        Path(cmd[-1]).with_suffix('.summary.json').write_text(json.dumps(result))
+        Path(cmd[-2]).with_suffix('.summary.json').write_text(json.dumps(result))
     monkeypatch.setattr(s, 'step', analysis)
     calls = []
     from examples.vllm_llm import x5
@@ -520,11 +524,100 @@ def test_paid_gap_opportunity_needs_both_perturbation_gates(
         sampled_bodies=382, max_abs_body_change_us=change_ticks * 10 / 1000)), original_off)
     assert evidence['status'] == status
     s = session(tmp_path); s.certified.add('kept')
-    assert h.first_stop(s, dict(G_ms=.09274), evidence) is passes
+    assert h.first_stop(s, machine_figures(), evidence) is passes
     row = s.rows['A.stop']
     assert row['status'] == ('PASS' if passes else 'NOT-COMPLETE')
-    assert row['value']['G_ms'] == (.09274 if passes else None)
+    assert row['value']['G_ms'] == (.356727 if passes else None)
+    assert row['value']['setup_atom_ms'] == .09274
+    assert row['value']['named_above_floor_sum_ms'] == pytest.approx(.356727)
+    assert row['value']['G_figure'] == h.G_FIGURE
+    assert row['value']['G_figure_disagreement'] is True
     assert row['value']['decision'] == ('CONTINUE to S2' if passes else 'END SESSION: NOT-COMPLETE')
+
+
+def machine_figures():
+    # Only the setup and total are the supplied machine figures. The split of
+    # the other two atoms below is synthetic CPU test data, not GPU evidence.
+    atoms = {name: dict(above_floor_ms=value, counted=True) for name, value in
+             [('P10.arrive', .100), ('P5/P11.observation', .163987), ('P4/P6/P7.setup', .09274)]}
+    return dict(atoms=atoms, G_ms=.356727, **h.gap_figure(dict(atoms=atoms)))
+
+
+def control_text(values):
+    return '\n'.join(f'run {i}: 32/32 generated tokens match HF greedy\nINBODY-RUN '+
+                     json.dumps(dict(run=i, matched=32, gen=32, wall_ms=x)) for i, x in enumerate(values))
+
+
+@pytest.mark.parametrize('off,expected', [([4.1, 4.2, 4.3, 4.2, 4.2], True),
+                                         ([4.5]*5, False), ([4.2]*4, None), ([float('nan')]*5, None)])
+def test_runner_measures_full_original_off_distributions(tmp_path, monkeypatch, off, expected):
+    s = session(tmp_path); s.certified.update(('kept', 'stamps'))
+    calls = []
+    def host(s, arm, name, args, extra):
+        calls.append((arm, name, args, extra))
+        assert 'ETX_INBODY_RAW' not in s.env and 'ETX_HOUR_TRACE_STEP' not in s.env
+        return control_text([4., 4.1, 4.2, 4.1, 4.1] if arm == 'kept' else off)
+    monkeypatch.setattr(h, 'host', host)
+    result = h.measure_original_off(s)
+    assert result['original_off_within_spread'] is expected
+    assert result['status'] == ('PASS' if expected is True else 'FAIL' if expected is False else 'NOT-COMPLETE')
+    assert [a for a, *_ in calls] == ['kept', 'stamps']
+    assert all(args == ['--repeat', '5'] and extra == {'ETX_INBODY_LOADS': '0'} for _, _, args, extra in calls)
+    assert json.loads((s.out/'A_original_off.json').read_text())['status'] == result['status']
+    if expected is None: assert 'stamps_OFF' in result['reason']
+
+
+@pytest.mark.parametrize('control_case,change,passes', [('missing', .48, False), ('outside', .48, False),
+                                                    ('within', .501, False), ('within', .48, True)])
+def test_runner_control_reaches_analyzer_and_named_s1_row(tmp_path, monkeypatch, capsys, control_case, change, passes):
+    from etx.tools import inbody
+    s = session(tmp_path); s.c['builds']['stamps'] = str(tmp_path/'stamps')
+    Path(s.c['builds']['stamps']).mkdir()
+    (Path(s.c['builds']['stamps'])/'plan.json').write_text('{}')
+    (s.out/'stamps_load_off.bin').touch()
+    def certify(s, arm):
+        if arm == 'stages': raise ValueError('no stage observation')
+        s.certified.add(arm)
+    monkeypatch.setattr(h, 'certify', certify)
+    monkeypatch.setattr(h, 'registered_reset', lambda s: None)
+    def host(s, arm, name, args, extra):
+        if name.startswith('A_control_'):
+            if arm == 'stamps' and control_case == 'missing': raise TimeoutError('OFF control deadline')
+            return control_text([4.5]*5 if arm == 'stamps' and control_case == 'outside' else [4.1]*5)
+        return host_text()+'HOUR-SNAPSHOT run=0 step=1024\n'
+    monkeypatch.setattr(h, 'host', host)
+    def report(body):
+        return dict(phases=[], critical_task_ids=[0], tasks=[dict(body_us=body, phase=next(iter(inbody.LOAD_ROLES)))])
+    monkeypatch.setattr(inbody, 'read_raw', lambda p: {})
+    monkeypatch.setattr(inbody, 'load_phases', lambda *args: {})
+    monkeypatch.setattr(inbody, 'analyze', lambda *args: report(1.))
+    pool = dict(above_floor_lower_ms=.2, above_floor_upper_ms=.2, count=1)
+    monkeypatch.setattr(h, 'edge_prices', lambda *args: dict(
+        critical_pools=dict(busy=pool, free=pool, ambiguous=dict(count=0)), floor_us=1.,
+        gap_atoms=machine_figures(), basis='synthetic test fixture', inbody=report(1.+change)))
+    def analyze(name, cmd, **kw):
+        assert name == 'A_analysis'
+        assert h.main(list(map(str, cmd[4:]))) == 0
+    monkeypatch.setattr(s, 'step', analyze)
+    assert h.tranche_a(s) is passes
+    row = s.rows['A.stop']['value']
+    assert row['G_ms'] == (.356727 if passes else None)
+    assert row['G_figure'] == h.G_FIGURE
+    assert row['G_figure_disagreement'] is True
+    assert row['setup_atom_ms'] == .09274
+    assert row['named_above_floor_sum_ms'] == pytest.approx(.356727)
+    assert row['stamp_perturbation']['original_off_control']['original_off_within_spread'] is (
+        None if control_case == 'missing' else control_case == 'within')
+    out = capsys.readouterr().out
+    log = json.loads(next(line.removeprefix('S1-G ') for line in out.splitlines() if line.startswith('S1-G ')))
+    assert log['gate_compared_ms'] == row['G_ms'] and log['G_figure'] == row['G_figure']
+    import inspect
+    assert log['G_code'] in inspect.getsource(h.gap_atom_prices)
+    if control_case == 'missing': assert 'stamps_OFF' in row['stamp_perturbation']['original_off_control']['reason']
+    for file in ('A_edges.json', 'A_edges.summary.json'):
+        result = json.loads((s.out/file).read_text())
+        assert result['gap_atoms']['G_ms'] == row['G_ms']
+        assert result['gap_atoms']['G_figure'] == row['G_figure']
 
 
 @pytest.mark.parametrize('g,r2,host,passes', [
@@ -597,7 +690,7 @@ def test_invalid_s1_does_not_override_session_deadline(tmp_path, monkeypatch, ca
     assert 'END after A: session deadline reached' in capsys.readouterr().out
 
 
-def test_gap_atoms_clip_to_critical_gap_and_apply_class_floor():
+def test_gap_atoms_clip_to_critical_gap_and_apply_class_floor(tmp_path):
     def task(phase='qkv', critical=True):
         return dict(critical=critical, arrive_is_synthetic=False, phase=phase,
                     record=[0, 200, 300, 0, 120, 170], arrive_bounds_ticks=[90, 120], gap_us=10.)
@@ -607,6 +700,14 @@ def test_gap_atoms_clip_to_critical_gap_and_apply_class_floor():
     assert result['atoms']['P10.arrive']['above_floor_ms'] == pytest.approx(48*(2-.30)/1000)
     assert result['atoms']['P5/P11.observation']['above_floor_ms'] == pytest.approx(48*(5-.951)/1000)
     assert result['atoms']['P4/P6/P7.setup']['above_floor_ms'] == pytest.approx(48*(3-.15)/1000)
+    total = sum(a['above_floor_ms'] for a in result['atoms'].values() if a['counted'])
+    assert result['G_ms'] == total
+    s = session(tmp_path); s.certified.add('kept')
+    assert h.first_stop(s, result, valid_perturbation())
+    value = s.rows['A.stop']['value']
+    assert value['G_ms'] == total == value['named_above_floor_sum_ms']
+    assert value['G_figure'] == result['G_figure'] == h.G_FIGURE
+    assert value['setup_atom_ms'] != value['G_ms'] and value['G_figure_disagreement']
     report['tasks'] += [task('attn'), task('reduce'), task(critical=False)]
     assert h.gap_atom_prices(report) == result  # booked boundaries/parallel bodies excluded
     report['tasks'] = [task()]

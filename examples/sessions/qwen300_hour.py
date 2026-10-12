@@ -415,6 +415,24 @@ def edge_prices(plan, raw):
                 basis='legacy critical B-D gap (same basis as registered pools/floor); classify at final-arrival bracket; readiness B-A bounds separate; not a removable pool')
 
 
+G_FIGURE = 'sum of counted named above-floor atoms'
+G_CODE = "G_ms=sum(a['above_floor_ms'] for a in atoms.values() if a['counted'])"
+
+
+def gap_figure(gap_atoms):
+    """Name the existing sum; retain the competing setup-only interpretation."""
+    atoms = (gap_atoms or {}).get('atoms', {})
+    setup = atoms.get('P4/P6/P7.setup', {}).get('above_floor_ms')
+    total = sum(a['above_floor_ms'] for a in atoms.values() if a['counted']) if atoms else None
+    disagree = (setup is not None and total is not None
+                and not math.isclose(setup, total, rel_tol=0., abs_tol=1e-12))
+    return dict(G_figure=G_FIGURE, G_code=G_CODE, setup_atom_ms=setup,
+                named_above_floor_sum_ms=total,
+                counted_atom_names=[n for n, a in atoms.items() if a['counted']],
+                G_figure_disagreement=disagree,
+                figure_review='OWNER RULING NEEDED: setup alone differs from the existing counted-atom sum' if disagree else None)
+
+
 def gap_atom_prices(report):
     """Stamped G, not removable savings: plan section 7, lines 301-302 (main 9f91f3a).
 
@@ -448,6 +466,7 @@ def gap_atom_prices(report):
         atom['us_layer'] = atom['above_floor_ms']*1000/48
         atom['counted'] = atom['us_layer'] >= .625 or math.isclose(atom['us_layer'], .625, abs_tol=1e-12)
     return dict(atoms=atoms, G_ms=sum(a['above_floor_ms'] for a in atoms.values() if a['counted']),
+                **gap_figure(dict(atoms=atoms)),
                 basis='stamped critical-gap atom excess; upper opportunity estimate, not certified savings',
                 unobserved=['P1.fetch', 'isolated P7.barrier', 'nonfinal producer arrivals'])
 
@@ -462,6 +481,7 @@ def stamp_perturbation(loads, original_off_within_spread=None):
         'VALID' if original_off_within_spread is True and load_pass else 'NOT-COMPLETE')
     reason = ('INVALID: load stamps exceed 0.5 us/body' if status == 'INVALID' else
               'VALID: original/OFF spread and load stamp perturbation established' if status == 'VALID' else
+              'NOT-COMPLETE: original/OFF control outside measured spread' if original_off_within_spread is False else
               'NOT-COMPLETE: original/OFF spread not established' if original_off_within_spread is not True else
               'NOT-COMPLETE: load stamp perturbation not established')
     return dict(status=status, original_off_within_spread=original_off_within_spread,
@@ -479,7 +499,9 @@ def first_stop(s, gap_atoms, perturbation=None):
     passes = g is not None and math.isfinite(g) and (g >= .088 or math.isclose(g, .088, rel_tol=0., abs_tol=1e-12))
     passes = passes and 'kept' in s.certified
     incomplete = g is None or not math.isfinite(g) or 'kept' not in s.certified
-    s.row('A.stop', dict(G_ms=g, gap_atoms=gap_atoms, stamp_perturbation=perturbation,
+    figure = gap_figure(gap_atoms)
+    print('S1-G '+json.dumps(dict(figure, gate_compared_ms=g, bar_ms=.088)), flush=True)
+    s.row('A.stop', dict(G_ms=g, **figure, gap_atoms=gap_atoms, stamp_perturbation=perturbation,
                         decision='END SESSION: NOT-COMPLETE' if incomplete else
                                  'CONTINUE to S2' if passes else 'STOP-SPEND: close target route'),
           'NOT-COMPLETE' if incomplete else 'PASS' if passes else 'STOP', REGISTERED['A.stop'])
@@ -632,6 +654,54 @@ def preflight(s):
         if arm != 'stamps' and seal['flags'].get('ETX_INBODY_BUILD', '0') != '0': raise ValueError('stamps contaminate timing')
 
 
+def original_off_control(measurements, failures=None):
+    """Registered F1: five full repetitions, OFF median within larger spread."""
+    result = dict(status='NOT-COMPLETE', original_off_within_spread=None,
+                  measurements=measurements, failures=failures or {},
+                  basis='five per-repeat host-wall medians; noninterleaved original/stamps-OFF distributions; counters OFF')
+    missing = [arm for arm in ('original', 'stamps_OFF') if arm not in measurements]
+    if missing:
+        return dict(result, reason='original/OFF control not measured: '+', '.join(missing))
+    for arm in ('original', 'stamps_OFF'):
+        xs = measurements[arm]['values_ms']
+        if len(xs) != 5 or any(not math.isfinite(x) or x <= 0 for x in xs):
+            return dict(result, reason='original/OFF control incomplete/invalid: '+arm)
+    original, off = (measurements[a]['values_ms'] for a in ('original', 'stamps_OFF'))
+    delta = st.median(off)-st.median(original)
+    spread = max(max(original)-min(original), max(off)-min(off))
+    within = abs(delta) <= spread
+    return dict(result, status='PASS' if within else 'FAIL', original_off_within_spread=within,
+                off_minus_original_ms=delta, off_spread_bar_ms=spread,
+                reason='OFF median within larger original/OFF spread' if within else
+                       'OFF median outside larger original/OFF spread')
+
+
+def measure_original_off(s):
+    from examples.sessions.inbody import samples
+    measurements = {}
+    failures = {}
+    for label, arm in (('original', 'kept'), ('stamps_OFF', 'stamps')):
+        name = 'A_control_'+label
+        def sample(arm=arm, name=name):
+            if arm not in s.certified: raise ValueError('fresh correctness certificate missing: '+arm)
+            # No RAW or TRACE_STEP: all stamp pointers remain null, including
+            # load stamps. The earlier load-OFF snapshot is NOT this control.
+            text = host(s, arm, name, ['--repeat', '5'], {'ETX_INBODY_LOADS': '0'})
+            matches = re.findall(r'^run (\d+): (\d+)/(\d+) generated tokens match HF greedy$', text, re.M)
+            if matches != [(str(i), '32', '32') for i in range(5)]:
+                raise ValueError('original/OFF control requires five complete free-running 32/32 repetitions')
+            return samples(text)
+        value = s.attempt(name, sample)
+        if value is not None:
+            measurements[label] = value
+        else:
+            failures[label] = s.arms[name]['reason']
+    result = original_off_control(measurements, failures)
+    (s.out/'A_original_off.json').write_text(json.dumps(result, indent=2)+'\n')
+    print('ORIGINAL-OFF-CONTROL '+json.dumps(result), flush=True)
+    return result
+
+
 def tranche_a(s):
     """900s including fresh correctness and all deciding probes, after cache setup."""
     gap_atoms = None
@@ -639,7 +709,14 @@ def tranche_a(s):
     for arm in ('kept', 'stamps', 'stages'):
         if s.attempt('A.gate.'+arm, lambda arm=arm: certify(s, arm)) is None and arm not in s.certified:
             continue
+    if 'stamps' not in s.certified:
+        perturbation = stamp_perturbation({}, None)
+        perturbation['original_off_control'] = original_off_control(
+            {}, {'stamps_OFF': 'fresh stamps correctness certificate missing; control not run'})
     if 'stamps' in s.certified:
+        control = measure_original_off(s)
+        perturbation = stamp_perturbation({}, control['original_off_within_spread'])
+        perturbation['original_off_control'] = control
         def stamped():
             raw = s.out/'inbody.bin'
             text = token_gate(host(s, 'stamps', 'A_stamp', ['--repeat', '1'],
@@ -647,7 +724,7 @@ def tranche_a(s):
             if 'HOUR-SNAPSHOT run=0 step=1024' not in text: raise ValueError('registered ctx1024 snapshot missing')
             output = s.out/'A_edges.json'
             s.step('A_analysis', [sys.executable, '-u', '-m', 'examples.sessions.qwen300_hour', '--analyze',
-                                 Path(s.c['builds']['stamps'])/'plan.json', raw, output], timeout=45, expected=15)
+                                 Path(s.c['builds']['stamps'])/'plan.json', raw, output, s.out/'A_original_off.json'], timeout=45, expected=15)
             summary = output.with_suffix('.summary.json')
             result = json.loads(summary.read_text())
             # Control comes from the already-budgeted stamps correctness gate.
@@ -1197,7 +1274,7 @@ def main(argv=None):
     args = list(sys.argv[1:] if argv is None else argv)
     if args and args[0] == '--vllm': vllm_entry(args[1:]); return 0
     if args and args[0] == '--analyze':
-        if len(args) != 4: raise ValueError('--analyze PLAN RAW OUTPUT required')
+        if len(args) not in (4, 5): raise ValueError('--analyze PLAN RAW OUTPUT [ORIGINAL_OFF_CONTROL] required')
         from etx.tools import inbody
         print('CPU ANALYSIS begin: lossless edge/body records', flush=True)
         result = edge_prices(json.loads(Path(args[1]).read_text()), inbody.read_raw(args[2]))
@@ -1215,17 +1292,24 @@ def main(argv=None):
                            for i in critical if on_report['tasks'][i]['phase'] in inbody.LOAD_ROLES]
                 if not changes: raise ValueError('missing load-phase perturbation population')
                 loads['perturbation'] = dict(sampled_bodies=len(changes), max_abs_body_change_us=max(changes),
-                    pass_le_0_5_us=max(changes) <= .5, basis='one matched snapshot ON/OFF, same stamp executable; original/OFF spread remains [U]')
-                loads['validity'] = 'NOT-COMPLETE: original/OFF spread not established' if max(changes) <= .5 else 'INVALID: load stamps exceed 0.5 us/body'
+                    pass_le_0_5_us=max(changes) <= .5, basis='one matched load-stamp ON/OFF snapshot, same stamp executable; original/OFF spread measured separately')
 
         except ValueError as exc:
             loads = dict(status='NOT-COMPLETE', reason=str(exc))
         result['load_phases'] = loads
-        # This one-snapshot analyzer has no original/OFF spread population.
-        # Do not promote the diagnostic controls in tranche A into that proof.
-        result['stamp_perturbation'] = stamp_perturbation(loads)
+        # The runner supplies full control distributions separately from the
+        # load-OFF snapshot. Recompute their gate; never trust a supplied bool.
+        control = original_off_control({})
+        if len(args) == 5:
+            try:
+                evidence = json.loads(Path(args[4]).read_text())
+                control = original_off_control(evidence['measurements'], evidence.get('failures'))
+            except (OSError, ValueError, KeyError) as exc:
+                control['reason'] = 'original/OFF control not measured: '+str(exc)
+        result['stamp_perturbation'] = stamp_perturbation(loads, control['original_off_within_spread'])
+        result['stamp_perturbation']['original_off_control'] = control
         loads['validity'] = result['stamp_perturbation']['reason']
-        print(loads['validity'], flush=True)
+        print(loads['validity']+'; '+control['reason'], flush=True)
         if result['stamp_perturbation']['status'] != 'VALID':
             result['gap_atoms']['G_ms'] = None
         output = Path(args[3])
