@@ -38,7 +38,7 @@ MAX_SESSION_SECONDS = 3600
 JOBS = [dict(name='moe_rpt', gpu=0, machine='A', timeout=MAX_SESSION_SECONDS, quiet_s=300,
              cmd='stdbuf -oL -eL python3 -u -m examples.sessions.moe_rpt --run')]
 BASE = 'kept'
-CANDIDATES = ('MOE24', 'MOE16', 'MOE16CU304')
+CANDIDATES = tuple(a for a in (os.environ.get('ETX_MOE_ARMS') or 'MOE24,MOE16,MOE16CU304').split(',') if a and a != BASE)
 ROUNDS = 5
 KEEP_MEDIAN_MS = 0.030        # the registered KEEP bar for a body pair
 
