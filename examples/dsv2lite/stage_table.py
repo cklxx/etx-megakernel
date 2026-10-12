@@ -149,29 +149,41 @@ ORDER = ["prologue", "in_norm", "qkv", "prep", "attn", "reduce", "o_proj", "rout
          "lm_head", "argmax", "tail"]
 
 
-def current() -> tuple[dict, dict, float]:
-    """us per stage on the traced token, the instance count per stage, and the token span."""
-    pinned_parser()
-    data = data_sets()
-    new, old = data / "results_2026-09-27d/sess2", data / "results_2026-09-27b"
-    rows, span = ld.ledger(ld.load_etx(new / "x1s_plan.json", new / "x1s_trace.bin", None), 0)
+def donor_ratios() -> dict:
+    """(staging + prologue) / (staging + prologue + stream) per phase, from the stamped 09-27b trace [E]."""
+    old = data_sets() / "results_2026-09-27b"
     donor, _ = ld.ledger(ld.load_etx(old / "etx_plan.json", old / "etx_trace.bin", old / "etx_pro.bin"), 0)
     ratio = {}
     for ph, v in aggregate(donor).items():
         rest = v["staging"] + v["prologue"] + v["stream"]
         ratio[ph] = (v["staging"] + v["prologue"]) / rest
+    return ratio
+
+
+def measured(plan: Path, trace: Path, stamps: Path | None = None) -> tuple[dict, dict, float]:
+    """us per stage of one traced token, instances per stage, and the span. With stamps (legacy prologue or STAMPS2),
+    in_norm / prep / topk are the stamped staging + prologue [M]; without, the donor ratios split the stream [E]."""
+    rows, span = ld.ledger(ld.load_etx(plan, trace, stamps), 0)
+    ratio = None if stamps else donor_ratios()
     us, n = defaultdict(float), defaultdict(set)
     for layer, ph, c in rows:
         st = stage_of(layer, ph)
         total = sum(c.values())
         if st in ("qkv", "attn", "moe_up") and ph in SPLIT:
-            pre = c["stream"] * ratio[ph]
+            pre = c["staging"] + c["prologue"] if stamps else c["stream"] * ratio[ph]
             us[SPLIT[ph]] += pre
             n[SPLIT[ph]].add(layer)
             total -= pre
         us[st] += total
         n[st].add(layer)
     return dict(us), {k: len(v) for k, v in n.items()}, span
+
+
+def current() -> tuple[dict, dict, float]:
+    """The stride-32 trace (x1s), unstamped: the account every expected value starts from."""
+    pinned_parser()
+    new = data_sets() / "results_2026-09-27d/sess2"
+    return measured(new / "x1s_plan.json", new / "x1s_trace.bin")
 
 
 def main() -> int:
