@@ -98,5 +98,8 @@ baseline.
 | MoE rows per task, 24 / 16 / 16 with 304 workers | **-0.140 / -0.356 / -0.413 ms** against the 32 baseline | [M] | `ETX_VL_MOE_RPT` in `examples/vllm_llm/host.hip`; `etx/select/variants.py` | four arms, one flag set, five interleaved rounds, 32/32 each | same KEEP rule | - | closed | closed, all negative |
 | Single-wave row ownership, `ETX_DSL_ROW_WAVE` | barriers **168 -> 170**, LDS ops **1101 -> 1119**; with a constant segment count **170 / 1119** | [M] static | `etx/ops/gemv.py`, the row-wave tile | the real flag set (`BASE_FLAGS` plus the new `-D`) | must remove sync work, not add it | - | closed | closed, static negative |
 
-The marginal price of one extra workgroup is **about 40 ns** (the three deltas above divided by the
-workgroups they added agree to 15%), which bounds every fixed-cost-removal route.
+The marginal slope near this configuration is **about 40-43 ns per extra workgroup** (the three deltas
+divided by the workgroups they added agree to 15%). It is an empirical slope for **this** task shape, not a fixed
+per-workgroup cost, and it must not be extrapolated to other tile sizes: the arms also change the weight bytes each
+workgroup reads, the rows each wave owns, the load-pipeline length and the XCD batch assignment, and the RPT=16 arm
+does not fit a constant-cost model. What the sweep does close is the direction, not a constant.
