@@ -1,22 +1,111 @@
 {
   "schema": 1,
   "B": [
-    {"id": "C1", "build": "C1", "kind": "shape", "flags": {"ETX_VL_ROUTER_NARROW": "1"}, "source": "docs/ISA-FIXES-2026-10-11.md:31", "overlap": "router-body", "enabled": true},
-    {"id": "C5", "build": "C5", "kind": "shape", "defines": ["ETX_DSL_NORM_HOIST"], "source": "docs/ISA-FIXES-2026-10-11.md:135", "overlap": "router-body", "enabled": true}
+    {
+      "id": "C1",
+      "build": "C1",
+      "kind": "shape",
+      "flags": {
+        "ETX_VL_ROUTER_NARROW": "1"
+      },
+      "source": "docs/ISA-FIXES-2026-10-11.md:31",
+      "overlap": "router-body",
+      "enabled": true
+    },
+    {
+      "id": "C5",
+      "build": "C5",
+      "kind": "shape",
+      "defines": [
+        "ETX_DSL_NORM_HOIST"
+      ],
+      "source": "docs/ISA-FIXES-2026-10-11.md:135",
+      "overlap": "router-body",
+      "enabled": true
+    },
+    {
+      "id": "MOE16",
+      "build": "MOE16",
+      "kind": "shape",
+      "defines": [
+        "ETX_VL_MOE_RPT=16"
+      ],
+      "flags": {
+        "ETX_VL_MOE_RPT": "16"
+      },
+      "source": "examples/vllm_llm/host.hip ETX_VL_MOE_RPT; examples/vllm_llm/model.py grid; etx/select/variants.py",
+      "overlap": "moe-up-body",
+      "enabled": true
+    },
+    {
+      "id": "MOE24",
+      "build": "MOE24",
+      "kind": "shape",
+      "defines": [
+        "ETX_VL_MOE_RPT=24"
+      ],
+      "flags": {
+        "ETX_VL_MOE_RPT": "24"
+      },
+      "source": "examples/vllm_llm/host.hip ETX_VL_MOE_RPT; examples/vllm_llm/model.py grid; etx/select/variants.py",
+      "overlap": "moe-up-body",
+      "enabled": true
+    }
   ],
   "C": [
-    {"id": "NO_TOUCH", "build": "NO_TOUCH", "diagnostic_build": "NO_TOUCH_stamps", "kind": "body", "enabled": true,
-     "defines": ["ETX_NO_TOUCH"], "flags": {"ETX_VL_TOUCH": "1", "ETX_PREFETCH_ISOLATE_POLLER": "0"},
-     "budget_s": 1620, "estimated_required_s": 1575,
-     "keep_threshold": {"complete_adjacent_pinned_pairs": 3, "every_wall_gain_ms_gt": 0, "median_wall_gain_ms_ge": 0.030, "median_gt_spread_multiplier": 2, "additional": null},
-     "source": "docs/PLAN-300TOKS-2026-10-11.md:310,314; docs/XCD-PREFETCH-2026-10-11.md:71-76,125; etx/codegen/kernel.py:297"},
-    {"id": "ISOLATE_POLLER", "build": "ISOLATE_POLLER", "kind": "body", "enabled": true,
-     "flags": {"ETX_VL_TOUCH": "1", "ETX_PREFETCH_ISOLATE_POLLER": "1"},
-     "budget_s": 1200, "estimated_required_s": 1140,
-     "keep_threshold": {"complete_adjacent_pinned_pairs": 3, "every_wall_gain_ms_gt": 0, "median_wall_gain_ms_ge": 0.030, "median_gt_spread_multiplier": 2, "round_trip_median_us_lt": 2.0},
-     "source": "docs/VERIFY-GAPS-2026-10-11.md:141-193; examples/vllm_llm/prefetch_isolation_cpu.py"},
-    {"id": "C6", "build": "C6", "kind": "fusion", "enabled": true,
-     "budget_s": 1200, "estimated_required_s": 1085,
-     "prerequisites": "Contract/hook only today; requires a sealed committed full-model adapter, prototype_certificate, prototype_commit, expected_vgpr and expected_lds_bytes before qualification", "source": "docs/ISA-FIXES-2026-10-11.md:246"}
+    {
+      "id": "NO_TOUCH",
+      "build": "NO_TOUCH",
+      "diagnostic_build": "NO_TOUCH_stamps",
+      "kind": "body",
+      "enabled": true,
+      "defines": [
+        "ETX_NO_TOUCH"
+      ],
+      "flags": {
+        "ETX_VL_TOUCH": "1",
+        "ETX_PREFETCH_ISOLATE_POLLER": "0"
+      },
+      "budget_s": 1620,
+      "estimated_required_s": 1575,
+      "keep_threshold": {
+        "complete_adjacent_pinned_pairs": 3,
+        "every_wall_gain_ms_gt": 0,
+        "median_wall_gain_ms_ge": 0.03,
+        "median_gt_spread_multiplier": 2,
+        "additional": null
+      },
+      "source": "docs/PLAN-300TOKS-2026-10-11.md:310,314; docs/XCD-PREFETCH-2026-10-11.md:71-76,125; etx/codegen/kernel.py:297"
+    },
+    {
+      "id": "ISOLATE_POLLER",
+      "build": "ISOLATE_POLLER",
+      "kind": "body",
+      "enabled": true,
+      "flags": {
+        "ETX_VL_TOUCH": "1",
+        "ETX_PREFETCH_ISOLATE_POLLER": "1"
+      },
+      "budget_s": 1200,
+      "estimated_required_s": 1140,
+      "keep_threshold": {
+        "complete_adjacent_pinned_pairs": 3,
+        "every_wall_gain_ms_gt": 0,
+        "median_wall_gain_ms_ge": 0.03,
+        "median_gt_spread_multiplier": 2,
+        "round_trip_median_us_lt": 2.0
+      },
+      "source": "docs/VERIFY-GAPS-2026-10-11.md:141-193; examples/vllm_llm/prefetch_isolation_cpu.py"
+    },
+    {
+      "id": "C6",
+      "build": "C6",
+      "kind": "fusion",
+      "enabled": true,
+      "budget_s": 1200,
+      "estimated_required_s": 1085,
+      "prerequisites": "Contract/hook only today; requires a sealed committed full-model adapter, prototype_certificate, prototype_commit, expected_vgpr and expected_lds_bytes before qualification",
+      "source": "docs/ISA-FIXES-2026-10-11.md:246"
+    }
   ]
 }
