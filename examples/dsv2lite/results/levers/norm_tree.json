@@ -21,7 +21,7 @@
       "tests/test_dsv2_lever_norm_tree.py",
       "tests/test_dsv2_stamps.py"
     ],
-    "summary": "11 passed in 0.14s"
+    "summary": "11 passed in 0.15s"
   },
   "default": {
     "isa_sha256": "a105cb16a414ee0f9f697c9de13205419d09674f5c69f6ee804cf36942377724",
@@ -47,8 +47,8 @@
     "sgpr": 0,
     "vgpr": 0
   },
-  "etx_commit": "6e24537a271add5530be2bd97fd8a7312717c5cb",
-  "etx_dirty": true,
+  "etx_commit": "35fd08953decab7f2b6effacd7d5e327f6c7bb0c",
+  "etx_dirty": false,
   "fleet_commit": "3fb67a6",
   "fleet_src_sha256": "28f5cbb4f39524df318883522341c48ca4162c18b71a3a6223c52eabb40ce4b3",
   "static_delta": {
