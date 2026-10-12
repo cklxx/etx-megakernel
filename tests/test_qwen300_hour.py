@@ -476,7 +476,7 @@ def test_s1_consumes_perturbation_before_any_later_tranche(tmp_path, monkeypatch
     if status == 'VALID':
         assert row['status'] == 'PASS' and row['value']['G_ms'] == .100
         assert calls == ['X5', 'S2', 'B', 'C', 'D']
-    elif status == 'INVALID':
+    elif status in ('INVALID', 'NOT-COMPLETE'):
         assert row['status'] == 'NOT-COMPLETE'
         assert row['value']['G_ms'] is None and row['value']['gap_atoms']['G_ms'] is None
         assert calls == ['X5', 'B', 'C', 'D']

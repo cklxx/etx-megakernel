@@ -22,49 +22,6 @@
       "source": "docs/ISA-FIXES-2026-10-11.md:135",
       "overlap": "router-body",
       "enabled": true
-    },
-    {
-      "id": "MOE16",
-      "build": "MOE16",
-      "kind": "shape",
-      "defines": [
-        "ETX_VL_MOE_RPT=16"
-      ],
-      "flags": {
-        "ETX_VL_MOE_RPT": "16"
-      },
-      "source": "examples/vllm_llm/host.hip ETX_VL_MOE_RPT; examples/vllm_llm/model.py grid; etx/select/variants.py",
-      "overlap": "moe-up-body",
-      "enabled": true
-    },
-    {
-      "id": "MOE24",
-      "build": "MOE24",
-      "kind": "shape",
-      "defines": [
-        "ETX_VL_MOE_RPT=24"
-      ],
-      "flags": {
-        "ETX_VL_MOE_RPT": "24"
-      },
-      "source": "examples/vllm_llm/host.hip ETX_VL_MOE_RPT; examples/vllm_llm/model.py grid; etx/select/variants.py",
-      "overlap": "moe-up-body",
-      "enabled": true
-    },
-    {
-      "id": "MOE16CU304",
-      "build": "MOE16CU304",
-      "kind": "shape",
-      "defines": [
-        "ETX_VL_MOE_RPT=16"
-      ],
-      "flags": {
-        "ETX_VL_MOE_RPT": "16",
-        "ETX_VL_CU": "304"
-      },
-      "source": "examples/vllm_llm/host.hip ETX_VL_MOE_RPT; ETX_VL_CU 304 workers on 8 XCDs",
-      "overlap": "moe-up-body",
-      "enabled": true
     }
   ],
   "C": [
