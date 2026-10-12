@@ -1202,7 +1202,7 @@ def execute(s):
     value = stop['value']
     # INVALID stamps leave S1 unjudged; independent pairs do not need G.
     unjudged = (stop['status'] == 'NOT-COMPLETE' and value['G_ms'] is None
-                and (value.get('stamp_perturbation') or {}).get('status') == 'INVALID'
+                and (value.get('stamp_perturbation') or {}).get('status') in ('INVALID', 'NOT-COMPLETE')
                 and 'kept' in s.certified)
     expired = time.monotonic() >= s.end
     if expired or (not a_pass and not unjudged):
