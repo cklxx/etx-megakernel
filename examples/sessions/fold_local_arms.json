@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "B": [],
+  "C": [
+    {
+      "id": "LOCAL_FOLD",
+      "build": "LOCAL_FOLD",
+      "kind": "shape",
+      "enabled": true,
+      "defines": [
+        "ETX_DSL_LOCAL_FOLD"
+      ],
+      "flags": {
+        "ETX_VL_TOUCH": "1"
+      },
+      "source": "examples/vllm_llm/results/2026-10-12/fleet-port.md",
+      "overlap": "qkv-fold",
+      "budget_s": 1200,
+      "estimated_required_s": 900,
+      "pair_rule": "5 interleaved pinned pairs against kept; every delta negative; median >= 0.030 ms and > 2x spread; 32/32 greedy tokens; host --check on every imported launch; 97/97 import coverage on the timed build",
+      "reject_if": "the complete reader-ready interval (assembly + publication + wait + consumer staging) is not shorter than the baseline fold path, or resources regress past 128 VGPR / 29,736 B LDS",
+      "expected_pool_us": 371.1,
+      "pool_basis": "docs/MASTER-TABLE-2026-10-11.md rows qkv (179.0 machinery + 183.2 gap) and lm_head (7.2 + 1.7)"
+    }
+  ]
+}

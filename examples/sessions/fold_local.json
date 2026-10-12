@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "model": "/root/llm/qwen3-30b-a3b",
+  "hf": "/root/llm/qwen3-30b-a3b/hf",
+  "image": "vllm/vllm-openai-rocm@sha256:bb44b39aea26798cce43030a98bf48efd0322ca7147367db86e38b96bd80f0e7",
+  "golden_sha256": "bab2f1fbe12f70179711ec40a215c74710845b73169b1cc6a3a6ca50e0a19484",
+  "cpu_gates": "/root/etx/build/foldlocal/cpu-gates.json",
+  "manifest": "/root/etx/examples/sessions/fold_local_arms.json",
+  "source_commit": "FILL-THE-40-HEX-COMMIT-THAT-LANDS-THE-PORT",
+  "builds": {
+    "kept": "/root/etx/build/foldlocal/kept",
+    "LOCAL_FOLD": "/root/etx/build/foldlocal/LOCAL_FOLD"
+  }
+}
