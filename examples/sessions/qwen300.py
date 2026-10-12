@@ -42,11 +42,10 @@ import statistics
 import subprocess
 import sys
 import time
+from examples.vllm_llm.qwen300_config import IMAGE, QWEN300_MAX_SESSION_SECONDS, validate_cap
 
-MAX_SESSION_SECONDS = 110 * 60
-if float(os.environ.get('ETX_SESS_MAX_SECONDS', MAX_SESSION_SECONDS)) > MAX_SESSION_SECONDS:
-    raise ValueError('Qwen300 hard stop cannot be extended')
-IMAGE = 'vllm/vllm-openai-rocm@sha256:bb44b39aea26798cce43030a98bf48efd0322ca7147367db86e38b96bd80f0e7'
+MAX_SESSION_SECONDS = QWEN300_MAX_SESSION_SECONDS
+validate_cap(MAX_SESSION_SECONDS, 'Qwen300')
 HF = {'bf16': 'Qwen/Qwen3-30B-A3B'}
 GOLDEN = Path('examples/llm/results/golden_c1024_qwen3-30b-a3b.txt')
 FLAGS = '-DETX_DSL_WSUM -DETX_DSL_SCALAR -DETX_DSL_GU1 -DETX_DSL_RBATCH'

@@ -34,6 +34,8 @@ jobs, their last log line, and a warning for any job silent past quiet_s), and a
 The runner exclusively creates <logdir>/runner.log. If it already exists (or status.json exists),
 the new session uses a unique session-* subdirectory for runner, status and job logs; the selected path is printed.
 Every job receives that directory as ETX_SESS_LOGDIR.
+Bare Python commands use the runner's interpreter directory first on PATH;
+commands naming an explicit interpreter path keep that choice.
 """
 from __future__ import annotations
 
@@ -180,6 +182,7 @@ class Runner:
         j.log = self.logdir / f"{j.name}.log"
         env = dict(os.environ)
         env.update({k: str(v) for k, v in j.env.items()})
+        env["PATH"] = str(Path(sys.executable).parent) + os.pathsep + env.get("PATH", os.defpath)
         if gpu is not None:
             env["HIP_VISIBLE_DEVICES"] = str(gpu)
             env["GPU"] = str(gpu)

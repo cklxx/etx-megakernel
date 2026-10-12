@@ -1,8 +1,30 @@
 """CPU refusal tests for the paid-session plan; no GPU or network."""
 import csv
+import os
 from pathlib import Path
+import subprocess
+import sys
 import pytest
 from examples.sessions import qwen300 as s
+
+
+@pytest.mark.parametrize('seconds,accepted', [
+    (None, True), ('6600', True), ('1500', True), ('6601', False),
+    ('8400', False), ('0', False), ('-1', False), ('nan', False),
+    ('inf', False), ('invalid', False),
+])
+def test_qwen300_cap_remains_110_minutes(seconds, accepted):
+    env = dict(os.environ)
+    env.pop('ETX_SESS_MAX_SECONDS', None)
+    if seconds is not None:
+        env['ETX_SESS_MAX_SECONDS'] = seconds
+    result = subprocess.run([sys.executable, '-m', 'etx.tools.gpu_jobs', s.__file__, '--dry-run'],
+                            env=env, text=True, capture_output=True, timeout=15)
+    assert (result.returncode == 0) is accepted, result.stdout + result.stderr
+    if accepted:
+        assert f'Session hard stop: {seconds or 6600}s' in result.stdout
+    else:
+        assert 'Qwen300 cap must be positive and <=6600 seconds' in result.stderr
 
 
 def test_two_serial_bf16_jobs():

@@ -582,13 +582,45 @@ def test_140_minute_cap_and_22_minute_b_deadline(tmp_path, monkeypatch):
     assert limited.end-limited.start == 990
 
 
-@pytest.mark.parametrize('seconds,accepted', [('8400', True), ('3600', True), ('8401', False), ('0', False), ('nan', False)])
+@pytest.mark.parametrize('seconds,accepted', [
+    ('8400', True), ('6601', True), ('3600', True), ('8401', False),
+    ('0', False), ('-1', False), ('nan', False), ('inf', False), ('invalid', False),
+])
 def test_cap_environment_validation(seconds, accepted):
     env = dict(os.environ, ETX_SESS_MAX_SECONDS=seconds)
-    result = subprocess.run([sys.executable, '-c', 'from examples.sessions import qwen300_hour'],
-                            env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    result = subprocess.run([sys.executable, '-m', 'examples.sessions.qwen300_hour', '--dry-run'],
+                            env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=15)
     assert (result.returncode == 0) is accepted
-    if not accepted: assert 'cap must be positive and <=8400 seconds' in result.stdout
+    if accepted: assert f'Session hard stop: {seconds}s' in result.stdout
+    else: assert 'cap must be positive and <=8400 seconds' in result.stdout
+
+
+def test_full_hour_cap_reaches_pinned_image_preflight(tmp_path):
+    hf = tmp_path/'hf'; hf.mkdir()
+    (hf/'config.json').write_text(json.dumps(dict(model_type='qwen3_moe', num_hidden_layers=48,
+        hidden_size=2048, num_key_value_heads=4, num_experts=128, num_experts_per_tok=8,
+        torch_dtype='bfloat16')))
+    gates = tmp_path/'gates.json'
+    gates.write_text(json.dumps(dict(pytest=True, gfx942=True, dry_run=True, shell=True,
+        local_matrix_16=True, rocm_build_check=True, source_hashes=h.source_hashes())))
+    config = dict(hf=str(hf), model=str(tmp_path), cpu_gates=str(gates), image='wrong-image')
+    code = f'''
+import types
+from examples.sessions import qwen300_hour as h
+from examples.vllm_llm.qwen300_config import IMAGE
+assert h.IMAGE == IMAGE
+assert 'examples/vllm_llm/qwen300_config.py' in h.source_hashes()
+try:
+    h.preflight(types.SimpleNamespace(c={config!r}))
+except ValueError as exc:
+    assert str(exc) == 'strongest legal reference requires pinned vLLM image', str(exc)
+else:
+    raise AssertionError('unpinned image accepted')
+'''
+    result = subprocess.run([sys.executable, '-c', code],
+                            env=dict(os.environ, ETX_SESS_MAX_SECONDS='8400'),
+                            text=True, capture_output=True, timeout=15)
+    assert result.returncode == 0, result.stdout + result.stderr
 
 
 def test_s2_does_not_attribute_pending_reset_device_work_to_host(tmp_path):
