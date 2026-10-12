@@ -1,14 +1,20 @@
 PY ?= .venv/bin/python
 ARCH ?= gfx942
 MODEL ?= $(HOME)/llm/qwen3-30b-a3b
+ARMS ?= $(HOME)/arms
+GATES ?= $(ARMS)/cpu-gates.json
 
 .DEFAULT_GOAL := help
 
-.PHONY: help setup test compile explain site-deploy calib bench
+.PHONY: help setup test compile explain site-deploy calib bench preflight
 
 help:
-	@echo "Targets: setup test compile explain calib site-deploy bench"
+	@echo "Targets: setup test compile explain calib site-deploy bench preflight"
 	@echo "  make bench [MODEL=/path/to/qwen3-30b-a3b]  Build, check and time kept ETX on MI300X"
+	@echo "  make preflight [MODEL=/path] [ARMS=/path] [GATES=/path]  Refuse unstaged boxes (read-only)"
+
+preflight:
+	@bash tools/vm_preflight.sh "$(MODEL)" "$(ARMS)" --gates "$(GATES)"
 
 bench:
 	@python3 -u -m examples.vllm_llm.bench "$(MODEL)"

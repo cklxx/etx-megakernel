@@ -93,6 +93,9 @@ def prepare(config_path):
     """
     from examples.vllm_llm import import_certificate as cert
     c = json.loads(config_path.read_text())
+    from examples.vllm_llm.vm_preflight import check
+    if check(c['model'], Path(c['builds']['kept']).parent, c['cpu_gates']):
+        raise ValueError('VM preflight refused staging; supply missing inputs before --prepare')
     if not re.fullmatch('[a-f0-9]{40}', c['source_commit']): raise ValueError('full source commit required')
     gates = json.loads(Path(c['cpu_gates']).read_text())
     if gates.get('source_hashes') != source_hashes(): raise ValueError('CPU gates belong to different source')
