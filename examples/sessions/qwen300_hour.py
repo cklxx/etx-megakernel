@@ -286,6 +286,7 @@ class Session:
         for name, rule in REGISTERED.items():
             self.rows.setdefault(name, dict(value=None, status='NOT-COMPLETE', rule=rule, source=THRESHOLD_SOURCES[name]))
         result = dict(thresholds=self.rows, arms=self.arms, elapsed_s=time.monotonic()-self.start,
+                      stamp_perturbation=(self.rows.get('A.stop', {}).get('value') or {}).get('stamp_perturbation'),
                       conditions=dict(precision='bf16', batch=1, context=1024, tokens=32, machine='A',
                                       gpu=os.environ.get('GPU', '0')), attribution='No removable-time credit from stamps')
         (self.out/'report.json').write_text(json.dumps(result, indent=2)+'\n')
@@ -466,13 +467,34 @@ def gap_atom_prices(report):
                 unobserved=['P1.fetch', 'isolated P7.barrier', 'nonfinal producer arrivals'])
 
 
-def first_stop(s, gap_atoms):
+def stamp_perturbation(loads, original_off_within_spread=None):
+    """F1 requires both checks; missing original/OFF evidence never funds G."""
+    p = loads.get('perturbation', {})
+    change = p.get('max_abs_body_change_us')
+    load_pass = (p.get('sampled_bodies', 0) > 0 and change is not None
+                 and math.isfinite(change) and 0 <= change <= .5)
+    status = 'INVALID' if change is not None and not load_pass else (
+        'VALID' if original_off_within_spread is True and load_pass else 'NOT-COMPLETE')
+    reason = ('INVALID: load stamps exceed 0.5 us/body' if status == 'INVALID' else
+              'VALID: original/OFF spread and load stamp perturbation established' if status == 'VALID' else
+              'NOT-COMPLETE: original/OFF spread not established' if original_off_within_spread is not True else
+              'NOT-COMPLETE: load stamp perturbation not established')
+    return dict(status=status, original_off_within_spread=original_off_within_spread,
+                load_stamps_within_bar=load_pass, reason=reason)
+
+
+def first_stop(s, gap_atoms, perturbation=None):
     # S1: plan section 7, line 302 (main 9f91f3a). Pool labels never decide S1.
+    valid = (perturbation is not None and perturbation.get('status') == 'VALID'
+             and perturbation.get('original_off_within_spread') is True
+             and perturbation.get('load_stamps_within_bar') is True)
+    # Recheck at the spending boundary, even if a summary contains a numeric G.
+    gap_atoms = dict(gap_atoms, G_ms=None) if gap_atoms is not None and not valid else gap_atoms
     g = gap_atoms['G_ms'] if gap_atoms is not None else None
     passes = g is not None and math.isfinite(g) and (g >= .088 or math.isclose(g, .088, rel_tol=0., abs_tol=1e-12))
     passes = passes and 'kept' in s.certified
     incomplete = g is None or not math.isfinite(g) or 'kept' not in s.certified
-    s.row('A.stop', dict(G_ms=g, gap_atoms=gap_atoms,
+    s.row('A.stop', dict(G_ms=g, gap_atoms=gap_atoms, stamp_perturbation=perturbation,
                         decision='END SESSION: NOT-COMPLETE' if incomplete else
                                  'CONTINUE to S2' if passes else 'STOP-SPEND: close target route'),
           'NOT-COMPLETE' if incomplete else 'PASS' if passes else 'STOP', REGISTERED['A.stop'])
@@ -629,6 +651,7 @@ def preflight(s):
 def tranche_a(s):
     """900s including fresh correctness and all deciding probes, after cache setup."""
     gap_atoms = None
+    perturbation = None
     for arm in ('kept', 'stamps', 'stages'):
         if s.attempt('A.gate.'+arm, lambda arm=arm: certify(s, arm)) is None and arm not in s.certified:
             continue
@@ -660,6 +683,7 @@ def tranche_a(s):
         result = s.attempt('A1', stamped)
         if result is not None:
             gap_atoms = result['gap_atoms']
+            perturbation = result.get('stamp_perturbation')
             def attention():
                 a2 = attention_price(result['inbody'])
                 (s.out/'A_attention.json').write_text(json.dumps(a2, indent=2)+'\n')
@@ -680,7 +704,7 @@ def tranche_a(s):
         s.attempt('A3/A4', stages)
     if 'kept' in s.certified:
         registered_reset(s)  # requested price is collected even if S1/S2 later stops
-    return first_stop(s, gap_atoms)
+    return first_stop(s, gap_atoms, perturbation)
 
 
 def timing(text, mode='fused'):
@@ -1104,7 +1128,9 @@ def execute(s):
     s.qualified_c = qualify_c(s)
     if not tranche_a(s):
         print('END after A: '+s.rows['A.stop']['value']['decision'], flush=True)
-        for name in ('B.keep', 'B.stop', 'C.fusion', 'C.body', 'C.NO_TOUCH', 'C.ISOLATE_POLLER',
+        if s.rows['A.stop']['status'] == 'NOT-COMPLETE':
+            s.arms['session'] = dict(status='NOT-COMPLETE', reason=s.rows['A.stop']['value']['decision'])
+        for name in ('X5', 'B.keep', 'B.stop', 'C.fusion', 'C.body', 'C.NO_TOUCH', 'C.ISOLATE_POLLER',
                      'D.target', 'D.fusion', 'D.system'):
             s.row(name, None, 'NOT-RUN', REGISTERED[name])
         return
@@ -1168,7 +1194,7 @@ def main(argv=None):
         from etx.tools import inbody
         print('CPU ANALYSIS begin: lossless edge/body records', flush=True)
         result = edge_prices(json.loads(Path(args[1]).read_text()), inbody.read_raw(args[2]))
-        # Load analysis is independent: absent load stamps must not erase G.
+        # Raw edge observations survive, but uncertified perturbation erases G.
         try:
             plan = json.loads(Path(args[1]).read_text())
             on = inbody.read_raw(args[2])
@@ -1188,13 +1214,21 @@ def main(argv=None):
         except ValueError as exc:
             loads = dict(status='NOT-COMPLETE', reason=str(exc))
         result['load_phases'] = loads
+        # This one-snapshot analyzer has no original/OFF spread population.
+        # Do not promote the diagnostic controls in tranche A into that proof.
+        result['stamp_perturbation'] = stamp_perturbation(loads)
+        loads['validity'] = result['stamp_perturbation']['reason']
+        print(loads['validity'], flush=True)
+        if result['stamp_perturbation']['status'] != 'VALID':
+            result['gap_atoms']['G_ms'] = None
         output = Path(args[3])
         output.write_text(json.dumps(result, indent=2)+'\n')
         # The parent must not parse/rewrite the large lossless report after
         # its subprocess deadline. Its small decision view is emitted HERE,
         # under the same deadline as all raw analysis and serialization.
         summary = dict(critical_pools=result['critical_pools'], floor_us=result['floor_us'], gap_atoms=result['gap_atoms'],
-                       basis=result['basis'], load_phases=result['load_phases'], inbody=dict(phases=result['inbody']['phases']))
+                       basis=result['basis'], load_phases=result['load_phases'], stamp_perturbation=result['stamp_perturbation'],
+                       inbody=dict(phases=result['inbody']['phases']))
         output.with_suffix('.summary.json').write_text(json.dumps(summary, indent=2)+'\n')
         print('CPU ANALYSIS complete', flush=True)
         return 0

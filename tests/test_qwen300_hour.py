@@ -13,6 +13,10 @@ import pytest
 from examples.sessions import qwen300_hour as h
 
 
+def valid_perturbation():
+    return h.stamp_perturbation(dict(perturbation=dict(sampled_bodies=48, max_abs_body_change_us=.5)), True)
+
+
 def trace(previous=True, ambiguous=False):
     p = dict(types={'attn_0': dict(id=0), 'prep_0': dict(id=1), 'reduce_0': dict(id=2)},
              descs=[dict(id=i, type=i, coord=[0], domain=0, mode='static') for i in range(3)],
@@ -91,7 +95,7 @@ def test_a2_failure_preserves_g_and_missing_a1_is_incomplete(tmp_path, monkeypat
         if failure == 'analysis': raise ValueError('analysis failed')
         pool = dict(above_floor_lower_ms=.2, above_floor_upper_ms=.2, count=1)
         result = dict(critical_pools=dict(busy=pool, free=pool, ambiguous=dict(count=0)),
-                      gap_atoms=dict(G_ms=.324), inbody=dict(phases=phases))
+                      gap_atoms=dict(G_ms=.324), stamp_perturbation=valid_perturbation(), inbody=dict(phases=phases))
         Path(cmd[-1]).with_suffix('.summary.json').write_text(json.dumps(result))
     monkeypatch.setattr(s, 'step', analysis)
     complete_g = failure in ('none', 'coverage')
@@ -381,6 +385,32 @@ def test_analysis_cli_emits_small_decision_view_under_its_deadline(tmp_path):
     assert small['critical_pools'] == full['critical_pools']
     assert 'raw' not in small['inbody']
     assert small['inbody']['phases'] == full['inbody']['phases']
+    assert small['stamp_perturbation'] == full['stamp_perturbation']
+    assert small['stamp_perturbation']['status'] == 'NOT-COMPLETE'
+    assert small['gap_atoms']['G_ms'] is None
+
+
+@pytest.mark.parametrize('change,status,message', [(.5, 'NOT-COMPLETE', 'NOT-COMPLETE: original/OFF spread not established'),
+                                                 (.501, 'INVALID', 'INVALID: load stamps exceed 0.5 us/body')])
+def test_analysis_cli_masks_g_and_keeps_perturbation_message(tmp_path, monkeypatch, capsys, change, status, message):
+    from etx.tools import inbody
+    plan=tmp_path/'plan.json';plan.write_text('{}')
+    raw=tmp_path/'raw.bin';(tmp_path/'stamps_load_off.bin').touch()
+    def report(body):
+        return dict(phases=[], critical_task_ids=[0], tasks=[dict(body_us=body,phase=next(iter(inbody.LOAD_ROLES)))])
+    monkeypatch.setattr(inbody,'read_raw',lambda p: {})
+    monkeypatch.setattr(inbody,'load_phases',lambda *args: {})
+    monkeypatch.setattr(inbody,'analyze',lambda *args: report(1.))
+    monkeypatch.setattr(h,'edge_prices',lambda *args: dict(critical_pools={},floor_us=1.,gap_atoms=dict(G_ms=.100),
+                                                       basis='test',inbody=report(1.+change)))
+    out=tmp_path/'analysis.json'
+    assert h.main(['--analyze',str(plan),str(raw),str(out)])==0
+    assert message in capsys.readouterr().out
+    for path in (out,out.with_suffix('.summary.json')):
+        result=json.loads(path.read_text())
+        assert result['stamp_perturbation']['status']==status
+        assert result['gap_atoms']['G_ms'] is None
+        assert result['load_phases']['validity']==message
 
 
 @pytest.mark.parametrize('g,passes', [(None, False), (.087999, False), (.088, True), (.100, True), (.324, True)])
@@ -388,7 +418,7 @@ def test_analysis_cli_emits_small_decision_view_under_its_deadline(tmp_path):
 def test_s1_uses_gap_atoms_instead_of_pool_labels(tmp_path, g, passes, busy, free):
     s = session(tmp_path); s.certified.add('kept')
     s.rows.update({'A1.busy': dict(status=busy), 'A1.free': dict(status=free)})
-    assert h.first_stop(s, None if g is None else dict(G_ms=g, atoms={})) is passes
+    assert h.first_stop(s, None if g is None else dict(G_ms=g, atoms={}), valid_perturbation()) is passes
     assert s.rows['A.stop']['status'] == ('NOT-COMPLETE' if g is None else 'PASS' if passes else 'STOP')
     assert ':301-302' in s.rows['A.stop']['source']
 
@@ -397,9 +427,66 @@ def test_s1_uses_gap_atoms_instead_of_pool_labels(tmp_path, g, passes, busy, fre
 def test_s1_missing_correctness_or_measurement_does_not_close_route(tmp_path, certified, g):
     s = session(tmp_path)
     if certified: s.certified.add('kept')
-    assert not h.first_stop(s, dict(G_ms=g))
+    assert not h.first_stop(s, dict(G_ms=g), valid_perturbation())
     assert s.rows['A.stop']['status'] == 'NOT-COMPLETE'
     assert s.rows['A.stop']['value']['decision'] == 'END SESSION: NOT-COMPLETE'
+
+
+@pytest.mark.parametrize('off,change,status', [(None, .5, 'NOT-COMPLETE'), (False, .5, 'NOT-COMPLETE'),
+                                              (True, .501, 'INVALID'), (True, .5, 'VALID')])
+def test_s1_consumes_perturbation_before_any_later_tranche(tmp_path, monkeypatch, off, change, status):
+    s = session(tmp_path); s.c['builds']['stamps'] = '/unused/stamps'
+    evidence = h.stamp_perturbation(dict(perturbation=dict(sampled_bodies=48, max_abs_body_change_us=change)), off)
+    assert evidence['status'] == status
+    monkeypatch.setattr(h, 'preflight', lambda s: None)
+    monkeypatch.setattr(h, 'environment_guard', lambda s: True)
+    monkeypatch.setattr(h, 'qualify_c', lambda s: [])
+    def certify(s, arm):
+        if arm == 'stages': raise ValueError('no stage observation')
+        s.certified.add(arm)
+    monkeypatch.setattr(h, 'certify', certify)
+    monkeypatch.setattr(h, 'registered_reset', lambda s: None)
+    monkeypatch.setattr(h, 'host', lambda *args: host_text()+'HOUR-SNAPSHOT run=0 step=1024\n')
+    def analysis(name, cmd, **kw):
+        pool = dict(above_floor_lower_ms=.2, above_floor_upper_ms=.2, count=1)
+        # Deliberately feed a numeric G even with invalid evidence: S1 must mask it.
+        result = dict(critical_pools=dict(busy=pool, free=pool, ambiguous=dict(count=0)),
+                      gap_atoms=dict(G_ms=.100), stamp_perturbation=evidence, inbody=dict(phases=[]))
+        Path(cmd[-1]).with_suffix('.summary.json').write_text(json.dumps(result))
+    monkeypatch.setattr(s, 'step', analysis)
+    calls = []
+    from examples.vllm_llm import x5
+    monkeypatch.setattr(x5, 'run', lambda s: calls.append('X5') or {})
+    # S2 is outside this regression; let it pass so every later tranche is observable.
+    monkeypatch.setattr(h, 'second_stop', lambda s: calls.append('S2') or True)
+    monkeypatch.setattr(h, 'tranche_b', lambda s: calls.append('B') or [])
+    monkeypatch.setattr(h, 'tranche_c', lambda s: (calls.append('C') or [], 0))
+    monkeypatch.setattr(h, 'tranche_d', lambda *args: calls.append('D'))
+    h.execute(s)
+    row = s.rows['A.stop']
+    assert row['value']['stamp_perturbation'] == evidence
+    if status == 'VALID':
+        assert row['status'] == 'PASS' and row['value']['G_ms'] == .100
+        assert calls == ['X5', 'S2', 'B', 'C', 'D']
+    else:
+        assert row['status'] == 'NOT-COMPLETE'
+        assert s.arms['session']['status'] == 'NOT-COMPLETE'
+        assert row['value']['G_ms'] is None and row['value']['gap_atoms']['G_ms'] is None
+        assert row['value']['decision'] == 'END SESSION: NOT-COMPLETE'
+        assert calls == []
+        assert all(s.rows[k]['status'] == 'NOT-RUN' for k in ('X5', 'B.keep', 'B.stop', 'C.body', 'D.target'))
+        s.finish()
+        report = json.loads((s.out/'report.json').read_text())
+        assert report['stamp_perturbation'] == evidence
+        assert report['thresholds']['A.stop']['value']['G_ms'] is None
+
+
+def test_s1_missing_or_contradictory_perturbation_fails_closed(tmp_path):
+    s = session(tmp_path); s.certified.add('kept')
+    for evidence in (None, {}, dict(valid_perturbation(), load_stamps_within_bar=False)):
+        assert not h.first_stop(s, dict(G_ms=.100), evidence)
+        assert s.rows['A.stop']['status'] == 'NOT-COMPLETE'
+        assert s.rows['A.stop']['value']['G_ms'] is None
 
 
 @pytest.mark.parametrize('g,r2,host,passes', [
@@ -408,7 +495,7 @@ def test_s1_missing_correctness_or_measurement_does_not_close_route(tmp_path, ce
     (.324, None, 0., True), (.200, None, .135, False)])
 def test_s2_combines_gap_attention_and_attributable_host(tmp_path, g, r2, host, passes):
     s = session(tmp_path); s.certified.add('kept')
-    assert h.first_stop(s, dict(G_ms=g))
+    assert h.first_stop(s, dict(G_ms=g), valid_perturbation())
     s.rows['A2.route'] = dict(value=dict(attainable_cut_ms=r2, available_cut_estimate_ms=.900))
     s.rows['A3.host'] = dict(value=dict(named_host_ms=dict(launch_us=host, reset_submit_us=.049,
         kernel_outside_token_timers_ms=.900, instrument_other_ms=.900), accounted_beyond_priced_ms=.900))
@@ -428,7 +515,7 @@ def test_execute_obeys_both_stops_with_time_remaining(tmp_path, monkeypatch, g, 
     monkeypatch.setattr(h, 'qualify_c', lambda s: [])
     from examples.vllm_llm import x5
     monkeypatch.setattr(x5, 'run', lambda s: None)
-    monkeypatch.setattr(h, 'tranche_a', lambda s: h.first_stop(s, dict(G_ms=g)))
+    monkeypatch.setattr(h, 'tranche_a', lambda s: h.first_stop(s, dict(G_ms=g), valid_perturbation()))
     def b(s):
         assert s.rows['B.stop']['status'] == 'PASS'
         calls.append('B'); return ['body-keep']
@@ -478,7 +565,7 @@ def test_s1_stops_at_protocol_floor_and_counts_only_excess(tmp_path, excess_tick
     assert result['atoms']['P4/P6/P7.setup']['idle_us'] == .15
     assert result['atoms']['P5/P11.observation']['idle_us'] == .951
     s = session(tmp_path); s.certified.add('kept')
-    assert h.first_stop(s, result) is passes
+    assert h.first_stop(s, result, valid_perturbation()) is passes
     assert s.rows['A.stop']['status'] == ('PASS' if passes else 'STOP')
 
 
@@ -504,7 +591,7 @@ def test_cap_environment_validation(seconds, accepted):
 
 def test_s2_does_not_attribute_pending_reset_device_work_to_host(tmp_path):
     s = session(tmp_path); s.certified.add('kept')
-    assert h.first_stop(s, dict(G_ms=.260))
+    assert h.first_stop(s, dict(G_ms=.260), valid_perturbation())
     s.rows['A3.host'] = dict(value=h.stage_prices(stage_text()))
     assert not h.second_stop(s)
     assert s.rows['B.stop']['value']['H_ms'] == pytest.approx(.046)

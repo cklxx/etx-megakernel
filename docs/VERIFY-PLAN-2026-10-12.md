@@ -224,8 +224,11 @@ This replaces the speculative 20-minute vendor sweep; it adds no B minutes.
 
 `x5.prices` requires all **288 records** (48 × 2 × 3), position1023, actual context1024 and
 100 replays, finite positive durations and bytes_equal. Average of each
-layer's sum of role medians must reach **<=7.69 us/layer**. A passing isolated
-price gives `R2=max(0,48*(10.645-price)/1000)` [E, cross-basis], never a
+layer's sum of role medians must reach **<=7.69 us/layer**. Only a build that differs from kept
+in an attention or reduce kernel specialization or legal launch (kernel/spec, block, grid, slots or capture metadata in verified build files) can earn R2.
+Renamed exports, build names, host flags and changes to other roles do not qualify. Kept and
+identical aliases are controls with R2=0; measuring kept may refresh the 10.645 us/layer baseline.
+A passing distinct candidate gives `R2=max(0,48*(baseline_us_layer-price)/1000)` [E, cross-basis], never a
 certified fused wall gain. Whole-grid replay includes import-wrapper work,
 whereas 10.645 is critical bodies. An eventual model-level pair/certificate
 must validate transfer. Incomplete population fails closed; warm reuse is
@@ -236,7 +239,8 @@ Runner now measures X5 **after S1 and before S2**, so R2 can influence
 in A4 before S1, so a later target stop cannot skip it. If all legal candidates
 have been certified/enumerated and none reaches the bar, **B1=0, R2=0**,
 then re-evaluate S2. Today's missing dispatch/adapters mean **B1 [U]**, with
-zero R2 for spending decisions, not an exhaustive CLOSED verdict. Failed
+zero R2 for spending decisions, not an exhaustive CLOSED verdict. An empty candidate list or
+control-only measurements likewise give R2=0 and leave B1 open. Failed
 byte/token gates disqualify a candidate; missing coverage is NOT-COMPLETE.
 
 ## 4. Environment guard: implemented, first VM step

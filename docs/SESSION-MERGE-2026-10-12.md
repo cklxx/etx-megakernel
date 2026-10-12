@@ -18,11 +18,12 @@ KEY32 evidence-reuse change adds documentation, with no off/on timing tranche.
 | NO_TOUCH | enabled, 1620 s | unchanged, full diagnostic + 3 pairs | `examples/sessions/qwen300_hour_arms.json:8` |
 | ISOLATE_POLLER | disabled, 600 s | enabled, 1200 s, 3 pairs + round-trip gate | `examples/sessions/qwen300_hour_arms.json:13` |
 | C6 | disabled, unallocated | enabled, 1200 s, full 3 pairs if eligible | `examples/sessions/qwen300_hour_arms.json:18` |
-| D | remaining cap, nominal 590 s after full A/B/C and report reserve | remaining cap, at least 2150 s after full A/B/C | `examples/sessions/qwen300_hour.py:14` |
+| Environment guard | none | 240 s before A | `examples/sessions/qwen300_hour.py:52` |
+| D | remaining cap, nominal 590 s after full A/B/C and report reserve | remaining cap, at least 1910 s after guard and full A/B/C | `examples/sessions/qwen300_hour.py:14` |
 | Reporting reserve | 10 s | unchanged | `examples/sessions/qwen300_hour.py:53` |
 | KEY32 timing tranche | none | none; reuse measured acceptance explicitly | `examples/sessions/qwen300_hour.py:24` |
 
-Budget arithmetic: **900 + 1320 + 4020 + 2150 + 10 = 8400 s**.
+Budget arithmetic: **240 + 900 + 1320 + 4020 + 1910 + 10 = 8400 s**.
 C allocates **1620 + 1200 + 1200 = 4020 s**, against estimates of
 **1575 + 1140 + 1085 = 3800 s**, leaving **220 s** of margin. Fresh import
 checks at both positions, CHECK-DSL and 32/32 gates are included in the arm
@@ -34,13 +35,13 @@ D keeps five adjacent fused/graph pairs and five adjacent fused/S3 pairs,
 with alternating order, plus its graph correctness gate. The prewarmed
 upper estimate is **16 × 28 + 5 × 97 = 933 s**, plus **3 × 28 = 84 s** for
 fresh certification if the final selection is a previously untested
-combination: **1017 s**, against **2150 s**, leaving **1133 s**. B's warm upper
+combination: **1017 s**, against **1910 s**, leaving **893 s**. B's warm upper
 estimate is **18 × 28 = 504 s**, against 1320 s. These call timings come from
 prior logs summarized in `docs/PREFLIGHT-QWEN300-HOUR-2026-10-11.md:95` and
 are **estimates**, not new measurements or guaranteed run times. A retains its
 15-minute S1 deadline, including preflight and correctness. The combined
-planning estimate, reserving all 900 s of A, is **900 + 504 + 3800 + 1017 +
-10 = 6231 s**, below the cap by **2169 s**; the stricter tranche allocations
+planning estimate, reserving all 900 s of A, is **240 + 900 + 504 + 3800 + 1017 +
+10 = 6471 s**, below the cap by **1929 s**; the stricter tranche allocations
 above still reserve 8400 s in total. This is the honest prewarmed basis for
 keeping every arm's complete population.
 
@@ -67,11 +68,11 @@ budgets does not certify that either prerequisite has been delivered.
 
 S1 still closes the target route below 0.088 ms at 15 minutes. S2's unchanged
 sum is G + R2 + H, with a 0.324 ms bar; it retains the existing early decision
-after A and before B because B does not modify these inputs. No stop or
+after A and X5, before the B body pairs: X5 can refresh R2 before S2. No stop or
 registered threshold was moved or weakened. Authorized arrive/setup prices
 remain 0.30/0.15 us. Fresh-correctness, exact timing populations, fail-closed
 NOT-COMPLETE, per-step/subprocess deadlines, silence probes and full logs are
-unchanged. An AST comparison against `54ea65c` checked these functions and the
+unchanged. The historical AST comparison against `54ea65c` checked these functions and the
 REGISTERED/THRESHOLD_SOURCES/BASE_FLAGS assignments.
 
 ## Existing 239 tok/s evidence; zero new KEY32 timing
@@ -110,7 +111,8 @@ Focused tests passed **98/98**. The full-suite result is recorded below.
 The AST guard audit and `git diff --check` passed. Archived checks-only
 certificates correctly return `eligible=False`; that is not a timing verdict.
 
-Actual session dry-run output (CPU-only):
+Historical session dry-run output (CPU-only, before the 240 s guard); operating numbers live in
+`examples/sessions/qwen300_hour.py` and the corrected budget account above:
 
 ```text
 {
