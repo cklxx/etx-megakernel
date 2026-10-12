@@ -491,6 +491,27 @@ def test_s1_missing_or_contradictory_perturbation_fails_closed(tmp_path):
         assert s.rows['A.stop']['value']['G_ms'] is None
 
 
+@pytest.mark.parametrize('change_ticks,original_off,status,passes', [
+    (352, None, 'INVALID', False),  # paid session: 3.52 us, not clock resolution
+    (352, True, 'INVALID', False),
+    (52, True, 'INVALID', False),   # 0.52 us still exceeds the unchanged bar
+    (48, None, 'NOT-COMPLETE', False),
+    (48, True, 'VALID', True),
+    (50, True, 'VALID', True),
+])
+def test_paid_gap_opportunity_needs_both_perturbation_gates(
+        tmp_path, change_ticks, original_off, status, passes):
+    evidence = h.stamp_perturbation(dict(perturbation=dict(
+        sampled_bodies=382, max_abs_body_change_us=change_ticks * 10 / 1000)), original_off)
+    assert evidence['status'] == status
+    s = session(tmp_path); s.certified.add('kept')
+    assert h.first_stop(s, dict(G_ms=.09274), evidence) is passes
+    row = s.rows['A.stop']
+    assert row['status'] == ('PASS' if passes else 'NOT-COMPLETE')
+    assert row['value']['G_ms'] == (.09274 if passes else None)
+    assert row['value']['decision'] == ('CONTINUE to S2' if passes else 'END SESSION: NOT-COMPLETE')
+
+
 @pytest.mark.parametrize('g,r2,host,passes', [
     (.100, None, .030, False), (.088, .236, 0., True),
     (.100, .193, .030, False), (.100, .194, .030, True),

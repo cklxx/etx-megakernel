@@ -50,12 +50,16 @@ def instrument(source):
                             '  for (; s0 + U <= se; s0 += U) {\n    lt.start();', 1)
     source = source.replace('  if (s0 < se) {', '  if (s0 < se) {\n    lt.start();', 1)
     fence = '''
+    // OFF must retain the original load/consume overlap. A null stop() alone
+    // does not disable these volatile operands or their compiler memory fence.
+    if (lt.records) {
     // Empty asm uses every dword: LLVM must resolve VMEM before the end tick.
 #pragma unroll
     for (int u = 0; u < U; ++u) if (s0 + u < se)
 #pragma unroll
       for (int j = 0; j < EPL / 2; ++j) asm volatile("" :: "v"(w[u][j]) : "memory");
     lt.stop(min(U, se - s0) * ETX_WAVE_SIZE * EPL * 2);
+    }
 '''
     anchor = '#pragma unroll\n    for (int u = 0; u < U; ++u)'
     for suffix in (' consume(s0 + u, w[u]);', ' if (s0 + u < se) consume(s0 + u, w[u]);'):
