@@ -52,7 +52,7 @@ def test_reset_measurement_precedes_s1_even_if_stamps_are_missing(tmp_path,monke
     monkeypatch.setattr(h,'certify',certify)
     monkeypatch.setattr(h,'registered_reset',lambda s:calls.append('reset'))
     stop=h.first_stop
-    def first_stop(s,g): calls.append('S1');return stop(s,g)
+    def first_stop(s,g,p=None): calls.append('S1');return stop(s,g,p)
     monkeypatch.setattr(h,'first_stop',first_stop)
     assert not h.tranche_a(s)
     assert calls==['reset','S1']

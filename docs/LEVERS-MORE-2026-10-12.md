@@ -236,7 +236,8 @@ optimistic equal 8-cycle stages vs KEY32's 48 DPP stages save `20×8/2100×48=3.
 The extracted HOUR mean fields are in `L/host-components.txt:4-13` [M, other session]: upload 3.990,
 reset submit 38.634, residency 1.046, launch 6.040, wait 4922.802, retire/readback 18.867,
 instrument/other 3.798, reset device 74.980, kernel device 4869.703, total wall 4995.178 **us**.
-Wait/kernel/wall are inclusive, and reset device lies in queued wait: **never sum these ten**.
+Wait/kernel/wall are inclusive; the source guarantees reset device time is inside the whole-step
+wall interval, but does not establish how much overlaps queued wait: **never sum these ten**.
 `wait−kernel=53.099`, of which 35.837 is kernel work outside token timers, leaving **17.261 us** of
 host wait discrepancy. H's existing formula yields 72.6 us (CERT:56-64), not 72.6 of removable host work.
 Readback includes event timing and 8-B control fetch (`etx/runtime/include/etx/host.h:358-381`);
