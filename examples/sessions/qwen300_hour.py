@@ -108,7 +108,10 @@ def prepare(config_path):
                     C1_C5={'ETX_VL_ROUTER_NARROW': '1', 'hoist': True},
                     NO_TOUCH={'no_touch': True},
                     NO_TOUCH_stamps={'no_touch': True, 'ETX_INBODY_BUILD': '1'},
-                    ISOLATE_POLLER={'ETX_PREFETCH_ISOLATE_POLLER': '1'})
+                    ISOLATE_POLLER={'ETX_PREFETCH_ISOLATE_POLLER': '1'},
+                    MOE16={'define': {'ETX_VL_MOE_RPT': 16}, 'ETX_VL_MOE_RPT': '16'},
+                    MOE24={'define': {'ETX_VL_MOE_RPT': 24}, 'ETX_VL_MOE_RPT': '24'},
+                    MOE16CU304={'define': {'ETX_VL_MOE_RPT': 16}, 'ETX_VL_MOE_RPT': '16', 'ETX_VL_CU': '304'})
     for arm, toggles in variants.items():
         if arm not in c['builds']: continue
         b = Path(c['builds'][arm]).resolve()
@@ -116,7 +119,8 @@ def prepare(config_path):
         b.mkdir(parents=True)
         flags = (BASE_FLAGS+(' -DETX_HOUR_PROFILE' if toggles.get('profile') else '')
                  +(' -DETX_DSL_NORM_HOIST' if toggles.get('hoist') else '')
-                 +(' -DETX_NO_TOUCH' if toggles.get('no_touch') else ''))
+                 +(' -DETX_NO_TOUCH' if toggles.get('no_touch') else '')
+                 +''.join(' -D'+k+'='+str(v) for k, v in (toggles.get('define') or {}).items()))
         use = dict(env, ETX_OUT=str(b), ETX_HIPCC_FLAGS=flags,
                    **{k: v for k, v in toggles.items() if k.startswith('ETX_')})
         print(f'CPU-STAGE {arm} build only; no GPU invocation', flush=True)
@@ -1125,7 +1129,9 @@ def select_final(s, survivors):
         return a['build']
     if len(ids) > 1:
         print('FINAL-COMBINATION unavailable: no prebuilt compatible combination; use strongest measured singleton', flush=True)
-    return max(survivors, key=lambda a: s.arms[a['id']]['median_ms'])['build']
+    measured = [a for a in survivors if (s.arms.get(a['id']) or {}).get('median_ms') is not None]
+    if not measured: return 'kept'
+    return max(measured, key=lambda a: s.arms[a['id']]['median_ms'])['build']
 
 
 def tranche_d(s, survivors, extra_seconds):
