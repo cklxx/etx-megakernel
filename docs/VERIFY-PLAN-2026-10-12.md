@@ -255,17 +255,7 @@ Direct guard-only command (registered for a future VM, not executed here):
   --run qwen300-hour.json --output GUARD_LOGDIR
 ```
 
-The first command is `rocm-smi --showproductname --showclocks --showpower
---showperflevel`. Full logs retain clocks/power/perf state; there is no
-invented frequency or wattage kill bar. Two **external historical control
-artifacts**, built before the measurement clock from
-7c85efb405f4e1972bdf1c7770835d4ba2426a1f and
-e068e47644821c0f6654d6435a7c71d1b1fc70d3 with the **same kept flags**
-(BASE_FLAGS, KEY32 on, ETX_DEV_RESET=0), do not replace any of the nine
-prepared arms. Both require immutable build identities, independent CPU
-and native compilation gates, same compiler, and matching normalized
-device-IR hashes. They are control executables, not new claimed speed arms.
-Their next-VM executable/resource/correctness readiness is [U] here.
+The guard requires `rocm-smi` product/clocks/power/perflevel readings, staged packed/HF weight hashes, and the current kept build's identity, seal, normalized IR/hash and boolean CPU gates. Historical controls are optional: absent `environment_guard`, a missing old/hour entry or an absent build directory selects fresh current-build checks at 0/1040 and two full 32/32 anchor samples. Attention p0 <=7.9 us and measured anchor <=4.210 ms yield **PASS-LOCAL-ONLY**, with `pinned_trees=unavailable: <reason> [U]`; drift remains unverified and `historical_need_valid` follows the measured anchor. With both controls present, all existing sealed compiler/IR checks, adjacent pairs and drift/status/action rules below remain mandatory. Refusals print/report collected readings and STOP before timed tranches. `template()` carries every consumed key; `--prewarm` always fills top-level `weight_sha256`, even without the optional guard config, and `--seal-config` pins the current `normalized_device_ir_sha256` and seals available historical controls.
 
 CPU staging commands are `--seal-config qwen300-hour.json` on the guard
 script (binds already-built artifact identity, exact source commit, checked

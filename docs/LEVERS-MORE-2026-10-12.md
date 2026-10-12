@@ -74,12 +74,7 @@ inputs at the final step are deterministic: four earlier gates (10-09, 10-10, 10
 hour runner does not pack weights; it uses what was staged (`qwen300_hour.py:98`). Neither data difference
 explains a slower position-0 attention kernel. A VF clock or power state does [E].
 
-**Cheapest GPU test (part of every next session, 4 GPU minutes, $0.13):** run `rocm-smi --showclocks
---showpower --showperflevel` and the import check's original-kernel medians first. Then run the kept gate from
-both trees (7c85efb and e068e47 rebuilt, same flags) as two pinned pairs, and record `sha256sum vl.bin`.
-**Decision:** if the two trees are within 0.030 ms of each other, the drift is environmental and closed. Then, if
-original attention is above 7.9 us (+5% over 7.5), the VM is slow: record and reprovision, or rebase every row.
-Tree A slower than tree B by ≥ 0.030 ms falsifies this section.
+**Cheapest GPU test (part of every next session, at most 4 GPU minutes, $0.13 [E]):** require `rocm-smi` product/clocks/power/perflevel readings, staged packed/HF weight SHA256, and the current kept build's identity, seal, normalized IR/hash and boolean CPU gates. Without `environment_guard`, either old/hour entry or either build directory, run fresh current-build checks at 0/1040 and two full 32/32 kept anchor samples; continue only with original attention p0 <=7.9 us and measured anchor <=4.210 ms, reporting **PASS-LOCAL-ONLY** and `pinned_trees=unavailable: <reason> [U]`. This leaves source drift unverified; `historical_need_valid` still follows the measured anchor. When both pinned controls exist, retain their complete adjacent pairs and the >=0.030 ms TREE-DRIFT rule unchanged. Missing local evidence or failed checks still prints/reports all collected readings and STOP before any timed tranche; slow attention requires reprovisioning, and a high anchor requires reprovisioning or rebasing every row. `template()` is the config authority; `--prewarm` always fills top-level `weight_sha256`, independently of optional historical controls.
 
 ## 2. Six new mechanisms, ranked inside the existing ledger
 

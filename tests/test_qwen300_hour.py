@@ -179,6 +179,8 @@ def test_prewarm_reads_staged_weights_before_any_session_clock(tmp_path, monkeyp
         assert h.main(['--prewarm', str(config)]) == 0
         out = capsys.readouterr().out
         assert str(model/'vl.bin') in out and str(hf/'model-00001.safetensors') in out
+        from examples.vllm_llm.import_certificate import sha
+        assert json.loads(config.read_text())['weight_sha256'] == {str(p): sha(p) for p in (model/'vl.bin', hf/'model-00001.safetensors')}
         assert 'CPU-PREWARM complete' in out
 
 
@@ -761,3 +763,23 @@ def test_enabled_c6_without_staged_prototype_remains_incomplete(tmp_path):
     assert h.qualify_c(s) == []
     assert s.arms['C.eligibility.C6']['status'] == 'NOT-COMPLETE'
     assert 'C6' not in s.certified
+
+
+def test_generated_template_carries_all_session_and_guard_keys(tmp_path):
+    import ast
+    from examples.vllm_llm import environment_guard as g
+    keys=set()
+    for module in (h,g):
+        tree=ast.parse(Path(module.__file__).read_text())
+        for node in ast.walk(tree):
+            if isinstance(node,ast.Subscript) and isinstance(node.slice,ast.Constant):
+                base=node.value
+                if ((module is h and isinstance(base,ast.Name) and base.id=='c') or
+                    (isinstance(base,ast.Attribute) and base.attr=='c')):
+                    keys.add(node.slice.value)
+    path=tmp_path/'template.json'
+    assert h.main(['--template',str(path)])==0
+    config=json.loads(path.read_text())
+    assert keys <= config.keys()
+    assert config['environment_guard']['trees']=={}
+    assert config['weight_sha256']=={}
