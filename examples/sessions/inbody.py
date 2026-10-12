@@ -23,8 +23,6 @@ from etx.tools import inbody as reader
 from examples.vllm_llm.bf16_300.pack import sha
 
 MAX_SESSION_SECONDS = 900
-if float(os.environ.get('ETX_SESS_MAX_SECONDS',900)) > 900:
-    raise ValueError('inbody measurement hard stop cannot be extended')
 JOBS = [dict(name='inbody_attribution',gpu=0,machine='A',timeout=900,quiet_s=180,
              cmd='stdbuf -oL -eL python3 -u -m examples.sessions.inbody --run')]
 
@@ -149,6 +147,9 @@ def run(config,logdir):
 
 
 def main():
+    if float(os.environ.get('ETX_SESS_MAX_SECONDS', 900)) > MAX_SESSION_SECONDS:
+        raise ValueError('inbody measurement hard stop cannot be extended')
+
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--run',action='store_true')
     p.add_argument('--template',type=Path)
