@@ -59,7 +59,7 @@ def main(argv=None) -> int:
     record = dict(arm=a.arm, etx_commit=run(["git", "rev-parse", "HEAD"]).strip(),
                   etx_dirty=bool(run(["git", "status", "--porcelain", "--", ".", ":!examples/dsv2lite/results/levers"]).strip()),
                   fleet_commit=FLEET_COMMIT, fleet_src_sha256=FLEET_SRC_SHA256)
-    tests = [f"tests/test_dsv2_lever_{name}.py" for name in levers] + ["tests/test_dsv2_stamps.py"]
+    tests = [f"tests/test_dsv2_lever_{name}.py" for name in levers if name != "stamps"] + ["tests/test_dsv2_stamps.py"]
     out = run([sys.executable, "-m", "pytest", "-q", "-rs", *tests])
     summary = out.strip().splitlines()[-1]
     if "skipped" in summary or "failed" in summary or "passed" not in summary:
