@@ -43,6 +43,8 @@ Restore with `gh release download data-2026-09-27 --repo cklxx/etx-data && shasu
 | `results_vlbest2_2026-10-10` (`~/code/etx/results_vlbest2_2026-10-10/`, outside git) | `examples/sessions/vlbest.py`; MI300X VF, ROCm 7.14.0 (`record.log:7,18`) | Raw arm logs, saved selections, status and runner logs; build identity and transferred checks | No SHA256SUMS manifest present; not checksum-verified | Answers whether the expanded search changes the strongest tested reference: S3 remains strongest; paired LEAD and fusion ESTABLISHED on both stated bases (`report.log:6-11`). S1 donor loses; f-arms enable the pass but replace no patterns; C2 lacks compatible winners. Import checks transfer between identical build identities (`build_identity.log:3`), not a fresh import check | `docs/VLBEST2-2026-10-10.md`, `AGENTS.md` §1; corrected offline `vlbest_report.py`; reuse for future applied-fusion and MoE search decisions; `b_all/plan.json` is the plan of `docs/XCD-TIMELINE-2026-10-11.md` |
 
 
+| `results_qwen300_hour_20261012b` (`~/code/etx/`, local only, 757 MB) | Qwen300 F0; MI300X VF M3000100, ROCm 7.14.0, batch 1, context 1024, 32 greedy tokens; `88f46c2` + `654a8c0` | 410.74 s fail-closed; raw logs, certificates and diagnostics | [Six small-file SHA256 checksums](evidence/qwen300-hour-2026-10-12b-SHA256SUMS); bulk not checksum-certified here | Answers local guard/anchor and A headroom; A.stop NOT-COMPLETE because load stamps perturb bodies; B/C/D NOT-RUN | [Session record and limitations](SESSION-2026-10-12b-F0.md); repair instrumentation before certifying the route |
+
 Earlier sets (2026-09-22 .. 26) are summarized in the design document (section 15) and `examples/*/results/`; their raw
 traces were not kept.
 

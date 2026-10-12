@@ -875,3 +875,38 @@ def test_generated_template_carries_all_session_and_guard_keys(tmp_path):
     assert keys <= config.keys()
     assert config['environment_guard']['trees']=={}
     assert config['weight_sha256']=={}
+
+
+@pytest.mark.parametrize('arm', ['C6', 'reset'])
+@pytest.mark.parametrize('key', ['builds', 'build_seals', 'build_commits'])
+def test_optional_prepared_arm_names_missing_key(tmp_path, arm, key):
+    config = h.template()
+    config['build_seals'][arm] = 'sealed'
+    config['build_commits'][arm] = 'committed'
+    config[key].pop(arm)
+    s = h.Session(config, tmp_path)
+    with pytest.raises(ValueError, match=rf'{arm}.*missing {key}\.{arm}'):
+        h.verify_seal(s, arm)
+
+
+def test_template_unprepared_optional_arms_have_named_rows(tmp_path, capsys):
+    s = h.Session(h.template(), tmp_path)
+    s.m['C'] = [a for a in s.m['C'] if a['id'] == 'C6']
+    assert h.qualify_c(s) == []
+    assert h.registered_reset(s) is None
+    for name, arm in [('C.eligibility.C6', 'C6'), ('RESET.keep', 'reset')]:
+        row = s.rows[name]
+        assert row['status'] == 'NOT-COMPLETE'
+        assert f'missing build_seals.{arm}' in row['value']['reason']
+    assert 'KeyError' not in capsys.readouterr().out
+
+
+@pytest.mark.parametrize('key', ['prototype_certificate', 'prototype_commit', 'expected_vgpr', 'expected_lds_bytes'])
+def test_optional_prototype_names_missing_field(tmp_path, monkeypatch, key):
+    s = h.Session(h.template(), tmp_path)
+    arm = dict(id='C6', build='C6', kind='fusion', prototype_certificate='/unused',
+               prototype_commit='a'*40, expected_vgpr=128, expected_lds_bytes=29752)
+    arm.pop(key)
+    monkeypatch.setattr(h, 'eligible_arm', lambda *args: None)
+    with pytest.raises(ValueError, match=f'C6.*missing {key}'):
+        h.c_eligibility(s, arm)

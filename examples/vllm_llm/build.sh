@@ -97,10 +97,15 @@ ABL=(); [ -n "${ETX_VL_ABLATE:-}" ] && ABL=(-DDSL_ABLATE_$(echo "$ETX_VL_ABLATE"
 [ "${ETX_TOPK_KEY32:-0}" = 1 ] && ABL+=(-DETX_TOPK_KEY32)
 # ETX_VL_FOLD_TOPK forces model.py's derived fold decision; it reaches the tile through plan_data.h's
 # ETX_EMIT_FOLD_TOPK, not a -D here -- the -D defaulted to "fold" and silently contradicted the plan (round 30).
-hipcc -O3 -std=c++17 --offload-arch=gfx942 ${ROCMINC[@]+"${ROCMINC[@]}"} -I "$ROOT/etx/runtime/include" -I "$OUT" -I "$ROOT" \
+ORIG_INPUTS=()
+if [ "${ETX_VL_CHECK:-0}" = 1 ]; then
+  ORIG_INPUTS=("$OUT/imp/orig_table.hip" -x none "$OUT"/imp/orig_*.o)
+fi
+HIPCC=(hipcc -O3 -std=c++17 --offload-arch=gfx942 ${ROCMINC[@]+"${ROCMINC[@]}"} -I "$ROOT/etx/runtime/include" -I "$OUT" -I "$ROOT" \
   -Xclang -mlink-builtin-bitcode -Xclang "$OUT/imports.bc" -Rpass-analysis=kernel-resource-usage \
-  ${CHK[@]+"${CHK[@]}"} ${NTF[@]+"${NTF[@]}"} ${VNF[@]+"${VNF[@]}"} ${ABL[@]+"${ABL[@]}"} ${PREPF[@]+"${PREPF[@]}"} ${IBF[@]+"${IBF[@]}"} ${ETX_HIPCC_FLAGS:-} "$OUT/megakernel_d0.hip" "$ROOT/examples/vllm_llm/host.hip" $([ "${ETX_VL_CHECK:-0}" = 1 ] && echo "$OUT/imp/orig_table.hip -x none $OUT/imp/orig_*.o") -o "$OUT/run" 2>&1 \
-  | tee "$OUT/hipcc.log"
+  ${CHK[@]+"${CHK[@]}"} ${NTF[@]+"${NTF[@]}"} ${VNF[@]+"${VNF[@]}"} ${ABL[@]+"${ABL[@]}"} ${PREPF[@]+"${PREPF[@]}"} ${IBF[@]+"${IBF[@]}"} ${ETX_HIPCC_FLAGS:-} "$OUT/megakernel_d0.hip" "$ROOT/examples/vllm_llm/host.hip" ${ORIG_INPUTS[@]+"${ORIG_INPUTS[@]}"} -o "$OUT/run")
+"$PY" -c 'import json, sys; print(json.dumps(sys.argv[1:]))' "${HIPCC[@]}" > "$OUT/hipcc_command.json"
+"${HIPCC[@]}" 2>&1 | tee "$OUT/hipcc.log"
 [ -x "$OUT/run" ] || { echo "build failed: no $OUT/run"; exit 1; }
 # CHECK builds require packed inputs and a golden before certification. Ordinary
 # pre-prep builds remain supported; they cannot supply a certificate until rebuilt.
