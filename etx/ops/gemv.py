@@ -283,6 +283,59 @@ static __device__ __forceinline__ void dsl_gemv_rows_nb(const __hip_bfloat16* __
 #endif
 #undef DSL_WP
 }
+#ifdef ETX_DSL_ROW_WAVE
+// One wave owns whole rows: same loads, same segment order, same lane offsets, so the sum is the
+// same bit pattern. What goes away is the partial matrix (zeroing, write, gather) and one barrier.
+// The GU1 offset becomes a per-row condition: a wave covers segments [0, spr) of a row, so
+// seg >= gsplit * spr is true exactly when the row index reaches gsplit.
+template <int EPL, int NB, class Epi>
+static __device__ __forceinline__ void dsl_gemv_rows_rw(const __hip_bfloat16* __restrict__ W, int K, int KS,
+                                                        const float* xs, int r0, int r1, Epi epi
+#ifdef ETX_DSL_GU1
+                                                        , int gsplit = 0, long long ggap = 0
+#endif
+                                                        ) {
+  typedef typename dsl_wvec<EPL>::T V;
+  constexpr int SEG = ETX_WAVE_SIZE * EPL;
+  const dsl_lds_f* xl = (const dsl_lds_f*)xs;
+#ifdef ETX_DSL_SCALAR
+  K = etx_uniform(K); r0 = etx_uniform(r0); r1 = etx_uniform(r1);
+  const int lane = etx_lane(), wv = etx_uniform(etx_wave()), nw = etx_uniform(etx_nwaves()), nrt = r1 - r0;
+#else
+  const int lane = etx_lane(), wv = etx_wave(), nw = etx_nwaves(), nrt = r1 - r0;
+#endif
+  const int spr = K / SEG;
+  const int per = (nrt + nw - 1) / nw, rb = wv * per, re2 = min(nrt, rb + per);
+  const DSL_G V* base0 = (const DSL_G V*)(W + (size_t)r0 * K);
+  for (int r = rb; r < re2; ++r) {
+    float acc[NB];
+#pragma unroll
+    for (int b = 0; b < NB; ++b) acc[b] = 0.f;
+    long long gg = 0;
+#ifdef ETX_DSL_GU1
+    if (gsplit > 0 && r >= gsplit) gg = ggap;
+#endif
+    const DSL_G V* rbase = base0 + (size_t)r * K + gg;
+    for (int sg = 0; sg < spr; ++sg) {
+      const V w = dsl_wload(rbase + (size_t)sg * ETX_WAVE_SIZE + lane);
+      const int off = sg * SEG + lane * EPL;
+#pragma unroll
+      for (int b = 0; b < NB; ++b) acc[b] += dsl_dot(w, xl + b * KS + off);
+    }
+    float v[NB];
+#pragma unroll
+    for (int b = 0; b < NB; ++b) {
+#ifdef ETX_DSL_WSUM
+      v[b] = dsl_wave_sum0(acc[b]);
+#else
+      v[b] = etx_wave_sum(acc[b]);
+#endif
+    }
+    if (lane == 0) epi(r0 + r, v);
+  }
+  __syncthreads();
+}
+#endif
 template <int EPL, int U, class Epi>
 static __device__ __forceinline__ void dsl_gemv_rows(const __hip_bfloat16* __restrict__ W, int K, const float* xs, int r0, int r1, float* part, Epi epi) {
   dsl_gemv_rows_nb<EPL, U, 1>(W, K, 0, xs, r0, r1, part, [&](int r, const float* v) { epi(r, v[0]); });
@@ -827,8 +880,13 @@ BODIES = {
   const int gn = r1 - r0, gspr = d.K / (ETX_WAVE_SIZE * 8), gnw = etx_nwaves();
   const int gp1 = (gn * gspr + gnw - 1) / gnw, gp2 = (2 * gn * gspr + gnw - 1) / gnw;
   if (d.K % (ETX_WAVE_SIZE * 8) == 0 && 2 * gn <= DSL_RCH && gp1 % gspr == 0 && gp2 % gspr == 0 && (gn * gspr) % gp2 == 0) {
+#ifdef ETX_DSL_ROW_WAVE
+    dsl_gemv_rows_rw<8, 1>(We, d.K, 0, xs, r0, r0 + 2 * gn, [&](int r, const float* v) {
+      const int q = r - r0; g[q < gn ? q : d.rpt + q - gn] = dsl_bfr(v[0]); }, gn, (long long)(d.M - gn) * d.K);
+#else
     dsl_gemv_rows_nb<8, DSL_UW, 1>(We, d.K, 0, xs, r0, r0 + 2 * gn, part, [&](int r, const float* v) {
       const int q = r - r0; g[q < gn ? q : d.rpt + q - gn] = dsl_bfr(v[0]); }, gn, (long long)(d.M - gn) * d.K);
+#endif
   } else
 #endif
   {
