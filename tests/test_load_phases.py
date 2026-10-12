@@ -1,5 +1,9 @@
 import copy
+import os
+from pathlib import Path
+import re
 import struct
+import subprocess
 import pytest
 from etx.tools import inbody
 from etx.ops import gemv
@@ -62,3 +66,71 @@ def test_load_overlay_ordinary_source_identical(monkeypatch):
     assert source.count('lt.stop(min(U, se - s0)')==2
     assert 'dsl_gemv_rows_nb<8, DSL_UW, 1>(lt, We' in source
     assert 'void dsl_gemv_rows_nb(etx_load_trace& lt,' in source
+
+
+def test_null_load_trace_eliminates_ready_fences_in_gfx942_ir(tmp_path):
+    """The real overlay must not force all loads ready in its OFF control."""
+    from etx.codegen.load_stamps import instrument
+    llvm = Path(os.environ.get('ETX_LLVM', '/opt/homebrew/opt/llvm/bin'))
+    if not all((llvm / name).exists() for name in ('clang++', 'llc')):
+        pytest.skip('local gfx942 compiler unavailable')
+    preamble = '''#include <stdint.h>
+#define __device__
+#define __forceinline__ inline __attribute__((always_inline))
+#define ETX_WAVE_SIZE 64
+#define ETX_LOAD_GROUP_CAPACITY 8
+inline unsigned etx_lane() { return 0; }
+inline int min(int a, int b) { return a < b ? a : b; }
+'''
+    # Full and partial groups use the same two anchors as the production GEMV.
+    stream = '''// ---- the stream loop
+template<int EPL, int U>
+static __device__ __forceinline__ void dsl_gemv_rows_nb(const float* W, float* out, int se) {
+  float sum = 0, w[U][EPL / 2];
+  auto consume = [&](int s, const float* v) { sum += v[0] + v[1]; };
+  int s0 = 0;
+  for (; s0 + U <= se; s0 += U) {
+    for (int u = 0; u < U; ++u)
+      for (int j = 0; j < EPL / 2; ++j) w[u][j] = W[(s0 + u) * 2 + j];
+#pragma unroll
+    for (int u = 0; u < U; ++u) consume(s0 + u, w[u]);
+  }
+  if (s0 < se) {
+    for (int u = 0; u < U; ++u) if (s0 + u < se)
+      for (int j = 0; j < EPL / 2; ++j) w[u][j] = W[(s0 + u) * 2 + j];
+#pragma unroll
+    for (int u = 0; u < U; ++u) if (s0 + u < se) consume(s0 + u, w[u]);
+  }
+  *out = sum;
+}
+'''
+    entry = '''extern "C" __attribute__((amdgpu_kernel)) void probe(
+    const float* W, float* out, int se, uint64_t* records) { %s }
+'''
+    sources = dict(original=stream + entry % 'dsl_gemv_rows_nb<4, 2>(W, out, se);',
+                   off=instrument(stream) + entry %
+                       'etx_load_trace lt(nullptr); dsl_gemv_rows_nb<4, 2>(lt, W, out, se); lt.finish();',
+                   on=instrument(stream) + entry %
+                       'etx_load_trace lt(records); dsl_gemv_rows_nb<4, 2>(lt, W, out, se); lt.finish();')
+    ir = {}; isa = {}
+    for name, source in sources.items():
+        cpp = tmp_path / 'probe.cpp'; cpp.write_text(preamble + source)
+        ll = tmp_path / (name + '.ll'); asm = tmp_path / (name + '.s')
+        for command in (
+            [str(llvm/'clang++'), '-target', 'amdgcn-amd-amdhsa', '-mcpu=gfx942',
+             '-nogpulib', '-ffreestanding', '-std=c++17', '-O3', '-S', '-emit-llvm',
+             '-I', str(Path(__file__).resolve().parents[1]/'etx/runtime/include'),
+             str(cpp), '-o', str(ll)],
+            [str(llvm/'llc'), '-mtriple=amdgcn-amd-amdhsa', '-mcpu=gfx942', '-O3',
+             str(ll), '-o', str(asm)],
+        ):
+            subprocess.run(command, check=True, capture_output=True, text=True, timeout=60)
+        ir[name] = ll.read_text(); isa[name] = asm.read_text()
+    assert 'asm sideeffect' not in ir['off']
+    assert 's_memrealtime' not in isa['off']
+    # Source line metadata is absent without diagnostics; compare instructions
+    # and resources too, so disappearance of the asm alone is insufficient.
+    assert ir['off'] == ir['original']
+    assert isa['off'] == isa['original']
+    assert 'asm sideeffect "", "v,~{memory}"' in ir['on']
+    assert re.search(r's_memrealtime s\[\d+:\d+\]\s+s_waitcnt lgkmcnt\(0\)', isa['on'])
