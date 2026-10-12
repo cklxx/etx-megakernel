@@ -232,15 +232,15 @@ def test_failed_capture_has_no_closing_stamp(tmp_path, monkeypatch, capsys):
 def test_compiler_failure_cannot_reuse_stale_executable(tmp_path):
     import subprocess
     script = Path('examples/vllm_llm/build.sh').read_text()
-    tail = script[script.index('hipcc -O3'):script.index('# CHECK builds require')]
+    tail = script[script.index('HIPCC=(hipcc -O3'):script.index('# CHECK builds require')]
     stale = tmp_path / 'run'; stale.write_text('old executable'); stale.chmod(0o755)
     prefix = r'''set -euo pipefail
 hipcc() { echo 'unfiltered diagnostic'; echo 'compiler failed' >&2; return 7; }
 # Nonempty placeholders isolate compiler status propagation from bash 3.2's
 # empty-array nounset rule, even when mutating the extracted compiler snippet.
-OUT="$1"; ROOT="$1"; ROCMINC=(-I "$1"); CHK=(-DCHECK); NTF=(-DNT)
+OUT="$1"; ROOT="$1"; PY="$2"; ROCMINC=(-I "$1"); CHK=(-DCHECK); NTF=(-DNT)
 VNF=(-DVN); ABL=(-DABL); PREPF=(-DPREP)
 '''
-    run = subprocess.run(['bash', '-c', prefix + tail, 'bash', str(tmp_path)], capture_output=True, text=True)
+    run = subprocess.run(['bash', '-c', prefix + tail, 'bash', str(tmp_path), __import__('sys').executable], capture_output=True, text=True)
     assert run.returncode == 7
     assert (tmp_path / 'hipcc.log').read_text() == 'unfiltered diagnostic\ncompiler failed\n'

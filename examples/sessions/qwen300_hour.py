@@ -82,22 +82,7 @@ def template():
                 manifest=str(MANIFEST), golden_sha256='bab2f1fbe12f70179711ec40a215c74710845b73169b1cc6a3a6ca50e0a19484')
 
 
-SOURCE_FILES = ('examples/sessions/qwen300_hour.py', 'examples/sessions/qwen300_hour_arms.json',
-                'examples/vllm_llm/qwen300_config.py',
-                'examples/vllm_llm/host.hip', 'etx/runtime/include/etx/host.h')
-BASE_FLAGS = '-DETX_DSL_WSUM -DETX_DSL_SCALAR -DETX_DSL_GU1 -DETX_DSL_RBATCH -DETX_INBODY_REPORT'
-
-
-def source_hashes():
-    from examples.vllm_llm.import_certificate import sha
-    paths = {ROOT/p for p in SOURCE_FILES}
-    paths.update(ROOT/p for p in ('examples/sessions/qwen300.py', 'examples/llm/vllm_bench.py',
-                                  'examples/llm/configs/qwen3-30b-a3b.json'))
-    for directory in ('etx', 'examples/vllm_llm'):
-        paths.update(p for p in (ROOT/directory).rglob('*') if p.is_file()
-                     and p.suffix in ('.py', '.hip', '.h', '.sh') and '__pycache__' not in p.parts)
-    return {str(p.relative_to(ROOT)): sha(p) for p in sorted(paths)}
-
+from examples.vllm_llm.kept_build import BASE_FLAGS, KEPT_ENV, source_hashes
 
 def prepare(config_path):
     """Explicit offline CPU staging command, OUTSIDE the paid measurement job.
@@ -113,8 +98,7 @@ def prepare(config_path):
     if gates.get('source_hashes') != source_hashes(): raise ValueError('CPU gates belong to different source')
     env = {k: v for k, v in os.environ.items() if not k.startswith(('ETX_VL_', 'ETX_DSL_', 'ETX_LLM_', 'DSL_ABLATE_', 'ETX_INBODY_', 'ETX_BF16_'))
            and k != 'ETX_PREFETCH_ISOLATE_POLLER'}
-    env.update(ETX_VL_CHECK='1', ETX_TOPK_KEY32='1', ETX_DEV_RESET='0', ETX_VL_REQUESTS='1',
-               ETX_VL_CU='256', ETX_VL_TOUCH='1', ETX_PREFETCH_ISOLATE_POLLER='0')
+    env.update(KEPT_ENV)
     # Optional C prototypes are NOT built here: integrate and prove before use.
     variants = dict(kept={}, reset={'ETX_DEV_RESET': '1'}, stamps={'ETX_INBODY_BUILD': '1'}, stages={'profile': True},
                     C1={'ETX_VL_ROUTER_NARROW': '1'}, C5={'hoist': True},
@@ -151,6 +135,9 @@ def prepare(config_path):
 
 def verify_seal(s, arm):
     from examples.vllm_llm import import_certificate as cert
+    for key in ('builds', 'build_seals', 'build_commits'):
+        if not s.c.get(key, {}).get(arm):
+            raise ValueError(f'{arm}: unsealed/stale optional prepared build unavailable: missing {key}.{arm}; stage and seal it before qualification')
     b = Path(s.c['builds'][arm]); record = b/'hour_build.json'
     if cert.sha(record) != s.c['build_seals'][arm]: raise ValueError('unsealed/stale prepared build: '+arm)
     seal = json.loads(record.read_text())
@@ -789,7 +776,8 @@ def registered_reset(s):
     try:
         result = s.attempt('RESET.keep', lambda: reset_pair.run(s))
         if result is None:
-            s.row('RESET.keep', None, 'NOT-COMPLETE', REGISTERED['RESET.keep'])
+            s.row('RESET.keep', dict(reason=s.arms['RESET.keep']['reason']),
+                  'NOT-COMPLETE', REGISTERED['RESET.keep'])
         return result
     finally:
         s.deadline = end
@@ -827,6 +815,9 @@ def c_eligibility(s, a):
         return a
     from examples.vllm_llm import import_certificate as cert
     from examples.vllm_llm.nvref_report import correctness
+    for key in ('prototype_certificate', 'prototype_commit', 'expected_vgpr', 'expected_lds_bytes'):
+        if a.get(key) is None:
+            raise ValueError(f'{a["id"]}: optional prototype unavailable: missing {key}')
     proof = Path(a['prototype_certificate'])
     info = cert.validate(proof, timing=False)
     identity = cert.verified_build(Path(s.c['builds'][a['build']]), Path(s.c['model']))
@@ -936,6 +927,9 @@ def qualify_c(s):
             s.arms['C.eligibility.'+a['id']] = dict(status='SKIP', reason=a.get('reason', 'disabled'))
             continue
         result = s.attempt('C.eligibility.'+a['id'], lambda a=a: c_eligibility(s, a))
+        if result is None:
+            s.row('C.eligibility.'+a['id'], dict(reason=s.arms['C.eligibility.'+a['id']]['reason']),
+                  'NOT-COMPLETE', a.get('prerequisites', 'sealed prepared build required'))
         if result:
             qualified.append(result)
             s.arms['C.eligibility.'+a['id']] = dict(status='QUALIFIED', native_resources=result.get('native_resources'))

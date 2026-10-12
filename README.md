@@ -175,6 +175,52 @@ make test                       # 30-ish tests: IR, edge maps, machine tables, p
 .venv/bin/python -m etx compile examples/moe_layer.py --arch gfx942 --out build/moe_gfx942 --sim
 ```
 
+### One-command ETX speed on MI300X
+
+Prerequisites, in order:
+
+1. A prepared ROCm build environment on an MI300X box. The staging container
+   image is `vllm/vllm-openai-rocm@sha256:bb44b39aea26798cce43030a98bf48efd0322ca7147367db86e38b96bd80f0e7`;
+   expose `/dev/kfd` and `/dev/dri` and mount the repository and model directory
+   if running inside it. The command runs in the current environment: it does
+   not start Docker or install tools. Have `hipcc`, ROCm device bitcode,
+   `rocm-smi`, `stdbuf`, and the repo's `.venv` (`make setup`) available.
+   Stage vLLM kernel sources at `~/vllm` (or set `VLLM`), with the headers
+   needed by `build.sh` (`ETX_ROCM_HEADERS` / `ETX_TORCH_HEADERS` when needed).
+2. A staged **Qwen3-30B-A3B bf16** model directory, default
+   `~/llm/qwen3-30b-a3b`, containing `hf/config.json`, packed `vl.bin` and
+   `vl.manifest` from `examples/vllm_llm/prep.py`.
+3. An independent HF greedy golden at `<model>/golden_c1024.txt`, with
+   **1024 prompt tokens and 32 generated tokens**, from `examples/llm/prep.py`
+   (`--context 1024 --gen 32`). Keep the HF golden; do not generate it from ETX.
+
+```bash
+make bench                                      # default model directory
+make bench MODEL=/path/to/qwen3-30b-a3b           # override the model directory
+# Equivalent direct command:
+python3 -m examples.vllm_llm.bench /path/to/qwen3-30b-a3b
+```
+
+This builds the current kept configuration through `build.sh`:
+`ETX_TOPK_KEY32=1 ETX_VL_TOUCH=1 ETX_VL_CU=256 ETX_DEV_RESET=0 ETX_VL_CHECK=1
+ETX_PREFETCH_ISOLATE_POLLER=0`, with the shared `BASE_FLAGS`
+(`-DETX_DSL_WSUM -DETX_DSL_SCALAR -DETX_DSL_GU1 -DETX_DSL_RBATCH -DETX_INBODY_REPORT`).
+Inherited experimental ETX switches are cleared. No session runner, gates file,
+or handwritten configuration is needed. Expected wall time is **5–10 minutes**
+(estimate for staged inputs, including a fresh build and three host calls);
+build and host calls have 900 s / 180 s deadlines, respectively.
+
+Stdout prints the source commit/hashes, generated build identity and actual
+hipcc command, then PASS/FAIL correctness counts (every imported instance,
+byte-identical `host --check` at positions 0 and 1040, plus 32/32 HF greedy),
+then median decode wall step in ms, wall tok/s, max-minus-min spread, and
+**31 steps after the first generated token**, excluding prefill and that first
+sample. The final success line is `BENCH PASS <ms/step> <tok/s>`.
+Missing inputs, no GPU, incomplete checks, or any correctness failure exit
+nonzero with `BENCH FAIL <reason>` and no speed. Full build/check/decode logs
+and certificates remain in `build/bench/kept-*/`; progress goes to stderr.
+This measures standalone ETX speed, not a paired fusion or vLLM-system verdict.
+
 `compile` verifies the graph and runs the seven L4 passes.
 It writes the persistent kernel source, `megakernel_d0.hip`, the per-arch lowering header, and tile prototypes.
 It also writes `plan.json` with queues, descriptors, event layout, and push lists.

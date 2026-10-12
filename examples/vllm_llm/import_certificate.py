@@ -39,6 +39,8 @@ def fingerprint(build: Path, model: Path):
              'plan_header': build / 'plan_data.h', 'plan_json': build / 'plan.json',
              'weights_manifest': model / 'vl.manifest', 'golden': model / 'golden_c1024.txt',
              'compiler_output': build / 'hipcc.log'}
+    if (build / 'hipcc_command.json').exists():
+        paths['compiler_command'] = build / 'hipcc_command.json'
     sources = sorted(build.glob('*.hip'))
     for required in ('megakernel_d0.hip', 'dsl_tiles.hip', 'imp_tiles.hip'):
         if build / required not in sources:
