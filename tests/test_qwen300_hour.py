@@ -436,7 +436,7 @@ def test_s1_missing_correctness_or_measurement_does_not_close_route(tmp_path, ce
 
 @pytest.mark.parametrize('off,change,status', [(None, .5, 'NOT-COMPLETE'), (False, .5, 'NOT-COMPLETE'),
                                               (True, .501, 'INVALID'), (True, .5, 'VALID')])
-def test_s1_consumes_perturbation_before_any_later_tranche(tmp_path, monkeypatch, off, change, status):
+def test_s1_consumes_perturbation_before_any_later_tranche(tmp_path, monkeypatch, capsys, off, change, status):
     s = session(tmp_path); s.c['builds']['stamps'] = '/unused/stamps'
     evidence = h.stamp_perturbation(dict(perturbation=dict(sampled_bodies=48, max_abs_body_change_us=change)), off)
     assert evidence['status'] == status
@@ -451,9 +451,11 @@ def test_s1_consumes_perturbation_before_any_later_tranche(tmp_path, monkeypatch
     monkeypatch.setattr(h, 'host', lambda *args: host_text()+'HOUR-SNAPSHOT run=0 step=1024\n')
     def analysis(name, cmd, **kw):
         pool = dict(above_floor_lower_ms=.2, above_floor_upper_ms=.2, count=1)
-        # Deliberately feed a numeric G even with invalid evidence: S1 must mask it.
+        # The analyzer masks invalid G while retaining raw atom observations.
         result = dict(critical_pools=dict(busy=pool, free=pool, ambiguous=dict(count=0)),
-                      gap_atoms=dict(G_ms=.100), stamp_perturbation=evidence, inbody=dict(phases=[]))
+                      gap_atoms=dict(G_ms=None if status == 'INVALID' else .100,
+                                     atoms={'raw': dict(above_floor_ms=.09274, counted=True)}),
+                      stamp_perturbation=evidence, inbody=dict(phases=[]))
         Path(cmd[-1]).with_suffix('.summary.json').write_text(json.dumps(result))
     monkeypatch.setattr(s, 'step', analysis)
     calls = []
@@ -470,6 +472,19 @@ def test_s1_consumes_perturbation_before_any_later_tranche(tmp_path, monkeypatch
     if status == 'VALID':
         assert row['status'] == 'PASS' and row['value']['G_ms'] == .100
         assert calls == ['X5', 'S2', 'B', 'C', 'D']
+    elif status == 'INVALID':
+        assert row['status'] == 'NOT-COMPLETE'
+        assert row['value']['G_ms'] is None and row['value']['gap_atoms']['G_ms'] is None
+        assert calls == ['X5', 'B', 'C', 'D']
+        assert s.rows['B.stop']['status'] == 'NOT-COMPLETE'
+        assert 'session' not in s.arms
+        out = capsys.readouterr().out
+        assert 'S1 verdict UNJUDGED' in out
+        assert 'raw above-floor opportunity=0.09274 ms (uncertified); session continues to B/C/D' in out
+        s.finish()
+        report = json.loads((s.out/'report.json').read_text())
+        assert report['thresholds']['A.stop']['status'] == 'NOT-COMPLETE'
+        assert report['thresholds']['A.stop']['value']['G_ms'] is None
     else:
         assert row['status'] == 'NOT-COMPLETE'
         assert s.arms['session']['status'] == 'NOT-COMPLETE'
@@ -531,7 +546,7 @@ def test_s2_combines_gap_attention_and_attributable_host(tmp_path, g, r2, host, 
 
 
 @pytest.mark.parametrize('g,runs_b,runs_cd', [(.087, False, False), (.100, False, False), (.324, True, True)])
-def test_execute_obeys_both_stops_with_time_remaining(tmp_path, monkeypatch, g, runs_b, runs_cd):
+def test_execute_obeys_both_stops_with_time_remaining(tmp_path, monkeypatch, capsys, g, runs_b, runs_cd):
     s = session(tmp_path); s.certified.add('kept'); calls = []
     monkeypatch.setattr(h, 'preflight', lambda s: None)
     monkeypatch.setattr(h, 'environment_guard', lambda s: True)
@@ -556,6 +571,30 @@ def test_execute_obeys_both_stops_with_time_remaining(tmp_path, monkeypatch, g, 
         assert all(s.rows[k]['status'] == 'NOT-RUN' for k in ('C.fusion', 'C.body', 'D.target', 'D.fusion', 'D.system'))
     if g >= .088: assert s.rows['B.stop']['status'] == ('PASS' if runs_cd else 'STOP')
     if not runs_b: assert s.rows['B.keep']['status'] == 'NOT-RUN'
+    if g < .088:
+        out = capsys.readouterr().out
+        assert 'END after A: STOP-SPEND: close target route; G_ms=0.087' in out
+        assert 'UNJUDGED' not in out
+
+
+def test_invalid_s1_does_not_override_session_deadline(tmp_path, monkeypatch, capsys):
+    s = session(tmp_path); s.certified.add('kept')
+    monkeypatch.setattr(h, 'preflight', lambda s: None)
+    monkeypatch.setattr(h, 'environment_guard', lambda s: True)
+    monkeypatch.setattr(h, 'qualify_c', lambda s: [])
+    evidence = h.stamp_perturbation(dict(perturbation=dict(sampled_bodies=48, max_abs_body_change_us=.501)), True)
+    def a(s):
+        s.end = h.time.monotonic()-1
+        return h.first_stop(s, dict(G_ms=.09274), evidence)
+    monkeypatch.setattr(h, 'tranche_a', a)
+    from examples.vllm_llm import x5
+    monkeypatch.setattr(x5, 'run', lambda s: pytest.fail('deadline must stop before X5'))
+    monkeypatch.setattr(h, 'tranche_b', lambda s: pytest.fail('deadline must stop before B'))
+    h.execute(s)
+    assert s.rows['A.stop']['status'] == 'NOT-COMPLETE'
+    assert s.rows['D.target']['status'] == 'NOT-RUN'
+    assert s.arms['session']['reason'] == 'session deadline reached'
+    assert 'END after A: session deadline reached' in capsys.readouterr().out
 
 
 def test_gap_atoms_clip_to_critical_gap_and_apply_class_floor():
