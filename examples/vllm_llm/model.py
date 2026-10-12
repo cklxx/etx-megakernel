@@ -648,14 +648,22 @@ def build() -> Graph:
         g.call_device(f"{pre(r)}argmax", (1,), hip_link(native, "vl_argmax"), resource=res, args=["vl"], consts=(r,),
                       in_edges={prev[r]: "i->(0)"}, out_edges={f"{pre(r)}E_argmax": "i->i"}, duration_us=3.0)
 
+    # Off by default; tile emission, graph and host launch rows share one flag.
+    from etx.ops import local_fold
+    if local_fold.enabled():
+        local_fold.apply(g, d)
     plan = os.environ.get("ETX_VL_PLAN")
     if plan:
         Path(str(plan) + '.imports-check.json').write_text(json.dumps(import_validation, indent=2) + '\n')
         insts = [i for r, n in order for i in groups_r[r][n]]
+        if local_fold.enabled():
+            insts = local_fold.plan_instances(insts)
         with open(plan, "w") as f:
             f.write(f"# vl plan {d.name}: instance export layer role gx gy gz offset tasks M K wvprgrp rep stride copyoff req nb; total {total} bytes\n")
             f.write(f"total {total} parts {math.ceil(MAXLEN / PART)} maxlen {MAXLEN} requests {REQUESTS}\n")
             for n, i in enumerate(insts):
+                if i.get("local_fold_argument_alias"):
+                    f.write("# local-fold assembler: argument-layout alias of the next row; actual launch has 8 tasks\n")
                 if i.get("skip"):                    # ETX_VL_BATCH: request 0's node runs this group for everyone
                     continue
                 gx, gy, gz = i["grid"]

@@ -988,6 +988,9 @@ def emit_tiles(lds_floats: int = 8192, machine=None) -> str:
             out.append(f'extern "C" __device__ __attribute__((always_inline)) void etx_touch_x_{e}(const etx_ctx* c) {{ dsl_touch_plain(etx_imp_argblock(c->args, c->cst[0] + c->coord[0] * c->cst[1]), c->coord[0] * c->cst[2] + c->coord[1]); }}')
         out.append("")
     source = "\n".join(out) + "\n"
+    from etx.ops import local_fold
+    if local_fold.enabled():
+        source += local_fold.emit(STREAM, BODIES["plain"])
     if _os.environ.get("ETX_INBODY_EMIT") == "1":
         from etx.codegen.load_stamps import instrument
         source = instrument(source)
