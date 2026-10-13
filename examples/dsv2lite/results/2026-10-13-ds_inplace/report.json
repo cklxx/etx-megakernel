@@ -1,0 +1,1112 @@
+{
+  "N": {
+    "arm": "N",
+    "condition": "one MI300X, batch 1, context 1024, 32 tokens, repeat 2",
+    "device_ms": {
+      "default": {
+        "every_positive": true,
+        "gains_us": [
+          24.99999999999991,
+          34.9999999999997,
+          29.999999999999805,
+          40.99999999999993,
+          28.000000000000025
+        ],
+        "go": null,
+        "median_us": 29.999999999999805,
+        "spread_us": 16.000000000000018
+      }
+    },
+    "rounds": [
+      {
+        "N": {
+          "device_ms": 3.68,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.714
+        },
+        "default": {
+          "device_ms": 3.705,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.738
+        }
+      },
+      {
+        "N": {
+          "device_ms": 3.676,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.71
+        },
+        "default": {
+          "device_ms": 3.711,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.744
+        }
+      },
+      {
+        "N": {
+          "device_ms": 3.677,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.712
+        },
+        "default": {
+          "device_ms": 3.707,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.741
+        }
+      },
+      {
+        "N": {
+          "device_ms": 3.673,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.707
+        },
+        "default": {
+          "device_ms": 3.714,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.749
+        }
+      },
+      {
+        "N": {
+          "device_ms": 3.684,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.717
+        },
+        "default": {
+          "device_ms": 3.712,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.747
+        }
+      }
+    ],
+    "wall_ms": {
+      "default": {
+        "every_positive": true,
+        "gains_us": [
+          24.00000000000002,
+          34.000000000000256,
+          28.999999999999915,
+          42.000000000000256,
+          29.999999999999805
+        ],
+        "go": false,
+        "median_us": 29.999999999999805,
+        "spread_us": 18.000000000000234
+      }
+    }
+  },
+  "Nall": {
+    "arm": "Nall",
+    "condition": "one MI300X, batch 1, context 1024, 32 tokens, repeat 2",
+    "device_ms": {
+      "default": {
+        "every_positive": true,
+        "gains_us": [
+          33.99999999999981,
+          40.000000000000036,
+          36.99999999999992,
+          40.99999999999993,
+          36.99999999999992
+        ],
+        "go": null,
+        "median_us": 36.99999999999992,
+        "spread_us": 7.000000000000121
+      }
+    },
+    "rounds": [
+      {
+        "Nall": {
+          "device_ms": 3.676,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.712
+        },
+        "default": {
+          "device_ms": 3.71,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.744
+        }
+      },
+      {
+        "Nall": {
+          "device_ms": 3.672,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.707
+        },
+        "default": {
+          "device_ms": 3.712,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.747
+        }
+      },
+      {
+        "Nall": {
+          "device_ms": 3.676,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.712
+        },
+        "default": {
+          "device_ms": 3.713,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.747
+        }
+      },
+      {
+        "Nall": {
+          "device_ms": 3.669,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.705
+        },
+        "default": {
+          "device_ms": 3.71,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.745
+        }
+      },
+      {
+        "Nall": {
+          "device_ms": 3.672,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.708
+        },
+        "default": {
+          "device_ms": 3.709,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.743
+        }
+      }
+    ],
+    "wall_ms": {
+      "default": {
+        "every_positive": true,
+        "gains_us": [
+          32.00000000000003,
+          40.000000000000036,
+          34.9999999999997,
+          40.000000000000036,
+          34.9999999999997
+        ],
+        "go": false,
+        "median_us": 34.9999999999997,
+        "spread_us": 8.000000000000007
+      }
+    }
+  },
+  "Q": {
+    "arm": "Q",
+    "condition": "one MI300X, batch 1, context 1024, 32 tokens, repeat 2",
+    "device_ms": {
+      "default": {
+        "every_positive": false,
+        "gains_us": [
+          -5.999999999999783,
+          0.9999999999998899,
+          -4.0000000000000036,
+          0.0,
+          -2.9999999999996696
+        ],
+        "go": null,
+        "median_us": -2.9999999999996696,
+        "spread_us": 6.999999999999673
+      }
+    },
+    "rounds": [
+      {
+        "Q": {
+          "device_ms": 3.715,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.751
+        },
+        "default": {
+          "device_ms": 3.709,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.742
+        }
+      },
+      {
+        "Q": {
+          "device_ms": 3.714,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.748
+        },
+        "default": {
+          "device_ms": 3.715,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.75
+        }
+      },
+      {
+        "Q": {
+          "device_ms": 3.717,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.75
+        },
+        "default": {
+          "device_ms": 3.713,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.747
+        }
+      },
+      {
+        "Q": {
+          "device_ms": 3.715,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.75
+        },
+        "default": {
+          "device_ms": 3.715,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.748
+        }
+      },
+      {
+        "Q": {
+          "device_ms": 3.715,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.749
+        },
+        "default": {
+          "device_ms": 3.712,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.746
+        }
+      }
+    ],
+    "wall_ms": {
+      "default": {
+        "every_positive": false,
+        "gains_us": [
+          -8.999999999999897,
+          1.9999999999997797,
+          -3.0000000000001137,
+          -1.9999999999997797,
+          -3.0000000000001137
+        ],
+        "go": false,
+        "median_us": -3.0000000000001137,
+        "spread_us": 10.999999999999677
+      }
+    }
+  },
+  "Qall": {
+    "arm": "Qall",
+    "condition": "one MI300X, batch 1, context 1024, 32 tokens, repeat 2",
+    "device_ms": {
+      "default": {
+        "every_positive": false,
+        "gains_us": [
+          -7.000000000000117,
+          -0.9999999999998899,
+          3.0000000000001137,
+          -3.0000000000001137,
+          -6.999999999999673
+        ],
+        "go": null,
+        "median_us": -3.0000000000001137,
+        "spread_us": 10.000000000000231
+      }
+    },
+    "rounds": [
+      {
+        "Qall": {
+          "device_ms": 3.713,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.747
+        },
+        "default": {
+          "device_ms": 3.706,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.741
+        }
+      },
+      {
+        "Qall": {
+          "device_ms": 3.714,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.748
+        },
+        "default": {
+          "device_ms": 3.713,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.746
+        }
+      },
+      {
+        "Qall": {
+          "device_ms": 3.711,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.744
+        },
+        "default": {
+          "device_ms": 3.714,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.749
+        }
+      },
+      {
+        "Qall": {
+          "device_ms": 3.71,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.744
+        },
+        "default": {
+          "device_ms": 3.707,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.741
+        }
+      },
+      {
+        "Qall": {
+          "device_ms": 3.711,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.744
+        },
+        "default": {
+          "device_ms": 3.704,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.739
+        }
+      }
+    ],
+    "wall_ms": {
+      "default": {
+        "every_positive": false,
+        "gains_us": [
+          -5.999999999999783,
+          -2.000000000000224,
+          4.999999999999893,
+          -3.0000000000001137,
+          -5.0000000000003375
+        ],
+        "go": false,
+        "median_us": -3.0000000000001137,
+        "spread_us": 10.999999999999677
+      }
+    }
+  },
+  "all": {
+    "arm": "all",
+    "condition": "one MI300X, batch 1, context 1024, 32 tokens, repeat 2",
+    "device_ms": {
+      "default": {
+        "every_positive": true,
+        "gains_us": [
+          92.00000000000009,
+          82.99999999999974,
+          96.99999999999997,
+          92.00000000000009,
+          100.99999999999997
+        ],
+        "go": true,
+        "median_us": 92.00000000000009,
+        "spread_us": 18.000000000000227
+      },
+      "fleet": {
+        "every_positive": false,
+        "gains_us": [
+          -49.99999999999982,
+          -49.00000000000038,
+          -47.000000000000156,
+          -51.000000000000156,
+          -48.99999999999993
+        ],
+        "go": false,
+        "median_us": -49.00000000000038,
+        "spread_us": 4.0
+      }
+    },
+    "rounds": [
+      {
+        "all": {
+          "device_ms": 3.614,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.648
+        },
+        "default": {
+          "device_ms": 3.706,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.74
+        },
+        "fleet": {
+          "device_ms": 3.564,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.576
+        }
+      },
+      {
+        "all": {
+          "device_ms": 3.619,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.655
+        },
+        "default": {
+          "device_ms": 3.702,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.736
+        },
+        "fleet": {
+          "device_ms": 3.57,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.582
+        }
+      },
+      {
+        "all": {
+          "device_ms": 3.615,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.649
+        },
+        "default": {
+          "device_ms": 3.712,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.746
+        },
+        "fleet": {
+          "device_ms": 3.568,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.582
+        }
+      },
+      {
+        "all": {
+          "device_ms": 3.621,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.655
+        },
+        "default": {
+          "device_ms": 3.713,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.748
+        },
+        "fleet": {
+          "device_ms": 3.57,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.582
+        }
+      },
+      {
+        "all": {
+          "device_ms": 3.616,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.652
+        },
+        "default": {
+          "device_ms": 3.717,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.75
+        },
+        "fleet": {
+          "device_ms": 3.567,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.58
+        }
+      }
+    ],
+    "wall_ms": {
+      "default": {
+        "every_positive": true,
+        "gains_us": [
+          92.00000000000009,
+          81.0000000000004,
+          96.99999999999997,
+          93.00000000000041,
+          97.99999999999986
+        ],
+        "go": true,
+        "median_us": 93.00000000000041,
+        "spread_us": 16.99999999999946
+      },
+      "fleet": {
+        "every_positive": false,
+        "gains_us": [
+          -72.00000000000006,
+          -72.99999999999996,
+          -67.00000000000017,
+          -72.99999999999996,
+          -72.00000000000006
+        ],
+        "go": false,
+        "median_us": -72.00000000000006,
+        "spread_us": 5.999999999999787
+      }
+    }
+  },
+  "argmax": {
+    "arm": "argmax",
+    "condition": "one MI300X, batch 1, context 1024, 32 tokens, repeat 2",
+    "device_ms": {
+      "default": {
+        "every_positive": false,
+        "gains_us": [
+          1.9999999999997797,
+          17.000000000000348,
+          -4.0000000000000036,
+          8.999999999999897,
+          -0.9999999999998899
+        ],
+        "go": null,
+        "median_us": 1.9999999999997797,
+        "spread_us": 21.00000000000035
+      }
+    },
+    "rounds": [
+      {
+        "argmax": {
+          "device_ms": 3.712,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.745
+        },
+        "default": {
+          "device_ms": 3.714,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.748
+        }
+      },
+      {
+        "argmax": {
+          "device_ms": 3.695,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.729
+        },
+        "default": {
+          "device_ms": 3.712,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.747
+        }
+      },
+      {
+        "argmax": {
+          "device_ms": 3.712,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.745
+        },
+        "default": {
+          "device_ms": 3.708,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.743
+        }
+      },
+      {
+        "argmax": {
+          "device_ms": 3.702,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.736
+        },
+        "default": {
+          "device_ms": 3.711,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.745
+        }
+      },
+      {
+        "argmax": {
+          "device_ms": 3.706,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.741
+        },
+        "default": {
+          "device_ms": 3.705,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.739
+        }
+      }
+    ],
+    "wall_ms": {
+      "default": {
+        "every_positive": false,
+        "gains_us": [
+          3.0000000000001137,
+          17.999999999999794,
+          -2.000000000000224,
+          8.999999999999897,
+          -2.000000000000224
+        ],
+        "go": false,
+        "median_us": 3.0000000000001137,
+        "spread_us": 20.000000000000018
+      }
+    }
+  },
+  "baseline": {
+    "arm": "baseline",
+    "condition": "one MI300X, batch 1, context 1024, 32 tokens, repeat 2",
+    "device_ms": {
+      "default": {
+        "every_positive": true,
+        "gains_us": [
+          141.99999999999991,
+          139.00000000000023,
+          155.00000000000026,
+          137.9999999999999,
+          135.00000000000023
+        ],
+        "go": null,
+        "median_us": 139.00000000000023,
+        "spread_us": 20.00000000000003
+      }
+    },
+    "rounds": [
+      {
+        "default": {
+          "device_ms": 3.71,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.743
+        },
+        "fleet": {
+          "device_ms": 3.568,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.58
+        }
+      },
+      {
+        "default": {
+          "device_ms": 3.709,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.743
+        },
+        "fleet": {
+          "device_ms": 3.57,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.584
+        }
+      },
+      {
+        "default": {
+          "device_ms": 3.716,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.748
+        },
+        "fleet": {
+          "device_ms": 3.561,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.577
+        }
+      },
+      {
+        "default": {
+          "device_ms": 3.706,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.739
+        },
+        "fleet": {
+          "device_ms": 3.568,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.581
+        }
+      },
+      {
+        "default": {
+          "device_ms": 3.704,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.738
+        },
+        "fleet": {
+          "device_ms": 3.569,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.58
+        }
+      }
+    ],
+    "wall_ms": {
+      "default": {
+        "every_positive": true,
+        "gains_us": [
+          162.9999999999998,
+          158.9999999999998,
+          171.00000000000026,
+          157.99999999999991,
+          157.99999999999991
+        ],
+        "go": true,
+        "median_us": 158.9999999999998,
+        "spread_us": 13.000000000000341
+      }
+    }
+  },
+  "prep": {
+    "arm": "prep",
+    "condition": "one MI300X, batch 1, context 1024, 32 tokens, repeat 2",
+    "device_ms": {
+      "default": {
+        "every_positive": true,
+        "gains_us": [
+          27.000000000000135,
+          32.00000000000003,
+          18.000000000000238,
+          31.00000000000014,
+          20.999999999999908
+        ],
+        "go": null,
+        "median_us": 27.000000000000135,
+        "spread_us": 13.99999999999979
+      }
+    },
+    "rounds": [
+      {
+        "default": {
+          "device_ms": 3.71,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.743
+        },
+        "prep": {
+          "device_ms": 3.683,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.719
+        }
+      },
+      {
+        "default": {
+          "device_ms": 3.713,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.747
+        },
+        "prep": {
+          "device_ms": 3.681,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.716
+        }
+      },
+      {
+        "default": {
+          "device_ms": 3.7,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.736
+        },
+        "prep": {
+          "device_ms": 3.682,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.715
+        }
+      },
+      {
+        "default": {
+          "device_ms": 3.71,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.744
+        },
+        "prep": {
+          "device_ms": 3.679,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.714
+        }
+      },
+      {
+        "default": {
+          "device_ms": 3.709,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.743
+        },
+        "prep": {
+          "device_ms": 3.688,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.721
+        }
+      }
+    ],
+    "wall_ms": {
+      "default": {
+        "every_positive": true,
+        "gains_us": [
+          24.00000000000002,
+          30.999999999999694,
+          21.00000000000035,
+          30.00000000000025,
+          21.999999999999797
+        ],
+        "go": false,
+        "median_us": 24.00000000000002,
+        "spread_us": 9.999999999999343
+      }
+    }
+  },
+  "stages": [
+    {
+      "all_us": 138.35000000000002,
+      "default_us": 140.46999999999997,
+      "expected_saving_us": 14.199095238095238,
+      "measured_saving_us": 2.1199999999999477,
+      "stage": "prologue"
+    },
+    {
+      "all_us": 173.19067567567566,
+      "default_us": 190.81932432432438,
+      "expected_saving_us": 40.014,
+      "measured_saving_us": 17.62864864864872,
+      "stage": "in_norm"
+    },
+    {
+      "all_us": 437.1093243243239,
+      "default_us": 448.7706756756751,
+      "expected_saving_us": 120.0869180952381,
+      "measured_saving_us": 11.661351351351186,
+      "stage": "qkv"
+    },
+    {
+      "all_us": 139.845625,
+      "default_us": 143.59140625,
+      "expected_saving_us": 63.475,
+      "measured_saving_us": 3.745781249999993,
+      "stage": "prep"
+    },
+    {
+      "all_us": 349.584375000001,
+      "default_us": 345.92859375,
+      "expected_saving_us": 0.0,
+      "measured_saving_us": -3.6557812500009845,
+      "stage": "attn"
+    },
+    {
+      "all_us": 314.6500000000009,
+      "default_us": 315.8500000000003,
+      "expected_saving_us": 12.48304761904762,
+      "measured_saving_us": 1.1999999999994202,
+      "stage": "reduce"
+    },
+    {
+      "all_us": 276.9700000000001,
+      "default_us": 279.35000000000053,
+      "expected_saving_us": 28.86704761904762,
+      "measured_saving_us": 2.38000000000045,
+      "stage": "o_proj"
+    },
+    {
+      "all_us": 357.9299999999995,
+      "default_us": 368.18000000000063,
+      "expected_saving_us": 52.908523809523814,
+      "measured_saving_us": 10.250000000001137,
+      "stage": "router"
+    },
+    {
+      "all_us": 94.19418918918916,
+      "default_us": 148.13,
+      "expected_saving_us": 85.38250000000001,
+      "measured_saving_us": 53.935810810810835,
+      "stage": "topk"
+    },
+    {
+      "all_us": 798.4958108108117,
+      "default_us": 767.3500000000007,
+      "expected_saving_us": 57.73409523809524,
+      "measured_saving_us": -31.145810810810985,
+      "stage": "moe_up"
+    },
+    {
+      "all_us": 558.0400000000001,
+      "default_us": 552.9499999999985,
+      "expected_saving_us": 39.692190476190476,
+      "measured_saving_us": -5.0900000000016234,
+      "stage": "moe_down"
+    },
+    {
+      "all_us": 129.38000000000028,
+      "default_us": 135.04000000000013,
+      "expected_saving_us": 4.387363809523809,
+      "measured_saving_us": 5.6599999999998545,
+      "stage": "lm_head"
+    },
+    {
+      "all_us": 5.369999999999891,
+      "default_us": 6.0099999999997635,
+      "expected_saving_us": 0.539,
+      "measured_saving_us": 0.6399999999998727,
+      "stage": "argmax"
+    },
+    {
+      "all_us": 117.56999999999957,
+      "default_us": 117.39999999999985,
+      "expected_saving_us": 13.621696190476191,
+      "measured_saving_us": -0.1699999999997175,
+      "stage": "tail"
+    }
+  ],
+  "topk": {
+    "arm": "topk",
+    "condition": "one MI300X, batch 1, context 1024, 32 tokens, repeat 2",
+    "device_ms": {
+      "default": {
+        "every_positive": true,
+        "gains_us": [
+          66.00000000000028,
+          70.00000000000028,
+          60.00000000000006,
+          66.00000000000028,
+          64.99999999999994
+        ],
+        "go": null,
+        "median_us": 66.00000000000028,
+        "spread_us": 10.000000000000227
+      }
+    },
+    "rounds": [
+      {
+        "default": {
+          "device_ms": 3.709,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.742
+        },
+        "topk": {
+          "device_ms": 3.643,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.678
+        }
+      },
+      {
+        "default": {
+          "device_ms": 3.713,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.747
+        },
+        "topk": {
+          "device_ms": 3.643,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.679
+        }
+      },
+      {
+        "default": {
+          "device_ms": 3.702,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.737
+        },
+        "topk": {
+          "device_ms": 3.642,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.677
+        }
+      },
+      {
+        "default": {
+          "device_ms": 3.708,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.741
+        },
+        "topk": {
+          "device_ms": 3.642,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.677
+        }
+      },
+      {
+        "default": {
+          "device_ms": 3.711,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.744
+        },
+        "topk": {
+          "device_ms": 3.646,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.68
+        }
+      }
+    ],
+    "wall_ms": {
+      "default": {
+        "every_positive": true,
+        "gains_us": [
+          64.00000000000006,
+          68.00000000000006,
+          60.00000000000006,
+          64.00000000000006,
+          64.00000000000006
+        ],
+        "go": false,
+        "median_us": 64.00000000000006,
+        "spread_us": 8.0
+      }
+    }
+  }
+}

@@ -1,0 +1,1093 @@
+# job pairs_all gpu=0 cwd=/root/etx
+# : "${ETX_DSV2_FLEET:=$HOME/fleet-3fb67a6}"; : "${ETX_DSV2_DATA:=$HOME/dsv2-data}"; export ETX_DSV2_FLEET ETX_DSV2_DATA; .venv/bin/python -u -m examples.dsv2lite.inplace_session pairs all
+$ timeout --kill-after=5s 180s stdbuf -oL -eL /root/sess/b_default/run --weights /root/dsv2-data/weights.bin --cache /root/dsv2-data/fleet_cache.bin --golden /root/dsv2-data/golden_tokens.txt --hidden /root/dsv2-data/golden_hidden.bin --tokens 32 --context 1024 --repeat 2
+device: AMD Instinct MI300X VF  arch gfx942:sramecc+:xnack-  CUs 304
+model: hidden 2048 heads 16 kv_lora 512 experts 64 top-6 layers 27 (dense < 1) vocab 102400
+  /root/dsv2-data/weights.bin: 31.4 GB uploaded
+  /root/dsv2-data/fleet_cache.bin: 0.0 GB uploaded
+etx: 54946 tasks, 1778 event words, 296 workers (8 domains x 37), lds 24576 B (fleet scratch 23408 B)
+run 0 (warm-up): 32/32 tokens match
+token  0:    3.701 ms (device)  step   3.734 ms  out   1780  ok
+token  1:    3.702 ms (device)  step   3.736 ms  out    185  ok
+token  2:    3.704 ms (device)  step   3.738 ms  out    300  ok
+token  3:    3.701 ms (device)  step   3.733 ms  out   1501  ok
+token  4:    3.695 ms (device)  step   3.729 ms  out  11747  ok
+token  5:    3.702 ms (device)  step   3.735 ms  out    254  ok
+token  6:    3.699 ms (device)  step   3.730 ms  out   3510  ok
+token  7:    3.706 ms (device)  step   3.738 ms  out    185  ok
+token  8:    3.706 ms (device)  step   3.739 ms  out   1558  ok
+token  9:    3.705 ms (device)  step   3.737 ms  out   8708  ok
+token 10:    3.706 ms (device)  step   3.738 ms  out      7  ok
+token 11:    3.701 ms (device)  step   3.735 ms  out     77  ok
+token 12:    3.702 ms (device)  step   3.736 ms  out   1780  ok
+token 13:    3.699 ms (device)  step   3.731 ms  out    185  ok
+token 14:    3.702 ms (device)  step   3.736 ms  out    300  ok
+token 15:    3.707 ms (device)  step   3.741 ms  out   1501  ok
+token 16:    3.706 ms (device)  step   3.737 ms  out  11747  ok
+token 17:    3.710 ms (device)  step   3.741 ms  out    254  ok
+token 18:    3.710 ms (device)  step   3.740 ms  out   3510  ok
+token 19:    3.711 ms (device)  step   3.744 ms  out    185  ok
+token 20:    3.715 ms (device)  step   3.758 ms  out   1558  ok
+token 21:    3.711 ms (device)  step   3.744 ms  out   8708  ok
+token 22:    3.709 ms (device)  step   3.742 ms  out      7  ok
+token 23:    3.719 ms (device)  step   3.751 ms  out     77  ok
+token 24:    3.710 ms (device)  step   3.743 ms  out   1780  ok
+token 25:    3.709 ms (device)  step   3.740 ms  out    185  ok
+token 26:    3.708 ms (device)  step   3.746 ms  out    300  ok
+token 27:    3.715 ms (device)  step   3.747 ms  out   1501  ok
+token 28:    3.709 ms (device)  step   3.742 ms  out  11747  ok
+token 29:    3.713 ms (device)  step   3.744 ms  out    254  ok
+token 30:    3.704 ms (device)  step   3.737 ms  out   3510  ok
+token 31:    3.714 ms (device)  step   3.746 ms  out    185  ok
+  layer  0 dense: max rel  1.72e-03  cosine 0.999996  [ok]
+  layer  1 moe  : max rel  3.13e-03  cosine 0.999993  [ok]
+  layer  2 moe  : max rel  2.96e-03  cosine 0.999986  [ok]
+  layer  3 moe  : max rel  2.45e-03  cosine 0.999985  [ok]
+  layer  4 moe  : max rel  6.54e-03  cosine 0.999979  [ok]
+  layer  5 moe  : max rel  4.65e-03  cosine 0.999983  [ok]
+  layer  6 moe  : max rel  4.07e-03  cosine 0.999983  [ok]
+  layer  7 moe  : max rel  1.76e-03  cosine 0.999974  [ok]
+  layer  8 moe  : max rel  1.88e-03  cosine 0.999973  [ok]
+  layer  9 moe  : max rel  1.56e-03  cosine 0.999980  [ok]
+  layer 10 moe  : max rel  1.40e-03  cosine 0.999981  [ok]
+  layer 11 moe  : max rel  1.35e-03  cosine 0.999981  [ok]
+  layer 12 moe  : max rel  3.07e-03  cosine 0.999984  [ok]
+  layer 13 moe  : max rel  3.23e-03  cosine 0.999983  [ok]
+  layer 14 moe  : max rel  1.74e-03  cosine 0.999981  [ok]
+  layer 15 moe  : max rel  6.29e-03  cosine 0.999981  [ok]
+  layer 16 moe  : max rel  5.71e-03  cosine 0.999978  [ok]
+  layer 17 moe  : max rel  5.41e-03  cosine 0.999979  [ok]
+  layer 18 moe  : max rel  5.81e-03  cosine 0.999923  [ok]
+  layer 19 moe  : max rel  1.91e-03  cosine 0.999949  [ok]
+  layer 20 moe  : max rel  4.41e-03  cosine 0.999961  [ok]
+  layer 21 moe  : max rel  4.90e-03  cosine 0.999949  [ok]
+  layer 22 moe  : max rel  4.17e-03  cosine 0.999905  [ok]
+  layer 23 moe  : max rel  2.25e-03  cosine 0.999933  [ok]
+  layer 24 moe  : max rel  2.60e-03  cosine 0.999937  [ok]
+  layer 25 moe  : max rel  5.26e-03  cosine 0.999969  [ok]
+  layer 26 moe  : max rel  8.79e-04  cosine 0.999981  [ok]
+  consecutive layers within the gate: 27 of 27
+
+per-token latency (embed -> argmax on device): median 3.706 ms  mean 3.707 ms; step wall (launch to end) 3.740 ms/token
+tokens: 32/32 match HF greedy
+$ timeout --kill-after=5s 180s stdbuf -oL -eL /root/sess/b_all/run --weights /root/dsv2-data/weights.bin --cache /root/dsv2-data/fleet_cache.bin --golden /root/dsv2-data/golden_tokens.txt --hidden /root/dsv2-data/golden_hidden.bin --tokens 32 --context 1024 --repeat 2
+device: AMD Instinct MI300X VF  arch gfx942:sramecc+:xnack-  CUs 304
+model: hidden 2048 heads 16 kv_lora 512 experts 64 top-6 layers 27 (dense < 1) vocab 102400
+  /root/dsv2-data/weights.bin: 31.4 GB uploaded
+  /root/dsv2-data/fleet_cache.bin: 0.0 GB uploaded
+etx: 54946 tasks, 1778 event words, 296 workers (8 domains x 37), lds 24576 B (fleet scratch 23408 B)
+run 0 (warm-up): 32/32 tokens match
+token  0:    3.606 ms (device)  step   3.639 ms  out   1780  ok
+token  1:    3.612 ms (device)  step   3.645 ms  out    185  ok
+token  2:    3.609 ms (device)  step   3.642 ms  out    300  ok
+token  3:    3.616 ms (device)  step   3.652 ms  out   1501  ok
+token  4:    3.607 ms (device)  step   3.641 ms  out  11747  ok
+token  5:    3.609 ms (device)  step   3.652 ms  out    254  ok
+token  6:    3.608 ms (device)  step   3.642 ms  out   3510  ok
+token  7:    3.614 ms (device)  step   3.648 ms  out    185  ok
+token  8:    3.610 ms (device)  step   3.644 ms  out   1558  ok
+token  9:    3.615 ms (device)  step   3.652 ms  out   8708  ok
+token 10:    3.620 ms (device)  step   3.653 ms  out      7  ok
+token 11:    3.612 ms (device)  step   3.646 ms  out     77  ok
+token 12:    3.616 ms (device)  step   3.650 ms  out   1780  ok
+token 13:    3.609 ms (device)  step   3.641 ms  out    185  ok
+token 14:    3.607 ms (device)  step   3.642 ms  out    300  ok
+token 15:    3.615 ms (device)  step   3.650 ms  out   1501  ok
+token 16:    3.616 ms (device)  step   3.651 ms  out  11747  ok
+token 17:    3.618 ms (device)  step   3.660 ms  out    254  ok
+token 18:    3.615 ms (device)  step   3.651 ms  out   3510  ok
+token 19:    3.608 ms (device)  step   3.643 ms  out    185  ok
+token 20:    3.619 ms (device)  step   3.653 ms  out   1558  ok
+token 21:    3.613 ms (device)  step   3.648 ms  out   8708  ok
+token 22:    3.605 ms (device)  step   3.638 ms  out      7  ok
+token 23:    3.619 ms (device)  step   3.652 ms  out     77  ok
+token 24:    3.612 ms (device)  step   3.646 ms  out   1780  ok
+token 25:    3.616 ms (device)  step   3.651 ms  out    185  ok
+token 26:    3.623 ms (device)  step   3.658 ms  out    300  ok
+token 27:    3.614 ms (device)  step   3.649 ms  out   1501  ok
+token 28:    3.611 ms (device)  step   3.646 ms  out  11747  ok
+token 29:    3.621 ms (device)  step   3.655 ms  out    254  ok
+token 30:    3.617 ms (device)  step   3.652 ms  out   3510  ok
+token 31:    3.623 ms (device)  step   3.656 ms  out    185  ok
+  layer  0 dense: max rel  1.72e-03  cosine 0.999996  [ok]
+  layer  1 moe  : max rel  3.13e-03  cosine 0.999993  [ok]
+  layer  2 moe  : max rel  2.96e-03  cosine 0.999986  [ok]
+  layer  3 moe  : max rel  2.45e-03  cosine 0.999985  [ok]
+  layer  4 moe  : max rel  6.54e-03  cosine 0.999979  [ok]
+  layer  5 moe  : max rel  4.65e-03  cosine 0.999983  [ok]
+  layer  6 moe  : max rel  4.07e-03  cosine 0.999983  [ok]
+  layer  7 moe  : max rel  1.76e-03  cosine 0.999974  [ok]
+  layer  8 moe  : max rel  1.88e-03  cosine 0.999973  [ok]
+  layer  9 moe  : max rel  1.56e-03  cosine 0.999979  [ok]
+  layer 10 moe  : max rel  2.11e-03  cosine 0.999980  [ok]
+  layer 11 moe  : max rel  4.31e-03  cosine 0.999977  [ok]
+  layer 12 moe  : max rel  3.07e-03  cosine 0.999985  [ok]
+  layer 13 moe  : max rel  3.23e-03  cosine 0.999983  [ok]
+  layer 14 moe  : max rel  1.74e-03  cosine 0.999981  [ok]
+  layer 15 moe  : max rel  6.29e-03  cosine 0.999979  [ok]
+  layer 16 moe  : max rel  5.71e-03  cosine 0.999979  [ok]
+  layer 17 moe  : max rel  5.41e-03  cosine 0.999978  [ok]
+  layer 18 moe  : max rel  5.81e-03  cosine 0.999923  [ok]
+  layer 19 moe  : max rel  1.02e-02  cosine 0.999935  [ok]
+  layer 20 moe  : max rel  8.81e-03  cosine 0.999950  [ok]
+  layer 21 moe  : max rel  7.35e-03  cosine 0.999940  [ok]
+  layer 22 moe  : max rel  8.33e-03  cosine 0.999887  [ok]
+  layer 23 moe  : max rel  4.49e-03  cosine 0.999920  [ok]
+  layer 24 moe  : max rel  5.21e-03  cosine 0.999926  [ok]
+  layer 25 moe  : max rel  2.63e-03  cosine 0.999966  [ok]
+  layer 26 moe  : max rel  6.25e-03  cosine 0.999977  [ok]
+  consecutive layers within the gate: 27 of 27
+
+per-token latency (embed -> argmax on device): median 3.614 ms  mean 3.614 ms; step wall (launch to end) 3.648 ms/token
+tokens: 32/32 match HF greedy
+$ timeout --kill-after=5s 180s stdbuf -oL -eL /root/sess/b_fleet/run --weights /root/dsv2-data/weights.bin --cache /root/dsv2-data/fleet_cache.bin --golden /root/dsv2-data/golden_tokens.txt --hidden /root/dsv2-data/golden_hidden.bin --tokens 32 --context 1024 --repeat 2 --graph /root/sess/b_fleet/taskgraph_d16.bin
+device: AMD Instinct MI300X VF  arch gfx942:sramecc+:xnack-  CUs 304
+graph: 54946 descriptors across 296 workers, 1589 events (85 global, mirrored), kv_chunks 16, final event 1588 (argmax)
+event counters: cached + release fence (scheme i); workers poll the per-XCD scheduler mirror; 32 token(s) per launch
+model: hidden 2048 heads 16 kv_lora 512 rope 64 experts 64/2 top-6 layers 27 (dense < 1) vocab 102400  softmax_scale 0.114721
+  /root/dsv2-data/weights.bin: 31.4 GB uploaded
+  /root/dsv2-data/fleet_cache.bin: 0.0 GB uploaded
+occupancy: 1 workgroup(s)/CU at 256 threads (need >= 1 for grid 304)
+placement: 304 workgroups by XCC_ID: [0]=38 [1]=38 [2]=38 [3]=38 [4]=38 [5]=38 [6]=38 [7]=38  (8 XCDs x 38 CUs x blocks/CU, as assumed)
+
+free-running decode: 32 tokens over a 1024-token context, 32 per launch, 2 run(s) (the last one is reported; the first is the warm-up)
+run 0 (warm-up): 126.681 ms total, 32/32 tokens match
+token  0:    3.562 ms  in     77 -> out   1780  ok
+token  1:    3.552 ms  in   1780 -> out    185  ok
+token  2:    3.567 ms  in    185 -> out    300  ok
+token  3:    3.554 ms  in    300 -> out   1501  ok
+token  4:    3.561 ms  in   1501 -> out  11747  ok
+token  5:    3.553 ms  in  11747 -> out    254  ok
+token  6:    3.564 ms  in    254 -> out   3510  ok
+token  7:    3.580 ms  in   3510 -> out    185  ok
+token  8:    3.548 ms  in    185 -> out   1558  ok
+token  9:    3.563 ms  in   1558 -> out   8708  ok
+token 10:    3.566 ms  in   8708 -> out      7  ok
+token 11:    3.555 ms  in      7 -> out     77  ok
+token 12:    3.563 ms  in     77 -> out   1780  ok
+token 13:    3.554 ms  in   1780 -> out    185  ok
+token 14:    3.547 ms  in    185 -> out    300  ok
+token 15:    3.557 ms  in    300 -> out   1501  ok
+token 16:    3.559 ms  in   1501 -> out  11747  ok
+token 17:    3.570 ms  in  11747 -> out    254  ok
+token 18:    3.573 ms  in    254 -> out   3510  ok
+token 19:    3.574 ms  in   3510 -> out    185  ok
+token 20:    3.566 ms  in    185 -> out   1558  ok
+token 21:    3.566 ms  in   1558 -> out   8708  ok
+token 22:    3.563 ms  in   8708 -> out      7  ok
+token 23:    3.565 ms  in      7 -> out     77  ok
+token 24:    3.565 ms  in     77 -> out   1780  ok
+token 25:    3.567 ms  in   1780 -> out    185  ok
+token 26:    3.565 ms  in    185 -> out    300  ok
+token 27:    3.561 ms  in    300 -> out   1501  ok
+token 28:    3.578 ms  in   1501 -> out  11747  ok
+token 29:    3.557 ms  in  11747 -> out    254  ok
+token 30:    3.566 ms  in    254 -> out   3510  ok
+token 31:    3.580 ms  in   3510 -> out    185  ok
+
+per-layer output vs HF, first decode step (gate: max rel <= 2e-2, cosine >= 0.999)
+  layer  0 dense: max rel  1.72e-03  cosine 0.999996  [ok]
+  layer  1 moe  : max rel  3.13e-03  cosine 0.999993  [ok]
+  layer  2 moe  : max rel  2.96e-03  cosine 0.999988  [ok]
+  layer  3 moe  : max rel  2.45e-03  cosine 0.999982  [ok]
+  layer  4 moe  : max rel  2.45e-03  cosine 0.999980  [ok]
+  layer  5 moe  : max rel  1.16e-03  cosine 0.999985  [ok]
+  layer  6 moe  : max rel  1.27e-03  cosine 0.999984  [ok]
+  layer  7 moe  : max rel  1.10e-03  cosine 0.999983  [ok]
+  layer  8 moe  : max rel  1.88e-03  cosine 0.999979  [ok]
+  layer  9 moe  : max rel  1.56e-03  cosine 0.999983  [ok]
+  layer 10 moe  : max rel  2.11e-03  cosine 0.999982  [ok]
+  layer 11 moe  : max rel  1.62e-03  cosine 0.999984  [ok]
+  layer 12 moe  : max rel  1.53e-03  cosine 0.999989  [ok]
+  layer 13 moe  : max rel  1.61e-03  cosine 0.999987  [ok]
+  layer 14 moe  : max rel  1.74e-03  cosine 0.999958  [ok]
+  layer 15 moe  : max rel  1.57e-03  cosine 0.999964  [ok]
+  layer 16 moe  : max rel  1.43e-03  cosine 0.999944  [ok]
+  layer 17 moe  : max rel  1.35e-03  cosine 0.999956  [ok]
+  layer 18 moe  : max rel  1.64e-03  cosine 0.999906  [ok]
+  layer 19 moe  : max rel  5.10e-03  cosine 0.999930  [ok]
+  layer 20 moe  : max rel  4.41e-03  cosine 0.999945  [ok]
+  layer 21 moe  : max rel  9.80e-03  cosine 0.999918  [ok]
+  layer 22 moe  : max rel  1.04e-02  cosine 0.999878  [ok]
+  layer 23 moe  : max rel  5.99e-03  cosine 0.999920  [ok]
+  layer 24 moe  : max rel  4.56e-03  cosine 0.999930  [ok]
+  layer 25 moe  : max rel  5.26e-03  cosine 0.999963  [ok]
+  layer 26 moe  : max rel  6.25e-03  cosine 0.999979  [ok]
+  consecutive layers within the gate: 27 of 27
+
+per-token latency (embed -> argmax on device): median 3.564 ms  p95 3.580 ms  mean 3.563 ms  (280.6 tok/s)
+wall time of the launches: 114.423 ms for 32 tokens = 3.576 ms/token (279.7 tok/s), 1 launch(es)
+tokens: 32/32 match HF greedy
+$ timeout --kill-after=5s 180s stdbuf -oL -eL /root/sess/b_fleet/run --weights /root/dsv2-data/weights.bin --cache /root/dsv2-data/fleet_cache.bin --golden /root/dsv2-data/golden_tokens.txt --hidden /root/dsv2-data/golden_hidden.bin --tokens 32 --context 1024 --repeat 2 --graph /root/sess/b_fleet/taskgraph_d16.bin
+device: AMD Instinct MI300X VF  arch gfx942:sramecc+:xnack-  CUs 304
+graph: 54946 descriptors across 296 workers, 1589 events (85 global, mirrored), kv_chunks 16, final event 1588 (argmax)
+event counters: cached + release fence (scheme i); workers poll the per-XCD scheduler mirror; 32 token(s) per launch
+model: hidden 2048 heads 16 kv_lora 512 rope 64 experts 64/2 top-6 layers 27 (dense < 1) vocab 102400  softmax_scale 0.114721
+  /root/dsv2-data/weights.bin: 31.4 GB uploaded
+  /root/dsv2-data/fleet_cache.bin: 0.0 GB uploaded
+occupancy: 1 workgroup(s)/CU at 256 threads (need >= 1 for grid 304)
+placement: 304 workgroups by XCC_ID: [0]=38 [1]=38 [2]=38 [3]=38 [4]=38 [5]=38 [6]=38 [7]=38  (8 XCDs x 38 CUs x blocks/CU, as assumed)
+
+free-running decode: 32 tokens over a 1024-token context, 32 per launch, 2 run(s) (the last one is reported; the first is the warm-up)
+run 0 (warm-up): 127.654 ms total, 32/32 tokens match
+token  0:    3.567 ms  in     77 -> out   1780  ok
+token  1:    3.567 ms  in   1780 -> out    185  ok
+token  2:    3.561 ms  in    185 -> out    300  ok
+token  3:    3.586 ms  in    300 -> out   1501  ok
+token  4:    3.561 ms  in   1501 -> out  11747  ok
+token  5:    3.550 ms  in  11747 -> out    254  ok
+token  6:    3.562 ms  in    254 -> out   3510  ok
+token  7:    3.563 ms  in   3510 -> out    185  ok
+token  8:    3.557 ms  in    185 -> out   1558  ok
+token  9:    3.557 ms  in   1558 -> out   8708  ok
+token 10:    3.565 ms  in   8708 -> out      7  ok
+token 11:    3.563 ms  in      7 -> out     77  ok
+token 12:    3.560 ms  in     77 -> out   1780  ok
+token 13:    3.557 ms  in   1780 -> out    185  ok
+token 14:    3.568 ms  in    185 -> out    300  ok
+token 15:    3.565 ms  in    300 -> out   1501  ok
+token 16:    3.579 ms  in   1501 -> out  11747  ok
+token 17:    3.574 ms  in  11747 -> out    254  ok
+token 18:    3.570 ms  in    254 -> out   3510  ok
+token 19:    3.576 ms  in   3510 -> out    185  ok
+token 20:    3.610 ms  in    185 -> out   1558  ok
+token 21:    3.572 ms  in   1558 -> out   8708  ok
+token 22:    3.566 ms  in   8708 -> out      7  ok
+token 23:    3.579 ms  in      7 -> out     77  ok
+token 24:    3.576 ms  in     77 -> out   1780  ok
+token 25:    3.573 ms  in   1780 -> out    185  ok
+token 26:    3.592 ms  in    185 -> out    300  ok
+token 27:    3.576 ms  in    300 -> out   1501  ok
+token 28:    3.572 ms  in   1501 -> out  11747  ok
+token 29:    3.571 ms  in  11747 -> out    254  ok
+token 30:    3.572 ms  in    254 -> out   3510  ok
+token 31:    3.571 ms  in   3510 -> out    185  ok
+
+per-layer output vs HF, first decode step (gate: max rel <= 2e-2, cosine >= 0.999)
+  layer  0 dense: max rel  1.72e-03  cosine 0.999996  [ok]
+  layer  1 moe  : max rel  3.13e-03  cosine 0.999993  [ok]
+  layer  2 moe  : max rel  2.96e-03  cosine 0.999988  [ok]
+  layer  3 moe  : max rel  2.45e-03  cosine 0.999982  [ok]
+  layer  4 moe  : max rel  2.45e-03  cosine 0.999980  [ok]
+  layer  5 moe  : max rel  1.16e-03  cosine 0.999985  [ok]
+  layer  6 moe  : max rel  1.27e-03  cosine 0.999984  [ok]
+  layer  7 moe  : max rel  1.10e-03  cosine 0.999983  [ok]
+  layer  8 moe  : max rel  1.88e-03  cosine 0.999979  [ok]
+  layer  9 moe  : max rel  1.56e-03  cosine 0.999983  [ok]
+  layer 10 moe  : max rel  2.11e-03  cosine 0.999982  [ok]
+  layer 11 moe  : max rel  1.62e-03  cosine 0.999984  [ok]
+  layer 12 moe  : max rel  1.53e-03  cosine 0.999989  [ok]
+  layer 13 moe  : max rel  1.61e-03  cosine 0.999987  [ok]
+  layer 14 moe  : max rel  1.74e-03  cosine 0.999958  [ok]
+  layer 15 moe  : max rel  1.57e-03  cosine 0.999964  [ok]
+  layer 16 moe  : max rel  1.43e-03  cosine 0.999944  [ok]
+  layer 17 moe  : max rel  1.35e-03  cosine 0.999956  [ok]
+  layer 18 moe  : max rel  1.64e-03  cosine 0.999906  [ok]
+  layer 19 moe  : max rel  5.10e-03  cosine 0.999930  [ok]
+  layer 20 moe  : max rel  4.41e-03  cosine 0.999945  [ok]
+  layer 21 moe  : max rel  9.80e-03  cosine 0.999918  [ok]
+  layer 22 moe  : max rel  1.04e-02  cosine 0.999878  [ok]
+  layer 23 moe  : max rel  5.99e-03  cosine 0.999920  [ok]
+  layer 24 moe  : max rel  4.56e-03  cosine 0.999930  [ok]
+  layer 25 moe  : max rel  5.26e-03  cosine 0.999963  [ok]
+  layer 26 moe  : max rel  6.25e-03  cosine 0.999979  [ok]
+  consecutive layers within the gate: 27 of 27
+
+per-token latency (embed -> argmax on device): median 3.570 ms  p95 3.592 ms  mean 3.570 ms  (280.1 tok/s)
+wall time of the launches: 114.625 ms for 32 tokens = 3.582 ms/token (279.2 tok/s), 1 launch(es)
+tokens: 32/32 match HF greedy
+$ timeout --kill-after=5s 180s stdbuf -oL -eL /root/sess/b_all/run --weights /root/dsv2-data/weights.bin --cache /root/dsv2-data/fleet_cache.bin --golden /root/dsv2-data/golden_tokens.txt --hidden /root/dsv2-data/golden_hidden.bin --tokens 32 --context 1024 --repeat 2
+device: AMD Instinct MI300X VF  arch gfx942:sramecc+:xnack-  CUs 304
+model: hidden 2048 heads 16 kv_lora 512 experts 64 top-6 layers 27 (dense < 1) vocab 102400
+  /root/dsv2-data/weights.bin: 31.4 GB uploaded
+  /root/dsv2-data/fleet_cache.bin: 0.0 GB uploaded
+etx: 54946 tasks, 1778 event words, 296 workers (8 domains x 37), lds 24576 B (fleet scratch 23408 B)
+run 0 (warm-up): 32/32 tokens match
+token  0:    3.617 ms (device)  step   3.650 ms  out   1780  ok
+token  1:    3.618 ms (device)  step   3.654 ms  out    185  ok
+token  2:    3.615 ms (device)  step   3.648 ms  out    300  ok
+token  3:    3.619 ms (device)  step   3.651 ms  out   1501  ok
+token  4:    3.618 ms (device)  step   3.654 ms  out  11747  ok
+token  5:    3.608 ms (device)  step   3.641 ms  out    254  ok
+token  6:    3.615 ms (device)  step   3.646 ms  out   3510  ok
+token  7:    3.625 ms (device)  step   3.659 ms  out    185  ok
+token  8:    3.617 ms (device)  step   3.650 ms  out   1558  ok
+token  9:    3.621 ms (device)  step   3.662 ms  out   8708  ok
+token 10:    3.617 ms (device)  step   3.650 ms  out      7  ok
+token 11:    3.615 ms (device)  step   3.650 ms  out     77  ok
+token 12:    3.624 ms (device)  step   3.656 ms  out   1780  ok
+token 13:    3.632 ms (device)  step   3.665 ms  out    185  ok
+token 14:    3.618 ms (device)  step   3.651 ms  out    300  ok
+token 15:    3.615 ms (device)  step   3.649 ms  out   1501  ok
+token 16:    3.618 ms (device)  step   3.651 ms  out  11747  ok
+token 17:    3.623 ms (device)  step   3.657 ms  out    254  ok
+token 18:    3.623 ms (device)  step   3.657 ms  out   3510  ok
+token 19:    3.623 ms (device)  step   3.656 ms  out    185  ok
+token 20:    3.617 ms (device)  step   3.649 ms  out   1558  ok
+token 21:    3.625 ms (device)  step   3.659 ms  out   8708  ok
+token 22:    3.627 ms (device)  step   3.659 ms  out      7  ok
+token 23:    3.626 ms (device)  step   3.672 ms  out     77  ok
+token 24:    3.619 ms (device)  step   3.652 ms  out   1780  ok
+token 25:    3.619 ms (device)  step   3.652 ms  out    185  ok
+token 26:    3.620 ms (device)  step   3.653 ms  out    300  ok
+token 27:    3.628 ms (device)  step   3.662 ms  out   1501  ok
+token 28:    3.614 ms (device)  step   3.648 ms  out  11747  ok
+token 29:    3.614 ms (device)  step   3.656 ms  out    254  ok
+token 30:    3.626 ms (device)  step   3.660 ms  out   3510  ok
+token 31:    3.634 ms (device)  step   3.668 ms  out    185  ok
+  layer  0 dense: max rel  1.72e-03  cosine 0.999996  [ok]
+  layer  1 moe  : max rel  3.13e-03  cosine 0.999993  [ok]
+  layer  2 moe  : max rel  2.96e-03  cosine 0.999986  [ok]
+  layer  3 moe  : max rel  2.45e-03  cosine 0.999985  [ok]
+  layer  4 moe  : max rel  6.54e-03  cosine 0.999979  [ok]
+  layer  5 moe  : max rel  4.65e-03  cosine 0.999983  [ok]
+  layer  6 moe  : max rel  4.07e-03  cosine 0.999983  [ok]
+  layer  7 moe  : max rel  1.76e-03  cosine 0.999974  [ok]
+  layer  8 moe  : max rel  1.88e-03  cosine 0.999973  [ok]
+  layer  9 moe  : max rel  1.56e-03  cosine 0.999979  [ok]
+  layer 10 moe  : max rel  2.11e-03  cosine 0.999980  [ok]
+  layer 11 moe  : max rel  4.31e-03  cosine 0.999977  [ok]
+  layer 12 moe  : max rel  3.07e-03  cosine 0.999985  [ok]
+  layer 13 moe  : max rel  3.23e-03  cosine 0.999983  [ok]
+  layer 14 moe  : max rel  1.74e-03  cosine 0.999981  [ok]
+  layer 15 moe  : max rel  6.29e-03  cosine 0.999979  [ok]
+  layer 16 moe  : max rel  5.71e-03  cosine 0.999979  [ok]
+  layer 17 moe  : max rel  5.41e-03  cosine 0.999978  [ok]
+  layer 18 moe  : max rel  5.81e-03  cosine 0.999923  [ok]
+  layer 19 moe  : max rel  1.02e-02  cosine 0.999935  [ok]
+  layer 20 moe  : max rel  8.81e-03  cosine 0.999950  [ok]
+  layer 21 moe  : max rel  7.35e-03  cosine 0.999940  [ok]
+  layer 22 moe  : max rel  8.33e-03  cosine 0.999887  [ok]
+  layer 23 moe  : max rel  4.49e-03  cosine 0.999920  [ok]
+  layer 24 moe  : max rel  5.21e-03  cosine 0.999926  [ok]
+  layer 25 moe  : max rel  2.63e-03  cosine 0.999966  [ok]
+  layer 26 moe  : max rel  6.25e-03  cosine 0.999977  [ok]
+  consecutive layers within the gate: 27 of 27
+
+per-token latency (embed -> argmax on device): median 3.619 ms  mean 3.620 ms; step wall (launch to end) 3.655 ms/token
+tokens: 32/32 match HF greedy
+$ timeout --kill-after=5s 180s stdbuf -oL -eL /root/sess/b_default/run --weights /root/dsv2-data/weights.bin --cache /root/dsv2-data/fleet_cache.bin --golden /root/dsv2-data/golden_tokens.txt --hidden /root/dsv2-data/golden_hidden.bin --tokens 32 --context 1024 --repeat 2
+device: AMD Instinct MI300X VF  arch gfx942:sramecc+:xnack-  CUs 304
+model: hidden 2048 heads 16 kv_lora 512 experts 64 top-6 layers 27 (dense < 1) vocab 102400
+  /root/dsv2-data/weights.bin: 31.4 GB uploaded
+  /root/dsv2-data/fleet_cache.bin: 0.0 GB uploaded
+etx: 54946 tasks, 1778 event words, 296 workers (8 domains x 37), lds 24576 B (fleet scratch 23408 B)
+run 0 (warm-up): 32/32 tokens match
+token  0:    3.696 ms (device)  step   3.727 ms  out   1780  ok
+token  1:    3.697 ms (device)  step   3.730 ms  out    185  ok
+token  2:    3.694 ms (device)  step   3.727 ms  out    300  ok
+token  3:    3.701 ms (device)  step   3.733 ms  out   1501  ok
+token  4:    3.699 ms (device)  step   3.739 ms  out  11747  ok
+token  5:    3.695 ms (device)  step   3.735 ms  out    254  ok
+token  6:    3.704 ms (device)  step   3.739 ms  out   3510  ok
+token  7:    3.698 ms (device)  step   3.732 ms  out    185  ok
+token  8:    3.704 ms (device)  step   3.736 ms  out   1558  ok
+token  9:    3.699 ms (device)  step   3.732 ms  out   8708  ok
+token 10:    3.697 ms (device)  step   3.731 ms  out      7  ok
+token 11:    3.700 ms (device)  step   3.731 ms  out     77  ok
+token 12:    3.696 ms (device)  step   3.729 ms  out   1780  ok
+token 13:    3.697 ms (device)  step   3.730 ms  out    185  ok
+token 14:    3.701 ms (device)  step   3.734 ms  out    300  ok
+token 15:    3.704 ms (device)  step   3.735 ms  out   1501  ok
+token 16:    3.706 ms (device)  step   3.737 ms  out  11747  ok
+token 17:    3.707 ms (device)  step   3.739 ms  out    254  ok
+token 18:    3.701 ms (device)  step   3.734 ms  out   3510  ok
+token 19:    3.703 ms (device)  step   3.735 ms  out    185  ok
+token 20:    3.702 ms (device)  step   3.734 ms  out   1558  ok
+token 21:    3.723 ms (device)  step   3.755 ms  out   8708  ok
+token 22:    3.702 ms (device)  step   3.734 ms  out      7  ok
+token 23:    3.705 ms (device)  step   3.737 ms  out     77  ok
+token 24:    3.704 ms (device)  step   3.738 ms  out   1780  ok
+token 25:    3.704 ms (device)  step   3.744 ms  out    185  ok
+token 26:    3.705 ms (device)  step   3.738 ms  out    300  ok
+token 27:    3.701 ms (device)  step   3.735 ms  out   1501  ok
+token 28:    3.710 ms (device)  step   3.742 ms  out  11747  ok
+token 29:    3.703 ms (device)  step   3.737 ms  out    254  ok
+token 30:    3.712 ms (device)  step   3.744 ms  out   3510  ok
+token 31:    3.717 ms (device)  step   3.753 ms  out    185  ok
+  layer  0 dense: max rel  1.72e-03  cosine 0.999996  [ok]
+  layer  1 moe  : max rel  3.13e-03  cosine 0.999993  [ok]
+  layer  2 moe  : max rel  2.96e-03  cosine 0.999986  [ok]
+  layer  3 moe  : max rel  2.45e-03  cosine 0.999985  [ok]
+  layer  4 moe  : max rel  6.54e-03  cosine 0.999979  [ok]
+  layer  5 moe  : max rel  4.65e-03  cosine 0.999983  [ok]
+  layer  6 moe  : max rel  4.07e-03  cosine 0.999983  [ok]
+  layer  7 moe  : max rel  1.76e-03  cosine 0.999974  [ok]
+  layer  8 moe  : max rel  1.88e-03  cosine 0.999973  [ok]
+  layer  9 moe  : max rel  1.56e-03  cosine 0.999980  [ok]
+  layer 10 moe  : max rel  1.40e-03  cosine 0.999981  [ok]
+  layer 11 moe  : max rel  1.35e-03  cosine 0.999981  [ok]
+  layer 12 moe  : max rel  3.07e-03  cosine 0.999984  [ok]
+  layer 13 moe  : max rel  3.23e-03  cosine 0.999983  [ok]
+  layer 14 moe  : max rel  1.74e-03  cosine 0.999981  [ok]
+  layer 15 moe  : max rel  6.29e-03  cosine 0.999981  [ok]
+  layer 16 moe  : max rel  5.71e-03  cosine 0.999978  [ok]
+  layer 17 moe  : max rel  5.41e-03  cosine 0.999979  [ok]
+  layer 18 moe  : max rel  5.81e-03  cosine 0.999923  [ok]
+  layer 19 moe  : max rel  1.91e-03  cosine 0.999949  [ok]
+  layer 20 moe  : max rel  4.41e-03  cosine 0.999961  [ok]
+  layer 21 moe  : max rel  4.90e-03  cosine 0.999949  [ok]
+  layer 22 moe  : max rel  4.17e-03  cosine 0.999905  [ok]
+  layer 23 moe  : max rel  2.25e-03  cosine 0.999933  [ok]
+  layer 24 moe  : max rel  2.60e-03  cosine 0.999937  [ok]
+  layer 25 moe  : max rel  5.26e-03  cosine 0.999969  [ok]
+  layer 26 moe  : max rel  8.79e-04  cosine 0.999981  [ok]
+  consecutive layers within the gate: 27 of 27
+
+per-token latency (embed -> argmax on device): median 3.702 ms  mean 3.703 ms; step wall (launch to end) 3.736 ms/token
+tokens: 32/32 match HF greedy
+$ timeout --kill-after=5s 180s stdbuf -oL -eL /root/sess/b_default/run --weights /root/dsv2-data/weights.bin --cache /root/dsv2-data/fleet_cache.bin --golden /root/dsv2-data/golden_tokens.txt --hidden /root/dsv2-data/golden_hidden.bin --tokens 32 --context 1024 --repeat 2
+device: AMD Instinct MI300X VF  arch gfx942:sramecc+:xnack-  CUs 304
+model: hidden 2048 heads 16 kv_lora 512 experts 64 top-6 layers 27 (dense < 1) vocab 102400
+  /root/dsv2-data/weights.bin: 31.4 GB uploaded
+  /root/dsv2-data/fleet_cache.bin: 0.0 GB uploaded
+etx: 54946 tasks, 1778 event words, 296 workers (8 domains x 37), lds 24576 B (fleet scratch 23408 B)
+run 0 (warm-up): 32/32 tokens match
+token  0:    3.699 ms (device)  step   3.732 ms  out   1780  ok
+token  1:    3.702 ms (device)  step   3.736 ms  out    185  ok
+token  2:    3.703 ms (device)  step   3.735 ms  out    300  ok
+token  3:    3.702 ms (device)  step   3.738 ms  out   1501  ok
+token  4:    3.703 ms (device)  step   3.738 ms  out  11747  ok
+token  5:    3.715 ms (device)  step   3.750 ms  out    254  ok
+token  6:    3.707 ms (device)  step   3.740 ms  out   3510  ok
+token  7:    3.717 ms (device)  step   3.750 ms  out    185  ok
+token  8:    3.713 ms (device)  step   3.748 ms  out   1558  ok
+token  9:    3.711 ms (device)  step   3.745 ms  out   8708  ok
+token 10:    3.711 ms (device)  step   3.745 ms  out      7  ok
+token 11:    3.709 ms (device)  step   3.743 ms  out     77  ok
+token 12:    3.710 ms (device)  step   3.745 ms  out   1780  ok
+token 13:    3.707 ms (device)  step   3.741 ms  out    185  ok
+token 14:    3.717 ms (device)  step   3.751 ms  out    300  ok
+token 15:    3.712 ms (device)  step   3.746 ms  out   1501  ok
+token 16:    3.710 ms (device)  step   3.750 ms  out  11747  ok
+token 17:    3.717 ms (device)  step   3.751 ms  out    254  ok
+token 18:    3.713 ms (device)  step   3.748 ms  out   3510  ok
+token 19:    3.711 ms (device)  step   3.744 ms  out    185  ok
+token 20:    3.714 ms (device)  step   3.747 ms  out   1558  ok
+token 21:    3.712 ms (device)  step   3.747 ms  out   8708  ok
+token 22:    3.713 ms (device)  step   3.746 ms  out      7  ok
+token 23:    3.717 ms (device)  step   3.749 ms  out     77  ok
+token 24:    3.711 ms (device)  step   3.745 ms  out   1780  ok
+token 25:    3.717 ms (device)  step   3.753 ms  out    185  ok
+token 26:    3.712 ms (device)  step   3.751 ms  out    300  ok
+token 27:    3.708 ms (device)  step   3.741 ms  out   1501  ok
+token 28:    3.714 ms (device)  step   3.756 ms  out  11747  ok
+token 29:    3.715 ms (device)  step   3.746 ms  out    254  ok
+token 30:    3.716 ms (device)  step   3.751 ms  out   3510  ok
+token 31:    3.717 ms (device)  step   3.751 ms  out    185  ok
+  layer  0 dense: max rel  1.72e-03  cosine 0.999996  [ok]
+  layer  1 moe  : max rel  3.13e-03  cosine 0.999993  [ok]
+  layer  2 moe  : max rel  2.96e-03  cosine 0.999986  [ok]
+  layer  3 moe  : max rel  2.45e-03  cosine 0.999985  [ok]
+  layer  4 moe  : max rel  6.54e-03  cosine 0.999979  [ok]
+  layer  5 moe  : max rel  4.65e-03  cosine 0.999983  [ok]
+  layer  6 moe  : max rel  4.07e-03  cosine 0.999983  [ok]
+  layer  7 moe  : max rel  1.76e-03  cosine 0.999974  [ok]
+  layer  8 moe  : max rel  1.88e-03  cosine 0.999973  [ok]
+  layer  9 moe  : max rel  1.56e-03  cosine 0.999980  [ok]
+  layer 10 moe  : max rel  1.40e-03  cosine 0.999981  [ok]
+  layer 11 moe  : max rel  1.35e-03  cosine 0.999981  [ok]
+  layer 12 moe  : max rel  3.07e-03  cosine 0.999984  [ok]
+  layer 13 moe  : max rel  3.23e-03  cosine 0.999983  [ok]
+  layer 14 moe  : max rel  1.74e-03  cosine 0.999981  [ok]
+  layer 15 moe  : max rel  6.29e-03  cosine 0.999981  [ok]
+  layer 16 moe  : max rel  5.71e-03  cosine 0.999978  [ok]
+  layer 17 moe  : max rel  5.41e-03  cosine 0.999979  [ok]
+  layer 18 moe  : max rel  5.81e-03  cosine 0.999923  [ok]
+  layer 19 moe  : max rel  1.91e-03  cosine 0.999949  [ok]
+  layer 20 moe  : max rel  4.41e-03  cosine 0.999961  [ok]
+  layer 21 moe  : max rel  4.90e-03  cosine 0.999949  [ok]
+  layer 22 moe  : max rel  4.17e-03  cosine 0.999905  [ok]
+  layer 23 moe  : max rel  2.25e-03  cosine 0.999933  [ok]
+  layer 24 moe  : max rel  2.60e-03  cosine 0.999937  [ok]
+  layer 25 moe  : max rel  5.26e-03  cosine 0.999969  [ok]
+  layer 26 moe  : max rel  8.79e-04  cosine 0.999981  [ok]
+  consecutive layers within the gate: 27 of 27
+
+per-token latency (embed -> argmax on device): median 3.712 ms  mean 3.711 ms; step wall (launch to end) 3.746 ms/token
+tokens: 32/32 match HF greedy
+$ timeout --kill-after=5s 180s stdbuf -oL -eL /root/sess/b_all/run --weights /root/dsv2-data/weights.bin --cache /root/dsv2-data/fleet_cache.bin --golden /root/dsv2-data/golden_tokens.txt --hidden /root/dsv2-data/golden_hidden.bin --tokens 32 --context 1024 --repeat 2
+device: AMD Instinct MI300X VF  arch gfx942:sramecc+:xnack-  CUs 304
+model: hidden 2048 heads 16 kv_lora 512 experts 64 top-6 layers 27 (dense < 1) vocab 102400
+  /root/dsv2-data/weights.bin: 31.4 GB uploaded
+  /root/dsv2-data/fleet_cache.bin: 0.0 GB uploaded
+etx: 54946 tasks, 1778 event words, 296 workers (8 domains x 37), lds 24576 B (fleet scratch 23408 B)
+run 0 (warm-up): 32/32 tokens match
+token  0:    3.613 ms (device)  step   3.645 ms  out   1780  ok
+token  1:    3.617 ms (device)  step   3.650 ms  out    185  ok
+token  2:    3.611 ms (device)  step   3.644 ms  out    300  ok
+token  3:    3.612 ms (device)  step   3.647 ms  out   1501  ok
+token  4:    3.615 ms (device)  step   3.650 ms  out  11747  ok
+token  5:    3.603 ms (device)  step   3.634 ms  out    254  ok
+token  6:    3.609 ms (device)  step   3.643 ms  out   3510  ok
+token  7:    3.613 ms (device)  step   3.646 ms  out    185  ok
+token  8:    3.612 ms (device)  step   3.645 ms  out   1558  ok
+token  9:    3.611 ms (device)  step   3.644 ms  out   8708  ok
+token 10:    3.614 ms (device)  step   3.648 ms  out      7  ok
+token 11:    3.617 ms (device)  step   3.650 ms  out     77  ok
+token 12:    3.618 ms (device)  step   3.652 ms  out   1780  ok
+token 13:    3.622 ms (device)  step   3.655 ms  out    185  ok
+token 14:    3.609 ms (device)  step   3.643 ms  out    300  ok
+token 15:    3.613 ms (device)  step   3.647 ms  out   1501  ok
+token 16:    3.613 ms (device)  step   3.645 ms  out  11747  ok
+token 17:    3.615 ms (device)  step   3.648 ms  out    254  ok
+token 18:    3.618 ms (device)  step   3.653 ms  out   3510  ok
+token 19:    3.615 ms (device)  step   3.647 ms  out    185  ok
+token 20:    3.617 ms (device)  step   3.651 ms  out   1558  ok
+token 21:    3.608 ms (device)  step   3.650 ms  out   8708  ok
+token 22:    3.615 ms (device)  step   3.648 ms  out      7  ok
+token 23:    3.619 ms (device)  step   3.653 ms  out     77  ok
+token 24:    3.617 ms (device)  step   3.651 ms  out   1780  ok
+token 25:    3.617 ms (device)  step   3.659 ms  out    185  ok
+token 26:    3.613 ms (device)  step   3.648 ms  out    300  ok
+token 27:    3.617 ms (device)  step   3.648 ms  out   1501  ok
+token 28:    3.612 ms (device)  step   3.646 ms  out  11747  ok
+token 29:    3.613 ms (device)  step   3.648 ms  out    254  ok
+token 30:    3.623 ms (device)  step   3.656 ms  out   3510  ok
+token 31:    3.633 ms (device)  step   3.668 ms  out    185  ok
+  layer  0 dense: max rel  1.72e-03  cosine 0.999996  [ok]
+  layer  1 moe  : max rel  3.13e-03  cosine 0.999993  [ok]
+  layer  2 moe  : max rel  2.96e-03  cosine 0.999986  [ok]
+  layer  3 moe  : max rel  2.45e-03  cosine 0.999985  [ok]
+  layer  4 moe  : max rel  6.54e-03  cosine 0.999979  [ok]
+  layer  5 moe  : max rel  4.65e-03  cosine 0.999983  [ok]
+  layer  6 moe  : max rel  4.07e-03  cosine 0.999983  [ok]
+  layer  7 moe  : max rel  1.76e-03  cosine 0.999974  [ok]
+  layer  8 moe  : max rel  1.88e-03  cosine 0.999973  [ok]
+  layer  9 moe  : max rel  1.56e-03  cosine 0.999979  [ok]
+  layer 10 moe  : max rel  2.11e-03  cosine 0.999980  [ok]
+  layer 11 moe  : max rel  4.31e-03  cosine 0.999977  [ok]
+  layer 12 moe  : max rel  3.07e-03  cosine 0.999985  [ok]
+  layer 13 moe  : max rel  3.23e-03  cosine 0.999983  [ok]
+  layer 14 moe  : max rel  1.74e-03  cosine 0.999981  [ok]
+  layer 15 moe  : max rel  6.29e-03  cosine 0.999979  [ok]
+  layer 16 moe  : max rel  5.71e-03  cosine 0.999979  [ok]
+  layer 17 moe  : max rel  5.41e-03  cosine 0.999978  [ok]
+  layer 18 moe  : max rel  5.81e-03  cosine 0.999923  [ok]
+  layer 19 moe  : max rel  1.02e-02  cosine 0.999935  [ok]
+  layer 20 moe  : max rel  8.81e-03  cosine 0.999950  [ok]
+  layer 21 moe  : max rel  7.35e-03  cosine 0.999940  [ok]
+  layer 22 moe  : max rel  8.33e-03  cosine 0.999887  [ok]
+  layer 23 moe  : max rel  4.49e-03  cosine 0.999920  [ok]
+  layer 24 moe  : max rel  5.21e-03  cosine 0.999926  [ok]
+  layer 25 moe  : max rel  2.63e-03  cosine 0.999966  [ok]
+  layer 26 moe  : max rel  6.25e-03  cosine 0.999977  [ok]
+  consecutive layers within the gate: 27 of 27
+
+per-token latency (embed -> argmax on device): median 3.615 ms  mean 3.615 ms; step wall (launch to end) 3.649 ms/token
+tokens: 32/32 match HF greedy
+$ timeout --kill-after=5s 180s stdbuf -oL -eL /root/sess/b_fleet/run --weights /root/dsv2-data/weights.bin --cache /root/dsv2-data/fleet_cache.bin --golden /root/dsv2-data/golden_tokens.txt --hidden /root/dsv2-data/golden_hidden.bin --tokens 32 --context 1024 --repeat 2 --graph /root/sess/b_fleet/taskgraph_d16.bin
+device: AMD Instinct MI300X VF  arch gfx942:sramecc+:xnack-  CUs 304
+graph: 54946 descriptors across 296 workers, 1589 events (85 global, mirrored), kv_chunks 16, final event 1588 (argmax)
+event counters: cached + release fence (scheme i); workers poll the per-XCD scheduler mirror; 32 token(s) per launch
+model: hidden 2048 heads 16 kv_lora 512 rope 64 experts 64/2 top-6 layers 27 (dense < 1) vocab 102400  softmax_scale 0.114721
+  /root/dsv2-data/weights.bin: 31.4 GB uploaded
+  /root/dsv2-data/fleet_cache.bin: 0.0 GB uploaded
+occupancy: 1 workgroup(s)/CU at 256 threads (need >= 1 for grid 304)
+placement: 304 workgroups by XCC_ID: [0]=38 [1]=38 [2]=38 [3]=38 [4]=38 [5]=38 [6]=38 [7]=38  (8 XCDs x 38 CUs x blocks/CU, as assumed)
+
+free-running decode: 32 tokens over a 1024-token context, 32 per launch, 2 run(s) (the last one is reported; the first is the warm-up)
+run 0 (warm-up): 127.395 ms total, 32/32 tokens match
+token  0:    3.563 ms  in     77 -> out   1780  ok
+token  1:    3.563 ms  in   1780 -> out    185  ok
+token  2:    3.556 ms  in    185 -> out    300  ok
+token  3:    3.560 ms  in    300 -> out   1501  ok
+token  4:    3.559 ms  in   1501 -> out  11747  ok
+token  5:    3.571 ms  in  11747 -> out    254  ok
+token  6:    3.560 ms  in    254 -> out   3510  ok
+token  7:    3.566 ms  in   3510 -> out    185  ok
+token  8:    3.556 ms  in    185 -> out   1558  ok
+token  9:    3.563 ms  in   1558 -> out   8708  ok
+token 10:    3.554 ms  in   8708 -> out      7  ok
+token 11:    3.563 ms  in      7 -> out     77  ok
+token 12:    3.558 ms  in     77 -> out   1780  ok
+token 13:    3.564 ms  in   1780 -> out    185  ok
+token 14:    3.563 ms  in    185 -> out    300  ok
+token 15:    3.564 ms  in    300 -> out   1501  ok
+token 16:    3.569 ms  in   1501 -> out  11747  ok
+token 17:    3.581 ms  in  11747 -> out    254  ok
+token 18:    3.572 ms  in    254 -> out   3510  ok
+token 19:    3.586 ms  in   3510 -> out    185  ok
+token 20:    3.588 ms  in    185 -> out   1558  ok
+token 21:    3.567 ms  in   1558 -> out   8708  ok
+token 22:    3.568 ms  in   8708 -> out      7  ok
+token 23:    3.569 ms  in      7 -> out     77  ok
+token 24:    3.583 ms  in     77 -> out   1780  ok
+token 25:    3.575 ms  in   1780 -> out    185  ok
+token 26:    3.571 ms  in    185 -> out    300  ok
+token 27:    3.600 ms  in    300 -> out   1501  ok
+token 28:    3.570 ms  in   1501 -> out  11747  ok
+token 29:    3.569 ms  in  11747 -> out    254  ok
+token 30:    3.574 ms  in    254 -> out   3510  ok
+token 31:    3.602 ms  in   3510 -> out    185  ok
+
+per-layer output vs HF, first decode step (gate: max rel <= 2e-2, cosine >= 0.999)
+  layer  0 dense: max rel  1.72e-03  cosine 0.999996  [ok]
+  layer  1 moe  : max rel  3.13e-03  cosine 0.999993  [ok]
+  layer  2 moe  : max rel  2.96e-03  cosine 0.999988  [ok]
+  layer  3 moe  : max rel  2.45e-03  cosine 0.999982  [ok]
+  layer  4 moe  : max rel  2.45e-03  cosine 0.999980  [ok]
+  layer  5 moe  : max rel  1.16e-03  cosine 0.999985  [ok]
+  layer  6 moe  : max rel  1.27e-03  cosine 0.999984  [ok]
+  layer  7 moe  : max rel  1.10e-03  cosine 0.999983  [ok]
+  layer  8 moe  : max rel  1.88e-03  cosine 0.999979  [ok]
+  layer  9 moe  : max rel  1.56e-03  cosine 0.999983  [ok]
+  layer 10 moe  : max rel  2.11e-03  cosine 0.999982  [ok]
+  layer 11 moe  : max rel  1.62e-03  cosine 0.999984  [ok]
+  layer 12 moe  : max rel  1.53e-03  cosine 0.999989  [ok]
+  layer 13 moe  : max rel  1.61e-03  cosine 0.999987  [ok]
+  layer 14 moe  : max rel  1.74e-03  cosine 0.999958  [ok]
+  layer 15 moe  : max rel  1.57e-03  cosine 0.999964  [ok]
+  layer 16 moe  : max rel  1.43e-03  cosine 0.999944  [ok]
+  layer 17 moe  : max rel  1.35e-03  cosine 0.999956  [ok]
+  layer 18 moe  : max rel  1.64e-03  cosine 0.999906  [ok]
+  layer 19 moe  : max rel  5.10e-03  cosine 0.999930  [ok]
+  layer 20 moe  : max rel  4.41e-03  cosine 0.999945  [ok]
+  layer 21 moe  : max rel  9.80e-03  cosine 0.999918  [ok]
+  layer 22 moe  : max rel  1.04e-02  cosine 0.999878  [ok]
+  layer 23 moe  : max rel  5.99e-03  cosine 0.999920  [ok]
+  layer 24 moe  : max rel  4.56e-03  cosine 0.999930  [ok]
+  layer 25 moe  : max rel  5.26e-03  cosine 0.999963  [ok]
+  layer 26 moe  : max rel  6.25e-03  cosine 0.999979  [ok]
+  consecutive layers within the gate: 27 of 27
+
+per-token latency (embed -> argmax on device): median 3.568 ms  p95 3.600 ms  mean 3.570 ms  (280.1 tok/s)
+wall time of the launches: 114.635 ms for 32 tokens = 3.582 ms/token (279.1 tok/s), 1 launch(es)
+tokens: 32/32 match HF greedy
+$ timeout --kill-after=5s 180s stdbuf -oL -eL /root/sess/b_fleet/run --weights /root/dsv2-data/weights.bin --cache /root/dsv2-data/fleet_cache.bin --golden /root/dsv2-data/golden_tokens.txt --hidden /root/dsv2-data/golden_hidden.bin --tokens 32 --context 1024 --repeat 2 --graph /root/sess/b_fleet/taskgraph_d16.bin
+device: AMD Instinct MI300X VF  arch gfx942:sramecc+:xnack-  CUs 304
+graph: 54946 descriptors across 296 workers, 1589 events (85 global, mirrored), kv_chunks 16, final event 1588 (argmax)
+event counters: cached + release fence (scheme i); workers poll the per-XCD scheduler mirror; 32 token(s) per launch
+model: hidden 2048 heads 16 kv_lora 512 rope 64 experts 64/2 top-6 layers 27 (dense < 1) vocab 102400  softmax_scale 0.114721
+  /root/dsv2-data/weights.bin: 31.4 GB uploaded
+  /root/dsv2-data/fleet_cache.bin: 0.0 GB uploaded
+occupancy: 1 workgroup(s)/CU at 256 threads (need >= 1 for grid 304)
+placement: 304 workgroups by XCC_ID: [0]=38 [1]=38 [2]=38 [3]=38 [4]=38 [5]=38 [6]=38 [7]=38  (8 XCDs x 38 CUs x blocks/CU, as assumed)
+
+free-running decode: 32 tokens over a 1024-token context, 32 per launch, 2 run(s) (the last one is reported; the first is the warm-up)
+run 0 (warm-up): 128.791 ms total, 32/32 tokens match
+token  0:    3.571 ms  in     77 -> out   1780  ok
+token  1:    3.559 ms  in   1780 -> out    185  ok
+token  2:    3.559 ms  in    185 -> out    300  ok
+token  3:    3.563 ms  in    300 -> out   1501  ok
+token  4:    3.572 ms  in   1501 -> out  11747  ok
+token  5:    3.563 ms  in  11747 -> out    254  ok
+token  6:    3.563 ms  in    254 -> out   3510  ok
+token  7:    3.566 ms  in   3510 -> out    185  ok
+token  8:    3.559 ms  in    185 -> out   1558  ok
+token  9:    3.559 ms  in   1558 -> out   8708  ok
+token 10:    3.566 ms  in   8708 -> out      7  ok
+token 11:    3.564 ms  in      7 -> out     77  ok
+token 12:    3.566 ms  in     77 -> out   1780  ok
+token 13:    3.568 ms  in   1780 -> out    185  ok
+token 14:    3.573 ms  in    185 -> out    300  ok
+token 15:    3.564 ms  in    300 -> out   1501  ok
+token 16:    3.570 ms  in   1501 -> out  11747  ok
+token 17:    3.572 ms  in  11747 -> out    254  ok
+token 18:    3.584 ms  in    254 -> out   3510  ok
+token 19:    3.591 ms  in   3510 -> out    185  ok
+token 20:    3.568 ms  in    185 -> out   1558  ok
+token 21:    3.571 ms  in   1558 -> out   8708  ok
+token 22:    3.570 ms  in   8708 -> out      7  ok
+token 23:    3.564 ms  in      7 -> out     77  ok
+token 24:    3.569 ms  in     77 -> out   1780  ok
+token 25:    3.571 ms  in   1780 -> out    185  ok
+token 26:    3.578 ms  in    185 -> out    300  ok
+token 27:    3.570 ms  in    300 -> out   1501  ok
+token 28:    3.576 ms  in   1501 -> out  11747  ok
+token 29:    3.576 ms  in  11747 -> out    254  ok
+token 30:    3.570 ms  in    254 -> out   3510  ok
+token 31:    3.578 ms  in   3510 -> out    185  ok
+
+per-layer output vs HF, first decode step (gate: max rel <= 2e-2, cosine >= 0.999)
+  layer  0 dense: max rel  1.72e-03  cosine 0.999996  [ok]
+  layer  1 moe  : max rel  3.13e-03  cosine 0.999993  [ok]
+  layer  2 moe  : max rel  2.96e-03  cosine 0.999988  [ok]
+  layer  3 moe  : max rel  2.45e-03  cosine 0.999982  [ok]
+  layer  4 moe  : max rel  2.45e-03  cosine 0.999980  [ok]
+  layer  5 moe  : max rel  1.16e-03  cosine 0.999985  [ok]
+  layer  6 moe  : max rel  1.27e-03  cosine 0.999984  [ok]
+  layer  7 moe  : max rel  1.10e-03  cosine 0.999983  [ok]
+  layer  8 moe  : max rel  1.88e-03  cosine 0.999979  [ok]
+  layer  9 moe  : max rel  1.56e-03  cosine 0.999983  [ok]
+  layer 10 moe  : max rel  2.11e-03  cosine 0.999982  [ok]
+  layer 11 moe  : max rel  1.62e-03  cosine 0.999984  [ok]
+  layer 12 moe  : max rel  1.53e-03  cosine 0.999989  [ok]
+  layer 13 moe  : max rel  1.61e-03  cosine 0.999987  [ok]
+  layer 14 moe  : max rel  1.74e-03  cosine 0.999958  [ok]
+  layer 15 moe  : max rel  1.57e-03  cosine 0.999964  [ok]
+  layer 16 moe  : max rel  1.43e-03  cosine 0.999944  [ok]
+  layer 17 moe  : max rel  1.35e-03  cosine 0.999956  [ok]
+  layer 18 moe  : max rel  1.64e-03  cosine 0.999906  [ok]
+  layer 19 moe  : max rel  5.10e-03  cosine 0.999930  [ok]
+  layer 20 moe  : max rel  4.41e-03  cosine 0.999945  [ok]
+  layer 21 moe  : max rel  9.80e-03  cosine 0.999918  [ok]
+  layer 22 moe  : max rel  1.04e-02  cosine 0.999878  [ok]
+  layer 23 moe  : max rel  5.99e-03  cosine 0.999920  [ok]
+  layer 24 moe  : max rel  4.56e-03  cosine 0.999930  [ok]
+  layer 25 moe  : max rel  5.26e-03  cosine 0.999963  [ok]
+  layer 26 moe  : max rel  6.25e-03  cosine 0.999979  [ok]
+  consecutive layers within the gate: 27 of 27
+
+per-token latency (embed -> argmax on device): median 3.570 ms  p95 3.584 ms  mean 3.569 ms  (280.2 tok/s)
+wall time of the launches: 114.609 ms for 32 tokens = 3.582 ms/token (279.2 tok/s), 1 launch(es)
+tokens: 32/32 match HF greedy
+$ timeout --kill-after=5s 180s stdbuf -oL -eL /root/sess/b_all/run --weights /root/dsv2-data/weights.bin --cache /root/dsv2-data/fleet_cache.bin --golden /root/dsv2-data/golden_tokens.txt --hidden /root/dsv2-data/golden_hidden.bin --tokens 32 --context 1024 --repeat 2
+device: AMD Instinct MI300X VF  arch gfx942:sramecc+:xnack-  CUs 304
+model: hidden 2048 heads 16 kv_lora 512 experts 64 top-6 layers 27 (dense < 1) vocab 102400
+  /root/dsv2-data/weights.bin: 31.4 GB uploaded
+  /root/dsv2-data/fleet_cache.bin: 0.0 GB uploaded
+etx: 54946 tasks, 1778 event words, 296 workers (8 domains x 37), lds 24576 B (fleet scratch 23408 B)
+run 0 (warm-up): 32/32 tokens match
+token  0:    3.618 ms (device)  step   3.652 ms  out   1780  ok
+token  1:    3.613 ms (device)  step   3.645 ms  out    185  ok
+token  2:    3.616 ms (device)  step   3.658 ms  out    300  ok
+token  3:    3.617 ms (device)  step   3.651 ms  out   1501  ok
+token  4:    3.618 ms (device)  step   3.650 ms  out  11747  ok
+token  5:    3.612 ms (device)  step   3.647 ms  out    254  ok
+token  6:    3.611 ms (device)  step   3.647 ms  out   3510  ok
+token  7:    3.620 ms (device)  step   3.655 ms  out    185  ok
+token  8:    3.620 ms (device)  step   3.652 ms  out   1558  ok
+token  9:    3.623 ms (device)  step   3.657 ms  out   8708  ok
+token 10:    3.624 ms (device)  step   3.659 ms  out      7  ok
+token 11:    3.624 ms (device)  step   3.659 ms  out     77  ok
+token 12:    3.614 ms (device)  step   3.649 ms  out   1780  ok
+token 13:    3.615 ms (device)  step   3.649 ms  out    185  ok
+token 14:    3.618 ms (device)  step   3.651 ms  out    300  ok
+token 15:    3.620 ms (device)  step   3.655 ms  out   1501  ok
+token 16:    3.622 ms (device)  step   3.655 ms  out  11747  ok
+token 17:    3.620 ms (device)  step   3.654 ms  out    254  ok
+token 18:    3.620 ms (device)  step   3.654 ms  out   3510  ok
+token 19:    3.617 ms (device)  step   3.652 ms  out    185  ok
+token 20:    3.622 ms (device)  step   3.653 ms  out   1558  ok
+token 21:    3.628 ms (device)  step   3.663 ms  out   8708  ok
+token 22:    3.623 ms (device)  step   3.659 ms  out      7  ok
+token 23:    3.626 ms (device)  step   3.658 ms  out     77  ok
+token 24:    3.623 ms (device)  step   3.654 ms  out   1780  ok
+token 25:    3.622 ms (device)  step   3.655 ms  out    185  ok
+token 26:    3.635 ms (device)  step   3.671 ms  out    300  ok
+token 27:    3.623 ms (device)  step   3.655 ms  out   1501  ok
+token 28:    3.625 ms (device)  step   3.659 ms  out  11747  ok
+token 29:    3.621 ms (device)  step   3.655 ms  out    254  ok
+token 30:    3.627 ms (device)  step   3.661 ms  out   3510  ok
+token 31:    3.638 ms (device)  step   3.672 ms  out    185  ok
+  layer  0 dense: max rel  1.72e-03  cosine 0.999996  [ok]
+  layer  1 moe  : max rel  3.13e-03  cosine 0.999993  [ok]
+  layer  2 moe  : max rel  2.96e-03  cosine 0.999986  [ok]
+  layer  3 moe  : max rel  2.45e-03  cosine 0.999985  [ok]
+  layer  4 moe  : max rel  6.54e-03  cosine 0.999979  [ok]
+  layer  5 moe  : max rel  4.65e-03  cosine 0.999983  [ok]
+  layer  6 moe  : max rel  4.07e-03  cosine 0.999983  [ok]
+  layer  7 moe  : max rel  1.76e-03  cosine 0.999974  [ok]
+  layer  8 moe  : max rel  1.88e-03  cosine 0.999973  [ok]
+  layer  9 moe  : max rel  1.56e-03  cosine 0.999979  [ok]
+  layer 10 moe  : max rel  2.11e-03  cosine 0.999980  [ok]
+  layer 11 moe  : max rel  4.31e-03  cosine 0.999977  [ok]
+  layer 12 moe  : max rel  3.07e-03  cosine 0.999985  [ok]
+  layer 13 moe  : max rel  3.23e-03  cosine 0.999983  [ok]
+  layer 14 moe  : max rel  1.74e-03  cosine 0.999981  [ok]
+  layer 15 moe  : max rel  6.29e-03  cosine 0.999979  [ok]
+  layer 16 moe  : max rel  5.71e-03  cosine 0.999979  [ok]
+  layer 17 moe  : max rel  5.41e-03  cosine 0.999978  [ok]
+  layer 18 moe  : max rel  5.81e-03  cosine 0.999923  [ok]
+  layer 19 moe  : max rel  1.02e-02  cosine 0.999935  [ok]
+  layer 20 moe  : max rel  8.81e-03  cosine 0.999950  [ok]
+  layer 21 moe  : max rel  7.35e-03  cosine 0.999940  [ok]
+  layer 22 moe  : max rel  8.33e-03  cosine 0.999887  [ok]
+  layer 23 moe  : max rel  4.49e-03  cosine 0.999920  [ok]
+  layer 24 moe  : max rel  5.21e-03  cosine 0.999926  [ok]
+  layer 25 moe  : max rel  2.63e-03  cosine 0.999966  [ok]
+  layer 26 moe  : max rel  6.25e-03  cosine 0.999977  [ok]
+  consecutive layers within the gate: 27 of 27
+
+per-token latency (embed -> argmax on device): median 3.621 ms  mean 3.621 ms; step wall (launch to end) 3.655 ms/token
+tokens: 32/32 match HF greedy
+$ timeout --kill-after=5s 180s stdbuf -oL -eL /root/sess/b_default/run --weights /root/dsv2-data/weights.bin --cache /root/dsv2-data/fleet_cache.bin --golden /root/dsv2-data/golden_tokens.txt --hidden /root/dsv2-data/golden_hidden.bin --tokens 32 --context 1024 --repeat 2
+device: AMD Instinct MI300X VF  arch gfx942:sramecc+:xnack-  CUs 304
+model: hidden 2048 heads 16 kv_lora 512 experts 64 top-6 layers 27 (dense < 1) vocab 102400
+  /root/dsv2-data/weights.bin: 31.4 GB uploaded
+  /root/dsv2-data/fleet_cache.bin: 0.0 GB uploaded
+etx: 54946 tasks, 1778 event words, 296 workers (8 domains x 37), lds 24576 B (fleet scratch 23408 B)
+run 0 (warm-up): 32/32 tokens match
+token  0:    3.714 ms (device)  step   3.747 ms  out   1780  ok
+token  1:    3.709 ms (device)  step   3.750 ms  out    185  ok
+token  2:    3.714 ms (device)  step   3.745 ms  out    300  ok
+token  3:    3.708 ms (device)  step   3.739 ms  out   1501  ok
+token  4:    3.712 ms (device)  step   3.743 ms  out  11747  ok
+token  5:    3.711 ms (device)  step   3.745 ms  out    254  ok
+token  6:    3.709 ms (device)  step   3.742 ms  out   3510  ok
+token  7:    3.717 ms (device)  step   3.749 ms  out    185  ok
+token  8:    3.710 ms (device)  step   3.743 ms  out   1558  ok
+token  9:    3.711 ms (device)  step   3.742 ms  out   8708  ok
+token 10:    3.712 ms (device)  step   3.743 ms  out      7  ok
+token 11:    3.711 ms (device)  step   3.745 ms  out     77  ok
+token 12:    3.718 ms (device)  step   3.752 ms  out   1780  ok
+token 13:    3.713 ms (device)  step   3.748 ms  out    185  ok
+token 14:    3.710 ms (device)  step   3.741 ms  out    300  ok
+token 15:    3.710 ms (device)  step   3.744 ms  out   1501  ok
+token 16:    3.710 ms (device)  step   3.744 ms  out  11747  ok
+token 17:    3.715 ms (device)  step   3.746 ms  out    254  ok
+token 18:    3.717 ms (device)  step   3.751 ms  out   3510  ok
+token 19:    3.709 ms (device)  step   3.742 ms  out    185  ok
+token 20:    3.719 ms (device)  step   3.753 ms  out   1558  ok
+token 21:    3.712 ms (device)  step   3.746 ms  out   8708  ok
+token 22:    3.724 ms (device)  step   3.757 ms  out      7  ok
+token 23:    3.711 ms (device)  step   3.744 ms  out     77  ok
+token 24:    3.715 ms (device)  step   3.748 ms  out   1780  ok
+token 25:    3.738 ms (device)  step   3.773 ms  out    185  ok
+token 26:    3.722 ms (device)  step   3.755 ms  out    300  ok
+token 27:    3.710 ms (device)  step   3.743 ms  out   1501  ok
+token 28:    3.717 ms (device)  step   3.752 ms  out  11747  ok
+token 29:    3.721 ms (device)  step   3.755 ms  out    254  ok
+token 30:    3.715 ms (device)  step   3.747 ms  out   3510  ok
+token 31:    3.735 ms (device)  step   3.768 ms  out    185  ok
+  layer  0 dense: max rel  1.72e-03  cosine 0.999996  [ok]
+  layer  1 moe  : max rel  3.13e-03  cosine 0.999993  [ok]
+  layer  2 moe  : max rel  2.96e-03  cosine 0.999986  [ok]
+  layer  3 moe  : max rel  2.45e-03  cosine 0.999985  [ok]
+  layer  4 moe  : max rel  6.54e-03  cosine 0.999979  [ok]
+  layer  5 moe  : max rel  4.65e-03  cosine 0.999983  [ok]
+  layer  6 moe  : max rel  4.07e-03  cosine 0.999983  [ok]
+  layer  7 moe  : max rel  1.76e-03  cosine 0.999974  [ok]
+  layer  8 moe  : max rel  1.88e-03  cosine 0.999973  [ok]
+  layer  9 moe  : max rel  1.56e-03  cosine 0.999980  [ok]
+  layer 10 moe  : max rel  1.40e-03  cosine 0.999981  [ok]
+  layer 11 moe  : max rel  1.35e-03  cosine 0.999981  [ok]
+  layer 12 moe  : max rel  3.07e-03  cosine 0.999984  [ok]
+  layer 13 moe  : max rel  3.23e-03  cosine 0.999983  [ok]
+  layer 14 moe  : max rel  1.74e-03  cosine 0.999981  [ok]
+  layer 15 moe  : max rel  6.29e-03  cosine 0.999981  [ok]
+  layer 16 moe  : max rel  5.71e-03  cosine 0.999978  [ok]
+  layer 17 moe  : max rel  5.41e-03  cosine 0.999979  [ok]
+  layer 18 moe  : max rel  5.81e-03  cosine 0.999923  [ok]
+  layer 19 moe  : max rel  1.91e-03  cosine 0.999949  [ok]
+  layer 20 moe  : max rel  4.41e-03  cosine 0.999961  [ok]
+  layer 21 moe  : max rel  4.90e-03  cosine 0.999949  [ok]
+  layer 22 moe  : max rel  4.17e-03  cosine 0.999905  [ok]
+  layer 23 moe  : max rel  2.25e-03  cosine 0.999933  [ok]
+  layer 24 moe  : max rel  2.60e-03  cosine 0.999937  [ok]
+  layer 25 moe  : max rel  5.26e-03  cosine 0.999969  [ok]
+  layer 26 moe  : max rel  8.79e-04  cosine 0.999981  [ok]
+  consecutive layers within the gate: 27 of 27
+
+per-token latency (embed -> argmax on device): median 3.713 ms  mean 3.715 ms; step wall (launch to end) 3.748 ms/token
+tokens: 32/32 match HF greedy
+$ timeout --kill-after=5s 180s stdbuf -oL -eL /root/sess/b_default/run --weights /root/dsv2-data/weights.bin --cache /root/dsv2-data/fleet_cache.bin --golden /root/dsv2-data/golden_tokens.txt --hidden /root/dsv2-data/golden_hidden.bin --tokens 32 --context 1024 --repeat 2
+device: AMD Instinct MI300X VF  arch gfx942:sramecc+:xnack-  CUs 304
+model: hidden 2048 heads 16 kv_lora 512 experts 64 top-6 layers 27 (dense < 1) vocab 102400
+  /root/dsv2-data/weights.bin: 31.4 GB uploaded
+  /root/dsv2-data/fleet_cache.bin: 0.0 GB uploaded
+etx: 54946 tasks, 1778 event words, 296 workers (8 domains x 37), lds 24576 B (fleet scratch 23408 B)
+run 0 (warm-up): 32/32 tokens match
+token  0:    3.713 ms (device)  step   3.745 ms  out   1780  ok
+token  1:    3.717 ms (device)  step   3.748 ms  out    185  ok
+token  2:    3.712 ms (device)  step   3.744 ms  out    300  ok
+token  3:    3.712 ms (device)  step   3.746 ms  out   1501  ok
+token  4:    3.731 ms (device)  step   3.763 ms  out  11747  ok
+token  5:    3.723 ms (device)  step   3.756 ms  out    254  ok
+token  6:    3.710 ms (device)  step   3.743 ms  out   3510  ok
+token  7:    3.721 ms (device)  step   3.755 ms  out    185  ok
+token  8:    3.708 ms (device)  step   3.739 ms  out   1558  ok
+token  9:    3.711 ms (device)  step   3.745 ms  out   8708  ok
+token 10:    3.714 ms (device)  step   3.746 ms  out      7  ok
+token 11:    3.715 ms (device)  step   3.747 ms  out     77  ok
+token 12:    3.717 ms (device)  step   3.751 ms  out   1780  ok
+token 13:    3.716 ms (device)  step   3.749 ms  out    185  ok
+token 14:    3.714 ms (device)  step   3.748 ms  out    300  ok
+token 15:    3.703 ms (device)  step   3.738 ms  out   1501  ok
+token 16:    3.725 ms (device)  step   3.758 ms  out  11747  ok
+token 17:    3.721 ms (device)  step   3.761 ms  out    254  ok
+token 18:    3.721 ms (device)  step   3.753 ms  out   3510  ok
+token 19:    3.716 ms (device)  step   3.747 ms  out    185  ok
+token 20:    3.707 ms (device)  step   3.741 ms  out   1558  ok
+token 21:    3.724 ms (device)  step   3.758 ms  out   8708  ok
+token 22:    3.716 ms (device)  step   3.748 ms  out      7  ok
+token 23:    3.722 ms (device)  step   3.759 ms  out     77  ok
+token 24:    3.719 ms (device)  step   3.752 ms  out   1780  ok
+token 25:    3.722 ms (device)  step   3.756 ms  out    185  ok
+token 26:    3.718 ms (device)  step   3.758 ms  out    300  ok
+token 27:    3.716 ms (device)  step   3.749 ms  out   1501  ok
+token 28:    3.717 ms (device)  step   3.750 ms  out  11747  ok
+token 29:    3.711 ms (device)  step   3.745 ms  out    254  ok
+token 30:    3.721 ms (device)  step   3.756 ms  out   3510  ok
+token 31:    3.726 ms (device)  step   3.759 ms  out    185  ok
+  layer  0 dense: max rel  1.72e-03  cosine 0.999996  [ok]
+  layer  1 moe  : max rel  3.13e-03  cosine 0.999993  [ok]
+  layer  2 moe  : max rel  2.96e-03  cosine 0.999986  [ok]
+  layer  3 moe  : max rel  2.45e-03  cosine 0.999985  [ok]
+  layer  4 moe  : max rel  6.54e-03  cosine 0.999979  [ok]
+  layer  5 moe  : max rel  4.65e-03  cosine 0.999983  [ok]
+  layer  6 moe  : max rel  4.07e-03  cosine 0.999983  [ok]
+  layer  7 moe  : max rel  1.76e-03  cosine 0.999974  [ok]
+  layer  8 moe  : max rel  1.88e-03  cosine 0.999973  [ok]
+  layer  9 moe  : max rel  1.56e-03  cosine 0.999980  [ok]
+  layer 10 moe  : max rel  1.40e-03  cosine 0.999981  [ok]
+  layer 11 moe  : max rel  1.35e-03  cosine 0.999981  [ok]
+  layer 12 moe  : max rel  3.07e-03  cosine 0.999984  [ok]
+  layer 13 moe  : max rel  3.23e-03  cosine 0.999983  [ok]
+  layer 14 moe  : max rel  1.74e-03  cosine 0.999981  [ok]
+  layer 15 moe  : max rel  6.29e-03  cosine 0.999981  [ok]
+  layer 16 moe  : max rel  5.71e-03  cosine 0.999978  [ok]
+  layer 17 moe  : max rel  5.41e-03  cosine 0.999979  [ok]
+  layer 18 moe  : max rel  5.81e-03  cosine 0.999923  [ok]
+  layer 19 moe  : max rel  1.91e-03  cosine 0.999949  [ok]
+  layer 20 moe  : max rel  4.41e-03  cosine 0.999961  [ok]
+  layer 21 moe  : max rel  4.90e-03  cosine 0.999949  [ok]
+  layer 22 moe  : max rel  4.17e-03  cosine 0.999905  [ok]
+  layer 23 moe  : max rel  2.25e-03  cosine 0.999933  [ok]
+  layer 24 moe  : max rel  2.60e-03  cosine 0.999937  [ok]
+  layer 25 moe  : max rel  5.26e-03  cosine 0.999969  [ok]
+  layer 26 moe  : max rel  8.79e-04  cosine 0.999981  [ok]
+  consecutive layers within the gate: 27 of 27
+
+per-token latency (embed -> argmax on device): median 3.717 ms  mean 3.717 ms; step wall (launch to end) 3.750 ms/token
+tokens: 32/32 match HF greedy
+$ timeout --kill-after=5s 180s stdbuf -oL -eL /root/sess/b_all/run --weights /root/dsv2-data/weights.bin --cache /root/dsv2-data/fleet_cache.bin --golden /root/dsv2-data/golden_tokens.txt --hidden /root/dsv2-data/golden_hidden.bin --tokens 32 --context 1024 --repeat 2
+device: AMD Instinct MI300X VF  arch gfx942:sramecc+:xnack-  CUs 304
+model: hidden 2048 heads 16 kv_lora 512 experts 64 top-6 layers 27 (dense < 1) vocab 102400
+  /root/dsv2-data/weights.bin: 31.4 GB uploaded
+  /root/dsv2-data/fleet_cache.bin: 0.0 GB uploaded
+etx: 54946 tasks, 1778 event words, 296 workers (8 domains x 37), lds 24576 B (fleet scratch 23408 B)
+run 0 (warm-up): 32/32 tokens match
+token  0:    3.612 ms (device)  step   3.647 ms  out   1780  ok
+token  1:    3.614 ms (device)  step   3.649 ms  out    185  ok
+token  2:    3.613 ms (device)  step   3.649 ms  out    300  ok
+token  3:    3.612 ms (device)  step   3.646 ms  out   1501  ok
+token  4:    3.618 ms (device)  step   3.652 ms  out  11747  ok
+token  5:    3.616 ms (device)  step   3.650 ms  out    254  ok
+token  6:    3.616 ms (device)  step   3.650 ms  out   3510  ok
+token  7:    3.611 ms (device)  step   3.644 ms  out    185  ok
+token  8:    3.604 ms (device)  step   3.638 ms  out   1558  ok
+token  9:    3.612 ms (device)  step   3.647 ms  out   8708  ok
+token 10:    3.621 ms (device)  step   3.661 ms  out      7  ok
+token 11:    3.623 ms (device)  step   3.657 ms  out     77  ok
+token 12:    3.627 ms (device)  step   3.662 ms  out   1780  ok
+token 13:    3.614 ms (device)  step   3.648 ms  out    185  ok
+token 14:    3.612 ms (device)  step   3.647 ms  out    300  ok
+token 15:    3.611 ms (device)  step   3.643 ms  out   1501  ok
+token 16:    3.615 ms (device)  step   3.647 ms  out  11747  ok
+token 17:    3.616 ms (device)  step   3.654 ms  out    254  ok
+token 18:    3.615 ms (device)  step   3.650 ms  out   3510  ok
+token 19:    3.612 ms (device)  step   3.645 ms  out    185  ok
+token 20:    3.613 ms (device)  step   3.647 ms  out   1558  ok
+token 21:    3.616 ms (device)  step   3.651 ms  out   8708  ok
+token 22:    3.625 ms (device)  step   3.659 ms  out      7  ok
+token 23:    3.623 ms (device)  step   3.659 ms  out     77  ok
+token 24:    3.622 ms (device)  step   3.654 ms  out   1780  ok
+token 25:    3.622 ms (device)  step   3.654 ms  out    185  ok
+token 26:    3.623 ms (device)  step   3.659 ms  out    300  ok
+token 27:    3.619 ms (device)  step   3.652 ms  out   1501  ok
+token 28:    3.622 ms (device)  step   3.655 ms  out  11747  ok
+token 29:    3.617 ms (device)  step   3.652 ms  out    254  ok
+token 30:    3.624 ms (device)  step   3.656 ms  out   3510  ok
+token 31:    3.632 ms (device)  step   3.667 ms  out    185  ok
+  layer  0 dense: max rel  1.72e-03  cosine 0.999996  [ok]
+  layer  1 moe  : max rel  3.13e-03  cosine 0.999993  [ok]
+  layer  2 moe  : max rel  2.96e-03  cosine 0.999986  [ok]
+  layer  3 moe  : max rel  2.45e-03  cosine 0.999985  [ok]
+  layer  4 moe  : max rel  6.54e-03  cosine 0.999979  [ok]
+  layer  5 moe  : max rel  4.65e-03  cosine 0.999983  [ok]
+  layer  6 moe  : max rel  4.07e-03  cosine 0.999983  [ok]
+  layer  7 moe  : max rel  1.76e-03  cosine 0.999974  [ok]
+  layer  8 moe  : max rel  1.88e-03  cosine 0.999973  [ok]
+  layer  9 moe  : max rel  1.56e-03  cosine 0.999979  [ok]
+  layer 10 moe  : max rel  2.11e-03  cosine 0.999980  [ok]
+  layer 11 moe  : max rel  4.31e-03  cosine 0.999977  [ok]
+  layer 12 moe  : max rel  3.07e-03  cosine 0.999985  [ok]
+  layer 13 moe  : max rel  3.23e-03  cosine 0.999983  [ok]
+  layer 14 moe  : max rel  1.74e-03  cosine 0.999981  [ok]
+  layer 15 moe  : max rel  6.29e-03  cosine 0.999979  [ok]
+  layer 16 moe  : max rel  5.71e-03  cosine 0.999979  [ok]
+  layer 17 moe  : max rel  5.41e-03  cosine 0.999978  [ok]
+  layer 18 moe  : max rel  5.81e-03  cosine 0.999923  [ok]
+  layer 19 moe  : max rel  1.02e-02  cosine 0.999935  [ok]
+  layer 20 moe  : max rel  8.81e-03  cosine 0.999950  [ok]
+  layer 21 moe  : max rel  7.35e-03  cosine 0.999940  [ok]
+  layer 22 moe  : max rel  8.33e-03  cosine 0.999887  [ok]
+  layer 23 moe  : max rel  4.49e-03  cosine 0.999920  [ok]
+  layer 24 moe  : max rel  5.21e-03  cosine 0.999926  [ok]
+  layer 25 moe  : max rel  2.63e-03  cosine 0.999966  [ok]
+  layer 26 moe  : max rel  6.25e-03  cosine 0.999977  [ok]
+  consecutive layers within the gate: 27 of 27
+
+per-token latency (embed -> argmax on device): median 3.616 ms  mean 3.617 ms; step wall (launch to end) 3.652 ms/token
+tokens: 32/32 match HF greedy
+$ timeout --kill-after=5s 180s stdbuf -oL -eL /root/sess/b_fleet/run --weights /root/dsv2-data/weights.bin --cache /root/dsv2-data/fleet_cache.bin --golden /root/dsv2-data/golden_tokens.txt --hidden /root/dsv2-data/golden_hidden.bin --tokens 32 --context 1024 --repeat 2 --graph /root/sess/b_fleet/taskgraph_d16.bin
+device: AMD Instinct MI300X VF  arch gfx942:sramecc+:xnack-  CUs 304
+graph: 54946 descriptors across 296 workers, 1589 events (85 global, mirrored), kv_chunks 16, final event 1588 (argmax)
+event counters: cached + release fence (scheme i); workers poll the per-XCD scheduler mirror; 32 token(s) per launch
+model: hidden 2048 heads 16 kv_lora 512 rope 64 experts 64/2 top-6 layers 27 (dense < 1) vocab 102400  softmax_scale 0.114721
+  /root/dsv2-data/weights.bin: 31.4 GB uploaded
+  /root/dsv2-data/fleet_cache.bin: 0.0 GB uploaded
+occupancy: 1 workgroup(s)/CU at 256 threads (need >= 1 for grid 304)
+placement: 304 workgroups by XCC_ID: [0]=38 [1]=38 [2]=38 [3]=38 [4]=38 [5]=38 [6]=38 [7]=38  (8 XCDs x 38 CUs x blocks/CU, as assumed)
+
+free-running decode: 32 tokens over a 1024-token context, 32 per launch, 2 run(s) (the last one is reported; the first is the warm-up)
+run 0 (warm-up): 126.876 ms total, 32/32 tokens match
+token  0:    3.558 ms  in     77 -> out   1780  ok
+token  1:    3.563 ms  in   1780 -> out    185  ok
+token  2:    3.558 ms  in    185 -> out    300  ok
+token  3:    3.572 ms  in    300 -> out   1501  ok
+token  4:    3.563 ms  in   1501 -> out  11747  ok
+token  5:    3.570 ms  in  11747 -> out    254  ok
+token  6:    3.564 ms  in    254 -> out   3510  ok
+token  7:    3.562 ms  in   3510 -> out    185  ok
+token  8:    3.564 ms  in    185 -> out   1558  ok
+token  9:    3.564 ms  in   1558 -> out   8708  ok
+token 10:    3.567 ms  in   8708 -> out      7  ok
+token 11:    3.561 ms  in      7 -> out     77  ok
+token 12:    3.560 ms  in     77 -> out   1780  ok
+token 13:    3.557 ms  in   1780 -> out    185  ok
+token 14:    3.555 ms  in    185 -> out    300  ok
+token 15:    3.560 ms  in    300 -> out   1501  ok
+token 16:    3.571 ms  in   1501 -> out  11747  ok
+token 17:    3.577 ms  in  11747 -> out    254  ok
+token 18:    3.576 ms  in    254 -> out   3510  ok
+token 19:    3.571 ms  in   3510 -> out    185  ok
+token 20:    3.569 ms  in    185 -> out   1558  ok
+token 21:    3.587 ms  in   1558 -> out   8708  ok
+token 22:    3.583 ms  in   8708 -> out      7  ok
+token 23:    3.567 ms  in      7 -> out     77  ok
+token 24:    3.564 ms  in     77 -> out   1780  ok
+token 25:    3.584 ms  in   1780 -> out    185  ok
+token 26:    3.571 ms  in    185 -> out    300  ok
+token 27:    3.584 ms  in    300 -> out   1501  ok
+token 28:    3.571 ms  in   1501 -> out  11747  ok
+token 29:    3.572 ms  in  11747 -> out    254  ok
+token 30:    3.566 ms  in    254 -> out   3510  ok
+token 31:    3.576 ms  in   3510 -> out    185  ok
+
+per-layer output vs HF, first decode step (gate: max rel <= 2e-2, cosine >= 0.999)
+  layer  0 dense: max rel  1.72e-03  cosine 0.999996  [ok]
+  layer  1 moe  : max rel  3.13e-03  cosine 0.999993  [ok]
+  layer  2 moe  : max rel  2.96e-03  cosine 0.999988  [ok]
+  layer  3 moe  : max rel  2.45e-03  cosine 0.999982  [ok]
+  layer  4 moe  : max rel  2.45e-03  cosine 0.999980  [ok]
+  layer  5 moe  : max rel  1.16e-03  cosine 0.999985  [ok]
+  layer  6 moe  : max rel  1.27e-03  cosine 0.999984  [ok]
+  layer  7 moe  : max rel  1.10e-03  cosine 0.999983  [ok]
+  layer  8 moe  : max rel  1.88e-03  cosine 0.999979  [ok]
+  layer  9 moe  : max rel  1.56e-03  cosine 0.999983  [ok]
+  layer 10 moe  : max rel  2.11e-03  cosine 0.999982  [ok]
+  layer 11 moe  : max rel  1.62e-03  cosine 0.999984  [ok]
+  layer 12 moe  : max rel  1.53e-03  cosine 0.999989  [ok]
+  layer 13 moe  : max rel  1.61e-03  cosine 0.999987  [ok]
+  layer 14 moe  : max rel  1.74e-03  cosine 0.999958  [ok]
+  layer 15 moe  : max rel  1.57e-03  cosine 0.999964  [ok]
+  layer 16 moe  : max rel  1.43e-03  cosine 0.999944  [ok]
+  layer 17 moe  : max rel  1.35e-03  cosine 0.999956  [ok]
+  layer 18 moe  : max rel  1.64e-03  cosine 0.999906  [ok]
+  layer 19 moe  : max rel  5.10e-03  cosine 0.999930  [ok]
+  layer 20 moe  : max rel  4.41e-03  cosine 0.999945  [ok]
+  layer 21 moe  : max rel  9.80e-03  cosine 0.999918  [ok]
+  layer 22 moe  : max rel  1.04e-02  cosine 0.999878  [ok]
+  layer 23 moe  : max rel  5.99e-03  cosine 0.999920  [ok]
+  layer 24 moe  : max rel  4.56e-03  cosine 0.999930  [ok]
+  layer 25 moe  : max rel  5.26e-03  cosine 0.999963  [ok]
+  layer 26 moe  : max rel  6.25e-03  cosine 0.999979  [ok]
+  consecutive layers within the gate: 27 of 27
+
+per-token latency (embed -> argmax on device): median 3.567 ms  p95 3.584 ms  mean 3.568 ms  (280.2 tok/s)
+wall time of the launches: 114.571 ms for 32 tokens = 3.580 ms/token (279.3 tok/s), 1 launch(es)
+tokens: 32/32 match HF greedy
+PAIRS arm=all device gain vs default median 92.0 us spread 18.0 every_positive=1 GO=True

@@ -1,0 +1,36 @@
+{
+  "arms": {
+    "N": [
+      "norm_tree"
+    ],
+    "Nall": [
+      "norm_tree_all"
+    ],
+    "Q": [
+      "gemv_no_terminal"
+    ],
+    "Qall": [
+      "gemv_no_terminal_all"
+    ],
+    "all": [
+      "gemv_no_terminal_all",
+      "norm_tree_all",
+      "argmax_tree",
+      "topk_rank",
+      "attn_prologue_live"
+    ],
+    "argmax": [
+      "argmax_tree"
+    ],
+    "default": [],
+    "prep": [
+      "attn_prologue_live"
+    ],
+    "topk": [
+      "topk_rank"
+    ]
+  },
+  "etx_identity": "commit 7f3dd89f8cc92648b4fa35f9000028059658cfee\nbranch dsv2-session\ndirty 0\nstaged 2026-10-13T00:14:02Z\n",
+  "fleet_commit": "3fb67a6",
+  "fleet_src_sha256": "28f5cbb4f39524df318883522341c48ca4162c18b71a3a6223c52eabb40ce4b3"
+}

@@ -1,0 +1,106 @@
+{
+  "arm": "prep",
+  "condition": "one MI300X, batch 1, context 1024, 32 tokens, repeat 2",
+  "device_ms": {
+    "default": {
+      "every_positive": true,
+      "gains_us": [
+        27.000000000000135,
+        32.00000000000003,
+        18.000000000000238,
+        31.00000000000014,
+        20.999999999999908
+      ],
+      "go": null,
+      "median_us": 27.000000000000135,
+      "spread_us": 13.99999999999979
+    }
+  },
+  "rounds": [
+    {
+      "default": {
+        "device_ms": 3.71,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.743
+      },
+      "prep": {
+        "device_ms": 3.683,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.719
+      }
+    },
+    {
+      "default": {
+        "device_ms": 3.713,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.747
+      },
+      "prep": {
+        "device_ms": 3.681,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.716
+      }
+    },
+    {
+      "default": {
+        "device_ms": 3.7,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.736
+      },
+      "prep": {
+        "device_ms": 3.682,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.715
+      }
+    },
+    {
+      "default": {
+        "device_ms": 3.71,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.744
+      },
+      "prep": {
+        "device_ms": 3.679,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.714
+      }
+    },
+    {
+      "default": {
+        "device_ms": 3.709,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.743
+      },
+      "prep": {
+        "device_ms": 3.688,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.721
+      }
+    }
+  ],
+  "wall_ms": {
+    "default": {
+      "every_positive": true,
+      "gains_us": [
+        24.00000000000002,
+        30.999999999999694,
+        21.00000000000035,
+        30.00000000000025,
+        21.999999999999797
+      ],
+      "go": false,
+      "median_us": 24.00000000000002,
+      "spread_us": 9.999999999999343
+    }
+  }
+}

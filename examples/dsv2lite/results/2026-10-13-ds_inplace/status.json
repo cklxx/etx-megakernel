@@ -1,0 +1,266 @@
+[
+ {
+  "name": "apt",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 9.002740859985352,
+  "note": ""
+ },
+ {
+  "name": "etx_env",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 3.002427101135254,
+  "note": ""
+ },
+ {
+  "name": "prep_env",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 94.06780982017517,
+  "note": ""
+ },
+ {
+  "name": "source",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 1.0004136562347412,
+  "note": ""
+ },
+ {
+  "name": "prep_dl",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 40.00960612297058,
+  "note": ""
+ },
+ {
+  "name": "prep_ref",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 42.00845503807068,
+  "note": ""
+ },
+ {
+  "name": "prep_pack",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 29.00953221321106,
+  "note": ""
+ },
+ {
+  "name": "prep_sums",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 21.00860834121704,
+  "note": ""
+ },
+ {
+  "name": "preflight",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 21.00325107574463,
+  "note": ""
+ },
+ {
+  "name": "build_default",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 26.009373903274536,
+  "note": ""
+ },
+ {
+  "name": "build_fleet",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 9.003750324249268,
+  "note": ""
+ },
+ {
+  "name": "build_all",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 30.011413097381592,
+  "note": ""
+ },
+ {
+  "name": "build_Q",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 26.00799012184143,
+  "note": ""
+ },
+ {
+  "name": "build_Qall",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 26.03346347808838,
+  "note": ""
+ },
+ {
+  "name": "build_N",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 27.033114433288574,
+  "note": ""
+ },
+ {
+  "name": "build_Nall",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 27.033186197280884,
+  "note": ""
+ },
+ {
+  "name": "build_argmax",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 25.016496896743774,
+  "note": ""
+ },
+ {
+  "name": "build_topk",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 26.010541200637817,
+  "note": ""
+ },
+ {
+  "name": "build_prep",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 25.008318185806274,
+  "note": ""
+ },
+ {
+  "name": "build_default_stamps",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 29.013630151748657,
+  "note": ""
+ },
+ {
+  "name": "build_all_stamps",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 34.01347470283508,
+  "note": ""
+ },
+ {
+  "name": "baseline",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 62.01094627380371,
+  "note": ""
+ },
+ {
+  "name": "pairs_all",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 91.01607203483582,
+  "note": ""
+ },
+ {
+  "name": "trace_default",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 7.001441240310669,
+  "note": ""
+ },
+ {
+  "name": "trace_all",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 7.001717805862427,
+  "note": ""
+ },
+ {
+  "name": "pairs_Q",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 62.01073694229126,
+  "note": ""
+ },
+ {
+  "name": "pairs_Qall",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 63.011592388153076,
+  "note": ""
+ },
+ {
+  "name": "pairs_N",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 62.010788679122925,
+  "note": ""
+ },
+ {
+  "name": "pairs_Nall",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 60.01019239425659,
+  "note": ""
+ },
+ {
+  "name": "pairs_argmax",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 63.0111346244812,
+  "note": ""
+ },
+ {
+  "name": "pairs_topk",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 71.012699842453,
+  "note": ""
+ },
+ {
+  "name": "pairs_prep",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 73.01370239257812,
+  "note": ""
+ },
+ {
+  "name": "report",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 1.000474452972412,
+  "note": ""
+ }
+]
