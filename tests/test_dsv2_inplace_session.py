@@ -287,3 +287,21 @@ def test_d5_two_way_pairs_require_every_invocation_complete(tmp_path, monkeypatc
         assert all(v["tokens"] == 32 and v["layers"] == 27 for r in report["rounds"] for v in r.values())
     assert calls == [(arm, f"alld5_r{i}_{arm}") for i in range(5)
                      for arm in (("all", "alld5") if i % 2 == 0 else ("alld5", "all"))]
+
+
+def test_the_paid_hour_session_order_and_gates():
+    """examples/sessions/ds_hour.py: the D2b rerun first, D3 / D5 next, the stamped record, the optional arm last, a
+    box-side hash job at the end; every GPU job gated hard on preflight and on each binary it runs."""
+    jobs, limit = load_session(Path("examples/sessions/ds_hour.py"))
+    assert limit == 1800
+    gpu = [j for j in jobs if j.lane == "gpu" and j.name != "prep_ref"]
+    assert [j.name for j in gpu] == ["pairs_l1", "pairs_alld4r0l1", "pairs_alld3", "pairs_alld5", "trace_default",
+                                     "trace_alld4r0", "trace_alld4r0l1", "pairs_alld4s"]
+    by = {j.name: j for j in jobs}
+    for j in gpu:
+        assert "preflight" in j.after and all(dep in by for dep in j.after), j.name
+    assert by["pairs_alld3"].after == ["preflight", "build_all", "build_alld3"]
+    assert by["trace_alld4r0l1"].after == ["preflight", "build_alld4r0l1_stamps"]
+    assert by["hash_session"].lane == "cpu" and set(by["hash_session"].after_any) == {j.name for j in gpu}
+    for arm in ("l1", "alld4r0l1", "alld3", "alld5", "alld4s"):
+        assert arm in ins.RULES, arm                    # every candidate measured in the hour has a rule

@@ -403,3 +403,20 @@ completion order, and the paired >=30 us gain against alld4r0. No new performanc
 is claimed. GPU hours **0**, GPU cost **$0**. The initial metadata serialization was caught locally; a CPU test's
 nonassociativity witness was corrected from 2^24 to 2^25 before the passing full suite. A trace lookup initially
 used run2 for the default trace; the reused default trace is in run1. No GPU session failed or was provisioned.
+
+## The paid hour, as built (2026-10-13): `examples/sessions/ds_hour.py`
+
+D3 and D5 are coded and locally proven, so their slots are filled; both are measured on the five-lever arm `all`
+(2-way, 59 s each), not on alld4r0: D4's expert bodies do not chunk (D3 + D4 is refused at build time) and D5's
+prefetch was proven on `all`. Order: pairs_l1, pairs_alld4r0l1, pairs_alld3, pairs_alld5, trace_default,
+trace_alld4r0, trace_alld4r0l1, then the optional pairs_alld4s, then `hash_session` (box-side SHA256SUMS). GPU total
+~494 s [from the runner records]; cap ETX_SESS_MAX_SECONDS=1800. Local proof before the box (ROCm 7.2.4, 0 scratch
+each): l1, alld4r0l1, alld3, alld5, alld4s, stamped alld4r0, stamped alld4r0l1; default plan 09011c20, default ISA
+a105cb16, unstamped alld4r0 ISA f26a7ff3 unchanged.
+
+Rule provenance for the hour's candidates: l1 and alld4r0l1 -- 8d69e52 (before the D2b code, d2e4d54); alld3 --
+1f6e3cc (before the D3 code, 04c768c); alld5 -- written in the doc first but committed together with the code
+(14ea3b7, Astra brief 06); alld4s -- likewise in one commit with its code (ff15c2c, Astra brief 05). For the last
+two the order is the worker's statement, not a separate commit. Expectation recorded for alld5, not a rule: on `all`
+every task's `buffer_inv sc1` follows the event wait the prefetch runs before, so warmed L2 lines may be dropped
+before use; a DROP there says nothing about D5 on the D2b arm.
