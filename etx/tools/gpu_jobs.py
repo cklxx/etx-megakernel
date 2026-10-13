@@ -10,7 +10,7 @@ A session is a Python file that defines JOBS, a list of dicts:
   after     names that must have finished OK first (a failed or skipped one skips this job)
   after_any names that must have finished, whatever the result
   gate      name of an earlier job and a regex: run only if that job's log matches, e.g. ("sync_gate", "UC_GO=1")
-  timeout   seconds (default 900); on expiry the job's process group is killed and the job is reported "timeout"
+  timeout   seconds (default 900); on expiry the job's whole process tree is killed and the job reported "timeout"
   env       extra environment
   machine   which machine runs it (default "A"): one runner per machine, `--machine B` on the second VM
   summary   regexes; matching log lines are printed when the job ends (the log keeps everything)
@@ -53,6 +53,8 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from etx.session import proc as sproc
+
 
 @dataclass
 class Job:
@@ -89,72 +91,6 @@ def session_limit(limit: float | None) -> float | None:
     if limit is not None and (not isinstance(limit, (int, float)) or not math.isfinite(limit) or limit <= 0):
         raise SystemExit("MAX_SESSION_SECONDS must be finite and positive")
     return limit
-
-
-def descendants(pid: int) -> list[int]:
-    """Every live descendant of pid, from /proc (Linux; empty elsewhere). Taken BEFORE killing: once a parent dies its
-    orphans are re-parented and no longer traceable (review 07/08, R01 / R14)."""
-    children: dict[int, list[int]] = {}
-    try:
-        entries = [d for d in os.listdir("/proc") if d.isdigit()]
-    except OSError:
-        return []
-    for d in entries:
-        try:
-            ppid = int(Path(f"/proc/{d}/stat").read_text().rsplit(")", 1)[1].split()[1])
-        except (OSError, ValueError, IndexError):
-            continue
-        children.setdefault(ppid, []).append(int(d))
-    out, stack = [], [pid]
-    while stack:
-        for c in children.get(stack.pop(), []):
-            out.append(c)
-            stack.append(c)
-    return out
-
-
-def freeze_and_kill(root: int, group: bool = True) -> int:
-    """Stop the job's group and every descendant with SIGSTOP, re-scanning until no new descendant appears (a stopped
-    process cannot fork, so the set converges), then SIGKILL all of them. Killing a live tree from one snapshot let
-    processes forked during the kill escape (review 09, R15). Returns how many descendants were killed."""
-    if group:
-        try:
-            os.killpg(root, signal.SIGSTOP)
-        except (ProcessLookupError, PermissionError):
-            pass
-    frozen: set[int] = set()
-    for _ in range(100):
-        new = set(descendants(root)) - frozen
-        if not new:
-            break
-        for pid in new:
-            _signal(pid, signal.SIGSTOP)
-        frozen |= new
-    if group:
-        try:
-            os.killpg(root, signal.SIGKILL)
-        except (ProcessLookupError, PermissionError):
-            pass
-    for pid in frozen:
-        _signal(pid, signal.SIGKILL)
-    return len(frozen)
-
-
-def become_subreaper() -> None:
-    """Linux: orphans of a killed job re-parent to the runner instead of init, so they stay its descendants and a
-    later sweep still finds them (review 09, R15). A no-op elsewhere."""
-    try:
-        import ctypes
-        ctypes.CDLL(None, use_errno=True).prctl(36, 1, 0, 0, 0)   # PR_SET_CHILD_SUBREAPER
-    except (OSError, AttributeError):
-        pass
-
-
-def _signal(pid: int, sig: int) -> None:
-    try:
-        os.kill(pid, sig)
-    except (ProcessLookupError, PermissionError):
-        pass
 
 
 def load_session(path: str | Path) -> tuple[list[Job], float | None]:
@@ -260,7 +196,9 @@ class Runner:
         fh = open(j.log, "w")
         fh.write(f"# job {j.name} gpu={gpu} cwd={cwd}\n# {j.cmd}\n")
         fh.flush()
-        j.proc = subprocess.Popen(["bash", "-c", j.cmd], cwd=cwd if os.path.isdir(cwd) else None, env=env, stdout=fh,
+        # the shim (etx/session/proc.py) owns the job's process tree: nothing the job started outlives it
+        j.proc = subprocess.Popen([sys.executable, "-I", sproc.__file__, "--", "bash", "-c", j.cmd],
+                                  cwd=cwd if os.path.isdir(cwd) else None, env=env, stdout=fh,
                                   stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, start_new_session=True)
         j.status, j.start, j.on_gpu = "running", time.time(), gpu
         self._write_status()
@@ -282,13 +220,20 @@ class Runner:
             print(f"    {ln[:240]}", file=self.out)
         self.out.flush()
 
-    def _kill(self, j: Job) -> None:
-        # the whole tree, including a group of its own under `timeout`, frozen before it is killed (R01, R14, R15)
-        freeze_and_kill(j.proc.pid)
-        try:
-            j.proc.wait(10)
-        except subprocess.TimeoutExpired:
-            pass
+    def _kill(self, *jobs: Job) -> None:
+        """Stop jobs: each shim kills its job's whole tree; a shim that does not finish is killed, and whatever it
+        left re-parents to the runner (a subreaper) and is swept here."""
+        for j in jobs:
+            j.proc.send_signal(signal.SIGTERM)
+        for j in jobs:
+            try:
+                j.proc.wait(sproc.SWEEP_S + 5)
+            except subprocess.TimeoutExpired:
+                j.proc.kill()
+                j.proc.wait()
+        survivors = sproc.sweep(keep={x.proc.pid for x in self.jobs if x.proc is not None})
+        if survivors:
+            self.say(f"SURVIVORS after sweep (stuck in the kernel?): {survivors}")
 
     def _progress(self) -> None:
         run = [j for j in self.jobs if j.status == "running"]
@@ -310,7 +255,7 @@ class Runner:
 
     # -------------------------------------------------------------- main loop
     def run(self) -> int:
-        become_subreaper()
+        sproc.subreaper()
         self.logdir.mkdir(parents=True, exist_ok=True)
         # Exclusive creation is the reservation, including for simultaneous starts.
         # A status-only directory may belong to an older runner; preserve it too.
@@ -339,13 +284,7 @@ class Runner:
             while True:
                 if self.deadline is not None and time.monotonic() >= self.deadline:
                     self.say("HARD-STOP: session budget exhausted; killing running jobs")
-                    # Signal every group first, without one grace period per job -- and every descendant, so a process
-                    # that left the job's group (GNU `timeout` puts its command in a group of its own) dies too
-                    for j in self.jobs:
-                        if j.status == "running":
-                            freeze_and_kill(j.proc.pid)
-                    # anything re-parented to the (subreaper) runner while its job died: same freeze, never the runner
-                    freeze_and_kill(os.getpid(), group=False)
+                    self._kill(*[j for j in self.jobs if j.status == "running"])
                     for j in self.jobs:
                         if j.status == "running":
                             j.proc.wait()

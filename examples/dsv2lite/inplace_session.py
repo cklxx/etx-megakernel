@@ -18,13 +18,13 @@ import math
 import os
 from pathlib import Path
 import re
-import selectors
 import shlex
 import statistics
 import subprocess
 import sys
 import time
 
+from etx.session import proc
 from examples.dsv2lite.acquire import RELAXED
 from examples.dsv2lite.pinned import FLEET_SRC_SHA256 as PINNED_SRC_SHA256
 from examples.dsv2lite.pinned import source_sha
@@ -306,45 +306,40 @@ class Session:
             log.write(value); log.flush(); print(value, end="", flush=True)
 
     def run(self, name: str, command: list[str], *, env: dict | None = None, timeout=180) -> str:
-        """Fresh invocation, full stderr/stdout, independent deadline, 30-second progress, probe after 150 s silence."""
+        """Fresh invocation, full stderr/stdout, independent deadline, 30-second progress, probe after 150 s silence.
+        etx/session/proc.py supervises it: at the deadline, and after a normal exit, nothing it started survives."""
         path = self.logs / f"{name}.raw.log"
         if path.exists():
             raise RuntimeError(f"refusing to overwrite prior invocation: {path}")
         clean = {k: v for k, v in os.environ.items() if not k.startswith(("ETX_", "FLEET_"))}
         clean.update(PYTHONUNBUFFERED="1")         # no caller override may leak into default or a candidate
         clean.update(env or {})
-        # plain `timeout`: at its deadline it kills the command's whole group, compiler children included (review 08,
-        # R14 -- --foreground left them alive). The runner's hard stop kills every descendant of the job, so the
-        # group `timeout` creates cannot survive it either (etx/tools/gpu_jobs.py descendants; review 07, R01)
-        command = ["timeout", "--kill-after=5s", f"{timeout}s", "stdbuf", "-oL", "-eL", *map(str, command)]
-        text = ""; started = heartbeat = last_output = last_probe = time.monotonic()
+        command = ["stdbuf", "-oL", "-eL", *map(str, command)]
+        text, clock = [], dict(heartbeat=0.0, output=0.0, probe=0.0)
         with path.open("w") as log:
+            def sink(part):
+                text.append(part); clock["output"] = time.monotonic()
+                log.write(part); log.flush(); print(part, end="", flush=True)
+
+            def on_poll(elapsed):
+                now = time.monotonic()
+                if elapsed - clock["heartbeat"] >= 30:
+                    print(f"PROGRESS invocation={name} elapsed_s={elapsed:.1f} deadline_s={timeout}", flush=True)
+                    clock["heartbeat"] = elapsed
+                if now - max(clock["output"], started) >= 150 and now - max(clock["probe"], started) >= 150:
+                    self.probe(log, name); clock["probe"] = time.monotonic()
+
             line = "$ " + shlex.join(command) + "\n"
             print(line, end="", flush=True); log.write(line)
-            with subprocess.Popen(command, cwd=self.root, env=clean, stdout=subprocess.PIPE, stderr=subprocess.STDOUT) as proc:
-                selector = selectors.DefaultSelector(); selector.register(proc.stdout, selectors.EVENT_READ)
-                while selector.get_map():
-                    for key, _ in selector.select(timeout=1):
-                        chunk = os.read(key.fileobj.fileno(), 65536)
-                        if not chunk:
-                            selector.unregister(key.fileobj); continue
-                        part = chunk.decode(errors="replace"); text += part
-                        last_output = time.monotonic()
-                        log.write(part); log.flush(); print(part, end="", flush=True)
-                    now = time.monotonic()
-                    if now - heartbeat >= 30:
-                        print(f"PROGRESS invocation={name} elapsed_s={now-started:.1f} deadline_s={timeout}", flush=True)
-                        heartbeat = now
-                    if now - last_output >= 150 and now - last_probe >= 150:
-                        self.probe(log, name); last_probe = time.monotonic()
-                rc = proc.wait()
-                if rc in (124, 137):
-                    message = f"DEADLINE invocation={name} rc={rc} deadline_s={timeout}; NOT COMPLETE\n"
-                    log.write(message); print(message, end="", flush=True)
-                    self.probe(log, name)
+            started = time.monotonic()
+            rc = proc.run(command, sink=sink, deadline_s=timeout, on_poll=on_poll, env=clean, cwd=self.root, log=log)
+            if rc == proc.DEADLINE_RC:
+                message = f"DEADLINE invocation={name} rc={rc} deadline_s={timeout}; NOT COMPLETE\n"
+                log.write(message); print(message, end="", flush=True)
+                self.probe(log, name)
         if rc:
             raise RuntimeError(f"invocation {name} failed rc={rc}; full log {path}")
-        return text
+        return "".join(text)
 
     def args(self) -> list[str]:
         return ["--weights", str(self.data / "weights.bin"), "--cache", str(self.data / "fleet_cache.bin"),

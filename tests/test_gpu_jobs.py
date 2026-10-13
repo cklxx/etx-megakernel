@@ -90,7 +90,7 @@ def test_child_uses_runner_interpreter_environment(tmp_path, monkeypatch):
         assert f'{sys.prefix}\npreserved\n' in jobs[f'probe{i}'].log.read_text()
     assert 'WRONG-INTERPRETER' in jobs['probe2'].log.read_text()
     for (args, env), cmd in zip(spawned, commands):
-        assert args == ['bash', '-c', cmd]
+        assert args == [sys.executable, '-I', gj.sproc.__file__, '--', 'bash', '-c', cmd]   # under the job shim
         assert env['PATH'] == str(Path(sys.executable).parent) + os.pathsep + inherited_path
         assert env['JOB_MARKER'] == 'preserved'
 

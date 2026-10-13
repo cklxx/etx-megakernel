@@ -8,6 +8,8 @@ import struct
 import subprocess
 import time
 
+from etx.session import proc
+
 from .pack import sha, sha_slice
 from .source import PAIRS
 
@@ -93,22 +95,12 @@ def run(a):
     log = Path(str(prefix)+'.log')
     # OS-level outer deadline bounds module load/copies as well as stream waits.
     with log.open('w') as f:
-        p = subprocess.Popen(command, stdout=f, stderr=subprocess.STDOUT, start_new_session=True)
-        try:
-            while p.poll() is None:
-                remaining = end-time.monotonic()
-                if remaining <= 0:
-                    raise TimeoutError('NOT-COMPLETE launcher deadline')
-                try: p.wait(timeout=min(15, remaining))
-                except subprocess.TimeoutExpired:
-                    print(f'PROGRESS probe pid={p.pid} elapsed={time.monotonic()-start:.0f}s log={log}', flush=True)
-            if p.returncode:
-                raise RuntimeError(f'probe rc={p.returncode}; full log={log}')
-        finally:
-            if p.poll() is None:
-                import os, signal
-                os.killpg(p.pid, signal.SIGKILL)
-                p.wait()
+        rc = proc.run(command, sink=f, deadline_s=end-time.monotonic(), poll_s=15, log=f,
+                      on_poll=lambda s: print(f'PROGRESS probe elapsed={time.monotonic()-start:.0f}s log={log}', flush=True))
+        if rc == proc.DEADLINE_RC:
+            raise TimeoutError('NOT-COMPLETE launcher deadline')
+        if rc:
+            raise RuntimeError(f'probe rc={rc}; full log={log}')
     raw = read_records(str(prefix)+'.bin', pack, a.iterations, a.task, a.wave, a.row)
     timings = [json.loads(l) for l in Path(str(prefix)+'.timing.jsonl').read_text().splitlines()]
     if len(timings) != a.iterations or any(t['iteration'] != i for i,t in enumerate(timings)):
