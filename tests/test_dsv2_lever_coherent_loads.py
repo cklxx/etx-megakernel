@@ -86,11 +86,16 @@ def test_every_reachable_payload_read_is_coherent(patched):
 
 
 def test_q_absorb_without_pub_wait_is_unreachable():
-    """q_absorb (not patched) runs only without FLAG_PUB_WAIT; the shim's only attention wrapper sets it."""
+    """q_absorb (not patched) runs only without FLAG_PUB_WAIT; EVERY attention wrapper of the shim sets it (today's
+    fleet_attention, and K1's fleet_attention_kvs behind -DETX_DSV2_KVA_SHARED), and no other code names the task."""
     shim = (pf.Path(cl.__file__).parents[1] / "fleet_shim.hip").read_text()
-    body = pf._function(shim, 'extern "C" __device__ void fleet_attention(')
-    assert "t.flags = fleet::FLAG_PUB_WAIT;" in body
-    assert shim.count("fleet::TASK_ATTENTION") == 2          # fleet_attention's descriptor and its stamp slot only
+    wrappers = ('extern "C" __device__ void fleet_attention(', 'extern "C" __device__ void fleet_attention_kvs(')
+    bodies = [pf._function(shim, w) for w in wrappers]
+    assert "t.flags = fleet::FLAG_PUB_WAIT;" in bodies[0]
+    assert "t.flags = fleet::FLAG_PUB_WAIT | fleet::FLAG_KVA_SHARED;" in bodies[1]
+    for b in bodies:                                          # each: its descriptor and its stamp slot
+        assert b.count("fleet::TASK_ATTENTION") == 2
+    assert shim.count("fleet::TASK_ATTENTION") == 2 * len(wrappers)   # nowhere else
 
 
 def test_shuffle_broadcasts_read_the_same_values():
