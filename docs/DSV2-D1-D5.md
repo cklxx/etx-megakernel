@@ -18,6 +18,78 @@ acquire (no flag); the 3.474 ms record of 2026-09-27 ran `-DETX_ACQUIRE_DOMAIN_R
 | D4 shared experts during routing + placement check | (a) shared-expert gate_up on the two shared XCDs carries no routing; (b) every routed slice's gate_up and down are on one XCD; (c) the build REFUSES an invalid placement, and a test in the suite proves the refusal fires; default byte-identical | GO if the trace shows the shared XCDs' gate_up ready before the layer's routing completes, and every pair faster with median >= 30 us and > 2 x spread (ceiling ~0.18 ms, scope section 4) |
 | D5 compiler prefetch (p7 + kernel hook) | the hook emits a prefetch body for fleet's tiles behind a switch; default byte-identical | DROP if the median is inside the spread or any pair is slower; KEEP only if every pair faster, median >= 30 us and > 2 x spread (prior: --prefetch-next 4% slower, idle prefetch no gain) |
 
+## D5 resumed: binding threshold before implementation (brief 06, 2026-10-13)
+
+The owner has resumed D5 for CPU-only implementation. `alld5` = all five tile levers
+(`gemv_no_terminal_all+norm_tree_all+argmax_tree+topk_rank+attn_prologue_live`) + compiler early weight loading.
+Compare exactly two arms, ordered (`all`, `alld5`), in five interleaved rounds (10 invocations), with the verdict
+against `all`. Every invocation must pass 32/32 HF-greedy tokens and 27/27 layers.
+
+**DROP if the median gain is inside the spread (|median| <= spread) or any pair is slower; KEEP only if every pair
+is faster, median >= 30 us and median > 2 x spread.** Any other completed outcome is DROP; an incomplete or
+incorrect run cannot KEEP. Gains are `all - alld5`, on the device embed-to-argmax basis. No GPU run is authorized
+by this brief. Default plan `09011c20` and ROCm 7.2.4 default ISA `a105cb16` must remain unchanged; the enabled
+arm must compile offline with zero scratch before it is eligible for any later GPU session.
+
+Prior evidence is adverse: fleet's retained-register prefetch was 4% slower and idle-worker cache warming gave no
+gain. D5 uses only immutable, routing-independent weights; benefit, runtime correctness and cache retention remain
+unknown until the complete paired experiment. Drop-if-neutral is binding.
+
+### D5 implementation and CPU evidence
+
+`ETX_DSV2_D5=1` selects `fleet_d5.hip`, attaches `hip_link(prefetch=...)` siblings and annotates their opaque
+FleetParams weight argument for P7. No switch keeps the old source, graph and generated kernel. `PassOptions.prefetch`
+already defaults to true; gfx942's `async_copy_to_lds: dword_only` chooses `l2_warm`. P7's queue entries are advisory
+(they omit queue heads); the existing pre-wait kernel hook controls execution. The FleetParams annotation alone is
+not a weight-address proof because the struct also contains activation pointers.
+
+The new source calls the pinned fleet weight-address planner with only dimensions, weights and static coordinates.
+Only QKV, merge W_UV, o_proj, router, lm_head and shared expert halves are selected. Routed experts return without
+loading; the dense layer's norm has zero rows. Waves 1-3 each issue one 16-byte load per lane, consumed by an asm sink
+inside the hook; wave 0 remains available to poll. Nothing is held for the body across the event wait, and the hook
+has no LDS, activation reads, stores or block barriers. Fleet's pinned source and original tile bodies are unchanged.
+
+The first offline attempt emitted the hook in every layer's switch case and failed the scratch gate (96 B/lane;
+256 VGPR, 96 AGPR). Opt-in shared prefetch dispatch now provides one call site per sibling, with per-type constants
+initialized before dispatch. The final five-lever + D5 build on gfx942, ROCm 7.2.4/clang 22, has **256 VGPR, 101 AGPR,
+108 SGPR, 0 B/lane scratch, 26,668 B LDS, 1 wave/SIMD**. The default has 256/48/108 registers, zero scratch, the same
+LDS and occupancy. These are offline compiler resource reports, not runtime measurements.
+
+Source counts (generated dispatch plus its included hook, **not ISA instruction counts**), for one request,
+27 layers, 256 threads: each eligible task issues 192 lane-vector loads of 16 B (3,072 requested bytes).
+
+- QKV: 7,992 tasks, 1,534,464 lane-vector loads.
+- Merge W_UV: 6,912 tasks, 1,327,104 loads.
+- o_proj: 7,992 tasks, 1,534,464 loads.
+- Router: 7,696 tasks, 1,477,632 loads; dense-layer norm: 296 tasks with zero loads.
+- Shared gate/up: 1,924 tasks, 369,408 loads; routed gate/up: 5,772 tasks with zero loads.
+- Shared down: 1,924 tasks, 369,408 loads; routed down: 5,772 tasks with zero loads.
+- lm_head: 296 tasks, 56,832 loads. Other task kinds have no hook.
+
+Total: 34,736 eligible tasks, 6,669,312 lane-vector loads, 106,708,992 requested bytes/token. [E] If all of those bytes
+required memory traffic at 4.3 TB/s, their ideal service time would be `106708992 / 4.3e12 * 1e6 = 24.816 us`.
+This is neither a gain prediction nor measured traffic: repeated cache hits, eviction, competition with the producer,
+the existing acquire invalidation and dispatch/register costs are unknown. The prior negative results remain relevant.
+
+Reproduction: `.venv/bin/python -m examples.dsv2lite.verify_lever alld5` runs the five lever gates, stamps gate and
+`tests/test_dsv2_d5.py`, then offline default/arm device + host builds and the default ISA check; the record is
+`examples/dsv2lite/results/levers/alld5.json`. `pytest -q -s tests/test_dsv2_d5.py` prints the address/count audit.
+Final verification exited 0 with 41 CPU gates passing, both offline device/host builds passing and the default ISA
+unchanged. The required `.venv/bin/python -m pytest -q tests/test_dsv2_*.py tests/test_coherence.py` exited 0:
+**133 passed**. Additional compiler/pass/manifest checks: 42 passed, 1 skipped (optional external-tool gate).
+The CPU harness executes the exact pinned C++ planner and exact D5 address code over all coordinates and lanes,
+replacing only the device load/sink with an address observer. It has no activation/KV/LDS fields and uses inaccessible
+weight allocations; every observed 16-byte span is checked against independently specified weight regions and row
+ownership. It does not establish GPU correctness.
+
+Default identities: plan `09011c207b1e92febf29a2c2efc2d944ef9ad7ac8a0803633579c8444d821f8a`, generated kernel
+`751293fad5f5c98ec6dbf9eeca3c73319b1d4ded4b6ca73996a65757c0ffae5d`, ROCm ISA
+`a105cb16a414ee0f9f697c9de13205419d09674f5c69f6ee804cf36942377724`. Tests pin the first two with the switch both
+unset and zero; the offline verifier checks the third. GPU cost: $0, no box. Runtime 32/32 + 27/27, speed and the
+KEEP/DROP verdict remain unknown. `.venv/bin/python -m examples.dsv2lite.inplace_session pairs alld5` is the future
+two-way experiment against `all`;
+this brief's two-way choice supersedes the older D5 budget slot below that named `alld4r0` as the reference.
+
 ## Scope change (2026-10-13, owner via kailun, `/tmp/claude-dsv2-priority.md`)
 
 D1, D2 and D4 only, today. **D3 and D5 are parked** (not started): their prior evidence is negative or neutral and the

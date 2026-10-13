@@ -64,6 +64,10 @@ ARM_ENV["alld4r0l1"] = {"ETX_DSV2_D4": "1", "ETX_DSV2_D4_ROWS": "0", "ETX_DSV2_C
 ARMS["alld4r0"] = LEVERS_ALL                       # candidate: the best arm + D4 placement without slices
 ARM_FLAGS["alld4r0"] = ["-DETX_DSV2_D4=1"]
 ARM_ENV["alld4r0"] = dict(ARM_ENV["d4r0"])
+# D5: compiler prefetch of immutable, routing-independent weights; paired only against the five-lever arm.
+ARMS["alld5"] = LEVERS_ALL
+ARM_ENV["alld5"] = {"ETX_DSV2_D5": "1"}
+D5_KEEP_US = 30.0
 SINGLE = ("Q", "Qall", "N", "Nall", "argmax", "topk", "prep", "relaxed")
 STAMPED = ("default", "all")
 DATA_FILES = ("weights.bin", "weights.bin.manifest", "fleet_cache.bin", "golden_tokens.txt", "golden_hidden.bin")
@@ -114,6 +118,15 @@ def d4_verdict(vs_default: dict) -> dict:
                 and vs_default["median_us"] > 2 * vs_default["spread_us"])
 
 
+def d5_verdict(vs_all: dict) -> dict:
+    """D5 drops neutral or slower results; only five positive gains >= 30 us median and > 2 x spread KEEP."""
+    neutral = abs(vs_all["median_us"]) <= vs_all["spread_us"]
+    any_slower = any(gain < 0 for gain in vs_all["gains_us"])
+    keep = (vs_all["every_positive"] and vs_all["median_us"] >= D5_KEEP_US
+            and vs_all["median_us"] > 2 * vs_all["spread_us"])
+    return dict(vs_all, neutral=neutral, any_slower=any_slower, keep=keep, drop=not keep)
+
+
 # Every measured arm's pre-registered rule, as written in docs/DSV2-D1-D5.md before its first measurement (commit of
 # the rule in the doc). verdict() records the outcome in ONE field so no arm reports a blank decision.
 RULES = {
@@ -123,6 +136,7 @@ RULES = {
     "d4": ("KEEP: every pair faster than default, median >= 30 us, > 2 x spread", "d4", None),
     "alld4r0": ("KEEP: every pair faster than all, median >= 30 us, > 2 x spread (rule commit 7e08d27)", "keep_vs_all", None),
     "alld4r0l1": ("KEEP: every pair faster than alld4r0, median >= 30 us, > 2 x spread (rule commit 8d69e52)", "keep_vs_alld4r0", None),
+    "alld5": ("DROP if |median gain| <= spread or any pair is slower than all; KEEP only if every pair faster than all, median >= 30 us and > 2 x spread; otherwise DROP (D5 rule commit 84eaa1b)", "d5", "all"),
 }
 
 
@@ -137,7 +151,8 @@ def verdict(arm: str, report: dict) -> dict:
         ok = report["d2"]["go"]
     else:
         ok = report[field]["keep"]
-    return dict(rule=rule, outcome=("GO" if field in ("go", "d2") else "KEEP") if ok else "NO-GO", passed=bool(ok))
+    return dict(rule=rule, outcome=("GO" if field in ("go", "d2") else "KEEP") if ok
+                else ("DROP" if field == "d5" else "NO-GO"), passed=bool(ok))
 
 
 def full_result(log: str) -> dict:
@@ -292,7 +307,7 @@ class Session:
             # plan switches default off; an arm's own switches override them (a dict update, not repeated keywords:
             # the 2026-10-13 d1d5 run lost build_coh / build_d4 to "multiple values for keyword argument")
             env = dict(ETX_OUT=str(out), ETX_FLEET_PATCH=" ".join(ARMS[arm]), ETX_BUILD_VERBOSE="1",
-                       ETX_DSV2_COH="0", ETX_DSV2_D4="0")
+                       ETX_DSV2_COH="0", ETX_DSV2_D4="0", ETX_DSV2_D5="0")
             env.update(ARM_ENV.get(arm, {}))
             flags = (["-Rpass-analysis=kernel-resource-usage"] + ARM_FLAGS.get(arm, [])
                      + (["-DETX_DSV2_STAMPS2"] if stamped else []))
@@ -327,6 +342,8 @@ class Session:
             order, refs, cand = ("default", "alld4r0", arm), ("default", "alld4r0"), arm
         elif arm in ("allrelaxed", "alld4r0"):
             order, refs, cand = ("default", "all", arm), ("default", "all"), arm
+        elif arm == "alld5":
+            order, refs, cand = ("all", arm), ("all",), arm
         else:
             order, refs, cand = ("default", arm), ("default",), arm
         rounds = []
@@ -344,6 +361,8 @@ class Session:
             report["keep_vs_all"] = d4_verdict(report["device_ms"]["all"])
         if arm == "alld4r0l1":
             report["keep_vs_alld4r0"] = d4_verdict(report["device_ms"]["alld4r0"])
+        if arm == "alld5":
+            report["d5"] = d5_verdict(report["device_ms"]["all"])
         if arm in ("coh", "l1"):
             report["d2"] = d2_verdict(rounds, arm)
         elif arm == "d4":
@@ -355,7 +374,8 @@ class Session:
         write_json(self.logs / f"pairs_{arm}.json", report)
         v = report["verdict"]
         print(f"VERDICT arm={arm} {v['outcome']} rule={v['rule']!r}", flush=True)
-        d = report["device_ms"]["default"]
+        summary_ref = "all" if arm == "alld5" else "default"
+        d = report["device_ms"][summary_ref]
         if arm in ("coh", "l1"):
             v = report["d2"]
             print(f"PAIRS arm={arm} D2 (a) vs sc1 median {v['a']['median_us']:.1f} us spread {v['a']['spread_us']:.1f} "
@@ -365,7 +385,7 @@ class Session:
             v = report["d4"]
             print(f"PAIRS arm=d4 D4 median {v['median_us']:.1f} us spread {v['spread_us']:.1f} every_positive="
                   f"{int(v['every_positive'])} KEEP={v['keep']}", flush=True)
-        print(f"PAIRS arm={arm} device gain vs default median {d['median_us']:.1f} us spread {d['spread_us']:.1f} "
+        print(f"PAIRS arm={arm} device gain vs {summary_ref} median {d['median_us']:.1f} us spread {d['spread_us']:.1f} "
               f"every_positive={int(d['every_positive'])} GO={d['go']}", flush=True)
 
     def trace(self, arm: str):
@@ -395,7 +415,7 @@ class Session:
     def report(self):
         from examples.dsv2lite import stage_table as st
         out = dict()
-        for arm in ("baseline", "all", *SINGLE, "coh", "d4"):
+        for arm in ("baseline", "all", *SINGLE, "coh", "d4", "alld5"):
             path = self.logs / f"pairs_{arm}.json"
             out[arm] = json.loads(path.read_text()) if path.exists() else "NOT COMPLETE"
         if out["all"] == "NOT COMPLETE":
@@ -430,7 +450,7 @@ def main(argv=None):
             ap.error(f"build arm must be one of {sorted((*ARMS, 'fleet'))}")
         session.build(a.arm, a.stamped)
     elif a.operation == "pairs":
-        if a.arm not in ("baseline", "all", *SINGLE, "coh", "d4", "allrelaxed", "d4r0", "alld4r0", "l1", "alld4r0l1"):
+        if a.arm not in ("baseline", "all", *SINGLE, "coh", "d4", "allrelaxed", "d4r0", "alld4r0", "l1", "alld4r0l1", "alld5"):
             ap.error("pairs arm must be baseline, all, coh, d4 or a single lever")
         session.pairs(a.arm)
     elif a.operation == "trace":

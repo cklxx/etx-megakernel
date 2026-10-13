@@ -1,6 +1,6 @@
 """Local verification record of one lever arm (no GPU): CPU gates, ROCm 7.2.4 resources, default-unchanged proof.
 
-  python -m examples.dsv2lite.verify_lever <arm>      # arm = a lever, or lever+lever for a combination
+  python -m examples.dsv2lite.verify_lever <arm>      # lever, lever+lever, or alld5 (five levers + compiler D5)
 
 Runs, in order, and fails closed on any step:
   1. the lever's CPU gates: tests/test_dsv2_lever_<name>.py for each lever in the arm, plus the stamps composition test;
@@ -50,15 +50,22 @@ def static_counts(asm: Path) -> dict[str, int]:
 
 # lever -> the plan switch it needs (the lever and the plan are checked against each other by coh_check.py)
 LEVER_ENV = {"coherent_loads": {"ETX_DSV2_COH": "1"}, "l1_loads": {"ETX_DSV2_COH": "l1"}}
+ARM_LEVERS = {"alld5": "gemv_no_terminal_all+norm_tree_all+argmax_tree+topk_rank+attn_prologue_live"}
 
 
 def build(arm: str, out: Path) -> dict:
-    env = {k: v for k, v in os.environ.items() if k not in ("ETX_DSV2_COH",)}
-    for lever in arm.split("+"):
+    env = {k: v for k, v in os.environ.items() if k not in ("ETX_DSV2_COH", "ETX_DSV2_D5")}
+    build_arm = ARM_LEVERS.get(arm, arm)
+    if arm == "alld5":
+        env["ETX_DSV2_D5"] = "1"
+        out = out / arm
+    for lever in build_arm.split("+"):
         env.update(LEVER_ENV.get(lever, {}))
-    run(["bash", "examples/dsv2lite/rocm_build_check.sh", str(fleet_export()), arm, str(out)], env=env)
-    d = out / arm
+    run(["bash", "examples/dsv2lite/rocm_build_check.sh", str(fleet_export()), build_arm, str(out)], env=env)
+    d = out / build_arm
     return dict(resources=parse((d / "resource.log").read_text()),
+                plan_sha256=hashlib.sha256((d / "plan.json").read_bytes()).hexdigest(),
+                kernel_sha256=hashlib.sha256((d / "megakernel_d0.hip").read_bytes()).hexdigest(),
                 isa_sha256=hashlib.sha256((d / "isa.bin").read_bytes()).hexdigest(),
                 static=static_counts(d / "mk.s"))
 
@@ -68,11 +75,14 @@ def main(argv=None) -> int:
     ap.add_argument("arm")
     ap.add_argument("--out", type=Path, default=ROOT / "build/verify_lever")
     a = ap.parse_args(argv)
-    levers = [] if a.arm == "default" else a.arm.split("+")
+    levers = [] if a.arm == "default" else ARM_LEVERS.get(a.arm, a.arm).split("+")
     record = dict(arm=a.arm, etx_commit=run(["git", "rev-parse", "HEAD"]).strip(),
                   etx_dirty=bool(run(["git", "status", "--porcelain", "--", ".", ":!examples/dsv2lite/results/levers"]).strip()),
                   fleet_commit=FLEET_COMMIT, fleet_src_sha256=FLEET_SRC_SHA256)
     tests = [f"tests/test_dsv2_lever_{name}.py" for name in levers if name != "stamps"] + ["tests/test_dsv2_stamps.py"]
+    if a.arm == "alld5":
+        tests += ["tests/test_dsv2_d5.py"]
+        record["plan_env"] = {"ETX_DSV2_D5": "1"}
     out = run([sys.executable, "-m", "pytest", "-q", "-rs", *tests])
     summary = out.strip().splitlines()[-1]
     if "skipped" in summary or "failed" in summary or "passed" not in summary:

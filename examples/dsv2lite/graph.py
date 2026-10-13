@@ -37,6 +37,16 @@ HEADS, KV_CHUNKS, QABS = 16, 16, 2
 LAYERS, FIRST_DENSE = 27, 1
 SCRATCH_BYTES = 24576      # >= sizeof(fleet::Scratch) (23,408 B); checked by the host against fleet_scratch_bytes()
 T = "examples/dsv2lite/fleet_shim.hip"
+D5_T = "examples/dsv2lite/fleet_d5.hip"
+# D5 uses Pass 7's existing l2_warm hook, not fleet's retained-register prefetch loop.
+D5_PREFETCH = {
+    "fleet_qkv_fused": "fleet_d5_qkv", "fleet_qkv_fused_fold": "fleet_d5_qkv",
+    "fleet_merge_uv": "fleet_d5_merge", "fleet_o_proj": "fleet_d5_oproj",
+    "fleet_norm_router": "fleet_d5_router",
+    "fleet_expert_gate_up": "fleet_d5_shared_gate_up",
+    "fleet_expert_down": "fleet_d5_shared_down", "fleet_expert_down_cached": "fleet_d5_shared_down",
+    "fleet_lm_head": "fleet_d5_lm_head", "fleet_lm_head_fold": "fleet_d5_lm_head",
+}
 
 # fleet per-task durations in microseconds (STATUS.md, v0.14-v0.18 traces)
 DUR = {"qkv": 7.4 + 12.0, "qabs": 4.0, "attn": 16.7, "merge": 7.6, "oproj": 12.0, "router": 9.0,
@@ -58,9 +68,12 @@ COH_MODES = {"1": "coherent_loads", "l1": "coherent_l1"}
 
 def _tile(symbol: str):
     mode = COH_MODES.get(os.environ.get("ETX_DSV2_COH", "0"))
+    d5 = os.environ.get("ETX_DSV2_D5", "0") == "1"
+    kw = {"prefetch": D5_PREFETCH.get(symbol)} if d5 else {}
+    source = D5_T if d5 else T
     if mode and symbol not in COH_PLAIN:
-        return hip_link(T, symbol, coherence=mode)
-    return hip_link(T, symbol)
+        return hip_link(source, symbol, coherence=mode, **kw)
+    return hip_link(source, symbol, **kw)
 
 
 def _res(lds: int = SCRATCH_BYTES, paired: bool = False) -> Resource:
@@ -269,6 +282,13 @@ def build(layers: int = LAYERS, routing_cached: bool | None = None, requests: in
         _snapshot(g, snapshot)
     if spec:
         _isolate(g, spec, int(os.environ.get("ETX_DSV2_ISOLATE_REPS", "8")), qs)
+    if os.environ.get("ETX_DSV2_D5", "0") == "1":
+        g.codegen["prefetch_dispatch"] = True
+        for grid in g.grids:
+            if grid.body.prefetch:
+                # FleetParams is an opaque container: this annotation lets P7 record the hook, but is NOT an
+                # address-safety proof. fleet_d5.hip passes only fp->w (never fp->act) to the weight planner.
+                grid.weight_args = [grid.args[0]]
     return g
 
 
