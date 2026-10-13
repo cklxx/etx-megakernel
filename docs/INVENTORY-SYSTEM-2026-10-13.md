@@ -180,6 +180,23 @@ the change); both models compile with `ETX_COHERENCE=l1` and nothing else change
 on the declared tiles and no added write-back; ROCm 7.2.4 builds at 0 scratch; negative tests: a plan in `l1` with
 tiles lacking the accessors is refused at build time for both families.
 
+**Status (2026-10-13 evening).** DeepSeek half measured: the paid hour's `pairs_l1` (examples/dsv2lite/results/
+2026-10-13-hour) gives +330 us vs default, spread 13 us, every pair faster: **KEEP under this rule** (re-derived from
+the stored pairs; DeepSeek's `ETX_DSV2_COH=l1` is the same compiler mode as `ETX_COHERENCE=l1`, proven on CPU earlier).
+Qwen half prepared, not measured (no paid GPU without approval):
+- `examples/vllm_llm/arms.py`: the Qwen arm registry (etx/session/experiment.py). `kept` = the kept recipe, `kept_l1` =
+  the same build + `ETX_COHERENCE=l1` and nothing else (tested); the rule above, verbatim, decided in integer ns.
+- `examples/vllm_llm/g6_session.py` + `examples/sessions/qwen_g6.py`: preflight (frozen shape, bf16, golden), both
+  builds, the same-build import certificate (positions 0 and 1040) + 32/32 + CHECK-DSL per build, then five
+  interleaved rounds. Dry run: 6 jobs; every GPU job reads what it runs.
+- `examples/vllm_llm/rocm_build_check.sh qwen3-30b-a3b arm:<name>` builds a registry arm with the VM's compiler.
+  ROCm 7.2.4, the full kept recipe (router narrowing included): kept and kept_l1 both 128 VGPR, occupancy 4, 7 VGPRs
+  spilled / 32 B/lane scratch (a property of the kept recipe, unchanged by the mode), identical plan (60362 tasks,
+  436 events). Megakernel ISA: system-scope loads `sc0 sc1` 82 -> 0, agent-scope `sc1` loads 1305 -> 1387 (+82),
+  `buffer_inv` 98 -> 98 (imported tiles keep their acquire), `buffer_wbl2` 50 -> 49 (one write-back fewer, none added).
+- Estimated session cost [E]: 2 certificates (3 host invocations each) + 10 timed invocations, each under the 240 s
+  invocation deadline; the session's hard stop is 3600 s.
+
 ### 4.2 Q2 -- interleaved GEMV rows (second, if cheap)
 
 A new row-ownership variant in `etx/ops/gemv.py` registered in `etx/select/variants.py` (class a from birth); its rule
