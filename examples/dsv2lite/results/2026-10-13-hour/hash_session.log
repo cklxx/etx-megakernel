@@ -1,0 +1,3 @@
+# job hash_session gpu=None cwd=/root/etx
+# : "${ETX_DSV2_FLEET:=$HOME/fleet-3fb67a6}"; : "${ETX_DSV2_DATA:=$HOME/dsv2-data}"; export ETX_DSV2_FLEET ETX_DSV2_DATA; cd "$ETX_SESS_LOGDIR" && find . -type f ! -name SHA256SUMS ! -name runner.log ! -name status.json ! -name 'startup.*' ! -name 'hash_session*' -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS && wc -l SHA256SUMS
+362 SHA256SUMS

@@ -1,0 +1,207 @@
+{
+  "arm": "l1",
+  "condition": "one MI300X, batch 1, context 1024, 32 tokens, repeat 2",
+  "d2": {
+    "a": {
+      "every_positive": true,
+      "gains_us": [
+        336.0,
+        324.0,
+        323.0,
+        331.0,
+        330.0
+      ],
+      "go": true,
+      "median_us": 330.0,
+      "spread_us": 13.0
+    },
+    "a_ok": true,
+    "b_gains_us": [
+      -104.0,
+      -99.0,
+      -95.0,
+      -99.0,
+      -92.0
+    ],
+    "b_median_us": -99.0,
+    "b_ok": false,
+    "b_tol_us": 26.0,
+    "go": false,
+    "relaxed_vs_default": {
+      "every_positive": true,
+      "gains_us": [
+        232.0,
+        225.0,
+        228.0,
+        232.0,
+        238.0
+      ],
+      "go": true,
+      "median_us": 232.0,
+      "spread_us": 13.0
+    }
+  },
+  "device_ms": {
+    "default": {
+      "every_positive": true,
+      "gains_us": [
+        336.0,
+        324.0,
+        323.0,
+        331.0,
+        330.0
+      ],
+      "go": null,
+      "median_us": 330.0,
+      "spread_us": 13.0
+    },
+    "relaxed": {
+      "every_positive": true,
+      "gains_us": [
+        104.0,
+        99.0,
+        95.0,
+        99.0,
+        92.0
+      ],
+      "go": null,
+      "median_us": 99.0,
+      "spread_us": 12.0
+    }
+  },
+  "rounds": [
+    {
+      "default": {
+        "device_ms": 3.732,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.766
+      },
+      "l1": {
+        "device_ms": 3.396,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.427
+      },
+      "relaxed": {
+        "device_ms": 3.5,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.534
+      }
+    },
+    {
+      "default": {
+        "device_ms": 3.73,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.763
+      },
+      "l1": {
+        "device_ms": 3.406,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.439
+      },
+      "relaxed": {
+        "device_ms": 3.505,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.538
+      }
+    },
+    {
+      "default": {
+        "device_ms": 3.733,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.766
+      },
+      "l1": {
+        "device_ms": 3.41,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.443
+      },
+      "relaxed": {
+        "device_ms": 3.505,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.54
+      }
+    },
+    {
+      "default": {
+        "device_ms": 3.732,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.767
+      },
+      "l1": {
+        "device_ms": 3.401,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.435
+      },
+      "relaxed": {
+        "device_ms": 3.5,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.535
+      }
+    },
+    {
+      "default": {
+        "device_ms": 3.739,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.772
+      },
+      "l1": {
+        "device_ms": 3.409,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.442
+      },
+      "relaxed": {
+        "device_ms": 3.501,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.535
+      }
+    }
+  ],
+  "verdict": {
+    "outcome": "NO-GO",
+    "passed": false,
+    "rule": "D2 rule applied to D2b: (a) every pair faster than default, median >= 70 us; (b) |median(l1 - relaxed)| <= max(2 x relaxed spread, 20 us)"
+  },
+  "wall_ms": {
+    "default": {
+      "every_positive": true,
+      "gains_us": [
+        339.0,
+        324.0,
+        323.0,
+        332.0,
+        330.0
+      ],
+      "go": true,
+      "median_us": 330.0,
+      "spread_us": 16.0
+    },
+    "relaxed": {
+      "every_positive": true,
+      "gains_us": [
+        107.0,
+        99.0,
+        97.0,
+        100.0,
+        93.0
+      ],
+      "go": true,
+      "median_us": 99.0,
+      "spread_us": 14.0
+    }
+  }
+}
