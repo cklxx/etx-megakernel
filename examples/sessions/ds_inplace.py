@@ -48,7 +48,7 @@ def job(name, cmd, *, lane="cpu", after=(), gate=None, timeout=600, summary=()):
 
 def add(name, operation, **kw):
     job(name, f".venv/bin/python -u -m examples.dsv2lite.inplace_session {operation}",
-        summary=[r"^(SOURCE|PREFLIGHT|BUILD|PAIRS|TRACE|REPORT) "], **kw)
+        summary=[r"^(SOURCE|PREFLIGHT|BUILD|PAIRS|TRACE|D4TRACE|REPORT) "], **kw)
 
 
 # ---------------------------------------------------------------- environments (cpu); recipes from ds_gap.py
@@ -99,25 +99,29 @@ add("baseline", "pairs baseline", lane="gpu", after=("preflight", "build_default
 # A failed reference or decision must not cost the data that explain it: later GPU jobs follow "whatever the result".
 add("pairs_all", "pairs all", lane="gpu", after=("preflight", "build_default", "build_all"), timeout=1200)
 JOBS[-1]["after_any"] = ["baseline"]
-add("trace_default", "trace default", lane="gpu", after=("build_default_stamps",), timeout=300)
+# Every GPU measurement depends HARD on preflight and on each binary it runs: an after_any predecessor that is SKIPPED
+# releases its successor at once, and on 2026-10-13 (d1d5 run) that started the single-lever pairs before the data
+# existed (build_coh failed -> pairs_coh/pairs_d4/d4trace skipped -> pairs_Q.. ran at +1 min, prep_pack wrote at +3 min).
+GATE = ("preflight", "build_default")
+add("trace_default", "trace default", lane="gpu", after=("preflight", "build_default_stamps"), timeout=300)
 JOBS[-1]["after_any"] = ["pairs_all"]
-add("trace_all", "trace all", lane="gpu", after=("build_all_stamps",), timeout=300)
+add("trace_all", "trace all", lane="gpu", after=("preflight", "build_all_stamps"), timeout=300)
 JOBS[-1]["after_any"] = ["trace_default"]
 previous = "trace_all"
 for arm in DITEMS:                       # new conditions before the attributions already measured on 2026-10-13
-    needs = [f"build_{arm}"] + (["build_relaxed"] if arm == "coh" else [])
+    needs = [*GATE, f"build_{arm}"] + (["build_relaxed"] if arm == "coh" else [])
     add(f"pairs_{arm}", f"pairs {arm}", lane="gpu", after=(previous, *needs), timeout=1200)
     JOBS[-1]["after_any"] = [previous]
     JOBS[-1]["after"] = needs
     previous = f"pairs_{arm}"
 add("d4trace", "d4trace", lane="gpu", after=(previous, "build_d4"), timeout=300)   # D4 criterion (a)
 JOBS[-1]["after_any"] = [previous]
-JOBS[-1]["after"] = ["build_d4"]
+JOBS[-1]["after"] = ["preflight", "build_d4"]
 previous = "d4trace"
 for arm in SINGLE:                       # attribution: each lever alone, after everything that decides
     add(f"pairs_{arm}", f"pairs {arm}", lane="gpu", after=(previous, f"build_{arm}"), timeout=900)
     JOBS[-1]["after_any"] = [previous]
-    JOBS[-1]["after"] = [f"build_{arm}"]
+    JOBS[-1]["after"] = [*GATE, f"build_{arm}"]
     previous = f"pairs_{arm}"
 add("report", "report", after=("pairs_all",), timeout=120)
 JOBS[-1]["after_any"] = ["trace_default", "trace_all", *(f"pairs_{a}" for a in DITEMS), "d4trace",

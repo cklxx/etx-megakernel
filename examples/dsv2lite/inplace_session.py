@@ -248,8 +248,11 @@ class Session:
                                               "-I" + str(self.fleet / "src"), self.fleet / "src/host/fleet_launch.hip",
                                               self.fleet / "src/kernels/fleet_kernel.hip", "-o", out / "run"], timeout=600)
         else:
+            # plan switches default off; an arm's own switches override them (a dict update, not repeated keywords:
+            # the 2026-10-13 d1d5 run lost build_coh / build_d4 to "multiple values for keyword argument")
             env = dict(ETX_OUT=str(out), ETX_FLEET_PATCH=" ".join(ARMS[arm]), ETX_BUILD_VERBOSE="1",
-                       ETX_DSV2_COH="0", ETX_DSV2_D4="0", **ARM_ENV.get(arm, {}))
+                       ETX_DSV2_COH="0", ETX_DSV2_D4="0")
+            env.update(ARM_ENV.get(arm, {}))
             flags = (["-Rpass-analysis=kernel-resource-usage"] + ARM_FLAGS.get(arm, [])
                      + (["-DETX_DSV2_STAMPS2"] if stamped else []))
             text = self.run(f"compile_{arm}{'_stamps' if stamped else ''}",

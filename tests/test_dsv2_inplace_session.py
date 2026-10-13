@@ -53,8 +53,16 @@ def test_job_graph_order_and_inputs():
     gpu = [j.name for j in jobs if j.lane == "gpu"]
     assert gpu[:5] == ["prep_ref", "baseline", "pairs_all", "trace_default", "trace_all"]   # decision before attribution
     assert gpu[5:8] == ["pairs_coh", "pairs_d4", "d4trace"]   # D2, D4: new conditions before the 10-13 attributions
-    assert by["pairs_coh"].after == ["build_coh", "build_relaxed"] and by["pairs_coh"].after_any == ["trace_all"]
-    assert by["pairs_d4"].after == ["build_d4"] and by["d4trace"].after == ["build_d4"]
+    assert by["pairs_coh"].after == ["preflight", "build_default", "build_coh", "build_relaxed"]
+    assert by["pairs_coh"].after_any == ["trace_all"]
+    assert by["pairs_d4"].after == ["preflight", "build_default", "build_d4"] and by["d4trace"].after == ["preflight", "build_d4"]
+    # a skipped after_any predecessor releases its successor at once: every GPU measurement gates HARD on preflight
+    # and on every binary it runs (2026-10-13 d1d5 run: the singles started before the data existed)
+    for j in jobs:
+        if j.lane == "gpu" and j.name != "prep_ref":
+            assert "preflight" in j.after, j.name
+        if j.name.startswith("pairs_"):
+            assert "build_default" in j.after and f"build_{j.name[6:]}" in j.after, j.name
     assert set(gpu[8:]) == {f"pairs_{a}" for a in ins.SINGLE}
     for arm in (*ins.ARMS, "fleet"):
         assert f"build_{arm}" in by and by[f"build_{arm}"].after == ["source"]
@@ -165,3 +173,25 @@ def test_pairs_refuses_a_failed_correctness_gate(recorded):
     _exe(logs / "b_all" / "run", f'sed "s/27 of 27/26 of 27/" "{etx_log}"\n')
     with pytest.raises(ValueError, match="27/27"):
         ins.Session().pairs("all")
+
+
+def test_build_env_lets_an_arm_switch_its_plan_on(tmp_path, monkeypatch):
+    """2026-10-13 d1d5 run: build coh / build d4 died with "multiple values for keyword argument" before compiling."""
+    for k in ("ETX_SESS_LOGDIR", "ETX_DSV2_FLEET", "ETX_DSV2_DATA"):
+        monkeypatch.setenv(k, str(tmp_path / k))
+    seen = {}
+
+    class Stop(Exception):
+        pass
+
+    def fake_run(self, name, command, *, env=None, timeout=180):
+        seen[name] = env
+        raise Stop
+
+    monkeypatch.setattr(ins.Session, "run", fake_run)
+    for arm in ("default", "coh", "d4", "relaxed"):
+        with pytest.raises(Stop):
+            ins.Session().build(arm)
+    assert seen["compile_default"]["ETX_DSV2_COH"] == "0" and seen["compile_default"]["ETX_DSV2_D4"] == "0"
+    assert seen["compile_coh"]["ETX_DSV2_COH"] == "1" and seen["compile_coh"]["ETX_FLEET_PATCH"] == "coherent_loads"
+    assert seen["compile_d4"]["ETX_DSV2_D4"] == "1" and seen["compile_d4"]["ETX_DSV2_COH"] == "0"
