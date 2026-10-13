@@ -128,3 +128,18 @@ Results, runs 4-5 (05:12-05:16, `$ETX_CACHE/results_2026-10-13-d1d5/run4`, `run5
   4.721 us (xcd1, the safe buffer_inv sc1: 1.055 / 1.409 / 4.165); cl1 and cl01 (cross XCD behind buffer_wbl2) 0 stale.
   By the rule: **xl1 is safe -> D2b** (sc1 payload loads, no per-task invalidate, no per-task write-back on
   same-XCD events).
+
+## D2b — sc1 payload loads, no per-task invalidate, no per-task write-back (thresholds written before the code)
+
+Design from the loadscope result: fleet's tiles read every payload another task wrote with AGENT-scope loads
+(`global_load ... sc1`: skips the CU's stale L1, xl1; reads behind a write-back across XCDs, cl1). New compiler mode
+`coherence="coherent_l1"`: no acquire invalidate; NOT a coherent consumer for the write-back rule (a same-XCD payload is
+read from the shared L2, so DOMAIN releases stay plain); a plain producer (DEVICE events keep the last-arriver flush).
+Switch `ETX_DSV2_COH=l1` + lever `l1_loads`; with the five levers it also covers attn_prologue_live's own payload reads.
+dense_down stays plain. With D4 only at 0 slice rows (the slices' h reads are plain).
+
+| arm | rule (fixed now) |
+|---|---|
+| l1 (vs default and relaxed, three-way) | D2's rule: GO if (a) every pair faster than default and median >= 70 us, and (b) median(l1 - relaxed) <= max(2 x relaxed-pair spread, 20 us) |
+| alld4r0l1 (all + D4 placement + l1; three-way default / alld4r0 / alld4r0l1) | KEEP if every pair faster than alld4r0, median >= 30 us and > 2 x spread. The 300 tok/s line is 3.333 ms device |
+| both | 32/32 + 27/27 in every invocation; any stale-data failure is a NO-GO regardless of time |
