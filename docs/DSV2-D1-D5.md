@@ -181,3 +181,33 @@ alld4r0l1 arm (the best arm + D2b) never ran.
 - **Per-stage attribution of the new arms is missing**, independent of the box: d4, alld4r0, l1 and alld4r0l1 never had
   a stamped build or trace (only an unstamped d4 trace). Recovering it needs a GPU run with their `--stamped` builds.
 - **D2b**: see "Incomplete" above.
+
+## The next paid hour (plan, 2026-10-13): minute budget from today's runner records
+
+Measured costs (`$ETX_CACHE/results_2026-10-13-d1d5/run*/runner.log`, `results/2026-10-13-runs/sess/runner.log`):
+one pairs invocation = 5.9 s (3-way pairs: 15 invocations in 88-90 s, 4 jobs; 2-way: 10 in 58-60 s, 11 jobs); one
+traced token = 7-8 s (3 jobs); builds 21-34 s each, stamped 28-33 s, all in parallel during prep (20 vCPUs); fresh-box
+prep to `preflight ok` = 3 min 59 s (run 1: apt 11, prep_env 87, prep_dl 30, prep_ref 41 on GPU, prep_pack 30,
+prep_sums 20, preflight 20); box-setup + session start <= 51 s (04:07:58 staged -> 04:08:49 runner start); staging
+volume 85.6 MB tree + 10 MB fleet export (rsync dry run). Unmeasured: rsync throughput over the SOCKS proxy.
+
+| minute (T = box handed over) | step | cost basis |
+|---|---|---|
+| 0:00-0:03 | connect THROUGH the proxy wrapper from the first attempt (direct SSH failed for ~25 min today; proxied login 3.5 s), stage, box-setup (HIP headers), start | 95.6 MB staged; <= 51 s setup [M]; proxy throughput [U] |
+| 0:03-0:07 | prep chain to preflight; all builds (incl. stamped) in parallel | 3 min 59 s [M] |
+| 0:07:00 | pairs_l1 (D2b rerun, 3-way default / relaxed / l1, 5 rounds) | 15 inv, 88 s [M] |
+| 0:08:30 | pairs_alld4r0l1 (3-way default / alld4r0 / alld4r0l1) | 15 inv, 88 s [M] |
+| 0:10:00 | pairs D3 on the best arm (2-way alld4r0 / +D3) -- ONLY if built and proven locally before the box | 10 inv, 59 s [M] |
+| 0:11:00 | pairs D5 on the best arm (2-way alld4r0 / +D5) -- same condition | 10 inv, 59 s [M] |
+| 0:12:00 | stamped traces: default, alld4r0, alld4r0l1 (recovers the lost per-stage record) | 3 inv, 24 s [M] |
+| 0:12:30 | box-side SHA256SUMS of the session directory (closes today's provenance gap) | seconds |
+| 0:13-0:40 | CONTINGENCY, not planned work: SSH trouble (today: ~25 min), one rerun of a failed arm (<= 88 s), staging retries. Only if everything above is complete before 0:30: Astra's alld4s (3-way, 88 s) | — |
+| 0:40 | hard stop for GPU work (session cap ETX_SESS_MAX_SECONDS=1800 from 0:03 ends the runner by 0:33 anyway) | — |
+| 0:40-0:55 | FETCH + VERIFY, reserved, never squeezed: ~385 MB (3 x 121 MB stamp+trace, ~20 MB logs); verify the box-side SHA256SUMS, re-derive every verdict and the stage tables, commit | throughput [U] -> 10 min reserved; verify ~2 min |
+| 0:55-1:00 | destroy, confirm 0 droplets | — |
+
+GPU work totals 318 s (5.3 min) with D3 and D5, 200 s without; the hour is bounded by connection, prep and fetch,
+not by GPU time. D3 and D5 run only if, before the box opens: code committed, default plan 09011c20 / ISA a105cb16
+unchanged, ROCm 7.2.4 build at 0 scratch, CPU gates passing, rule written here first. Their slots stay empty otherwise.
+Prerequisites for the stamped rerun (CPU, before the box): stage_table must map the D4 grids (shgu / sdown) to stages
+and the d4 bodies must write STAMPS2 slots; without that the alld4r0 / alld4r0l1 traces give spans but no stages.
