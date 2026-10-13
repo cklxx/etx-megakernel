@@ -80,6 +80,10 @@ SINGLE = ("Q", "Qall", "N", "Nall", "argmax", "topk", "prep", "relaxed")
 STAMPED = ("default", "all")
 TRACEABLE = (*STAMPED, "alld4r0", "alld4r0l1")    # arms whose stamped build a session may trace (the new arms' stages)
 DATA_FILES = ("weights.bin", "weights.bin.manifest", "fleet_cache.bin", "golden_tokens.txt", "golden_hidden.bin")
+# The measured inputs (2026-10-13 session, committed): preflight refuses anything else. prep_sums rewrites the box's
+# SHA256SUMS from whatever is on disk, so that file alone cannot tell a stale or different input (review 07, R09); the
+# model download does not pin a revision, and these hashes are what identify it.
+PINNED_INPUTS = json.loads((Path(__file__).resolve().parent / "results/2026-10-13-ds_inplace/inputs.json").read_text())["sha256"]
 GO_US = 70.0
 
 
@@ -95,12 +99,19 @@ def write_json(path: Path, data: dict) -> None:
     path.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n")
 
 
+def gain_us(ref_ms: float, cand_ms: float) -> float:
+    """reference - candidate in us, rounded to 1e-6 us: the logs carry ms with three decimals, and binary floating
+    point would otherwise move an exact boundary (60.00000000000006 > 2 x 30, 29.9999999999998 < 30; review 07, R02)."""
+    return round(1000 * (ref_ms - cand_ms), 6)
+
+
 def paired(gains_us: list[float]) -> dict:
     """Five paired gains (reference minus candidate, us): median, full-range spread, and the decision rule."""
     if len(gains_us) != 5 or not all(math.isfinite(v) for v in gains_us):
         raise ValueError("a paired result needs five finite gains")
-    median = statistics.median(gains_us)
-    spread = max(gains_us) - min(gains_us)
+    gains_us = [round(v, 6) for v in gains_us]
+    median = round(statistics.median(gains_us), 6)
+    spread = round(max(gains_us) - min(gains_us), 6)
     return dict(gains_us=gains_us, median_us=median, spread_us=spread, every_positive=min(gains_us) > 0,
                 go=min(gains_us) > 0 and median >= GO_US and median > 2 * spread)
 
@@ -109,10 +120,10 @@ def d2_verdict(rounds: list[dict], cand: str = "coh") -> dict:
     """D2's rule (docs/DSV2-D1-D5.md, fixed before the code), device basis, the same five rounds:
     (a) coh vs default (sc1): every pair faster and median >= 70 us;
     (b) coh vs relaxed: |median(coh - relaxed)| <= max(2 x spread of the relaxed-vs-default pairs, 20 us)."""
-    a = paired([1000 * (r["default"]["device_ms"] - r[cand]["device_ms"]) for r in rounds])
-    rel = paired([1000 * (r["default"]["device_ms"] - r["relaxed"]["device_ms"]) for r in rounds])
-    b = [1000 * (r[cand]["device_ms"] - r["relaxed"]["device_ms"]) for r in rounds]
-    b_median = statistics.median(b)
+    a = paired([gain_us(r["default"]["device_ms"], r[cand]["device_ms"]) for r in rounds])
+    rel = paired([gain_us(r["default"]["device_ms"], r["relaxed"]["device_ms"]) for r in rounds])
+    b = [gain_us(r[cand]["device_ms"], r["relaxed"]["device_ms"]) for r in rounds]
+    b_median = round(statistics.median(b), 6)
     tol = max(2 * rel["spread_us"], D2_MIN_TOL_US)
     a_ok = a["every_positive"] and a["median_us"] >= GO_US
     b_ok = abs(b_median) <= tol
@@ -188,6 +199,76 @@ def full_result(log: str) -> dict:
     return result
 
 
+D4_STAGE_NOTE = ("D4 arms: topk = the ROUTED XCDs' routing prologue (only routed gate_up tasks write stamps); moe_up and "
+                 "moe_down are the merged routed + shared-XCD phases (shgu / sdown join gate_up / down), so their "
+                 "bodies include the shared XCDs while the topk split does not. Span, stage sums and verdicts are exact.")
+
+
+def tree_hash(root: Path) -> str:
+    """sha256 over `sha256  path` lines of the tracked files listed in SOURCE_FILES (stage_inplace.sh writes it in
+    `git ls-files` order) -- the same bytes as `xargs -0 sha256sum < list | sha256sum` on the box."""
+    lines = []
+    for name in (root / "SOURCE_FILES").read_text().splitlines():
+        if name:
+            lines.append(f"{hashlib.sha256((root / name).read_bytes()).hexdigest()}  {name}\n")
+    return hashlib.sha256("".join(lines).encode()).hexdigest()
+
+
+def arm_order(arm: str, fleet_available: bool = True) -> tuple[tuple, tuple, str]:
+    """(invocation order of round 0, references, candidate) of a pairs arm; odd rounds reverse the order."""
+    if arm == "baseline":
+        order, refs, cand = ("default", "fleet"), ("default",), "fleet"
+    elif arm == "all":
+        order, refs, cand = ("default", "all", "fleet"), ("default", "fleet"), "all"
+        if not fleet_available:                               # the decision is vs default; fleet is the context
+            print("PAIRS arm=all: fleet binary missing, measuring against default only", flush=True)
+            order, refs = ("default", "all"), ("default",)
+    elif arm in ("coh", "l1"):
+        order, refs, cand = ("default", "relaxed", arm), ("default", "relaxed"), arm
+    elif arm == "alld4r0l1":
+        order, refs, cand = ("default", "alld4r0", arm), ("default", "alld4r0"), arm
+    elif arm == "alld3":
+        order, refs, cand = ("all", arm), ("all",), arm
+    elif arm in ("allrelaxed", "alld4r0"):
+        order, refs, cand = ("default", "all", arm), ("default", "all"), arm
+    elif arm == "alld4s":
+        order, refs, cand = ("default", "alld4r0", "alld4s"), ("default", "alld4r0"), "alld4s"
+    elif arm == "alld5":
+        order, refs, cand = ("all", arm), ("all",), arm
+    else:
+        order, refs, cand = ("default", arm), ("default",), arm
+    return order, refs, cand
+
+
+def build_report(arm: str, refs: tuple, cand: str, rounds: list[dict]) -> dict:
+    """The pairs report of five rounds: the ONE implementation pairs() writes and verify_hour.py re-derives."""
+    report = dict(arm=arm, rounds=rounds, condition="one MI300X, batch 1, context 1024, 32 tokens, repeat 2")
+    for key in ("device_ms", "wall_ms"):
+        report[key] = {}
+        for ref in refs:
+            report[key][ref] = paired([gain_us(r[ref][key], r[cand][key]) for r in rounds])
+    if arm == "alld4r0":
+        report["keep_vs_all"] = d4_verdict(report["device_ms"]["all"])
+    if arm == "alld4r0l1":
+        report["keep_vs_alld4r0"] = d4_verdict(report["device_ms"]["alld4r0"])
+    if arm == "alld4s":
+        report["keep_vs_alld4r0"] = d4_verdict(report["device_ms"]["alld4r0"])
+    if arm == "alld3":
+        report["keep_vs_all"] = d4_verdict(report["device_ms"]["all"])
+    if arm == "alld5":
+        report["d5"] = d5_verdict(report["device_ms"]["all"])
+    if arm in ("coh", "l1"):
+        report["d2"] = d2_verdict(rounds, arm)
+    elif arm == "d4":
+        report["d4"] = d4_verdict(report["device_ms"]["default"])
+    if arm != "all":
+        for basis in report["device_ms"].values():
+            basis["go"] = None          # per-reference fields carry no decision; the arm's rule is in `verdict`
+    report["verdict"] = verdict(arm, report)
+    report["verdict"] = verdict(arm, report)
+    return report
+
+
 class Session:
     def __init__(self):
         self.root = Path(__file__).resolve().parents[2]
@@ -218,7 +299,9 @@ class Session:
         clean = {k: v for k, v in os.environ.items() if not k.startswith(("ETX_", "FLEET_"))}
         clean.update(PYTHONUNBUFFERED="1")         # no caller override may leak into default or a candidate
         clean.update(env or {})
-        command = ["timeout", "--kill-after=5s", f"{timeout}s", "stdbuf", "-oL", "-eL", *map(str, command)]
+        # --foreground: the command stays in the runner job's process group, so the runner's hard stop (killpg) also
+        # stops it; plain `timeout` moves it into a group of its own that survives (review 07, R01)
+        command = ["timeout", "--foreground", "--kill-after=5s", f"{timeout}s", "stdbuf", "-oL", "-eL", *map(str, command)]
         text = ""; started = heartbeat = last_output = last_probe = time.monotonic()
         with path.open("w") as log:
             line = "$ " + shlex.join(command) + "\n"
@@ -262,6 +345,9 @@ class Session:
         text = path.read_text() if path.is_file() else ""
         if not re.search(r"^commit [0-9a-f]{40}$", text, re.M) or not re.search(r"^dirty 0$", text, re.M):
             raise RuntimeError(f"missing or dirty {path}: stage the box with examples/dsv2lite/stage_inplace.sh")
+        m = re.search(r"^tree ([0-9a-f]{64})$", text, re.M)
+        if not m or tree_hash(self.root) != m.group(1):         # review 07, R08: the marker alone proved nothing
+            raise RuntimeError(f"{self.root} is not the staged tree recorded in {path} (tree hash): restage the box")
         return text
 
     def source(self):
@@ -297,12 +383,15 @@ class Session:
             actual[name] = sha(path)
             if actual[name] != manifest[name]:
                 raise RuntimeError(f"input checksum mismatch: {path}")
+            if actual[name] != PINNED_INPUTS[name]:
+                raise RuntimeError(f"input {name} is not the measured one ({actual[name][:16]} vs pinned "
+                                   f"{PINNED_INPUTS[name][:16]}): a different experiment; refused")
         if len((self.data / "golden_tokens.txt").read_text().split()) < 33:
             raise RuntimeError("golden needs 33 tokens for 32 decode comparisons")
         if (self.data / "golden_hidden.bin").stat().st_size != 27 * 2048 * 4:
             raise RuntimeError("hidden golden is not 27 x 2048 fp32")
         write_json(self.logs / "inputs.json", dict(data=str(self.data), sha256=actual))
-        print("PREFLIGHT OK inputs match their SHA256SUMS", flush=True)
+        print("PREFLIGHT OK inputs match their SHA256SUMS and the pinned measured inputs", flush=True)
 
     def build(self, arm: str, stamped: bool = False):
         out = self.out(arm, stamped)
@@ -342,56 +431,14 @@ class Session:
         """Five interleaved rounds; order reversed on odd rounds; every invocation a fresh process with all gates."""
         if arm == "alld4s" and (self.logs / "pairs_alld4s.json").exists():
             raise RuntimeError("alld4s report already exists; choose a fresh ETX_SESS_LOGDIR for new pairs")
-        if arm == "baseline":
-            order, refs, cand = ("default", "fleet"), ("default",), "fleet"
-        elif arm == "all":
-            order, refs, cand = ("default", "all", "fleet"), ("default", "fleet"), "all"
-            if not (self.out("fleet") / "run").exists():          # the decision is vs default; fleet is the context
-                print("PAIRS arm=all: fleet binary missing, measuring against default only", flush=True)
-                order, refs = ("default", "all"), ("default",)
-        elif arm in ("coh", "l1"):
-            order, refs, cand = ("default", "relaxed", arm), ("default", "relaxed"), arm
-        elif arm == "alld4r0l1":
-            order, refs, cand = ("default", "alld4r0", arm), ("default", "alld4r0"), arm
-        elif arm == "alld3":
-            order, refs, cand = ("all", arm), ("all",), arm
-        elif arm in ("allrelaxed", "alld4r0"):
-            order, refs, cand = ("default", "all", arm), ("default", "all"), arm
-        elif arm == "alld4s":
-            order, refs, cand = ("default", "alld4r0", "alld4s"), ("default", "alld4r0"), "alld4s"
-        elif arm == "alld5":
-            order, refs, cand = ("all", arm), ("all",), arm
-        else:
-            order, refs, cand = ("default", arm), ("default",), arm
+        order, refs, cand = arm_order(arm, fleet_available=(self.out("fleet") / "run").exists())
         rounds = []
         for i in range(5):
             result = {}
             for current in (order if i % 2 == 0 else tuple(reversed(order))):
                 result[current] = self.full_invocation(current, f"{arm}_r{i}_{current}")
             rounds.append(result)
-        report = dict(arm=arm, rounds=rounds, condition="one MI300X, batch 1, context 1024, 32 tokens, repeat 2")
-        for key in ("device_ms", "wall_ms"):
-            report[key] = {}
-            for ref in refs:
-                report[key][ref] = paired([1000 * (r[ref][key] - r[cand][key]) for r in rounds])
-        if arm == "alld4r0":
-            report["keep_vs_all"] = d4_verdict(report["device_ms"]["all"])
-        if arm == "alld4r0l1":
-            report["keep_vs_alld4r0"] = d4_verdict(report["device_ms"]["alld4r0"])
-        if arm == "alld4s":
-            report["keep_vs_alld4r0"] = d4_verdict(report["device_ms"]["alld4r0"])
-        if arm == "alld3":
-            report["keep_vs_all"] = d4_verdict(report["device_ms"]["all"])
-        if arm == "alld5":
-            report["d5"] = d5_verdict(report["device_ms"]["all"])
-        if arm in ("coh", "l1"):
-            report["d2"] = d2_verdict(rounds, arm)
-        elif arm == "d4":
-            report["d4"] = d4_verdict(report["device_ms"]["default"])
-        if arm != "all":
-            for basis in report["device_ms"].values():
-                basis["go"] = None          # per-reference fields carry no decision; the arm's rule is in `verdict`
-        report["verdict"] = verdict(arm, report)
+        report = build_report(arm, refs, cand, rounds)
         write_json(self.logs / f"pairs_{arm}.json", report)
         v = report["verdict"]
         print(f"VERDICT arm={arm} {v['outcome']} rule={v['rule']!r}", flush=True)
@@ -423,7 +470,10 @@ class Session:
         from examples.dsv2lite import stage_table as st
         us, n, span = st.measured(self.out(arm, stamped=True) / "plan.json", self.logs / f"{name}.trace.bin",
                                   self.logs / f"{name}.stamps.bin")
-        write_json(self.logs / f"stages_{arm}.json", dict(arm=arm, span_us=span, stages_us=us, instances=n))
+        rec = dict(arm=arm, span_us=span, stages_us=us, instances=n)
+        if arm in ("alld4r0", "alld4r0l1"):     # review 07, R11: what the D4 split means (totals and verdicts unaffected)
+            rec["attribution_note"] = D4_STAGE_NOTE
+        write_json(self.logs / f"stages_{arm}.json", rec)
         print(f"TRACE arm={arm} span {span:.1f} us; stages " + " ".join(f"{k}={us[k]:.1f}" for k in st.ORDER), flush=True)
 
     def d4trace(self):

@@ -86,8 +86,15 @@ REMOTE
     $SSH 'pgrep -f etx.tools.gpu_jobs >/dev/null && echo RUNNING || echo "runner not running"; find ~/sess -name runner.log -print -exec tail -25 {} \;' ;;
   fetch)
     DEST=${3:?dest}; mkdir -p "$DEST"
-    rsync -az --exclude 'b_*/' $H:~/sess/ "$DEST/" || exit 1
+    # build records (plans, resources, generated kernels) are part of the result; only the binaries and patched
+    # source copies stay on the box (review 07, R03). The box's SHA256SUMS is verified, never overwritten (R04).
+    rsync -az --exclude 'b_*/run' --exclude 'b_*/fleet_src/' --exclude '*.o' $H:~/sess/ "$DEST/" || exit 1
     ls "$DEST" | head -50
+    if [ -f "$DEST/SHA256SUMS" ]; then
+      python3 "$(dirname "$0")/../etx/tools/verify_sums.py" "$DEST" --excluded 'b_*/run' 'b_*/fleet_src/*' '*.o' || { echo "FETCH NOT VERIFIED: keep the box"; exit 2; }
+    else
+      echo "no box-side SHA256SUMS in $DEST: provenance missing (the session had no hash job)"
+    fi
     # keep the fleet reference outputs (goldens, KV caches) for the next VM: no reference re-run (docs/DATA.md)
     mkdir -p ~/code/etx-cache/fleet_ref/build ~/code/etx-cache/fleet_ref/build_r1
     capture_rc=0

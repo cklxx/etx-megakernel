@@ -420,3 +420,19 @@ Rule provenance for the hour's candidates: l1 and alld4r0l1 -- 8d69e52 (before t
 two the order is the worker's statement, not a separate commit. Expectation recorded for alld5, not a rule: on `all`
 every task's `buffer_inv sc1` follows the event wait the prefetch runs before, so warmed L2 lines may be dropped
 before use; a DROP there says nothing about D5 on the D2b arm.
+
+## Review 07 (Astra, independent reviewer, 2026-10-13): 11 findings, all addressed before the box
+
+Report: `/tmp/etx-dsv2/answer-07-review.md` (reproductions under `/tmp/etx-dsv2/review07-*`). Fixes, each re-checked:
+R01 `timeout --foreground` keeps the measured binary in the job's process group (Astra's repro: no longer survives the
+hard stop); R02 gains rounded to 1e-6 us before any threshold (repro: the boundary case now NO-GO as written); R03 fetch
+keeps the build records (plans, resources, generated kernels), only binaries / patched sources / objects stay; R04 the
+box's SHA256SUMS is verified (`etx/tools/verify_sums.py`), never overwritten; R05 the hash excludes the runner's live
+`startup.*` (repro: `sha256sum -c` OK); R06 the hash waits for every job (repro: waits); R07 each GPU job waits for ALL
+earlier ones (repro: alld3 waits for l1); R08 staging sends exactly the tracked files, deletes the rest, and the box's
+`source` job recomputes the tree hash; R09 preflight refuses inputs other than the pinned measured ones; R10
+`examples/dsv2lite/verify_hour.py` re-derives every hour verdict and stage table from the raw files; R11 the D4 stage
+split is documented in each D4 stages JSON (topk = routed XCDs only; totals and verdicts exact).
+
+**FETCH + VERIFY in the hour:** `tools/session.sh fetch <ip> <dest>` (verifies the box SHA256SUMS), then
+`.venv/bin/python -m examples.dsv2lite.verify_hour <dest>` must print `HOUR VERIFIED` before the box is destroyed.

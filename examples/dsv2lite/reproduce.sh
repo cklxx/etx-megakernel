@@ -94,8 +94,14 @@ fetch)
   IP=${2:?ip}; DEST=${3:?dest}; mux "$IP"; mkdir -p "$DEST"
   rsync -az -e "ssh ${OPTS[*]}" --exclude 'b_*/run' --exclude 'b_*/fleet_src' --exclude '*.o' \
     "$ETX_SESS_USER@$IP:sess/" "$DEST/"
-  (cd "$DEST" && find . -type f ! -name SHA256SUMS | sort | xargs shasum -a 256 > SHA256SUMS)
-  ok "$(wc -l < "$DEST/SHA256SUMS") files in $DEST; next: $0 rederive $DEST"
+  # the box's SHA256SUMS is the provenance record: verify the copy against it, never overwrite it (review 07, R04)
+  if [ -f "$DEST/SHA256SUMS" ]; then
+    $PY etx/tools/verify_sums.py "$DEST" --excluded 'b_*/run' 'b_*/fleet_src/*' '*.o' || die "fetch does not match the box's SHA256SUMS: keep the box"
+  else
+    (cd "$DEST" && find . -type f ! -name 'SHA256SUMS*' | sort | xargs shasum -a 256 > SHA256SUMS.local)
+    echo "no box-side SHA256SUMS: only SHA256SUMS.local (hashes of the copy) exists"
+  fi
+  ok "fetched to $DEST; next: $0 rederive $DEST (ds_inplace) or examples/dsv2lite/verify_hour.py $DEST (ds_hour)"
   ;;
 rederive)
   DIR=${2:?session dir}

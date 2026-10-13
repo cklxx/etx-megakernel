@@ -24,10 +24,21 @@ ssh "${OPTS[@]}" -fN "$H"
 trap 'ssh -o "ControlPath=$CM_DIR/cm" -O exit "$H" >/dev/null 2>&1; rm -rf "$CM_DIR"' EXIT
 RSH="ssh ${OPTS[*]}"
 
-rsync -az -e "$RSH" --delete --exclude .git --exclude .venv --exclude build --exclude __pycache__ \
-  --exclude 'results_*' "$ROOT/" "$H:etx/"
+# EXACTLY the tracked files (review 07, R08: ignored .pyc and other untracked files rode along while `git status` was
+# clean). Anything else in ~/etx is deleted (the box's own .venv and build/ excepted), and the box recomputes the tree
+# hash -- sha256 over `sha256  path` lines of the tracked files in `git ls-files` order -- which must equal ours.
+FILES=$(mktemp); git -C "$ROOT" ls-files -z > "$FILES"
+TREE=$(cd "$ROOT" && xargs -0 shasum -a 256 < "$FILES" | shasum -a 256 | cut -c1-64)
+rsync -az -e "$RSH" --from0 --files-from="$FILES" "$ROOT/" "$H:etx/"
+BOX_TREE=$(tr '\0' '\n' < "$FILES" | ssh "${OPTS[@]}" "$H" 'set -e; cd ~/etx; cat > SOURCE_FILES
+  find . -type f ! -path "./.venv/*" ! -path "./build/*" ! -name SOURCE_FILES ! -name SOURCE_IDENTITY | sed "s#^\./##" | sort > /tmp/etx_have
+  sort SOURCE_FILES > /tmp/etx_want; comm -23 /tmp/etx_have /tmp/etx_want | xargs -r -d "\n" rm -f
+  find . -name __pycache__ ! -path "./.venv/*" -prune -exec rm -rf {} +
+  tr "\n" "\0" < SOURCE_FILES | xargs -0 sha256sum | sha256sum | cut -c1-64')
+rm -f "$FILES"
+[ "$BOX_TREE" = "$TREE" ] || { echo "refusing: the box tree $BOX_TREE differs from the commit's $TREE" >&2; exit 2; }
 rsync -az -e "$RSH" --delete "$EXPORT/" "$H:fleet-3fb67a6/"
-printf 'commit %s\nbranch %s\ndirty 0\nstaged %s\n' "$COMMIT" "$BRANCH" "$(date -u +%FT%TZ)" | ssh "${OPTS[@]}" "$H" 'cat > ~/etx/SOURCE_IDENTITY'
+printf 'commit %s\nbranch %s\ndirty 0\ntree %s\nstaged %s\n' "$COMMIT" "$BRANCH" "$TREE" "$(date -u +%FT%TZ)" | ssh "${OPTS[@]}" "$H" 'cat > ~/etx/SOURCE_IDENTITY'
 ssh "${OPTS[@]}" "$H" 'cat ~/etx/SOURCE_IDENTITY; test -f ~/fleet-3fb67a6/src/host/reference_run.py && echo FLEET-EXPORT-OK
   hipcc --version 2>/dev/null | head -1
   printf "#include <hip/hip_runtime.h>\n" | hipcc -x hip --offload-arch=gfx942 -fsyntax-only - >/dev/null 2>&1 \

@@ -41,15 +41,19 @@ GPU = [  # (job, operation, binaries it runs)
     ("trace_alld4r0l1", "trace alld4r0l1", ("alld4r0l1_stamps",)),
     ("pairs_alld4s", "pairs alld4s", ("default", "alld4r0", "alld4s")),
 ]
-previous = None
+earlier = []
 for name, op, bins in GPU:
     add(name, op, lane="gpu", after=("preflight", *(f"build_{b}" for b in bins)), timeout=1200)
-    if previous:
-        _full.JOBS[-1]["after_any"] = [previous]       # strictly in this order, whatever the previous result
-    previous = name
+    if earlier:
+        # strictly in this order, whatever each result: after ALL earlier GPU jobs, so a skip in the middle cannot let
+        # a later arm run before an earlier one that is still waiting for its build (review 07, R07)
+        _full.JOBS[-1]["after_any"] = list(earlier)
+    earlier.append(name)
 # box-side hashes of everything the session wrote, before any fetch (2026-10-13: no run directory had them)
+# the runner's own live files (runner.log, status.json, startup.* -- review 07, R05) are written after this job; it
+# waits for EVERY other job, not only the measurements, so no build is still writing (R06)
 _full.job("hash_session", 'cd "$ETX_SESS_LOGDIR" && find . -type f ! -name SHA256SUMS ! -name runner.log '
-          "! -name status.json ! -name 'hash_session*' -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS "
-          '&& wc -l SHA256SUMS', after=(), timeout=300)
-_full.JOBS[-1]["after_any"] = [name for name, _, _ in GPU]
+          "! -name status.json ! -name 'startup.*' ! -name 'hash_session*' -print0 | sort -z | xargs -0 sha256sum "
+          '> SHA256SUMS && wc -l SHA256SUMS', after=(), timeout=300)
+_full.JOBS[-1]["after_any"] = [d["name"] for d in JOBS + _full.JOBS[:-1]]
 JOBS += _full.JOBS

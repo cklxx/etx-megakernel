@@ -147,4 +147,7 @@ def test_fetch_keeps_stage_b_logs(tmp_path):
     result = run_session(env, 'fetch', 'localhost', str(tmp_path / 'capture'))
     assert result.returncode == 0
     first = (tmp_path / 'rsync-args').read_text().splitlines()[0]
-    assert "--exclude b_*/ " in first  # directories only: retain b_r1_C2.log
+    # review 07, R03: build records are part of the result -- only binaries, patched sources and objects stay on the
+    # box; stage-B logs named b_* (b_r1_C2.log) are files and still retained
+    assert "--exclude b_*/run " in first and "--exclude b_*/fleet_src/ " in first and "--exclude *.o " in first
+    assert "--exclude b_*/ " not in first
