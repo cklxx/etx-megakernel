@@ -211,3 +211,18 @@ not by GPU time. D3 and D5 run only if, before the box opens: code committed, de
 unchanged, ROCm 7.2.4 build at 0 scratch, CPU gates passing, rule written here first. Their slots stay empty otherwise.
 Prerequisites for the stamped rerun (CPU, before the box): stage_table must map the D4 grids (shgu / sdown) to stages
 and the d4 bodies must write STAMPS2 slots; without that the alld4r0 / alld4r0l1 traces give spans but no stages.
+
+## D3 — four K-chunks of 352 rows (thresholds written before the code, 2026-10-13)
+
+Design (ETX port): gate_up signals each 352-row chunk of h per wave as its rows land (fleet's CHUNK_SIGNAL, 4 chunks,
+148 = 37 workers x 4 waves signals per chunk); down no longer waits for the whole gate_up through `E_gu` but for the
+routing (`E_norm`, as gate_up) and then, inside its body, for chunk 0, 1, 2, 3 before staging that chunk of h (fleet's
+CHUNK_WAIT). Every chunk wait is followed by `buffer_inv sc1` (today's safe acquire: fleet's own `buffer_inv sc0`
+does not invalidate L1, run 5). A worker's gate_up precedes its down in its queue (ROUTING_CACHED kept), so the
+in-body waits cannot deadlock. Switch: `ETX_DSV2_KCHUNKS=4` (plan) + `-DETX_DSV2_KCHUNKS=1` (tiles) + lever
+`kchunk352` (fleet's kExpertKChunk 2048 -> 352); a build with one but not the others fails to compile. Not combinable
+with D4 (its expert bodies do not chunk): refused at build time.
+
+| arm | rule (fixed now) |
+|---|---|
+| alld3 = all five levers + D3, 2-way against `all` (one chunk), 5 rounds, 10 invocations | **GO only if every pair is faster than `all`, median >= 30 us and median > 2 x spread; otherwise DROP.** 32/32 + 27/27 in every invocation. Context, not the bar: fleet's 512-row tiling ran 4.020 ms, the tiling alone cost 0.42 ms because down runs on the same workers (`fleet:docs/STATUS.md:33,68`) |
