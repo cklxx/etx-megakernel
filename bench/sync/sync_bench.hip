@@ -40,7 +40,7 @@ static const char* mode_name[] = {"dev", "uc", "light", "xcd", "uc1", "xcd1", "x
 // the vector L1 outside threadgroup-split mode, so a consumer re-reading the same lines sees its own stale L1 copy.
 static bool is_uc(int m) { return m == UC || m == UC1; }
 static bool is_xcd(int m) { return m == XCD || m == XCD1 || m == XN || m == XL0 || m == XL1; }
-static bool no_inv(int m) { return m >= XN; }
+__host__ __device__ static bool no_inv(int m) { return m >= XN; }
 
 __device__ __forceinline__ uint32_t xcc_id() { return __builtin_amdgcn_s_getreg((3 << 11) | (0 << 6) | 20) & 0xF; }
 __device__ __forceinline__ void release(int mode) {
