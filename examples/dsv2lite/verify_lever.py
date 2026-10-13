@@ -49,11 +49,12 @@ def static_counts(asm: Path) -> dict[str, int]:
 
 
 # lever -> the plan switch it needs (the lever and the plan are checked against each other by coh_check.py)
-LEVER_ENV = {"coherent_loads": {"ETX_DSV2_COH": "1"}, "l1_loads": {"ETX_DSV2_COH": "l1"}}
+LEVER_ENV = {"coherent_loads": {"ETX_DSV2_COH": "1"}, "l1_loads": {"ETX_DSV2_COH": "l1"},
+             "kchunk352": {"ETX_DSV2_KCHUNKS": "4", "ETX_CFLAGS": "-DETX_DSV2_KCHUNKS=1"}}
 
 
 def build(arm: str, out: Path) -> dict:
-    env = {k: v for k, v in os.environ.items() if k not in ("ETX_DSV2_COH",)}
+    env = {k: v for k, v in os.environ.items() if k not in ("ETX_DSV2_COH", "ETX_DSV2_KCHUNKS", "ETX_CFLAGS")}
     for lever in arm.split("+"):
         env.update(LEVER_ENV.get(lever, {}))
     run(["bash", "examples/dsv2lite/rocm_build_check.sh", str(fleet_export()), arm, str(out)], env=env)

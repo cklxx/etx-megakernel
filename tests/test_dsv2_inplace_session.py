@@ -64,7 +64,7 @@ def test_job_graph_order_and_inputs():
         if j.name.startswith("pairs_"):
             assert "build_default" in j.after and f"build_{j.name[6:]}" in j.after, j.name
     assert set(gpu[8:]) == {f"pairs_{a}" for a in ins.SINGLE}
-    for arm in (*(a for a in ins.ARMS if a not in ("allrelaxed", "d4r0", "alld4r0", "l1", "alld4r0l1")), "fleet"):   # follow-up session files
+    for arm in (*(a for a in ins.ARMS if a not in ("allrelaxed", "d4r0", "alld4r0", "l1", "alld4r0l1", "alld3")), "fleet"):   # follow-up session files
         assert f"build_{arm}" in by and by[f"build_{arm}"].after == ["source"]
     for arm in ins.STAMPED:
         assert f"--stamped" in by[f"build_{arm}_stamps"].cmd

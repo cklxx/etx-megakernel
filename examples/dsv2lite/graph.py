@@ -129,10 +129,19 @@ def build_moe_layer(g: Graph, q: _Req, L: int, e_in: str, e_in_map: str, fold: b
                     extra_gu=None) -> str:
     n = q.n
     e_oproj = build_attention_block(g, q, L, e_in, e_in_map, fold, extra_in)
+    kchunks = os.environ.get("ETX_DSV2_KCHUNKS", "1") == "4"
     g.etensor(n(f"E_norm_{L}"), (XCDS,), wait_count=W)
-    g.etensor(n(f"E_gu_{L}"), (XCDS,), wait_count=W)
+    if not kchunks:                     # event creation order is part of the plan: unchanged for the default path
+        g.etensor(n(f"E_gu_{L}"), (XCDS,), wait_count=W)
     g.etensor(n(f"E_down_{L}"), (1,), wait_count=XCDS * W)
     _chiplet(g, q, f"router_{L}", "fleet_norm_router", L, {e_oproj: "xw->(0)"}, {n(f"E_norm_{L}"): "xw->x"}, DUR["router"])
+    if kchunks:
+        # D3 (docs/DSV2-D1-D5.md): no E_gu -- down waits for the routing like gate_up, then for each of the 4 K-chunks
+        # of h inside its body (fleet_shim.hip ETX_DSV2_KCHUNKS); the worker's own gate_up precedes it in its queue
+        _chiplet(g, q, f"gate_up_{L}", "fleet_expert_gate_up_k", L, {n(f"E_norm_{L}"): "xw->x"}, {}, DUR["gate_up"])
+        _chiplet(g, q, f"down_{L}", "fleet_expert_down_k", L, {n(f"E_norm_{L}"): "xw->x"}, {n(f"E_down_{L}"): "xw->(0)"},
+                 DUR["down"])
+        return n(f"E_down_{L}")
     _chiplet(g, q, f"gate_up_{L}", "fleet_expert_gate_up", L, {n(f"E_norm_{L}"): "xw->x", **(extra_gu or {})}, {n(f"E_gu_{L}"): "xw->x"},
              DUR["gate_up"])
     _chiplet(g, q, f"down_{L}", "fleet_expert_down_cached" if routing_cached else "fleet_expert_down", L,
@@ -202,6 +211,11 @@ def build(layers: int = LAYERS, routing_cached: bool | None = None, requests: in
     # half-layer offset); experts = only the expert streams alternate (r1's gate_up of L after r0's down of L, r0's of L+1
     # after r1's of L), the latency phases run freely; none = no cross-request edges
     couple = os.environ.get("ETX_DSV2_COUPLE", "router")
+    # ETX_DSV2_KCHUNKS=4: D3, gate_up -> down in four 352-row K-chunks (build_moe_layer); 1 = today's single piece
+    if os.environ.get("ETX_DSV2_KCHUNKS", "1") not in ("1", "4"):
+        raise ValueError("ETX_DSV2_KCHUNKS must be 1 or 4")
+    if os.environ.get("ETX_DSV2_KCHUNKS", "1") == "4" and (requests != 1 or not routing_cached):
+        raise ValueError("ETX_DSV2_KCHUNKS=4 supports one request with cached routing only")
     # ETX_DSV2_D4=1: D4's expert placement (build_moe_layer_d4); ETX_DSV2_D4_ROWS: rows of each routed expert moved to the
     # shared XCDs (d4_placement.ROWS by default). Single request, routing cached; the tiles need -DETX_DSV2_D4=1.
     d4_rows = None
@@ -210,6 +224,8 @@ def build(layers: int = LAYERS, routing_cached: bool | None = None, requests: in
         d4_rows = int(os.environ.get("ETX_DSV2_D4_ROWS", str(d4_placement.ROWS)))
         if requests != 1 or not routing_cached:
             raise ValueError("ETX_DSV2_D4 supports one request with cached routing only")
+        if os.environ.get("ETX_DSV2_KCHUNKS", "1") != "1":    # D4's expert bodies do not chunk
+            raise ValueError("ETX_DSV2_D4 with ETX_DSV2_KCHUNKS is not supported")
         coh = os.environ.get("ETX_DSV2_COH", "0")
         if coh == "1" or (coh == "l1" and d4_rows):     # the slices' h reads are plain; at 0 rows every read is patched
             raise ValueError("ETX_DSV2_D4 with ETX_DSV2_COH is not supported: the d4 tiles read h plainly "

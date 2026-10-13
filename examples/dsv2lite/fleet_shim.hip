@@ -193,6 +193,54 @@ extern "C" __device__ void fleet_lm_head(const etx_ctx* c) { fleet_call(c, fleet
 extern "C" __device__ void fleet_lm_head_fold(const etx_ctx* c) { fleet_call(c, fleet::TASK_LM_HEAD, fleet::FLAG_FOLD_PARTIALS, -1, -1, 1, -1, CHIPLET_WORKER); }
 extern "C" __device__ void fleet_argmax(const etx_ctx* c) { fleet_call(c, fleet::TASK_ARGMAX, 0, -1, -1, 1, -1, 0); }
 
+#if defined(ETX_DSV2_KCHUNKS) && ETX_DSV2_KCHUNKS
+// D3 (docs/DSV2-D1-D5.md): gate_up -> down handed over in 4 K-chunks of 352 rows of h. gate_up signals chunk c on the
+// XCD's counter KCH_EVENT(L) + c from every wave as its rows land (fleet's CHUNK_SIGNAL); down -- whose ETX edge is the
+// routing, not gate_up -- waits chunk 0 here and chunks 1..3 inside fleet's body (CHUNK_WAIT), each followed by
+// buffer_inv sc1 (lever kchunk352). A worker's gate_up precedes its down in its queue, so the waits cannot deadlock.
+static_assert(fleet::kExpertKChunk == 352, "ETX_DSV2_KCHUNKS needs lever kchunk352 (fleet kExpertKChunk = 352)");
+static_assert(fleet::kWorkersPerXCD == 37 && fleet::kWaves == 4, "148 chunk signals per chunk per token");
+#define KCH_N 4
+#define KCH_EVENT(L) (1024 + KCH_N * (L))   // xcd_counters slots (qabs 256 + 16 L + h < 768, D4 768 + L)
+#define KCH_SIGNALS (fleet::kWorkersPerXCD * fleet::kWaves)
+static __device__ __forceinline__ void fleet_call_k(const etx_ctx* c, uint16_t kind, int16_t flags) {
+  const FleetParams* fp = FP(c);
+  const int32_t L = LAYER(c);
+  fleet::TaskDescriptor t{};
+  t.kind = kind; t.layer = (int16_t)L; t.xcd = (int16_t)c->domain; t.worker = (int16_t)CHIPLET_WORKER;
+  t.wait_event = -1; t.signal_event = -1; t.signal_scope = 0; t.n_split = 1;
+  t.head = -1; t.kv_chunk = KCH_N; t.expert_slot = (int16_t)SLOT_OF_XCD(fp->d.top_k);
+  t.wait_scope = 0; t.wait_count = KCH_SIGNALS; t.local_event = (int16_t)KCH_EVENT(L); t.flags = flags;
+  t.signal_xcd_count = 0; t.index = 0;
+  fleet::TokenCtx tc;
+  tc.tok = fp->tok; tc.epoch = fp->epoch; tc.pos = fp->pos; tc.seq_len = fp->pos + 1;
+  tc.cos = fp->act.cos + (int64_t)fp->pos * fp->d.qk_rope;
+  tc.sin = fp->act.sin + (int64_t)fp->pos * fp->d.qk_rope;
+  tc.dump = fp->dump != 0; tc.trace = false;
+  fleet::Activations& act = *const_cast<fleet::Activations*>(&fp->act);
+  fleet::KVCache& kv = *const_cast<fleet::KVCache*>(&fp->kv);
+  fleet::Scratch& s = *reinterpret_cast<fleet::Scratch*>(c->lds);
+  uint64_t t0 = 0;
+  pro_begin(fp, tc, s, t0);
+  fleet::run_task(t, fp->rt, fp->d, fp->w, act, kv, s, tc, (int)c->domain, CHIPLET_WORKER);
+  pro_end(fp, s, PRO_SLOT(L, kind, c), t0);
+}
+extern "C" __device__ void fleet_expert_gate_up_k(const etx_ctx* c) {
+  fleet_call_k(c, fleet::TASK_EXPERT_GATE_UP, fleet::FLAG_CHUNK_SIGNAL);
+}
+extern "C" __device__ void fleet_expert_down_k(const etx_ctx* c) {
+  const FleetParams* fp = FP(c);
+  __shared__ int k0_ok;
+  if (threadIdx.x == 0) {
+    k0_ok = fleet::wait_event(fp->rt, fp->epoch, KCH_EVENT(LAYER(c)), fleet::SCOPE_XCD_LOCAL, (int)c->domain, KCH_SIGNALS) ? 1 : 0;
+    if (k0_ok) asm volatile("buffer_inv sc1" ::: "memory");   // the CU's L1 too (sc0 would not, run 5)
+  }
+  __syncthreads();
+  if (!k0_ok) return;
+  fleet_call_k(c, fleet::TASK_EXPERT_DOWN, fleet::FLAG_CHUNK_WAIT | fleet::FLAG_ROUTING_CACHED);
+}
+#endif
+
 #if defined(ETX_DSV2_D4) && ETX_DSV2_D4
 // D4 (docs/DSV2-D1-D5.md; placement and its build-time check: examples/dsv2lite/d4_placement.py, graph.py
 // build_moe_layer_d4). Grid constants (L, request, rows, spx). Routed grid coordinate k = routing slot k = XCD k;

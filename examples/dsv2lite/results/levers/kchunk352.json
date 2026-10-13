@@ -1,0 +1,72 @@
+{
+  "arm": "kchunk352",
+  "arm_build": {
+    "isa_sha256": "6d4fb74922717b53dc8dbd80e5adefdd4b8fb62538e835bac6fa3927e916ebfe",
+    "resources": {
+      "agpr": 67,
+      "lds": 26676,
+      "occupancy": 1,
+      "scratch": 0,
+      "sgpr": 108,
+      "vgpr": 256
+    },
+    "static": {
+      "asm_lines": 107837,
+      "inv_sc0": 14,
+      "inv_sc1": 288,
+      "nt_weight_loads": 252,
+      "sys_loads": 0,
+      "vmcnt0_waits": 2750,
+      "wbl2": 118
+    }
+  },
+  "cpu_gates": {
+    "files": [
+      "tests/test_dsv2_lever_kchunk352.py",
+      "tests/test_dsv2_stamps.py"
+    ],
+    "summary": "22 passed in 0.22s"
+  },
+  "default": {
+    "isa_sha256": "a105cb16a414ee0f9f697c9de13205419d09674f5c69f6ee804cf36942377724",
+    "resources": {
+      "agpr": 48,
+      "lds": 26668,
+      "occupancy": 1,
+      "scratch": 0,
+      "sgpr": 108,
+      "vgpr": 256
+    },
+    "static": {
+      "asm_lines": 107990,
+      "inv_sc0": 6,
+      "inv_sc1": 279,
+      "nt_weight_loads": 252,
+      "sys_loads": 0,
+      "vmcnt0_waits": 2750,
+      "wbl2": 118
+    }
+  },
+  "delta_vs_default": {
+    "agpr": 19,
+    "lds": 8,
+    "occupancy": 0,
+    "scratch": 0,
+    "sgpr": 0,
+    "vgpr": 0
+  },
+  "etx_commit": "1f6e3cc0762f6b98fc8cd146afd4987b7bb9f7af",
+  "etx_dirty": true,
+  "fleet_commit": "3fb67a6",
+  "fleet_src_sha256": "28f5cbb4f39524df318883522341c48ca4162c18b71a3a6223c52eabb40ce4b3",
+  "static_delta": {
+    "asm_lines": -153,
+    "inv_sc0": 8,
+    "inv_sc1": 9,
+    "nt_weight_loads": 0,
+    "sys_loads": 0,
+    "vmcnt0_waits": 0,
+    "wbl2": 0
+  },
+  "verdict": "PASS"
+}

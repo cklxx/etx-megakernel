@@ -61,6 +61,10 @@ ARM_ENV["l1"] = {"ETX_DSV2_COH": "l1"}
 ARMS["alld4r0l1"] = (*LEVERS_ALL, "l1_loads")
 ARM_FLAGS["alld4r0l1"] = ["-DETX_DSV2_D4=1"]
 ARM_ENV["alld4r0l1"] = {"ETX_DSV2_D4": "1", "ETX_DSV2_D4_ROWS": "0", "ETX_DSV2_COH": "l1"}
+# D3 (docs/DSV2-D1-D5.md): four 352-row K-chunks on top of the five levers, 2-way against `all`
+ARMS["alld3"] = (*LEVERS_ALL, "kchunk352")
+ARM_FLAGS["alld3"] = ["-DETX_DSV2_KCHUNKS=1"]
+ARM_ENV["alld3"] = {"ETX_DSV2_KCHUNKS": "4"}
 ARMS["alld4r0"] = LEVERS_ALL                       # candidate: the best arm + D4 placement without slices
 ARM_FLAGS["alld4r0"] = ["-DETX_DSV2_D4=1"]
 ARM_ENV["alld4r0"] = dict(ARM_ENV["d4r0"])
@@ -123,6 +127,7 @@ RULES = {
     "d4": ("KEEP: every pair faster than default, median >= 30 us, > 2 x spread", "d4", None),
     "alld4r0": ("KEEP: every pair faster than all, median >= 30 us, > 2 x spread (rule commit 7e08d27)", "keep_vs_all", None),
     "alld4r0l1": ("KEEP: every pair faster than alld4r0, median >= 30 us, > 2 x spread (rule commit 8d69e52)", "keep_vs_alld4r0", None),
+    "alld3": ("D3 GO only if every pair faster than all (one chunk), median >= 30 us, > 2 x spread; else DROP (rule commit 1f6e3cc)", "keep_vs_all", None),
 }
 
 
@@ -292,7 +297,7 @@ class Session:
             # plan switches default off; an arm's own switches override them (a dict update, not repeated keywords:
             # the 2026-10-13 d1d5 run lost build_coh / build_d4 to "multiple values for keyword argument")
             env = dict(ETX_OUT=str(out), ETX_FLEET_PATCH=" ".join(ARMS[arm]), ETX_BUILD_VERBOSE="1",
-                       ETX_DSV2_COH="0", ETX_DSV2_D4="0")
+                       ETX_DSV2_COH="0", ETX_DSV2_D4="0", ETX_DSV2_KCHUNKS="1")
             env.update(ARM_ENV.get(arm, {}))
             flags = (["-Rpass-analysis=kernel-resource-usage"] + ARM_FLAGS.get(arm, [])
                      + (["-DETX_DSV2_STAMPS2"] if stamped else []))
@@ -325,6 +330,8 @@ class Session:
             order, refs, cand = ("default", "relaxed", arm), ("default", "relaxed"), arm
         elif arm == "alld4r0l1":
             order, refs, cand = ("default", "alld4r0", arm), ("default", "alld4r0"), arm
+        elif arm == "alld3":
+            order, refs, cand = ("all", arm), ("all",), arm
         elif arm in ("allrelaxed", "alld4r0"):
             order, refs, cand = ("default", "all", arm), ("default", "all"), arm
         else:
@@ -344,6 +351,8 @@ class Session:
             report["keep_vs_all"] = d4_verdict(report["device_ms"]["all"])
         if arm == "alld4r0l1":
             report["keep_vs_alld4r0"] = d4_verdict(report["device_ms"]["alld4r0"])
+        if arm == "alld3":
+            report["keep_vs_all"] = d4_verdict(report["device_ms"]["all"])
         if arm in ("coh", "l1"):
             report["d2"] = d2_verdict(rounds, arm)
         elif arm == "d4":
@@ -430,7 +439,7 @@ def main(argv=None):
             ap.error(f"build arm must be one of {sorted((*ARMS, 'fleet'))}")
         session.build(a.arm, a.stamped)
     elif a.operation == "pairs":
-        if a.arm not in ("baseline", "all", *SINGLE, "coh", "d4", "allrelaxed", "d4r0", "alld4r0", "l1", "alld4r0l1"):
+        if a.arm not in ("baseline", "all", *SINGLE, "coh", "d4", "allrelaxed", "d4r0", "alld4r0", "l1", "alld4r0l1", "alld3"):
             ap.error("pairs arm must be baseline, all, coh, d4 or a single lever")
         session.pairs(a.arm)
     elif a.operation == "trace":
