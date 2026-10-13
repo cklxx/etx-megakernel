@@ -63,7 +63,9 @@ def test_job_graph_gates_every_gpu_job_on_what_it_runs():
     from etx.tools.gpu_jobs import load_session
     jobs, limit = load_session(ROOT / "examples/sessions/qwen_g6.py")
     by = {j.name: j for j in jobs}
-    assert [j.name for j in jobs if j.lane == "gpu"] == ["certify_kept", "certify_kept_l1", "pairs_kept_l1"]
+    assert [j.name for j in jobs if j.lane == "gpu"] == ["moerows", "certify_kept", "certify_kept_l1", "pairs_kept_l1"]
+    assert by["moerows"].reads == ["b_hw/hw_bench"]                      # microbenchmark first; needs no model input
+    assert all(by[f"build_{a}"].reads == ["inputs.json"] for a in ("kept", "kept_l1"))   # preflight refuses first
     assert {"certificate_kept/gate.log", "certificate_kept_l1/gate.log", "inputs.json"} <= set(by["pairs_kept_l1"].reads)
     assert by["certify_kept_l1"].reads == ["inputs.json", "b_kept_l1/arm.json"]
     assert limit == 3600

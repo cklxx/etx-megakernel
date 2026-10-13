@@ -36,6 +36,12 @@
 //                      each followed by a warm 28 KB weight stream: what coherent activation loads (no inv) buy a phase.
 //   hw_bench moegather the MoE expert gather (2 x 128 KB halves 3.15 MB apart, experts 6.29 MB apart over 805 MB)
 //                      against one contiguous sweep of the same 50.3 MB at the same width; + the tile's LDS stage.
+//   hw_bench moerows   Qwen's moe_up phase (as moegather's gather) with each task's 32 rows owned CONTIGUOUSLY (rows
+//                      j*32 .. j*32+31, what dsl_gemv_rows does) or INTERLEAVED between the expert's 24 workgroups (rows
+//                      j, j+24, j+48, ...): same experts, bytes, load depth and code but the row address. Cold reads (an
+//                      expert recurs only after >= 350 MB, beyond the 256 MB MALL), a position-dependent fill, and a per-pass
+//                      sum checksum against the host's expected value; 5 launch pairs, order reversed on odd pairs. Decides
+//                      Q2 (docs/INVENTORY-SYSTEM-2026-10-13.md 4.2); rule in examples/vllm_llm/results/QWEN-READINESS-2026-10-14.md section 4.
 //   hw_bench streamw   the stream shapes at 256 AND 1024 threads per workgroup: the achievable rate in the
 //                      megakernel's own 16-wave regime, which `stream` (256 threads) does not measure.
 //   hw_bench launch    the kernel boundary with work: 200 kernels in one HIP graph, each reads the previous kernel's output
@@ -679,6 +685,64 @@ __global__ void __launch_bounds__(kT) k_cohload(uint32_t* vec, const u4* __restr
   if (acc == 0x12345u) sink[blockIdx.x] = acc;
 }
 
+
+// ------------------------------------------------------------------ moerows (Q2: row ownership between workgroups)
+// Position-dependent fill so the checksum proves which bytes were read (the buffer is otherwise memset to 0x01).
+__host__ __device__ inline u4 mr_pat(size_t i) {
+  const uint32_t a = (uint32_t)(i * 2654435761ull), b = (uint32_t)(i >> 32) ^ 0x9e3779b9u;
+  return u4{a, a ^ b, a * 3u + 1u, (uint32_t)i ^ b};
+}
+__global__ void k_mr_fill(u4* w, size_t n) {
+  for (size_t i = (size_t)blockIdx.x * blockDim.x + threadIdx.x; i < n; i += (size_t)gridDim.x * blockDim.x) w[i] = mr_pat(i);
+}
+// One 4 KB row = 2048 bf16 = 256 u4. Task (s, j): expert e(s, pass), the j-th of tpe tasks; it reads `rows` rows of the
+// gate half and the same rows of the up half (half bytes later). Its r-th row is first + r * step: contiguous
+// first = j * rows, step = 1; interleaved first = j, step = tpe. ONE kernel, so both modes run identical instructions
+// and registers; only two uniform values differ (a template per mode compiled to 47 vs 91 VGPRs: a confound).
+constexpr int MR_ROW16 = 2048 * 2 / 16;
+__global__ void __launch_bounds__(kT) k_moerows(const u4* __restrict__ w, int active, int tpe, int rows, int interleaved,
+                                                int64_t estride, int64_t half, int nexp, int iters, Ctl* ctl,
+                                                uint64_t* t_start, uint64_t* t_end, unsigned long long* chk) {
+  __shared__ int s_slot;
+  __shared__ unsigned long long s_red[kT];
+  if (threadIdx.x == 0) s_slot = claim_xslot(ctl);
+  __syncthreads();
+  const int x = (int)xcc_id(), pbase = active / 8, rem = active % 8;
+  const int slot = s_slot, wid = x * pbase + (x < rem ? x : rem) + slot;
+  const bool on = slot < pbase + (x < rem ? 1 : 0);
+  const int64_t n16 = (int64_t)rows * MR_ROW16;
+  for (int it = 0; it < iters; ++it) {
+    grid_barrier(ctl, it + 1);
+    if (!on) continue;
+    const uint64_t t0 = now();
+    const int s = wid / tpe, j = wid - s * tpe;
+    const int e = (int)((s * 37 + 11 + it * 13) % nexp);                // moegather's gather schedule
+    const int64_t first = interleaved ? j : (int64_t)j * rows, step = interleaved ? tpe : 1;
+    unsigned long long acc = 0;
+    for (int h = 0; h < 2; ++h) {
+      const u4* p = w + (size_t)e * (size_t)(estride / 16) + (size_t)h * (size_t)(half / 16);
+      for (int64_t i = threadIdx.x; i < n16; i += kT * 8) {
+        u4 v[8];
+#pragma unroll
+        for (int d = 0; d < 8; ++d) {
+          const int64_t q = i + (int64_t)d * kT, r = q / MR_ROW16, c = q - r * MR_ROW16;
+          const int64_t row = first + r * step;
+          v[d] = q < n16 ? p[row * MR_ROW16 + c] : u4{0, 0, 0, 0};
+        }
+        live8(v);
+#pragma unroll
+        for (int d = 0; d < 8; ++d) acc += xs(v[d]);
+      }
+    }
+    __syncthreads();
+    if (threadIdx.x == 0) { t_start[(size_t)it * active + wid] = t0; t_end[(size_t)it * active + wid] = now(); }
+    s_red[threadIdx.x] = acc;                                            // checksum after the timestamp: not timed
+    __syncthreads();
+    for (int k = kT / 2; k > 0; k >>= 1) { if ((int)threadIdx.x < k) s_red[threadIdx.x] += s_red[threadIdx.x + k]; __syncthreads(); }
+    if (threadIdx.x == 0) atomicAdd(&chk[it], s_red[0]);
+  }
+}
+
 // ------------------------------------------------------------------ moegather (the MoE expert gather vs one sweep)
 // Qwen3-30B-A3B's moe_up phase, exactly: 192 workgroups, task w = (s = w / 24, j = w % 24); expert s reads rows
 // j * 32 .. j * 32 + 32 of gate (128 KB contiguous) and the same rows of up, which sit estride/2 = 3.15 MB later;
@@ -1135,6 +1199,61 @@ int main(int argc, char** argv) {
     }
   }
 
+  if (what == "moerows") {
+    // the moegather gather shape: 192 tasks = 8 experts x 24 tasks of 32 rows of the 768-row gate (and up) half
+    const int iters = 12, active = 192, tpe = 24, nexp = 128, rows = 32, pairs = 5, first = 2;
+    const int64_t half = 768LL * 2048 * 2, estride = 2 * half;
+    hipLaunchKernelGGL(k_mr_fill, dim3(4096), dim3(256), 0, st, w, buf_u4);
+    if (!wait_stream(st, 60)) { printf("RESULT moerows FILL HUNG\n"); return 3; }
+    std::vector<unsigned long long> want(iters, 0);                     // the host's checksum of exactly the rows due
+    for (int it = 0; it < iters; ++it)
+      for (int wid = 0; wid < active; ++wid) {
+        const int s = wid / tpe, j = wid - s * tpe, e = (s * 37 + 11 + it * 13) % nexp;
+        for (int h = 0; h < 2; ++h)
+          for (int r = 0; r < rows; ++r)
+            for (int c = 0; c < MR_ROW16; ++c) {
+              const size_t off = (size_t)e * (estride / 16) + (size_t)h * (half / 16) + (size_t)(j * rows + r) * MR_ROW16 + c;
+              const u4 v = mr_pat(off); want[it] += (unsigned long long)(v.x ^ v.y ^ v.z ^ v.w);
+            }
+      }
+    uint64_t *ts, *te; unsigned long long* chk;
+    CHECK(hipMalloc(&ts, (size_t)iters * 304 * 8)); CHECK(hipMalloc(&te, (size_t)iters * 304 * 8)); CHECK(hipMalloc(&chk, iters * 8));
+    std::vector<double> gain;
+    bool complete = true;
+    for (int pr = 0; pr < pairs && complete; ++pr) {
+      double span[2] = {0, 0};
+      for (int k = 0; k < 2; ++k) {
+        const int ilv = (pr % 2 == 0) ? k : 1 - k;                       // order reversed on odd pairs
+        reset(); CHECK(hipMemset(ts, 0, (size_t)iters * 304 * 8)); CHECK(hipMemset(te, 0, (size_t)iters * 304 * 8));
+        CHECK(hipMemset(chk, 0, iters * 8));
+        hipLaunchKernelGGL(k_moerows, dim3(ncu), dim3(kT), lds1, st, w, active, tpe, rows, ilv, estride, half, nexp, iters, ctl, ts, te, chk);
+        if (!wait_stream(st, 30)) { printf("RESULT moerows HUNG\n"); return 3; }
+        std::vector<uint64_t> hs((size_t)iters * 304), he((size_t)iters * 304); std::vector<unsigned long long> got(iters);
+        CHECK(hipMemcpy(hs.data(), ts, hs.size() * 8, hipMemcpyDeviceToHost)); CHECK(hipMemcpy(he.data(), te, he.size() * 8, hipMemcpyDeviceToHost));
+        CHECK(hipMemcpy(got.data(), chk, iters * 8, hipMemcpyDeviceToHost));
+        for (int it = 0; it < iters; ++it) if (got[it] != want[it]) {
+          printf("RESULT moerows CHECKSUM MISMATCH pair %d %s pass %d: got %llx want %llx\n", pr, ilv ? "interleaved" : "contiguous", it, got[it], want[it]);
+          complete = false;
+        }
+        std::vector<double> spans;
+        for (int it = first; it < iters; ++it) {
+          uint64_t lo = ~0ull, hi = 0;
+          for (int q = 0; q < active; ++q) { const size_t i = (size_t)it * active + q; if (!hs[i]) continue; lo = std::min(lo, hs[i]); hi = std::max(hi, he[i]); }
+          if (hi > lo) spans.push_back((hi - lo) * 0.01);
+        }
+        span[ilv] = pct(spans, 0.5);
+        const double total = (double)active * 2 * rows * 4096;
+        printf("RESULT moerows pair %d %-11s span %7.2f us -> %.2f TB/s, checksum %s\n", pr, ilv ? "interleaved" : "contiguous",
+               span[ilv], total / (span[ilv] * 1e-6) / 1e12, complete ? "OK" : "MISMATCH");
+      }
+      gain.push_back((span[0] - span[1]) / span[0] * 100.0);                // + = interleaved faster, % of contiguous
+    }
+    if (!complete || (int)gain.size() != pairs) { printf("DECISION moerows INCOMPLETE (checksum mismatch or missing pairs): no decision\n"); return 4; }
+    const double med = pct(gain, 0.5), lo = *std::min_element(gain.begin(), gain.end()), hi = *std::max_element(gain.begin(), gain.end());
+    const bool pass = lo > 0 && med >= 3.0 && med > 2 * (hi - lo);
+    printf("DECISION moerows %s: gains %% [%.2f %.2f %.2f %.2f %.2f] median %.2f%% spread %.2f%% (PASS: every pair faster, median >= 3%%, > 2 x spread)\n",
+           pass ? "PASS" : "NO-GO", gain[0], gain[1], gain[2], gain[3], gain[4], med, hi - lo);
+  }
   if (what == "all" || what == "moegather") {
     // Qwen3-30B-A3B moe_up: E = 128, H = 2048, MI = 768, top-k 8; gate_up per expert 2 * MI * H * 2 B = 6.29 MB,
     // the up half 3.15 MB after the gate half; 192 tasks = 8 experts x 24 row chunks of 32 rows x 2048 bf16 = 128 KB
