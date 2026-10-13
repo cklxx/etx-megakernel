@@ -479,3 +479,35 @@ slash), so a failed re-fetch left that capture certifiable. Now `find -H "$DEST"
 followed, links below it are not; DEST itself is never a target). Astra's symlink repro: `current` and
 `current-trailing-slash` both `verify_hour_exit 2`, `old_box_manifest_survived False` (was exit 0, True); all PATH
 SAFETY checks True; macOS `find` with the same flags leaves no manifest.
+
+## K1: shared kv_a on the kept arm, and two lever ablations (thresholds written before the code, 2026-10-14)
+
+**Why K1.** Kept arm `alld4r0l1`, retained stamped trace (`results/2026-10-13-hour/trace_alld4r0l1.*`), ledger
+mean MoE layer 124.0 us [C]. The handoffs are tight: mean wait 0.5-2.6 us per task. The time is in bodies, and the
+largest body excess without any lever, open or closed, is qkv: 21.5 us against a 3.5 us byte floor.
+- Its stamps: norm 2.2 + gamma 1.2, then q GEMV 6.7, then kv_a GEMV 5.3 us, in sequence.
+- Every XCD computes all 576 kv_a rows (OPS-dsv2.md:17,52,149: 18.9 MB requested for 2.36 MB unique).
+  MODEL-dsv2.md:154 explained the qkv stream excess as issued bytes: a replay at 160-180 KB/task gave 12-16 us,
+  and 14.6 us was stamped [M].
+- The over-issue half was tried (gemv_no_terminal: dead, L2 hits). The replication half was never measured under ETX.
+  Fleet's own default is `FLAG_KVA_SHARED`: kv_a split over the XCDs behind a global event (ETX_Technical_Design.md:1063).
+
+**K1 change.** `ETX_DSV2_KVA=shared` (default `replicated` = today, byte-identical):
+- each XCD's qkv tasks compute 1/8 of kv_a into one buffer (fleet's FLAG_KVA_SHARED path);
+- the qkv event becomes global (1,), 296 arrivals; attention and q_absorb wait on it and read the single kv_a buffer.
+Safety: attention's kv_a loads are already l1 agent-scope loads (levers/l1_loads.py), and a cross-XCD hand-off goes
+through the last-arriver write-back (the loadscope cl1 case, 0 stale words) like o_proj -> router today.
+
+**Expected, not promised.**
+- qkv: kv_a issued bytes per task fall from ~98 KB to ~8-12 KB, so qkv stream -5..-7 us/layer [E].
+- Costs: a global handoff instead of an XCD-local one, plus attention reading kv_a remotely (B2: a fresh remote
+  64 KB costs 3.9-6.0 us; kv_a is 2.3 KB). +1..+4 us/layer [E].
+- Net sign [U]. It decides on the GPU.
+
+**Rule (K1):** arm `alld4r0l1kvs` vs `alld4r0l1`, five interleaved rounds, device time, no stamps.
+**KEEP** if every pair is faster, median >= 30 us and > 2 x spread; otherwise **DROP**. 32/32 + 27/27 in every invocation.
+
+**Ablations (new interaction question, not a 14 us assumption).** `alld4r0l1noQ` (without gemv_no_terminal_all) and
+`alld4r0l1noA` (without argmax_tree), each vs `alld4r0l1`, same five rounds. **REMOVE** the lever from the kept
+recipe if every pair is faster and median > 2 x spread; otherwise it stays. Low ceiling: argmax measures 5.1 us in
+total. They ride the same box after K1, never instead of it.
