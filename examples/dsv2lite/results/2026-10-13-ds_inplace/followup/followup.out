@@ -1,0 +1,2311 @@
+$ timeout --kill-after=5s 900s stdbuf -oL -eL bash examples/dsv2lite/build.sh /root/fleet-3fb67a6 -Rpass-analysis=kernel-resource-usage
+patched /root/sess_followup/b_allnoQ/fleet_src (norm_tree_all)
+patched /root/sess_followup/b_allnoQ/fleet_src (argmax_tree)
+patched /root/sess_followup/b_allnoQ/fleet_src (topk_rank)
+patched /root/sess_followup/b_allnoQ/fleet_src (attn_prologue_live)
+plan: graph=dsv2lite_decode arch=gfx942 bindings={}
+  devices=1 domains/device=8 workers/domain=37 (wg/CU=1)
+  tasks=54946 events=219 eliminated=[]
+  embed                    static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  qkv_0                    static   S_balance=1.94us <= 1.5x(C_cross=1.89+C_queue=1.20)
+  qabs_0                   static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  attn_0                   static   S_balance=3.34us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  merge_0                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  oproj_0                  static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  norm_0                   static   S_balance=0.90us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  dense_gu_0               static   S_balance=4.50us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  dense_dn_0               static   S_balance=4.50us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  qkv_1                    static   S_balance=1.94us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  qabs_1                   static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  attn_1                   static   S_balance=3.34us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  merge_1                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  oproj_1                  static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  router_1                 static   S_balance=0.90us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  gate_up_1                static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  down_1                   static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  qkv_2                    static   S_balance=1.94us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  qabs_2                   static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  attn_2                   static   S_balance=3.34us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  merge_2                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  oproj_2                  static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  router_2                 static   S_balance=0.90us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  gate_up_2                static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  down_2                   static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  qkv_3                    static   S_balance=1.94us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  qabs_3                   static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  attn_3                   static   S_balance=3.34us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  merge_3                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  oproj_3                  static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  router_3                 static   S_balance=0.90us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  gate_up_3                static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  down_3                   static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  qkv_4                    static   S_balance=1.94us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  qabs_4                   static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  attn_4                   static   S_balance=3.34us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  merge_4                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  oproj_4                  static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  router_4                 static   S_balance=0.90us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  gate_up_4                static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  down_4                   static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  qkv_5                    static   S_balance=1.94us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  qabs_5                   static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  attn_5                   static   S_balance=3.34us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  merge_5                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  oproj_5                  static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  router_5                 static   S_balance=0.90us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  gate_up_5                static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  down_5                   static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  qkv_6                    static   S_balance=1.94us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  qabs_6                   static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  attn_6                   static   S_balance=3.34us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  merge_6                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  oproj_6                  static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  router_6                 static   S_balance=0.90us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  gate_up_6                static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  down_6                   static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  qkv_7                    static   S_balance=1.94us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  qabs_7                   static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  attn_7                   static   S_balance=3.34us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  merge_7                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  oproj_7                  static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  router_7                 static   S_balance=0.90us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  gate_up_7                static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  down_7                   static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  qkv_8                    static   S_balance=1.94us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  qabs_8                   static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  attn_8                   static   S_balance=3.34us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  merge_8                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  oproj_8                  static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  router_8                 static   S_balance=0.90us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  gate_up_8                static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  down_8                   static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  qkv_9                    static   S_balance=1.94us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  qabs_9                   static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  attn_9                   static   S_balance=3.34us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  merge_9                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  oproj_9                  static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  router_9                 static   S_balance=0.90us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  gate_up_9                static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  down_9                   static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  qkv_10                   static   S_balance=1.94us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  qabs_10                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  attn_10                  static   S_balance=3.34us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  merge_10                 static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  oproj_10                 static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  router_10                static   S_balance=0.90us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  gate_up_10               static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  down_10                  static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  qkv_11                   static   S_balance=1.94us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  qabs_11                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  attn_11                  static   S_balance=3.34us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  merge_11                 static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  oproj_11                 static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  router_11                static   S_balance=0.90us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  gate_up_11               static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  down_11                  static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  qkv_12                   static   S_balance=1.94us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  qabs_12                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  attn_12                  static   S_balance=3.34us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  merge_12                 static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  oproj_12                 static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  router_12                static   S_balance=0.90us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  gate_up_12               static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  down_12                  static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  qkv_13                   static   S_balance=1.94us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  qabs_13                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  attn_13                  static   S_balance=3.34us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  merge_13                 static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  oproj_13                 static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  router_13                static   S_balance=0.90us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  gate_up_13               static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  down_13                  static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  qkv_14                   static   S_balance=1.94us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  qabs_14                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  attn_14                  static   S_balance=3.34us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  merge_14                 static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  oproj_14                 static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  router_14                static   S_balance=0.90us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  gate_up_14               static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  down_14                  static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  qkv_15                   static   S_balance=1.94us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  qabs_15                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  attn_15                  static   S_balance=3.34us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  merge_15                 static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  oproj_15                 static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  router_15                static   S_balance=0.90us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  gate_up_15               static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  down_15                  static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  qkv_16                   static   S_balance=1.94us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  qabs_16                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  attn_16                  static   S_balance=3.34us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  merge_16                 static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  oproj_16                 static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  router_16                static   S_balance=0.90us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  gate_up_16               static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  down_16                  static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  qkv_17                   static   S_balance=1.94us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  qabs_17                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  attn_17                  static   S_balance=3.34us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  merge_17                 static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  oproj_17                 static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  router_17                static   S_balance=0.90us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  gate_up_17               static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  down_17                  static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  qkv_18                   static   S_balance=1.94us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  qabs_18                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  attn_18                  static   S_balance=3.34us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  merge_18                 static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  oproj_18                 static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  router_18                static   S_balance=0.90us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  gate_up_18               static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  down_18                  static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  qkv_19                   static   S_balance=1.94us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  qabs_19                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  attn_19                  static   S_balance=3.34us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  merge_19                 static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  oproj_19                 static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  router_19                static   S_balance=0.90us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  gate_up_19               static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  down_19                  static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  qkv_20                   static   S_balance=1.94us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  qabs_20                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  attn_20                  static   S_balance=3.34us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  merge_20                 static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  oproj_20                 static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  router_20                static   S_balance=0.90us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  gate_up_20               static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  down_20                  static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  qkv_21                   static   S_balance=1.94us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  qabs_21                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  attn_21                  static   S_balance=3.34us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  merge_21                 static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  oproj_21                 static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  router_21                static   S_balance=0.90us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  gate_up_21               static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  down_21                  static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  qkv_22                   static   S_balance=1.94us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  qabs_22                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  attn_22                  static   S_balance=3.34us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  merge_22                 static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  oproj_22                 static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  router_22                static   S_balance=0.90us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  gate_up_22               static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  down_22                  static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  qkv_23                   static   S_balance=1.94us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  qabs_23                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  attn_23                  static   S_balance=3.34us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  merge_23                 static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  oproj_23                 static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  router_23                static   S_balance=0.90us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  gate_up_23               static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  down_23                  static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  qkv_24                   static   S_balance=1.94us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  qabs_24                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  attn_24                  static   S_balance=3.34us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  merge_24                 static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  oproj_24                 static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  router_24                static   S_balance=0.90us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  gate_up_24               static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  down_24                  static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  qkv_25                   static   S_balance=1.94us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  qabs_25                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  attn_25                  static   S_balance=3.34us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  merge_25                 static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  oproj_25                 static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  router_25                static   S_balance=0.90us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  gate_up_25               static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  down_25                  static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  qkv_26                   static   S_balance=1.94us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  qabs_26                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  attn_26                  static   S_balance=3.34us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  merge_26                 static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  oproj_26                 static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  router_26                static   S_balance=0.90us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  gate_up_26               static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  down_26                  static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  lm_head                  static   S_balance=14.00us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  argmax                   static   S_balance=0.00us <= 1.5x(C_cross=1.89+C_queue=1.20)
+  event E_embed          scope=DEVICE  mem=device       numel=1 cross_domain=259 cross_device=0
+  event E_qkv_0          scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_qabs_0         scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_attn_0         scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_merge_0        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_oproj_0        scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_norm_0         scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_dgu_0          scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_dense_0        scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_qkv_1          scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_qabs_1         scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_attn_1         scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_merge_1        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_oproj_1        scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_norm_1         scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_gu_1           scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_down_1         scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_qkv_2          scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_qabs_2         scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_attn_2         scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_merge_2        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_oproj_2        scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_norm_2         scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_gu_2           scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_down_2         scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_qkv_3          scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_qabs_3         scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_attn_3         scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_merge_3        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_oproj_3        scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_norm_3         scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_gu_3           scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_down_3         scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_qkv_4          scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_qabs_4         scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_attn_4         scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_merge_4        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_oproj_4        scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_norm_4         scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_gu_4           scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_down_4         scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_qkv_5          scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_qabs_5         scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_attn_5         scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_merge_5        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_oproj_5        scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_norm_5         scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_gu_5           scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_down_5         scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_qkv_6          scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_qabs_6         scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_attn_6         scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_merge_6        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_oproj_6        scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_norm_6         scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_gu_6           scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_down_6         scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_qkv_7          scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_qabs_7         scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_attn_7         scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_merge_7        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_oproj_7        scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_norm_7         scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_gu_7           scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_down_7         scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_qkv_8          scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_qabs_8         scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_attn_8         scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_merge_8        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_oproj_8        scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_norm_8         scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_gu_8           scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_down_8         scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_qkv_9          scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_qabs_9         scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_attn_9         scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_merge_9        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_oproj_9        scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_norm_9         scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_gu_9           scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_down_9         scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_qkv_10         scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_qabs_10        scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_attn_10        scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_merge_10       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_oproj_10       scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_norm_10        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_gu_10          scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_down_10        scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_qkv_11         scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_qabs_11        scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_attn_11        scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_merge_11       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_oproj_11       scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_norm_11        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_gu_11          scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_down_11        scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_qkv_12         scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_qabs_12        scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_attn_12        scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_merge_12       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_oproj_12       scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_norm_12        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_gu_12          scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_down_12        scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_qkv_13         scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_qabs_13        scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_attn_13        scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_merge_13       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_oproj_13       scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_norm_13        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_gu_13          scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_down_13        scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_qkv_14         scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_qabs_14        scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_attn_14        scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_merge_14       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_oproj_14       scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_norm_14        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_gu_14          scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_down_14        scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_qkv_15         scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_qabs_15        scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_attn_15        scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_merge_15       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_oproj_15       scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_norm_15        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_gu_15          scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_down_15        scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_qkv_16         scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_qabs_16        scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_attn_16        scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_merge_16       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_oproj_16       scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_norm_16        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_gu_16          scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_down_16        scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_qkv_17         scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_qabs_17        scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_attn_17        scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_merge_17       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_oproj_17       scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_norm_17        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_gu_17          scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_down_17        scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_qkv_18         scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_qabs_18        scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_attn_18        scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_merge_18       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_oproj_18       scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_norm_18        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_gu_18          scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_down_18        scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_qkv_19         scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_qabs_19        scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_attn_19        scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_merge_19       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_oproj_19       scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_norm_19        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_gu_19          scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_down_19        scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_qkv_20         scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_qabs_20        scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_attn_20        scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_merge_20       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_oproj_20       scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_norm_20        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_gu_20          scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_down_20        scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_qkv_21         scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_qabs_21        scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_attn_21        scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_merge_21       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_oproj_21       scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_norm_21        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_gu_21          scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_down_21        scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_qkv_22         scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_qabs_22        scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_attn_22        scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_merge_22       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_oproj_22       scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_norm_22        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_gu_22          scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_down_22        scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_qkv_23         scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_qabs_23        scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_attn_23        scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_merge_23       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_oproj_23       scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_norm_23        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_gu_23          scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_down_23        scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_qkv_24         scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_qabs_24        scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_attn_24        scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_merge_24       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_oproj_24       scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_norm_24        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_gu_24          scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_down_24        scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_qkv_25         scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_qabs_25        scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_attn_25        scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_merge_25       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_oproj_25       scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_norm_25        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_gu_25          scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_down_25        scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_qkv_26         scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_qabs_26        scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_attn_26        scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_merge_26       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_oproj_26       scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_norm_26        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_gu_26          scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_down_26        scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_lm             scope=DEVICE  mem=device       numel=1 cross_domain=259 cross_device=0
+  event E_argmax         scope=DOMAIN  mem=device       numel=1 cross_domain=0 cross_device=0
+  prefetch entries=0
+sources to link: ['examples/dsv2lite/fleet_shim.hip']
+wrote /root/sess_followup/b_allnoQ/
+In file included from /root/sess_followup/b_allnoQ/megakernel_d0.hip:45:
+In file included from /root/etx/examples/dsv2lite/fleet_shim.hip:19:
+/root/sess_followup/b_allnoQ/fleet_src/kernels/fleet_kernel.hip:1038:1: remark: Function Name: fleet_decode_step [-Rpass-analysis=kernel-resource-usage]
+ 1038 |                        Activations act, KVCache kv) {
+      | ^
+/root/sess_followup/b_allnoQ/fleet_src/kernels/fleet_kernel.hip:1038:1: remark:     TotalSGPRs: 108 [-Rpass-analysis=kernel-resource-usage]
+/root/sess_followup/b_allnoQ/fleet_src/kernels/fleet_kernel.hip:1038:1: remark:     VGPRs: 256 [-Rpass-analysis=kernel-resource-usage]
+/root/sess_followup/b_allnoQ/fleet_src/kernels/fleet_kernel.hip:1038:1: remark:     AGPRs: 169 [-Rpass-analysis=kernel-resource-usage]
+/root/sess_followup/b_allnoQ/fleet_src/kernels/fleet_kernel.hip:1038:1: remark:     ScratchSize [bytes/lane]: 112 [-Rpass-analysis=kernel-resource-usage]
+/root/sess_followup/b_allnoQ/fleet_src/kernels/fleet_kernel.hip:1038:1: remark:     Dynamic Stack: False [-Rpass-analysis=kernel-resource-usage]
+/root/sess_followup/b_allnoQ/fleet_src/kernels/fleet_kernel.hip:1038:1: remark:     Occupancy [waves/SIMD]: 1 [-Rpass-analysis=kernel-resource-usage]
+/root/sess_followup/b_allnoQ/fleet_src/kernels/fleet_kernel.hip:1038:1: remark:     SGPRs Spill: 869 [-Rpass-analysis=kernel-resource-usage]
+/root/sess_followup/b_allnoQ/fleet_src/kernels/fleet_kernel.hip:1038:1: remark:     VGPRs Spill: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess_followup/b_allnoQ/fleet_src/kernels/fleet_kernel.hip:1038:1: remark:     LDS Size [bytes/block]: 25488 [-Rpass-analysis=kernel-resource-usage]
+/root/sess_followup/b_allnoQ/fleet_src/kernels/fleet_kernel.hip:1151:1: remark: Function Name: _Z15fleet_probe_xccPj [-Rpass-analysis=kernel-resource-usage]
+ 1151 | __global__ void fleet_probe_xcc(uint32_t* hist) {
+      | ^
+/root/sess_followup/b_allnoQ/fleet_src/kernels/fleet_kernel.hip:1151:1: remark:     TotalSGPRs: 14 [-Rpass-analysis=kernel-resource-usage]
+/root/sess_followup/b_allnoQ/fleet_src/kernels/fleet_kernel.hip:1151:1: remark:     VGPRs: 2 [-Rpass-analysis=kernel-resource-usage]
+/root/sess_followup/b_allnoQ/fleet_src/kernels/fleet_kernel.hip:1151:1: remark:     AGPRs: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess_followup/b_allnoQ/fleet_src/kernels/fleet_kernel.hip:1151:1: remark:     ScratchSize [bytes/lane]: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess_followup/b_allnoQ/fleet_src/kernels/fleet_kernel.hip:1151:1: remark:     Dynamic Stack: False [-Rpass-analysis=kernel-resource-usage]
+/root/sess_followup/b_allnoQ/fleet_src/kernels/fleet_kernel.hip:1151:1: remark:     Occupancy [waves/SIMD]: 8 [-Rpass-analysis=kernel-resource-usage]
+/root/sess_followup/b_allnoQ/fleet_src/kernels/fleet_kernel.hip:1151:1: remark:     SGPRs Spill: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess_followup/b_allnoQ/fleet_src/kernels/fleet_kernel.hip:1151:1: remark:     VGPRs Spill: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess_followup/b_allnoQ/fleet_src/kernels/fleet_kernel.hip:1151:1: remark:     LDS Size [bytes/block]: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess_followup/b_allnoQ/megakernel_d0.hip:5135:1: remark: Function Name: etx_megakernel_d0 [-Rpass-analysis=kernel-resource-usage]
+ 5135 | extern "C" __global__ void __launch_bounds__(ETX_THREADS, ETX_MIN_WG_PER_CU) etx_megakernel_d0(etx_params p) {
+      | ^
+/root/sess_followup/b_allnoQ/megakernel_d0.hip:5135:1: remark:     TotalSGPRs: 108 [-Rpass-analysis=kernel-resource-usage]
+/root/sess_followup/b_allnoQ/megakernel_d0.hip:5135:1: remark:     VGPRs: 256 [-Rpass-analysis=kernel-resource-usage]
+/root/sess_followup/b_allnoQ/megakernel_d0.hip:5135:1: remark:     AGPRs: 114 [-Rpass-analysis=kernel-resource-usage]
+/root/sess_followup/b_allnoQ/megakernel_d0.hip:5135:1: remark:     ScratchSize [bytes/lane]: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess_followup/b_allnoQ/megakernel_d0.hip:5135:1: remark:     Dynamic Stack: False [-Rpass-analysis=kernel-resource-usage]
+/root/sess_followup/b_allnoQ/megakernel_d0.hip:5135:1: remark:     Occupancy [waves/SIMD]: 1 [-Rpass-analysis=kernel-resource-usage]
+/root/sess_followup/b_allnoQ/megakernel_d0.hip:5135:1: remark:     SGPRs Spill: 709 [-Rpass-analysis=kernel-resource-usage]
+/root/sess_followup/b_allnoQ/megakernel_d0.hip:5135:1: remark:     VGPRs Spill: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess_followup/b_allnoQ/megakernel_d0.hip:5135:1: remark:     LDS Size [bytes/block]: 26668 [-Rpass-analysis=kernel-resource-usage]
+/root/sess_followup/b_allnoQ/megakernel_d0.hip:5193:1: remark: Function Name: etx_unfused_d0 [-Rpass-analysis=kernel-resource-usage]
+ 5193 | extern "C" __global__ void __launch_bounds__(ETX_THREADS, ETX_MIN_WG_PER_CU) etx_unfused_d0(etx_params p, int32_t first) {
+      | ^
+/root/sess_followup/b_allnoQ/megakernel_d0.hip:5193:1: remark:     TotalSGPRs: 85 [-Rpass-analysis=kernel-resource-usage]
+/root/sess_followup/b_allnoQ/megakernel_d0.hip:5193:1: remark:     VGPRs: 248 [-Rpass-analysis=kernel-resource-usage]
+/root/sess_followup/b_allnoQ/megakernel_d0.hip:5193:1: remark:     AGPRs: 2 [-Rpass-analysis=kernel-resource-usage]
+/root/sess_followup/b_allnoQ/megakernel_d0.hip:5193:1: remark:     ScratchSize [bytes/lane]: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess_followup/b_allnoQ/megakernel_d0.hip:5193:1: remark:     Dynamic Stack: False [-Rpass-analysis=kernel-resource-usage]
+/root/sess_followup/b_allnoQ/megakernel_d0.hip:5193:1: remark:     Occupancy [waves/SIMD]: 2 [-Rpass-analysis=kernel-resource-usage]
+/root/sess_followup/b_allnoQ/megakernel_d0.hip:5193:1: remark:     SGPRs Spill: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess_followup/b_allnoQ/megakernel_d0.hip:5193:1: remark:     VGPRs Spill: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess_followup/b_allnoQ/megakernel_d0.hip:5193:1: remark:     LDS Size [bytes/block]: 26628 [-Rpass-analysis=kernel-resource-usage]
+built /root/sess_followup/b_allnoQ/run  (run it from /root/fleet-3fb67a6 so build/weights.bin, fleet_cache.bin, golden_tokens.txt resolve)
+PROGRESS invocation=compile_allnoQ elapsed_s=30.1 deadline_s=900
+BUILD arm=allnoQ stamped=0 resources={'vgpr': 256, 'agpr': 114, 'sgpr': 108, 'scratch': 0, 'lds': 26668, 'occupancy': 1}
+BUILD arm=allnoQ OK
+$ timeout --kill-after=5s 900s stdbuf -oL -eL docker run --rm -v /root:/root -w /root/etx --entrypoint bash rocm:latest -c 'hipcc --version | head -2 && hipcc -O3 -std=c++17 --offload-arch=gfx942 -DFLEET_NT_WEIGHTS=1 -Rpass-analysis=kernel-resource-usage -I /root/fleet-3fb67a6/src -I /root/etx/etx/runtime/include -I /root/sess_followup/b_default723 -I /root/etx /root/sess_followup/b_default723/megakernel_d0.hip /root/etx/examples/dsv2lite/host.hip -o /root/sess_followup/b_default723/run'
+HIP version: 7.2.53211-c2d9476115
+AMD clang version 22.0.0git (https://github.com/RadeonOpenCompute/llvm-project roc-7.2.3 26084 f58b06dce1f9c15707c5f808fd002e18c2accf7e)
+In file included from /root/sess_followup/b_default723/megakernel_d0.hip:45:
+In file included from /root/etx/examples/dsv2lite/fleet_shim.hip:19:
+/root/fleet-3fb67a6/src/kernels/fleet_kernel.hip:940:1: remark: Function Name: fleet_decode_step [-Rpass-analysis=kernel-resource-usage]
+  940 |                        Activations act, KVCache kv) {
+      | ^
+/root/fleet-3fb67a6/src/kernels/fleet_kernel.hip:940:1: remark:     TotalSGPRs: 108 [-Rpass-analysis=kernel-resource-usage]
+/root/fleet-3fb67a6/src/kernels/fleet_kernel.hip:940:1: remark:     VGPRs: 256 [-Rpass-analysis=kernel-resource-usage]
+/root/fleet-3fb67a6/src/kernels/fleet_kernel.hip:940:1: remark:     AGPRs: 95 [-Rpass-analysis=kernel-resource-usage]
+/root/fleet-3fb67a6/src/kernels/fleet_kernel.hip:940:1: remark:     ScratchSize [bytes/lane]: 48 [-Rpass-analysis=kernel-resource-usage]
+/root/fleet-3fb67a6/src/kernels/fleet_kernel.hip:940:1: remark:     Dynamic Stack: False [-Rpass-analysis=kernel-resource-usage]
+/root/fleet-3fb67a6/src/kernels/fleet_kernel.hip:940:1: remark:     Occupancy [waves/SIMD]: 1 [-Rpass-analysis=kernel-resource-usage]
+/root/fleet-3fb67a6/src/kernels/fleet_kernel.hip:940:1: remark:     SGPRs Spill: 756 [-Rpass-analysis=kernel-resource-usage]
+/root/fleet-3fb67a6/src/kernels/fleet_kernel.hip:940:1: remark:     VGPRs Spill: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/fleet-3fb67a6/src/kernels/fleet_kernel.hip:940:1: remark:     LDS Size [bytes/block]: 25488 [-Rpass-analysis=kernel-resource-usage]
+/root/fleet-3fb67a6/src/kernels/fleet_kernel.hip:1053:1: remark: Function Name: _Z15fleet_probe_xccPj [-Rpass-analysis=kernel-resource-usage]
+ 1053 | __global__ void fleet_probe_xcc(uint32_t* hist) {
+      | ^
+/root/fleet-3fb67a6/src/kernels/fleet_kernel.hip:1053:1: remark:     TotalSGPRs: 14 [-Rpass-analysis=kernel-resource-usage]
+/root/fleet-3fb67a6/src/kernels/fleet_kernel.hip:1053:1: remark:     VGPRs: 2 [-Rpass-analysis=kernel-resource-usage]
+/root/fleet-3fb67a6/src/kernels/fleet_kernel.hip:1053:1: remark:     AGPRs: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/fleet-3fb67a6/src/kernels/fleet_kernel.hip:1053:1: remark:     ScratchSize [bytes/lane]: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/fleet-3fb67a6/src/kernels/fleet_kernel.hip:1053:1: remark:     Dynamic Stack: False [-Rpass-analysis=kernel-resource-usage]
+/root/fleet-3fb67a6/src/kernels/fleet_kernel.hip:1053:1: remark:     Occupancy [waves/SIMD]: 8 [-Rpass-analysis=kernel-resource-usage]
+/root/fleet-3fb67a6/src/kernels/fleet_kernel.hip:1053:1: remark:     SGPRs Spill: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/fleet-3fb67a6/src/kernels/fleet_kernel.hip:1053:1: remark:     VGPRs Spill: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/fleet-3fb67a6/src/kernels/fleet_kernel.hip:1053:1: remark:     LDS Size [bytes/block]: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess_followup/b_default723/megakernel_d0.hip:5135:1: remark: Function Name: etx_megakernel_d0 [-Rpass-analysis=kernel-resource-usage]
+ 5135 | extern "C" __global__ void __launch_bounds__(ETX_THREADS, ETX_MIN_WG_PER_CU) etx_megakernel_d0(etx_params p) {
+      | ^
+/root/sess_followup/b_default723/megakernel_d0.hip:5135:1: remark:     TotalSGPRs: 108 [-Rpass-analysis=kernel-resource-usage]
+/root/sess_followup/b_default723/megakernel_d0.hip:5135:1: remark:     VGPRs: 256 [-Rpass-analysis=kernel-resource-usage]
+/root/sess_followup/b_default723/megakernel_d0.hip:5135:1: remark:     AGPRs: 48 [-Rpass-analysis=kernel-resource-usage]
+/root/sess_followup/b_default723/megakernel_d0.hip:5135:1: remark:     ScratchSize [bytes/lane]: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess_followup/b_default723/megakernel_d0.hip:5135:1: remark:     Dynamic Stack: False [-Rpass-analysis=kernel-resource-usage]
+/root/sess_followup/b_default723/megakernel_d0.hip:5135:1: remark:     Occupancy [waves/SIMD]: 1 [-Rpass-analysis=kernel-resource-usage]
+/root/sess_followup/b_default723/megakernel_d0.hip:5135:1: remark:     SGPRs Spill: 625 [-Rpass-analysis=kernel-resource-usage]
+/root/sess_followup/b_default723/megakernel_d0.hip:5135:1: remark:     VGPRs Spill: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess_followup/b_default723/megakernel_d0.hip:5135:1: remark:     LDS Size [bytes/block]: 26668 [-Rpass-analysis=kernel-resource-usage]
+/root/sess_followup/b_default723/megakernel_d0.hip:5193:1: remark: Function Name: etx_unfused_d0 [-Rpass-analysis=kernel-resource-usage]
+ 5193 | extern "C" __global__ void __launch_bounds__(ETX_THREADS, ETX_MIN_WG_PER_CU) etx_unfused_d0(etx_params p, int32_t first) {
+      | ^
+/root/sess_followup/b_default723/megakernel_d0.hip:5193:1: remark:     TotalSGPRs: 85 [-Rpass-analysis=kernel-resource-usage]
+/root/sess_followup/b_default723/megakernel_d0.hip:5193:1: remark:     VGPRs: 248 [-Rpass-analysis=kernel-resource-usage]
+/root/sess_followup/b_default723/megakernel_d0.hip:5193:1: remark:     AGPRs: 14 [-Rpass-analysis=kernel-resource-usage]
+/root/sess_followup/b_default723/megakernel_d0.hip:5193:1: remark:     ScratchSize [bytes/lane]: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess_followup/b_default723/megakernel_d0.hip:5193:1: remark:     Dynamic Stack: False [-Rpass-analysis=kernel-resource-usage]
+/root/sess_followup/b_default723/megakernel_d0.hip:5193:1: remark:     Occupancy [waves/SIMD]: 1 [-Rpass-analysis=kernel-resource-usage]
+/root/sess_followup/b_default723/megakernel_d0.hip:5193:1: remark:     SGPRs Spill: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess_followup/b_default723/megakernel_d0.hip:5193:1: remark:     VGPRs Spill: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess_followup/b_default723/megakernel_d0.hip:5193:1: remark:     LDS Size [bytes/block]: 26628 [-Rpass-analysis=kernel-resource-usage]
+BUILD default723 (ROCm 7.2.3) resources={'vgpr': 256, 'agpr': 48, 'sgpr': 108, 'scratch': 0, 'lds': 26668, 'occupancy': 1}
+$ timeout --kill-after=5s 180s stdbuf -oL -eL /root/sess_followup/b_default/run --weights /root/dsv2-data/weights.bin --cache /root/dsv2-data/fleet_cache.bin --golden /root/dsv2-data/golden_tokens.txt --hidden /root/dsv2-data/golden_hidden.bin --tokens 32 --context 1024 --repeat 2
+device: AMD Instinct MI300X VF  arch gfx942:sramecc+:xnack-  CUs 304
+model: hidden 2048 heads 16 kv_lora 512 experts 64 top-6 layers 27 (dense < 1) vocab 102400
+  /root/dsv2-data/weights.bin: 31.4 GB uploaded
+  /root/dsv2-data/fleet_cache.bin: 0.0 GB uploaded
+etx: 54946 tasks, 1778 event words, 296 workers (8 domains x 37), lds 24576 B (fleet scratch 23408 B)
+run 0 (warm-up): 32/32 tokens match
+token  0:    3.700 ms (device)  step   3.732 ms  out   1780  ok
+token  1:    3.700 ms (device)  step   3.735 ms  out    185  ok
+token  2:    3.699 ms (device)  step   3.738 ms  out    300  ok
+token  3:    3.695 ms (device)  step   3.726 ms  out   1501  ok
+token  4:    3.700 ms (device)  step   3.733 ms  out  11747  ok
+token  5:    3.700 ms (device)  step   3.734 ms  out    254  ok
+token  6:    3.702 ms (device)  step   3.737 ms  out   3510  ok
+token  7:    3.696 ms (device)  step   3.728 ms  out    185  ok
+token  8:    3.702 ms (device)  step   3.733 ms  out   1558  ok
+token  9:    3.701 ms (device)  step   3.744 ms  out   8708  ok
+token 10:    3.696 ms (device)  step   3.738 ms  out      7  ok
+token 11:    3.703 ms (device)  step   3.738 ms  out     77  ok
+token 12:    3.693 ms (device)  step   3.724 ms  out   1780  ok
+token 13:    3.705 ms (device)  step   3.739 ms  out    185  ok
+token 14:    3.704 ms (device)  step   3.738 ms  out    300  ok
+token 15:    3.702 ms (device)  step   3.733 ms  out   1501  ok
+token 16:    3.704 ms (device)  step   3.737 ms  out  11747  ok
+token 17:    3.702 ms (device)  step   3.735 ms  out    254  ok
+token 18:    3.710 ms (device)  step   3.742 ms  out   3510  ok
+token 19:    3.710 ms (device)  step   3.744 ms  out    185  ok
+token 20:    3.706 ms (device)  step   3.742 ms  out   1558  ok
+token 21:    3.703 ms (device)  step   3.737 ms  out   8708  ok
+token 22:    3.699 ms (device)  step   3.731 ms  out      7  ok
+token 23:    3.708 ms (device)  step   3.740 ms  out     77  ok
+token 24:    3.707 ms (device)  step   3.750 ms  out   1780  ok
+token 25:    3.704 ms (device)  step   3.738 ms  out    185  ok
+token 26:    3.709 ms (device)  step   3.741 ms  out    300  ok
+token 27:    3.709 ms (device)  step   3.743 ms  out   1501  ok
+token 28:    3.708 ms (device)  step   3.753 ms  out  11747  ok
+token 29:    3.700 ms (device)  step   3.732 ms  out    254  ok
+token 30:    3.712 ms (device)  step   3.747 ms  out   3510  ok
+token 31:    3.724 ms (device)  step   3.756 ms  out    185  ok
+  layer  0 dense: max rel  1.72e-03  cosine 0.999996  [ok]
+  layer  1 moe  : max rel  3.13e-03  cosine 0.999993  [ok]
+  layer  2 moe  : max rel  2.96e-03  cosine 0.999986  [ok]
+  layer  3 moe  : max rel  2.45e-03  cosine 0.999985  [ok]
+  layer  4 moe  : max rel  6.54e-03  cosine 0.999979  [ok]
+  layer  5 moe  : max rel  4.65e-03  cosine 0.999983  [ok]
+  layer  6 moe  : max rel  4.07e-03  cosine 0.999983  [ok]
+  layer  7 moe  : max rel  1.76e-03  cosine 0.999974  [ok]
+  layer  8 moe  : max rel  1.88e-03  cosine 0.999973  [ok]
+  layer  9 moe  : max rel  1.56e-03  cosine 0.999980  [ok]
+  layer 10 moe  : max rel  1.40e-03  cosine 0.999981  [ok]
+  layer 11 moe  : max rel  1.35e-03  cosine 0.999981  [ok]
+  layer 12 moe  : max rel  3.07e-03  cosine 0.999984  [ok]
+  layer 13 moe  : max rel  3.23e-03  cosine 0.999983  [ok]
+  layer 14 moe  : max rel  1.74e-03  cosine 0.999981  [ok]
+  layer 15 moe  : max rel  6.29e-03  cosine 0.999981  [ok]
+  layer 16 moe  : max rel  5.71e-03  cosine 0.999978  [ok]
+  layer 17 moe  : max rel  5.41e-03  cosine 0.999979  [ok]
+  layer 18 moe  : max rel  5.81e-03  cosine 0.999923  [ok]
+  layer 19 moe  : max rel  1.91e-03  cosine 0.999949  [ok]
+  layer 20 moe  : max rel  4.41e-03  cosine 0.999961  [ok]
+  layer 21 moe  : max rel  4.90e-03  cosine 0.999949  [ok]
+  layer 22 moe  : max rel  4.17e-03  cosine 0.999905  [ok]
+  layer 23 moe  : max rel  2.25e-03  cosine 0.999933  [ok]
+  layer 24 moe  : max rel  2.60e-03  cosine 0.999937  [ok]
+  layer 25 moe  : max rel  5.26e-03  cosine 0.999969  [ok]
+  layer 26 moe  : max rel  8.79e-04  cosine 0.999981  [ok]
+  consecutive layers within the gate: 27 of 27
+
+per-token latency (embed -> argmax on device): median 3.703 ms  mean 3.704 ms; step wall (launch to end) 3.738 ms/token
+tokens: 32/32 match HF greedy
+$ timeout --kill-after=5s 180s stdbuf -oL -eL /root/sess_followup/b_all/run --weights /root/dsv2-data/weights.bin --cache /root/dsv2-data/fleet_cache.bin --golden /root/dsv2-data/golden_tokens.txt --hidden /root/dsv2-data/golden_hidden.bin --tokens 32 --context 1024 --repeat 2
+device: AMD Instinct MI300X VF  arch gfx942:sramecc+:xnack-  CUs 304
+model: hidden 2048 heads 16 kv_lora 512 experts 64 top-6 layers 27 (dense < 1) vocab 102400
+  /root/dsv2-data/weights.bin: 31.4 GB uploaded
+  /root/dsv2-data/fleet_cache.bin: 0.0 GB uploaded
+etx: 54946 tasks, 1778 event words, 296 workers (8 domains x 37), lds 24576 B (fleet scratch 23408 B)
+run 0 (warm-up): 32/32 tokens match
+token  0:    3.610 ms (device)  step   3.646 ms  out   1780  ok
+token  1:    3.615 ms (device)  step   3.649 ms  out    185  ok
+token  2:    3.607 ms (device)  step   3.649 ms  out    300  ok
+token  3:    3.610 ms (device)  step   3.644 ms  out   1501  ok
+token  4:    3.612 ms (device)  step   3.646 ms  out  11747  ok
+token  5:    3.605 ms (device)  step   3.640 ms  out    254  ok
+token  6:    3.611 ms (device)  step   3.646 ms  out   3510  ok
+token  7:    3.621 ms (device)  step   3.655 ms  out    185  ok
+token  8:    3.609 ms (device)  step   3.642 ms  out   1558  ok
+token  9:    3.608 ms (device)  step   3.643 ms  out   8708  ok
+token 10:    3.613 ms (device)  step   3.646 ms  out      7  ok
+token 11:    3.611 ms (device)  step   3.645 ms  out     77  ok
+token 12:    3.614 ms (device)  step   3.647 ms  out   1780  ok
+token 13:    3.606 ms (device)  step   3.639 ms  out    185  ok
+token 14:    3.609 ms (device)  step   3.642 ms  out    300  ok
+token 15:    3.608 ms (device)  step   3.642 ms  out   1501  ok
+token 16:    3.618 ms (device)  step   3.660 ms  out  11747  ok
+token 17:    3.613 ms (device)  step   3.647 ms  out    254  ok
+token 18:    3.612 ms (device)  step   3.647 ms  out   3510  ok
+token 19:    3.616 ms (device)  step   3.649 ms  out    185  ok
+token 20:    3.623 ms (device)  step   3.657 ms  out   1558  ok
+token 21:    3.619 ms (device)  step   3.654 ms  out   8708  ok
+token 22:    3.611 ms (device)  step   3.644 ms  out      7  ok
+token 23:    3.614 ms (device)  step   3.648 ms  out     77  ok
+token 24:    3.617 ms (device)  step   3.652 ms  out   1780  ok
+token 25:    3.616 ms (device)  step   3.650 ms  out    185  ok
+token 26:    3.613 ms (device)  step   3.648 ms  out    300  ok
+token 27:    3.615 ms (device)  step   3.647 ms  out   1501  ok
+token 28:    3.613 ms (device)  step   3.648 ms  out  11747  ok
+token 29:    3.612 ms (device)  step   3.645 ms  out    254  ok
+token 30:    3.618 ms (device)  step   3.652 ms  out   3510  ok
+token 31:    3.630 ms (device)  step   3.665 ms  out    185  ok
+  layer  0 dense: max rel  1.72e-03  cosine 0.999996  [ok]
+  layer  1 moe  : max rel  3.13e-03  cosine 0.999993  [ok]
+  layer  2 moe  : max rel  2.96e-03  cosine 0.999986  [ok]
+  layer  3 moe  : max rel  2.45e-03  cosine 0.999985  [ok]
+  layer  4 moe  : max rel  6.54e-03  cosine 0.999979  [ok]
+  layer  5 moe  : max rel  4.65e-03  cosine 0.999983  [ok]
+  layer  6 moe  : max rel  4.07e-03  cosine 0.999983  [ok]
+  layer  7 moe  : max rel  1.76e-03  cosine 0.999974  [ok]
+  layer  8 moe  : max rel  1.88e-03  cosine 0.999973  [ok]
+  layer  9 moe  : max rel  1.56e-03  cosine 0.999979  [ok]
+  layer 10 moe  : max rel  2.11e-03  cosine 0.999980  [ok]
+  layer 11 moe  : max rel  4.31e-03  cosine 0.999977  [ok]
+  layer 12 moe  : max rel  3.07e-03  cosine 0.999985  [ok]
+  layer 13 moe  : max rel  3.23e-03  cosine 0.999983  [ok]
+  layer 14 moe  : max rel  1.74e-03  cosine 0.999981  [ok]
+  layer 15 moe  : max rel  6.29e-03  cosine 0.999979  [ok]
+  layer 16 moe  : max rel  5.71e-03  cosine 0.999979  [ok]
+  layer 17 moe  : max rel  5.41e-03  cosine 0.999978  [ok]
+  layer 18 moe  : max rel  5.81e-03  cosine 0.999923  [ok]
+  layer 19 moe  : max rel  1.02e-02  cosine 0.999935  [ok]
+  layer 20 moe  : max rel  8.81e-03  cosine 0.999950  [ok]
+  layer 21 moe  : max rel  7.35e-03  cosine 0.999940  [ok]
+  layer 22 moe  : max rel  8.33e-03  cosine 0.999887  [ok]
+  layer 23 moe  : max rel  4.49e-03  cosine 0.999920  [ok]
+  layer 24 moe  : max rel  5.21e-03  cosine 0.999926  [ok]
+  layer 25 moe  : max rel  2.63e-03  cosine 0.999966  [ok]
+  layer 26 moe  : max rel  6.25e-03  cosine 0.999977  [ok]
+  consecutive layers within the gate: 27 of 27
+
+per-token latency (embed -> argmax on device): median 3.613 ms  mean 3.613 ms; step wall (launch to end) 3.648 ms/token
+tokens: 32/32 match HF greedy
+$ timeout --kill-after=5s 180s stdbuf -oL -eL /root/sess_followup/b_allnoQ/run --weights /root/dsv2-data/weights.bin --cache /root/dsv2-data/fleet_cache.bin --golden /root/dsv2-data/golden_tokens.txt --hidden /root/dsv2-data/golden_hidden.bin --tokens 32 --context 1024 --repeat 2
+device: AMD Instinct MI300X VF  arch gfx942:sramecc+:xnack-  CUs 304
+model: hidden 2048 heads 16 kv_lora 512 experts 64 top-6 layers 27 (dense < 1) vocab 102400
+  /root/dsv2-data/weights.bin: 31.4 GB uploaded
+  /root/dsv2-data/fleet_cache.bin: 0.0 GB uploaded
+etx: 54946 tasks, 1778 event words, 296 workers (8 domains x 37), lds 24576 B (fleet scratch 23408 B)
+run 0 (warm-up): 32/32 tokens match
+token  0:    3.597 ms (device)  step   3.631 ms  out   1780  ok
+token  1:    3.593 ms (device)  step   3.626 ms  out    185  ok
+token  2:    3.591 ms (device)  step   3.625 ms  out    300  ok
+token  3:    3.591 ms (device)  step   3.625 ms  out   1501  ok
+token  4:    3.595 ms (device)  step   3.629 ms  out  11747  ok
+token  5:    3.598 ms (device)  step   3.630 ms  out    254  ok
+token  6:    3.589 ms (device)  step   3.624 ms  out   3510  ok
+token  7:    3.592 ms (device)  step   3.633 ms  out    185  ok
+token  8:    3.592 ms (device)  step   3.624 ms  out   1558  ok
+token  9:    3.591 ms (device)  step   3.624 ms  out   8708  ok
+token 10:    3.598 ms (device)  step   3.631 ms  out      7  ok
+token 11:    3.596 ms (device)  step   3.630 ms  out     77  ok
+token 12:    3.596 ms (device)  step   3.631 ms  out   1780  ok
+token 13:    3.594 ms (device)  step   3.639 ms  out    185  ok
+token 14:    3.601 ms (device)  step   3.636 ms  out    300  ok
+token 15:    3.600 ms (device)  step   3.634 ms  out   1501  ok
+token 16:    3.603 ms (device)  step   3.647 ms  out  11747  ok
+token 17:    3.601 ms (device)  step   3.635 ms  out    254  ok
+token 18:    3.608 ms (device)  step   3.643 ms  out   3510  ok
+token 19:    3.597 ms (device)  step   3.632 ms  out    185  ok
+token 20:    3.599 ms (device)  step   3.641 ms  out   1558  ok
+token 21:    3.605 ms (device)  step   3.637 ms  out   8708  ok
+token 22:    3.602 ms (device)  step   3.636 ms  out      7  ok
+token 23:    3.608 ms (device)  step   3.640 ms  out     77  ok
+token 24:    3.604 ms (device)  step   3.639 ms  out   1780  ok
+token 25:    3.595 ms (device)  step   3.638 ms  out    185  ok
+token 26:    3.600 ms (device)  step   3.634 ms  out    300  ok
+token 27:    3.600 ms (device)  step   3.632 ms  out   1501  ok
+token 28:    3.602 ms (device)  step   3.636 ms  out  11747  ok
+token 29:    3.602 ms (device)  step   3.636 ms  out    254  ok
+token 30:    3.600 ms (device)  step   3.635 ms  out   3510  ok
+token 31:    3.617 ms (device)  step   3.651 ms  out    185  ok
+  layer  0 dense: max rel  1.72e-03  cosine 0.999996  [ok]
+  layer  1 moe  : max rel  3.13e-03  cosine 0.999993  [ok]
+  layer  2 moe  : max rel  2.96e-03  cosine 0.999986  [ok]
+  layer  3 moe  : max rel  2.45e-03  cosine 0.999985  [ok]
+  layer  4 moe  : max rel  6.54e-03  cosine 0.999979  [ok]
+  layer  5 moe  : max rel  4.65e-03  cosine 0.999983  [ok]
+  layer  6 moe  : max rel  4.07e-03  cosine 0.999983  [ok]
+  layer  7 moe  : max rel  1.76e-03  cosine 0.999974  [ok]
+  layer  8 moe  : max rel  1.88e-03  cosine 0.999973  [ok]
+  layer  9 moe  : max rel  1.56e-03  cosine 0.999979  [ok]
+  layer 10 moe  : max rel  2.11e-03  cosine 0.999980  [ok]
+  layer 11 moe  : max rel  4.31e-03  cosine 0.999977  [ok]
+  layer 12 moe  : max rel  3.07e-03  cosine 0.999985  [ok]
+  layer 13 moe  : max rel  3.23e-03  cosine 0.999983  [ok]
+  layer 14 moe  : max rel  1.74e-03  cosine 0.999981  [ok]
+  layer 15 moe  : max rel  6.29e-03  cosine 0.999979  [ok]
+  layer 16 moe  : max rel  5.71e-03  cosine 0.999979  [ok]
+  layer 17 moe  : max rel  5.41e-03  cosine 0.999978  [ok]
+  layer 18 moe  : max rel  5.81e-03  cosine 0.999923  [ok]
+  layer 19 moe  : max rel  1.02e-02  cosine 0.999935  [ok]
+  layer 20 moe  : max rel  8.81e-03  cosine 0.999950  [ok]
+  layer 21 moe  : max rel  7.35e-03  cosine 0.999940  [ok]
+  layer 22 moe  : max rel  8.33e-03  cosine 0.999887  [ok]
+  layer 23 moe  : max rel  4.49e-03  cosine 0.999920  [ok]
+  layer 24 moe  : max rel  5.21e-03  cosine 0.999926  [ok]
+  layer 25 moe  : max rel  2.63e-03  cosine 0.999966  [ok]
+  layer 26 moe  : max rel  6.25e-03  cosine 0.999977  [ok]
+  consecutive layers within the gate: 27 of 27
+
+per-token latency (embed -> argmax on device): median 3.599 ms  mean 3.599 ms; step wall (launch to end) 3.634 ms/token
+tokens: 32/32 match HF greedy
+$ timeout --kill-after=5s 180s stdbuf -oL -eL /root/sess_followup/b_allnoQ/run --weights /root/dsv2-data/weights.bin --cache /root/dsv2-data/fleet_cache.bin --golden /root/dsv2-data/golden_tokens.txt --hidden /root/dsv2-data/golden_hidden.bin --tokens 32 --context 1024 --repeat 2
+device: AMD Instinct MI300X VF  arch gfx942:sramecc+:xnack-  CUs 304
+model: hidden 2048 heads 16 kv_lora 512 experts 64 top-6 layers 27 (dense < 1) vocab 102400
+  /root/dsv2-data/weights.bin: 31.4 GB uploaded
+  /root/dsv2-data/fleet_cache.bin: 0.0 GB uploaded
+etx: 54946 tasks, 1778 event words, 296 workers (8 domains x 37), lds 24576 B (fleet scratch 23408 B)
+run 0 (warm-up): 32/32 tokens match
+token  0:    3.598 ms (device)  step   3.632 ms  out   1780  ok
+token  1:    3.600 ms (device)  step   3.633 ms  out    185  ok
+token  2:    3.595 ms (device)  step   3.629 ms  out    300  ok
+token  3:    3.604 ms (device)  step   3.638 ms  out   1501  ok
+token  4:    3.592 ms (device)  step   3.632 ms  out  11747  ok
+token  5:    3.605 ms (device)  step   3.638 ms  out    254  ok
+token  6:    3.598 ms (device)  step   3.634 ms  out   3510  ok
+token  7:    3.600 ms (device)  step   3.635 ms  out    185  ok
+token  8:    3.600 ms (device)  step   3.637 ms  out   1558  ok
+token  9:    3.611 ms (device)  step   3.644 ms  out   8708  ok
+token 10:    3.596 ms (device)  step   3.631 ms  out      7  ok
+token 11:    3.601 ms (device)  step   3.637 ms  out     77  ok
+token 12:    3.614 ms (device)  step   3.648 ms  out   1780  ok
+token 13:    3.600 ms (device)  step   3.642 ms  out    185  ok
+token 14:    3.605 ms (device)  step   3.639 ms  out    300  ok
+token 15:    3.600 ms (device)  step   3.631 ms  out   1501  ok
+token 16:    3.607 ms (device)  step   3.639 ms  out  11747  ok
+token 17:    3.612 ms (device)  step   3.644 ms  out    254  ok
+token 18:    3.605 ms (device)  step   3.639 ms  out   3510  ok
+token 19:    3.605 ms (device)  step   3.639 ms  out    185  ok
+token 20:    3.605 ms (device)  step   3.640 ms  out   1558  ok
+token 21:    3.600 ms (device)  step   3.636 ms  out   8708  ok
+token 22:    3.605 ms (device)  step   3.640 ms  out      7  ok
+token 23:    3.608 ms (device)  step   3.649 ms  out     77  ok
+token 24:    3.608 ms (device)  step   3.641 ms  out   1780  ok
+token 25:    3.599 ms (device)  step   3.643 ms  out    185  ok
+token 26:    3.613 ms (device)  step   3.659 ms  out    300  ok
+token 27:    3.601 ms (device)  step   3.636 ms  out   1501  ok
+token 28:    3.601 ms (device)  step   3.637 ms  out  11747  ok
+token 29:    3.610 ms (device)  step   3.645 ms  out    254  ok
+token 30:    3.596 ms (device)  step   3.629 ms  out   3510  ok
+token 31:    3.614 ms (device)  step   3.658 ms  out    185  ok
+  layer  0 dense: max rel  1.72e-03  cosine 0.999996  [ok]
+  layer  1 moe  : max rel  3.13e-03  cosine 0.999993  [ok]
+  layer  2 moe  : max rel  2.96e-03  cosine 0.999986  [ok]
+  layer  3 moe  : max rel  2.45e-03  cosine 0.999985  [ok]
+  layer  4 moe  : max rel  6.54e-03  cosine 0.999979  [ok]
+  layer  5 moe  : max rel  4.65e-03  cosine 0.999983  [ok]
+  layer  6 moe  : max rel  4.07e-03  cosine 0.999983  [ok]
+  layer  7 moe  : max rel  1.76e-03  cosine 0.999974  [ok]
+  layer  8 moe  : max rel  1.88e-03  cosine 0.999973  [ok]
+  layer  9 moe  : max rel  1.56e-03  cosine 0.999979  [ok]
+  layer 10 moe  : max rel  2.11e-03  cosine 0.999980  [ok]
+  layer 11 moe  : max rel  4.31e-03  cosine 0.999977  [ok]
+  layer 12 moe  : max rel  3.07e-03  cosine 0.999985  [ok]
+  layer 13 moe  : max rel  3.23e-03  cosine 0.999983  [ok]
+  layer 14 moe  : max rel  1.74e-03  cosine 0.999981  [ok]
+  layer 15 moe  : max rel  6.29e-03  cosine 0.999979  [ok]
+  layer 16 moe  : max rel  5.71e-03  cosine 0.999979  [ok]
+  layer 17 moe  : max rel  5.41e-03  cosine 0.999978  [ok]
+  layer 18 moe  : max rel  5.81e-03  cosine 0.999923  [ok]
+  layer 19 moe  : max rel  1.02e-02  cosine 0.999935  [ok]
+  layer 20 moe  : max rel  8.81e-03  cosine 0.999950  [ok]
+  layer 21 moe  : max rel  7.35e-03  cosine 0.999940  [ok]
+  layer 22 moe  : max rel  8.33e-03  cosine 0.999887  [ok]
+  layer 23 moe  : max rel  4.49e-03  cosine 0.999920  [ok]
+  layer 24 moe  : max rel  5.21e-03  cosine 0.999926  [ok]
+  layer 25 moe  : max rel  2.63e-03  cosine 0.999966  [ok]
+  layer 26 moe  : max rel  6.25e-03  cosine 0.999977  [ok]
+  consecutive layers within the gate: 27 of 27
+
+per-token latency (embed -> argmax on device): median 3.604 ms  mean 3.603 ms; step wall (launch to end) 3.639 ms/token
+tokens: 32/32 match HF greedy
+$ timeout --kill-after=5s 180s stdbuf -oL -eL /root/sess_followup/b_all/run --weights /root/dsv2-data/weights.bin --cache /root/dsv2-data/fleet_cache.bin --golden /root/dsv2-data/golden_tokens.txt --hidden /root/dsv2-data/golden_hidden.bin --tokens 32 --context 1024 --repeat 2
+device: AMD Instinct MI300X VF  arch gfx942:sramecc+:xnack-  CUs 304
+model: hidden 2048 heads 16 kv_lora 512 experts 64 top-6 layers 27 (dense < 1) vocab 102400
+  /root/dsv2-data/weights.bin: 31.4 GB uploaded
+  /root/dsv2-data/fleet_cache.bin: 0.0 GB uploaded
+etx: 54946 tasks, 1778 event words, 296 workers (8 domains x 37), lds 24576 B (fleet scratch 23408 B)
+run 0 (warm-up): 32/32 tokens match
+token  0:    3.603 ms (device)  step   3.637 ms  out   1780  ok
+token  1:    3.605 ms (device)  step   3.638 ms  out    185  ok
+token  2:    3.601 ms (device)  step   3.635 ms  out    300  ok
+token  3:    3.612 ms (device)  step   3.648 ms  out   1501  ok
+token  4:    3.614 ms (device)  step   3.649 ms  out  11747  ok
+token  5:    3.609 ms (device)  step   3.645 ms  out    254  ok
+token  6:    3.606 ms (device)  step   3.640 ms  out   3510  ok
+token  7:    3.611 ms (device)  step   3.646 ms  out    185  ok
+token  8:    3.613 ms (device)  step   3.654 ms  out   1558  ok
+token  9:    3.611 ms (device)  step   3.644 ms  out   8708  ok
+token 10:    3.613 ms (device)  step   3.648 ms  out      7  ok
+token 11:    3.615 ms (device)  step   3.648 ms  out     77  ok
+token 12:    3.611 ms (device)  step   3.644 ms  out   1780  ok
+token 13:    3.607 ms (device)  step   3.642 ms  out    185  ok
+token 14:    3.613 ms (device)  step   3.646 ms  out    300  ok
+token 15:    3.613 ms (device)  step   3.648 ms  out   1501  ok
+token 16:    3.612 ms (device)  step   3.646 ms  out  11747  ok
+token 17:    3.611 ms (device)  step   3.645 ms  out    254  ok
+token 18:    3.620 ms (device)  step   3.660 ms  out   3510  ok
+token 19:    3.612 ms (device)  step   3.656 ms  out    185  ok
+token 20:    3.609 ms (device)  step   3.640 ms  out   1558  ok
+token 21:    3.627 ms (device)  step   3.671 ms  out   8708  ok
+token 22:    3.626 ms (device)  step   3.660 ms  out      7  ok
+token 23:    3.624 ms (device)  step   3.657 ms  out     77  ok
+token 24:    3.619 ms (device)  step   3.653 ms  out   1780  ok
+token 25:    3.618 ms (device)  step   3.652 ms  out    185  ok
+token 26:    3.618 ms (device)  step   3.652 ms  out    300  ok
+token 27:    3.628 ms (device)  step   3.662 ms  out   1501  ok
+token 28:    3.617 ms (device)  step   3.652 ms  out  11747  ok
+token 29:    3.620 ms (device)  step   3.652 ms  out    254  ok
+token 30:    3.625 ms (device)  step   3.657 ms  out   3510  ok
+token 31:    3.632 ms (device)  step   3.664 ms  out    185  ok
+  layer  0 dense: max rel  1.72e-03  cosine 0.999996  [ok]
+  layer  1 moe  : max rel  3.13e-03  cosine 0.999993  [ok]
+  layer  2 moe  : max rel  2.96e-03  cosine 0.999986  [ok]
+  layer  3 moe  : max rel  2.45e-03  cosine 0.999985  [ok]
+  layer  4 moe  : max rel  6.54e-03  cosine 0.999979  [ok]
+  layer  5 moe  : max rel  4.65e-03  cosine 0.999983  [ok]
+  layer  6 moe  : max rel  4.07e-03  cosine 0.999983  [ok]
+  layer  7 moe  : max rel  1.76e-03  cosine 0.999974  [ok]
+  layer  8 moe  : max rel  1.88e-03  cosine 0.999973  [ok]
+  layer  9 moe  : max rel  1.56e-03  cosine 0.999979  [ok]
+  layer 10 moe  : max rel  2.11e-03  cosine 0.999980  [ok]
+  layer 11 moe  : max rel  4.31e-03  cosine 0.999977  [ok]
+  layer 12 moe  : max rel  3.07e-03  cosine 0.999985  [ok]
+  layer 13 moe  : max rel  3.23e-03  cosine 0.999983  [ok]
+  layer 14 moe  : max rel  1.74e-03  cosine 0.999981  [ok]
+  layer 15 moe  : max rel  6.29e-03  cosine 0.999979  [ok]
+  layer 16 moe  : max rel  5.71e-03  cosine 0.999979  [ok]
+  layer 17 moe  : max rel  5.41e-03  cosine 0.999978  [ok]
+  layer 18 moe  : max rel  5.81e-03  cosine 0.999923  [ok]
+  layer 19 moe  : max rel  1.02e-02  cosine 0.999935  [ok]
+  layer 20 moe  : max rel  8.81e-03  cosine 0.999950  [ok]
+  layer 21 moe  : max rel  7.35e-03  cosine 0.999940  [ok]
+  layer 22 moe  : max rel  8.33e-03  cosine 0.999887  [ok]
+  layer 23 moe  : max rel  4.49e-03  cosine 0.999920  [ok]
+  layer 24 moe  : max rel  5.21e-03  cosine 0.999926  [ok]
+  layer 25 moe  : max rel  2.63e-03  cosine 0.999966  [ok]
+  layer 26 moe  : max rel  6.25e-03  cosine 0.999977  [ok]
+  consecutive layers within the gate: 27 of 27
+
+per-token latency (embed -> argmax on device): median 3.613 ms  mean 3.615 ms; step wall (launch to end) 3.650 ms/token
+tokens: 32/32 match HF greedy
+$ timeout --kill-after=5s 180s stdbuf -oL -eL /root/sess_followup/b_default/run --weights /root/dsv2-data/weights.bin --cache /root/dsv2-data/fleet_cache.bin --golden /root/dsv2-data/golden_tokens.txt --hidden /root/dsv2-data/golden_hidden.bin --tokens 32 --context 1024 --repeat 2
+device: AMD Instinct MI300X VF  arch gfx942:sramecc+:xnack-  CUs 304
+model: hidden 2048 heads 16 kv_lora 512 experts 64 top-6 layers 27 (dense < 1) vocab 102400
+  /root/dsv2-data/weights.bin: 31.4 GB uploaded
+  /root/dsv2-data/fleet_cache.bin: 0.0 GB uploaded
+etx: 54946 tasks, 1778 event words, 296 workers (8 domains x 37), lds 24576 B (fleet scratch 23408 B)
+run 0 (warm-up): 32/32 tokens match
+token  0:    3.711 ms (device)  step   3.741 ms  out   1780  ok
+token  1:    3.710 ms (device)  step   3.744 ms  out    185  ok
+token  2:    3.708 ms (device)  step   3.741 ms  out    300  ok
+token  3:    3.699 ms (device)  step   3.733 ms  out   1501  ok
+token  4:    3.704 ms (device)  step   3.738 ms  out  11747  ok
+token  5:    3.709 ms (device)  step   3.742 ms  out    254  ok
+token  6:    3.710 ms (device)  step   3.742 ms  out   3510  ok
+token  7:    3.708 ms (device)  step   3.741 ms  out    185  ok
+token  8:    3.718 ms (device)  step   3.750 ms  out   1558  ok
+token  9:    3.710 ms (device)  step   3.742 ms  out   8708  ok
+token 10:    3.709 ms (device)  step   3.741 ms  out      7  ok
+token 11:    3.718 ms (device)  step   3.750 ms  out     77  ok
+token 12:    3.708 ms (device)  step   3.741 ms  out   1780  ok
+token 13:    3.711 ms (device)  step   3.757 ms  out    185  ok
+token 14:    3.711 ms (device)  step   3.744 ms  out    300  ok
+token 15:    3.711 ms (device)  step   3.742 ms  out   1501  ok
+token 16:    3.712 ms (device)  step   3.746 ms  out  11747  ok
+token 17:    3.713 ms (device)  step   3.746 ms  out    254  ok
+token 18:    3.711 ms (device)  step   3.746 ms  out   3510  ok
+token 19:    3.714 ms (device)  step   3.746 ms  out    185  ok
+token 20:    3.713 ms (device)  step   3.748 ms  out   1558  ok
+token 21:    3.717 ms (device)  step   3.751 ms  out   8708  ok
+token 22:    3.713 ms (device)  step   3.745 ms  out      7  ok
+token 23:    3.706 ms (device)  step   3.738 ms  out     77  ok
+token 24:    3.716 ms (device)  step   3.759 ms  out   1780  ok
+token 25:    3.711 ms (device)  step   3.744 ms  out    185  ok
+token 26:    3.712 ms (device)  step   3.744 ms  out    300  ok
+token 27:    3.725 ms (device)  step   3.758 ms  out   1501  ok
+token 28:    3.712 ms (device)  step   3.744 ms  out  11747  ok
+token 29:    3.713 ms (device)  step   3.744 ms  out    254  ok
+token 30:    3.725 ms (device)  step   3.760 ms  out   3510  ok
+token 31:    3.726 ms (device)  step   3.759 ms  out    185  ok
+  layer  0 dense: max rel  1.72e-03  cosine 0.999996  [ok]
+  layer  1 moe  : max rel  3.13e-03  cosine 0.999993  [ok]
+  layer  2 moe  : max rel  2.96e-03  cosine 0.999986  [ok]
+  layer  3 moe  : max rel  2.45e-03  cosine 0.999985  [ok]
+  layer  4 moe  : max rel  6.54e-03  cosine 0.999979  [ok]
+  layer  5 moe  : max rel  4.65e-03  cosine 0.999983  [ok]
+  layer  6 moe  : max rel  4.07e-03  cosine 0.999983  [ok]
+  layer  7 moe  : max rel  1.76e-03  cosine 0.999974  [ok]
+  layer  8 moe  : max rel  1.88e-03  cosine 0.999973  [ok]
+  layer  9 moe  : max rel  1.56e-03  cosine 0.999980  [ok]
+  layer 10 moe  : max rel  1.40e-03  cosine 0.999981  [ok]
+  layer 11 moe  : max rel  1.35e-03  cosine 0.999981  [ok]
+  layer 12 moe  : max rel  3.07e-03  cosine 0.999984  [ok]
+  layer 13 moe  : max rel  3.23e-03  cosine 0.999983  [ok]
+  layer 14 moe  : max rel  1.74e-03  cosine 0.999981  [ok]
+  layer 15 moe  : max rel  6.29e-03  cosine 0.999981  [ok]
+  layer 16 moe  : max rel  5.71e-03  cosine 0.999978  [ok]
+  layer 17 moe  : max rel  5.41e-03  cosine 0.999979  [ok]
+  layer 18 moe  : max rel  5.81e-03  cosine 0.999923  [ok]
+  layer 19 moe  : max rel  1.91e-03  cosine 0.999949  [ok]
+  layer 20 moe  : max rel  4.41e-03  cosine 0.999961  [ok]
+  layer 21 moe  : max rel  4.90e-03  cosine 0.999949  [ok]
+  layer 22 moe  : max rel  4.17e-03  cosine 0.999905  [ok]
+  layer 23 moe  : max rel  2.25e-03  cosine 0.999933  [ok]
+  layer 24 moe  : max rel  2.60e-03  cosine 0.999937  [ok]
+  layer 25 moe  : max rel  5.26e-03  cosine 0.999969  [ok]
+  layer 26 moe  : max rel  8.79e-04  cosine 0.999981  [ok]
+  consecutive layers within the gate: 27 of 27
+
+per-token latency (embed -> argmax on device): median 3.711 ms  mean 3.712 ms; step wall (launch to end) 3.746 ms/token
+tokens: 32/32 match HF greedy
+$ timeout --kill-after=5s 180s stdbuf -oL -eL /root/sess_followup/b_default/run --weights /root/dsv2-data/weights.bin --cache /root/dsv2-data/fleet_cache.bin --golden /root/dsv2-data/golden_tokens.txt --hidden /root/dsv2-data/golden_hidden.bin --tokens 32 --context 1024 --repeat 2
+device: AMD Instinct MI300X VF  arch gfx942:sramecc+:xnack-  CUs 304
+model: hidden 2048 heads 16 kv_lora 512 experts 64 top-6 layers 27 (dense < 1) vocab 102400
+  /root/dsv2-data/weights.bin: 31.4 GB uploaded
+  /root/dsv2-data/fleet_cache.bin: 0.0 GB uploaded
+etx: 54946 tasks, 1778 event words, 296 workers (8 domains x 37), lds 24576 B (fleet scratch 23408 B)
+run 0 (warm-up): 32/32 tokens match
+token  0:    3.705 ms (device)  step   3.736 ms  out   1780  ok
+token  1:    3.712 ms (device)  step   3.744 ms  out    185  ok
+token  2:    3.707 ms (device)  step   3.740 ms  out    300  ok
+token  3:    3.703 ms (device)  step   3.735 ms  out   1501  ok
+token  4:    3.704 ms (device)  step   3.736 ms  out  11747  ok
+token  5:    3.709 ms (device)  step   3.742 ms  out    254  ok
+token  6:    3.708 ms (device)  step   3.742 ms  out   3510  ok
+token  7:    3.706 ms (device)  step   3.738 ms  out    185  ok
+token  8:    3.706 ms (device)  step   3.738 ms  out   1558  ok
+token  9:    3.707 ms (device)  step   3.748 ms  out   8708  ok
+token 10:    3.711 ms (device)  step   3.744 ms  out      7  ok
+token 11:    3.706 ms (device)  step   3.739 ms  out     77  ok
+token 12:    3.703 ms (device)  step   3.736 ms  out   1780  ok
+token 13:    3.710 ms (device)  step   3.742 ms  out    185  ok
+token 14:    3.706 ms (device)  step   3.738 ms  out    300  ok
+token 15:    3.705 ms (device)  step   3.739 ms  out   1501  ok
+token 16:    3.709 ms (device)  step   3.741 ms  out  11747  ok
+token 17:    3.713 ms (device)  step   3.744 ms  out    254  ok
+token 18:    3.710 ms (device)  step   3.746 ms  out   3510  ok
+token 19:    3.715 ms (device)  step   3.748 ms  out    185  ok
+token 20:    3.713 ms (device)  step   3.745 ms  out   1558  ok
+token 21:    3.715 ms (device)  step   3.749 ms  out   8708  ok
+token 22:    3.709 ms (device)  step   3.742 ms  out      7  ok
+token 23:    3.716 ms (device)  step   3.750 ms  out     77  ok
+token 24:    3.710 ms (device)  step   3.744 ms  out   1780  ok
+token 25:    3.714 ms (device)  step   3.747 ms  out    185  ok
+token 26:    3.711 ms (device)  step   3.753 ms  out    300  ok
+token 27:    3.710 ms (device)  step   3.743 ms  out   1501  ok
+token 28:    3.718 ms (device)  step   3.752 ms  out  11747  ok
+token 29:    3.711 ms (device)  step   3.744 ms  out    254  ok
+token 30:    3.708 ms (device)  step   3.738 ms  out   3510  ok
+token 31:    3.718 ms (device)  step   3.751 ms  out    185  ok
+  layer  0 dense: max rel  1.72e-03  cosine 0.999996  [ok]
+  layer  1 moe  : max rel  3.13e-03  cosine 0.999993  [ok]
+  layer  2 moe  : max rel  2.96e-03  cosine 0.999986  [ok]
+  layer  3 moe  : max rel  2.45e-03  cosine 0.999985  [ok]
+  layer  4 moe  : max rel  6.54e-03  cosine 0.999979  [ok]
+  layer  5 moe  : max rel  4.65e-03  cosine 0.999983  [ok]
+  layer  6 moe  : max rel  4.07e-03  cosine 0.999983  [ok]
+  layer  7 moe  : max rel  1.76e-03  cosine 0.999974  [ok]
+  layer  8 moe  : max rel  1.88e-03  cosine 0.999973  [ok]
+  layer  9 moe  : max rel  1.56e-03  cosine 0.999980  [ok]
+  layer 10 moe  : max rel  1.40e-03  cosine 0.999981  [ok]
+  layer 11 moe  : max rel  1.35e-03  cosine 0.999981  [ok]
+  layer 12 moe  : max rel  3.07e-03  cosine 0.999984  [ok]
+  layer 13 moe  : max rel  3.23e-03  cosine 0.999983  [ok]
+  layer 14 moe  : max rel  1.74e-03  cosine 0.999981  [ok]
+  layer 15 moe  : max rel  6.29e-03  cosine 0.999981  [ok]
+  layer 16 moe  : max rel  5.71e-03  cosine 0.999978  [ok]
+  layer 17 moe  : max rel  5.41e-03  cosine 0.999979  [ok]
+  layer 18 moe  : max rel  5.81e-03  cosine 0.999923  [ok]
+  layer 19 moe  : max rel  1.91e-03  cosine 0.999949  [ok]
+  layer 20 moe  : max rel  4.41e-03  cosine 0.999961  [ok]
+  layer 21 moe  : max rel  4.90e-03  cosine 0.999949  [ok]
+  layer 22 moe  : max rel  4.17e-03  cosine 0.999905  [ok]
+  layer 23 moe  : max rel  2.25e-03  cosine 0.999933  [ok]
+  layer 24 moe  : max rel  2.60e-03  cosine 0.999937  [ok]
+  layer 25 moe  : max rel  5.26e-03  cosine 0.999969  [ok]
+  layer 26 moe  : max rel  8.79e-04  cosine 0.999981  [ok]
+  consecutive layers within the gate: 27 of 27
+
+per-token latency (embed -> argmax on device): median 3.710 ms  mean 3.710 ms; step wall (launch to end) 3.743 ms/token
+tokens: 32/32 match HF greedy
+$ timeout --kill-after=5s 180s stdbuf -oL -eL /root/sess_followup/b_all/run --weights /root/dsv2-data/weights.bin --cache /root/dsv2-data/fleet_cache.bin --golden /root/dsv2-data/golden_tokens.txt --hidden /root/dsv2-data/golden_hidden.bin --tokens 32 --context 1024 --repeat 2
+device: AMD Instinct MI300X VF  arch gfx942:sramecc+:xnack-  CUs 304
+model: hidden 2048 heads 16 kv_lora 512 experts 64 top-6 layers 27 (dense < 1) vocab 102400
+  /root/dsv2-data/weights.bin: 31.4 GB uploaded
+  /root/dsv2-data/fleet_cache.bin: 0.0 GB uploaded
+etx: 54946 tasks, 1778 event words, 296 workers (8 domains x 37), lds 24576 B (fleet scratch 23408 B)
+run 0 (warm-up): 32/32 tokens match
+token  0:    3.617 ms (device)  step   3.650 ms  out   1780  ok
+token  1:    3.610 ms (device)  step   3.641 ms  out    185  ok
+token  2:    3.612 ms (device)  step   3.645 ms  out    300  ok
+token  3:    3.611 ms (device)  step   3.645 ms  out   1501  ok
+token  4:    3.619 ms (device)  step   3.651 ms  out  11747  ok
+token  5:    3.624 ms (device)  step   3.665 ms  out    254  ok
+token  6:    3.614 ms (device)  step   3.652 ms  out   3510  ok
+token  7:    3.616 ms (device)  step   3.650 ms  out    185  ok
+token  8:    3.611 ms (device)  step   3.647 ms  out   1558  ok
+token  9:    3.606 ms (device)  step   3.639 ms  out   8708  ok
+token 10:    3.611 ms (device)  step   3.645 ms  out      7  ok
+token 11:    3.612 ms (device)  step   3.646 ms  out     77  ok
+token 12:    3.618 ms (device)  step   3.653 ms  out   1780  ok
+token 13:    3.618 ms (device)  step   3.652 ms  out    185  ok
+token 14:    3.616 ms (device)  step   3.651 ms  out    300  ok
+token 15:    3.618 ms (device)  step   3.650 ms  out   1501  ok
+token 16:    3.618 ms (device)  step   3.653 ms  out  11747  ok
+token 17:    3.616 ms (device)  step   3.651 ms  out    254  ok
+token 18:    3.623 ms (device)  step   3.657 ms  out   3510  ok
+token 19:    3.621 ms (device)  step   3.654 ms  out    185  ok
+token 20:    3.621 ms (device)  step   3.654 ms  out   1558  ok
+token 21:    3.623 ms (device)  step   3.656 ms  out   8708  ok
+token 22:    3.620 ms (device)  step   3.660 ms  out      7  ok
+token 23:    3.619 ms (device)  step   3.653 ms  out     77  ok
+token 24:    3.621 ms (device)  step   3.654 ms  out   1780  ok
+token 25:    3.614 ms (device)  step   3.647 ms  out    185  ok
+token 26:    3.624 ms (device)  step   3.657 ms  out    300  ok
+token 27:    3.622 ms (device)  step   3.654 ms  out   1501  ok
+token 28:    3.628 ms (device)  step   3.660 ms  out  11747  ok
+token 29:    3.623 ms (device)  step   3.656 ms  out    254  ok
+token 30:    3.620 ms (device)  step   3.653 ms  out   3510  ok
+token 31:    3.628 ms (device)  step   3.664 ms  out    185  ok
+  layer  0 dense: max rel  1.72e-03  cosine 0.999996  [ok]
+  layer  1 moe  : max rel  3.13e-03  cosine 0.999993  [ok]
+  layer  2 moe  : max rel  2.96e-03  cosine 0.999986  [ok]
+  layer  3 moe  : max rel  2.45e-03  cosine 0.999985  [ok]
+  layer  4 moe  : max rel  6.54e-03  cosine 0.999979  [ok]
+  layer  5 moe  : max rel  4.65e-03  cosine 0.999983  [ok]
+  layer  6 moe  : max rel  4.07e-03  cosine 0.999983  [ok]
+  layer  7 moe  : max rel  1.76e-03  cosine 0.999974  [ok]
+  layer  8 moe  : max rel  1.88e-03  cosine 0.999973  [ok]
+  layer  9 moe  : max rel  1.56e-03  cosine 0.999979  [ok]
+  layer 10 moe  : max rel  2.11e-03  cosine 0.999980  [ok]
+  layer 11 moe  : max rel  4.31e-03  cosine 0.999977  [ok]
+  layer 12 moe  : max rel  3.07e-03  cosine 0.999985  [ok]
+  layer 13 moe  : max rel  3.23e-03  cosine 0.999983  [ok]
+  layer 14 moe  : max rel  1.74e-03  cosine 0.999981  [ok]
+  layer 15 moe  : max rel  6.29e-03  cosine 0.999979  [ok]
+  layer 16 moe  : max rel  5.71e-03  cosine 0.999979  [ok]
+  layer 17 moe  : max rel  5.41e-03  cosine 0.999978  [ok]
+  layer 18 moe  : max rel  5.81e-03  cosine 0.999923  [ok]
+  layer 19 moe  : max rel  1.02e-02  cosine 0.999935  [ok]
+  layer 20 moe  : max rel  8.81e-03  cosine 0.999950  [ok]
+  layer 21 moe  : max rel  7.35e-03  cosine 0.999940  [ok]
+  layer 22 moe  : max rel  8.33e-03  cosine 0.999887  [ok]
+  layer 23 moe  : max rel  4.49e-03  cosine 0.999920  [ok]
+  layer 24 moe  : max rel  5.21e-03  cosine 0.999926  [ok]
+  layer 25 moe  : max rel  2.63e-03  cosine 0.999966  [ok]
+  layer 26 moe  : max rel  6.25e-03  cosine 0.999977  [ok]
+  consecutive layers within the gate: 27 of 27
+
+per-token latency (embed -> argmax on device): median 3.618 ms  mean 3.618 ms; step wall (launch to end) 3.652 ms/token
+tokens: 32/32 match HF greedy
+$ timeout --kill-after=5s 180s stdbuf -oL -eL /root/sess_followup/b_allnoQ/run --weights /root/dsv2-data/weights.bin --cache /root/dsv2-data/fleet_cache.bin --golden /root/dsv2-data/golden_tokens.txt --hidden /root/dsv2-data/golden_hidden.bin --tokens 32 --context 1024 --repeat 2
+device: AMD Instinct MI300X VF  arch gfx942:sramecc+:xnack-  CUs 304
+model: hidden 2048 heads 16 kv_lora 512 experts 64 top-6 layers 27 (dense < 1) vocab 102400
+  /root/dsv2-data/weights.bin: 31.4 GB uploaded
+  /root/dsv2-data/fleet_cache.bin: 0.0 GB uploaded
+etx: 54946 tasks, 1778 event words, 296 workers (8 domains x 37), lds 24576 B (fleet scratch 23408 B)
+run 0 (warm-up): 32/32 tokens match
+token  0:    3.593 ms (device)  step   3.627 ms  out   1780  ok
+token  1:    3.594 ms (device)  step   3.630 ms  out    185  ok
+token  2:    3.588 ms (device)  step   3.623 ms  out    300  ok
+token  3:    3.602 ms (device)  step   3.646 ms  out   1501  ok
+token  4:    3.596 ms (device)  step   3.628 ms  out  11747  ok
+token  5:    3.600 ms (device)  step   3.636 ms  out    254  ok
+token  6:    3.594 ms (device)  step   3.628 ms  out   3510  ok
+token  7:    3.600 ms (device)  step   3.634 ms  out    185  ok
+token  8:    3.596 ms (device)  step   3.629 ms  out   1558  ok
+token  9:    3.601 ms (device)  step   3.636 ms  out   8708  ok
+token 10:    3.597 ms (device)  step   3.631 ms  out      7  ok
+token 11:    3.591 ms (device)  step   3.626 ms  out     77  ok
+token 12:    3.612 ms (device)  step   3.658 ms  out   1780  ok
+token 13:    3.596 ms (device)  step   3.632 ms  out    185  ok
+token 14:    3.604 ms (device)  step   3.639 ms  out    300  ok
+token 15:    3.593 ms (device)  step   3.628 ms  out   1501  ok
+token 16:    3.603 ms (device)  step   3.638 ms  out  11747  ok
+token 17:    3.599 ms (device)  step   3.630 ms  out    254  ok
+token 18:    3.600 ms (device)  step   3.633 ms  out   3510  ok
+token 19:    3.599 ms (device)  step   3.637 ms  out    185  ok
+token 20:    3.591 ms (device)  step   3.623 ms  out   1558  ok
+token 21:    3.609 ms (device)  step   3.645 ms  out   8708  ok
+token 22:    3.596 ms (device)  step   3.630 ms  out      7  ok
+token 23:    3.592 ms (device)  step   3.625 ms  out     77  ok
+token 24:    3.598 ms (device)  step   3.631 ms  out   1780  ok
+token 25:    3.596 ms (device)  step   3.629 ms  out    185  ok
+token 26:    3.600 ms (device)  step   3.635 ms  out    300  ok
+token 27:    3.611 ms (device)  step   3.645 ms  out   1501  ok
+token 28:    3.593 ms (device)  step   3.629 ms  out  11747  ok
+token 29:    3.601 ms (device)  step   3.636 ms  out    254  ok
+token 30:    3.607 ms (device)  step   3.643 ms  out   3510  ok
+token 31:    3.614 ms (device)  step   3.648 ms  out    185  ok
+  layer  0 dense: max rel  1.72e-03  cosine 0.999996  [ok]
+  layer  1 moe  : max rel  3.13e-03  cosine 0.999993  [ok]
+  layer  2 moe  : max rel  2.96e-03  cosine 0.999986  [ok]
+  layer  3 moe  : max rel  2.45e-03  cosine 0.999985  [ok]
+  layer  4 moe  : max rel  6.54e-03  cosine 0.999979  [ok]
+  layer  5 moe  : max rel  4.65e-03  cosine 0.999983  [ok]
+  layer  6 moe  : max rel  4.07e-03  cosine 0.999983  [ok]
+  layer  7 moe  : max rel  1.76e-03  cosine 0.999974  [ok]
+  layer  8 moe  : max rel  1.88e-03  cosine 0.999973  [ok]
+  layer  9 moe  : max rel  1.56e-03  cosine 0.999979  [ok]
+  layer 10 moe  : max rel  2.11e-03  cosine 0.999980  [ok]
+  layer 11 moe  : max rel  4.31e-03  cosine 0.999977  [ok]
+  layer 12 moe  : max rel  3.07e-03  cosine 0.999985  [ok]
+  layer 13 moe  : max rel  3.23e-03  cosine 0.999983  [ok]
+  layer 14 moe  : max rel  1.74e-03  cosine 0.999981  [ok]
+  layer 15 moe  : max rel  6.29e-03  cosine 0.999979  [ok]
+  layer 16 moe  : max rel  5.71e-03  cosine 0.999979  [ok]
+  layer 17 moe  : max rel  5.41e-03  cosine 0.999978  [ok]
+  layer 18 moe  : max rel  5.81e-03  cosine 0.999923  [ok]
+  layer 19 moe  : max rel  1.02e-02  cosine 0.999935  [ok]
+  layer 20 moe  : max rel  8.81e-03  cosine 0.999950  [ok]
+  layer 21 moe  : max rel  7.35e-03  cosine 0.999940  [ok]
+  layer 22 moe  : max rel  8.33e-03  cosine 0.999887  [ok]
+  layer 23 moe  : max rel  4.49e-03  cosine 0.999920  [ok]
+  layer 24 moe  : max rel  5.21e-03  cosine 0.999926  [ok]
+  layer 25 moe  : max rel  2.63e-03  cosine 0.999966  [ok]
+  layer 26 moe  : max rel  6.25e-03  cosine 0.999977  [ok]
+  consecutive layers within the gate: 27 of 27
+
+per-token latency (embed -> argmax on device): median 3.599 ms  mean 3.599 ms; step wall (launch to end) 3.634 ms/token
+tokens: 32/32 match HF greedy
+$ timeout --kill-after=5s 180s stdbuf -oL -eL /root/sess_followup/b_allnoQ/run --weights /root/dsv2-data/weights.bin --cache /root/dsv2-data/fleet_cache.bin --golden /root/dsv2-data/golden_tokens.txt --hidden /root/dsv2-data/golden_hidden.bin --tokens 32 --context 1024 --repeat 2
+device: AMD Instinct MI300X VF  arch gfx942:sramecc+:xnack-  CUs 304
+model: hidden 2048 heads 16 kv_lora 512 experts 64 top-6 layers 27 (dense < 1) vocab 102400
+  /root/dsv2-data/weights.bin: 31.4 GB uploaded
+  /root/dsv2-data/fleet_cache.bin: 0.0 GB uploaded
+etx: 54946 tasks, 1778 event words, 296 workers (8 domains x 37), lds 24576 B (fleet scratch 23408 B)
+run 0 (warm-up): 32/32 tokens match
+token  0:    3.598 ms (device)  step   3.631 ms  out   1780  ok
+token  1:    3.607 ms (device)  step   3.644 ms  out    185  ok
+token  2:    3.594 ms (device)  step   3.627 ms  out    300  ok
+token  3:    3.596 ms (device)  step   3.637 ms  out   1501  ok
+token  4:    3.598 ms (device)  step   3.632 ms  out  11747  ok
+token  5:    3.608 ms (device)  step   3.642 ms  out    254  ok
+token  6:    3.595 ms (device)  step   3.630 ms  out   3510  ok
+token  7:    3.596 ms (device)  step   3.630 ms  out    185  ok
+token  8:    3.589 ms (device)  step   3.624 ms  out   1558  ok
+token  9:    3.596 ms (device)  step   3.631 ms  out   8708  ok
+token 10:    3.607 ms (device)  step   3.646 ms  out      7  ok
+token 11:    3.598 ms (device)  step   3.634 ms  out     77  ok
+token 12:    3.596 ms (device)  step   3.632 ms  out   1780  ok
+token 13:    3.598 ms (device)  step   3.631 ms  out    185  ok
+token 14:    3.601 ms (device)  step   3.640 ms  out    300  ok
+token 15:    3.597 ms (device)  step   3.631 ms  out   1501  ok
+token 16:    3.604 ms (device)  step   3.638 ms  out  11747  ok
+token 17:    3.597 ms (device)  step   3.632 ms  out    254  ok
+token 18:    3.601 ms (device)  step   3.634 ms  out   3510  ok
+token 19:    3.615 ms (device)  step   3.660 ms  out    185  ok
+token 20:    3.616 ms (device)  step   3.652 ms  out   1558  ok
+token 21:    3.610 ms (device)  step   3.643 ms  out   8708  ok
+token 22:    3.601 ms (device)  step   3.639 ms  out      7  ok
+token 23:    3.601 ms (device)  step   3.635 ms  out     77  ok
+token 24:    3.604 ms (device)  step   3.639 ms  out   1780  ok
+token 25:    3.607 ms (device)  step   3.642 ms  out    185  ok
+token 26:    3.599 ms (device)  step   3.632 ms  out    300  ok
+token 27:    3.600 ms (device)  step   3.635 ms  out   1501  ok
+token 28:    3.603 ms (device)  step   3.637 ms  out  11747  ok
+token 29:    3.615 ms (device)  step   3.649 ms  out    254  ok
+token 30:    3.609 ms (device)  step   3.643 ms  out   3510  ok
+token 31:    3.612 ms (device)  step   3.646 ms  out    185  ok
+  layer  0 dense: max rel  1.72e-03  cosine 0.999996  [ok]
+  layer  1 moe  : max rel  3.13e-03  cosine 0.999993  [ok]
+  layer  2 moe  : max rel  2.96e-03  cosine 0.999986  [ok]
+  layer  3 moe  : max rel  2.45e-03  cosine 0.999985  [ok]
+  layer  4 moe  : max rel  6.54e-03  cosine 0.999979  [ok]
+  layer  5 moe  : max rel  4.65e-03  cosine 0.999983  [ok]
+  layer  6 moe  : max rel  4.07e-03  cosine 0.999983  [ok]
+  layer  7 moe  : max rel  1.76e-03  cosine 0.999974  [ok]
+  layer  8 moe  : max rel  1.88e-03  cosine 0.999973  [ok]
+  layer  9 moe  : max rel  1.56e-03  cosine 0.999979  [ok]
+  layer 10 moe  : max rel  2.11e-03  cosine 0.999980  [ok]
+  layer 11 moe  : max rel  4.31e-03  cosine 0.999977  [ok]
+  layer 12 moe  : max rel  3.07e-03  cosine 0.999985  [ok]
+  layer 13 moe  : max rel  3.23e-03  cosine 0.999983  [ok]
+  layer 14 moe  : max rel  1.74e-03  cosine 0.999981  [ok]
+  layer 15 moe  : max rel  6.29e-03  cosine 0.999979  [ok]
+  layer 16 moe  : max rel  5.71e-03  cosine 0.999979  [ok]
+  layer 17 moe  : max rel  5.41e-03  cosine 0.999978  [ok]
+  layer 18 moe  : max rel  5.81e-03  cosine 0.999923  [ok]
+  layer 19 moe  : max rel  1.02e-02  cosine 0.999935  [ok]
+  layer 20 moe  : max rel  8.81e-03  cosine 0.999950  [ok]
+  layer 21 moe  : max rel  7.35e-03  cosine 0.999940  [ok]
+  layer 22 moe  : max rel  8.33e-03  cosine 0.999887  [ok]
+  layer 23 moe  : max rel  4.49e-03  cosine 0.999920  [ok]
+  layer 24 moe  : max rel  5.21e-03  cosine 0.999926  [ok]
+  layer 25 moe  : max rel  2.63e-03  cosine 0.999966  [ok]
+  layer 26 moe  : max rel  6.25e-03  cosine 0.999977  [ok]
+  consecutive layers within the gate: 27 of 27
+
+per-token latency (embed -> argmax on device): median 3.601 ms  mean 3.602 ms; step wall (launch to end) 3.637 ms/token
+tokens: 32/32 match HF greedy
+$ timeout --kill-after=5s 180s stdbuf -oL -eL /root/sess_followup/b_all/run --weights /root/dsv2-data/weights.bin --cache /root/dsv2-data/fleet_cache.bin --golden /root/dsv2-data/golden_tokens.txt --hidden /root/dsv2-data/golden_hidden.bin --tokens 32 --context 1024 --repeat 2
+device: AMD Instinct MI300X VF  arch gfx942:sramecc+:xnack-  CUs 304
+model: hidden 2048 heads 16 kv_lora 512 experts 64 top-6 layers 27 (dense < 1) vocab 102400
+  /root/dsv2-data/weights.bin: 31.4 GB uploaded
+  /root/dsv2-data/fleet_cache.bin: 0.0 GB uploaded
+etx: 54946 tasks, 1778 event words, 296 workers (8 domains x 37), lds 24576 B (fleet scratch 23408 B)
+run 0 (warm-up): 32/32 tokens match
+token  0:    3.611 ms (device)  step   3.644 ms  out   1780  ok
+token  1:    3.606 ms (device)  step   3.641 ms  out    185  ok
+token  2:    3.608 ms (device)  step   3.642 ms  out    300  ok
+token  3:    3.611 ms (device)  step   3.644 ms  out   1501  ok
+token  4:    3.608 ms (device)  step   3.644 ms  out  11747  ok
+token  5:    3.614 ms (device)  step   3.647 ms  out    254  ok
+token  6:    3.611 ms (device)  step   3.645 ms  out   3510  ok
+token  7:    3.617 ms (device)  step   3.652 ms  out    185  ok
+token  8:    3.609 ms (device)  step   3.650 ms  out   1558  ok
+token  9:    3.613 ms (device)  step   3.646 ms  out   8708  ok
+token 10:    3.607 ms (device)  step   3.641 ms  out      7  ok
+token 11:    3.605 ms (device)  step   3.640 ms  out     77  ok
+token 12:    3.609 ms (device)  step   3.648 ms  out   1780  ok
+token 13:    3.607 ms (device)  step   3.642 ms  out    185  ok
+token 14:    3.610 ms (device)  step   3.645 ms  out    300  ok
+token 15:    3.614 ms (device)  step   3.647 ms  out   1501  ok
+token 16:    3.610 ms (device)  step   3.642 ms  out  11747  ok
+token 17:    3.609 ms (device)  step   3.644 ms  out    254  ok
+token 18:    3.613 ms (device)  step   3.646 ms  out   3510  ok
+token 19:    3.609 ms (device)  step   3.641 ms  out    185  ok
+token 20:    3.611 ms (device)  step   3.645 ms  out   1558  ok
+token 21:    3.614 ms (device)  step   3.648 ms  out   8708  ok
+token 22:    3.610 ms (device)  step   3.643 ms  out      7  ok
+token 23:    3.615 ms (device)  step   3.648 ms  out     77  ok
+token 24:    3.610 ms (device)  step   3.645 ms  out   1780  ok
+token 25:    3.608 ms (device)  step   3.641 ms  out    185  ok
+token 26:    3.601 ms (device)  step   3.637 ms  out    300  ok
+token 27:    3.620 ms (device)  step   3.652 ms  out   1501  ok
+token 28:    3.613 ms (device)  step   3.647 ms  out  11747  ok
+token 29:    3.612 ms (device)  step   3.646 ms  out    254  ok
+token 30:    3.612 ms (device)  step   3.645 ms  out   3510  ok
+token 31:    3.618 ms (device)  step   3.653 ms  out    185  ok
+  layer  0 dense: max rel  1.72e-03  cosine 0.999996  [ok]
+  layer  1 moe  : max rel  3.13e-03  cosine 0.999993  [ok]
+  layer  2 moe  : max rel  2.96e-03  cosine 0.999986  [ok]
+  layer  3 moe  : max rel  2.45e-03  cosine 0.999985  [ok]
+  layer  4 moe  : max rel  6.54e-03  cosine 0.999979  [ok]
+  layer  5 moe  : max rel  4.65e-03  cosine 0.999983  [ok]
+  layer  6 moe  : max rel  4.07e-03  cosine 0.999983  [ok]
+  layer  7 moe  : max rel  1.76e-03  cosine 0.999974  [ok]
+  layer  8 moe  : max rel  1.88e-03  cosine 0.999973  [ok]
+  layer  9 moe  : max rel  1.56e-03  cosine 0.999979  [ok]
+  layer 10 moe  : max rel  2.11e-03  cosine 0.999980  [ok]
+  layer 11 moe  : max rel  4.31e-03  cosine 0.999977  [ok]
+  layer 12 moe  : max rel  3.07e-03  cosine 0.999985  [ok]
+  layer 13 moe  : max rel  3.23e-03  cosine 0.999983  [ok]
+  layer 14 moe  : max rel  1.74e-03  cosine 0.999981  [ok]
+  layer 15 moe  : max rel  6.29e-03  cosine 0.999979  [ok]
+  layer 16 moe  : max rel  5.71e-03  cosine 0.999979  [ok]
+  layer 17 moe  : max rel  5.41e-03  cosine 0.999978  [ok]
+  layer 18 moe  : max rel  5.81e-03  cosine 0.999923  [ok]
+  layer 19 moe  : max rel  1.02e-02  cosine 0.999935  [ok]
+  layer 20 moe  : max rel  8.81e-03  cosine 0.999950  [ok]
+  layer 21 moe  : max rel  7.35e-03  cosine 0.999940  [ok]
+  layer 22 moe  : max rel  8.33e-03  cosine 0.999887  [ok]
+  layer 23 moe  : max rel  4.49e-03  cosine 0.999920  [ok]
+  layer 24 moe  : max rel  5.21e-03  cosine 0.999926  [ok]
+  layer 25 moe  : max rel  2.63e-03  cosine 0.999966  [ok]
+  layer 26 moe  : max rel  6.25e-03  cosine 0.999977  [ok]
+  consecutive layers within the gate: 27 of 27
+
+per-token latency (embed -> argmax on device): median 3.611 ms  mean 3.611 ms; step wall (launch to end) 3.645 ms/token
+tokens: 32/32 match HF greedy
+$ timeout --kill-after=5s 180s stdbuf -oL -eL /root/sess_followup/b_default/run --weights /root/dsv2-data/weights.bin --cache /root/dsv2-data/fleet_cache.bin --golden /root/dsv2-data/golden_tokens.txt --hidden /root/dsv2-data/golden_hidden.bin --tokens 32 --context 1024 --repeat 2
+device: AMD Instinct MI300X VF  arch gfx942:sramecc+:xnack-  CUs 304
+model: hidden 2048 heads 16 kv_lora 512 experts 64 top-6 layers 27 (dense < 1) vocab 102400
+  /root/dsv2-data/weights.bin: 31.4 GB uploaded
+  /root/dsv2-data/fleet_cache.bin: 0.0 GB uploaded
+etx: 54946 tasks, 1778 event words, 296 workers (8 domains x 37), lds 24576 B (fleet scratch 23408 B)
+run 0 (warm-up): 32/32 tokens match
+token  0:    3.701 ms (device)  step   3.732 ms  out   1780  ok
+token  1:    3.703 ms (device)  step   3.738 ms  out    185  ok
+token  2:    3.705 ms (device)  step   3.737 ms  out    300  ok
+token  3:    3.714 ms (device)  step   3.747 ms  out   1501  ok
+token  4:    3.709 ms (device)  step   3.741 ms  out  11747  ok
+token  5:    3.706 ms (device)  step   3.741 ms  out    254  ok
+token  6:    3.711 ms (device)  step   3.755 ms  out   3510  ok
+token  7:    3.715 ms (device)  step   3.749 ms  out    185  ok
+token  8:    3.704 ms (device)  step   3.736 ms  out   1558  ok
+token  9:    3.708 ms (device)  step   3.742 ms  out   8708  ok
+token 10:    3.715 ms (device)  step   3.754 ms  out      7  ok
+token 11:    3.710 ms (device)  step   3.744 ms  out     77  ok
+token 12:    3.700 ms (device)  step   3.732 ms  out   1780  ok
+token 13:    3.710 ms (device)  step   3.749 ms  out    185  ok
+token 14:    3.704 ms (device)  step   3.737 ms  out    300  ok
+token 15:    3.705 ms (device)  step   3.737 ms  out   1501  ok
+token 16:    3.702 ms (device)  step   3.734 ms  out  11747  ok
+token 17:    3.711 ms (device)  step   3.743 ms  out    254  ok
+token 18:    3.709 ms (device)  step   3.740 ms  out   3510  ok
+token 19:    3.705 ms (device)  step   3.739 ms  out    185  ok
+token 20:    3.707 ms (device)  step   3.739 ms  out   1558  ok
+token 21:    3.711 ms (device)  step   3.746 ms  out   8708  ok
+token 22:    3.710 ms (device)  step   3.755 ms  out      7  ok
+token 23:    3.713 ms (device)  step   3.746 ms  out     77  ok
+token 24:    3.709 ms (device)  step   3.744 ms  out   1780  ok
+token 25:    3.710 ms (device)  step   3.743 ms  out    185  ok
+token 26:    3.706 ms (device)  step   3.740 ms  out    300  ok
+token 27:    3.714 ms (device)  step   3.748 ms  out   1501  ok
+token 28:    3.708 ms (device)  step   3.741 ms  out  11747  ok
+token 29:    3.718 ms (device)  step   3.758 ms  out    254  ok
+token 30:    3.706 ms (device)  step   3.740 ms  out   3510  ok
+token 31:    3.721 ms (device)  step   3.754 ms  out    185  ok
+  layer  0 dense: max rel  1.72e-03  cosine 0.999996  [ok]
+  layer  1 moe  : max rel  3.13e-03  cosine 0.999993  [ok]
+  layer  2 moe  : max rel  2.96e-03  cosine 0.999986  [ok]
+  layer  3 moe  : max rel  2.45e-03  cosine 0.999985  [ok]
+  layer  4 moe  : max rel  6.54e-03  cosine 0.999979  [ok]
+  layer  5 moe  : max rel  4.65e-03  cosine 0.999983  [ok]
+  layer  6 moe  : max rel  4.07e-03  cosine 0.999983  [ok]
+  layer  7 moe  : max rel  1.76e-03  cosine 0.999974  [ok]
+  layer  8 moe  : max rel  1.88e-03  cosine 0.999973  [ok]
+  layer  9 moe  : max rel  1.56e-03  cosine 0.999980  [ok]
+  layer 10 moe  : max rel  1.40e-03  cosine 0.999981  [ok]
+  layer 11 moe  : max rel  1.35e-03  cosine 0.999981  [ok]
+  layer 12 moe  : max rel  3.07e-03  cosine 0.999984  [ok]
+  layer 13 moe  : max rel  3.23e-03  cosine 0.999983  [ok]
+  layer 14 moe  : max rel  1.74e-03  cosine 0.999981  [ok]
+  layer 15 moe  : max rel  6.29e-03  cosine 0.999981  [ok]
+  layer 16 moe  : max rel  5.71e-03  cosine 0.999978  [ok]
+  layer 17 moe  : max rel  5.41e-03  cosine 0.999979  [ok]
+  layer 18 moe  : max rel  5.81e-03  cosine 0.999923  [ok]
+  layer 19 moe  : max rel  1.91e-03  cosine 0.999949  [ok]
+  layer 20 moe  : max rel  4.41e-03  cosine 0.999961  [ok]
+  layer 21 moe  : max rel  4.90e-03  cosine 0.999949  [ok]
+  layer 22 moe  : max rel  4.17e-03  cosine 0.999905  [ok]
+  layer 23 moe  : max rel  2.25e-03  cosine 0.999933  [ok]
+  layer 24 moe  : max rel  2.60e-03  cosine 0.999937  [ok]
+  layer 25 moe  : max rel  5.26e-03  cosine 0.999969  [ok]
+  layer 26 moe  : max rel  8.79e-04  cosine 0.999981  [ok]
+  consecutive layers within the gate: 27 of 27
+
+per-token latency (embed -> argmax on device): median 3.709 ms  mean 3.709 ms; step wall (launch to end) 3.743 ms/token
+tokens: 32/32 match HF greedy
+$ timeout --kill-after=5s 180s stdbuf -oL -eL /root/sess_followup/b_default/run --weights /root/dsv2-data/weights.bin --cache /root/dsv2-data/fleet_cache.bin --golden /root/dsv2-data/golden_tokens.txt --hidden /root/dsv2-data/golden_hidden.bin --tokens 32 --context 1024 --repeat 2
+device: AMD Instinct MI300X VF  arch gfx942:sramecc+:xnack-  CUs 304
+model: hidden 2048 heads 16 kv_lora 512 experts 64 top-6 layers 27 (dense < 1) vocab 102400
+  /root/dsv2-data/weights.bin: 31.4 GB uploaded
+  /root/dsv2-data/fleet_cache.bin: 0.0 GB uploaded
+etx: 54946 tasks, 1778 event words, 296 workers (8 domains x 37), lds 24576 B (fleet scratch 23408 B)
+run 0 (warm-up): 32/32 tokens match
+token  0:    3.709 ms (device)  step   3.743 ms  out   1780  ok
+token  1:    3.711 ms (device)  step   3.743 ms  out    185  ok
+token  2:    3.705 ms (device)  step   3.737 ms  out    300  ok
+token  3:    3.702 ms (device)  step   3.733 ms  out   1501  ok
+token  4:    3.708 ms (device)  step   3.740 ms  out  11747  ok
+token  5:    3.705 ms (device)  step   3.739 ms  out    254  ok
+token  6:    3.710 ms (device)  step   3.744 ms  out   3510  ok
+token  7:    3.711 ms (device)  step   3.744 ms  out    185  ok
+token  8:    3.703 ms (device)  step   3.737 ms  out   1558  ok
+token  9:    3.708 ms (device)  step   3.741 ms  out   8708  ok
+token 10:    3.703 ms (device)  step   3.735 ms  out      7  ok
+token 11:    3.708 ms (device)  step   3.741 ms  out     77  ok
+token 12:    3.709 ms (device)  step   3.741 ms  out   1780  ok
+token 13:    3.705 ms (device)  step   3.739 ms  out    185  ok
+token 14:    3.709 ms (device)  step   3.743 ms  out    300  ok
+token 15:    3.720 ms (device)  step   3.752 ms  out   1501  ok
+token 16:    3.714 ms (device)  step   3.745 ms  out  11747  ok
+token 17:    3.710 ms (device)  step   3.743 ms  out    254  ok
+token 18:    3.709 ms (device)  step   3.742 ms  out   3510  ok
+token 19:    3.710 ms (device)  step   3.745 ms  out    185  ok
+token 20:    3.711 ms (device)  step   3.744 ms  out   1558  ok
+token 21:    3.713 ms (device)  step   3.744 ms  out   8708  ok
+token 22:    3.711 ms (device)  step   3.744 ms  out      7  ok
+token 23:    3.712 ms (device)  step   3.753 ms  out     77  ok
+token 24:    3.712 ms (device)  step   3.744 ms  out   1780  ok
+token 25:    3.711 ms (device)  step   3.745 ms  out    185  ok
+token 26:    3.726 ms (device)  step   3.758 ms  out    300  ok
+token 27:    3.715 ms (device)  step   3.745 ms  out   1501  ok
+token 28:    3.718 ms (device)  step   3.751 ms  out  11747  ok
+token 29:    3.710 ms (device)  step   3.741 ms  out    254  ok
+token 30:    3.707 ms (device)  step   3.746 ms  out   3510  ok
+token 31:    3.724 ms (device)  step   3.756 ms  out    185  ok
+  layer  0 dense: max rel  1.72e-03  cosine 0.999996  [ok]
+  layer  1 moe  : max rel  3.13e-03  cosine 0.999993  [ok]
+  layer  2 moe  : max rel  2.96e-03  cosine 0.999986  [ok]
+  layer  3 moe  : max rel  2.45e-03  cosine 0.999985  [ok]
+  layer  4 moe  : max rel  6.54e-03  cosine 0.999979  [ok]
+  layer  5 moe  : max rel  4.65e-03  cosine 0.999983  [ok]
+  layer  6 moe  : max rel  4.07e-03  cosine 0.999983  [ok]
+  layer  7 moe  : max rel  1.76e-03  cosine 0.999974  [ok]
+  layer  8 moe  : max rel  1.88e-03  cosine 0.999973  [ok]
+  layer  9 moe  : max rel  1.56e-03  cosine 0.999980  [ok]
+  layer 10 moe  : max rel  1.40e-03  cosine 0.999981  [ok]
+  layer 11 moe  : max rel  1.35e-03  cosine 0.999981  [ok]
+  layer 12 moe  : max rel  3.07e-03  cosine 0.999984  [ok]
+  layer 13 moe  : max rel  3.23e-03  cosine 0.999983  [ok]
+  layer 14 moe  : max rel  1.74e-03  cosine 0.999981  [ok]
+  layer 15 moe  : max rel  6.29e-03  cosine 0.999981  [ok]
+  layer 16 moe  : max rel  5.71e-03  cosine 0.999978  [ok]
+  layer 17 moe  : max rel  5.41e-03  cosine 0.999979  [ok]
+  layer 18 moe  : max rel  5.81e-03  cosine 0.999923  [ok]
+  layer 19 moe  : max rel  1.91e-03  cosine 0.999949  [ok]
+  layer 20 moe  : max rel  4.41e-03  cosine 0.999961  [ok]
+  layer 21 moe  : max rel  4.90e-03  cosine 0.999949  [ok]
+  layer 22 moe  : max rel  4.17e-03  cosine 0.999905  [ok]
+  layer 23 moe  : max rel  2.25e-03  cosine 0.999933  [ok]
+  layer 24 moe  : max rel  2.60e-03  cosine 0.999937  [ok]
+  layer 25 moe  : max rel  5.26e-03  cosine 0.999969  [ok]
+  layer 26 moe  : max rel  8.79e-04  cosine 0.999981  [ok]
+  consecutive layers within the gate: 27 of 27
+
+per-token latency (embed -> argmax on device): median 3.710 ms  mean 3.711 ms; step wall (launch to end) 3.744 ms/token
+tokens: 32/32 match HF greedy
+$ timeout --kill-after=5s 180s stdbuf -oL -eL /root/sess_followup/b_all/run --weights /root/dsv2-data/weights.bin --cache /root/dsv2-data/fleet_cache.bin --golden /root/dsv2-data/golden_tokens.txt --hidden /root/dsv2-data/golden_hidden.bin --tokens 32 --context 1024 --repeat 2
+device: AMD Instinct MI300X VF  arch gfx942:sramecc+:xnack-  CUs 304
+model: hidden 2048 heads 16 kv_lora 512 experts 64 top-6 layers 27 (dense < 1) vocab 102400
+  /root/dsv2-data/weights.bin: 31.4 GB uploaded
+  /root/dsv2-data/fleet_cache.bin: 0.0 GB uploaded
+etx: 54946 tasks, 1778 event words, 296 workers (8 domains x 37), lds 24576 B (fleet scratch 23408 B)
+run 0 (warm-up): 32/32 tokens match
+token  0:    3.613 ms (device)  step   3.646 ms  out   1780  ok
+token  1:    3.616 ms (device)  step   3.651 ms  out    185  ok
+token  2:    3.615 ms (device)  step   3.650 ms  out    300  ok
+token  3:    3.619 ms (device)  step   3.660 ms  out   1501  ok
+token  4:    3.613 ms (device)  step   3.647 ms  out  11747  ok
+token  5:    3.618 ms (device)  step   3.661 ms  out    254  ok
+token  6:    3.614 ms (device)  step   3.651 ms  out   3510  ok
+token  7:    3.610 ms (device)  step   3.645 ms  out    185  ok
+token  8:    3.612 ms (device)  step   3.646 ms  out   1558  ok
+token  9:    3.613 ms (device)  step   3.647 ms  out   8708  ok
+token 10:    3.613 ms (device)  step   3.648 ms  out      7  ok
+token 11:    3.613 ms (device)  step   3.645 ms  out     77  ok
+token 12:    3.613 ms (device)  step   3.648 ms  out   1780  ok
+token 13:    3.614 ms (device)  step   3.648 ms  out    185  ok
+token 14:    3.611 ms (device)  step   3.645 ms  out    300  ok
+token 15:    3.613 ms (device)  step   3.646 ms  out   1501  ok
+token 16:    3.611 ms (device)  step   3.647 ms  out  11747  ok
+token 17:    3.620 ms (device)  step   3.654 ms  out    254  ok
+token 18:    3.619 ms (device)  step   3.654 ms  out   3510  ok
+token 19:    3.617 ms (device)  step   3.649 ms  out    185  ok
+token 20:    3.619 ms (device)  step   3.654 ms  out   1558  ok
+token 21:    3.610 ms (device)  step   3.643 ms  out   8708  ok
+token 22:    3.619 ms (device)  step   3.654 ms  out      7  ok
+token 23:    3.622 ms (device)  step   3.655 ms  out     77  ok
+token 24:    3.625 ms (device)  step   3.662 ms  out   1780  ok
+token 25:    3.620 ms (device)  step   3.655 ms  out    185  ok
+token 26:    3.619 ms (device)  step   3.654 ms  out    300  ok
+token 27:    3.624 ms (device)  step   3.655 ms  out   1501  ok
+token 28:    3.622 ms (device)  step   3.655 ms  out  11747  ok
+token 29:    3.616 ms (device)  step   3.650 ms  out    254  ok
+token 30:    3.618 ms (device)  step   3.653 ms  out   3510  ok
+token 31:    3.637 ms (device)  step   3.670 ms  out    185  ok
+  layer  0 dense: max rel  1.72e-03  cosine 0.999996  [ok]
+  layer  1 moe  : max rel  3.13e-03  cosine 0.999993  [ok]
+  layer  2 moe  : max rel  2.96e-03  cosine 0.999986  [ok]
+  layer  3 moe  : max rel  2.45e-03  cosine 0.999985  [ok]
+  layer  4 moe  : max rel  6.54e-03  cosine 0.999979  [ok]
+  layer  5 moe  : max rel  4.65e-03  cosine 0.999983  [ok]
+  layer  6 moe  : max rel  4.07e-03  cosine 0.999983  [ok]
+  layer  7 moe  : max rel  1.76e-03  cosine 0.999974  [ok]
+  layer  8 moe  : max rel  1.88e-03  cosine 0.999973  [ok]
+  layer  9 moe  : max rel  1.56e-03  cosine 0.999979  [ok]
+  layer 10 moe  : max rel  2.11e-03  cosine 0.999980  [ok]
+  layer 11 moe  : max rel  4.31e-03  cosine 0.999977  [ok]
+  layer 12 moe  : max rel  3.07e-03  cosine 0.999985  [ok]
+  layer 13 moe  : max rel  3.23e-03  cosine 0.999983  [ok]
+  layer 14 moe  : max rel  1.74e-03  cosine 0.999981  [ok]
+  layer 15 moe  : max rel  6.29e-03  cosine 0.999979  [ok]
+  layer 16 moe  : max rel  5.71e-03  cosine 0.999979  [ok]
+  layer 17 moe  : max rel  5.41e-03  cosine 0.999978  [ok]
+  layer 18 moe  : max rel  5.81e-03  cosine 0.999923  [ok]
+  layer 19 moe  : max rel  1.02e-02  cosine 0.999935  [ok]
+  layer 20 moe  : max rel  8.81e-03  cosine 0.999950  [ok]
+  layer 21 moe  : max rel  7.35e-03  cosine 0.999940  [ok]
+  layer 22 moe  : max rel  8.33e-03  cosine 0.999887  [ok]
+  layer 23 moe  : max rel  4.49e-03  cosine 0.999920  [ok]
+  layer 24 moe  : max rel  5.21e-03  cosine 0.999926  [ok]
+  layer 25 moe  : max rel  2.63e-03  cosine 0.999966  [ok]
+  layer 26 moe  : max rel  6.25e-03  cosine 0.999977  [ok]
+  consecutive layers within the gate: 27 of 27
+
+per-token latency (embed -> argmax on device): median 3.616 ms  mean 3.617 ms; step wall (launch to end) 3.652 ms/token
+tokens: 32/32 match HF greedy
+$ timeout --kill-after=5s 180s stdbuf -oL -eL /root/sess_followup/b_allnoQ/run --weights /root/dsv2-data/weights.bin --cache /root/dsv2-data/fleet_cache.bin --golden /root/dsv2-data/golden_tokens.txt --hidden /root/dsv2-data/golden_hidden.bin --tokens 32 --context 1024 --repeat 2
+device: AMD Instinct MI300X VF  arch gfx942:sramecc+:xnack-  CUs 304
+model: hidden 2048 heads 16 kv_lora 512 experts 64 top-6 layers 27 (dense < 1) vocab 102400
+  /root/dsv2-data/weights.bin: 31.4 GB uploaded
+  /root/dsv2-data/fleet_cache.bin: 0.0 GB uploaded
+etx: 54946 tasks, 1778 event words, 296 workers (8 domains x 37), lds 24576 B (fleet scratch 23408 B)
+run 0 (warm-up): 32/32 tokens match
+token  0:    3.601 ms (device)  step   3.636 ms  out   1780  ok
+token  1:    3.594 ms (device)  step   3.630 ms  out    185  ok
+token  2:    3.590 ms (device)  step   3.623 ms  out    300  ok
+token  3:    3.599 ms (device)  step   3.633 ms  out   1501  ok
+token  4:    3.597 ms (device)  step   3.631 ms  out  11747  ok
+token  5:    3.599 ms (device)  step   3.633 ms  out    254  ok
+token  6:    3.596 ms (device)  step   3.628 ms  out   3510  ok
+token  7:    3.592 ms (device)  step   3.625 ms  out    185  ok
+token  8:    3.602 ms (device)  step   3.634 ms  out   1558  ok
+token  9:    3.597 ms (device)  step   3.633 ms  out   8708  ok
+token 10:    3.596 ms (device)  step   3.630 ms  out      7  ok
+token 11:    3.598 ms (device)  step   3.633 ms  out     77  ok
+token 12:    3.599 ms (device)  step   3.634 ms  out   1780  ok
+token 13:    3.595 ms (device)  step   3.630 ms  out    185  ok
+token 14:    3.600 ms (device)  step   3.635 ms  out    300  ok
+token 15:    3.600 ms (device)  step   3.633 ms  out   1501  ok
+token 16:    3.601 ms (device)  step   3.634 ms  out  11747  ok
+token 17:    3.603 ms (device)  step   3.637 ms  out    254  ok
+token 18:    3.607 ms (device)  step   3.644 ms  out   3510  ok
+token 19:    3.601 ms (device)  step   3.635 ms  out    185  ok
+token 20:    3.603 ms (device)  step   3.638 ms  out   1558  ok
+token 21:    3.608 ms (device)  step   3.642 ms  out   8708  ok
+token 22:    3.602 ms (device)  step   3.638 ms  out      7  ok
+token 23:    3.597 ms (device)  step   3.633 ms  out     77  ok
+token 24:    3.605 ms (device)  step   3.639 ms  out   1780  ok
+token 25:    3.600 ms (device)  step   3.634 ms  out    185  ok
+token 26:    3.599 ms (device)  step   3.634 ms  out    300  ok
+token 27:    3.601 ms (device)  step   3.636 ms  out   1501  ok
+token 28:    3.604 ms (device)  step   3.640 ms  out  11747  ok
+token 29:    3.597 ms (device)  step   3.630 ms  out    254  ok
+token 30:    3.614 ms (device)  step   3.651 ms  out   3510  ok
+token 31:    3.611 ms (device)  step   3.643 ms  out    185  ok
+  layer  0 dense: max rel  1.72e-03  cosine 0.999996  [ok]
+  layer  1 moe  : max rel  3.13e-03  cosine 0.999993  [ok]
+  layer  2 moe  : max rel  2.96e-03  cosine 0.999986  [ok]
+  layer  3 moe  : max rel  2.45e-03  cosine 0.999985  [ok]
+  layer  4 moe  : max rel  6.54e-03  cosine 0.999979  [ok]
+  layer  5 moe  : max rel  4.65e-03  cosine 0.999983  [ok]
+  layer  6 moe  : max rel  4.07e-03  cosine 0.999983  [ok]
+  layer  7 moe  : max rel  1.76e-03  cosine 0.999974  [ok]
+  layer  8 moe  : max rel  1.88e-03  cosine 0.999973  [ok]
+  layer  9 moe  : max rel  1.56e-03  cosine 0.999979  [ok]
+  layer 10 moe  : max rel  2.11e-03  cosine 0.999980  [ok]
+  layer 11 moe  : max rel  4.31e-03  cosine 0.999977  [ok]
+  layer 12 moe  : max rel  3.07e-03  cosine 0.999985  [ok]
+  layer 13 moe  : max rel  3.23e-03  cosine 0.999983  [ok]
+  layer 14 moe  : max rel  1.74e-03  cosine 0.999981  [ok]
+  layer 15 moe  : max rel  6.29e-03  cosine 0.999979  [ok]
+  layer 16 moe  : max rel  5.71e-03  cosine 0.999979  [ok]
+  layer 17 moe  : max rel  5.41e-03  cosine 0.999978  [ok]
+  layer 18 moe  : max rel  5.81e-03  cosine 0.999923  [ok]
+  layer 19 moe  : max rel  1.02e-02  cosine 0.999935  [ok]
+  layer 20 moe  : max rel  8.81e-03  cosine 0.999950  [ok]
+  layer 21 moe  : max rel  7.35e-03  cosine 0.999940  [ok]
+  layer 22 moe  : max rel  8.33e-03  cosine 0.999887  [ok]
+  layer 23 moe  : max rel  4.49e-03  cosine 0.999920  [ok]
+  layer 24 moe  : max rel  5.21e-03  cosine 0.999926  [ok]
+  layer 25 moe  : max rel  2.63e-03  cosine 0.999966  [ok]
+  layer 26 moe  : max rel  6.25e-03  cosine 0.999977  [ok]
+  consecutive layers within the gate: 27 of 27
+
+per-token latency (embed -> argmax on device): median 3.600 ms  mean 3.600 ms; step wall (launch to end) 3.635 ms/token
+tokens: 32/32 match HF greedy
+$ timeout --kill-after=5s 180s stdbuf -oL -eL /root/sess_followup/b_default/run --weights /root/dsv2-data/weights.bin --cache /root/dsv2-data/fleet_cache.bin --golden /root/dsv2-data/golden_tokens.txt --hidden /root/dsv2-data/golden_hidden.bin --tokens 32 --context 1024 --repeat 2
+device: AMD Instinct MI300X VF  arch gfx942:sramecc+:xnack-  CUs 304
+model: hidden 2048 heads 16 kv_lora 512 experts 64 top-6 layers 27 (dense < 1) vocab 102400
+  /root/dsv2-data/weights.bin: 31.4 GB uploaded
+  /root/dsv2-data/fleet_cache.bin: 0.0 GB uploaded
+etx: 54946 tasks, 1778 event words, 296 workers (8 domains x 37), lds 24576 B (fleet scratch 23408 B)
+run 0 (warm-up): 32/32 tokens match
+token  0:    3.713 ms (device)  step   3.744 ms  out   1780  ok
+token  1:    3.710 ms (device)  step   3.741 ms  out    185  ok
+token  2:    3.702 ms (device)  step   3.734 ms  out    300  ok
+token  3:    3.707 ms (device)  step   3.741 ms  out   1501  ok
+token  4:    3.698 ms (device)  step   3.730 ms  out  11747  ok
+token  5:    3.708 ms (device)  step   3.743 ms  out    254  ok
+token  6:    3.716 ms (device)  step   3.747 ms  out   3510  ok
+token  7:    3.707 ms (device)  step   3.741 ms  out    185  ok
+token  8:    3.705 ms (device)  step   3.740 ms  out   1558  ok
+token  9:    3.707 ms (device)  step   3.741 ms  out   8708  ok
+token 10:    3.708 ms (device)  step   3.752 ms  out      7  ok
+token 11:    3.704 ms (device)  step   3.737 ms  out     77  ok
+token 12:    3.703 ms (device)  step   3.736 ms  out   1780  ok
+token 13:    3.702 ms (device)  step   3.734 ms  out    185  ok
+token 14:    3.711 ms (device)  step   3.742 ms  out    300  ok
+token 15:    3.702 ms (device)  step   3.737 ms  out   1501  ok
+token 16:    3.704 ms (device)  step   3.736 ms  out  11747  ok
+token 17:    3.710 ms (device)  step   3.743 ms  out    254  ok
+token 18:    3.709 ms (device)  step   3.740 ms  out   3510  ok
+token 19:    3.709 ms (device)  step   3.744 ms  out    185  ok
+token 20:    3.704 ms (device)  step   3.737 ms  out   1558  ok
+token 21:    3.708 ms (device)  step   3.742 ms  out   8708  ok
+token 22:    3.704 ms (device)  step   3.738 ms  out      7  ok
+token 23:    3.706 ms (device)  step   3.739 ms  out     77  ok
+token 24:    3.720 ms (device)  step   3.754 ms  out   1780  ok
+token 25:    3.711 ms (device)  step   3.753 ms  out    185  ok
+token 26:    3.714 ms (device)  step   3.747 ms  out    300  ok
+token 27:    3.712 ms (device)  step   3.743 ms  out   1501  ok
+token 28:    3.707 ms (device)  step   3.742 ms  out  11747  ok
+token 29:    3.706 ms (device)  step   3.738 ms  out    254  ok
+token 30:    3.707 ms (device)  step   3.739 ms  out   3510  ok
+token 31:    3.717 ms (device)  step   3.750 ms  out    185  ok
+  layer  0 dense: max rel  1.72e-03  cosine 0.999996  [ok]
+  layer  1 moe  : max rel  3.13e-03  cosine 0.999993  [ok]
+  layer  2 moe  : max rel  2.96e-03  cosine 0.999986  [ok]
+  layer  3 moe  : max rel  2.45e-03  cosine 0.999985  [ok]
+  layer  4 moe  : max rel  6.54e-03  cosine 0.999979  [ok]
+  layer  5 moe  : max rel  4.65e-03  cosine 0.999983  [ok]
+  layer  6 moe  : max rel  4.07e-03  cosine 0.999983  [ok]
+  layer  7 moe  : max rel  1.76e-03  cosine 0.999974  [ok]
+  layer  8 moe  : max rel  1.88e-03  cosine 0.999973  [ok]
+  layer  9 moe  : max rel  1.56e-03  cosine 0.999980  [ok]
+  layer 10 moe  : max rel  1.40e-03  cosine 0.999981  [ok]
+  layer 11 moe  : max rel  1.35e-03  cosine 0.999981  [ok]
+  layer 12 moe  : max rel  3.07e-03  cosine 0.999984  [ok]
+  layer 13 moe  : max rel  3.23e-03  cosine 0.999983  [ok]
+  layer 14 moe  : max rel  1.74e-03  cosine 0.999981  [ok]
+  layer 15 moe  : max rel  6.29e-03  cosine 0.999981  [ok]
+  layer 16 moe  : max rel  5.71e-03  cosine 0.999978  [ok]
+  layer 17 moe  : max rel  5.41e-03  cosine 0.999979  [ok]
+  layer 18 moe  : max rel  5.81e-03  cosine 0.999923  [ok]
+  layer 19 moe  : max rel  1.91e-03  cosine 0.999949  [ok]
+  layer 20 moe  : max rel  4.41e-03  cosine 0.999961  [ok]
+  layer 21 moe  : max rel  4.90e-03  cosine 0.999949  [ok]
+  layer 22 moe  : max rel  4.17e-03  cosine 0.999905  [ok]
+  layer 23 moe  : max rel  2.25e-03  cosine 0.999933  [ok]
+  layer 24 moe  : max rel  2.60e-03  cosine 0.999937  [ok]
+  layer 25 moe  : max rel  5.26e-03  cosine 0.999969  [ok]
+  layer 26 moe  : max rel  8.79e-04  cosine 0.999981  [ok]
+  consecutive layers within the gate: 27 of 27
+
+per-token latency (embed -> argmax on device): median 3.707 ms  mean 3.708 ms; step wall (launch to end) 3.741 ms/token
+tokens: 32/32 match HF greedy
+$ timeout --kill-after=5s 180s stdbuf -oL -eL /root/sess_followup/b_default723/run --weights /root/dsv2-data/weights.bin --cache /root/dsv2-data/fleet_cache.bin --golden /root/dsv2-data/golden_tokens.txt --hidden /root/dsv2-data/golden_hidden.bin --tokens 32 --context 1024 --repeat 2
+device: AMD Instinct MI300X VF  arch gfx942:sramecc+:xnack-  CUs 304
+model: hidden 2048 heads 16 kv_lora 512 experts 64 top-6 layers 27 (dense < 1) vocab 102400
+  /root/dsv2-data/weights.bin: 31.4 GB uploaded
+  /root/dsv2-data/fleet_cache.bin: 0.0 GB uploaded
+etx: 54946 tasks, 1778 event words, 296 workers (8 domains x 37), lds 24576 B (fleet scratch 23408 B)
+run 0 (warm-up): 32/32 tokens match
+token  0:    3.639 ms (device)  step   3.671 ms  out   1780  ok
+token  1:    3.641 ms (device)  step   3.675 ms  out    185  ok
+token  2:    3.643 ms (device)  step   3.674 ms  out    300  ok
+token  3:    3.636 ms (device)  step   3.667 ms  out   1501  ok
+token  4:    3.627 ms (device)  step   3.660 ms  out  11747  ok
+token  5:    3.634 ms (device)  step   3.667 ms  out    254  ok
+token  6:    3.634 ms (device)  step   3.669 ms  out   3510  ok
+token  7:    3.646 ms (device)  step   3.679 ms  out    185  ok
+token  8:    3.637 ms (device)  step   3.672 ms  out   1558  ok
+token  9:    3.640 ms (device)  step   3.671 ms  out   8708  ok
+token 10:    3.630 ms (device)  step   3.662 ms  out      7  ok
+token 11:    3.629 ms (device)  step   3.663 ms  out     77  ok
+token 12:    3.633 ms (device)  step   3.665 ms  out   1780  ok
+token 13:    3.630 ms (device)  step   3.664 ms  out    185  ok
+token 14:    3.643 ms (device)  step   3.677 ms  out    300  ok
+token 15:    3.637 ms (device)  step   3.668 ms  out   1501  ok
+token 16:    3.629 ms (device)  step   3.662 ms  out  11747  ok
+token 17:    3.641 ms (device)  step   3.674 ms  out    254  ok
+token 18:    3.635 ms (device)  step   3.666 ms  out   3510  ok
+token 19:    3.638 ms (device)  step   3.672 ms  out    185  ok
+token 20:    3.639 ms (device)  step   3.670 ms  out   1558  ok
+token 21:    3.651 ms (device)  step   3.685 ms  out   8708  ok
+token 22:    3.631 ms (device)  step   3.673 ms  out      7  ok
+token 23:    3.634 ms (device)  step   3.666 ms  out     77  ok
+token 24:    3.636 ms (device)  step   3.668 ms  out   1780  ok
+token 25:    3.632 ms (device)  step   3.666 ms  out    185  ok
+token 26:    3.638 ms (device)  step   3.670 ms  out    300  ok
+token 27:    3.638 ms (device)  step   3.671 ms  out   1501  ok
+token 28:    3.639 ms (device)  step   3.672 ms  out  11747  ok
+token 29:    3.633 ms (device)  step   3.666 ms  out    254  ok
+token 30:    3.633 ms (device)  step   3.665 ms  out   3510  ok
+token 31:    3.653 ms (device)  step   3.685 ms  out    185  ok
+  layer  0 dense: max rel  1.72e-03  cosine 0.999996  [ok]
+  layer  1 moe  : max rel  3.13e-03  cosine 0.999993  [ok]
+  layer  2 moe  : max rel  2.96e-03  cosine 0.999986  [ok]
+  layer  3 moe  : max rel  2.45e-03  cosine 0.999985  [ok]
+  layer  4 moe  : max rel  6.54e-03  cosine 0.999981  [ok]
+  layer  5 moe  : max rel  9.30e-03  cosine 0.999975  [ok]
+  layer  6 moe  : max rel  8.13e-03  cosine 0.999974  [ok]
+  layer  7 moe  : max rel  7.04e-03  cosine 0.999770  [ok]
+  layer  8 moe  : max rel  1.50e-02  cosine 0.999555  [ok]
+  layer  9 moe  : max rel  1.25e-02  cosine 0.999738  [ok]
+  layer 10 moe  : max rel  1.12e-02  cosine 0.999807  [ok]
+  layer 11 moe  : max rel  8.62e-03  cosine 0.999882  [ok]
+  layer 12 moe  : max rel  3.07e-03  cosine 0.999931  [ok]
+  layer 13 moe  : max rel  4.84e-03  cosine 0.999930  [ok]
+  layer 14 moe  : max rel  3.47e-03  cosine 0.999931  [ok]
+  layer 15 moe  : max rel  6.29e-03  cosine 0.999944  [ok]
+  layer 16 moe  : max rel  2.86e-03  cosine 0.999946  [ok]
+  layer 17 moe  : max rel  2.70e-03  cosine 0.999951  [ok]
+  layer 18 moe  : max rel  2.91e-03  cosine 0.999899  [ok]
+  layer 19 moe  : max rel  5.10e-03  cosine 0.999929  [ok]
+  layer 20 moe  : max rel  4.41e-03  cosine 0.999950  [ok]
+  layer 21 moe  : max rel  3.68e-03  cosine 0.999933  [ok]
+  layer 22 moe  : max rel  4.17e-03  cosine 0.999890  [ok]
+  layer 23 moe  : max rel  2.25e-03  cosine 0.999921  [ok]
+  layer 24 moe  : max rel  2.60e-03  cosine 0.999928  [ok]
+  layer 25 moe  : max rel  5.26e-03  cosine 0.999966  [ok]
+  layer 26 moe  : max rel  6.25e-03  cosine 0.999978  [ok]
+  consecutive layers within the gate: 27 of 27
+
+per-token latency (embed -> argmax on device): median 3.637 ms  mean 3.637 ms; step wall (launch to end) 3.670 ms/token
+tokens: 32/32 match HF greedy
+$ timeout --kill-after=5s 180s stdbuf -oL -eL /root/sess_followup/b_default723/run --weights /root/dsv2-data/weights.bin --cache /root/dsv2-data/fleet_cache.bin --golden /root/dsv2-data/golden_tokens.txt --hidden /root/dsv2-data/golden_hidden.bin --tokens 32 --context 1024 --repeat 2
+device: AMD Instinct MI300X VF  arch gfx942:sramecc+:xnack-  CUs 304
+model: hidden 2048 heads 16 kv_lora 512 experts 64 top-6 layers 27 (dense < 1) vocab 102400
+  /root/dsv2-data/weights.bin: 31.4 GB uploaded
+  /root/dsv2-data/fleet_cache.bin: 0.0 GB uploaded
+etx: 54946 tasks, 1778 event words, 296 workers (8 domains x 37), lds 24576 B (fleet scratch 23408 B)
+run 0 (warm-up): 32/32 tokens match
+token  0:    3.653 ms (device)  step   3.687 ms  out   1780  ok
+token  1:    3.642 ms (device)  step   3.676 ms  out    185  ok
+token  2:    3.648 ms (device)  step   3.681 ms  out    300  ok
+token  3:    3.653 ms (device)  step   3.685 ms  out   1501  ok
+token  4:    3.638 ms (device)  step   3.671 ms  out  11747  ok
+token  5:    3.643 ms (device)  step   3.675 ms  out    254  ok
+token  6:    3.644 ms (device)  step   3.676 ms  out   3510  ok
+token  7:    3.648 ms (device)  step   3.681 ms  out    185  ok
+token  8:    3.644 ms (device)  step   3.678 ms  out   1558  ok
+token  9:    3.649 ms (device)  step   3.681 ms  out   8708  ok
+token 10:    3.657 ms (device)  step   3.691 ms  out      7  ok
+token 11:    3.649 ms (device)  step   3.682 ms  out     77  ok
+token 12:    3.645 ms (device)  step   3.679 ms  out   1780  ok
+token 13:    3.652 ms (device)  step   3.684 ms  out    185  ok
+token 14:    3.647 ms (device)  step   3.681 ms  out    300  ok
+token 15:    3.647 ms (device)  step   3.680 ms  out   1501  ok
+token 16:    3.653 ms (device)  step   3.684 ms  out  11747  ok
+token 17:    3.649 ms (device)  step   3.683 ms  out    254  ok
+token 18:    3.648 ms (device)  step   3.680 ms  out   3510  ok
+token 19:    3.651 ms (device)  step   3.684 ms  out    185  ok
+token 20:    3.652 ms (device)  step   3.690 ms  out   1558  ok
+token 21:    3.652 ms (device)  step   3.686 ms  out   8708  ok
+token 22:    3.648 ms (device)  step   3.682 ms  out      7  ok
+token 23:    3.660 ms (device)  step   3.695 ms  out     77  ok
+token 24:    3.650 ms (device)  step   3.682 ms  out   1780  ok
+token 25:    3.656 ms (device)  step   3.690 ms  out    185  ok
+token 26:    3.646 ms (device)  step   3.679 ms  out    300  ok
+token 27:    3.660 ms (device)  step   3.694 ms  out   1501  ok
+token 28:    3.652 ms (device)  step   3.685 ms  out  11747  ok
+token 29:    3.649 ms (device)  step   3.683 ms  out    254  ok
+token 30:    3.647 ms (device)  step   3.679 ms  out   3510  ok
+token 31:    3.661 ms (device)  step   3.693 ms  out    185  ok
+  layer  0 dense: max rel  1.72e-03  cosine 0.999996  [ok]
+  layer  1 moe  : max rel  3.13e-03  cosine 0.999993  [ok]
+  layer  2 moe  : max rel  2.96e-03  cosine 0.999986  [ok]
+  layer  3 moe  : max rel  2.45e-03  cosine 0.999985  [ok]
+  layer  4 moe  : max rel  6.54e-03  cosine 0.999981  [ok]
+  layer  5 moe  : max rel  9.30e-03  cosine 0.999975  [ok]
+  layer  6 moe  : max rel  8.13e-03  cosine 0.999974  [ok]
+  layer  7 moe  : max rel  7.04e-03  cosine 0.999770  [ok]
+  layer  8 moe  : max rel  1.50e-02  cosine 0.999555  [ok]
+  layer  9 moe  : max rel  1.25e-02  cosine 0.999738  [ok]
+  layer 10 moe  : max rel  1.12e-02  cosine 0.999807  [ok]
+  layer 11 moe  : max rel  8.62e-03  cosine 0.999882  [ok]
+  layer 12 moe  : max rel  3.07e-03  cosine 0.999931  [ok]
+  layer 13 moe  : max rel  4.84e-03  cosine 0.999930  [ok]
+  layer 14 moe  : max rel  3.47e-03  cosine 0.999931  [ok]
+  layer 15 moe  : max rel  6.29e-03  cosine 0.999944  [ok]
+  layer 16 moe  : max rel  2.86e-03  cosine 0.999946  [ok]
+  layer 17 moe  : max rel  2.70e-03  cosine 0.999951  [ok]
+  layer 18 moe  : max rel  2.91e-03  cosine 0.999899  [ok]
+  layer 19 moe  : max rel  5.10e-03  cosine 0.999929  [ok]
+  layer 20 moe  : max rel  4.41e-03  cosine 0.999950  [ok]
+  layer 21 moe  : max rel  3.68e-03  cosine 0.999933  [ok]
+  layer 22 moe  : max rel  4.17e-03  cosine 0.999890  [ok]
+  layer 23 moe  : max rel  2.25e-03  cosine 0.999921  [ok]
+  layer 24 moe  : max rel  2.60e-03  cosine 0.999928  [ok]
+  layer 25 moe  : max rel  5.26e-03  cosine 0.999966  [ok]
+  layer 26 moe  : max rel  6.25e-03  cosine 0.999978  [ok]
+  consecutive layers within the gate: 27 of 27
+
+per-token latency (embed -> argmax on device): median 3.649 ms  mean 3.650 ms; step wall (launch to end) 3.683 ms/token
+tokens: 32/32 match HF greedy
+$ timeout --kill-after=5s 180s stdbuf -oL -eL /root/sess_followup/b_default/run --weights /root/dsv2-data/weights.bin --cache /root/dsv2-data/fleet_cache.bin --golden /root/dsv2-data/golden_tokens.txt --hidden /root/dsv2-data/golden_hidden.bin --tokens 32 --context 1024 --repeat 2
+device: AMD Instinct MI300X VF  arch gfx942:sramecc+:xnack-  CUs 304
+model: hidden 2048 heads 16 kv_lora 512 experts 64 top-6 layers 27 (dense < 1) vocab 102400
+  /root/dsv2-data/weights.bin: 31.4 GB uploaded
+  /root/dsv2-data/fleet_cache.bin: 0.0 GB uploaded
+etx: 54946 tasks, 1778 event words, 296 workers (8 domains x 37), lds 24576 B (fleet scratch 23408 B)
+run 0 (warm-up): 32/32 tokens match
+token  0:    3.703 ms (device)  step   3.735 ms  out   1780  ok
+token  1:    3.706 ms (device)  step   3.739 ms  out    185  ok
+token  2:    3.707 ms (device)  step   3.742 ms  out    300  ok
+token  3:    3.707 ms (device)  step   3.742 ms  out   1501  ok
+token  4:    3.708 ms (device)  step   3.741 ms  out  11747  ok
+token  5:    3.706 ms (device)  step   3.739 ms  out    254  ok
+token  6:    3.710 ms (device)  step   3.741 ms  out   3510  ok
+token  7:    3.711 ms (device)  step   3.744 ms  out    185  ok
+token  8:    3.707 ms (device)  step   3.738 ms  out   1558  ok
+token  9:    3.714 ms (device)  step   3.754 ms  out   8708  ok
+token 10:    3.707 ms (device)  step   3.741 ms  out      7  ok
+token 11:    3.703 ms (device)  step   3.737 ms  out     77  ok
+token 12:    3.704 ms (device)  step   3.736 ms  out   1780  ok
+token 13:    3.704 ms (device)  step   3.736 ms  out    185  ok
+token 14:    3.707 ms (device)  step   3.739 ms  out    300  ok
+token 15:    3.713 ms (device)  step   3.745 ms  out   1501  ok
+token 16:    3.711 ms (device)  step   3.744 ms  out  11747  ok
+token 17:    3.711 ms (device)  step   3.744 ms  out    254  ok
+token 18:    3.708 ms (device)  step   3.739 ms  out   3510  ok
+token 19:    3.718 ms (device)  step   3.750 ms  out    185  ok
+token 20:    3.717 ms (device)  step   3.750 ms  out   1558  ok
+token 21:    3.721 ms (device)  step   3.764 ms  out   8708  ok
+token 22:    3.710 ms (device)  step   3.745 ms  out      7  ok
+token 23:    3.718 ms (device)  step   3.750 ms  out     77  ok
+token 24:    3.713 ms (device)  step   3.745 ms  out   1780  ok
+token 25:    3.714 ms (device)  step   3.747 ms  out    185  ok
+token 26:    3.712 ms (device)  step   3.743 ms  out    300  ok
+token 27:    3.718 ms (device)  step   3.749 ms  out   1501  ok
+token 28:    3.711 ms (device)  step   3.743 ms  out  11747  ok
+token 29:    3.715 ms (device)  step   3.747 ms  out    254  ok
+token 30:    3.719 ms (device)  step   3.761 ms  out   3510  ok
+token 31:    3.718 ms (device)  step   3.749 ms  out    185  ok
+  layer  0 dense: max rel  1.72e-03  cosine 0.999996  [ok]
+  layer  1 moe  : max rel  3.13e-03  cosine 0.999993  [ok]
+  layer  2 moe  : max rel  2.96e-03  cosine 0.999986  [ok]
+  layer  3 moe  : max rel  2.45e-03  cosine 0.999985  [ok]
+  layer  4 moe  : max rel  6.54e-03  cosine 0.999979  [ok]
+  layer  5 moe  : max rel  4.65e-03  cosine 0.999983  [ok]
+  layer  6 moe  : max rel  4.07e-03  cosine 0.999983  [ok]
+  layer  7 moe  : max rel  1.76e-03  cosine 0.999974  [ok]
+  layer  8 moe  : max rel  1.88e-03  cosine 0.999973  [ok]
+  layer  9 moe  : max rel  1.56e-03  cosine 0.999980  [ok]
+  layer 10 moe  : max rel  1.40e-03  cosine 0.999981  [ok]
+  layer 11 moe  : max rel  1.35e-03  cosine 0.999981  [ok]
+  layer 12 moe  : max rel  3.07e-03  cosine 0.999984  [ok]
+  layer 13 moe  : max rel  3.23e-03  cosine 0.999983  [ok]
+  layer 14 moe  : max rel  1.74e-03  cosine 0.999981  [ok]
+  layer 15 moe  : max rel  6.29e-03  cosine 0.999981  [ok]
+  layer 16 moe  : max rel  5.71e-03  cosine 0.999978  [ok]
+  layer 17 moe  : max rel  5.41e-03  cosine 0.999979  [ok]
+  layer 18 moe  : max rel  5.81e-03  cosine 0.999923  [ok]
+  layer 19 moe  : max rel  1.91e-03  cosine 0.999949  [ok]
+  layer 20 moe  : max rel  4.41e-03  cosine 0.999961  [ok]
+  layer 21 moe  : max rel  4.90e-03  cosine 0.999949  [ok]
+  layer 22 moe  : max rel  4.17e-03  cosine 0.999905  [ok]
+  layer 23 moe  : max rel  2.25e-03  cosine 0.999933  [ok]
+  layer 24 moe  : max rel  2.60e-03  cosine 0.999937  [ok]
+  layer 25 moe  : max rel  5.26e-03  cosine 0.999969  [ok]
+  layer 26 moe  : max rel  8.79e-04  cosine 0.999981  [ok]
+  consecutive layers within the gate: 27 of 27
+
+per-token latency (embed -> argmax on device): median 3.711 ms  mean 3.711 ms; step wall (launch to end) 3.744 ms/token
+tokens: 32/32 match HF greedy
+$ timeout --kill-after=5s 180s stdbuf -oL -eL /root/sess_followup/b_default/run --weights /root/dsv2-data/weights.bin --cache /root/dsv2-data/fleet_cache.bin --golden /root/dsv2-data/golden_tokens.txt --hidden /root/dsv2-data/golden_hidden.bin --tokens 32 --context 1024 --repeat 2
+device: AMD Instinct MI300X VF  arch gfx942:sramecc+:xnack-  CUs 304
+model: hidden 2048 heads 16 kv_lora 512 experts 64 top-6 layers 27 (dense < 1) vocab 102400
+  /root/dsv2-data/weights.bin: 31.4 GB uploaded
+  /root/dsv2-data/fleet_cache.bin: 0.0 GB uploaded
+etx: 54946 tasks, 1778 event words, 296 workers (8 domains x 37), lds 24576 B (fleet scratch 23408 B)
+run 0 (warm-up): 32/32 tokens match
+token  0:    3.711 ms (device)  step   3.745 ms  out   1780  ok
+token  1:    3.707 ms (device)  step   3.741 ms  out    185  ok
+token  2:    3.711 ms (device)  step   3.745 ms  out    300  ok
+token  3:    3.712 ms (device)  step   3.743 ms  out   1501  ok
+token  4:    3.714 ms (device)  step   3.747 ms  out  11747  ok
+token  5:    3.723 ms (device)  step   3.757 ms  out    254  ok
+token  6:    3.714 ms (device)  step   3.748 ms  out   3510  ok
+token  7:    3.714 ms (device)  step   3.744 ms  out    185  ok
+token  8:    3.711 ms (device)  step   3.745 ms  out   1558  ok
+token  9:    3.716 ms (device)  step   3.750 ms  out   8708  ok
+token 10:    3.709 ms (device)  step   3.740 ms  out      7  ok
+token 11:    3.725 ms (device)  step   3.758 ms  out     77  ok
+token 12:    3.712 ms (device)  step   3.745 ms  out   1780  ok
+token 13:    3.712 ms (device)  step   3.742 ms  out    185  ok
+token 14:    3.718 ms (device)  step   3.749 ms  out    300  ok
+token 15:    3.713 ms (device)  step   3.745 ms  out   1501  ok
+token 16:    3.723 ms (device)  step   3.753 ms  out  11747  ok
+token 17:    3.718 ms (device)  step   3.749 ms  out    254  ok
+token 18:    3.723 ms (device)  step   3.755 ms  out   3510  ok
+token 19:    3.720 ms (device)  step   3.754 ms  out    185  ok
+token 20:    3.722 ms (device)  step   3.753 ms  out   1558  ok
+token 21:    3.724 ms (device)  step   3.757 ms  out   8708  ok
+token 22:    3.724 ms (device)  step   3.756 ms  out      7  ok
+token 23:    3.719 ms (device)  step   3.751 ms  out     77  ok
+token 24:    3.737 ms (device)  step   3.779 ms  out   1780  ok
+token 25:    3.718 ms (device)  step   3.750 ms  out    185  ok
+token 26:    3.719 ms (device)  step   3.750 ms  out    300  ok
+token 27:    3.717 ms (device)  step   3.747 ms  out   1501  ok
+token 28:    3.717 ms (device)  step   3.749 ms  out  11747  ok
+token 29:    3.714 ms (device)  step   3.746 ms  out    254  ok
+token 30:    3.718 ms (device)  step   3.751 ms  out   3510  ok
+token 31:    3.725 ms (device)  step   3.760 ms  out    185  ok
+  layer  0 dense: max rel  1.72e-03  cosine 0.999996  [ok]
+  layer  1 moe  : max rel  3.13e-03  cosine 0.999993  [ok]
+  layer  2 moe  : max rel  2.96e-03  cosine 0.999986  [ok]
+  layer  3 moe  : max rel  2.45e-03  cosine 0.999985  [ok]
+  layer  4 moe  : max rel  6.54e-03  cosine 0.999979  [ok]
+  layer  5 moe  : max rel  4.65e-03  cosine 0.999983  [ok]
+  layer  6 moe  : max rel  4.07e-03  cosine 0.999983  [ok]
+  layer  7 moe  : max rel  1.76e-03  cosine 0.999974  [ok]
+  layer  8 moe  : max rel  1.88e-03  cosine 0.999973  [ok]
+  layer  9 moe  : max rel  1.56e-03  cosine 0.999980  [ok]
+  layer 10 moe  : max rel  1.40e-03  cosine 0.999981  [ok]
+  layer 11 moe  : max rel  1.35e-03  cosine 0.999981  [ok]
+  layer 12 moe  : max rel  3.07e-03  cosine 0.999984  [ok]
+  layer 13 moe  : max rel  3.23e-03  cosine 0.999983  [ok]
+  layer 14 moe  : max rel  1.74e-03  cosine 0.999981  [ok]
+  layer 15 moe  : max rel  6.29e-03  cosine 0.999981  [ok]
+  layer 16 moe  : max rel  5.71e-03  cosine 0.999978  [ok]
+  layer 17 moe  : max rel  5.41e-03  cosine 0.999979  [ok]
+  layer 18 moe  : max rel  5.81e-03  cosine 0.999923  [ok]
+  layer 19 moe  : max rel  1.91e-03  cosine 0.999949  [ok]
+  layer 20 moe  : max rel  4.41e-03  cosine 0.999961  [ok]
+  layer 21 moe  : max rel  4.90e-03  cosine 0.999949  [ok]
+  layer 22 moe  : max rel  4.17e-03  cosine 0.999905  [ok]
+  layer 23 moe  : max rel  2.25e-03  cosine 0.999933  [ok]
+  layer 24 moe  : max rel  2.60e-03  cosine 0.999937  [ok]
+  layer 25 moe  : max rel  5.26e-03  cosine 0.999969  [ok]
+  layer 26 moe  : max rel  8.79e-04  cosine 0.999981  [ok]
+  consecutive layers within the gate: 27 of 27
+
+per-token latency (embed -> argmax on device): median 3.718 ms  mean 3.717 ms; step wall (launch to end) 3.750 ms/token
+tokens: 32/32 match HF greedy
+$ timeout --kill-after=5s 180s stdbuf -oL -eL /root/sess_followup/b_default723/run --weights /root/dsv2-data/weights.bin --cache /root/dsv2-data/fleet_cache.bin --golden /root/dsv2-data/golden_tokens.txt --hidden /root/dsv2-data/golden_hidden.bin --tokens 32 --context 1024 --repeat 2
+device: AMD Instinct MI300X VF  arch gfx942:sramecc+:xnack-  CUs 304
+model: hidden 2048 heads 16 kv_lora 512 experts 64 top-6 layers 27 (dense < 1) vocab 102400
+  /root/dsv2-data/weights.bin: 31.4 GB uploaded
+  /root/dsv2-data/fleet_cache.bin: 0.0 GB uploaded
+etx: 54946 tasks, 1778 event words, 296 workers (8 domains x 37), lds 24576 B (fleet scratch 23408 B)
+run 0 (warm-up): 32/32 tokens match
+token  0:    3.638 ms (device)  step   3.673 ms  out   1780  ok
+token  1:    3.642 ms (device)  step   3.684 ms  out    185  ok
+token  2:    3.634 ms (device)  step   3.666 ms  out    300  ok
+token  3:    3.644 ms (device)  step   3.676 ms  out   1501  ok
+token  4:    3.637 ms (device)  step   3.671 ms  out  11747  ok
+token  5:    3.641 ms (device)  step   3.676 ms  out    254  ok
+token  6:    3.636 ms (device)  step   3.669 ms  out   3510  ok
+token  7:    3.647 ms (device)  step   3.682 ms  out    185  ok
+token  8:    3.644 ms (device)  step   3.678 ms  out   1558  ok
+token  9:    3.646 ms (device)  step   3.679 ms  out   8708  ok
+token 10:    3.642 ms (device)  step   3.674 ms  out      7  ok
+token 11:    3.640 ms (device)  step   3.675 ms  out     77  ok
+token 12:    3.642 ms (device)  step   3.675 ms  out   1780  ok
+token 13:    3.643 ms (device)  step   3.677 ms  out    185  ok
+token 14:    3.656 ms (device)  step   3.688 ms  out    300  ok
+token 15:    3.643 ms (device)  step   3.675 ms  out   1501  ok
+token 16:    3.645 ms (device)  step   3.690 ms  out  11747  ok
+token 17:    3.650 ms (device)  step   3.684 ms  out    254  ok
+token 18:    3.649 ms (device)  step   3.681 ms  out   3510  ok
+token 19:    3.645 ms (device)  step   3.680 ms  out    185  ok
+token 20:    3.645 ms (device)  step   3.679 ms  out   1558  ok
+token 21:    3.644 ms (device)  step   3.676 ms  out   8708  ok
+token 22:    3.645 ms (device)  step   3.678 ms  out      7  ok
+token 23:    3.641 ms (device)  step   3.673 ms  out     77  ok
+token 24:    3.645 ms (device)  step   3.680 ms  out   1780  ok
+token 25:    3.659 ms (device)  step   3.694 ms  out    185  ok
+token 26:    3.652 ms (device)  step   3.686 ms  out    300  ok
+token 27:    3.639 ms (device)  step   3.674 ms  out   1501  ok
+token 28:    3.644 ms (device)  step   3.678 ms  out  11747  ok
+token 29:    3.655 ms (device)  step   3.696 ms  out    254  ok
+token 30:    3.643 ms (device)  step   3.677 ms  out   3510  ok
+token 31:    3.659 ms (device)  step   3.694 ms  out    185  ok
+  layer  0 dense: max rel  1.72e-03  cosine 0.999996  [ok]
+  layer  1 moe  : max rel  3.13e-03  cosine 0.999993  [ok]
+  layer  2 moe  : max rel  2.96e-03  cosine 0.999986  [ok]
+  layer  3 moe  : max rel  2.45e-03  cosine 0.999985  [ok]
+  layer  4 moe  : max rel  6.54e-03  cosine 0.999981  [ok]
+  layer  5 moe  : max rel  9.30e-03  cosine 0.999975  [ok]
+  layer  6 moe  : max rel  8.13e-03  cosine 0.999974  [ok]
+  layer  7 moe  : max rel  7.04e-03  cosine 0.999770  [ok]
+  layer  8 moe  : max rel  1.50e-02  cosine 0.999555  [ok]
+  layer  9 moe  : max rel  1.25e-02  cosine 0.999738  [ok]
+  layer 10 moe  : max rel  1.12e-02  cosine 0.999807  [ok]
+  layer 11 moe  : max rel  8.62e-03  cosine 0.999882  [ok]
+  layer 12 moe  : max rel  3.07e-03  cosine 0.999931  [ok]
+  layer 13 moe  : max rel  4.84e-03  cosine 0.999930  [ok]
+  layer 14 moe  : max rel  3.47e-03  cosine 0.999931  [ok]
+  layer 15 moe  : max rel  6.29e-03  cosine 0.999944  [ok]
+  layer 16 moe  : max rel  2.86e-03  cosine 0.999946  [ok]
+  layer 17 moe  : max rel  2.70e-03  cosine 0.999951  [ok]
+  layer 18 moe  : max rel  2.91e-03  cosine 0.999899  [ok]
+  layer 19 moe  : max rel  5.10e-03  cosine 0.999929  [ok]
+  layer 20 moe  : max rel  4.41e-03  cosine 0.999950  [ok]
+  layer 21 moe  : max rel  3.68e-03  cosine 0.999933  [ok]
+  layer 22 moe  : max rel  4.17e-03  cosine 0.999890  [ok]
+  layer 23 moe  : max rel  2.25e-03  cosine 0.999921  [ok]
+  layer 24 moe  : max rel  2.60e-03  cosine 0.999928  [ok]
+  layer 25 moe  : max rel  5.26e-03  cosine 0.999966  [ok]
+  layer 26 moe  : max rel  6.25e-03  cosine 0.999978  [ok]
+  consecutive layers within the gate: 27 of 27
+
+per-token latency (embed -> argmax on device): median 3.644 ms  mean 3.645 ms; step wall (launch to end) 3.679 ms/token
+tokens: 32/32 match HF greedy
+$ timeout --kill-after=5s 180s stdbuf -oL -eL /root/sess_followup/b_default723/run --weights /root/dsv2-data/weights.bin --cache /root/dsv2-data/fleet_cache.bin --golden /root/dsv2-data/golden_tokens.txt --hidden /root/dsv2-data/golden_hidden.bin --tokens 32 --context 1024 --repeat 2
+device: AMD Instinct MI300X VF  arch gfx942:sramecc+:xnack-  CUs 304
+model: hidden 2048 heads 16 kv_lora 512 experts 64 top-6 layers 27 (dense < 1) vocab 102400
+  /root/dsv2-data/weights.bin: 31.4 GB uploaded
+  /root/dsv2-data/fleet_cache.bin: 0.0 GB uploaded
+etx: 54946 tasks, 1778 event words, 296 workers (8 domains x 37), lds 24576 B (fleet scratch 23408 B)
+run 0 (warm-up): 32/32 tokens match
+token  0:    3.653 ms (device)  step   3.688 ms  out   1780  ok
+token  1:    3.653 ms (device)  step   3.687 ms  out    185  ok
+token  2:    3.645 ms (device)  step   3.677 ms  out    300  ok
+token  3:    3.643 ms (device)  step   3.678 ms  out   1501  ok
+token  4:    3.645 ms (device)  step   3.681 ms  out  11747  ok
+token  5:    3.650 ms (device)  step   3.684 ms  out    254  ok
+token  6:    3.652 ms (device)  step   3.687 ms  out   3510  ok
+token  7:    3.659 ms (device)  step   3.692 ms  out    185  ok
+token  8:    3.648 ms (device)  step   3.681 ms  out   1558  ok
+token  9:    3.646 ms (device)  step   3.681 ms  out   8708  ok
+token 10:    3.640 ms (device)  step   3.675 ms  out      7  ok
+token 11:    3.649 ms (device)  step   3.683 ms  out     77  ok
+token 12:    3.643 ms (device)  step   3.677 ms  out   1780  ok
+token 13:    3.647 ms (device)  step   3.679 ms  out    185  ok
+token 14:    3.648 ms (device)  step   3.693 ms  out    300  ok
+token 15:    3.648 ms (device)  step   3.682 ms  out   1501  ok
+token 16:    3.645 ms (device)  step   3.685 ms  out  11747  ok
+token 17:    3.660 ms (device)  step   3.694 ms  out    254  ok
+token 18:    3.642 ms (device)  step   3.675 ms  out   3510  ok
+token 19:    3.648 ms (device)  step   3.681 ms  out    185  ok
+token 20:    3.642 ms (device)  step   3.673 ms  out   1558  ok
+token 21:    3.644 ms (device)  step   3.678 ms  out   8708  ok
+token 22:    3.649 ms (device)  step   3.682 ms  out      7  ok
+token 23:    3.649 ms (device)  step   3.682 ms  out     77  ok
+token 24:    3.649 ms (device)  step   3.684 ms  out   1780  ok
+token 25:    3.654 ms (device)  step   3.687 ms  out    185  ok
+token 26:    3.644 ms (device)  step   3.678 ms  out    300  ok
+token 27:    3.658 ms (device)  step   3.692 ms  out   1501  ok
+token 28:    3.651 ms (device)  step   3.686 ms  out  11747  ok
+token 29:    3.640 ms (device)  step   3.674 ms  out    254  ok
+token 30:    3.645 ms (device)  step   3.680 ms  out   3510  ok
+token 31:    3.655 ms (device)  step   3.689 ms  out    185  ok
+  layer  0 dense: max rel  1.72e-03  cosine 0.999996  [ok]
+  layer  1 moe  : max rel  3.13e-03  cosine 0.999993  [ok]
+  layer  2 moe  : max rel  2.96e-03  cosine 0.999986  [ok]
+  layer  3 moe  : max rel  2.45e-03  cosine 0.999985  [ok]
+  layer  4 moe  : max rel  6.54e-03  cosine 0.999981  [ok]
+  layer  5 moe  : max rel  9.30e-03  cosine 0.999975  [ok]
+  layer  6 moe  : max rel  8.13e-03  cosine 0.999974  [ok]
+  layer  7 moe  : max rel  7.04e-03  cosine 0.999770  [ok]
+  layer  8 moe  : max rel  1.50e-02  cosine 0.999555  [ok]
+  layer  9 moe  : max rel  1.25e-02  cosine 0.999738  [ok]
+  layer 10 moe  : max rel  1.12e-02  cosine 0.999807  [ok]
+  layer 11 moe  : max rel  8.62e-03  cosine 0.999882  [ok]
+  layer 12 moe  : max rel  3.07e-03  cosine 0.999931  [ok]
+  layer 13 moe  : max rel  4.84e-03  cosine 0.999930  [ok]
+  layer 14 moe  : max rel  3.47e-03  cosine 0.999931  [ok]
+  layer 15 moe  : max rel  6.29e-03  cosine 0.999944  [ok]
+  layer 16 moe  : max rel  2.86e-03  cosine 0.999946  [ok]
+  layer 17 moe  : max rel  2.70e-03  cosine 0.999951  [ok]
+  layer 18 moe  : max rel  2.91e-03  cosine 0.999899  [ok]
+  layer 19 moe  : max rel  5.10e-03  cosine 0.999929  [ok]
+  layer 20 moe  : max rel  4.41e-03  cosine 0.999950  [ok]
+  layer 21 moe  : max rel  3.68e-03  cosine 0.999933  [ok]
+  layer 22 moe  : max rel  4.17e-03  cosine 0.999890  [ok]
+  layer 23 moe  : max rel  2.25e-03  cosine 0.999921  [ok]
+  layer 24 moe  : max rel  2.60e-03  cosine 0.999928  [ok]
+  layer 25 moe  : max rel  5.26e-03  cosine 0.999966  [ok]
+  layer 26 moe  : max rel  6.25e-03  cosine 0.999978  [ok]
+  consecutive layers within the gate: 27 of 27
+
+per-token latency (embed -> argmax on device): median 3.648 ms  mean 3.648 ms; step wall (launch to end) 3.683 ms/token
+tokens: 32/32 match HF greedy
+$ timeout --kill-after=5s 180s stdbuf -oL -eL /root/sess_followup/b_default/run --weights /root/dsv2-data/weights.bin --cache /root/dsv2-data/fleet_cache.bin --golden /root/dsv2-data/golden_tokens.txt --hidden /root/dsv2-data/golden_hidden.bin --tokens 32 --context 1024 --repeat 2
+device: AMD Instinct MI300X VF  arch gfx942:sramecc+:xnack-  CUs 304
+model: hidden 2048 heads 16 kv_lora 512 experts 64 top-6 layers 27 (dense < 1) vocab 102400
+  /root/dsv2-data/weights.bin: 31.4 GB uploaded
+  /root/dsv2-data/fleet_cache.bin: 0.0 GB uploaded
+etx: 54946 tasks, 1778 event words, 296 workers (8 domains x 37), lds 24576 B (fleet scratch 23408 B)
+run 0 (warm-up): 32/32 tokens match
+token  0:    3.703 ms (device)  step   3.746 ms  out   1780  ok
+token  1:    3.702 ms (device)  step   3.733 ms  out    185  ok
+token  2:    3.705 ms (device)  step   3.738 ms  out    300  ok
+token  3:    3.710 ms (device)  step   3.743 ms  out   1501  ok
+token  4:    3.705 ms (device)  step   3.739 ms  out  11747  ok
+token  5:    3.701 ms (device)  step   3.734 ms  out    254  ok
+token  6:    3.705 ms (device)  step   3.736 ms  out   3510  ok
+token  7:    3.701 ms (device)  step   3.734 ms  out    185  ok
+token  8:    3.699 ms (device)  step   3.739 ms  out   1558  ok
+token  9:    3.709 ms (device)  step   3.742 ms  out   8708  ok
+token 10:    3.704 ms (device)  step   3.738 ms  out      7  ok
+token 11:    3.706 ms (device)  step   3.740 ms  out     77  ok
+token 12:    3.703 ms (device)  step   3.737 ms  out   1780  ok
+token 13:    3.707 ms (device)  step   3.742 ms  out    185  ok
+token 14:    3.708 ms (device)  step   3.742 ms  out    300  ok
+token 15:    3.703 ms (device)  step   3.735 ms  out   1501  ok
+token 16:    3.711 ms (device)  step   3.744 ms  out  11747  ok
+token 17:    3.717 ms (device)  step   3.751 ms  out    254  ok
+token 18:    3.710 ms (device)  step   3.741 ms  out   3510  ok
+token 19:    3.712 ms (device)  step   3.746 ms  out    185  ok
+token 20:    3.708 ms (device)  step   3.740 ms  out   1558  ok
+token 21:    3.713 ms (device)  step   3.747 ms  out   8708  ok
+token 22:    3.709 ms (device)  step   3.742 ms  out      7  ok
+token 23:    3.711 ms (device)  step   3.744 ms  out     77  ok
+token 24:    3.709 ms (device)  step   3.752 ms  out   1780  ok
+token 25:    3.714 ms (device)  step   3.745 ms  out    185  ok
+token 26:    3.712 ms (device)  step   3.743 ms  out    300  ok
+token 27:    3.708 ms (device)  step   3.741 ms  out   1501  ok
+token 28:    3.705 ms (device)  step   3.738 ms  out  11747  ok
+token 29:    3.714 ms (device)  step   3.744 ms  out    254  ok
+token 30:    3.708 ms (device)  step   3.741 ms  out   3510  ok
+token 31:    3.717 ms (device)  step   3.748 ms  out    185  ok
+  layer  0 dense: max rel  1.72e-03  cosine 0.999996  [ok]
+  layer  1 moe  : max rel  3.13e-03  cosine 0.999993  [ok]
+  layer  2 moe  : max rel  2.96e-03  cosine 0.999986  [ok]
+  layer  3 moe  : max rel  2.45e-03  cosine 0.999985  [ok]
+  layer  4 moe  : max rel  6.54e-03  cosine 0.999979  [ok]
+  layer  5 moe  : max rel  4.65e-03  cosine 0.999983  [ok]
+  layer  6 moe  : max rel  4.07e-03  cosine 0.999983  [ok]
+  layer  7 moe  : max rel  1.76e-03  cosine 0.999974  [ok]
+  layer  8 moe  : max rel  1.88e-03  cosine 0.999973  [ok]
+  layer  9 moe  : max rel  1.56e-03  cosine 0.999980  [ok]
+  layer 10 moe  : max rel  1.40e-03  cosine 0.999981  [ok]
+  layer 11 moe  : max rel  1.35e-03  cosine 0.999981  [ok]
+  layer 12 moe  : max rel  3.07e-03  cosine 0.999984  [ok]
+  layer 13 moe  : max rel  3.23e-03  cosine 0.999983  [ok]
+  layer 14 moe  : max rel  1.74e-03  cosine 0.999981  [ok]
+  layer 15 moe  : max rel  6.29e-03  cosine 0.999981  [ok]
+  layer 16 moe  : max rel  5.71e-03  cosine 0.999978  [ok]
+  layer 17 moe  : max rel  5.41e-03  cosine 0.999979  [ok]
+  layer 18 moe  : max rel  5.81e-03  cosine 0.999923  [ok]
+  layer 19 moe  : max rel  1.91e-03  cosine 0.999949  [ok]
+  layer 20 moe  : max rel  4.41e-03  cosine 0.999961  [ok]
+  layer 21 moe  : max rel  4.90e-03  cosine 0.999949  [ok]
+  layer 22 moe  : max rel  4.17e-03  cosine 0.999905  [ok]
+  layer 23 moe  : max rel  2.25e-03  cosine 0.999933  [ok]
+  layer 24 moe  : max rel  2.60e-03  cosine 0.999937  [ok]
+  layer 25 moe  : max rel  5.26e-03  cosine 0.999969  [ok]
+  layer 26 moe  : max rel  8.79e-04  cosine 0.999981  [ok]
+  consecutive layers within the gate: 27 of 27
+
+per-token latency (embed -> argmax on device): median 3.708 ms  mean 3.708 ms; step wall (launch to end) 3.741 ms/token
+tokens: 32/32 match HF greedy
+$ timeout --kill-after=5s 180s stdbuf -oL -eL /root/sess_followup/b_default/run --weights /root/dsv2-data/weights.bin --cache /root/dsv2-data/fleet_cache.bin --golden /root/dsv2-data/golden_tokens.txt --hidden /root/dsv2-data/golden_hidden.bin --tokens 32 --context 1024 --repeat 2
+device: AMD Instinct MI300X VF  arch gfx942:sramecc+:xnack-  CUs 304
+model: hidden 2048 heads 16 kv_lora 512 experts 64 top-6 layers 27 (dense < 1) vocab 102400
+  /root/dsv2-data/weights.bin: 31.4 GB uploaded
+  /root/dsv2-data/fleet_cache.bin: 0.0 GB uploaded
+etx: 54946 tasks, 1778 event words, 296 workers (8 domains x 37), lds 24576 B (fleet scratch 23408 B)
+run 0 (warm-up): 32/32 tokens match
+token  0:    3.708 ms (device)  step   3.741 ms  out   1780  ok
+token  1:    3.704 ms (device)  step   3.737 ms  out    185  ok
+token  2:    3.702 ms (device)  step   3.736 ms  out    300  ok
+token  3:    3.705 ms (device)  step   3.737 ms  out   1501  ok
+token  4:    3.708 ms (device)  step   3.741 ms  out  11747  ok
+token  5:    3.710 ms (device)  step   3.742 ms  out    254  ok
+token  6:    3.707 ms (device)  step   3.741 ms  out   3510  ok
+token  7:    3.708 ms (device)  step   3.740 ms  out    185  ok
+token  8:    3.705 ms (device)  step   3.739 ms  out   1558  ok
+token  9:    3.707 ms (device)  step   3.744 ms  out   8708  ok
+token 10:    3.700 ms (device)  step   3.732 ms  out      7  ok
+token 11:    3.704 ms (device)  step   3.736 ms  out     77  ok
+token 12:    3.696 ms (device)  step   3.727 ms  out   1780  ok
+token 13:    3.707 ms (device)  step   3.741 ms  out    185  ok
+token 14:    3.707 ms (device)  step   3.740 ms  out    300  ok
+token 15:    3.701 ms (device)  step   3.733 ms  out   1501  ok
+token 16:    3.704 ms (device)  step   3.735 ms  out  11747  ok
+token 17:    3.709 ms (device)  step   3.743 ms  out    254  ok
+token 18:    3.706 ms (device)  step   3.739 ms  out   3510  ok
+token 19:    3.718 ms (device)  step   3.750 ms  out    185  ok
+token 20:    3.713 ms (device)  step   3.748 ms  out   1558  ok
+token 21:    3.714 ms (device)  step   3.746 ms  out   8708  ok
+token 22:    3.721 ms (device)  step   3.755 ms  out      7  ok
+token 23:    3.715 ms (device)  step   3.749 ms  out     77  ok
+token 24:    3.713 ms (device)  step   3.745 ms  out   1780  ok
+token 25:    3.703 ms (device)  step   3.735 ms  out    185  ok
+token 26:    3.710 ms (device)  step   3.742 ms  out    300  ok
+token 27:    3.724 ms (device)  step   3.756 ms  out   1501  ok
+token 28:    3.709 ms (device)  step   3.739 ms  out  11747  ok
+token 29:    3.717 ms (device)  step   3.749 ms  out    254  ok
+token 30:    3.711 ms (device)  step   3.745 ms  out   3510  ok
+token 31:    3.721 ms (device)  step   3.755 ms  out    185  ok
+  layer  0 dense: max rel  1.72e-03  cosine 0.999996  [ok]
+  layer  1 moe  : max rel  3.13e-03  cosine 0.999993  [ok]
+  layer  2 moe  : max rel  2.96e-03  cosine 0.999986  [ok]
+  layer  3 moe  : max rel  2.45e-03  cosine 0.999985  [ok]
+  layer  4 moe  : max rel  6.54e-03  cosine 0.999979  [ok]
+  layer  5 moe  : max rel  4.65e-03  cosine 0.999983  [ok]
+  layer  6 moe  : max rel  4.07e-03  cosine 0.999983  [ok]
+  layer  7 moe  : max rel  1.76e-03  cosine 0.999974  [ok]
+  layer  8 moe  : max rel  1.88e-03  cosine 0.999973  [ok]
+  layer  9 moe  : max rel  1.56e-03  cosine 0.999980  [ok]
+  layer 10 moe  : max rel  1.40e-03  cosine 0.999981  [ok]
+  layer 11 moe  : max rel  1.35e-03  cosine 0.999981  [ok]
+  layer 12 moe  : max rel  3.07e-03  cosine 0.999984  [ok]
+  layer 13 moe  : max rel  3.23e-03  cosine 0.999983  [ok]
+  layer 14 moe  : max rel  1.74e-03  cosine 0.999981  [ok]
+  layer 15 moe  : max rel  6.29e-03  cosine 0.999981  [ok]
+  layer 16 moe  : max rel  5.71e-03  cosine 0.999978  [ok]
+  layer 17 moe  : max rel  5.41e-03  cosine 0.999979  [ok]
+  layer 18 moe  : max rel  5.81e-03  cosine 0.999923  [ok]
+  layer 19 moe  : max rel  1.91e-03  cosine 0.999949  [ok]
+  layer 20 moe  : max rel  4.41e-03  cosine 0.999961  [ok]
+  layer 21 moe  : max rel  4.90e-03  cosine 0.999949  [ok]
+  layer 22 moe  : max rel  4.17e-03  cosine 0.999905  [ok]
+  layer 23 moe  : max rel  2.25e-03  cosine 0.999933  [ok]
+  layer 24 moe  : max rel  2.60e-03  cosine 0.999937  [ok]
+  layer 25 moe  : max rel  5.26e-03  cosine 0.999969  [ok]
+  layer 26 moe  : max rel  8.79e-04  cosine 0.999981  [ok]
+  consecutive layers within the gate: 27 of 27
+
+per-token latency (embed -> argmax on device): median 3.708 ms  mean 3.709 ms; step wall (launch to end) 3.742 ms/token
+tokens: 32/32 match HF greedy
+$ timeout --kill-after=5s 180s stdbuf -oL -eL /root/sess_followup/b_default723/run --weights /root/dsv2-data/weights.bin --cache /root/dsv2-data/fleet_cache.bin --golden /root/dsv2-data/golden_tokens.txt --hidden /root/dsv2-data/golden_hidden.bin --tokens 32 --context 1024 --repeat 2
+device: AMD Instinct MI300X VF  arch gfx942:sramecc+:xnack-  CUs 304
+model: hidden 2048 heads 16 kv_lora 512 experts 64 top-6 layers 27 (dense < 1) vocab 102400
+  /root/dsv2-data/weights.bin: 31.4 GB uploaded
+  /root/dsv2-data/fleet_cache.bin: 0.0 GB uploaded
+etx: 54946 tasks, 1778 event words, 296 workers (8 domains x 37), lds 24576 B (fleet scratch 23408 B)
+run 0 (warm-up): 32/32 tokens match
+token  0:    3.649 ms (device)  step   3.683 ms  out   1780  ok
+token  1:    3.643 ms (device)  step   3.676 ms  out    185  ok
+token  2:    3.640 ms (device)  step   3.674 ms  out    300  ok
+token  3:    3.639 ms (device)  step   3.672 ms  out   1501  ok
+token  4:    3.641 ms (device)  step   3.676 ms  out  11747  ok
+token  5:    3.643 ms (device)  step   3.677 ms  out    254  ok
+token  6:    3.648 ms (device)  step   3.680 ms  out   3510  ok
+token  7:    3.644 ms (device)  step   3.676 ms  out    185  ok
+token  8:    3.646 ms (device)  step   3.678 ms  out   1558  ok
+token  9:    3.646 ms (device)  step   3.679 ms  out   8708  ok
+token 10:    3.641 ms (device)  step   3.675 ms  out      7  ok
+token 11:    3.648 ms (device)  step   3.682 ms  out     77  ok
+token 12:    3.638 ms (device)  step   3.672 ms  out   1780  ok
+token 13:    3.651 ms (device)  step   3.684 ms  out    185  ok
+token 14:    3.641 ms (device)  step   3.674 ms  out    300  ok
+token 15:    3.644 ms (device)  step   3.677 ms  out   1501  ok
+token 16:    3.644 ms (device)  step   3.678 ms  out  11747  ok
+token 17:    3.647 ms (device)  step   3.681 ms  out    254  ok
+token 18:    3.640 ms (device)  step   3.672 ms  out   3510  ok
+token 19:    3.645 ms (device)  step   3.678 ms  out    185  ok
+token 20:    3.650 ms (device)  step   3.684 ms  out   1558  ok
+token 21:    3.650 ms (device)  step   3.683 ms  out   8708  ok
+token 22:    3.642 ms (device)  step   3.676 ms  out      7  ok
+token 23:    3.646 ms (device)  step   3.680 ms  out     77  ok
+token 24:    3.647 ms (device)  step   3.678 ms  out   1780  ok
+token 25:    3.651 ms (device)  step   3.686 ms  out    185  ok
+token 26:    3.647 ms (device)  step   3.681 ms  out    300  ok
+token 27:    3.648 ms (device)  step   3.682 ms  out   1501  ok
+token 28:    3.646 ms (device)  step   3.678 ms  out  11747  ok
+token 29:    3.644 ms (device)  step   3.676 ms  out    254  ok
+token 30:    3.643 ms (device)  step   3.676 ms  out   3510  ok
+token 31:    3.657 ms (device)  step   3.693 ms  out    185  ok
+  layer  0 dense: max rel  1.72e-03  cosine 0.999996  [ok]
+  layer  1 moe  : max rel  3.13e-03  cosine 0.999993  [ok]
+  layer  2 moe  : max rel  2.96e-03  cosine 0.999986  [ok]
+  layer  3 moe  : max rel  2.45e-03  cosine 0.999985  [ok]
+  layer  4 moe  : max rel  6.54e-03  cosine 0.999981  [ok]
+  layer  5 moe  : max rel  9.30e-03  cosine 0.999975  [ok]
+  layer  6 moe  : max rel  8.13e-03  cosine 0.999974  [ok]
+  layer  7 moe  : max rel  7.04e-03  cosine 0.999770  [ok]
+  layer  8 moe  : max rel  1.50e-02  cosine 0.999555  [ok]
+  layer  9 moe  : max rel  1.25e-02  cosine 0.999738  [ok]
+  layer 10 moe  : max rel  1.12e-02  cosine 0.999807  [ok]
+  layer 11 moe  : max rel  8.62e-03  cosine 0.999882  [ok]
+  layer 12 moe  : max rel  3.07e-03  cosine 0.999931  [ok]
+  layer 13 moe  : max rel  4.84e-03  cosine 0.999930  [ok]
+  layer 14 moe  : max rel  3.47e-03  cosine 0.999931  [ok]
+  layer 15 moe  : max rel  6.29e-03  cosine 0.999944  [ok]
+  layer 16 moe  : max rel  2.86e-03  cosine 0.999946  [ok]
+  layer 17 moe  : max rel  2.70e-03  cosine 0.999951  [ok]
+  layer 18 moe  : max rel  2.91e-03  cosine 0.999899  [ok]
+  layer 19 moe  : max rel  5.10e-03  cosine 0.999929  [ok]
+  layer 20 moe  : max rel  4.41e-03  cosine 0.999950  [ok]
+  layer 21 moe  : max rel  3.68e-03  cosine 0.999933  [ok]
+  layer 22 moe  : max rel  4.17e-03  cosine 0.999890  [ok]
+  layer 23 moe  : max rel  2.25e-03  cosine 0.999921  [ok]
+  layer 24 moe  : max rel  2.60e-03  cosine 0.999928  [ok]
+  layer 25 moe  : max rel  5.26e-03  cosine 0.999966  [ok]
+  layer 26 moe  : max rel  6.25e-03  cosine 0.999978  [ok]
+  consecutive layers within the gate: 27 of 27
+
+per-token latency (embed -> argmax on device): median 3.646 ms  mean 3.645 ms; step wall (launch to end) 3.679 ms/token
+tokens: 32/32 match HF greedy
+FOLLOWUP E1 all - allnoQ: median 14.0 us spread 10.0 diffs [14.0, 9.0, 19.0, 10.0, 16.0] holds=False
+FOLLOWUP E1 default - allnoQ: median 108.0 us spread 7.0 diffs [104.0, 107.0, 111.0, 108.0, 110.0] holds=True
+FOLLOWUP E2 default - default723: median 62.0 us spread 14.0 diffs [70.0, 62.0, 74.0, 60.0, 62.0] holds=True
+FOLLOWUP medians {"e1": {"default": 3.71, "all": 3.613, "allnoQ": 3.6}, "e2": {"default": 3.708, "default723": 3.646}}

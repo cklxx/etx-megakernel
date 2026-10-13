@@ -1,0 +1,236 @@
+{
+  "e1": {
+    "allnoQ_vs_default": {
+      "diffs_us": [
+        104.0,
+        107.0,
+        111.0,
+        108.0,
+        110.0
+      ],
+      "holds": true,
+      "median_us": 108.0,
+      "spread_us": 7.0,
+      "test": "E1 default - allnoQ"
+    },
+    "drop_q_all": {
+      "diffs_us": [
+        14.0,
+        9.0,
+        19.0,
+        10.0,
+        16.0
+      ],
+      "holds": false,
+      "median_us": 14.0,
+      "spread_us": 10.0,
+      "test": "E1 all - allnoQ"
+    },
+    "medians_ms": {
+      "all": 3.613,
+      "allnoQ": 3.6,
+      "default": 3.71
+    },
+    "rounds": [
+      {
+        "all": {
+          "device_ms": 3.613,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.648
+        },
+        "allnoQ": {
+          "device_ms": 3.599,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.634
+        },
+        "default": {
+          "device_ms": 3.703,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.738
+        }
+      },
+      {
+        "all": {
+          "device_ms": 3.613,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.65
+        },
+        "allnoQ": {
+          "device_ms": 3.604,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.639
+        },
+        "default": {
+          "device_ms": 3.711,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.746
+        }
+      },
+      {
+        "all": {
+          "device_ms": 3.618,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.652
+        },
+        "allnoQ": {
+          "device_ms": 3.599,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.634
+        },
+        "default": {
+          "device_ms": 3.71,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.743
+        }
+      },
+      {
+        "all": {
+          "device_ms": 3.611,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.645
+        },
+        "allnoQ": {
+          "device_ms": 3.601,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.637
+        },
+        "default": {
+          "device_ms": 3.709,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.743
+        }
+      },
+      {
+        "all": {
+          "device_ms": 3.616,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.652
+        },
+        "allnoQ": {
+          "device_ms": 3.6,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.635
+        },
+        "default": {
+          "device_ms": 3.71,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.744
+        }
+      }
+    ]
+  },
+  "e2": {
+    "compiler_costs": {
+      "diffs_us": [
+        70.0,
+        62.0,
+        74.0,
+        60.0,
+        62.0
+      ],
+      "holds": true,
+      "median_us": 62.0,
+      "spread_us": 14.0,
+      "test": "E2 default - default723"
+    },
+    "medians_ms": {
+      "default": 3.708,
+      "default723": 3.646
+    },
+    "resources_723": {
+      "agpr": 48,
+      "lds": 26668,
+      "occupancy": 1,
+      "scratch": 0,
+      "sgpr": 108,
+      "vgpr": 256
+    },
+    "rounds": [
+      {
+        "default": {
+          "device_ms": 3.707,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.741
+        },
+        "default723": {
+          "device_ms": 3.637,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.67
+        }
+      },
+      {
+        "default": {
+          "device_ms": 3.711,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.744
+        },
+        "default723": {
+          "device_ms": 3.649,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.683
+        }
+      },
+      {
+        "default": {
+          "device_ms": 3.718,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.75
+        },
+        "default723": {
+          "device_ms": 3.644,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.679
+        }
+      },
+      {
+        "default": {
+          "device_ms": 3.708,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.741
+        },
+        "default723": {
+          "device_ms": 3.648,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.683
+        }
+      },
+      {
+        "default": {
+          "device_ms": 3.708,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.742
+        },
+        "default723": {
+          "device_ms": 3.646,
+          "layers": 27,
+          "tokens": 32,
+          "wall_ms": 3.679
+        }
+      }
+    ]
+  }
+}

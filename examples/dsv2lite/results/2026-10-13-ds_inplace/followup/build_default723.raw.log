@@ -1,0 +1,53 @@
+$ timeout --kill-after=5s 900s stdbuf -oL -eL docker run --rm -v /root:/root -w /root/etx --entrypoint bash rocm:latest -c 'hipcc --version | head -2 && hipcc -O3 -std=c++17 --offload-arch=gfx942 -DFLEET_NT_WEIGHTS=1 -Rpass-analysis=kernel-resource-usage -I /root/fleet-3fb67a6/src -I /root/etx/etx/runtime/include -I /root/sess_followup/b_default723 -I /root/etx /root/sess_followup/b_default723/megakernel_d0.hip /root/etx/examples/dsv2lite/host.hip -o /root/sess_followup/b_default723/run'
+HIP version: 7.2.53211-c2d9476115
+AMD clang version 22.0.0git (https://github.com/RadeonOpenCompute/llvm-project roc-7.2.3 26084 f58b06dce1f9c15707c5f808fd002e18c2accf7e)
+In file included from /root/sess_followup/b_default723/megakernel_d0.hip:45:
+In file included from /root/etx/examples/dsv2lite/fleet_shim.hip:19:
+/root/fleet-3fb67a6/src/kernels/fleet_kernel.hip:940:1: remark: Function Name: fleet_decode_step [-Rpass-analysis=kernel-resource-usage]
+  940 |                        Activations act, KVCache kv) {
+      | ^
+/root/fleet-3fb67a6/src/kernels/fleet_kernel.hip:940:1: remark:     TotalSGPRs: 108 [-Rpass-analysis=kernel-resource-usage]
+/root/fleet-3fb67a6/src/kernels/fleet_kernel.hip:940:1: remark:     VGPRs: 256 [-Rpass-analysis=kernel-resource-usage]
+/root/fleet-3fb67a6/src/kernels/fleet_kernel.hip:940:1: remark:     AGPRs: 95 [-Rpass-analysis=kernel-resource-usage]
+/root/fleet-3fb67a6/src/kernels/fleet_kernel.hip:940:1: remark:     ScratchSize [bytes/lane]: 48 [-Rpass-analysis=kernel-resource-usage]
+/root/fleet-3fb67a6/src/kernels/fleet_kernel.hip:940:1: remark:     Dynamic Stack: False [-Rpass-analysis=kernel-resource-usage]
+/root/fleet-3fb67a6/src/kernels/fleet_kernel.hip:940:1: remark:     Occupancy [waves/SIMD]: 1 [-Rpass-analysis=kernel-resource-usage]
+/root/fleet-3fb67a6/src/kernels/fleet_kernel.hip:940:1: remark:     SGPRs Spill: 756 [-Rpass-analysis=kernel-resource-usage]
+/root/fleet-3fb67a6/src/kernels/fleet_kernel.hip:940:1: remark:     VGPRs Spill: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/fleet-3fb67a6/src/kernels/fleet_kernel.hip:940:1: remark:     LDS Size [bytes/block]: 25488 [-Rpass-analysis=kernel-resource-usage]
+/root/fleet-3fb67a6/src/kernels/fleet_kernel.hip:1053:1: remark: Function Name: _Z15fleet_probe_xccPj [-Rpass-analysis=kernel-resource-usage]
+ 1053 | __global__ void fleet_probe_xcc(uint32_t* hist) {
+      | ^
+/root/fleet-3fb67a6/src/kernels/fleet_kernel.hip:1053:1: remark:     TotalSGPRs: 14 [-Rpass-analysis=kernel-resource-usage]
+/root/fleet-3fb67a6/src/kernels/fleet_kernel.hip:1053:1: remark:     VGPRs: 2 [-Rpass-analysis=kernel-resource-usage]
+/root/fleet-3fb67a6/src/kernels/fleet_kernel.hip:1053:1: remark:     AGPRs: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/fleet-3fb67a6/src/kernels/fleet_kernel.hip:1053:1: remark:     ScratchSize [bytes/lane]: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/fleet-3fb67a6/src/kernels/fleet_kernel.hip:1053:1: remark:     Dynamic Stack: False [-Rpass-analysis=kernel-resource-usage]
+/root/fleet-3fb67a6/src/kernels/fleet_kernel.hip:1053:1: remark:     Occupancy [waves/SIMD]: 8 [-Rpass-analysis=kernel-resource-usage]
+/root/fleet-3fb67a6/src/kernels/fleet_kernel.hip:1053:1: remark:     SGPRs Spill: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/fleet-3fb67a6/src/kernels/fleet_kernel.hip:1053:1: remark:     VGPRs Spill: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/fleet-3fb67a6/src/kernels/fleet_kernel.hip:1053:1: remark:     LDS Size [bytes/block]: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess_followup/b_default723/megakernel_d0.hip:5135:1: remark: Function Name: etx_megakernel_d0 [-Rpass-analysis=kernel-resource-usage]
+ 5135 | extern "C" __global__ void __launch_bounds__(ETX_THREADS, ETX_MIN_WG_PER_CU) etx_megakernel_d0(etx_params p) {
+      | ^
+/root/sess_followup/b_default723/megakernel_d0.hip:5135:1: remark:     TotalSGPRs: 108 [-Rpass-analysis=kernel-resource-usage]
+/root/sess_followup/b_default723/megakernel_d0.hip:5135:1: remark:     VGPRs: 256 [-Rpass-analysis=kernel-resource-usage]
+/root/sess_followup/b_default723/megakernel_d0.hip:5135:1: remark:     AGPRs: 48 [-Rpass-analysis=kernel-resource-usage]
+/root/sess_followup/b_default723/megakernel_d0.hip:5135:1: remark:     ScratchSize [bytes/lane]: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess_followup/b_default723/megakernel_d0.hip:5135:1: remark:     Dynamic Stack: False [-Rpass-analysis=kernel-resource-usage]
+/root/sess_followup/b_default723/megakernel_d0.hip:5135:1: remark:     Occupancy [waves/SIMD]: 1 [-Rpass-analysis=kernel-resource-usage]
+/root/sess_followup/b_default723/megakernel_d0.hip:5135:1: remark:     SGPRs Spill: 625 [-Rpass-analysis=kernel-resource-usage]
+/root/sess_followup/b_default723/megakernel_d0.hip:5135:1: remark:     VGPRs Spill: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess_followup/b_default723/megakernel_d0.hip:5135:1: remark:     LDS Size [bytes/block]: 26668 [-Rpass-analysis=kernel-resource-usage]
+/root/sess_followup/b_default723/megakernel_d0.hip:5193:1: remark: Function Name: etx_unfused_d0 [-Rpass-analysis=kernel-resource-usage]
+ 5193 | extern "C" __global__ void __launch_bounds__(ETX_THREADS, ETX_MIN_WG_PER_CU) etx_unfused_d0(etx_params p, int32_t first) {
+      | ^
+/root/sess_followup/b_default723/megakernel_d0.hip:5193:1: remark:     TotalSGPRs: 85 [-Rpass-analysis=kernel-resource-usage]
+/root/sess_followup/b_default723/megakernel_d0.hip:5193:1: remark:     VGPRs: 248 [-Rpass-analysis=kernel-resource-usage]
+/root/sess_followup/b_default723/megakernel_d0.hip:5193:1: remark:     AGPRs: 14 [-Rpass-analysis=kernel-resource-usage]
+/root/sess_followup/b_default723/megakernel_d0.hip:5193:1: remark:     ScratchSize [bytes/lane]: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess_followup/b_default723/megakernel_d0.hip:5193:1: remark:     Dynamic Stack: False [-Rpass-analysis=kernel-resource-usage]
+/root/sess_followup/b_default723/megakernel_d0.hip:5193:1: remark:     Occupancy [waves/SIMD]: 1 [-Rpass-analysis=kernel-resource-usage]
+/root/sess_followup/b_default723/megakernel_d0.hip:5193:1: remark:     SGPRs Spill: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess_followup/b_default723/megakernel_d0.hip:5193:1: remark:     VGPRs Spill: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess_followup/b_default723/megakernel_d0.hip:5193:1: remark:     LDS Size [bytes/block]: 26628 [-Rpass-analysis=kernel-resource-usage]
