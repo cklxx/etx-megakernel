@@ -460,3 +460,13 @@ every descendant, re-scanning until no new pid appears, then SIGKILLs; it is a c
 stay its descendants, and the hard stop sweeps its own tree last. Repro: 0/0/0 survivors. A Linux-only regression test
 (`test_hard_stop_kills_children_forked_during_the_stop`) fails 3/3 on 2ef1e58 and passes 3/3 on 0a88e45. Local gates:
 238 passed, 1 skipped (that test, macOS has no /proc); `ds_hour.py --dry-run` in the container unchanged.
+
+## Review 10 (Astra re-check of 0a88e45): R15 and R01-R11, R13, R14 confirmed; R12 nested case -- fixed
+
+Astra confirmed R15 (fork race: 0/0/0 survivors; ten extra two-lane per-job-timeout and hard-stop cases: no late
+marker, no live or stopped survivor, no cross-lane kill) and both top-level R12 paths. Remaining: a failed re-fetch
+removed only the top-level manifests, so an earlier capture nested as `session-*/` (the runner's layout when its log
+directory is taken) still verified. Fetch now deletes every SHA256SUMS / SHA256SUMS.local under the destination before
+the transfer. Astra's nested repro, failed transfer: `nested_old_box_manifest_survived False`, `HOUR NOT VERIFIED`,
+exit 2 (was `HOUR VERIFIED`, exit 0); working transfer: `nested_old_session_removed True`, only `startup.NEW` left.
+First fetch and golden-cache copies unchanged (`review10-fetch-first-and-golden`: identical, verified, preserved).

@@ -161,10 +161,12 @@ def test_reused_fetch_drops_old_provenance_and_mirrors(tmp_path):
                ETX_FETCH_REUSE='1')
     dest = tmp_path / 'capture'
     dest.mkdir()
+    (dest / 'session-old').mkdir()
     for name in ('SHA256SUMS', 'SHA256SUMS.local', 'pairs_l1.json'):
         (dest / name).write_text('old\n')
+        (dest / 'session-old' / name).write_text('old\n')       # review 10: a nested earlier session too
     result = run_session(env, 'fetch', 'localhost', str(dest))
     assert result.returncode != 0
-    assert not (dest / 'SHA256SUMS').exists() and not (dest / 'SHA256SUMS.local').exists()
+    assert not list(dest.rglob('SHA256SUMS*'))
     first = (tmp_path / 'rsync-args').read_text().splitlines()[0]
     assert first.startswith('-az --delete --delete-excluded ')
