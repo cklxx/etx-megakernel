@@ -110,3 +110,12 @@ the slices are the +271 us (the shared down, 35.7 us per task against 17.5 for a
 | arm | what | rule (fixed now, before the code) |
 |---|---|---|
 | alld4r0 | all five levers + D4 placement, 0 slice rows; three-way default / all / alld4r0 | KEEP if every pair faster than `all`, median >= 30 us and > 2 x spread; 32/32 + 27/27 everywhere |
+
+## The deciding microbenchmark for a safe cheap acquire (rule written before the run)
+
+`bench/sync/sync_bench.hip loadscope`: the ping-pong with NO acquire invalidate and the payload read with plain (xn,
+control), sc0 (xl0) or sc1 (xl1) loads on one XCD, and sc1 (cl1) or sc0 sc1 (cl01) loads across XCDs behind a
+`buffer_wbl2 sc1` release. A mode is SAFE only with 0 stale words at 64 B, 8 KB and 64 KB over 2000 rounds, and only
+if `xn` goes stale in the same run (the check detects staleness). If xl1 is safe: next lever "D2b" = sc1 payload loads,
+no per-task invalidate, no per-task write-back (DEVICE events keep their flush). If only cl01 is safe: that is D2's
+form, measured at no gain, and the safe-acquire route is closed.

@@ -26,22 +26,41 @@
 
 #define CHECK(x) do { hipError_t e_ = (x); if (e_ != hipSuccess) { fprintf(stderr, "%s:%d %s: %s\n", __FILE__, __LINE__, #x, hipGetErrorString(e_)); exit(1); } } while (0)
 
-enum Mode { DEV = 0, UC = 1, LIGHT = 2, XCD = 3, UC1 = 4, XCD1 = 5 };
-static const char* mode_name[] = {"dev", "uc", "light", "xcd", "uc1", "xcd1"};
+enum Mode { DEV = 0, UC = 1, LIGHT = 2, XCD = 3, UC1 = 4, XCD1 = 5, XN = 6, XL0 = 7, XL1 = 8, CL1 = 9, CL01 = 10 };
+static const char* mode_name[] = {"dev", "uc", "light", "xcd", "uc1", "xcd1", "xn", "xl0", "xl1", "cl1", "cl01"};
+// Load-scope modes (2026-10-13, `sync_bench loadscope`): NO acquire invalidate; the consumer reads the payload with
+//   xn   plain loads, same XCD (control: must read stale, as xcd did)
+//   xl0  global_load sc0, same XCD          xl1  global_load sc1, same XCD
+//   cl1  global_load sc1, cross XCD, producer release buffer_wbl2 sc1
+//   cl01 global_load sc0 sc1, cross XCD, producer release buffer_wbl2 sc1 (D2's coherent_loads form)
+// The question: which load skips the consumer's stale L1 line (and, same XCD, still hits the shared L2), so that the
+// per-task buffer_inv sc1 (D1's safe acquire, 232 us/token) can go without D2's per-task write-back.
 // uc1 / xcd1: as uc / xcd but the acquire is buffer_inv sc1 (agent scope). Added 2026-09-27 after uc and xcd read stale
 // data at 64 B and 8 KB (not at 64 KB): the hypothesis is that buffer_inv sc0 (workgroup scope) does not invalidate
 // the vector L1 outside threadgroup-split mode, so a consumer re-reading the same lines sees its own stale L1 copy.
 static bool is_uc(int m) { return m == UC || m == UC1; }
-static bool is_xcd(int m) { return m == XCD || m == XCD1; }
+static bool is_xcd(int m) { return m == XCD || m == XCD1 || m == XN || m == XL0 || m == XL1; }
+static bool no_inv(int m) { return m >= XN; }
 
 __device__ __forceinline__ uint32_t xcc_id() { return __builtin_amdgcn_s_getreg((3 << 11) | (0 << 6) | 20) & 0xF; }
 __device__ __forceinline__ void release(int mode) {
-  if (mode == DEV) asm volatile("s_waitcnt vmcnt(0) lgkmcnt(0)\n\tbuffer_wbl2 sc1\n\ts_waitcnt vmcnt(0)" ::: "memory");
+  if (mode == DEV || mode == CL1 || mode == CL01) asm volatile("s_waitcnt vmcnt(0) lgkmcnt(0)\n\tbuffer_wbl2 sc1\n\ts_waitcnt vmcnt(0)" ::: "memory");
   else asm volatile("s_waitcnt vmcnt(0) lgkmcnt(0)" ::: "memory");
 }
 __device__ __forceinline__ void acquire(int mode) {
+  if (no_inv(mode)) return;
   if (mode == DEV || mode == UC1 || mode == XCD1) asm volatile("buffer_inv sc1" ::: "memory");
   else asm volatile("buffer_inv sc0" ::: "memory");
+}
+// payload load with the mode's cache bits (each load waited for: correctness test, so its one-way time is not
+// comparable with the plain-load modes)
+__device__ __forceinline__ int ld_payload(const int* p, int mode) {
+  int v;
+  if (mode == XL0) asm volatile("global_load_dword %0, %1, off sc0\n\ts_waitcnt vmcnt(0)" : "=v"(v) : "v"(p) : "memory");
+  else if (mode == XL1 || mode == CL1) asm volatile("global_load_dword %0, %1, off sc1\n\ts_waitcnt vmcnt(0)" : "=v"(v) : "v"(p) : "memory");
+  else if (mode == CL01) asm volatile("global_load_dword %0, %1, off sc0 sc1\n\ts_waitcnt vmcnt(0)" : "=v"(v) : "v"(p) : "memory");
+  else v = *p;
+  return v;
 }
 __device__ __forceinline__ int poll(const int* p) { return __hip_atomic_load(p, __ATOMIC_RELAXED, __HIP_MEMORY_SCOPE_AGENT); }
 __device__ __forceinline__ void post(int* p, int v) { __hip_atomic_store(p, v, __ATOMIC_RELAXED, __HIP_MEMORY_SCOPE_AGENT); }
@@ -80,7 +99,7 @@ __global__ void __launch_bounds__(1024) k_pingpong(int* pay_ab, int* pay_ba, int
         __syncthreads();
         if (!s_ok) { if (threadIdx.x == 0) { progress[0] = r; } return; }
         int bad = 0;
-        for (int i = threadIdx.x; i < words; i += blockDim.x) bad += in[i] != r;
+        for (int i = threadIdx.x; i < words; i += blockDim.x) bad += ld_payload(in + i, mode) != r;
         if (bad) atomicAdd(&s_err, bad);
         __syncthreads();
       }
@@ -195,9 +214,11 @@ int main(int argc, char** argv) {
   for (int i = 1; i < ncu; ++i) { if (wb_cross < 0 && xcc[i] != xcc[0]) wb_cross = i; if (wb_same < 0 && xcc[i] == xcc[0]) wb_same = i; }
   printf("workgroup 0 on XCD %u; cross partner %d (XCD %u), same partner %d\n", xcc[0], wb_cross, wb_cross >= 0 ? xcc[wb_cross] : 99, wb_same);
 
-  if (what == "all" || what == "pingpong") {
+  if (what == "all" || what == "pingpong" || what == "loadscope") {
     const int rounds = 2000;
-    for (int mode : {DEV, UC, LIGHT, XCD, UC1, XCD1}) for (int words : {16, 2048, 16384}) {
+    const std::vector<int> modes = what == "loadscope" ? std::vector<int>{XCD, XCD1, XN, XL0, XL1, DEV, CL1, CL01}
+                                                       : std::vector<int>{DEV, UC, LIGHT, XCD, UC1, XCD1};
+    for (int mode : modes) for (int words : {16, 2048, 16384}) {
       const bool uc = is_uc(mode);
       int* ab = alloc(words * 4, uc); int* ba = alloc(words * 4, uc); int* fl = alloc(128 * 4, false);   // flags: ordinary memory, like ETX's event words
       int *err = alloc(8, false), *prog = alloc(4, false); unsigned long long* ticks; CHECK(hipMalloc(&ticks, 32));
