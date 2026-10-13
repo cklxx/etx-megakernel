@@ -470,3 +470,12 @@ directory is taken) still verified. Fetch now deletes every SHA256SUMS / SHA256S
 the transfer. Astra's nested repro, failed transfer: `nested_old_box_manifest_survived False`, `HOUR NOT VERIFIED`,
 exit 2 (was `HOUR VERIFIED`, exit 0); working transfer: `nested_old_session_removed True`, only `startup.NEW` left.
 First fetch and golden-cache copies unchanged (`review10-fetch-first-and-golden`: identical, verified, preserved).
+
+## Review 11 (Astra re-check of 18f4f51): R12 symlinked destination -- fixed
+
+Nested and top-level R12 paths, path safety (outside targets, whitespace/newline paths, non-manifests) and first fetch /
+golden cache confirmed. Remaining: `find "$DEST"` did not enter a destination that is itself a symlink (no trailing
+slash), so a failed re-fetch left that capture certifiable. Now `find -H "$DEST" -mindepth 1 ...` (the starting path is
+followed, links below it are not; DEST itself is never a target). Astra's symlink repro: `current` and
+`current-trailing-slash` both `verify_hour_exit 2`, `old_box_manifest_survived False` (was exit 0, True); all PATH
+SAFETY checks True; macOS `find` with the same flags leaves no manifest.

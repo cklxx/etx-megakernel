@@ -94,8 +94,9 @@ REMOTE
     mkdir -p "$DEST"
     # the provenance of an earlier capture goes before anything is transferred: if this fetch fails half-way, the
     # directory has no box manifest and cannot verify as this box's capture (review 09, R12) -- at any depth: the
-    # runner nests a session-*/ directory when its log directory is taken (review 10, R12)
-    find "$DEST" \( -name SHA256SUMS -o -name SHA256SUMS.local \) ! -type d -exec rm -f {} +
+    # runner nests a session-*/ directory when its log directory is taken (review 10, R12); -H: a DEST that is itself
+    # a symlink is entered (links below it are not followed), -mindepth 1: never DEST itself (review 11, R12)
+    find -H "$DEST" -mindepth 1 \( -name SHA256SUMS -o -name SHA256SUMS.local \) ! -type d -exec rm -f {} +
     # build records (plans, resources, generated kernels) are part of the result; only the binaries and patched
     # source copies stay on the box (review 07, R03). The box's SHA256SUMS is verified, never overwritten (R04).
     # an exact mirror of the box's session directory (minus the excluded): nothing from an earlier capture -- an old

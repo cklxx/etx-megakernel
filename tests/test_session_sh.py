@@ -170,3 +170,19 @@ def test_reused_fetch_drops_old_provenance_and_mirrors(tmp_path):
     assert not list(dest.rglob('SHA256SUMS*'))
     first = (tmp_path / 'rsync-args').read_text().splitlines()[0]
     assert first.startswith('-az --delete --delete-excluded ')
+
+
+def test_reused_fetch_through_a_symlinked_destination_drops_old_provenance(tmp_path):
+    # review 11, R12: DEST given as a symlink (no trailing slash) to an earlier capture
+    stub(tmp_path, 'rsync', 'exit 23')
+    env = dict(os.environ, HOME=str(tmp_path), PATH=str(tmp_path / 'bin') + ':' + os.environ['PATH'],
+               ETX_FETCH_REUSE='1')
+    real = tmp_path / 'real'
+    (real / 'session-old').mkdir(parents=True)
+    for d in (real, real / 'session-old'):
+        (d / 'SHA256SUMS').write_text('old\n')
+        (d / 'SHA256SUMS.local').write_text('old\n')
+    (tmp_path / 'capture').symlink_to(real)
+    result = run_session(env, 'fetch', 'localhost', str(tmp_path / 'capture'))
+    assert result.returncode != 0
+    assert (tmp_path / 'capture').is_symlink() and not list(real.rglob('SHA256SUMS*'))
