@@ -98,3 +98,89 @@ session machinery; "model" = a patch of one model's tiles or graph (`examples/ds
 5. **G2:** the multi-request graph as a generic plan option (larger batches), on the register budget it needs.
 
 Nothing in this order changes weight precision.
+
+## 4. Can the generic-path levers be DIRECTLY reusable? Classification and plan (2026-10-13, kailun)
+
+**The criterion for "reusable": ONE mode, TWO models, zero per-model patch, measured under ONE decision rule.** One
+mode = one switch spelled once, in the compiler / plan / runtime, that every graph builder inherits. Two models = it
+is built and measured on two different model graphs. Zero per-model patch = flipping it edits no model file. One
+rule = the same pre-registered KEEP / NO-GO rule, same basis, on both. Anything less is "a mechanism that could be
+reused", not "reusable".
+
+Three classes. Facts used: `examples/vllm_llm/model.py` is the SHARED graph builder of the generic family (Qwen2.5/3,
+Mixtral, PhiMoE, from configs; its docstring and lines 113, 246, 361, 449-460), not one model's file;
+`examples/dsv2lite/` is DeepSeek-only (fleet tiles). Both compile through `python -m etx compile` (`etx/tools/cli.py`).
+
+- **(a) reusable now**: mechanism in `etx/` AND switched by the plan / feature manifest (`etx/codegen/manifest.py`), so
+  a new model inherits it with no patch.
+- **(a') reusable mechanism, per-builder switch**: mechanism in `etx/`, but the switch is an `ETX_VL_*` (or
+  `ETX_DSV2_*`) variable read by one builder. Lifting = move the switch into the plan options / manifest. Cheap.
+- **(b) model patch**: the mechanism itself is a patch of one model's files. Lifting = re-implement it in `etx/`.
+
+| row | class | why (location of mechanism / switch) | lift |
+|---|---|---|---|
+| D1 acquire default | a | codegen default (`etx/runtime`, lowering); relaxed is a compile flag | — |
+| D2 `coherent_loads` | a' / b | compiler mode (a); its use is decided in `dsv2lite/graph.py` (`ETX_DSV2_COH`) and the accessors are a fleet lever (b) | closed NO-GO; nothing to lift |
+| D2b `coherent_l1` | a' / b | compiler mode (a); switch `ETX_DSV2_COH=l1` (a'); accessors: fleet lever `l1_loads` (b); the DSL ops have no agent-scope variant | **G6** |
+| D3 K-chunks | b | fleet in-body counters, dsv2 shim wrappers | IR chunked edges (later) |
+| D4 / D4s placement | b + a(check idea) | dsv2 graph + shim; the check is `dsv2lite/d4_placement.py` | G4 (IR validator rule) |
+| D5 prefetch | a' / b | p7 + hook are `etx/` (a); switch `ETX_DSV2_D5` (a'); body `fleet_d5.hip` (b) | switch -> plan option; body -> DSL `touch` |
+| L1-L7 fleet levers | b | patches of a fleet copy | retire with G1 |
+| T1 toolchain | a | build image | — |
+| M1 stamps / stage table | b | `dsv2lite/ledger.py`, phase names | `etx/tools/timeline.py` is the system form |
+| M2 verdict / gates / hashes | b (logic is model-agnostic) | `dsv2lite/inplace_session.py` | G5 |
+| Q1 KEY32 | a' | `etx/ops/topk*.py`, `tile_util.h`; switch via `ETX_VL_*` / `ETX_TOPK_KEY32` in the vllm builder | switch -> manifest |
+| Q2 interleaved rows | (absent) | would be a variant in `etx/ops/gemv.py` + `etx/select/variants.py` | build it as (a): second experiment |
+| Q3 attention tile | (absent) | would be an `etx/ops` family | G1 shares it (MLA) |
+| Q4 / A1 host reset | a | `etx` runtime / host | — |
+| Q5 GEMV body | a | `etx/ops/gemv.py` | — |
+| A2 / C6 head-local protocol | b | `examples/vllm_llm/head_local_protocol.py` | protocol -> compiler |
+| A3 / P prep order | a | `etx/ops/attnprep.py` | — |
+| A4 / C5 norm hoist | a' | `etx/ops/local_fold.py`, `gemv.py`; switch `-DETX_DSL_NORM_HOIST` from the vllm build | switch -> manifest |
+| A5 / C1 narrow router | a' | `etx/ops/gemv.py`; switch `ETX_VL_ROUTER_NARROW` in `vllm_llm/model.py` | switch -> plan option |
+| A6 MoE-up layout | a (if built) | `etx/ops/gemv.py` | — |
+| R / T / A issue order | a | `etx/ops` | — |
+| B1 vendor attention | a | `etx/importer` | closed |
+| B2/B3 / X7 layout | b | `apply_layout.py` hook, not wired | -> scheduler pass |
+| I1 import CK MoE | a | `etx/importer` | — |
+| H1 resident loop | a | runtime | closed |
+| X1 cross-phase prefetch | a (not built) | scheduler | — |
+| touch / argpf / bar2 / chain / xcd | a' | `etx/codegen/kernel.py`, `etx/ops`; switches `ETX_VL_*` in the vllm builder | switch -> plan option |
+| G2 multi-request | a' | plan supports requests; switches `ETX_VL_REQUESTS` / `ETX_DSV2_REQUESTS` | one plan option |
+
+Count: of the rows with a built mechanism, most generic-path levers are (a) or (a'); the DeepSeek fleet-path items are
+(b) by construction. The cheapest systemic step is therefore to lift switches (a' -> a); the first experiment lifts
+the one with a measured payoff: `coherent_l1`.
+
+### 4.1 G6 -- `coherent_l1` as ONE compiler mode on Qwen AND DeepSeek (thresholds written before the code)
+
+Design:
+- **One switch, in the compiler**: `PassOptions.coherence` / `etx compile --coherence {declared,l1}`, default from the
+  environment variable `ETX_COHERENCE` (unset = `declared` = today, byte-identical). With `l1`, every grid whose tile
+  declares the capability gets `coherence="coherent_l1"`; others are untouched.
+- **Capability, declared by the tile family, not the model**: `TileBody.coherence_caps`. The DSL family declares it
+  in the shared builder's tile constructor (`coh_of` in `examples/vllm_llm/model.py`, one place for every generic
+  model); the fleet family in `examples/dsv2lite/graph.py` `_tile`.
+- **Accessors**: DSL ops get an agent-scope variant of `etx/ops/coh.py` (loads `sc1` through address_space(1), stores
+  plain), published by the plan through the feature manifest (`coh_l1` -> `ETX_DSL_COH_L1`; takes precedence over
+  `ETX_DSL_COH`). Fleet tiles use the existing `l1_loads` lever, which the DeepSeek build adds whenever the plan is
+  `l1` (one rule in `examples/dsv2lite/build.sh`); `coh_check.py` keeps refusing a plan without its tiles.
+- Basis for safety: the loadscope bench (sc1 loads, no invalidate: 0 stale words, run 5).
+
+**One decision rule for both models** (device time; 5 interleaved rounds, order reversed on odd rounds): the arm is
+the model's reference build with `ETX_COHERENCE=l1`, the reference is the same build without it. **KEEP if every
+pair is faster, median >= 30 us and median > 2 x spread; otherwise NO-GO.** Every invocation must pass the model's
+correctness gates: DeepSeek 32/32 tokens + 27/27 layers; Qwen 32/32 tokens + the same-build import certificate (97/97,
+`examples/vllm_llm/import_certificate.py`). References: DeepSeek `default` (and, separately, `alld4r0`); Qwen the
+kept build (`examples/vllm_llm/kept_build.py`). Reusability (the criterion) needs the mode to build and pass the gates
+on both with the one switch; a performance claim needs KEEP on both.
+
+CPU proof before any box: default plans byte-identical (DeepSeek 09011c20; Qwen's kept-build plan hash recorded before
+the change); both models compile with `ETX_COHERENCE=l1` and nothing else changed; the generated code has no acquire
+on the declared tiles and no added write-back; ROCm 7.2.4 builds at 0 scratch; negative tests: a plan in `l1` with
+tiles lacking the accessors is refused at build time for both families.
+
+### 4.2 Q2 -- interleaved GEMV rows (second, if cheap)
+
+A new row-ownership variant in `etx/ops/gemv.py` registered in `etx/select/variants.py` (class a from birth); its rule
+and cost estimate get written here before its code.
