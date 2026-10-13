@@ -80,9 +80,9 @@ SINGLE = ("Q", "Qall", "N", "Nall", "argmax", "topk", "prep", "relaxed")
 STAMPED = ("default", "all")
 TRACEABLE = (*STAMPED, "alld4r0", "alld4r0l1")    # arms whose stamped build a session may trace (the new arms' stages)
 DATA_FILES = ("weights.bin", "weights.bin.manifest", "fleet_cache.bin", "golden_tokens.txt", "golden_hidden.bin")
-# The measured inputs (2026-10-13 session, committed): preflight refuses anything else. prep_sums rewrites the box's
-# SHA256SUMS from whatever is on disk, so that file alone cannot tell a stale or different input (review 07, R09); the
-# model download does not pin a revision, and these hashes are what identify it.
+# The measured inputs (2026-10-13 session, committed) ARE the inputs' identity: preflight compares the bytes on the box
+# with these and nothing else (no checksum file regenerated on the box can vouch for them: review 07, R09). The model
+# download does not pin a revision; these hashes identify it.
 PINNED_INPUTS = json.loads((Path(__file__).resolve().parent / "results/2026-10-13-ds_inplace/inputs.json").read_text())["sha256"]
 GO_US = 70.0
 
@@ -202,30 +202,6 @@ def full_result(log: str) -> dict:
 D4_STAGE_NOTE = ("D4 arms: topk = the ROUTED XCDs' routing prologue (only routed gate_up tasks write stamps); moe_up and "
                  "moe_down are the merged routed + shared-XCD phases (shgu / sdown join gate_up / down), so their "
                  "bodies include the shared XCDs while the topk split does not. Span, stage sums and verdicts are exact.")
-
-
-def tree_hash(root: Path) -> str:
-    """sha256 over `sha256  path` lines of the tracked files listed in SOURCE_FILES (stage_inplace.sh writes it in
-    `git ls-files` order) -- the same bytes as `xargs -0 sha256sum < list | sha256sum` on the box."""
-    lines = []
-    for name in (root / "SOURCE_FILES").read_text().splitlines():
-        if name:
-            lines.append(f"{hashlib.sha256((root / name).read_bytes()).hexdigest()}  {name}\n")
-    return hashlib.sha256("".join(lines).encode()).hexdigest()
-
-
-def untracked_entries(root: Path) -> list[str]:
-    """Every non-directory entry under root (files AND symlinks) that SOURCE_FILES does not list, outside the box's own
-    .venv and build/, __pycache__ and the two staging records."""
-    listed = set((root / "SOURCE_FILES").read_text().splitlines())
-    out = []
-    for p in root.rglob("*"):
-        rel = p.relative_to(root)
-        if rel.parts[0] in (".venv", "build") or "__pycache__" in rel.parts or p.is_dir() and not p.is_symlink():
-            continue
-        if str(rel) not in listed and str(rel) not in ("SOURCE_FILES", "SOURCE_IDENTITY"):
-            out.append(str(rel))
-    return sorted(out)
 
 
 def arm_order(arm: str, fleet_available: bool = True) -> tuple[tuple, tuple, str]:
@@ -350,17 +326,13 @@ class Session:
         return self.logs / f"b_{arm}{'_stamps' if stamped else ''}"
 
     def source_identity(self) -> str:
-        """The pushed tree has no .git: stage_inplace.sh writes the clean commit it pushed to SOURCE_IDENTITY."""
+        """`tools/session.sh stage` extracts the archive of a clean commit, after checking its hash, into a NEW
+        directory named by that hash: the tree that runs is that archive and nothing else (R08 by construction)."""
         path = self.root / "SOURCE_IDENTITY"
         text = path.read_text() if path.is_file() else ""
-        if not re.search(r"^commit [0-9a-f]{40}$", text, re.M) or not re.search(r"^dirty 0$", text, re.M):
-            raise RuntimeError(f"missing or dirty {path}: stage the box with examples/dsv2lite/stage_inplace.sh")
-        m = re.search(r"^tree ([0-9a-f]{64})$", text, re.M)
-        if not m or tree_hash(self.root) != m.group(1):         # review 07, R08: the marker alone proved nothing
-            raise RuntimeError(f"{self.root} is not the staged tree recorded in {path} (tree hash): restage the box")
-        extra = untracked_entries(self.root)                     # review 08, R08: e.g. a symlinked yaml.pyc
-        if extra:
-            raise RuntimeError(f"{self.root} holds entries that are not in SOURCE_FILES ({extra[:5]}): restage the box")
+        m = re.search(r"^archive ([0-9a-f]{64})$", text, re.M)
+        if not re.search(r"^commit [0-9a-f]{40}$", text, re.M) or not m or not self.root.name.startswith(m[1] + "-"):
+            raise RuntimeError(f"{self.root} is not a staged archive (SOURCE_IDENTITY): run tools/session.sh stage")
         return text
 
     def source(self):
@@ -382,29 +354,18 @@ class Session:
         print(f"SOURCE OK fleet export {PINNED_SRC_SHA256[:16]} etx {identity.split()[1][:12]}", flush=True)
 
     def preflight(self):
-        manifest = {}
-        for line in (self.data / "SHA256SUMS").read_text().splitlines():
-            match = re.fullmatch(r"([0-9a-f]{64}) [ *](.+)", line)
-            if match:
-                manifest[match[2].removeprefix("./")] = match[1]
         actual = {}
         for name in DATA_FILES:
             path = self.data / name
-            if name not in manifest or not path.is_file() or not path.stat().st_size:
-                raise RuntimeError(f"missing input or trusted checksum: {path}")
+            if not path.is_file():
+                raise RuntimeError(f"missing input: {path}")
             print(f"PREFLIGHT hashing {path} bytes={path.stat().st_size}", flush=True)
             actual[name] = sha(path)
-            if actual[name] != manifest[name]:
-                raise RuntimeError(f"input checksum mismatch: {path}")
             if actual[name] != PINNED_INPUTS[name]:
                 raise RuntimeError(f"input {name} is not the measured one ({actual[name][:16]} vs pinned "
                                    f"{PINNED_INPUTS[name][:16]}): a different experiment; refused")
-        if len((self.data / "golden_tokens.txt").read_text().split()) < 33:
-            raise RuntimeError("golden needs 33 tokens for 32 decode comparisons")
-        if (self.data / "golden_hidden.bin").stat().st_size != 27 * 2048 * 4:
-            raise RuntimeError("hidden golden is not 27 x 2048 fp32")
         write_json(self.logs / "inputs.json", dict(data=str(self.data), sha256=actual))
-        print("PREFLIGHT OK inputs match their SHA256SUMS and the pinned measured inputs", flush=True)
+        print("PREFLIGHT OK inputs are the pinned measured inputs", flush=True)
 
     def build(self, arm: str, stamped: bool = False):
         out = self.out(arm, stamped)

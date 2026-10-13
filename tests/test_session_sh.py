@@ -85,11 +85,6 @@ def test_preflight_failed_checks(remote, failure):
     assert f'PREFLIGHT FAIL {"pushed-tree" if failure == "headers" else "container"}:' in result.stdout
 
 
-def postmortem_env(tmp_path, fail=False):
-    stub(tmp_path, 'rsync', 'exit ' + ('1' if fail else '0'))
-    return dict(os.environ, HOME=str(tmp_path), PATH=str(tmp_path / 'bin') + ':' + os.environ['PATH'])
-
-
 def capture(dest):
     dest.mkdir(parents=True)
     (dest / 'status.json').write_text(json.dumps([
@@ -100,73 +95,104 @@ def capture(dest):
     (dest / 'runner.log').write_text('[23:59:00 +  0m00s] start\n[00:01:31 +  2m31s] session done\n')
 
 
-def test_postmortem_skipped_missing_log(tmp_path):
-    dest = tmp_path / 'capture'
-    capture(dest / 'session-one')
-    result = run_session(postmortem_env(tmp_path), 'postmortem', 'localhost', str(dest))
+def report(dest):
+    return subprocess.run(['python3', str(ROOT / 'tools/session_postmortem.py'), str(dest)], text=True,
+                          capture_output=True)
+
+
+def test_postmortem_report_names_failed_skipped_and_missing(tmp_path):
+    capture(tmp_path / 'one')
+    result = report(tmp_path)
     assert result.returncode == 1
-    assert 'JOB build status=fail' in result.stdout
-    assert '# exact build command' in result.stdout
-    assert '0\n1\n2\n3\n4' in result.stdout
-    assert 'JOB gate status=skip' in result.stdout
-    assert f'UNCAPTURED {dest}/session-one/gate.log' in result.stdout
-    assert ': 2.52 (captured runner span' in result.stdout
+    for line in ('JOB build status=fail', '# exact build command', '0\n1\n2\n3\n4', 'JOB gate status=skip',
+                 f'UNCAPTURED {tmp_path}/one/gate.log', ': 2.52 (captured runner span'):
+        assert line in result.stdout
     assert 'JOB good' not in result.stdout
-
-
-def test_postmortem_complete(tmp_path):
-    dest = tmp_path / 'capture'
-    capture(dest)
-    (dest / 'gate.log').write_text('# job gate\n# skipped command\n')
-    result = run_session(postmortem_env(tmp_path), 'postmortem', 'localhost', str(dest))
-    assert result.returncode == 0
-    assert 'UNCAPTURED' not in result.stdout
-
-
-def test_postmortem_missing_tree_and_failed_fetch(tmp_path):
-    dest = tmp_path / 'empty'
-    result = run_session(postmortem_env(tmp_path, fail=True), 'postmortem', 'localhost', str(dest))
-    assert result.returncode == 1
-    for suffix in (' (fetch failed)', '/status.json', '/runner.log'):
-        assert f'UNCAPTURED {dest}{suffix}' in result.stdout
+    (tmp_path / 'one/gate.log').write_text('# job gate\n# skipped command\n')
+    assert report(tmp_path).returncode == 0
 
 
 @pytest.mark.parametrize('missing', ['status.json', 'runner.log', 'build.log'])
-def test_postmortem_partial(tmp_path, missing):
-    dest = tmp_path / 'capture'
-    capture(dest)
-    (dest / missing).unlink()
-    result = run_session(postmortem_env(tmp_path), 'postmortem', 'localhost', str(dest))
-    assert result.returncode == 1
-    assert f'UNCAPTURED {dest}/{missing}' in result.stdout
+def test_postmortem_report_partial(tmp_path, missing):
+    capture(tmp_path / 'c')
+    (tmp_path / 'c' / missing).unlink()
+    (tmp_path / 'c/gate.log').write_text('# job gate\n# skipped command\n')
+    result = report(tmp_path / 'c')
+    assert result.returncode == 1 and f'UNCAPTURED {tmp_path}/c/{missing}' in result.stdout
 
 
-def test_fetch_keeps_stage_b_logs(tmp_path):
-    stub(tmp_path, 'rsync', 'printf "%s\\n" "$*" >> "$HOME/rsync-args"')
+@pytest.fixture
+def box(tmp_path):
+    """The box is this machine under HOME=tmp_path: ssh runs its command locally, rsync drops the host prefix."""
+    stub(tmp_path, 'ssh', 'shift 5; exec bash -c "$*"')
+    stub(tmp_path, 'rsync', 'a=(); for x in "$@"; do a+=("${x/#*@localhost:/$HOME/}"); done; exec /usr/bin/rsync "${a[@]}"')
     env = dict(os.environ, HOME=str(tmp_path), PATH=str(tmp_path / 'bin') + ':' + os.environ['PATH'])
-    result = run_session(env, 'fetch', 'localhost', str(tmp_path / 'capture'))
-    assert result.returncode == 0
-    first = (tmp_path / 'rsync-args').read_text().splitlines()[0]
-    # review 07, R03: build records are part of the result -- only binaries, patched sources and objects stay on the
-    # box; stage-B logs named b_* (b_r1_C2.log) are files and still retained
-    assert "--exclude b_*/run " in first and "--exclude b_*/fleet_src/ " in first and "--exclude *.o " in first
-    assert "--exclude b_*/ " not in first
+    return tmp_path, env
 
 
-def test_reused_fetch_drops_old_provenance_and_mirrors(tmp_path):
-    # review 09, R12: a postmortem re-fetch over an earlier capture must not leave that capture's box manifest behind,
-    # neither when the transfer fails (no manifest -> NOT VERIFIED) nor when it works (an exact mirror of the new box)
-    stub(tmp_path, 'rsync', 'printf "%s\\n" "$*" >> "$HOME/rsync-args"; exit 23')
-    env = dict(os.environ, HOME=str(tmp_path), PATH=str(tmp_path / 'bin') + ':' + os.environ['PATH'],
-               ETX_FETCH_REUSE='1')
+def sealed_session(tmp_path, cmd):
+    import sys
+    session = tmp_path / 'session.py'
+    session.write_text(f'JOBS = [dict(name="work", lane="cpu", cmd={cmd!r})]\n')
+    subprocess.run([sys.executable, '-m', 'etx.tools.gpu_jobs', str(session), '--gpus', '', '--logdir',
+                    str(tmp_path / 'sess')], cwd=ROOT, check=False, capture_output=True, timeout=30)
+    return max((tmp_path / 'sess').iterdir())
+
+
+def test_fetch_copies_one_sealed_record_into_its_own_directory(box):
+    tmp_path, env = box
+    rec = sealed_session(tmp_path, 'mkdir -p "$ETX_SESS_LOGDIR/b_x" && echo plan > "$ETX_SESS_LOGDIR/b_x/plan.json" '
+                                   '&& echo bin > "$ETX_SESS_LOGDIR/b_x/run" && echo r > "$ETX_SESS_LOGDIR/pairs_x.json"')
     dest = tmp_path / 'capture'
-    dest.mkdir()
-    (dest / 'session-old').mkdir()
-    for name in ('SHA256SUMS', 'SHA256SUMS.local', 'pairs_l1.json'):
-        (dest / name).write_text('old\n')
-        (dest / 'session-old' / name).write_text('old\n')       # review 10: a nested earlier session too
     result = run_session(env, 'fetch', 'localhost', str(dest))
-    assert result.returncode != 0
-    assert not list(dest.rglob('SHA256SUMS*'))
-    first = (tmp_path / 'rsync-args').read_text().splitlines()[0]
-    assert first.startswith('-az --delete --delete-excluded ')
+    assert result.returncode == 0, result.stdout + result.stderr
+    got = dest / rec.name
+    assert (got / 'b_x/plan.json').exists() and not (got / 'b_x/run').exists()        # R03: binaries stay
+    assert 'VERIFIED' in result.stdout and '1 left on the box by design' in result.stdout
+    assert run_session(env, 'fetch', 'localhost', str(dest)).returncode == 2          # R12: never onto a copy
+    (got / 'pairs_x.json').write_text('changed\n')                                    # R04: the copy is checked
+    (got / 'stale.json').write_text('{}')                                              # R12: nothing unsealed counts
+    out = subprocess.run(['python3', str(ROOT / 'etx/session/record.py'), 'verify', str(got)], text=True,
+                         capture_output=True).stdout
+    assert 'MISMATCH pairs_x.json' in out and 'NOT IN THE SEALED MANIFEST stale.json' in out
+
+
+def test_incomplete_unsealed_and_absent_records_are_never_results(box):
+    tmp_path, env = box
+    rec = sealed_session(tmp_path, 'exit 3')                                       # R13: a job not ok
+    assert run_session(env, 'fetch', 'localhost', str(tmp_path / 'a')).returncode == 3
+    (tmp_path / 'sess' / 'unsealed').mkdir()                                       # the runner died: no SEAL
+    (tmp_path / 'sess' / 'unsealed' / 'pairs_x.json').write_text('{}')
+    result = run_session(env, 'fetch', 'localhost', str(tmp_path / 'a'), 'unsealed')
+    assert result.returncode == 3 and 'UNSEALED' in result.stdout
+    for d in ('sess/unsealed', f'sess/{rec.name}'):
+        subprocess.run(['rm', '-rf', str(tmp_path / d)], check=True)
+    (tmp_path / 'sess/startup.abc').write_text("ModuleNotFoundError: No module named 'etx'\n")
+    result = run_session(env, 'postmortem', 'localhost', str(tmp_path / 'pm'))       # R12: startup-failed box
+    assert result.returncode == 1 and 'NO RECORD' in result.stdout and 'UNCAPTURED' in result.stdout
+    assert "No module named 'etx'" in result.stdout
+
+
+def test_stage_extracts_the_commit_into_a_new_directory(box, tmp_path):
+    tmp, env = box
+    repo = tmp / 'repo'
+    (repo / 'tools').mkdir(parents=True)
+    (repo / 'tools/session.sh').write_bytes((ROOT / 'tools/session.sh').read_bytes())
+    (repo / '.gitignore').write_text('*.pyc\n')
+    git = lambda *a: subprocess.run(['git', '-C', str(repo), *a], check=True, capture_output=True)
+    git('init', '-q'); git('add', '.'); git('-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', 'x')
+    (repo / 'yaml.pyc').write_text('ignored, untracked')                           # R08: never staged
+    (tmp / 'etx').mkdir()
+    (tmp / 'etx/yaml.pyc').symlink_to(tmp / 'elsewhere')                            # R08': a used box's tree
+    result = subprocess.run(['bash', str(repo / 'tools/session.sh'), 'stage', 'localhost'], env=env, text=True,
+                            capture_output=True)
+    assert result.returncode == 0, result.stdout + result.stderr
+    staged = (tmp / 'etx').resolve()
+    assert sorted(p.name for p in staged.iterdir()) == ['.gitignore', 'SOURCE_IDENTITY', 'tools']
+    from examples.dsv2lite.inplace_session import Session
+    s = object.__new__(Session)
+    s.root = staged
+    assert 'archive ' + staged.name[:64] in s.source_identity()
+    (repo / '.gitignore').write_text('changed\n')                                  # an uncommitted change: refused
+    assert subprocess.run(['bash', str(repo / 'tools/session.sh'), 'stage', 'localhost'], env=env,
+                          capture_output=True).returncode == 2

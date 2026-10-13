@@ -22,11 +22,11 @@ plus builds' tail: ~45-60 min total.
 Inputs are prepared ON THE BOX by the prep_* jobs (the ds_gap.py recipes): docs/DATA.md:59-64 says the fleet reference
 outputs (~70 MB, ~2 GPU minutes) and the packed weights (31 GB, ~1 min download + ~1 min pack) were never kept. Both
 come from the PINNED fleet export (ETX_DSV2_FLEET, default ~/fleet-3fb67a6, src hash verified by `source`) and
-deepseek-ai/DeepSeek-Coder-V2-Lite-Base, into ETX_DSV2_DATA (default ~/dsv2-data); SHA256SUMS is written and
-`preflight` re-verifies every file before the first timed run.
+deepseek-ai/DeepSeek-Coder-V2-Lite-Base, into ETX_DSV2_DATA (default ~/dsv2-data); `preflight` compares every file
+with the pinned measured hashes before the first timed run.
 
 Run (after local validation, balance check and budget authorization):
-  examples/dsv2lite/stage_inplace.sh <ip> && ETX_SESS_MAX_SECONDS=7200 tools/session.sh start <ip> examples/sessions/ds_inplace.py 0
+  examples/dsv2lite/reproduce.sh stage <ip> && ETX_SESS_MAX_SECONDS=7200 tools/session.sh start <ip> examples/sessions/ds_inplace.py 0
 Use --dry-run locally. Fetch the session directory into the tree before deleting the VM; delete it right after.
 """
 MAX_SESSION_SECONDS = 7200
@@ -83,9 +83,7 @@ job("prep_ref", 'mkdir -p "$ETX_DSV2_DATA" && cd "$ETX_DSV2_FLEET" && '
 job("prep_pack", 'cd "$ETX_DSV2_FLEET" && { test -s "$ETX_DSV2_DATA/weights.bin" -a -s "$ETX_DSV2_DATA/weights.bin.manifest" || '
                  f'{PREP_PY} src/host/pack_weights.py --model {MODEL} --out "$ETX_DSV2_DATA/weights.bin"; }} '
                  '&& ls -la "$ETX_DSV2_DATA"', after=("prep_ref",), timeout=1200, summary=[r"wrote |expert stride"])
-job("prep_sums", 'cd "$ETX_DSV2_DATA" && sha256sum weights.bin weights.bin.manifest fleet_cache.bin golden_tokens.txt '
-                 'golden_hidden.bin > SHA256SUMS && cat SHA256SUMS', after=("prep_pack",), timeout=600)
-add("preflight", "preflight", after=("prep_sums",), timeout=600)
+add("preflight", "preflight", after=("prep_pack",), timeout=600)
 
 # ---------------------------------------------------------------- builds (cpu, while the inputs are prepared)
 DITEMS = ("coh", "d4")   # D2: three-way pairs default / relaxed / coh; D4: pairs default / d4 (docs/DSV2-D1-D5.md)

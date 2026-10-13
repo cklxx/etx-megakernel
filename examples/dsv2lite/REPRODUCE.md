@@ -95,7 +95,7 @@ HIP-HEADERS-OK
 SOURCE OK fleet export 28f5cbb4f39524df etx <commit>
       smallest top-2 margin over the run: 6.6250
 wrote /root/dsv2-data/weights.bin (31.41 GB) ...
-PREFLIGHT OK inputs match their SHA256SUMS
+PREFLIGHT OK inputs are the pinned measured inputs
 BUILD arm=default stamped=0 resources={'vgpr': 256, 'agpr': 56, 'sgpr': 108, 'scratch': 0, 'lds': 26668, 'occupancy': 1}
 BUILD arm=all stamped=0 resources={'vgpr': 256, 'agpr': 104, 'sgpr': 108, 'scratch': 0, 'lds': 26668, 'occupancy': 1}
 PAIRS arm=baseline device gain vs default median 139.0 us spread 20.0 every_positive=1 GO=None
@@ -129,6 +129,6 @@ logs). STAGES printed `skipped` there: the two STAMPS2 stamp files exist only in
 
 ## Files
 
-`reproduce.sh` (entry point), `stage_inplace.sh` (staging), `../sessions/ds_inplace.py` (job graph), `inplace_session.py`
+`reproduce.sh` (entry point), `../../tools/session.sh stage` (staging), `../sessions/ds_inplace.py` (job graph), `inplace_session.py`
 (each job), `rederive.py` (verdicts from raw logs), `stage_table.py` + `replay.py` (expected values),
 `pinned.py` (fleet export + data sets), `verify_lever.py` (per-lever local records), `followup_2026_10_13.py`.

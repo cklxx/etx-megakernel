@@ -1,7 +1,7 @@
 """D2b session (thresholds: docs/DSV2-D1-D5.md, "D2b"): l1 (three-way default / relaxed / l1, D2's rule) and
 alld4r0l1 (three-way default / alld4r0 / alld4r0l1, KEEP vs alld4r0). The full prep chain of ds_inplace.py runs first
 (idempotent on a box that already has the inputs), so this file works on a fresh droplet.
-Run: examples/dsv2lite/stage_inplace.sh <ip> && examples/dsv2lite/reproduce.sh box-setup <ip> &&
+Run: examples/dsv2lite/reproduce.sh stage <ip> && examples/dsv2lite/reproduce.sh box-setup <ip> &&
      ETX_SESS_USER=root ETX_SESS_MAX_SECONDS=3600 tools/session.sh start <ip> examples/sessions/ds_d2b.py
 """
 import importlib.util
@@ -12,7 +12,7 @@ _full = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_full)
 
 MAX_SESSION_SECONDS = 3600
-PREP = ("apt", "etx_env", "prep_env", "source", "prep_dl", "prep_ref", "prep_pack", "prep_sums", "preflight",
+PREP = ("apt", "etx_env", "prep_env", "source", "prep_dl", "prep_ref", "prep_pack", "preflight",
         "build_default", "build_all", "build_relaxed")
 JOBS = [dict(d) for d in _full.JOBS if d["name"] in PREP]
 _full.JOBS.clear()

@@ -133,61 +133,35 @@ def test_status_atomic_replace(tmp_path, monkeypatch):
     assert json.loads((tmp_path / "status.json").read_text())[0]["status"] == "fail"
 
 
-def test_follow_on_session_preserves_parent_logs(tmp_path):
-    import os
-    from pathlib import Path
+def test_every_session_gets_a_new_sealed_record(tmp_path):
     import subprocess
-    import sys
-
-    session = tmp_path / "session.py"
-    logdir = tmp_path / "logs"
+    from etx.session import record
+    session, root = tmp_path / "session.py", tmp_path / "sess"
     env = dict(os.environ, PYTHONPATH=str(Path(gj.__file__).resolve().parents[2]))
-
-    def start(marker):
-        # Same job name deliberately exercises job-log preservation as well.
+    for marker in ("first", "second"):          # same job name, same --logdir: two records, the first untouched
         session.write_text(f'JOBS = [dict(name="probe", lane="cpu", cmd="echo {marker}")]\n')
-        result = subprocess.run(
-            [sys.executable, "-m", "etx.tools.gpu_jobs", str(session),
-             "--gpus", "", "--logdir", str(logdir)],
-            env=env, capture_output=True, text=True, timeout=15)
+        result = subprocess.run([sys.executable, "-m", "etx.tools.gpu_jobs", str(session), "--gpus", "",
+                                 "--logdir", str(root)], env=env, capture_output=True, text=True, timeout=15)
         assert result.returncode == 0, result.stdout + result.stderr
-        return result.stdout
-
-    start("parent")
-    originals = {name: (logdir / name).read_bytes()
-                 for name in ("runner.log", "status.json", "probe.log")}
-    output = start("follow_on")
-    for name, contents in originals.items():
-        assert (logdir / name).read_bytes() == contents
-    children = list(logdir.glob("session-*/runner.log"))
-    assert len(children) == 1
-    child = children[0].parent
-    assert str(child) in output
-    assert "session done" in children[0].read_text()
-    assert "follow_on" in (child / "probe.log").read_text()
-    assert json.loads((child / "status.json").read_text())[0]["status"] == "ok"
+        if marker == "first":
+            first = {p: p.read_bytes() for p in root.rglob("*") if p.is_file()}
+    records = sorted(p for p in root.iterdir())
+    assert len(records) == 2 and all(record.verify(r)[0] == 0 for r in records)
+    assert {p: p.read_bytes() for p in records[0].rglob("*") if p.is_file()} == first
+    assert "second" in (records[1] / "probe.log").read_text()
+    assert json.loads((records[1] / "SEAL").read_text())["jobs"] == {"probe": "ok"}
 
 
-@pytest.mark.parametrize('reuse', [False, True])
 @pytest.mark.parametrize('lane', ['cpu', 'gpu'])
-def test_job_environment_uses_actual_logdir(tmp_path, monkeypatch, reuse, lane):
+def test_job_environment_names_the_record_and_a_used_directory_is_refused(tmp_path, monkeypatch, lane):
     logdir = tmp_path / 'logs'
-    logdir.mkdir()
-    if reuse:
-        (logdir / 'status.json').write_text('[]')
     monkeypatch.setenv('ETX_SESS_LOGDIR', '/stale/parent')
-    job = gj.Job(name='probe', lane=lane, cwd=str(tmp_path),
-                 env={'ETX_SESS_LOGDIR': '/stale/job'},
+    job = gj.Job(name='probe', lane=lane, cwd=str(tmp_path), env={'ETX_SESS_LOGDIR': '/stale/job'},
                  cmd='printf "%s\\n" "$ETX_SESS_LOGDIR"; test -f "$ETX_SESS_LOGDIR/status.json"')
-    runner = gj.Runner([job], [0], 1, logdir, out=io.StringIO(), poll_s=.01)
-    assert runner.run() == 0
-    assert job.log.read_text().splitlines()[-1] == str(runner.logdir)
-    if reuse:
-        assert runner.logdir.parent == logdir
-        assert runner.logdir.name.startswith('session-')
-        assert (logdir / 'status.json').read_text() == '[]'
-    else:
-        assert runner.logdir == logdir
+    assert gj.Runner([job], [0], 1, logdir, out=io.StringIO(), poll_s=.01).run() == 0
+    assert job.log.read_text().splitlines()[-1] == str(logdir)
+    with pytest.raises(SystemExit, match='not empty'):
+        gj.Runner([gj.Job(name='again', cmd='true')], [0], 1, logdir, out=io.StringIO()).run()
 
 
 def test_session_hard_stop_kills_all_lanes_and_skips_tail(tmp_path):

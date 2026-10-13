@@ -88,27 +88,24 @@ def test_every_arm_names_levers_present_and_locally_passed():
     assert rec["arm_build"]["resources"]["scratch"] == 0
 
 
-@pytest.mark.parametrize("identity,ok", [
-    ("commit " + "a" * 40 + "\nbranch b\ndirty 0\ntree " + "TREE" + "\n", True),
-    ("commit " + "a" * 40 + "\nbranch b\ndirty 0\n", False),          # no tree hash: refused (review 07, R08)
-    ("commit " + "a" * 40 + "\nbranch b\ndirty 1\n", False),
-    ("branch b\ndirty 0\n", False),
-    (None, False),
+@pytest.mark.parametrize("name,identity,ok", [
+    ("A-1", "commit " + "a" * 40 + "\narchive A\n", True),
+    ("B-1", "commit " + "a" * 40 + "\narchive A\n", False),        # not the directory that archive was extracted to
+    ("A-1", "commit " + "a" * 40 + "\n", False),                    # no archive hash
+    ("A-1", None, False),
 ])
-def test_source_identity_must_name_a_clean_commit(tmp_path, monkeypatch, identity, ok):
-    monkeypatch.setenv("ETX_SESS_LOGDIR", str(tmp_path / "logs"))
-    monkeypatch.setenv("ETX_DSV2_DATA", str(tmp_path / "data"))
-    monkeypatch.setenv("ETX_DSV2_FLEET", str(tmp_path / "fleet"))
-    session = ins.Session()
-    session.root = tmp_path
-    (tmp_path / "SOURCE_FILES").write_text("")              # an empty staged tree: its hash is well defined
+def test_source_identity_is_the_staged_archive(tmp_path, name, identity, ok):
+    root = tmp_path / name.replace("A", "a" * 64).replace("B", "b" * 64)
+    root.mkdir()
     if identity is not None:
-        (tmp_path / "SOURCE_IDENTITY").write_text(identity.replace("TREE", ins.tree_hash(tmp_path)))
+        (root / "SOURCE_IDENTITY").write_text(identity.replace("archive A", "archive " + "a" * 64))
+    s = object.__new__(ins.Session)
+    s.root = root
     if ok:
-        assert session.source_identity().startswith("commit ")
+        assert s.source_identity().startswith("commit ")
     else:
-        with pytest.raises(RuntimeError, match="SOURCE_IDENTITY|staged tree"):
-            session.source_identity()
+        with pytest.raises(RuntimeError, match="not a staged archive"):
+            s.source_identity()
 
 
 def _exe(path: Path, body: str):
@@ -292,8 +289,8 @@ def test_d5_two_way_pairs_require_every_invocation_complete(tmp_path, monkeypatc
 
 
 def test_the_paid_hour_session_order_and_gates():
-    """examples/sessions/ds_hour.py: the D2b rerun first, D3 / D5 next, the stamped record, the optional arm last, a
-    box-side hash job at the end; every GPU job gated hard on preflight and on each binary it runs."""
+    """examples/sessions/ds_hour.py: the D2b rerun first, D3 / D5 next, the stamped record, the optional arm last; every
+    GPU job gated hard on preflight and on each binary it runs. No hash job: the runner seals the record."""
     jobs, limit = load_session(Path("examples/sessions/ds_hour.py"))
     assert limit == 1800
     gpu = [j for j in jobs if j.lane == "gpu" and j.name != "prep_ref"]
@@ -304,18 +301,16 @@ def test_the_paid_hour_session_order_and_gates():
         assert "preflight" in j.after and all(dep in by for dep in j.after), j.name
     assert by["pairs_alld3"].after == ["preflight", "build_all", "build_alld3"]
     assert by["trace_alld4r0l1"].after == ["preflight", "build_alld4r0l1_stamps"]
-    # review 07: the hash waits for EVERY other job (R06); each GPU job waits for ALL earlier ones (R07)
-    assert by["hash_session"].lane == "cpu" and set(by["hash_session"].after_any) == {j.name for j in jobs} - {"hash_session"}
-    for k, j in enumerate(gpu):
+    assert "hash_session" not in by and "prep_sums" not in by
+    for k, j in enumerate(gpu):              # review 07, R07: each GPU job waits for ALL earlier ones
         assert set(j.after_any) == {g.name for g in gpu[:k]}, j.name
-    assert "'startup.*'" in by["hash_session"].cmd                              # R05: the runner's live file
     for arm in ("l1", "alld4r0l1", "alld3", "alld5", "alld4s"):
         assert arm in ins.RULES, arm                    # every candidate measured in the hour has a rule
 
 
 def _hour_dir(tmp_path, monkeypatch, arm, ms):
-    """Run the real pairs() with a stubbed binary that writes genuine raw logs; box-side SHA256SUMS like hash_session."""
-    import hashlib
+    """Run the real pairs() with a stubbed binary that writes genuine raw logs, then seal the record as the runner does."""
+    from etx.session import record
     logs = tmp_path / "sess"
     for k, v in (("ETX_SESS_LOGDIR", logs), ("ETX_DSV2_FLEET", tmp_path / "f"), ("ETX_DSV2_DATA", tmp_path / "d")):
         monkeypatch.setenv(k, str(v))
@@ -327,9 +322,7 @@ def _hour_dir(tmp_path, monkeypatch, arm, ms):
         return text
     monkeypatch.setattr(ins.Session, "run", fake_run)
     ins.Session().pairs(arm)
-    rows = [f"{hashlib.sha256(p.read_bytes()).hexdigest()}  ./{p.relative_to(logs)}"
-            for p in sorted(logs.rglob("*")) if p.is_file()]
-    (logs / "SHA256SUMS").write_text("\n".join(rows) + "\n")
+    record.seal(logs, jobs={f"pairs_{arm}": "ok"}, plan="test")
     return logs
 
 
@@ -346,16 +339,14 @@ def test_verify_hour_rederives_every_verdict_and_catches_a_changed_log(tmp_path,
     assert verify_hour.main([str(d)]) == 2                  # both the box hash and the re-derived pairs disagree
 
 
-def test_a_stale_file_in_the_fetch_destination_fails_verification(tmp_path, monkeypatch):
-    """review 08, R12: a file the box did not list is not this session's."""
-    from etx.tools.verify_sums import verify
+def test_a_stale_file_in_the_record_copy_fails_verification(tmp_path, monkeypatch):
+    """review 08, R12: a file the sealed MANIFEST does not list is not this session's."""
+    from etx.session.record import verify
     d = _hour_dir(tmp_path, monkeypatch, "alld3", {"all": 3.500, "alld3": 3.440})
-    assert verify(d, [])[0] == 0
+    assert verify(d)[0] == 0
     (d / "pairs_alld5.json").write_text("{}")                # left over from an earlier fetch
-    rc, lines = verify(d, [])
-    assert rc == 2 and any("NOT IN THE BOX MANIFEST pairs_alld5.json" in line for line in lines)
-    for sh in ("tools/session.sh", "examples/dsv2lite/reproduce.sh"):
-        assert "not empty" in Path(sh).read_text()            # both fetches refuse a reused destination
+    rc, lines = verify(d)
+    assert rc == 2 and any("NOT IN THE SEALED MANIFEST pairs_alld5.json" in line for line in lines)
 
 
 @pytest.mark.parametrize("ref,cand,keep", [
@@ -369,48 +360,8 @@ def test_exact_boundaries_decide_as_written(ref, cand, keep):
     assert v["keep"] is keep
 
 
-def test_tree_hash_matches_the_staging_pipeline_and_catches_a_change(tmp_path):
-    """review 07, R08: the box's source check recomputes the staged tree's hash; it must equal stage_inplace.sh's
-    `git ls-files -z | xargs -0 shasum -a 256 | shasum -a 256`, and a changed tracked file must be refused."""
-    import subprocess
-    root = Path(__file__).resolve().parents[1]
-    files = subprocess.run(["git", "ls-files"], cwd=root, capture_output=True, text=True, check=True).stdout
-    shell = subprocess.run("git ls-files -z | xargs -0 shasum -a 256 | shasum -a 256 | cut -c1-64", shell=True,
-                           cwd=root, capture_output=True, text=True, check=True).stdout.strip()
-    stage = tmp_path / "etx"
-    for name in files.splitlines()[:40]:                    # a staged tree: a slice of the real files
-        (stage / name).parent.mkdir(parents=True, exist_ok=True)
-        (stage / name).write_bytes((root / name).read_bytes())
-    (stage / "SOURCE_FILES").write_text("\n".join(files.splitlines()[:40]) + "\n")
-    full = tmp_path / "full"
-    full.mkdir()
-    (full / "SOURCE_FILES").write_text(files)
-    for name in files.splitlines():
-        (full / name).parent.mkdir(parents=True, exist_ok=True)
-        (full / name).symlink_to(root / name)
-    assert ins.tree_hash(full) == shell
-    h = ins.tree_hash(stage)
-    s = object.__new__(ins.Session)
-    s.root = stage
-    (stage / "SOURCE_IDENTITY").write_text(f"commit {'a' * 40}\nbranch b\ndirty 0\ntree {h}\nstaged t\n")
-    assert s.source_identity()
-    victim = stage / files.splitlines()[3]
-    victim.write_bytes(victim.read_bytes() + b"\n# changed on the box\n")
-    with pytest.raises(RuntimeError, match="not the staged tree"):
-        s.source_identity()
-    victim.write_bytes(victim.read_bytes().replace(b"\n# changed on the box\n", b""))
-    assert s.source_identity()
-    (stage / "yaml.pyc").symlink_to(tmp_path / "elsewhere.pyc")       # review 08, R08: an untracked symlink
-    with pytest.raises(RuntimeError, match="not in SOURCE_FILES"):
-        s.source_identity()
-    (stage / "yaml.pyc").unlink()
-    (stage / "SOURCE_IDENTITY").write_text(f"commit {'a' * 40}\nbranch b\ndirty 0\nstaged t\n")   # no tree line
-    with pytest.raises(RuntimeError, match="not the staged tree"):
-        s.source_identity()
-
-
 def test_preflight_refuses_inputs_that_are_not_the_measured_ones(tmp_path, monkeypatch):
-    """review 07, R09: a consistent but different input set passes its own SHA256SUMS; it must not pass preflight."""
+    """review 07, R09: a consistent but different input set (even with its own SHA256SUMS) must not pass preflight."""
     import hashlib
     data = tmp_path / "data"
     data.mkdir()

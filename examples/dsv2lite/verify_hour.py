@@ -3,7 +3,7 @@
 
   .venv/bin/python -m examples.dsv2lite.verify_hour <fetched session dir>
 
-1. the box's SHA256SUMS against the copy (etx/tools/verify_sums.py; binaries and patched sources stay on the box);
+1. the copy against the record's own SEAL and MANIFEST (etx/session/record.py; binaries stay on the box);
 2. every pairs_<arm>.json re-derived from its raw invocation logs (<arm>_r<i>_<build>.raw.log, parsed by the same
    full_result() and reported by the same build_report() the session ran): rounds, medians, spreads and the verdict
    must be equal;
@@ -17,10 +17,8 @@ import json
 import sys
 from pathlib import Path
 
-from etx.tools.verify_sums import verify
+from etx.session import record
 from examples.dsv2lite import inplace_session as ins
-
-EXCLUDED = ["b_*/run", "b_*/fleet_src/*", "*.o"]
 
 
 def rederive_pairs(d: Path, arm: str) -> tuple[bool, str]:
@@ -70,9 +68,12 @@ def main(argv=None) -> int:
     if len(a) != 1:
         raise SystemExit(__doc__)
     d = Path(a[0])
-    rc, lines = verify(d, EXCLUDED)
+    rc, lines = record.verify(d)
     print("\n".join(lines))
-    ok = rc == 0
+    if rc == 2 or not (d / "SEAL").is_file():               # not what the box sealed, or no seal: not a result
+        print("HOUR NOT VERIFIED")
+        return 2
+    ok = True
     for f in sorted(d.glob("pairs_*.json")):
         same, line = rederive_pairs(d, f.stem.removeprefix("pairs_"))
         ok &= same
@@ -87,7 +88,7 @@ def main(argv=None) -> int:
     if not ok:
         print("HOUR NOT VERIFIED")
         return 2
-    if missing:
+    if missing or rc:
         print(f"HOUR INCOMPLETE: what exists is verified; {len(missing)} promised result(s) missing")
         return 3
     print("HOUR VERIFIED: every promised verdict and stage table present and re-derived from the raw files")

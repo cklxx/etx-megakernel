@@ -31,15 +31,16 @@ a free lane takes the first ready job in list order.
 Output: one line per start / end with the elapsed session time, a progress block every --progress-s seconds (running
 jobs, their last log line, and a warning for any job silent past quiet_s), and at the end a status table.
 <logdir>/status.json is atomically refreshed on every transition (including skipped jobs). Exit code 0 only if every job that ran finished OK.
-The runner exclusively creates <logdir>/runner.log. If it already exists (or status.json exists),
-the new session uses a unique session-* subdirectory for runner, status and job logs; the selected path is printed.
-Every job receives that directory as ETX_SESS_LOGDIR.
+The session's record is a NEW directory <logdir>/<session id> (etx/session/record.py), printed at start; every job
+receives it as ETX_SESS_LOGDIR. After the last job the runner seals it (MANIFEST + SEAL); a session file may name
+LOCAL_ONLY globs (what a fetch leaves on the box).
 Bare Python commands use the runner's interpreter directory first on PATH;
 commands naming an explicit interpreter path keep that choice.
 """
 from __future__ import annotations
 
 import argparse
+import hashlib
 import importlib.util
 import json
 import math
@@ -54,6 +55,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from etx.session import proc as sproc
+from etx.session import record
 
 
 @dataclass
@@ -94,6 +96,11 @@ def session_limit(limit: float | None) -> float | None:
 
 
 def load_session(path: str | Path) -> tuple[list[Job], float | None]:
+    jobs, limit, _ = _load(path)
+    return jobs, limit
+
+
+def _load(path):
     spec = importlib.util.spec_from_file_location("etx_session", path)
     mod = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
@@ -119,7 +126,7 @@ def load_session(path: str | Path) -> tuple[list[Job], float | None]:
         if j.lane not in ("gpu", "cpu"):
             raise SystemExit(f"job {j.name}: lane must be gpu or cpu")
     limit = session_limit(getattr(mod, "MAX_SESSION_SECONDS", None))
-    return jobs, limit
+    return jobs, limit, tuple(getattr(mod, "LOCAL_ONLY", record.LOCAL_ONLY))
 
 
 def load_jobs(path: str | Path) -> list[Job]:
@@ -142,7 +149,7 @@ class _Tee:
 
 class Runner:
     def __init__(self, jobs: list[Job], gpus: list[int], cpu_slots: int, logdir: Path, progress_s: float = 60.0,
-                 out=None, poll_s: float = 1.0, max_seconds: float | None = None):
+                 out=None, poll_s: float = 1.0, max_seconds: float | None = None, local_only=record.LOCAL_ONLY):
         self.jobs = jobs
         self.gpus = gpus
         self.cpu_slots = cpu_slots
@@ -153,6 +160,7 @@ class Runner:
         self.t0 = time.time()
         self.deadline = time.monotonic() + max_seconds if max_seconds is not None else None
         self.by_name = {j.name: j for j in jobs}
+        self.local_only = local_only
 
     # -------------------------------------------------------------- helpers
     def say(self, msg: str) -> None:
@@ -255,27 +263,25 @@ class Runner:
 
     # -------------------------------------------------------------- main loop
     def run(self) -> int:
+        """Run every job, then seal the record. The record directory is this session's alone: never one that holds
+        anything (a record is write-once)."""
         sproc.subreaper()
+        if self.logdir.exists() and any(self.logdir.iterdir()):
+            raise SystemExit(f"refusing {self.logdir}: not empty; a session record is a new directory")
         self.logdir.mkdir(parents=True, exist_ok=True)
-        # Exclusive creation is the reservation, including for simultaneous starts.
-        # A status-only directory may belong to an older runner; preserve it too.
-        root = self.logdir
-        while True:
-            try:
-                if (self.logdir / "status.json").exists():
-                    raise FileExistsError
-                log = (self.logdir / "runner.log").open("x")
-                break
-            except FileExistsError:
-                self.logdir = Path(tempfile.mkdtemp(prefix="session-", dir=root))
         out = self.out
-        with log:
-            self.out = _Tee(out, log)
-            try:
-                self.say(f"session logs: {self.logdir}")
+        try:
+            with (self.logdir / "runner.log").open("x") as log:
+                self.out = _Tee(out, log)
+                self.say(f"session record: {self.logdir}")
                 return self._run()
-            finally:
-                self.out = out
+        finally:
+            self.out = out
+            plan = json.dumps([[j.name, j.cmd, j.lane, j.gpu, j.after, j.after_any, j.gate, j.timeout, j.env]
+                               for j in self.jobs], default=str)
+            s = record.seal(self.logdir, jobs={j.name: j.status for j in self.jobs},
+                            plan=hashlib.sha256(plan.encode()).hexdigest(), local_only=self.local_only)
+            print(f"SEALED {self.logdir} complete={s['complete']}", file=out, flush=True)
 
     def _run(self) -> int:
         self._write_status()
@@ -378,7 +384,7 @@ def main(argv=None) -> int:
     ap.add_argument("--progress-s", type=float, default=60.0)
     ap.add_argument("--dry-run", action="store_true", help="print the plan (order, lanes, dependencies) and exit")
     a = ap.parse_args(argv)
-    jobs, max_seconds = load_session(a.session)
+    jobs, max_seconds, local_only = _load(a.session)
     jobs = [j for j in jobs if j.machine == a.machine]
     if a.only:
         keep = {j.name for j in jobs if re.search(a.only, j.name)}
@@ -397,7 +403,8 @@ def main(argv=None) -> int:
             deps = ", ".join(j.after + [f"~{d}" for d in j.after_any] + ([f"gate {j.gate[0]}~{j.gate[1]}"] if j.gate else []))
             print(f"{i:3d} {j.name:32} {pin:8} timeout {j.timeout:5.0f}s  after: {deps or '-'}")
         return 0
-    return Runner(jobs, gpus, a.cpu_slots, Path(os.path.expanduser(a.logdir)), a.progress_s, max_seconds=max_seconds).run()
+    logdir = record.create(Path(os.path.expanduser(a.logdir)))
+    return Runner(jobs, gpus, a.cpu_slots, logdir, a.progress_s, max_seconds=max_seconds, local_only=local_only).run()
 
 
 if __name__ == "__main__":
