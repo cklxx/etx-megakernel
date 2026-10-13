@@ -91,7 +91,9 @@ status)
   tools/session.sh status "${2:?ip}"
   ;;
 fetch)
-  IP=${2:?ip}; DEST=${3:?dest}; mux "$IP"; mkdir -p "$DEST"
+  IP=${2:?ip}; DEST=${3:?dest}
+  [ -e "$DEST" ] && [ -n "$(ls -A "$DEST" 2>/dev/null)" ] && die "$DEST is not empty: fetch into a new directory (review 08, R12)"
+  mux "$IP"; mkdir -p "$DEST"
   rsync -az -e "ssh ${OPTS[*]}" --exclude 'b_*/run' --exclude 'b_*/fleet_src' --exclude '*.o' \
     "$ETX_SESS_USER@$IP:sess/" "$DEST/"
   # the box's SHA256SUMS is the provenance record: verify the copy against it, never overwrite it (review 07, R04)

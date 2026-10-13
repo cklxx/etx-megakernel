@@ -337,11 +337,25 @@ def test_verify_hour_rederives_every_verdict_and_catches_a_changed_log(tmp_path,
     """review 07, R10: the hour's own verifier -- same parser, same report code, on the raw logs."""
     from examples.dsv2lite import verify_hour
     d = _hour_dir(tmp_path, monkeypatch, "alld3", {"all": 3.500, "alld3": 3.440})
-    assert verify_hour.main([str(d)]) == 0
+    # one arm of the eight promised results: what exists verifies, but the hour is INCOMPLETE (review 08, R13)
+    assert verify_hour.main([str(d)]) == 3
+    assert len(verify_hour.expected_outputs()) == 8 and "stages_alld4r0l1.json" in verify_hour.expected_outputs()
     assert json.loads((d / "pairs_alld3.json").read_text())["verdict"]["outcome"] == "KEEP"
     raw = d / "alld3_r2_alld3.raw.log"
     raw.write_text(raw.read_text().replace("median 3.440", "median 3.300"))
     assert verify_hour.main([str(d)]) == 2                  # both the box hash and the re-derived pairs disagree
+
+
+def test_a_stale_file_in_the_fetch_destination_fails_verification(tmp_path, monkeypatch):
+    """review 08, R12: a file the box did not list is not this session's."""
+    from etx.tools.verify_sums import verify
+    d = _hour_dir(tmp_path, monkeypatch, "alld3", {"all": 3.500, "alld3": 3.440})
+    assert verify(d, [])[0] == 0
+    (d / "pairs_alld5.json").write_text("{}")                # left over from an earlier fetch
+    rc, lines = verify(d, [])
+    assert rc == 2 and any("NOT IN THE BOX MANIFEST pairs_alld5.json" in line for line in lines)
+    for sh in ("tools/session.sh", "examples/dsv2lite/reproduce.sh"):
+        assert "not empty" in Path(sh).read_text()            # both fetches refuse a reused destination
 
 
 @pytest.mark.parametrize("ref,cand,keep", [
@@ -384,6 +398,12 @@ def test_tree_hash_matches_the_staging_pipeline_and_catches_a_change(tmp_path):
     victim.write_bytes(victim.read_bytes() + b"\n# changed on the box\n")
     with pytest.raises(RuntimeError, match="not the staged tree"):
         s.source_identity()
+    victim.write_bytes(victim.read_bytes().replace(b"\n# changed on the box\n", b""))
+    assert s.source_identity()
+    (stage / "yaml.pyc").symlink_to(tmp_path / "elsewhere.pyc")       # review 08, R08: an untracked symlink
+    with pytest.raises(RuntimeError, match="not in SOURCE_FILES"):
+        s.source_identity()
+    (stage / "yaml.pyc").unlink()
     (stage / "SOURCE_IDENTITY").write_text(f"commit {'a' * 40}\nbranch b\ndirty 0\nstaged t\n")   # no tree line
     with pytest.raises(RuntimeError, match="not the staged tree"):
         s.source_identity()

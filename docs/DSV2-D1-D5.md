@@ -436,3 +436,14 @@ split is documented in each D4 stages JSON (topk = routed XCDs only; totals and 
 
 **FETCH + VERIFY in the hour:** `tools/session.sh fetch <ip> <dest>` (verifies the box SHA256SUMS), then
 `.venv/bin/python -m examples.dsv2lite.verify_hour <dest>` must print `HOUR VERIFIED` before the box is destroyed.
+
+## Review 08 (Astra re-check of f7b6279): R01-R07, R09-R11 confirmed fixed; R08 open, R12-R14 new -- all fixed
+
+R08 staging cleanup and the box's source check now cover every non-directory entry, symlinks included (real staging
+snippet on a used box: both untracked symlinks removed, `import yaml` resolves to the system package, tree hash
+equal). R12 a fetch refuses a non-empty destination (postmortem re-fetches with ETX_FETCH_REUSE=1) and the verifier
+fails on any fetched file the box did not list (Astra's repro: stale results now `NOT IN THE BOX MANIFEST`, `HOUR
+NOT VERIFIED`). R13 verify_hour requires every result ds_hour.py promises: exit 0 = complete and verified, 3 =
+verified but INCOMPLETE, 2 = not verified. R14 plain `timeout` again (its deadline kills a build's compiler
+children: repro 0.30 s, no survivor), and the runner kills every descendant of a job at a stop -- /proc tree taken
+before the kill -- so the group `timeout` creates cannot survive the hard stop (both R01 repros: False).

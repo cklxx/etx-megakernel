@@ -54,7 +54,7 @@ REMOTE
     DEST=${3:?dest}
     # Always inspect partial captures, but never hide a failed transfer.
     fetch_rc=0
-    bash "$0" fetch "$IP" "$DEST" || fetch_rc=$?
+    ETX_FETCH_REUSE=1 bash "$0" fetch "$IP" "$DEST" || fetch_rc=$?
     if [ "$fetch_rc" != 0 ]; then
       printf 'UNCAPTURED %s (fetch failed)\n' "$DEST"
     fi
@@ -85,7 +85,13 @@ REMOTE
   status)
     $SSH 'pgrep -f etx.tools.gpu_jobs >/dev/null && echo RUNNING || echo "runner not running"; find ~/sess -name runner.log -print -exec tail -25 {} \;' ;;
   fetch)
-    DEST=${3:?dest}; mkdir -p "$DEST"
+    DEST=${3:?dest}
+    # a reused destination would mix another session's files into this one (review 08, R12)
+    # (postmortem re-fetches over a partial capture on purpose: ETX_FETCH_REUSE=1; the verifier still flags any file
+    # the box did not list)
+    if [ "${ETX_FETCH_REUSE:-0}" != 1 ] && [ -e "$DEST" ] && [ -n "$(ls -A "$DEST" 2>/dev/null)" ]; then
+      echo "refusing: $DEST is not empty; fetch into a new directory"; exit 2; fi
+    mkdir -p "$DEST"
     # build records (plans, resources, generated kernels) are part of the result; only the binaries and patched
     # source copies stay on the box (review 07, R03). The box's SHA256SUMS is verified, never overwritten (R04).
     rsync -az --exclude 'b_*/run' --exclude 'b_*/fleet_src/' --exclude '*.o' $H:~/sess/ "$DEST/" || exit 1

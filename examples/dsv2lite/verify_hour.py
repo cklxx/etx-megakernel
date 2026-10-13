@@ -8,7 +8,8 @@
    full_result() and reported by the same build_report() the session ran): rounds, medians, spreads and the verdict
    must be equal;
 3. every stages_<arm>.json re-derived from its trace, stamps and the fetched plan of its stamped build.
-Prints one line per arm; exit 0 only if everything matches.
+Prints one line per arm. Exit 0 = every promised result present and re-derived; 3 = what exists verifies but a
+promised result is missing (an incomplete hour); 2 = something does not match the box or does not re-derive.
 """
 from __future__ import annotations
 
@@ -50,6 +51,20 @@ def rederive_stages(d: Path, arm: str) -> tuple[bool, str]:
     return same, f"{'OK  ' if same else 'DIFF'} trace {arm:10s} span {span:.1f} us"
 
 
+def expected_outputs() -> list[str]:
+    """Every result file examples/sessions/ds_hour.py promises: one pairs report per pairs job, one stage table per trace
+    job. A missing one is an incomplete hour, never a verified one (review 08, R13)."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("ds_hour", Path(__file__).resolve().parents[1] / "sessions/ds_hour.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    out = []
+    for name, op, _ in mod.GPU:
+        kind, arm = op.split()
+        out.append(f"pairs_{arm}.json" if kind == "pairs" else f"stages_{arm}.json")
+    return out
+
+
 def main(argv=None) -> int:
     a = sys.argv[1:] if argv is None else argv
     if len(a) != 1:
@@ -66,8 +81,17 @@ def main(argv=None) -> int:
         same, line = rederive_stages(d, f.stem.removeprefix("stages_"))
         ok &= same
         print(line)
-    print("HOUR VERIFIED: every verdict and stage table re-derived from the raw files" if ok else "HOUR NOT VERIFIED")
-    return 0 if ok else 2
+    missing = [f for f in expected_outputs() if not (d / f).exists()]
+    for f in missing:
+        print(f"MISSING {f} (its job did not complete: see runner.log / status.json)")
+    if not ok:
+        print("HOUR NOT VERIFIED")
+        return 2
+    if missing:
+        print(f"HOUR INCOMPLETE: what exists is verified; {len(missing)} promised result(s) missing")
+        return 3
+    print("HOUR VERIFIED: every promised verdict and stage table present and re-derived from the raw files")
+    return 0
 
 
 if __name__ == "__main__":

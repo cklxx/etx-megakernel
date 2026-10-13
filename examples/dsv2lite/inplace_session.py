@@ -214,6 +214,20 @@ def tree_hash(root: Path) -> str:
     return hashlib.sha256("".join(lines).encode()).hexdigest()
 
 
+def untracked_entries(root: Path) -> list[str]:
+    """Every non-directory entry under root (files AND symlinks) that SOURCE_FILES does not list, outside the box's own
+    .venv and build/, __pycache__ and the two staging records."""
+    listed = set((root / "SOURCE_FILES").read_text().splitlines())
+    out = []
+    for p in root.rglob("*"):
+        rel = p.relative_to(root)
+        if rel.parts[0] in (".venv", "build") or "__pycache__" in rel.parts or p.is_dir() and not p.is_symlink():
+            continue
+        if str(rel) not in listed and str(rel) not in ("SOURCE_FILES", "SOURCE_IDENTITY"):
+            out.append(str(rel))
+    return sorted(out)
+
+
 def arm_order(arm: str, fleet_available: bool = True) -> tuple[tuple, tuple, str]:
     """(invocation order of round 0, references, candidate) of a pairs arm; odd rounds reverse the order."""
     if arm == "baseline":
@@ -299,9 +313,10 @@ class Session:
         clean = {k: v for k, v in os.environ.items() if not k.startswith(("ETX_", "FLEET_"))}
         clean.update(PYTHONUNBUFFERED="1")         # no caller override may leak into default or a candidate
         clean.update(env or {})
-        # --foreground: the command stays in the runner job's process group, so the runner's hard stop (killpg) also
-        # stops it; plain `timeout` moves it into a group of its own that survives (review 07, R01)
-        command = ["timeout", "--foreground", "--kill-after=5s", f"{timeout}s", "stdbuf", "-oL", "-eL", *map(str, command)]
+        # plain `timeout`: at its deadline it kills the command's whole group, compiler children included (review 08,
+        # R14 -- --foreground left them alive). The runner's hard stop kills every descendant of the job, so the
+        # group `timeout` creates cannot survive it either (etx/tools/gpu_jobs.py descendants; review 07, R01)
+        command = ["timeout", "--kill-after=5s", f"{timeout}s", "stdbuf", "-oL", "-eL", *map(str, command)]
         text = ""; started = heartbeat = last_output = last_probe = time.monotonic()
         with path.open("w") as log:
             line = "$ " + shlex.join(command) + "\n"
@@ -348,6 +363,9 @@ class Session:
         m = re.search(r"^tree ([0-9a-f]{64})$", text, re.M)
         if not m or tree_hash(self.root) != m.group(1):         # review 07, R08: the marker alone proved nothing
             raise RuntimeError(f"{self.root} is not the staged tree recorded in {path} (tree hash): restage the box")
+        extra = untracked_entries(self.root)                     # review 08, R08: e.g. a symlinked yaml.pyc
+        if extra:
+            raise RuntimeError(f"{self.root} holds entries that are not in SOURCE_FILES ({extra[:5]}): restage the box")
         return text
 
     def source(self):

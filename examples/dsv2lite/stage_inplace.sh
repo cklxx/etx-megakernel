@@ -31,7 +31,7 @@ FILES=$(mktemp); git -C "$ROOT" ls-files -z > "$FILES"
 TREE=$(cd "$ROOT" && xargs -0 shasum -a 256 < "$FILES" | shasum -a 256 | cut -c1-64)
 rsync -az -e "$RSH" --from0 --files-from="$FILES" "$ROOT/" "$H:etx/"
 BOX_TREE=$(tr '\0' '\n' < "$FILES" | ssh "${OPTS[@]}" "$H" 'set -e; cd ~/etx; cat > SOURCE_FILES
-  find . -type f ! -path "./.venv/*" ! -path "./build/*" ! -name SOURCE_FILES ! -name SOURCE_IDENTITY | sed "s#^\./##" | sort > /tmp/etx_have
+  find . ! -type d ! -path "./.venv/*" ! -path "./build/*" ! -name SOURCE_FILES ! -name SOURCE_IDENTITY | sed "s#^\./##" | sort > /tmp/etx_have
   sort SOURCE_FILES > /tmp/etx_want; comm -23 /tmp/etx_have /tmp/etx_want | xargs -r -d "\n" rm -f
   find . -name __pycache__ ! -path "./.venv/*" -prune -exec rm -rf {} +
   tr "\n" "\0" < SOURCE_FILES | xargs -0 sha256sum | sha256sum | cut -c1-64')

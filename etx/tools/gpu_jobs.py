@@ -91,6 +91,35 @@ def session_limit(limit: float | None) -> float | None:
     return limit
 
 
+def descendants(pid: int) -> list[int]:
+    """Every live descendant of pid, from /proc (Linux; empty elsewhere). Taken BEFORE killing: once a parent dies its
+    orphans are re-parented and no longer traceable (review 07/08, R01 / R14)."""
+    children: dict[int, list[int]] = {}
+    try:
+        entries = [d for d in os.listdir("/proc") if d.isdigit()]
+    except OSError:
+        return []
+    for d in entries:
+        try:
+            ppid = int(Path(f"/proc/{d}/stat").read_text().rsplit(")", 1)[1].split()[1])
+        except (OSError, ValueError, IndexError):
+            continue
+        children.setdefault(ppid, []).append(int(d))
+    out, stack = [], [pid]
+    while stack:
+        for c in children.get(stack.pop(), []):
+            out.append(c)
+            stack.append(c)
+    return out
+
+
+def _signal(pid: int, sig: int) -> None:
+    try:
+        os.kill(pid, sig)
+    except (ProcessLookupError, PermissionError):
+        pass
+
+
 def load_session(path: str | Path) -> tuple[list[Job], float | None]:
     spec = importlib.util.spec_from_file_location("etx_session", path)
     mod = importlib.util.module_from_spec(spec)
@@ -217,8 +246,11 @@ class Runner:
         self.out.flush()
 
     def _kill(self, j: Job) -> None:
+        tree = descendants(j.proc.pid)      # before the group dies: an escaped group (e.g. under `timeout`) is still ours
         try:
             os.killpg(j.proc.pid, signal.SIGTERM)
+            for pid in tree:
+                _signal(pid, signal.SIGTERM)
             try:
                 grace = min(10, max(0, self.deadline - time.monotonic())) if self.deadline is not None else 10
                 j.proc.wait(grace)
@@ -227,6 +259,8 @@ class Runner:
                 j.proc.wait(10)
         except ProcessLookupError:
             pass
+        for pid in tree:
+            _signal(pid, signal.SIGKILL)
 
     def _progress(self) -> None:
         run = [j for j in self.jobs if j.status == "running"]
@@ -276,13 +310,17 @@ class Runner:
             while True:
                 if self.deadline is not None and time.monotonic() >= self.deadline:
                     self.say("HARD-STOP: session budget exhausted; killing running jobs")
-                    # Signal every group first, without one grace period per job.
+                    # Signal every group first, without one grace period per job -- and every descendant, so a process
+                    # that left the job's group (GNU `timeout` puts its command in a group of its own) dies too
                     for j in self.jobs:
                         if j.status == "running":
+                            tree = descendants(j.proc.pid)
                             try:
                                 os.killpg(j.proc.pid, signal.SIGKILL)
                             except ProcessLookupError:
                                 pass
+                            for pid in tree:
+                                _signal(pid, signal.SIGKILL)
                     for j in self.jobs:
                         if j.status == "running":
                             j.proc.wait()

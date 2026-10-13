@@ -3,7 +3,8 @@
   python -m etx.tools.verify_sums <dir> [--excluded GLOB ...]
 
 The box's SHA256SUMS is the provenance record; it is never overwritten. Every listed file must be present with the
-listed hash, unless it matches one of the --excluded globs (files a fetch leaves on the box by design, e.g. binaries).
+listed hash, unless it matches one of the --excluded globs (files a fetch leaves on the box by design, e.g. binaries),
+and every fetched file must be listed (only the runner's own live files are exempt).
 Writes <dir>/SHA256SUMS.local (hashes of everything fetched) next to it. Exit 0 = every fetched file verified,
 2 = a mismatch or an unexpected absence (the copy is not what the box wrote), 3 = no box-side SHA256SUMS.
 """
@@ -46,8 +47,15 @@ def verify(d: Path, excluded: list[str]) -> tuple[int, list[str]]:
             lines.append(f"MISMATCH {name}")
         else:
             ok += 1
-    local = sorted(p for p in d.rglob("*") if p.is_file() and p.name not in ("SHA256SUMS", "SHA256SUMS.local"))
-    (d / "SHA256SUMS.local").write_text("".join(f"{sha256(p)}  ./{p.relative_to(d)}\n" for p in local))
+    listed = {row.split(None, 1)[1].lstrip("*").removeprefix("./") for row in sums.read_text().splitlines() if row.strip()}
+    local = sorted(p for p in d.rglob("*") if (p.is_file() or p.is_symlink())
+                   and p.name not in ("SHA256SUMS", "SHA256SUMS.local"))
+    for p in local:                       # a file the box did not list is not this session's (review 08, R12)
+        name = str(p.relative_to(d))
+        if name not in listed and not name.startswith(("runner.log", "status.json", "startup.", "hash_session")):
+            bad += 1
+            lines.append(f"NOT IN THE BOX MANIFEST {name}")
+    (d / "SHA256SUMS.local").write_text("".join(f"{sha256(p)}  ./{p.relative_to(d)}\n" for p in local if p.is_file()))
     lines.append(f"{'VERIFIED' if not bad else 'FAILED'}: {ok} files match the box, {bad} bad, {skipped} not fetched "
                  f"by design ({', '.join(excluded) or 'none'})")
     return (2 if bad else 0), lines
