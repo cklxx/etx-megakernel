@@ -49,6 +49,12 @@ ARMS["d4"] = ()
 ARM_FLAGS["d4"] = ["-DETX_DSV2_D4=1"]
 ARM_ENV["d4"] = {"ETX_DSV2_D4": "1"}
 D4_KEEP_US = 30.0
+# measurements only (docs/DSV2-D1-D5.md, "Next two arms"): the unsafe acquire on the best arm, and D4 without slices
+ARMS["allrelaxed"] = LEVERS_ALL
+ARM_FLAGS["allrelaxed"] = [RELAXED]
+ARMS["d4r0"] = ()
+ARM_FLAGS["d4r0"] = ["-DETX_DSV2_D4=1"]
+ARM_ENV["d4r0"] = {"ETX_DSV2_D4": "1", "ETX_DSV2_D4_ROWS": "0"}
 SINGLE = ("Q", "Qall", "N", "Nall", "argmax", "topk", "prep", "relaxed")
 STAMPED = ("default", "all")
 DATA_FILES = ("weights.bin", "weights.bin.manifest", "fleet_cache.bin", "golden_tokens.txt", "golden_hidden.bin")
@@ -282,6 +288,8 @@ class Session:
                 order, refs = ("default", "all"), ("default",)
         elif arm == "coh":
             order, refs, cand = ("default", "relaxed", "coh"), ("default", "relaxed"), "coh"
+        elif arm == "allrelaxed":
+            order, refs, cand = ("default", "all", "allrelaxed"), ("default", "all"), "allrelaxed"
         else:
             order, refs, cand = ("default", arm), ("default",), arm
         rounds = []
@@ -378,7 +386,7 @@ def main(argv=None):
             ap.error(f"build arm must be one of {sorted((*ARMS, 'fleet'))}")
         session.build(a.arm, a.stamped)
     elif a.operation == "pairs":
-        if a.arm not in ("baseline", "all", *SINGLE, "coh", "d4"):
+        if a.arm not in ("baseline", "all", *SINGLE, "coh", "d4", "allrelaxed", "d4r0"):
             ap.error("pairs arm must be baseline, all, coh, d4 or a single lever")
         session.pairs(a.arm)
     elif a.operation == "trace":
