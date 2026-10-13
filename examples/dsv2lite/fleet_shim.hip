@@ -143,6 +143,11 @@ extern "C" __device__ void fleet_q_absorb(const etx_ctx* c) {
     const FleetParams* fp = FP(c);
     const int32_t L = LAYER(c);
     fleet::drain_stores();
+#ifdef FLEET_COH_LOADS
+    // D2 (lever coherent_loads): attention reads q_absorbed with loads past this XCD's L2, and this in-body hand-off has
+    // no ETX consumer edge to carry the write-back release, so write the L2 back before publishing
+    fleet::fence_release();
+#endif
     __hip_atomic_fetch_add(&fp->rt.xcd_counters[(size_t)c->domain * fleet::kMaxEvents + QABS_EVENT(L, c->coord[0])], 1u,
                            __ATOMIC_RELAXED, __HIP_MEMORY_SCOPE_AGENT);
   }

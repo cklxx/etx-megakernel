@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 import subprocess
@@ -39,11 +40,23 @@ def static_counts(asm: Path) -> dict[str, int]:
     text = asm.read_text()
     return {"nt_weight_loads": len(re.findall(r"(?:flat|global)_load_dwordx4[^\n]*\bnt\b", text)),
             "vmcnt0_waits": len(re.findall(r"s_waitcnt[^\n]*vmcnt\(0\)", text)),
-            "asm_lines": text.count("\n")}
+            "asm_lines": text.count("\n"),
+            # D2: acquire invalidates, L2 write-backs and system-scope (sc0 sc1) loads in the megakernel
+            "inv_sc1": len(re.findall(r"^\s*buffer_inv sc1\s*$", text, re.M)),
+            "inv_sc0": len(re.findall(r"^\s*buffer_inv sc0\s*$", text, re.M)),
+            "wbl2": len(re.findall(r"^\s*buffer_wbl2\b", text, re.M)),
+            "sys_loads": len(re.findall(r"^\s*global_load\w*[^\n]*\bsc0 sc1\b", text, re.M))}
+
+
+# lever -> the plan switch it needs (the lever and the plan are checked against each other by coh_check.py)
+LEVER_ENV = {"coherent_loads": {"ETX_DSV2_COH": "1"}}
 
 
 def build(arm: str, out: Path) -> dict:
-    run(["bash", "examples/dsv2lite/rocm_build_check.sh", str(fleet_export()), arm, str(out)])
+    env = {k: v for k, v in os.environ.items() if k not in ("ETX_DSV2_COH",)}
+    for lever in arm.split("+"):
+        env.update(LEVER_ENV.get(lever, {}))
+    run(["bash", "examples/dsv2lite/rocm_build_check.sh", str(fleet_export()), arm, str(out)], env=env)
     d = out / arm
     return dict(resources=parse((d / "resource.log").read_text()),
                 isa_sha256=hashlib.sha256((d / "isa.bin").read_bytes()).hexdigest(),

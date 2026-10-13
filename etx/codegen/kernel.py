@@ -307,6 +307,9 @@ def emit_kernel(plan: Plan, device: int = 0) -> str:
                 # the tile's activation loads are device-coherent (sc0 sc1): nothing cached needs invalidating, and
                 # the weights (and the touch hook's lines) stay in this XCD's L2 across the phase boundary
                 out.append("        // coherent tile: no acquire invalidate (activation loads bypass the XCD caches)")
+            elif g.body.coherence == "coherent_loads":
+                # loads past the XCD caches as above; its own stores are plain, so its release writes back (below)
+                out.append("        // coherent-load tile: no acquire invalidate (payload loads bypass the XCD caches; producers write back)")
             else:
                 acq = sorted({_scope_macro(plan, ev) for ev in g.in_edges}, key=lambda s: Scope[s].value)
                 relayed = any(_relayed(plan, plan.events[ev]) for ev in g.in_edges)

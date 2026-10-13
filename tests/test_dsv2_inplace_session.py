@@ -52,7 +52,9 @@ def test_job_graph_order_and_inputs():
     assert all(j.gpu == 0 for j in jobs if j.lane == "gpu")
     gpu = [j.name for j in jobs if j.lane == "gpu"]
     assert gpu[:5] == ["prep_ref", "baseline", "pairs_all", "trace_default", "trace_all"]   # decision before attribution
-    assert set(gpu[5:]) == {f"pairs_{a}" for a in ins.SINGLE}
+    assert gpu[5] == "pairs_coh"                         # D2: a new condition before the 2026-10-13 attributions
+    assert by["pairs_coh"].after == ["build_coh", "build_relaxed"] and by["pairs_coh"].after_any == ["trace_all"]
+    assert set(gpu[6:]) == {f"pairs_{a}" for a in ins.SINGLE}
     for arm in (*ins.ARMS, "fleet"):
         assert f"build_{arm}" in by and by[f"build_{arm}"].after == ["source"]
     for arm in ins.STAMPED:

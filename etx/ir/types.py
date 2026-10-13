@@ -86,7 +86,10 @@ class TileBody:
     coherence: str = "imported"     # "coherent": the tile loads and stores its ACTIVATIONS with device-coherent
                                     # accesses (sc0 sc1, past the XCD caches), so the megakernel emits no acquire
                                     # invalidate for it and the caches survive the phase boundary; "imported": the
-                                    # tile uses plain accesses and keeps the buffer_inv acquire (every imported kernel)
+                                    # tile uses plain accesses and keeps the buffer_inv acquire (every imported kernel);
+                                    # "coherent_loads": the tile LOADS every payload another task wrote device-coherently
+                                    # but stores plainly, so it needs no acquire invalidate yet counts as a plain producer
+                                    # (its release writes its L2 back; fleet's tiles under ETX_DSV2_COH, docs/DSV2-D1-D5.md)
     arg_bytes: int = 0              # size of the type's argument block (bytes): lets the megakernel prefetch the
                                     # NEXT task's block while the current arrive runs (ETX_VL_ARGPF); 0 = unknown, skip
 

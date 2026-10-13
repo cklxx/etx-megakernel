@@ -61,6 +61,7 @@ if [ ${#PATCHES[@]} -gt 0 ] || [ "$STAMPS" = 1 ]; then
     python3 -m examples.dsv2lite.patch_stamps "$SRC" >> "$OUT/patch.log" 2>&1
   fi
 fi
+python3 -m examples.dsv2lite.coh_check "$OUT/megakernel_d0.hip" "$SRC" > "$OUT/coh_check.log" 2>&1 || { cat "$OUT/coh_check.log"; exit 2; }
 # ETX_CFLAGS is a whitespace-separated compiler argument list, never evaluated as code.
 read -ra EXTRA <<< "${ETX_CFLAGS:-}"
 COMMON=(-x hip --offload-arch=gfx942 -O3 -std=c++17 -nogpuinc --rocm-device-lib-path="$DL"

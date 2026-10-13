@@ -45,6 +45,8 @@ else
   compile_plan
   SHIM="$ROOT/examples/dsv2lite/fleet_shim.hip"
 fi
+# D2: the plan (ETX_DSV2_COH) and the tiles (lever coherent_loads) must agree; refused before the compiler runs
+(cd "$ROOT" && "$ROOT/.venv/bin/python" -m examples.dsv2lite.coh_check "$OUT/megakernel_d0.hip" "$FLEET_SRC") || exit 2
 RDC="${ETX_RDC:-0}"                # 0 (default): whole-program device compile, as fleet builds (3.72 vs 3.90 ms/token, scratch 112 -> 0 B/lane); needs INLINE=1
 RDCFLAG="-fgpu-rdc"; if [ "$RDC" = "0" ] && [ "$INLINE" = "1" ]; then RDCFLAG=""; fi
 hipcc -O3 -std=c++17 --offload-arch=gfx942 $RDCFLAG -DFLEET_NT_WEIGHTS=1 "$@" \

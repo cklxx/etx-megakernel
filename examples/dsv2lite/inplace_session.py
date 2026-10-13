@@ -37,6 +37,12 @@ ARMS = {"default": (), "Q": ("gemv_no_terminal",), "Qall": ("gemv_no_terminal_al
 # the old sc0 acquire, named explicitly (examples/dsv2lite/acquire.py).
 ARM_FLAGS = {"relaxed": [RELAXED]}
 ARMS["relaxed"] = ()
+# D2: fleet's tiles load every payload coherently (lever coherent_loads) and the plan drops their acquire invalidates
+# (ETX_DSV2_COH=1); the build refuses one without the other (coh_check.py). Measured against BOTH default (sc1) and
+# relaxed in the same rounds: docs/DSV2-D1-D5.md, D2.
+ARMS["coh"] = ("coherent_loads",)
+ARM_ENV = {"coh": {"ETX_DSV2_COH": "1"}}
+D2_MIN_TOL_US = 20.0
 SINGLE = ("Q", "Qall", "N", "Nall", "argmax", "topk", "prep", "relaxed")
 STAMPED = ("default", "all")
 DATA_FILES = ("weights.bin", "weights.bin.manifest", "fleet_cache.bin", "golden_tokens.txt", "golden_hidden.bin")
@@ -63,6 +69,21 @@ def paired(gains_us: list[float]) -> dict:
     spread = max(gains_us) - min(gains_us)
     return dict(gains_us=gains_us, median_us=median, spread_us=spread, every_positive=min(gains_us) > 0,
                 go=min(gains_us) > 0 and median >= GO_US and median > 2 * spread)
+
+
+def d2_verdict(rounds: list[dict]) -> dict:
+    """D2's rule (docs/DSV2-D1-D5.md, fixed before the code), device basis, the same five rounds:
+    (a) coh vs default (sc1): every pair faster and median >= 70 us;
+    (b) coh vs relaxed: |median(coh - relaxed)| <= max(2 x spread of the relaxed-vs-default pairs, 20 us)."""
+    a = paired([1000 * (r["default"]["device_ms"] - r["coh"]["device_ms"]) for r in rounds])
+    rel = paired([1000 * (r["default"]["device_ms"] - r["relaxed"]["device_ms"]) for r in rounds])
+    b = [1000 * (r["coh"]["device_ms"] - r["relaxed"]["device_ms"]) for r in rounds]
+    b_median = statistics.median(b)
+    tol = max(2 * rel["spread_us"], D2_MIN_TOL_US)
+    a_ok = a["every_positive"] and a["median_us"] >= GO_US
+    b_ok = abs(b_median) <= tol
+    return dict(a=a, relaxed_vs_default=rel, b_gains_us=b, b_median_us=b_median, b_tol_us=tol, a_ok=a_ok, b_ok=b_ok,
+                go=a_ok and b_ok)
 
 
 def full_result(log: str) -> dict:
@@ -214,7 +235,8 @@ class Session:
                                               "-I" + str(self.fleet / "src"), self.fleet / "src/host/fleet_launch.hip",
                                               self.fleet / "src/kernels/fleet_kernel.hip", "-o", out / "run"], timeout=600)
         else:
-            env = dict(ETX_OUT=str(out), ETX_FLEET_PATCH=" ".join(ARMS[arm]), ETX_BUILD_VERBOSE="1")
+            env = dict(ETX_OUT=str(out), ETX_FLEET_PATCH=" ".join(ARMS[arm]), ETX_BUILD_VERBOSE="1",
+                       ETX_DSV2_COH="0", **ARM_ENV.get(arm, {}))
             flags = (["-Rpass-analysis=kernel-resource-usage"] + ARM_FLAGS.get(arm, [])
                      + (["-DETX_DSV2_STAMPS2"] if stamped else []))
             text = self.run(f"compile_{arm}{'_stamps' if stamped else ''}",
@@ -242,6 +264,8 @@ class Session:
             if not (self.out("fleet") / "run").exists():          # the decision is vs default; fleet is the context
                 print("PAIRS arm=all: fleet binary missing, measuring against default only", flush=True)
                 order, refs = ("default", "all"), ("default",)
+        elif arm == "coh":
+            order, refs, cand = ("default", "relaxed", "coh"), ("default", "relaxed"), "coh"
         else:
             order, refs, cand = ("default", arm), ("default",), arm
         rounds = []
@@ -255,11 +279,18 @@ class Session:
             report[key] = {}
             for ref in refs:
                 report[key][ref] = paired([1000 * (r[ref][key] - r[cand][key]) for r in rounds])
-        if arm != "all":
+        if arm == "coh":
+            report["d2"] = d2_verdict(rounds)
+        elif arm != "all":
             for basis in report["device_ms"].values():
                 basis["go"] = None          # attribution only: the decision belongs to `all`
         write_json(self.logs / f"pairs_{arm}.json", report)
         d = report["device_ms"]["default"]
+        if arm == "coh":
+            v = report["d2"]
+            print(f"PAIRS arm=coh D2 (a) vs sc1 median {v['a']['median_us']:.1f} us spread {v['a']['spread_us']:.1f} "
+                  f"every_positive={int(v['a']['every_positive'])} ok={v['a_ok']}; (b) coh - relaxed median "
+                  f"{v['b_median_us']:.1f} us tolerance {v['b_tol_us']:.1f} ok={v['b_ok']}; GO={v['go']}", flush=True)
         print(f"PAIRS arm={arm} device gain vs default median {d['median_us']:.1f} us spread {d['spread_us']:.1f} "
               f"every_positive={int(d['every_positive'])} GO={d['go']}", flush=True)
 
@@ -279,7 +310,7 @@ class Session:
     def report(self):
         from examples.dsv2lite import stage_table as st
         out = dict()
-        for arm in ("baseline", "all", *SINGLE):
+        for arm in ("baseline", "all", *SINGLE, "coh"):
             path = self.logs / f"pairs_{arm}.json"
             out[arm] = json.loads(path.read_text()) if path.exists() else "NOT COMPLETE"
         if out["all"] == "NOT COMPLETE":
@@ -314,8 +345,8 @@ def main(argv=None):
             ap.error(f"build arm must be one of {sorted((*ARMS, 'fleet'))}")
         session.build(a.arm, a.stamped)
     elif a.operation == "pairs":
-        if a.arm not in ("baseline", "all", *SINGLE):
-            ap.error("pairs arm must be baseline, all or a single lever")
+        if a.arm not in ("baseline", "all", *SINGLE, "coh"):
+            ap.error("pairs arm must be baseline, all, coh or a single lever")
         session.pairs(a.arm)
     elif a.operation == "trace":
         if a.arm not in STAMPED:

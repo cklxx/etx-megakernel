@@ -53,6 +53,33 @@ def test_coherent_tile_skips_acquire_and_plain_producer_writes_back():
     assert "ETX_RELEASE_DEVICE();   // a coherent consumer bypasses this XCD's L2: write it back" in src
 
 
+def test_coherent_loads_tile_skips_acquire_but_writes_back_as_a_producer():
+    """D2 (fleet's tiles, ETX_DSV2_COH): loads coherent, stores plain -> no acquire, and its own release writes back."""
+    plan = compile_graph(_build("coherent_loads", cross=False), "gfx942", {}, {})
+    ep1, ep2 = plan.events["E1"], plan.events["E2"]
+    assert ep1.coherent_consumer and not ep1.producers_coherent          # a (plain) -> b (coherent loads)
+    assert not ep2.coherent_consumer and not ep2.producers_coherent      # b is a PLAIN producer
+    src = emit_kernel(plan)
+    b_case = _case(src, "b")
+    assert "coherent-load tile: no acquire invalidate" in b_case and "ETX_ACQUIRE" not in b_case
+    assert "ETX_ACQUIRE_DOMAIN();" in _case(src, "c")
+    assert "ETX_RELEASE_DEVICE();   // a coherent consumer bypasses this XCD's L2: write it back" in src
+    # a chain of coherent-load tiles: the producer still writes back for its coherent-load consumer
+    g = _build("coherent_loads", cross=False)
+    g.grid("c").body = hip_link("c.hip", "etx_tile_c", coherence="coherent_loads")
+    src2 = emit_kernel(compile_graph(g, "gfx942", {}, {}))
+    assert src2.count("ETX_RELEASE_DEVICE();   // a coherent consumer bypasses this XCD's L2: write it back") == 2
+    assert "ETX_ACQUIRE" not in _case(src2, "c")
+
+
+def test_coherent_loads_device_event_keeps_the_flush():
+    plan = compile_graph(_build("coherent_loads", cross=True), "gfx942", {}, {})
+    from etx.ir.types import Scope
+    assert plan.events["E2"].scope == Scope.DEVICE and not plan.events["E2"].producers_coherent
+    src = emit_kernel(plan)
+    assert re.search(r"etx_arrive_flush_DEVICE(_s)?\(", src) and not re.search(r"_nf\(", src)
+
+
 def test_imported_build_is_unchanged():
     plan = compile_graph(_build("imported", cross=False), "gfx942", {}, {})
     src = emit_kernel(plan)

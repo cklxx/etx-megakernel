@@ -45,6 +45,18 @@ DUR = {"qkv": 7.4 + 12.0, "qabs": 4.0, "attn": 16.7, "merge": 7.6, "oproj": 12.0
 
 CUS = 38                   # CUs per XCD: the interleaved build pins request r to worker slots r * CUS + w (ETX_SLOT_BY_CU pairs them per CU)
 
+# D2 (docs/DSV2-D1-D5.md): ETX_DSV2_COH=1 marks fleet's tiles "coherent_loads" (no acquire invalidate; their releases
+# write the L2 back). Correct ONLY with the coherent_loads lever patched into the tiles (examples/dsv2lite/levers/
+# coherent_loads.py); examples/dsv2lite/coh_check.py refuses a build that has one without the other. dense_down reads the
+# dense h from global inside gemv_rows, which the lever does not cover: it stays plain and keeps its acquire.
+COH_PLAIN = frozenset({"fleet_dense_down"})
+
+
+def _tile(symbol: str):
+    if os.environ.get("ETX_DSV2_COH", "0") == "1" and symbol not in COH_PLAIN:
+        return hip_link(T, symbol, coherence="coherent_loads")
+    return hip_link(T, symbol)
+
 
 def _res(lds: int = SCRATCH_BYTES, paired: bool = False) -> Resource:
     # paired: two workgroups per CU (one per request) -> at most 256 registers per lane (measured cost 0.8%, design 15.12)
@@ -70,7 +82,7 @@ class _Req:
 
 
 def _chiplet(g: Graph, q: _Req, name: str, symbol: str, L: int, in_edges: dict, out_edges: dict, dur: float, **kw):
-    return g.call_device(q.n(name), (XCDS, W), hip_link(T, symbol), resource=_res(paired=q.paired), args=[q.fleet, f"layer_{L}"],
+    return g.call_device(q.n(name), (XCDS, W), _tile(symbol), resource=_res(paired=q.paired), args=[q.fleet, f"layer_{L}"],
                          consts=(L, q.r), domain_map="xw->x", worker_map=q.wmap_chiplet(), in_edges=in_edges, out_edges=out_edges,
                          duration_us=dur, duration_cv=0.05, **kw)
 
@@ -92,16 +104,16 @@ def build_attention_block(g: Graph, q: _Req, L: int, e_in: str, e_in_map: str, f
     g.etensor(n(f"E_oproj_{L}"), (1,), wait_count=XCDS * W)
     qkv_in = {e_in: e_in_map, **(extra_in or {})}
     _chiplet(g, q, f"qkv_{L}", "fleet_qkv_fused_fold" if fold else "fleet_qkv_fused", L, qkv_in, {n(f"E_qkv_{L}"): "xw->x"}, DUR["qkv"])
-    g.call_device(n(f"qabs_{L}"), (HEADS, QABS), hip_link(T, "fleet_q_absorb"), resource=_res(paired=q.paired), args=[q.fleet, f"layer_{L}"],
+    g.call_device(n(f"qabs_{L}"), (HEADS, QABS), _tile("fleet_q_absorb"), resource=_res(paired=q.paired), args=[q.fleet, f"layer_{L}"],
                   consts=(L, q.r), domain_map="hs->(h/2)", worker_map=q.wmap("hs->((h%2)*2+s+OFF)"),
                   in_edges={n(f"E_qkv_{L}"): "hs->(h/2)"}, out_edges={n(f"E_qabs_{L}"): "hs->h"}, duration_us=DUR["qabs"])
-    g.call_device(n(f"attn_{L}"), (HEADS, KV_CHUNKS), hip_link(T, "fleet_attention"), resource=_res(paired=q.paired), args=[q.fleet, f"layer_{L}"],
+    g.call_device(n(f"attn_{L}"), (HEADS, KV_CHUNKS), _tile("fleet_attention"), resource=_res(paired=q.paired), args=[q.fleet, f"layer_{L}"],
                   consts=(L, q.r),
                   # E_qabs is consumed INSIDE the attention body (fleet's PUB_WAIT, kept for overlap; see fleet_shim.hip);
                   # ETX still orders attention after E_qkv, and qabs after E_qkv, so the in-body wait is deadlock-free.
                   domain_map="hc->(h/2)", worker_map=q.wmap("hc->((h%2)*16+c+OFF)"), in_edges={n(f"E_qkv_{L}"): "hc->(h/2)"},
                   out_edges={n(f"E_attn_{L}"): "hc->h"}, duration_us=DUR["attn"], duration_cv=0.1)
-    g.call_device(n(f"merge_{L}"), (HEADS, KV_CHUNKS), hip_link(T, "fleet_merge_uv"), resource=_res(paired=q.paired), args=[q.fleet, f"layer_{L}"],
+    g.call_device(n(f"merge_{L}"), (HEADS, KV_CHUNKS), _tile("fleet_merge_uv"), resource=_res(paired=q.paired), args=[q.fleet, f"layer_{L}"],
                   consts=(L, q.r), domain_map="hc->(h/2)", worker_map=q.wmap("hc->((h%2)*16+c+OFF)"),
                   in_edges={n(f"E_attn_{L}"): "hc->h"}, out_edges={n(f"E_merge_{L}"): "hc->(h/2)"}, duration_us=DUR["merge"])
     _chiplet(g, q, f"oproj_{L}", "fleet_o_proj", L, {n(f"E_merge_{L}"): "xw->x"}, {n(f"E_oproj_{L}"): "xw->(0)"}, DUR["oproj"])
@@ -159,7 +171,7 @@ def build(layers: int = LAYERS, routing_cached: bool | None = None, requests: in
         n = q.n
         g.tensor(q.fleet, (1,), role="weight", bytes_per_elem=8)   # FleetParams*, set by the host
         g.etensor(n("E_embed"), (1,), wait_count=1)
-        g.call_device(n("embed"), (1,), hip_link(T, "fleet_embed"), resource=_res(paired=q.paired), args=[q.fleet, "layer_-1"],
+        g.call_device(n("embed"), (1,), _tile("fleet_embed"), resource=_res(paired=q.paired), args=[q.fleet, "layer_-1"],
                       consts=(-1, q.r), out_edges={n("E_embed"): "i->i"}, duration_us=DUR["embed"], worker_map=q.wmap("i->(OFF)"))
         state[q.r] = (n("E_embed"), "xw->(0)", False)
     # layers outer, requests inner: every cross-request producer is created before its consumer (program order is the
@@ -190,7 +202,7 @@ def build(layers: int = LAYERS, routing_cached: bool | None = None, requests: in
         g.etensor(n("E_lm"), (1,), wait_count=XCDS * W)
         g.etensor(n("E_argmax"), (1,), wait_count=1)
         _chiplet(g, q, "lm_head", "fleet_lm_head_fold" if prev_moe else "fleet_lm_head", -1, {e: "xw->(0)"}, {n("E_lm"): "xw->(0)"}, DUR["lm_head"])
-        g.call_device(n("argmax"), (1,), hip_link(T, "fleet_argmax"), resource=_res(paired=q.paired), args=[q.fleet, "layer_-1"],
+        g.call_device(n("argmax"), (1,), _tile("fleet_argmax"), resource=_res(paired=q.paired), args=[q.fleet, "layer_-1"],
                       consts=(-1, q.r), in_edges={n("E_lm"): "i->i"}, out_edges={n("E_argmax"): "i->i"}, duration_us=DUR["argmax"],
                       worker_map=q.wmap("i->(OFF)"))
     spec = os.environ.get("ETX_DSV2_ISOLATE", "")
