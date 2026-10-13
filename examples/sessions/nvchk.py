@@ -68,7 +68,7 @@ record['cmd'] = record['cmd'].replace(
     'cat "$newest" 2>/dev/null; } || hipconfig --version 2>/dev/null || printf unknown); '
     'printf "ROCM-VERSION %s\\n" "$rocm_version"')
 
-job(name='build_chkx', lane='cpu', after=['etx_env', 'prep', 'golden_sha'],
+job(name='build_chkx', lane='cpu', reads=['etx_env', 'prep', 'golden_sha'],
     timeout=1200,
     cmd=f'set -euo pipefail; mkdir -p {S}; {V} ETX_VL_CHECK=1 '
         f"ETX_HIPCC_FLAGS='{ALL}' ETX_OUT={BUILD} bash examples/vllm_llm/build.sh {MODEL} "
@@ -84,25 +84,25 @@ def capture(extra='', sync=''):
             f'--run-build {BUILD} --model {MODEL} -- {extra}')
 
 
-job(name='gate_chkx', gpu=0, after=['build_chkx', 'record'], timeout=600,
+job(name='gate_chkx', gpu=0, reads=['build_chkx', 'record'], timeout=600,
     cmd=f'set -euo pipefail; rm -rf {S}/dump_all; mkdir -p {S}/dump_all; '
         f'ETX_DUMP={S}/dump_all ETX_DUMP_STEP=1040 ETX_TOKTRACE={S}/tok_all.txt '
         + capture('--repeat 1 --check-dsl') + f' 2>&1 | tee {LOGS}/gate_chkx.txt; '
         f"grep -q '^RESULT .*matched=32 gen=32' {LOGS}/gate_chkx.txt; "
         f"grep -q '^CHECK-DSL OK' {LOGS}/gate_chkx.txt; "
         f'test -s {S}/dump_all/logits.bin; echo GATE-OK', summary=[reference.RES])
-job(name='gate_unf', gpu=0, after='gate_chkx', timeout=600,
+job(name='gate_unf', gpu=0, reads='gate_chkx', timeout=600,
     cmd='set -euo pipefail; ' + capture('--unfused --repeat 1')
         + f' 2>&1 | tee {LOGS}/gate_unf.txt; '
         f"grep -q '^RESULT .*matched=32 gen=32' {LOGS}/gate_unf.txt; echo GATE-OK",
     summary=[reference.RES])
-job(name='check_timed', gpu=0, after='gate_unf', timeout=600,
+job(name='check_timed', gpu=0, reads='gate_unf', timeout=600,
     cmd='set -euo pipefail; ' + '; '.join(
         capture(f'--check 48 --check-pos {pos}') + f' 2>&1 | tee {LOGS}/check_p{pos}.txt'
         for pos in (0, 1040)),
     summary=[r'^CHECK|^IMPORT-CERTIFICATE'])
 
-job(name='check_certificate', lane='cpu', after='check_timed', timeout=120,
+job(name='check_certificate', lane='cpu', reads='check_timed', timeout=120,
     cmd=f'{CERT} {LOGS} --require-positions 0,1040 --checks-only', summary=[r'.'])
 
 finished = ['check_certificate']
@@ -110,7 +110,7 @@ pair_logs = []
 for rnd in range(1, 6):
     for arm in (('etx', 'etxu') if rnd % 2 else ('etxu', 'etx')):
         name = f'{arm}_r{rnd}'
-        job(name=name, gpu=0, after=list(finished), timeout=300,
+        job(name=name, gpu=0, reads=list(finished), timeout=300,
             cmd='set -euo pipefail; ' + capture('--unfused' if arm == 'etxu' else ''),
             summary=[r'^RESULT|BUILD-IDENTITY'])
         pair_logs.append(f'{LOGS}/{name}.log')
@@ -119,7 +119,7 @@ for rnd in range(1, 6):
 # Always report incomplete primary evidence; diagnostic jobs depend on the
 # correctness check, not on whether the fusion performance threshold passed.
 primary = [j['name'] for j in JOBS]
-job(name='report', lane='cpu', after_any=primary, timeout=120,
+job(name='report', lane='cpu', reads=['?' + n for n in primary], timeout=120,
     cmd=f'set -o pipefail; {CERT} {LOGS} --require-positions 0,1040; cert_rc=$?; '
         'if [ "$cert_rc" -gt 1 ]; then exit "$cert_rc"; fi; '
         f".venv/bin/python -m examples.vllm_llm.pairs {' '.join(pair_logs)} --pairs 5 --basis wall; "
@@ -129,12 +129,12 @@ for rnd in range(1, 4):
     arms = ('poll', 'block', 'graph') if rnd % 2 else ('graph', 'block', 'poll')
     for arm in arms:
         name = f'{arm}_r{rnd}'
-        job(name=name, gpu=0, after='check_certificate', after_any=list(finished), timeout=300,
+        job(name=name, gpu=0, reads=['check_certificate', *('?' + n for n in finished)], timeout=300,
             cmd='set -euo pipefail; ' + capture('--unfused' if arm == 'graph' else '',
                                               sync='block' if arm == 'block' else ''),
             summary=[r'^RESULT|BUILD-IDENTITY'])
         finished.append(name)
-job(name='sync_report', lane='cpu', after_any=list(finished), timeout=120,
+job(name='sync_report', lane='cpu', reads=['?' + n for n in finished], timeout=120,
     cmd=f'.venv/bin/python -m examples.sessions.nvchk --report-sync {LOGS}', summary=[r'.'])
 
 # Reserve enough time BEFORE pulling. The timeout inside the container also
@@ -143,7 +143,7 @@ job(name='sync_report', lane='cpu', after_any=list(finished), timeout=120,
 optional = reference.vllm('vllm_last').replace('--entrypoint python3', '--entrypoint timeout')
 optional = optional.replace(' examples/llm/vllm_bench.py', ' -k 5 300 python3 examples/llm/vllm_bench.py')
 optional = optional.replace(f'{S}/vllm_last.json', f'{LOGS}/vllm_last.json')
-job(name='vllm_last', gpu=0, after=['golden_sha', 'check_certificate'], after_any=['sync_report'],
+job(name='vllm_last', gpu=0, reads=['golden_sha', 'check_certificate', '?sync_report'],
     timeout=600,
     cmd='set -euo pipefail; '
         'if [ "${ETX_NVCHK_VLLM:-0}" != 1 ]; then echo "VLLM NOT-COMPLETE: optional arm disabled"; exit 0; fi; '

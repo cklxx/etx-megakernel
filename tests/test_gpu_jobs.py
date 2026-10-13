@@ -27,14 +27,14 @@ def test_parallel_pins_deps_gates_timeouts(tmp_path):
     specs = [
         dict(name="a", cmd="echo GPU=$GPU HIP=$HIP_VISIBLE_DEVICES; sleep 0.5"),
         dict(name="b", cmd="echo GPU=$GPU; sleep 0.5"),
-        dict(name="pin1", cmd="echo GPU=$GPU", gpu=1, after=["a", "b"]),
-        dict(name="build", cmd="echo built; echo GATE_OK", lane="cpu"),
+        dict(name="pin1", cmd="echo GPU=$GPU", gpu=1, reads=["a", "b"]),
+        dict(name="build", cmd="echo built > $ETX_SESS_LOGDIR/built.txt", lane="cpu", writes=["built.txt"]),
         dict(name="bad", cmd="echo oops; exit 3", lane="cpu"),
-        dict(name="needs_bad", cmd="echo never", after=["bad"]),
-        dict(name="gated_yes", cmd="echo ran", gate=("build", "GATE_OK")),
-        dict(name="gated_no", cmd="echo ran", gate=("build", "NOPE")),
-        dict(name="slow", cmd="echo start; sleep 30", timeout=0.6, summary=["start"]),
-        dict(name="any", cmd="echo done", after_any=["bad"]),
+        dict(name="needs_bad", cmd="echo never", reads=["bad"]),
+        dict(name="gated_yes", cmd="echo ran", reads=["built.txt"]),
+        dict(name="gated_no", cmd="echo ran", reads=["never-written.txt"]),
+        dict(name="slow", cmd="echo start; sleep 30", timeout=0.6, summary=["start"], lane="cpu"),
+        dict(name="any", cmd="echo done", reads=["?bad"]),
     ]
     rc, j, out, dt = _run(tmp_path, specs)
     assert rc == 1                                           # "bad" failed and "slow" timed out
@@ -51,13 +51,40 @@ def test_parallel_pins_deps_gates_timeouts(tmp_path):
     assert {s["name"]: s["status"] for s in st}["bad"] == "fail"
 
 
+def test_reads_wait_for_their_writer_and_the_gpu_lane_keeps_list_order(tmp_path):
+    """The d1d5 loss (2bb3597) and R07: a reader starts only after its writer succeeded and the file exists; a GPU job
+    never overtakes an earlier pending one; a skip advances the lane; a missing declared output fails its job."""
+    rc, j, _, _ = _run(tmp_path, [
+        dict(name="prep_pack", lane="cpu", cmd="sleep .4; echo m > $ETX_SESS_LOGDIR/data.manifest", writes=["data.manifest"]),
+        dict(name="build_bad", lane="cpu", cmd="exit 1", writes=["b_bad/run"]),
+        dict(name="build_slow", lane="cpu", cmd="sleep .6; mkdir -p $ETX_SESS_LOGDIR/b_s; touch $ETX_SESS_LOGDIR/b_s/run",
+             writes=["b_s/run"]),
+        dict(name="liar", lane="cpu", cmd="true", writes=["promised.txt"]),
+        dict(name="g_bad", reads=["data.manifest", "b_bad/run"], cmd="echo never"),
+        dict(name="g_slow", reads=["data.manifest", "b_s/run"], cmd="test -f $ETX_SESS_LOGDIR/data.manifest"),
+        dict(name="g_ready", reads=["data.manifest"], cmd="test -f $ETX_SESS_LOGDIR/data.manifest"),
+        dict(name="g_lie", reads=["promised.txt"], cmd="echo never"),
+    ], gpus=(0,))
+    assert j["g_bad"].status == "skipped" and "build_bad fail" in j["g_bad"].note
+    assert j["g_slow"].status == j["g_ready"].status == "ok"
+    assert j["g_slow"].start >= j["build_slow"].end and j["g_ready"].start >= j["g_slow"].start   # no overtaking
+    assert j["liar"].status == "fail" and "declared output missing" in j["liar"].note
+    assert j["g_lie"].status == "skipped"
+
+
 def test_load_and_dry_run(tmp_path, capsys):
     f = tmp_path / "s.py"
-    f.write_text('JOBS = [dict(name="x", cmd="true"), dict(name="y", cmd="true", after="x", machine="B")]\n')
+    f.write_text('JOBS = [dict(name="x", cmd="true"), dict(name="y", cmd="true", reads="x", machine="B")]\n')
     jobs = gj.load_jobs(f)
-    assert jobs[1].after == ["x"]
+    assert jobs[1].reads == ["x"]
     assert gj.main([str(f), "--dry-run", "--machine", "B"]) == 0
     assert "y" in capsys.readouterr().out
+    f.write_text('JOBS = [dict(name="x", cmd="true", after=["y"])]\n')         # the old edge fields are gone
+    with pytest.raises(SystemExit, match="after"):
+        gj.load_jobs(f)
+    f.write_text('JOBS = [dict(name="x", cmd="true", reads=["typo"])]\n')
+    with pytest.raises(SystemExit, match="unknown dependency"):
+        gj.load_jobs(f)
 
 
 def test_child_uses_runner_interpreter_environment(tmp_path, monkeypatch):
@@ -106,9 +133,9 @@ def test_live_status_before_report_job(tmp_path):
     reader = "import json; from pathlib import Path; s={x['name']:x['status'] for x in json.loads(Path('logs/status.json').read_text())}; assert s['bad']=='fail'; assert s['skip']=='skipped'; assert s['slow']=='timeout'; print('LIVE-STATUS OK')"
     rc, jobs, _, _ = _run(tmp_path, [
         dict(name="bad", lane="cpu", cmd="exit 3"),
-        dict(name="skip", lane="cpu", after=["bad"], cmd="exit 99"),
+        dict(name="skip", lane="cpu", reads=["bad"], cmd="exit 99"),
         dict(name="slow", lane="cpu", cmd="sleep 10", timeout=.1),
-        dict(name="report", lane="cpu", after_any=["bad", "skip", "slow"],
+        dict(name="report", lane="final",
              cmd=f"{shlex.quote(sys.executable)} -c {shlex.quote(reader)}"),
     ])
     assert rc == 1 and jobs["report"].status == "ok"
@@ -167,7 +194,7 @@ def test_job_environment_names_the_record_and_a_used_directory_is_refused(tmp_pa
 def test_session_hard_stop_kills_all_lanes_and_skips_tail(tmp_path):
     jobs = [gj.Job(name=name, cmd='echo started; sleep 30', lane=lane, cwd=str(tmp_path))
             for name, lane in [('cpu', 'cpu'), ('gpu', 'gpu')]]
-    jobs.append(gj.Job(name='tail', cmd='echo must-not-run', after_any=['cpu', 'gpu']))
+    jobs.append(gj.Job(name='tail', cmd='echo must-not-run', lane='final'))
     runner = gj.Runner(jobs, [0], 1, tmp_path, poll_s=.01, out=io.StringIO(), max_seconds=.15)
     start = time.monotonic()
     assert runner.run() == 1

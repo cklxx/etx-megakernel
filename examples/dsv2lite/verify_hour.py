@@ -57,7 +57,7 @@ def expected_outputs() -> list[str]:
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     out = []
-    for name, op, _ in mod.GPU:
+    for name, op in mod.GPU:
         kind, arm = op.split()
         out.append(f"pairs_{arm}.json" if kind == "pairs" else f"stages_{arm}.json")
     return out

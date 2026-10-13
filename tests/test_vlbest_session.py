@@ -12,6 +12,7 @@ from etx.tools.gpu_jobs import load_session
 from examples.sessions import vlbest as s
 from examples.vllm_llm import vlbest_report as r
 
+
 SESSION = Path(__file__).resolve().parents[1] / 'examples/sessions/vlbest.py'
 
 
@@ -44,15 +45,15 @@ def test_budget_and_graph(capsys):
     assert s.main(['--dry-run']) == 0
     out = capsys.readouterr().out
     assert s.BUDGET in out
-    rows = [line for line in out.splitlines() if '  after: ' in line]
+    rows = [line for line in out.splitlines() if '  reads: ' in line]
     assert len(rows) == len(jobs)
     assert all(j.name in rows[i] for i, j in enumerate(jobs))
     seen = set()
     for j in jobs:
-        assert set(j.after + j.after_any) <= seen, j.name
+        assert set(j.deps() + j.deps(True)) <= seen, j.name
         seen.add(j.name)
         assert subprocess.run(['bash', '-n', '-c', j.cmd], capture_output=True).returncode == 0, j.name
-    assert set(graph['report'].after_any) == {j.name for j in jobs[:next(i for i,j in enumerate(jobs) if j.name == 'report')]}
+    assert set(graph['report'].deps(True)) == {j.name for j in jobs[:next(i for i,j in enumerate(jobs) if j.name == 'report')]}
 
 
 def test_correctness_and_screening_dependencies():
@@ -61,28 +62,27 @@ def test_correctness_and_screening_dependencies():
     assert 'ETX_VL_CHECK=1' in graph['build_chkx'].cmd
     assert 'check_timed' not in graph and 'check_certificate' not in graph
     assert '--verify-build' in graph['build_identity'].cmd
-    assert graph['gate_chkx'].after == ['build_identity', 'record', 'budget']
+    assert graph['gate_chkx'].deps() == ['build_identity', 'record', 'budget']
     for j in jobs:
         if j.name.startswith(('a_r', 'b_r', 'S0_r', 'F_r', 'etx_r', 'etxu_r')):
             assert j.gpu == 0
-            assert 'build_identity' in j.after and 'gate_unf' in j.after
+            assert 'build_identity' in j.deps() and 'gate_unf' in j.deps()
     for rnd in (1, 2):
         names = [j.name for j in jobs if j.name.startswith(f'a_r{rnd}_')]
         assert names[0] == f'a_r{rnd}_S0_open'
         assert names[-1] == f'a_r{rnd}_S0_close'
         assert set(names[1:-1]) == {f'a_r{rnd}_{arm}' for arm in ('S1', 'S3', 'S4f', 'S5f', 'S6f')}
-        assert 'moe_configs' in graph[f'a_r{rnd}_S1'].after
+        assert 'moe_configs' in graph[f'a_r{rnd}_S1'].deps()
     timed = [j for j in jobs if j.name.startswith(('a_r', 'b_r', 'S0_r', 'F_r', 'etx_r', 'etxu_r'))]
-    for i, j in enumerate(timed):
-        # Every previous arm remains a completion barrier, including skipped arms.
-        assert {p.name for p in timed[:i]} <= set(j.after_any)
+    # Every previous arm remains a completion barrier, including skipped arms: one GPU lane, strictly in list order.
+    assert all(j.lane == 'gpu' and j.gpu == 0 for j in timed)
     for rnd in range(1, 6):
         names = [j.name.split('_')[0] for j in jobs if j.name in {f'{a}_r{rnd}' for a in ('S0','F','etx','etxu')}]
         assert names == (['S0','F','etx','etxu'] if rnd % 2 else ['etxu','etx','F','S0'])
     assert 'moe_tune' not in graph and 'moe_budget' not in graph
-    assert graph['moe_configs'].after == ['docker_pull', 'dl']
-    assert graph['moe_configs'].gate is None
-    assert graph['a_r1_S1'].gate is None
+    assert graph['moe_configs'].deps() == ['docker_pull', 'dl']
+    assert not [r for r in graph['moe_configs'].reads + graph['a_r1_S1'].reads if r.startswith('go_')]
+    assert 'go_screen_S3.ok' in graph['a_r1_S3'].reads
     assert next(j.name for j in jobs if j.name.startswith('a_r1_S') and 'open' not in j.name) == 'a_r1_S1'
 
 
@@ -214,7 +214,7 @@ def test_triplets_are_tail_and_keep_nvchk_commands():
     assert [j.name for j in tail] == [f'{arm}_r{rnd}' for rnd in (1,2,3)
         for arm in (('graph','block','poll') if rnd == 2 else ('poll','block','graph'))]
     for j in tail:
-        assert 'report' in j.after_any
+        assert 'report' in j.deps(True) and 'go_triplets.ok' in j.reads
         assert j.cmd == original[j.name]['cmd']
     assert jobs[-1].cmd.endswith('examples.sessions.nvchk --report-sync ' + s.LOGS)
 
@@ -377,7 +377,7 @@ def test_vlbest3_graph():
     assert all(j.timeout == 390 for j in jobs if j.name.startswith('a_r'))
     seen = set()
     for job in jobs:
-        assert set(job.after + job.after_any) <= seen
+        assert set(job.deps() + job.deps(True)) <= seen
         seen.add(job.name)
         assert subprocess.run(['bash', '-n', '-c', job.cmd], capture_output=True).returncode == 0
     assert 'ps -eo pid,args' in __import__('inspect').getsource(v3.cleanup_tuner)

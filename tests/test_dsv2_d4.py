@@ -164,13 +164,13 @@ def test_d4s_session_builds_the_three_arms_before_timing(monkeypatch):
     assert limit == 1800
     assert set(by) == {"etx_env", "source", "preflight", "build_default", "build_alld4r0", "build_alld4s",
                        "pairs_alld4s"}
-    assert by["source"].after == ["etx_env"] and by["preflight"].after == ["source"]
+    assert by["source"].reads == ["etx_env"] and by["preflight"].writes == ["inputs.json"]   # inputs: already on the box
     for arm in ("default", "alld4r0", "alld4s"):
-        assert by[f"build_{arm}"].after == ["source"]
+        assert by[f"build_{arm}"].reads == ["source.json"]
         assert by[f"build_{arm}"].cmd.endswith(f"inplace_session build {arm}")
     assert [j.name for j in jobs if j.lane == "gpu"] == ["pairs_alld4s"]
     assert by["pairs_alld4s"].gpu == 0
-    assert by["pairs_alld4s"].after == ["preflight", "build_default", "build_alld4r0", "build_alld4s"]
+    assert by["pairs_alld4s"].reads == ["inputs.json", "b_default/run", "b_alld4r0/run", "b_alld4s/run"]
     assert by["pairs_alld4s"].cmd.endswith("inplace_session pairs alld4s")
     assert ARMS["alld4s"] == ARMS["alld4r0"] == LEVERS_ALL
     assert ARM_FLAGS["alld4s"] == ARM_FLAGS["alld4r0"] == ["-DETX_DSV2_D4=1"]

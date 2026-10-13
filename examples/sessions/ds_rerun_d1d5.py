@@ -22,15 +22,6 @@ GPU_ORDER = ["pairs_coh", "pairs_d4", "d4trace", *(f"pairs_{a}" for a in _full.S
 ARMS_BUILT = ["default", "relaxed", "coh", "d4", *(a for a in _full.SINGLE if a != "relaxed")]
 KEEP = {"etx_env", "source", "preflight", *(f"build_{a}" for a in ARMS_BUILT), *GPU_ORDER}
 
-JOBS = []
-for d in _full.JOBS:
-    if d["name"] not in KEEP:
-        continue
-    d = dict(d)
-    d["after"] = [a for a in d["after"] if a in KEEP]
-    if "after_any" in d:
-        d["after_any"] = [a for a in d["after_any"] if a in KEEP]
-    if d["name"] == "preflight":
-        d["after"] = ["source"]          # the inputs exist; preflight re-verifies every file against the pinned hashes
-    JOBS.append(d)
+# the inputs exist on the box: without the prep jobs, preflight reads the files already there
+JOBS = [dict(d, reads=[r for r in d["reads"] if r != "apt"]) for d in _full.JOBS if d["name"] in KEEP]
 assert [d["name"] for d in JOBS if d["lane"] == "gpu"] == GPU_ORDER

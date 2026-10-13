@@ -48,7 +48,7 @@ def g0_command():
 
 
 job(name='g0', lane='cpu', timeout=75, cmd=g0_command())
-job(name='docker_pull', lane='cpu', after='g0', timeout=30,
+job(name='docker_pull', lane='cpu', reads='g0', timeout=30,
     cmd=f"printf 'IMAGE '; sudo docker inspect --format '{{{{index .RepoDigests 0}}}}' {IMAGE}")
 job(name='budget', lane='cpu', timeout=10, cmd=f"printf '%s\\n' '{BUDGET}'")
 for original in nvchk.JOBS:
@@ -58,38 +58,38 @@ for original in nvchk.JOBS:
         continue
     entry = deepcopy(original)
     if entry['name'] == 'gate_chkx':
-        entry['after'] = ['build_identity', 'record']
-    deps = entry.get('after', [])
-    entry['after'] = ([deps] if isinstance(deps, str) else deps) + ['budget', 'g0']
+        entry['reads'] = ['build_identity', 'record']
+    deps = entry.get('reads', [])
+    entry['reads'] = ([deps] if isinstance(deps, str) else deps) + ['budget', 'g0']
     job(**entry)
     if entry['name'] == 'build_chkx':
-        job(name='build_identity', lane='cpu', after='build_chkx', timeout=120,
+        job(name='build_identity', lane='cpu', reads='build_chkx', timeout=120,
             cmd=command('--verify-build'))
 
-job(name='moe_tune', gpu=0, after=['gate_unf', 'build_identity', 'g0'], timeout=2700,
+job(name='moe_tune', gpu=0, reads=['gate_unf', 'build_identity', 'g0'], timeout=2700,
     cmd=command('--tune'))
 # Always runs, including when the runner killed the tuner client. Removes any
 # daemon-owned process by PID before checking the receipt; no orphan tuning.
-job(name='moe_gate', lane='cpu', after_any=['moe_tune'], timeout=45,
+job(name='moe_gate', lane='cpu', reads=['?moe_tune'], timeout=45,
     cmd=command('--tune-gate'))
 previous = 'moe_gate'
 for rnd in (1, 2):
     arms = ['S0_open'] + list(SCREEN_ARMS if rnd == 1 else reversed(SCREEN_ARMS)) + ['S0_close']
     for arm in arms:
         name = f'a_r{rnd}_{arm}'
-        job(name=name, gpu=0, after=[previous, 'moe_tune', 'golden_sha', 'build_identity'], timeout=390,
+        job(name=name, gpu=0, reads=[previous, 'moe_tune', 'golden_sha', 'build_identity'], timeout=390,
             cmd=command(f'--run-arm {arm.split("_")[0]} --name {name}'))
         previous = name
-job(name='select_final', lane='cpu', after=[previous, 'etx_env'], timeout=60,
+job(name='select_final', lane='cpu', reads=[previous, 'etx_env'], timeout=60,
     cmd=command('--select'))
 previous = 'select_final'
 for rnd in range(1, 6):
     for arm in (('S0', 'F', 'etx', 'etxu') if rnd % 2 else ('etxu', 'etx', 'F', 'S0')):
         name = f'{arm}_r{rnd}'
-        job(name=name, gpu=0, after=[previous, 'gate_unf', 'build_identity'], timeout=390,
+        job(name=name, gpu=0, reads=[previous, 'gate_unf', 'build_identity'], timeout=390,
             cmd=command(f'--run-arm {arm} --name {name}'))
         previous = name
-job(name='report', lane='cpu', after_any=[j['name'] for j in JOBS], timeout=120,
+job(name='report', lane='final', timeout=120,
     cmd=command('--report'))
 
 

@@ -69,12 +69,12 @@ for original in nvchk.JOBS:
         continue
     entry = deepcopy(original)
     if entry['name'] == 'gate_chkx':
-        entry['after'] = ['build_identity', 'record']
-    deps = entry.get('after', [])
-    entry['after'] = ([deps] if isinstance(deps, str) else deps) + ['budget']
+        entry['reads'] = ['build_identity', 'record']
+    deps = entry.get('reads', [])
+    entry['reads'] = ([deps] if isinstance(deps, str) else deps) + ['budget']
     job(**entry)
     if entry['name'] == 'build_chkx':
-        job(name='build_identity', lane='cpu', after='build_chkx', timeout=120,
+        job(name='build_identity', lane='cpu', reads='build_chkx', timeout=120,
             cmd=f'.venv/bin/python -m examples.sessions.vlbest --verify-build --directory {LOGS}')
 
 
@@ -96,14 +96,27 @@ def arm_command(cfg, name, timeout=360):
 
 
 # Donor preparation has no budget admission and needs no GPU.
-job(name='moe_configs', lane='cpu', after=['docker_pull', 'dl'], timeout=180,
+job(name='moe_configs', lane='cpu', reads=['docker_pull', 'dl'], timeout=180,
     cmd=f'sudo docker run --rm -v "$HOME:$HOME" -w "$HOME/etx" --entrypoint timeout '
         f'{IMAGE} -k 5 150 python3 -m examples.sessions.vlbest --prepare-moe')
 
 # Admit optional work in reverse drop priority; reserve both screenings and
 # the unchanged finals before admitting any lower-priority diagnostic.
-job(name='screen_budget', lane='cpu', after=['gate_unf', 'moe_configs'], timeout=10,
+def go(token, guard, regex):
+    """A GO token: written only when the guard job's log matches (a gated job reads it and is skipped without it)."""
+    job(name=f'go_{token}', lane='cpu', reads=[guard], timeout=10, writes=[f'?go_{token}.ok'],
+        cmd=f'grep -Eq {shlex.quote(regex)} "$ETX_SESS_LOGDIR/{guard}.log" && touch "$ETX_SESS_LOGDIR/go_{token}.ok"; true')
+    return f'go_{token}.ok'
+
+
+def done(names):
+    """Wait for these jobs, whatever their result (the GPU lane orders GPU jobs by itself)."""
+    return ['?' + n for n in names]
+
+
+job(name='screen_budget', lane='cpu', reads=['gate_unf', 'moe_configs'], timeout=10,
     cmd='python3 -m examples.sessions.vlbest --budget-guard screen')
+GATE = {arm: go(f'screen_{arm}', 'screen_budget', f'^SCREEN {arm} GO$') for arm in ('S3', 'S4f', 'S5f')}
 finished = ['screen_budget']
 for rnd in (1, 2):
     arms = ['S0_open'] + list(report.SCREEN_ARMS if rnd == 1 else reversed(report.SCREEN_ARMS)) + ['S0_close']
@@ -112,24 +125,24 @@ for rnd in (1, 2):
         deps = ['docker_pull', 'golden_sha', 'build_identity', 'gate_unf']
         if arm == 'S1':
             deps += ['moe_configs']
-        job(name=name, gpu=0, after=deps, after_any=list(finished), timeout=390,
-            gate=('screen_budget', f'^SCREEN {arm} GO$') if arm in ('S3', 'S4f', 'S5f') else None,
+        job(name=name, gpu=0, reads=deps + done(finished) + ([GATE[arm]] if arm in GATE else []), timeout=390,
             cmd=f'.venv/bin/python -m examples.sessions.vlbest --run-arm {arm.split("_")[0]} --name {name} --directory {LOGS}')
         finished.append(name)
-job(name='select_screen', lane='cpu', after=['etx_env'], after_any=list(finished), timeout=60,
+job(name='select_screen', lane='cpu', reads=['etx_env', *done(finished)], timeout=60,
     cmd=f'.venv/bin/python -m examples.vllm_llm.vlbest_report {LOGS} --select screen')
 finished.append('select_screen')
-job(name='b_budget', lane='cpu', after='select_screen', timeout=10,
+job(name='b_budget', lane='cpu', reads='select_screen', timeout=10,
     cmd='python3 -m examples.sessions.vlbest --budget-guard b')
 finished.append('b_budget')
+STAGE_B = go('stage_b', 'b_budget', r'^STAGE-B GO$')
 for rnd in (1, 2):
     for arm in ('S0_open', 'C2', 'S0_close'):
         name = f'b_r{rnd}_{arm}'
-        job(name=name, gpu=0, after=['select_screen', 'build_identity', 'gate_unf'], after_any=list(finished), timeout=390,
-            gate=('b_budget', r'^STAGE-B GO$'),
+        job(name=name, gpu=0, reads=['select_screen', 'build_identity', 'gate_unf', STAGE_B, *done(finished)],
+            timeout=390,
             cmd=f'.venv/bin/python -m examples.sessions.vlbest --run-selected combination --arm {arm} --name {name} --directory {LOGS}')
         finished.append(name)
-job(name='select_final', lane='cpu', after='select_screen', after_any=list(finished), timeout=60,
+job(name='select_final', lane='cpu', reads=['select_screen', *done(finished)], timeout=60,
     cmd=f'.venv/bin/python -m examples.vllm_llm.vlbest_report {LOGS} --select final')
 finished.append('select_final')
 for rnd in range(1, 6):
@@ -138,23 +151,24 @@ for rnd in range(1, 6):
         cmd = (nvchk.capture('--unfused' if arm == 'etxu' else '') if arm.startswith('etx') else
                arm_command(report.config('S0'), name) if arm == 'S0' else
                f'.venv/bin/python -m examples.sessions.vlbest --run-selected final --arm F --name {name} --directory {LOGS}')
-        job(name=name, gpu=0, after=['select_final', 'build_identity', 'gate_unf'], after_any=list(finished), timeout=390, cmd=cmd)
+        job(name=name, gpu=0, reads=['select_final', 'build_identity', 'gate_unf', *done(finished)], timeout=390,
+            cmd=cmd)
         finished.append(name)
-job(name='report', lane='cpu', after_any=[j['name'] for j in JOBS], timeout=120,
+job(name='report', lane='cpu', reads=done(j['name'] for j in JOBS), timeout=120,
     cmd=f'.venv/bin/python -m examples.vllm_llm.vlbest_report {LOGS}')
 
 
-job(name='triplet_budget', lane='cpu', after_any=['report'], timeout=10,
+job(name='triplet_budget', lane='cpu', reads=done(['report']), timeout=10,
     cmd='python3 -m examples.sessions.vlbest --budget-guard triplets')
+TRIPLETS = go('triplets', 'triplet_budget', r'^TRIPLETS GO$')
 finished = ['report', 'triplet_budget']
 for original in nvchk.JOBS:
     if original['name'].startswith(('poll_r', 'block_r', 'graph_r')):
         entry = deepcopy(original)
-        entry.update(after=['build_identity', 'gate_unf'], after_any=list(finished),
-                     gate=('triplet_budget', r'^TRIPLETS GO$'))
+        entry.update(reads=['build_identity', 'gate_unf', TRIPLETS, *done(finished)])
         job(**entry)
         finished.append(entry['name'])
-job(name='sync_report', lane='cpu', after_any=list(finished), timeout=120,
+job(name='sync_report', lane='final', timeout=120,
     cmd=f'.venv/bin/python -m examples.sessions.nvchk --report-sync {LOGS}')
 
 

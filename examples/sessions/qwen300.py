@@ -68,7 +68,7 @@ Report fused and same-kernel HIP graph, device separately, and Job 1 bf16 vLLM.
 No shorter-run numbers; missing/failed arms are explicitly NOT-COMPLETE.
 '''
 JOBS = [dict(name=f'job{i}_{name}', gpu=0, machine='A', quiet_s=180,
-             timeout=seconds, after_any=[] if i == 1 else ['job1_pricing'],
+             timeout=seconds,
              cmd=f'stdbuf -oL -eL python3 -u -m {MODULE} --job {i}')
         for i, name, seconds in [(1, 'pricing', 1800), (2, 'key32', 2400)]]
 

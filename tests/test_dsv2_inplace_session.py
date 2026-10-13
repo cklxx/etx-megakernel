@@ -53,25 +53,24 @@ def test_job_graph_order_and_inputs():
     gpu = [j.name for j in jobs if j.lane == "gpu"]
     assert gpu[:5] == ["prep_ref", "baseline", "pairs_all", "trace_default", "trace_all"]   # decision before attribution
     assert gpu[5:8] == ["pairs_coh", "pairs_d4", "d4trace"]   # D2, D4: new conditions before the 10-13 attributions
-    assert by["pairs_coh"].after == ["preflight", "build_default", "build_coh", "build_relaxed"]
-    assert by["pairs_coh"].after_any == ["trace_all"]
-    assert by["pairs_d4"].after == ["preflight", "build_default", "build_d4"] and by["d4trace"].after == ["preflight", "build_d4"]
-    # a skipped after_any predecessor releases its successor at once: every GPU measurement gates HARD on preflight
-    # and on every binary it runs (2026-10-13 d1d5 run: the singles started before the data existed)
+    assert set(gpu[8:]) == {f"pairs_{a}" for a in ins.SINGLE}
+    assert by["pairs_coh"].reads == ["inputs.json", "b_default/run", "b_relaxed/run", "b_coh/run"]
+    assert by["pairs_all"].reads == ["inputs.json", "b_default/run", "b_all/run"]       # fleet: context only
+    assert by["baseline"].reads == ["inputs.json", "b_default/run", "b_fleet/run"]
+    assert by["d4trace"].reads == ["inputs.json", "b_d4/run"]
+    # the 2026-10-13 d1d5 loss: every GPU measurement reads inputs.json, which only a passed preflight writes, and
+    # preflight reads the five data files their prep jobs write
+    assert by["preflight"].writes == ["inputs.json"] and len(by["preflight"].reads) == len(ins.DATA_FILES)
+    assert set(by["preflight"].reads) == set(by["prep_ref"].writes) | set(by["prep_pack"].writes)
     for j in jobs:
         if j.lane == "gpu" and j.name != "prep_ref":
-            assert "preflight" in j.after, j.name
-        if j.name.startswith("pairs_"):
-            assert "build_default" in j.after and f"build_{j.name[6:]}" in j.after, j.name
-    assert set(gpu[8:]) == {f"pairs_{a}" for a in ins.SINGLE}
-    for arm in (*(a for a in ins.ARMS if a not in ("allrelaxed", "d4r0", "alld4r0", "l1", "alld4r0l1", "alld3", "alld4s", "alld5")), "fleet"):   # follow-up session files
-        assert f"build_{arm}" in by and by[f"build_{arm}"].after == ["source"]
+            assert j.reads[0] == "inputs.json" and all(r.endswith("/run") for r in j.reads[1:]), j.name
+        if j.name.startswith("build_"):
+            assert j.reads == ["source.json"] and j.writes == [f"b_{j.name[6:]}/run"], j.name
     for arm in ins.STAMPED:
-        assert f"--stamped" in by[f"build_{arm}_stamps"].cmd
-    assert "preflight" in by["baseline"].after and "preflight" in by["pairs_all"].after
-    assert by["pairs_all"].after_any == ["baseline"] and by["trace_default"].after_any == ["pairs_all"]
-    assert "pairs_all" in by["report"].after
-    assert all("ETX_DSV2_DATA:=$HOME/dsv2-data" in j.cmd and "ETX_DSV2_FLEET:=$HOME/fleet-3fb67a6" in j.cmd for j in jobs)
+        assert "--stamped" in by[f"build_{arm}_stamps"].cmd
+    assert by["report"].lane == "final" and by["report"].reads == ["pairs_all.json"]
+    assert all(j.env["ETX_DSV2_DATA"] and j.env["ETX_DSV2_FLEET"] for j in jobs)
     assert all("fleet-mi300x" not in j.cmd for j in jobs)
 
 
@@ -290,20 +289,19 @@ def test_d5_two_way_pairs_require_every_invocation_complete(tmp_path, monkeypatc
 
 def test_the_paid_hour_session_order_and_gates():
     """examples/sessions/ds_hour.py: the D2b rerun first, D3 / D5 next, the stamped record, the optional arm last; every
-    GPU job gated hard on preflight and on each binary it runs. No hash job: the runner seals the record."""
+    GPU job reads inputs.json and each binary it runs; the GPU lane keeps this order (R07); the runner seals."""
     jobs, limit = load_session(Path("examples/sessions/ds_hour.py"))
     assert limit == 1800
     gpu = [j for j in jobs if j.lane == "gpu" and j.name != "prep_ref"]
     assert [j.name for j in gpu] == ["pairs_l1", "pairs_alld4r0l1", "pairs_alld3", "pairs_alld5", "trace_default",
                                      "trace_alld4r0", "trace_alld4r0l1", "pairs_alld4s"]
-    by = {j.name: j for j in jobs}
+    writers = {w for j in jobs for w in j.writes}
     for j in gpu:
-        assert "preflight" in j.after and all(dep in by for dep in j.after), j.name
-    assert by["pairs_alld3"].after == ["preflight", "build_all", "build_alld3"]
-    assert by["trace_alld4r0l1"].after == ["preflight", "build_alld4r0l1_stamps"]
+        assert j.reads[0] == "inputs.json" and set(j.reads) <= writers, j.name
+    by = {j.name: j for j in jobs}
+    assert by["pairs_alld3"].reads == ["inputs.json", "b_all/run", "b_alld3/run"]
+    assert by["trace_alld4r0l1"].reads == ["inputs.json", "b_alld4r0l1_stamps/run"]
     assert "hash_session" not in by and "prep_sums" not in by
-    for k, j in enumerate(gpu):              # review 07, R07: each GPU job waits for ALL earlier ones
-        assert set(j.after_any) == {g.name for g in gpu[:k]}, j.name
     for arm in ("l1", "alld4r0l1", "alld3", "alld5", "alld4s"):
         assert arm in ins.RULES, arm                    # every candidate measured in the hour has a rule
 

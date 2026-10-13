@@ -29,21 +29,26 @@ Run (after local validation, balance check and budget authorization):
   examples/dsv2lite/reproduce.sh stage <ip> && ETX_SESS_MAX_SECONDS=7200 tools/session.sh start <ip> examples/sessions/ds_inplace.py 0
 Use --dry-run locally. Fetch the session directory into the tree before deleting the VM; delete it right after.
 """
+import os
+
+from examples.dsv2lite.inplace_session import DATA_FILES, arm_order
+
 MAX_SESSION_SECONDS = 7200
 SINGLE = ("Q", "Qall", "N", "Nall", "argmax", "topk", "prep", "relaxed")   # relaxed: D1, the sc0 acquire by name
 JOBS = []
 
-# The runner forwards only ETX_SESS_MAX_SECONDS, so the paths get their defaults in every job's shell.
-PATHS = (': "${ETX_DSV2_FLEET:=$HOME/fleet-3fb67a6}"; : "${ETX_DSV2_DATA:=$HOME/dsv2-data}"; '
-         "export ETX_DSV2_FLEET ETX_DSV2_DATA; ")
+# The runner loads this file on the box, so these are the box's defaults; every job gets them, and the runner expands
+# the $ETX_DSV2_DATA paths jobs read and write with the same values.
+ENV = dict(ETX_DSV2_FLEET=os.environ.get("ETX_DSV2_FLEET", os.path.expanduser("~/fleet-3fb67a6")),
+           ETX_DSV2_DATA=os.environ.get("ETX_DSV2_DATA", os.path.expanduser("~/dsv2-data")))
 PREP_PY = "$HOME/dsv2-prep/.venv/bin/python"
 MODEL = "$HOME/models/dsv2-lite-base"
+DATA = {name: f"$ETX_DSV2_DATA/{name}" for name in DATA_FILES}
 
 
-def job(name, cmd, *, lane="cpu", after=(), gate=None, timeout=600, summary=()):
-    JOBS.append(dict(name=name, lane=lane, gpu=0 if lane == "gpu" else None,
-                     after=list(after), gate=gate, timeout=timeout, quiet_s=90,
-                     cmd=PATHS + cmd, summary=list(summary)))
+def job(name, cmd, *, lane="cpu", reads=(), writes=(), timeout=600, summary=()):
+    JOBS.append(dict(name=name, lane=lane, gpu=0 if lane == "gpu" else None, reads=list(reads), writes=list(writes),
+                     timeout=timeout, quiet_s=90, cmd=cmd, env=dict(ENV), summary=list(summary)))
 
 
 def add(name, operation, **kw):
@@ -51,12 +56,31 @@ def add(name, operation, **kw):
         summary=[r"^(SOURCE|PREFLIGHT|BUILD|PAIRS|TRACE|D4TRACE|REPORT) "], **kw)
 
 
+def build(arm, stamped=False):
+    tag = "_stamps" if stamped else ""
+    add(f"build_{arm}{tag}", f"build {arm}" + (" --stamped" if stamped else ""), reads=["source.json"],
+        writes=[f"b_{arm}{tag}/run"], timeout=1200)
+
+
+def pairs(arm, timeout=1200, name=None):
+    """Reads exactly what `pairs <arm>` runs: the verified inputs and each build of the arm's order (fleet is context
+    for `all`, run only if it built; it is required where it is the candidate)."""
+    order, _, cand = arm_order(arm)
+    add(name or f"pairs_{arm}", f"pairs {arm}", lane="gpu", writes=[f"pairs_{arm}.json"], timeout=timeout,
+        reads=["inputs.json", *(f"b_{b}/run" for b in order if b != "fleet" or cand == "fleet")])
+
+
+def trace(arm, timeout=300):
+    add(f"trace_{arm}", f"trace {arm}", lane="gpu", reads=["inputs.json", f"b_{arm}_stamps/run"],
+        writes=[f"stages_{arm}.json"], timeout=timeout)
+
+
 # ---------------------------------------------------------------- environments (cpu); recipes from ds_gap.py
 job("apt", "python3 -c 'import ensurepip' 2>/dev/null || "
            "{ sudo apt-get update -qq; sudo apt-get install -y -qq python3.12-venv; }")
 job("etx_env", ".venv/bin/python -c 1 2>/dev/null || { rm -rf .venv; python3 -m venv --system-site-packages .venv; }; "
                ".venv/bin/python -c 'import yaml' 2>/dev/null || .venv/bin/pip install -q pyyaml; "
-               ".venv/bin/python -c 'import etx; print(\"etx ok\")'", after=("apt",))
+               ".venv/bin/python -c 'import etx; print(\"etx ok\")'", reads=("apt",))
 job("prep_env", f"{PREP_PY} -c 1 2>/dev/null || {{ rm -rf $HOME/dsv2-prep; python3 -m venv $HOME/dsv2-prep/.venv; }}; "
                 ". $HOME/dsv2-prep/.venv/bin/activate; "
                 "pip install -q --upgrade pip; pip install -q numpy 'huggingface_hub[hf_transfer]' hf_transfer; "
@@ -65,62 +89,46 @@ job("prep_env", f"{PREP_PY} -c 1 2>/dev/null || {{ rm -rf $HOME/dsv2-prep; pytho
                 "SP=$(python3 -c 'import site;print(site.getsitepackages()[0])'); mkdir -p $SP/flash_attn; "
                 "echo '# stub: satisfies transformers check_imports only' > $SP/flash_attn/__init__.py; "
                 "python3 -c 'import torch, transformers; print(torch.__version__, torch.cuda.is_available(), transformers.__version__)'",
-    after=("apt",), timeout=1800)
-add("source", "source", after=("etx_env",), timeout=300)
+    reads=("apt",), timeout=1800)
+add("source", "source", reads=("etx_env",), writes=["source.json"], timeout=300)
 
 # ---------------------------------------------------------------- inputs, produced on the box from the pinned export
 job("prep_dl", f"HF_HUB_ENABLE_HF_TRANSFER=1 {PREP_PY} -c \"from huggingface_hub import snapshot_download; "
                f"snapshot_download('deepseek-ai/DeepSeek-Coder-V2-Lite-Base', local_dir='{MODEL}', "
                "allow_patterns=['*.json', '*.safetensors', '*.py', 'tokenizer*'], max_workers=8); print('DL-DONE')\" "
-               f"&& du -sh {MODEL} && test -f {MODEL}/config.json", after=("prep_env",), timeout=1800)
+               f"&& du -sh {MODEL} && test -f {MODEL}/config.json", reads=("prep_env",), writes=[f"{MODEL}/config.json"],
+    timeout=1800)
 job("prep_ref", 'mkdir -p "$ETX_DSV2_DATA" && cd "$ETX_DSV2_FLEET" && '
                 '{ test -s "$ETX_DSV2_DATA/fleet_cache.bin" -a -s "$ETX_DSV2_DATA/golden_tokens.txt" '
                 '-a -s "$ETX_DSV2_DATA/golden_hidden.bin" || '
                 f'HIP_VISIBLE_DEVICES=$GPU {PREP_PY} src/host/reference_run.py --model {MODEL} '
                 '--out "$ETX_DSV2_DATA/golden.npz"; } && ls -la "$ETX_DSV2_DATA"',
-    lane="gpu", after=("prep_dl", "source"), timeout=1200,
+    lane="gpu", reads=(f"{MODEL}/config.json", "source.json"), timeout=1200,
+    writes=[DATA[n] for n in ("fleet_cache.bin", "golden_tokens.txt", "golden_hidden.bin")],
     summary=[r"smallest top-2 margin|wrote |golden"])
 job("prep_pack", 'cd "$ETX_DSV2_FLEET" && { test -s "$ETX_DSV2_DATA/weights.bin" -a -s "$ETX_DSV2_DATA/weights.bin.manifest" || '
                  f'{PREP_PY} src/host/pack_weights.py --model {MODEL} --out "$ETX_DSV2_DATA/weights.bin"; }} '
-                 '&& ls -la "$ETX_DSV2_DATA"', after=("prep_ref",), timeout=1200, summary=[r"wrote |expert stride"])
-add("preflight", "preflight", after=("prep_pack",), timeout=600)
+                 '&& ls -la "$ETX_DSV2_DATA"', reads=(f"{MODEL}/config.json", "prep_ref"), timeout=1200,
+    writes=[DATA["weights.bin"], DATA["weights.bin.manifest"]], summary=[r"wrote |expert stride"])
+# every GPU measurement reads inputs.json, which only a passed preflight writes, and each binary it runs: the
+# 2026-10-13 d1d5 run started the single-lever pairs at +1 min, before prep_pack wrote the inputs at +3 min
+add("preflight", "preflight", reads=list(DATA.values()), writes=["inputs.json"], timeout=600)
 
 # ---------------------------------------------------------------- builds (cpu, while the inputs are prepared)
 DITEMS = ("coh", "d4")   # D2: three-way pairs default / relaxed / coh; D4: pairs default / d4 (docs/DSV2-D1-D5.md)
 for arm in ("default", "fleet", "all", *SINGLE, *DITEMS):
-    add(f"build_{arm}", f"build {arm}", after=("source",), timeout=1200)
+    build(arm)
 for arm in ("default", "all"):
-    add(f"build_{arm}_stamps", f"build {arm} --stamped", after=("source",), timeout=1200)
+    build(arm, stamped=True)
 
-# ---------------------------------------------------------------- GPU, in order of importance
-add("baseline", "pairs baseline", lane="gpu", after=("preflight", "build_default", "build_fleet"), timeout=900)
-# A failed reference or decision must not cost the data that explain it: later GPU jobs follow "whatever the result".
-add("pairs_all", "pairs all", lane="gpu", after=("preflight", "build_default", "build_all"), timeout=1200)
-JOBS[-1]["after_any"] = ["baseline"]
-# Every GPU measurement depends HARD on preflight and on each binary it runs: an after_any predecessor that is SKIPPED
-# releases its successor at once, and on 2026-10-13 (d1d5 run) that started the single-lever pairs before the data
-# existed (build_coh failed -> pairs_coh/pairs_d4/d4trace skipped -> pairs_Q.. ran at +1 min, prep_pack wrote at +3 min).
-GATE = ("preflight", "build_default")
-add("trace_default", "trace default", lane="gpu", after=("preflight", "build_default_stamps"), timeout=300)
-JOBS[-1]["after_any"] = ["pairs_all"]
-add("trace_all", "trace all", lane="gpu", after=("preflight", "build_all_stamps"), timeout=300)
-JOBS[-1]["after_any"] = ["trace_default"]
-previous = "trace_all"
+# ---------------------------------------------------------------- GPU, in order of importance (the list order)
+pairs("baseline", timeout=900, name="baseline")
+pairs("all")                             # the decision
+trace("default")
+trace("all")
 for arm in DITEMS:                       # new conditions before the attributions already measured on 2026-10-13
-    needs = [*GATE, f"build_{arm}"] + (["build_relaxed"] if arm == "coh" else [])
-    add(f"pairs_{arm}", f"pairs {arm}", lane="gpu", after=(previous, *needs), timeout=1200)
-    JOBS[-1]["after_any"] = [previous]
-    JOBS[-1]["after"] = needs
-    previous = f"pairs_{arm}"
-add("d4trace", "d4trace", lane="gpu", after=(previous, "build_d4"), timeout=300)   # D4 criterion (a)
-JOBS[-1]["after_any"] = [previous]
-JOBS[-1]["after"] = ["preflight", "build_d4"]
-previous = "d4trace"
+    pairs(arm)
+add("d4trace", "d4trace", lane="gpu", reads=["inputs.json", "b_d4/run"], writes=["d4_trace.json"], timeout=300)
 for arm in SINGLE:                       # attribution: each lever alone, after everything that decides
-    add(f"pairs_{arm}", f"pairs {arm}", lane="gpu", after=(previous, f"build_{arm}"), timeout=900)
-    JOBS[-1]["after_any"] = [previous]
-    JOBS[-1]["after"] = [*GATE, f"build_{arm}"]
-    previous = f"pairs_{arm}"
-add("report", "report", after=("pairs_all",), timeout=120)
-JOBS[-1]["after_any"] = ["trace_default", "trace_all", *(f"pairs_{a}" for a in DITEMS), "d4trace",
-                         *(f"pairs_{a}" for a in SINGLE)]
+    pairs(arm, timeout=900)
+add("report", "report", lane="final", reads=["pairs_all.json"], writes=["report.json"], timeout=120)

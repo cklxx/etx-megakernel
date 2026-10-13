@@ -17,10 +17,7 @@ PREP = ("apt", "etx_env", "prep_env", "source", "prep_dl", "prep_ref", "prep_pac
 JOBS = [dict(d) for d in _full.JOBS if d["name"] in PREP]
 _full.JOBS.clear()
 for arm in ("alld4r0", "l1", "alld4r0l1"):
-    _full.add(f"build_{arm}", f"build {arm}", after=("source",), timeout=1200)
-_full.add("pairs_l1", "pairs l1", lane="gpu", after=("preflight", "build_default", "build_relaxed", "build_l1"),
-          timeout=1200)
-_full.add("pairs_alld4r0l1", "pairs alld4r0l1", lane="gpu",
-          after=("preflight", "build_default", "build_alld4r0", "build_alld4r0l1"), timeout=1200)
-_full.JOBS[-1]["after_any"] = ["pairs_l1"]
+    _full.build(arm)
+_full.pairs("l1")
+_full.pairs("alld4r0l1")
 JOBS += _full.JOBS

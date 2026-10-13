@@ -4,12 +4,17 @@ A session is a Python file that defines JOBS, a list of dicts:
 
   name      unique; the log is <logdir>/<name>.log (full output, never filtered)
   cmd       bash command (run with `bash -c`, from `cwd`); $GPU holds the GPU id the job got
-  lane      "gpu" (default: one job per GPU at a time) or "cpu" (builds, downloads: --cpu-slots in parallel)
+  lane      "gpu" (default): one job per GPU at a time, STRICTLY in list order per GPU (a job never overtakes an
+            earlier one that is still pending; a skip advances the queue); "cpu" (builds, downloads: --cpu-slots in
+            parallel); "final": one at a time, after every other job is terminal (reports)
   gpu       pin to one GPU id (A/B pairs that must share a device); default: any free GPU. A pin to a GPU the
             machine does not have folds onto the first GPU (so a two-GPU session also runs, serially, on one)
-  after     names that must have finished OK first (a failed or skipped one skips this job)
-  after_any names that must have finished, whatever the result
-  gate      name of an earlier job and a regex: run only if that job's log matches, e.g. ("sync_gate", "UC_GO=1")
+  writes    files the job produces: relative to the record, or absolute / ~ / $VAR paths (the job's env first). A job
+            that exits 0 without one of them FAILS ("declared output missing"); a leading "?" marks an output the job
+            may decide not to write (a GO token): its readers are skipped when it is absent
+  reads     what the job needs: a file (written by the job that declares it, or present before the session) or a job
+            name (that job's success). The job waits until each producer finished, and is skipped if one did not
+            succeed or a file without producer is absent. A leading "?" waits for the producer, whatever its result.
   timeout   seconds (default 900); on expiry the job's whole process tree is killed and the job reported "timeout"
   env       extra environment
   machine   which machine runs it (default "A"): one runner per machine, `--machine B` on the second VM
@@ -24,7 +29,7 @@ ETX_SESS_MAX_SECONDS overrides MAX_SESSION_SECONDS for one run and must be finit
 
 Every GPU job gets HIP_VISIBLE_DEVICES=$GPU, so a single-GPU program runs on the lane's GPU; a docker command passes
 `-e HIP_VISIBLE_DEVICES=$GPU` itself. Order the list by priority (microbenchmarks and correctness first, captures last):
-a free lane takes the first ready job in list order.
+GPU jobs run strictly in list order per GPU, so the list order IS the priority.
 
   python3 -m etx.tools.gpu_jobs examples/sessions/next.py --gpus 0,1 --logdir ~/vlnext [--machine A] [--dry-run]
 
@@ -64,9 +69,8 @@ class Job:
     cmd: str
     lane: str = "gpu"
     gpu: int | None = None
-    after: list[str] = field(default_factory=list)
-    after_any: list[str] = field(default_factory=list)
-    gate: tuple[str, str] | None = None
+    reads: list[str] = field(default_factory=list)
+    writes: list[str] = field(default_factory=list)
     timeout: float = 900.0
     env: dict[str, str] = field(default_factory=dict)
     machine: str = "A"
@@ -82,6 +86,10 @@ class Job:
     proc: subprocess.Popen | None = None
     log: Path | None = None
     note: str = ""
+
+    def deps(self, optional=False) -> list[str]:
+        """The jobs this one needs to succeed, or (optional) waits for whatever their result: its bare-word reads."""
+        return [r.lstrip("?") for r in self.reads if r.startswith("?") == optional and not set("/.") & set(r)]
 
 
 def session_limit(limit: float | None) -> float | None:
@@ -107,24 +115,32 @@ def _load(path):
     spec.loader.exec_module(mod)
     jobs = []
     for d in mod.JOBS:
-        d = dict(d)
-        for k in ("after", "after_any", "summary"):
-            if isinstance(d.get(k), str):
-                d[k] = [d[k]]
-        if d.get("gate") is not None:
-            d["gate"] = tuple(d["gate"])
-        jobs.append(Job(**d))
+        d = {k: [v] if k in ("reads", "writes", "summary") and isinstance(v, str) else v for k, v in d.items()}
+        try:
+            jobs.append(Job(**d))
+        except TypeError as exc:
+            raise SystemExit(f"job {d.get('name')}: {exc}") from None
     names = [j.name for j in jobs]
     dup = {n for n in names if names.count(n) > 1}
     if dup:
         raise SystemExit(f"duplicate job names: {sorted(dup)}")
-    known = set(names)
+    writers = [w.lstrip("?") for j in jobs for w in j.writes]
     for j in jobs:
-        for dep in j.after + j.after_any + ([j.gate[0]] if j.gate else []):
-            if dep not in known:
-                raise SystemExit(f"job {j.name}: unknown dependency {dep!r}")
-        if j.lane not in ("gpu", "cpu"):
-            raise SystemExit(f"job {j.name}: lane must be gpu or cpu")
+        if j.lane not in ("gpu", "cpu", "final"):
+            raise SystemExit(f"job {j.name}: lane must be gpu, cpu or final")
+        for w in (w.lstrip("?") for w in j.writes):
+            if writers.count(w) > 1 or w in names:
+                raise SystemExit(f"job {j.name}: {w!r} has more than one writer or is a job name")
+        by, writer = {x.name: x for x in jobs}, {w.lstrip("?"): x for x in jobs for w in x.writes}
+        for r in (r.lstrip("?") for r in j.reads):
+            if not set("/.") & set(r) and r not in names:         # a bare word names a job: catch typos at load
+                raise SystemExit(f"job {j.name}: unknown dependency {r!r}")
+            p = by.get(r, writer.get(r))
+            if p is not None and p.lane == "final" and j.lane != "final":
+                raise SystemExit(f"job {j.name}: reads the final job {p.name!r}, which runs after it")
+            if p is not None and p.lane == j.lane == "gpu" and names.index(p.name) > names.index(j.name) and (
+                    p.gpu is None or j.gpu is None or p.gpu == j.gpu):
+                raise SystemExit(f"job {j.name}: reads {p.name!r}, a later job on its GPU lane (it would never run)")
     limit = session_limit(getattr(mod, "MAX_SESSION_SECONDS", None))
     return jobs, limit, tuple(getattr(mod, "LOCAL_ONLY", record.LOCAL_ONLY))
 
@@ -160,6 +176,11 @@ class Runner:
         self.t0 = time.time()
         self.deadline = time.monotonic() + max_seconds if max_seconds is not None else None
         self.by_name = {j.name: j for j in jobs}
+        self.writer = {w.lstrip("?"): j for j in jobs for w in j.writes}
+        for j in jobs:
+            if j.lane == "gpu" and j.gpu is not None and gpus and j.gpu not in gpus:
+                # a session written for two GPUs still runs on a one-GPU machine: the pin folds onto the first
+                j.note, j.gpu = f"pinned GPU {j.gpu} absent, run on GPU {gpus[0]}", gpus[0]
         self.local_only = local_only
 
     # -------------------------------------------------------------- helpers
@@ -167,24 +188,25 @@ class Runner:
         el = time.time() - self.t0
         print(f"[{time.strftime('%H:%M:%S', time.gmtime())} +{int(el // 60):3d}m{int(el % 60):02d}s] {msg}", file=self.out, flush=True)
 
-    def _deps_state(self, j: Job) -> str:
-        """ready | wait | skip"""
-        for d in j.after:
-            s = self.by_name[d].status
-            if s in ("fail", "timeout", "skipped"):
+    def path(self, j: Job, name: str) -> Path:
+        env = {**os.environ, **j.env, "ETX_SESS_LOGDIR": str(self.logdir)}
+        p = os.path.expanduser(re.sub(r"\$\{?(\w+)\}?", lambda m: env.get(m[1], m[0]), name))
+        return Path(p) if os.path.isabs(p) else self.logdir / p
+
+    def _state(self, j: Job) -> str:
+        """ready | wait | skip, from what the job reads (module docstring)"""
+        for r in j.reads:
+            key = r.lstrip("?")
+            producer = self.by_name.get(key, self.writer.get(key))
+            if producer is not None and producer.status in ("pending", "running"):
+                return "wait"
+            if r.startswith("?"):
+                continue
+            if producer is not None and producer.status != "ok":
+                j.note = f"{key}: {producer.name} {producer.status}"
                 return "skip"
-            if s != "ok":
-                return "wait"
-        for d in j.after_any:
-            if self.by_name[d].status in ("pending", "running"):
-                return "wait"
-        if j.gate:
-            g = self.by_name[j.gate[0]]
-            if g.status in ("pending", "running"):
-                return "wait"
-            text = g.log.read_text(errors="replace") if g.log and g.log.exists() else ""
-            if not re.search(j.gate[1], text, re.M):
-                j.note = f"gate {j.gate[0]} !~ {j.gate[1]!r}"
+            if key not in self.by_name and not self.path(j, key).exists():
+                j.note = f"absent: {key}"
                 return "skip"
         return "ready"
 
@@ -213,6 +235,9 @@ class Runner:
         self.say(f"start {j.name}" + (f" on GPU {gpu}" if gpu is not None else " (cpu)"))
 
     def _finish(self, j: Job, status: str) -> None:
+        missing = [w for w in j.writes if w[0] != "?" and not self.path(j, w).exists()] if status == "ok" else []
+        if missing:
+            status, j.note = "fail", f"declared output missing: {missing}"
         j.status, j.end = status, time.time()
         j.rc = j.proc.returncode if j.proc else None
         self._write_status()
@@ -277,7 +302,7 @@ class Runner:
                 return self._run()
         finally:
             self.out = out
-            plan = json.dumps([[j.name, j.cmd, j.lane, j.gpu, j.after, j.after_any, j.gate, j.timeout, j.env]
+            plan = json.dumps([[j.name, j.cmd, j.lane, j.gpu, j.reads, j.writes, j.timeout, j.env]
                                for j in self.jobs], default=str)
             s = record.seal(self.logdir, jobs={j.name: j.status for j in self.jobs},
                             plan=hashlib.sha256(plan.encode()).hexdigest(), local_only=self.local_only)
@@ -311,26 +336,33 @@ class Runner:
                             j.note = f"timeout {j.timeout:.0f}s"
                             self._finish(j, "timeout")
                 for j in self.jobs:                                   # skips propagate
-                    if j.status == "pending" and self._deps_state(j) == "skip":
+                    if j.status == "pending" and self._state(j) == "skip":
                         j.status = "skipped"
                         self._write_status()
-                        self.say(f"skip    {j.name}" + (f" [{j.note}]" if j.note else " [a dependency failed]"))
+                        self.say(f"skip    {j.name} [{j.note}]")
                 busy_gpus = {j.on_gpu for j in self.jobs if j.status == "running" and j.lane == "gpu"}
                 cpu_busy = sum(j.status == "running" and j.lane == "cpu" for j in self.jobs)
+                others_done = all(j.status not in ("pending", "running") for j in self.jobs if j.lane != "final")
+                final_free = not any(j.status == "running" and j.lane == "final" for j in self.jobs)
+                held = set()                                          # GPUs an earlier pending job holds in order
                 for j in self.jobs:                                   # start, in list order
-                    if j.status != "pending" or self._deps_state(j) != "ready":
+                    if j.status != "pending":
                         continue
+                    ready = self._state(j) == "ready"
                     if j.lane == "cpu":
-                        if cpu_busy < self.cpu_slots:
+                        if ready and cpu_busy < self.cpu_slots:
                             self._start(j, None); cpu_busy += 1
-                        continue
-                    if j.gpu is not None and j.gpu not in self.gpus:
-                        # a session written for two GPUs still runs on a one-GPU machine: the pin folds onto the first
-                        j.note = f"pinned GPU {j.gpu} absent, run on GPU {self.gpus[0]}"
-                        j.gpu = self.gpus[0]
-                    free = [g for g in self.gpus if g not in busy_gpus and (j.gpu is None or g == j.gpu)]
-                    if free:
-                        self._start(j, free[0]); busy_gpus.add(free[0])
+                    elif j.lane == "final":
+                        if ready and others_done and final_free:
+                            self._start(j, None)
+                        final_free = False                            # finals run one at a time, in order
+                    else:
+                        lanes = set(self.gpus) if j.gpu is None else {j.gpu}
+                        free = [g for g in self.gpus if g in lanes - busy_gpus - held]
+                        if ready and free:
+                            self._start(j, free[0]); busy_gpus.add(free[0])
+                        else:
+                            held |= lanes
                 if all(j.status not in ("pending", "running") for j in self.jobs):
                     break
                 if time.time() - last_progress > self.progress_s:
@@ -388,11 +420,9 @@ def main(argv=None) -> int:
     jobs = [j for j in jobs if j.machine == a.machine]
     if a.only:
         keep = {j.name for j in jobs if re.search(a.only, j.name)}
+        dropped = {w for j in jobs if j.name not in keep for w in j.writes} | {j.name for j in jobs} - keep
         for j in jobs:
-            j.after = [d for d in j.after if d in keep]
-            j.after_any = [d for d in j.after_any if d in keep]
-            if j.gate and j.gate[0] not in keep:
-                j.gate = None
+            j.reads = [r for r in j.reads if r.lstrip("?") not in dropped]
         jobs = [j for j in jobs if j.name in keep]
     gpus = [int(x) for x in a.gpus.split(",") if x != ""]
     if a.dry_run:
@@ -400,8 +430,9 @@ def main(argv=None) -> int:
             print(f"Session hard stop: {max_seconds:g}s from runner start (includes setup)")
         for i, j in enumerate(jobs):
             pin = f"GPU {j.gpu}" if j.gpu is not None else ("any GPU" if j.lane == "gpu" else "cpu")
-            deps = ", ".join(j.after + [f"~{d}" for d in j.after_any] + ([f"gate {j.gate[0]}~{j.gate[1]}"] if j.gate else []))
-            print(f"{i:3d} {j.name:32} {pin:8} timeout {j.timeout:5.0f}s  after: {deps or '-'}")
+            pin = "final" if j.lane == "final" else pin
+            print(f"{i:3d} {j.name:32} {pin:8} timeout {j.timeout:5.0f}s  reads: {', '.join(j.reads) or '-'}"
+                  + (f"  writes: {', '.join(j.writes)}" if j.writes else ""))
         return 0
     logdir = record.create(Path(os.path.expanduser(a.logdir)))
     return Runner(jobs, gpus, a.cpu_slots, logdir, a.progress_s, max_seconds=max_seconds, local_only=local_only).run()
