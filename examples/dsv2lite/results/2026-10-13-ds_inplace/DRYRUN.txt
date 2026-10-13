@@ -1,0 +1,34 @@
+Session hard stop: 7200s from runner start (includes setup)
+  0 apt                              cpu      timeout   600s  after: -
+  1 etx_env                          cpu      timeout   600s  after: apt
+  2 prep_env                         cpu      timeout  1800s  after: apt
+  3 source                           cpu      timeout   300s  after: etx_env
+  4 prep_dl                          cpu      timeout  1800s  after: prep_env
+  5 prep_ref                         GPU 0    timeout  1200s  after: prep_dl, source
+  6 prep_pack                        cpu      timeout  1200s  after: prep_ref
+  7 prep_sums                        cpu      timeout   600s  after: prep_pack
+  8 preflight                        cpu      timeout   600s  after: prep_sums
+  9 build_default                    cpu      timeout  1200s  after: source
+ 10 build_fleet                      cpu      timeout  1200s  after: source
+ 11 build_all                        cpu      timeout  1200s  after: source
+ 12 build_Q                          cpu      timeout  1200s  after: source
+ 13 build_Qall                       cpu      timeout  1200s  after: source
+ 14 build_N                          cpu      timeout  1200s  after: source
+ 15 build_Nall                       cpu      timeout  1200s  after: source
+ 16 build_argmax                     cpu      timeout  1200s  after: source
+ 17 build_topk                       cpu      timeout  1200s  after: source
+ 18 build_prep                       cpu      timeout  1200s  after: source
+ 19 build_default_stamps             cpu      timeout  1200s  after: source
+ 20 build_all_stamps                 cpu      timeout  1200s  after: source
+ 21 baseline                         GPU 0    timeout   900s  after: preflight, build_default, build_fleet
+ 22 pairs_all                        GPU 0    timeout  1200s  after: preflight, build_default, build_all, ~baseline
+ 23 trace_default                    GPU 0    timeout   300s  after: build_default_stamps, ~pairs_all
+ 24 trace_all                        GPU 0    timeout   300s  after: build_all_stamps, ~trace_default
+ 25 pairs_Q                          GPU 0    timeout   900s  after: build_Q, ~trace_all
+ 26 pairs_Qall                       GPU 0    timeout   900s  after: build_Qall, ~pairs_Q
+ 27 pairs_N                          GPU 0    timeout   900s  after: build_N, ~pairs_Qall
+ 28 pairs_Nall                       GPU 0    timeout   900s  after: build_Nall, ~pairs_N
+ 29 pairs_argmax                     GPU 0    timeout   900s  after: build_argmax, ~pairs_Nall
+ 30 pairs_topk                       GPU 0    timeout   900s  after: build_topk, ~pairs_argmax
+ 31 pairs_prep                       GPU 0    timeout   900s  after: build_prep, ~pairs_topk
+ 32 report                           cpu      timeout   120s  after: pairs_all, ~trace_default, ~trace_all, ~pairs_Q, ~pairs_Qall, ~pairs_N, ~pairs_Nall, ~pairs_argmax, ~pairs_topk, ~pairs_prep
