@@ -4,6 +4,7 @@ the real `etx compile` command line."""
 from __future__ import annotations
 
 import dataclasses
+import json
 import os
 import re
 import subprocess
@@ -152,3 +153,252 @@ def test_d4_verdict_and_trace_criterion(monkeypatch):
     monkeypatch.setattr(ld, "load_etx", lambda plan, trace, pro: fake)
     r = d4.trace_lead("plan.json", "trace.bin")
     assert r["layers"] == 2 and r["before_routing"] == 1 and r["leads_us"] == {"5": 9.5, "6": -1.0}
+
+
+def test_d4s_session_builds_the_three_arms_before_timing(monkeypatch):
+    from etx.tools.gpu_jobs import load_session
+    from examples.dsv2lite.inplace_session import ARMS, ARM_ENV, ARM_FLAGS, LEVERS_ALL
+    monkeypatch.delenv("ETX_SESS_MAX_SECONDS", raising=False)
+    jobs, limit = load_session(ROOT / "examples/sessions/ds_d4s.py")
+    by = {j.name: j for j in jobs}
+    assert limit == 1800
+    assert set(by) == {"etx_env", "source", "preflight", "build_default", "build_alld4r0", "build_alld4s",
+                       "pairs_alld4s"}
+    assert by["source"].after == ["etx_env"] and by["preflight"].after == ["source"]
+    for arm in ("default", "alld4r0", "alld4s"):
+        assert by[f"build_{arm}"].after == ["source"]
+        assert by[f"build_{arm}"].cmd.endswith(f"inplace_session build {arm}")
+    assert [j.name for j in jobs if j.lane == "gpu"] == ["pairs_alld4s"]
+    assert by["pairs_alld4s"].gpu == 0
+    assert by["pairs_alld4s"].after == ["preflight", "build_default", "build_alld4r0", "build_alld4s"]
+    assert by["pairs_alld4s"].cmd.endswith("inplace_session pairs alld4s")
+    assert ARMS["alld4s"] == ARMS["alld4r0"] == LEVERS_ALL
+    assert ARM_FLAGS["alld4s"] == ARM_FLAGS["alld4r0"] == ["-DETX_DSV2_D4=1"]
+    assert ARM_ENV["alld4s"] == {"ETX_DSV2_D4": "1", "ETX_DSV2_D4_ROWS": "32"}
+    assert ARM_ENV["alld4r0"] == {"ETX_DSV2_D4": "1", "ETX_DSV2_D4_ROWS": "0"}
+
+
+def _slice_session(tmp_path, monkeypatch):
+    from examples.dsv2lite.inplace_session import Session
+    for name in ("ETX_SESS_LOGDIR", "ETX_DSV2_FLEET", "ETX_DSV2_DATA"):
+        monkeypatch.setenv(name, str(tmp_path / name))
+    return Session()
+
+
+def _full_slice_log(device_ms):
+    return ("run 0 (warm-up): 32/32 tokens match\n"
+            "consecutive layers within the gate: 27 of 27\n"
+            f"per-token latency (embed -> argmax on device): median {device_ms:.6f} ms\n"
+            f"step wall (launch to end) {device_ms + 0.1:.6f} ms/token\n"
+            "tokens: 32/32 match HF greedy\n")
+
+
+@pytest.mark.parametrize("gains,keep", [
+    ([40, 35, 42, 38, 41], True),
+    ([10, 9, 11, 8, 10], False),             # faster than default by >100 us, but <30 us against alld4r0
+    ([40, 35, -1, 38, 41], False),           # every pair must improve
+    ([40, 20, 30, 35, 40], False),           # median must exceed twice the full-range spread
+])
+def test_d4s_pairs_decides_against_alld4r0_and_reverses_order(tmp_path, monkeypatch, capsys, gains, keep):
+    s = _slice_session(tmp_path, monkeypatch)
+    seen = []
+
+    def run(name, command, **kwargs):
+        _, round_name, arm = name.split("_", 2)
+        seen.append(arm)
+        r = int(round_name[1:])
+        device = {"default": 3.650, "alld4r0": 3.500, "alld4s": 3.500 - gains[r] / 1000}[arm]
+        return _full_slice_log(device)
+
+    monkeypatch.setattr(s, "run", run)
+    s.pairs("alld4s")
+    assert seen == ["default", "alld4r0", "alld4s", "alld4s", "alld4r0", "default"] * 2 + \
+                   ["default", "alld4r0", "alld4s"]
+    report = json.loads((s.logs / "pairs_alld4s.json").read_text())
+    assert len(report["rounds"]) == 5
+    assert all(v["tokens"] == 32 and v["layers"] == 27 for r in report["rounds"] for v in r.values())
+    for basis in ("device_ms", "wall_ms"):
+        assert set(report[basis]) == {"default", "alld4r0"}
+        assert report[basis]["alld4r0"]["gains_us"] == pytest.approx(gains)
+    assert report["keep_vs_alld4r0"]["keep"] is keep
+    assert report["device_ms"]["default"]["median_us"] > 100
+    assert f"KEEP={keep}" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("arm", ["default", "alld4r0", "alld4s"])
+@pytest.mark.parametrize("old,new", [("27 of 27", "26 of 27"), ("tokens: 32/32", "tokens: 31/32"),
+                                    ("32/32 tokens match", "31/32 tokens match")])
+def test_d4s_pairs_refuses_any_arm_with_a_failed_gate(tmp_path, monkeypatch, arm, old, new):
+    s = _slice_session(tmp_path, monkeypatch)
+
+    def run(name, command, **kwargs):
+        log = _full_slice_log(3.5)
+        return log.replace(old, new) if name.endswith(f"_{arm}") else log
+
+    monkeypatch.setattr(s, "run", run)
+    with pytest.raises(ValueError):
+        s.pairs("alld4s")
+    assert not (s.logs / "pairs_alld4s.json").exists()
+
+
+@pytest.mark.parametrize("gains,keep", [
+    ([30.0] * 5, True),                    # inclusive minimum gain
+    ([29.999] * 5, False),
+    ([30.0, 30.0, 30.0, 30.0, 45.0], False),  # exclusive twice-spread bound: median = 2 x spread
+    ([30.0, 30.0, 30.0, 30.0, 44.999], True),
+])
+def test_d4s_numeric_keep_boundaries(gains, keep):
+    from examples.dsv2lite.inplace_session import d4_verdict, paired
+    assert d4_verdict(paired(gains))["keep"] is keep
+
+
+@pytest.mark.parametrize("fail_at", [1, 8, 15])
+@pytest.mark.parametrize("failure", [RuntimeError("deadline; NOT COMPLETE"), KeyboardInterrupt()])
+def test_d4s_pairs_does_not_publish_an_interrupted_run(tmp_path, monkeypatch, capsys, fail_at, failure):
+    s = _slice_session(tmp_path, monkeypatch)
+    calls = 0
+
+    def run(name, command, **kwargs):
+        nonlocal calls
+        calls += 1
+        if calls == fail_at:
+            raise failure
+        return _full_slice_log(3.5)
+
+    monkeypatch.setattr(s, "run", run)
+    with pytest.raises(type(failure)):
+        s.pairs("alld4s")
+    assert calls == fail_at
+    assert not (s.logs / "pairs_alld4s.json").exists()
+    assert "KEEP=" not in capsys.readouterr().out
+
+
+def test_d4s_pairs_rejects_a_truncated_last_invocation(tmp_path, monkeypatch, capsys):
+    s = _slice_session(tmp_path, monkeypatch)
+    calls = 0
+
+    def run(name, command, **kwargs):
+        nonlocal calls
+        calls += 1
+        log = _full_slice_log(3.5)
+        return log.rsplit("tokens:", 1)[0] if calls == 15 else log
+
+    monkeypatch.setattr(s, "run", run)
+    with pytest.raises(ValueError, match="32/32 free-greedy gate"):
+        s.pairs("alld4s")
+    assert calls == 15
+    assert not (s.logs / "pairs_alld4s.json").exists()
+    assert "KEEP=" not in capsys.readouterr().out
+
+
+def test_d4s_pairs_refuses_reusing_a_completed_report(tmp_path, monkeypatch, capsys):
+    s = _slice_session(tmp_path, monkeypatch)
+    prior = s.logs / "pairs_alld4s.json"
+    original = '{"arm": "alld4s", "keep_vs_alld4r0": {"keep": true}}\n'
+    prior.write_text(original)
+
+    def run(*args, **kwargs):
+        pytest.fail("an existing result must be refused before launching a new invocation")
+
+    monkeypatch.setattr(s, "run", run)
+    with pytest.raises(RuntimeError, match="fresh ETX_SESS_LOGDIR"):
+        s.pairs("alld4s")
+    assert prior.read_text() == original
+    assert "KEEP=" not in capsys.readouterr().out
+
+
+def test_d4s_compiled_queues_preserve_routing_in_worker_lds(monkeypatch):
+    """Caching ids/ws from shgu into sdown is valid only if nothing runs between them on that workgroup."""
+    from etx.passes import PassOptions, compile_graph
+    from examples.dsv2lite import graph
+    monkeypatch.setenv("ETX_DSV2_D4", "1")
+    monkeypatch.setenv("ETX_DSV2_D4_ROWS", "32")
+    monkeypatch.setenv("ETX_DSV2_COH", "0")
+    g = graph.build(layers=3, requests=1, routing_cached=True)
+    plan = compile_graph(g, "gfx942", {}, {}, PassOptions(relay="on"))
+    tasks = {t.id: t for t in plan.tasks}
+    assert all(t.mode == "static" for t in tasks.values())
+    count = 0
+    for queue in plan.static_queues.values():
+        for i, task_id in enumerate(queue):
+            gu = tasks[task_id]
+            if gu.grid.startswith("shgu_"):
+                down = tasks[queue[i + 1]]
+                assert down.grid == gu.grid.replace("shgu_", "sdown_")
+                assert down.coord == gu.coord
+                assert down.worker == gu.worker and down.domain == gu.domain
+                assert gu.domain == 6 + gu.coord[0]
+                count += 1
+    shared_layers = sum(grid.name.startswith("shgu_") for grid in g.grids)
+    assert count == shared_layers * 2 * 37 and shared_layers > 0
+
+
+@pytest.mark.parametrize("changes", [{"requests": 2}, {"routing_cached": False}])
+def test_d4s_refuses_to_run_without_single_request_cached_routing(monkeypatch, changes):
+    from examples.dsv2lite import graph
+    monkeypatch.setenv("ETX_DSV2_D4", "1")
+    options = dict(layers=3, requests=1, routing_cached=True)
+    options.update(changes)
+    with pytest.raises(ValueError, match="one request with cached routing only"):
+        graph.build(**options)
+
+
+def test_d4s_wave_and_subgroup_ownership_cover_every_row_once():
+    """Addressing proof: flattened slices stay on their shared XCD; four-lane groups read only their worker's part."""
+    from collections import Counter
+    for x in range(2):
+        gu = Counter()
+        dn = Counter()
+        for worker in range(37):
+            for wave in range(4):
+                for n in range(worker + wave * 37, 3 * 32, 4 * 37):
+                    gu[(x * 3 + n // 32, n % 32)] += 1
+            for subgroup in range(256 // 4):
+                for n in range(worker + subgroup * 37, 2048, (256 // 4) * 37):
+                    assert n % 37 == worker  # shared GEMV's part[n] lives in this worker's LDS
+                    dn[n] += 1
+        assert gu == Counter({(slot, row): 1 for slot in range(x * 3, x * 3 + 3) for row in range(32)})
+        assert dn == Counter({row: 1 for row in range(2048)})
+
+
+def test_d4s_short_reduction_matches_fleet_including_cancellation_and_signed_zero():
+    """Numerical proof of the changed reduction, independent of GPU scheduling or timing.
+
+    Inputs are the four fp32 fma8 lane accumulators (the common fma8 body is unchanged). Compare the actual old
+    half-wave butterfly, including its 28 inactive lanes, against 16 four-lane groups packed into a wave. Exercise
+    three independent slice sums, the shared-first addition order, and the final BF16 epilogue bit for bit.
+    """
+    import numpy as np
+    rng = np.random.default_rng(405)
+    v = rng.normal(size=(4096, 3, 4)).astype(np.float32)
+    v *= np.exp2(rng.integers(-100, 100, size=v.shape)).astype(np.float32)
+    v[0] = np.float32(-0.0)
+    v[1] = np.float32([0.0, -0.0, 0.0, -0.0])
+    v[2] = np.float32([2**50, -2**50, 1, -1])
+    v[3] = np.float32([1, -1, -1, 1])
+    old = np.zeros((4096, 3, 32), np.float32)
+    old[..., :4] = v
+    for off in (16, 8, 4, 2, 1):
+        old = old + old[..., np.arange(32) ^ off]
+    # Adjacent groups hold unrelated rows: using offsets 4/8/16 here would cross rows and fail.
+    new = (v + np.float32(0)).transpose(1, 0, 2).reshape(3, -1, 64)
+    for off in (2, 1):
+        new = new + new[..., np.arange(64) ^ off]
+    got = new.reshape(3, 4096, 4).transpose(1, 0, 2)[..., 0]
+    want = old[..., 0]
+    assert np.array_equal(got.view(np.uint32), want.view(np.uint32))
+
+    def bf16(a):
+        u = np.asarray(a, np.float32).view(np.uint32)
+        return ((u + np.uint32(0x7fff) + ((u >> 16) & 1)) & np.uint32(0xffff0000)).view(np.float32)
+
+    shared = rng.normal(size=4096).astype(np.float32)
+    ref, opt = shared.copy(), shared.copy()
+    for j in range(3):
+        ref = ref + want[:, j]
+        opt = opt + got[:, j]
+    # Fleet's last expert_down_chunk has scale=1 and two BF16 roundings; the new store removes the redundant one.
+    assert np.array_equal(bf16(np.float32(1) * bf16(ref)).view(np.uint32), bf16(opt).view(np.uint32))
+    # This fixture distinguishes the forbidden concatenated/reassociated reduction from shared-first accumulation.
+    assert np.float32(np.float32(np.float32(2**25) + np.float32(-(2**25))) + np.float32(1)) != \
+           np.float32(np.float32(2**25) + np.float32(np.float32(-(2**25)) + np.float32(1)))

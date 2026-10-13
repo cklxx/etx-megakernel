@@ -58,6 +58,10 @@ ARM_ENV["d4r0"] = {"ETX_DSV2_D4": "1", "ETX_DSV2_D4_ROWS": "0"}
 ARMS["alld4r0"] = LEVERS_ALL                       # candidate: the best arm + D4 placement without slices
 ARM_FLAGS["alld4r0"] = ["-DETX_DSV2_D4=1"]
 ARM_ENV["alld4r0"] = dict(ARM_ENV["d4r0"])
+# D4 slices: paired against both default and the measured best arm, alld4r0. The KEEP decision is against alld4r0.
+ARMS["alld4s"] = LEVERS_ALL
+ARM_FLAGS["alld4s"] = ["-DETX_DSV2_D4=1"]
+ARM_ENV["alld4s"] = {"ETX_DSV2_D4": "1", "ETX_DSV2_D4_ROWS": "32"}
 SINGLE = ("Q", "Qall", "N", "Nall", "argmax", "topk", "prep", "relaxed")
 STAMPED = ("default", "all")
 DATA_FILES = ("weights.bin", "weights.bin.manifest", "fleet_cache.bin", "golden_tokens.txt", "golden_hidden.bin")
@@ -282,6 +286,8 @@ class Session:
 
     def pairs(self, arm: str):
         """Five interleaved rounds; order reversed on odd rounds; every invocation a fresh process with all gates."""
+        if arm == "alld4s" and (self.logs / "pairs_alld4s.json").exists():
+            raise RuntimeError("alld4s report already exists; choose a fresh ETX_SESS_LOGDIR for new pairs")
         if arm == "baseline":
             order, refs, cand = ("default", "fleet"), ("default",), "fleet"
         elif arm == "all":
@@ -293,6 +299,8 @@ class Session:
             order, refs, cand = ("default", "relaxed", "coh"), ("default", "relaxed"), "coh"
         elif arm in ("allrelaxed", "alld4r0"):
             order, refs, cand = ("default", "all", arm), ("default", "all"), arm
+        elif arm == "alld4s":
+            order, refs, cand = ("default", "alld4r0", "alld4s"), ("default", "alld4r0"), "alld4s"
         else:
             order, refs, cand = ("default", arm), ("default",), arm
         rounds = []
@@ -308,6 +316,8 @@ class Session:
                 report[key][ref] = paired([1000 * (r[ref][key] - r[cand][key]) for r in rounds])
         if arm == "alld4r0":
             report["keep_vs_all"] = d4_verdict(report["device_ms"]["all"])
+        elif arm == "alld4s":
+            report["keep_vs_alld4r0"] = d4_verdict(report["device_ms"]["alld4r0"])
         if arm == "coh":
             report["d2"] = d2_verdict(rounds)
         elif arm == "d4":
@@ -326,6 +336,10 @@ class Session:
             v = report["d4"]
             print(f"PAIRS arm=d4 D4 median {v['median_us']:.1f} us spread {v['spread_us']:.1f} every_positive="
                   f"{int(v['every_positive'])} KEEP={v['keep']}", flush=True)
+        if arm == "alld4s":
+            v = report["keep_vs_alld4r0"]
+            print(f"PAIRS arm=alld4s device gain vs alld4r0 median {v['median_us']:.1f} us spread "
+                  f"{v['spread_us']:.1f} every_positive={int(v['every_positive'])} KEEP={v['keep']}", flush=True)
         print(f"PAIRS arm={arm} device gain vs default median {d['median_us']:.1f} us spread {d['spread_us']:.1f} "
               f"every_positive={int(d['every_positive'])} GO={d['go']}", flush=True)
 
@@ -391,8 +405,8 @@ def main(argv=None):
             ap.error(f"build arm must be one of {sorted((*ARMS, 'fleet'))}")
         session.build(a.arm, a.stamped)
     elif a.operation == "pairs":
-        if a.arm not in ("baseline", "all", *SINGLE, "coh", "d4", "allrelaxed", "d4r0", "alld4r0"):
-            ap.error("pairs arm must be baseline, all, coh, d4 or a single lever")
+        if a.arm not in ("baseline", "all", *SINGLE, "coh", "d4", "allrelaxed", "d4r0", "alld4r0", "alld4s"):
+            ap.error("pairs arm must be baseline, all, coh, d4, allrelaxed, d4r0, alld4r0, alld4s or a single lever")
         session.pairs(a.arm)
     elif a.operation == "trace":
         if a.arm not in STAMPED:
