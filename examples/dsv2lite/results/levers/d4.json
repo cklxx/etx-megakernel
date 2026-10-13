@@ -1,0 +1,53 @@
+{
+  "arm": "d4",
+  "d4": {
+    "isa_sha256": "9d1543e83d59f88add104a28c2e1f60aec97eb1e0473e3f20584c54ea6be6f4d",
+    "plan": {
+      "d4_bodies": [
+        "fleet_d4_routed_down",
+        "fleet_d4_routed_gate_up",
+        "fleet_d4_shared_down",
+        "fleet_d4_shared_gate_up"
+      ]
+    },
+    "resources": {
+      "agpr": 54,
+      "lds": 26672,
+      "occupancy": 1,
+      "scratch": 0,
+      "sgpr": 108,
+      "vgpr": 256
+    },
+    "static": {
+      "asm_lines": 129429,
+      "inv_sc0": 8,
+      "inv_sc1": 357,
+      "nt_weight_loads": 348,
+      "sys_loads": 0,
+      "vmcnt0_waits": 3321,
+      "wbl2": 172
+    }
+  },
+  "default": {
+    "isa_sha256": "a105cb16a414ee0f9f697c9de13205419d09674f5c69f6ee804cf36942377724",
+    "resources": {
+      "agpr": 48,
+      "lds": 26668,
+      "occupancy": 1,
+      "scratch": 0,
+      "sgpr": 108,
+      "vgpr": 256
+    },
+    "static": {
+      "asm_lines": 107990,
+      "inv_sc0": 6,
+      "inv_sc1": 279,
+      "nt_weight_loads": 252,
+      "sys_loads": 0,
+      "vmcnt0_waits": 2750,
+      "wbl2": 118
+    }
+  },
+  "etx_commit": "65350473c0abb0244bced1ed8fa25f7d3ac816ab",
+  "how": "ETX_DSV2_D4=1 ETX_CFLAGS=-DETX_DSV2_D4=1 rocm_build_check.sh <fleet export> default (ROCm 7.2.4)"
+}

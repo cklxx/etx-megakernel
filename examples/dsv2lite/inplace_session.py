@@ -43,6 +43,12 @@ ARMS["relaxed"] = ()
 ARMS["coh"] = ("coherent_loads",)
 ARM_ENV = {"coh": {"ETX_DSV2_COH": "1"}}
 D2_MIN_TOL_US = 20.0
+# D4: shared experts during routing, routed slices on the shared XCDs (d4_placement.py; the plan is checked at build
+# time). Plan switch + tile switch; pairs against default, its own rule, and one traced token for criterion (a).
+ARMS["d4"] = ()
+ARM_FLAGS["d4"] = ["-DETX_DSV2_D4=1"]
+ARM_ENV["d4"] = {"ETX_DSV2_D4": "1"}
+D4_KEEP_US = 30.0
 SINGLE = ("Q", "Qall", "N", "Nall", "argmax", "topk", "prep", "relaxed")
 STAMPED = ("default", "all")
 DATA_FILES = ("weights.bin", "weights.bin.manifest", "fleet_cache.bin", "golden_tokens.txt", "golden_hidden.bin")
@@ -84,6 +90,13 @@ def d2_verdict(rounds: list[dict]) -> dict:
     b_ok = abs(b_median) <= tol
     return dict(a=a, relaxed_vs_default=rel, b_gains_us=b, b_median_us=b_median, b_tol_us=tol, a_ok=a_ok, b_ok=b_ok,
                 go=a_ok and b_ok)
+
+
+def d4_verdict(vs_default: dict) -> dict:
+    """D4's speed rule (docs/DSV2-D1-D5.md): every pair faster, median >= 30 us and > 2 x spread. Criterion (a), the
+    shared XCDs' gate_up ready before the layer's routing completes, comes from `d4trace`."""
+    return dict(vs_default, keep=vs_default["every_positive"] and vs_default["median_us"] >= D4_KEEP_US
+                and vs_default["median_us"] > 2 * vs_default["spread_us"])
 
 
 def full_result(log: str) -> dict:
@@ -236,7 +249,7 @@ class Session:
                                               self.fleet / "src/kernels/fleet_kernel.hip", "-o", out / "run"], timeout=600)
         else:
             env = dict(ETX_OUT=str(out), ETX_FLEET_PATCH=" ".join(ARMS[arm]), ETX_BUILD_VERBOSE="1",
-                       ETX_DSV2_COH="0", **ARM_ENV.get(arm, {}))
+                       ETX_DSV2_COH="0", ETX_DSV2_D4="0", **ARM_ENV.get(arm, {}))
             flags = (["-Rpass-analysis=kernel-resource-usage"] + ARM_FLAGS.get(arm, [])
                      + (["-DETX_DSV2_STAMPS2"] if stamped else []))
             text = self.run(f"compile_{arm}{'_stamps' if stamped else ''}",
@@ -281,6 +294,8 @@ class Session:
                 report[key][ref] = paired([1000 * (r[ref][key] - r[cand][key]) for r in rounds])
         if arm == "coh":
             report["d2"] = d2_verdict(rounds)
+        elif arm == "d4":
+            report["d4"] = d4_verdict(report["device_ms"]["default"])
         elif arm != "all":
             for basis in report["device_ms"].values():
                 basis["go"] = None          # attribution only: the decision belongs to `all`
@@ -291,6 +306,10 @@ class Session:
             print(f"PAIRS arm=coh D2 (a) vs sc1 median {v['a']['median_us']:.1f} us spread {v['a']['spread_us']:.1f} "
                   f"every_positive={int(v['a']['every_positive'])} ok={v['a_ok']}; (b) coh - relaxed median "
                   f"{v['b_median_us']:.1f} us tolerance {v['b_tol_us']:.1f} ok={v['b_ok']}; GO={v['go']}", flush=True)
+        if arm == "d4":
+            v = report["d4"]
+            print(f"PAIRS arm=d4 D4 median {v['median_us']:.1f} us spread {v['spread_us']:.1f} every_positive="
+                  f"{int(v['every_positive'])} KEEP={v['keep']}", flush=True)
         print(f"PAIRS arm={arm} device gain vs default median {d['median_us']:.1f} us spread {d['spread_us']:.1f} "
               f"every_positive={int(d['every_positive'])} GO={d['go']}", flush=True)
 
@@ -307,10 +326,21 @@ class Session:
         write_json(self.logs / f"stages_{arm}.json", dict(arm=arm, span_us=span, stages_us=us, instances=n))
         print(f"TRACE arm={arm} span {span:.1f} us; stages " + " ".join(f"{k}={us[k]:.1f}" for k in st.ORDER), flush=True)
 
+    def d4trace(self):
+        """One traced token of the d4 build: does every MoE layer's shared gate_up start before its routing completes?"""
+        name = "trace_d4"
+        env = dict(ETX_TRACE="1", ETX_TRACE_RAW=str(self.logs / f"{name}.trace.bin"))
+        full_result(self.run(name, [self.out("d4") / "run", *self.args()], env=env))
+        from examples.dsv2lite.d4_placement import trace_lead
+        r = trace_lead(self.out("d4") / "plan.json", self.logs / f"{name}.trace.bin")
+        write_json(self.logs / "d4_trace.json", r)
+        print(f"D4TRACE shared gate_up ready before routing done in {r['before_routing']}/{r['layers']} MoE layers, "
+              f"median lead {r['median_lead_us']:.1f} us, min {r['min_lead_us']:.1f} us", flush=True)
+
     def report(self):
         from examples.dsv2lite import stage_table as st
         out = dict()
-        for arm in ("baseline", "all", *SINGLE, "coh"):
+        for arm in ("baseline", "all", *SINGLE, "coh", "d4"):
             path = self.logs / f"pairs_{arm}.json"
             out[arm] = json.loads(path.read_text()) if path.exists() else "NOT COMPLETE"
         if out["all"] == "NOT COMPLETE":
@@ -335,7 +365,7 @@ class Session:
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("operation", choices=("source", "preflight", "build", "pairs", "trace", "report"))
+    ap.add_argument("operation", choices=("source", "preflight", "build", "pairs", "trace", "d4trace", "report"))
     ap.add_argument("arm", nargs="?")
     ap.add_argument("--stamped", action="store_true")
     a = ap.parse_args(argv)
@@ -345,8 +375,8 @@ def main(argv=None):
             ap.error(f"build arm must be one of {sorted((*ARMS, 'fleet'))}")
         session.build(a.arm, a.stamped)
     elif a.operation == "pairs":
-        if a.arm not in ("baseline", "all", *SINGLE, "coh"):
-            ap.error("pairs arm must be baseline, all, coh or a single lever")
+        if a.arm not in ("baseline", "all", *SINGLE, "coh", "d4"):
+            ap.error("pairs arm must be baseline, all, coh, d4 or a single lever")
         session.pairs(a.arm)
     elif a.operation == "trace":
         if a.arm not in STAMPED:

@@ -56,3 +56,35 @@ Unknown until a box: correctness under traffic (32/32 + 27/27), and the price. T
 every task now ends in a whole-L2 write-back (249 sites, ~one per producer task instead of one per domain per DEVICE
 event), and payload reads are MALL round trips. If (a) passes and (b) fails, the next step is coherent STORES too (the
 full Qwen form, `_nf` arrives, no write-back), which the work order's "keep the writeback" rules out today.
+
+## D4 on CPU (done; the GPU pairs and trace wait for a box)
+
+Switch: `ETX_DSV2_D4=1` (plan) + `-DETX_DSV2_D4=1` (tiles); `ETX_DSV2_D4_ROWS` (default 32); session arm `d4`, pairs vs
+default plus `d4trace` (criterion (a)). Default unchanged: plan `09011c20`, ROCm 7.2.4 default ISA `a105cb16`.
+Implemented in ETX's port (graph.py `build_moe_layer_d4`, fleet_shim.hip `fleet_d4_*`); the pinned fleet export is
+not edited, so fleet's own launcher (`fleet_launch.hip:543`, `taskgraph.py:420`) is untouched.
+
+Placement per MoE layer (`examples/dsv2lite/d4_placement.py`):
+- routed XCD k (routing slot k): router, then gate_up / down of rows [32, 1408) of slot k; gate_up's worker 0 publishes
+  slot k's (id, weight) and bumps the owning shared XCD's counter (written back first);
+- shared XCD 6 + x: NO router. Its gate_up folds the o_proj partials and norms by itself and waits on o_proj only
+  (starts during routing), runs shared half x, then -- in-body wait on the counter, as fleet's q_c publication -- rows
+  [0, 32) of slots 3x..3x+2 from the same staged x; one down for the half and the three slices (fp32 accumulator,
+  one bf16 store; each slice's routing weight folded into its h).
+Build-time refusal (graph.build(), so `etx compile` exits non-zero before writing a plan): a split slice (gate_up and
+down on different XCDs), rows uncovered or covered twice, a row boundary not a multiple of 32 (an h cache line written
+by two XCDs), a shared XCD whose first stage needs routing, and a realised grid whose domain_map puts a stage on another
+XCD than the table (evaluated per task coordinate). D4 + D2 together is refused (the d4 bodies are not audited for
+coherent loads). Tests: `tests/test_dsv2_d4.py` (17), including the refusals through graph.build() and `etx compile`.
+
+| ROCm 7.2.4 | default | d4 |
+|---|---|---|
+| VGPR / AGPR / SGPR / scratch / LDS / waves | 256 / 48 / 108 / 0 / 26,668 / 1 | 256 / 54 / 108 / 0 / 26,672 / 1 |
+
+Expected [E], from fleet's per-XCD stamps (gate_up 27.5 us + 5.5 prologue for 1408 rows, down 28.4 + 1.6; router 9 =
+7.4 fold/norm + 1.6 logits): the shared XCDs drop the router logits and the gate_up routing, about 7.1 us of slack per
+layer; each routed row moved costs them three. With 32 rows the routed XCDs end 1.3 us earlier and the shared ones still
+before them: about 1.3 us/layer, 33 us/token, at the 30 us KEEP bar. 64 rows overshoots (the shared XCDs become the
+stragglers, a loss). The estimate is crude, so the GPU decides. Numerics change (a routed expert's output is split over
+two bf16 partials; the shared XCD's slices are summed in fp32 before one rounding), so 32/32 + 27/27 must be re-proven
+on the GPU.

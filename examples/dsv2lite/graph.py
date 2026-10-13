@@ -135,6 +135,42 @@ def build_moe_layer(g: Graph, q: _Req, L: int, e_in: str, e_in_map: str, fold: b
     return n(f"E_down_{L}")
 
 
+def build_moe_layer_d4(g: Graph, q: _Req, L: int, e_in: str, e_in_map: str, fold: bool, rows: int) -> str:
+    """D4 (docs/DSV2-D1-D5.md, examples/dsv2lite/d4_placement.py): routed XCDs 0..5 route and run rows [rows, 1408) of
+    their slot; shared XCDs 6, 7 run no router -- their gate_up folds and norms by itself and waits on o_proj only --
+    then, after an in-body wait for the routed XCDs' published routing, rows [0, rows) of three slots each, and one down
+    for the shared half and those slices. Every slice's gate_up and down on one XCD (checked below, refused otherwise)."""
+    from examples.dsv2lite import d4_placement as d4
+    n = q.n
+    e_oproj = build_attention_block(g, q, L, e_in, e_in_map, fold)
+    R, S = d4.TOP_K, d4.SHARED
+    g.etensor(n(f"E_norm_{L}"), (R,), wait_count=W)
+    g.etensor(n(f"E_shgu_{L}"), (S,), wait_count=W)
+    g.etensor(n(f"E_gu_{L}"), (R,), wait_count=W)
+    g.etensor(n(f"E_down_{L}"), (1,), wait_count=XCDS * W)
+    consts = (L, q.r, rows, d4.SPX)
+    shared_map = f"xw->(x+{R})"
+
+    def grid(name, shape, symbol, dmap, ins, outs, dur):
+        g.call_device(n(f"{name}_{L}"), shape, _tile(symbol), resource=_res(), args=[q.fleet, f"layer_{L}"], consts=consts,
+                      domain_map=dmap, worker_map="xw->w", in_edges=ins, out_edges=outs, duration_us=dur, duration_cv=0.05)
+    # creation order = each worker's queue order: routed workers router, gate_up, down (down reuses gate_up's routing in
+    # LDS); shared workers shgu, sdown
+    grid("router", (R, W), "fleet_norm_router", "xw->x", {e_oproj: "xw->(0)"}, {n(f"E_norm_{L}"): "xw->x"}, DUR["router"])
+    grid("shgu", (S, W), "fleet_d4_shared_gate_up", shared_map, {e_oproj: "xw->(0)"}, {n(f"E_shgu_{L}"): "xw->x"},
+         DUR["router"] - 1.6 + DUR["gate_up"] - 5.5)
+    grid("gate_up", (R, W), "fleet_d4_routed_gate_up", "xw->x", {n(f"E_norm_{L}"): "xw->x"}, {n(f"E_gu_{L}"): "xw->x"},
+         DUR["gate_up"])
+    grid("down", (R, W), "fleet_d4_routed_down", "xw->x", {n(f"E_gu_{L}"): "xw->x"}, {n(f"E_down_{L}"): "xw->(0)"},
+         DUR["down"])
+    grid("sdown", (S, W), "fleet_d4_shared_down", shared_map, {n(f"E_shgu_{L}"): "xw->x"}, {n(f"E_down_{L}"): "xw->(0)"},
+         DUR["down"])
+    stages = d4.layout(rows)
+    d4.check(stages)
+    d4.verify_graph(g, L, stages, router_events={n(f"E_norm_{L}")})
+    return n(f"E_down_{L}")
+
+
 def build_dense_layer(g: Graph, q: _Req, L: int, e_in: str, e_in_map: str, fold: bool, extra_in=None) -> str:
     n = q.n
     e_oproj = build_attention_block(g, q, L, e_in, e_in_map, fold, extra_in)
@@ -161,6 +197,16 @@ def build(layers: int = LAYERS, routing_cached: bool | None = None, requests: in
     # half-layer offset); experts = only the expert streams alternate (r1's gate_up of L after r0's down of L, r0's of L+1
     # after r1's of L), the latency phases run freely; none = no cross-request edges
     couple = os.environ.get("ETX_DSV2_COUPLE", "router")
+    # ETX_DSV2_D4=1: D4's expert placement (build_moe_layer_d4); ETX_DSV2_D4_ROWS: rows of each routed expert moved to the
+    # shared XCDs (d4_placement.ROWS by default). Single request, routing cached; the tiles need -DETX_DSV2_D4=1.
+    d4_rows = None
+    if os.environ.get("ETX_DSV2_D4", "0") == "1":
+        from examples.dsv2lite import d4_placement
+        d4_rows = int(os.environ.get("ETX_DSV2_D4_ROWS", str(d4_placement.ROWS)))
+        if requests != 1 or not routing_cached:
+            raise ValueError("ETX_DSV2_D4 supports one request with cached routing only")
+        if os.environ.get("ETX_DSV2_COH", "0") == "1":     # the d4 bodies' payload reads are not audited for D2
+            raise ValueError("ETX_DSV2_D4 with ETX_DSV2_COH is not supported: the d4 tiles read h plainly")
     if couple not in ("router", "experts", "none"):
         raise ValueError(f"ETX_DSV2_COUPLE={couple!r}: router | experts | none")
     g = Graph("dsv2lite_decode" if requests == 1 else f"dsv2lite_decode_x{requests}")
@@ -192,6 +238,9 @@ def build(layers: int = LAYERS, routing_cached: bool | None = None, requests: in
                     extra_gu = {f"r1_E_down_{L - 1}": "xw->(0)"}       # r0's of L after r1's of L-1
             if L < FIRST_DENSE:
                 e = build_dense_layer(g, q, L, e, m, fold=prev_moe, extra_in=extra); prev_moe = False
+            elif d4_rows is not None:
+                e = build_moe_layer_d4(g, q, L, e, m, fold=prev_moe, rows=d4_rows)
+                prev_moe = True
             else:
                 e = build_moe_layer(g, q, L, e, m, fold=prev_moe, routing_cached=routing_cached, extra_in=extra, extra_gu=extra_gu)
                 prev_moe = True

@@ -88,7 +88,7 @@ job("prep_sums", 'cd "$ETX_DSV2_DATA" && sha256sum weights.bin weights.bin.manif
 add("preflight", "preflight", after=("prep_sums",), timeout=600)
 
 # ---------------------------------------------------------------- builds (cpu, while the inputs are prepared)
-DITEMS = ("coh",)   # D2 (docs/DSV2-D1-D5.md): three-way pairs default / relaxed / coh, its own verdict
+DITEMS = ("coh", "d4")   # D2: three-way pairs default / relaxed / coh; D4: pairs default / d4 (docs/DSV2-D1-D5.md)
 for arm in ("default", "fleet", "all", *SINGLE, *DITEMS):
     add(f"build_{arm}", f"build {arm}", after=("source",), timeout=1200)
 for arm in ("default", "all"):
@@ -105,14 +105,20 @@ add("trace_all", "trace all", lane="gpu", after=("build_all_stamps",), timeout=3
 JOBS[-1]["after_any"] = ["trace_default"]
 previous = "trace_all"
 for arm in DITEMS:                       # new conditions before the attributions already measured on 2026-10-13
-    add(f"pairs_{arm}", f"pairs {arm}", lane="gpu", after=(previous, f"build_{arm}", "build_relaxed"), timeout=1200)
+    needs = [f"build_{arm}"] + (["build_relaxed"] if arm == "coh" else [])
+    add(f"pairs_{arm}", f"pairs {arm}", lane="gpu", after=(previous, *needs), timeout=1200)
     JOBS[-1]["after_any"] = [previous]
-    JOBS[-1]["after"] = [f"build_{arm}", "build_relaxed"]
+    JOBS[-1]["after"] = needs
     previous = f"pairs_{arm}"
+add("d4trace", "d4trace", lane="gpu", after=(previous, "build_d4"), timeout=300)   # D4 criterion (a)
+JOBS[-1]["after_any"] = [previous]
+JOBS[-1]["after"] = ["build_d4"]
+previous = "d4trace"
 for arm in SINGLE:                       # attribution: each lever alone, after everything that decides
     add(f"pairs_{arm}", f"pairs {arm}", lane="gpu", after=(previous, f"build_{arm}"), timeout=900)
     JOBS[-1]["after_any"] = [previous]
     JOBS[-1]["after"] = [f"build_{arm}"]
     previous = f"pairs_{arm}"
 add("report", "report", after=("pairs_all",), timeout=120)
-JOBS[-1]["after_any"] = ["trace_default", "trace_all", *(f"pairs_{a}" for a in (*DITEMS, *SINGLE))]
+JOBS[-1]["after_any"] = ["trace_default", "trace_all", *(f"pairs_{a}" for a in DITEMS), "d4trace",
+                         *(f"pairs_{a}" for a in SINGLE)]

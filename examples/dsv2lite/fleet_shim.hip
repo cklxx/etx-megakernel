@@ -193,5 +193,124 @@ extern "C" __device__ void fleet_lm_head(const etx_ctx* c) { fleet_call(c, fleet
 extern "C" __device__ void fleet_lm_head_fold(const etx_ctx* c) { fleet_call(c, fleet::TASK_LM_HEAD, fleet::FLAG_FOLD_PARTIALS, -1, -1, 1, -1, CHIPLET_WORKER); }
 extern "C" __device__ void fleet_argmax(const etx_ctx* c) { fleet_call(c, fleet::TASK_ARGMAX, 0, -1, -1, 1, -1, 0); }
 
+#if defined(ETX_DSV2_D4) && ETX_DSV2_D4
+// D4 (docs/DSV2-D1-D5.md; placement and its build-time check: examples/dsv2lite/d4_placement.py, graph.py
+// build_moe_layer_d4). Grid constants (L, request, rows, spx). Routed grid coordinate k = routing slot k = XCD k;
+// shared grid coordinate x = shared half x on XCD top_k + x, which also runs rows [0, rows) of slots [x*spx, x*spx+spx).
+// A slice's h lives in its slot's h buffer (rows [0, rows) by the shared XCD, [rows, inter) by the routed XCD; rows is a
+// multiple of 32, so no h cache line is written by two XCDs).
+#define D4_ROWS(c) ((int)(c)->cst[2])
+#define D4_SPX(c) ((int)(c)->cst[3])
+#define D4_EVENT(L) (768 + (L))      // xcd_counters slot of the routing publication (qabs uses 256 + 16 L + h < 768)
+struct D4Task {
+  const FleetParams* fp; int L, xcd, worker, nw;
+  fleet::Activations* act; fleet::Scratch* s;
+};
+static __device__ __forceinline__ D4Task d4_task(const etx_ctx* c) {
+  D4Task t;
+  t.fp = FP(c); t.L = LAYER(c); t.xcd = (int)c->domain; t.worker = (int)c->coord[1]; t.nw = fleet::kWorkersPerXCD;
+  t.act = const_cast<fleet::Activations*>(&t.fp->act); t.s = reinterpret_cast<fleet::Scratch*>(c->lds);
+  return t;
+}
+static __device__ __forceinline__ fleet::ExpertUnit d4_unit(const D4Task& t, int slot, const int32_t* ids, const float* ws) {
+  const fleet::ModelDims& d = t.fp->d;
+  return fleet::resolve_unit(slot, t.fp->w.layer_experts[t.L], t.fp->w.layer_shared[t.L], ids, ws, d.routed_scaling,
+                             d.hidden, d.moe_inter, d.moe_inter * 2, t.fp->w.expert_stride);
+}
+// a routed slot's slice for the shared XCD: (id, weight) as the routed XCD published them (coherent loads)
+static __device__ __forceinline__ fleet::ExpertUnit d4_slice_unit(const D4Task& t, int slot, int rows, float* weight) {
+  const fleet::ModelDims& d = t.fp->d;
+  const int id = fleet::ld_coh(t.act->topk_ids + slot, true);
+  *weight = fleet::ld_coh(t.act->topk_w + slot, true) * d.routed_scaling;
+  fleet::ExpertUnit u;
+  const __hip_bfloat16* base = t.fp->w.layer_experts[t.L] + (int64_t)id * t.fp->w.expert_stride;
+  u.gate_up = base; u.down = base + (int64_t)2 * d.moe_inter * d.hidden; u.down_ld = d.moe_inter;
+  u.weight = 1.f; u.inter = rows;          // the routing weight is folded into h (d4 shared down)
+  return u;
+}
+
+// routed XCD k: fleet's routing (per task, as fleet_expert_gate_up), worker 0 publishes slot k's (id, weight) for the
+// shared XCD that runs slot k's slice, then rows [rows, inter) of slot k
+extern "C" __device__ void fleet_d4_routed_gate_up(const etx_ctx* c) {
+  const D4Task t = d4_task(c);
+  const fleet::ModelDims& d = t.fp->d;
+  const int slot = (int)c->coord[0], rows = D4_ROWS(c);
+  fleet::select_experts(d, t.act->router_logits + (int64_t)t.xcd * d.n_routed, t.s->ids, t.s->ws);
+  if (t.worker == 0 && threadIdx.x == 0) {
+    fleet::st_coh(t.act->topk_ids + slot, t.s->ids[slot], true);
+    fleet::st_coh(t.act->topk_w + slot, t.s->ws[slot], true);
+    fleet::drain_stores();
+    fleet::fence_release();
+    __hip_atomic_fetch_add(&t.fp->rt.xcd_counters[(size_t)(d.top_k + slot / D4_SPX(c)) * fleet::kMaxEvents + D4_EVENT(t.L)],
+                           1u, __ATOMIC_RELAXED, __HIP_MEMORY_SCOPE_AGENT);
+  }
+  fleet::ExpertUnit u = d4_unit(t, slot, t.s->ids, t.s->ws);
+  fleet::stage_vector(t.act->x_norm + (int64_t)t.xcd * d.hidden, t.s->vec, d.hidden);
+  u.gate_up += (int64_t)2 * rows * d.hidden;
+  u.inter -= rows;
+  fleet::expert_gate_up(u, t.s->vec, t.act->expert_h + (int64_t)slot * d.moe_inter + rows, d.hidden, t.worker, t.nw);
+}
+
+// routed XCD k: rows [rows, inter) of slot k's down, with the routing its own gate_up left in LDS (as ROUTING_CACHED)
+extern "C" __device__ void fleet_d4_routed_down(const etx_ctx* c) {
+  const D4Task t = d4_task(c);
+  const fleet::ModelDims& d = t.fp->d;
+  const int slot = (int)c->coord[0], rows = D4_ROWS(c);
+  fleet::ExpertUnit u = d4_unit(t, slot, t.s->ids, t.s->ws);
+  u.down += rows;
+  u.inter -= rows;
+  fleet::stage_vector(t.act->expert_h + (int64_t)slot * d.moe_inter + rows, t.s->vec, u.inter);
+  fleet::expert_down_chunk(u, t.s->vec, nullptr, t.act->expert_out + (int64_t)t.xcd * d.hidden, d.hidden, t.worker, t.nw,
+                           0, u.inter, true, true);
+}
+
+// shared XCD top_k + x: the router's prologue without the router (fold the o_proj partials, norm), the shared half's
+// gate_up -- no routing, so this starts when o_proj completes -- then, after the routed XCDs published their routing,
+// rows [0, rows) of slots [x*spx, x*spx + spx) from the same staged x
+extern "C" __device__ void fleet_d4_shared_gate_up(const etx_ctx* c) {
+  const D4Task t = d4_task(c);
+  const fleet::ModelDims& d = t.fp->d;
+  const int x = (int)c->coord[0], rows = D4_ROWS(c), spx = D4_SPX(c);
+  fleet::stage_residual_f32(d, t.act->x[0], t.act->oproj_partial, t.act->x[1], t.s->vec, t.xcd, t.worker, false);
+  fleet::rms_norm_lds(d, t.fp->w.layer_norm_post[t.L], t.s->vec, t.s->smem);
+  const fleet::ExpertUnit sh = d4_unit(t, -(x + 1), nullptr, nullptr);
+  fleet::expert_gate_up(sh, t.s->vec, t.act->expert_h + (int64_t)t.xcd * d.moe_inter, d.hidden, t.worker, t.nw);
+  if (rows == 0) return;
+  __shared__ int d4_ok;
+  if (threadIdx.x == 0)
+    d4_ok = fleet::wait_event(t.fp->rt, t.fp->epoch, D4_EVENT(t.L), fleet::SCOPE_XCD_LOCAL, t.xcd, spx) ? 1 : 0;
+  __syncthreads();
+  if (!d4_ok) return;
+  for (int j = 0; j < spx; ++j) {
+    const int slot = x * spx + j;
+    float weight;
+    const fleet::ExpertUnit u = d4_slice_unit(t, slot, rows, &weight);
+    fleet::expert_gate_up(u, t.s->vec, t.act->expert_h + (int64_t)slot * d.moe_inter, d.hidden, t.worker, t.nw);
+  }
+}
+
+// shared XCD top_k + x: one partial = bf16(shared half's down + sum over its slices of weight * down . h), as fleet's
+// K-chunked down (fp32 accumulator in LDS, one bf16 store); the slices' routing weights are folded into their h
+extern "C" __device__ void fleet_d4_shared_down(const etx_ctx* c) {
+  const D4Task t = d4_task(c);
+  const fleet::ModelDims& d = t.fp->d;
+  const int x = (int)c->coord[0], rows = D4_ROWS(c), spx = D4_SPX(c);
+  __hip_bfloat16* out = t.act->expert_out + (int64_t)t.xcd * d.hidden;
+  const fleet::ExpertUnit sh = d4_unit(t, -(x + 1), nullptr, nullptr);
+  fleet::stage_vector(t.act->expert_h + (int64_t)t.xcd * d.moe_inter, t.s->vec, sh.inter);
+  fleet::expert_down_chunk(sh, t.s->vec, t.s->part, out, d.hidden, t.worker, t.nw, 0, sh.inter, true, rows == 0);
+  for (int j = 0; rows > 0 && j < spx; ++j) {
+    const int slot = x * spx + j;
+    float weight;
+    const fleet::ExpertUnit u = d4_slice_unit(t, slot, rows, &weight);
+    __syncthreads();                       // every wave is done with s.vec (and its accumulator rows are in LDS)
+    const float* h = t.act->expert_h + (int64_t)slot * d.moe_inter;
+    for (int i = threadIdx.x; i < rows; i += blockDim.x) t.s->vec[i] = h[i] * weight;
+    __syncthreads();
+    fleet::expert_down_chunk(u, t.s->vec, t.s->part, out, d.hidden, t.worker, t.nw, 0, rows, false, j + 1 == spx);
+  }
+}
+#endif
+
 // exported for the host: the LDS the bodies need, so the graph's resource declaration can be checked
 extern "C" size_t fleet_scratch_bytes() { return sizeof(fleet::Scratch); }
