@@ -226,3 +226,108 @@ with D4 (its expert bodies do not chunk): refused at build time.
 | arm | rule (fixed now) |
 |---|---|
 | alld3 = all five levers + D3, 2-way against `all` (one chunk), 5 rounds, 10 invocations | **GO only if every pair is faster than `all`, median >= 30 us and median > 2 x spread; otherwise DROP.** 32/32 + 27/27 in every invocation. Context, not the bar: fleet's 512-row tiling ran 4.020 ms, the tiling alone cost 0.42 ms because down runs on the same workers (`fleet:docs/STATUS.md:33,68`) |
+
+## D4 slices without shared-XCD stragglers: fixed GPU gate (2026-10-13, before code)
+
+New arm `alld4s`: all five levers + D4 with **32 slice rows** per routed expert. Run five interleaved three-way
+rounds **default / alld4r0 / alld4s**, alternating direction between rounds. KEEP only if **every pair is faster
+than alld4r0**, the median device gain is **>= 30 us/token and > 2 x spread**, and **32/32 tokens + 27/27 layers**
+pass in every invocation. Otherwise DROP (an incomplete run is NOT-COMPLETE). Compare with default as well, but
+`alld4r0`, the measured best safe arm, is the deciding baseline.
+
+The deciding per-layer target is <= **8 us** extra work on each shared XCD with slices on: shared down task body
+<= **25 us**, shared gate_up <= **36.7 us** (the measured 33.7 us + 3 us), and shared down last completion no later
+than routed down. These are GPU targets, not CPU timing claims. The measured 32-row build shortened routed completion
+by **7.3 us/layer** (72.9 -> 65.6 us after o_proj), but shared down completed at 77.1 us with a 35.7 us mean body.
+The recoverable routed improvement is a ceiling of about **190 us/token [E]** (26 MoE layers x 7.3 us), not a prediction.
+For the 3 slices, gate/up plus down reads 1,179,648 weight bytes per shared XCD/layer (bf16, hidden 2048, rows 32);
+the two shared XCDs' combined 2,359,296 bytes have a **0.55 us [E]** whole-device bandwidth floor at 4.3 TB/s.
+Placement, latency and dependency constraints make that optimistic floor unattainable in general.
+
+CPU-only work: reduce the slices' serial staging and routing overhead, retain the placement checks and rows=0 path,
+compile with ROCm 7.2.4, record resources and source/ISA round-trip counts. No GPU is provisioned by this change.
+If the gate passes, keep slices; if it fails, retain `alld4r0`. The task-body targets and shared/routed completion
+ordering need a GPU trace in addition to the paired verdict.
+
+### D4s implementation and CPU evidence
+
+The optimized path is restricted to `rows=32, spx=3`; other slice sizes retain their old implementation. The graph,
+placement table and routing publication are unchanged. Shared gate_up still finishes its shared half before it
+waits for routing. Wave 0 broadcasts the wait result, then lanes 0..2 each load one `(id, weight)` pair coherently
+into the existing `Scratch.ids/ws`; one workgroup barrier publishes all six words. The 96 slice rows are flattened
+across the shared XCD's 37 workers and four waves, using Fleet's `wave_dot<2,4>` and unchanged BF16/SiLU epilogue.
+The shared down reuses that routing cache: the compiled queues place shgu immediately before sdown on the same
+worker, with no intervening task. D4 already refuses multiple requests and uncached routing. A lowered-plan test
+now checks this LDS lifetime, in addition to the existing placement refusals.
+
+Shared down stages all 96 weighted h values in the otherwise-unused `Scratch.row` before its shared-half GEMV;
+`stage_vector`'s existing barrier publishes them. It does not overwrite `vec` for each slice. After the shared-half
+GEMV, one barrier makes `part` visible to the new row owners. Four lanes now compute each K=32 row, with separate
+slice reductions and exactly `((shared + slice0) + slice1) + slice2` before BF16 rounding. This uses all 64 lanes for
+16 independent output rows instead of four useful lanes in each 32-lane half-wave. Scaling stays on h, before the
+dot. Adding +0 before the shortened shuffle tree preserves the original inactive lanes' signed-zero normalization.
+No weight-prefetch overlap with the shared GEMV is claimed or required by this implementation.
+
+Source-level count (per shared task, default 32 rows; a group below is a dependency phase, **not a measured memory
+round trip**, and the unchanged shared-half stream is excluded): old sdown had three serial
+`metadata -> h staging -> matrix stream` chains, **9 groups**, **6 per-slice barriers**, and **1,536 coherent scalar
+metadata lane-loads** (3 slices x 2 words x 256 lanes). New sdown has **0 metadata global reads**, **1 batched h group**
+before the shared stream, **1 matrix group** in source after it, and **1 added barrier** after the shared stream.
+The three slice matrices have independent addresses, but the compiler may split their issue; the ISA counts below
+are the actual static evidence. Old shgu had three serial metadata/GEMV chains; new shgu has one six-word broadcast
+phase and one wave-distributed slice batch. Only **6 metadata scalar words per shgu task** are read globally.
+
+Prior evidence was checked in Fleet's pinned `docs/STATUS.md` / `results/` and ETX design section 15: broad prefetch
+regressed (4.69488 -> 4.77216 ms in that older Fleet session), and one versus three waves/SIMD measured 38.8 us for
+both in the occupancy probe. This change is confined to the short slices; those old results are not timing evidence
+for D4s. The original D4 trace was re-read using `ledger.load_etx`: median across layers 3..25, shared gate_up mean
+body **33.660 us**, shared down ready **39.030 us**, last done **77.110 us**, mean body **35.734 us**; routed down last
+done **65.570 us**, mean body **17.514 us**. The original default trace's down last done is **72.870 us**. These are
+old GPU observations, not measurements of the new implementation.
+
+Final ROCm 7.2.4 gfx942 static evidence (`examples/dsv2lite/results/levers/d4s.json`; device assembly + host device
+pass + host syntax pass all exit 0, offline container):
+
+| build | VGPR | AGPR | SGPR | scratch B/lane | LDS B | waves/SIMD |
+|---|---:|---:|---:|---:|---:|---:|
+| default | 256 | 48 | 108 | 0 | 26,668 | 1 |
+| alld4r0 before and after | 256 | 90 | 108 | 0 | 26,668 | 1 |
+| old all + D4, 32 rows | 256 | 89 | 108 | 0 | 26,672 | 1 |
+| optimized D4, 32 rows, no levers | 256 | 65 | 108 | 0 | 26,672 | 1 |
+| alld4s | 256 | 104 | 108 | 0 | 26,672 | 1 |
+
+Default plan SHA256 is `09011c207b1e92febf29a2c2efc2d944ef9ad7ac8a0803633579c8444d821f8a`; default ISA is
+`a105cb16a414ee0f9f697c9de13205419d09674f5c69f6ee804cf36942377724`. **alld4r0's entire ISA is byte-identical**
+before/after, SHA256 `f26a7ff3bdf99aa5d0f7ae1c7a50450bb5bfb801b089a6b3217455f3fb396bf5`; its plan is identical too.
+
+In `build/d4s-final-slices/<all-five-levers>/mk.s`, metadata uses **two vector coherent-load instructions**, each
+followed by a wait, with three active lanes (lines 112465 and 112471), then the workgroup barrier at 112478. An initial
+thread-0-only implementation compiled to six serialized loads and was replaced before the final build. In shared
+down the expert-base pointer fetch is at 108655; the three slice matrix-load sites are 108660, 108665 and 108668,
+with a full wait at 108666: **two matrix issue batches**, not one latency round trip. The new all-lever build uses
+15 more AGPRs than the old 32-row build; scratch, LDS and reported occupancy are unchanged. These counts do not
+predict the GPU body time.
+
+Proof commands (from this worktree, pinned export `~/code/etx-cache/fleet-3fb67a6`):
+
+```sh
+bash examples/dsv2lite/rocm_build_check.sh ~/code/etx-cache/fleet-3fb67a6 default build/d4s-final-default
+ETX_DSV2_D4=1 ETX_DSV2_D4_ROWS=0 ETX_CFLAGS=-DETX_DSV2_D4=1 bash examples/dsv2lite/rocm_build_check.sh ~/code/etx-cache/fleet-3fb67a6 gemv_no_terminal_all+norm_tree_all+argmax_tree+topk_rank+attn_prologue_live build/d4s-final-r0
+ETX_DSV2_D4=1 ETX_CFLAGS=-DETX_DSV2_D4=1 bash examples/dsv2lite/rocm_build_check.sh ~/code/etx-cache/fleet-3fb67a6 default build/d4s-final-d4
+ETX_DSV2_D4=1 ETX_CFLAGS=-DETX_DSV2_D4=1 bash examples/dsv2lite/rocm_build_check.sh ~/code/etx-cache/fleet-3fb67a6 gemv_no_terminal_all+norm_tree_all+argmax_tree+topk_rank+attn_prologue_live build/d4s-final-slices
+.venv/bin/python -m pytest -q tests/test_dsv2_*.py tests/test_coherence.py
+.venv/bin/python -m etx.tools.gpu_jobs examples/sessions/ds_d4s.py --gpus 0 --dry-run
+```
+
+Required suite: **133 passed in 35.53 s, exit 0**. Tests include placement refusal, lowered same-worker queue
+adjacency, exact row cover, 4,096 three-slice reduction cases with signed zero/cancellation, BF16 epilogue, KEEP
+threshold boundaries, three-way order, correctness failure in any arm, interruption/truncation, and refusal to reuse
+a completed report. Dry run: **7 jobs, exit 0**, all generated job commands pass `bash -n`; three builds and preflight
+are hard dependencies of the sole paired GPU job. Full logs, per-invocation deadlines and silence probes use the
+existing session runner. `ds_d4s.py` is prepared, not run, with a 1,800-second cap and no provisioning/download jobs.
+
+Unknown: GPU correctness (32/32 + 27/27), the <=25 us shared-down / <=36.7 us shared-gate_up targets, shared-versus-routed
+completion order, and the paired >=30 us gain against alld4r0. No new performance result, KEEP, or latency estimate
+is claimed. GPU hours **0**, GPU cost **$0**. The initial metadata serialization was caught locally; a CPU test's
+nonassociativity witness was corrected from 2^24 to 2^25 before the passing full suite. A trace lookup initially
+used run2 for the default trace; the reused default trace is in run1. No GPU session failed or was provisioned.

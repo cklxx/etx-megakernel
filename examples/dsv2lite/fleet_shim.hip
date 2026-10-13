@@ -277,6 +277,86 @@ static __device__ __forceinline__ fleet::ExpertUnit d4_slice_unit(const D4Task& 
   return u;
 }
 
+// The measured 32-row case: three slices fit in one wave-row batch (96 rows, 37 workers x 4 waves).
+// Keep the shared half first; only then wait for routing. ids/ws survive into sdown, just as routed gate_up/down:
+// graph.build() requires cached routing, and the two shared tasks are consecutive on the same pinned worker.
+static __device__ __forceinline__ void d4_slices_gate_up_32(const D4Task& t, int x) {
+  const fleet::ModelDims& d = t.fp->d;
+  __shared__ int ready;
+  int ok = 0;
+  if (threadIdx.x == 0) {
+    ok = fleet::wait_event(t.fp->rt, t.fp->epoch, D4_EVENT(t.L), fleet::SCOPE_XCD_LOCAL, t.xcd, 3) ? 1 : 0;
+    ready = ok;
+  }
+  if (threadIdx.x < fleet::kWaveLanes) {   // uniform wave-0 branch; broadcast success before reading routing
+    ok = __shfl(ok, 0, fleet::kWaveLanes);
+    if (ok && threadIdx.x < 3) {
+      // Six scalar atomics in thread 0 serialize in ROCm's ISA; three lanes fetch one pair each in two rounds.
+      const int j = threadIdx.x;
+      t.s->ids[j] = fleet::ld_coh(t.act->topk_ids + x * 3 + j, true);
+      t.s->ws[j] = fleet::ld_coh(t.act->topk_w + x * 3 + j, true) * d.routed_scaling;
+    }
+  }
+  __syncthreads();                       // one routing broadcast, shared-half GEMV already complete
+  if (!ready) return;
+  const int wave = threadIdx.x / fleet::kWaveLanes, lane = threadIdx.x % fleet::kWaveLanes;
+  for (int n = t.worker + wave * t.nw; n < 3 * 32; n += fleet::kWaves * t.nw) {
+    const int j = n / 32, row = n % 32;
+    const __hip_bfloat16* base = t.fp->w.layer_experts[t.L] + (int64_t)t.s->ids[j] * t.fp->w.expert_stride;
+    const __hip_bfloat16* pair[2] = {base + (int64_t)2 * row * d.hidden,
+                                    base + (int64_t)(2 * row + 1) * d.hidden};
+    float sums[2];
+    fleet::wave_dot<2, 4>(pair, t.s->vec, d.hidden, sums);
+    if (lane == 0)
+      t.act->expert_h[(int64_t)(x * 3 + j) * d.moe_inter + row] =
+          fleet::bf16_round(fleet::bf16_round(fleet::silu(fleet::bf16_round(sums[0]))) * fleet::bf16_round(sums[1]));
+  }
+}
+
+// K=32 needs four 16-byte loads per output row, not a half-wave with 28 idle lanes. All three slices' weight loads
+// are independent and issued together. Keep three separate reductions and the original shared+s0+s1+s2 order;
+// concatenating into one K=96 dot or weighting after reduction would change the floating-point computation.
+static __device__ __forceinline__ void d4_shared_down_32(const D4Task& t, int x, const fleet::ExpertUnit& sh,
+                                                       __hip_bfloat16* out) {
+  const fleet::ModelDims& d = t.fp->d;
+  // row is otherwise unused by these two expert tasks; vec and part keep their existing GEMV roles.
+  if (threadIdx.x < 3 * 32) {
+    const int j = threadIdx.x / 32, i = threadIdx.x % 32;
+    t.s->row[threadIdx.x] = t.act->expert_h[(int64_t)(x * 3 + j) * d.moe_inter + i] * t.s->ws[j];
+  }
+  fleet::stage_vector(t.act->expert_h + (int64_t)t.xcd * d.moe_inter, t.s->vec, sh.inter);
+  // stage_vector's barrier also publishes all 96 weighted h values. No per-slice barrier or vec overwrite.
+  fleet::expert_down_chunk(sh, t.s->vec, t.s->part, out, d.hidden, t.worker, t.nw, 0, sh.inter, true, false);
+  __syncthreads();                       // row ownership changes: all shared-half accumulators must be visible
+  const int lane4 = threadIdx.x & 3;
+  for (int n = t.worker + (threadIdx.x / 4) * t.nw; n < d.hidden; n += (fleet::kBlockThreads / 4) * t.nw) {
+    uint4 weights[3];
+#pragma unroll
+    for (int j = 0; j < 3; ++j) {
+      const __hip_bfloat16* base = t.fp->w.layer_experts[t.L] + (int64_t)t.s->ids[j] * t.fp->w.expert_stride;
+      const __hip_bfloat16* w = base + (int64_t)2 * d.moe_inter * d.hidden + (int64_t)n * d.moe_inter;
+      weights[j] = fleet::load_weight(reinterpret_cast<const uint4*>(w) + lane4);
+    }
+    float sums[3];
+#pragma unroll
+    for (int j = 0; j < 3; ++j) {
+      float acc = 0.f;
+      fleet::fma8(weights[j], t.s->row + j * 32 + lane4 * 8, acc);
+      // The old half-wave reduction has 28 zero lanes: offsets 16,8,4 add zero, then offsets 2,1 do this tree.
+      acc += 0.f;                         // retain the old tree's signed-zero normalization
+      acc += __shfl_xor(acc, 2, fleet::kWaveLanes);
+      acc += __shfl_xor(acc, 1, fleet::kWaveLanes);
+      sums[j] = acc;
+    }
+    if (lane4 == 0) {
+      float acc = t.s->part[n];
+#pragma unroll
+      for (int j = 0; j < 3; ++j) acc += sums[j];
+      out[n] = __float2bfloat16(fleet::bf16_round(acc));
+    }
+  }
+}
+
 // routed XCD k: fleet's routing (per task, as fleet_expert_gate_up), worker 0 publishes slot k's (id, weight) for the
 // shared XCD that runs slot k's slice, then rows [rows, inter) of slot k
 extern "C" __device__ void fleet_d4_routed_gate_up(const etx_ctx* c) {
@@ -324,6 +404,7 @@ extern "C" __device__ void fleet_d4_shared_gate_up(const etx_ctx* c) {
   const fleet::ExpertUnit sh = d4_unit(t, -(x + 1), nullptr, nullptr);
   fleet::expert_gate_up(sh, t.s->vec, t.act->expert_h + (int64_t)t.xcd * d.moe_inter, d.hidden, t.worker, t.nw);
   if (rows == 0) return;
+  if (rows == 32 && spx == 3) { d4_slices_gate_up_32(t, x); return; }
   __shared__ int d4_ok;
   if (threadIdx.x == 0)
     d4_ok = fleet::wait_event(t.fp->rt, t.fp->epoch, D4_EVENT(t.L), fleet::SCOPE_XCD_LOCAL, t.xcd, spx) ? 1 : 0;
@@ -345,6 +426,7 @@ extern "C" __device__ void fleet_d4_shared_down(const etx_ctx* c) {
   const int x = (int)c->coord[0], rows = D4_ROWS(c), spx = D4_SPX(c);
   __hip_bfloat16* out = t.act->expert_out + (int64_t)t.xcd * d.hidden;
   const fleet::ExpertUnit sh = d4_unit(t, -(x + 1), nullptr, nullptr);
+  if (rows == 32 && spx == 3) { d4_shared_down_32(t, x, sh, out); return; }
   fleet::stage_vector(t.act->expert_h + (int64_t)t.xcd * d.moe_inter, t.s->vec, sh.inter);
   fleet::expert_down_chunk(sh, t.s->vec, t.s->part, out, d.hidden, t.worker, t.nw, 0, sh.inter, true, rows == 0);
   for (int j = 0; rows > 0 && j < spx; ++j) {

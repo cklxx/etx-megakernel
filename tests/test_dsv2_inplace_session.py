@@ -64,7 +64,7 @@ def test_job_graph_order_and_inputs():
         if j.name.startswith("pairs_"):
             assert "build_default" in j.after and f"build_{j.name[6:]}" in j.after, j.name
     assert set(gpu[8:]) == {f"pairs_{a}" for a in ins.SINGLE}
-    for arm in (*(a for a in ins.ARMS if a not in ("allrelaxed", "d4r0", "alld4r0", "l1", "alld4r0l1", "alld3")), "fleet"):   # follow-up session files
+    for arm in (*(a for a in ins.ARMS if a not in ("allrelaxed", "d4r0", "alld4r0", "l1", "alld4r0l1", "alld3", "alld4s")), "fleet"):   # follow-up session files
         assert f"build_{arm}" in by and by[f"build_{arm}"].after == ["source"]
     for arm in ins.STAMPED:
         assert f"--stamped" in by[f"build_{arm}_stamps"].cmd
@@ -206,3 +206,21 @@ def test_every_decided_arm_reports_one_verdict():
     assert verdict("alld4r0", dict(rep, keep_vs_all=dict(keep, keep=False)))["outcome"] == "NO-GO"
     assert verdict("d4r0", rep)["outcome"] == "NO RULE (attribution)"
     assert {"all", "coh", "l1", "d4", "alld4r0", "alld4r0l1"} <= set(RULES)
+
+
+@pytest.mark.parametrize("arm", ["all", "coh", "l1", "d4", "alld4r0", "alld4r0l1", "alld4s", "alld3", "relaxed"])
+def test_pairs_runs_end_to_end_for_every_arm_shape(tmp_path, monkeypatch, arm):
+    """pairs() with stubbed invocations: every arm writes its JSON, a verdict and its PAIRS line (2026-10-13: an
+    arm-shape bug after five GPU rounds would lose the arm)."""
+    for k in ("ETX_SESS_LOGDIR", "ETX_DSV2_FLEET", "ETX_DSV2_DATA"):
+        monkeypatch.setenv(k, str(tmp_path / k))
+    ms = {"default": 3.67, "fleet": 3.54, "all": 3.56, "relaxed": 3.44, "alld4r0": 3.50}
+    def fake(self, a, name):
+        return {"device_ms": ms.get(a, 3.40), "wall_ms": ms.get(a, 3.40) + 0.03}
+    monkeypatch.setattr(ins.Session, "full_invocation", fake)
+    monkeypatch.setattr(ins.Session, "out", lambda self, a, stamped=False: tmp_path / f"b_{a}")
+    (tmp_path / "b_fleet").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "b_fleet" / "run").write_text("")
+    ins.Session().pairs(arm)
+    rep = json.loads((tmp_path / "ETX_SESS_LOGDIR" / f"pairs_{arm}.json").read_text())
+    assert "verdict" in rep and rep["verdict"]["outcome"]
