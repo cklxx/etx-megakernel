@@ -196,3 +196,26 @@ def test_stage_extracts_the_commit_into_a_new_directory(box, tmp_path):
     (repo / '.gitignore').write_text('changed\n')                                  # an uncommitted change: refused
     assert subprocess.run(['bash', str(repo / 'tools/session.sh'), 'stage', 'localhost'], env=env,
                           capture_output=True).returncode == 2
+
+
+def test_failed_or_symlinked_refetch_never_yields_a_verifiable_old_capture(box):
+    # the R12 regressions of reviews 09-11, restated for sealed records: a transfer that fails half-way leaves only
+    # <id>.partial (never <id>) and nothing there verifies; a destination that is a symlink to an earlier copy of the
+    # same record is refused and that copy is left as it was
+    tmp_path, env = box
+    rec = sealed_session(tmp_path, 'echo r > "$ETX_SESS_LOGDIR/pairs_x.json"')
+    stub(tmp_path, 'rsync', 'case "$*" in *SEAL*) ;; *) exit 23;; esac; '
+                            'a=(); for x in "$@"; do a+=("${x/#*@localhost:/$HOME/}"); done; exec /usr/bin/rsync "${a[@]}"')
+    dest = tmp_path / 'failed'
+    assert run_session(env, 'fetch', 'localhost', str(dest)).returncode != 0
+    assert not (dest / rec.name).exists()
+    out = subprocess.run(['python3', str(ROOT / 'etx/session/record.py'), 'verify', str(dest / f'{rec.name}.partial')],
+                         text=True, capture_output=True)
+    assert out.returncode != 0
+    stub(tmp_path, 'rsync', 'a=(); for x in "$@"; do a+=("${x/#*@localhost:/$HOME/}"); done; exec /usr/bin/rsync "${a[@]}"')
+    real = tmp_path / 'real'
+    assert run_session(env, 'fetch', 'localhost', str(real)).returncode == 0
+    before = {p.relative_to(real): p.read_bytes() for p in real.rglob('*') if p.is_file()}
+    (tmp_path / 'alias').symlink_to(real)
+    assert run_session(env, 'fetch', 'localhost', str(tmp_path / 'alias')).returncode == 2
+    assert {p.relative_to(real): p.read_bytes() for p in real.rglob('*') if p.is_file()} == before
