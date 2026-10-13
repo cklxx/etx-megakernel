@@ -9,7 +9,7 @@
 # examples/vllm_llm/rocm_build_check.Dockerfile .), and under
 # ~/code/rocm-headers: rocm-llvm/ (the rocm-llvm 7.2.4 .deb unpacked), inc/ (HIP headers), devlibs/, pytorch/.
 set -euo pipefail
-M=${1:?model}; V=${2:-base}; OUT=${3:-$HOME/code/etx/build/rocm22/${M}_$V}
+M=${1:?model}; V=${2:-base}; OUT=${3:-$HOME/code/etx/build/rocm22/${M}_${V//:/_}}
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 case $V in base) E="";; chain) E="ETX_VL_CHAIN=1";; xcd) E="ETX_VL_XCD=1 ETX_VL_CHAIN=1";;
   xcd2) E="ETX_VL_XCD=1 ETX_VL_CHAIN=1 ETX_VL_REQUESTS=2";;
@@ -34,6 +34,9 @@ case $V in base) E="";; chain) E="ETX_VL_CHAIN=1";; xcd) E="ETX_VL_XCD=1 ETX_VL_
   xcd_dsl3x2_all) E="ETX_VL_XCD=1 ETX_VL_CHAIN=1 ETX_VL_DSL_GEMV=1 ETX_VL_DSL_TOPK=1 ETX_VL_DSL_ATTN=head ETX_VL_DSL_FOLD=1 ETX_VL_TOUCH=1 ETX_VL_COH=1 ETX_VL_ARGPF=1 ETX_VL_BAR2=1 ETX_VL_SLOTS=attn_mfma16_g8=1 ETX_VL_REQUESTS=2";;
   xcd_dsl3x2_touch) E="ETX_VL_XCD=1 ETX_VL_CHAIN=1 ETX_VL_DSL_GEMV=1 ETX_VL_DSL_TOPK=1 ETX_VL_DSL_ATTN=head ETX_VL_DSL_FOLD=1 ETX_VL_TOUCH=1 ETX_VL_SLOTS=attn_mfma16_g8=1 ETX_VL_REQUESTS=2";;
   xcd_dsl2x2) E="ETX_VL_XCD=1 ETX_VL_CHAIN=1 ETX_VL_DSL_GEMV=1 ETX_VL_DSL_TOPK=1 ETX_VL_DSL_ATTN=head ETX_VL_SLOTS=attn_mfma16_g8=1 ETX_VL_REQUESTS=2";;
+  arm:*) A=${V#arm:}                                  # an arm of the registry (examples/vllm_llm/arms.py): what the session builds
+    E="$(cd "$ROOT" && python3 -m examples.vllm_llm.arms env "$A")"
+    ETX_CFLAGS="${ETX_CFLAGS:-} $(cd "$ROOT" && python3 -m examples.vllm_llm.arms cflags "$A")";;
   *) echo "variant $V"; exit 1;; esac
 mkdir -p "$OUT"
 # paths as the container sees them: $HOME/code -> /code
