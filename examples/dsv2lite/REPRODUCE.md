@@ -118,6 +118,15 @@ one; the weights hash is the identity). Fetch BEFORE destroying the box.
 on the box (needs the `rocm:latest` image with ROCm 7.2.3 for E2). Expected: `FOLLOWUP E1 all - allnoQ`,
 `FOLLOWUP E1 default - allnoQ`, `FOLLOWUP E2 default - default723` lines and `followup.json`.
 
+## Verified
+
+2026-10-13, from `git clone` of this repository at `dsv2-session` (58f2f95) with an EMPTY `ETX_CACHE` and a new `.venv`
+(Python 3.14.0): `reproduce.sh setup` OK; `reproduce.sh check` all 7 steps OK in 37 s (fleet export rebuilt from the
+fleet repository and hash-checked, data sets downloaded and checksum-verified, 63 CPU gates, the 33-job table identical,
+stage table byte-identical, plan regenerated = `09011c20`, all vs default 92.0 us / 18.0 / GO re-derived from the raw
+logs). STAGES printed `skipped` there: the two STAMPS2 stamp files exist only in the measuring machine's
+`ETX_CACHE/results_2026-10-13-ds_inplace/` until they are published to the data repository.
+
 ## Files
 
 `reproduce.sh` (entry point), `stage_inplace.sh` (staging), `../sessions/ds_inplace.py` (job graph), `inplace_session.py`
