@@ -119,3 +119,12 @@ control), sc0 (xl0) or sc1 (xl1) loads on one XCD, and sc1 (cl1) or sc0 sc1 (cl0
 if `xn` goes stale in the same run (the check detects staleness). If xl1 is safe: next lever "D2b" = sc1 payload loads,
 no per-task invalidate, no per-task write-back (DEVICE events keep their flush). If only cl01 is safe: that is D2's
 form, measured at no gain, and the safe-acquire route is closed.
+
+Results, runs 4-5 (05:12-05:16, `$ETX_CACHE/results_2026-10-13-d1d5/run4`, `run5`):
+- **alld4r0 3.506 ms vs all 3.567 ms: -61 us, spread 8, every pair faster: KEEP.** Best safe arm (285 tok/s).
+  Against default (3.666): -160 us.
+- **loadscope**: control xn stale at 64 B / 8 KB (detection proven; 64 KB clean by L1 eviction); xl0 (sc0 loads)
+  stale like xcd; **xl1 (sc1 loads, no invalidate, same XCD) 0 stale at all sizes**, one-way 1.047 / 1.351 /
+  4.721 us (xcd1, the safe buffer_inv sc1: 1.055 / 1.409 / 4.165); cl1 and cl01 (cross XCD behind buffer_wbl2) 0 stale.
+  By the rule: **xl1 is safe -> D2b** (sc1 payload loads, no per-task invalidate, no per-task write-back on
+  same-XCD events).
