@@ -143,3 +143,41 @@ dense_down stays plain. With D4 only at 0 slice rows (the slices' h reads are pl
 | l1 (vs default and relaxed, three-way) | D2's rule: GO if (a) every pair faster than default and median >= 70 us, and (b) median(l1 - relaxed) <= max(2 x relaxed-pair spread, 20 us) |
 | alld4r0l1 (all + D4 placement + l1; three-way default / alld4r0 / alld4r0l1) | KEEP if every pair faster than alld4r0, median >= 30 us and > 2 x spread. The 300 tok/s line is 3.333 ms device |
 | both | 32/32 + 27/27 in every invocation; any stale-data failure is a NO-GO regardless of time |
+
+## Decision register (2026-10-13): every measured arm, its rule, when the rule was fixed, the outcome
+
+Re-derived by `examples.dsv2lite.inplace_session.verdict` from the fetched pairs JSONs (`$ETX_CACHE/results_2026-10-13-d1d5/run1..4`).
+From the commit that adds this register on, every pairs JSON carries one `verdict` field and the runner prints a `VERDICT` line; before it,
+an arm's decision lived in an arm-specific field (`d2`, `d4`, `keep_vs_all`) while its per-reference `go` fields were
+blanked to None -- a reporting defect that made a decided arm look undecided.
+
+| arm | rule (as fixed) | rule fixed in | measured in | outcome |
+|---|---|---|---|---|
+| all | GO: every pair faster than default, median >= 70 us, > 2 x spread | inplace_session GO_US (10-12) | run 1 | **GO** (-108 us, spread 18) |
+| coh (D2) | (a) every pair faster than default, median >= 70 us; (b) within max(2 x relaxed spread, 20 us) of relaxed | 84eaa1b | run 2 | **NO-GO** (+9 us; 237 us behind relaxed) |
+| d4 (D4) | KEEP: every pair faster than default, median >= 30 us, > 2 x spread | 84eaa1b | run 2 | **NO-GO** (+271 us) |
+| alld4r0 | KEEP: every pair faster than `all`, median >= 30 us, > 2 x spread | **7e08d27, 05:12:12 UTC**; the measuring session started 05:12:30 UTC from that commit (`run4/runner.log`, SOURCE_IDENTITY) | run 4 | **KEEP** (-61 us vs all, spread 8, 5/5 pairs faster; `keep_vs_all.keep = true`). 3.506 ms device median |
+| l1 (D2b) | D2's rule | 8d69e52 | **NOT COMPLETE** (box destroyed in round 3 of 5) | none |
+| alld4r0l1 | KEEP vs alld4r0 | 8d69e52 | **never ran** | none |
+| relaxed, allrelaxed, d4r0, baseline, singles | no decision: attribution / measurement | — | runs 1-3 | NO RULE (by design) |
+
+The 3.506 ms figure is a measurement; the decision to keep alld4r0 rests on the rule above, fixed before its run.
+
+## Incomplete: D2b (l1), run of 05:25 UTC, box destroyed mid-session
+
+`examples/dsv2lite/results/2026-10-13-runs/sess/l1_r{0,1,2}_*.raw.log`: three of five rounds, every invocation 32/32 +
+27/27. Device medians, ms -- default 3.661 / 3.671 / 3.665, relaxed 3.445 / 3.441 / 3.432, **l1 3.333 / 3.341 / 3.329**.
+NOT a result: the rule needs five interleaved rounds, and round 3 was cut. It is the first measurement to repeat; the
+alld4r0l1 arm (the best arm + D2b) never ran.
+
+## Known losses and provenance (2026-10-13)
+
+- **No box-side hashes.** No run directory carried a SHA256SUMS written on the box. `SHA256SUMS` in each
+  `$ETX_CACHE/results_2026-10-13-d1d5/run*` and in `examples/dsv2lite/results/2026-10-13-runs/` were computed AFTER the
+  fetch (rsync over SSH): they pin the copies we hold, not what the box wrote.
+- **Stamps.** The run-1 STAMPS2 files (trace_default / trace_all, 117,440,544 B each) are NOT lost: they are in
+  `$ETX_CACHE/results_2026-10-13-d1d5/run1` and re-derive the box's stage tables exactly (spans 3939.2 / 3842.4 us).
+  They are outside git (size) and not yet in a data release.
+- **Per-stage attribution of the new arms is missing**, independent of the box: d4, alld4r0, l1 and alld4r0l1 never had
+  a stamped build or trace (only an unstamped d4 trace). Recovering it needs a GPU run with their `--stamped` builds.
+- **D2b**: see "Incomplete" above.

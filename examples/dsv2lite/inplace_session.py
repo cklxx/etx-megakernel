@@ -114,6 +114,32 @@ def d4_verdict(vs_default: dict) -> dict:
                 and vs_default["median_us"] > 2 * vs_default["spread_us"])
 
 
+# Every measured arm's pre-registered rule, as written in docs/DSV2-D1-D5.md before its first measurement (commit of
+# the rule in the doc). verdict() records the outcome in ONE field so no arm reports a blank decision.
+RULES = {
+    "all": ("GO: every pair faster than default, median >= 70 us, > 2 x spread", "go", "default"),
+    "coh": ("D2: (a) every pair faster than default, median >= 70 us; (b) |median(coh - relaxed)| <= max(2 x relaxed spread, 20 us)", "d2", None),
+    "l1": ("D2 rule applied to D2b: (a) every pair faster than default, median >= 70 us; (b) |median(l1 - relaxed)| <= max(2 x relaxed spread, 20 us)", "d2", None),
+    "d4": ("KEEP: every pair faster than default, median >= 30 us, > 2 x spread", "d4", None),
+    "alld4r0": ("KEEP: every pair faster than all, median >= 30 us, > 2 x spread (rule commit 7e08d27)", "keep_vs_all", None),
+    "alld4r0l1": ("KEEP: every pair faster than alld4r0, median >= 30 us, > 2 x spread (rule commit 8d69e52)", "keep_vs_alld4r0", None),
+}
+
+
+def verdict(arm: str, report: dict) -> dict:
+    if arm not in RULES:
+        return dict(rule="attribution or measurement only: no decision", outcome="NO RULE (attribution)")
+    rule, field, ref = RULES[arm]
+    if field == "go":
+        ok = report["device_ms"][ref]["median_us"] >= GO_US and report["device_ms"][ref]["every_positive"] and \
+            report["device_ms"][ref]["median_us"] > 2 * report["device_ms"][ref]["spread_us"]
+    elif field == "d2":
+        ok = report["d2"]["go"]
+    else:
+        ok = report[field]["keep"]
+    return dict(rule=rule, outcome=("GO" if field in ("go", "d2") else "KEEP") if ok else "NO-GO", passed=bool(ok))
+
+
 def full_result(log: str) -> dict:
     if len(re.findall(r"^tokens: 32/32 match HF greedy$", log, re.M)) != 1:
         raise ValueError("full invocation missing exact 32/32 free-greedy gate")
@@ -322,10 +348,13 @@ class Session:
             report["d2"] = d2_verdict(rounds, arm)
         elif arm == "d4":
             report["d4"] = d4_verdict(report["device_ms"]["default"])
-        elif arm != "all":
+        if arm != "all":
             for basis in report["device_ms"].values():
-                basis["go"] = None          # attribution only: the decision belongs to `all`
+                basis["go"] = None          # per-reference fields carry no decision; the arm's rule is in `verdict`
+        report["verdict"] = verdict(arm, report)
         write_json(self.logs / f"pairs_{arm}.json", report)
+        v = report["verdict"]
+        print(f"VERDICT arm={arm} {v['outcome']} rule={v['rule']!r}", flush=True)
         d = report["device_ms"]["default"]
         if arm in ("coh", "l1"):
             v = report["d2"]

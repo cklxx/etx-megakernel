@@ -195,3 +195,14 @@ def test_build_env_lets_an_arm_switch_its_plan_on(tmp_path, monkeypatch):
     assert seen["compile_default"]["ETX_DSV2_COH"] == "0" and seen["compile_default"]["ETX_DSV2_D4"] == "0"
     assert seen["compile_coh"]["ETX_DSV2_COH"] == "1" and seen["compile_coh"]["ETX_FLEET_PATCH"] == "coherent_loads"
     assert seen["compile_d4"]["ETX_DSV2_D4"] == "1" and seen["compile_d4"]["ETX_DSV2_COH"] == "0"
+
+
+def test_every_decided_arm_reports_one_verdict():
+    """A decided arm must never look undecided: pairs JSONs carry `verdict`, re-derivable from the old fields."""
+    from examples.dsv2lite.inplace_session import RULES, verdict
+    keep = {"every_positive": True, "median_us": 61.0, "spread_us": 8.0, "keep": True}
+    rep = {"device_ms": {"default": dict(keep, go=None), "all": dict(keep, go=None)}, "keep_vs_all": keep}
+    assert verdict("alld4r0", rep) == dict(rule=RULES["alld4r0"][0], outcome="KEEP", passed=True)
+    assert verdict("alld4r0", dict(rep, keep_vs_all=dict(keep, keep=False)))["outcome"] == "NO-GO"
+    assert verdict("d4r0", rep)["outcome"] == "NO RULE (attribution)"
+    assert {"all", "coh", "l1", "d4", "alld4r0", "alld4r0l1"} <= set(RULES)
