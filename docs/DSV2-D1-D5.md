@@ -447,3 +447,16 @@ NOT VERIFIED`). R13 verify_hour requires every result ds_hour.py promises: exit 
 verified but INCOMPLETE, 2 = not verified. R14 plain `timeout` again (its deadline kills a build's compiler
 children: repro 0.30 s, no survivor), and the runner kills every descendant of a job at a stop -- /proc tree taken
 before the kill -- so the group `timeout` creates cannot survive the hard stop (both R01 repros: False).
+
+## Review 09 (Astra re-check of 2ef1e58): R12 still open, R15 new -- both fixed in 0a88e45
+
+R12 (postmortem re-fetch over an earlier capture from a new box with no SHA256SUMS kept the old manifest and results,
+and `verify_hour` certified them: HOUR VERIFIED, exit 0). Fetch now deletes the destination's SHA256SUMS and
+SHA256SUMS.local before any transfer and mirrors the box with `rsync --delete --delete-excluded`. Astra's repro with a
+failing transfer and with a working Linux rsync: both end `HOUR NOT VERIFIED`, exit 2; with the working transfer only
+the new box's `startup.NEW` remains. R15 (the hard stop killed from a /proc snapshot while the tree could still fork,
+so children forked during the kill escaped: Astra's repro 2/4/4 survivors). The runner now SIGSTOPs the job's group and
+every descendant, re-scanning until no new pid appears, then SIGKILLs; it is a child subreaper (Linux prctl) so orphans
+stay its descendants, and the hard stop sweeps its own tree last. Repro: 0/0/0 survivors. A Linux-only regression test
+(`test_hard_stop_kills_children_forked_during_the_stop`) fails 3/3 on 2ef1e58 and passes 3/3 on 0a88e45. Local gates:
+238 passed, 1 skipped (that test, macOS has no /proc); `ds_hour.py --dry-run` in the container unchanged.
