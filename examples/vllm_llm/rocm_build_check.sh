@@ -41,7 +41,7 @@ C_ROOT=/code/${ROOT#$HOME/code/}; C_OUT=/code/${OUT#$HOME/code/}
 case "$OUT" in "$HOME/code/"*) ;; *) echo "outdir must be under ~/code (mounted into the container)"; exit 1;; esac
 # Forward caller instructions as well as the named variant (the latter wins).
 ENV_ARGS=()
-for name in ${!ETX_VL_@} ${!ETX_DSL_@} ETX_DEV_RESET ETX_INBODY_EMIT; do
+for name in ${!ETX_VL_@} ${!ETX_DSL_@} ETX_DEV_RESET ETX_INBODY_EMIT ETX_COHERENCE; do   # ETX_COHERENCE: the build-wide coherence mode
   [ -z "${!name+x}" ] || ENV_ARGS+=(-e "$name=${!name}")
 done
 docker run --rm --pull=never --network=none ${ENV_ARGS[@]+"${ENV_ARGS[@]}"} --platform linux/amd64 -v "$HOME/code:/code" -v "$HOME/code:$HOME/code" -e M="$M" -e E="$E" -e ROOT="$C_ROOT" -e OUT="$C_OUT" -e CFLAGS="${ETX_CFLAGS:-}" etx-rocm22 bash -c '

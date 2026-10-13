@@ -95,6 +95,11 @@ class TileBody:
                                     # inside one XCD; it is a plain producer (DEVICE events keep their flush) -- D2b
     arg_bytes: int = 0              # size of the type's argument block (bytes): lets the megakernel prefetch the
                                     # NEXT task's block while the current arrive runs (ETX_VL_ARGPF); 0 = unknown, skip
+    coherence_caps: tuple = ()      # coherence modes the tile's SOURCE implements beyond its declared one, e.g.
+                                    # ("coherent_l1",): the compiler option `coherence` (ETX_COHERENCE) may switch the
+                                    # tile into one of them. Declared by the tile family, never by a model.
+                                    # "coherent_stores": in such a mode the family's stores are write-through, so the
+                                    # tile counts as a coherent producer (no last-arriver flush) -- the DSL ops do this.
 
 
 @dataclass

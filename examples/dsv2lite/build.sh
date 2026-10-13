@@ -16,6 +16,10 @@ if [ "$STAMPS2" = 1 ] && [ -n "${ETX_DSV2_ISOLATE:-}" ]; then
   echo "ETX_DSV2_STAMPS2 rejects ETX_DSV2_ISOLATE: repeated tasks share prologue slots" >&2
   exit 2
 fi
+# the build-wide coherence mode (ETX_COHERENCE=l1, etx/passes/plan.py) needs the fleet family's agent-scope accessors
+if [ "${ETX_COHERENCE:-declared}" = l1 ]; then
+  case " ${ETX_FLEET_PATCH:-} " in *" l1_loads "*) ;; *) ETX_FLEET_PATCH="${ETX_FLEET_PATCH:+$ETX_FLEET_PATCH }l1_loads";; esac
+fi
 # ETX_FLEET_PATCH="gemv_noinline ...": build against a patched copy of fleet's sources (examples/dsv2lite/patch_fleet.py)
 if [ -n "${ETX_FLEET_PATCH:-}" ] || [ "$STAMPS2" = 1 ]; then
   rm -rf "$OUT/fleet_src"; mkdir -p "$OUT/fleet_src"; cp -r "$FLEET/src/." "$OUT/fleet_src/"

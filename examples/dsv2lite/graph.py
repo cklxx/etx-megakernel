@@ -71,6 +71,9 @@ def _tile(symbol: str):
     d5 = os.environ.get("ETX_DSV2_D5", "0") == "1"
     kw = {"prefetch": D5_PREFETCH.get(symbol)} if d5 else {}
     source = D5_T if d5 else T
+    # the fleet tile family implements "coherent_l1" through lever l1_loads, which examples/dsv2lite/build.sh adds when
+    # the build-wide switch ETX_COHERENCE=l1 is set (etx/passes/plan.py); dense_down reads h inside gemv_rows: not capable
+    kw["coherence_caps"] = () if symbol in COH_PLAIN else ("coherent_l1",)
     if mode and symbol not in COH_PLAIN:
         return hip_link(source, symbol, coherence=mode, **kw)
     return hip_link(source, symbol, **kw)
@@ -240,6 +243,8 @@ def build(layers: int = LAYERS, routing_cached: bool | None = None, requests: in
         if os.environ.get("ETX_DSV2_KCHUNKS", "1") != "1":    # D4's expert bodies do not chunk
             raise ValueError("ETX_DSV2_D4 with ETX_DSV2_KCHUNKS is not supported")
         coh = os.environ.get("ETX_DSV2_COH", "0")
+        if os.environ.get("ETX_COHERENCE", "declared") == "l1":
+            coh = "l1"                                      # the build-wide switch reaches the same tiles
         if coh == "1" or (coh == "l1" and d4_rows):     # the slices' h reads are plain; at 0 rows every read is patched
             raise ValueError("ETX_DSV2_D4 with ETX_DSV2_COH is not supported: the d4 tiles read h plainly "
                              "(only ETX_DSV2_COH=l1 with ETX_DSV2_D4_ROWS=0)")

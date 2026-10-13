@@ -6,6 +6,7 @@ between steps, and those are what the host uploads.
 """
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -23,6 +24,11 @@ class PassOptions:
     affinity_imbalance: float = 1.25       # max load / mean load tolerated when following producers
     sentinel_signals: bool = False         # lower waits to sentinel polling where the capability exists
     inline_tiles: bool = False             # emit #include of the tile sources into the kernel TU (single-TU build, bodies inlinable)
+    # coherence mode of the whole build, the SAME switch for every model: "declared" (default: each tile keeps the
+    # coherence its graph declared) | "l1" (every tile whose family declares the capability becomes "coherent_l1":
+    # agent-scope payload loads, no acquire invalidate, no added write-back). Default from ETX_COHERENCE so every
+    # build script inherits it unchanged (docs/INVENTORY-SYSTEM-2026-10-13.md, G6).
+    coherence: str = field(default_factory=lambda: os.environ.get("ETX_COHERENCE", "declared"))
     relay: str = "off"                     # per-domain relay of DEVICE-scope counters: off (default) | auto | on.
                                            # Off by default: measured neutral on MI300X, and its hierarchical acquire
                                            # (relay invalidates L2 once, consumers drop only L1) was shown UNSAFE on

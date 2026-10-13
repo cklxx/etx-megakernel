@@ -178,6 +178,13 @@ def emit_kernel(plan: Plan, device: int = 0) -> str:
         out.append("// single-TU build: tile sources included so the bodies can inline into the dispatch")
         for src in dict.fromkeys(g.body.source for g in grids if g.body.source and g.body.kind in ("hip_link", "cuda_link")):
             out.append(f"#include \"{src}\"")
+        if plan.graph.codegen.get("coh_l1"):
+            # coherence mode l1 (ETX_COHERENCE): a DSL tile source emitted before etx/ops/coh.py had the agent-scope
+            # variant would build and run correctly with system-scope loads -- under the wrong arm's name. Refuse it.
+            out.append("#if defined(ETX_DSL_COH_HELPERS) && !defined(ETX_DSL_COH_L1_IMPL)")
+            out.append('#error "coherence mode l1: the DSL tile source predates the agent-scope accessors '
+                       '(etx/ops/coh.py); re-emit it with etx.ops.emit"')
+            out.append("#endif")
     else:
         for g in grids:
             out.append(f"extern \"C\" __device__ void {g.body.symbol}(const etx_ctx*);")

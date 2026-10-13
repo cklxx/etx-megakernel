@@ -14,6 +14,7 @@ from __future__ import annotations
 HELPERS = r'''
 #ifndef ETX_DSL_COH_HELPERS
 #define ETX_DSL_COH_HELPERS
+#define ETX_DSL_COH_L1_IMPL 1      // this source implements ETX_DSL_COH_L1 (the megakernel refuses one that does not)
 #ifndef DSL_U32X4_DEFINED                                 // also defined by etx/ops/gemv.py, whichever is emitted first
 #define DSL_U32X4_DEFINED
 typedef unsigned int dsl_u32x4 __attribute__((ext_vector_type(4)));
@@ -21,24 +22,32 @@ typedef unsigned int dsl_u32x4 __attribute__((ext_vector_type(4)));
 #ifndef DSL_G
 #define DSL_G __attribute__((address_space(1)))
 #endif
-#ifdef ETX_DSL_COH
+#if defined(ETX_DSL_COH) || defined(ETX_DSL_COH_L1)
 #define DSL_COH_SCOPE __HIP_MEMORY_SCOPE_SYSTEM
+// ETX_DSL_COH_L1 (coherence mode "l1", published by the plan): loads at AGENT scope (sc1: past this CU's L1, never a
+// stale L2 line -- sync_bench loadscope xl1 / cl1, 0 stale words); stores stay system scope (write-through), so a tile
+// still declared "coherent" keeps every guarantee it had
+#ifdef ETX_DSL_COH_L1
+#define DSL_COH_LD_SCOPE __HIP_MEMORY_SCOPE_AGENT
+#else
+#define DSL_COH_LD_SCOPE __HIP_MEMORY_SCOPE_SYSTEM
+#endif
 // the atomics go through address_space(1) pointers so they lower to global_ ops with sc0 sc1, not flat_ ones
 // (a flat access also waits on the LDS counter: the DSL_G note in etx/ops/gemv.py)
 #define DSL_COH_G __attribute__((address_space(1)))
 static __device__ __forceinline__ float dsl_a_ldbf(const __hip_bfloat16* p) {
-  const unsigned short u = __hip_atomic_load((const DSL_COH_G unsigned short*)p, __ATOMIC_RELAXED, DSL_COH_SCOPE);
+  const unsigned short u = __hip_atomic_load((const DSL_COH_G unsigned short*)p, __ATOMIC_RELAXED, DSL_COH_LD_SCOPE);
   __hip_bfloat16 h; __builtin_memcpy(&h, &u, 2); return __bfloat162float(h);
 }
 static __device__ __forceinline__ void dsl_a_stbf(__hip_bfloat16* p, __hip_bfloat16 v) {
   unsigned short u; __builtin_memcpy(&u, &v, 2); __hip_atomic_store((DSL_COH_G unsigned short*)p, u, __ATOMIC_RELAXED, DSL_COH_SCOPE);
 }
-static __device__ __forceinline__ int dsl_a_ldi(const int* p) { return __hip_atomic_load((const DSL_COH_G int*)p, __ATOMIC_RELAXED, DSL_COH_SCOPE); }
+static __device__ __forceinline__ int dsl_a_ldi(const int* p) { return __hip_atomic_load((const DSL_COH_G int*)p, __ATOMIC_RELAXED, DSL_COH_LD_SCOPE); }
 static __device__ __forceinline__ void dsl_a_sti(int* p, int v) { __hip_atomic_store((DSL_COH_G int*)p, v, __ATOMIC_RELAXED, DSL_COH_SCOPE); }
-static __device__ __forceinline__ float dsl_a_ldf(const float* p) { return __hip_atomic_load((const DSL_COH_G float*)p, __ATOMIC_RELAXED, DSL_COH_SCOPE); }
+static __device__ __forceinline__ float dsl_a_ldf(const float* p) { return __hip_atomic_load((const DSL_COH_G float*)p, __ATOMIC_RELAXED, DSL_COH_LD_SCOPE); }
 static __device__ __forceinline__ void dsl_a_stf(float* p, float v) { __hip_atomic_store((DSL_COH_G float*)p, v, __ATOMIC_RELAXED, DSL_COH_SCOPE); }
-static __device__ __forceinline__ long long dsl_a_ldll(const long long* p) { return __hip_atomic_load((const DSL_COH_G long long*)p, __ATOMIC_RELAXED, DSL_COH_SCOPE); }
-static __device__ __forceinline__ unsigned long long dsl_a_ld64(const unsigned long long* p) { return __hip_atomic_load((const DSL_COH_G unsigned long long*)p, __ATOMIC_RELAXED, DSL_COH_SCOPE); }
+static __device__ __forceinline__ long long dsl_a_ldll(const long long* p) { return __hip_atomic_load((const DSL_COH_G long long*)p, __ATOMIC_RELAXED, DSL_COH_LD_SCOPE); }
+static __device__ __forceinline__ unsigned long long dsl_a_ld64(const unsigned long long* p) { return __hip_atomic_load((const DSL_COH_G unsigned long long*)p, __ATOMIC_RELAXED, DSL_COH_LD_SCOPE); }
 static __device__ __forceinline__ void dsl_a_st64(unsigned long long* p, unsigned long long v) { __hip_atomic_store((DSL_COH_G unsigned long long*)p, v, __ATOMIC_RELAXED, DSL_COH_SCOPE); }
 // 16 B of activation in one pair of requests. A coherent access bypasses L1/L2, so a per-element 2 B accessor
 // issues one memory request per lane per element: dsl_stage_norm's K=2048 fold made 4096 of them per task against

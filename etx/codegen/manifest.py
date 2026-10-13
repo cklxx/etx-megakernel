@@ -35,6 +35,7 @@ FEATURES: dict[str, tuple[str, str, int]] = {
     "dev_reset": ("ETX_EMIT_DEV_RESET", "value", 0),  # the kernel resets its own per-step state (host.h)
     "fold_topk": ("ETX_EMIT_FOLD_TOPK", "value", 0),  # the top-k folded into the expert tasks (host.hip)
     "coh": ("ETX_DSL_COH", "flag", 0),              # the DSL tiles' coherent activation access (etx/ops/coh.py)
+    "coh_l1": ("ETX_DSL_COH_L1", "flag", 0),        # ...with AGENT-scope loads (coherence mode "l1", p4 sets it)
     "nb": ("ETX_VL_NB", "value", 1),                # activation columns the tiles were emitted for (host.hip)
     "requests": ("ETX_VL_REQUESTS", "value", 1),    # concurrent decode requests the plan carries (host.hip)
     "uc": ("ETX_VL_UC", "flag", 0),                 # cross-XCD tensors in uncached memory (host.hip, lowering)

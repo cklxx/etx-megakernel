@@ -11,6 +11,7 @@ Data-dependent grids never go static (static would degrade to an E[0] barrier).
 from __future__ import annotations
 
 import math
+from dataclasses import replace
 
 from ..ir.types import Scope
 from .plan import Plan
@@ -18,7 +19,35 @@ from .plan import Plan
 MARGIN = 1.5     # bias toward static: the paper's regular workloads lose 6-17% under dynamic scheduling
 
 
+COHERENCE_MODES = {"declared": None, "l1": "coherent_l1"}
+
+
+def _stores_coherent(body) -> bool:
+    """A producer's payload is past its L2 without a write-back: a "coherent" tile, or a "coherent_l1" tile whose family
+    declares its stores write-through ("coherent_stores": the DSL ops; not fleet's tiles, whose stores are plain)."""
+    return body.coherence == "coherent" or (body.coherence == "coherent_l1" and "coherent_stores" in body.coherence_caps)
+
+
+def apply_coherence_mode(plan: Plan) -> None:
+    """The build-wide coherence switch (PassOptions.coherence / ETX_COHERENCE): every grid whose tile family declares
+    the target mode in `coherence_caps` takes it; nothing else changes. "declared" (the default) touches nothing."""
+    mode = plan.options.coherence
+    if mode not in COHERENCE_MODES:
+        raise ValueError(f"coherence={mode!r}: one of {sorted(COHERENCE_MODES)} (ETX_COHERENCE)")
+    target = COHERENCE_MODES[mode]
+    if target is None:
+        return
+    switched = [g for g in plan.graph.grids if target in g.body.coherence_caps]
+    for g in switched:
+        g.body = replace(g.body, coherence=target)
+    if switched:
+        plan.graph.codegen["coh_l1"] = 1          # the DSL accessors' agent-scope variant (etx/ops/coh.py)
+    plan.say(f"P4: coherence={mode}: {len(switched)} of {len(plan.graph.grids)} grids -> {target} "
+             f"(tile families declaring it); the rest keep their declared coherence")
+
+
 def run(plan: Plan) -> None:
+    apply_coherence_mode(plan)
     m = plan.machine
     inst = plan.inst
     total_workers = max(1, plan.workers_per_device())
@@ -108,6 +137,6 @@ def run(plan: Plan) -> None:
         prods = [g for g in plan.graph.grids if ev_name in g.out_edges]
         cons = [g for g in plan.graph.grids if ev_name in g.in_edges]
         ep.coherent_consumer = any(c.body.coherence in ("coherent", "coherent_loads") for c in cons)
-        ep.producers_coherent = bool(prods) and all(pg.body.coherence == "coherent" for pg in prods)
+        ep.producers_coherent = bool(prods) and all(_stores_coherent(pg.body) for pg in prods)
         if ep.coherent_consumer and not ep.producers_coherent:
             plan.say(f"P4: event {ev_name}: plain producer with a coherent consumer -> write-back release")

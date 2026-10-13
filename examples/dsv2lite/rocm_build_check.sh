@@ -28,7 +28,7 @@ for arm in "${ARMS[@]}"; do
 done
 ENV_ARGS=()
 while IFS= read -r name; do
-  case "$name" in ETX_DSV2_*) ENV_ARGS+=(-e "$name=${!name}");; esac
+  case "$name" in ETX_DSV2_*|ETX_COHERENCE) ENV_ARGS+=(-e "$name=${!name}");; esac
 done < <(compgen -e)
 for arm in "${ARMS[@]}"; do
   mkdir -p "$OUT/$arm"
@@ -47,6 +47,8 @@ OUT=/out/$ARM
 python3 -m etx compile examples/dsv2lite/graph.py --arch gfx942 --out "$OUT" --inline-tiles --relay on > "$OUT/compile.log" 2>&1
 SRC=/fleet/src
 PATCHES=(); FLAGS=()
+# the build-wide coherence mode needs the fleet family agent-scope accessors (same rule as build.sh)
+if [ "${ETX_COHERENCE:-declared}" = l1 ] && [[ "+$ARM+" != *"+l1_loads+"* ]]; then ARM="$ARM+l1_loads"; fi
 STAMPS=0
 for token in ${ARM//+/ }; do
   case "$token" in default) ;; stamps) STAMPS=1; FLAGS=(-DETX_DSV2_STAMPS2);; *) PATCHES+=("$token");; esac

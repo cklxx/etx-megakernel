@@ -485,6 +485,10 @@ def build() -> Graph:
 
     def coh_of(i):                                             # the DSL tiles are the coherent ones (their source is ours)
         return "coherent" if COH and i["export"].startswith("dsl_") else "imported"
+
+    def caps_of(i):        # the DSL family implements the agent-scope variant (etx/ops/coh.py ETX_DSL_COH_L1) for every
+        # model, with write-through (system-scope) stores: ETX_COHERENCE=l1 switches it, no flush is added
+        return ("coherent_l1", "coherent_stores") if i["export"].startswith("dsl_") else ()
     native = str(HERE / "vl_tiles.hip")
     pre = (lambda r: f"r{r}_") if REQUESTS > 1 else (lambda r: "")
 
@@ -556,7 +560,7 @@ def build() -> Graph:
             i = grp[0]
             g.etensor(ev, (NX,), wait_count=1)
             name = P + (f"{i['role']}_{i['layer']}_x" if i["layer"] >= 0 else f"{i['role']}_x")
-            g.call_device(name, (NX,), hip_link(src_of(i), f"etx_tile_rep_{i['export']}", pre_wait=f"etx_pre_x_{i['export']}", coherence=coh_of(i), arg_bytes=i.get("arg_bytes", 0)),
+            g.call_device(name, (NX,), hip_link(src_of(i), f"etx_tile_rep_{i['export']}", pre_wait=f"etx_pre_x_{i['export']}", coherence=coh_of(i), coherence_caps=caps_of(i), arg_bytes=i.get("arg_bytes", 0)),
                           resource=res, args=["impargs"],
                           consts=(i["offset"], i["stride"], i["copyoff"]), in_edges=ins_of("x->(0)"), out_edges={ev: "x->x"},
                           domain_map="x->x", duration_us=3.0)
@@ -581,7 +585,7 @@ def build() -> Graph:
                 out = {ev: "xw->(0)"}; this_x = False
             name = P + (f"{i['role']}_{i['layer']}" if i["layer"] >= 0 else i["role"])
             dur = max(2.0, i["M"] * i["K"] * 2 / 4.0e12 * 1e6) if i["export"].startswith("wvsplitk") else 3.0
-            g.call_device(name, (NX, per), hip_link(src_of(i), f"etx_tile_x_{i['export']}", pre_wait=f"etx_pre_x_{i['export']}", touch=touch_of(i, True), coherence=coh_of(i), arg_bytes=i.get("arg_bytes", 0)),
+            g.call_device(name, (NX, per), hip_link(src_of(i), f"etx_tile_x_{i['export']}", pre_wait=f"etx_pre_x_{i['export']}", touch=touch_of(i, True), coherence=coh_of(i), coherence_caps=caps_of(i), arg_bytes=i.get("arg_bytes", 0)),
                           resource=res, args=["impargs"],
                           consts=(i["offset"], i["stride"], per), in_edges=ins_of("xw->x" if prev_x[r] else "xw->(0)"), out_edges=out,
                           domain_map="xw->x", duration_us=dur)
@@ -590,7 +594,7 @@ def build() -> Graph:
             # the attention block by kv head: prep h -> attention (partition p, head h) -> reduce h, all on XCD h
             i = grp[0]
             name = P + f"{i['role']}_{i['layer']}"
-            link = hip_link(src_of(i), f"etx_tile_{i['export']}", pre_wait=f"etx_pre_{i['export']}", coherence=coh_of(i), arg_bytes=i.get("arg_bytes", 0))
+            link = hip_link(src_of(i), f"etx_tile_{i['export']}", pre_wait=f"etx_pre_{i['export']}", coherence=coh_of(i), coherence_caps=caps_of(i), arg_bytes=i.get("arg_bytes", 0))
             if i["role"] == "prep":
                 nkv = i["tasks"]
                 g.etensor(ev, (nkv,), wait_count=1)
@@ -616,7 +620,7 @@ def build() -> Graph:
             g.etensor(ev, (1,), wait_count=i["tasks"])
             name = P + (f"{i['role']}_{i['layer']}" if i["layer"] >= 0 else i["role"])
             pin = {"domain_map": "i->(0)"} if i["role"] in PIN_ROLES else {}
-            g.call_device(name, (i["tasks"],), hip_link(src_of(i), f"etx_tile_{i['export']}", pre_wait=f"etx_pre_{i['export']}", touch=touch_of(i, False), coherence=coh_of(i), arg_bytes=i.get("arg_bytes", 0)),
+            g.call_device(name, (i["tasks"],), hip_link(src_of(i), f"etx_tile_{i['export']}", pre_wait=f"etx_pre_{i['export']}", touch=touch_of(i, False), coherence=coh_of(i), coherence_caps=caps_of(i), arg_bytes=i.get("arg_bytes", 0)),
                           resource=res, args=["impargs"],
                           consts=(i["offset"],), in_edges=ins_of("i->(0)"), out_edges={ev: "i->(0)"}, **pin,
                           duration_us=2.0 if not i["export"].startswith("wvsplitk") else max(2.0, i["M"] * i["K"] * 2 / 4.0e12 * 1e6))
