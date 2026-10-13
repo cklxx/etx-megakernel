@@ -20,6 +20,7 @@ import json
 from pathlib import Path
 import re
 import statistics
+import sys
 
 from examples.dsv2lite import inplace_session as ins
 from examples.dsv2lite.pinned import CACHE
@@ -34,6 +35,21 @@ def sha(path: Path) -> str:
         while block := f.read(8 << 20):
             h.update(block)
     return h.hexdigest()
+
+
+def regenerate_plan(d: Path) -> Path:
+    """The ETX plan is deterministic: compile it from this commit and check it against the session's PLAN.sha256."""
+    import subprocess
+    import tempfile
+    out = Path(tempfile.mkdtemp(prefix="etxplan."))
+    subprocess.run([sys.executable, "-m", "etx", "compile", "examples/dsv2lite/graph.py", "--arch", "gfx942",
+                    "--out", str(out), "--inline-tiles", "--relay", "on"], check=True, capture_output=True)
+    want = (d / "PLAN.sha256").read_text().split()[0]
+    got = sha(out / "plan.json")
+    if got != want:
+        raise SystemExit(f"regenerated plan {got[:16]} != the session's {want[:16]}: not the measured commit")
+    print(f"PLAN regenerated from this commit: sha256 {got[:16]} = the session's plan")
+    return out / "plan.json"
 
 
 def main(argv=None) -> int:
@@ -77,10 +93,13 @@ def main(argv=None) -> int:
                   f"every_positive={int(got['every_positive'])} GO={go}  device medians "
                   + " ".join(f"{n}={v:.3f}" for n, v in med.items()))
 
+    plan_file = None
     for arm in ins.STAMPED:
         st_file, trace = d / f"stages_{arm}.json", d / f"trace_{arm}.trace.bin"
         pro = stamps_dir / f"trace_{arm}.stamps.bin"
         plan = d / f"b_{arm}_stamps" / "plan.json"
+        if not plan.exists() and (d / "PLAN.sha256").exists():
+            plan = plan_file = plan_file or regenerate_plan(d)
         if not (st_file.exists() and trace.exists() and pro.exists() and plan.exists()):
             print(f"STAGES {arm}: skipped (needs {pro.name} from the archive)")
             continue
