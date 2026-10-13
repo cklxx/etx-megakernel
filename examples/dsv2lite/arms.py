@@ -71,6 +71,17 @@ ARMS = {a.name: a for a in [
         rule=Rule("device_ms", "all", 30, text="DROP if |median gain| <= spread or any pair is slower than all; KEEP only if every pair faster than "
                   "all, median >= 30 us and > 2 x spread; otherwise DROP (D5 rule commit 84eaa1b)",
                   labels=("KEEP", "DROP"))),
+    # K1 and the two ablations on the kept arm (docs/DSV2-D1-D5.md, "K1", rules written before the code, 2ec2d29)
+    Arm("alld4r0l1kvs", levers=(*LEVERS_ALL, "l1_loads"), flags=(*D4, "-DETX_DSV2_KVA_SHARED=1"),
+        env=dict(D4R0, ETX_DSV2_COH="l1", ETX_DSV2_KVA="shared"),
+        order=("alld4r0l1", "alld4r0l1kvs"), references=("alld4r0l1",), stamped=True,
+        rule=Rule("device_ms", "alld4r0l1", 30, text="K1: KEEP if every pair faster than alld4r0l1, median >= 30 us, "
+                  "> 2 x spread; otherwise DROP (rule commit 2ec2d29)", labels=("KEEP", "DROP"))),
+    *(Arm(name, levers=tuple(x for x in (*LEVERS_ALL, "l1_loads") if x != lever), flags=D4, env=dict(D4R0, ETX_DSV2_COH="l1"),
+          order=("alld4r0l1", name), references=("alld4r0l1",),
+          rule=Rule("device_ms", "alld4r0l1", 0, text=f"REMOVE {lever} from the kept recipe if every pair faster than "
+                    "alld4r0l1 and median > 2 x spread; otherwise it stays (rule commit 2ec2d29)", labels=("REMOVE", "STAYS")))
+      for name, lever in (("alld4r0l1noQ", "gemv_no_terminal_all"), ("alld4r0l1noA", "argmax_tree"))),
     Arm("allnoQ", levers=tuple(x for x in LEVERS_ALL if x != "gemv_no_terminal_all"),
         order=("default", "all", "allnoQ"), references=("default", "all"),
         rule=Rule("device_ms", "all", 0, text="every pair faster, median > 2 x spread")),

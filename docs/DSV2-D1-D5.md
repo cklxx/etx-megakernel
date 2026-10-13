@@ -511,3 +511,49 @@ through the last-arriver write-back (the loadscope cl1 case, 0 stale words) like
 `alld4r0l1noA` (without argmax_tree), each vs `alld4r0l1`, same five rounds. **REMOVE** the lever from the kept
 recipe if every pair is faster and median > 2 x spread; otherwise it stays. Low ceiling: argmax measures 5.1 us in
 total. They ride the same box after K1, never instead of it.
+
+### K1 stage-data note (from the retained kept trace; no new capture)
+`python -m examples.dsv2lite.ledger --etx <hour>/b_alld4r0l1_stamps/plan.json <hour>/trace_alld4r0l1.trace.bin
+<hour>/trace_alld4r0l1.stamps.bin`. The trace is stamped, so it is attribution only, not the uninstrumented baseline.
+Mean MoE layer (layers 2-25) = 124.0 us [C]:
+- handoff -19.1 / ramp 27.2: they cancel, because placement lets fast XCDs start early;
+- staging 9.3, prologue 10.7, tail 9.0;
+- bandwidth floor 38.4, stream above floor 48.5.
+The per-type table (`trace_alld4r0l1.raw.log`) shows mean waits of only 0.5-2.6 us per task, and every phase starts
+within ~0.5 us of the previous one's end. The time is in bodies [M]. Above-floor per layer:
+- qkv 21.5 vs floor 3.5 (norm 2.2 + gamma 1.2, then q 6.7, then kv_a 5.3 us, in sequence);
+- attention 18.1 vs 0.27;
+- merge 11.4 vs 0.49 (W_uv GEMV 5.2 us per task);
+- router 12.6 vs 0.06;
+- gate_up 32.7 vs 21.5;
+- down 18.1 vs 10.7.
+These are accounting residuals, not measured stalls. K1 is the one body excess with a recorded cause
+(MODEL-dsv2.md:154) and no lever, open or closed. merge's W_uv GEMV and attention have no measured cause yet [U].
+
+### K1 local evidence (branch wf/dsv2-next; ROCm 7.2.4, `rocm_build_check.sh <fleet export> --arm <arm>`)
+- **Default byte-identical.** Plan 09011c20 and kernel 751293fa unchanged (tests/test_dsv2_kva.py). The kept arm
+  `alld4r0l1` gives plan 3379ec89 on main and on the branch, and its `mk.s` and `host_dev.s` are byte-identical.
+  The K1 entry points sit behind `-DETX_DSV2_KVA_SHARED=1`; always-present entry points had moved the kept ISA in
+  78 lines, so they were guarded.
+- **K1 `alld4r0l1kvs`:**
+  - plan f23f959e; 256 VGPR / 71 AGPR / 0 scratch / 1 wave;
+  - the qkv event is DEVICE scope in all 27 layers;
+  - `buffer_wbl2` 172 -> 226: the +54 is the per-layer release write-back K1 adds, its cost side in the code;
+  - dispatch calls only the `_kvs` entry points.
+- **Ablations:**
+  - `alld4r0l1noQ`: 87 AGPR (+17 vs kept), static loads 3344 -> 3078;
+  - `alld4r0l1noA`: 70 AGPR, barriers 252 -> 273 (+21, the argmax tree's 9 -> 2 reversed);
+  - both 0 scratch, 1 wave. Static counts do not give issued loads; the GPU decides.
+
+### K1 GPU queue (registered; needs the owner's approval; `examples/sessions/ds_k1.py`)
+- **Order:** prep chain (fresh droplet: 3 min 59 s to preflight, 2026-10-13 [M]) with 5 parallel builds ->
+  `pairs_alld4r0l1kvs` -> `pairs_alld4r0l1noQ` -> `pairs_alld4r0l1noA` -> `trace_alld4r0l1kvs` (attribution only).
+- **Measurement:** five interleaved rounds per pairs job on one machine, deciding timings unstamped, 32/32 + 27/27
+  in every invocation; rules as above.
+- **GPU time [E]** from the 2026-10-13 runner records: 3 x 10 invocations x 5.9 s + 1 traced token ≈ 3.1 min. The
+  runner hard stop is 1800 s. The paid hour on 2026-10-13 ran 10 min 53 s and was billed ≈ 50 min [M].
+- **Proposed cap:** one MI300X box <= 1 h, about $2 at $1.99/h [E]. Delete the box at the end, fetch into a new
+  directory, seal the record.
+- **Expected vs unknown:** K1's net sign is [U] (-5..-7 us qkv against +1..+4 us handoff/attention per layer, both [E]).
+  The ablations' ceilings are low: argmax is 5.1 us in total; terminal loads cost 14 us in an earlier session, on
+  another combination. Nothing is promised.

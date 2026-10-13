@@ -172,6 +172,35 @@ extern "C" __device__ void fleet_attention(const etx_ctx* c) {
   fleet::run_task(t, fp->rt, fp->d, fp->w, act, kv, s, tc, (int)c->domain, 0);
   pro_end(fp, s, PRO_SLOT(L, fleet::TASK_ATTENTION, c), t0);
 }
+#if defined(ETX_DSV2_KVA_SHARED) && ETX_DSV2_KVA_SHARED
+// K1 (docs/DSV2-D1-D5.md, ETX_DSV2_KVA=shared; the arm passes -DETX_DSV2_KVA_SHARED=1): fleet's FLAG_KVA_SHARED -- each XCD
+// computes 1/8 of the 576 kv_a rows into ONE buffer instead of its own full copy, graph.py makes the qkv event global and
+// attention reads that buffer. Compiled only in that build: the default translation unit stays byte-identical (with the
+// entry points always present, the unchanged default ISA moved in 78 lines on ROCm 7.2.4). A plan that names these
+// symbols without the define fails to link.
+extern "C" __device__ void fleet_qkv_fused_kvs(const etx_ctx* c) { fleet_call(c, fleet::TASK_QKV_FUSED, fleet::FLAG_KVA_SHARED, -1, -1, 1, -1, CHIPLET_WORKER); }
+extern "C" __device__ void fleet_qkv_fused_fold_kvs(const etx_ctx* c) { fleet_call(c, fleet::TASK_QKV_FUSED, fleet::FLAG_FOLD_PARTIALS | fleet::FLAG_KVA_SHARED, -1, -1, 1, -1, CHIPLET_WORKER); }
+extern "C" __device__ void fleet_attention_kvs(const etx_ctx* c) {   // fleet_attention plus FLAG_KVA_SHARED
+  const FleetParams* fp = FP(c);
+  const int32_t L = LAYER(c);
+  fleet::TaskDescriptor t{};
+  t.kind = fleet::TASK_ATTENTION; t.layer = (int16_t)L; t.xcd = (int16_t)c->domain; t.worker = 0;
+  t.wait_event = -1; t.signal_event = -1; t.n_split = fleet::kMaxKvChunks; t.head = (int16_t)c->coord[0];
+  t.kv_chunk = (int16_t)c->coord[1]; t.expert_slot = -1; t.wait_count = fleet::kQAbsSlices;
+  t.local_event = (int16_t)QABS_EVENT(L, c->coord[0]); t.flags = fleet::FLAG_PUB_WAIT | fleet::FLAG_KVA_SHARED;
+  fleet::TokenCtx tc;
+  tc.tok = fp->tok; tc.epoch = fp->epoch; tc.pos = fp->pos; tc.seq_len = fp->pos + 1;
+  tc.cos = fp->act.cos + (int64_t)fp->pos * fp->d.qk_rope; tc.sin = fp->act.sin + (int64_t)fp->pos * fp->d.qk_rope;
+  tc.dump = fp->dump != 0; tc.trace = false;
+  fleet::Activations& act = *const_cast<fleet::Activations*>(&fp->act);
+  fleet::KVCache& kv = *const_cast<fleet::KVCache*>(&fp->kv);
+  fleet::Scratch& s = *reinterpret_cast<fleet::Scratch*>(c->lds);
+  uint64_t t0 = 0;
+  pro_begin(fp, tc, s, t0);
+  fleet::run_task(t, fp->rt, fp->d, fp->w, act, kv, s, tc, (int)c->domain, 0);
+  pro_end(fp, s, PRO_SLOT(L, fleet::TASK_ATTENTION, c), t0);
+}
+#endif
 extern "C" __device__ void fleet_merge_uv(const etx_ctx* c) { fleet_call(c, fleet::TASK_MERGE_UV, 0, c->coord[0], c->coord[1], fleet::kMaxKvChunks, -1, 0); }
 extern "C" __device__ void fleet_o_proj(const etx_ctx* c) { fleet_call(c, fleet::TASK_O_PROJ, 0, -1, -1, 1, -1, CHIPLET_WORKER); }
 extern "C" __device__ void fleet_norm_router(const etx_ctx* c) { fleet_call(c, fleet::TASK_NORM_ROUTER, 0, -1, -1, 1, -1, CHIPLET_WORKER); }

@@ -118,21 +118,29 @@ def build_attention_block(g: Graph, q: _Req, L: int, e_in: str, e_in_map: str, f
     (the interleave's cross-request ordering)."""
     _layer_tensor(g, L)
     n = q.n
-    g.etensor(n(f"E_qkv_{L}"), (XCDS,), wait_count=W)
+    # K1 (docs/DSV2-D1-D5.md), ETX_DSV2_KVA=shared: kv_a is computed once, 1/8 per XCD (fleet's FLAG_KVA_SHARED), so the
+    # qkv event is global -- every attention/q_absorb task waits for all 296 qkv tasks and reads the one kv_a buffer.
+    # Default `replicated`: every XCD computes its own full kv_a, the event stays XCD-local (today's graph).
+    kvs = os.environ.get("ETX_DSV2_KVA", "replicated") == "shared"
+    sfx = "_kvs" if kvs else ""
+    g.etensor(n(f"E_qkv_{L}"), (1,) if kvs else (XCDS,), wait_count=XCDS * W if kvs else W)
     g.etensor(n(f"E_qabs_{L}"), (HEADS,), wait_count=QABS)
     g.etensor(n(f"E_attn_{L}"), (HEADS,), wait_count=KV_CHUNKS)
     g.etensor(n(f"E_merge_{L}"), (XCDS,), wait_count=(HEADS // XCDS) * KV_CHUNKS)
     g.etensor(n(f"E_oproj_{L}"), (1,), wait_count=XCDS * W)
     qkv_in = {e_in: e_in_map, **(extra_in or {})}
-    _chiplet(g, q, f"qkv_{L}", "fleet_qkv_fused_fold" if fold else "fleet_qkv_fused", L, qkv_in, {n(f"E_qkv_{L}"): "xw->x"}, DUR["qkv"])
+    _chiplet(g, q, f"qkv_{L}", ("fleet_qkv_fused_fold" if fold else "fleet_qkv_fused") + sfx, L, qkv_in,
+             {n(f"E_qkv_{L}"): "xw->(0)" if kvs else "xw->x"}, DUR["qkv"])
     g.call_device(n(f"qabs_{L}"), (HEADS, QABS), _tile("fleet_q_absorb"), resource=_res(paired=q.paired), args=[q.fleet, f"layer_{L}"],
                   consts=(L, q.r), domain_map="hs->(h/2)", worker_map=q.wmap("hs->((h%2)*2+s+OFF)"),
-                  in_edges={n(f"E_qkv_{L}"): "hs->(h/2)"}, out_edges={n(f"E_qabs_{L}"): "hs->h"}, duration_us=DUR["qabs"])
-    g.call_device(n(f"attn_{L}"), (HEADS, KV_CHUNKS), _tile("fleet_attention"), resource=_res(paired=q.paired), args=[q.fleet, f"layer_{L}"],
+                  in_edges={n(f"E_qkv_{L}"): "hs->(0)" if kvs else "hs->(h/2)"}, out_edges={n(f"E_qabs_{L}"): "hs->h"},
+                  duration_us=DUR["qabs"])
+    g.call_device(n(f"attn_{L}"), (HEADS, KV_CHUNKS), _tile("fleet_attention" + sfx), resource=_res(paired=q.paired), args=[q.fleet, f"layer_{L}"],
                   consts=(L, q.r),
                   # E_qabs is consumed INSIDE the attention body (fleet's PUB_WAIT, kept for overlap; see fleet_shim.hip);
                   # ETX still orders attention after E_qkv, and qabs after E_qkv, so the in-body wait is deadlock-free.
-                  domain_map="hc->(h/2)", worker_map=q.wmap("hc->((h%2)*16+c+OFF)"), in_edges={n(f"E_qkv_{L}"): "hc->(h/2)"},
+                  domain_map="hc->(h/2)", worker_map=q.wmap("hc->((h%2)*16+c+OFF)"),
+                  in_edges={n(f"E_qkv_{L}"): "hc->(0)" if kvs else "hc->(h/2)"},
                   out_edges={n(f"E_attn_{L}"): "hc->h"}, duration_us=DUR["attn"], duration_cv=0.1)
     g.call_device(n(f"merge_{L}"), (HEADS, KV_CHUNKS), _tile("fleet_merge_uv"), resource=_res(paired=q.paired), args=[q.fleet, f"layer_{L}"],
                   consts=(L, q.r), domain_map="hc->(h/2)", worker_map=q.wmap("hc->((h%2)*16+c+OFF)"),
@@ -250,6 +258,13 @@ def build(layers: int = LAYERS, routing_cached: bool | None = None, requests: in
                              "(only ETX_DSV2_COH=l1 with ETX_DSV2_D4_ROWS=0)")
     if couple not in ("router", "experts", "none"):
         raise ValueError(f"ETX_DSV2_COUPLE={couple!r}: router | experts | none")
+    # K1: ETX_DSV2_KVA=shared (build_attention_block). One request only, and not with D5, whose prefetch map has no
+    # shared-kv_a qkv symbol: neither combination is part of K1's experiment.
+    kva = os.environ.get("ETX_DSV2_KVA", "replicated")
+    if kva not in ("replicated", "shared"):
+        raise ValueError(f"ETX_DSV2_KVA={kva!r}: replicated | shared")
+    if kva == "shared" and (requests != 1 or os.environ.get("ETX_DSV2_D5", "0") == "1"):
+        raise ValueError("ETX_DSV2_KVA=shared supports one request without ETX_DSV2_D5 only")
     g = Graph("dsv2lite_decode" if requests == 1 else f"dsv2lite_decode_x{requests}")
     g.tensor("layer_-1", (1,), role="runtime", bytes_per_elem=4)
     qs = [_Req(r, requests) for r in range(requests)]

@@ -30,6 +30,9 @@ GPU column: the session that measured it. GPU numbers are paired medians (five i
 | D3 `alld3`: four 352-row K-chunks | Start `down` on gate_up's finished rows instead of after all of them | yes — paid hour 2026-10-13, arm `alld3` (vs all) | **NO-GO**: −741 us (spread 19), every pair slower (4.386 vs 3.647 ms). Measured on `all`, not on the kept arm |
 | D5 `alld5`: compiler weight prefetch | Load immutable, routing-independent weights before the event wait | yes — paid hour 2026-10-13, arm `alld5` (vs all) | **DROP**: +2 us (spread 9), pairs [2, −1, 8, 0, 8] include a loss and a tie. Measured on `all` only; its interaction with l1 is unmeasured |
 | `alld4s`: batched routed slices on the shared XCDs | Give the shared XCDs 32-row routed slices, batched, to remove serial staging | yes — paid hour 2026-10-13, arm `alld4s` (vs alld4r0 and default) | **NO-GO**: −13 us (spread 12) vs alld4r0, every deciding pair slower (+159 us vs default, which is not the deciding reference) |
+| K1 `alld4r0l1kvs`: kv_a computed once | Every XCD computes all 576 kv_a rows (18.9 MB requested for 2.36 MB unique). Compute 1/8 per XCD behind a global qkv event (Fleet's own default), cutting qkv's issued bytes; attention then reads kv_a across XCDs | not yet — queued in `examples/sessions/ds_k1.py` (rule written first, 2ec2d29) | Locally: builds with 0 scratch, kept ISA byte-identical, +54 release write-backs. Net sign unknown until measured |
+| ablation `alld4r0l1noQ` | gemv_no_terminal_all was dead alone and cost 14 us inside `all`, yet it ships in the kept arm: does removing it help the new combination? | not yet — queued | Locally: 87 AGPR (+17), 0 scratch |
+| ablation `alld4r0l1noA` | argmax_tree was +2 us (noise), yet it ships in the kept arm | not yet — queued | Locally: +21 barriers, 0 scratch; ceiling 5.1 us |
 
 ## The two accounting lines
 
