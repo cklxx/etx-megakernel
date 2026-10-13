@@ -1,0 +1,242 @@
+[
+ {
+  "name": "apt",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 10.002076387405396,
+  "note": ""
+ },
+ {
+  "name": "etx_env",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 2.0014615058898926,
+  "note": ""
+ },
+ {
+  "name": "prep_env",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 91.03733038902283,
+  "note": ""
+ },
+ {
+  "name": "source",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 1.0003771781921387,
+  "note": ""
+ },
+ {
+  "name": "prep_dl",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 29.017987489700317,
+  "note": ""
+ },
+ {
+  "name": "prep_ref",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 42.00913047790527,
+  "note": ""
+ },
+ {
+  "name": "prep_pack",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 30.01260018348694,
+  "note": ""
+ },
+ {
+  "name": "prep_sums",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 21.004656314849854,
+  "note": ""
+ },
+ {
+  "name": "preflight",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 21.003676652908325,
+  "note": ""
+ },
+ {
+  "name": "build_default",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 25.008513689041138,
+  "note": ""
+ },
+ {
+  "name": "build_all",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 29.012702465057373,
+  "note": ""
+ },
+ {
+  "name": "build_relaxed",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 24.005408763885498,
+  "note": ""
+ },
+ {
+  "name": "build_default_stamps",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 28.008681535720825,
+  "note": ""
+ },
+ {
+  "name": "build_alld4r0",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 34.01560592651367,
+  "note": ""
+ },
+ {
+  "name": "build_l1",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 22.00967025756836,
+  "note": ""
+ },
+ {
+  "name": "build_alld4r0l1",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 32.01521635055542,
+  "note": ""
+ },
+ {
+  "name": "build_alld3",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 30.010143995285034,
+  "note": ""
+ },
+ {
+  "name": "build_alld5",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 31.010873556137085,
+  "note": ""
+ },
+ {
+  "name": "build_alld4s",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 37.0136981010437,
+  "note": ""
+ },
+ {
+  "name": "build_alld4r0_stamps",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 38.022377252578735,
+  "note": ""
+ },
+ {
+  "name": "build_alld4r0l1_stamps",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 34.00917315483093,
+  "note": ""
+ },
+ {
+  "name": "pairs_l1",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 90.01760363578796,
+  "note": ""
+ },
+ {
+  "name": "pairs_alld4r0l1",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 87.01478004455566,
+  "note": ""
+ },
+ {
+  "name": "pairs_alld3",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 61.01065540313721,
+  "note": ""
+ },
+ {
+  "name": "pairs_alld5",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 60.00885796546936,
+  "note": ""
+ },
+ {
+  "name": "trace_default",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 7.0013954639434814,
+  "note": ""
+ },
+ {
+  "name": "trace_alld4r0",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 7.001308917999268,
+  "note": ""
+ },
+ {
+  "name": "trace_alld4r0l1",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 7.001329660415649,
+  "note": ""
+ },
+ {
+  "name": "pairs_alld4s",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 89.01435470581055,
+  "note": ""
+ },
+ {
+  "name": "hash_session",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 1.000589370727539,
+  "note": ""
+ }
+]

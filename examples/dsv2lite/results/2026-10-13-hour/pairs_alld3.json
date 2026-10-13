@@ -1,0 +1,125 @@
+{
+  "arm": "alld3",
+  "condition": "one MI300X, batch 1, context 1024, 32 tokens, repeat 2",
+  "device_ms": {
+    "all": {
+      "every_positive": false,
+      "gains_us": [
+        -727.0,
+        -743.0,
+        -733.0,
+        -741.0,
+        -746.0
+      ],
+      "go": null,
+      "median_us": -741.0,
+      "spread_us": 19.0
+    }
+  },
+  "keep_vs_all": {
+    "every_positive": false,
+    "gains_us": [
+      -727.0,
+      -743.0,
+      -733.0,
+      -741.0,
+      -746.0
+    ],
+    "go": false,
+    "keep": false,
+    "median_us": -741.0,
+    "spread_us": 19.0
+  },
+  "rounds": [
+    {
+      "all": {
+        "device_ms": 3.65,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.684
+      },
+      "alld3": {
+        "device_ms": 4.377,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 4.413
+      }
+    },
+    {
+      "all": {
+        "device_ms": 3.644,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.679
+      },
+      "alld3": {
+        "device_ms": 4.387,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 4.423
+      }
+    },
+    {
+      "all": {
+        "device_ms": 3.647,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.682
+      },
+      "alld3": {
+        "device_ms": 4.38,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 4.417
+      }
+    },
+    {
+      "all": {
+        "device_ms": 3.645,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.678
+      },
+      "alld3": {
+        "device_ms": 4.386,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 4.422
+      }
+    },
+    {
+      "all": {
+        "device_ms": 3.647,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.684
+      },
+      "alld3": {
+        "device_ms": 4.393,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 4.427
+      }
+    }
+  ],
+  "verdict": {
+    "outcome": "NO-GO",
+    "passed": false,
+    "rule": "D3 GO only if every pair faster than all (one chunk), median >= 30 us, > 2 x spread; else DROP (rule commit 1f6e3cc)"
+  },
+  "wall_ms": {
+    "all": {
+      "every_positive": false,
+      "gains_us": [
+        -729.0,
+        -744.0,
+        -735.0,
+        -744.0,
+        -743.0
+      ],
+      "go": false,
+      "median_us": -743.0,
+      "spread_us": 15.0
+    }
+  }
+}

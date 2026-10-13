@@ -1,0 +1,37 @@
+{
+  "arm": "alld4r0l1",
+  "attribution_note": "D4 arms: topk = the ROUTED XCDs' routing prologue (only routed gate_up tasks write stamps); moe_up and moe_down are the merged routed + shared-XCD phases (shgu / sdown join gate_up / down), so their bodies include the shared XCDs while the topk split does not. Span, stage sums and verdicts are exact.",
+  "instances": {
+    "argmax": 1,
+    "attn": 25,
+    "in_norm": 26,
+    "lm_head": 1,
+    "moe_down": 25,
+    "moe_up": 25,
+    "o_proj": 25,
+    "prep": 25,
+    "prologue": 2,
+    "qkv": 26,
+    "reduce": 25,
+    "router": 25,
+    "tail": 1,
+    "topk": 25
+  },
+  "span_us": 3491.28,
+  "stages_us": {
+    "argmax": 5.110000000000127,
+    "attn": 308.66093749999897,
+    "in_norm": 122.28729729729729,
+    "lm_head": 131.17000000000024,
+    "moe_down": 451.33000000000004,
+    "moe_up": 722.540450450452,
+    "o_proj": 243.9599999999993,
+    "prep": 144.1290625,
+    "prologue": 130.96,
+    "qkv": 434.1927027027033,
+    "reduce": 285.1100000000008,
+    "router": 315.0300000000001,
+    "tail": 103.06999999999948,
+    "topk": 93.72954954954953
+  }
+}
