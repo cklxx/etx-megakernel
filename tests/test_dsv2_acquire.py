@@ -24,7 +24,9 @@ def test_relaxed_only_in_a_named_arm(name):
 def test_the_default_is_safe_and_relaxed_is_one_explicit_arm():
     assert ACQUIRE == ""                                    # the build default: buffer_inv sc1
     assert RELAXED == "-DETX_ACQUIRE_DOMAIN_RELAXED"
-    assert {a for a, flags in ins.ARM_FLAGS.items() if RELAXED in flags} == {"relaxed"}
+    # relaxed only in arms named for it: D1's comparison, and allrelaxed (the prize measurement, never a candidate)
+    assert {a for a, flags in ins.ARM_FLAGS.items() if RELAXED in flags} == {"relaxed", "allrelaxed"}
+    assert all("relaxed" in a for a, flags in ins.ARM_FLAGS.items() if RELAXED in flags)
     assert ins.ARMS["relaxed"] == () and "relaxed" in ins.SINGLE
     jobs, _ = load_session(Path("examples/sessions/ds_inplace.py"))
     by = {j.name: j for j in jobs}
