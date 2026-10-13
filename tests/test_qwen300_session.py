@@ -31,8 +31,7 @@ def test_two_serial_bf16_jobs():
     assert [j['name'] for j in s.JOBS] == ['job1_pricing', 'job2_key32']
     assert [j['timeout'] for j in s.JOBS] == [1800, 2400]
     assert all(j['gpu'] == 0 and j['quiet_s'] <= 180 for j in s.JOBS)
-    assert s.JOBS[0]['after_any'] == []
-    assert s.JOBS[1]['after_any'] == ['job1_pricing']
+    assert all('after_any' not in j and j.get('lane', 'gpu') == 'gpu' for j in s.JOBS)   # one GPU lane, in order
     assert 'All configurations require bf16 and 32/32' in s.HEADER
     assert '<=21' in s.HEADER and '>24' in s.HEADER
     assert s.HF == {'bf16': 'Qwen/Qwen3-30B-A3B'}

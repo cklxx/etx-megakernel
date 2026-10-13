@@ -37,22 +37,22 @@ RES = r"^RESULT|generated tokens match|per-token latency"
 # ---------------------------------------------------------------- environment and data (cpu lane)
 job(name="apt", lane="cpu", timeout=600,
     cmd="python3 -c 'import ensurepip' 2>/dev/null || { sudo apt-get update -qq; sudo apt-get install -y -qq python3.12-venv; }")
-job(name="etx_env", lane="cpu", after="apt", timeout=600,
+job(name="etx_env", lane="cpu", reads="apt", timeout=600,
     cmd=".venv/bin/python -c 1 2>/dev/null || { rm -rf .venv; python3 -m venv --system-site-packages .venv; }; "
         ".venv/bin/python -c 'import yaml' 2>/dev/null || .venv/bin/pip install -q pyyaml; .venv/bin/python -c 'import etx; print(\"etx ok\")'")
 # prep.py builds vLLM's rotary cache with torch on the GPU, as vLLM does: the ROCm wheel, not the CPU one
-job(name="llm_env", lane="cpu", after="apt", timeout=1800,
+job(name="llm_env", lane="cpu", reads="apt", timeout=1800,
     cmd="[ -d ~/llmenv ] || python3 -m venv ~/llmenv; . ~/llmenv/bin/activate && pip install -q --upgrade pip && "
         "pip install -q numpy 'huggingface_hub[hf_transfer]' hf_transfer safetensors && "
         "{ python3 -c 'import torch' 2>/dev/null || pip install -q --index-url https://download.pytorch.org/whl/rocm7.0 torch; } && "
         "python3 -c 'import torch; print(torch.__version__, torch.cuda.is_available())'")
 for n, hf in MODELS.items():
-    job(name=f"dl_{n}", lane="cpu", after="llm_env", timeout=2400,
+    job(name=f"dl_{n}", lane="cpu", reads="llm_env", timeout=2400,
         cmd=f"HF_HUB_ENABLE_HF_TRANSFER=1 {PY} -c \"from huggingface_hub import snapshot_download; "
             f"snapshot_download('{hf}', local_dir='{LLM}/{n}/hf', allow_patterns=['*.json', '*.safetensors', 'tokenizer*', '*.txt', '*.model'], "
             f"max_workers=16); print('DL-DONE')\" && du -sh {LLM}/{n}/hf && test -f {LLM}/{n}/hf/config.json")
     # the goldens are kept in the repo (HF greedy, 1024-token context): no reference run
-    job(name=f"prep_{n}", gpu=1 if n == "qwen3-30b-a3b" else 0, after=[f"dl_{n}", "etx_env"], timeout=2400,
+    job(name=f"prep_{n}", gpu=1 if n == "qwen3-30b-a3b" else 0, reads=[f"dl_{n}", "etx_env"], timeout=2400,
         cmd=f"{PY} examples/vllm_llm/prep.py --src {LLM}/{n}/hf --out {LLM}/{n} --maxlen 1072 && "
             f"cp examples/llm/results/golden_c1024_{n}.txt {LLM}/{n}/golden_c1024.txt && ls -la {LLM}/{n}/vl.bin",
         summary=[r"wrote .*vl.bin"])
@@ -73,7 +73,7 @@ BUILDS = {
     "moe_xcd": ("qwen3-30b-a3b", "ETX_VL_XCD=1 ETX_VL_CHAIN=1", ""),
 }
 for b, (m, env, flags) in BUILDS.items():
-    job(name=f"build_{b}", lane="cpu", after=["etx_env", f"dl_{m}"], timeout=2400,
+    job(name=f"build_{b}", lane="cpu", reads=["etx_env", f"dl_{m}"], timeout=2400,
         cmd=f"{V} {env} ETX_HIPCC_FLAGS='{flags}' ETX_OUT=$HOME/sess/b_{b} bash examples/vllm_llm/build.sh {LLM}/{m} "
             f"> $HOME/sess/b_{b}.buildlog 2>&1; grep -E 'tasks=|Function Name|VGPRs|error' $HOME/sess/b_{b}.buildlog | tail -4; "
             f"cp $HOME/sess/b_{b}.buildlog $HOME/sess/buildlog_{b}.txt; test -x $HOME/sess/b_{b}/run",
@@ -86,7 +86,7 @@ def run(b, extra=""):
 
 
 # ---------------------------------------------------------------- MoE correctness first (GPU 1)
-job(name="moe_check", gpu=1, after=["build_moe_base", "prep_qwen3-30b-a3b"], timeout=1200,
+job(name="moe_check", gpu=1, reads=["build_moe_base", "prep_qwen3-30b-a3b"], timeout=1200,
     cmd=f"stdbuf -oL {run('moe_base', '--check 2')}", summary=[r"^CHECK|DIFFERS|HANG|  total|fused_moe|topk|moe_sum"])
 
 # ---------------------------------------------------------------- timing, alternated: dense on GPU 0, MoE on GPU 1
@@ -101,7 +101,7 @@ for gpu, T in ((0, DENSE), (1, MOE)):
             m = BUILDS[b][0]
             name = f"t{rnd}_{b}{'_unf' if extra else ''}"
             deps = [f"build_{b}", f"prep_{m}"] + (["moe_check"] if m == "qwen3-30b-a3b" else [])
-            job(name=name, gpu=gpu, after=deps, after_any=[prev] if prev else [], timeout=900,
+            job(name=name, gpu=gpu, reads=deps, timeout=900,
                 cmd=f"stdbuf -oL {run(b, extra)}", summary=[RES])
             prev = name
     LAST[gpu] = prev
@@ -110,15 +110,14 @@ for gpu, T in ((0, DENSE), (1, MOE)):
 for b in ("q15_xs1", "moe_xcd"):
     m = BUILDS[b][0]
     g = 1 if m == "qwen3-30b-a3b" else 0
-    job(name=f"trace_{b}", gpu=g, after=[f"build_{b}", f"prep_{m}"] + (["moe_check"] if g == 1 else []),
-        after_any=[LAST[g]], timeout=900,
+    job(name=f"trace_{b}", gpu=g, reads=[f"build_{b}", f"prep_{m}"] + (["moe_check"] if g == 1 else []), timeout=900,
         cmd=f"ETX_TRACE=1 ETX_TRACE_RAW=$HOME/sess/trace_{b}.bin stdbuf -oL {run(b, '--max-steps 8 --repeat 1')}; "
             f"cp $HOME/sess/b_{b}/plan.json $HOME/sess/plan_{b}.json; cp $HOME/sess/b_{b}/vl_plan.txt $HOME/sess/vlplan_{b}.txt",
         summary=[RES])
 for b in ("q15_base", "moe_base"):
     m = BUILDS[b][0]
     g = 1 if m == "qwen3-30b-a3b" else 0
-    job(name=f"rocprof_{b}", gpu=g, after=[f"build_{b}", f"prep_{m}"], after_any=["trace_moe_xcd" if g == 1 else "trace_q15_xs1"], timeout=1200,
+    job(name=f"rocprof_{b}", gpu=g, reads=[f"build_{b}", f"prep_{m}"], timeout=1200,
         cmd=f"rocprofv3 --kernel-trace --output-format csv -d $HOME/sess/rocprof_{b} -o kt -- {run(b, '--unfused --max-steps 8 --repeat 1')} "
             f"> $HOME/sess/rocprof_{b}.run.log 2>&1; tail -3 $HOME/sess/rocprof_{b}.run.log; cp $HOME/sess/b_{b}/vl_plan.txt $HOME/sess/vlplan_{b}.txt; "
             f"find $HOME/sess/rocprof_{b} -name '*kernel_trace.csv' | head -1 | xargs -r wc -l",

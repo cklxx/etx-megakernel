@@ -8,7 +8,6 @@ import os
 from pathlib import Path
 import re
 import shutil
-import signal
 import statistics
 import subprocess
 import sys
@@ -16,6 +15,7 @@ import tempfile
 import time
 
 from examples.vllm_llm import import_certificate as cert
+from etx.session import proc
 from examples.vllm_llm.kept_build import BASE_FLAGS, KEPT_ENV, ROOT, source_hashes
 from examples.vllm_llm.nvref_report import correctness
 from examples.vllm_llm.pairs import Refusal, parse
@@ -38,25 +38,13 @@ def command(argv, log, env, timeout):
     print(f'BENCH progress: {log.stem}; log={log}', file=sys.stderr, flush=True)
     with log.open('x') as out:
         out.write('# command ' + json.dumps(list(map(str, argv))) + '\n'); out.flush()
-        proc = subprocess.Popen(list(map(str, argv)), cwd=ROOT, env=env,
-                                stdout=out, stderr=subprocess.STDOUT, start_new_session=True)
-        started = time.monotonic()
-        try:
-            while True:
-                remaining = timeout - (time.monotonic() - started)
-                if remaining <= 0:
-                    raise Refusal(f'{log.stem}: timeout; full log={log}')
-                try:
-                    rc = proc.wait(timeout=min(15, remaining))
-                    break
-                except subprocess.TimeoutExpired:
-                    print(f'BENCH progress: {log.stem} elapsed={time.monotonic()-started:.0f}s '
-                          f'pid={proc.pid} bytes={log.stat().st_size}', file=sys.stderr, flush=True)
-            if rc:
-                raise Refusal(f'{log.stem}: exit {rc}; full log={log}')
-        finally:
-            if proc.poll() is None:
-                os.killpg(proc.pid, signal.SIGKILL); proc.wait()
+        rc = proc.run(argv, sink=out, deadline_s=timeout, poll_s=15, cwd=ROOT, env=env, log=out,
+                      on_poll=lambda s: print(f'BENCH progress: {log.stem} elapsed={s:.0f}s bytes={log.stat().st_size}',
+                                              file=sys.stderr, flush=True))
+        if rc == proc.DEADLINE_RC:
+            raise Refusal(f'{log.stem}: timeout; full log={log}')
+        if rc:
+            raise Refusal(f'{log.stem}: exit {rc}; full log={log}')
     return log.read_text()
 
 

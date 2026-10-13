@@ -9,7 +9,7 @@ import json
 from pathlib import Path
 
 from etx.tools.gpu_jobs import load_session
-from examples.dsv2lite import inplace_session as ins
+from examples.dsv2lite import arms
 from examples.dsv2lite.pinned import FLEET_COMMIT, FLEET_SRC_SHA256
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -49,11 +49,11 @@ def main() -> int:
            f"- byte limit {st['summary']['limit']['step_us']:.1f} us ({st['summary']['limit']['tok_s']:.0f} tok/s)", "",
            "## The session (examples/sessions/ds_inplace.py)", "",
            f"- {len(jobs)} jobs, hard stop {limit} s; GPU jobs in order: {', '.join(gpu)}",
-           f"- arms: " + "; ".join(f"{k} = {'+'.join(v) or 'default'}" for k, v in ins.ARMS.items()),
-           f"- decision (combined arm vs default, device): every paired gain > 0, median >= {ins.GO_US:.0f} us, "
-           "median > 2 x spread; 32/32 tokens + 27/27 layers + 32/32 warm-up in every invocation",
-           f"- invocations: baseline 10, all 15, traces 2, single levers {10 * len(ins.SINGLE)} = "
-           f"{10 + 15 + 2 + 10 * len(ins.SINGLE)}"]
+           f"- arms: " + "; ".join(f"{k} = {'+'.join(a.levers) or 'default'}" for k, a in arms.ARMS.items()),
+           f"- decision (combined arm vs default, device): {arms.ARMS['all'].rule.text}; "
+           "32/32 tokens + 27/27 layers + 32/32 warm-up in every invocation",
+           f"- invocations: baseline 10, all 15, traces 2, single levers {10 * len(arms.SINGLE)} = "
+           f"{10 + 15 + 2 + 10 * len(arms.SINGLE)}"]
     out = RES / "PRE-GPU.md"
     out.write_text("\n".join(md) + "\n")
     print("\n".join(md))

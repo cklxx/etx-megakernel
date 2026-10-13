@@ -11,6 +11,7 @@ from tests.test_import_certificate import envelope, fixture_session
 from tests.test_nvref_report import etx
 
 
+
 SESSION = Path('examples/sessions/nvchk.py')
 
 
@@ -29,7 +30,7 @@ def test_record_version_fallbacks():
     assert 'sort -V' in cmd
     assert cmd.startswith('set -e; rocm-smi --showproductname; ')
     assert '; uname -r; nproc; ' in cmd
-    assert graph['gate_chkx'].after == ['build_chkx', 'record']
+    assert graph['gate_chkx'].deps() == ['build_chkx', 'record']
     for j in graph.values():
         if 'cat /opt/rocm/.info/version' in j.cmd:
             assert 'cat /opt/rocm/.info/version 2>/dev/null || ' in j.cmd, j.name
@@ -37,7 +38,7 @@ def test_record_version_fallbacks():
 
 
 def ancestors(name, graph, success_only=True):
-    deps = graph[name].after + ([] if success_only else graph[name].after_any)
+    deps = graph[name].deps() + ([] if success_only else graph[name].deps(True))
     return set(deps).union(*(ancestors(d, graph, success_only) for d in deps))
 
 
@@ -57,7 +58,7 @@ def test_producers_and_certification_precede_every_consumer():
     assert '--check-pos 0' in graph['check_timed'].cmd
     assert '--check-pos 1040' in graph['check_timed'].cmd
     assert '--checks-only' in graph['check_certificate'].cmd
-    assert 'check_timed' in graph['check_certificate'].after
+    assert 'check_timed' in graph['check_certificate'].deps()
     assert '--export-build $HOME/sess/b_all' in graph['build_chkx'].cmd
     assert '--session ${ETX_SESS_LOGDIR:-$HOME/sess}' in graph['build_chkx'].cmd
 

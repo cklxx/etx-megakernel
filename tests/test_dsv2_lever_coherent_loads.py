@@ -157,17 +157,21 @@ def test_build_refuses_a_plan_without_the_patched_tiles(tmp_path, plans, patched
 
 
 def test_d2_verdict_applies_both_thresholds():
-    from examples.dsv2lite.inplace_session import ARMS, ARM_ENV, d2_verdict
+    from decimal import Decimal
+    from etx.session.experiment import decide
+    from examples.dsv2lite.arms import ARMS
 
     def rounds(default, relaxed, coh):
         return [{"default": {"device_ms": d}, "relaxed": {"device_ms": r}, "coh": {"device_ms": c}}
                 for d, r, c in zip(default, relaxed, coh)]
-    d = [3.710, 3.712, 3.709, 3.711, 3.713]
-    r = [3.475, 3.478, 3.474, 3.476, 3.480]                      # relaxed-vs-default spread ~6 us -> tolerance 20 us
-    ok = d2_verdict(rounds(d, r, [x + 0.010 for x in r]))       # coh 10 us behind relaxed, 225 us ahead of sc1
-    assert ok["a_ok"] and ok["b_ok"] and ok["go"] and ok["b_tol_us"] == 20.0
-    slow = d2_verdict(rounds(d, r, [x + 0.050 for x in r]))     # 50 us behind relaxed: outside the tolerance
-    assert slow["a_ok"] and not slow["b_ok"] and not slow["go"]
-    mixed = d2_verdict(rounds(d, r, [3.600, 3.600, 3.600, 3.600, 3.720]))   # one pair slower than sc1
-    assert not mixed["a_ok"] and not mixed["go"]
-    assert ARMS["coh"] == ("coherent_loads",) and ARM_ENV["coh"] == {"ETX_DSV2_COH": "1"}
+    def d2_verdict(rs):
+        return decide(ARMS["coh"].rule, rs, "coh")
+    d = ["3.710", "3.712", "3.709", "3.711", "3.713"]
+    r = list(map(Decimal, ["3.475", "3.478", "3.474", "3.476", "3.480"]))                      # relaxed-vs-default spread ~6 us -> tolerance 20 us
+    ok = d2_verdict(rounds(d, r, [x + Decimal("0.010") for x in r]))       # coh 10 us behind relaxed, 225 us ahead of sc1
+    assert ok["a_ok"] and ok["b_ok"] and ok["passed"] and ok["b_tol_us"] == 20.0
+    slow = d2_verdict(rounds(d, r, [x + Decimal("0.050") for x in r]))     # 50 us behind relaxed: outside the tolerance
+    assert slow["a_ok"] and not slow["b_ok"] and not slow["passed"]
+    mixed = d2_verdict(rounds(d, r, ["3.600", "3.600", "3.600", "3.600", "3.720"]))   # one pair slower than sc1
+    assert not mixed["a_ok"] and not mixed["passed"]
+    assert ARMS["coh"].levers == ("coherent_loads",) and ARMS["coh"].env == {"ETX_DSV2_COH": "1"}

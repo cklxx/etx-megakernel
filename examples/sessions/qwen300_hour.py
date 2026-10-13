@@ -38,11 +38,11 @@ import math
 import os
 from pathlib import Path
 import re
-import signal
 import statistics as st
 import subprocess
 import sys
 import time
+from etx.session import proc
 from examples.vllm_llm.pairs import Refusal
 from examples.vllm_llm.qwen300_config import IMAGE, QWEN300_HOUR_MAX_SESSION_SECONDS, validate_cap
 
@@ -230,40 +230,31 @@ class Session:
         with path.open('x') as out:
             out.write(f'# job {name} gpu={os.environ.get("GPU", "0")} machine=A\n')
             out.write('# command '+json.dumps(list(map(str, cmd)))+'\n'); out.flush()
-            p = subprocess.Popen(list(map(str, cmd)), stdout=out, stderr=subprocess.STDOUT,
-                                 env=dict(self.env, **(extra or {})), start_new_session=True)
-            begin = time.monotonic(); size = path.stat().st_size; last = begin; probed = False
-            try:
-                while p.poll() is None:
-                    now = time.monotonic()
-                    if now-begin >= remaining:
-                        self.probe(out)
-                        raise TimeoutError(f'{name}: NOT-COMPLETE substep deadline pid={p.pid}')
-                    try:
-                        p.wait(timeout=min(5, remaining-(now-begin)))
-                    except subprocess.TimeoutExpired:
-                        new = path.stat().st_size
-                        if new != size: last = time.monotonic(); size = new
-                        elapsed = time.monotonic()-begin
-                        print(f'PROGRESS {name} elapsed={elapsed:.0f}s pid={p.pid} bytes={size}', flush=True)
-                        # During decode each step is printed. A missing step for 10s
-                        # is a stuck step, even if the HIP call itself is blocked.
-                        tail = path.read_text(errors='replace')[-4096:]
-                        if ('  step ' in tail or 'HOUR-STEP-BEGIN' in tail) and time.monotonic()-last > 10:
-                            self.probe(out)
-                            raise TimeoutError(f'{name}: NOT-COMPLETE step watchdog (10s)')
-                        begin_at = tail.rfind('VLLM-GENERATE-BEGIN')
-                        end_at = tail.rfind('VLLM-GENERATE-END')
-                        if begin_at > end_at and time.monotonic()-last > 10:
-                            self.probe(out)
-                            raise TimeoutError(f'{name}: NOT-COMPLETE vLLM burst watchdog (10s)')
-                        if elapsed > expected+180 and time.monotonic()-last > 180 and not probed:
-                            self.probe(out); probed = True
-                if p.returncode:
-                    raise RuntimeError(f'{name}: NOT-COMPLETE rc={p.returncode}, full log={path}')
-            finally:
-                if p.poll() is None:
-                    os.killpg(p.pid, signal.SIGKILL); p.wait()
+            watch = dict(size=path.stat().st_size, last=time.monotonic(), probed=False)
+
+            def watchdog(elapsed):
+                new = path.stat().st_size
+                if new != watch['size']: watch.update(last=time.monotonic(), size=new)
+                print(f'PROGRESS {name} elapsed={elapsed:.0f}s bytes={watch["size"]}', flush=True)
+                # During decode each step is printed. A missing step for 10s
+                # is a stuck step, even if the HIP call itself is blocked.
+                tail = path.read_text(errors='replace')[-4096:]
+                quiet = time.monotonic()-watch['last']
+                if ('  step ' in tail or 'HOUR-STEP-BEGIN' in tail) and quiet > 10:
+                    self.probe(out)
+                    raise TimeoutError(f'{name}: NOT-COMPLETE step watchdog (10s)')
+                if tail.rfind('VLLM-GENERATE-BEGIN') > tail.rfind('VLLM-GENERATE-END') and quiet > 10:
+                    self.probe(out)
+                    raise TimeoutError(f'{name}: NOT-COMPLETE vLLM burst watchdog (10s)')
+                if elapsed > expected+180 and quiet > 180 and not watch['probed']:
+                    self.probe(out); watch['probed'] = True
+            rc = proc.run(cmd, sink=out, deadline_s=remaining, poll_s=5, on_poll=watchdog, log=out,
+                          env=dict(self.env, **(extra or {})))
+            if rc == proc.DEADLINE_RC:
+                self.probe(out)
+                raise TimeoutError(f'{name}: NOT-COMPLETE substep deadline')
+            if rc:
+                raise RuntimeError(f'{name}: NOT-COMPLETE rc={rc}, full log={path}')
         return path.read_text(errors='replace')
 
     def attempt(self, name, fn):

@@ -13,6 +13,7 @@ from etx.tools import ktrace
 from examples.vllm_llm.kcmp_report import decide
 from etx.tools.gpu_jobs import load_jobs
 
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -100,7 +101,7 @@ def test_session_order_and_shell():
     jobs = load_jobs('examples/sessions/kcmp.py')
     assert [j.name for j in jobs] == ['kc_etx_1', 'kc_vnd_1', 'kc_vnd_2', 'kc_etx_2', 'kc_etx_3', 'kc_vnd_3', 'kc_report']
     for i, job in enumerate(jobs):
-        assert job.after_any == [j.name for j in jobs[:i]]
+        assert job.lane == 'gpu' or job.deps(True) == [j.name for j in jobs[:i]]   # GPU jobs: the lane's order
         subprocess.run(['bash', '-n', '-c', job.cmd], check=True)
     assert jobs[-1].lane == 'cpu'
     assert all(j.gpu == 0 for j in jobs[:-1])

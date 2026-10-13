@@ -26,10 +26,10 @@ def vllm(name, aiter=False):
 
 for rnd in range(1, 7):
     name = f"vs_r{rnd}"
-    job(name=name, gpu=0, after=[f"vs_r{rnd - 1}"] if rnd > 1 else [],
+    job(name=name, gpu=0, reads=[f"vs_r{rnd - 1}"] if rnd > 1 else [],
         timeout=420, quiet_s=240, cmd=vllm(name), summary=[r"^VLLM|^RESULT"])
 
-job(name="vs_summary", lane="cpu", after="vs_r6", timeout=120,
+job(name="vs_summary", lane="cpu", reads="vs_r6", timeout=120,
     cmd="""python3 - "${ETX_SESS_LOGDIR:-$HOME/sess}" <<'PY'
 import json
 import statistics

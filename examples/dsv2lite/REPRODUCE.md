@@ -1,7 +1,7 @@
 # Reproducing the 2026-10-13 ETX DeepSeek lever session
 
-One entry point, `examples/dsv2lite/reproduce.sh`, takes a fresh clone to the measured numbers. Steps 1-3 need no GPU
-and re-derive every published verdict from the committed raw logs; steps 4-8 re-run the session on a box.
+One entry point, `examples/dsv2lite/reproduce.sh`, takes a fresh clone to the measured numbers. Steps 1-2 need no GPU
+and re-derive every published verdict from the committed raw logs; steps 3-8 re-run the session on a box.
 
 ## What was measured
 
@@ -33,42 +33,26 @@ Laptop: git, python >= 3.11, `gh` logged in with read access to `cklxx/etx-data`
 
 ## Steps and their expected output
 
-**0. Clone** this repository and `git checkout dsv2-session` (or any later commit of it: step 2.1 proves the box-side
-code is still `7f3dd89`).
+**0. Clone** this repository. Historical `check` requires the measured source at `dsv2-session`; after the session
+machinery refactor, use `check-verdicts` below to re-derive the committed results on the current branch.
 
 **1. `examples/dsv2lite/reproduce.sh setup`**: `.venv` with the dev extra.
 ```
 OK   .venv ready: Python 3.1x.y
 ```
 
-**2. `examples/dsv2lite/reproduce.sh check`** (no GPU, ~30 s once the caches exist). Expected, in order:
+**2. `examples/dsv2lite/reproduce.sh check-verdicts`** runs check step 7 directly, without a GPU or downloads:
 ```
-== 1. box-side code is the measured commit (7f3dd89); later commits may only ADD files
-OK   no box-side file modified or removed since 7f3dd89
-== 2. pinned fleet source (git archive 3fb67a6)
-OK   <ETX_CACHE>/fleet-3fb67a6 = 3fb67a6, src sha256 28f5cbb4f39524df...
-== 3. archived data sets (cklxx/etx-data release data-2026-09-27, tarball + per-file SHA256)
-OK   <ETX_CACHE>/data-2026-09-27
-== 4. CPU gates (tests/test_dsv2_*.py)
-OK   63 passed in <t>s
-== 5. dry run: the same 33-job table as the measured session
-OK   33 jobs, identical to examples/dsv2lite/results/2026-10-13-ds_inplace/DRYRUN.txt
-== 6. expected per-stage values regenerate byte for byte (stage_table.py: trace partition + replay)
-OK   Summary, arithmetic (rows add): 3473.5 - 533.4 = 2940.1 us/token = 340.1 tok/s.
-== 7. every verdict re-derived from the session's raw logs (incl. the combined arm's 92 us)
-  all      vs default median    92.0 spread  18.0 every_positive=1 GO=True  device medians default=3.712 all=3.616 fleet=3.568
-  ...      (every arm: baseline 139.0, Q -3.0, Qall -3.0, N 30.0, Nall 37.0, argmax 2.0, topk 66.0, prep 27.0)
-STAGES default: span 3959.8 us, recomputed from trace + stamps, equal to stages_default.json
-STAGES all: span 3890.7 us, recomputed from trace + stamps, equal to stages_all.json
-FOLLOWUP e1 all-allnoQ: median 14.0 spread 10.0 ...   FOLLOWUP e2 default-default723: median 62.0 spread 14.0 ...
-RESULT OK: every verdict re-derived from raw logs
+OK   pairs all        GO                     vs default: median 92.0 us spread 18.0 every_positive=1
+RE-DERIVED: every available verdict and table from the raw files
 OK   all vs default: median 92.0 us, spread 18.0, every pair faster, GO
 ```
-The STAGES lines need the two STAMPS2 stamp files (2 x 112 MB, archived outside git in
-`$ETX_CACHE/results_2026-10-13-ds_inplace/`, hashes in the session's `SHA256SUMS`); without them they print `skipped`.
-Steps 1-3 re-derive the numbers from the recorded raw logs EXACTLY (to 1e-6 us). Steps 4-8 re-measure: a new session
-gives new milliseconds (timing noise, and absolute ms are not compared across boxes); what must reproduce is the
-decision under the same rule, with the same commit and the same input hashes.
+Rules use integer nanoseconds parsed from decimal log text; legacy display fields may differ by up to 1e-6 us.
+Stage checks need the two archived STAMPS2 files in `$ETX_CACHE/results_2026-10-13-ds_inplace/` (2 x 112 MB,
+hashes in `SHA256SUMS`); missing files are reported as SKIP. Legacy captures remain explicitly unsealed.
+On the historical source, `reproduce.sh check` also verifies source identity, fleet/data hashes, CPU gates,
+the recorded 33-job table and regenerated stage estimates before step 7. Refactored source fails that identity check.
+Steps 3-8 re-measure; new timings must satisfy the same rule and input hashes, and are compared within one session.
 
 **3. Provision** one MI300X box as above (`ETX_SESS_USER`, default `root`).
 
@@ -95,7 +79,7 @@ HIP-HEADERS-OK
 SOURCE OK fleet export 28f5cbb4f39524df etx <commit>
       smallest top-2 margin over the run: 6.6250
 wrote /root/dsv2-data/weights.bin (31.41 GB) ...
-PREFLIGHT OK inputs match their SHA256SUMS
+PREFLIGHT OK inputs are the pinned measured inputs
 BUILD arm=default stamped=0 resources={'vgpr': 256, 'agpr': 56, 'sgpr': 108, 'scratch': 0, 'lds': 26668, 'occupancy': 1}
 BUILD arm=all stamped=0 resources={'vgpr': 256, 'agpr': 104, 'sgpr': 108, 'scratch': 0, 'lds': 26668, 'occupancy': 1}
 PAIRS arm=baseline device gain vs default median 139.0 us spread 20.0 every_positive=1 GO=None
@@ -104,19 +88,18 @@ REPORT all: median 92.0 us spread 18.0 GO=True; stages measured: True; ...
 ```
 (ROCm 7.14 resources; every arm 0 scratch, 26,668 B LDS, 1 wave/SIMD. A build with scratch > 0 fails its job.)
 
-**7. `examples/dsv2lite/reproduce.sh fetch <ip> <dest>`**, then **`reproduce.sh rederive <dest>`**:
+**7. `examples/dsv2lite/reproduce.sh fetch <ip> <dest>`** writes `<dest>/<session id>`. Verify that record:
 ```
-RESULT OK: every verdict re-derived from raw logs
-inputs.json: SAME as the measured session
-source.json: SAME as the measured session
+.venv/bin/python -m etx.session.experiment verify <dest>/<session-id> examples.dsv2lite.arms examples/sessions/ds_hour.py
 ```
-`DIFFERENT` means a different experiment (e.g. a new HuggingFace revision of the model: the download does not pin
-one; the weights hash is the identity). Fetch BEFORE destroying the box.
+Use `ds_inplace.py` instead for that session. Exit 0 requires the seal, all promised outputs and raw-log re-derivation;
+3 means incomplete/unsealed, 2 means mismatched evidence. `reproduce.sh rederive <record>` additionally compares input
+and fleet-source hashes with the measured session; `DIFFERENT` means a different experiment. Fetch before deletion.
 
 **8. Follow-up arms** (optional; same box after step 6):
 `ETX_SESS_LOGDIR=~/sess_followup ETX_DSV2_FLEET=~/fleet-3fb67a6 ETX_DSV2_DATA=~/dsv2-data .venv/bin/python -u -m examples.dsv2lite.followup_2026_10_13 /root/sess`
-on the box (needs the `rocm:latest` image with ROCm 7.2.3 for E2). Expected: `FOLLOWUP E1 all - allnoQ`,
-`FOLLOWUP E1 default - allnoQ`, `FOLLOWUP E2 default - default723` lines and `followup.json`.
+on the box (needs the `rocm:latest` image with ROCm 7.2.3 for E2). Expected: `FOLLOWUP e1 all - allnoQ`,
+`FOLLOWUP e1 default - allnoQ`, `FOLLOWUP e2 default - default723` lines and `followup.json`.
 
 ## Verified
 
@@ -129,6 +112,6 @@ logs). STAGES printed `skipped` there: the two STAMPS2 stamp files exist only in
 
 ## Files
 
-`reproduce.sh` (entry point), `stage_inplace.sh` (staging), `../sessions/ds_inplace.py` (job graph), `inplace_session.py`
-(each job), `rederive.py` (verdicts from raw logs), `stage_table.py` + `replay.py` (expected values),
+`reproduce.sh` (entry point), `../../tools/session.sh stage` (staging), `../sessions/ds_inplace.py` (job graph), `inplace_session.py`
+(each job), `arms.py` + `../../etx/session/experiment.py` (builds, rules and re-derivation), `stage_table.py` + `replay.py` (estimates),
 `pinned.py` (fleet export + data sets), `verify_lever.py` (per-lever local records), `followup_2026_10_13.py`.

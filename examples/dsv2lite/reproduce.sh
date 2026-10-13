@@ -3,11 +3,11 @@
 #   reproduce.sh setup                 create .venv (python >= 3.11) with the dev extra
 #   reproduce.sh check                 local, no GPU: every step of the measured chain, expected outputs asserted
 #   reproduce.sh box-setup <ip>        give the box's hipcc its HIP headers if they are missing (ROCm 7.14 boxes)
-#   reproduce.sh stage <ip>            push this clone + pinned fleet export + SOURCE_IDENTITY (stage_inplace.sh)
+#   reproduce.sh stage <ip>            this clone's HEAD (tools/session.sh stage) + the pinned fleet export; HIP check
 #   reproduce.sh run <ip>              start examples/sessions/ds_inplace.py on GPU 0, hard stop 7200 s
 #   reproduce.sh status <ip>           runner state
-#   reproduce.sh fetch <ip> <dest>     pull ~/sess (logs, JSON, traces, stamps; no binaries) + SHA256SUMS
-#   reproduce.sh rederive <dir>        re-derive every verdict of a fetched session from its raw logs
+#   reproduce.sh fetch <ip> <dest>     the box's session record into <dest>/<id>, verified (tools/session.sh fetch)
+#   reproduce.sh rederive <dir> [job-file]  verify a fetched record, its verdicts and optionally promised outputs
 # ETX_SESS_USER is the box login (default root). ETX_CACHE (default ~/code/etx-cache) holds the pinned fleet export and
 # the archived data sets; ETX_FLEET_REPO (default ~/code/fleet-mi300x) is a clone of github.com/cklxx/fleet-mi300x.
 set -euo pipefail
@@ -40,7 +40,7 @@ check)
   step "1. box-side code is the measured commit (${MEASURED_COMMIT:0:7}); later commits may only ADD files"
   git cat-file -e "$MEASURED_COMMIT^{commit}" || die "commit $MEASURED_COMMIT not in this clone"
   git diff --quiet --diff-filter=MDR "$MEASURED_COMMIT" HEAD -- etx examples/dsv2lite examples/sessions/ds_inplace.py \
-    ':!examples/dsv2lite/stage_inplace.sh' ':!examples/dsv2lite/results' \
+    ':!examples/dsv2lite/results' \
     || die "box-side code differs from $MEASURED_COMMIT: $(git diff --name-only --diff-filter=MDR "$MEASURED_COMMIT" HEAD -- etx examples/dsv2lite examples/sessions/ds_inplace.py ':!examples/dsv2lite/stage_inplace.sh' ':!examples/dsv2lite/results' | tr '\n' ' ')"
   ok "no box-side file modified or removed since ${MEASURED_COMMIT:0:7}"
   step "2. pinned fleet source (git archive 3fb67a6)"
@@ -62,10 +62,17 @@ check)
   $PY -m examples.dsv2lite.stage_table > /dev/null
   git diff --exit-code --stat -- examples/dsv2lite/results/stages || die "stage table regenerated differently"
   ok "$(grep '^\*\*Summary, arithmetic' examples/dsv2lite/results/stages/stage_table.md | tr -d '*')"
+  "$0" check-verdicts
+  ;;
+check-verdicts)
+  logdir=$(mktemp -d /tmp/etxdry.XXXXXX)
   step "7. every verdict re-derived from the session's raw logs (incl. the combined arm's 92 us)"
-  $PY -m examples.dsv2lite.rederive "$SESSION_DIR" | tee "$logdir/rederive.txt"
-  grep -q '^  all      vs default median    92.0 spread  18.0 every_positive=1 GO=True' "$logdir/rederive.txt" \
-    || die "the combined arm's verdict did not re-derive"
+  rc=0
+  $PY -m etx.session.experiment verify "$SESSION_DIR" examples.dsv2lite.arms > "$logdir/rederive.txt" || rc=$?
+  cat "$logdir/rederive.txt"
+  [ "$rc" = 0 ] || [ "$rc" = 3 ] || die "re-derivation failed ($rc)"
+  grep -q '^OK   pairs all        GO .* vs default: median 92.0 us spread 18.0 every_positive=1$' "$logdir/rederive.txt" \
+    && grep -q '^RE-DERIVED:' "$logdir/rederive.txt" || die "the combined arm's verdict did not re-derive"
   ok "all vs default: median 92.0 us, spread 18.0, every pair faster, GO"
   ;;
 box-setup)
@@ -82,7 +89,13 @@ box-setup)
     hipcc --version | head -2'
   ;;
 stage)
-  examples/dsv2lite/stage_inplace.sh "${2:?ip}"
+  IP=${2:?ip}; tools/session.sh stage "$IP" || die "staging"
+  EXPORT=$($PY -m examples.dsv2lite.pinned export) || die "no verified fleet export"
+  mux "$IP"
+  rsync -az -e "ssh ${OPTS[*]}" --delete "$EXPORT/" "$ETX_SESS_USER@$IP:fleet-3fb67a6/"
+  ssh "${OPTS[@]}" "$ETX_SESS_USER@$IP" 'test -f ~/fleet-3fb67a6/src/host/reference_run.py && echo FLEET-EXPORT-OK
+    printf "#include <hip/hip_runtime.h>\n" | hipcc -x hip --offload-arch=gfx942 -fsyntax-only - >/dev/null 2>&1 \
+      && echo HIP-HEADERS-OK || echo "HIP-HEADERS-MISSING: run reproduce.sh box-setup"; nproc; df -h ~ | tail -1'
   ;;
 run)
   ETX_SESS_MAX_SECONDS=7200 tools/session.sh start "${2:?ip}" examples/sessions/ds_inplace.py 0
@@ -91,23 +104,13 @@ status)
   tools/session.sh status "${2:?ip}"
   ;;
 fetch)
-  IP=${2:?ip}; DEST=${3:?dest}
-  [ -e "$DEST" ] && [ -n "$(ls -A "$DEST" 2>/dev/null)" ] && die "$DEST is not empty: fetch into a new directory (review 08, R12)"
-  mux "$IP"; mkdir -p "$DEST"
-  rsync -az -e "ssh ${OPTS[*]}" --exclude 'b_*/run' --exclude 'b_*/fleet_src' --exclude '*.o' \
-    "$ETX_SESS_USER@$IP:sess/" "$DEST/"
-  # the box's SHA256SUMS is the provenance record: verify the copy against it, never overwrite it (review 07, R04)
-  if [ -f "$DEST/SHA256SUMS" ]; then
-    $PY etx/tools/verify_sums.py "$DEST" --excluded 'b_*/run' 'b_*/fleet_src/*' '*.o' || die "fetch does not match the box's SHA256SUMS: keep the box"
-  else
-    (cd "$DEST" && find . -type f ! -name 'SHA256SUMS*' | sort | xargs shasum -a 256 > SHA256SUMS.local)
-    echo "no box-side SHA256SUMS: only SHA256SUMS.local (hashes of the copy) exists"
-  fi
-  ok "fetched to $DEST; next: $0 rederive $DEST (ds_inplace) or examples/dsv2lite/verify_hour.py $DEST (ds_hour)"
+  tools/session.sh fetch "${2:?ip}" "${3:?dest}"
   ;;
 rederive)
   DIR=${2:?session dir}
-  $PY -m examples.dsv2lite.rederive "$DIR"
+  rc=0
+  $PY -m etx.session.experiment verify "$DIR" examples.dsv2lite.arms "${@:3}" || rc=$?
+  [ "$rc" = 0 ] || [ "$rc" = 3 ] || exit "$rc"
   # A new session is the same experiment only with the measured inputs and sources (the HF model revision is not
   # pinned by the download; the weights' hash is what identifies it).
   $PY - "$DIR" "$SESSION_DIR" <<'PYEOF'
@@ -121,6 +124,7 @@ for f, key in (("inputs.json", "sha256"), ("source.json", "fleet_src_sha256")):
     same &= a == b
 sys.exit(0 if same else 3)
 PYEOF
+  exit "$rc"
   ;;
 *)
   sed -n '2,13p' "$0"; exit 2

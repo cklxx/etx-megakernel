@@ -28,11 +28,11 @@ import json
 import os
 from pathlib import Path
 import re
-import signal
 import statistics
 import subprocess
 import sys
 import time
+from etx.session import proc
 
 MAX_SESSION_SECONDS = 3600
 JOBS = [dict(name='moe_rpt', gpu=0, machine='A', timeout=MAX_SESSION_SECONDS, quiet_s=300,
@@ -114,31 +114,21 @@ def run(config, logdir):
         with path.open('w') as out:
             out.write('# command ' + json.dumps(list(map(str, cmd))) + '\n')
             out.flush()
-            p = subprocess.Popen(list(map(str, cmd)), stdout=out, stderr=subprocess.STDOUT,
-                                 env=dict(clean, **(extra or {})), start_new_session=True)
-            start = time.monotonic()
-            try:
-                while p.poll() is None:
-                    remaining = deadline - time.monotonic()
-                    if remaining <= 0:
-                        raise TimeoutError('NOT-COMPLETE ' + name)
-                    try:
-                        p.wait(timeout=min(15, remaining))
-                    except subprocess.TimeoutExpired:
-                        print(f'PROGRESS {name} elapsed={time.monotonic()-start:.0f}s pid={p.pid}', flush=True)
-                        if time.time() - path.stat().st_mtime > 180:
-                            for probe in (['ps', '-eo', 'pid,ppid,etime,stat,args'], ['rocm-smi']):
-                                try:
-                                    subprocess.run(probe, timeout=min(5, max(.01, deadline - time.monotonic())),
-                                                   check=False, stdout=out, stderr=subprocess.STDOUT)
-                                except (OSError, subprocess.TimeoutExpired):
-                                    pass
-                if p.returncode:
-                    raise RuntimeError(f'NOT-COMPLETE {name} rc={p.returncode}; full log={path}')
-            finally:
-                if p.poll() is None:
-                    os.killpg(p.pid, signal.SIGKILL)
-                    p.wait()
+            def stuck(elapsed):
+                print(f'PROGRESS {name} elapsed={elapsed:.0f}s', flush=True)
+                if time.time() - path.stat().st_mtime > 180:
+                    for probe in (['ps', '-eo', 'pid,ppid,etime,stat,args'], ['rocm-smi']):
+                        try:
+                            subprocess.run(probe, timeout=min(5, max(.01, deadline - time.monotonic())),
+                                           check=False, stdout=out, stderr=subprocess.STDOUT)
+                        except (OSError, subprocess.TimeoutExpired):
+                            pass
+            rc = proc.run(cmd, sink=out, deadline_s=remaining, poll_s=15, on_poll=stuck, log=out,
+                          env=dict(clean, **(extra or {})))
+            if rc == proc.DEADLINE_RC:
+                raise TimeoutError('NOT-COMPLETE ' + name)
+            if rc:
+                raise RuntimeError(f'NOT-COMPLETE {name} rc={rc}; full log={path}')
         return path.read_text()
 
     def host(arm, args, extra=None):

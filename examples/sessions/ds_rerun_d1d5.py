@@ -3,11 +3,11 @@
 That run lost build_coh / build_d4 to a session bug (fixed in inplace_session.build) and, through a job-graph bug (fixed
 in ds_inplace.py: every GPU measurement now gates hard on preflight), started the single-lever pairs before the data
 existed. baseline, pairs_all and both traces completed and are kept in ~/sess_run1. This session reuses the prepared
-inputs on the box (~/dsv2-data, re-verified by preflight against its SHA256SUMS) and runs, in order: pairs_coh,
+inputs on the box (~/dsv2-data, re-verified by preflight against the pinned hashes) and runs, in order: pairs_coh,
 pairs_d4, d4trace, then the eight single-arm pairs (relaxed last). No report job: report needs pairs_all, which is in
 run 1; the two runs are combined after fetch.
 
-Run: examples/dsv2lite/stage_inplace.sh <ip> && ETX_SESS_USER=root ETX_SESS_MAX_SECONDS=3600 \\
+Run: examples/dsv2lite/reproduce.sh stage <ip> && ETX_SESS_USER=root ETX_SESS_MAX_SECONDS=3600 \\
      tools/session.sh start <ip> examples/sessions/ds_rerun_d1d5.py
 """
 import importlib.util
@@ -22,15 +22,6 @@ GPU_ORDER = ["pairs_coh", "pairs_d4", "d4trace", *(f"pairs_{a}" for a in _full.S
 ARMS_BUILT = ["default", "relaxed", "coh", "d4", *(a for a in _full.SINGLE if a != "relaxed")]
 KEEP = {"etx_env", "source", "preflight", *(f"build_{a}" for a in ARMS_BUILT), *GPU_ORDER}
 
-JOBS = []
-for d in _full.JOBS:
-    if d["name"] not in KEEP:
-        continue
-    d = dict(d)
-    d["after"] = [a for a in d["after"] if a in KEEP]
-    if "after_any" in d:
-        d["after_any"] = [a for a in d["after_any"] if a in KEEP]
-    if d["name"] == "preflight":
-        d["after"] = ["source"]          # the inputs exist; preflight re-verifies every file against SHA256SUMS
-    JOBS.append(d)
+# the inputs exist on the box: without the prep jobs, preflight reads the files already there
+JOBS = [dict(d, reads=[r for r in d["reads"] if r != "apt"]) for d in _full.JOBS if d["name"] in KEEP]
 assert [d["name"] for d in JOBS if d["lane"] == "gpu"] == GPU_ORDER

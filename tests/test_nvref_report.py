@@ -7,6 +7,7 @@ from examples.vllm_llm import nvref_report as nr
 from etx.tools.gpu_jobs import Runner, load_jobs
 
 
+
 def write(d, name, body, gpu="0"):
     (d / f"{name}.log").write_text(f"# job {name} gpu={gpu} cwd=/x\n"
                                   "# echo 'RESULT matched=32 gen=32'; echo 'CHECK-DSL OK'\n" + body + "\n")
@@ -157,17 +158,18 @@ def test_session_commands_and_order():
         assert subprocess.run(["bash", "-n", "-c", j.cmd], capture_output=True).returncode == 0
         assert j.lane == "cpu" or j.gpu == 0
     names = [j.name for j in jobs]
+    by = {j.name: j for j in jobs}
     preceding = ["gate_all", "gate_unf", "check_imp", "check_imp1"]
     for r in range(1, 6):
         for arm in (["vllm", "etx", "etxu"] if r % 2 else ["etxu", "etx", "vllm"]):
             j = next(j for j in jobs if j.name == f"{arm}_r{r}")
-            assert j.after_any == preceding
-            assert "golden_sha" in j.after
+            assert j.lane == "gpu" and all(by[d].lane == "gpu" for d in preceding)   # the GPU lane keeps the order
+            assert "golden_sha" in j.deps()
             assert all(names.index(dep) < names.index(j.name) for dep in preceding)
             expected = {"vllm": ["golden_sha", "docker_pull"],
                         "etx": ["golden_sha", "build_all", "gate_all"],
                         "etxu": ["golden_sha", "build_all", "gate_all", "gate_unf"]}
-            assert j.after == expected[arm]
+            assert j.deps() == expected[arm]
             preceding.append(j.name)
 
 
@@ -256,14 +258,12 @@ def test_check_build_and_skipped_neighbour_barrier(tmp_path):
         job.status = "ok"
     by_name["gate_unf"].status = "fail"
     for r in range(1, 6):
-        assert runner._deps_state(by_name[f"etxu_r{r}"]) == "skip"
+        assert runner._state(by_name[f"etxu_r{r}"]) == "skip"
         by_name[f"etxu_r{r}"].status = "skipped"
-    by_name["etx_r1"].status = "running"
-    assert runner._deps_state(by_name["etx_r2"]) == "wait"
-    by_name["etx_r1"].status = "ok"
-    assert runner._deps_state(by_name["etx_r2"]) == "ready"
+    # the barrier between neighbours is the GPU lane: one GPU, strictly in list order, a skip advances it
+    assert by_name["etx_r1"].gpu == by_name["etx_r2"].gpu == 0 and jobs.index(by_name["etx_r1"]) < jobs.index(by_name["etx_r2"])
     for name in ("hostprof", "etx_noprog", "vllm_aiter_r1", "vllm_aiter_r2", "vllm_aiter_r3", "report"):
-        assert runner._deps_state(by_name[name]) == "ready"
+        assert runner._state(by_name[name]) == "ready"
         by_name[name].status = "fail"
 
 
@@ -334,11 +334,11 @@ def test_tail_needs_builds_not_gates(tmp_path):
         by_name[name].status = "fail"
     for name in ("hostprof", "etx_noprog", "vllm_aiter_r1", "vllm_aiter_r2", "vllm_aiter_r3", "report"):
         j = by_name[name]
-        assert runner._deps_state(j) == "ready"
-        assert "gate_all" in j.after_any and "gate_unf" in j.after_any
-        for dep in j.after:
+        assert runner._state(j) == "ready"
+        assert "gate_all" not in j.deps() and "gate_unf" not in j.deps()
+        for dep in j.deps():
             by_name[dep].status = "fail"
-            assert runner._deps_state(j) == "skip"
+            assert runner._state(j) == "skip"
             by_name[dep].status = "ok"
 
 

@@ -16,13 +16,13 @@ prev = None
 for rnd in (1, 2):
     for b in ("x1", "x1s", "x2", "x2s"):
         args = " --r1-dir build_r1" if b.startswith("x2") else ""
-        JOBS.append(dict(name=f"t{rnd}_{b}", gpu=0, after=[f"build_{b}"], after_any=[prev] if prev else [], timeout=600, cwd=FLEET,
+        JOBS.append(dict(name=f"t{rnd}_{b}", gpu=0, reads=[f"build_{b}"], timeout=600, cwd=FLEET,
                          cmd=f"$HOME/sess2/b_{b}/run --tokens 32 --context 1024 --repeat 2{args}",
                          summary=[r"per-token", r"tokens:", r"consecutive", r"^RESULT"]))
         prev = f"t{rnd}_{b}"
-JOBS.append(dict(name="trace_x1s", gpu=1, after=["build_x1s"], timeout=600, cwd=FLEET,
+JOBS.append(dict(name="trace_x1s", gpu=1, reads=["build_x1s"], timeout=600, cwd=FLEET,
                  cmd="ETX_TRACE=1 ETX_TRACE_RAW=$HOME/sess2/x1s_trace.bin $HOME/sess2/b_x1s/run --tokens 8 --context 1024 && "
                      "cp $HOME/sess2/b_x1s/plan.json $HOME/sess2/x1s_plan.json", summary=[r"per-token", r"tokens:"]))
-JOBS.append(dict(name="ledger_x1s", lane="cpu", after=["trace_x1s"], timeout=300,
+JOBS.append(dict(name="ledger_x1s", lane="cpu", reads=["trace_x1s"], timeout=300,
                  cmd="PYTHONPATH=. .venv/bin/python -m examples.dsv2lite.ledger --etx $HOME/sess2/x1s_plan.json $HOME/sess2/x1s_trace.bin "
                      "--label 'x1 stride 32' --fleet-src ~/fleet-mi300x/src", summary=[r"^== |handoff|layer "]))

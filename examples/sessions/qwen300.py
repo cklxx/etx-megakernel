@@ -37,11 +37,11 @@ import json
 import os
 from pathlib import Path
 import shlex
-import signal
 import statistics
 import subprocess
 import sys
 import time
+from etx.session import proc
 from examples.vllm_llm.qwen300_config import IMAGE, QWEN300_MAX_SESSION_SECONDS, validate_cap
 
 MAX_SESSION_SECONDS = QWEN300_MAX_SESSION_SECONDS
@@ -68,7 +68,7 @@ Report fused and same-kernel HIP graph, device separately, and Job 1 bf16 vLLM.
 No shorter-run numbers; missing/failed arms are explicitly NOT-COMPLETE.
 '''
 JOBS = [dict(name=f'job{i}_{name}', gpu=0, machine='A', quiet_s=180,
-             timeout=seconds, after_any=[] if i == 1 else ['job1_pricing'],
+             timeout=seconds,
              cmd=f'stdbuf -oL -eL python3 -u -m {MODULE} --job {i}')
         for i, name, seconds in [(1, 'pricing', 1800), (2, 'key32', 2400)]]
 
@@ -136,36 +136,23 @@ def step(name, cmd, seconds, env=None):
     with path.open('w') as f:
         f.write(f'# job {name} gpu={os.environ.get("GPU", "0")}\n# {shlex.join(cmd)}\n')
         f.flush()
-        p = subprocess.Popen(cmd, stdout=f, stderr=subprocess.STDOUT, start_new_session=True,
-                             env=({k: v for k, v in dict(os.environ, **(env or {})).items() if v is not None}))
-        try:
-            while p.poll() is None:
-                try:
-                    p.wait(timeout=min(15, max(.01, limit - (time.monotonic() - started))))
-                except subprocess.TimeoutExpired:
-                    elapsed = time.monotonic() - started
-                    print(f'PROGRESS {name} elapsed={elapsed:.0f}s deadline={limit}s full_log={path}', flush=True)
-                    if time.time() - path.stat().st_mtime > 180 or elapsed >= limit:
-                        print(f'STUCK-STATE {name} pid={p.pid}', flush=True)
-                        for probe in (['ps', '-eo', 'pid,ppid,etime,stat,args'], ['rocm-smi']):
-                            try:
-                                subprocess.run(probe, timeout=8, check=False)
-                            except (OSError, subprocess.TimeoutExpired) as exc:
-                                print(f'PROBE {exc}', flush=True)
-                    if elapsed >= limit:
-                        raise RuntimeError(f'{name}: NOT-COMPLETE substep timeout')
-        finally:
-            if p.poll() is None:
-                os.killpg(p.pid, signal.SIGTERM)
-                try:
-                    p.wait(timeout=5)
-                except subprocess.TimeoutExpired:
-                    os.killpg(p.pid, signal.SIGKILL)
-                    p.wait()
-    print(f'FINISH {name} rc={p.returncode} full_log={path}', flush=True)
-    if p.returncode:
+        def stuck(elapsed):
+            print(f'PROGRESS {name} elapsed={elapsed:.0f}s deadline={limit}s full_log={path}', flush=True)
+            if time.time() - path.stat().st_mtime > 180:
+                print(f'STUCK-STATE {name}', flush=True)
+                for probe in (['ps', '-eo', 'pid,ppid,etime,stat,args'], ['rocm-smi']):
+                    try:
+                        subprocess.run(probe, timeout=8, check=False)
+                    except (OSError, subprocess.TimeoutExpired) as exc:
+                        print(f'PROBE {exc}', flush=True)
+        rc = proc.run(cmd, sink=f, deadline_s=limit, poll_s=15, on_poll=stuck, log=f,
+                      env={k: v for k, v in dict(os.environ, **(env or {})).items() if v is not None})
+    if rc == proc.DEADLINE_RC:
+        raise RuntimeError(f'{name}: NOT-COMPLETE substep timeout')
+    print(f'FINISH {name} rc={rc} full_log={path}', flush=True)
+    if rc:
         print(path.read_text(errors='replace'), flush=True)
-        raise RuntimeError(f'{name}: failed rc={p.returncode}')
+        raise RuntimeError(f'{name}: failed rc={rc}')
     return path.read_text(errors='replace')
 
 

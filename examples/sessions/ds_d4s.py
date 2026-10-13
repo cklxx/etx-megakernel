@@ -18,19 +18,11 @@ _full = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_full)
 
 MAX_SESSION_SECONDS = 1800
-JOBS = []
-for d in _full.JOBS:
-    if d["name"] in ("etx_env", "source", "build_default"):
-        d = dict(d)
-        d["after"] = [a for a in d["after"] if a != "apt"]
-        JOBS.append(d)
-    elif d["name"] == "preflight":
-        d = dict(d)
-        d["after"] = ["source"]
-        JOBS.append(d)
+# inputs reused from the box: without the prep jobs, preflight reads the files already there
+JOBS = [dict(d, reads=[r for r in d["reads"] if r != "apt"]) for d in _full.JOBS
+        if d["name"] in ("etx_env", "source", "build_default", "preflight")]
 _full.JOBS.clear()
 for arm in ("alld4r0", "alld4s"):
-    _full.add(f"build_{arm}", f"build {arm}", after=("source",), timeout=1200)
-_full.add("pairs_alld4s", "pairs alld4s", lane="gpu",
-          after=("preflight", "build_default", "build_alld4r0", "build_alld4s"), timeout=1200)
+    _full.build(arm)
+_full.pairs("alld4s")
 JOBS += _full.JOBS

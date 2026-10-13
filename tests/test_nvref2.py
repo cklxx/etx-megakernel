@@ -76,7 +76,7 @@ def test_nvref2_only_primary_vllm_repeats_change():
     for j, predecessor, lane in zip(
         diagnostics, ("report", "trace1", "floors_trace"), ("gpu", "cpu", "gpu")
     ):
-        assert j["after"] == predecessor
+        assert j["reads"] == predecessor
         assert j["timeout"] == 300
         assert j.get("lane", "gpu") == lane
         if lane == "gpu":

@@ -47,8 +47,8 @@ for arm, rnd in [('etx', 1), ('vnd', 1), ('vnd', 2), ('etx', 2), ('etx', 3), ('v
                f'-v $HOME:$HOME -w $HOME/etx --entrypoint python3 {IMAGE} '
                'examples/vllm_llm/vendor_gemv.py --lib hipblaslt,rocblas,tunable '
                f'--copies 48 --warmup 10 --iters 30 --check {S}/dump_all --model {MODEL} --out {S}/{name}')
-    job(name=name, gpu=0, lane='gpu', after_any=list(finished), timeout=60 if arm == 'etx' else 180,
+    job(name=name, gpu=0, lane='gpu', timeout=60 if arm == 'etx' else 180,
         quiet_s=60, cmd=cmd, summary=[r'^RESULT|^KC|REFUSED'])
     finished.append(name)
-job(name='kc_report', lane='cpu', after_any=list(finished), timeout=60,
+job(name='kc_report', lane='cpu', reads=['?' + n for n in finished], timeout=60,
     cmd=f'.venv/bin/python -m examples.vllm_llm.kcmp_report {LOGS}', summary=[r'.'])

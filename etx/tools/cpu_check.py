@@ -14,6 +14,7 @@ import time
 import xml.etree.ElementTree as ET
 
 from etx.tools.bench_sim import ROOT, provenance, write_json, digest
+from etx.session import proc
 
 # Known optional tests need artifacts/toolchains beyond the source-only CPU suite.
 EXTERNAL_TESTS = {
@@ -142,22 +143,10 @@ def command_step(name, command, out, *, timeout=300, cwd=ROOT, env=None):
     started = time.monotonic()
     with log.open("w") as stream:
         try:
-            proc = subprocess.Popen(list(map(str, command)), cwd=cwd, stdout=stream,
-                                    stderr=subprocess.STDOUT, start_new_session=True, env=env)
-            while True:
-                try:
-                    code = proc.wait(timeout=10)
-                    break
-                except subprocess.TimeoutExpired:
-                    elapsed = time.monotonic() - started
-                    print(f"RUNNING {name}: {elapsed:.0f}s; log={log}", flush=True)
-                    if elapsed >= timeout:
-                        import signal
-                        os.killpg(proc.pid, signal.SIGKILL)
-                        proc.wait()
-                        stream.write(f"\nTIMEOUT after {timeout}s\n")
-                        code = 124
-                        break
+            code = proc.run(command, sink=stream, deadline_s=timeout, poll_s=10, cwd=cwd, env=env, log=stream,
+                            on_poll=lambda s: print(f"RUNNING {name}: {s:.0f}s; log={log}", flush=True))
+            if code == proc.DEADLINE_RC:
+                stream.write(f"\nTIMEOUT after {timeout}s\n")
         except OSError as exc:
             stream.write(f"{type(exc).__name__}: {exc}\n")
             code = 127
