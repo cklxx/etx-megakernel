@@ -64,7 +64,7 @@ def test_job_graph_order_and_inputs():
         if j.name.startswith("pairs_"):
             assert "build_default" in j.after and f"build_{j.name[6:]}" in j.after, j.name
     assert set(gpu[8:]) == {f"pairs_{a}" for a in ins.SINGLE}
-    for arm in (*(a for a in ins.ARMS if a not in ("allrelaxed", "d4r0", "alld4r0", "l1", "alld4r0l1", "alld3", "alld4s")), "fleet"):   # follow-up session files
+    for arm in (*(a for a in ins.ARMS if a not in ("allrelaxed", "d4r0", "alld4r0", "l1", "alld4r0l1", "alld3", "alld4s", "alld5")), "fleet"):   # follow-up session files
         assert f"build_{arm}" in by and by[f"build_{arm}"].after == ["source"]
     for arm in ins.STAMPED:
         assert f"--stamped" in by[f"build_{arm}_stamps"].cmd
@@ -189,12 +189,15 @@ def test_build_env_lets_an_arm_switch_its_plan_on(tmp_path, monkeypatch):
         raise Stop
 
     monkeypatch.setattr(ins.Session, "run", fake_run)
-    for arm in ("default", "coh", "d4", "relaxed"):
+    for arm in ("default", "coh", "d4", "relaxed", "all", "alld5"):
         with pytest.raises(Stop):
             ins.Session().build(arm)
     assert seen["compile_default"]["ETX_DSV2_COH"] == "0" and seen["compile_default"]["ETX_DSV2_D4"] == "0"
     assert seen["compile_coh"]["ETX_DSV2_COH"] == "1" and seen["compile_coh"]["ETX_FLEET_PATCH"] == "coherent_loads"
     assert seen["compile_d4"]["ETX_DSV2_D4"] == "1" and seen["compile_d4"]["ETX_DSV2_COH"] == "0"
+    assert seen["compile_default"]["ETX_DSV2_D5"] == seen["compile_all"]["ETX_DSV2_D5"] == "0"
+    assert seen["compile_alld5"]["ETX_DSV2_D5"] == "1"
+    assert seen["compile_alld5"]["ETX_FLEET_PATCH"] == seen["compile_all"]["ETX_FLEET_PATCH"] == " ".join(ins.LEVERS_ALL)
 
 
 def test_every_decided_arm_reports_one_verdict():
@@ -205,10 +208,10 @@ def test_every_decided_arm_reports_one_verdict():
     assert verdict("alld4r0", rep) == dict(rule=RULES["alld4r0"][0], outcome="KEEP", passed=True)
     assert verdict("alld4r0", dict(rep, keep_vs_all=dict(keep, keep=False)))["outcome"] == "NO-GO"
     assert verdict("d4r0", rep)["outcome"] == "NO RULE (attribution)"
-    assert {"all", "coh", "l1", "d4", "alld4r0", "alld4r0l1"} <= set(RULES)
+    assert {"all", "coh", "l1", "d4", "alld4r0", "alld4r0l1", "alld5"} <= set(RULES)
 
 
-@pytest.mark.parametrize("arm", ["all", "coh", "l1", "d4", "alld4r0", "alld4r0l1", "alld4s", "alld3", "relaxed"])
+@pytest.mark.parametrize("arm", ["all", "coh", "l1", "d4", "alld4r0", "alld4r0l1", "alld4s", "alld3", "alld5", "relaxed"])
 def test_pairs_runs_end_to_end_for_every_arm_shape(tmp_path, monkeypatch, arm):
     """pairs() with stubbed invocations: every arm writes its JSON, a verdict and its PAIRS line (2026-10-13: an
     arm-shape bug after five GPU rounds would lose the arm)."""
@@ -224,3 +227,63 @@ def test_pairs_runs_end_to_end_for_every_arm_shape(tmp_path, monkeypatch, arm):
     ins.Session().pairs(arm)
     rep = json.loads((tmp_path / "ETX_SESS_LOGDIR" / f"pairs_{arm}.json").read_text())
     assert "verdict" in rep and rep["verdict"]["outcome"]
+
+
+
+
+@pytest.mark.parametrize("gains,outcome,neutral,any_slower", [
+    ([30, 30, 30, 30, 30], "KEEP", False, False),      # equality at the minimum median is allowed
+    ([29, 29, 29, 29, 29], "DROP", False, False),      # positive and stable, but below 30 us
+    ([20, 30, 30, 30, 35], "DROP", False, False),      # median == 2 x spread is insufficient
+    ([20, 30, 30, 30, 34], "KEEP", False, False),
+    ([0, 0, 0, 0, 0], "DROP", True, False),
+    ([10, 30, 30, 30, 40], "DROP", True, False),       # |median| == spread is explicitly neutral
+    ([-1, 40, 40, 40, 40], "DROP", True, True),        # any slower pair drops the arm
+    ([0, 40, 40, 40, 40], "DROP", True, False),        # a tie cannot satisfy every pair faster
+    ([-40, -40, -40, -40, -40], "DROP", False, True),
+])
+def test_d5_registered_keep_and_drop_rule(gains, outcome, neutral, any_slower):
+    decision = ins.d5_verdict(paired(gains))
+    assert decision["neutral"] is neutral and decision["any_slower"] is any_slower
+    assert decision["keep"] is (outcome == "KEEP")
+    assert decision["drop"] is (outcome == "DROP")
+    assert ins.verdict("alld5", {"d5": decision}) == dict(rule=ins.RULES["alld5"][0], outcome=outcome,
+                                                        passed=outcome == "KEEP")
+
+
+@pytest.mark.parametrize("failure", [None, "layers", "tokens", "warmup", "incomplete"])
+def test_d5_two_way_pairs_require_every_invocation_complete(tmp_path, monkeypatch, failure):
+    for k in ("ETX_SESS_LOGDIR", "ETX_DSV2_FLEET", "ETX_DSV2_DATA"):
+        monkeypatch.setenv(k, str(tmp_path / k))
+    calls = []
+
+    def fake_run(self, name, command, **kwargs):
+        arm = Path(command[0]).parent.name.removeprefix("b_")
+        calls.append((arm, name))
+        log = good_log().replace("median 2.900", "median 2.850" if arm == "alld5" else "median 2.900")
+        if len(calls) == 10:
+            if failure == "incomplete":
+                raise RuntimeError("invocation deadline: NOT COMPLETE")
+            old, new = {"layers": ("27 of 27", "26 of 27"), "tokens": ("tokens: 32/32", "tokens: 31/32"),
+                        "warmup": ("32/32 tokens match", "31/32 tokens match")}.get(failure, ("", ""))
+            if old:
+                log = log.replace(old, new)
+        return log
+
+    monkeypatch.setattr(ins.Session, "run", fake_run)
+    path = Path(os.environ["ETX_SESS_LOGDIR"]) / "pairs_alld5.json"
+    if failure:
+        with pytest.raises((ValueError, RuntimeError)):
+            ins.main(["pairs", "alld5"])
+        assert not path.exists()                 # no verdict from nine correct invocations
+    else:
+        ins.main(["pairs", "alld5"])
+        report = json.loads(path.read_text())
+        assert set(report["device_ms"]) == set(report["wall_ms"]) == {"all"}
+        assert report["device_ms"]["all"]["median_us"] == pytest.approx(50)
+        assert report["device_ms"]["all"]["go"] is None
+        assert report["verdict"]["outcome"] == "KEEP"
+        assert all(set(r) == {"all", "alld5"} for r in report["rounds"])
+        assert all(v["tokens"] == 32 and v["layers"] == 27 for r in report["rounds"] for v in r.values())
+    assert calls == [(arm, f"alld5_r{i}_{arm}") for i in range(5)
+                     for arm in (("all", "alld5") if i % 2 == 0 else ("alld5", "all"))]

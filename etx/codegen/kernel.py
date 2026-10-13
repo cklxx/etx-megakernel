@@ -152,6 +152,11 @@ def emit_kernel(plan: Plan, device: int = 0) -> str:
     m = plan.machine
     is_hip = m.vendor == "amd"
     grids = [g for g in plan.graph.grids if g.device == device]
+    # Opt-in shared dispatch: a prefetch sibling, like a tile body, needs one
+    # call site rather than one per layer to keep inlining/register use bounded.
+    shared_prefetch = bool(plan.graph.codegen.get("prefetch_dispatch")) and plan.options.prefetch and \
+        m.capabilities.get("async_copy_to_lds", "none") != "none"
+    prefetch_symbols = list(dict.fromkeys(g.body.prefetch for g in grids if g.body.prefetch)) if shared_prefetch else []
     threads = max([g.resource.threads for g in grids] + [64])
     lds = max([g.resource.lds_bytes + g.resource.prefetch_bytes for g in grids] + [0])
     out: list[str] = []
@@ -199,6 +204,21 @@ def emit_kernel(plan: Plan, device: int = 0) -> str:
     out.append(f"#define ETX_THREADS {threads}")
     out.append(f"#define ETX_LDS_USED {lds}")
     n_types = len(plan.type_ids)
+    if prefetch_symbols:
+        pf_ids = [-1] * n_types
+        pf_consts = [[0] * 4 for _ in range(n_types)]
+        for g in grids:
+            if g.body.prefetch:
+                pf_ids[plan.type_ids[g.name]] = prefetch_symbols.index(g.body.prefetch)
+                pf_consts[plan.type_ids[g.name]] = list(g.consts)[:4] + [0] * (4 - min(4, len(g.consts)))
+        out.append(f"static __device__ const int etx_prefetch_symbol[{n_types}] = {{{', '.join(map(str, pf_ids))}}};")
+        out.append(f"static __device__ const int etx_prefetch_consts[{n_types}][4] = {{" +
+                   ", ".join("{" + ", ".join(map(str, cs)) + "}" for cs in pf_consts) + "};")
+        out.append("static __device__ __forceinline__ void etx_call_prefetch(int sym, const etx_ctx* ctx) {")
+        out.append("  switch (sym) {")
+        for i, symbol in enumerate(prefetch_symbols):
+            out.append(f"    case {i}: {symbol}(ctx); break;")
+        out.extend(["    default: break;", "  }", "}", ""])
     dyn_flags = ["0"] * n_types
     for g in plan.graph.grids:
         dyn_flags[plan.type_ids[g.name]] = "1" if plan.modes.get(g.name, "static") != "static" else "0"
@@ -267,6 +287,13 @@ def emit_kernel(plan: Plan, device: int = 0) -> str:
     out.append("  etx_ctx ctx; for (int i = 0; i < 4; ++i) ctx.coord[i] = t.coord[i];")
     out.append("  ctx.shape = p.shape; ctx.args = p.type_args + t.type * p.max_args; ctx.events = p.events; ctx.ev_offset = p.ev_offset; ctx.ev_shape = (const int32_t*)p.ev_shape;")
     out.append("  ctx.domain = domain; ctx.worker = worker; ctx.lds = etx_lds; ctx.cst[0] = ctx.cst[1] = ctx.cst[2] = ctx.cst[3] = 0;")
+    if prefetch_symbols:
+        out.append("  const int pf_sym = etx_prefetch_symbol[t.type];")
+        out.append("  if (pf_sym >= 0) {")
+        out.append("    for (int i = 0; i < 4; ++i) ctx.cst[i] = etx_prefetch_consts[t.type][i];")
+        pf_guard = "if (threadIdx.x >= 64) " if isolate_poller else ""
+        out.append(f"    {pf_guard}etx_call_prefetch(pf_sym, &ctx);   // Pass 7: immutable weights before this task's event wait")
+        out.append("  }")
     out.append("  int sym = -1;")
     if max_pro:
         out.append(f"  etx_ctx pctx[{max_pro}]; int psym[{max_pro}];")
@@ -276,7 +303,7 @@ def emit_kernel(plan: Plan, device: int = 0) -> str:
         mode = plan.modes.get(g.name, "static")
         out.append(f"    case {plan.type_ids[g.name]}: {{ // {g.name} [{mode}] grid={g.grid}")
         out.extend(_setup_consts(g))
-        if g.body.prefetch and plan.options.prefetch and plan.machine.capabilities.get("async_copy_to_lds", "none") != "none":
+        if not shared_prefetch and g.body.prefetch and plan.options.prefetch and plan.machine.capabilities.get("async_copy_to_lds", "none") != "none":
             if isolate_poller:
                 out.append(f"      if (threadIdx.x >= 64) {g.body.prefetch}(&ctx);   // isolate polling wave 0")
             else:

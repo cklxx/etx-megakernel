@@ -44,6 +44,7 @@ if [ "$INLINE" = "1" ]; then
 else
   compile_plan
   SHIM="$ROOT/examples/dsv2lite/fleet_shim.hip"
+  if [ "${ETX_DSV2_D5:-0}" = 1 ]; then SHIM="$ROOT/examples/dsv2lite/fleet_d5.hip"; fi
 fi
 # D2: the plan (ETX_DSV2_COH) and the tiles (lever coherent_loads) must agree; refused before the compiler runs
 (cd "$ROOT" && "$ROOT/.venv/bin/python" -m examples.dsv2lite.coh_check "$OUT/megakernel_d0.hip" "$FLEET_SRC") || exit 2

@@ -1,0 +1,84 @@
+{
+  "arm": "alld5",
+  "arm_build": {
+    "isa_sha256": "e3315f671effc797131c8cee77706dcc05025d6220fdde4dd67a1bb9a2cb36a3",
+    "kernel_sha256": "d984ab852545c00143f6e06944aa8bc58dbd1b2541e4d8737875f055314c3976",
+    "plan_sha256": "d18357701514bc526216dfa7d83fe61aefd9cb5b7c645457350faf9bee850a23",
+    "resources": {
+      "agpr": 101,
+      "lds": 26668,
+      "occupancy": 1,
+      "scratch": 0,
+      "sgpr": 108,
+      "vgpr": 256
+    },
+    "static": {
+      "asm_lines": 139953,
+      "inv_sc0": 6,
+      "inv_sc1": 279,
+      "nt_weight_loads": 168,
+      "sys_loads": 0,
+      "vmcnt0_waits": 3134,
+      "wbl2": 118
+    }
+  },
+  "cpu_gates": {
+    "files": [
+      "tests/test_dsv2_lever_gemv_no_terminal_all.py",
+      "tests/test_dsv2_lever_norm_tree_all.py",
+      "tests/test_dsv2_lever_argmax_tree.py",
+      "tests/test_dsv2_lever_topk_rank.py",
+      "tests/test_dsv2_lever_attn_prologue_live.py",
+      "tests/test_dsv2_stamps.py",
+      "tests/test_dsv2_d5.py"
+    ],
+    "summary": "41 passed in 19.66s"
+  },
+  "default": {
+    "isa_sha256": "a105cb16a414ee0f9f697c9de13205419d09674f5c69f6ee804cf36942377724",
+    "kernel_sha256": "751293fad5f5c98ec6dbf9eeca3c73319b1d4ded4b6ca73996a65757c0ffae5d",
+    "plan_sha256": "09011c207b1e92febf29a2c2efc2d944ef9ad7ac8a0803633579c8444d821f8a",
+    "resources": {
+      "agpr": 48,
+      "lds": 26668,
+      "occupancy": 1,
+      "scratch": 0,
+      "sgpr": 108,
+      "vgpr": 256
+    },
+    "static": {
+      "asm_lines": 107990,
+      "inv_sc0": 6,
+      "inv_sc1": 279,
+      "nt_weight_loads": 252,
+      "sys_loads": 0,
+      "vmcnt0_waits": 2750,
+      "wbl2": 118
+    }
+  },
+  "delta_vs_default": {
+    "agpr": 53,
+    "lds": 0,
+    "occupancy": 0,
+    "scratch": 0,
+    "sgpr": 0,
+    "vgpr": 0
+  },
+  "etx_commit": "43a726707ec567dec5d2780d1af684fc3612fb48",
+  "etx_dirty": true,
+  "fleet_commit": "3fb67a6",
+  "fleet_src_sha256": "28f5cbb4f39524df318883522341c48ca4162c18b71a3a6223c52eabb40ce4b3",
+  "plan_env": {
+    "ETX_DSV2_D5": "1"
+  },
+  "static_delta": {
+    "asm_lines": 31963,
+    "inv_sc0": 0,
+    "inv_sc1": 0,
+    "nt_weight_loads": -84,
+    "sys_loads": 0,
+    "vmcnt0_waits": 384,
+    "wbl2": 0
+  },
+  "verdict": "PASS"
+}
