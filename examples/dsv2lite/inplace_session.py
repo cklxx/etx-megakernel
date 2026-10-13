@@ -74,6 +74,7 @@ ARM_FLAGS["alld4s"] = ["-DETX_DSV2_D4=1"]
 ARM_ENV["alld4s"] = {"ETX_DSV2_D4": "1", "ETX_DSV2_D4_ROWS": "32"}
 SINGLE = ("Q", "Qall", "N", "Nall", "argmax", "topk", "prep", "relaxed")
 STAMPED = ("default", "all")
+TRACEABLE = (*STAMPED, "alld4r0", "alld4r0l1")    # arms whose stamped build a session may trace (the new arms' stages)
 DATA_FILES = ("weights.bin", "weights.bin.manifest", "fleet_cache.bin", "golden_tokens.txt", "golden_hidden.bin")
 GO_US = 70.0
 
@@ -460,8 +461,8 @@ def main(argv=None):
             ap.error("pairs arm must be baseline, all, coh, d4 or a single lever")
         session.pairs(a.arm)
     elif a.operation == "trace":
-        if a.arm not in STAMPED:
-            ap.error(f"trace arm must be one of {STAMPED}")
+        if a.arm not in TRACEABLE:
+            ap.error(f"trace arm must be one of {TRACEABLE}")
         session.trace(a.arm)
     else:
         getattr(session, a.operation)()

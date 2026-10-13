@@ -363,7 +363,17 @@ extern "C" __device__ void fleet_d4_routed_gate_up(const etx_ctx* c) {
   const D4Task t = d4_task(c);
   const fleet::ModelDims& d = t.fp->d;
   const int slot = (int)c->coord[0], rows = D4_ROWS(c);
+#if ETX_DSV2_STAMPS2
+  // stamped builds only: fleet's gate_up stamps (start, routing done, x staged) in fleet's gate_up slot for this XCD,
+  // so the stage table splits topk / moe_up for D4 arms as for the default arm. Kept in LDS (stamps2[0], stamp_stage,
+  // stamp), nothing live in registers across the GEMV: a register-held start time spilled 96 B/lane. Unstamped
+  // builds are unchanged.
+  if (t.fp->pro_trace != nullptr && threadIdx.x == 0) t.s->stamps2[0] = __builtin_amdgcn_s_memrealtime();
+#endif
   fleet::select_experts(d, t.act->router_logits + (int64_t)t.xcd * d.n_routed, t.s->ids, t.s->ws);
+#if ETX_DSV2_STAMPS2
+  if (t.fp->pro_trace != nullptr && threadIdx.x == 0) t.s->stamp_stage = __builtin_amdgcn_s_memrealtime();
+#endif
   if (t.worker == 0 && threadIdx.x == 0) {
     fleet::st_coh(t.act->topk_ids + slot, t.s->ids[slot], true);
     fleet::st_coh(t.act->topk_w + slot, t.s->ws[slot], true);
@@ -374,9 +384,19 @@ extern "C" __device__ void fleet_d4_routed_gate_up(const etx_ctx* c) {
   }
   fleet::ExpertUnit u = d4_unit(t, slot, t.s->ids, t.s->ws);
   fleet::stage_vector(t.act->x_norm + (int64_t)t.xcd * d.hidden, t.s->vec, d.hidden);
+#if ETX_DSV2_STAMPS2
+  if (t.fp->pro_trace != nullptr && threadIdx.x == 0) t.s->stamp = __builtin_amdgcn_s_memrealtime();
+#endif
   u.gate_up += (int64_t)2 * rows * d.hidden;
   u.inter -= rows;
   fleet::expert_gate_up(u, t.s->vec, t.act->expert_h + (int64_t)slot * d.moe_inter + rows, d.hidden, t.worker, t.nw);
+#if ETX_DSV2_STAMPS2
+  if (t.fp->pro_trace != nullptr && threadIdx.x == 0) {      // pro_end's STAMPS2 row: {start, staging, prologue, 0...}
+    uint64_t* r = t.fp->pro_trace + PRO_SLOT(t.L, fleet::TASK_EXPERT_GATE_UP, c) * 16;
+    r[0] = t.s->stamps2[0]; r[1] = t.s->stamp_stage; r[2] = t.s->stamp;
+    for (int i = 3; i < 16; ++i) r[i] = 0;
+  }
+#endif
 }
 
 // routed XCD k: rows [rows, inter) of slot k's down, with the routing its own gate_up left in LDS (as ROUTING_CACHED)

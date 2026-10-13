@@ -150,7 +150,7 @@ def test_d4_verdict_and_trace_criterion(monkeypatch):
     fake = [T(0, 5, "router", 10.0, 19.0, None, None), T(0, 5, "router", 10.0, 20.0, None, None),
             T(0, 5, "shgu", 10.5, 40.0, None, None), T(0, 6, "router", 90.0, 99.0, None, None),
             T(0, 6, "shgu", 100.0, 120.0, None, None)]
-    monkeypatch.setattr(ld, "load_etx", lambda plan, trace, pro: fake)
+    monkeypatch.setattr(ld, "load_etx", lambda plan, trace, pro, merge_d4=True: fake if not merge_d4 else [])
     r = d4.trace_lead("plan.json", "trace.bin")
     assert r["layers"] == 2 and r["before_routing"] == 1 and r["leads_us"] == {"5": 9.5, "6": -1.0}
 

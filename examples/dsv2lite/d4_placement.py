@@ -127,7 +127,7 @@ def trace_lead(plan, trace) -> dict:
     """GPU criterion (a) from one traced token of the d4 build: per MoE layer, how long before the layer's routing
     completes (last router task done) the shared XCDs' gate_up became ready (first shgu task)."""
     from examples.dsv2lite import ledger as ld
-    tasks = ld.load_etx(plan, trace, None)
+    tasks = ld.load_etx(plan, trace, None, merge_d4=False)     # this criterion needs the shared grids by name
     leads = {}
     for L in sorted({t.layer for t in tasks if t.phase == "shgu"}):
         routed_done = max(t.done for t in tasks if t.layer == L and t.phase == "router")

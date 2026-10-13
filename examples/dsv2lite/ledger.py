@@ -44,6 +44,9 @@ FLEET_KIND = {"EMBED": "embed", "QKV_FUSED": "qkv", "Q_ABSORB": "qabs", "ATTENTI
               "O_PROJ": "oproj", "NORM_ROUTER": "router", "EXPERT_GATE_UP": "gate_up", "EXPERT_DOWN": "down",
               "DENSE_GATE_UP": "dense_gu", "DENSE_DOWN": "dense_dn", "LM_HEAD": "lm_head", "ARGMAX": "argmax"}
 # fleet 3fb67a6 TaskKind, frozen rather than silently importing a working tree.
+# D4 (examples/dsv2lite/graph.py build_moe_layer_d4): the shared XCDs run their expert stages as their own grids;
+# in the chain they are the same phases, so a phase ends when its last task does, routed or shared
+D4_PHASE = {"shgu": "gate_up", "sdown": "down"}
 STAMP_KINDS = {"qkv": 0, "attn": 1, "merge": 2, "oproj": 3, "router": 4, "norm": 4,
                "gate_up": 5, "down": 6, "dense_gu": 8, "dense_dn": 9, "embed": 10,
                "lm_head": 11, "argmax": 12, "qabs": 14}
@@ -98,7 +101,7 @@ class T:
     subphases: dict[str, float] = field(default_factory=dict)
 
 
-def load_etx(plan: Path, trace: Path, prologue: Path | None) -> list[T]:
+def load_etx(plan: Path, trace: Path, prologue: Path | None, merge_d4: bool = True) -> list[T]:
     p = tl.load_plan(plan)
     tr = tl.build_trace(p, tl.read_raw(trace))
     stamps = {}
@@ -127,6 +130,8 @@ def load_etx(plan: Path, trace: Path, prologue: Path | None) -> list[T]:
         if not m:
             continue
         r, ph, L = int(m.group(1) or 0), m.group(2), int(m.group(3)) if m.group(3) else -1
+        if merge_d4:
+            ph = D4_PHASE.get(ph, ph)   # D4: the shared XCDs' expert stages join the routed ones
         pr, sg, sub = stamps.get(t.id, (None, None, {}))
         out.append(T(r, L, ph, t.ready, t.done, pr, sg, sub))
     return out
