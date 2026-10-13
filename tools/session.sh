@@ -92,9 +92,14 @@ REMOTE
     if [ "${ETX_FETCH_REUSE:-0}" != 1 ] && [ -e "$DEST" ] && [ -n "$(ls -A "$DEST" 2>/dev/null)" ]; then
       echo "refusing: $DEST is not empty; fetch into a new directory"; exit 2; fi
     mkdir -p "$DEST"
+    # the provenance of an earlier capture goes before anything is transferred: if this fetch fails half-way, the
+    # directory has no box manifest and cannot verify as this box's capture (review 09, R12)
+    rm -f "$DEST/SHA256SUMS" "$DEST/SHA256SUMS.local"
     # build records (plans, resources, generated kernels) are part of the result; only the binaries and patched
     # source copies stay on the box (review 07, R03). The box's SHA256SUMS is verified, never overwritten (R04).
-    rsync -az --exclude 'b_*/run' --exclude 'b_*/fleet_src/' --exclude '*.o' $H:~/sess/ "$DEST/" || exit 1
+    # an exact mirror of the box's session directory (minus the excluded): nothing from an earlier capture -- an old
+    # SHA256SUMS included -- can survive a re-fetch into the same place (review 09, R12)
+    rsync -az --delete --delete-excluded --exclude 'b_*/run' --exclude 'b_*/fleet_src/' --exclude '*.o' $H:~/sess/ "$DEST/" || exit 1
     ls "$DEST" | head -50
     if [ -f "$DEST/SHA256SUMS" ]; then
       python3 "$(dirname "$0")/../etx/tools/verify_sums.py" "$DEST" --excluded 'b_*/run' 'b_*/fleet_src/*' '*.o' || { echo "FETCH NOT VERIFIED: keep the box"; exit 2; }

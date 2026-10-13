@@ -113,6 +113,43 @@ def descendants(pid: int) -> list[int]:
     return out
 
 
+def freeze_and_kill(root: int, group: bool = True) -> int:
+    """Stop the job's group and every descendant with SIGSTOP, re-scanning until no new descendant appears (a stopped
+    process cannot fork, so the set converges), then SIGKILL all of them. Killing a live tree from one snapshot let
+    processes forked during the kill escape (review 09, R15). Returns how many descendants were killed."""
+    if group:
+        try:
+            os.killpg(root, signal.SIGSTOP)
+        except (ProcessLookupError, PermissionError):
+            pass
+    frozen: set[int] = set()
+    for _ in range(100):
+        new = set(descendants(root)) - frozen
+        if not new:
+            break
+        for pid in new:
+            _signal(pid, signal.SIGSTOP)
+        frozen |= new
+    if group:
+        try:
+            os.killpg(root, signal.SIGKILL)
+        except (ProcessLookupError, PermissionError):
+            pass
+    for pid in frozen:
+        _signal(pid, signal.SIGKILL)
+    return len(frozen)
+
+
+def become_subreaper() -> None:
+    """Linux: orphans of a killed job re-parent to the runner instead of init, so they stay its descendants and a
+    later sweep still finds them (review 09, R15). A no-op elsewhere."""
+    try:
+        import ctypes
+        ctypes.CDLL(None, use_errno=True).prctl(36, 1, 0, 0, 0)   # PR_SET_CHILD_SUBREAPER
+    except (OSError, AttributeError):
+        pass
+
+
 def _signal(pid: int, sig: int) -> None:
     try:
         os.kill(pid, sig)
@@ -246,21 +283,12 @@ class Runner:
         self.out.flush()
 
     def _kill(self, j: Job) -> None:
-        tree = descendants(j.proc.pid)      # before the group dies: an escaped group (e.g. under `timeout`) is still ours
+        # the whole tree, including a group of its own under `timeout`, frozen before it is killed (R01, R14, R15)
+        freeze_and_kill(j.proc.pid)
         try:
-            os.killpg(j.proc.pid, signal.SIGTERM)
-            for pid in tree:
-                _signal(pid, signal.SIGTERM)
-            try:
-                grace = min(10, max(0, self.deadline - time.monotonic())) if self.deadline is not None else 10
-                j.proc.wait(grace)
-            except subprocess.TimeoutExpired:
-                os.killpg(j.proc.pid, signal.SIGKILL)
-                j.proc.wait(10)
-        except ProcessLookupError:
+            j.proc.wait(10)
+        except subprocess.TimeoutExpired:
             pass
-        for pid in tree:
-            _signal(pid, signal.SIGKILL)
 
     def _progress(self) -> None:
         run = [j for j in self.jobs if j.status == "running"]
@@ -282,6 +310,7 @@ class Runner:
 
     # -------------------------------------------------------------- main loop
     def run(self) -> int:
+        become_subreaper()
         self.logdir.mkdir(parents=True, exist_ok=True)
         # Exclusive creation is the reservation, including for simultaneous starts.
         # A status-only directory may belong to an older runner; preserve it too.
@@ -314,13 +343,9 @@ class Runner:
                     # that left the job's group (GNU `timeout` puts its command in a group of its own) dies too
                     for j in self.jobs:
                         if j.status == "running":
-                            tree = descendants(j.proc.pid)
-                            try:
-                                os.killpg(j.proc.pid, signal.SIGKILL)
-                            except ProcessLookupError:
-                                pass
-                            for pid in tree:
-                                _signal(pid, signal.SIGKILL)
+                            freeze_and_kill(j.proc.pid)
+                    # anything re-parented to the (subreaper) runner while its job died: same freeze, never the runner
+                    freeze_and_kill(os.getpid(), group=False)
                     for j in self.jobs:
                         if j.status == "running":
                             j.proc.wait()

@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import shlex
 import sys
+import textwrap
 import time
 
 import pytest
@@ -203,6 +204,29 @@ def test_session_hard_stop_kills_all_lanes_and_skips_tail(tmp_path):
     assert not (tmp_path / 'tail.log').exists()
     assert [j['status'] for j in json.loads((tmp_path / 'status.json').read_text())] == [
         'timeout', 'timeout', 'skipped']
+
+
+@pytest.mark.skipif(not os.path.isdir('/proc/self/task'), reason='descendant sweep reads /proc (Linux, the box)')
+def test_hard_stop_kills_children_forked_during_the_stop(tmp_path):
+    # review 09, R15: a job that keeps forking (a compiler under GNU timeout, its own process group) must leave no
+    # survivor once the runner reports the session done
+    child = tmp_path / 'fork.py'
+    child.write_text(textwrap.dedent(f'''
+        import os, time
+        for _ in range(250):
+            if os.fork() == 0:
+                time.sleep(1.5)
+                open(os.path.join({str(tmp_path)!r}, 'late-%d' % os.getpid()), 'w').write('x')
+                os._exit(0)
+            time.sleep(.0001)
+        time.sleep(2)
+    '''))
+    job = gj.Job(name='forker', cmd=f'timeout --kill-after=5s 5s {sys.executable} {child}; echo after', lane='cpu',
+                 cwd=str(tmp_path), timeout=5)
+    runner = gj.Runner([job], [0], 1, tmp_path / 'logs', poll_s=.005, out=io.StringIO(), max_seconds=.8)
+    assert runner.run() == 1
+    time.sleep(2.5)
+    assert job.status == 'timeout' and not list(tmp_path.glob('late-*'))
 
 
 @pytest.mark.parametrize('limit', ['0', '-1', "float('inf')", "float('nan')", "'2400'"])
