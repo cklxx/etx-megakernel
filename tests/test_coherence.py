@@ -80,6 +80,20 @@ def test_coherent_loads_device_event_keeps_the_flush():
     assert re.search(r"etx_arrive_flush_DEVICE(_s)?\(", src) and not re.search(r"_nf\(", src)
 
 
+def test_coherent_l1_tile_skips_acquire_and_adds_no_write_back():
+    """D2b: agent-scope payload loads read the XCD's L2, so neither the tile nor its producers change their releases."""
+    plan = compile_graph(_build("coherent_l1", cross=False), "gfx942", {}, {})
+    ep1, ep2 = plan.events["E1"], plan.events["E2"]
+    assert not ep1.coherent_consumer and not ep1.producers_coherent and not ep2.producers_coherent
+    src = emit_kernel(plan)
+    b_case = _case(src, "b")
+    assert "coherent-L1 tile: no acquire invalidate" in b_case and "ETX_ACQUIRE" not in b_case
+    assert "write it back" not in src and "_nf(" not in src
+    assert "ETX_ACQUIRE_DOMAIN();" in _case(src, "c")
+    cross = emit_kernel(compile_graph(_build("coherent_l1", cross=True), "gfx942", {}, {}))
+    assert re.search(r"etx_arrive_flush_DEVICE(_s)?\(", cross) and "_nf(" not in cross     # DEVICE events keep the flush
+
+
 def test_imported_build_is_unchanged():
     plan = compile_graph(_build("imported", cross=False), "gfx942", {}, {})
     src = emit_kernel(plan)

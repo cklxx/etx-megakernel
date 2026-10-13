@@ -49,7 +49,7 @@ def static_counts(asm: Path) -> dict[str, int]:
 
 
 # lever -> the plan switch it needs (the lever and the plan are checked against each other by coh_check.py)
-LEVER_ENV = {"coherent_loads": {"ETX_DSV2_COH": "1"}}
+LEVER_ENV = {"coherent_loads": {"ETX_DSV2_COH": "1"}, "l1_loads": {"ETX_DSV2_COH": "l1"}}
 
 
 def build(arm: str, out: Path) -> dict:

@@ -55,6 +55,12 @@ ARM_FLAGS["allrelaxed"] = [RELAXED]
 ARMS["d4r0"] = ()
 ARM_FLAGS["d4r0"] = ["-DETX_DSV2_D4=1"]
 ARM_ENV["d4r0"] = {"ETX_DSV2_D4": "1", "ETX_DSV2_D4_ROWS": "0"}
+# D2b (docs/DSV2-D1-D5.md): l1 alone under D2's rule; alld4r0l1 = the best arm + D2b, KEEP rule against alld4r0
+ARMS["l1"] = ("l1_loads",)
+ARM_ENV["l1"] = {"ETX_DSV2_COH": "l1"}
+ARMS["alld4r0l1"] = (*LEVERS_ALL, "l1_loads")
+ARM_FLAGS["alld4r0l1"] = ["-DETX_DSV2_D4=1"]
+ARM_ENV["alld4r0l1"] = {"ETX_DSV2_D4": "1", "ETX_DSV2_D4_ROWS": "0", "ETX_DSV2_COH": "l1"}
 ARMS["alld4r0"] = LEVERS_ALL                       # candidate: the best arm + D4 placement without slices
 ARM_FLAGS["alld4r0"] = ["-DETX_DSV2_D4=1"]
 ARM_ENV["alld4r0"] = dict(ARM_ENV["d4r0"])
@@ -86,13 +92,13 @@ def paired(gains_us: list[float]) -> dict:
                 go=min(gains_us) > 0 and median >= GO_US and median > 2 * spread)
 
 
-def d2_verdict(rounds: list[dict]) -> dict:
+def d2_verdict(rounds: list[dict], cand: str = "coh") -> dict:
     """D2's rule (docs/DSV2-D1-D5.md, fixed before the code), device basis, the same five rounds:
     (a) coh vs default (sc1): every pair faster and median >= 70 us;
     (b) coh vs relaxed: |median(coh - relaxed)| <= max(2 x spread of the relaxed-vs-default pairs, 20 us)."""
-    a = paired([1000 * (r["default"]["device_ms"] - r["coh"]["device_ms"]) for r in rounds])
+    a = paired([1000 * (r["default"]["device_ms"] - r[cand]["device_ms"]) for r in rounds])
     rel = paired([1000 * (r["default"]["device_ms"] - r["relaxed"]["device_ms"]) for r in rounds])
-    b = [1000 * (r["coh"]["device_ms"] - r["relaxed"]["device_ms"]) for r in rounds]
+    b = [1000 * (r[cand]["device_ms"] - r["relaxed"]["device_ms"]) for r in rounds]
     b_median = statistics.median(b)
     tol = max(2 * rel["spread_us"], D2_MIN_TOL_US)
     a_ok = a["every_positive"] and a["median_us"] >= GO_US
@@ -289,8 +295,10 @@ class Session:
             if not (self.out("fleet") / "run").exists():          # the decision is vs default; fleet is the context
                 print("PAIRS arm=all: fleet binary missing, measuring against default only", flush=True)
                 order, refs = ("default", "all"), ("default",)
-        elif arm == "coh":
-            order, refs, cand = ("default", "relaxed", "coh"), ("default", "relaxed"), "coh"
+        elif arm in ("coh", "l1"):
+            order, refs, cand = ("default", "relaxed", arm), ("default", "relaxed"), arm
+        elif arm == "alld4r0l1":
+            order, refs, cand = ("default", "alld4r0", arm), ("default", "alld4r0"), arm
         elif arm in ("allrelaxed", "alld4r0"):
             order, refs, cand = ("default", "all", arm), ("default", "all"), arm
         else:
@@ -308,8 +316,10 @@ class Session:
                 report[key][ref] = paired([1000 * (r[ref][key] - r[cand][key]) for r in rounds])
         if arm == "alld4r0":
             report["keep_vs_all"] = d4_verdict(report["device_ms"]["all"])
-        if arm == "coh":
-            report["d2"] = d2_verdict(rounds)
+        if arm == "alld4r0l1":
+            report["keep_vs_alld4r0"] = d4_verdict(report["device_ms"]["alld4r0"])
+        if arm in ("coh", "l1"):
+            report["d2"] = d2_verdict(rounds, arm)
         elif arm == "d4":
             report["d4"] = d4_verdict(report["device_ms"]["default"])
         elif arm != "all":
@@ -317,9 +327,9 @@ class Session:
                 basis["go"] = None          # attribution only: the decision belongs to `all`
         write_json(self.logs / f"pairs_{arm}.json", report)
         d = report["device_ms"]["default"]
-        if arm == "coh":
+        if arm in ("coh", "l1"):
             v = report["d2"]
-            print(f"PAIRS arm=coh D2 (a) vs sc1 median {v['a']['median_us']:.1f} us spread {v['a']['spread_us']:.1f} "
+            print(f"PAIRS arm={arm} D2 (a) vs sc1 median {v['a']['median_us']:.1f} us spread {v['a']['spread_us']:.1f} "
                   f"every_positive={int(v['a']['every_positive'])} ok={v['a_ok']}; (b) coh - relaxed median "
                   f"{v['b_median_us']:.1f} us tolerance {v['b_tol_us']:.1f} ok={v['b_ok']}; GO={v['go']}", flush=True)
         if arm == "d4":
@@ -391,7 +401,7 @@ def main(argv=None):
             ap.error(f"build arm must be one of {sorted((*ARMS, 'fleet'))}")
         session.build(a.arm, a.stamped)
     elif a.operation == "pairs":
-        if a.arm not in ("baseline", "all", *SINGLE, "coh", "d4", "allrelaxed", "d4r0", "alld4r0"):
+        if a.arm not in ("baseline", "all", *SINGLE, "coh", "d4", "allrelaxed", "d4r0", "alld4r0", "l1", "alld4r0l1"):
             ap.error("pairs arm must be baseline, all, coh, d4 or a single lever")
         session.pairs(a.arm)
     elif a.operation == "trace":

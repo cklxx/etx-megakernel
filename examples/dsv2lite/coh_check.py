@@ -11,23 +11,29 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-PLAN_MARK = "coherent-load tile: no acquire invalidate"
-TILE_MARK = "#define FLEET_COH_LOADS 1"
+# (plan mark in megakernel_d0.hip, tile mark in the patched gemv.h, lever, switch value): D2 and D2b
+MODES = [("coherent-load tile: no acquire invalidate", "#define FLEET_COH_LOADS 1", "coherent_loads", "1"),
+         ("coherent-L1 tile: no acquire invalidate", "#define FLEET_L1_LOADS 1", "l1_loads", "l1")]
 
 
-def state(megakernel: Path, src: Path) -> tuple[bool, bool]:
-    return PLAN_MARK in megakernel.read_text(), TILE_MARK in (src / "kernels/gemv.h").read_text()
+def state(megakernel: Path, src: Path) -> list[tuple[bool, bool]]:
+    mk, gemv = megakernel.read_text(), (src / "kernels/gemv.h").read_text()
+    return [(plan in mk, tile in gemv) for plan, tile, _, _ in MODES]
 
 
 def check(megakernel: Path, src: Path) -> str:
-    plan, tiles = state(megakernel, src)
-    if plan and not tiles:
-        raise SystemExit("COH-CHECK REFUSED: the plan drops the acquires of coherent-load tiles (ETX_DSV2_COH=1) but the "
-                         "fleet tiles are not patched with coherent_loads: they would read stale cached payloads")
-    if tiles and not plan:
-        raise SystemExit("COH-CHECK REFUSED: the fleet tiles are patched with coherent_loads but the plan keeps every "
-                         "acquire (ETX_DSV2_COH unset): not the coh arm")
-    return f"COH-CHECK OK coherent={int(plan)}"
+    on = []
+    for (plan, tiles), (_, _, lever, value) in zip(state(megakernel, src), MODES):
+        if plan and not tiles:
+            raise SystemExit(f"COH-CHECK REFUSED: the plan drops the acquires of its tiles (ETX_DSV2_COH={value}) but "
+                             f"the fleet tiles are not patched with {lever}: they would read stale cached payloads")
+        if tiles and not plan:
+            raise SystemExit(f"COH-CHECK REFUSED: the fleet tiles are patched with {lever} but the plan keeps every "
+                             f"acquire (ETX_DSV2_COH={value} unset): not that arm")
+        on.append(int(plan))
+    if sum(on) > 1:
+        raise SystemExit("COH-CHECK REFUSED: two coherence modes in one build")
+    return "COH-CHECK OK " + " ".join(f"{m[2]}={o}" for m, o in zip(MODES, on))
 
 
 def main(argv=None) -> int:

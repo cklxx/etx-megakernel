@@ -52,9 +52,14 @@ CUS = 38                   # CUs per XCD: the interleaved build pins request r t
 COH_PLAIN = frozenset({"fleet_dense_down"})
 
 
+# ETX_DSV2_COH=l1 (D2b): the same tiles marked "coherent_l1" (agent-scope payload loads, lever l1_loads).
+COH_MODES = {"1": "coherent_loads", "l1": "coherent_l1"}
+
+
 def _tile(symbol: str):
-    if os.environ.get("ETX_DSV2_COH", "0") == "1" and symbol not in COH_PLAIN:
-        return hip_link(T, symbol, coherence="coherent_loads")
+    mode = COH_MODES.get(os.environ.get("ETX_DSV2_COH", "0"))
+    if mode and symbol not in COH_PLAIN:
+        return hip_link(T, symbol, coherence=mode)
     return hip_link(T, symbol)
 
 
@@ -205,8 +210,10 @@ def build(layers: int = LAYERS, routing_cached: bool | None = None, requests: in
         d4_rows = int(os.environ.get("ETX_DSV2_D4_ROWS", str(d4_placement.ROWS)))
         if requests != 1 or not routing_cached:
             raise ValueError("ETX_DSV2_D4 supports one request with cached routing only")
-        if os.environ.get("ETX_DSV2_COH", "0") == "1":     # the d4 bodies' payload reads are not audited for D2
-            raise ValueError("ETX_DSV2_D4 with ETX_DSV2_COH is not supported: the d4 tiles read h plainly")
+        coh = os.environ.get("ETX_DSV2_COH", "0")
+        if coh == "1" or (coh == "l1" and d4_rows):     # the slices' h reads are plain; at 0 rows every read is patched
+            raise ValueError("ETX_DSV2_D4 with ETX_DSV2_COH is not supported: the d4 tiles read h plainly "
+                             "(only ETX_DSV2_COH=l1 with ETX_DSV2_D4_ROWS=0)")
     if couple not in ("router", "experts", "none"):
         raise ValueError(f"ETX_DSV2_COUPLE={couple!r}: router | experts | none")
     g = Graph("dsv2lite_decode" if requests == 1 else f"dsv2lite_decode_x{requests}")

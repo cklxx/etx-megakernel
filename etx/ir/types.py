@@ -89,7 +89,10 @@ class TileBody:
                                     # tile uses plain accesses and keeps the buffer_inv acquire (every imported kernel);
                                     # "coherent_loads": the tile LOADS every payload another task wrote device-coherently
                                     # but stores plainly, so it needs no acquire invalidate yet counts as a plain producer
-                                    # (its release writes its L2 back; fleet's tiles under ETX_DSV2_COH, docs/DSV2-D1-D5.md)
+                                    # (its release writes its L2 back; fleet's tiles under ETX_DSV2_COH, docs/DSV2-D1-D5.md);
+                                    # "coherent_l1": the tile loads every such payload with AGENT-scope loads (sc1: past
+                                    # the CU's L1, from the XCD's L2), so it needs no acquire invalidate and no write-back
+                                    # inside one XCD; it is a plain producer (DEVICE events keep their flush) -- D2b
     arg_bytes: int = 0              # size of the type's argument block (bytes): lets the megakernel prefetch the
                                     # NEXT task's block while the current arrive runs (ETX_VL_ARGPF); 0 = unknown, skip
 
