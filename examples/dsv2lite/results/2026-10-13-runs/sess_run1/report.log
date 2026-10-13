@@ -1,0 +1,3 @@
+# job report gpu=None cwd=/root/etx
+# : "${ETX_DSV2_FLEET:=$HOME/fleet-3fb67a6}"; : "${ETX_DSV2_DATA:=$HOME/dsv2-data}"; export ETX_DSV2_FLEET ETX_DSV2_DATA; .venv/bin/python -u -m examples.dsv2lite.inplace_session report
+REPORT all: median 108.0 us spread 18.0 GO=True; stages measured: True; raw logs and JSON kept in /root/sess

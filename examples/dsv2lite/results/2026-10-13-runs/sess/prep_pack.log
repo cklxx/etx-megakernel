@@ -1,0 +1,14 @@
+# job prep_pack gpu=None cwd=/root/etx
+# : "${ETX_DSV2_FLEET:=$HOME/fleet-3fb67a6}"; : "${ETX_DSV2_DATA:=$HOME/dsv2-data}"; export ETX_DSV2_FLEET ETX_DSV2_DATA; cd "$ETX_DSV2_FLEET" && { test -s "$ETX_DSV2_DATA/weights.bin" -a -s "$ETX_DSV2_DATA/weights.bin.manifest" || $HOME/dsv2-prep/.venv/bin/python src/host/pack_weights.py --model $HOME/models/dsv2-lite-base --out "$ETX_DSV2_DATA/weights.bin"; } && ls -la "$ETX_DSV2_DATA"
+total 30737892
+drwxr-xr-x  2 root root        4096 Oct 13 04:12 .
+drwx------ 16 root root        4096 Oct 13 05:25 ..
+-rw-r--r--  1 root root         415 Oct 13 04:12 SHA256SUMS
+-rw-r--r--  1 root root    32845824 Oct 13 04:11 fleet_cache.bin
+-rw-r--r--  1 root root         487 Oct 13 04:11 golden.json
+-rw-r--r--  1 root root    29492654 Oct 13 04:11 golden.npz
+-rw-r--r--  1 root root      221184 Oct 13 04:11 golden_hidden.bin
+-rw-r--r--  1 root root         144 Oct 13 04:11 golden_tokens.txt
+-rw-r--r--  1 root root 31412968448 Oct 13 04:12 weights.bin
+-rw-r--r--  1 root root       30815 Oct 13 04:12 weights.bin.json
+-rw-r--r--  1 root root        9561 Oct 13 04:12 weights.bin.manifest

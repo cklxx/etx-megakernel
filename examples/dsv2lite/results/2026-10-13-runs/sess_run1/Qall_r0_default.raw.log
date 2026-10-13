@@ -1,0 +1,4 @@
+$ timeout --kill-after=5s 180s stdbuf -oL -eL /root/sess/b_default/run --weights /root/dsv2-data/weights.bin --cache /root/dsv2-data/fleet_cache.bin --golden /root/dsv2-data/golden_tokens.txt --hidden /root/dsv2-data/golden_hidden.bin --tokens 32 --context 1024 --repeat 2
+device: AMD Instinct MI300X VF  arch gfx942:sramecc+:xnack-  CUs 304
+
+error: cannot open /root/dsv2-data/weights.bin.manifest (run src/host/pack_weights.py)

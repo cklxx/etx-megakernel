@@ -1,0 +1,202 @@
+[
+ {
+  "name": "etx_env",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 1.0003724098205566,
+  "note": ""
+ },
+ {
+  "name": "source",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 1.0003743171691895,
+  "note": ""
+ },
+ {
+  "name": "preflight",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 21.005747079849243,
+  "note": ""
+ },
+ {
+  "name": "build_default",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 25.007063627243042,
+  "note": ""
+ },
+ {
+  "name": "build_Q",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 25.00725507736206,
+  "note": ""
+ },
+ {
+  "name": "build_Qall",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 26.008838176727295,
+  "note": ""
+ },
+ {
+  "name": "build_N",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 26.00898051261902,
+  "note": ""
+ },
+ {
+  "name": "build_Nall",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 26.010812997817993,
+  "note": ""
+ },
+ {
+  "name": "build_argmax",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 25.009944915771484,
+  "note": ""
+ },
+ {
+  "name": "build_topk",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 25.009982347488403,
+  "note": ""
+ },
+ {
+  "name": "build_prep",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 25.007988929748535,
+  "note": ""
+ },
+ {
+  "name": "build_relaxed",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 24.00605583190918,
+  "note": ""
+ },
+ {
+  "name": "build_coh",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 21.00587558746338,
+  "note": ""
+ },
+ {
+  "name": "build_d4",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 29.006070852279663,
+  "note": ""
+ },
+ {
+  "name": "pairs_coh",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 88.01191687583923,
+  "note": ""
+ },
+ {
+  "name": "pairs_d4",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 59.00764060020447,
+  "note": ""
+ },
+ {
+  "name": "d4trace",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 7.001290321350098,
+  "note": ""
+ },
+ {
+  "name": "pairs_Q",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 58.00909090042114,
+  "note": ""
+ },
+ {
+  "name": "pairs_Qall",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 59.008522748947144,
+  "note": ""
+ },
+ {
+  "name": "pairs_N",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 59.00774669647217,
+  "note": ""
+ },
+ {
+  "name": "pairs_Nall",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 59.008970975875854,
+  "note": ""
+ },
+ {
+  "name": "pairs_argmax",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 59.00823450088501,
+  "note": ""
+ },
+ {
+  "name": "pairs_topk",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 60.0097336769104,
+  "note": ""
+ },
+ {
+  "name": "pairs_prep",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 59.008305072784424,
+  "note": ""
+ },
+ {
+  "name": "pairs_relaxed",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 59.00800347328186,
+  "note": ""
+ }
+]

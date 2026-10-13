@@ -1,0 +1,502 @@
+# job build_argmax gpu=None cwd=/root/etx
+# : "${ETX_DSV2_FLEET:=$HOME/fleet-3fb67a6}"; : "${ETX_DSV2_DATA:=$HOME/dsv2-data}"; export ETX_DSV2_FLEET ETX_DSV2_DATA; .venv/bin/python -u -m examples.dsv2lite.inplace_session build argmax
+$ timeout --kill-after=5s 900s stdbuf -oL -eL bash examples/dsv2lite/build.sh /root/fleet-3fb67a6 -Rpass-analysis=kernel-resource-usage
+patched /root/sess/b_argmax/fleet_src (argmax_tree)
+plan: graph=dsv2lite_decode arch=gfx942 bindings={}
+  devices=1 domains/device=8 workers/domain=37 (wg/CU=1)
+  tasks=54946 events=219 eliminated=[]
+  embed                    static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  qkv_0                    static   S_balance=1.94us <= 1.5x(C_cross=1.89+C_queue=1.20)
+  qabs_0                   static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  attn_0                   static   S_balance=3.34us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  merge_0                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  oproj_0                  static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  norm_0                   static   S_balance=0.90us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  dense_gu_0               static   S_balance=4.50us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  dense_dn_0               static   S_balance=4.50us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  qkv_1                    static   S_balance=1.94us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  qabs_1                   static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  attn_1                   static   S_balance=3.34us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  merge_1                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  oproj_1                  static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  router_1                 static   S_balance=0.90us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  gate_up_1                static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  down_1                   static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  qkv_2                    static   S_balance=1.94us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  qabs_2                   static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  attn_2                   static   S_balance=3.34us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  merge_2                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  oproj_2                  static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  router_2                 static   S_balance=0.90us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  gate_up_2                static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  down_2                   static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  qkv_3                    static   S_balance=1.94us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  qabs_3                   static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  attn_3                   static   S_balance=3.34us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  merge_3                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  oproj_3                  static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  router_3                 static   S_balance=0.90us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  gate_up_3                static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  down_3                   static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  qkv_4                    static   S_balance=1.94us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  qabs_4                   static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  attn_4                   static   S_balance=3.34us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  merge_4                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  oproj_4                  static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  router_4                 static   S_balance=0.90us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  gate_up_4                static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  down_4                   static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  qkv_5                    static   S_balance=1.94us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  qabs_5                   static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  attn_5                   static   S_balance=3.34us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  merge_5                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  oproj_5                  static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  router_5                 static   S_balance=0.90us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  gate_up_5                static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  down_5                   static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  qkv_6                    static   S_balance=1.94us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  qabs_6                   static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  attn_6                   static   S_balance=3.34us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  merge_6                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  oproj_6                  static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  router_6                 static   S_balance=0.90us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  gate_up_6                static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  down_6                   static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  qkv_7                    static   S_balance=1.94us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  qabs_7                   static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  attn_7                   static   S_balance=3.34us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  merge_7                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  oproj_7                  static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  router_7                 static   S_balance=0.90us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  gate_up_7                static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  down_7                   static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  qkv_8                    static   S_balance=1.94us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  qabs_8                   static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  attn_8                   static   S_balance=3.34us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  merge_8                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  oproj_8                  static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  router_8                 static   S_balance=0.90us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  gate_up_8                static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  down_8                   static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  qkv_9                    static   S_balance=1.94us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  qabs_9                   static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  attn_9                   static   S_balance=3.34us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  merge_9                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  oproj_9                  static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  router_9                 static   S_balance=0.90us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  gate_up_9                static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  down_9                   static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  qkv_10                   static   S_balance=1.94us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  qabs_10                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  attn_10                  static   S_balance=3.34us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  merge_10                 static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  oproj_10                 static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  router_10                static   S_balance=0.90us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  gate_up_10               static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  down_10                  static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  qkv_11                   static   S_balance=1.94us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  qabs_11                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  attn_11                  static   S_balance=3.34us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  merge_11                 static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  oproj_11                 static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  router_11                static   S_balance=0.90us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  gate_up_11               static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  down_11                  static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  qkv_12                   static   S_balance=1.94us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  qabs_12                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  attn_12                  static   S_balance=3.34us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  merge_12                 static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  oproj_12                 static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  router_12                static   S_balance=0.90us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  gate_up_12               static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  down_12                  static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  qkv_13                   static   S_balance=1.94us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  qabs_13                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  attn_13                  static   S_balance=3.34us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  merge_13                 static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  oproj_13                 static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  router_13                static   S_balance=0.90us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  gate_up_13               static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  down_13                  static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  qkv_14                   static   S_balance=1.94us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  qabs_14                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  attn_14                  static   S_balance=3.34us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  merge_14                 static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  oproj_14                 static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  router_14                static   S_balance=0.90us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  gate_up_14               static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  down_14                  static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  qkv_15                   static   S_balance=1.94us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  qabs_15                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  attn_15                  static   S_balance=3.34us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  merge_15                 static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  oproj_15                 static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  router_15                static   S_balance=0.90us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  gate_up_15               static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  down_15                  static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  qkv_16                   static   S_balance=1.94us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  qabs_16                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  attn_16                  static   S_balance=3.34us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  merge_16                 static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  oproj_16                 static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  router_16                static   S_balance=0.90us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  gate_up_16               static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  down_16                  static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  qkv_17                   static   S_balance=1.94us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  qabs_17                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  attn_17                  static   S_balance=3.34us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  merge_17                 static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  oproj_17                 static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  router_17                static   S_balance=0.90us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  gate_up_17               static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  down_17                  static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  qkv_18                   static   S_balance=1.94us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  qabs_18                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  attn_18                  static   S_balance=3.34us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  merge_18                 static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  oproj_18                 static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  router_18                static   S_balance=0.90us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  gate_up_18               static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  down_18                  static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  qkv_19                   static   S_balance=1.94us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  qabs_19                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  attn_19                  static   S_balance=3.34us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  merge_19                 static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  oproj_19                 static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  router_19                static   S_balance=0.90us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  gate_up_19               static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  down_19                  static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  qkv_20                   static   S_balance=1.94us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  qabs_20                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  attn_20                  static   S_balance=3.34us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  merge_20                 static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  oproj_20                 static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  router_20                static   S_balance=0.90us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  gate_up_20               static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  down_20                  static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  qkv_21                   static   S_balance=1.94us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  qabs_21                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  attn_21                  static   S_balance=3.34us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  merge_21                 static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  oproj_21                 static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  router_21                static   S_balance=0.90us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  gate_up_21               static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  down_21                  static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  qkv_22                   static   S_balance=1.94us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  qabs_22                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  attn_22                  static   S_balance=3.34us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  merge_22                 static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  oproj_22                 static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  router_22                static   S_balance=0.90us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  gate_up_22               static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  down_22                  static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  qkv_23                   static   S_balance=1.94us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  qabs_23                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  attn_23                  static   S_balance=3.34us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  merge_23                 static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  oproj_23                 static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  router_23                static   S_balance=0.90us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  gate_up_23               static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  down_23                  static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  qkv_24                   static   S_balance=1.94us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  qabs_24                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  attn_24                  static   S_balance=3.34us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  merge_24                 static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  oproj_24                 static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  router_24                static   S_balance=0.90us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  gate_up_24               static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  down_24                  static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  qkv_25                   static   S_balance=1.94us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  qabs_25                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  attn_25                  static   S_balance=3.34us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  merge_25                 static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  oproj_25                 static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  router_25                static   S_balance=0.90us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  gate_up_25               static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  down_25                  static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  qkv_26                   static   S_balance=1.94us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  qabs_26                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  attn_26                  static   S_balance=3.34us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  merge_26                 static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  oproj_26                 static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  router_26                static   S_balance=0.90us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  gate_up_26               static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  down_26                  static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  lm_head                  static   S_balance=14.00us <= 1.5x(C_cross=339.17+C_queue=1.20)
+  argmax                   static   S_balance=0.00us <= 1.5x(C_cross=1.89+C_queue=1.20)
+  event E_embed          scope=DEVICE  mem=device       numel=1 cross_domain=259 cross_device=0
+  event E_qkv_0          scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_qabs_0         scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_attn_0         scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_merge_0        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_oproj_0        scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_norm_0         scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_dgu_0          scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_dense_0        scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_qkv_1          scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_qabs_1         scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_attn_1         scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_merge_1        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_oproj_1        scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_norm_1         scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_gu_1           scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_down_1         scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_qkv_2          scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_qabs_2         scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_attn_2         scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_merge_2        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_oproj_2        scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_norm_2         scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_gu_2           scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_down_2         scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_qkv_3          scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_qabs_3         scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_attn_3         scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_merge_3        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_oproj_3        scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_norm_3         scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_gu_3           scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_down_3         scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_qkv_4          scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_qabs_4         scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_attn_4         scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_merge_4        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_oproj_4        scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_norm_4         scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_gu_4           scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_down_4         scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_qkv_5          scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_qabs_5         scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_attn_5         scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_merge_5        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_oproj_5        scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_norm_5         scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_gu_5           scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_down_5         scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_qkv_6          scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_qabs_6         scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_attn_6         scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_merge_6        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_oproj_6        scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_norm_6         scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_gu_6           scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_down_6         scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_qkv_7          scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_qabs_7         scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_attn_7         scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_merge_7        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_oproj_7        scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_norm_7         scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_gu_7           scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_down_7         scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_qkv_8          scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_qabs_8         scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_attn_8         scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_merge_8        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_oproj_8        scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_norm_8         scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_gu_8           scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_down_8         scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_qkv_9          scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_qabs_9         scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_attn_9         scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_merge_9        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_oproj_9        scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_norm_9         scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_gu_9           scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_down_9         scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_qkv_10         scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_qabs_10        scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_attn_10        scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_merge_10       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_oproj_10       scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_norm_10        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_gu_10          scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_down_10        scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_qkv_11         scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_qabs_11        scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_attn_11        scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_merge_11       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_oproj_11       scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_norm_11        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_gu_11          scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_down_11        scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_qkv_12         scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_qabs_12        scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_attn_12        scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_merge_12       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_oproj_12       scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_norm_12        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_gu_12          scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_down_12        scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_qkv_13         scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_qabs_13        scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_attn_13        scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_merge_13       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_oproj_13       scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_norm_13        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_gu_13          scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_down_13        scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_qkv_14         scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_qabs_14        scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_attn_14        scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_merge_14       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_oproj_14       scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_norm_14        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_gu_14          scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_down_14        scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_qkv_15         scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_qabs_15        scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_attn_15        scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_merge_15       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_oproj_15       scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_norm_15        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_gu_15          scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_down_15        scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_qkv_16         scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_qabs_16        scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_attn_16        scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_merge_16       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_oproj_16       scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_norm_16        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_gu_16          scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_down_16        scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_qkv_17         scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_qabs_17        scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_attn_17        scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_merge_17       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_oproj_17       scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_norm_17        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_gu_17          scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_down_17        scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_qkv_18         scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_qabs_18        scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_attn_18        scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_merge_18       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_oproj_18       scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_norm_18        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_gu_18          scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_down_18        scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_qkv_19         scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_qabs_19        scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_attn_19        scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_merge_19       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_oproj_19       scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_norm_19        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_gu_19          scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_down_19        scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_qkv_20         scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_qabs_20        scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_attn_20        scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_merge_20       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_oproj_20       scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_norm_20        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_gu_20          scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_down_20        scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_qkv_21         scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_qabs_21        scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_attn_21        scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_merge_21       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_oproj_21       scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_norm_21        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_gu_21          scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_down_21        scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_qkv_22         scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_qabs_22        scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_attn_22        scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_merge_22       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_oproj_22       scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_norm_22        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_gu_22          scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_down_22        scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_qkv_23         scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_qabs_23        scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_attn_23        scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_merge_23       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_oproj_23       scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_norm_23        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_gu_23          scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_down_23        scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_qkv_24         scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_qabs_24        scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_attn_24        scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_merge_24       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_oproj_24       scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_norm_24        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_gu_24          scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_down_24        scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_qkv_25         scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_qabs_25        scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_attn_25        scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_merge_25       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_oproj_25       scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_norm_25        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_gu_25          scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_down_25        scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_qkv_26         scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_qabs_26        scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_attn_26        scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event E_merge_26       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_oproj_26       scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_norm_26        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_gu_26          scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_down_26        scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event E_lm             scope=DEVICE  mem=device       numel=1 cross_domain=259 cross_device=0
+  event E_argmax         scope=DOMAIN  mem=device       numel=1 cross_domain=0 cross_device=0
+  prefetch entries=0
+sources to link: ['examples/dsv2lite/fleet_shim.hip']
+wrote /root/sess/b_argmax/
+COH-CHECK OK coherent=0
+In file included from /root/sess/b_argmax/megakernel_d0.hip:45:
+In file included from /root/etx/examples/dsv2lite/fleet_shim.hip:19:
+/root/sess/b_argmax/fleet_src/kernels/fleet_kernel.hip:951:1: remark: Function Name: fleet_decode_step [-Rpass-analysis=kernel-resource-usage]
+  951 |                        Activations act, KVCache kv) {
+      | ^
+/root/sess/b_argmax/fleet_src/kernels/fleet_kernel.hip:951:1: remark:     TotalSGPRs: 108 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/b_argmax/fleet_src/kernels/fleet_kernel.hip:951:1: remark:     VGPRs: 256 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/b_argmax/fleet_src/kernels/fleet_kernel.hip:951:1: remark:     AGPRs: 110 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/b_argmax/fleet_src/kernels/fleet_kernel.hip:951:1: remark:     ScratchSize [bytes/lane]: 112 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/b_argmax/fleet_src/kernels/fleet_kernel.hip:951:1: remark:     Dynamic Stack: False [-Rpass-analysis=kernel-resource-usage]
+/root/sess/b_argmax/fleet_src/kernels/fleet_kernel.hip:951:1: remark:     Occupancy [waves/SIMD]: 1 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/b_argmax/fleet_src/kernels/fleet_kernel.hip:951:1: remark:     SGPRs Spill: 688 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/b_argmax/fleet_src/kernels/fleet_kernel.hip:951:1: remark:     VGPRs Spill: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/b_argmax/fleet_src/kernels/fleet_kernel.hip:951:1: remark:     LDS Size [bytes/block]: 25488 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/b_argmax/fleet_src/kernels/fleet_kernel.hip:1064:1: remark: Function Name: _Z15fleet_probe_xccPj [-Rpass-analysis=kernel-resource-usage]
+ 1064 | __global__ void fleet_probe_xcc(uint32_t* hist) {
+      | ^
+/root/sess/b_argmax/fleet_src/kernels/fleet_kernel.hip:1064:1: remark:     TotalSGPRs: 14 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/b_argmax/fleet_src/kernels/fleet_kernel.hip:1064:1: remark:     VGPRs: 2 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/b_argmax/fleet_src/kernels/fleet_kernel.hip:1064:1: remark:     AGPRs: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/b_argmax/fleet_src/kernels/fleet_kernel.hip:1064:1: remark:     ScratchSize [bytes/lane]: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/b_argmax/fleet_src/kernels/fleet_kernel.hip:1064:1: remark:     Dynamic Stack: False [-Rpass-analysis=kernel-resource-usage]
+/root/sess/b_argmax/fleet_src/kernels/fleet_kernel.hip:1064:1: remark:     Occupancy [waves/SIMD]: 8 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/b_argmax/fleet_src/kernels/fleet_kernel.hip:1064:1: remark:     SGPRs Spill: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/b_argmax/fleet_src/kernels/fleet_kernel.hip:1064:1: remark:     VGPRs Spill: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/b_argmax/fleet_src/kernels/fleet_kernel.hip:1064:1: remark:     LDS Size [bytes/block]: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/b_argmax/megakernel_d0.hip:5135:1: remark: Function Name: etx_megakernel_d0 [-Rpass-analysis=kernel-resource-usage]
+ 5135 | extern "C" __global__ void __launch_bounds__(ETX_THREADS, ETX_MIN_WG_PER_CU) etx_megakernel_d0(etx_params p) {
+      | ^
+/root/sess/b_argmax/megakernel_d0.hip:5135:1: remark:     TotalSGPRs: 108 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/b_argmax/megakernel_d0.hip:5135:1: remark:     VGPRs: 256 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/b_argmax/megakernel_d0.hip:5135:1: remark:     AGPRs: 56 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/b_argmax/megakernel_d0.hip:5135:1: remark:     ScratchSize [bytes/lane]: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/b_argmax/megakernel_d0.hip:5135:1: remark:     Dynamic Stack: False [-Rpass-analysis=kernel-resource-usage]
+/root/sess/b_argmax/megakernel_d0.hip:5135:1: remark:     Occupancy [waves/SIMD]: 1 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/b_argmax/megakernel_d0.hip:5135:1: remark:     SGPRs Spill: 624 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/b_argmax/megakernel_d0.hip:5135:1: remark:     VGPRs Spill: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/b_argmax/megakernel_d0.hip:5135:1: remark:     LDS Size [bytes/block]: 26668 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/b_argmax/megakernel_d0.hip:5193:1: remark: Function Name: etx_unfused_d0 [-Rpass-analysis=kernel-resource-usage]
+ 5193 | extern "C" __global__ void __launch_bounds__(ETX_THREADS, ETX_MIN_WG_PER_CU) etx_unfused_d0(etx_params p, int32_t first) {
+      | ^
+/root/sess/b_argmax/megakernel_d0.hip:5193:1: remark:     TotalSGPRs: 85 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/b_argmax/megakernel_d0.hip:5193:1: remark:     VGPRs: 248 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/b_argmax/megakernel_d0.hip:5193:1: remark:     AGPRs: 2 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/b_argmax/megakernel_d0.hip:5193:1: remark:     ScratchSize [bytes/lane]: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/b_argmax/megakernel_d0.hip:5193:1: remark:     Dynamic Stack: False [-Rpass-analysis=kernel-resource-usage]
+/root/sess/b_argmax/megakernel_d0.hip:5193:1: remark:     Occupancy [waves/SIMD]: 2 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/b_argmax/megakernel_d0.hip:5193:1: remark:     SGPRs Spill: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/b_argmax/megakernel_d0.hip:5193:1: remark:     VGPRs Spill: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/b_argmax/megakernel_d0.hip:5193:1: remark:     LDS Size [bytes/block]: 26628 [-Rpass-analysis=kernel-resource-usage]
+built /root/sess/b_argmax/run  (run it from /root/fleet-3fb67a6 so build/weights.bin, fleet_cache.bin, golden_tokens.txt resolve)
+BUILD arm=argmax stamped=0 resources={'vgpr': 256, 'agpr': 56, 'sgpr': 108, 'scratch': 0, 'lds': 26668, 'occupancy': 1}
+BUILD arm=argmax OK

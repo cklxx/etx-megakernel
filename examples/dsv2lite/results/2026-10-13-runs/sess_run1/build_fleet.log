@@ -1,0 +1,30 @@
+# job build_fleet gpu=None cwd=/root/etx
+# : "${ETX_DSV2_FLEET:=$HOME/fleet-3fb67a6}"; : "${ETX_DSV2_DATA:=$HOME/dsv2-data}"; export ETX_DSV2_FLEET ETX_DSV2_DATA; .venv/bin/python -u -m examples.dsv2lite.inplace_session build fleet
+$ timeout --kill-after=5s 60s stdbuf -oL -eL /root/etx/.venv/bin/python /root/fleet-3fb67a6/src/host/taskgraph.py --kv-chunks 16 --emit /root/sess/b_fleet/taskgraph_d16.bin
+wrote 54946 descriptors to /root/sess/b_fleet/taskgraph_d16.bin (3434 KB) and taskgraph_d16.bin.events.txt
+$ timeout --kill-after=5s 600s stdbuf -oL -eL hipcc --offload-arch=gfx942 -O3 -std=c++17 -DFLEET_NT_WEIGHTS=1 -Rpass-analysis=kernel-resource-usage -I/root/fleet-3fb67a6/src /root/fleet-3fb67a6/src/host/fleet_launch.hip /root/fleet-3fb67a6/src/kernels/fleet_kernel.hip -o /root/sess/b_fleet/run
+/root/fleet-3fb67a6/src/kernels/fleet_kernel.hip:940:1: remark: Function Name: fleet_decode_step [-Rpass-analysis=kernel-resource-usage]
+  940 |                        Activations act, KVCache kv) {
+      | ^
+/root/fleet-3fb67a6/src/kernels/fleet_kernel.hip:940:1: remark:     TotalSGPRs: 108 [-Rpass-analysis=kernel-resource-usage]
+/root/fleet-3fb67a6/src/kernels/fleet_kernel.hip:940:1: remark:     VGPRs: 256 [-Rpass-analysis=kernel-resource-usage]
+/root/fleet-3fb67a6/src/kernels/fleet_kernel.hip:940:1: remark:     AGPRs: 111 [-Rpass-analysis=kernel-resource-usage]
+/root/fleet-3fb67a6/src/kernels/fleet_kernel.hip:940:1: remark:     ScratchSize [bytes/lane]: 112 [-Rpass-analysis=kernel-resource-usage]
+/root/fleet-3fb67a6/src/kernels/fleet_kernel.hip:940:1: remark:     Dynamic Stack: False [-Rpass-analysis=kernel-resource-usage]
+/root/fleet-3fb67a6/src/kernels/fleet_kernel.hip:940:1: remark:     Occupancy [waves/SIMD]: 1 [-Rpass-analysis=kernel-resource-usage]
+/root/fleet-3fb67a6/src/kernels/fleet_kernel.hip:940:1: remark:     SGPRs Spill: 684 [-Rpass-analysis=kernel-resource-usage]
+/root/fleet-3fb67a6/src/kernels/fleet_kernel.hip:940:1: remark:     VGPRs Spill: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/fleet-3fb67a6/src/kernels/fleet_kernel.hip:940:1: remark:     LDS Size [bytes/block]: 25488 [-Rpass-analysis=kernel-resource-usage]
+/root/fleet-3fb67a6/src/kernels/fleet_kernel.hip:1053:1: remark: Function Name: _Z15fleet_probe_xccPj [-Rpass-analysis=kernel-resource-usage]
+ 1053 | __global__ void fleet_probe_xcc(uint32_t* hist) {
+      | ^
+/root/fleet-3fb67a6/src/kernels/fleet_kernel.hip:1053:1: remark:     TotalSGPRs: 14 [-Rpass-analysis=kernel-resource-usage]
+/root/fleet-3fb67a6/src/kernels/fleet_kernel.hip:1053:1: remark:     VGPRs: 2 [-Rpass-analysis=kernel-resource-usage]
+/root/fleet-3fb67a6/src/kernels/fleet_kernel.hip:1053:1: remark:     AGPRs: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/fleet-3fb67a6/src/kernels/fleet_kernel.hip:1053:1: remark:     ScratchSize [bytes/lane]: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/fleet-3fb67a6/src/kernels/fleet_kernel.hip:1053:1: remark:     Dynamic Stack: False [-Rpass-analysis=kernel-resource-usage]
+/root/fleet-3fb67a6/src/kernels/fleet_kernel.hip:1053:1: remark:     Occupancy [waves/SIMD]: 8 [-Rpass-analysis=kernel-resource-usage]
+/root/fleet-3fb67a6/src/kernels/fleet_kernel.hip:1053:1: remark:     SGPRs Spill: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/fleet-3fb67a6/src/kernels/fleet_kernel.hip:1053:1: remark:     VGPRs Spill: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/fleet-3fb67a6/src/kernels/fleet_kernel.hip:1053:1: remark:     LDS Size [bytes/block]: 0 [-Rpass-analysis=kernel-resource-usage]
+BUILD arm=fleet OK

@@ -1,0 +1,202 @@
+{
+  "arm": "coh",
+  "condition": "one MI300X, batch 1, context 1024, 32 tokens, repeat 2",
+  "d2": {
+    "a": {
+      "every_positive": false,
+      "gains_us": [
+        -17.000000000000348,
+        4.0000000000000036,
+        -8.999999999999897,
+        8.000000000000007,
+        -11.00000000000012
+      ],
+      "go": false,
+      "median_us": -8.999999999999897,
+      "spread_us": 25.000000000000355
+    },
+    "a_ok": false,
+    "b_gains_us": [
+      237.0000000000001,
+      231.99999999999977,
+      242.9999999999999,
+      218.99999999999986,
+      238.0
+    ],
+    "b_median_us": 237.0000000000001,
+    "b_ok": false,
+    "b_tol_us": 32.00000000000006,
+    "go": false,
+    "relaxed_vs_default": {
+      "every_positive": true,
+      "gains_us": [
+        219.99999999999974,
+        235.99999999999977,
+        234.0,
+        226.99999999999986,
+        226.99999999999986
+      ],
+      "go": true,
+      "median_us": 226.99999999999986,
+      "spread_us": 16.00000000000003
+    }
+  },
+  "device_ms": {
+    "default": {
+      "every_positive": false,
+      "gains_us": [
+        -17.000000000000348,
+        4.0000000000000036,
+        -8.999999999999897,
+        8.000000000000007,
+        -11.00000000000012
+      ],
+      "go": false,
+      "median_us": -8.999999999999897,
+      "spread_us": 25.000000000000355
+    },
+    "relaxed": {
+      "every_positive": false,
+      "gains_us": [
+        -237.0000000000001,
+        -231.99999999999977,
+        -242.9999999999999,
+        -218.99999999999986,
+        -238.0
+      ],
+      "go": false,
+      "median_us": -237.0000000000001,
+      "spread_us": 24.00000000000003
+    }
+  },
+  "rounds": [
+    {
+      "coh": {
+        "device_ms": 3.68,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.712
+      },
+      "default": {
+        "device_ms": 3.663,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.696
+      },
+      "relaxed": {
+        "device_ms": 3.443,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.477
+      }
+    },
+    {
+      "coh": {
+        "device_ms": 3.667,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.702
+      },
+      "default": {
+        "device_ms": 3.671,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.704
+      },
+      "relaxed": {
+        "device_ms": 3.435,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.468
+      }
+    },
+    {
+      "coh": {
+        "device_ms": 3.677,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.713
+      },
+      "default": {
+        "device_ms": 3.668,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.701
+      },
+      "relaxed": {
+        "device_ms": 3.434,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.466
+      }
+    },
+    {
+      "coh": {
+        "device_ms": 3.661,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.692
+      },
+      "default": {
+        "device_ms": 3.669,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.704
+      },
+      "relaxed": {
+        "device_ms": 3.442,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.476
+      }
+    },
+    {
+      "coh": {
+        "device_ms": 3.677,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.709
+      },
+      "default": {
+        "device_ms": 3.666,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.7
+      },
+      "relaxed": {
+        "device_ms": 3.439,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.472
+      }
+    }
+  ],
+  "wall_ms": {
+    "default": {
+      "every_positive": false,
+      "gains_us": [
+        -16.000000000000014,
+        2.000000000000224,
+        -12.00000000000001,
+        12.00000000000001,
+        -8.999999999999897
+      ],
+      "go": false,
+      "median_us": -8.999999999999897,
+      "spread_us": 28.000000000000025
+    },
+    "relaxed": {
+      "every_positive": false,
+      "gains_us": [
+        -235.0000000000003,
+        -234.0,
+        -246.9999999999999,
+        -216.0000000000002,
+        -237.0000000000001
+      ],
+      "go": false,
+      "median_us": -235.0000000000003,
+      "spread_us": 30.999999999999687
+    }
+  }
+}

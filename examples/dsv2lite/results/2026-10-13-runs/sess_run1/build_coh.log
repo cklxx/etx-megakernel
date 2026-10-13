@@ -1,0 +1,13 @@
+# job build_coh gpu=None cwd=/root/etx
+# : "${ETX_DSV2_FLEET:=$HOME/fleet-3fb67a6}"; : "${ETX_DSV2_DATA:=$HOME/dsv2-data}"; export ETX_DSV2_FLEET ETX_DSV2_DATA; .venv/bin/python -u -m examples.dsv2lite.inplace_session build coh
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/root/etx/examples/dsv2lite/inplace_session.py", line 390, in <module>
+    main()
+  File "/root/etx/examples/dsv2lite/inplace_session.py", line 376, in main
+    session.build(a.arm, a.stamped)
+  File "/root/etx/examples/dsv2lite/inplace_session.py", line 251, in build
+    env = dict(ETX_OUT=str(out), ETX_FLEET_PATCH=" ".join(ARMS[arm]), ETX_BUILD_VERBOSE="1",
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: dict() got multiple values for keyword argument 'ETX_DSV2_COH'

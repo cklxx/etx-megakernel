@@ -1,0 +1,143 @@
+[04:35:00 +  0m00s] session logs: /root/sess
+[04:35:00 +  0m00s] start etx_env (cpu)
+[04:35:01 +  0m01s] ok      etx_env rc=0 1s
+[04:35:01 +  0m01s] start source (cpu)
+[04:35:02 +  0m02s] ok      source rc=0 1s
+    SOURCE OK fleet export 28f5cbb4f39524df etx 2bb359719feb
+[04:35:02 +  0m02s] start preflight (cpu)
+[04:35:02 +  0m02s] start build_default (cpu)
+[04:35:02 +  0m02s] start build_Q (cpu)
+[04:35:02 +  0m02s] start build_Qall (cpu)
+[04:35:02 +  0m02s] start build_N (cpu)
+[04:35:23 +  0m23s] ok      preflight rc=0 21s
+    PREFLIGHT hashing /root/dsv2-data/weights.bin bytes=31412968448
+    PREFLIGHT hashing /root/dsv2-data/weights.bin.manifest bytes=9561
+    PREFLIGHT hashing /root/dsv2-data/fleet_cache.bin bytes=32845824
+    PREFLIGHT hashing /root/dsv2-data/golden_tokens.txt bytes=144
+    PREFLIGHT hashing /root/dsv2-data/golden_hidden.bin bytes=221184
+    PREFLIGHT OK inputs match their SHA256SUMS
+[04:35:23 +  0m23s] start build_Nall (cpu)
+[04:35:27 +  0m27s] ok      build_default rc=0 25s
+    BUILD arm=default stamped=0 resources={'vgpr': 256, 'agpr': 56, 'sgpr': 108, 'scratch': 0, 'lds': 26668, 'occupancy': 1}
+    BUILD arm=default OK
+[04:35:27 +  0m27s] ok      build_Q rc=0 25s
+    BUILD arm=Q stamped=0 resources={'vgpr': 256, 'agpr': 56, 'sgpr': 108, 'scratch': 0, 'lds': 26668, 'occupancy': 1}
+    BUILD arm=Q OK
+[04:35:27 +  0m27s] start build_argmax (cpu)
+[04:35:27 +  0m27s] start build_topk (cpu)
+[04:35:28 +  0m28s] ok      build_Qall rc=0 26s
+    BUILD arm=Qall stamped=0 resources={'vgpr': 256, 'agpr': 46, 'sgpr': 106, 'scratch': 0, 'lds': 26668, 'occupancy': 1}
+    BUILD arm=Qall OK
+[04:35:28 +  0m28s] ok      build_N rc=0 26s
+    BUILD arm=N stamped=0 resources={'vgpr': 256, 'agpr': 82, 'sgpr': 108, 'scratch': 0, 'lds': 26668, 'occupancy': 1}
+    BUILD arm=N OK
+[04:35:28 +  0m28s] start build_prep (cpu)
+[04:35:28 +  0m28s] start build_relaxed (cpu)
+[04:35:49 +  0m49s] ok      build_Nall rc=0 26s
+    BUILD arm=Nall stamped=0 resources={'vgpr': 256, 'agpr': 98, 'sgpr': 108, 'scratch': 0, 'lds': 26668, 'occupancy': 1}
+    BUILD arm=Nall OK
+[04:35:49 +  0m49s] start build_coh (cpu)
+[04:35:52 +  0m52s] ok      build_argmax rc=0 25s
+    BUILD arm=argmax stamped=0 resources={'vgpr': 256, 'agpr': 56, 'sgpr': 108, 'scratch': 0, 'lds': 26668, 'occupancy': 1}
+    BUILD arm=argmax OK
+[04:35:52 +  0m52s] ok      build_topk rc=0 25s
+    BUILD arm=topk stamped=0 resources={'vgpr': 256, 'agpr': 58, 'sgpr': 108, 'scratch': 0, 'lds': 26668, 'occupancy': 1}
+    BUILD arm=topk OK
+[04:35:52 +  0m52s] ok      build_relaxed rc=0 24s
+    BUILD arm=relaxed stamped=0 resources={'vgpr': 256, 'agpr': 56, 'sgpr': 108, 'scratch': 0, 'lds': 26668, 'occupancy': 1}
+    BUILD arm=relaxed OK
+[04:35:52 +  0m52s] start build_d4 (cpu)
+[04:35:53 +  0m53s] ok      build_prep rc=0 25s
+    BUILD arm=prep stamped=0 resources={'vgpr': 256, 'agpr': 70, 'sgpr': 108, 'scratch': 0, 'lds': 26668, 'occupancy': 1}
+    BUILD arm=prep OK
+[04:36:00 +  1m00s] progress: 2 running, 11 waiting, 12 done
+    build_coh [cpu] 11s / 1200s: /root/sess/b_coh/fleet_src/kernels/fleet_kernel.hip:1052:1: remark:     LDS Size [bytes/block]: 0 [-Rpass-analysis=kernel-resource-usage]
+    build_d4 [cpu] 8s / 1200s: COH-CHECK OK coherent=0
+[04:36:10 +  1m10s] ok      build_coh rc=0 21s
+    BUILD arm=coh stamped=0 resources={'vgpr': 256, 'agpr': 56, 'sgpr': 106, 'scratch': 0, 'lds': 26668, 'occupancy': 1}
+    BUILD arm=coh OK
+[04:36:10 +  1m10s] start pairs_coh on GPU 0
+[04:36:21 +  1m21s] ok      build_d4 rc=0 29s
+    BUILD arm=d4 stamped=0 resources={'vgpr': 256, 'agpr': 60, 'sgpr': 108, 'scratch': 0, 'lds': 26672, 'occupancy': 1}
+    BUILD arm=d4 OK
+[04:37:00 +  2m00s] progress: 1 running, 10 waiting, 14 done
+    pairs_coh [GPU 0] 50s / 1200s: model: hidden 2048 heads 16 kv_lora 512 experts 64 top-6 layers 27 (dense < 1) vocab 102400
+[04:37:38 +  2m38s] ok      pairs_coh rc=0 88s
+    PAIRS arm=coh D2 (a) vs sc1 median -9.0 us spread 25.0 every_positive=0 ok=False; (b) coh - relaxed median 237.0 us tolerance 32.0 ok=False; GO=False
+    PAIRS arm=coh device gain vs default median -9.0 us spread 25.0 every_positive=0 GO=False
+[04:37:38 +  2m38s] start pairs_d4 on GPU 0
+[04:38:00 +  3m00s] progress: 1 running, 9 waiting, 15 done
+    pairs_d4 [GPU 0] 22s / 1200s: model: hidden 2048 heads 16 kv_lora 512 experts 64 top-6 layers 27 (dense < 1) vocab 102400
+[04:38:37 +  3m37s] ok      pairs_d4 rc=0 59s
+    PAIRS arm=d4 D4 median -271.0 us spread 17.0 every_positive=0 KEEP=False
+    PAIRS arm=d4 device gain vs default median -271.0 us spread 17.0 every_positive=0 GO=False
+[04:38:37 +  3m37s] start d4trace on GPU 0
+[04:38:44 +  3m44s] ok      d4trace rc=0 7s
+    D4TRACE shared gate_up ready before routing done in 26/26 MoE layers, median lead 11.5 us, min 11.0 us
+[04:38:44 +  3m44s] start pairs_Q on GPU 0
+[04:39:00 +  4m00s] progress: 1 running, 7 waiting, 17 done
+    pairs_Q [GPU 0] 16s / 900s: model: hidden 2048 heads 16 kv_lora 512 experts 64 top-6 layers 27 (dense < 1) vocab 102400
+[04:39:42 +  4m42s] ok      pairs_Q rc=0 58s
+    PAIRS arm=Q device gain vs default median -16.0 us spread 12.0 every_positive=0 GO=None
+[04:39:42 +  4m42s] start pairs_Qall on GPU 0
+[04:40:00 +  5m00s] progress: 1 running, 6 waiting, 18 done
+    pairs_Qall [GPU 0] 18s / 900s: model: hidden 2048 heads 16 kv_lora 512 experts 64 top-6 layers 27 (dense < 1) vocab 102400
+[04:40:41 +  5m41s] ok      pairs_Qall rc=0 59s
+    PAIRS arm=Qall device gain vs default median 5.0 us spread 17.0 every_positive=0 GO=None
+[04:40:41 +  5m41s] start pairs_N on GPU 0
+[04:41:00 +  6m00s] progress: 1 running, 5 waiting, 19 done
+    pairs_N [GPU 0] 19s / 900s: model: hidden 2048 heads 16 kv_lora 512 experts 64 top-6 layers 27 (dense < 1) vocab 102400
+[04:41:40 +  6m40s] ok      pairs_N rc=0 59s
+    PAIRS arm=N device gain vs default median 39.0 us spread 11.0 every_positive=1 GO=None
+[04:41:40 +  6m40s] start pairs_Nall on GPU 0
+[04:42:00 +  7m00s] progress: 1 running, 4 waiting, 20 done
+    pairs_Nall [GPU 0] 20s / 900s: model: hidden 2048 heads 16 kv_lora 512 experts 64 top-6 layers 27 (dense < 1) vocab 102400
+[04:42:39 +  7m39s] ok      pairs_Nall rc=0 59s
+    PAIRS arm=Nall device gain vs default median 41.0 us spread 19.0 every_positive=1 GO=None
+[04:42:39 +  7m39s] start pairs_argmax on GPU 0
+[04:43:00 +  8m00s] progress: 1 running, 3 waiting, 21 done
+    pairs_argmax [GPU 0] 21s / 900s: model: hidden 2048 heads 16 kv_lora 512 experts 64 top-6 layers 27 (dense < 1) vocab 102400
+[04:43:38 +  8m38s] ok      pairs_argmax rc=0 59s
+    PAIRS arm=argmax device gain vs default median 6.0 us spread 6.0 every_positive=1 GO=None
+[04:43:38 +  8m38s] start pairs_topk on GPU 0
+[04:44:00 +  9m00s] progress: 1 running, 2 waiting, 22 done
+    pairs_topk [GPU 0] 22s / 900s: model: hidden 2048 heads 16 kv_lora 512 experts 64 top-6 layers 27 (dense < 1) vocab 102400
+[04:44:38 +  9m38s] ok      pairs_topk rc=0 60s
+    PAIRS arm=topk device gain vs default median 64.0 us spread 17.0 every_positive=1 GO=None
+[04:44:38 +  9m38s] start pairs_prep on GPU 0
+[04:45:00 + 10m00s] progress: 1 running, 1 waiting, 23 done
+    pairs_prep [GPU 0] 22s / 900s: etx: 54946 tasks, 1778 event words, 296 workers (8 domains x 37), lds 24576 B (fleet scratch 23408 B)
+[04:45:37 + 10m37s] ok      pairs_prep rc=0 59s
+    PAIRS arm=prep device gain vs default median 31.0 us spread 18.0 every_positive=1 GO=None
+[04:45:37 + 10m37s] start pairs_relaxed on GPU 0
+[04:46:00 + 11m00s] progress: 1 running, 0 waiting, 24 done
+    pairs_relaxed [GPU 0] 23s / 900s: model: hidden 2048 heads 16 kv_lora 512 experts 64 top-6 layers 27 (dense < 1) vocab 102400
+[04:46:36 + 11m36s] ok      pairs_relaxed rc=0 59s
+    PAIRS arm=relaxed device gain vs default median 232.0 us spread 11.0 every_positive=1 GO=None
+[04:46:36 + 11m36s] session done
+  job                              status     rc  gpu  seconds
+  etx_env                          ok          0             1  
+  source                           ok          0             1  
+  preflight                        ok          0            21  
+  build_default                    ok          0            25  
+  build_Q                          ok          0            25  
+  build_Qall                       ok          0            26  
+  build_N                          ok          0            26  
+  build_Nall                       ok          0            26  
+  build_argmax                     ok          0            25  
+  build_topk                       ok          0            25  
+  build_prep                       ok          0            25  
+  build_relaxed                    ok          0            24  
+  build_coh                        ok          0            21  
+  build_d4                         ok          0            29  
+  pairs_coh                        ok          0    0       88  
+  pairs_d4                         ok          0    0       59  
+  d4trace                          ok          0    0        7  
+  pairs_Q                          ok          0    0       58  
+  pairs_Qall                       ok          0    0       59  
+  pairs_N                          ok          0    0       59  
+  pairs_Nall                       ok          0    0       59  
+  pairs_argmax                     ok          0    0       59  
+  pairs_topk                       ok          0    0       60  
+  pairs_prep                       ok          0    0       59  
+  pairs_relaxed                    ok          0    0       59  

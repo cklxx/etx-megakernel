@@ -1,0 +1,322 @@
+[
+ {
+  "name": "apt",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 11.001800298690796,
+  "note": ""
+ },
+ {
+  "name": "etx_env",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 3.0014398097991943,
+  "note": ""
+ },
+ {
+  "name": "prep_env",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 87.06002402305603,
+  "note": ""
+ },
+ {
+  "name": "source",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 1.0004124641418457,
+  "note": ""
+ },
+ {
+  "name": "prep_dl",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 30.008564472198486,
+  "note": ""
+ },
+ {
+  "name": "prep_ref",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 41.00808000564575,
+  "note": ""
+ },
+ {
+  "name": "prep_pack",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 30.008848190307617,
+  "note": ""
+ },
+ {
+  "name": "prep_sums",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 20.00257444381714,
+  "note": ""
+ },
+ {
+  "name": "preflight",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 20.002904891967773,
+  "note": ""
+ },
+ {
+  "name": "build_default",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 26.01257610321045,
+  "note": ""
+ },
+ {
+  "name": "build_fleet",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 8.004668474197388,
+  "note": ""
+ },
+ {
+  "name": "build_all",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 29.013254404067993,
+  "note": ""
+ },
+ {
+  "name": "build_Q",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 25.00873112678528,
+  "note": ""
+ },
+ {
+  "name": "build_Qall",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 26.010992527008057,
+  "note": ""
+ },
+ {
+  "name": "build_N",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 26.01174259185791,
+  "note": ""
+ },
+ {
+  "name": "build_Nall",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 26.01196265220642,
+  "note": ""
+ },
+ {
+  "name": "build_argmax",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 24.011848211288452,
+  "note": ""
+ },
+ {
+  "name": "build_topk",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 25.02119731903076,
+  "note": ""
+ },
+ {
+  "name": "build_prep",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 24.023396730422974,
+  "note": ""
+ },
+ {
+  "name": "build_relaxed",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 24.024778127670288,
+  "note": ""
+ },
+ {
+  "name": "build_coh",
+  "status": "fail",
+  "rc": 1,
+  "gpu": null,
+  "seconds": 1.0006003379821777,
+  "note": ""
+ },
+ {
+  "name": "build_d4",
+  "status": "fail",
+  "rc": 1,
+  "gpu": null,
+  "seconds": 1.0004491806030273,
+  "note": ""
+ },
+ {
+  "name": "build_default_stamps",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 28.023863792419434,
+  "note": ""
+ },
+ {
+  "name": "build_all_stamps",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 33.01801419258118,
+  "note": ""
+ },
+ {
+  "name": "baseline",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 60.01008176803589,
+  "note": ""
+ },
+ {
+  "name": "pairs_all",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 88.01593017578125,
+  "note": ""
+ },
+ {
+  "name": "trace_default",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 8.001517057418823,
+  "note": ""
+ },
+ {
+  "name": "trace_all",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 7.0014708042144775,
+  "note": ""
+ },
+ {
+  "name": "pairs_coh",
+  "status": "skipped",
+  "rc": null,
+  "gpu": null,
+  "seconds": null,
+  "note": ""
+ },
+ {
+  "name": "pairs_d4",
+  "status": "skipped",
+  "rc": null,
+  "gpu": null,
+  "seconds": null,
+  "note": ""
+ },
+ {
+  "name": "d4trace",
+  "status": "skipped",
+  "rc": null,
+  "gpu": null,
+  "seconds": null,
+  "note": ""
+ },
+ {
+  "name": "pairs_Q",
+  "status": "fail",
+  "rc": 1,
+  "gpu": 0,
+  "seconds": 1.0004570484161377,
+  "note": ""
+ },
+ {
+  "name": "pairs_Qall",
+  "status": "fail",
+  "rc": 1,
+  "gpu": 0,
+  "seconds": 1.0004899501800537,
+  "note": ""
+ },
+ {
+  "name": "pairs_N",
+  "status": "fail",
+  "rc": 1,
+  "gpu": 0,
+  "seconds": 1.0004692077636719,
+  "note": ""
+ },
+ {
+  "name": "pairs_Nall",
+  "status": "fail",
+  "rc": 1,
+  "gpu": 0,
+  "seconds": 1.0012853145599365,
+  "note": ""
+ },
+ {
+  "name": "pairs_argmax",
+  "status": "fail",
+  "rc": 1,
+  "gpu": 0,
+  "seconds": 1.000434398651123,
+  "note": ""
+ },
+ {
+  "name": "pairs_topk",
+  "status": "fail",
+  "rc": 1,
+  "gpu": 0,
+  "seconds": 1.0004498958587646,
+  "note": ""
+ },
+ {
+  "name": "pairs_prep",
+  "status": "fail",
+  "rc": 1,
+  "gpu": 0,
+  "seconds": 1.0013492107391357,
+  "note": ""
+ },
+ {
+  "name": "pairs_relaxed",
+  "status": "fail",
+  "rc": 1,
+  "gpu": 0,
+  "seconds": 1.0010576248168945,
+  "note": ""
+ },
+ {
+  "name": "report",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 1.0004463195800781,
+  "note": ""
+ }
+]

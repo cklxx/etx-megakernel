@@ -1,0 +1,14 @@
+# job prep_ref gpu=0 cwd=/root/etx
+# : "${ETX_DSV2_FLEET:=$HOME/fleet-3fb67a6}"; : "${ETX_DSV2_DATA:=$HOME/dsv2-data}"; export ETX_DSV2_FLEET ETX_DSV2_DATA; mkdir -p "$ETX_DSV2_DATA" && cd "$ETX_DSV2_FLEET" && { test -s "$ETX_DSV2_DATA/fleet_cache.bin" -a -s "$ETX_DSV2_DATA/golden_tokens.txt" -a -s "$ETX_DSV2_DATA/golden_hidden.bin" || HIP_VISIBLE_DEVICES=$GPU $HOME/dsv2-prep/.venv/bin/python src/host/reference_run.py --model $HOME/models/dsv2-lite-base --out "$ETX_DSV2_DATA/golden.npz"; } && ls -la "$ETX_DSV2_DATA"
+total 30737892
+drwxr-xr-x  2 root root        4096 Oct 13 04:12 .
+drwx------ 16 root root        4096 Oct 13 05:25 ..
+-rw-r--r--  1 root root         415 Oct 13 04:12 SHA256SUMS
+-rw-r--r--  1 root root    32845824 Oct 13 04:11 fleet_cache.bin
+-rw-r--r--  1 root root         487 Oct 13 04:11 golden.json
+-rw-r--r--  1 root root    29492654 Oct 13 04:11 golden.npz
+-rw-r--r--  1 root root      221184 Oct 13 04:11 golden_hidden.bin
+-rw-r--r--  1 root root         144 Oct 13 04:11 golden_tokens.txt
+-rw-r--r--  1 root root 31412968448 Oct 13 04:12 weights.bin
+-rw-r--r--  1 root root       30815 Oct 13 04:12 weights.bin.json
+-rw-r--r--  1 root root        9561 Oct 13 04:12 weights.bin.manifest

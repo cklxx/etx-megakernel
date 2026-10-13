@@ -1,0 +1,10 @@
+{
+  "data": "/root/dsv2-data",
+  "sha256": {
+    "fleet_cache.bin": "61f526227ca7d004b4f607bda9306d0aa3acfb19e13e3f999bbd010eafbe82d2",
+    "golden_hidden.bin": "dccd2f4818ae3d93067490a0a98c97612e67d317f808174a78cda2be479664ce",
+    "golden_tokens.txt": "7ca30d0e843eff0e7900400ade527a78dcd9f8854f5efc3bffc40327c619ab3c",
+    "weights.bin": "ad7e8290b80490981048eeb85637ec1d0174d6605bf8f40730afe96a07548981",
+    "weights.bin.manifest": "1f0f667dd8ab4dad2565666ea5d0284c1a1880d39aac74245eaa85fabc958fd3"
+  }
+}

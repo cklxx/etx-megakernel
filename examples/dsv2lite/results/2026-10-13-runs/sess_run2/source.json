@@ -1,0 +1,41 @@
+{
+  "arms": {
+    "N": [
+      "norm_tree"
+    ],
+    "Nall": [
+      "norm_tree_all"
+    ],
+    "Q": [
+      "gemv_no_terminal"
+    ],
+    "Qall": [
+      "gemv_no_terminal_all"
+    ],
+    "all": [
+      "gemv_no_terminal_all",
+      "norm_tree_all",
+      "argmax_tree",
+      "topk_rank",
+      "attn_prologue_live"
+    ],
+    "argmax": [
+      "argmax_tree"
+    ],
+    "coh": [
+      "coherent_loads"
+    ],
+    "d4": [],
+    "default": [],
+    "prep": [
+      "attn_prologue_live"
+    ],
+    "relaxed": [],
+    "topk": [
+      "topk_rank"
+    ]
+  },
+  "etx_identity": "commit 2bb359719febeca2dd8136059c39d39020cc4230\nbranch dsv2-d1d5\ndirty 0\nstaged 2026-10-13T04:34:53Z\n",
+  "fleet_commit": "3fb67a6",
+  "fleet_src_sha256": "28f5cbb4f39524df318883522341c48ca4162c18b71a3a6223c52eabb40ce4b3"
+}

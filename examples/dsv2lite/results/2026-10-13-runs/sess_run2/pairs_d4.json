@@ -1,0 +1,120 @@
+{
+  "arm": "d4",
+  "condition": "one MI300X, batch 1, context 1024, 32 tokens, repeat 2",
+  "d4": {
+    "every_positive": false,
+    "gains_us": [
+      -271.9999999999998,
+      -271.00000000000034,
+      -262.9999999999999,
+      -275.00000000000034,
+      -258.0
+    ],
+    "go": false,
+    "keep": false,
+    "median_us": -271.00000000000034,
+    "spread_us": 17.00000000000034
+  },
+  "device_ms": {
+    "default": {
+      "every_positive": false,
+      "gains_us": [
+        -271.9999999999998,
+        -271.00000000000034,
+        -262.9999999999999,
+        -275.00000000000034,
+        -258.0
+      ],
+      "go": false,
+      "median_us": -271.00000000000034,
+      "spread_us": 17.00000000000034
+    }
+  },
+  "rounds": [
+    {
+      "d4": {
+        "device_ms": 3.936,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.974
+      },
+      "default": {
+        "device_ms": 3.664,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.698
+      }
+    },
+    {
+      "d4": {
+        "device_ms": 3.938,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.978
+      },
+      "default": {
+        "device_ms": 3.667,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.701
+      }
+    },
+    {
+      "d4": {
+        "device_ms": 3.935,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.976
+      },
+      "default": {
+        "device_ms": 3.672,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.707
+      }
+    },
+    {
+      "d4": {
+        "device_ms": 3.938,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.975
+      },
+      "default": {
+        "device_ms": 3.663,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.697
+      }
+    },
+    {
+      "d4": {
+        "device_ms": 3.929,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.966
+      },
+      "default": {
+        "device_ms": 3.671,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.706
+      }
+    }
+  ],
+  "wall_ms": {
+    "default": {
+      "every_positive": false,
+      "gains_us": [
+        -276.0000000000002,
+        -277.0000000000001,
+        -269.0000000000001,
+        -278.0,
+        -260.0000000000002
+      ],
+      "go": false,
+      "median_us": -276.0000000000002,
+      "spread_us": 17.999999999999773
+    }
+  }
+}

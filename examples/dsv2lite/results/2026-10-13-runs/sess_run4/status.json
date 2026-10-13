@@ -1,0 +1,58 @@
+[
+ {
+  "name": "etx_env",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 1.0002996921539307,
+  "note": ""
+ },
+ {
+  "name": "source",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 1.0003340244293213,
+  "note": ""
+ },
+ {
+  "name": "preflight",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 21.00469660758972,
+  "note": ""
+ },
+ {
+  "name": "build_default",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 24.00492238998413,
+  "note": ""
+ },
+ {
+  "name": "build_all",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 29.005715370178223,
+  "note": ""
+ },
+ {
+  "name": "build_alld4r0",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 33.00637149810791,
+  "note": ""
+ },
+ {
+  "name": "pairs_alld4r0",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 88.01325702667236,
+  "note": ""
+ }
+]

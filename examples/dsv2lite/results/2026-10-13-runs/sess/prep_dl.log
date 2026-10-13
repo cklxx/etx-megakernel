@@ -1,0 +1,4 @@
+# job prep_dl gpu=None cwd=/root/etx
+# : "${ETX_DSV2_FLEET:=$HOME/fleet-3fb67a6}"; : "${ETX_DSV2_DATA:=$HOME/dsv2-data}"; export ETX_DSV2_FLEET ETX_DSV2_DATA; HF_HUB_ENABLE_HF_TRANSFER=1 $HOME/dsv2-prep/.venv/bin/python -c "from huggingface_hub import snapshot_download; snapshot_download('deepseek-ai/DeepSeek-Coder-V2-Lite-Base', local_dir='$HOME/models/dsv2-lite-base', allow_patterns=['*.json', '*.safetensors', '*.py', 'tokenizer*'], max_workers=8); print('DL-DONE')" && du -sh $HOME/models/dsv2-lite-base && test -f $HOME/models/dsv2-lite-base/config.json
+DL-DONE
+30G	/root/models/dsv2-lite-base

@@ -1,0 +1,138 @@
+[
+ {
+  "name": "apt",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 1.000331163406372,
+  "note": ""
+ },
+ {
+  "name": "etx_env",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 1.0014739036560059,
+  "note": ""
+ },
+ {
+  "name": "prep_env",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 4.005399942398071,
+  "note": ""
+ },
+ {
+  "name": "source",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 1.0003135204315186,
+  "note": ""
+ },
+ {
+  "name": "prep_dl",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 1.0004665851593018,
+  "note": ""
+ },
+ {
+  "name": "prep_ref",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 1.0012261867523193,
+  "note": ""
+ },
+ {
+  "name": "prep_pack",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 1.001056432723999,
+  "note": ""
+ },
+ {
+  "name": "prep_sums",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 21.00483512878418,
+  "note": ""
+ },
+ {
+  "name": "preflight",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 21.003454208374023,
+  "note": ""
+ },
+ {
+  "name": "build_default",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 25.01080560684204,
+  "note": ""
+ },
+ {
+  "name": "build_all",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 29.01498317718506,
+  "note": ""
+ },
+ {
+  "name": "build_relaxed",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 25.01035189628601,
+  "note": ""
+ },
+ {
+  "name": "build_alld4r0",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 34.01543688774109,
+  "note": ""
+ },
+ {
+  "name": "build_l1",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 22.00614643096924,
+  "note": ""
+ },
+ {
+  "name": "build_alld4r0l1",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 31.008870601654053,
+  "note": ""
+ },
+ {
+  "name": "pairs_l1",
+  "status": "running",
+  "rc": null,
+  "gpu": 0,
+  "seconds": null,
+  "note": ""
+ },
+ {
+  "name": "pairs_alld4r0l1",
+  "status": "pending",
+  "rc": null,
+  "gpu": null,
+  "seconds": null,
+  "note": ""
+ }
+]

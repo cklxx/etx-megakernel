@@ -1,0 +1,176 @@
+{
+  "arm": "alld4r0",
+  "condition": "one MI300X, batch 1, context 1024, 32 tokens, repeat 2",
+  "device_ms": {
+    "all": {
+      "every_positive": true,
+      "gains_us": [
+        58.999999999999716,
+        60.00000000000006,
+        61.000000000000384,
+        60.99999999999994,
+        67.00000000000017
+      ],
+      "go": null,
+      "median_us": 60.99999999999994,
+      "spread_us": 8.000000000000455
+    },
+    "default": {
+      "every_positive": true,
+      "gains_us": [
+        159.9999999999997,
+        160.00000000000014,
+        158.00000000000037,
+        165.99999999999991,
+        164.00000000000014
+      ],
+      "go": null,
+      "median_us": 160.00000000000014,
+      "spread_us": 7.999999999999545
+    }
+  },
+  "keep_vs_all": {
+    "every_positive": true,
+    "gains_us": [
+      58.999999999999716,
+      60.00000000000006,
+      61.000000000000384,
+      60.99999999999994,
+      67.00000000000017
+    ],
+    "go": false,
+    "keep": true,
+    "median_us": 60.99999999999994,
+    "spread_us": 8.000000000000455
+  },
+  "rounds": [
+    {
+      "all": {
+        "device_ms": 3.566,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.599
+      },
+      "alld4r0": {
+        "device_ms": 3.507,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.543
+      },
+      "default": {
+        "device_ms": 3.667,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.7
+      }
+    },
+    {
+      "all": {
+        "device_ms": 3.566,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.599
+      },
+      "alld4r0": {
+        "device_ms": 3.506,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.543
+      },
+      "default": {
+        "device_ms": 3.666,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.7
+      }
+    },
+    {
+      "all": {
+        "device_ms": 3.567,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.603
+      },
+      "alld4r0": {
+        "device_ms": 3.506,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.541
+      },
+      "default": {
+        "device_ms": 3.664,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.699
+      }
+    },
+    {
+      "all": {
+        "device_ms": 3.568,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.603
+      },
+      "alld4r0": {
+        "device_ms": 3.507,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.543
+      },
+      "default": {
+        "device_ms": 3.673,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.708
+      }
+    },
+    {
+      "all": {
+        "device_ms": 3.569,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.602
+      },
+      "alld4r0": {
+        "device_ms": 3.502,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.539
+      },
+      "default": {
+        "device_ms": 3.666,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.699
+      }
+    }
+  ],
+  "wall_ms": {
+    "all": {
+      "every_positive": true,
+      "gains_us": [
+        56.00000000000005,
+        56.00000000000005,
+        62.00000000000028,
+        60.00000000000006,
+        62.99999999999972
+      ],
+      "go": false,
+      "median_us": 60.00000000000006,
+      "spread_us": 6.999999999999673
+    },
+    "default": {
+      "every_positive": true,
+      "gains_us": [
+        157.00000000000003,
+        157.00000000000003,
+        157.99999999999991,
+        165.00000000000003,
+        159.9999999999997
+      ],
+      "go": true,
+      "median_us": 157.99999999999991,
+      "spread_us": 8.0
+    }
+  }
+}

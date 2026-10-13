@@ -1,0 +1,2 @@
+$ timeout --kill-after=5s 60s stdbuf -oL -eL /root/etx/.venv/bin/python /root/fleet-3fb67a6/src/host/taskgraph.py --kv-chunks 16 --emit /root/sess/b_fleet/taskgraph_d16.bin
+wrote 54946 descriptors to /root/sess/b_fleet/taskgraph_d16.bin (3434 KB) and taskgraph_d16.bin.events.txt

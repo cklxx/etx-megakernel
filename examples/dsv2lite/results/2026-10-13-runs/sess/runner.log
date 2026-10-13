@@ -1,0 +1,60 @@
+[05:25:31 +  0m00s] session logs: /root/sess
+[05:25:31 +  0m00s] start apt (cpu)
+[05:25:32 +  0m01s] ok      apt rc=0 1s
+[05:25:32 +  0m01s] start etx_env (cpu)
+[05:25:32 +  0m01s] start prep_env (cpu)
+[05:25:33 +  0m02s] ok      etx_env rc=0 1s
+[05:25:33 +  0m02s] start source (cpu)
+[05:25:34 +  0m03s] ok      source rc=0 1s
+    SOURCE OK fleet export 28f5cbb4f39524df etx 65ca3b0d697e
+[05:25:34 +  0m03s] start build_default (cpu)
+[05:25:34 +  0m03s] start build_all (cpu)
+[05:25:34 +  0m03s] start build_relaxed (cpu)
+[05:25:34 +  0m03s] start build_alld4r0 (cpu)
+[05:25:36 +  0m05s] ok      prep_env rc=0 4s
+[05:25:36 +  0m05s] start prep_dl (cpu)
+[05:25:37 +  0m06s] ok      prep_dl rc=0 1s
+[05:25:37 +  0m06s] start prep_ref on GPU 0
+[05:25:37 +  0m06s] start build_l1 (cpu)
+[05:25:38 +  0m07s] ok      prep_ref rc=0 1s
+    # : "${ETX_DSV2_FLEET:=$HOME/fleet-3fb67a6}"; : "${ETX_DSV2_DATA:=$HOME/dsv2-data}"; export ETX_DSV2_FLEET ETX_DSV2_DATA; mkdir -p "$ETX_DSV2_DATA" && cd "$ETX_DSV2_FLEET" && { test -s "$ETX_DSV2_DATA/fleet_cache.bin" -a -s "$ETX_DSV2_DATA/
+    -rw-r--r--  1 root root         487 Oct 13 04:11 golden.json
+    -rw-r--r--  1 root root    29492654 Oct 13 04:11 golden.npz
+    -rw-r--r--  1 root root      221184 Oct 13 04:11 golden_hidden.bin
+    -rw-r--r--  1 root root         144 Oct 13 04:11 golden_tokens.txt
+[05:25:59 +  0m28s] ok      build_default rc=0 25s
+    BUILD arm=default stamped=0 resources={'vgpr': 256, 'agpr': 56, 'sgpr': 108, 'scratch': 0, 'lds': 26668, 'occupancy': 1}
+    BUILD arm=default OK
+[05:25:59 +  0m28s] ok      build_relaxed rc=0 25s
+    BUILD arm=relaxed stamped=0 resources={'vgpr': 256, 'agpr': 56, 'sgpr': 108, 'scratch': 0, 'lds': 26668, 'occupancy': 1}
+    BUILD arm=relaxed OK
+[05:25:59 +  0m28s] ok      build_l1 rc=0 22s
+    BUILD arm=l1 stamped=0 resources={'vgpr': 256, 'agpr': 56, 'sgpr': 106, 'scratch': 0, 'lds': 26668, 'occupancy': 1}
+    BUILD arm=l1 OK
+[05:25:59 +  0m28s] start prep_pack (cpu)
+[05:25:59 +  0m28s] start build_alld4r0l1 (cpu)
+[05:26:00 +  0m29s] ok      prep_pack rc=0 1s
+[05:26:00 +  0m29s] start prep_sums (cpu)
+[05:26:03 +  0m32s] ok      build_all rc=0 29s
+    BUILD arm=all stamped=0 resources={'vgpr': 256, 'agpr': 104, 'sgpr': 108, 'scratch': 0, 'lds': 26668, 'occupancy': 1}
+    BUILD arm=all OK
+[05:26:08 +  0m37s] ok      build_alld4r0 rc=0 34s
+    BUILD arm=alld4r0 stamped=0 resources={'vgpr': 256, 'agpr': 106, 'sgpr': 108, 'scratch': 0, 'lds': 26668, 'occupancy': 1}
+    BUILD arm=alld4r0 OK
+[05:26:21 +  0m50s] ok      prep_sums rc=0 21s
+[05:26:21 +  0m50s] start preflight (cpu)
+[05:26:30 +  0m59s] ok      build_alld4r0l1 rc=0 31s
+    BUILD arm=alld4r0l1 stamped=0 resources={'vgpr': 256, 'agpr': 108, 'sgpr': 106, 'scratch': 0, 'lds': 26668, 'occupancy': 1}
+    BUILD arm=alld4r0l1 OK
+[05:26:31 +  1m00s] progress: 1 running, 2 waiting, 14 done
+    preflight [cpu] 10s / 600s: PREFLIGHT hashing /root/dsv2-data/weights.bin bytes=31412968448
+[05:26:42 +  1m11s] ok      preflight rc=0 21s
+    PREFLIGHT hashing /root/dsv2-data/weights.bin bytes=31412968448
+    PREFLIGHT hashing /root/dsv2-data/weights.bin.manifest bytes=9561
+    PREFLIGHT hashing /root/dsv2-data/fleet_cache.bin bytes=32845824
+    PREFLIGHT hashing /root/dsv2-data/golden_tokens.txt bytes=144
+    PREFLIGHT hashing /root/dsv2-data/golden_hidden.bin bytes=221184
+    PREFLIGHT OK inputs match their SHA256SUMS
+[05:26:42 +  1m11s] start pairs_l1 on GPU 0
+[05:27:31 +  2m00s] progress: 1 running, 1 waiting, 15 done
+    pairs_l1 [GPU 0] 49s / 1200s: model: hidden 2048 heads 16 kv_lora 512 experts 64 top-6 layers 27 (dense < 1) vocab 102400

@@ -1,0 +1,162 @@
+{
+  "arm": "all",
+  "condition": "one MI300X, batch 1, context 1024, 32 tokens, repeat 2",
+  "device_ms": {
+    "default": {
+      "every_positive": true,
+      "gains_us": [
+        108.0000000000001,
+        96.99999999999997,
+        98.00000000000031,
+        108.99999999999999,
+        115.00000000000021
+      ],
+      "go": true,
+      "median_us": 108.0000000000001,
+      "spread_us": 18.00000000000024
+    },
+    "fleet": {
+      "every_positive": false,
+      "gains_us": [
+        -22.00000000000024,
+        -21.00000000000035,
+        -21.999999999999797,
+        -22.00000000000024,
+        -20.000000000000018
+      ],
+      "go": false,
+      "median_us": -21.999999999999797,
+      "spread_us": 2.000000000000224
+    }
+  },
+  "rounds": [
+    {
+      "all": {
+        "device_ms": 3.564,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.6
+      },
+      "default": {
+        "device_ms": 3.672,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.706
+      },
+      "fleet": {
+        "device_ms": 3.542,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.554
+      }
+    },
+    {
+      "all": {
+        "device_ms": 3.567,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.601
+      },
+      "default": {
+        "device_ms": 3.664,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.698
+      },
+      "fleet": {
+        "device_ms": 3.546,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.558
+      }
+    },
+    {
+      "all": {
+        "device_ms": 3.566,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.599
+      },
+      "default": {
+        "device_ms": 3.664,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.699
+      },
+      "fleet": {
+        "device_ms": 3.544,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.557
+      }
+    },
+    {
+      "all": {
+        "device_ms": 3.564,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.601
+      },
+      "default": {
+        "device_ms": 3.673,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.707
+      },
+      "fleet": {
+        "device_ms": 3.542,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.556
+      }
+    },
+    {
+      "all": {
+        "device_ms": 3.562,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.598
+      },
+      "default": {
+        "device_ms": 3.677,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.711
+      },
+      "fleet": {
+        "device_ms": 3.542,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.553
+      }
+    }
+  ],
+  "wall_ms": {
+    "default": {
+      "every_positive": true,
+      "gains_us": [
+        105.99999999999987,
+        96.99999999999997,
+        99.99999999999964,
+        105.99999999999987,
+        112.99999999999999
+      ],
+      "go": true,
+      "median_us": 105.99999999999987,
+      "spread_us": 16.000000000000014
+    },
+    "fleet": {
+      "every_positive": false,
+      "gains_us": [
+        -46.00000000000026,
+        -43.00000000000015,
+        -42.000000000000256,
+        -44.99999999999993,
+        -44.99999999999993
+      ],
+      "go": false,
+      "median_us": -44.99999999999993,
+      "spread_us": 4.000000000000007
+    }
+  }
+}

@@ -1,0 +1,22 @@
+# job pairs_Q gpu=0 cwd=/root/etx
+# : "${ETX_DSV2_FLEET:=$HOME/fleet-3fb67a6}"; : "${ETX_DSV2_DATA:=$HOME/dsv2-data}"; export ETX_DSV2_FLEET ETX_DSV2_DATA; .venv/bin/python -u -m examples.dsv2lite.inplace_session pairs Q
+$ timeout --kill-after=5s 180s stdbuf -oL -eL /root/sess/b_default/run --weights /root/dsv2-data/weights.bin --cache /root/dsv2-data/fleet_cache.bin --golden /root/dsv2-data/golden_tokens.txt --hidden /root/dsv2-data/golden_hidden.bin --tokens 32 --context 1024 --repeat 2
+device: AMD Instinct MI300X VF  arch gfx942:sramecc+:xnack-  CUs 304
+
+error: cannot open /root/dsv2-data/weights.bin.manifest (run src/host/pack_weights.py)
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/root/etx/examples/dsv2lite/inplace_session.py", line 390, in <module>
+    main()
+  File "/root/etx/examples/dsv2lite/inplace_session.py", line 380, in main
+    session.pairs(a.arm)
+  File "/root/etx/examples/dsv2lite/inplace_session.py", line 288, in pairs
+    result[current] = self.full_invocation(current, f"{arm}_r{i}_{current}")
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/etx/examples/dsv2lite/inplace_session.py", line 269, in full_invocation
+    return full_result(self.run(name, command))
+                       ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/etx/examples/dsv2lite/inplace_session.py", line 181, in run
+    raise RuntimeError(f"invocation {name} failed rc={rc}; full log {path}")
+RuntimeError: invocation Q_r0_default failed rc=1; full log /root/sess/Q_r0_default.raw.log

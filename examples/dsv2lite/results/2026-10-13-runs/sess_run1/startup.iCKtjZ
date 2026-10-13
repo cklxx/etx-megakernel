@@ -1,0 +1,235 @@
+[04:08:49 +  0m00s] session logs: /root/sess
+[04:08:49 +  0m00s] start apt (cpu)
+[04:09:00 +  0m11s] ok      apt rc=0 11s
+[04:09:00 +  0m11s] start etx_env (cpu)
+[04:09:00 +  0m11s] start prep_env (cpu)
+[04:09:03 +  0m14s] ok      etx_env rc=0 3s
+[04:09:03 +  0m14s] start source (cpu)
+[04:09:04 +  0m15s] ok      source rc=0 1s
+    SOURCE OK fleet export 28f5cbb4f39524df etx 54f9344c60ee
+[04:09:04 +  0m15s] start build_default (cpu)
+[04:09:04 +  0m15s] start build_fleet (cpu)
+[04:09:04 +  0m15s] start build_all (cpu)
+[04:09:04 +  0m15s] start build_Q (cpu)
+[04:09:12 +  0m23s] ok      build_fleet rc=0 8s
+    BUILD arm=fleet OK
+[04:09:12 +  0m23s] start build_Qall (cpu)
+[04:09:29 +  0m40s] ok      build_Q rc=0 25s
+    BUILD arm=Q stamped=0 resources={'vgpr': 256, 'agpr': 56, 'sgpr': 108, 'scratch': 0, 'lds': 26668, 'occupancy': 1}
+    BUILD arm=Q OK
+[04:09:29 +  0m40s] start build_N (cpu)
+[04:09:30 +  0m41s] ok      build_default rc=0 26s
+    BUILD arm=default stamped=0 resources={'vgpr': 256, 'agpr': 56, 'sgpr': 108, 'scratch': 0, 'lds': 26668, 'occupancy': 1}
+    BUILD arm=default OK
+[04:09:30 +  0m41s] start build_Nall (cpu)
+[04:09:33 +  0m44s] ok      build_all rc=0 29s
+    BUILD arm=all stamped=0 resources={'vgpr': 256, 'agpr': 104, 'sgpr': 108, 'scratch': 0, 'lds': 26668, 'occupancy': 1}
+    BUILD arm=all OK
+[04:09:33 +  0m44s] start build_argmax (cpu)
+[04:09:38 +  0m49s] ok      build_Qall rc=0 26s
+    BUILD arm=Qall stamped=0 resources={'vgpr': 256, 'agpr': 46, 'sgpr': 106, 'scratch': 0, 'lds': 26668, 'occupancy': 1}
+    BUILD arm=Qall OK
+[04:09:38 +  0m49s] start build_topk (cpu)
+[04:09:49 +  1m00s] progress: 5 running, 27 waiting, 8 done
+    prep_env [cpu] 49s / 1800s: WARNING: huggingface-hub 2.2.0 does not provide the extra 'hf-transfer'
+    build_N [cpu] 20s / 1200s: /root/sess/b_N/fleet_src/kernels/fleet_kernel.hip:1112:1: remark:     LDS Size [bytes/block]: 0 [-Rpass-analysis=kernel-resource-usage]
+    build_Nall [cpu] 19s / 1200s: /root/sess/b_Nall/fleet_src/kernels/fleet_kernel.hip:1111:1: remark:     LDS Size [bytes/block]: 0 [-Rpass-analysis=kernel-resource-usage]
+    build_argmax [cpu] 16s / 1200s: /root/sess/b_argmax/fleet_src/kernels/fleet_kernel.hip:1064:1: remark:     LDS Size [bytes/block]: 0 [-Rpass-analysis=kernel-resource-usage]
+    build_topk [cpu] 11s / 1200s: COH-CHECK OK coherent=0
+[04:09:55 +  1m06s] ok      build_N rc=0 26s
+    BUILD arm=N stamped=0 resources={'vgpr': 256, 'agpr': 82, 'sgpr': 108, 'scratch': 0, 'lds': 26668, 'occupancy': 1}
+    BUILD arm=N OK
+[04:09:55 +  1m06s] start build_prep (cpu)
+[04:09:56 +  1m07s] ok      build_Nall rc=0 26s
+    BUILD arm=Nall stamped=0 resources={'vgpr': 256, 'agpr': 98, 'sgpr': 108, 'scratch': 0, 'lds': 26668, 'occupancy': 1}
+    BUILD arm=Nall OK
+[04:09:56 +  1m07s] start build_relaxed (cpu)
+[04:09:57 +  1m08s] ok      build_argmax rc=0 24s
+    BUILD arm=argmax stamped=0 resources={'vgpr': 256, 'agpr': 56, 'sgpr': 108, 'scratch': 0, 'lds': 26668, 'occupancy': 1}
+    BUILD arm=argmax OK
+[04:09:57 +  1m08s] start build_coh (cpu)
+[04:09:58 +  1m09s] fail    build_coh rc=1 1s
+        session.build(a.arm, a.stamped)
+      File "/root/etx/examples/dsv2lite/inplace_session.py", line 251, in build
+        env = dict(ETX_OUT=str(out), ETX_FLEET_PATCH=" ".join(ARMS[arm]), ETX_BUILD_VERBOSE="1",
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    TypeError: dict() got multiple values for keyword argument 'ETX_DSV2_COH'
+[04:09:58 +  1m09s] skip    pairs_coh [a dependency failed]
+[04:09:58 +  1m09s] start build_d4 (cpu)
+[04:09:59 +  1m10s] fail    build_d4 rc=1 1s
+        session.build(a.arm, a.stamped)
+      File "/root/etx/examples/dsv2lite/inplace_session.py", line 251, in build
+        env = dict(ETX_OUT=str(out), ETX_FLEET_PATCH=" ".join(ARMS[arm]), ETX_BUILD_VERBOSE="1",
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    TypeError: dict() got multiple values for keyword argument 'ETX_DSV2_D4'
+[04:09:59 +  1m10s] skip    pairs_d4 [a dependency failed]
+[04:09:59 +  1m10s] skip    d4trace [a dependency failed]
+[04:09:59 +  1m10s] start build_default_stamps (cpu)
+[04:09:59 +  1m10s] start pairs_Q on GPU 0
+[04:10:00 +  1m11s] fail    pairs_Q rc=1 1s
+        return full_result(self.run(name, command))
+                           ^^^^^^^^^^^^^^^^^^^^^^^
+      File "/root/etx/examples/dsv2lite/inplace_session.py", line 181, in run
+        raise RuntimeError(f"invocation {name} failed rc={rc}; full log {path}")
+    RuntimeError: invocation Q_r0_default failed rc=1; full log /root/sess/Q_r0_default.raw.log
+[04:10:00 +  1m11s] start pairs_Qall on GPU 0
+[04:10:01 +  1m12s] fail    pairs_Qall rc=1 1s
+        return full_result(self.run(name, command))
+                           ^^^^^^^^^^^^^^^^^^^^^^^
+      File "/root/etx/examples/dsv2lite/inplace_session.py", line 181, in run
+        raise RuntimeError(f"invocation {name} failed rc={rc}; full log {path}")
+    RuntimeError: invocation Qall_r0_default failed rc=1; full log /root/sess/Qall_r0_default.raw.log
+[04:10:01 +  1m12s] start pairs_N on GPU 0
+[04:10:02 +  1m13s] fail    pairs_N rc=1 1s
+        return full_result(self.run(name, command))
+                           ^^^^^^^^^^^^^^^^^^^^^^^
+      File "/root/etx/examples/dsv2lite/inplace_session.py", line 181, in run
+        raise RuntimeError(f"invocation {name} failed rc={rc}; full log {path}")
+    RuntimeError: invocation N_r0_default failed rc=1; full log /root/sess/N_r0_default.raw.log
+[04:10:02 +  1m13s] start pairs_Nall on GPU 0
+[04:10:03 +  1m14s] ok      build_topk rc=0 25s
+    BUILD arm=topk stamped=0 resources={'vgpr': 256, 'agpr': 58, 'sgpr': 108, 'scratch': 0, 'lds': 26668, 'occupancy': 1}
+    BUILD arm=topk OK
+[04:10:03 +  1m14s] fail    pairs_Nall rc=1 1s
+        return full_result(self.run(name, command))
+                           ^^^^^^^^^^^^^^^^^^^^^^^
+      File "/root/etx/examples/dsv2lite/inplace_session.py", line 181, in run
+        raise RuntimeError(f"invocation {name} failed rc={rc}; full log {path}")
+    RuntimeError: invocation Nall_r0_default failed rc=1; full log /root/sess/Nall_r0_default.raw.log
+[04:10:03 +  1m14s] start build_all_stamps (cpu)
+[04:10:03 +  1m14s] start pairs_argmax on GPU 0
+[04:10:04 +  1m15s] fail    pairs_argmax rc=1 1s
+        return full_result(self.run(name, command))
+                           ^^^^^^^^^^^^^^^^^^^^^^^
+      File "/root/etx/examples/dsv2lite/inplace_session.py", line 181, in run
+        raise RuntimeError(f"invocation {name} failed rc={rc}; full log {path}")
+    RuntimeError: invocation argmax_r0_default failed rc=1; full log /root/sess/argmax_r0_default.raw.log
+[04:10:04 +  1m15s] start pairs_topk on GPU 0
+[04:10:05 +  1m16s] fail    pairs_topk rc=1 1s
+        return full_result(self.run(name, command))
+                           ^^^^^^^^^^^^^^^^^^^^^^^
+      File "/root/etx/examples/dsv2lite/inplace_session.py", line 181, in run
+        raise RuntimeError(f"invocation {name} failed rc={rc}; full log {path}")
+    RuntimeError: invocation topk_r0_default failed rc=1; full log /root/sess/topk_r0_default.raw.log
+[04:10:19 +  1m30s] ok      build_prep rc=0 24s
+    BUILD arm=prep stamped=0 resources={'vgpr': 256, 'agpr': 70, 'sgpr': 108, 'scratch': 0, 'lds': 26668, 'occupancy': 1}
+    BUILD arm=prep OK
+[04:10:19 +  1m30s] start pairs_prep on GPU 0
+[04:10:20 +  1m31s] ok      build_relaxed rc=0 24s
+    BUILD arm=relaxed stamped=0 resources={'vgpr': 256, 'agpr': 56, 'sgpr': 108, 'scratch': 0, 'lds': 26668, 'occupancy': 1}
+    BUILD arm=relaxed OK
+[04:10:20 +  1m31s] fail    pairs_prep rc=1 1s
+        return full_result(self.run(name, command))
+                           ^^^^^^^^^^^^^^^^^^^^^^^
+      File "/root/etx/examples/dsv2lite/inplace_session.py", line 181, in run
+        raise RuntimeError(f"invocation {name} failed rc={rc}; full log {path}")
+    RuntimeError: invocation prep_r0_default failed rc=1; full log /root/sess/prep_r0_default.raw.log
+[04:10:20 +  1m31s] start pairs_relaxed on GPU 0
+[04:10:21 +  1m32s] fail    pairs_relaxed rc=1 1s
+        return full_result(self.run(name, command))
+                           ^^^^^^^^^^^^^^^^^^^^^^^
+      File "/root/etx/examples/dsv2lite/inplace_session.py", line 181, in run
+        raise RuntimeError(f"invocation {name} failed rc={rc}; full log {path}")
+    RuntimeError: invocation relaxed_r0_default failed rc=1; full log /root/sess/relaxed_r0_default.raw.log
+[04:10:27 +  1m38s] ok      prep_env rc=0 87s
+[04:10:27 +  1m38s] ok      build_default_stamps rc=0 28s
+    BUILD arm=default stamped=1 resources={'vgpr': 256, 'agpr': 64, 'sgpr': 108, 'scratch': 0, 'lds': 26668, 'occupancy': 1}
+    BUILD arm=default OK
+[04:10:27 +  1m38s] start prep_dl (cpu)
+[04:10:36 +  1m47s] ok      build_all_stamps rc=0 33s
+    BUILD arm=all stamped=1 resources={'vgpr': 256, 'agpr': 112, 'sgpr': 108, 'scratch': 0, 'lds': 26668, 'occupancy': 1}
+    BUILD arm=all OK
+[04:10:49 +  2m00s] progress: 1 running, 9 waiting, 30 done
+    prep_dl [cpu] 22s / 1800s: # : "${ETX_DSV2_FLEET:=$HOME/fleet-3fb67a6}"; : "${ETX_DSV2_DATA:=$HOME/dsv2-data}"; export ETX_DSV2_FLEET ETX_DSV2_DATA; HF_HUB_ENABLE_HF_TRANSFER=1 $HOME/dsv2
+[04:10:57 +  2m08s] ok      prep_dl rc=0 30s
+[04:10:57 +  2m08s] start prep_ref on GPU 0
+[04:11:38 +  2m49s] ok      prep_ref rc=0 41s
+    # : "${ETX_DSV2_FLEET:=$HOME/fleet-3fb67a6}"; : "${ETX_DSV2_DATA:=$HOME/dsv2-data}"; export ETX_DSV2_FLEET ETX_DSV2_DATA; mkdir -p "$ETX_DSV2_DATA" && cd "$ETX_DSV2_FLEET" && { test -s "$ETX_DSV2_DATA/fleet_cache.bin" -a -s "$ETX_DSV2_DATA/
+    wrote /root/dsv2-data/golden.npz and /root/dsv2-data/golden.json
+    wrote /root/dsv2-data/fleet_cache.bin  [27][1056][576] cols 0:512 = c (post kv_a_layernorm), 512:576 = k_pe (post RoPE)  -> 32.8 MB bf16
+    wrote /root/dsv2-data/golden_tokens.txt (33 tokens)
+    wrote /root/dsv2-data/golden_hidden.bin (27, 2048)
+      smallest top-2 margin over the run: 6.6250 (a small margin here is where bf16 drift would flip a token)
+    -rw-r--r--  1 root root      487 Oct 13 04:11 golden.json
+    -rw-r--r--  1 root root 29492654 Oct 13 04:11 golden.npz
+    -rw-r--r--  1 root root   221184 Oct 13 04:11 golden_hidden.bin
+    -rw-r--r--  1 root root      144 Oct 13 04:11 golden_tokens.txt
+[04:11:38 +  2m49s] start prep_pack (cpu)
+[04:11:49 +  3m00s] progress: 1 running, 7 waiting, 32 done
+    prep_pack [cpu] 11s / 1200s:   layer  3 packed, 4.51 GB
+[04:12:08 +  3m19s] ok      prep_pack rc=0 30s
+    wrote /root/dsv2-data/weights.bin (31.41 GB), /root/dsv2-data/weights.bin.json and /root/dsv2-data/weights.bin.manifest
+      expert stride: 8650752 elems (17.3 MB) — matches design.md §1's 17.3 MB per routed expert
+[04:12:08 +  3m19s] start prep_sums (cpu)
+[04:12:28 +  3m39s] ok      prep_sums rc=0 20s
+[04:12:28 +  3m39s] start preflight (cpu)
+[04:12:48 +  3m59s] ok      preflight rc=0 20s
+    PREFLIGHT hashing /root/dsv2-data/weights.bin bytes=31412968448
+    PREFLIGHT hashing /root/dsv2-data/weights.bin.manifest bytes=9561
+    PREFLIGHT hashing /root/dsv2-data/fleet_cache.bin bytes=32845824
+    PREFLIGHT hashing /root/dsv2-data/golden_tokens.txt bytes=144
+    PREFLIGHT hashing /root/dsv2-data/golden_hidden.bin bytes=221184
+    PREFLIGHT OK inputs match their SHA256SUMS
+[04:12:48 +  3m59s] start baseline on GPU 0
+[04:12:49 +  4m00s] progress: 1 running, 4 waiting, 35 done
+    baseline [GPU 0] 1s / 900s: model: hidden 2048 heads 16 kv_lora 512 experts 64 top-6 layers 27 (dense < 1) vocab 102400
+[04:13:48 +  4m59s] ok      baseline rc=0 60s
+    PAIRS arm=baseline device gain vs default median 121.0 us spread 7.0 every_positive=1 GO=None
+[04:13:48 +  4m59s] start pairs_all on GPU 0
+[04:13:49 +  5m00s] progress: 1 running, 3 waiting, 36 done
+    pairs_all [GPU 0] 1s / 1200s: model: hidden 2048 heads 16 kv_lora 512 experts 64 top-6 layers 27 (dense < 1) vocab 102400
+[04:14:49 +  6m00s] progress: 1 running, 3 waiting, 36 done
+    pairs_all [GPU 0] 61s / 1200s: model: hidden 2048 heads 16 kv_lora 512 experts 64 top-6 layers 27 (dense < 1) vocab 102400
+[04:15:16 +  6m27s] ok      pairs_all rc=0 88s
+    PAIRS arm=all device gain vs default median 108.0 us spread 18.0 every_positive=1 GO=True
+[04:15:16 +  6m27s] start trace_default on GPU 0
+[04:15:24 +  6m35s] ok      trace_default rc=0 8s
+    TRACE arm=default span 3939.2 us; stages prologue=139.9 in_norm=192.4 qkv=433.8 prep=143.3 attn=350.5 reduce=319.0 o_proj=279.2 router=372.8 topk=149.1 moe_up=751.3 moe_down=551.4 lm_head=133.3 argmax=6.0 tail=117.2
+[04:15:24 +  6m35s] start trace_all on GPU 0
+[04:15:31 +  6m42s] ok      trace_all rc=0 7s
+    TRACE arm=all span 3842.4 us; stages prologue=137.9 in_norm=173.5 qkv=429.9 prep=142.1 attn=347.9 reduce=314.6 o_proj=277.3 router=354.3 topk=93.7 moe_up=775.7 moe_down=548.5 lm_head=127.4 argmax=5.2 tail=114.4
+[04:15:31 +  6m42s] start report (cpu)
+[04:15:32 +  6m43s] ok      report rc=0 1s
+    REPORT all: median 108.0 us spread 18.0 GO=True; stages measured: True; raw logs and JSON kept in /root/sess
+[04:15:32 +  6m43s] session done
+  job                              status     rc  gpu  seconds
+  apt                              ok          0            11  
+  etx_env                          ok          0             3  
+  prep_env                         ok          0            87  
+  source                           ok          0             1  
+  prep_dl                          ok          0            30  
+  prep_ref                         ok          0    0       41  
+  prep_pack                        ok          0            30  
+  prep_sums                        ok          0            20  
+  preflight                        ok          0            20  
+  build_default                    ok          0            26  
+  build_fleet                      ok          0             8  
+  build_all                        ok          0            29  
+  build_Q                          ok          0            25  
+  build_Qall                       ok          0            26  
+  build_N                          ok          0            26  
+  build_Nall                       ok          0            26  
+  build_argmax                     ok          0            24  
+  build_topk                       ok          0            25  
+  build_prep                       ok          0            24  
+  build_relaxed                    ok          0            24  
+  build_coh                        fail        1             1  
+  build_d4                         fail        1             1  
+  build_default_stamps             ok          0            28  
+  build_all_stamps                 ok          0            33  
+  baseline                         ok          0    0       60  
+  pairs_all                        ok          0    0       88  
+  trace_default                    ok          0    0        8  
+  trace_all                        ok          0    0        7  
+  pairs_coh                        skipped                      
+  pairs_d4                         skipped                      
+  d4trace                          skipped                      
+  pairs_Q                          fail        1    0        1  
+  pairs_Qall                       fail        1    0        1  
+  pairs_N                          fail        1    0        1  
+  pairs_Nall                       fail        1    0        1  
+  pairs_argmax                     fail        1    0        1  
+  pairs_topk                       fail        1    0        1  
+  pairs_prep                       fail        1    0        1  
+  pairs_relaxed                    fail        1    0        1  
+  report                           ok          0             1  
