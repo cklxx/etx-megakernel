@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from etx.tools.gpu_jobs import load_session
-from examples.dsv2lite import inplace_session as ins
+from examples.dsv2lite.arms import ARMS, SINGLE
 from examples.dsv2lite.acquire import ACQUIRE, RELAXED
 
 SESSIONS = ["ds_inplace", "ds_model", "ds_interleave", "ds_evstride", "ds_gap"]
@@ -25,9 +25,9 @@ def test_the_default_is_safe_and_relaxed_is_one_explicit_arm():
     assert ACQUIRE == ""                                    # the build default: buffer_inv sc1
     assert RELAXED == "-DETX_ACQUIRE_DOMAIN_RELAXED"
     # relaxed only in arms named for it: D1's comparison, and allrelaxed (the prize measurement, never a candidate)
-    assert {a for a, flags in ins.ARM_FLAGS.items() if RELAXED in flags} == {"relaxed", "allrelaxed"}
-    assert all("relaxed" in a for a, flags in ins.ARM_FLAGS.items() if RELAXED in flags)
-    assert ins.ARMS["relaxed"] == () and "relaxed" in ins.SINGLE
+    assert {a for a, arm in ARMS.items() if RELAXED in arm.flags} == {"relaxed", "allrelaxed"}
+    assert all("relaxed" in a for a, arm in ARMS.items() if RELAXED in arm.flags)
+    assert ARMS["relaxed"].levers == () and "relaxed" in SINGLE
     jobs, _ = load_session(Path("examples/sessions/ds_inplace.py"))
     by = {j.name: j for j in jobs}
     assert by["build_relaxed"].cmd.endswith("inplace_session build relaxed")

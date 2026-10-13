@@ -1,262 +1,45 @@
 """Fail-closed implementation of the prepared ds_inplace.py GPU session: every lever measured as whole tokens.
 
-Arms (ARMS): default, fleet (shipped 3fb67a6), each lever alone, and `all` (every lever that passed its local gate).
-  baseline        5 interleaved pairs default / fleet
-  full <arm>      5 interleaved pairs default / arm (/ fleet for `all`), every invocation 32/32 tokens + 27/27 layers
-  trace <arm>     one stamped token of the STAMPS2 build of default or `all`: the measured per-stage table
-  report          verdicts + measured per-stage table next to the expected one (stage_table.py)
-Decision (fixed before the run, for `all` only): every paired device gain > 0, median >= 70 us, median > 2 x spread.
-Single levers are attribution: median and spread are reported, no verdict (most are below 5 pairs' resolution).
+Every arm -- its levers, flags, plan switches, invocation order, references and pre-registered rule -- is ONE record in
+examples/dsv2lite/arms.py; the decisions are etx/session/experiment.py's, on integer nanoseconds.
+  build <arm> [--stamped]   the arm's build (fleet: fleet's own)
+  pairs <arm>     5 interleaved rounds in the arm's order (reversed on odd rounds), every invocation 32/32 + 27/27
+  trace <arm>     one stamped token of the arm's STAMPS2 build: the measured per-stage table
+  report          every pairs report found + measured per-stage savings next to stage_table.json's expected ones
 No invocation here provisions a GPU or downloads; inputs are prepared by the prep_* jobs. Unfiltered output is kept.
 """
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
-import math
 import os
 from pathlib import Path
 import re
 import shlex
-import statistics
 import subprocess
 import sys
 import time
 
-from etx.session import proc
-from examples.dsv2lite.acquire import RELAXED
+from etx.session import experiment, proc
+from etx.session.record import sha256 as sha
+from examples.dsv2lite.arms import ARMS, CONDITION, build_env, full_result
 from examples.dsv2lite.pinned import FLEET_SRC_SHA256 as PINNED_SRC_SHA256
 from examples.dsv2lite.pinned import source_sha
 
-LEVERS_ALL = ("gemv_no_terminal_all", "norm_tree_all", "argmax_tree", "topk_rank", "attn_prologue_live")
-ARMS = {"default": (), "Q": ("gemv_no_terminal",), "Qall": ("gemv_no_terminal_all",), "N": ("norm_tree",),
-        "Nall": ("norm_tree_all",), "argmax": ("argmax_tree",), "topk": ("topk_rank",),
-        "prep": ("attn_prologue_live",), "all": LEVERS_ALL}
-# Arms that differ by a build flag instead of a lever patch. "relaxed" is D1's comparison: the safe default against
-# the old sc0 acquire, named explicitly (examples/dsv2lite/acquire.py).
-ARM_FLAGS = {"relaxed": [RELAXED]}
-ARMS["relaxed"] = ()
-# D2: fleet's tiles load every payload coherently (lever coherent_loads) and the plan drops their acquire invalidates
-# (ETX_DSV2_COH=1); the build refuses one without the other (coh_check.py). Measured against BOTH default (sc1) and
-# relaxed in the same rounds: docs/DSV2-D1-D5.md, D2.
-ARMS["coh"] = ("coherent_loads",)
-ARM_ENV = {"coh": {"ETX_DSV2_COH": "1"}}
-D2_MIN_TOL_US = 20.0
-# D4: shared experts during routing, routed slices on the shared XCDs (d4_placement.py; the plan is checked at build
-# time). Plan switch + tile switch; pairs against default, its own rule, and one traced token for criterion (a).
-ARMS["d4"] = ()
-ARM_FLAGS["d4"] = ["-DETX_DSV2_D4=1"]
-ARM_ENV["d4"] = {"ETX_DSV2_D4": "1"}
-D4_KEEP_US = 30.0
-# measurements only (docs/DSV2-D1-D5.md, "Next two arms"): the unsafe acquire on the best arm, and D4 without slices
-ARMS["allrelaxed"] = LEVERS_ALL
-ARM_FLAGS["allrelaxed"] = [RELAXED]
-ARMS["d4r0"] = ()
-ARM_FLAGS["d4r0"] = ["-DETX_DSV2_D4=1"]
-ARM_ENV["d4r0"] = {"ETX_DSV2_D4": "1", "ETX_DSV2_D4_ROWS": "0"}
-# D2b (docs/DSV2-D1-D5.md): l1 alone under D2's rule; alld4r0l1 = the best arm + D2b, KEEP rule against alld4r0
-ARMS["l1"] = ("l1_loads",)
-ARM_ENV["l1"] = {"ETX_DSV2_COH": "l1"}
-ARMS["alld4r0l1"] = (*LEVERS_ALL, "l1_loads")
-ARM_FLAGS["alld4r0l1"] = ["-DETX_DSV2_D4=1"]
-ARM_ENV["alld4r0l1"] = {"ETX_DSV2_D4": "1", "ETX_DSV2_D4_ROWS": "0", "ETX_DSV2_COH": "l1"}
-# D3 (docs/DSV2-D1-D5.md): four 352-row K-chunks on top of the five levers, 2-way against `all`
-ARMS["alld3"] = (*LEVERS_ALL, "kchunk352")
-ARM_FLAGS["alld3"] = ["-DETX_DSV2_KCHUNKS=1"]
-ARM_ENV["alld3"] = {"ETX_DSV2_KCHUNKS": "4"}
-ARMS["alld4r0"] = LEVERS_ALL                       # candidate: the best arm + D4 placement without slices
-ARM_FLAGS["alld4r0"] = ["-DETX_DSV2_D4=1"]
-ARM_ENV["alld4r0"] = dict(ARM_ENV["d4r0"])
-# D4 slices: paired against both default and the measured best arm, alld4r0. The KEEP decision is against alld4r0.
-ARMS["alld4s"] = LEVERS_ALL
-ARM_FLAGS["alld4s"] = ["-DETX_DSV2_D4=1"]
-ARM_ENV["alld4s"] = {"ETX_DSV2_D4": "1", "ETX_DSV2_D4_ROWS": "32"}
-# D5: compiler prefetch of immutable, routing-independent weights; paired only against the five-lever arm.
-ARMS["alld5"] = LEVERS_ALL
-ARM_ENV["alld5"] = {"ETX_DSV2_D5": "1"}
-D5_KEEP_US = 30.0
-SINGLE = ("Q", "Qall", "N", "Nall", "argmax", "topk", "prep", "relaxed")
-STAMPED = ("default", "all")
-TRACEABLE = (*STAMPED, "alld4r0", "alld4r0l1")    # arms whose stamped build a session may trace (the new arms' stages)
 DATA_FILES = ("weights.bin", "weights.bin.manifest", "fleet_cache.bin", "golden_tokens.txt", "golden_hidden.bin")
 # The measured inputs (2026-10-13 session, committed) ARE the inputs' identity: preflight compares the bytes on the box
 # with these and nothing else (no checksum file regenerated on the box can vouch for them: review 07, R09). The model
 # download does not pin a revision; these hashes identify it.
 PINNED_INPUTS = json.loads((Path(__file__).resolve().parent / "results/2026-10-13-ds_inplace/inputs.json").read_text())["sha256"]
-GO_US = 70.0
-
-
-def sha(path: Path) -> str:
-    h = hashlib.sha256()
-    with path.open("rb") as f:
-        while block := f.read(8 << 20):
-            h.update(block)
-    return h.hexdigest()
 
 
 def write_json(path: Path, data: dict) -> None:
     path.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n")
 
 
-def gain_us(ref_ms: float, cand_ms: float) -> float:
-    """reference - candidate in us, rounded to 1e-6 us: the logs carry ms with three decimals, and binary floating
-    point would otherwise move an exact boundary (60.00000000000006 > 2 x 30, 29.9999999999998 < 30; review 07, R02)."""
-    return round(1000 * (ref_ms - cand_ms), 6)
-
-
-def paired(gains_us: list[float]) -> dict:
-    """Five paired gains (reference minus candidate, us): median, full-range spread, and the decision rule."""
-    if len(gains_us) != 5 or not all(math.isfinite(v) for v in gains_us):
-        raise ValueError("a paired result needs five finite gains")
-    gains_us = [round(v, 6) for v in gains_us]
-    median = round(statistics.median(gains_us), 6)
-    spread = round(max(gains_us) - min(gains_us), 6)
-    return dict(gains_us=gains_us, median_us=median, spread_us=spread, every_positive=min(gains_us) > 0,
-                go=min(gains_us) > 0 and median >= GO_US and median > 2 * spread)
-
-
-def d2_verdict(rounds: list[dict], cand: str = "coh") -> dict:
-    """D2's rule (docs/DSV2-D1-D5.md, fixed before the code), device basis, the same five rounds:
-    (a) coh vs default (sc1): every pair faster and median >= 70 us;
-    (b) coh vs relaxed: |median(coh - relaxed)| <= max(2 x spread of the relaxed-vs-default pairs, 20 us)."""
-    a = paired([gain_us(r["default"]["device_ms"], r[cand]["device_ms"]) for r in rounds])
-    rel = paired([gain_us(r["default"]["device_ms"], r["relaxed"]["device_ms"]) for r in rounds])
-    b = [gain_us(r[cand]["device_ms"], r["relaxed"]["device_ms"]) for r in rounds]
-    b_median = round(statistics.median(b), 6)
-    tol = max(2 * rel["spread_us"], D2_MIN_TOL_US)
-    a_ok = a["every_positive"] and a["median_us"] >= GO_US
-    b_ok = abs(b_median) <= tol
-    return dict(a=a, relaxed_vs_default=rel, b_gains_us=b, b_median_us=b_median, b_tol_us=tol, a_ok=a_ok, b_ok=b_ok,
-                go=a_ok and b_ok)
-
-
-def d4_verdict(vs_default: dict) -> dict:
-    """D4's speed rule (docs/DSV2-D1-D5.md): every pair faster, median >= 30 us and > 2 x spread. Criterion (a), the
-    shared XCDs' gate_up ready before the layer's routing completes, comes from `d4trace`."""
-    return dict(vs_default, keep=vs_default["every_positive"] and vs_default["median_us"] >= D4_KEEP_US
-                and vs_default["median_us"] > 2 * vs_default["spread_us"])
-
-
-def d5_verdict(vs_all: dict) -> dict:
-    """D5 drops neutral or slower results; only five positive gains >= 30 us median and > 2 x spread KEEP."""
-    neutral = abs(vs_all["median_us"]) <= vs_all["spread_us"]
-    any_slower = any(gain < 0 for gain in vs_all["gains_us"])
-    keep = (vs_all["every_positive"] and vs_all["median_us"] >= D5_KEEP_US
-            and vs_all["median_us"] > 2 * vs_all["spread_us"])
-    return dict(vs_all, neutral=neutral, any_slower=any_slower, keep=keep, drop=not keep)
-
-
-# Every measured arm's pre-registered rule, as written in docs/DSV2-D1-D5.md before its first measurement (commit of
-# the rule in the doc). verdict() records the outcome in ONE field so no arm reports a blank decision.
-RULES = {
-    "all": ("GO: every pair faster than default, median >= 70 us, > 2 x spread", "go", "default"),
-    "coh": ("D2: (a) every pair faster than default, median >= 70 us; (b) |median(coh - relaxed)| <= max(2 x relaxed spread, 20 us)", "d2", None),
-    "l1": ("D2 rule applied to D2b: (a) every pair faster than default, median >= 70 us; (b) |median(l1 - relaxed)| <= max(2 x relaxed spread, 20 us)", "d2", None),
-    "d4": ("KEEP: every pair faster than default, median >= 30 us, > 2 x spread", "d4", None),
-    "alld4r0": ("KEEP: every pair faster than all, median >= 30 us, > 2 x spread (rule commit 7e08d27)", "keep_vs_all", None),
-    "alld4r0l1": ("KEEP: every pair faster than alld4r0, median >= 30 us, > 2 x spread (rule commit 8d69e52)", "keep_vs_alld4r0", None),
-    "alld4s": ("KEEP: every pair faster than alld4r0, median >= 30 us, > 2 x spread (rule commit ff15c2c, brief 05)", "keep_vs_alld4r0", None),
-    "alld3": ("D3 GO only if every pair faster than all (one chunk), median >= 30 us, > 2 x spread; else DROP (rule commit 1f6e3cc)", "keep_vs_all", None),
-    "alld5": ("DROP if |median gain| <= spread or any pair is slower than all; KEEP only if every pair faster than all, median >= 30 us and > 2 x spread; otherwise DROP (D5 rule commit 84eaa1b)", "d5", "all"),
-}
-
-
-def verdict(arm: str, report: dict) -> dict:
-    if arm not in RULES:
-        return dict(rule="attribution or measurement only: no decision", outcome="NO RULE (attribution)")
-    rule, field, ref = RULES[arm]
-    if field == "go":
-        ok = report["device_ms"][ref]["median_us"] >= GO_US and report["device_ms"][ref]["every_positive"] and \
-            report["device_ms"][ref]["median_us"] > 2 * report["device_ms"][ref]["spread_us"]
-    elif field == "d2":
-        ok = report["d2"]["go"]
-    else:
-        ok = report[field]["keep"]
-    return dict(rule=rule, outcome=("GO" if field in ("go", "d2") else "KEEP") if ok
-                else ("DROP" if field == "d5" else "NO-GO"), passed=bool(ok))
-
-
-def full_result(log: str) -> dict:
-    if len(re.findall(r"^tokens: 32/32 match HF greedy$", log, re.M)) != 1:
-        raise ValueError("full invocation missing exact 32/32 free-greedy gate")
-    if len(re.findall(r"consecutive layers within the gate: 27 of 27", log)) != 1:
-        raise ValueError("full invocation missing 27/27 layer gate")
-    warmups = re.findall(r"run \d+ \(warm-up\).*?: [^\n]*?(\d+)/(\d+) tokens match", log)
-    if warmups != [("32", "32")]:
-        raise ValueError("full invocation missing one 32/32 warmup")
-    if re.search(r"MISMATCH|\[FAIL\]|no reference token", log):
-        raise ValueError("full invocation contains a correctness failure")
-    device = re.search(r"per-token latency .*?: median ([\d.]+) ms", log)
-    wall = re.search(r"step wall \(launch to end\) ([\d.]+) ms/token", log)
-    if wall is None:
-        wall = re.search(r"wall time of the launches: .*? = ([\d.]+) ms/token", log)
-    if device is None or wall is None:
-        raise ValueError("full invocation missing device/wall timing")
-    result = dict(device_ms=float(device[1]), wall_ms=float(wall[1]), tokens=32, layers=27)
-    if not all(math.isfinite(result[k]) and result[k] > 0 for k in ("device_ms", "wall_ms")):
-        raise ValueError("invalid full timing")
-    return result
-
-
 D4_STAGE_NOTE = ("D4 arms: topk = the ROUTED XCDs' routing prologue (only routed gate_up tasks write stamps); moe_up and "
                  "moe_down are the merged routed + shared-XCD phases (shgu / sdown join gate_up / down), so their "
                  "bodies include the shared XCDs while the topk split does not. Span, stage sums and verdicts are exact.")
-
-
-def arm_order(arm: str, fleet_available: bool = True) -> tuple[tuple, tuple, str]:
-    """(invocation order of round 0, references, candidate) of a pairs arm; odd rounds reverse the order."""
-    if arm == "baseline":
-        order, refs, cand = ("default", "fleet"), ("default",), "fleet"
-    elif arm == "all":
-        order, refs, cand = ("default", "all", "fleet"), ("default", "fleet"), "all"
-        if not fleet_available:                               # the decision is vs default; fleet is the context
-            print("PAIRS arm=all: fleet binary missing, measuring against default only", flush=True)
-            order, refs = ("default", "all"), ("default",)
-    elif arm in ("coh", "l1"):
-        order, refs, cand = ("default", "relaxed", arm), ("default", "relaxed"), arm
-    elif arm == "alld4r0l1":
-        order, refs, cand = ("default", "alld4r0", arm), ("default", "alld4r0"), arm
-    elif arm == "alld3":
-        order, refs, cand = ("all", arm), ("all",), arm
-    elif arm in ("allrelaxed", "alld4r0"):
-        order, refs, cand = ("default", "all", arm), ("default", "all"), arm
-    elif arm == "alld4s":
-        order, refs, cand = ("default", "alld4r0", "alld4s"), ("default", "alld4r0"), "alld4s"
-    elif arm == "alld5":
-        order, refs, cand = ("all", arm), ("all",), arm
-    else:
-        order, refs, cand = ("default", arm), ("default",), arm
-    return order, refs, cand
-
-
-def build_report(arm: str, refs: tuple, cand: str, rounds: list[dict]) -> dict:
-    """The pairs report of five rounds: the ONE implementation pairs() writes and verify_hour.py re-derives."""
-    report = dict(arm=arm, rounds=rounds, condition="one MI300X, batch 1, context 1024, 32 tokens, repeat 2")
-    for key in ("device_ms", "wall_ms"):
-        report[key] = {}
-        for ref in refs:
-            report[key][ref] = paired([gain_us(r[ref][key], r[cand][key]) for r in rounds])
-    if arm == "alld4r0":
-        report["keep_vs_all"] = d4_verdict(report["device_ms"]["all"])
-    if arm == "alld4r0l1":
-        report["keep_vs_alld4r0"] = d4_verdict(report["device_ms"]["alld4r0"])
-    if arm == "alld4s":
-        report["keep_vs_alld4r0"] = d4_verdict(report["device_ms"]["alld4r0"])
-    if arm == "alld3":
-        report["keep_vs_all"] = d4_verdict(report["device_ms"]["all"])
-    if arm == "alld5":
-        report["d5"] = d5_verdict(report["device_ms"]["all"])
-    if arm in ("coh", "l1"):
-        report["d2"] = d2_verdict(rounds, arm)
-    elif arm == "d4":
-        report["d4"] = d4_verdict(report["device_ms"]["default"])
-    if arm != "all":
-        for basis in report["device_ms"].values():
-            basis["go"] = None          # per-reference fields carry no decision; the arm's rule is in `verdict`
-    report["verdict"] = verdict(arm, report)
-    report["verdict"] = verdict(arm, report)
-    return report
 
 
 class Session:
@@ -344,12 +127,12 @@ class Session:
         if source_sha(self.fleet / "src") != PINNED_SRC_SHA256:
             raise RuntimeError("fleet src is not the exact pinned 3fb67a6 export")
         from examples.dsv2lite.patch_fleet import levers
-        missing = sorted({p for arm in ARMS.values() for p in arm} - set(levers()))
+        missing = sorted({p for arm in ARMS.values() for p in arm.levers} - set(levers()))
         if missing:
             raise RuntimeError(f"levers not on this branch: {missing}")
         identity = self.source_identity()
         write_json(self.logs / "source.json", dict(fleet_commit="3fb67a6", fleet_src_sha256=PINNED_SRC_SHA256,
-                                                   etx_identity=identity, arms={k: list(v) for k, v in ARMS.items()}))
+                                                   etx_identity=identity, arms={k: list(a.levers) for k, a in ARMS.items()}))
         self.run("environment", ["bash", "-c", "set -eu\nhipcc --version\nrocminfo\ncat SOURCE_IDENTITY"], timeout=60)
         print(f"SOURCE OK fleet export {PINNED_SRC_SHA256[:16]} etx {identity.split()[1][:12]}", flush=True)
 
@@ -369,7 +152,7 @@ class Session:
 
     def build(self, arm: str, stamped: bool = False):
         out = self.out(arm, stamped)
-        if arm == "fleet":
+        if ARMS[arm].builder == "fleet":
             out.mkdir(parents=True)
             self.run("build_fleet_graph", [sys.executable, self.fleet / "src/host/taskgraph.py", "--kv-chunks", "16",
                                            "--emit", out / "taskgraph_d16.bin"], timeout=60)
@@ -378,13 +161,9 @@ class Session:
                                               "-I" + str(self.fleet / "src"), self.fleet / "src/host/fleet_launch.hip",
                                               self.fleet / "src/kernels/fleet_kernel.hip", "-o", out / "run"], timeout=600)
         else:
-            # plan switches default off; an arm's own switches override them (a dict update, not repeated keywords:
-            # the 2026-10-13 d1d5 run lost build_coh / build_d4 to "multiple values for keyword argument")
-            env = dict(ETX_OUT=str(out), ETX_FLEET_PATCH=" ".join(ARMS[arm]), ETX_BUILD_VERBOSE="1",
-                       ETX_DSV2_COH="0", ETX_DSV2_D4="0", ETX_DSV2_KCHUNKS="1", ETX_DSV2_D5="0")
-            env.update(ARM_ENV.get(arm, {}))
-            flags = (["-Rpass-analysis=kernel-resource-usage"] + ARM_FLAGS.get(arm, [])
-                     + (["-DETX_DSV2_STAMPS2"] if stamped else []))
+            a = ARMS[arm]               # exactly the build rocm_build_check.sh --arm resolves
+            env = dict(build_env(a, stamped), ETX_OUT=str(out), ETX_BUILD_VERBOSE="1")
+            flags = shlex.split(env["ETX_CFLAGS"])
             text = self.run(f"compile_{arm}{'_stamps' if stamped else ''}",
                             ["bash", "examples/dsv2lite/build.sh", self.fleet, *flags], env=env, timeout=900)
             from examples.dsv2lite.build_resources import parse
@@ -392,7 +171,7 @@ class Session:
             write_json(out / "resources.json", resources)
             if resources["scratch"] > 0:
                 raise RuntimeError(f"arm {arm} spills to scratch on this box: {resources}")
-            print(f"BUILD arm={arm} stamped={int(stamped)} resources={resources}", flush=True)
+            print(f"BUILD arm={arm} stamped={int(stamped)} plan_sha256={sha(out / 'plan.json')} resources={resources}", flush=True)
         print(f"BUILD arm={arm} OK", flush=True)
 
     def full_invocation(self, arm: str, name: str) -> dict:
@@ -403,36 +182,17 @@ class Session:
 
     def pairs(self, arm: str):
         """Five interleaved rounds; order reversed on odd rounds; every invocation a fresh process with all gates."""
-        if arm == "alld4s" and (self.logs / "pairs_alld4s.json").exists():
-            raise RuntimeError("alld4s report already exists; choose a fresh ETX_SESS_LOGDIR for new pairs")
-        order, refs, cand = arm_order(arm, fleet_available=(self.out("fleet") / "run").exists())
-        rounds = []
-        for i in range(5):
-            result = {}
-            for current in (order if i % 2 == 0 else tuple(reversed(order))):
-                result[current] = self.full_invocation(current, f"{arm}_r{i}_{current}")
-            rounds.append(result)
-        report = build_report(arm, refs, cand, rounds)
+        if (self.logs / f"pairs_{arm}.json").exists():
+            raise RuntimeError(f"pairs_{arm}.json already exists: use a fresh ETX_SESS_LOGDIR")
+        a = ARMS[arm]
+        rounds = experiment.measure(a, self.full_invocation, lambda b: (self.out(b) / "run").exists())
+        report = experiment.report(a, rounds, CONDITION)
         write_json(self.logs / f"pairs_{arm}.json", report)
         v = report["verdict"]
         print(f"VERDICT arm={arm} {v['outcome']} rule={v['rule']!r}", flush=True)
-        base = "default" if "default" in report["device_ms"] else refs[0]     # 2-way arms against `all` (alld3, alld5)
-        d = report["device_ms"][base]
-        if arm in ("coh", "l1"):
-            v = report["d2"]
-            print(f"PAIRS arm={arm} D2 (a) vs sc1 median {v['a']['median_us']:.1f} us spread {v['a']['spread_us']:.1f} "
-                  f"every_positive={int(v['a']['every_positive'])} ok={v['a_ok']}; (b) coh - relaxed median "
-                  f"{v['b_median_us']:.1f} us tolerance {v['b_tol_us']:.1f} ok={v['b_ok']}; GO={v['go']}", flush=True)
-        if arm == "d4":
-            v = report["d4"]
-            print(f"PAIRS arm=d4 D4 median {v['median_us']:.1f} us spread {v['spread_us']:.1f} every_positive="
-                  f"{int(v['every_positive'])} KEEP={v['keep']}", flush=True)
-        if arm == "alld4s":
-            v = report["keep_vs_alld4r0"]
-            print(f"PAIRS arm=alld4s device gain vs alld4r0 median {v['median_us']:.1f} us spread "
-                  f"{v['spread_us']:.1f} every_positive={int(v['every_positive'])} KEEP={v['keep']}", flush=True)
-        print(f"PAIRS arm={arm} device gain vs {base} median {d['median_us']:.1f} us spread {d['spread_us']:.1f} "
-              f"every_positive={int(d['every_positive'])} GO={d['go']}", flush=True)
+        for ref, d in report["device_ms"].items():
+            print(f"PAIRS arm={arm} device gain vs {ref} median {d['median_us']:.1f} us spread {d['spread_us']:.1f} "
+                  f"every_positive={int(d['every_positive'])}", flush=True)
 
     def trace(self, arm: str):
         """One stamped run of arm's STAMPS2 build (trace + prologue stamps), then the per-stage table of that token."""
@@ -463,15 +223,12 @@ class Session:
 
     def report(self):
         from examples.dsv2lite import stage_table as st
-        out = dict()
-        for arm in ("baseline", "all", *SINGLE, "coh", "d4", "alld5"):
-            path = self.logs / f"pairs_{arm}.json"
-            out[arm] = json.loads(path.read_text()) if path.exists() else "NOT COMPLETE"
-        if out["all"] == "NOT COMPLETE":
+        out = {f.stem.removeprefix("pairs_"): json.loads(f.read_text()) for f in sorted(self.logs.glob("pairs_*.json"))}
+        if "all" not in out:
             raise RuntimeError("the deciding arm `all` is NOT COMPLETE")
         expected = json.loads((self.root / "examples/dsv2lite/results/stages/stage_table.json").read_text())
         rows = []
-        stages = {a: json.loads((self.logs / f"stages_{a}.json").read_text()) for a in STAMPED
+        stages = {a: json.loads((self.logs / f"stages_{a}.json").read_text()) for a in ("default", "all")
                   if (self.logs / f"stages_{a}.json").exists()}
         for r in expected["rows"]:
             s = r["stage"]
@@ -483,7 +240,7 @@ class Session:
         out["stages"] = rows
         write_json(self.logs / "report.json", out)
         a = out["all"]["device_ms"]["default"]
-        print(f"REPORT all: median {a['median_us']:.1f} us spread {a['spread_us']:.1f} GO={a['go']}; "
+        print(f"REPORT all: median {a['median_us']:.1f} us spread {a['spread_us']:.1f} {out['all']['verdict']['outcome']}; "
               f"stages measured: {len(stages) == 2}; raw logs and JSON kept in {self.logs}", flush=True)
 
 
@@ -494,19 +251,12 @@ def main(argv=None):
     ap.add_argument("--stamped", action="store_true")
     a = ap.parse_args(argv)
     session = Session()
-    if a.operation == "build":
-        if a.arm not in (*ARMS, "fleet"):
-            ap.error(f"build arm must be one of {sorted((*ARMS, 'fleet'))}")
-        session.build(a.arm, a.stamped)
-    elif a.operation == "pairs":
-        if a.arm not in ("baseline", "all", *SINGLE, "coh", "d4", "allrelaxed", "d4r0", "alld4r0", "l1", "alld4r0l1",
-                         "alld3", "alld4s", "alld5"):
-            ap.error("pairs arm must be baseline, all, coh, d4 or a single lever")
-        session.pairs(a.arm)
-    elif a.operation == "trace":
-        if a.arm not in TRACEABLE:
-            ap.error(f"trace arm must be one of {TRACEABLE}")
-        session.trace(a.arm)
+    allowed = dict(build=[n for n, x in ARMS.items() if x.builder in ("etx", "fleet")], pairs=[n for n, x in ARMS.items() if x.order],
+                   trace=[n for n, x in ARMS.items() if x.stamped])
+    if a.operation in allowed:
+        if a.arm not in allowed[a.operation]:
+            ap.error(f"{a.operation} arm must be one of {allowed[a.operation]}")
+        getattr(session, a.operation)(a.arm, *([a.stamped] if a.operation == "build" else []))
     else:
         getattr(session, a.operation)()
 

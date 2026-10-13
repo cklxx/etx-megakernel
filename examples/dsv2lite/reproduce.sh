@@ -7,7 +7,7 @@
 #   reproduce.sh run <ip>              start examples/sessions/ds_inplace.py on GPU 0, hard stop 7200 s
 #   reproduce.sh status <ip>           runner state
 #   reproduce.sh fetch <ip> <dest>     the box's session record into <dest>/<id>, verified (tools/session.sh fetch)
-#   reproduce.sh rederive <dir>        re-derive every verdict of a fetched session from its raw logs
+#   reproduce.sh rederive <dir> [job-file]  verify a fetched record, its verdicts and optionally promised outputs
 # ETX_SESS_USER is the box login (default root). ETX_CACHE (default ~/code/etx-cache) holds the pinned fleet export and
 # the archived data sets; ETX_FLEET_REPO (default ~/code/fleet-mi300x) is a clone of github.com/cklxx/fleet-mi300x.
 set -euo pipefail
@@ -62,10 +62,17 @@ check)
   $PY -m examples.dsv2lite.stage_table > /dev/null
   git diff --exit-code --stat -- examples/dsv2lite/results/stages || die "stage table regenerated differently"
   ok "$(grep '^\*\*Summary, arithmetic' examples/dsv2lite/results/stages/stage_table.md | tr -d '*')"
+  "$0" check-verdicts
+  ;;
+check-verdicts)
+  logdir=$(mktemp -d /tmp/etxdry.XXXXXX)
   step "7. every verdict re-derived from the session's raw logs (incl. the combined arm's 92 us)"
-  $PY -m examples.dsv2lite.rederive "$SESSION_DIR" | tee "$logdir/rederive.txt"
-  grep -q '^  all      vs default median    92.0 spread  18.0 every_positive=1 GO=True' "$logdir/rederive.txt" \
-    || die "the combined arm's verdict did not re-derive"
+  rc=0
+  $PY -m etx.session.experiment verify "$SESSION_DIR" examples.dsv2lite.arms > "$logdir/rederive.txt" || rc=$?
+  cat "$logdir/rederive.txt"
+  [ "$rc" = 0 ] || [ "$rc" = 3 ] || die "re-derivation failed ($rc)"
+  grep -q '^OK   pairs all        GO .* vs default: median 92.0 us spread 18.0 every_positive=1$' "$logdir/rederive.txt" \
+    && grep -q '^RE-DERIVED:' "$logdir/rederive.txt" || die "the combined arm's verdict did not re-derive"
   ok "all vs default: median 92.0 us, spread 18.0, every pair faster, GO"
   ;;
 box-setup)
@@ -101,7 +108,9 @@ fetch)
   ;;
 rederive)
   DIR=${2:?session dir}
-  $PY -m examples.dsv2lite.rederive "$DIR"
+  rc=0
+  $PY -m etx.session.experiment verify "$DIR" examples.dsv2lite.arms "${@:3}" || rc=$?
+  [ "$rc" = 0 ] || [ "$rc" = 3 ] || exit "$rc"
   # A new session is the same experiment only with the measured inputs and sources (the HF model revision is not
   # pinned by the download; the weights' hash is what identifies it).
   $PY - "$DIR" "$SESSION_DIR" <<'PYEOF'
@@ -115,6 +124,7 @@ for f, key in (("inputs.json", "sha256"), ("source.json", "fleet_src_sha256")):
     same &= a == b
 sys.exit(0 if same else 3)
 PYEOF
+  exit "$rc"
   ;;
 *)
   sed -n '2,13p' "$0"; exit 2

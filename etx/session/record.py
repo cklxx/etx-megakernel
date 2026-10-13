@@ -89,6 +89,23 @@ def verify(d: Path) -> tuple[int, list[str]]:
     return (2 if bad else 3 if not s["complete"] else 0), lines
 
 
+def verify_legacy(d: Path, archives=()) -> tuple[int, list[str]]:
+    """A result kept before records were sealed: its SHA256SUMS (computed after the fetch) against the copy, files
+    archived outside git looked up in `archives`. Never more than 3: without a SEAL it is not a sealed record."""
+    sums = d / "SHA256SUMS"
+    if not sums.exists():
+        return 3, [f"UNSEALED {d}: no SEAL and no SHA256SUMS"]
+    bad, archived = [], 0
+    for row in sums.read_text().splitlines():
+        digest, name = row.split(None, 1)
+        name = name.lstrip("*").removeprefix("./")
+        path = next((p for p in (d / name, *(a / Path(name).name for a in archives)) if p.exists()), None)
+        archived += path is None
+        bad += [f"MISMATCH {name}"] if path is not None and sha256(path) != digest else []
+    return (2 if bad else 3), bad + [f"LEGACY (no SEAL): SHA256SUMS {'FAILED' if bad else 'matches'}, "
+                                     f"{archived} archived file(s) not present"]
+
+
 def main(argv=None) -> int:
     a = sys.argv[1:] if argv is None else argv
     if len(a) != 2 or a[0] not in ("verify", "local-only"):

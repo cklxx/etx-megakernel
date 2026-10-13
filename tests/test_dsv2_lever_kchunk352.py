@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 
 from examples.dsv2lite import patch_fleet as pf
-from examples.dsv2lite.inplace_session import ARM_ENV, ARM_FLAGS, ARMS, LEVERS_ALL
+from examples.dsv2lite.arms import ARMS, LEVERS_ALL
 from examples.dsv2lite.levers import kchunk352 as kc
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -95,5 +95,5 @@ def test_tiles_need_the_flag_and_the_lever():
     assert re.search(r'static_assert\(fleet::kExpertKChunk == 352', block)
     assert "fleet_expert_gate_up_k" in block and "fleet_expert_down_k" in block
     assert 'asm volatile("buffer_inv sc1"' in block           # chunk 0's acquire includes the L1
-    assert ARMS["alld3"] == (*LEVERS_ALL, "kchunk352")
-    assert ARM_FLAGS["alld3"] == ["-DETX_DSV2_KCHUNKS=1"] and ARM_ENV["alld3"] == {"ETX_DSV2_KCHUNKS": "4"}
+    assert ARMS["alld3"].levers == (*LEVERS_ALL, "kchunk352")
+    assert ARMS["alld3"].flags == ("-DETX_DSV2_KCHUNKS=1",) and ARMS["alld3"].env == {"ETX_DSV2_KCHUNKS": "4"}

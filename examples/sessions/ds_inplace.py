@@ -1,18 +1,11 @@
 """PREPARED, NOT RUN. One MI300X, GPU 0 only. No provisioning; the model download and reference run happen on the box.
 
-What it measures (examples/dsv2lite/inplace_session.py): the ETX DeepSeek port with every lever that passed its local
-gate (examples/dsv2lite/results/levers/*.json), as whole tokens, against default ETX and shipped fleet (3fb67a6).
-  1. baseline        5 interleaved rounds default / fleet
-  2. pairs all       5 interleaved rounds default / all / fleet: THE decision
-  3. trace default, trace all   one stamped token each (STAMPS2 builds): the measured per-stage table
-  4. pairs <lever>   5 rounds default / lever for Q, Qall, N, Nall, argmax, topk, prep: attribution, no verdict
-  5. report          verdict + measured per-stage savings next to stage_table.json's expected ones
-Every invocation is a fresh process and must show 32/32 HF-greedy tokens, 27/27 layers and a 32/32 warm-up.
-
-Decision rule, fixed before the run (all vs default, device basis): every paired gain > 0, median >= 70 us/token,
-median > 2 x full-range spread. Expected from the local account: 531.1 us simulated / 533.4 us arithmetic
-(stage_table.md; BYTES rows are upper bounds). Reject `all` on any correctness gate, on scratch in its build, or on
-the rule; then the single-lever pairs say which lever fails. A run that does not finish is NOT COMPLETE.
+Measures ETX's DeepSeek port against default ETX and shipped fleet (3fb67a6). Arm builds, invocation orders,
+references and decision rules come from examples/dsv2lite/arms.py; build jobs are generated from measurement inputs.
+The GPU lane runs baseline, the deciding combined arm, stage traces, then individual levers for attribution.
+Every invocation is fresh and requires 32/32 HF-greedy tokens, 27/27 layers and a 32/32 warm-up. Scratch in a build or
+any correctness failure rejects its job; an unfinished run is NOT COMPLETE. Expected local savings: 531.1 us
+simulated / 533.4 us arithmetic (stage_table.md; BYTES rows are upper bounds).
 
 Budget [planning cap]: 120 GPU minutes (MAX_SESSION_SECONDS), $5.98 at $2.99/h (Hot Aisle 1x; balance $6.29 on
 2026-10-13) or $3.98 at $1.99/h. Expected use [E]: ~25 min environments + inputs (builds run in parallel), then
@@ -31,10 +24,10 @@ Use --dry-run locally. Fetch the session directory into the tree before deleting
 """
 import os
 
-from examples.dsv2lite.inplace_session import DATA_FILES, arm_order
+from examples.dsv2lite.arms import ARMS, SINGLE
+from examples.dsv2lite.inplace_session import DATA_FILES
 
 MAX_SESSION_SECONDS = 7200
-SINGLE = ("Q", "Qall", "N", "Nall", "argmax", "topk", "prep", "relaxed")   # relaxed: D1, the sc0 acquire by name
 JOBS = []
 
 # The runner loads this file on the box, so these are the box's defaults; every job gets them, and the runner expands
@@ -63,11 +56,11 @@ def build(arm, stamped=False):
 
 
 def pairs(arm, timeout=1200, name=None):
-    """Reads exactly what `pairs <arm>` runs: the verified inputs and each build of the arm's order (fleet is context
-    for `all`, run only if it built; it is required where it is the candidate)."""
-    order, _, cand = arm_order(arm)
+    """Reads exactly what `pairs <arm>` runs: the verified inputs and each build of the arm's order in the registry
+    (an optional build, fleet for `all`, is context: measured only if it built)."""
+    a = ARMS[arm]
     add(name or f"pairs_{arm}", f"pairs {arm}", lane="gpu", writes=[f"pairs_{arm}.json"], timeout=timeout,
-        reads=["inputs.json", *(f"b_{b}/run" for b in order if b != "fleet" or cand == "fleet")])
+        reads=["inputs.json", *(f"b_{b}/run" for b in a.order if b not in a.optional)])
 
 
 def trace(arm, timeout=300):
@@ -114,21 +107,29 @@ job("prep_pack", 'cd "$ETX_DSV2_FLEET" && { test -s "$ETX_DSV2_DATA/weights.bin"
 # 2026-10-13 d1d5 run started the single-lever pairs at +1 min, before prep_pack wrote the inputs at +3 min
 add("preflight", "preflight", reads=list(DATA.values()), writes=["inputs.json"], timeout=600)
 
-# ---------------------------------------------------------------- builds (cpu, while the inputs are prepared)
-DITEMS = ("coh", "d4")   # D2: three-way pairs default / relaxed / coh; D4: pairs default / d4 (docs/DSV2-D1-D5.md)
-for arm in ("default", "fleet", "all", *SINGLE, *DITEMS):
-    build(arm)
-for arm in ("default", "all"):
-    build(arm, stamped=True)
+def generate_builds():
+    """Materialize every measurement's build inputs, already derived from the registry's invocation order."""
+    required = dict.fromkeys(r for j in JOBS for r in j["reads"] if r.startswith("b_") and r.endswith("/run"))
+    first = next(i for i, j in enumerate(JOBS) if j["lane"] == "gpu" and j["name"] != "prep_ref")
+    start = len(JOBS)
+    for path in required:
+        name = path[2:-4]
+        build(name.removesuffix("_stamps"), stamped=name.endswith("_stamps"))
+    generated = JOBS[start:]
+    del JOBS[start:]
+    JOBS[first:first] = generated
+
 
 # ---------------------------------------------------------------- GPU, in order of importance (the list order)
 pairs("baseline", timeout=900, name="baseline")
 pairs("all")                             # the decision
 trace("default")
 trace("all")
-for arm in DITEMS:                       # new conditions before the attributions already measured on 2026-10-13
+for arm in ("coh", "d4"):                # new conditions before the attributions already measured on 2026-10-13
     pairs(arm)
 add("d4trace", "d4trace", lane="gpu", reads=["inputs.json", "b_d4/run"], writes=["d4_trace.json"], timeout=300)
 for arm in SINGLE:                       # attribution: each lever alone, after everything that decides
     pairs(arm, timeout=900)
 add("report", "report", lane="final", reads=["pairs_all.json"], writes=["report.json"], timeout=120)
+
+generate_builds()

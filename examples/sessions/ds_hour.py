@@ -21,20 +21,15 @@ _full = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_full)
 
 MAX_SESSION_SECONDS = 1800
-PREP = ("apt", "etx_env", "prep_env", "source", "prep_dl", "prep_ref", "prep_pack", "preflight",
-        "build_default", "build_all", "build_relaxed", "build_default_stamps")
-JOBS = [dict(d) for d in _full.JOBS if d["name"] in PREP]
-_full.JOBS.clear()
-for arm in ("alld4r0", "l1", "alld4r0l1", "alld3", "alld5", "alld4s"):
-    _full.build(arm)
-for arm in ("alld4r0", "alld4r0l1"):
-    _full.build(arm, stamped=True)
+_full.JOBS = [dict(d) for d in _full.JOBS if d["name"] in
+              ("apt", "etx_env", "prep_env", "source", "prep_dl", "prep_ref", "prep_pack", "preflight")]
 # the GPU lane runs strictly in this order (review 07, R07: a skip cannot let a later arm overtake an earlier one);
-# each job reads the binaries its operation runs (ds_inplace.pairs / trace: from arm_order), and inputs.json
+# each job reads the binaries its operation runs (ds_inplace.pairs / trace: from the arm registry), and inputs.json
 GPU = [("pairs_l1", "pairs l1"), ("pairs_alld4r0l1", "pairs alld4r0l1"), ("pairs_alld3", "pairs alld3"),
        ("pairs_alld5", "pairs alld5"), ("trace_default", "trace default"), ("trace_alld4r0", "trace alld4r0"),
        ("trace_alld4r0l1", "trace alld4r0l1"), ("pairs_alld4s", "pairs alld4s")]
 for name, op in GPU:
     kind, arm = op.split()
     _full.pairs(arm) if kind == "pairs" else _full.trace(arm, timeout=1200)
-JOBS += _full.JOBS
+_full.generate_builds()
+JOBS = _full.JOBS

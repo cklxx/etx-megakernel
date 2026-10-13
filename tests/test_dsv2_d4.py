@@ -4,6 +4,7 @@ the real `etx compile` command line."""
 from __future__ import annotations
 
 import dataclasses
+from decimal import Decimal
 import json
 import os
 import re
@@ -13,9 +14,18 @@ from pathlib import Path
 
 import pytest
 
+from etx.session.experiment import decide
+from examples.dsv2lite.arms import ARMS, LEVERS_ALL
 from examples.dsv2lite import d4_placement as d4
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def decision(name, gains):
+    arm = ARMS[name]
+    rounds = [{arm.rule.reference: {"device_ms": "3.500"},
+               name: {"device_ms": str(Decimal("3.500") - Decimal(g) / 1000)}} for g in gains]
+    return decide(arm.rule, rounds, name)
 
 
 @pytest.fixture
@@ -140,11 +150,10 @@ def test_the_tiles_exist_only_in_the_d4_build(monkeypatch):
 
 
 def test_d4_verdict_and_trace_criterion(monkeypatch):
-    from examples.dsv2lite.inplace_session import ARM_ENV, ARM_FLAGS, d4_verdict, paired
-    assert ARM_FLAGS["d4"] == ["-DETX_DSV2_D4=1"] and ARM_ENV["d4"] == {"ETX_DSV2_D4": "1"}
-    assert d4_verdict(paired([40.0, 35.0, 42.0, 38.0, 41.0]))["keep"]
-    assert not d4_verdict(paired([40.0, 35.0, -1.0, 38.0, 41.0]))["keep"]          # one pair slower
-    assert not d4_verdict(paired([28.0, 29.0, 31.0, 27.0, 29.5]))["keep"]          # median below 30 us
+    assert ARMS["d4"].flags == ("-DETX_DSV2_D4=1",) and ARMS["d4"].env == {"ETX_DSV2_D4": "1"}
+    assert decision("d4", [40, 35, 42, 38, 41])["passed"]
+    assert not decision("d4", [40, 35, -1, 38, 41])["passed"]          # one pair slower
+    assert not decision("d4", [28, 29, 31, 27, "29.5"])["passed"]          # median below 30 us
     from examples.dsv2lite import ledger as ld
     T = ld.T
     fake = [T(0, 5, "router", 10.0, 19.0, None, None), T(0, 5, "router", 10.0, 20.0, None, None),
@@ -157,7 +166,6 @@ def test_d4_verdict_and_trace_criterion(monkeypatch):
 
 def test_d4s_session_builds_the_three_arms_before_timing(monkeypatch):
     from etx.tools.gpu_jobs import load_session
-    from examples.dsv2lite.inplace_session import ARMS, ARM_ENV, ARM_FLAGS, LEVERS_ALL
     monkeypatch.delenv("ETX_SESS_MAX_SECONDS", raising=False)
     jobs, limit = load_session(ROOT / "examples/sessions/ds_d4s.py")
     by = {j.name: j for j in jobs}
@@ -172,10 +180,10 @@ def test_d4s_session_builds_the_three_arms_before_timing(monkeypatch):
     assert by["pairs_alld4s"].gpu == 0
     assert by["pairs_alld4s"].reads == ["inputs.json", "b_default/run", "b_alld4r0/run", "b_alld4s/run"]
     assert by["pairs_alld4s"].cmd.endswith("inplace_session pairs alld4s")
-    assert ARMS["alld4s"] == ARMS["alld4r0"] == LEVERS_ALL
-    assert ARM_FLAGS["alld4s"] == ARM_FLAGS["alld4r0"] == ["-DETX_DSV2_D4=1"]
-    assert ARM_ENV["alld4s"] == {"ETX_DSV2_D4": "1", "ETX_DSV2_D4_ROWS": "32"}
-    assert ARM_ENV["alld4r0"] == {"ETX_DSV2_D4": "1", "ETX_DSV2_D4_ROWS": "0"}
+    assert ARMS["alld4s"].levers == ARMS["alld4r0"].levers == LEVERS_ALL
+    assert ARMS["alld4s"].flags == ARMS["alld4r0"].flags == ("-DETX_DSV2_D4=1",)
+    assert ARMS["alld4s"].env == {"ETX_DSV2_D4": "1", "ETX_DSV2_D4_ROWS": "32"}
+    assert ARMS["alld4r0"].env == {"ETX_DSV2_D4": "1", "ETX_DSV2_D4_ROWS": "0"}
 
 
 def _slice_session(tmp_path, monkeypatch):
@@ -186,10 +194,11 @@ def _slice_session(tmp_path, monkeypatch):
 
 
 def _full_slice_log(device_ms):
+    device_ms = Decimal(device_ms)
     return ("run 0 (warm-up): 32/32 tokens match\n"
             "consecutive layers within the gate: 27 of 27\n"
             f"per-token latency (embed -> argmax on device): median {device_ms:.6f} ms\n"
-            f"step wall (launch to end) {device_ms + 0.1:.6f} ms/token\n"
+            f"step wall (launch to end) {device_ms + Decimal('0.1'):.6f} ms/token\n"
             "tokens: 32/32 match HF greedy\n")
 
 
@@ -207,7 +216,7 @@ def test_d4s_pairs_decides_against_alld4r0_and_reverses_order(tmp_path, monkeypa
         _, round_name, arm = name.split("_", 2)
         seen.append(arm)
         r = int(round_name[1:])
-        device = {"default": 3.650, "alld4r0": 3.500, "alld4s": 3.500 - gains[r] / 1000}[arm]
+        device = {"default": "3.650", "alld4r0": "3.500", "alld4s": Decimal("3.500") - Decimal(gains[r]) / 1000}[arm]
         return _full_slice_log(device)
 
     monkeypatch.setattr(s, "run", run)
@@ -220,9 +229,9 @@ def test_d4s_pairs_decides_against_alld4r0_and_reverses_order(tmp_path, monkeypa
     for basis in ("device_ms", "wall_ms"):
         assert set(report[basis]) == {"default", "alld4r0"}
         assert report[basis]["alld4r0"]["gains_us"] == pytest.approx(gains)
-    assert report["keep_vs_alld4r0"]["keep"] is keep
+    assert report["decision"]["passed"] is keep
     assert report["device_ms"]["default"]["median_us"] > 100
-    assert f"KEEP={keep}" in capsys.readouterr().out
+    assert f"VERDICT arm=alld4s {'KEEP' if keep else 'NO-GO'}" in capsys.readouterr().out
 
 
 @pytest.mark.parametrize("arm", ["default", "alld4r0", "alld4s"])
@@ -232,7 +241,7 @@ def test_d4s_pairs_refuses_any_arm_with_a_failed_gate(tmp_path, monkeypatch, arm
     s = _slice_session(tmp_path, monkeypatch)
 
     def run(name, command, **kwargs):
-        log = _full_slice_log(3.5)
+        log = _full_slice_log("3.5")
         return log.replace(old, new) if name.endswith(f"_{arm}") else log
 
     monkeypatch.setattr(s, "run", run)
@@ -242,14 +251,13 @@ def test_d4s_pairs_refuses_any_arm_with_a_failed_gate(tmp_path, monkeypatch, arm
 
 
 @pytest.mark.parametrize("gains,keep", [
-    ([30.0] * 5, True),                    # inclusive minimum gain
-    ([29.999] * 5, False),
-    ([30.0, 30.0, 30.0, 30.0, 45.0], False),  # exclusive twice-spread bound: median = 2 x spread
-    ([30.0, 30.0, 30.0, 30.0, 44.999], True),
+    (["30.0"] * 5, True),                    # inclusive minimum gain
+    (["29.999"] * 5, False),
+    (["30.0", "30.0", "30.0", "30.0", "45.0"], False),  # exclusive twice-spread bound: median = 2 x spread
+    (["30.0", "30.0", "30.0", "30.0", "44.999"], True),
 ])
 def test_d4s_numeric_keep_boundaries(gains, keep):
-    from examples.dsv2lite.inplace_session import d4_verdict, paired
-    assert d4_verdict(paired(gains))["keep"] is keep
+    assert decision("alld4s", gains)["passed"] is keep
 
 
 @pytest.mark.parametrize("fail_at", [1, 8, 15])
@@ -263,14 +271,14 @@ def test_d4s_pairs_does_not_publish_an_interrupted_run(tmp_path, monkeypatch, ca
         calls += 1
         if calls == fail_at:
             raise failure
-        return _full_slice_log(3.5)
+        return _full_slice_log("3.5")
 
     monkeypatch.setattr(s, "run", run)
     with pytest.raises(type(failure)):
         s.pairs("alld4s")
     assert calls == fail_at
     assert not (s.logs / "pairs_alld4s.json").exists()
-    assert "KEEP=" not in capsys.readouterr().out
+    assert "VERDICT" not in capsys.readouterr().out
 
 
 def test_d4s_pairs_rejects_a_truncated_last_invocation(tmp_path, monkeypatch, capsys):
@@ -280,7 +288,7 @@ def test_d4s_pairs_rejects_a_truncated_last_invocation(tmp_path, monkeypatch, ca
     def run(name, command, **kwargs):
         nonlocal calls
         calls += 1
-        log = _full_slice_log(3.5)
+        log = _full_slice_log("3.5")
         return log.rsplit("tokens:", 1)[0] if calls == 15 else log
 
     monkeypatch.setattr(s, "run", run)
@@ -288,7 +296,7 @@ def test_d4s_pairs_rejects_a_truncated_last_invocation(tmp_path, monkeypatch, ca
         s.pairs("alld4s")
     assert calls == 15
     assert not (s.logs / "pairs_alld4s.json").exists()
-    assert "KEEP=" not in capsys.readouterr().out
+    assert "VERDICT" not in capsys.readouterr().out
 
 
 def test_d4s_pairs_refuses_reusing_a_completed_report(tmp_path, monkeypatch, capsys):
@@ -304,7 +312,7 @@ def test_d4s_pairs_refuses_reusing_a_completed_report(tmp_path, monkeypatch, cap
     with pytest.raises(RuntimeError, match="fresh ETX_SESS_LOGDIR"):
         s.pairs("alld4s")
     assert prior.read_text() == original
-    assert "KEEP=" not in capsys.readouterr().out
+    assert "VERDICT" not in capsys.readouterr().out
 
 
 def test_d4s_compiled_queues_preserve_routing_in_worker_lds(monkeypatch):

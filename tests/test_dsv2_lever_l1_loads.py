@@ -10,7 +10,7 @@ import pytest
 
 from examples.dsv2lite import coh_check
 from examples.dsv2lite import patch_fleet as pf
-from examples.dsv2lite.inplace_session import LEVERS_ALL
+from examples.dsv2lite.arms import LEVERS_ALL
 from examples.dsv2lite.levers import coherent_loads as cl
 from examples.dsv2lite.levers import l1_loads as l1
 

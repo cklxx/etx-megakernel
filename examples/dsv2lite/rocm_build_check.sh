@@ -1,14 +1,31 @@
 #!/usr/bin/env bash
 # Offline device + host compilation using the already-local x86 ROCm 7.2.4 toolchain.
-# Usage: rocm_build_check.sh PINNED_FLEET_EXPORT [default|stamps|<lever>[+<lever>...]|all] [OUT]
+# Usage: rocm_build_check.sh [PINNED_FLEET_EXPORT] --arm NAME [OUT]
+# Legacy: rocm_build_check.sh PINNED_FLEET_EXPORT [default|stamps|<lever>[+<lever>...]|all] [OUT]
 #   all = default, stamps and every lever on this branch alone (examples/dsv2lite/levers/).
 # No GPU, pull or network. Fleet must be an export, never a checkout. Extra compiler
 # flags go in ETX_CFLAGS; ETX_DSV2_* graph settings are forwarded explicitly.
 set -euo pipefail
-FLEET="$(cd "${1:?pinned fleet export required}" && pwd)"
-ARM=${2:-all}
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-OUT=${3:-$ROOT/build/dsv2lite-rocm22}
+HEADERS=${ETX_ROCM_HEADERS:-$HOME/code/rocm-headers}
+REGISTERED=""
+if [ "${1:-}" = --arm ]; then
+  FLEET=$(cd "$ROOT" && .venv/bin/python -m examples.dsv2lite.pinned export)
+else
+  FLEET="$(cd "${1:?pinned fleet export or --arm required}" && pwd)"; shift
+fi
+if [ "${1:-}" = --arm ]; then
+  REGISTERED=${2:?registered arm name required}; shift 2
+  # The session strips these too: an arm never inherits ambient plan switches or flags.
+  while IFS= read -r name; do case "$name" in ETX_*|FLEET_*) unset "$name";; esac; done < <(compgen -e)
+  ARM_ENV=$(cd "$ROOT" && .venv/bin/python -m examples.dsv2lite.arms shell "$REGISTERED")
+  eval "$ARM_ENV"
+  FLEET=$(cd "$ROOT" && .venv/bin/python -c 'from pathlib import Path; import sys; from examples.dsv2lite.pinned import fleet_export; print(fleet_export(Path(sys.argv[1])))' "$FLEET")
+  ARM=$REGISTERED
+else
+  ARM=${1:-all}; if [ "$#" -gt 0 ]; then shift; fi
+fi
+OUT=${1:-$ROOT/build/dsv2lite-rocm22}
 mkdir -p "$OUT"; OUT="$(cd "$OUT" && pwd)"
 if [ -e "$FLEET/.git" ]; then echo 'refusing a fleet checkout; use git archive 3fb67a6' >&2; exit 2; fi
 if ! docker image inspect etx-rocm22 >/dev/null 2>&1; then
@@ -19,8 +36,9 @@ if ! docker image inspect etx-rocm22 >/dev/null 2>&1; then
 fi
 docker image inspect etx-rocm22 --format '{{.Id}}' > "$OUT/image.txt"
 LEVERS=$(cd "$ROOT" && .venv/bin/python -c 'from examples.dsv2lite.patch_fleet import levers; print(" ".join(levers()))')
-if [ "$ARM" = all ]; then ARMS=(default stamps $LEVERS); else ARMS=("$ARM"); fi
+if [ -z "$REGISTERED" ] && [ "$ARM" = all ]; then ARMS=(default stamps $LEVERS); else ARMS=("$ARM"); fi
 for arm in "${ARMS[@]}"; do
+  if [ -n "$REGISTERED" ]; then continue; fi
   case "$arm" in default) continue;; esac
   for lever in ${arm//+/ }; do          # "stamps" combines with levers: stamps+<lever>+...
     case " stamps $LEVERS " in *" $lever "*) ;; *) echo "unknown arm $arm: lever $lever not on this branch ($LEVERS)" >&2; exit 2;; esac
@@ -28,21 +46,28 @@ for arm in "${ARMS[@]}"; do
 done
 ENV_ARGS=()
 while IFS= read -r name; do
-  case "$name" in ETX_DSV2_*|ETX_COHERENCE) ENV_ARGS+=(-e "$name=${!name}");; esac
+  if [ -n "$REGISTERED" ]; then
+    case "$name" in ETX_*) ENV_ARGS+=(-e "$name=${!name}");; esac
+  else
+    case "$name" in ETX_DSV2_*|ETX_COHERENCE) ENV_ARGS+=(-e "$name=${!name}");; esac
+  fi
 done < <(compgen -e)
 for arm in "${ARMS[@]}"; do
+  PATCH_ARM=$arm
+  if [ -n "$REGISTERED" ]; then PATCH_ARM=${ETX_FLEET_PATCH// /+}; fi
   mkdir -p "$OUT/$arm"
   echo "== $arm: offline ROCm 7.2.4 compile"
   docker run --rm --pull=never --network=none --platform linux/amd64 \
     -v "$ROOT:/etx:ro" -v "$FLEET:/fleet:ro" -v "$OUT:/out" \
-    -v "${ETX_ROCM_HEADERS:-$HOME/code/rocm-headers}:/rocm:ro" \
-    ${ENV_ARGS[@]+"${ENV_ARGS[@]}"} -e ARM="$arm" -e ETX_CFLAGS="${ETX_CFLAGS:-}" \
+    -v "$HEADERS:/rocm:ro" \
+    ${ENV_ARGS[@]+"${ENV_ARGS[@]}"} -e NAME="$arm" -e ARM="$PATCH_ARM" -e ETX_CFLAGS="${ETX_CFLAGS:-}" \
     -w /etx etx-rocm22 bash -c '
 set -euo pipefail
 export PYTHONDONTWRITEBYTECODE=1
 RL=/rocm/rocm-llvm/opt/rocm-7.2.4/lib/llvm
 DL=/rocm/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode
-OUT=/out/$ARM
+OUT=/out/$NAME
+python3 -c '\''import json, os; print(json.dumps({k: v for k, v in os.environ.items() if k.startswith("ETX_")}, sort_keys=True, indent=2))'\'' > "$OUT/build_env.json"
 "$RL/bin/clang++" --version > "$OUT/compiler.txt"
 python3 -m etx compile examples/dsv2lite/graph.py --arch gfx942 --out "$OUT" --inline-tiles --relay on > "$OUT/compile.log" 2>&1
 SRC=/fleet/src
@@ -76,9 +101,11 @@ declare -p COMMON > "$OUT/compiler_args.txt"
 "$RL/bin/llvm-objcopy" --dump-section .text="$OUT/isa.bin" "$OUT/mk.o"
 "$RL/bin/clang++" "${COMMON[@]}" --cuda-device-only -S examples/dsv2lite/host.hip -o "$OUT/host_dev.s" > "$OUT/host_dev.log" 2>&1
 "$RL/bin/clang++" "${COMMON[@]}" --cuda-host-only -fsyntax-only examples/dsv2lite/host.hip > "$OUT/host_syntax.log" 2>&1
-sha256sum "$OUT/plan_data.h" "$OUT/megakernel_d0.hip" "$OUT/mk.s" "$OUT/isa.bin" > "$OUT/SHA256SUMS"
-echo "$ARM: device and host passes OK"
+sha256sum "$OUT/plan.json" "$OUT/plan_data.h" "$OUT/megakernel_d0.hip" "$OUT/mk.s" "$OUT/isa.bin" > "$OUT/SHA256SUMS"
+sha256sum "$OUT/plan.json"
+echo "$NAME: device and host passes OK"
 ' > "$OUT/$arm/docker.log" 2>&1 || { cat "$OUT/$arm/docker.log"; echo "FAILED: full logs in $OUT/$arm" >&2; exit 1; }
   cat "$OUT/$arm/docker.log"
 done
+cd "$ROOT"
 "$ROOT/.venv/bin/python" -m examples.dsv2lite.build_resources "$OUT"
