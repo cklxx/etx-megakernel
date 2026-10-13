@@ -101,3 +101,12 @@ Every invocation 32/32 + 27/27. Device medians: default 3.668-3.672, fleet 3.542
 |---|---|---|
 | allrelaxed | all five levers + `-DETX_ACQUIRE_DOMAIN_RELAXED` (UNSAFE acquire: a measurement of the prize, never a candidate) | no verdict; its gain over `all` is the most a safe acquire as cheap as sc0 could add to the best arm. If `all - allrelaxed` < 150 us, the acquire route alone cannot close the 231 us to 3.333 ms |
 | d4r0 | D4's placement with 0 slice rows (shared XCDs: own fold + norm, no router, no slices) | splits D4's +271 us: d4r0 slower than default by >= 200 us -> the placement itself is the loss; by <= 50 us -> the slices are |
+
+Results (run 3, 05:08-05:11): **allrelaxed -326 us vs default (spread 8)**: the unsafe acquire is worth ~218 us on top
+of `all`, above the 150 us bar, so the acquire route can close most of the gap to 3.333 ms if a SAFE acquire costs
+what sc0 costs. **d4r0 -62 us vs default (spread 8, every pair faster)**: D4's placement without slices is a gain;
+the slices are the +271 us (the shared down, 35.7 us per task against 17.5 for a routed down, is the straggler).
+
+| arm | what | rule (fixed now, before the code) |
+|---|---|---|
+| alld4r0 | all five levers + D4 placement, 0 slice rows; three-way default / all / alld4r0 | KEEP if every pair faster than `all`, median >= 30 us and > 2 x spread; 32/32 + 27/27 everywhere |

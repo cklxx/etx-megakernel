@@ -24,4 +24,11 @@ _full.add("pairs_allrelaxed", "pairs allrelaxed", lane="gpu",
           after=("preflight", "build_default", "build_all", "build_allrelaxed"), timeout=1200)
 _full.add("pairs_d4r0", "pairs d4r0", lane="gpu", after=("preflight", "build_default", "build_d4r0"), timeout=900)
 _full.JOBS[-1]["after_any"] = ["pairs_allrelaxed"]
+# run 4: the candidate (docs/DSV2-D1-D5.md, alld4r0); ETX_DSV2_NEXT=alld4r0 selects it
+import os
+if os.environ.get("ETX_DSV2_NEXT", "alld4r0") == "alld4r0":
+    _full.JOBS.clear()
+    _full.add("build_alld4r0", "build alld4r0", after=("source",), timeout=1200)
+    _full.add("pairs_alld4r0", "pairs alld4r0", lane="gpu",
+              after=("preflight", "build_default", "build_all", "build_alld4r0"), timeout=1200)
 JOBS += _full.JOBS
