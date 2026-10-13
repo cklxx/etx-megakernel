@@ -11,6 +11,7 @@ section 3 of the same file.
 
   python3 -m etx.tools.gpu_jobs examples/sessions/ds_model.py --gpus 0,1 --logdir ~/sess
 """
+from examples.dsv2lite.acquire import ACQUIRE, RELAXED   # D1: safe sc1 unless an arm names RELAXED
 FLEET = "~/fleet-mi300x"
 JOBS = []
 
@@ -64,11 +65,11 @@ PAIRS = ";".join(["0:qkv_5", "0:attn_5", "0:router_5", "0:gate_up_5", "1:gate_up
                   "0:gate_up_5,1:gate_up_5", "0:qkv_5,1:qkv_5", "0:attn_5,1:attn_5"])
 job(name="build_iso1", lane="cpu", after="etx_env", timeout=1800,
     cmd=f"ETX_DSV2_ISOLATE='{ONE}' ETX_DSV2_ISOLATE_REPS=8 ETX_OUT=$HOME/sess/b_iso1 bash examples/dsv2lite/build.sh ~/fleet-mi300x "
-        "-DETX_ACQUIRE_DOMAIN_RELAXED > $HOME/sess/b_iso1.buildlog 2>&1; tail -2 $HOME/sess/b_iso1.buildlog; test -x $HOME/sess/b_iso1/run")
+        f"{ACQUIRE} > $HOME/sess/b_iso1.buildlog 2>&1; tail -2 $HOME/sess/b_iso1.buildlog; test -x $HOME/sess/b_iso1/run")
 job(name="build_iso2", lane="cpu", after="etx_env", timeout=1800,
     cmd=f"ETX_DSV2_REQUESTS=2 ETX_DSV2_COUPLE=none ETX_RELAY_PLAN=off ETX_FLEET_PATCH=gemv_noinline ETX_DSV2_ISOLATE='{PAIRS}' "
         "ETX_DSV2_ISOLATE_REPS=8 ETX_OUT=$HOME/sess/b_iso2 bash examples/dsv2lite/build.sh ~/fleet-mi300x "
-        "-DETX_ACQUIRE_DOMAIN_RELAXED -DETX_DS_REQUESTS=2 -DETX_SLOT_BY_CU > $HOME/sess/b_iso2.buildlog 2>&1; "
+        f"{ACQUIRE} -DETX_DS_REQUESTS=2 -DETX_SLOT_BY_CU > $HOME/sess/b_iso2.buildlog 2>&1; "
         "tail -2 $HOME/sess/b_iso2.buildlog; test -x $HOME/sess/b_iso2/run")
 job(name="iso1", gpu=0, after=["ds_prep", "build_iso1"], after_any=[prev], timeout=600, cwd=FLEET,
     cmd="ETX_TRACE=1 ETX_TRACE_RAW=$HOME/sess/iso1_trace.bin $HOME/sess/b_iso1/run --tokens 2 --context 1024; "
@@ -83,11 +84,11 @@ job(name="iso2", gpu=0, after=["ds_prep", "ref_r1", "build_iso2", "iso1"], timeo
 
 # ---------------------------------------------------------------- whole-token builds for the counters (GPU 1)
 job(name="build_x1", lane="cpu", after="etx_env", timeout=1800,
-    cmd="ETX_OUT=$HOME/sess/b_x1 bash examples/dsv2lite/build.sh ~/fleet-mi300x -DETX_ACQUIRE_DOMAIN_RELAXED > $HOME/sess/b_x1.buildlog 2>&1; "
+    cmd=f"ETX_OUT=$HOME/sess/b_x1 bash examples/dsv2lite/build.sh ~/fleet-mi300x {ACQUIRE} > $HOME/sess/b_x1.buildlog 2>&1; "
         "test -x $HOME/sess/b_x1/run")
 job(name="build_x2", lane="cpu", after="etx_env", timeout=1800,
     cmd="ETX_DSV2_REQUESTS=2 ETX_DSV2_COUPLE=none ETX_RELAY_PLAN=off ETX_FLEET_PATCH=gemv_noinline ETX_OUT=$HOME/sess/b_x2 "
-        "bash examples/dsv2lite/build.sh ~/fleet-mi300x -DETX_ACQUIRE_DOMAIN_RELAXED -DETX_DS_REQUESTS=2 -DETX_SLOT_BY_CU "
+        f"bash examples/dsv2lite/build.sh ~/fleet-mi300x {ACQUIRE} -DETX_DS_REQUESTS=2 -DETX_SLOT_BY_CU "
         "> $HOME/sess/b_x2.buildlog 2>&1; test -x $HOME/sess/b_x2/run")
 job(name="pmc_list", gpu=1, after="ref_r1", timeout=300, cmd="rocprofv3 --list-avail 2>&1 | head -400")
 COUNTERS = {

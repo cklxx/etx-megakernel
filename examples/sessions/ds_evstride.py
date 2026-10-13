@@ -2,11 +2,12 @@
 a traced one-request run with the stride on GPU 1 for the ledger. Prediction (docs/MODEL-dsv2.md H6, 2026-09-27): about
 5 XCD-local hand-offs per MoE layer lose ~2.3 us each to the shared line, so up to ~11 us per layer, ~0.3 ms per token.
 Assumes the environment, references and weights of ds_model.py are in place (same VM)."""
+from examples.dsv2lite.acquire import ACQUIRE, RELAXED   # D1: safe sc1 unless an arm names RELAXED
 FLEET = "~/fleet-mi300x"
 JOBS = []
 X2 = "ETX_DSV2_REQUESTS=2 ETX_DSV2_COUPLE=none ETX_RELAY_PLAN=off ETX_FLEET_PATCH=gemv_noinline"
-X2F = "-DETX_ACQUIRE_DOMAIN_RELAXED -DETX_DS_REQUESTS=2 -DETX_SLOT_BY_CU"
-B = {"x1": ("", "-DETX_ACQUIRE_DOMAIN_RELAXED"), "x1s": ("", "-DETX_ACQUIRE_DOMAIN_RELAXED -DETX_EV_STRIDE=32"),
+X2F = f"{ACQUIRE} -DETX_DS_REQUESTS=2 -DETX_SLOT_BY_CU"
+B = {"x1": ("", f"{ACQUIRE}"), "x1s": ("", f"{ACQUIRE} -DETX_EV_STRIDE=32"),
      "x2": (X2, X2F), "x2s": (X2, X2F + " -DETX_EV_STRIDE=32")}
 for b, (env, flags) in B.items():
     JOBS.append(dict(name=f"build_{b}", lane="cpu", timeout=1800,

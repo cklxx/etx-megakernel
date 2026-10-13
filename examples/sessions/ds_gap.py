@@ -15,6 +15,7 @@ Decisions (written before the session, docs/PLAN-v3.md section 8):
 
   python3 -m etx.tools.gpu_jobs examples/sessions/ds_gap.py --gpus 0,1 --logdir ~/sess
 """
+from examples.dsv2lite.acquire import ACQUIRE, RELAXED   # D1: safe sc1 unless an arm names RELAXED
 HOME = "$HOME"
 FLEET = "~/fleet-mi300x"
 RUN_ARGS = "--tokens 32 --context 1024 --repeat 2"
@@ -49,12 +50,12 @@ job(name="dl_ds", lane="cpu", after="fleet_env", timeout=1800, cwd=FLEET,
 
 # ---------------------------------------------------------------- builds (cpu lane, parallel)
 BUILDS = {   # name -> (env, extra hipcc flags)
-    "relaxed": ("", "-DETX_ACQUIRE_DOMAIN_RELAXED"),
+    "relaxed": ("", RELAXED),
     "sc1": ("", ""),
-    "cap256": ("", "-DETX_ACQUIRE_DOMAIN_RELAXED -DETX_MIN_WG_PER_CU=2"),
-    "nocp": ("", "-DETX_ACQUIRE_DOMAIN_RELAXED -DFLEET_CONST_PARAMS=0"),
-    "relayoff": ("ETX_RELAY_PLAN=off", "-DETX_ACQUIRE_DOMAIN_RELAXED"),
-    "pro": ("", "-DETX_ACQUIRE_DOMAIN_RELAXED -DETX_DS_PRO=1"),
+    "cap256": ("", f"{ACQUIRE} -DETX_MIN_WG_PER_CU=2"),
+    "nocp": ("", f"{ACQUIRE} -DFLEET_CONST_PARAMS=0"),
+    "relayoff": ("ETX_RELAY_PLAN=off", f"{ACQUIRE}"),
+    "pro": ("", f"{ACQUIRE} -DETX_DS_PRO=1"),
 }
 for b, (env, flags) in BUILDS.items():
     job(name=f"build_{b}", lane="cpu", after="etx_env", timeout=1200,

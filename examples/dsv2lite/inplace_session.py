@@ -25,6 +25,7 @@ import subprocess
 import sys
 import time
 
+from examples.dsv2lite.acquire import RELAXED
 from examples.dsv2lite.pinned import FLEET_SRC_SHA256 as PINNED_SRC_SHA256
 from examples.dsv2lite.pinned import source_sha
 
@@ -32,7 +33,11 @@ LEVERS_ALL = ("gemv_no_terminal_all", "norm_tree_all", "argmax_tree", "topk_rank
 ARMS = {"default": (), "Q": ("gemv_no_terminal",), "Qall": ("gemv_no_terminal_all",), "N": ("norm_tree",),
         "Nall": ("norm_tree_all",), "argmax": ("argmax_tree",), "topk": ("topk_rank",),
         "prep": ("attn_prologue_live",), "all": LEVERS_ALL}
-SINGLE = ("Q", "Qall", "N", "Nall", "argmax", "topk", "prep")
+# Arms that differ by a build flag instead of a lever patch. "relaxed" is D1's comparison: the safe default against
+# the old sc0 acquire, named explicitly (examples/dsv2lite/acquire.py).
+ARM_FLAGS = {"relaxed": [RELAXED]}
+ARMS["relaxed"] = ()
+SINGLE = ("Q", "Qall", "N", "Nall", "argmax", "topk", "prep", "relaxed")
 STAMPED = ("default", "all")
 DATA_FILES = ("weights.bin", "weights.bin.manifest", "fleet_cache.bin", "golden_tokens.txt", "golden_hidden.bin")
 GO_US = 70.0
@@ -210,7 +215,8 @@ class Session:
                                               self.fleet / "src/kernels/fleet_kernel.hip", "-o", out / "run"], timeout=600)
         else:
             env = dict(ETX_OUT=str(out), ETX_FLEET_PATCH=" ".join(ARMS[arm]), ETX_BUILD_VERBOSE="1")
-            flags = ["-Rpass-analysis=kernel-resource-usage"] + (["-DETX_DSV2_STAMPS2"] if stamped else [])
+            flags = (["-Rpass-analysis=kernel-resource-usage"] + ARM_FLAGS.get(arm, [])
+                     + (["-DETX_DSV2_STAMPS2"] if stamped else []))
             text = self.run(f"compile_{arm}{'_stamps' if stamped else ''}",
                             ["bash", "examples/dsv2lite/build.sh", self.fleet, *flags], env=env, timeout=900)
             from examples.dsv2lite.build_resources import parse

@@ -30,7 +30,7 @@ Run (after local validation, balance check and budget authorization):
 Use --dry-run locally. Fetch the session directory into the tree before deleting the VM; delete it right after.
 """
 MAX_SESSION_SECONDS = 7200
-SINGLE = ("Q", "Qall", "N", "Nall", "argmax", "topk", "prep")
+SINGLE = ("Q", "Qall", "N", "Nall", "argmax", "topk", "prep", "relaxed")   # relaxed: D1, the sc0 acquire by name
 JOBS = []
 
 # The runner forwards only ETX_SESS_MAX_SECONDS, so the paths get their defaults in every job's shell.

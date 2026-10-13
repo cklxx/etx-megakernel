@@ -17,6 +17,7 @@ Pass / decide (written before the session):
 
   python3 -m etx.tools.gpu_jobs examples/sessions/ds_interleave.py --gpus 0,1 --logdir ~/sess
 """
+from examples.dsv2lite.acquire import ACQUIRE, RELAXED   # D1: safe sc1 unless an arm names RELAXED
 FLEET = "~/fleet-mi300x"
 RUN1 = "--tokens 32 --context 1024 --repeat 2"
 RUN2 = RUN1 + " --r1-dir build_r1"
@@ -52,10 +53,10 @@ job(name="dl_ds", lane="cpu", after="fleet_env", timeout=1800, cwd=FLEET,
 
 # ---------------------------------------------------------------- builds (cpu lane)
 X2 = "ETX_DSV2_REQUESTS=2 ETX_RELAY_PLAN=off ETX_FLEET_PATCH=gemv_noinline"
-X2F = "-DETX_ACQUIRE_DOMAIN_RELAXED -DETX_DS_REQUESTS=2 -DETX_SLOT_BY_CU"
+X2F = f"{ACQUIRE} -DETX_DS_REQUESTS=2 -DETX_SLOT_BY_CU"
 BUILDS = {   # name -> (env, hipcc flags)
-    "x1": ("", "-DETX_ACQUIRE_DOMAIN_RELAXED"),
-    "x1cap": ("ETX_FLEET_PATCH=gemv_noinline", "-DETX_ACQUIRE_DOMAIN_RELAXED -DETX_MIN_WG_PER_CU=2"),
+    "x1": ("", f"{ACQUIRE}"),
+    "x1cap": ("ETX_FLEET_PATCH=gemv_noinline", f"{ACQUIRE} -DETX_MIN_WG_PER_CU=2"),
     "x2_router": (f"{X2} ETX_DSV2_COUPLE=router", X2F),
     "x2_experts": (f"{X2} ETX_DSV2_COUPLE=experts", X2F),
     "x2_none": (f"{X2} ETX_DSV2_COUPLE=none", X2F),
