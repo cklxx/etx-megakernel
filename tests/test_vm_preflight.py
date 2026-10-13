@@ -40,6 +40,7 @@ def box(tmp_path, monkeypatch):
     subprocess.run(['git', '-C', str(source), '-c', 'user.name=Fixture', '-c',
                     'user.email=fixture@example.test', '-c', 'commit.gpgsign=false',
                     'commit', '-qm', 'fixture'], check=True)
+    subprocess.run(['git', '-C', str(source), '-c', 'tag.gpgsign=false', 'tag', p.VLLM_TAG], check=True)   # a release clone is at its tag
     monkeypatch.setenv('VLLM', str(source))
     model = tmp_path/'llm/qwen3-30b-a3b'
     (model/'hf').mkdir(parents=True)
@@ -79,7 +80,7 @@ def test_all_good(box, capsys):
     lines = verdicts(capsys)
     assert [line.split(':')[0] for line in lines[:-1]] == ['PASS '+n for n in NAMES]
     assert lines[-1] == 'PREFLIGHT PASS'
-    assert 'commit=' in lines[1] and 'runtime_tag=v0.27.1' in lines[1]
+    assert 'commit=' in lines[1] and lines[1].endswith('= v0.27.1')
     assert p.IMAGE in lines[5]
     for name in ('vl.bin', 'vl.manifest', 'hf/config.json', 'golden_c1024.txt'):
         assert f'{name}={(box["model"]/name).stat().st_size} bytes' in lines[2]
@@ -264,3 +265,21 @@ def test_stage_command_quotes_paths(tmp_path, monkeypatch):
     subprocess.run(['bash', '-c', p.stage(name, destination, directory=True)], cwd=tmp_path, check=True)
     assert (destination/'vl.bin').read_bytes() == b'fixture'
     assert not (tmp_path/'SHOULD_NOT_EXIST').exists()
+
+
+def test_a_checkout_off_the_runtime_tag_is_refused(box, capsys):
+    """2026-10-14: a v0.27.0-5 checkout passed while the detail printed v0.27.1; the tag is now verified."""
+    git = ['git', '-C', str(box['source']), '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.test',
+           '-c', 'commit.gpgsign=false']
+    subprocess.run([*git, 'commit', '-q', '--allow-empty', '-m', 'past the tag'], check=True)
+    assert run(box) == 1
+    line = next(l for l in verdicts(capsys) if l.startswith('FAIL vllm_source'))
+    assert f'not {p.VLLM_TAG}' in line and f'git clone --depth 1 --branch {p.VLLM_TAG}' in line
+
+
+def test_only_runs_the_named_items(box, capsys):
+    assert p.check(box['model'], box['arms'], box['gates'], only=('interpreter', 'packed_model')) == 0
+    lines = verdicts(capsys)
+    assert [l.split(':')[0] for l in lines[:-1]] == ['PASS interpreter', 'PASS packed_model']
+    with pytest.raises(ValueError, match='unknown preflight items'):
+        p.check(box['model'], box['arms'], box['gates'], only=('nope',))

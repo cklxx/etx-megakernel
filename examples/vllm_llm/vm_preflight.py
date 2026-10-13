@@ -47,8 +47,8 @@ def stage(relative, destination, directory=False):
             f'rsync -a "{source}/"{shlex.quote(relative+suffix)} {shlex.quote(str(destination)+suffix)}')
 
 
-def check(model, arms, gates=None, *, fix=False):
-    """Print exactly eight item verdicts and a summary; return the CLI exit code."""
+def check(model, arms, gates=None, *, fix=False, only=None):
+    """Print the item verdicts (all eight, or the named subset `only`) and a summary; return the CLI exit code."""
     model, arms = Path(model).expanduser().resolve(), Path(arms).expanduser().resolve()
     gates = Path(gates).expanduser().resolve() if gates else arms/'cpu-gates.json'
     vllm = Path(os.environ.get('VLLM', str(Path.home()/'vllm'))).expanduser().resolve()
@@ -71,7 +71,14 @@ def check(model, arms, gates=None, *, fix=False):
         require(Path(top).resolve() == vllm, f'not a checkout root: {vllm}')
         commit = command(['git', '-C', vllm, 'rev-parse', 'HEAD'])
         require((vllm/'csrc/rocm/attention.cu').is_file(), f'missing {vllm}/csrc/rocm/attention.cu')
-        return f'{vllm}; commit={commit}; runtime_tag={VLLM_TAG}'
+        # the imported kernels must come from the runtime's release, not whatever the checkout holds: the tag is
+        # verified, never just printed (2026-10-14: a v0.27.0-5 checkout passed while this line said v0.27.1)
+        try:
+            pinned = command(['git', '-C', vllm, 'rev-parse', '--verify', '-q', VLLM_TAG + '^{commit}'])
+        except ValueError:
+            pinned = 'absent'
+        require(commit == pinned, f'{vllm} is at {commit}, not {VLLM_TAG} ({pinned})')
+        return f'{vllm}; commit={commit} = {VLLM_TAG}'
 
     def packed():
         sizes, missing = [], []
@@ -135,6 +142,11 @@ def check(model, arms, gates=None, *, fix=False):
         ('gpu', gpu, f'bash {q(str(ROOT/"tools/hotaisle_grab.sh"))} 1x'),
         ('gates', cpu_gates, stage('cpu-gates.json', gates)),
     ]
+    if only is not None:
+        unknown = set(only) - {name for name, _, _ in items}
+        if unknown:
+            raise ValueError(f'unknown preflight items {sorted(unknown)}')
+        items = [i for i in items if i[0] in only]
     failures = 0
     for name, probe, supply in items:
         try:

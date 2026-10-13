@@ -54,9 +54,20 @@ def run(name: str, argv: list, env=None, deadline_s=INVOCATION_S) -> str:
     return text
 
 
+# what this session's builds and invocations consume, checked by the shared VM preflight (examples/vllm_llm/vm_preflight.py)
+# before anything else: the vLLM checkout AT the runtime's release tag, the packed model (vl.bin, vl.manifest,
+# hf/config.json, the pinned golden), the HIP headers, the interpreter and the GPU. Each failure prints its supply command.
+# Not checked: the vLLM runtime image and the qwen300 hour's CPU-gate record (this session runs neither vLLM nor that
+# staging); its CPU gates are the committed tests.
+BUILD_INPUTS = ("interpreter", "vllm_source", "packed_model", "rocm_headers", "gpu")
+
+
 def preflight() -> None:
     from examples.vllm_llm import import_certificate as cert
+    from examples.vllm_llm.vm_preflight import check
     c = config()
+    if check(Path(c["model"]), record(), only=BUILD_INPUTS):
+        raise ValueError("box inputs missing: supply each FAIL above with its printed command, then rerun preflight")
     hf = json.loads((Path(c["hf"]) / "config.json").read_text())
     wrong = {k: hf.get(k) for k, v in QWEN3_30B_A3B.items() if hf.get(k) != v}
     if wrong:

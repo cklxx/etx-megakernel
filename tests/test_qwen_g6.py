@@ -105,5 +105,22 @@ def test_preflight_refuses_a_non_bf16_checkpoint(tmp_path, monkeypatch):
     cfg.write_text(json.dumps(dict(model=str(tmp_path), hf=str(hf), golden_sha256="0" * 64)))
     monkeypatch.setenv("ETX_QWEN_G6_CONFIG", str(cfg))
     monkeypatch.setenv("ETX_SESS_LOGDIR", str(tmp_path))
+    from examples.vllm_llm import vm_preflight
+    monkeypatch.setattr(vm_preflight, "check", lambda *a, **k: 0)        # build inputs present: reach the HF check
     with pytest.raises(ValueError, match="bf16 weights required"):
         g6.preflight()
+
+
+def test_preflight_refuses_a_box_without_the_build_inputs_before_anything_runs(tmp_path, monkeypatch, capsys):
+    cfg = tmp_path / "c.json"
+    cfg.write_text(json.dumps(dict(model=str(tmp_path / "absent"), hf=str(tmp_path / "absent/hf"), golden_sha256="0" * 64)))
+    monkeypatch.setenv("ETX_QWEN_G6_CONFIG", str(cfg))
+    monkeypatch.setenv("ETX_SESS_LOGDIR", str(tmp_path))
+    monkeypatch.setenv("VLLM", str(tmp_path / "no-vllm"))
+    with pytest.raises(ValueError, match="box inputs missing"):
+        g6.preflight()
+    out = capsys.readouterr().out
+    assert "FAIL packed_model" in out and "missing=vl.bin,vl.manifest,hf/config.json,golden_c1024.txt" in out
+    assert "FAIL vllm_source" in out and "git clone --depth 1 --branch v0.27.1" in out
+    assert not (tmp_path / "inputs.json").exists()
+    assert [l.split()[1].rstrip(":") for l in out.splitlines() if l.startswith(("PASS", "FAIL"))] == list(g6.BUILD_INPUTS)
