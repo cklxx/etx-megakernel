@@ -24,7 +24,7 @@ BASE_ENV = dict(ETX_DSV2_COH="0", ETX_DSV2_D4="0", ETX_DSV2_KCHUNKS="1", ETX_DSV
 D4 = ("-DETX_DSV2_D4=1",)
 D4R0 = dict(ETX_DSV2_D4="1", ETX_DSV2_D4_ROWS="0")
 BATCHES = (1, 2, 4, 8)                       # docs/BATCH-2026-10-14.md: the ETX arm of batch B is BATCH_ARMS[B]
-BATCH_ARMS = {1: "alld4r0l1", 2: "x2", 4: "x4", 8: "x8"}
+BATCH_ARMS = {1: "alld4r0l1kvsmw", 2: "x2", 4: "x4", 8: "x8"}   # B = 1: the kept arm (section 9 amendment, ebb8cc3)
 BATCH_CONDITION = "one MI300X, bf16, batch B in (1, 2, 4, 8), context 1024, 32 greedy tokens per request, repeat 2"
 
 

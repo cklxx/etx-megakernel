@@ -96,7 +96,7 @@ def test_two_requests_keep_the_historic_slots():
 
 def test_batch_arms_are_the_kept_recipe_without_d4():
     kept = ARMS["alld4r0l1"]
-    assert BATCH_ARMS == {1: "alld4r0l1", 2: "x2", 4: "x4", 8: "x8"} and BATCHES == (1, 2, 4, 8)
+    assert BATCH_ARMS == {1: "alld4r0l1kvsmw", 2: "x2", 4: "x4", 8: "x8"} and BATCHES == (1, 2, 4, 8)
     for b in (2, 4, 8):
         a = ARMS[f"x{b}"]
         assert a.levers == kept.levers == (*LEVERS_ALL, "l1_loads")
@@ -104,6 +104,8 @@ def test_batch_arms_are_the_kept_recipe_without_d4():
         assert a.env == dict(ETX_DSV2_COH="l1", ETX_DSV2_REQUESTS=str(b), ETX_DSV2_COUPLE="none")
         assert a.rule is None and a.order == ()
     assert [ARMS[f"x{b}"].scratch_allow for b in (2, 4, 8)] == [0, 64, 192] and kept.scratch_allow == 0
+    b1 = ARMS[BATCH_ARMS[1]]                 # section 9: B = 1 is the kept arm, K1 + M1 on the same recipe
+    assert b1.levers == (*kept.levers, "merge_uv_waves") and "-DETX_DSV2_KVA_SHARED=1" in b1.flags
 
 
 # ---------------------------------------------------------------- per-request gates (ETX)
@@ -269,9 +271,9 @@ def test_session_order_correctness_first_then_timings_then_captures(session):
     assert limit == 5400
     assert [j.name for j in jobs if j.lane == "gpu"] == ["prep_ref", "prep_goldens", "bgate_x2", "bgate_x4", "bgate_x8",
                                                           "vsel", "brounds", "routing"]
-    assert {f"build_{a}" for a in ("alld4r0l1", "x2", "x4", "x8")} <= set(by)
+    assert {f"build_{a}" for a in ("alld4r0l1kvsmw", "x2", "x4", "x8")} <= set(by)
     assert all(by[f"bgate_{a}"].reads[1] == "$ETX_DSV2_DATA/goldens.json" for a in ("x2", "x4", "x8"))
-    assert set(by["brounds"].reads) == {"vsel.json", "b_alld4r0l1/run", "?bgate_x2.json", "?bgate_x4.json", "?bgate_x8.json"}
+    assert set(by["brounds"].reads) == {"vsel.json", "b_alld4r0l1kvsmw/run", "?bgate_x2.json", "?bgate_x4.json", "?bgate_x8.json"}
     assert "docker_pull" in by["vsel"].reads and by["breport"].lane == "final"
 
 
@@ -287,7 +289,7 @@ def test_rounds_alternate_and_skip_an_arm_whose_gate_failed(tmp_path, monkeypatc
     monkeypatch.setattr(s, "etx", lambda b, name: calls.append(name) or dict(step_ms="1.0", latency_ms="1.0"))
     monkeypatch.setattr(s, "vllm", lambda c, name: calls.append(name) or {})
     s.rounds()
-    assert calls[:3] == ["b1_alld4r0l1", "b1_x2", "b1_vllm_aiter"] and calls[3:6] == ["b2_vllm_aiter", "b2_x2", "b2_alld4r0l1"]
+    assert calls[:3] == ["b1_alld4r0l1kvsmw", "b1_x2", "b1_vllm_aiter"] and calls[3:6] == ["b2_vllm_aiter", "b2_x2", "b2_alld4r0l1kvsmw"]
     assert len(calls) == 15
     rec = json.loads((tmp_path / "brounds.json").read_text())
     assert rec["skipped"] == ["x4", "x8"]
