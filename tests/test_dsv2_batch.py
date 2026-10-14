@@ -107,16 +107,22 @@ def test_batch_arms_carry_the_kept_recipe_without_d4():
     assert BATCH_ARMS == {1: "alld4r0l1kvsmw", 2: "x2", 4: "x4", 8: "x8"} and BATCHES == (1, 2, 4, 8)
     # section 10: the batch arms carry the kept arm's two levers (M1, K1) as well, so a scaling ratio measures
     # batching and not a recipe difference
-    for b in (2, 4, 8):
+    for b in (2, 4):
         a = ARMS[f"x{b}"]
         assert a.levers == (*kept.levers, "merge_uv_waves")
-        k1 = "-DETX_DSV2_KVA_SHARED=1" in a.flags
-        assert k1 == (b != 8)      # measured: K1 is wrong at B = 8 (3/27 layers on request 5), so x8 carries M1 only
+        assert "-DETX_DSV2_KVA_SHARED=1" in a.flags and a.env["ETX_DSV2_KVA"] == "shared"
         assert a.flags[:2] == (f"-DETX_DS_REQUESTS={b}", "-DETX_SLOT_BY_CU")
-        assert a.env == dict(ETX_DSV2_COH="l1", ETX_DSV2_REQUESTS=str(b), ETX_DSV2_COUPLE="none",
-                             **({"ETX_DSV2_KVA": "shared"} if k1 else {}))
         assert a.rule is None and a.order == ()
-    assert [ARMS[f"x{b}"].scratch_allow for b in (2, 4, 8)] == [64, 64, 192] and kept.scratch_allow == 0
+    # B = 8: the gate failed with M1 + K1 and with M1 alone, so the four recipes are built and gated side by side
+    # (examples/sessions/x8_diag.py); all four carry the same request flags and the same scratch allowance
+    for name, extra, k1 in (("x8p", (), False), ("x8m", ("merge_uv_waves",), False),
+                            ("x8k", (), True), ("x8", ("merge_uv_waves",), True)):
+        a = ARMS[name]
+        assert a.levers == (*kept.levers, *extra), name
+        assert (("-DETX_DSV2_KVA_SHARED=1",) if k1 else ()) == tuple(f for f in a.flags if "KVA" in f), name
+        assert a.env["ETX_DSV2_REQUESTS"] == "8" and (a.env.get("ETX_DSV2_KVA") == "shared") == k1, name
+        assert a.scratch_allow == 192, name
+    assert [ARMS[f"x{b}"].scratch_allow for b in (2, 4)] == [64, 64] and kept.scratch_allow == 0
     b1 = ARMS[BATCH_ARMS[1]]                 # section 9: B = 1 is the kept arm, K1 + M1 on the same recipe
     assert b1.levers == (*kept.levers, "merge_uv_waves") and "-DETX_DSV2_KVA_SHARED=1" in b1.flags
     assert b1.levers == ARMS["x2"].levers and b1.levers == ARMS["x4"].levers == ARMS["x8"].levers
