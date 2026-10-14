@@ -16,7 +16,7 @@ import importlib.util
 import copy
 from pathlib import Path
 
-MAX_SESSION_SECONDS = 5400
+MAX_SESSION_SECONDS = 7200
 
 
 def _load(name):
