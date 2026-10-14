@@ -109,7 +109,17 @@ ARMS = {a.name: a for a in [
           env=dict(ETX_DSV2_COH="l1", ETX_DSV2_REQUESTS=str(n), ETX_DSV2_COUPLE="none",
                    **({"ETX_DSV2_KVA": "shared"} if k1 else {})),
           scratch_allow=allow)
-      for n, allow, k1 in ((2, 64, True), (4, 64, True), (8, 192, False))),
+      for n, allow, k1 in ((2, 64, True), (4, 64, True))),
+    # B = 8 is a diagnostic: with M1 alone the eight-request gate failed (request 5, 3/27 layers), so the three
+    # recipes are built side by side and the gate says which one is correct at eight requests. x8p is the plain
+    # replication recipe (the pre-section-10 arm), x8m adds M1, x8k adds K1.
+    *(Arm(name, levers=(*LEVERS_ALL, "l1_loads", *extra),
+          flags=(f"-DETX_DS_REQUESTS=8", "-DETX_SLOT_BY_CU") + (("-DETX_DSV2_KVA_SHARED=1",) if k1 else ()),
+          env=dict(ETX_DSV2_COH="l1", ETX_DSV2_REQUESTS="8", ETX_DSV2_COUPLE="none",
+                   **({"ETX_DSV2_KVA": "shared"} if k1 else {})),
+          scratch_allow=192)
+      for name, extra, k1 in (("x8p", (), False), ("x8m", ("merge_uv_waves",), False),
+                              ("x8k", (), True), ("x8", ("merge_uv_waves",), True))),
     Arm("allnoQ", levers=tuple(x for x in LEVERS_ALL if x != "gemv_no_terminal_all"),
         order=("default", "all", "allnoQ"), references=("default", "all"),
         rule=Rule("device_ms", "all", 0, text="every pair faster, median > 2 x spread")),
