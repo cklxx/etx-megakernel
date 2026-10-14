@@ -49,9 +49,12 @@ def check(prompts: list[list[int]], gens: list[list[int]], token_files: list[lis
     return bad
 
 
-def collisions(gens: list[list[int]]) -> list[list[int]]:
-    """Pairs (o, r) whose 32-token greedy sequences are equal: the mix-up check is unavailable for those pairs."""
-    return [[o, r] for r in range(len(gens)) for o in range(r) if gens[o] == gens[r]]
+def collisions(gens: list[list[int]], start=None, count=32) -> list[list[int]]:
+    """Pairs indistinguishable in either checked window, or in the selected gate's window."""
+    starts = (0, 1) if start is None else (start,)
+    return [[o, r] for r in range(len(gens)) for o in range(r)
+            if any(len(gens[o]) >= s + count and len(gens[r]) >= s + count and
+                   gens[o][s:s + count] == gens[r][s:s + count] for s in starts)]
 
 
 def sha(path: Path) -> str:
@@ -109,17 +112,18 @@ def main(argv=None) -> None:
     if bad:
         raise SystemExit("GOLDENS REFUSED\n" + "\n".join(bad))
     coll = collisions(gens)
+    windows = dict(vllm=collisions(gens, start=0), etx=collisions(gens, start=1))
     out = a.data / "vllm"
     out.mkdir(exist_ok=True)
     for r in range(a.requests):
         (out / f"golden_r{r}.txt").write_text("prompt " + " ".join(map(str, prompts[r])) + "\n"
                                               + "gen " + " ".join(map(str, gens[r])) + "\n")
     (a.data / "goldens.json").write_text(json.dumps(
-        dict(requests=a.requests, rotate=ROTATE, sha256=hashes, bindings=bindings, collisions=coll,
+        dict(requests=a.requests, rotate=ROTATE, sha256=hashes, bindings=bindings, collisions=coll, collision_windows=windows,
              collision_note="pairs with identical 32-token greedy output; the request mix-up check is unavailable "
                             "for those pairs, every other gate still applies"), indent=1) + "\n")
     print(f"GOLDENS OK {a.requests} requests: prompts are the 97 r rotations, pairwise distinct; "
-          f"collisions {coll if coll else 'none'}; vLLM files in {out}", flush=True)
+          f"collisions by gate (vLLM [0:32], ETX [1:33]) {windows}; vLLM files in {out}", flush=True)
 
 
 if __name__ == "__main__":

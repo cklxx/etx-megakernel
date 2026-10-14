@@ -550,3 +550,29 @@ def test_standalone_diagnostic_prepares_its_goldens():
     names = [j.name for j in jobs]
     assert "prep_goldens" in names
     assert all(names.index("prep_goldens") < names.index(f"bgate_{a}") for a in ("x8p", "x8m", "x8k", "x8"))
+
+
+@pytest.mark.parametrize("changed", [0, 32])
+def test_collision_warning_covers_either_checked_token_window(changed):
+    from examples.dsv2lite.batch_goldens import collisions
+    goldens = [list(range(33)), list(range(33))]
+    goldens[1][changed] = 999
+    assert collisions(goldens) == [[0, 1]]
+
+
+@pytest.mark.parametrize("changed,expected", [(0, "1"), (32, "0")])
+def test_host_collision_compares_its_checked_suffix(tmp_path, changed, expected):
+    import subprocess
+    toolchain = Path("/opt/homebrew/opt/llvm/bin/clang++")
+    src = (ROOT / "examples/dsv2lite/host.hip").read_text()
+    line = next(x.strip() for x in src.splitlines() if x.strip().startswith("if (") and "q.golden" in x and "reqs[o].golden" in x)
+    condition = line[len("if ("):-1]
+    cpp = tmp_path / "collision.cpp"
+    cpp.write_text('#include <vector>\n#include <algorithm>\n#include <iostream>\n'
+                   'int main() { struct Req { std::vector<int> golden; }; Req q; std::vector<Req> reqs(1); '
+                   'int o=0, tokens=32; for(int i=0;i<33;++i) { q.golden.push_back(i); reqs[0].golden.push_back(i); } '
+                   f'q.golden[{changed}]=999; std::cout << ({condition}); }}\n')
+    subprocess.run([str(toolchain) if toolchain.exists() else "c++", "-std=c++17", str(cpp), "-o", str(tmp_path / "collision")],
+                   check=True, capture_output=True)
+    out = subprocess.run([str(tmp_path / "collision")], check=True, capture_output=True, text=True)
+    assert out.stdout == expected
