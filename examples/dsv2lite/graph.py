@@ -399,6 +399,9 @@ def _isolate(g: Graph, spec: str, reps: int, qs: list) -> None:
 
 
 def bindings(**overrides) -> dict:
+    if overrides:
+        raise ValueError(f"DeepSeek graph does not accept --bind overrides: {', '.join(sorted(overrides))}; "
+                         "use ETX_DSV2_REQUESTS for request count")
     return {}
 
 

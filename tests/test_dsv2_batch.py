@@ -14,6 +14,16 @@ from examples.dsv2lite.arms import ARMS, BATCH_ARMS, BATCHES, LEVERS_ALL
 ROOT = Path(__file__).resolve().parents[1]
 
 
+@pytest.mark.parametrize("binding", ["requests=8", "requestsz=8"])
+def test_deepseek_cli_rejects_unsupported_bindings_before_compilation(tmp_path, monkeypatch, binding):
+    from etx.tools import cli
+    monkeypatch.setattr(cli, "compile_graph", lambda *args, **kwargs: pytest.fail("unsupported binding reached compiler"))
+    with pytest.raises(ValueError, match="does not accept --bind.*" + binding.split("=")[0]):
+        cli.main(["compile", str(ROOT / "examples/dsv2lite/graph.py"), "--out", str(tmp_path), "--bind", binding])
+    from examples.dsv2lite import graph
+    assert graph.bindings() == {}
+
+
 # ---------------------------------------------------------------- the graph: slots, queue order, LDS hand-offs
 @pytest.fixture(scope="module", params=[2, 4, 8])
 def lowered(request):
