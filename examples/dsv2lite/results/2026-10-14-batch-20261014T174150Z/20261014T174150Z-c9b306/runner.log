@@ -1,0 +1,150 @@
+[17:41:50 +  0m00s] session record: /root/sess/20261014T174150Z-c9b306
+[17:41:50 +  0m00s] start apt (cpu)
+[17:41:50 +  0m00s] start qwen_build_hw_bench (cpu)
+[17:41:50 +  0m00s] start qwen_stage_vllm (cpu)
+[17:41:53 +  0m03s] ok      qwen_stage_vllm rc=0 3s
+    VLLM 6e448d0ea9bf3d88d898b65449ca6dc2aec170ac = v0.27.1
+[17:41:54 +  0m04s] ok      qwen_build_hw_bench rc=0 4s
+[17:42:00 +  0m10s] ok      apt rc=0 10s
+[17:42:00 +  0m10s] start etx_env (cpu)
+[17:42:00 +  0m10s] start prep_env (cpu)
+[17:42:00 +  0m10s] start qwen_stage_env (cpu)
+[17:42:01 +  0m11s] ok      etx_env rc=0 1s
+[17:42:01 +  0m11s] start source (cpu)
+[17:42:02 +  0m12s] ok      source rc=0 1s
+    SOURCE OK fleet export 28f5cbb4f39524df etx e0b9a75c03b6
+[17:42:02 +  0m12s] start build_x8p (cpu)
+[17:42:02 +  0m12s] start build_x8m (cpu)
+[17:42:02 +  0m12s] start build_x8k (cpu)
+[17:42:50 +  1m00s] progress: 5 running, 17 waiting, 5 done
+    prep_env [cpu] 50s / 1800s: WARNING: huggingface-hub 2.2.0 does not provide the extra 'hf-transfer'
+    qwen_stage_env [cpu] 50s / 1800s: WARNING: huggingface-hub 2.2.0 does not provide the extra 'hf-transfer'
+    build_x8p [cpu] 48s / 1200s: PROGRESS invocation=compile_x8p elapsed_s=30.1 deadline_s=900
+    build_x8m [cpu] 48s / 1200s: PROGRESS invocation=compile_x8m elapsed_s=30.1 deadline_s=900
+    build_x8k [cpu] 48s / 1200s: PROGRESS invocation=compile_x8k elapsed_s=30.1 deadline_s=900
+[17:43:29 +  1m39s] ok      qwen_stage_env rc=0 89s
+[17:43:29 +  1m39s] start qwen_stage_dl (cpu)
+[17:43:40 +  1m50s] ok      prep_env rc=0 100s
+[17:43:40 +  1m50s] start prep_dl (cpu)
+[17:43:50 +  2m00s] progress: 5 running, 15 waiting, 7 done
+    prep_dl [cpu] 10s / 1800s: # HF_HUB_ENABLE_HF_TRANSFER=1 $HOME/dsv2-prep/.venv/bin/python -c "from huggingface_hub import snapshot_download; snapshot_download('deepseek-ai/DeepSeek-Coder-
+    qwen_stage_dl [cpu] 21s / 2400s: Fetching 23 files:  43%|████▎     | 10/23 [00:20<00:23,  1.81s/it]
+    build_x8p [cpu] 108s / 1200s: PROGRESS invocation=compile_x8p elapsed_s=90.1 deadline_s=900
+    build_x8m [cpu] 108s / 1200s: PROGRESS invocation=compile_x8m elapsed_s=90.7 deadline_s=900
+    build_x8k [cpu] 108s / 1200s: PROGRESS invocation=compile_x8k elapsed_s=90.3 deadline_s=900
+[17:44:08 +  2m18s] ok      qwen_stage_dl rc=0 39s
+    HF Qwen/Qwen3-30B-A3B@ad44e777bcd18fa416d9da3bd8f70d33ebb85d39
+[17:44:08 +  2m18s] start build_x8 (cpu)
+[17:44:50 +  3m00s] progress: 5 running, 14 waiting, 8 done
+    prep_dl [cpu] 70s / 1800s: # HF_HUB_ENABLE_HF_TRANSFER=1 $HOME/dsv2-prep/.venv/bin/python -c "from huggingface_hub import snapshot_download; snapshot_download('deepseek-ai/DeepSeek-Coder-
+    build_x8p [cpu] 168s / 1200s: PROGRESS invocation=compile_x8p elapsed_s=150.5 deadline_s=900
+    build_x8m [cpu] 168s / 1200s: PROGRESS invocation=compile_x8m elapsed_s=151.2 deadline_s=900
+    build_x8k [cpu] 168s / 1200s: PROGRESS invocation=compile_x8k elapsed_s=151.1 deadline_s=900
+    build_x8 [cpu] 42s / 1200s: PROGRESS invocation=compile_x8 elapsed_s=30.1 deadline_s=900
+[17:44:53 +  3m03s] ok      prep_dl rc=0 73s
+[17:44:53 +  3m03s] start prep_ref on GPU 0
+[17:45:50 +  4m00s] progress: 5 running, 13 waiting, 9 done
+    prep_ref [GPU 0] 57s / 1200s: prefill
+    build_x8p [cpu] 228s / 1200s: PROGRESS invocation=compile_x8p elapsed_s=210.6 deadline_s=900
+    build_x8m [cpu] 228s / 1200s: PROGRESS invocation=compile_x8m elapsed_s=211.3 deadline_s=900
+    build_x8k [cpu] 228s / 1200s: PROGRESS invocation=compile_x8k elapsed_s=211.1 deadline_s=900
+    build_x8 [cpu] 102s / 1200s: PROGRESS invocation=compile_x8 elapsed_s=90.6 deadline_s=900
+[17:46:09 +  4m19s] ok      prep_ref rc=0 76s
+    # mkdir -p "$ETX_DSV2_DATA" && cd "$ETX_DSV2_FLEET" && { test -s "$ETX_DSV2_DATA/fleet_cache.bin" -a -s "$ETX_DSV2_DATA/golden_tokens.txt" -a -s "$ETX_DSV2_DATA/golden_hidden.bin" || HIP_VISIBLE_DEVICES=$GPU $HOME/dsv2-prep/.venv/bin/python
+    wrote /root/dsv2-data/golden.npz and /root/dsv2-data/golden.json
+    wrote /root/dsv2-data/fleet_cache.bin  [27][1056][576] cols 0:512 = c (post kv_a_layernorm), 512:576 = k_pe (post RoPE)  -> 32.8 MB bf16
+    wrote /root/dsv2-data/golden_tokens.txt (33 tokens)
+    wrote /root/dsv2-data/golden_hidden.bin (27, 2048)
+      smallest top-2 margin over the run: 6.6250 (a small margin here is where bf16 drift would flip a token)
+    -rw-r--r--  1 root root      487 Oct 14 17:46 golden.json
+    -rw-r--r--  1 root root 29492654 Oct 14 17:46 golden.npz
+    -rw-r--r--  1 root root   221184 Oct 14 17:46 golden_hidden.bin
+    -rw-r--r--  1 root root      144 Oct 14 17:46 golden_tokens.txt
+[17:46:09 +  4m19s] start prep_pack (cpu)
+[17:46:09 +  4m19s] start qwen_stage_pack on GPU 0
+[17:46:43 +  4m53s] ok      build_x8p rc=0 281s
+    BUILD arm=x8p stamped=0 plan_sha256=1d19b7e18a199b072c9c997ca4d61310281ca8581daa4284b1b7d062bd087cb2 resources={'vgpr': 256, 'agpr': 0, 'sgpr': 108, 'scratch': 96, 'lds': 26668, 'occupancy': 2}
+    BUILD arm=x8p OK
+[17:46:46 +  4m56s] ok      build_x8m rc=0 284s
+    BUILD arm=x8m stamped=0 plan_sha256=1d19b7e18a199b072c9c997ca4d61310281ca8581daa4284b1b7d062bd087cb2 resources={'vgpr': 256, 'agpr': 0, 'sgpr': 108, 'scratch': 96, 'lds': 26668, 'occupancy': 2}
+    BUILD arm=x8m OK
+[17:46:50 +  5m00s] progress: 4 running, 11 waiting, 12 done
+    prep_pack [cpu] 41s / 1200s:   layer  7 packed, 9.19 GB
+    build_x8k [cpu] 288s / 1200s: PROGRESS invocation=compile_x8k elapsed_s=271.2 deadline_s=900
+    build_x8 [cpu] 162s / 1200s: /root/sess/20261014T174150Z-c9b306/b_x8/fleet_src/kernels/fleet_kernel.hip:1150:1: remark:     LDS Size [bytes/block]: 0 [-Rpass-analysis=kernel-resource-usage]
+    qwen_stage_pack [GPU 0] 41s / 2400s:   packed layer 6/48
+[17:47:50 +  6m00s] progress: 4 running, 11 waiting, 12 done
+    prep_pack [cpu] 101s / 1200s:   layer 24 packed, 29.07 GB
+    build_x8k [cpu] 348s / 1200s: PROGRESS invocation=compile_x8k elapsed_s=331.4 deadline_s=900
+    build_x8 [cpu] 222s / 1200s: PROGRESS invocation=compile_x8 elapsed_s=211.7 deadline_s=900
+    qwen_stage_pack [GPU 0] 101s / 2400s:   packed layer 16/48
+[17:47:57 +  6m07s] ok      prep_pack rc=0 108s
+    wrote /root/dsv2-data/weights.bin (31.41 GB), /root/dsv2-data/weights.bin.json and /root/dsv2-data/weights.bin.manifest
+      expert stride: 8650752 elems (17.3 MB) — matches design.md §1's 17.3 MB per routed expert
+[17:47:57 +  6m07s] start preflight (cpu)
+[17:48:19 +  6m29s] ok      preflight rc=0 22s
+    PREFLIGHT hashing /root/dsv2-data/weights.bin bytes=31412968448
+    PREFLIGHT hashing /root/dsv2-data/weights.bin.manifest bytes=9561
+    PREFLIGHT hashing /root/dsv2-data/fleet_cache.bin bytes=32845824
+    PREFLIGHT hashing /root/dsv2-data/golden_tokens.txt bytes=144
+    PREFLIGHT hashing /root/dsv2-data/golden_hidden.bin bytes=221184
+    PREFLIGHT OK inputs are the pinned measured inputs
+[17:48:19 +  6m29s] skip    bgate_x8p [absent: $ETX_DSV2_DATA/goldens.json]
+[17:48:19 +  6m29s] skip    bgate_x8m [absent: $ETX_DSV2_DATA/goldens.json]
+[17:48:19 +  6m29s] skip    bgate_x8k [absent: $ETX_DSV2_DATA/goldens.json]
+[17:48:19 +  6m29s] skip    bgate_x8 [absent: $ETX_DSV2_DATA/goldens.json]
+[17:48:50 +  7m00s] progress: 3 running, 6 waiting, 18 done
+    build_x8k [cpu] 408s / 1200s: PROGRESS invocation=compile_x8k elapsed_s=391.4 deadline_s=900
+    build_x8 [cpu] 282s / 1200s: PROGRESS invocation=compile_x8 elapsed_s=271.7 deadline_s=900
+    qwen_stage_pack [GPU 0] 161s / 2400s:   packed layer 30/48
+[17:49:04 +  7m14s] ok      build_x8k rc=0 422s
+    BUILD arm=x8k stamped=0 plan_sha256=6beb4b01bb9ea997aa6ab16968fb043b2453ae85d73632bd7f57cb9d3e8f891d resources={'vgpr': 256, 'agpr': 0, 'sgpr': 108, 'scratch': 144, 'lds': 26668, 'occupancy': 2}
+    BUILD arm=x8k OK
+[17:49:50 +  8m00s] progress: 2 running, 6 waiting, 19 done
+    build_x8 [cpu] 342s / 1200s: PROGRESS invocation=compile_x8 elapsed_s=331.9 deadline_s=900
+    qwen_stage_pack [GPU 0] 221s / 2400s:   packed layer 45/48
+[17:50:00 +  8m10s] ok      qwen_stage_pack rc=0 231s
+    wrote /root/llm/qwen3-30b-a3b/vl.bin (61.06 GB) and vl.manifest: {"H": 2048, "NH": 32, "NKV": 4, "HD": 128, "INTER": 6144, "L": 48, "V": 151936, "tie": 0, "bias": 0, "qk_norm": 1, "maxlen": 1072, "bytes": 61064519680, "moe": 1, "E": 128, "T
+    QWEN-STAGED /root/llm/qwen3-30b-a3b
+[17:50:00 +  8m10s] start qwen_preflight (cpu)
+[17:50:01 +  8m11s] fail    qwen_preflight rc=1 1s
+    PREFLIGHT FAIL 1 item(s)
+[17:50:01 +  8m11s] skip    qwen_build_kept [qwen/inputs.json: qwen_preflight fail]
+[17:50:01 +  8m11s] skip    qwen_build_kept_l1 [qwen/inputs.json: qwen_preflight fail]
+[17:50:01 +  8m11s] skip    qwen_certify_kept [qwen/inputs.json: qwen_preflight fail]
+[17:50:01 +  8m11s] skip    qwen_certify_kept_l1 [qwen/inputs.json: qwen_preflight fail]
+[17:50:01 +  8m11s] skip    qwen_pairs_kept_l1 [qwen/inputs.json: qwen_preflight fail]
+[17:50:50 +  9m00s] progress: 1 running, 0 waiting, 26 done
+    build_x8 [cpu] 402s / 1200s: PROGRESS invocation=compile_x8 elapsed_s=391.9 deadline_s=900
+[17:51:16 +  9m26s] ok      build_x8 rc=0 428s
+    BUILD arm=x8 stamped=0 plan_sha256=6beb4b01bb9ea997aa6ab16968fb043b2453ae85d73632bd7f57cb9d3e8f891d resources={'vgpr': 256, 'agpr': 0, 'sgpr': 108, 'scratch': 144, 'lds': 26668, 'occupancy': 2}
+    BUILD arm=x8 OK
+[17:51:16 +  9m26s] session done
+  job                              status     rc  gpu  seconds
+  apt                              ok          0            10  
+  etx_env                          ok          0             1  
+  prep_env                         ok          0           100  
+  source                           ok          0             1  
+  prep_dl                          ok          0            73  
+  prep_ref                         ok          0    0       76  
+  prep_pack                        ok          0           108  
+  preflight                        ok          0            22  
+  qwen_build_hw_bench              ok          0             4  
+  qwen_stage_env                   ok          0            89  
+  qwen_stage_vllm                  ok          0             3  
+  qwen_stage_dl                    ok          0            39  
+  qwen_preflight                   fail        1             1  
+  qwen_build_kept                  skipped                      qwen/inputs.json: qwen_preflight fail
+  qwen_build_kept_l1               skipped                      qwen/inputs.json: qwen_preflight fail
+  build_x8p                        ok          0           281  
+  build_x8m                        ok          0           284  
+  build_x8k                        ok          0           422  
+  build_x8                         ok          0           428  
+  qwen_stage_pack                  ok          0    0      231  
+  qwen_certify_kept                skipped                      qwen/inputs.json: qwen_preflight fail
+  qwen_certify_kept_l1             skipped                      qwen/inputs.json: qwen_preflight fail
+  qwen_pairs_kept_l1               skipped                      qwen/inputs.json: qwen_preflight fail
+  bgate_x8p                        skipped                      absent: $ETX_DSV2_DATA/goldens.json
+  bgate_x8m                        skipped                      absent: $ETX_DSV2_DATA/goldens.json
+  bgate_x8k                        skipped                      absent: $ETX_DSV2_DATA/goldens.json
+  bgate_x8                         skipped                      absent: $ETX_DSV2_DATA/goldens.json

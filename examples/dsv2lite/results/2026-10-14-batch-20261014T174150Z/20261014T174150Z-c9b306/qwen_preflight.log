@@ -1,0 +1,19 @@
+# job qwen_preflight gpu=None cwd=/root/etx
+# .venv/bin/python -u -m examples.vllm_llm.g6_session preflight
+PASS interpreter: /root/src/9631c710a01f925af9563bccc887c3f540396dee6ca688fa4f8988e14ab2c3e9-20261014T173802Z/.venv/bin/python; yaml, numpy import from .venv
+PASS vllm_source: /root/vllm; commit=6e448d0ea9bf3d88d898b65449ca6dc2aec170ac = v0.27.1
+PASS packed_model: /root/llm/qwen3-30b-a3b; vl.bin=61064519680 bytes, vl.manifest=12519 bytes, hf/config.json=963 bytes, golden_c1024.txt=5129 bytes; golden sha256=bab2f1fbe12f70179711ec40a215c74710845b73169b1cc6a3a6ca50e0a19484 expected=bab2f1fbe12f70179711ec40a215c74710845b73169b1cc6a3a6ca50e0a19484
+FAIL rocm_headers: ETX_ROCM_HEADERS=/root/rocm-headers/inc; requires hip/hip_runtime.h; supply: mkdir -p /root/rocm-headers/inc && rsync -a "${ETX_STAGE_SOURCE:?set ETX_STAGE_SOURCE to the CPU-tested staging directory}/"rocm-headers/inc/ /root/rocm-headers/inc/
+PASS gpu: /dev/kfd exists=True; rocm-smi============================= ROCm System Management Interface ============================ ====================================== Product Info ====================================== GPU[0]		: Card Series: 		AMD Instinct MI300X VF GPU[0]		: Card Model: 		0x74b5 GPU[0]		: Card Vendor: 		Advanced Micro Devices, Inc. [AMD/ATI] GPU[0]		: Card SKU: 		M3000100 GPU[0]		: Subsystem ID: 	0x74a1 GPU[0]		: Device Rev: 		0x00 GPU[0]		: Node ID: 		1 GPU[0]		: GUID: 		21947 GPU[0]		: GFX Version: 		gfx942 ========================================================================================== ================================== End of ROCm SMI Log ===================================
+PREFLIGHT FAIL 1 item(s)
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/root/src/9631c710a01f925af9563bccc887c3f540396dee6ca688fa4f8988e14ab2c3e9-20261014T173802Z/examples/vllm_llm/g6_session.py", line 151, in <module>
+    sys.exit(main())
+             ^^^^^^
+  File "/root/src/9631c710a01f925af9563bccc887c3f540396dee6ca688fa4f8988e14ab2c3e9-20261014T173802Z/examples/vllm_llm/g6_session.py", line 146, in main
+    ops[a[0]][0](*a[1:])
+  File "/root/src/9631c710a01f925af9563bccc887c3f540396dee6ca688fa4f8988e14ab2c3e9-20261014T173802Z/examples/vllm_llm/g6_session.py", line 73, in preflight
+    raise ValueError("box inputs missing: supply each FAIL above with its printed command, then rerun preflight")
+ValueError: box inputs missing: supply each FAIL above with its printed command, then rerun preflight

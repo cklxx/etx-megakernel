@@ -1,0 +1,5 @@
+# job prep_env gpu=None cwd=/root/etx
+# $HOME/dsv2-prep/.venv/bin/python -c 1 2>/dev/null || { rm -rf $HOME/dsv2-prep; python3 -m venv $HOME/dsv2-prep/.venv; }; . $HOME/dsv2-prep/.venv/bin/activate; pip install -q --upgrade pip; pip install -q numpy 'huggingface_hub[hf_transfer]' hf_transfer; python3 -c 'import torch' 2>/dev/null || pip install -q --index-url https://download.pytorch.org/whl/rocm7.0 torch; pip install -q 'transformers>=4.39,<5' 'tokenizers<0.20' accelerate safetensors; SP=$(python3 -c 'import site;print(site.getsitepackages()[0])'); mkdir -p $SP/flash_attn; echo '# stub: satisfies transformers check_imports only' > $SP/flash_attn/__init__.py; python3 -c 'import torch, transformers; print(torch.__version__, torch.cuda.is_available(), transformers.__version__)'
+WARNING: huggingface-hub 2.2.0 does not provide the extra 'hf-transfer'
+/opt/amdgpu/share/libdrm/amdgpu.ids: No such file or directory
+2.10.0+rocm7.0 True 4.44.2

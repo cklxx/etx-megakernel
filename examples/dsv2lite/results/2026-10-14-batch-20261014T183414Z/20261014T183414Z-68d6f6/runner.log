@@ -1,0 +1,102 @@
+[18:34:14 +  0m00s] session record: /root/sess/20261014T183414Z-68d6f6
+[18:34:14 +  0m00s] start apt (cpu)
+[18:34:14 +  0m00s] start qwen_build_hw_bench (cpu)
+[18:34:14 +  0m00s] start qwen_stage_vllm (cpu)
+[18:34:15 +  0m01s] ok      apt rc=0 1s
+[18:34:15 +  0m01s] ok      qwen_stage_vllm rc=0 1s
+    VLLM 6e448d0ea9bf3d88d898b65449ca6dc2aec170ac = v0.27.1
+[18:34:15 +  0m01s] start etx_env (cpu)
+[18:34:15 +  0m01s] start prep_env (cpu)
+[18:34:15 +  0m01s] start qwen_stage_env (cpu)
+[18:34:16 +  0m02s] ok      etx_env rc=0 1s
+[18:34:16 +  0m02s] start source (cpu)
+[18:34:17 +  0m03s] fail    source rc=1 1s
+      File "/root/src/9631c710a01f925af9563bccc887c3f540396dee6ca688fa4f8988e14ab2c3e9-20261014T173802Z/examples/dsv2lite/inplace_session.py", line 262, in main
+        getattr(session, a.operation)()
+      File "/root/src/9631c710a01f925af9563bccc887c3f540396dee6ca688fa4f8988e14ab2c3e9-20261014T173802Z/examples/dsv2lite/inplace_session.py", line 128, in source
+        raise RuntimeError("fleet src is not the exact pinned 3fb67a6 export")
+    RuntimeError: fleet src is not the exact pinned 3fb67a6 export
+[18:34:17 +  0m03s] ok      qwen_build_hw_bench rc=0 3s
+[18:34:17 +  0m03s] skip    build_x8p [source.json: source fail]
+[18:34:17 +  0m03s] skip    build_x8m [source.json: source fail]
+[18:34:17 +  0m03s] skip    build_x8k [source.json: source fail]
+[18:34:17 +  0m03s] skip    build_x8 [source.json: source fail]
+[18:34:19 +  0m05s] ok      prep_env rc=0 4s
+[18:34:19 +  0m05s] ok      qwen_stage_env rc=0 4s
+[18:34:19 +  0m05s] start prep_dl (cpu)
+[18:34:19 +  0m05s] start qwen_stage_dl (cpu)
+[18:34:20 +  0m06s] ok      prep_dl rc=0 1s
+[18:34:20 +  0m06s] ok      qwen_stage_dl rc=0 1s
+    HF Qwen/Qwen3-30B-A3B@ad44e777bcd18fa416d9da3bd8f70d33ebb85d39
+[18:34:20 +  0m06s] skip    prep_ref [source.json: source fail]
+[18:34:20 +  0m06s] skip    prep_pack [prep_ref: prep_ref skipped]
+[18:34:20 +  0m06s] skip    preflight [$ETX_DSV2_DATA/weights.bin: prep_pack skipped]
+[18:34:20 +  0m06s] skip    bgate_x8p [inputs.json: preflight skipped]
+[18:34:20 +  0m06s] skip    bgate_x8m [inputs.json: preflight skipped]
+[18:34:20 +  0m06s] skip    bgate_x8k [inputs.json: preflight skipped]
+[18:34:20 +  0m06s] skip    bgate_x8 [inputs.json: preflight skipped]
+[18:34:20 +  0m06s] start qwen_stage_pack on GPU 0
+[18:34:21 +  0m07s] ok      qwen_stage_pack rc=0 1s
+    QWEN-STAGED /root/llm/qwen3-30b-a3b
+[18:34:21 +  0m07s] start qwen_preflight (cpu)
+[18:34:22 +  0m08s] ok      qwen_preflight rc=0 1s
+    PREFLIGHT PASS
+    PREFLIGHT OK Qwen3-30B-A3B bf16, golden bab2f1fbe12f7017
+[18:34:22 +  0m08s] start qwen_build_kept (cpu)
+[18:34:22 +  0m08s] start qwen_build_kept_l1 (cpu)
+[18:35:14 +  1m00s] progress: 2 running, 3 waiting, 22 done
+    qwen_build_kept [cpu] 52s / 1500s: # .venv/bin/python -u -m examples.vllm_llm.g6_session build kept
+    qwen_build_kept_l1 [cpu] 52s / 1500s: # .venv/bin/python -u -m examples.vllm_llm.g6_session build kept_l1
+[18:35:26 +  1m12s] ok      qwen_build_kept rc=0 64s
+    BUILD kept OK /root/sess/20261014T183414Z-68d6f6/qwen/b_kept
+[18:35:26 +  1m12s] start qwen_certify_kept on GPU 0
+[18:35:27 +  1m13s] ok      qwen_build_kept_l1 rc=0 65s
+    BUILD kept_l1 OK /root/sess/20261014T183414Z-68d6f6/qwen/b_kept_l1
+[18:36:14 +  2m00s] progress: 1 running, 2 waiting, 24 done
+    qwen_certify_kept [GPU 0] 48s / 1200s: # .venv/bin/python -u -m examples.vllm_llm.g6_session certify kept
+[18:36:39 +  2m25s] ok      qwen_certify_kept rc=0 73s
+    CERTIFIED kept: import certificate at positions 0 and 1040, 32/32, CHECK-DSL OK
+[18:36:39 +  2m25s] start qwen_certify_kept_l1 on GPU 0
+[18:37:14 +  3m00s] progress: 1 running, 1 waiting, 25 done
+    qwen_certify_kept_l1 [GPU 0] 35s / 1200s: # .venv/bin/python -u -m examples.vllm_llm.g6_session certify kept_l1
+[18:37:42 +  3m28s] ok      qwen_certify_kept_l1 rc=0 63s
+    CERTIFIED kept_l1: import certificate at positions 0 and 1040, 32/32, CHECK-DSL OK
+[18:37:42 +  3m28s] start qwen_pairs_kept_l1 on GPU 0
+[18:38:14 +  4m00s] progress: 1 running, 0 waiting, 26 done
+    qwen_pairs_kept_l1 [GPU 0] 32s / 3000s: # .venv/bin/python -u -m examples.vllm_llm.g6_session pairs kept_l1
+[18:39:14 +  5m00s] progress: 1 running, 0 waiting, 26 done
+    qwen_pairs_kept_l1 [GPU 0] 92s / 3000s: # .venv/bin/python -u -m examples.vllm_llm.g6_session pairs kept_l1
+[18:40:14 +  6m00s] progress: 1 running, 0 waiting, 26 done
+    qwen_pairs_kept_l1 [GPU 0] 152s / 3000s: # .venv/bin/python -u -m examples.vllm_llm.g6_session pairs kept_l1
+[18:40:23 +  6m09s] ok      qwen_pairs_kept_l1 rc=0 161s
+    VERDICT arm=kept_l1 NO-GO rule='G6 (docs/INVENTORY-SYSTEM-2026-10-13.md 4.1): KEEP if every pair is faster than kept, median >= 30 us and median > 2 x spread; otherwise NO-GO'
+    PAIRS arm=kept_l1 vs kept median 9.0 us spread 19.0 us every_positive=0
+[18:40:23 +  6m09s] session done
+  job                              status     rc  gpu  seconds
+  apt                              ok          0             1  
+  etx_env                          ok          0             1  
+  prep_env                         ok          0             4  
+  source                           fail        1             1  
+  prep_dl                          ok          0             1  
+  prep_ref                         skipped                      source.json: source fail
+  prep_pack                        skipped                      prep_ref: prep_ref skipped
+  preflight                        skipped                      $ETX_DSV2_DATA/weights.bin: prep_pack skipped
+  qwen_build_hw_bench              ok          0             3  
+  qwen_stage_env                   ok          0             4  
+  qwen_stage_vllm                  ok          0             1  
+  qwen_stage_dl                    ok          0             1  
+  qwen_preflight                   ok          0             1  
+  qwen_build_kept                  ok          0            64  
+  qwen_build_kept_l1               ok          0            65  
+  build_x8p                        skipped                      source.json: source fail
+  build_x8m                        skipped                      source.json: source fail
+  build_x8k                        skipped                      source.json: source fail
+  build_x8                         skipped                      source.json: source fail
+  qwen_stage_pack                  ok          0    0        1  
+  qwen_certify_kept                ok          0    0       73  
+  qwen_certify_kept_l1             ok          0    0       63  
+  qwen_pairs_kept_l1               ok          0    0      161  
+  bgate_x8p                        skipped                      inputs.json: preflight skipped
+  bgate_x8m                        skipped                      inputs.json: preflight skipped
+  bgate_x8k                        skipped                      inputs.json: preflight skipped
+  bgate_x8                         skipped                      inputs.json: preflight skipped

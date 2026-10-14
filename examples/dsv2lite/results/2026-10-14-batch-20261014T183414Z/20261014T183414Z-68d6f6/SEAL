@@ -1,0 +1,42 @@
+{
+ "complete": false,
+ "jobs": {
+  "apt": "ok",
+  "bgate_x8": "skipped",
+  "bgate_x8k": "skipped",
+  "bgate_x8m": "skipped",
+  "bgate_x8p": "skipped",
+  "build_x8": "skipped",
+  "build_x8k": "skipped",
+  "build_x8m": "skipped",
+  "build_x8p": "skipped",
+  "etx_env": "ok",
+  "preflight": "skipped",
+  "prep_dl": "ok",
+  "prep_env": "ok",
+  "prep_pack": "skipped",
+  "prep_ref": "skipped",
+  "qwen_build_hw_bench": "ok",
+  "qwen_build_kept": "ok",
+  "qwen_build_kept_l1": "ok",
+  "qwen_certify_kept": "ok",
+  "qwen_certify_kept_l1": "ok",
+  "qwen_pairs_kept_l1": "ok",
+  "qwen_preflight": "ok",
+  "qwen_stage_dl": "ok",
+  "qwen_stage_env": "ok",
+  "qwen_stage_pack": "ok",
+  "qwen_stage_vllm": "ok",
+  "source": "fail"
+ },
+ "local_only": [
+  "b_*/run",
+  "b_*/fleet_src/*",
+  "*.o"
+ ],
+ "manifest_sha256": "831e2ff6d7aa339a8a91416c499ea4f3918fc0e385cd38af42ca6041110cc6a0",
+ "plan_sha256": "36ff2003752b97f3ef57d5a05102bab5a6bcedad58cccb7d74f07d8208c72711",
+ "sealed": "2026-10-14T18:40:23Z",
+ "session": "20261014T183414Z-68d6f6",
+ "source": "commit e0b9a75c03b699e9b7bdb848750d13b00c03ce20\nbranch main\narchive 9631c710a01f925af9563bccc887c3f540396dee6ca688fa4f8988e14ab2c3e9\nstaged 2026-10-14T17:38:05Z\n"
+}

@@ -8,7 +8,8 @@ Labels: [M] measured, [E] estimate, [U] unknown. bf16, batch 1, context 1024, 32
 - **DeepSeek (6):** K1, M1, two ablations, one trace, KM. **All six measured on 2026-10-14:** K1 KEEP +41 us,
   M1 KEEP +66 us, both ablated levers STAY, trace recorded, KM (K1 + M1) KEEP +52 us over M1 alone, +120 us over
   `alld4r0l1`. **The DeepSeek kept arm is now `alld4r0l1kvsmw`.**
-- **Qwen (2):** moerows, the common cache mode.
+- **Qwen (2):** moerows (NO-GO, measured twice with medians of -0.12% and +14.29%: the microbenchmark cannot decide it),
+  the common cache mode (**NO-GO, measured 2026-10-14: +9.0 us against DeepSeek's +330 us, every_positive=0**).
 - **Not counted:** `certify_kept` / `certify_kept_l1` (correctness gates), `moegather` (moerows' cross-check),
   preflights and builds.
 - **Also listed, not counted as studies:** 4 open team proposals (P1, P3, P4, P5), design only: not built, not queued
@@ -126,6 +127,15 @@ Labels: [M] measured, [E] estimate, [U] unknown. bf16, batch 1, context 1024, 32
   same-build import certificate + 32/32 first.
 - **GPU-only unknown:** correctness on the device and any gain. Expect far less than DeepSeek's [E].
 - **Sources:** INVENTORY 4.1; tests/test_qwen_g6.py.
+- **Result (2026-10-14, box session `20261014T183414Z-68d6f6`, `results/2026-10-14-batch-20261014T183414Z`): NO-GO.**
+  Both builds came out of the same tree (`BUILD kept OK`, `BUILD kept_l1 OK`) and both passed the import certificate
+  (`CERTIFIED kept` / `CERTIFIED kept_l1: import certificate at positions 0 and 1040, 32/32, CHECK-DSL OK`), so the
+  switch is correct on Qwen. The timing rule then refused it: `PAIRS arm=kept_l1 vs kept median 9.0 us spread 19.0 us
+  every_positive=0` — **+9 us against DeepSeek's +330 us, not one pair faster, and the median is inside 2x the
+  spread.** The reuse criterion therefore reads: one switch, two models, one rule — and **the rule is not portable**.
+  The switch compiles and stays correct on both models, but the gain that made it a KEEP on DeepSeek does not appear on
+  Qwen. That is a measured answer to the system goal's cross-model half, and it is the first Qwen arm this project has
+  taken all the way to a verdict.
 
 ## Open proposals (team, 2026-10-14; design only)
 

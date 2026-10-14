@@ -1,0 +1,39 @@
+/root/sess/20261014T183414Z-68d6f6/qwen/b_kept/megakernel_d0.hip:11623:1: remark: Function Name: etx_megakernel_d0 [-Rpass-analysis=kernel-resource-usage]
+ 11623 | extern "C" __global__ void __launch_bounds__(ETX_THREADS, ETX_MIN_WG_PER_CU) etx_megakernel_d0(etx_params p) {
+       | ^
+/root/sess/20261014T183414Z-68d6f6/qwen/b_kept/megakernel_d0.hip:11623:1: remark:     TotalSGPRs: 106 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/20261014T183414Z-68d6f6/qwen/b_kept/megakernel_d0.hip:11623:1: remark:     VGPRs: 128 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/20261014T183414Z-68d6f6/qwen/b_kept/megakernel_d0.hip:11623:1: remark:     AGPRs: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/20261014T183414Z-68d6f6/qwen/b_kept/megakernel_d0.hip:11623:1: remark:     ScratchSize [bytes/lane]: 64 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/20261014T183414Z-68d6f6/qwen/b_kept/megakernel_d0.hip:11623:1: remark:     Dynamic Stack: False [-Rpass-analysis=kernel-resource-usage]
+/root/sess/20261014T183414Z-68d6f6/qwen/b_kept/megakernel_d0.hip:11623:1: remark:     Occupancy [waves/SIMD]: 4 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/20261014T183414Z-68d6f6/qwen/b_kept/megakernel_d0.hip:11623:1: remark:     SGPRs Spill: 273 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/20261014T183414Z-68d6f6/qwen/b_kept/megakernel_d0.hip:11623:1: remark:     VGPRs Spill: 15 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/20261014T183414Z-68d6f6/qwen/b_kept/megakernel_d0.hip:11623:1: remark:     LDS Size [bytes/block]: 29736 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/20261014T183414Z-68d6f6/qwen/b_kept/megakernel_d0.hip:11677:1: remark: Function Name: etx_unfused_d0 [-Rpass-analysis=kernel-resource-usage]
+ 11677 | extern "C" __global__ void __launch_bounds__(ETX_THREADS, ETX_MIN_WG_PER_CU) etx_unfused_d0(etx_params p, int32_t first) {
+       | ^
+/root/sess/20261014T183414Z-68d6f6/qwen/b_kept/megakernel_d0.hip:11677:1: remark:     TotalSGPRs: 99 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/20261014T183414Z-68d6f6/qwen/b_kept/megakernel_d0.hip:11677:1: remark:     VGPRs: 104 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/20261014T183414Z-68d6f6/qwen/b_kept/megakernel_d0.hip:11677:1: remark:     AGPRs: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/20261014T183414Z-68d6f6/qwen/b_kept/megakernel_d0.hip:11677:1: remark:     ScratchSize [bytes/lane]: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/20261014T183414Z-68d6f6/qwen/b_kept/megakernel_d0.hip:11677:1: remark:     Dynamic Stack: False [-Rpass-analysis=kernel-resource-usage]
+/root/sess/20261014T183414Z-68d6f6/qwen/b_kept/megakernel_d0.hip:11677:1: remark:     Occupancy [waves/SIMD]: 4 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/20261014T183414Z-68d6f6/qwen/b_kept/megakernel_d0.hip:11677:1: remark:     SGPRs Spill: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/20261014T183414Z-68d6f6/qwen/b_kept/megakernel_d0.hip:11677:1: remark:     VGPRs Spill: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/20261014T183414Z-68d6f6/qwen/b_kept/megakernel_d0.hip:11677:1: remark:     LDS Size [bytes/block]: 29704 [-Rpass-analysis=kernel-resource-usage]
+warning: linking module '/root/sess/20261014T183414Z-68d6f6/qwen/b_kept/imports.bc': Linking two modules of different data layouts: '/root/sess/20261014T183414Z-68d6f6/qwen/b_kept/imports.bc' is 'e-m:e-p:64:64-p1:64:64-p2:32:32-p3:32:32-p4:64:64-p5:32:32-p6:32:32-p7:160:256:256:32-p8:128:128:128:48-p9:192:256:256:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024-v2048:2048-n32:64-S32-A5-G1-ni:7:8:9' whereas '/root/sess/20261014T183414Z-68d6f6/qwen/b_kept/megakernel_d0.hip' is 'e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128'
+ [-Wlinker-warnings]
+warning: linking module '/root/sess/20261014T183414Z-68d6f6/qwen/b_kept/imports.bc': Linking two modules of different target triples: '/root/sess/20261014T183414Z-68d6f6/qwen/b_kept/imports.bc' is 'amdgcn-amd-amdhsa' whereas '/root/sess/20261014T183414Z-68d6f6/qwen/b_kept/megakernel_d0.hip' is 'x86_64-unknown-linux-gnu'
+ [-Wlinker-warnings]
+2 warnings generated when compiling for host.
+warning: linking module '/root/sess/20261014T183414Z-68d6f6/qwen/b_kept/imports.bc': Linking two modules of different data layouts: '/root/sess/20261014T183414Z-68d6f6/qwen/b_kept/imports.bc' is 'e-m:e-p:64:64-p1:64:64-p2:32:32-p3:32:32-p4:64:64-p5:32:32-p6:32:32-p7:160:256:256:32-p8:128:128:128:48-p9:192:256:256:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024-v2048:2048-n32:64-S32-A5-G1-ni:7:8:9' whereas '/root/src/9631c710a01f925af9563bccc887c3f540396dee6ca688fa4f8988e14ab2c3e9-20261014T173802Z/examples/vllm_llm/host.hip' is 'e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128'
+ [-Wlinker-warnings]
+warning: linking module '/root/sess/20261014T183414Z-68d6f6/qwen/b_kept/imports.bc': Linking two modules of different target triples: '/root/sess/20261014T183414Z-68d6f6/qwen/b_kept/imports.bc' is 'amdgcn-amd-amdhsa' whereas '/root/src/9631c710a01f925af9563bccc887c3f540396dee6ca688fa4f8988e14ab2c3e9-20261014T173802Z/examples/vllm_llm/host.hip' is 'x86_64-unknown-linux-gnu'
+ [-Wlinker-warnings]
+2 warnings generated when compiling for host.
+warning: linking module '/root/sess/20261014T183414Z-68d6f6/qwen/b_kept/imports.bc': Linking two modules of different data layouts: '/root/sess/20261014T183414Z-68d6f6/qwen/b_kept/imports.bc' is 'e-m:e-p:64:64-p1:64:64-p2:32:32-p3:32:32-p4:64:64-p5:32:32-p6:32:32-p7:160:256:256:32-p8:128:128:128:48-p9:192:256:256:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024-v2048:2048-n32:64-S32-A5-G1-ni:7:8:9' whereas '/root/sess/20261014T183414Z-68d6f6/qwen/b_kept/imp/orig_table.hip' is 'e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128'
+ [-Wlinker-warnings]
+warning: linking module '/root/sess/20261014T183414Z-68d6f6/qwen/b_kept/imports.bc': Linking two modules of different target triples: '/root/sess/20261014T183414Z-68d6f6/qwen/b_kept/imports.bc' is 'amdgcn-amd-amdhsa' whereas '/root/sess/20261014T183414Z-68d6f6/qwen/b_kept/imp/orig_table.hip' is 'x86_64-unknown-linux-gnu'
+ [-Wlinker-warnings]
+2 warnings generated when compiling for host.

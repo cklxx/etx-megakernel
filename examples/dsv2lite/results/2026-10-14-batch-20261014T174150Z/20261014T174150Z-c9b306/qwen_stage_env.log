@@ -1,0 +1,4 @@
+# job qwen_stage_env gpu=None cwd=/root/etx
+# [ -d $HOME/qwen-llmenv ] || python3 -m venv $HOME/qwen-llmenv; . $HOME/qwen-llmenv/bin/activate && pip install -q --upgrade pip && pip install -q numpy 'huggingface_hub[hf_transfer]' hf_transfer safetensors && { python3 -c 'import torch' 2>/dev/null || pip install -q --index-url https://download.pytorch.org/whl/rocm7.0 torch; } && python3 -c 'import torch, safetensors, huggingface_hub; print("QWEN-ENV OK", torch.__version__)'
+WARNING: huggingface-hub 2.2.0 does not provide the extra 'hf-transfer'
+QWEN-ENV OK 2.10.0+rocm7.0

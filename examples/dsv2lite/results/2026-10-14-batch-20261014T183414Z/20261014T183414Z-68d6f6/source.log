@@ -1,0 +1,12 @@
+# job source gpu=None cwd=/root/etx
+# .venv/bin/python -u -m examples.dsv2lite.inplace_session source
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/root/src/9631c710a01f925af9563bccc887c3f540396dee6ca688fa4f8988e14ab2c3e9-20261014T173802Z/examples/dsv2lite/inplace_session.py", line 266, in <module>
+    main()
+  File "/root/src/9631c710a01f925af9563bccc887c3f540396dee6ca688fa4f8988e14ab2c3e9-20261014T173802Z/examples/dsv2lite/inplace_session.py", line 262, in main
+    getattr(session, a.operation)()
+  File "/root/src/9631c710a01f925af9563bccc887c3f540396dee6ca688fa4f8988e14ab2c3e9-20261014T173802Z/examples/dsv2lite/inplace_session.py", line 128, in source
+    raise RuntimeError("fleet src is not the exact pinned 3fb67a6 export")
+RuntimeError: fleet src is not the exact pinned 3fb67a6 export

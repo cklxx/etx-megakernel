@@ -1,0 +1,114 @@
+{
+  "arm": "kept_l1",
+  "rounds": [
+    {
+      "kept": {
+        "device_ms": "3.917",
+        "wall_ms": "4.051",
+        "tokens": 32
+      },
+      "kept_l1": {
+        "device_ms": "3.908",
+        "wall_ms": "4.039",
+        "tokens": 32
+      }
+    },
+    {
+      "kept_l1": {
+        "device_ms": "3.907",
+        "wall_ms": "4.044",
+        "tokens": 32
+      },
+      "kept": {
+        "device_ms": "3.917",
+        "wall_ms": "4.052",
+        "tokens": 32
+      }
+    },
+    {
+      "kept": {
+        "device_ms": "3.909",
+        "wall_ms": "4.042",
+        "tokens": 32
+      },
+      "kept_l1": {
+        "device_ms": "3.914",
+        "wall_ms": "4.048",
+        "tokens": 32
+      }
+    },
+    {
+      "kept_l1": {
+        "device_ms": "3.913",
+        "wall_ms": "4.043",
+        "tokens": 32
+      },
+      "kept": {
+        "device_ms": "3.927",
+        "wall_ms": "4.059",
+        "tokens": 32
+      }
+    },
+    {
+      "kept": {
+        "device_ms": "3.917",
+        "wall_ms": "4.048",
+        "tokens": 32
+      },
+      "kept_l1": {
+        "device_ms": "3.917",
+        "wall_ms": "4.050",
+        "tokens": 32
+      }
+    }
+  ],
+  "condition": "one MI300X, Qwen3-30B-A3B, bf16, batch 1, context 1024, 32 tokens, device time",
+  "device_ms": {
+    "kept": {
+      "gains_us": [
+        9.0,
+        10.0,
+        -5.0,
+        14.0,
+        0.0
+      ],
+      "median_us": 9.0,
+      "spread_us": 19.0,
+      "every_positive": false
+    }
+  },
+  "wall_ms": {
+    "kept": {
+      "gains_us": [
+        12.0,
+        8.0,
+        -6.0,
+        16.0,
+        -2.0
+      ],
+      "median_us": 8.0,
+      "spread_us": 22.0,
+      "every_positive": false
+    }
+  },
+  "decision": {
+    "gains_us": [
+      9.0,
+      10.0,
+      -5.0,
+      14.0,
+      0.0
+    ],
+    "median_us": 9.0,
+    "spread_us": 19.0,
+    "every_positive": false,
+    "ref": "kept",
+    "a_ok": false,
+    "passed": false
+  },
+  "verdict": {
+    "rule": "G6 (docs/INVENTORY-SYSTEM-2026-10-13.md 4.1): KEEP if every pair is faster than kept, median >= 30 us and median > 2 x spread; otherwise NO-GO",
+    "outcome": "NO-GO",
+    "passed": false
+  }
+}

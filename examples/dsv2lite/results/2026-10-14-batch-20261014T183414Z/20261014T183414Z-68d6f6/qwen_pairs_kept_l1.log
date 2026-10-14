@@ -1,0 +1,4 @@
+# job qwen_pairs_kept_l1 gpu=0 cwd=/root/etx
+# .venv/bin/python -u -m examples.vllm_llm.g6_session pairs kept_l1
+VERDICT arm=kept_l1 NO-GO rule='G6 (docs/INVENTORY-SYSTEM-2026-10-13.md 4.1): KEEP if every pair is faster than kept, median >= 30 us and median > 2 x spread; otherwise NO-GO'
+PAIRS arm=kept_l1 vs kept median 9.0 us spread 19.0 us every_positive=0

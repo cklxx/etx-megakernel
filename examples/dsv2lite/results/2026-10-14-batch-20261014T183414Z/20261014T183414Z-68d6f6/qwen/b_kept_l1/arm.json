@@ -1,0 +1,15 @@
+{
+  "arm": "kept_l1",
+  "env": {
+    "ETX_VL_CHECK": "1",
+    "ETX_TOPK_KEY32": "1",
+    "ETX_DEV_RESET": "0",
+    "ETX_VL_REQUESTS": "1",
+    "ETX_VL_CU": "256",
+    "ETX_VL_TOUCH": "1",
+    "ETX_PREFETCH_ISOLATE_POLLER": "0",
+    "ETX_VL_ROUTER_NARROW": "1",
+    "ETX_COHERENCE": "l1",
+    "ETX_HIPCC_FLAGS": "-DETX_DSL_WSUM -DETX_DSL_SCALAR -DETX_DSL_GU1 -DETX_DSL_RBATCH -DETX_INBODY_REPORT -DETX_DSL_NORM_HOIST"
+  }
+}

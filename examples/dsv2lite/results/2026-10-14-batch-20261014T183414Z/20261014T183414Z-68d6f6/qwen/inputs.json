@@ -1,0 +1,6 @@
+{
+  "model": "/root/llm/qwen3-30b-a3b",
+  "hf": "/root/llm/qwen3-30b-a3b/hf",
+  "golden_sha256": "bab2f1fbe12f70179711ec40a215c74710845b73169b1cc6a3a6ca50e0a19484",
+  "golden_sha256_verified": true
+}
