@@ -30,9 +30,15 @@ class BatchSession(Session):
     def etx_args(self, b: int) -> list[str]:
         return [*self.args(), *(a for r in range(1, b) for a in ("--req-dir", str(self.data / f"r{r}")))]
 
-    def etx(self, b: int, name: str) -> dict:
-        """One gated invocation of B's arm: every request 32/32, 27/27, warm-up 32/32 (etx/session/batch.py)."""
-        arm = BATCH_ARMS[b]
+    def etx(self, b: int, name: str, arm: str | None = None) -> dict:
+        """One gated invocation of one arm at B requests: every request 32/32, 27/27, warm-up 32/32
+        (etx/session/batch.py).
+
+        `arm` says which binary runs: it defaults to BATCH_ARMS[b], and the batch-8 diagnostic passes its own name so
+        the run is that candidate's tree (b_<arm>/run) and never another arm's. Without this, the four candidate labels
+        all executed b_x8/run and the four verdicts were one measurement written four times.
+        """
+        arm = arm or BATCH_ARMS[b]
         try:
             text = self.run(name, [self.out(arm) / "run", *self.etx_args(b)])
             return batch.etx_result(text, b)
@@ -70,7 +76,7 @@ class BatchSession(Session):
         if b is None:
             raise SystemExit(f"gate: {arm} is not a batch arm and not a batch-8 candidate")
         out = self.fresh(self.logs / f"bgate_{arm}.json")
-        r = self.etx(b, f"bgate_{arm}")
+        r = self.etx(b, f"bgate_{arm}", arm=arm)
         write_json(out, dict(arm=arm, batch=b, passed="error" not in r, result=r))
         print(f"BGATE arm={arm} b={b} {'PASS' if 'error' not in r else 'NOT COMPLETE: ' + r['error']}", flush=True)
 
