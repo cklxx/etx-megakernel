@@ -22,7 +22,7 @@ from examples.dsv2lite.inplace_session import Session, write_json
 
 IMAGE = "vllm/vllm-openai-rocm@sha256:bb44b39aea26798cce43030a98bf48efd0322ca7147367db86e38b96bd80f0e7"
 CONFIGS = {"default": "0", "aiter": "1"}            # VLLM_ROCM_USE_AITER, in tie-break order
-MODEL = Path(os.environ.get("ETX_DSV2_MODEL", Path.home() / "models/dsv2-lite-base"))
+MODEL = Path.home() / "models/dsv2-lite-base"     # examples/sessions/ds_batch.py prepares and declares this path
 VLLM_DEADLINE_S = 900
 
 
@@ -48,6 +48,9 @@ class BatchSession(Session):
 
     def vllm(self, config: str, name: str) -> dict:
         """One vLLM process measuring every batch size; per-sequence gates are read from its log, never filtered."""
+        requested = Path(os.environ.get("ETX_DSV2_MODEL", MODEL)).expanduser()
+        if requested.resolve() != MODEL.resolve():
+            raise ValueError(f"ETX_DSV2_MODEL {requested} differs from prepared model {MODEL}; refused")
         goldens = [str(self.data / "vllm" / f"golden_r{r}.txt") for r in range(max(BATCHES))]
         sudo = [] if os.geteuid() == 0 else ["sudo"]
         command = [*sudo, "docker", "run", "--rm", "--device=/dev/kfd", "--device=/dev/dri", "--group-add", "video",

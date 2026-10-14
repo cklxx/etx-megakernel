@@ -524,3 +524,21 @@ def test_verifier_checks_the_promised_batch_report(tmp_path):
     rc, lines = experiment.verify(tmp_path, arms, ROOT / "examples/sessions/ds_batch.py")
     assert rc == 3
     assert any("MISSING batch_report.json" in line for line in lines)
+
+
+def test_baseline_refuses_a_model_other_than_the_prepared_model(tmp_path, monkeypatch):
+    from examples.dsv2lite import batch_session as bs
+    for k in ("ETX_SESS_LOGDIR", "ETX_DSV2_FLEET", "ETX_DSV2_DATA"):
+        monkeypatch.setenv(k, str(tmp_path))
+    other = tmp_path / "different-model"
+    prepared = tmp_path / "prepared-model"
+    monkeypatch.setattr(bs, "MODEL", prepared)
+    monkeypatch.setenv("ETX_DSV2_MODEL", str(other))
+    s = bs.BatchSession()
+    calls = []
+    monkeypatch.setattr(s, "run", lambda *a, **kw: calls.append(a) or "")
+    with pytest.raises(ValueError) as exc:
+        s.vllm("default", "model_probe")
+    assert str(other) in str(exc.value)
+    assert str(prepared) in str(exc.value)
+    assert not calls
