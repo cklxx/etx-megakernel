@@ -557,3 +557,24 @@ These are accounting residuals, not measured stalls. K1 is the one body excess w
 - **Expected vs unknown:** K1's net sign is [U] (-5..-7 us qkv against +1..+4 us handoff/attention per layer, both [E]).
   The ablations' ceilings are low: argmax is 5.1 us in total; terminal loads cost 14 us in an earlier session, on
   another combination. Nothing is promised.
+
+## M1: merge's W_UV GEMV on all four waves (threshold written before the code, 2026-10-14)
+
+**Why.** In the kept trace, merge takes 11.4 us per layer against a 0.49 us byte floor [C]. Its stamped stages are
+coefficients 0.72, partial fold 1.90, then the W_UV GEMV 5.24 us per task [M, stamped]. That GEMV is
+`gemv_rows(..., n_rows = 8, K = kv_lora = 512)`; K <= 512 picks `gemv_rows_pipelined<8, 1>`: 8 rows per wave per
+group, groups interleaved over waves (`k = 8 * wave`). A task owns exactly 8 rows, so **wave 0 loads, reduces and
+stores all eight while waves 1-3 sit idle** (OPS-dsv2.md:82, :146 noted it; no lever was ever made, open or closed).
+
+**Change, lever `merge_uv_waves`:** merge calls `gemv_rows_pipelined<2, 1>` directly, so the 8 rows go 2 per wave.
+- Every row is computed by the same operations: `fma8` of the lane's one 16-byte chunk, then `wave_sum`, then lane
+  0's bf16 epilogue. The lane-to-chunk mapping depends on K only, so the outputs are **bit-identical** by construction.
+- Default off. The kept recipe's other levers (including gemv_no_terminal_all's loop patch) apply as before.
+
+**Expected [E], not promised.** Wave 0's serial chain shrinks from 8 row loads + 8 wave sums + 8 epilogue stores to
+2 + 2 + 2. Estimate: 1-3 us per merge task. M3 ends each merge task, so that is up to 27-80 us/token. If the time
+is a single memory round trip that both versions pay once, the gain is ~0 [U].
+
+**Rule (M1):** arm `alld4r0l1mw` (kept + `merge_uv_waves`) vs `alld4r0l1`, five interleaved rounds, device time, no
+stamps. **KEEP** if every pair is faster, median >= 30 us and > 2 x spread; otherwise **DROP**. 32/32 + 27/27 in every
+invocation.
