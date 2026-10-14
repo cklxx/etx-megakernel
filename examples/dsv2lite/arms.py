@@ -82,6 +82,11 @@ ARMS = {a.name: a for a in [
           rule=Rule("device_ms", "alld4r0l1", 0, text=f"REMOVE {lever} from the kept recipe if every pair faster than "
                     "alld4r0l1 and median > 2 x spread; otherwise it stays (rule commit 2ec2d29)", labels=("REMOVE", "STAYS")))
       for name, lever in (("alld4r0l1noQ", "gemv_no_terminal_all"), ("alld4r0l1noA", "argmax_tree"))),
+    # M1 on the kept arm (docs/DSV2-D1-D5.md, "M1", rule written before the code, 3d27ff8)
+    Arm("alld4r0l1mw", levers=(*LEVERS_ALL, "l1_loads", "merge_uv_waves"), flags=D4, env=dict(D4R0, ETX_DSV2_COH="l1"),
+        order=("alld4r0l1", "alld4r0l1mw"), references=("alld4r0l1",),
+        rule=Rule("device_ms", "alld4r0l1", 30, text="M1: KEEP if every pair faster than alld4r0l1, median >= 30 us, "
+                  "> 2 x spread; otherwise DROP (rule commit 3d27ff8)", labels=("KEEP", "DROP"))),
     Arm("allnoQ", levers=tuple(x for x in LEVERS_ALL if x != "gemv_no_terminal_all"),
         order=("default", "all", "allnoQ"), references=("default", "all"),
         rule=Rule("device_ms", "all", 0, text="every pair faster, median > 2 x spread")),

@@ -1,6 +1,6 @@
 """DeepSeek's K1 queue and Qwen's prepared studies on ONE box, one runner: the two session files' own jobs, combined.
 
-Six experiments (docs/EXPERIMENTS-2026-10-14.md): DeepSeek K1 + two kept-arm ablations (timed pairs) + one stamped
+Seven experiments (docs/EXPERIMENTS-2026-10-14.md): DeepSeek K1, M1 + two kept-arm ablations (timed pairs) + one stamped
 trace (attribution only); Qwen row ownership between MoE workgroups (hw_bench moerows; moegather is its cross-check, not a
 study) + the common cache mode (pairs_kept_l1). certify_kept / certify_kept_l1 are correctness gates, not experiments.
 
@@ -9,7 +9,8 @@ prefix "qwen_", record subdirectory qwen/ (model-separated raw outputs) and shar
 .venv, whatever their result, instead of racing apt). The models share no file: every Qwen read and write is under
 qwen/ or in Qwen's own $HOME paths, so a failed Qwen input skips only Qwen's jobs, and the microbenchmark's outcome gates
 nothing. One GPU lane, strictly in this order (gpu_jobs.py), so no two GPU jobs ever overlap:
-  qwen_moerows (no model input, seconds [E]) -> DeepSeek prep_ref -> pairs_alld4r0l1kvs -> pairs_alld4r0l1noQ ->
+  qwen_moerows (no model input, seconds [E]) -> DeepSeek prep_ref -> pairs_alld4r0l1kvs -> pairs_alld4r0l1mw ->
+  pairs_alld4r0l1noQ ->
   pairs_alld4r0l1noA -> trace_alld4r0l1kvs -> qwen_stage_pack -> qwen_certify_kept -> qwen_certify_kept_l1 ->
   qwen_pairs_kept_l1
 DeepSeek, the active priority, finishes first; Qwen's download and environment run on the CPU meanwhile.
@@ -33,5 +34,5 @@ _qwen = _q.jobs(prefix="qwen_", sub="qwen", shared_setup=True)
 _first = {"qwen_build_hw_bench", "qwen_moerows", "qwen_stage_env", "qwen_stage_vllm", "qwen_stage_dl"}
 JOBS = ([j for j in _qwen if j["name"] in _first] + [dict(j) for j in _ds.JOBS] +
         [j for j in _qwen if j["name"] not in _first])
-STUDIES = {"DeepSeek": ["pairs_alld4r0l1kvs", "pairs_alld4r0l1noQ", "pairs_alld4r0l1noA", "trace_alld4r0l1kvs"],
+STUDIES = {"DeepSeek": ["pairs_alld4r0l1kvs", "pairs_alld4r0l1mw", "pairs_alld4r0l1noQ", "pairs_alld4r0l1noA", "trace_alld4r0l1kvs"],
            "Qwen": ["qwen_moerows", "qwen_pairs_kept_l1"]}

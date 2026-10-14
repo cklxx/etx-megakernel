@@ -8,7 +8,7 @@ from etx.tools import gpu_jobs as gj
 
 ROOT = Path(__file__).resolve().parents[1]
 SESSION = ROOT / "examples/sessions/joint_ds_qwen.py"
-DS_STUDIES = ["pairs_alld4r0l1kvs", "pairs_alld4r0l1noQ", "pairs_alld4r0l1noA", "trace_alld4r0l1kvs"]
+DS_STUDIES = ["pairs_alld4r0l1kvs", "pairs_alld4r0l1mw", "pairs_alld4r0l1noQ", "pairs_alld4r0l1noA", "trace_alld4r0l1kvs"]
 QWEN_STUDIES = ["qwen_moerows", "qwen_pairs_kept_l1"]
 GATES = ["qwen_certify_kept", "qwen_certify_kept_l1"]
 
@@ -41,7 +41,7 @@ def test_exactly_six_studies_and_two_gates(joint):
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     assert mod.STUDIES == {"DeepSeek": DS_STUDIES, "Qwen": QWEN_STUDIES}
-    assert sum(map(len, mod.STUDIES.values())) == 6
+    assert sum(map(len, mod.STUDIES.values())) == 7
     assert all(by[n].lane == "gpu" for n in DS_STUDIES + QWEN_STUDIES + GATES)
     assert limit == 7200
 

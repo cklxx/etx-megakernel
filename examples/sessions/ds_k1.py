@@ -2,6 +2,7 @@
 
 GPU order (one pairs invocation 5.9 s, one traced token 7-8 s, from the 2026-10-13 runner records):
   pairs_alld4r0l1kvs   K1: kv_a computed once (1/8 per XCD) behind a global qkv event; KEEP or DROP   10 inv, ~59 s
+  pairs_alld4r0l1mw    M1: merge's W_UV GEMV on all four waves (2 rows each); KEEP or DROP           10 inv, ~59 s
   pairs_alld4r0l1noQ   ablation: the kept recipe without gemv_no_terminal_all; REMOVE or STAYS       10 inv, ~59 s
   pairs_alld4r0l1noA   ablation: the kept recipe without argmax_tree; REMOVE or STAYS                10 inv, ~59 s
   trace_alld4r0l1kvs   one stamped token of K1: attribution only (qkv vs attention), never a timing  1 inv, ~8 s
@@ -21,7 +22,8 @@ _spec.loader.exec_module(_full)
 MAX_SESSION_SECONDS = 1800
 _full.JOBS = [dict(d) for d in _full.JOBS if d["name"] in
               ("apt", "etx_env", "prep_env", "source", "prep_dl", "prep_ref", "prep_pack", "preflight")]
-GPU = [("pairs_alld4r0l1kvs", "pairs alld4r0l1kvs"), ("pairs_alld4r0l1noQ", "pairs alld4r0l1noQ"),
+GPU = [("pairs_alld4r0l1kvs", "pairs alld4r0l1kvs"), ("pairs_alld4r0l1mw", "pairs alld4r0l1mw"),
+       ("pairs_alld4r0l1noQ", "pairs alld4r0l1noQ"),
        ("pairs_alld4r0l1noA", "pairs alld4r0l1noA"), ("trace_alld4r0l1kvs", "trace alld4r0l1kvs")]
 for name, op in GPU:
     kind, arm = op.split()

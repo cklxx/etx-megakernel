@@ -578,3 +578,18 @@ is a single memory round trip that both versions pay once, the gain is ~0 [U].
 **Rule (M1):** arm `alld4r0l1mw` (kept + `merge_uv_waves`) vs `alld4r0l1`, five interleaved rounds, device time, no
 stamps. **KEEP** if every pair is faster, median >= 30 us and > 2 x spread; otherwise **DROP**. 32/32 + 27/27 in every
 invocation.
+
+### M1 local evidence (branch wf/merge-waves2; ROCm 7.2.4)
+- **Device build:** `rocm_build_check.sh <fleet export> --arm alld4r0l1mw`: plan 3379ec89 (= kept: the change is tile
+  code only); 256 VGPR / 78 AGPR (+8 vs kept) / 0 scratch / 1 wave.
+- **Probe:** `merge_and_uv` compiled alone with the kept recipe's GEMV + l1 levers, with and without M1 (lines after
+  merge's last barrier = one wave's M3).
+  - assembly lines 1082 -> 365;
+  - weight loads 24 -> 6;
+  - DPP/bpermute reduction ops 96 -> 24;
+  - s_waitcnt 95 -> 30;
+  - FMAs 144 -> 36;
+  - the probe's VGPR 124 -> 64, 0 scratch.
+- **Bit identity:** same per-row operations (fma8 on the lane's chunk, wave_sum, lane-0 epilogue; the lane -> chunk map
+  is K's). Row coverage over waves is tested (each row once; 1 busy wave -> 4).
+- **Queued** in `examples/sessions/ds_k1.py` right after K1, with the same kept baseline.

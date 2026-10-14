@@ -1,0 +1,76 @@
+{
+  "arm": "merge_uv_waves",
+  "arm_build": {
+    "isa_sha256": "fdb4f2e4d1f6dd1ba2cbbb42eb44d3ea2dc4168fe8e31e197346d4b045668cd5",
+    "kernel_sha256": "751293fad5f5c98ec6dbf9eeca3c73319b1d4ded4b6ca73996a65757c0ffae5d",
+    "plan_sha256": "09011c207b1e92febf29a2c2efc2d944ef9ad7ac8a0803633579c8444d821f8a",
+    "resources": {
+      "agpr": 57,
+      "lds": 26668,
+      "occupancy": 1,
+      "scratch": 0,
+      "sgpr": 108,
+      "vgpr": 256
+    },
+    "static": {
+      "asm_lines": 108179,
+      "inv_sc0": 6,
+      "inv_sc1": 279,
+      "nt_weight_loads": 270,
+      "sys_loads": 0,
+      "vmcnt0_waits": 2763,
+      "wbl2": 118
+    }
+  },
+  "cpu_gates": {
+    "files": [
+      "tests/test_dsv2_lever_merge_uv_waves.py",
+      "tests/test_dsv2_stamps.py"
+    ],
+    "summary": "20 passed in 0.17s"
+  },
+  "default": {
+    "isa_sha256": "a105cb16a414ee0f9f697c9de13205419d09674f5c69f6ee804cf36942377724",
+    "kernel_sha256": "751293fad5f5c98ec6dbf9eeca3c73319b1d4ded4b6ca73996a65757c0ffae5d",
+    "plan_sha256": "09011c207b1e92febf29a2c2efc2d944ef9ad7ac8a0803633579c8444d821f8a",
+    "resources": {
+      "agpr": 48,
+      "lds": 26668,
+      "occupancy": 1,
+      "scratch": 0,
+      "sgpr": 108,
+      "vgpr": 256
+    },
+    "static": {
+      "asm_lines": 107990,
+      "inv_sc0": 6,
+      "inv_sc1": 279,
+      "nt_weight_loads": 252,
+      "sys_loads": 0,
+      "vmcnt0_waits": 2750,
+      "wbl2": 118
+    }
+  },
+  "delta_vs_default": {
+    "agpr": 9,
+    "lds": 0,
+    "occupancy": 0,
+    "scratch": 0,
+    "sgpr": 0,
+    "vgpr": 0
+  },
+  "etx_commit": "3d27ff8eb98caf30e0acd7adb0c6b4fff664f17d",
+  "etx_dirty": true,
+  "fleet_commit": "3fb67a6",
+  "fleet_src_sha256": "28f5cbb4f39524df318883522341c48ca4162c18b71a3a6223c52eabb40ce4b3",
+  "static_delta": {
+    "asm_lines": 189,
+    "inv_sc0": 0,
+    "inv_sc1": 0,
+    "nt_weight_loads": 18,
+    "sys_loads": 0,
+    "vmcnt0_waits": 13,
+    "wbl2": 0
+  },
+  "verdict": "PASS"
+}
