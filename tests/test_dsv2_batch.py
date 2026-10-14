@@ -322,3 +322,30 @@ def test_rounds_alternate_and_skip_an_arm_whose_gate_failed(tmp_path, monkeypatc
     assert rec["skipped"] == ["x4", "x8"]
     with pytest.raises(RuntimeError, match="fresh ETX_SESS_LOGDIR"):
         s.rounds()
+
+
+def test_gate_runs_the_arm_it_names(tmp_path, monkeypatch):
+    """x8p / x8m / x8k / x8 must each gate their own binary.
+
+    The four labels once all executed b_x8/run (the batch number alone selected the arm), so one measurement was
+    written four times under four names and the run appeared to say that the plain arm fails exactly like the lever
+    arms. This test is the local check that each gate invocation points at b_<arm>/run.
+    """
+    from examples.dsv2lite import batch_session as bs
+    for k, v in dict(ETX_SESS_LOGDIR=str(tmp_path), ETX_DSV2_FLEET=str(tmp_path), ETX_DSV2_DATA=str(tmp_path)).items():
+        monkeypatch.setenv(k, v)
+    s = bs.BatchSession()
+    seen = []
+
+    def fake_run(name, command, **kw):
+        seen.append((name, str(command[0])))
+        raise RuntimeError("stub: no GPU here")
+
+    monkeypatch.setattr(s, "run", fake_run)
+    for arm in bs.X8_CANDIDATES:
+        s.gate(arm)
+    assert [name for name, _ in seen] == [f"bgate_{a}" for a in ("x8p", "x8m", "x8k", "x8")]
+    assert [path for _, path in seen] == [str(tmp_path / f"b_{a}" / "run") for a in ("x8p", "x8m", "x8k", "x8")]
+    for arm in ("x8p", "x8m", "x8k", "x8"):
+        rec = json.loads((tmp_path / f"bgate_{arm}.json").read_text())
+        assert rec["arm"] == arm and rec["batch"] == 8 and rec["passed"] is False
