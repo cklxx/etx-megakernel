@@ -1,0 +1,31 @@
+{
+ "complete": false,
+ "jobs": {
+  "apt": "ok",
+  "bgate_x8": "ok",
+  "bgate_x8k": "fail",
+  "bgate_x8m": "fail",
+  "bgate_x8p": "fail",
+  "build_x8": "ok",
+  "build_x8k": "ok",
+  "build_x8m": "ok",
+  "build_x8p": "ok",
+  "etx_env": "ok",
+  "preflight": "ok",
+  "prep_dl": "ok",
+  "prep_env": "ok",
+  "prep_pack": "ok",
+  "prep_ref": "ok",
+  "source": "ok"
+ },
+ "local_only": [
+  "b_*/run",
+  "b_*/fleet_src/*",
+  "*.o"
+ ],
+ "manifest_sha256": "90ed71f7fc985af760392045c54d65fa96ae133c0987a9d74869f7bb7687c0c9",
+ "plan_sha256": "b8dbaebbd3ac0e49b53f7d41df810ba3c624e0466144694353d54d2c75cf3f5e",
+ "sealed": "2026-10-14T20:17:22Z",
+ "session": "20261014T201049Z-0b4dcc",
+ "source": "commit a85c7969064647c46fd53ce05d1a9cb1c4c90416\nbranch main\narchive b1a06f43f311da91692a93144c51be281a9b52ca65b6a751aa6fc58a6377db6d\nstaged 2026-10-14T20:10:20Z\n"
+}

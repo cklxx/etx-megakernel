@@ -1,0 +1,130 @@
+[
+ {
+  "name": "apt",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 1.0003149509429932,
+  "note": ""
+ },
+ {
+  "name": "etx_env",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 1.001331090927124,
+  "note": ""
+ },
+ {
+  "name": "prep_env",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 4.008501768112183,
+  "note": ""
+ },
+ {
+  "name": "source",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 1.000594139099121,
+  "note": ""
+ },
+ {
+  "name": "prep_dl",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 1.0004897117614746,
+  "note": ""
+ },
+ {
+  "name": "prep_ref",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 1.000685453414917,
+  "note": ""
+ },
+ {
+  "name": "prep_pack",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 1.0005154609680176,
+  "note": ""
+ },
+ {
+  "name": "preflight",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 21.003512382507324,
+  "note": ""
+ },
+ {
+  "name": "build_x8p",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 256.1410253047943,
+  "note": ""
+ },
+ {
+  "name": "bgate_x8p",
+  "status": "fail",
+  "rc": 1,
+  "gpu": 0,
+  "seconds": 1.0005426406860352,
+  "note": ""
+ },
+ {
+  "name": "build_x8m",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 259.14419078826904,
+  "note": ""
+ },
+ {
+  "name": "bgate_x8m",
+  "status": "fail",
+  "rc": 1,
+  "gpu": 0,
+  "seconds": 1.0004682540893555,
+  "note": ""
+ },
+ {
+  "name": "build_x8k",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 368.2007305622101,
+  "note": ""
+ },
+ {
+  "name": "bgate_x8k",
+  "status": "fail",
+  "rc": 1,
+  "gpu": 0,
+  "seconds": 1.0004065036773682,
+  "note": ""
+ },
+ {
+  "name": "build_x8",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 380.20862102508545,
+  "note": ""
+ },
+ {
+  "name": "bgate_x8",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 7.0013267993927,
+  "note": ""
+ }
+]

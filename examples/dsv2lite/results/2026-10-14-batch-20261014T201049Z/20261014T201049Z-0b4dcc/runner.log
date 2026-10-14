@@ -1,0 +1,115 @@
+[20:10:49 +  0m00s] session record: /root/sess/20261014T201049Z-0b4dcc
+[20:10:49 +  0m00s] start apt (cpu)
+[20:10:50 +  0m01s] ok      apt rc=0 1s
+[20:10:50 +  0m01s] start etx_env (cpu)
+[20:10:50 +  0m01s] start prep_env (cpu)
+[20:10:51 +  0m02s] ok      etx_env rc=0 1s
+[20:10:51 +  0m02s] start source (cpu)
+[20:10:52 +  0m03s] ok      source rc=0 1s
+    SOURCE OK fleet export 28f5cbb4f39524df etx a85c79690646
+[20:10:52 +  0m03s] start build_x8p (cpu)
+[20:10:52 +  0m03s] start build_x8m (cpu)
+[20:10:52 +  0m03s] start build_x8k (cpu)
+[20:10:52 +  0m03s] start build_x8 (cpu)
+[20:10:54 +  0m05s] ok      prep_env rc=0 4s
+[20:10:54 +  0m05s] start prep_dl (cpu)
+[20:10:55 +  0m06s] ok      prep_dl rc=0 1s
+[20:10:55 +  0m06s] start prep_ref on GPU 0
+[20:10:56 +  0m07s] ok      prep_ref rc=0 1s
+    # mkdir -p "$ETX_DSV2_DATA" && cd "$ETX_DSV2_FLEET" && { test -s "$ETX_DSV2_DATA/fleet_cache.bin" -a -s "$ETX_DSV2_DATA/golden_tokens.txt" -a -s "$ETX_DSV2_DATA/golden_hidden.bin" || HIP_VISIBLE_DEVICES=$GPU $HOME/dsv2-prep/.venv/bin/python
+    -rw-r--r--  1 root root         487 Oct 14 17:46 golden.json
+    -rw-r--r--  1 root root    29492654 Oct 14 17:46 golden.npz
+    -rw-r--r--  1 root root      221184 Oct 14 17:46 golden_hidden.bin
+    -rw-r--r--  1 root root         144 Oct 14 17:46 golden_tokens.txt
+    -rw-r--r--  1 root root        3221 Oct 14 19:07 goldens.json
+[20:10:56 +  0m07s] start prep_pack (cpu)
+[20:10:57 +  0m08s] ok      prep_pack rc=0 1s
+[20:10:57 +  0m08s] start preflight (cpu)
+[20:11:18 +  0m29s] ok      preflight rc=0 21s
+    PREFLIGHT hashing /root/dsv2-data/weights.bin bytes=31412968448
+    PREFLIGHT hashing /root/dsv2-data/weights.bin.manifest bytes=9561
+    PREFLIGHT hashing /root/dsv2-data/fleet_cache.bin bytes=32845824
+    PREFLIGHT hashing /root/dsv2-data/golden_tokens.txt bytes=144
+    PREFLIGHT hashing /root/dsv2-data/golden_hidden.bin bytes=221184
+    PREFLIGHT OK inputs are the pinned measured inputs
+[20:11:49 +  1m00s] progress: 4 running, 4 waiting, 8 done
+    build_x8p [cpu] 57s / 1200s: COH-CHECK OK coherent_loads=0 l1_loads=1
+    build_x8m [cpu] 57s / 1200s: COH-CHECK OK coherent_loads=0 l1_loads=1
+    build_x8k [cpu] 57s / 1200s: COH-CHECK OK coherent_loads=0 l1_loads=1
+    build_x8 [cpu] 57s / 1200s: COH-CHECK OK coherent_loads=0 l1_loads=1
+[20:12:49 +  2m00s] progress: 4 running, 4 waiting, 8 done
+    build_x8p [cpu] 117s / 1200s: /root/sess/20261014T201049Z-0b4dcc/b_x8p/fleet_src/kernels/fleet_kernel.hip:1150:1: remark:     LDS Size [bytes/block]: 0 [-Rpass-analysis=kernel-resource-usage
+    build_x8m [cpu] 117s / 1200s: /root/sess/20261014T201049Z-0b4dcc/b_x8m/fleet_src/kernels/fleet_kernel.hip:1150:1: remark:     LDS Size [bytes/block]: 0 [-Rpass-analysis=kernel-resource-usage
+    build_x8k [cpu] 117s / 1200s: PROGRESS invocation=compile_x8k elapsed_s=91.0 deadline_s=900
+    build_x8 [cpu] 117s / 1200s: PROGRESS invocation=compile_x8 elapsed_s=90.2 deadline_s=900
+[20:13:49 +  3m00s] progress: 4 running, 4 waiting, 8 done
+    build_x8p [cpu] 177s / 1200s: PROGRESS invocation=compile_x8p elapsed_s=150.6 deadline_s=900
+    build_x8m [cpu] 177s / 1200s: PROGRESS invocation=compile_x8m elapsed_s=151.2 deadline_s=900
+    build_x8k [cpu] 177s / 1200s: PROGRESS invocation=compile_x8k elapsed_s=151.3 deadline_s=900
+    build_x8 [cpu] 177s / 1200s: PROGRESS invocation=compile_x8 elapsed_s=150.6 deadline_s=900
+[20:14:49 +  4m00s] progress: 4 running, 4 waiting, 8 done
+    build_x8p [cpu] 237s / 1200s: PROGRESS invocation=compile_x8p elapsed_s=210.7 deadline_s=900
+    build_x8m [cpu] 237s / 1200s: PROGRESS invocation=compile_x8m elapsed_s=211.3 deadline_s=900
+    build_x8k [cpu] 237s / 1200s: PROGRESS invocation=compile_x8k elapsed_s=211.4 deadline_s=900
+    build_x8 [cpu] 237s / 1200s: PROGRESS invocation=compile_x8 elapsed_s=210.6 deadline_s=900
+[20:15:08 +  4m19s] ok      build_x8p rc=0 256s
+    BUILD arm=x8p stamped=0 plan_sha256=1d19b7e18a199b072c9c997ca4d61310281ca8581daa4284b1b7d062bd087cb2 resources={'vgpr': 256, 'agpr': 0, 'sgpr': 108, 'scratch': 96, 'lds': 26668, 'occupancy': 2}
+    BUILD arm=x8p OK
+[20:15:11 +  4m22s] ok      build_x8m rc=0 259s
+    BUILD arm=x8m stamped=0 plan_sha256=1d19b7e18a199b072c9c997ca4d61310281ca8581daa4284b1b7d062bd087cb2 resources={'vgpr': 256, 'agpr': 0, 'sgpr': 108, 'scratch': 96, 'lds': 26668, 'occupancy': 2}
+    BUILD arm=x8m OK
+[20:15:49 +  5m00s] progress: 2 running, 4 waiting, 10 done
+    build_x8k [cpu] 297s / 1200s:  503197  502808       00:00 R ps -eo pid,ppid,etime,state,args
+    build_x8 [cpu] 297s / 1200s:  503196  502809       00:00 R ps -eo pid,ppid,etime,state,args
+[20:16:49 +  6m00s] progress: 2 running, 4 waiting, 10 done
+    build_x8k [cpu] 357s / 1200s: /root/sess/20261014T201049Z-0b4dcc/b_x8k/megakernel_d0.hip:40526:1: remark:     LDS Size [bytes/block]: 26668 [-Rpass-analysis=kernel-resource-usage]
+    build_x8 [cpu] 357s / 1200s: PROGRESS invocation=compile_x8 elapsed_s=330.8 deadline_s=900
+[20:17:00 +  6m11s] ok      build_x8k rc=0 368s
+    BUILD arm=x8k stamped=0 plan_sha256=6beb4b01bb9ea997aa6ab16968fb043b2453ae85d73632bd7f57cb9d3e8f891d resources={'vgpr': 256, 'agpr': 0, 'sgpr': 108, 'scratch': 144, 'lds': 26668, 'occupancy': 2}
+    BUILD arm=x8k OK
+[20:17:12 +  6m23s] ok      build_x8 rc=0 380s
+    BUILD arm=x8 stamped=0 plan_sha256=6beb4b01bb9ea997aa6ab16968fb043b2453ae85d73632bd7f57cb9d3e8f891d resources={'vgpr': 256, 'agpr': 0, 'sgpr': 108, 'scratch': 144, 'lds': 26668, 'occupancy': 2}
+    BUILD arm=x8 OK
+[20:17:12 +  6m23s] start bgate_x8p on GPU 0
+[20:17:13 +  6m24s] fail    bgate_x8p rc=1 1s
+        s.gate(a.arm)
+      File "/root/src/b1a06f43f311da91692a93144c51be281a9b52ca65b6a751aa6fc58a6377db6d-20261014T201014Z/examples/dsv2lite/batch_session.py", line 67, in gate
+        b = next(b for b, a in BATCH_ARMS.items() if a == arm)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    StopIteration
+[20:17:13 +  6m24s] start bgate_x8m on GPU 0
+[20:17:14 +  6m25s] fail    bgate_x8m rc=1 1s
+        s.gate(a.arm)
+      File "/root/src/b1a06f43f311da91692a93144c51be281a9b52ca65b6a751aa6fc58a6377db6d-20261014T201014Z/examples/dsv2lite/batch_session.py", line 67, in gate
+        b = next(b for b, a in BATCH_ARMS.items() if a == arm)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    StopIteration
+[20:17:14 +  6m25s] start bgate_x8k on GPU 0
+[20:17:15 +  6m26s] fail    bgate_x8k rc=1 1s
+        s.gate(a.arm)
+      File "/root/src/b1a06f43f311da91692a93144c51be281a9b52ca65b6a751aa6fc58a6377db6d-20261014T201014Z/examples/dsv2lite/batch_session.py", line 67, in gate
+        b = next(b for b, a in BATCH_ARMS.items() if a == arm)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    StopIteration
+[20:17:15 +  6m26s] start bgate_x8 on GPU 0
+[20:17:22 +  6m33s] ok      bgate_x8 rc=0 7s
+    BATCH-INCOMPLETE invocation=bgate_x8 arm=x8 b=8: request 5: 3 layers within the gate (need 27)
+    BGATE arm=x8 b=8 NOT COMPLETE: request 5: 3 layers within the gate (need 27)
+[20:17:22 +  6m33s] session done
+  job                              status     rc  gpu  seconds
+  apt                              ok          0             1  
+  etx_env                          ok          0             1  
+  prep_env                         ok          0             4  
+  source                           ok          0             1  
+  prep_dl                          ok          0             1  
+  prep_ref                         ok          0    0        1  
+  prep_pack                        ok          0             1  
+  preflight                        ok          0            21  
+  build_x8p                        ok          0           256  
+  bgate_x8p                        fail        1    0        1  
+  build_x8m                        ok          0           259  
+  bgate_x8m                        fail        1    0        1  
+  build_x8k                        ok          0           368  
+  bgate_x8k                        fail        1    0        1  
+  build_x8                         ok          0           380  
+  bgate_x8                         ok          0    0        7  

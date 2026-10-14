@@ -64,7 +64,11 @@ class BatchSession(Session):
         return path
 
     def gate(self, arm: str):
-        b = next(b for b, a in BATCH_ARMS.items() if a == arm)
+        # the study's own arms carry their batch in BATCH_ARMS; the batch-8 recipe diagnostic's four candidates
+        # (X8_CANDIDATES) are all eight-request arms, so they gate at B = 8
+        b = next((b for b, a in BATCH_ARMS.items() if a == arm), 8 if arm in X8_CANDIDATES else None)
+        if b is None:
+            raise SystemExit(f"gate: {arm} is not a batch arm and not a batch-8 candidate")
         out = self.fresh(self.logs / f"bgate_{arm}.json")
         r = self.etx(b, f"bgate_{arm}")
         write_json(out, dict(arm=arm, batch=b, passed="error" not in r, result=r))

@@ -1,0 +1,13 @@
+# job bgate_x8k gpu=0 cwd=/root/etx
+# .venv/bin/python -u -m examples.dsv2lite.batch_session gate x8k
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/root/src/b1a06f43f311da91692a93144c51be281a9b52ca65b6a751aa6fc58a6377db6d-20261014T201014Z/examples/dsv2lite/batch_session.py", line 152, in <module>
+    main()
+  File "/root/src/b1a06f43f311da91692a93144c51be281a9b52ca65b6a751aa6fc58a6377db6d-20261014T201014Z/examples/dsv2lite/batch_session.py", line 146, in main
+    s.gate(a.arm)
+  File "/root/src/b1a06f43f311da91692a93144c51be281a9b52ca65b6a751aa6fc58a6377db6d-20261014T201014Z/examples/dsv2lite/batch_session.py", line 67, in gate
+    b = next(b for b, a in BATCH_ARMS.items() if a == arm)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+StopIteration
