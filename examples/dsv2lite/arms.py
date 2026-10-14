@@ -101,12 +101,14 @@ ARMS = {a.name: a for a in [
     # Measured by examples/dsv2lite/batch_session.py against vLLM at the same B, not by `pairs`: no Rule here.
     # Scratch: x2 0; x4 32 and x8 96 B/lane on the local ROCm 7.2.4 compile (7 / 21 VGPRs holding SGPR spills; the
     # spills grow with the task types, i.e. with the requests). Allowance: twice the local figure, since the box's
-    # compiler differs (docs/BATCH-2026-10-14.md, local build evidence).
+    # compiler differs (docs/BATCH-2026-10-14.md, local build evidence). Section 10 gave the arms M1 and K1: on the
+    # box (ROCm 7.14, one compile each, 2026-10-14) the new recipe spilled x2 32, x4 64 and x8 144 B/lane, so x2's
+    # allowance rises from 0 to 64 with that measurement; x4's 64 and x8's 192 already covered it.
     *(Arm(f"x{n}", levers=(*LEVERS_ALL, "l1_loads", "merge_uv_waves"),
           flags=(f"-DETX_DS_REQUESTS={n}", "-DETX_SLOT_BY_CU", "-DETX_DSV2_KVA_SHARED=1"),
           env=dict(ETX_DSV2_COH="l1", ETX_DSV2_REQUESTS=str(n), ETX_DSV2_COUPLE="none", ETX_DSV2_KVA="shared"),
           scratch_allow=allow)
-      for n, allow in ((2, 0), (4, 64), (8, 192))),
+      for n, allow in ((2, 64), (4, 64), (8, 192))),
     Arm("allnoQ", levers=tuple(x for x in LEVERS_ALL if x != "gemv_no_terminal_all"),
         order=("default", "all", "allnoQ"), references=("default", "all"),
         rule=Rule("device_ms", "all", 0, text="every pair faster, median > 2 x spread")),

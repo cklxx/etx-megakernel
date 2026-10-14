@@ -113,7 +113,7 @@ def test_batch_arms_carry_the_kept_recipe_without_d4():
         assert a.flags == (f"-DETX_DS_REQUESTS={b}", "-DETX_SLOT_BY_CU", "-DETX_DSV2_KVA_SHARED=1")
         assert a.env == dict(ETX_DSV2_COH="l1", ETX_DSV2_REQUESTS=str(b), ETX_DSV2_COUPLE="none", ETX_DSV2_KVA="shared")
         assert a.rule is None and a.order == ()
-    assert [ARMS[f"x{b}"].scratch_allow for b in (2, 4, 8)] == [0, 64, 192] and kept.scratch_allow == 0
+    assert [ARMS[f"x{b}"].scratch_allow for b in (2, 4, 8)] == [64, 64, 192] and kept.scratch_allow == 0
     b1 = ARMS[BATCH_ARMS[1]]                 # section 9: B = 1 is the kept arm, K1 + M1 on the same recipe
     assert b1.levers == (*kept.levers, "merge_uv_waves") and "-DETX_DSV2_KVA_SHARED=1" in b1.flags
     assert b1.levers == ARMS["x2"].levers and b1.levers == ARMS["x4"].levers == ARMS["x8"].levers
