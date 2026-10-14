@@ -1,0 +1,12 @@
+device gfx942:sramecc+:xnack-, 304 CUs, clockRate 2100000 kHz
+RESULT moerows pair 0 contiguous  span   26.08 us -> 1.93 TB/s, checksum OK
+RESULT moerows pair 0 interleaved span   16.34 us -> 3.08 TB/s, checksum OK
+RESULT moerows pair 1 interleaved span   15.98 us -> 3.15 TB/s, checksum OK
+RESULT moerows pair 1 contiguous  span   14.93 us -> 3.37 TB/s, checksum OK
+RESULT moerows pair 2 contiguous  span   16.64 us -> 3.02 TB/s, checksum OK
+RESULT moerows pair 2 interleaved span   15.57 us -> 3.23 TB/s, checksum OK
+RESULT moerows pair 3 interleaved span   15.26 us -> 3.30 TB/s, checksum OK
+RESULT moerows pair 3 contiguous  span   15.80 us -> 3.19 TB/s, checksum OK
+RESULT moerows pair 4 contiguous  span   15.14 us -> 3.32 TB/s, checksum OK
+RESULT moerows pair 4 interleaved span   15.10 us -> 3.33 TB/s, checksum OK
+DECISION moerows NO-GO: gains % [37.35 -7.03 6.43 3.42 0.26] median 3.42% spread 44.38% (PASS: every pair faster, median >= 3%, > 2 x spread)
