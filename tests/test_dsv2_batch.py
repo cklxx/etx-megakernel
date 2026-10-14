@@ -478,3 +478,18 @@ def test_nonpositive_vllm_sample_is_illegal(sample):
     log = vllm_log(batches=(1,), per=("5", "5", sample, "5", "5"))
     result = batch.vllm_results(log, "default")[1]
     assert not result["legal"] and "nonpositive" in result["reason"]
+
+
+@pytest.mark.parametrize("damage", ["failure_first", "failure_last", "extra_index", "extra_phase"])
+def test_duplicate_or_unexpected_sequence_gate_cannot_pass(damage):
+    log = vllm_log(batches=(1,))
+    line = next(x for x in log.splitlines() if "phase=sample0 seq=0 " in x)
+    if damage.startswith("failure"):
+        line = line.replace("32/32", "7/32")
+    elif damage == "extra_index":
+        line = line.replace("seq=0", "seq=1")
+    else:
+        line = line.replace("phase=sample0", "phase=sample99")
+    log = line + "\n" + log if damage == "failure_first" else log + line + "\n"
+    result = batch.vllm_results(log, "default")[1]
+    assert not result["legal"]

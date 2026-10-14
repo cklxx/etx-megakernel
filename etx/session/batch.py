@@ -79,12 +79,14 @@ def vllm_results(log: str, label: str, tokens: int = 32, samples: int = SAMPLES)
         mine = [s for s in seqs if s["label"] == label and s["batch"] == str(b)]
         phases = {p: n for phase in ["warmup", *(f"sample{k}" for k in range(samples))]
                   for p, n in ((phase, tokens), (phase + "_short", 1))}
-        seen = {(s["phase"], int(s["seq"])): s for s in mine}
+        seen = {(s["phase"], int(s["seq"])) for s in mine}
         missing = [(p, r) for p in phases for r in range(b) if (p, r) not in seen]
-        bad = [(p, r) for (p, r), s in seen.items()
-               if p in phases and (s["first_divergence"] != f"{phases[p]}/{phases[p]}" or s["tokens"] != str(phases[p]))]
-        reason = ("" if not missing and not bad else
-                  f"missing {missing[:4]}" if missing else f"diverged {[(p, r, seen[p, r]['first_divergence']) for p, r in bad[:4]]}")
+        unexpected = sorted((p, r) for p, r in seen if p not in phases or r not in range(b))
+        bad = [(s["phase"], int(s["seq"]), s["first_divergence"]) for s in mine
+               if s["phase"] in phases and (s["first_divergence"] != f"{phases[s['phase']]}/{phases[s['phase']]}"
+                                            or s["tokens"] != str(phases[s["phase"]]))]
+        reason = (f"unexpected {unexpected[:4]}" if unexpected else f"diverged {bad[:4]}" if bad else
+                  f"missing {missing[:4]}" if missing else "")
         if len(per) != samples:
             reason = reason or f"{len(per)} samples, need {samples}"
         if any(ns(x) <= 0 for x in per):
