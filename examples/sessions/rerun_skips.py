@@ -7,9 +7,10 @@ The first run (session 20261014T112629Z-d09618) failed two input jobs and skippe
 - qwen_preflight failed because /root/rocm-headers/inc was empty on the box (hip/hip_runtime.h missing). 467 files
   including hip/hip_runtime.h were pushed from the laptop's ~/code/rocm-headers/inc before this run.
 
-Everything the first run completed is reused, not regenerated (AGENTS.md section 2.5): the arm builds
-(build_x2/x4/x8, build_alld4r0l1kvsmw), prep_pack, prep_ref, routing and qwen_moerows stay as they are. This session
-runs only the skipped set, in the same GPU order the combined session used.
+The runner creates a fresh record, so this session includes producers for the required record-local certificates
+and binaries. The preparation jobs reuse the persistent model, packed weights and references when present; CPU
+builds and preflight certificates populate the new record. Completed GPU measurements are not imported implicitly:
+qwen_moerows and routing are not rerun, and the report has no optional routing projection in this record.
 
 Budget [E]: DeepSeek goldens ~5 min [M] + batch gates and rounds ~40-60 min GPU [E]; Qwen preflight, two builds, two
 certificates and the pairs study ~32 min [E]. Cap 7200 s = 2 h. The DeepSeek batch numbers come first by list order.
@@ -39,19 +40,27 @@ DS_FINAL = ("breport",)
 QWEN_JOBS = ("qwen_preflight", "qwen_build_kept", "qwen_build_kept_l1", "qwen_certify_kept",
              "qwen_certify_kept_l1", "qwen_pairs_kept_l1")
 
-# The runner refuses a read that names no job in this list, even an optional one (`?etx_env`), so pull in the
-# transitive closure of the selected jobs' dependencies. Those jobs are cheap CPU steps that already ran on this box.
+# A fresh record cannot see the prior record's relative artifacts. Include their producers as well as bare-job
+# dependencies, before their consumers (in particular, GPU preparation must precede its GPU gates). Optional artifact
+# reads may remain absent; pulling those producers in would repeat completed measurements such as routing.
 _every = dict(_by_name, **_qwen)
-_order = list(QWEN_JOBS + DS_GPU + DS_FINAL)
+_writers = {w.lstrip("?"): n for n, j in _every.items() for w in j.get("writes", [])}
 _selected = []
-for n in _order:
+
+
+def _include(n):
     if n in _selected:
-        continue
-    _selected.append(n)
+        return
     for r in _every[n].get("reads", []):
-        r = r.lstrip("?")
-        if r in _every and r not in _order:
-            _order.append(r)
+        key = r.lstrip("?")
+        producer = key if key in _every else None if r.startswith("?") else _writers.get(key)
+        if producer is not None:
+            _include(producer)
+    _selected.append(n)
+
+
+for n in QWEN_JOBS + DS_GPU + DS_FINAL:
+    _include(n)
 
 JOBS = [_every[n] for n in _selected]
 

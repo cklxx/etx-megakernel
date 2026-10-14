@@ -286,6 +286,39 @@ def test_the_host_prints_exactly_the_fields_the_rule_reads():
     assert "BATCHCOLLISION requests %d and %d" in src and '--req-dir' in src
 
 
+def test_rerun_includes_required_artifact_producers_before_their_consumers(tmp_path, monkeypatch):
+    import runpy
+    from etx.tools.gpu_jobs import Runner, load_jobs
+    path = ROOT / "examples/sessions/rerun_skips.py"
+    all_jobs = runpy.run_path(str(path))["_every"]
+    writers = {w.lstrip("?"): name for name, job in all_jobs.items() for w in job.get("writes", [])}
+    jobs = load_jobs(path)     # Also rejects a same-GPU producer placed after its consumer.
+    by = {j.name: j for j in jobs}
+    order = {j.name: i for i, j in enumerate(jobs)}
+    assert {"preflight", "build_x2", "build_x4", "build_x8", "build_alld4r0l1kvsmw"} <= set(by)
+    for job in jobs:
+        for read in job.reads:
+            key = read.lstrip("?")
+            producer = key if key in all_jobs else None if read.startswith("?") else writers.get(key)
+            if producer is not None:
+                assert producer in by, (job.name, read, producer)
+                assert order[producer] < order[job.name], (job.name, read, producer)
+    assert "routing" not in by and "qwen_moerows" not in by
+    runner = Runner(jobs, [0], 2, tmp_path)
+    present = tmp_path / "present"
+    present.touch()
+    monkeypatch.setattr(runner, "path", lambda job, key: present)
+    for job in jobs:
+        job.status = "ok"
+    build, gate = by["build_x2"], by["bgate_x2"]
+    build.status = "running"
+    assert runner._state(gate) == "wait"
+    build.status = "fail"
+    assert runner._state(gate) == "skip" and "build_x2 fail" in gate.note
+    build.status = "ok"
+    assert runner._state(gate) == "ready"
+
+
 # ---------------------------------------------------------------- the session
 @pytest.fixture(scope="module")
 def session():
