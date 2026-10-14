@@ -1,0 +1,151 @@
+"""The batch 2 / 4 / 8 study on DeepSeek-V2-Lite (docs/BATCH-2026-10-14.md; rules committed before this code, 0fc38c9).
+
+Operations, each run by one job of examples/sessions/ds_batch.py; every invocation is a fresh process with its full log
+kept (inplace_session.Session.run: deadline, progress, probes):
+  gate <arm>   one invocation of a multi-request arm with every per-request gate -> bgate_<arm>.json
+  vsel         vLLM round 0: both configurations, B = 1, 2, 4, 8, one engine each -> vsel.json (baseline per B)
+  rounds       rounds 1-5: the kept arm, the x arms that passed their gate, the selected vLLM configuration(s);
+               order reversed on even rounds -> brounds.json
+  report       verdicts per B and quantity, scalings, the section-5 next step per B -> batch_report.json
+No invocation here provisions a GPU or downloads; inputs come from the prep jobs.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import os
+from pathlib import Path
+
+from etx.session import batch
+from examples.dsv2lite.arms import BATCH_ARMS, BATCHES
+from examples.dsv2lite.inplace_session import Session, write_json
+
+IMAGE = "vllm/vllm-openai-rocm@sha256:bb44b39aea26798cce43030a98bf48efd0322ca7147367db86e38b96bd80f0e7"
+CONFIGS = {"default": "0", "aiter": "1"}            # VLLM_ROCM_USE_AITER, in tie-break order
+MODEL = Path(os.environ.get("ETX_DSV2_MODEL", Path.home() / "models/dsv2-lite-base"))
+VLLM_DEADLINE_S = 900
+
+
+class BatchSession(Session):
+    def etx_args(self, b: int) -> list[str]:
+        return [*self.args(), *(a for r in range(1, b) for a in ("--req-dir", str(self.data / f"r{r}")))]
+
+    def etx(self, b: int, name: str) -> dict:
+        """One gated invocation of B's arm: every request 32/32, 27/27, warm-up 32/32 (etx/session/batch.py)."""
+        arm = BATCH_ARMS[b]
+        try:
+            text = self.run(name, [self.out(arm) / "run", *self.etx_args(b)])
+            return batch.etx_result(text, b)
+        except (RuntimeError, ValueError) as exc:
+            print(f"BATCH-INCOMPLETE invocation={name} arm={arm} b={b}: {exc}", flush=True)
+            return dict(error=str(exc))
+
+    def vllm(self, config: str, name: str) -> dict:
+        """One vLLM process measuring every batch size; per-sequence gates are read from its log, never filtered."""
+        goldens = [str(self.data / "vllm" / f"golden_r{r}.txt") for r in range(max(BATCHES))]
+        sudo = [] if os.geteuid() == 0 else ["sudo"]
+        command = [*sudo, "docker", "run", "--rm", "--device=/dev/kfd", "--device=/dev/dri", "--group-add", "video",
+                   "--ipc=host", "--shm-size", "16g", "--security-opt", "seccomp=unconfined",
+                   "-e", f"HIP_VISIBLE_DEVICES={os.environ.get('GPU', '0')}", "-e", "PYTHONUNBUFFERED=1",
+                   "-e", f"VLLM_ROCM_USE_AITER={CONFIGS[config]}", "-v", f"{Path.home()}:{Path.home()}",
+                   "-w", str(self.root), "--entrypoint", "timeout", IMAGE, "-k", "5", str(VLLM_DEADLINE_S - 30),
+                   "python3", "examples/llm/vllm_bench.py", "--model", str(MODEL), "--goldens", *goldens,
+                   "--batches", ",".join(map(str, BATCHES)), "--tokens", "32", "--repeats", str(batch.SAMPLES),
+                   "--label", config, "--echo-config", "--json", str(self.logs / f"{name}.json")]
+        try:
+            return batch.vllm_results(self.run(name, command, timeout=VLLM_DEADLINE_S), config)
+        except (RuntimeError, ValueError) as exc:
+            print(f"BATCH-INCOMPLETE invocation={name} vllm={config}: {exc}", flush=True)
+            return dict(error=str(exc))
+
+    def fresh(self, path: Path) -> Path:
+        if path.exists():
+            raise RuntimeError(f"{path.name} already exists: use a fresh ETX_SESS_LOGDIR")
+        return path
+
+    def gate(self, arm: str):
+        b = next(b for b, a in BATCH_ARMS.items() if a == arm)
+        out = self.fresh(self.logs / f"bgate_{arm}.json")
+        r = self.etx(b, f"bgate_{arm}")
+        write_json(out, dict(arm=arm, batch=b, passed="error" not in r, result=r))
+        print(f"BGATE arm={arm} b={b} {'PASS' if 'error' not in r else 'NOT COMPLETE: ' + r['error']}", flush=True)
+
+    def vsel(self):
+        out = self.fresh(self.logs / "vsel.json")
+        round0 = {c: self.vllm(c, f"vsel_{c}") for c in CONFIGS}
+        sel = batch.select({c: r for c, r in round0.items() if "error" not in r}, BATCHES)
+        write_json(out, dict(round0=round0, selection={str(b): s for b, s in sel.items()}))
+        for b, s in sel.items():
+            print(f"VSEL b={b} " + (f"baseline={s['config']} step {s['step_ms']} ms" if s["config"] else
+                                    f"NO LEGAL BASELINE {s['reasons']}"), flush=True)
+
+    def rounds(self):
+        out = self.fresh(self.logs / "brounds.json")
+        sel = {int(b): s for b, s in json.loads((self.logs / "vsel.json").read_text())["selection"].items()}
+        def passed(arm):                 # a gate that never ran (its build failed) did not pass
+            f = self.logs / f"bgate_{arm}.json"
+            return f.exists() and json.loads(f.read_text())["passed"]
+        gated = {b for b, a in BATCH_ARMS.items() if b == 1 or passed(a)}
+        configs = list(dict.fromkeys(s["config"] for s in sel.values() if s["config"]))
+        order = [*(("etx", b) for b in BATCHES if b in gated), *(("vllm", c) for c in configs)]
+        rounds = []
+        for k in range(1, batch.ROUNDS + 1):
+            r = dict(etx={}, vllm={})
+            for kind, x in (order if k % 2 else order[::-1]):
+                if kind == "etx":
+                    r["etx"][x] = self.etx(x, f"b{k}_{BATCH_ARMS[x]}")
+                else:
+                    r["vllm"][x] = self.vllm(x, f"b{k}_vllm_{x}")
+            rounds.append(r)
+            write_json(out.with_suffix(".partial.json"), dict(rounds=rounds))
+        write_json(out, dict(order=[list(o) for o in order], skipped=[BATCH_ARMS[b] for b in BATCHES if b not in gated],
+                             rounds=[dict(etx={str(b): e for b, e in r["etx"].items()}, vllm=r["vllm"]) for r in rounds]))
+        print(f"BROUNDS {batch.ROUNDS} rounds; arms {[BATCH_ARMS[b] for b in BATCHES if b in gated]}; vLLM {configs}", flush=True)
+
+    def report(self):
+        from examples.dsv2lite.batch_floor import step_bytes
+        sel = {int(b): s for b, s in json.loads((self.logs / "vsel.json").read_text())["selection"].items()}
+        raw = json.loads((self.logs / "brounds.json").read_text())["rounds"]
+        rounds = [dict(etx={int(b): e for b, e in r["etx"].items()},
+                       vllm={c: (v if "error" in v else {int(b): x for b, x in v.items()}) for c, v in r["vllm"].items()})
+                  for r in raw]
+        res = batch.study(rounds, sel, BATCHES)
+        routing = self.logs / "routing.json"
+        union = json.loads(routing.read_text())["overall"] if routing.exists() else {}
+        kept = res.get(1, {})
+        for b, rec in res.items():
+            extra = None
+            if str(b) in union:
+                extra = step_bytes(b, union=float(union[str(b)]))["batched"] - step_bytes(1)["one"]
+            kept_step = batch.median_text(kept["etx_step_ms"]) if kept.get("status") == "COMPLETE" else None
+            rec["next"] = (batch.build_decision(rec, kept_step, extra) if kept_step else
+                           dict(next="the kept batch-1 arm is NOT COMPLETE: no projection"))
+        write_json(self.logs / "batch_report.json", dict(condition="docs/BATCH-2026-10-14.md", union=union,
+                                                          batches={str(b): r for b, r in res.items()}))
+        for b, rec in res.items():
+            if rec["status"] != "COMPLETE":
+                print(f"BREPORT b={b} {rec['status']} next: {rec['next']['next']}", flush=True)
+                continue
+            t, l = rec["throughput"], rec["latency"]
+            print(f"BREPORT b={b} vs vLLM {rec['config']}: throughput {t['outcome']} median {t['median_pct']:+.2f}% "
+                  f"spread {t['spread_pct']:.2f}% ({rec['etx_tokens_per_s']:.0f} vs {rec['vllm_tokens_per_s']:.0f} tok/s); "
+                  f"per-request latency {l['outcome']} median {l['median_pct']:+.2f}% spread {l['spread_pct']:.2f}%; "
+                  f"next: {rec['next']['next']}", flush=True)
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("operation", choices=("gate", "vsel", "rounds", "report"))
+    ap.add_argument("arm", nargs="?")
+    a = ap.parse_args(argv)
+    s = BatchSession()
+    if a.operation == "gate":
+        if a.arm not in [BATCH_ARMS[b] for b in BATCHES if b > 1]:
+            ap.error(f"gate arm must be one of {[BATCH_ARMS[b] for b in BATCHES if b > 1]}")
+        s.gate(a.arm)
+    else:
+        getattr(s, a.operation)()
+
+
+if __name__ == "__main__":
+    main()

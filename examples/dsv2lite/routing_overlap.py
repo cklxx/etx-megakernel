@@ -72,8 +72,8 @@ def main() -> None:
                 vals.append(len(set().union(*(set(step[i]) for i in g))))
         return sum(vals) / len(vals)
 
-    per_layer = {L: {s: mean_union(s, st) for s in (1, 2, 4) if s <= a.batch} for L, st in sorted(picks.items())}
-    overall = {s: sum(v[s] for v in per_layer.values()) / len(per_layer) for s in (1, 2, 4) if s <= a.batch}
+    per_layer = {L: {s: mean_union(s, st) for s in (1, 2, 4, 8) if s <= a.batch} for L, st in sorted(picks.items())}
+    overall = {s: sum(v[s] for v in per_layer.values()) / len(per_layer) for s in (1, 2, 4, 8) if s <= a.batch}
     k = len(next(iter(picks.values()))[0][0])
     n_routed = model.config.n_routed_experts
     uniform = {s: n_routed * (1 - (1 - k / n_routed) ** s) for s in overall}

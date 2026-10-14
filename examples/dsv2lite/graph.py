@@ -90,7 +90,9 @@ class _Req:
         self.r, self.paired = r, requests > 1
         self.p = f"r{r}_" if self.paired else ""
         self.fleet = f"fleet{r}" if self.paired else "fleet"
-        self.off = r * CUS
+        # two workgroups per CU is the residency limit of the paired build (docs/BATCH-2026-10-14.md section 3): request
+        # r takes slot r mod 2, so with 4 or 8 requests a slot's requests take turns in its queue in creation order
+        self.off = (r % 2) * CUS
 
     def n(self, name: str) -> str:
         return self.p + name
@@ -258,6 +260,10 @@ def build(layers: int = LAYERS, routing_cached: bool | None = None, requests: in
                              "(only ETX_DSV2_COH=l1 with ETX_DSV2_D4_ROWS=0)")
     if couple not in ("router", "experts", "none"):
         raise ValueError(f"ETX_DSV2_COUPLE={couple!r}: router | experts | none")
+    if requests < 1:
+        raise ValueError(f"ETX_DSV2_REQUESTS={requests}: at least one request")
+    if requests > 2 and couple != "none":   # the coupling edges name two requests only
+        raise ValueError("more than two requests need ETX_DSV2_COUPLE=none")
     # K1: ETX_DSV2_KVA=shared (build_attention_block). One request only, and not with D5, whose prefetch map has no
     # shared-kv_a qkv symbol: neither combination is part of K1's experiment.
     kva = os.environ.get("ETX_DSV2_KVA", "replicated")

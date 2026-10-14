@@ -169,8 +169,9 @@ class Session:
             from examples.dsv2lite.build_resources import parse
             resources = parse(text)
             write_json(out / "resources.json", resources)
-            if resources["scratch"] > 0:
-                raise RuntimeError(f"arm {arm} spills to scratch on this box: {resources}")
+            if resources["scratch"] > a.scratch_allow:
+                raise RuntimeError(f"arm {arm} spills to scratch on this box beyond its allowance "
+                                   f"({a.scratch_allow} B/lane): {resources}")
             print(f"BUILD arm={arm} stamped={int(stamped)} plan_sha256={sha(out / 'plan.json')} resources={resources}", flush=True)
         print(f"BUILD arm={arm} OK", flush=True)
 

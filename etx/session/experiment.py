@@ -52,6 +52,7 @@ class Arm:
     optional: tuple[str, ...] = ()
     stamped: bool = False
     builder: str = "etx"
+    scratch_allow: int = 0          # bytes/lane of scratch the build may use (a recorded, measured exception; default none)
 
     @property
     def cand(self) -> str:

@@ -1,7 +1,8 @@
 # Experiment index, 2026-10-14: DeepSeek and Qwen, seven studies, no GPU yet
 
 Labels: [M] measured, [E] estimate, [U] unknown. bf16, batch 1, context 1024, 32 tokens throughout. Larger batches
-(2/4/8) are the next phase: neither ready nor tested.
+(2/4/8) are a separate, prepared study with its own session and rules: docs/BATCH-2026-10-14.md,
+`examples/sessions/ds_batch.py` (DeepSeek; not run, not counted below).
 
 **Count:** 7 experiments = 6 decision studies + 1 attribution-only trace.
 - **DeepSeek (5):** K1, M1, two ablations, one trace.

@@ -38,6 +38,7 @@ int main(int argc, char** argv) {
   std::string weights_path = "build/weights.bin", cache_path = "build/fleet_cache.bin";
   std::string golden_path = "build/golden_tokens.txt", hidden_path = "build/golden_hidden.bin", json_path;
   std::string r1_dir = "build_r1";     // request 1's cache, golden tokens and hidden states (reference_rotated.py)
+  std::vector<std::string> req_dirs;   // --req-dir, once per request 1..R-1 in order (docs/BATCH-2026-10-14.md section 4)
   int tokens = 32, context = 1024, first_token = -1, repeat = 1; bool unfused = false;
   bool teacher = false;
   for (int i = 1; i < argc; ++i) {
@@ -55,6 +56,7 @@ int main(int argc, char** argv) {
     else if (a == "--unfused") unfused = true;     // baseline: fleet's tiles, one launch per grid (HIP graph)
     else if (a == "--teacher-force") teacher = true;
     else if (a == "--r1-dir") r1_dir = next();
+    else if (a == "--req-dir") req_dirs.push_back(next());
     else die("unknown argument " + a);
   }
   hipDeviceProp_t prop; HIP_CHECK(hipGetDeviceProperties(&prop, 0));
@@ -95,15 +97,21 @@ int main(int argc, char** argv) {
     Activations act{}; KVCache kv{}; RuntimeState rt{}; FleetParams fp{}; FleetParams* d_fp = nullptr;
     std::vector<int> golden; std::vector<float> golden_hidden; int first_token = -1;
     std::vector<int> produced; std::vector<uint64_t> times; std::vector<float> ms;
-    int matched = 0, compared = 0, first_div = -1, layers_ok = -1;
+    int matched = 0, compared = 0, first_div = -1, layers_ok = -1, warm_matched = -1, warm_compared = -1;
   };
   std::vector<Req> reqs(R);
+  // request r >= 1 reads its own prompt's reference: --req-dir (one per request, in order), or --r1-dir for two requests
+  if (!req_dirs.empty() && (int)req_dirs.size() != R - 1)
+    die("--req-dir given " + std::to_string(req_dirs.size()) + " times for a " + std::to_string(R) + "-request build (need " +
+        std::to_string(R - 1) + ")");
+  if (req_dirs.empty() && R > 2) die("a " + std::to_string(R) + "-request build needs --req-dir for requests 1.." + std::to_string(R - 1));
+  auto req_dir = [&](int r) { return req_dirs.empty() ? r1_dir : req_dirs[r - 1]; };
   std::vector<float> cos_h, sin_h; yarn_tables(rp, max_pos, cos_h, sin_h);
   for (int r = 0; r < R; ++r) {
     Req& q = reqs[r]; Activations& act = q.act; KVCache& kv = q.kv;
-    const std::string cp = r == 0 ? cache_path : r1_dir + "/fleet_cache.bin";
-    const std::string gp = r == 0 ? golden_path : r1_dir + "/golden_tokens.txt";
-    const std::string hp = r == 0 ? hidden_path : r1_dir + "/golden_hidden.bin";
+    const std::string cp = r == 0 ? cache_path : req_dir(r) + "/fleet_cache.bin";
+    const std::string gp = r == 0 ? golden_path : req_dir(r) + "/golden_tokens.txt";
+    const std::string hp = r == 0 ? hidden_path : req_dir(r) + "/golden_hidden.bin";
     act.token_in = dev_alloc<int32_t>(tokens + 1); act.token_out = dev_alloc<int32_t>(tokens); act.token_time = dev_alloc<uint64_t>((size_t)tokens * 2);
     act.x[0] = dev_alloc<float>(d.hidden); act.x[1] = dev_alloc<float>(d.hidden);
     act.x_norm = dev_alloc<float>((size_t)kNumXCDs * d.hidden); act.q = dev_alloc<float>((size_t)d.heads * d.q_head_dim);
@@ -124,6 +132,9 @@ int main(int argc, char** argv) {
     { const size_t cache_bytes = (size_t)d.layers * kv.max_pos * kv.row * sizeof(__hip_bfloat16);
       __hip_bfloat16* cache_dev = nullptr; HIP_CHECK(hipMalloc(&cache_dev, cache_bytes)); upload_file(cp, cache_dev, cache_bytes); kv.data = cache_dev; }
     q.golden = load_tokens(gp);
+    for (int o = 0; o < r; ++o)        // the same prompt twice would route identically and flatter every batched phase
+      if (!q.golden.empty() && q.golden == reqs[o].golden)
+        die("requests " + std::to_string(o) + " and " + std::to_string(r) + " have the same golden tokens: one prompt twice");
     q.first_token = first_token;
     if (q.golden.empty() && q.first_token < 0) die("no golden tokens and no --first-token for request " + std::to_string(r));
     if (q.first_token < 0) q.first_token = q.golden[0];
@@ -211,6 +222,7 @@ int main(int argc, char** argv) {
                               i, q.ms[i], step_ms[i], q.produced[i], verdict.c_str());
       }
       if (!last) std::printf("run %d (warm-up)%s: %d/%d tokens match\n", run, R > 1 ? (" r" + std::to_string(r)).c_str() : "", q.matched, q.compared);
+      if (!last) { q.warm_matched = q.matched; q.warm_compared = q.compared; }
     }
   }
   for (int r = 0; r < R; ++r) {
@@ -257,6 +269,21 @@ int main(int argc, char** argv) {
   if (R > 1)
     std::printf("\nRESULT requests=%d step median %.3f ms -> %.1f tokens/s (%d tokens per step); tokens %d/%d match\n",
                 R, step_med, R * 1000.0 / step_med, R, matched, compared);
+  // docs/BATCH-2026-10-14.md section 1: throughput from the host's step time, per-request latency from each request's own
+  // device timestamps (token_time: s_memrealtime, 10 ns ticks), the median time from one token's end to the next's.
+  // Exact decimals (ms with 6 places = integer ns) for etx/session/batch.py.
+  for (int r = 0; r < R; ++r) {
+    Req& q = reqs[r];
+    std::vector<uint64_t> iv;
+    for (int i = 1; i < tokens; ++i) iv.push_back(q.times[2 * i + 1] - q.times[2 * i - 1]);
+    std::sort(iv.begin(), iv.end());
+    std::vector<float> dev(q.ms); std::sort(dev.begin(), dev.end());
+    const uint64_t ticks = iv.empty() ? 0 : iv[iv.size() / 2];
+    std::printf("BATCHREQ r=%d tokens=%d/%d layers=%d warmup=%d/%d interval_median_ms=%llu.%05llu device_median_ms=%.6f\n",
+                r, q.matched, q.compared, q.layers_ok, q.warm_matched, q.warm_compared,
+                (unsigned long long)(ticks / 100000), (unsigned long long)(ticks % 100000), (double)dev[dev.size() / 2]);
+  }
+  std::printf("BATCH requests=%d tokens=%d step_median_ms=%.6f\n", R, tokens, step_med);
   if (!json_path.empty()) {
     std::ofstream j(json_path);
     j << "{\"mode\": \"" << (teacher ? "teacher" : "free") << "\", \"requests\": " << R << ", \"tokens\": " << tokens
