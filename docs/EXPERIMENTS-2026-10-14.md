@@ -1,4 +1,4 @@
-# Experiment index, 2026-10-14: DeepSeek and Qwen, seven studies, no GPU yet
+# Experiment index, 2026-10-14: DeepSeek and Qwen, seven studies and four open proposals, no GPU yet
 
 Labels: [M] measured, [E] estimate, [U] unknown. bf16, batch 1, context 1024, 32 tokens throughout. Larger batches
 (2/4/8) are a separate, prepared study with its own session and rules: docs/BATCH-2026-10-14.md,
@@ -9,6 +9,8 @@ Labels: [M] measured, [E] estimate, [U] unknown. bf16, batch 1, context 1024, 32
 - **Qwen (2):** moerows, the common cache mode.
 - **Not counted:** `certify_kept` / `certify_kept_l1` (correctness gates), `moegather` (moerows' cross-check),
   preflights and builds.
+- **Also listed, not counted as studies:** 4 open team proposals (P1, P3, P4, P5), design only: not built, not queued
+  (section "Open proposals"; classification of all five in docs/PROPOSALS-2026-10-14.md).
 
 **Four-column logs:** DeepSeek `examples/dsv2lite/results/EXPERIMENT-LOG.md`; Qwen `examples/vllm_llm/results/EXPERIMENT-LOG.md`.
 
@@ -85,6 +87,79 @@ Labels: [M] measured, [E] estimate, [U] unknown. bf16, batch 1, context 1024, 32
   same-build import certificate + 32/32 first.
 - **GPU-only unknown:** correctness on the device and any gain. Expect far less than DeepSeek's [E].
 - **Sources:** INVENTORY 4.1; tests/test_qwen_g6.py.
+
+## Open proposals (team, 2026-10-14; design only)
+
+Classified in docs/PROPOSALS-2026-10-14.md. Proposal 2 (pre-shuffle weights) is implemented and kept, and its remainder
+is covered by study 5. The other four are open in the form stated here; the forms already measured and lost are not
+reopened. All four are Qwen, bf16, batch 1. Each rule is written before any code. A model arm needs the same-build
+import certificate and 32/32 first.
+
+**P1. Router grid of 128 tasks, 16 per XCD** (`router128`)
+- **Mechanism:** a router grid of 128 tasks with rows remapped so each XCD owns 16, instead of 256 tasks with rows on
+  XCD 0-3 and 128 empty tasks.
+- **Rationale:** the empty tasks and the 4-XCD placement are literal today (`etx/ops/gemv.py:783`,
+  `examples/vllm_llm/model.py:303`, `docs/XCD-TIMELINE-2026-10-11.md:60`).
+- **Status:** not built. The narrowing itself is kept (C1, +0.0626 ms [M]).
+- **Baseline:** `kept`, device time.
+- **Rule:** KEEP if every pair is faster, median >= 30 us and > 2 x spread; otherwise DROP.
+- **GPU-only unknown:** whether 32 router tasks sharing one XCD's L2 lengthen the path task's body.
+- **Box:** **not worth a box.** The empty tasks are 0.28 us and off the path. The stage is one task's serial chain
+  (`docs/MASTER-TABLE-2026-10-11.md:266-268`), which placement does not shorten; [E] about 0. Reopens only if an
+  X1/X6 trace shows the path task's body >= 0.625 us/layer above the median working body.
+- **Sources:** PROPOSALS-2026-10-14.md section 1; `docs/LEVERS-MORE-2026-10-12.md:134`.
+
+**P3. Epoch-tagged events with static-only reset** (`epoch_reset`)
+- **Mechanism:** event words compare against a per-step epoch, so the host stops resetting events, queues and slots
+  every step. Only static state and `d_ctrl` are written.
+- **Rationale:** reset submission is 0.0386 / 0.0380 ms [M] in two sessions (`docs/PLAN-300-CERTAIN-2026-10-12.md:41,56-59`).
+- **Status:** not built. The device token loop is closed by the bar (0.012 / 0.005 ms [M]). The device reset was
+  measured and lost (−0.008 ms wall [M], `docs/RESULTS-2026-10-01.md:107`).
+- **Baseline:** `kept`, **host wall** (a device-time rule cannot see host work).
+- **Rule:** KEEP if every pair is faster, median >= 30 us and > 2 x spread; otherwise DROP. Epoch, abort and rollover
+  proofs come first.
+- **GPU-only unknown:** how much of the reset submission lies on the wall path.
+- **Box:** **not worth a box now.** By the `ETX_DEV_RESET` decomposition, the best case is 0.008 + 0.014 =
+  0.022 ms [E from M], below the bar. It reopens on a host-only diagnostic on the kept build: wall minus kernel falls
+  by >= 0.030 ms when the reset work is enqueued before the timer. That diagnostic is minutes on any Qwen box.
+- **Sources:** PROPOSALS-2026-10-14.md section 3; `etx/runtime/include/etx/host.h:259-312`;
+  `docs/PLAN-300TOKS-2026-10-11.md:193-194`.
+
+**P4. Producer-side combine, row-partitioned moe_down** (`moe_rowsum`)
+- **Mechanism:** each moe_down task owns output rows across all 8 selected experts, sums them and adds the residual
+  once. The qkv tasks then read one finished vector instead of folding residual + 8 slot rows (QK2).
+- **Rationale:** QK2 is repeated by all 256 qkv tasks (`docs/MASTER-TABLE-2026-10-11.md:185,195`).
+- **Status:** not built. A separate combine phase lost 4.10 us/layer [M] (`docs/PHASES-2026-10-01.md:33`). Fleet's
+  one-writer fold lost, 4.80 vs 4.38 / 4.06 ms [M] (`~/code/fleet-mi300x/docs/STATUS.md:66-68`). Atomics are
+  excluded because they break bit-reproducibility.
+- **Baseline:** `kept`, device time.
+- **Gate before code:** X6 in-body stamps (`docs/MASTER-TABLE-2026-10-11.md:385`, not built) show QK2 exposed
+  >= 0.625 us/layer. Otherwise no build.
+- **Rule:** KEEP if every pair is faster, median >= 30 us and > 2 x spread; otherwise DROP.
+- **GPU-only unknown:** QK2's exposed time [U] (ceiling 1.51 us/layer = 0.073 ms [E]). Also the cost of turning the
+  XCD-local moe_up -> moe_down edge (2.60 us/layer [M]) into a device-wide wait (cross-XCD edges 1.53-2.67 us/layer
+  [M], `docs/DEP-GAP-LEDGER-2026-10-11.md:103-109`).
+- **Box:** the gate rides the next Qwen box once X6 is built (+5 min, +$0.17 [E], MASTER-TABLE:385). No timed arm
+  before the gate passes.
+- **Sources:** PROPOSALS-2026-10-14.md section 4.
+
+**P5. Last-arriver top-k** (`topk_lastarr`)
+- **Mechanism:** the router task whose arrival completes the 128 producers runs the top-k itself and publishes one
+  record to moe_up on all 8 XCDs. This replaces the 8 per-XCD top-k replicas behind the device event.
+- **Rationale:** the router -> top-k handoff is 74.0 us/step [M], consumer always already waiting
+  (`docs/DEP-GAP-LEDGER-2026-10-11.md:109,114,200`). Unlike Fleet's `--topk-published` (slower, router 12 -> 18 us,
+  `~/code/fleet-mi300x/docs/STATUS.md:29`), Qwen's top-k is already serial, so the fold adds no serial work.
+- **Status:** not built; the deciding microbenchmark is not written.
+- **Baseline:** for the microbenchmark, today's arrive -> poll -> consumer -> publish chain on the same box; for a
+  model arm, `kept`, device time.
+- **Microbenchmark rule:** GO for a model arm only if the modeled saving is >= 0.625 us/layer after adding the
+  cross-XCD top-k -> moe_up edge (+0.45-0.70 us/layer [E from M]).
+- **Model rule:** KEEP if every pair is faster, median >= 30 us and > 2 x spread; otherwise DROP.
+- **GPU-only unknown:** whether the last arriver still pays the cross-XCD visibility round trip (0.74-0.9 us one-way
+  [M], `docs/RESEARCH-sync-hardware.md:24`). Net 0.040-0.052 ms if it does not; −0.003 to +0.017 ms if it does [E].
+- **Box:** a `bench/sync/sync_bench.hip` mode (minutes of GPU on any box) once written. It is the only one of the
+  four worth preparing next.
+- **Sources:** PROPOSALS-2026-10-14.md section 5.
 
 ## The joint run (`examples/sessions/joint_ds_qwen.py`)
 
