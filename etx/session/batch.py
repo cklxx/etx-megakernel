@@ -77,11 +77,12 @@ def vllm_results(log: str, label: str, tokens: int = 32, samples: int = SAMPLES)
         b = int(d["batch"])
         per = d["per_token_ms"].split(",")
         mine = [s for s in seqs if s["label"] == label and s["batch"] == str(b)]
-        phases = ["warmup", *(f"sample{k}" for k in range(samples))]
+        phases = {p: n for phase in ["warmup", *(f"sample{k}" for k in range(samples))]
+                  for p, n in ((phase, tokens), (phase + "_short", 1))}
         seen = {(s["phase"], int(s["seq"])): s for s in mine}
         missing = [(p, r) for p in phases for r in range(b) if (p, r) not in seen]
         bad = [(p, r) for (p, r), s in seen.items()
-               if s["first_divergence"] != f"{tokens}/{tokens}" or s["tokens"] != str(tokens)]
+               if p in phases and (s["first_divergence"] != f"{phases[p]}/{phases[p]}" or s["tokens"] != str(phases[p]))]
         reason = ("" if not missing and not bad else
                   f"missing {missing[:4]}" if missing else f"diverged {[(p, r, seen[p, r]['first_divergence']) for p, r in bad[:4]]}")
         if len(per) != samples:

@@ -161,6 +161,7 @@ def vllm_log(label="default", batches=(1, 2, 4, 8), per=("5.1", "5.0", "5.3", "5
             if diverge and diverge == (b, phase):
                 outs[-1] = outs[-1][:7] + [0] * 25
             out += batch_lines(label, b, phase, goldens, outs, 32)
+            out += batch_lines(label, b, phase + "_short", goldens, [g[:1] for g in goldens], 1)
         out.append(f"VLLMB label={label} batch={b} per_token_ms={','.join(f'{float(x) * b:.6f}' for x in per)}")
     return "\n".join(out) + "\n"
 
@@ -430,3 +431,43 @@ def test_fresh_golden_binding_verifies_and_exports(tmp_path):
     bg.main([str(tmp_path), "--verify-binding"])
     bg.main([str(tmp_path), "--requests", "1"])
     assert (tmp_path / "vllm/golden_r0.txt").read_text().startswith("prompt 0 1 2")
+
+
+@pytest.mark.parametrize("bad_short", range(6))
+def test_each_short_vllm_invocation_is_gated(tmp_path, monkeypatch, capsys, bad_short):
+    import sys
+    from types import ModuleType, SimpleNamespace
+    from examples.llm import vllm_bench as vb
+    clock = [0.0]
+    shorts = []
+    vllm = ModuleType("vllm")
+    vllm.__version__ = "test"
+    vllm.SamplingParams = lambda **kw: SimpleNamespace(**kw)
+
+    class LLM:
+        def __init__(self, **kw):
+            pass
+
+        def generate(self, prompts, sp, **kw):
+            clock[0] += sp.max_tokens * 0.001
+            tokens = list(range(100, 100 + sp.max_tokens))
+            if sp.max_tokens == 1:
+                if len(shorts) == bad_short:
+                    tokens = [999]
+                shorts.append(tokens)
+            return [SimpleNamespace(outputs=[SimpleNamespace(token_ids=tokens)]) for _ in prompts]
+
+    vllm.LLM = LLM
+    inputs = ModuleType("vllm.inputs")
+    inputs.TokensPrompt = lambda **kw: kw
+    monkeypatch.setitem(sys.modules, "vllm", vllm)
+    monkeypatch.setitem(sys.modules, "vllm.inputs", inputs)
+    monkeypatch.setattr(vb.time, "perf_counter", lambda: clock[0])
+    golden = tmp_path / "golden.txt"
+    golden.write_text("prompt 1 2 3\ngen " + " ".join(map(str, range(100, 133))) + "\n")
+    a = SimpleNamespace(goldens=[golden], batches="1", model="test", tokens=32, eager=False,
+                        echo_config=False, label="default", repeats=5, no_detok=False, json=None)
+    vb.batch_mode(a, {})
+    assert len(shorts) == 6
+    result = batch.vllm_results(capsys.readouterr().out, "default")[1]
+    assert not result["legal"] and "diverged" in result["reason"]

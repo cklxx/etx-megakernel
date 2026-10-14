@@ -103,13 +103,15 @@ def batch_mode(a, kw) -> None:
         print(f"VLLM-PROGRESS label={a.label} batch={b} warm-up", flush=True)
         _, outs = gen(a.tokens)
         print("\n".join(batch_lines(a.label, b, "warmup", goldens, outs, a.tokens)), flush=True)
-        gen(1)
+        _, short = gen(1)
+        print("\n".join(batch_lines(a.label, b, "warmup_short", goldens, short, 1)), flush=True)
         per = []
         for k in range(a.repeats):
             full, outs = gen(a.tokens)
-            one, _ = gen(1)
+            one, short = gen(1)
             per.append((full - one) / (a.tokens - 1))
             print("\n".join(batch_lines(a.label, b, f"sample{k}", goldens, outs, a.tokens)), flush=True)
+            print("\n".join(batch_lines(a.label, b, f"sample{k}_short", goldens, short, 1)), flush=True)
         print(f"VLLMB label={a.label} batch={b} per_token_ms={','.join(f'{x:.6f}' for x in per)}", flush=True)
         result[b] = per
     if a.json:
