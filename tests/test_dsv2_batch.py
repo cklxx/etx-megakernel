@@ -349,3 +349,14 @@ def test_gate_runs_the_arm_it_names(tmp_path, monkeypatch):
     for arm in ("x8p", "x8m", "x8k", "x8"):
         rec = json.loads((tmp_path / f"bgate_{arm}.json").read_text())
         assert rec["arm"] == arm and rec["batch"] == 8 and rec["passed"] is False
+
+
+@pytest.mark.parametrize("name", ["x8_diag", "x8_diag_qwen"])
+def test_candidate_gate_declares_its_own_build(name):
+    from etx.tools.gpu_jobs import load_session
+    jobs, _ = load_session(ROOT / f"examples/sessions/{name}.py")
+    by = {j.name: j for j in jobs}
+    for arm in ("x8p", "x8m", "x8k", "x8"):
+        gate = by[f"bgate_{arm}"]
+        assert gate.cmd.endswith(f"gate {arm}")
+        assert {p for p in gate.reads if p.startswith("b_")} == {f"b_{arm}/run"}
