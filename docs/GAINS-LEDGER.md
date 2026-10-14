@@ -103,3 +103,23 @@ divided by the workgroups they added agree to 15%). It is an empirical slope for
 per-workgroup cost, and it must not be extrapolated to other tile sizes: the arms also change the weight bytes each
 workgroup reads, the rows each wave owns, the load-pipeline length and the XCD batch assignment, and the RPT=16 arm
 does not fit a constant-cost model. What the sweep does close is the direction, not a constant.
+
+## 2026-10-14, the DeepSeek levers on the kept arm
+
+Same column shape. The deciding basis is the device time of one token, batch 1, bf16, context 1024, 32 greedy tokens;
+every row's runs are gated on 32/32 tokens and 27/27 layers. The baseline of the first two rows is the arm that was
+kept before them, `alld4r0l1` (3.188-3.195 ms device, measured in the same sessions).
+
+| claim | number | [M]/[E] | source file:line | baseline build/trace | threshold | action on a hit | action on a miss | verdict |
+|---|---|---|---|---|---|---|---|---|
+| kv_a computed once (`kvs`, K1) | device **+41 us** (pairs 40, 40, 41, 48, 44; spread 8); wall +41 | [M] | `examples/dsv2lite/results/2026-10-14-k1/RESULT.md`; `pairs_alld4r0l1kvs.json` | `alld4r0l1` kept arm, five interleaved rounds in one session | rule 2ec2d29, written first: every pair faster, median >= 30 us, median > 2x spread | KEEP, banked | DROP | **KEEP** |
+| merge's W_UV GEMV on four waves (`mw`, M1) | device **+66 us** (pairs 76, 65, 55, 74, 66; spread 21); wall +68 | [M] | `examples/dsv2lite/results/2026-10-14-k1/RESULT.md`; `pairs_alld4r0l1mw.json` | `alld4r0l1` kept arm, same session as the row above | rule 3d27ff8: same shape as K1's | KEEP, banked | DROP | **KEEP** |
+| K1 and M1 together (`kvsmw`, KM) | device **+52 us versus M1 alone** (48, 52, 50, 58, 54; spread 10) and **+120 us versus `alld4r0l1`** | [M] | `examples/dsv2lite/results/2026-10-14-km/RESULT.md`; `pairs_alld4r0l1kvsmw.json` | `alld4r0l1mw` and `alld4r0l1`, five rounds each in one session | rule bf92fd4, written first: KEEP if the pair beats M1 alone, every pair faster, median >= 30 us, median > 2x spread | KEEP: the new DeepSeek kept arm | keep M1 alone | **KEEP; kept arm `alld4r0l1kvsmw`, 3.068-3.075 ms device** |
+| ablation: remove `gemv_no_terminal_all` (`noQ`) | removing it costs **-29 us** (pairs -29, -29, -23, -32, -22; spread 10) | [M] | `examples/dsv2lite/results/2026-10-14-k1/RESULT.md` | `alld4r0l1` kept arm in the same session (3.185-3.193 ms device) | same rule shape; a lever that is dead alone may be live inside the combination | DROP the ablation, keep the lever | remove the lever | **lever STAYS** |
+| ablation: remove `argmax_tree` (`noA`) | removing it costs **-13 us** (pairs -13, -6, -21, -6, -14; spread 15) | [M] | `examples/dsv2lite/results/2026-10-14-k1/RESULT.md` | `alld4r0l1` kept arm in the same session | every pair slower, but the median is inside 2x spread | DROP the ablation, keep the lever | remove the lever | **lever STAYS, weakest of the pair** |
+
+Open, not banked: the batch 2/4/8 study (docs/BATCH-2026-10-14.md). Its reference set is built and two of its three
+correctness gates have passed on the box (B = 2 and B = 4, 2026-10-14); the B = 8 gate and the five timed rounds are
+not measured, so no throughput number is claimed here. The two levers' sum (+107 us measured separately) is **not** a
+number: the merged arm's +120 us is the measurement.
+

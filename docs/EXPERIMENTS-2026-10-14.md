@@ -109,6 +109,13 @@ Labels: [M] measured, [E] estimate, [U] unknown. bf16, batch 1, context 1024, 32
 - **Rule:** PASS if every pair is faster, median >= 3% and > 2 x spread. A checksum mismatch means INCOMPLETE.
 - **GPU-only unknown:** HBM / MALL behaviour under each pattern.
 - **Sources:** QWEN-READINESS-2026-10-14.md section 4; bench/hw/moerows_oracle.py.
+- **Result (2026-10-14, first measurement in `results`-recorded run): NO-GO, median -0.12%, spread 43.68%** (five pairs,
+  every pair faster required). The second measurement the same day, on the rerun box with the same benchmark, came out
+  **NO-GO again but with median +14.29% and spread 26.98%**: the median now clears 3%, and the rule still refuses it
+  because the median does not exceed 2x the spread. The two runs disagree in magnitude (-0.12% versus +14.29%), which is
+  itself the finding: this microbenchmark is too noisy at ten launches to decide Q2, and the row-ownership arm stays
+  unbuilt rather than being called a loss. A decision needs more launches per mode, or a cold-cache measurement that
+  does not depend on timing a 15 us kernel.
 
 **6. Qwen common cache mode** (`qwen_pairs_kept_l1`)
 - **Mechanism:** `ETX_COHERENCE=l1` on the kept build: one compiler switch for both models.
