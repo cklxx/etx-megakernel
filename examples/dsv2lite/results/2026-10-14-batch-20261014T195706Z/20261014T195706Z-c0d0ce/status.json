@@ -1,0 +1,130 @@
+[
+ {
+  "name": "apt",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 1.0003652572631836,
+  "note": ""
+ },
+ {
+  "name": "etx_env",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 1.0032458305358887,
+  "note": ""
+ },
+ {
+  "name": "prep_env",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 4.007731914520264,
+  "note": ""
+ },
+ {
+  "name": "source",
+  "status": "fail",
+  "rc": 1,
+  "gpu": null,
+  "seconds": 1.0003612041473389,
+  "note": ""
+ },
+ {
+  "name": "prep_dl",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 1.0005452632904053,
+  "note": ""
+ },
+ {
+  "name": "prep_ref",
+  "status": "skipped",
+  "rc": null,
+  "gpu": null,
+  "seconds": null,
+  "note": "source.json: source fail"
+ },
+ {
+  "name": "prep_pack",
+  "status": "skipped",
+  "rc": null,
+  "gpu": null,
+  "seconds": null,
+  "note": "prep_ref: prep_ref skipped"
+ },
+ {
+  "name": "preflight",
+  "status": "skipped",
+  "rc": null,
+  "gpu": null,
+  "seconds": null,
+  "note": "$ETX_DSV2_DATA/weights.bin: prep_pack skipped"
+ },
+ {
+  "name": "build_x8p",
+  "status": "skipped",
+  "rc": null,
+  "gpu": null,
+  "seconds": null,
+  "note": "source.json: source fail"
+ },
+ {
+  "name": "bgate_x8p",
+  "status": "skipped",
+  "rc": null,
+  "gpu": null,
+  "seconds": null,
+  "note": "inputs.json: preflight skipped"
+ },
+ {
+  "name": "build_x8m",
+  "status": "skipped",
+  "rc": null,
+  "gpu": null,
+  "seconds": null,
+  "note": "source.json: source fail"
+ },
+ {
+  "name": "bgate_x8m",
+  "status": "skipped",
+  "rc": null,
+  "gpu": null,
+  "seconds": null,
+  "note": "inputs.json: preflight skipped"
+ },
+ {
+  "name": "build_x8k",
+  "status": "skipped",
+  "rc": null,
+  "gpu": null,
+  "seconds": null,
+  "note": "source.json: source fail"
+ },
+ {
+  "name": "bgate_x8k",
+  "status": "skipped",
+  "rc": null,
+  "gpu": null,
+  "seconds": null,
+  "note": "inputs.json: preflight skipped"
+ },
+ {
+  "name": "build_x8",
+  "status": "skipped",
+  "rc": null,
+  "gpu": null,
+  "seconds": null,
+  "note": "source.json: source fail"
+ },
+ {
+  "name": "bgate_x8",
+  "status": "skipped",
+  "rc": null,
+  "gpu": null,
+  "seconds": null,
+  "note": "inputs.json: preflight skipped"
+ }
+]

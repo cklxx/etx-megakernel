@@ -1,0 +1,226 @@
+[
+ {
+  "name": "apt",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 1.0016825199127197,
+  "note": ""
+ },
+ {
+  "name": "etx_env",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 3.006561517715454,
+  "note": ""
+ },
+ {
+  "name": "prep_env",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 4.008402585983276,
+  "note": ""
+ },
+ {
+  "name": "source",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 1.0016593933105469,
+  "note": ""
+ },
+ {
+  "name": "prep_dl",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 1.003486156463623,
+  "note": ""
+ },
+ {
+  "name": "prep_ref",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 1.0006191730499268,
+  "note": ""
+ },
+ {
+  "name": "prep_pack",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 1.0012013912200928,
+  "note": ""
+ },
+ {
+  "name": "preflight",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 21.005215406417847,
+  "note": ""
+ },
+ {
+  "name": "qwen_build_hw_bench",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 3.007828712463379,
+  "note": ""
+ },
+ {
+  "name": "qwen_stage_env",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 3.0059382915496826,
+  "note": ""
+ },
+ {
+  "name": "qwen_stage_vllm",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 1.0008716583251953,
+  "note": ""
+ },
+ {
+  "name": "qwen_stage_dl",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 1.0014381408691406,
+  "note": ""
+ },
+ {
+  "name": "qwen_preflight",
+  "status": "fail",
+  "rc": 1,
+  "gpu": null,
+  "seconds": 1.0005605220794678,
+  "note": ""
+ },
+ {
+  "name": "qwen_build_kept",
+  "status": "skipped",
+  "rc": null,
+  "gpu": null,
+  "seconds": null,
+  "note": "qwen/inputs.json: qwen_preflight fail"
+ },
+ {
+  "name": "qwen_build_kept_l1",
+  "status": "skipped",
+  "rc": null,
+  "gpu": null,
+  "seconds": null,
+  "note": "qwen/inputs.json: qwen_preflight fail"
+ },
+ {
+  "name": "build_x8p",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 282.20592212677,
+  "note": ""
+ },
+ {
+  "name": "build_x8m",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 276.20054030418396,
+  "note": ""
+ },
+ {
+  "name": "build_x8k",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 404.2805700302124,
+  "note": ""
+ },
+ {
+  "name": "build_x8",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 401.27330684661865,
+  "note": ""
+ },
+ {
+  "name": "qwen_stage_pack",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 1.0011858940124512,
+  "note": ""
+ },
+ {
+  "name": "qwen_certify_kept",
+  "status": "skipped",
+  "rc": null,
+  "gpu": null,
+  "seconds": null,
+  "note": "qwen/inputs.json: qwen_preflight fail"
+ },
+ {
+  "name": "qwen_certify_kept_l1",
+  "status": "skipped",
+  "rc": null,
+  "gpu": null,
+  "seconds": null,
+  "note": "qwen/inputs.json: qwen_preflight fail"
+ },
+ {
+  "name": "qwen_pairs_kept_l1",
+  "status": "skipped",
+  "rc": null,
+  "gpu": null,
+  "seconds": null,
+  "note": "qwen/inputs.json: qwen_preflight fail"
+ },
+ {
+  "name": "prep_goldens",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 454.29385447502136,
+  "note": ""
+ },
+ {
+  "name": "bgate_x8p",
+  "status": "fail",
+  "rc": 2,
+  "gpu": 0,
+  "seconds": 1.0005815029144287,
+  "note": ""
+ },
+ {
+  "name": "bgate_x8m",
+  "status": "fail",
+  "rc": 2,
+  "gpu": 0,
+  "seconds": 1.0005450248718262,
+  "note": ""
+ },
+ {
+  "name": "bgate_x8k",
+  "status": "fail",
+  "rc": 2,
+  "gpu": 0,
+  "seconds": 1.0004560947418213,
+  "note": ""
+ },
+ {
+  "name": "bgate_x8",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 8.001322031021118,
+  "note": ""
+ }
+]

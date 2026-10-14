@@ -1,0 +1,192 @@
+[18:59:22 +  0m00s] session record: /root/sess/20261014T185922Z-3e63d4
+[18:59:22 +  0m00s] start apt (cpu)
+[18:59:22 +  0m00s] start qwen_build_hw_bench (cpu)
+[18:59:22 +  0m00s] start qwen_stage_vllm (cpu)
+[18:59:23 +  0m01s] ok      apt rc=0 1s
+[18:59:23 +  0m01s] ok      qwen_stage_vllm rc=0 1s
+    VLLM 6e448d0ea9bf3d88d898b65449ca6dc2aec170ac = v0.27.1
+[18:59:23 +  0m01s] start etx_env (cpu)
+[18:59:23 +  0m01s] start prep_env (cpu)
+[18:59:23 +  0m01s] start qwen_stage_env (cpu)
+[18:59:25 +  0m03s] ok      qwen_build_hw_bench rc=0 3s
+[18:59:26 +  0m04s] ok      etx_env rc=0 3s
+[18:59:26 +  0m04s] ok      qwen_stage_env rc=0 3s
+[18:59:26 +  0m04s] start source (cpu)
+[18:59:26 +  0m04s] start qwen_stage_dl (cpu)
+[18:59:27 +  0m05s] ok      prep_env rc=0 4s
+[18:59:27 +  0m05s] ok      source rc=0 1s
+    SOURCE OK fleet export 28f5cbb4f39524df etx f03f0192e5c0
+[18:59:27 +  0m05s] ok      qwen_stage_dl rc=0 1s
+    HF Qwen/Qwen3-30B-A3B@ad44e777bcd18fa416d9da3bd8f70d33ebb85d39
+[18:59:27 +  0m05s] start prep_dl (cpu)
+[18:59:27 +  0m05s] start build_x8p (cpu)
+[18:59:27 +  0m05s] start build_x8m (cpu)
+[18:59:27 +  0m05s] start build_x8k (cpu)
+[18:59:27 +  0m05s] start build_x8 (cpu)
+[18:59:28 +  0m06s] ok      prep_dl rc=0 1s
+[18:59:28 +  0m06s] start prep_ref on GPU 0
+[18:59:29 +  0m07s] ok      prep_ref rc=0 1s
+    # mkdir -p "$ETX_DSV2_DATA" && cd "$ETX_DSV2_FLEET" && { test -s "$ETX_DSV2_DATA/fleet_cache.bin" -a -s "$ETX_DSV2_DATA/golden_tokens.txt" -a -s "$ETX_DSV2_DATA/golden_hidden.bin" || HIP_VISIBLE_DEVICES=$GPU $HOME/dsv2-prep/.venv/bin/python
+    -rw-r--r--  1 root root         487 Oct 14 17:46 golden.json
+    -rw-r--r--  1 root root    29492654 Oct 14 17:46 golden.npz
+    -rw-r--r--  1 root root      221184 Oct 14 17:46 golden_hidden.bin
+    -rw-r--r--  1 root root         144 Oct 14 17:46 golden_tokens.txt
+[18:59:29 +  0m07s] start prep_pack (cpu)
+[18:59:29 +  0m07s] start qwen_stage_pack on GPU 0
+[18:59:30 +  0m08s] ok      prep_pack rc=0 1s
+[18:59:30 +  0m08s] ok      qwen_stage_pack rc=0 1s
+    QWEN-STAGED /root/llm/qwen3-30b-a3b
+[18:59:30 +  0m08s] start preflight (cpu)
+[18:59:51 +  0m29s] ok      preflight rc=0 21s
+    PREFLIGHT hashing /root/dsv2-data/weights.bin bytes=31412968448
+    PREFLIGHT hashing /root/dsv2-data/weights.bin.manifest bytes=9561
+    PREFLIGHT hashing /root/dsv2-data/fleet_cache.bin bytes=32845824
+    PREFLIGHT hashing /root/dsv2-data/golden_tokens.txt bytes=144
+    PREFLIGHT hashing /root/dsv2-data/golden_hidden.bin bytes=221184
+    PREFLIGHT OK inputs are the pinned measured inputs
+[18:59:51 +  0m29s] start qwen_preflight (cpu)
+[18:59:52 +  0m30s] fail    qwen_preflight rc=1 1s
+    PREFLIGHT FAIL 1 item(s)
+[18:59:52 +  0m30s] skip    qwen_build_kept [qwen/inputs.json: qwen_preflight fail]
+[18:59:52 +  0m30s] skip    qwen_build_kept_l1 [qwen/inputs.json: qwen_preflight fail]
+[18:59:52 +  0m30s] skip    qwen_certify_kept [qwen/inputs.json: qwen_preflight fail]
+[18:59:52 +  0m30s] skip    qwen_certify_kept_l1 [qwen/inputs.json: qwen_preflight fail]
+[18:59:52 +  0m30s] skip    qwen_pairs_kept_l1 [qwen/inputs.json: qwen_preflight fail]
+[18:59:52 +  0m30s] start prep_goldens on GPU 0
+[19:00:22 +  1m00s] progress: 5 running, 4 waiting, 19 done
+    build_x8p [cpu] 55s / 1200s: COH-CHECK OK coherent_loads=0 l1_loads=1
+    build_x8m [cpu] 55s / 1200s: COH-CHECK OK coherent_loads=0 l1_loads=1
+    build_x8k [cpu] 55s / 1200s: PROGRESS invocation=compile_x8k elapsed_s=30.1 deadline_s=900
+    build_x8 [cpu] 55s / 1200s: PROGRESS invocation=compile_x8 elapsed_s=30.1 deadline_s=900
+    prep_goldens [GPU 0] 30s / 1500s: loading /root/models/dsv2-lite-base (bf16)
+[19:01:22 +  2m00s] progress: 5 running, 4 waiting, 19 done
+    build_x8p [cpu] 115s / 1200s: PROGRESS invocation=compile_x8p elapsed_s=90.8 deadline_s=900
+    build_x8m [cpu] 115s / 1200s: PROGRESS invocation=compile_x8m elapsed_s=90.6 deadline_s=900
+    build_x8k [cpu] 115s / 1200s: PROGRESS invocation=compile_x8k elapsed_s=91.1 deadline_s=900
+    build_x8 [cpu] 115s / 1200s: PROGRESS invocation=compile_x8 elapsed_s=91.1 deadline_s=900
+    prep_goldens [GPU 0] 90s / 1500s: loading /root/models/dsv2-lite-base (bf16)
+[19:02:23 +  3m00s] progress: 5 running, 4 waiting, 19 done
+    build_x8p [cpu] 175s / 1200s: PROGRESS invocation=compile_x8p elapsed_s=150.8 deadline_s=900
+    build_x8m [cpu] 175s / 1200s: PROGRESS invocation=compile_x8m elapsed_s=151.6 deadline_s=900
+    build_x8k [cpu] 175s / 1200s: PROGRESS invocation=compile_x8k elapsed_s=151.8 deadline_s=900
+    build_x8 [cpu] 175s / 1200s: PROGRESS invocation=compile_x8 elapsed_s=151.4 deadline_s=900
+    prep_goldens [GPU 0] 150s / 1500s: loading /root/models/dsv2-lite-base (bf16)
+[19:03:23 +  4m00s] progress: 5 running, 4 waiting, 19 done
+    build_x8p [cpu] 235s / 1200s: PROGRESS invocation=compile_x8p elapsed_s=210.9 deadline_s=900
+    build_x8m [cpu] 235s / 1200s: PROGRESS invocation=compile_x8m elapsed_s=211.6 deadline_s=900
+    build_x8k [cpu] 235s / 1200s: PROGRESS invocation=compile_x8k elapsed_s=211.8 deadline_s=900
+    build_x8 [cpu] 235s / 1200s: PROGRESS invocation=compile_x8 elapsed_s=211.5 deadline_s=900
+    prep_goldens [GPU 0] 210s / 1500s:   '(n):\n    # compute the answer\ndef solve(n):\n    # compute the answer\ndef solve(n):\n    # compute the answer'
+[19:04:04 +  4m41s] ok      build_x8m rc=0 276s
+    BUILD arm=x8m stamped=0 plan_sha256=1d19b7e18a199b072c9c997ca4d61310281ca8581daa4284b1b7d062bd087cb2 resources={'vgpr': 256, 'agpr': 0, 'sgpr': 108, 'scratch': 96, 'lds': 26668, 'occupancy': 2}
+    BUILD arm=x8m OK
+[19:04:10 +  4m47s] ok      build_x8p rc=0 282s
+    BUILD arm=x8p stamped=0 plan_sha256=1d19b7e18a199b072c9c997ca4d61310281ca8581daa4284b1b7d062bd087cb2 resources={'vgpr': 256, 'agpr': 0, 'sgpr': 108, 'scratch': 96, 'lds': 26668, 'occupancy': 2}
+    BUILD arm=x8p OK
+[19:04:23 +  5m00s] progress: 3 running, 4 waiting, 21 done
+    build_x8k [cpu] 295s / 1200s: PROGRESS invocation=compile_x8k elapsed_s=271.9 deadline_s=900
+    build_x8 [cpu] 295s / 1200s: PROGRESS invocation=compile_x8 elapsed_s=271.5 deadline_s=900
+    prep_goldens [GPU 0] 270s / 1500s: /opt/amdgpu/share/libdrm/amdgpu.ids: No such file or directory
+[19:05:23 +  6m00s] progress: 3 running, 4 waiting, 21 done
+    build_x8k [cpu] 355s / 1200s: PROGRESS invocation=compile_x8k elapsed_s=332.0 deadline_s=900
+    build_x8 [cpu] 355s / 1200s: PROGRESS invocation=compile_x8 elapsed_s=331.6 deadline_s=900
+    prep_goldens [GPU 0] 330s / 1500s: Loading checkpoint shards:  50%|█████     | 2/4 [00:01<00:01,  1.39it/s]
+[19:06:09 +  6m46s] ok      build_x8 rc=0 401s
+    BUILD arm=x8 stamped=0 plan_sha256=6beb4b01bb9ea997aa6ab16968fb043b2453ae85d73632bd7f57cb9d3e8f891d resources={'vgpr': 256, 'agpr': 0, 'sgpr': 108, 'scratch': 144, 'lds': 26668, 'occupancy': 2}
+    BUILD arm=x8 OK
+[19:06:12 +  6m49s] ok      build_x8k rc=0 404s
+    BUILD arm=x8k stamped=0 plan_sha256=6beb4b01bb9ea997aa6ab16968fb043b2453ae85d73632bd7f57cb9d3e8f891d resources={'vgpr': 256, 'agpr': 0, 'sgpr': 108, 'scratch': 144, 'lds': 26668, 'occupancy': 2}
+    BUILD arm=x8k OK
+[19:06:23 +  7m00s] progress: 1 running, 4 waiting, 23 done
+    prep_goldens [GPU 0] 390s / 1500s: /opt/amdgpu/share/libdrm/amdgpu.ids: No such file or directory
+[19:07:23 +  8m00s] progress: 1 running, 4 waiting, 23 done
+    prep_goldens [GPU 0] 450s / 1500s:   '    # compute the answer\ndef solve(n):\n    # compute the answer\ndef solve(n):\n    # compute the answer\ndef solve('
+[19:07:27 +  8m04s] ok      prep_goldens rc=0 454s
+    GOLDENS OK 8 requests: prompts are the 97 r rotations, pairwise distinct; collisions [[0, 4]]; vLLM files in /root/dsv2-data/vllm
+    prompt rotated by 97 tokens (first ids [1558, 8708, 7, 77])
+    wrote /root/dsv2-data/r1/golden.npz and /root/dsv2-data/r1/golden.json
+    wrote /root/dsv2-data/r1/fleet_cache.bin  [27][1056][576] cols 0:512 = c (post kv_a_layernorm), 512:576 = k_pe (post RoPE)  -> 32.8 MB bf16
+    wrote /root/dsv2-data/r1/golden_tokens.txt (33 tokens)
+    wrote /root/dsv2-data/r1/golden_hidden.bin (27, 2048)
+    prompt rotated by 194 tokens (first ids [8708, 7, 77, 1780])
+    wrote /root/dsv2-data/r2/golden.npz and /root/dsv2-data/r2/golden.json
+    wrote /root/dsv2-data/r2/fleet_cache.bin  [27][1056][576] cols 0:512 = c (post kv_a_layernorm), 512:576 = k_pe (post RoPE)  -> 32.8 MB bf16
+    wrote /root/dsv2-data/r2/golden_tokens.txt (33 tokens)
+    wrote /root/dsv2-data/r2/golden_hidden.bin (27, 2048)
+    prompt rotated by 291 tokens (first ids [7, 77, 1780, 185])
+    wrote /root/dsv2-data/r3/golden.npz and /root/dsv2-data/r3/golden.json
+    wrote /root/dsv2-data/r3/fleet_cache.bin  [27][1056][576] cols 0:512 = c (post kv_a_layernorm), 512:576 = k_pe (post RoPE)  -> 32.8 MB bf16
+    wrote /root/dsv2-data/r3/golden_tokens.txt (33 tokens)
+    wrote /root/dsv2-data/r3/golden_hidden.bin (27, 2048)
+    prompt rotated by 388 tokens (first ids [77, 1780, 185, 300])
+    wrote /root/dsv2-data/r4/golden.npz and /root/dsv2-data/r4/golden.json
+    wrote /root/dsv2-data/r4/fleet_cache.bin  [27][1056][576] cols 0:512 = c (post kv_a_layernorm), 512:576 = k_pe (post RoPE)  -> 32.8 MB bf16
+    wrote /root/dsv2-data/r4/golden_tokens.txt (33 tokens)
+    wrote /root/dsv2-data/r4/golden_hidden.bin (27, 2048)
+    prompt rotated by 485 tokens (first ids [1780, 185, 300, 1501])
+    wrote /root/dsv2-data/r5/golden.npz and /root/dsv2-data/r5/golden.json
+    wrote /root/dsv2-data/r5/fleet_cache.bin  [27][1056][576] cols 0:512 = c (post kv_a_layernorm), 512:576 = k_pe (post RoPE)  -> 32.8 MB bf16
+    wrote /root/dsv2-data/r5/golden_tokens.txt (33 tokens)
+    wrote /root/dsv2-data/r5/golden_hidden.bin (27, 2048)
+    prompt rotated by 582 tokens (first ids [185, 300, 1501, 11747])
+    wrote /root/dsv2-data/r6/golden.npz and /root/dsv2-data/r6/golden.json
+    wrote /root/dsv2-data/r6/fleet_cache.bin  [27][1056][576] cols 0:512 = c (post kv_a_layernorm), 512:576 = k_pe (post RoPE)  -> 32.8 MB bf16
+    wrote /root/dsv2-data/r6/golden_tokens.txt (33 tokens)
+    wrote /root/dsv2-data/r6/golden_hidden.bin (27, 2048)
+    prompt rotated by 679 tokens (first ids [300, 1501, 11747, 254])
+    wrote /root/dsv2-data/r7/golden.npz and /root/dsv2-data/r7/golden.json
+    wrote /root/dsv2-data/r7/fleet_cache.bin  [27][1056][576] cols 0:512 = c (post kv_a_layernorm), 512:576 = k_pe (post RoPE)  -> 32.8 MB bf16
+    wrote /root/dsv2-data/r7/golden_tokens.txt (33 tokens)
+    wrote /root/dsv2-data/r7/golden_hidden.bin (27, 2048)
+[19:07:27 +  8m04s] start bgate_x8p on GPU 0
+[19:07:28 +  8m05s] fail    bgate_x8p rc=2 1s
+    # job bgate_x8p gpu=0 cwd=/root/etx
+    # .venv/bin/python -u -m examples.dsv2lite.batch_session gate x8p
+    usage: batch_session.py [-h] {gate,vsel,rounds,report} [arm]
+    batch_session.py: error: gate arm must be one of ['x2', 'x4', 'x8']
+[19:07:28 +  8m05s] start bgate_x8m on GPU 0
+[19:07:29 +  8m06s] fail    bgate_x8m rc=2 1s
+    # job bgate_x8m gpu=0 cwd=/root/etx
+    # .venv/bin/python -u -m examples.dsv2lite.batch_session gate x8m
+    usage: batch_session.py [-h] {gate,vsel,rounds,report} [arm]
+    batch_session.py: error: gate arm must be one of ['x2', 'x4', 'x8']
+[19:07:29 +  8m06s] start bgate_x8k on GPU 0
+[19:07:30 +  8m07s] fail    bgate_x8k rc=2 1s
+    # job bgate_x8k gpu=0 cwd=/root/etx
+    # .venv/bin/python -u -m examples.dsv2lite.batch_session gate x8k
+    usage: batch_session.py [-h] {gate,vsel,rounds,report} [arm]
+    batch_session.py: error: gate arm must be one of ['x2', 'x4', 'x8']
+[19:07:30 +  8m07s] start bgate_x8 on GPU 0
+[19:07:38 +  8m15s] ok      bgate_x8 rc=0 8s
+    BATCH-INCOMPLETE invocation=bgate_x8 arm=x8 b=8: request 5: 3 layers within the gate (need 27)
+    BGATE arm=x8 b=8 NOT COMPLETE: request 5: 3 layers within the gate (need 27)
+[19:07:38 +  8m15s] session done
+  job                              status     rc  gpu  seconds
+  apt                              ok          0             1  
+  etx_env                          ok          0             3  
+  prep_env                         ok          0             4  
+  source                           ok          0             1  
+  prep_dl                          ok          0             1  
+  prep_ref                         ok          0    0        1  
+  prep_pack                        ok          0             1  
+  preflight                        ok          0            21  
+  qwen_build_hw_bench              ok          0             3  
+  qwen_stage_env                   ok          0             3  
+  qwen_stage_vllm                  ok          0             1  
+  qwen_stage_dl                    ok          0             1  
+  qwen_preflight                   fail        1             1  
+  qwen_build_kept                  skipped                      qwen/inputs.json: qwen_preflight fail
+  qwen_build_kept_l1               skipped                      qwen/inputs.json: qwen_preflight fail
+  build_x8p                        ok          0           282  
+  build_x8m                        ok          0           276  
+  build_x8k                        ok          0           404  
+  build_x8                         ok          0           401  
+  qwen_stage_pack                  ok          0    0        1  
+  qwen_certify_kept                skipped                      qwen/inputs.json: qwen_preflight fail
+  qwen_certify_kept_l1             skipped                      qwen/inputs.json: qwen_preflight fail
+  qwen_pairs_kept_l1               skipped                      qwen/inputs.json: qwen_preflight fail
+  prep_goldens                     ok          0    0      454  
+  bgate_x8p                        fail        2    0        1  
+  bgate_x8m                        fail        2    0        1  
+  bgate_x8k                        fail        2    0        1  
+  bgate_x8                         ok          0    0        8  

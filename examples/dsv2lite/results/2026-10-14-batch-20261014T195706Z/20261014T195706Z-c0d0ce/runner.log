@@ -1,0 +1,45 @@
+[19:57:06 +  0m00s] session record: /root/sess/20261014T195706Z-c0d0ce
+[19:57:06 +  0m00s] start apt (cpu)
+[19:57:07 +  0m01s] ok      apt rc=0 1s
+[19:57:07 +  0m01s] start etx_env (cpu)
+[19:57:07 +  0m01s] start prep_env (cpu)
+[19:57:08 +  0m02s] ok      etx_env rc=0 1s
+[19:57:08 +  0m02s] start source (cpu)
+[19:57:09 +  0m03s] fail    source rc=1 1s
+      File "/root/src/8cb55c391539f2e18aed7de2c928287cec5fb756923c05c27b5b4bbd91abf692-20261014T185905Z/examples/dsv2lite/inplace_session.py", line 262, in main
+        getattr(session, a.operation)()
+      File "/root/src/8cb55c391539f2e18aed7de2c928287cec5fb756923c05c27b5b4bbd91abf692-20261014T185905Z/examples/dsv2lite/inplace_session.py", line 128, in source
+        raise RuntimeError("fleet src is not the exact pinned 3fb67a6 export")
+    RuntimeError: fleet src is not the exact pinned 3fb67a6 export
+[19:57:09 +  0m03s] skip    build_x8p [source.json: source fail]
+[19:57:09 +  0m03s] skip    build_x8m [source.json: source fail]
+[19:57:09 +  0m03s] skip    build_x8k [source.json: source fail]
+[19:57:09 +  0m03s] skip    build_x8 [source.json: source fail]
+[19:57:11 +  0m05s] ok      prep_env rc=0 4s
+[19:57:11 +  0m05s] start prep_dl (cpu)
+[19:57:12 +  0m06s] ok      prep_dl rc=0 1s
+[19:57:12 +  0m06s] skip    prep_ref [source.json: source fail]
+[19:57:12 +  0m06s] skip    prep_pack [prep_ref: prep_ref skipped]
+[19:57:12 +  0m06s] skip    preflight [$ETX_DSV2_DATA/weights.bin: prep_pack skipped]
+[19:57:12 +  0m06s] skip    bgate_x8p [inputs.json: preflight skipped]
+[19:57:12 +  0m06s] skip    bgate_x8m [inputs.json: preflight skipped]
+[19:57:12 +  0m06s] skip    bgate_x8k [inputs.json: preflight skipped]
+[19:57:12 +  0m06s] skip    bgate_x8 [inputs.json: preflight skipped]
+[19:57:12 +  0m06s] session done
+  job                              status     rc  gpu  seconds
+  apt                              ok          0             1  
+  etx_env                          ok          0             1  
+  prep_env                         ok          0             4  
+  source                           fail        1             1  
+  prep_dl                          ok          0             1  
+  prep_ref                         skipped                      source.json: source fail
+  prep_pack                        skipped                      prep_ref: prep_ref skipped
+  preflight                        skipped                      $ETX_DSV2_DATA/weights.bin: prep_pack skipped
+  build_x8p                        skipped                      source.json: source fail
+  bgate_x8p                        skipped                      inputs.json: preflight skipped
+  build_x8m                        skipped                      source.json: source fail
+  bgate_x8m                        skipped                      inputs.json: preflight skipped
+  build_x8k                        skipped                      source.json: source fail
+  bgate_x8k                        skipped                      inputs.json: preflight skipped
+  build_x8                         skipped                      source.json: source fail
+  bgate_x8                         skipped                      inputs.json: preflight skipped

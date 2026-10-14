@@ -1,0 +1,108 @@
+# job prep_goldens gpu=0 cwd=/root/etx
+# set -eu; for r in $(seq 1 7); do d="$ETX_DSV2_DATA/r$r"; if [ -s "$d/fleet_cache.bin" ] && [ -s "$d/golden_tokens.txt" ] && [ -s "$d/golden_hidden.bin" ] && [ -s "$d/golden.npz" ]; then echo "request $r: reference present"; else mkdir -p "$d"; HIP_VISIBLE_DEVICES=$GPU $HOME/dsv2-prep/.venv/bin/python examples/dsv2lite/reference_rotated.py --fleet "$ETX_DSV2_FLEET" --rotate $((97 * r)) -- --model $HOME/models/dsv2-lite-base --out "$d/golden.npz"; fi; done; $HOME/dsv2-prep/.venv/bin/python -m examples.dsv2lite.batch_goldens "$ETX_DSV2_DATA" --requests 8
+loading /root/models/dsv2-lite-base (bf16)
+Loading checkpoint shards:   0%|          | 0/4 [00:00<?, ?it/s]Loading checkpoint shards:  25%|██▌       | 1/4 [00:00<00:02,  1.40it/s]Loading checkpoint shards:  50%|█████     | 2/4 [00:01<00:01,  1.33it/s]Loading checkpoint shards:  75%|███████▌  | 3/4 [00:02<00:00,  1.33it/s]Loading checkpoint shards: 100%|██████████| 4/4 [00:02<00:00,  1.54it/s]Loading checkpoint shards: 100%|██████████| 4/4 [00:02<00:00,  1.46it/s]
+/opt/amdgpu/share/libdrm/amdgpu.ids: No such file or directory
+  loaded in 53.6s
+prompt rotated by 97 tokens (first ids [1558, 8708, 7, 77])
+prompt: 1024 tokens
+prefill
+  first token 1558, top-2 logit margin 6.0000
+decoding 32 tokens greedily
+  'def solve(n):\n    # compute the answer\ndef solve(n):\n    # compute the answer\ndef solve(n):\n    # compute'
+wrote /root/dsv2-data/r1/golden.npz and /root/dsv2-data/r1/golden.json
+wrote /root/dsv2-data/r1/fleet_cache.bin  [27][1056][576] cols 0:512 = c (post kv_a_layernorm), 512:576 = k_pe (post RoPE)  -> 32.8 MB bf16
+wrote /root/dsv2-data/r1/golden_tokens.txt (33 tokens)
+wrote /root/dsv2-data/r1/golden_hidden.bin (27, 2048)
+  smallest top-2 margin over the run: 6.0000 (a small margin here is where bf16 drift would flip a token)
+loading /root/models/dsv2-lite-base (bf16)
+Loading checkpoint shards:   0%|          | 0/4 [00:00<?, ?it/s]Loading checkpoint shards:  25%|██▌       | 1/4 [00:00<00:02,  1.41it/s]Loading checkpoint shards:  50%|█████     | 2/4 [00:01<00:01,  1.36it/s]Loading checkpoint shards:  75%|███████▌  | 3/4 [00:02<00:00,  1.32it/s]Loading checkpoint shards: 100%|██████████| 4/4 [00:02<00:00,  1.55it/s]Loading checkpoint shards: 100%|██████████| 4/4 [00:02<00:00,  1.47it/s]
+/opt/amdgpu/share/libdrm/amdgpu.ids: No such file or directory
+  loaded in 53.2s
+prompt rotated by 194 tokens (first ids [8708, 7, 77, 1780])
+prompt: 1024 tokens
+prefill
+  first token 8708, top-2 logit margin 9.0000
+decoding 32 tokens greedily
+  ' solve(n):\n    # compute the answer\ndef solve(n):\n    # compute the answer\ndef solve(n):\n    # compute the'
+wrote /root/dsv2-data/r2/golden.npz and /root/dsv2-data/r2/golden.json
+wrote /root/dsv2-data/r2/fleet_cache.bin  [27][1056][576] cols 0:512 = c (post kv_a_layernorm), 512:576 = k_pe (post RoPE)  -> 32.8 MB bf16
+wrote /root/dsv2-data/r2/golden_tokens.txt (33 tokens)
+wrote /root/dsv2-data/r2/golden_hidden.bin (27, 2048)
+  smallest top-2 margin over the run: 6.6250 (a small margin here is where bf16 drift would flip a token)
+loading /root/models/dsv2-lite-base (bf16)
+Loading checkpoint shards:   0%|          | 0/4 [00:00<?, ?it/s]Loading checkpoint shards:  25%|██▌       | 1/4 [00:00<00:02,  1.39it/s]Loading checkpoint shards:  50%|█████     | 2/4 [00:01<00:01,  1.32it/s]Loading checkpoint shards:  75%|███████▌  | 3/4 [00:02<00:00,  1.33it/s]Loading checkpoint shards: 100%|██████████| 4/4 [00:02<00:00,  1.55it/s]Loading checkpoint shards: 100%|██████████| 4/4 [00:02<00:00,  1.46it/s]
+/opt/amdgpu/share/libdrm/amdgpu.ids: No such file or directory
+  loaded in 53.3s
+prompt rotated by 291 tokens (first ids [7, 77, 1780, 185])
+prompt: 1024 tokens
+prefill
+  first token 7, top-2 logit margin 7.7500
+decoding 32 tokens greedily
+  '(n):\n    # compute the answer\ndef solve(n):\n    # compute the answer\ndef solve(n):\n    # compute the answer'
+wrote /root/dsv2-data/r3/golden.npz and /root/dsv2-data/r3/golden.json
+wrote /root/dsv2-data/r3/fleet_cache.bin  [27][1056][576] cols 0:512 = c (post kv_a_layernorm), 512:576 = k_pe (post RoPE)  -> 32.8 MB bf16
+wrote /root/dsv2-data/r3/golden_tokens.txt (33 tokens)
+wrote /root/dsv2-data/r3/golden_hidden.bin (27, 2048)
+  smallest top-2 margin over the run: 6.2500 (a small margin here is where bf16 drift would flip a token)
+loading /root/models/dsv2-lite-base (bf16)
+Loading checkpoint shards:   0%|          | 0/4 [00:00<?, ?it/s]Loading checkpoint shards:  25%|██▌       | 1/4 [00:00<00:02,  1.41it/s]Loading checkpoint shards:  50%|█████     | 2/4 [00:01<00:01,  1.38it/s]Loading checkpoint shards:  75%|███████▌  | 3/4 [00:02<00:00,  1.37it/s]Loading checkpoint shards: 100%|██████████| 4/4 [00:02<00:00,  1.59it/s]Loading checkpoint shards: 100%|██████████| 4/4 [00:02<00:00,  1.51it/s]
+/opt/amdgpu/share/libdrm/amdgpu.ids: No such file or directory
+  loaded in 52.9s
+prompt rotated by 388 tokens (first ids [77, 1780, 185, 300])
+prompt: 1024 tokens
+prefill
+  first token 77, top-2 logit margin 7.0000
+decoding 32 tokens greedily
+  'n):\n    # compute the answer\ndef solve(n):\n    # compute the answer\ndef solve(n):\n    # compute the answer\n'
+wrote /root/dsv2-data/r4/golden.npz and /root/dsv2-data/r4/golden.json
+wrote /root/dsv2-data/r4/fleet_cache.bin  [27][1056][576] cols 0:512 = c (post kv_a_layernorm), 512:576 = k_pe (post RoPE)  -> 32.8 MB bf16
+wrote /root/dsv2-data/r4/golden_tokens.txt (33 tokens)
+wrote /root/dsv2-data/r4/golden_hidden.bin (27, 2048)
+  smallest top-2 margin over the run: 5.1250 (a small margin here is where bf16 drift would flip a token)
+loading /root/models/dsv2-lite-base (bf16)
+Loading checkpoint shards:   0%|          | 0/4 [00:00<?, ?it/s]Loading checkpoint shards:  25%|██▌       | 1/4 [00:00<00:02,  1.44it/s]Loading checkpoint shards:  50%|█████     | 2/4 [00:01<00:01,  1.39it/s]Loading checkpoint shards:  75%|███████▌  | 3/4 [00:02<00:00,  1.38it/s]Loading checkpoint shards: 100%|██████████| 4/4 [00:02<00:00,  1.60it/s]Loading checkpoint shards: 100%|██████████| 4/4 [00:02<00:00,  1.52it/s]
+/opt/amdgpu/share/libdrm/amdgpu.ids: No such file or directory
+  loaded in 52.6s
+prompt rotated by 485 tokens (first ids [1780, 185, 300, 1501])
+prompt: 1024 tokens
+prefill
+  first token 1780, top-2 logit margin 6.6250
+decoding 32 tokens greedily
+  '):\n    # compute the answer\ndef solve(n):\n    # compute the answer\ndef solve(n):\n    # compute the answer\ndef'
+wrote /root/dsv2-data/r5/golden.npz and /root/dsv2-data/r5/golden.json
+wrote /root/dsv2-data/r5/fleet_cache.bin  [27][1056][576] cols 0:512 = c (post kv_a_layernorm), 512:576 = k_pe (post RoPE)  -> 32.8 MB bf16
+wrote /root/dsv2-data/r5/golden_tokens.txt (33 tokens)
+wrote /root/dsv2-data/r5/golden_hidden.bin (27, 2048)
+  smallest top-2 margin over the run: 4.2500 (a small margin here is where bf16 drift would flip a token)
+loading /root/models/dsv2-lite-base (bf16)
+Loading checkpoint shards:   0%|          | 0/4 [00:00<?, ?it/s]Loading checkpoint shards:  25%|██▌       | 1/4 [00:00<00:02,  1.42it/s]Loading checkpoint shards:  50%|█████     | 2/4 [00:01<00:01,  1.38it/s]Loading checkpoint shards:  75%|███████▌  | 3/4 [00:02<00:00,  1.37it/s]Loading checkpoint shards: 100%|██████████| 4/4 [00:02<00:00,  1.60it/s]Loading checkpoint shards: 100%|██████████| 4/4 [00:02<00:00,  1.51it/s]
+/opt/amdgpu/share/libdrm/amdgpu.ids: No such file or directory
+  loaded in 35.1s
+prompt rotated by 582 tokens (first ids [185, 300, 1501, 11747])
+prompt: 1024 tokens
+prefill
+  first token 185, top-2 logit margin 5.3750
+decoding 32 tokens greedily
+  '\n    # compute the answer\ndef solve(n):\n    # compute the answer\ndef solve(n):\n    # compute the answer\ndef solve'
+wrote /root/dsv2-data/r6/golden.npz and /root/dsv2-data/r6/golden.json
+wrote /root/dsv2-data/r6/fleet_cache.bin  [27][1056][576] cols 0:512 = c (post kv_a_layernorm), 512:576 = k_pe (post RoPE)  -> 32.8 MB bf16
+wrote /root/dsv2-data/r6/golden_tokens.txt (33 tokens)
+wrote /root/dsv2-data/r6/golden_hidden.bin (27, 2048)
+  smallest top-2 margin over the run: 3.8750 (a small margin here is where bf16 drift would flip a token)
+loading /root/models/dsv2-lite-base (bf16)
+Loading checkpoint shards:   0%|          | 0/4 [00:00<?, ?it/s]Loading checkpoint shards:  25%|██▌       | 1/4 [00:00<00:02,  1.41it/s]Loading checkpoint shards:  50%|█████     | 2/4 [00:01<00:01,  1.38it/s]Loading checkpoint shards:  75%|███████▌  | 3/4 [00:02<00:00,  1.37it/s]Loading checkpoint shards: 100%|██████████| 4/4 [00:02<00:00,  1.59it/s]Loading checkpoint shards: 100%|██████████| 4/4 [00:02<00:00,  1.50it/s]
+/opt/amdgpu/share/libdrm/amdgpu.ids: No such file or directory
+  loaded in 21.0s
+prompt rotated by 679 tokens (first ids [300, 1501, 11747, 254])
+prompt: 1024 tokens
+prefill
+  first token 300, top-2 logit margin 6.8750
+decoding 32 tokens greedily
+  '    # compute the answer\ndef solve(n):\n    # compute the answer\ndef solve(n):\n    # compute the answer\ndef solve('
+wrote /root/dsv2-data/r7/golden.npz and /root/dsv2-data/r7/golden.json
+wrote /root/dsv2-data/r7/fleet_cache.bin  [27][1056][576] cols 0:512 = c (post kv_a_layernorm), 512:576 = k_pe (post RoPE)  -> 32.8 MB bf16
+wrote /root/dsv2-data/r7/golden_tokens.txt (33 tokens)
+wrote /root/dsv2-data/r7/golden_hidden.bin (27, 2048)
+  smallest top-2 margin over the run: 4.5000 (a small margin here is where bf16 drift would flip a token)
+GOLDENS OK 8 requests: prompts are the 97 r rotations, pairwise distinct; collisions [[0, 4]]; vLLM files in /root/dsv2-data/vllm

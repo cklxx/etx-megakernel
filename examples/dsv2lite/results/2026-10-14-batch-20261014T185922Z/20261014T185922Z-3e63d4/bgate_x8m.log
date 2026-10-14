@@ -1,0 +1,4 @@
+# job bgate_x8m gpu=0 cwd=/root/etx
+# .venv/bin/python -u -m examples.dsv2lite.batch_session gate x8m
+usage: batch_session.py [-h] {gate,vsel,rounds,report} [arm]
+batch_session.py: error: gate arm must be one of ['x2', 'x4', 'x8']
