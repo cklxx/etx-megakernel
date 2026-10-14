@@ -120,6 +120,6 @@ kept before them, `alld4r0l1` (3.188-3.195 ms device, measured in the same sessi
 
 Open, not banked: the batch 2/4/8 study (docs/BATCH-2026-10-14.md). Its reference set is built and two of its three
 correctness gates have passed on the box (B = 2 and B = 4, 2026-10-14); the B = 8 gate and the five timed rounds are
-not measured, so no throughput number is claimed here. The two levers' sum (+107 us measured separately) is **not** a
+not measured, so no throughput number is claimed here. The batch-8 recipe diagnostic that ran on 2026-10-14 is withdrawn as evidence: its four gates all executed one arm's binary (docs/BATCH-2026-10-14.md section 13, corrected 2026-10-15). The two levers' sum (+107 us measured separately) is **not** a
 number: the merged arm's +120 us is the measurement.
 
