@@ -90,6 +90,12 @@ ARMS = {a.name: a for a in [
         order=("alld4r0l1", "alld4r0l1mw"), references=("alld4r0l1",),
         rule=Rule("device_ms", "alld4r0l1", 30, text="M1: KEEP if every pair faster than alld4r0l1, median >= 30 us, "
                   "> 2 x spread; otherwise DROP (rule commit 3d27ff8)", labels=("KEEP", "DROP"))),
+    # KM: K1 and M1 together, against M1 alone (docs/DSV2-D1-D5.md, "KM", rule written before the code, bf92fd4)
+    Arm("alld4r0l1kvsmw", levers=(*LEVERS_ALL, "l1_loads", "merge_uv_waves"), flags=(*D4, "-DETX_DSV2_KVA_SHARED=1"),
+        env=dict(D4R0, ETX_DSV2_COH="l1", ETX_DSV2_KVA="shared"),
+        order=("alld4r0l1", "alld4r0l1mw", "alld4r0l1kvsmw"), references=("alld4r0l1", "alld4r0l1mw"),
+        rule=Rule("device_ms", "alld4r0l1mw", 30, text="KM: KEEP if every pair faster than alld4r0l1mw, median >= 30 us, "
+                  "> 2 x spread; otherwise the kept arm is alld4r0l1mw (rule commit bf92fd4)", labels=("KEEP", "M1-ONLY"))),
     # batch 2 / 4 / 8 (docs/BATCH-2026-10-14.md, rules written before the code, 0fc38c9): the kept recipe without D4
     # (D4 refuses multiple requests), two workgroups per CU paired by CU, request r on slot r mod 2, no coupling.
     # Measured by examples/dsv2lite/batch_session.py against vLLM at the same B, not by `pairs`: no Rule here.

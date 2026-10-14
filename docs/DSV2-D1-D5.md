@@ -614,3 +614,7 @@ shortened chain is hidden behind the cross-XCD kv_a read that K1 adds, the gain 
 - **Otherwise** the new kept arm is `alld4r0l1mw` (M1 alone, KEEP on 2026-10-14), and K1 is recorded as not adding
   on top of M1.
 - The gain vs `alld4r0l1` is reported for attribution only; it decides nothing.
+
+### KM local evidence (ROCm 7.2.4, `rocm_build_check.sh --arm alld4r0l1kvsmw`)
+- plan f23f959e (= K1's: M1 is tile code only); 256 VGPR / 79 AGPR (K1 71 + M1's 8) / 0 scratch / 1 wave.
+- Session `examples/sessions/ds_km.py`: the prep chain (skips what the box holds), three builds, one pairs job.
