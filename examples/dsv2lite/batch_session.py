@@ -121,7 +121,7 @@ class BatchSession(Session):
                   for r in raw]
         res = batch.study(rounds, sel, BATCHES)
         routing = self.logs / "routing.json"
-        union = json.loads(routing.read_text())["overall"] if routing.exists() else {}
+        union = json.loads(routing.read_text()).get("executed_prefix", {}) if routing.exists() else {}
         kept = res.get(1, {})
         for b, rec in res.items():
             extra = None

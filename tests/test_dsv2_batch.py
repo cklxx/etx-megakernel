@@ -360,3 +360,33 @@ def test_candidate_gate_declares_its_own_build(name):
         gate = by[f"bgate_{arm}"]
         assert gate.cmd.endswith(f"gate {arm}")
         assert {p for p in gate.reads if p.startswith("b_")} == {f"b_{arm}/run"}
+
+
+def test_routing_union_uses_the_executed_request_prefix():
+    import ast
+    from types import SimpleNamespace
+    from itertools import combinations
+    tree = ast.parse((ROOT / "examples/dsv2lite/routing_overlap.py").read_text())
+    fn = next(n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == "mean_union")
+    scope = dict(a=SimpleNamespace(batch=8), combinations=combinations)
+    exec(compile(ast.Module(body=[fn], type_ignores=[]), "routing_overlap.py", "exec"), scope)
+    disjoint = [list(range(6 * r, 6 * r + 6)) for r in range(4)]
+    step = disjoint + [disjoint[0]] * 4
+    assert scope["mean_union"](2, [step]) == 12
+    assert scope["mean_union"](4, [step]) == 24
+    assert scope["mean_union"](8, [step]) == 24
+
+
+def test_report_does_not_project_from_legacy_subset_means(tmp_path, monkeypatch):
+    from examples.dsv2lite import batch_session as bs
+    for k in ("ETX_SESS_LOGDIR", "ETX_DSV2_FLEET", "ETX_DSV2_DATA"):
+        monkeypatch.setenv(k, str(tmp_path))
+    s = bs.BatchSession()
+    selection = {str(b): dict(config="aiter") for b in BATCHES}
+    (tmp_path / "vsel.json").write_text(json.dumps(dict(selection=selection)))
+    rounds = rounds_for({4: "9.0"}, {1: "4.2", 4: "6.0"})
+    (tmp_path / "brounds.json").write_text(json.dumps(dict(rounds=rounds)))
+    (tmp_path / "routing.json").write_text(json.dumps(dict(overall={"4": 15})))
+    s.report()
+    report = json.loads((tmp_path / "batch_report.json").read_text())
+    assert "PENDING" in report["batches"]["4"]["next"]["next"]
