@@ -31,7 +31,8 @@ def rotate(ids: list[int], r: int) -> list[int]:
 
 
 def check(prompts: list[list[int]], gens: list[list[int]], token_files: list[list[int]]) -> list[str]:
-    """Every refusal reason; empty when the set is usable."""
+    """Every refusal reason; empty when the set is usable. Two requests may share their 32-token greedy output
+    (a repetitive prompt does it): that is reported as a collision, not refused. See docs/BATCH-2026-10-14.md 4a."""
     bad = []
     for r, (p, g, t) in enumerate(zip(prompts, gens, token_files)):
         if p != rotate(prompts[0], r):
@@ -41,9 +42,12 @@ def check(prompts: list[list[int]], gens: list[list[int]], token_files: list[lis
         for o in range(r):
             if p == prompts[o]:
                 bad.append(f"requests {o} and {r}: the same prompt")
-            if g == gens[o]:
-                bad.append(f"requests {o} and {r}: the same greedy tokens")
     return bad
+
+
+def collisions(gens: list[list[int]]) -> list[list[int]]:
+    """Pairs (o, r) whose 32-token greedy sequences are equal: the mix-up check is unavailable for those pairs."""
+    return [[o, r] for r in range(len(gens)) for o in range(r) if gens[o] == gens[r]]
 
 
 def sha(path: Path) -> str:
@@ -71,14 +75,18 @@ def main(argv=None) -> None:
     bad = check(prompts, gens, tokens)
     if bad:
         raise SystemExit("GOLDENS REFUSED\n" + "\n".join(bad))
+    coll = collisions(gens)
     out = a.data / "vllm"
     out.mkdir(exist_ok=True)
     for r in range(a.requests):
         (out / f"golden_r{r}.txt").write_text("prompt " + " ".join(map(str, prompts[r])) + "\n"
                                               + "gen " + " ".join(map(str, gens[r])) + "\n")
-    (a.data / "goldens.json").write_text(json.dumps(dict(requests=a.requests, rotate=ROTATE, sha256=hashes), indent=1) + "\n")
+    (a.data / "goldens.json").write_text(json.dumps(
+        dict(requests=a.requests, rotate=ROTATE, sha256=hashes, collisions=coll,
+             collision_note="pairs with identical 32-token greedy output; the request mix-up check is unavailable "
+                            "for those pairs, every other gate still applies"), indent=1) + "\n")
     print(f"GOLDENS OK {a.requests} requests: prompts are the 97 r rotations, pairwise distinct; "
-          f"greedy sequences pairwise distinct; vLLM files in {out}", flush=True)
+          f"collisions {coll if coll else 'none'}; vLLM files in {out}", flush=True)
 
 
 if __name__ == "__main__":

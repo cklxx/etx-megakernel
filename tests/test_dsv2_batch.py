@@ -234,14 +234,19 @@ def test_build_decision_follows_section_5():
 
 # ---------------------------------------------------------------- goldens, floors, host lines
 def test_goldens_refuse_a_wrong_rotation_a_duplicate_and_a_token_file_mismatch():
-    from examples.dsv2lite.batch_goldens import check, rotate
+    from examples.dsv2lite.batch_goldens import check, collisions, rotate
     p0 = list(range(1024))
     prompts = [rotate(p0, r) for r in range(8)]
     gens = [[r] * 33 for r in range(8)]
     assert check(prompts, gens, gens) == []
+    assert collisions(gens) == []
     assert any("rotated" in x for x in check([p0, p0, *prompts[2:]], gens, gens))
-    assert any("same greedy" in x for x in check(prompts, [gens[0], gens[0], *gens[2:]], [gens[0], gens[0], *gens[2:]]))
+    assert any("same prompt" in x for x in check([p0, p0, *prompts[2:]], gens, gens))
     assert any("differs" in x for x in check(prompts, gens, [gens[0], [9] * 33, *gens[2:]]))
+    # an identical 32-token greedy output is reported as a collision, never refused (docs/BATCH-2026-10-14.md 4a)
+    dup = [gens[0], gens[0], *gens[2:]]
+    assert check(prompts, dup, dup) == []
+    assert collisions(dup) == [[0, 1]]
 
 
 def test_floors_match_the_design_table():
