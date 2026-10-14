@@ -8,8 +8,11 @@ Labels: [M] measured, [E] estimate, [U] unknown. bf16, batch 1, context 1024, 32
 - **DeepSeek (6):** K1, M1, two ablations, one trace, KM. **All six measured on 2026-10-14:** K1 KEEP +41 us,
   M1 KEEP +66 us, both ablated levers STAY, trace recorded, KM (K1 + M1) KEEP +52 us over M1 alone, +120 us over
   `alld4r0l1`. **The DeepSeek kept arm is now `alld4r0l1kvsmw`.**
-- **Qwen (2):** moerows (NO-GO, measured twice with medians of -0.12% and +14.29%: the microbenchmark cannot decide it),
-  the common cache mode (**NO-GO, measured 2026-10-14: +9.0 us against DeepSeek's +330 us, every_positive=0**).
+- **Qwen (2):** moerows (NO-GO twice; the raw records' medians are **-6.01%** with spread 44.68% and **+3.42%** with
+  spread 44.38%, so the microbenchmark cannot decide it. The medians this line used to carry (-0.12% and +14.29%)
+  appear in no raw record and are retracted, 2026-10-15),
+  the common cache mode (**NO-GO, measured 2026-10-14: +9.0 us against DeepSeek's +330 us; three pairs faster, one
+  slower, one equal, spread 19.0 us, so the median fails the >= 30 us and > 2x spread rule**).
 - **Not counted:** `certify_kept` / `certify_kept_l1` (correctness gates), `moegather` (moerows' cross-check),
   preflights and builds.
 - **Also listed, not counted as studies:** 4 open team proposals (P1, P3, P4, P5), design only: not built, not queued
@@ -110,10 +113,12 @@ Labels: [M] measured, [E] estimate, [U] unknown. bf16, batch 1, context 1024, 32
 - **Rule:** PASS if every pair is faster, median >= 3% and > 2 x spread. A checksum mismatch means INCOMPLETE.
 - **GPU-only unknown:** HBM / MALL behaviour under each pattern.
 - **Sources:** QWEN-READINESS-2026-10-14.md section 4; bench/hw/moerows_oracle.py.
-- **Result (2026-10-14, first measurement in `results`-recorded run): NO-GO, median -0.12%, spread 43.68%** (five pairs,
-  every pair faster required). The second measurement the same day, on the rerun box with the same benchmark, came out
-  **NO-GO again but with median +14.29% and spread 26.98%**: the median now clears 3%, and the rule still refuses it
-  because the median does not exceed 2x the spread. The two runs disagree in magnitude (-0.12% versus +14.29%), which is
+- **Result (2026-10-14, first measurement in `results`-recorded run): NO-GO, median -6.01%, spread 44.68%** (`DECISION
+  moerows NO-GO: gains % [37.43 -6.01 -4.83 -6.34 -7.25]`, five pairs, every pair faster required). The second
+  measurement the same day, on the rerun box with the same benchmark, came out **NO-GO again with median +3.42% and
+  spread 44.38%** (`gains % [37.35 -7.03 6.43 3.42 0.26]`). **Correction, 2026-10-15:** this item used to report medians
+  of -0.12% and +14.29%. Neither value appears in any raw record; they are retracted, and the raw lines above are the
+  record. The two runs disagree in sign (a -6.01% median against +3.42%), which is
   itself the finding: this microbenchmark is too noisy at ten launches to decide Q2, and the row-ownership arm stays
   unbuilt rather than being called a loss. A decision needs more launches per mode, or a cold-cache measurement that
   does not depend on timing a 15 us kernel.
@@ -131,7 +136,8 @@ Labels: [M] measured, [E] estimate, [U] unknown. bf16, batch 1, context 1024, 32
   Both builds came out of the same tree (`BUILD kept OK`, `BUILD kept_l1 OK`) and both passed the import certificate
   (`CERTIFIED kept` / `CERTIFIED kept_l1: import certificate at positions 0 and 1040, 32/32, CHECK-DSL OK`), so the
   switch is correct on Qwen. The timing rule then refused it: `PAIRS arm=kept_l1 vs kept median 9.0 us spread 19.0 us
-  every_positive=0` — **+9 us against DeepSeek's +330 us, not one pair faster, and the median is inside 2x the
+  every_positive=0` (gains 9.0, 10.0, -5.0, 14.0, 0.0: three faster, one slower, one equal — `every_positive=0` means
+  not every pair was faster) — **+9 us against DeepSeek's +330 us, and the median is inside 2x the
   spread.** The reuse criterion therefore reads: one switch, two models, one rule — and **the rule is not portable**.
   The switch compiles and stays correct on both models, but the gain that made it a KEEP on DeepSeek does not appear on
   Qwen. That is a measured answer to the system goal's cross-model half, and it is the first Qwen arm this project has

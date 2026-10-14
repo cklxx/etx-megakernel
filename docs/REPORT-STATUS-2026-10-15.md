@@ -47,10 +47,11 @@ attribution against the old baseline. Both were recomputed from the 15 raw run l
 
 | Item | Measured | Outcome |
 |---|---|---|
-| Reassign MoE row ownership between workgroups | median **-0.12%**, spread 43.7%; **+14.29%** on a second session | **NO-GO twice with opposite medians** — the microbenchmark cannot decide it, which is a finding about the measurement, not the lever |
-| One compiler switch that makes cached blocks coherent at a tighter scope | median **+9.0 µs**, spread 19.0 µs, **no pair faster** | **NO-GO** |
+| Reassign MoE row ownership between workgroups | median **-6.01%**, spread 44.7%; **+3.42%** on a second session (raw records; the pair of medians quoted for weeks, -0.12% and +14.29%, appears in no raw record and was retracted on 2026-10-15) | **NO-GO twice with opposite medians** — the microbenchmark cannot decide it, which is a finding about the measurement, not the lever |
+| One compiler switch that makes cached blocks coherent at a tighter scope | median **+9.0 µs**, spread 19.0 µs; pairs 9.0 / 10.0 / -5.0 / 14.0 / 0.0 (three faster, one slower, one equal) | **NO-GO** — the median fails the >= 30 µs and > 2x spread rule |
 
-The second row is the platform-level result: the **same switch is worth +330 µs on DeepSeek and +9 µs on Qwen**, and
+The second row is the platform-level result: the **same switch is worth +330 µs on DeepSeek and +9 µs on Qwen** (and
+three of its five Qwen pairs were faster, so this is a failed threshold, not a uniformly slower switch), and
 both models compile and pass their correctness gates (32/32, import certificates at two positions). Cross-model
 portability is therefore a work item with a measured negative example, not an assumption.
 
@@ -86,17 +87,28 @@ Five decisions on the same model were taken through the same rule-first process 
 
 ## 4. Why batch 4 loses while batch 1 and 2 win
 
-The batch arms replicate work per request. Bytes read per decode step therefore grow linearly with the number of
-requests, while the measured step time stops improving: at batch 2 ETX already sits at a bandwidth ceiling, and the
-extra requests of batch 4 add bytes without adding throughput. This is a structural property of the current
-replication, not a scheduling accident, and the fix is already named in the design: process the batch by columns so the
-weights are read once for all requests of a step. That work item now has its trigger measurement.
+The batch arms replicate work per request: every request of a step streams its own weight set, on a fixed overlap
+capacity. Bytes per step therefore grow with the number of requests while the useful rate stops rising — 1352, 1990,
+2022 GB/s at one, two and four requests — and a descriptive fit (`s(B) ~ (B/2) x s(2)`: 9.92 ms predicted against 9.76
+ms measured) is what nearly doubled queued work looks like.
+
+**That is the measurement; the cause is not isolated, and we do not claim it is.** The same numbers are consistent with
+HBM saturation, with serialized task bodies under a longer queue, with load-issue limits, and with the spill traffic the
+batch arms carry (64 B/lane of scratch at batch 4, none in the single-request recipe). An internal attribution pass
+also retired two things this report used to imply: the "5.20 GB per request" figure is an older measurement from a
+different engine version rather than traffic measured for these arms, and the byte floor does not force the loss at all
+(19.7 GB at the assumed 4.3 TB/s is 4.59 ms, below vLLM's measured 7.05 ms).
+
+The fix named in the design is unchanged — process the batch by columns so the weights are read once for all requests
+of a step — and the decisive next measurement is now written down: measured memory traffic and device span per arm,
+plus per-phase body/wait spans and spill resources, which separates a true bandwidth plateau from serialized work.
 
 ## 5. What is not yet true
 
-- **Batch 8 has no verdict.** The eight-request arm fails its correctness gate deterministically, at the same request
-  and the same layer. The four-recipe comparison was withdrawn (one binary under four labels); the tooling defect is
-  fixed and tested locally, and the correct comparison needs a fresh box.
+- **Batch 8 has no verdict.** The eight-request arm fails its hidden-state gate deterministically — requests 5 and 7
+  both, with their greedy tokens still 32/32 correct, and the "3 layers" in the log is where the gate stopped counting,
+  not a count of bad layers. The four-recipe comparison was withdrawn (one binary under four labels); that tooling
+  defect is fixed and tested locally, and the correct comparison needs a fresh box.
 - **Cross-model portability is not free** (section 2.2).
 - **Untested:** models larger than DeepSeek-V2-Lite, batch 8, contexts beyond 1024, anything on a second GPU, and the
   four design-only proposals.
