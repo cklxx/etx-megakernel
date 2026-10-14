@@ -1,0 +1,154 @@
+[
+ {
+  "name": "apt",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 15.002430200576782,
+  "note": ""
+ },
+ {
+  "name": "etx_env",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 3.0012786388397217,
+  "note": ""
+ },
+ {
+  "name": "prep_env",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 84.03428840637207,
+  "note": ""
+ },
+ {
+  "name": "source",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 1.0006425380706787,
+  "note": ""
+ },
+ {
+  "name": "prep_dl",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 33.006975412368774,
+  "note": ""
+ },
+ {
+  "name": "prep_ref",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 42.01303744316101,
+  "note": ""
+ },
+ {
+  "name": "prep_pack",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 30.01024103164673,
+  "note": ""
+ },
+ {
+  "name": "preflight",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 21.003125429153442,
+  "note": ""
+ },
+ {
+  "name": "build_alld4r0l1",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 32.017770290374756,
+  "note": ""
+ },
+ {
+  "name": "build_alld4r0l1kvs",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 35.019959926605225,
+  "note": ""
+ },
+ {
+  "name": "build_alld4r0l1mw",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 32.01708722114563,
+  "note": ""
+ },
+ {
+  "name": "build_alld4r0l1noQ",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 30.01339364051819,
+  "note": ""
+ },
+ {
+  "name": "build_alld4r0l1noA",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 31.00950860977173,
+  "note": ""
+ },
+ {
+  "name": "build_alld4r0l1kvs_stamps",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 38.0089955329895,
+  "note": ""
+ },
+ {
+  "name": "pairs_alld4r0l1kvs",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 62.037145376205444,
+  "note": ""
+ },
+ {
+  "name": "pairs_alld4r0l1mw",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 59.03173089027405,
+  "note": ""
+ },
+ {
+  "name": "pairs_alld4r0l1noQ",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 60.026999711990356,
+  "note": ""
+ },
+ {
+  "name": "pairs_alld4r0l1noA",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 60.02146005630493,
+  "note": ""
+ },
+ {
+  "name": "trace_alld4r0l1kvs",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 7.001551866531372,
+  "note": ""
+ }
+]

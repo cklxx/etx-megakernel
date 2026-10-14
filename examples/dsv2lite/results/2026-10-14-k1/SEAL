@@ -1,0 +1,34 @@
+{
+ "complete": true,
+ "jobs": {
+  "apt": "ok",
+  "build_alld4r0l1": "ok",
+  "build_alld4r0l1kvs": "ok",
+  "build_alld4r0l1kvs_stamps": "ok",
+  "build_alld4r0l1mw": "ok",
+  "build_alld4r0l1noA": "ok",
+  "build_alld4r0l1noQ": "ok",
+  "etx_env": "ok",
+  "pairs_alld4r0l1kvs": "ok",
+  "pairs_alld4r0l1mw": "ok",
+  "pairs_alld4r0l1noA": "ok",
+  "pairs_alld4r0l1noQ": "ok",
+  "preflight": "ok",
+  "prep_dl": "ok",
+  "prep_env": "ok",
+  "prep_pack": "ok",
+  "prep_ref": "ok",
+  "source": "ok",
+  "trace_alld4r0l1kvs": "ok"
+ },
+ "local_only": [
+  "b_*/run",
+  "b_*/fleet_src/*",
+  "*.o"
+ ],
+ "manifest_sha256": "6f7da61103e857fc77de6419121a50d3588f57148f7b8e360e964fd2e8c63290",
+ "plan_sha256": "cca7b4db49a1e841e76329d33481cef3d49d0505597cee08b4ec9db8b0556c66",
+ "sealed": "2026-10-14T07:34:45Z",
+ "session": "20261014T072651Z-6792a0",
+ "source": "commit 0fc7e060c035eaf2400666d41eb3258b380d9138\nbranch wf/batch\narchive 84e83652d9e564838ac5a4f3f313a2f3ab258b2e3e869aebdbde9795c2d88021\nstaged 2026-10-14T07:25:59Z\n"
+}

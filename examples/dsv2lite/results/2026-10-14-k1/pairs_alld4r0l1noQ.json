@@ -1,0 +1,124 @@
+{
+  "arm": "alld4r0l1noQ",
+  "condition": "one MI300X, batch 1, context 1024, 32 tokens, repeat 2",
+  "decision": {
+    "a_ok": false,
+    "every_positive": false,
+    "gains_us": [
+      -29.0,
+      -29.0,
+      -23.0,
+      -32.0,
+      -22.0
+    ],
+    "median_us": -29.0,
+    "passed": false,
+    "ref": "alld4r0l1",
+    "spread_us": 10.0
+  },
+  "device_ms": {
+    "alld4r0l1": {
+      "every_positive": false,
+      "gains_us": [
+        -29.0,
+        -29.0,
+        -23.0,
+        -32.0,
+        -22.0
+      ],
+      "median_us": -29.0,
+      "spread_us": 10.0
+    }
+  },
+  "rounds": [
+    {
+      "alld4r0l1": {
+        "device_ms": "3.190",
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": "3.223"
+      },
+      "alld4r0l1noQ": {
+        "device_ms": "3.219",
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": "3.253"
+      }
+    },
+    {
+      "alld4r0l1": {
+        "device_ms": "3.186",
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": "3.220"
+      },
+      "alld4r0l1noQ": {
+        "device_ms": "3.215",
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": "3.250"
+      }
+    },
+    {
+      "alld4r0l1": {
+        "device_ms": "3.188",
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": "3.221"
+      },
+      "alld4r0l1noQ": {
+        "device_ms": "3.211",
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": "3.246"
+      }
+    },
+    {
+      "alld4r0l1": {
+        "device_ms": "3.182",
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": "3.216"
+      },
+      "alld4r0l1noQ": {
+        "device_ms": "3.214",
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": "3.249"
+      }
+    },
+    {
+      "alld4r0l1": {
+        "device_ms": "3.190",
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": "3.223"
+      },
+      "alld4r0l1noQ": {
+        "device_ms": "3.212",
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": "3.244"
+      }
+    }
+  ],
+  "verdict": {
+    "outcome": "STAYS",
+    "passed": false,
+    "rule": "REMOVE gemv_no_terminal_all from the kept recipe if every pair faster than alld4r0l1 and median > 2 x spread; otherwise it stays (rule commit 2ec2d29)"
+  },
+  "wall_ms": {
+    "alld4r0l1": {
+      "every_positive": false,
+      "gains_us": [
+        -30.0,
+        -30.0,
+        -25.0,
+        -33.0,
+        -21.0
+      ],
+      "median_us": -30.0,
+      "spread_us": 12.0
+    }
+  }
+}

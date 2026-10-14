@@ -1,0 +1,124 @@
+{
+  "arm": "alld4r0l1mw",
+  "condition": "one MI300X, batch 1, context 1024, 32 tokens, repeat 2",
+  "decision": {
+    "a_ok": true,
+    "every_positive": true,
+    "gains_us": [
+      76.0,
+      65.0,
+      55.0,
+      74.0,
+      66.0
+    ],
+    "median_us": 66.0,
+    "passed": true,
+    "ref": "alld4r0l1",
+    "spread_us": 21.0
+  },
+  "device_ms": {
+    "alld4r0l1": {
+      "every_positive": true,
+      "gains_us": [
+        76.0,
+        65.0,
+        55.0,
+        74.0,
+        66.0
+      ],
+      "median_us": 66.0,
+      "spread_us": 21.0
+    }
+  },
+  "rounds": [
+    {
+      "alld4r0l1": {
+        "device_ms": "3.190",
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": "3.223"
+      },
+      "alld4r0l1mw": {
+        "device_ms": "3.114",
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": "3.148"
+      }
+    },
+    {
+      "alld4r0l1": {
+        "device_ms": "3.189",
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": "3.225"
+      },
+      "alld4r0l1mw": {
+        "device_ms": "3.124",
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": "3.157"
+      }
+    },
+    {
+      "alld4r0l1": {
+        "device_ms": "3.183",
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": "3.218"
+      },
+      "alld4r0l1mw": {
+        "device_ms": "3.128",
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": "3.160"
+      }
+    },
+    {
+      "alld4r0l1": {
+        "device_ms": "3.193",
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": "3.226"
+      },
+      "alld4r0l1mw": {
+        "device_ms": "3.119",
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": "3.154"
+      }
+    },
+    {
+      "alld4r0l1": {
+        "device_ms": "3.188",
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": "3.223"
+      },
+      "alld4r0l1mw": {
+        "device_ms": "3.122",
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": "3.156"
+      }
+    }
+  ],
+  "verdict": {
+    "outcome": "KEEP",
+    "passed": true,
+    "rule": "M1: KEEP if every pair faster than alld4r0l1, median >= 30 us, > 2 x spread; otherwise DROP (rule commit 3d27ff8)"
+  },
+  "wall_ms": {
+    "alld4r0l1": {
+      "every_positive": true,
+      "gains_us": [
+        75.0,
+        68.0,
+        58.0,
+        72.0,
+        67.0
+      ],
+      "median_us": 68.0,
+      "spread_us": 17.0
+    }
+  }
+}

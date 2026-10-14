@@ -1,0 +1,124 @@
+{
+  "arm": "alld4r0l1noA",
+  "condition": "one MI300X, batch 1, context 1024, 32 tokens, repeat 2",
+  "decision": {
+    "a_ok": false,
+    "every_positive": false,
+    "gains_us": [
+      -13.0,
+      -6.0,
+      -21.0,
+      -6.0,
+      -14.0
+    ],
+    "median_us": -13.0,
+    "passed": false,
+    "ref": "alld4r0l1",
+    "spread_us": 15.0
+  },
+  "device_ms": {
+    "alld4r0l1": {
+      "every_positive": false,
+      "gains_us": [
+        -13.0,
+        -6.0,
+        -21.0,
+        -6.0,
+        -14.0
+      ],
+      "median_us": -13.0,
+      "spread_us": 15.0
+    }
+  },
+  "rounds": [
+    {
+      "alld4r0l1": {
+        "device_ms": "3.185",
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": "3.218"
+      },
+      "alld4r0l1noA": {
+        "device_ms": "3.198",
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": "3.232"
+      }
+    },
+    {
+      "alld4r0l1": {
+        "device_ms": "3.193",
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": "3.226"
+      },
+      "alld4r0l1noA": {
+        "device_ms": "3.199",
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": "3.232"
+      }
+    },
+    {
+      "alld4r0l1": {
+        "device_ms": "3.186",
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": "3.219"
+      },
+      "alld4r0l1noA": {
+        "device_ms": "3.207",
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": "3.239"
+      }
+    },
+    {
+      "alld4r0l1": {
+        "device_ms": "3.191",
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": "3.225"
+      },
+      "alld4r0l1noA": {
+        "device_ms": "3.197",
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": "3.232"
+      }
+    },
+    {
+      "alld4r0l1": {
+        "device_ms": "3.189",
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": "3.223"
+      },
+      "alld4r0l1noA": {
+        "device_ms": "3.203",
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": "3.238"
+      }
+    }
+  ],
+  "verdict": {
+    "outcome": "STAYS",
+    "passed": false,
+    "rule": "REMOVE argmax_tree from the kept recipe if every pair faster than alld4r0l1 and median > 2 x spread; otherwise it stays (rule commit 2ec2d29)"
+  },
+  "wall_ms": {
+    "alld4r0l1": {
+      "every_positive": false,
+      "gains_us": [
+        -14.0,
+        -6.0,
+        -20.0,
+        -7.0,
+        -15.0
+      ],
+      "median_us": -14.0,
+      "spread_us": 14.0
+    }
+  }
+}

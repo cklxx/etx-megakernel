@@ -1,0 +1,112 @@
+[07:26:51 +  0m00s] session record: /root/sess/20261014T072651Z-6792a0
+[07:26:51 +  0m00s] start apt (cpu)
+[07:27:06 +  0m15s] ok      apt rc=0 15s
+[07:27:06 +  0m15s] start etx_env (cpu)
+[07:27:06 +  0m15s] start prep_env (cpu)
+[07:27:09 +  0m18s] ok      etx_env rc=0 3s
+[07:27:09 +  0m18s] start source (cpu)
+[07:27:10 +  0m19s] ok      source rc=0 1s
+    SOURCE OK fleet export 28f5cbb4f39524df etx 0fc7e060c035
+[07:27:10 +  0m19s] start build_alld4r0l1 (cpu)
+[07:27:10 +  0m19s] start build_alld4r0l1kvs (cpu)
+[07:27:10 +  0m19s] start build_alld4r0l1mw (cpu)
+[07:27:10 +  0m19s] start build_alld4r0l1noQ (cpu)
+[07:27:40 +  0m49s] ok      build_alld4r0l1noQ rc=0 30s
+    BUILD arm=alld4r0l1noQ stamped=0 plan_sha256=3379ec89b21ebf97cc0406660ebfd7de63c547c6e50f2ca31bcc0894a3c4bab7 resources={'vgpr': 256, 'agpr': 118, 'sgpr': 108, 'scratch': 0, 'lds': 26668, 'occupancy': 1}
+    BUILD arm=alld4r0l1noQ OK
+[07:27:40 +  0m49s] start build_alld4r0l1noA (cpu)
+[07:27:42 +  0m51s] ok      build_alld4r0l1 rc=0 32s
+    BUILD arm=alld4r0l1 stamped=0 plan_sha256=3379ec89b21ebf97cc0406660ebfd7de63c547c6e50f2ca31bcc0894a3c4bab7 resources={'vgpr': 256, 'agpr': 108, 'sgpr': 106, 'scratch': 0, 'lds': 26668, 'occupancy': 1}
+    BUILD arm=alld4r0l1 OK
+[07:27:42 +  0m51s] ok      build_alld4r0l1mw rc=0 32s
+    BUILD arm=alld4r0l1mw stamped=0 plan_sha256=3379ec89b21ebf97cc0406660ebfd7de63c547c6e50f2ca31bcc0894a3c4bab7 resources={'vgpr': 256, 'agpr': 117, 'sgpr': 106, 'scratch': 0, 'lds': 26668, 'occupancy': 1}
+    BUILD arm=alld4r0l1mw OK
+[07:27:42 +  0m51s] start build_alld4r0l1kvs_stamps (cpu)
+[07:27:45 +  0m54s] ok      build_alld4r0l1kvs rc=0 35s
+    BUILD arm=alld4r0l1kvs stamped=0 plan_sha256=f23f959e82edaa9fe19147026c20d3b855e5af6c881a1858289c1c22ce15785f resources={'vgpr': 256, 'agpr': 108, 'sgpr': 106, 'scratch': 0, 'lds': 26668, 'occupancy': 1}
+    BUILD arm=alld4r0l1kvs OK
+[07:27:51 +  1m00s] progress: 3 running, 9 waiting, 7 done
+    prep_env [cpu] 45s / 1800s: WARNING: huggingface-hub 2.2.0 does not provide the extra 'hf-transfer'
+    build_alld4r0l1noA [cpu] 11s / 1200s: COH-CHECK OK coherent_loads=0 l1_loads=1
+    build_alld4r0l1kvs_stamps [cpu] 9s / 1200s: COH-CHECK OK coherent_loads=0 l1_loads=1
+[07:28:11 +  1m20s] ok      build_alld4r0l1noA rc=0 31s
+    BUILD arm=alld4r0l1noA stamped=0 plan_sha256=3379ec89b21ebf97cc0406660ebfd7de63c547c6e50f2ca31bcc0894a3c4bab7 resources={'vgpr': 256, 'agpr': 110, 'sgpr': 106, 'scratch': 0, 'lds': 26668, 'occupancy': 1}
+    BUILD arm=alld4r0l1noA OK
+[07:28:20 +  1m29s] ok      build_alld4r0l1kvs_stamps rc=0 38s
+    BUILD arm=alld4r0l1kvs stamped=1 plan_sha256=f23f959e82edaa9fe19147026c20d3b855e5af6c881a1858289c1c22ce15785f resources={'vgpr': 256, 'agpr': 116, 'sgpr': 106, 'scratch': 0, 'lds': 26668, 'occupancy': 1}
+    BUILD arm=alld4r0l1kvs OK
+[07:28:30 +  1m39s] ok      prep_env rc=0 84s
+[07:28:30 +  1m39s] start prep_dl (cpu)
+[07:28:51 +  2m00s] progress: 1 running, 8 waiting, 10 done
+    prep_dl [cpu] 21s / 1800s: # HF_HUB_ENABLE_HF_TRANSFER=1 $HOME/dsv2-prep/.venv/bin/python -c "from huggingface_hub import snapshot_download; snapshot_download('deepseek-ai/DeepSeek-Coder-
+[07:29:03 +  2m12s] ok      prep_dl rc=0 33s
+[07:29:03 +  2m12s] start prep_ref on GPU 0
+[07:29:45 +  2m54s] ok      prep_ref rc=0 42s
+    # mkdir -p "$ETX_DSV2_DATA" && cd "$ETX_DSV2_FLEET" && { test -s "$ETX_DSV2_DATA/fleet_cache.bin" -a -s "$ETX_DSV2_DATA/golden_tokens.txt" -a -s "$ETX_DSV2_DATA/golden_hidden.bin" || HIP_VISIBLE_DEVICES=$GPU $HOME/dsv2-prep/.venv/bin/python
+    wrote /root/dsv2-data/golden.npz and /root/dsv2-data/golden.json
+    wrote /root/dsv2-data/fleet_cache.bin  [27][1056][576] cols 0:512 = c (post kv_a_layernorm), 512:576 = k_pe (post RoPE)  -> 32.8 MB bf16
+    wrote /root/dsv2-data/golden_tokens.txt (33 tokens)
+    wrote /root/dsv2-data/golden_hidden.bin (27, 2048)
+      smallest top-2 margin over the run: 6.6250 (a small margin here is where bf16 drift would flip a token)
+    -rw-r--r--  1 root root      487 Oct 14 07:29 golden.json
+    -rw-r--r--  1 root root 29492654 Oct 14 07:29 golden.npz
+    -rw-r--r--  1 root root   221184 Oct 14 07:29 golden_hidden.bin
+    -rw-r--r--  1 root root      144 Oct 14 07:29 golden_tokens.txt
+[07:29:45 +  2m54s] start prep_pack (cpu)
+[07:29:51 +  3m00s] progress: 1 running, 6 waiting, 12 done
+    prep_pack [cpu] 6s / 1200s: Loading checkpoint shards:  25%|██▌       | 1/4 [00:00<00:02,  1.48it/s]
+[07:30:16 +  3m24s] ok      prep_pack rc=0 30s
+    wrote /root/dsv2-data/weights.bin (31.41 GB), /root/dsv2-data/weights.bin.json and /root/dsv2-data/weights.bin.manifest
+      expert stride: 8650752 elems (17.3 MB) — matches design.md §1's 17.3 MB per routed expert
+[07:30:16 +  3m24s] start preflight (cpu)
+[07:30:37 +  3m45s] ok      preflight rc=0 21s
+    PREFLIGHT hashing /root/dsv2-data/weights.bin bytes=31412968448
+    PREFLIGHT hashing /root/dsv2-data/weights.bin.manifest bytes=9561
+    PREFLIGHT hashing /root/dsv2-data/fleet_cache.bin bytes=32845824
+    PREFLIGHT hashing /root/dsv2-data/golden_tokens.txt bytes=144
+    PREFLIGHT hashing /root/dsv2-data/golden_hidden.bin bytes=221184
+    PREFLIGHT OK inputs are the pinned measured inputs
+[07:30:37 +  3m45s] start pairs_alld4r0l1kvs on GPU 0
+[07:30:52 +  4m00s] progress: 1 running, 4 waiting, 14 done
+    pairs_alld4r0l1kvs [GPU 0] 15s / 1200s: model: hidden 2048 heads 16 kv_lora 512 experts 64 top-6 layers 27 (dense < 1) vocab 102400
+[07:31:39 +  4m47s] ok      pairs_alld4r0l1kvs rc=0 62s
+    PAIRS arm=alld4r0l1kvs device gain vs alld4r0l1 median 41.0 us spread 8.0 every_positive=1
+[07:31:39 +  4m47s] start pairs_alld4r0l1mw on GPU 0
+[07:31:52 +  5m00s] progress: 1 running, 3 waiting, 15 done
+    pairs_alld4r0l1mw [GPU 0] 13s / 1200s: model: hidden 2048 heads 16 kv_lora 512 experts 64 top-6 layers 27 (dense < 1) vocab 102400
+[07:32:38 +  5m46s] ok      pairs_alld4r0l1mw rc=0 59s
+    PAIRS arm=alld4r0l1mw device gain vs alld4r0l1 median 66.0 us spread 21.0 every_positive=1
+[07:32:38 +  5m46s] start pairs_alld4r0l1noQ on GPU 0
+[07:32:52 +  6m00s] progress: 1 running, 2 waiting, 16 done
+    pairs_alld4r0l1noQ [GPU 0] 14s / 1200s: model: hidden 2048 heads 16 kv_lora 512 experts 64 top-6 layers 27 (dense < 1) vocab 102400
+[07:33:38 +  6m46s] ok      pairs_alld4r0l1noQ rc=0 60s
+    PAIRS arm=alld4r0l1noQ device gain vs alld4r0l1 median -29.0 us spread 10.0 every_positive=0
+[07:33:38 +  6m46s] start pairs_alld4r0l1noA on GPU 0
+[07:33:52 +  7m00s] progress: 1 running, 1 waiting, 17 done
+    pairs_alld4r0l1noA [GPU 0] 14s / 1200s: model: hidden 2048 heads 16 kv_lora 512 experts 64 top-6 layers 27 (dense < 1) vocab 102400
+[07:34:38 +  7m46s] ok      pairs_alld4r0l1noA rc=0 60s
+    PAIRS arm=alld4r0l1noA device gain vs alld4r0l1 median -13.0 us spread 15.0 every_positive=0
+[07:34:38 +  7m46s] start trace_alld4r0l1kvs on GPU 0
+[07:34:45 +  7m53s] ok      trace_alld4r0l1kvs rc=0 7s
+    TRACE arm=alld4r0l1kvs span 3380.9 us; stages prologue=127.9 in_norm=122.1 qkv=329.8 prep=142.4 attn=354.0 reduce=281.1 o_proj=249.3 router=314.6 topk=92.8 moe_up=694.5 moe_down=438.0 lm_head=127.1 argmax=5.1 tail=102.3
+[07:34:45 +  7m53s] session done
+  job                              status     rc  gpu  seconds
+  apt                              ok          0            15  
+  etx_env                          ok          0             3  
+  prep_env                         ok          0            84  
+  source                           ok          0             1  
+  prep_dl                          ok          0            33  
+  prep_ref                         ok          0    0       42  
+  prep_pack                        ok          0            30  
+  preflight                        ok          0            21  
+  build_alld4r0l1                  ok          0            32  
+  build_alld4r0l1kvs               ok          0            35  
+  build_alld4r0l1mw                ok          0            32  
+  build_alld4r0l1noQ               ok          0            30  
+  build_alld4r0l1noA               ok          0            31  
+  build_alld4r0l1kvs_stamps        ok          0            38  
+  pairs_alld4r0l1kvs               ok          0    0       62  
+  pairs_alld4r0l1mw                ok          0    0       59  
+  pairs_alld4r0l1noQ               ok          0    0       60  
+  pairs_alld4r0l1noA               ok          0    0       60  
+  trace_alld4r0l1kvs               ok          0    0        7  

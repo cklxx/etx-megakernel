@@ -1,11 +1,12 @@
-# Experiment index, 2026-10-14: DeepSeek and Qwen, seven studies and four open proposals, no GPU yet
+# Experiment index, 2026-10-14: DeepSeek and Qwen, seven studies (five DeepSeek measured) and four open proposals
 
 Labels: [M] measured, [E] estimate, [U] unknown. bf16, batch 1, context 1024, 32 tokens throughout. Larger batches
 (2/4/8) are a separate, prepared study with its own session and rules: docs/BATCH-2026-10-14.md,
 `examples/sessions/ds_batch.py` (DeepSeek; not run, not counted below).
 
 **Count:** 7 experiments = 6 decision studies + 1 attribution-only trace.
-- **DeepSeek (5):** K1, M1, two ablations, one trace.
+- **DeepSeek (5):** K1, M1, two ablations, one trace. **All five measured on 2026-10-14:** K1 KEEP +41 us,
+  M1 KEEP +66 us, both ablated levers STAY, trace recorded. K1 and M1 together are not yet measured.
 - **Qwen (2):** moerows, the common cache mode.
 - **Not counted:** `certify_kept` / `certify_kept_l1` (correctness gates), `moegather` (moerows' cross-check),
   preflights and builds.
@@ -31,6 +32,8 @@ Labels: [M] measured, [E] estimate, [U] unknown. bf16, batch 1, context 1024, 32
 - **Rule (2ec2d29):** KEEP if every pair is faster, median >= 30 us and > 2 x spread; otherwise DROP.
 - **GPU-only unknown:** the net sign (qkv -5..-7 vs handoff/attention +1..+4 us per layer, both [E]).
 - **Sources:** DSV2-D1-D5.md "K1"; tests/test_dsv2_kva.py.
+- **Result (2026-10-14, `examples/dsv2lite/results/2026-10-14-k1`): KEEP, +41 us device [M]** (pairs 40, 40, 41,
+  48, 44; spread 8; wall +41). All 10 runs 32/32 tokens, 27/27 layers.
 
 **1b. DeepSeek M1: merge's W_UV GEMV on all four waves** (`pairs_alld4r0l1mw`)
 - **Mechanism:** lever `merge_uv_waves`, `gemv_rows_pipelined<2, 1>` instead of `<8, 1>`.
@@ -42,6 +45,8 @@ Labels: [M] measured, [E] estimate, [U] unknown. bf16, batch 1, context 1024, 32
 - **GPU-only unknown:** whether the 3x shorter per-wave chain shortens the phase (one shared memory round trip could
   dominate). Estimate 27-80 us/token [E].
 - **Sources:** DSV2-D1-D5.md "M1"; tests/test_dsv2_lever_merge_uv_waves.py.
+- **Result (2026-10-14): KEEP, +66 us device [M]** (pairs 76, 65, 55, 74, 66; spread 21; wall +68). All runs 32/32,
+  27/27. Measured alone against the kept arm; K1 and M1 together are not measured.
 
 **2. DeepSeek ablation: remove gemv_no_terminal_all** (`pairs_alld4r0l1noQ`)
 - **Mechanism:** the kept recipe without that lever.
@@ -51,6 +56,7 @@ Labels: [M] measured, [E] estimate, [U] unknown. bf16, batch 1, context 1024, 32
 - **Rule:** REMOVE if every pair is faster and median > 2 x spread (no 30 us bar); otherwise it stays.
 - **GPU-only unknown:** the interaction with l1 + D4r0.
 - **Sources:** same.
+- **Result (2026-10-14): STAYS [M].** Removing it is slower: −29 us (pairs −29, −29, −23, −32, −22; spread 10).
 
 **3. DeepSeek ablation: remove argmax_tree** (`pairs_alld4r0l1noA`)
 - **Mechanism:** the kept recipe without that lever.
@@ -60,6 +66,8 @@ Labels: [M] measured, [E] estimate, [U] unknown. bf16, batch 1, context 1024, 32
 - **Rule:** REMOVE if every pair is faster and median > 2 x spread; otherwise it stays.
 - **GPU-only unknown:** the sign. The ceiling is low: argmax is 5.1 us in total [M].
 - **Sources:** same.
+- **Result (2026-10-14): STAYS [M].** Removing it: −13 us (pairs −13, −6, −21, −6, −14; spread 15), every pair
+  slower but within 2 x spread.
 
 **4. DeepSeek K1 trace** (`trace_alld4r0l1kvs`)
 - **Mechanism:** one stamped token of K1.
@@ -68,6 +76,9 @@ Labels: [M] measured, [E] estimate, [U] unknown. bf16, batch 1, context 1024, 32
 - **Rule:** none; attribution only, never a timing.
 - **GPU-only unknown:** the stage shifts.
 - **Sources:** ds_k1.py.
+- **Result (2026-10-14), attribution only:** span 3380.9 us. Against the kept arm's stamped token of 2026-10-13
+  (another session): qkv 434.2 -> 329.8 us (−3.9 us/layer, below the −5..−7 estimate), attention 308.7 -> 354.0 us
+  (+1.7 us/layer, inside the +1..+4 estimate).
 
 **5. Qwen moerows: row ownership between MoE workgroups** (`qwen_moerows`, `hw_bench moerows`)
 - **Mechanism:** contiguous vs interleaved rows, Qwen's moe_up shape, cold, checksummed. One kernel for both modes.
