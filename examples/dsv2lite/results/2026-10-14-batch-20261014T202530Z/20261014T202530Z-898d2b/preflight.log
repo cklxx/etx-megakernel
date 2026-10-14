@@ -1,0 +1,8 @@
+# job preflight gpu=None cwd=/root/etx
+# .venv/bin/python -u -m examples.dsv2lite.inplace_session preflight
+PREFLIGHT hashing /root/dsv2-data/weights.bin bytes=31412968448
+PREFLIGHT hashing /root/dsv2-data/weights.bin.manifest bytes=9561
+PREFLIGHT hashing /root/dsv2-data/fleet_cache.bin bytes=32845824
+PREFLIGHT hashing /root/dsv2-data/golden_tokens.txt bytes=144
+PREFLIGHT hashing /root/dsv2-data/golden_hidden.bin bytes=221184
+PREFLIGHT OK inputs are the pinned measured inputs

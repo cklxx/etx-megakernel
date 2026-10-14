@@ -1,0 +1,190 @@
+{
+  "arms": {
+    "N": [
+      "norm_tree"
+    ],
+    "Nall": [
+      "norm_tree_all"
+    ],
+    "Q": [
+      "gemv_no_terminal"
+    ],
+    "Qall": [
+      "gemv_no_terminal_all"
+    ],
+    "all": [
+      "gemv_no_terminal_all",
+      "norm_tree_all",
+      "argmax_tree",
+      "topk_rank",
+      "attn_prologue_live"
+    ],
+    "alld3": [
+      "gemv_no_terminal_all",
+      "norm_tree_all",
+      "argmax_tree",
+      "topk_rank",
+      "attn_prologue_live",
+      "kchunk352"
+    ],
+    "alld4r0": [
+      "gemv_no_terminal_all",
+      "norm_tree_all",
+      "argmax_tree",
+      "topk_rank",
+      "attn_prologue_live"
+    ],
+    "alld4r0l1": [
+      "gemv_no_terminal_all",
+      "norm_tree_all",
+      "argmax_tree",
+      "topk_rank",
+      "attn_prologue_live",
+      "l1_loads"
+    ],
+    "alld4r0l1kvs": [
+      "gemv_no_terminal_all",
+      "norm_tree_all",
+      "argmax_tree",
+      "topk_rank",
+      "attn_prologue_live",
+      "l1_loads"
+    ],
+    "alld4r0l1kvsmw": [
+      "gemv_no_terminal_all",
+      "norm_tree_all",
+      "argmax_tree",
+      "topk_rank",
+      "attn_prologue_live",
+      "l1_loads",
+      "merge_uv_waves"
+    ],
+    "alld4r0l1mw": [
+      "gemv_no_terminal_all",
+      "norm_tree_all",
+      "argmax_tree",
+      "topk_rank",
+      "attn_prologue_live",
+      "l1_loads",
+      "merge_uv_waves"
+    ],
+    "alld4r0l1noA": [
+      "gemv_no_terminal_all",
+      "norm_tree_all",
+      "topk_rank",
+      "attn_prologue_live",
+      "l1_loads"
+    ],
+    "alld4r0l1noQ": [
+      "norm_tree_all",
+      "argmax_tree",
+      "topk_rank",
+      "attn_prologue_live",
+      "l1_loads"
+    ],
+    "alld4s": [
+      "gemv_no_terminal_all",
+      "norm_tree_all",
+      "argmax_tree",
+      "topk_rank",
+      "attn_prologue_live"
+    ],
+    "alld5": [
+      "gemv_no_terminal_all",
+      "norm_tree_all",
+      "argmax_tree",
+      "topk_rank",
+      "attn_prologue_live"
+    ],
+    "allnoQ": [
+      "norm_tree_all",
+      "argmax_tree",
+      "topk_rank",
+      "attn_prologue_live"
+    ],
+    "allrelaxed": [
+      "gemv_no_terminal_all",
+      "norm_tree_all",
+      "argmax_tree",
+      "topk_rank",
+      "attn_prologue_live"
+    ],
+    "argmax": [
+      "argmax_tree"
+    ],
+    "baseline": [],
+    "coh": [
+      "coherent_loads"
+    ],
+    "d4": [],
+    "d4r0": [],
+    "default": [],
+    "default723": [],
+    "fleet": [],
+    "l1": [
+      "l1_loads"
+    ],
+    "prep": [
+      "attn_prologue_live"
+    ],
+    "relaxed": [],
+    "topk": [
+      "topk_rank"
+    ],
+    "x2": [
+      "gemv_no_terminal_all",
+      "norm_tree_all",
+      "argmax_tree",
+      "topk_rank",
+      "attn_prologue_live",
+      "l1_loads",
+      "merge_uv_waves"
+    ],
+    "x4": [
+      "gemv_no_terminal_all",
+      "norm_tree_all",
+      "argmax_tree",
+      "topk_rank",
+      "attn_prologue_live",
+      "l1_loads",
+      "merge_uv_waves"
+    ],
+    "x8": [
+      "gemv_no_terminal_all",
+      "norm_tree_all",
+      "argmax_tree",
+      "topk_rank",
+      "attn_prologue_live",
+      "l1_loads",
+      "merge_uv_waves"
+    ],
+    "x8k": [
+      "gemv_no_terminal_all",
+      "norm_tree_all",
+      "argmax_tree",
+      "topk_rank",
+      "attn_prologue_live",
+      "l1_loads"
+    ],
+    "x8m": [
+      "gemv_no_terminal_all",
+      "norm_tree_all",
+      "argmax_tree",
+      "topk_rank",
+      "attn_prologue_live",
+      "l1_loads",
+      "merge_uv_waves"
+    ],
+    "x8p": [
+      "gemv_no_terminal_all",
+      "norm_tree_all",
+      "argmax_tree",
+      "topk_rank",
+      "attn_prologue_live",
+      "l1_loads"
+    ]
+  },
+  "etx_identity": "commit 09e86d4b78bb2dc29f7fdb4e20940cea475755a6\nbranch main\narchive 997ea8de1a057104c81675ac096bab40ccf585825d3edd2d1b6bed4aa14e2666\nstaged 2026-10-14T20:25:00Z\n",
+  "fleet_commit": "3fb67a6",
+  "fleet_src_sha256": "28f5cbb4f39524df318883522341c48ca4162c18b71a3a6223c52eabb40ce4b3"
+}

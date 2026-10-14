@@ -1,0 +1,8 @@
+{
+  "arm": "x8m",
+  "batch": 8,
+  "passed": false,
+  "result": {
+    "error": "request 5: 3 layers within the gate (need 27)"
+  }
+}

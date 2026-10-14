@@ -1,0 +1,22 @@
+# job prep_pack gpu=None cwd=/root/etx
+# cd "$ETX_DSV2_FLEET" && { test -s "$ETX_DSV2_DATA/weights.bin" -a -s "$ETX_DSV2_DATA/weights.bin.manifest" || $HOME/dsv2-prep/.venv/bin/python src/host/pack_weights.py --model $HOME/models/dsv2-lite-base --out "$ETX_DSV2_DATA/weights.bin"; } && ls -la "$ETX_DSV2_DATA"
+total 30737924
+drwxr-xr-x 10 root root        4096 Oct 14 19:07 .
+drwx------ 15 root root        4096 Oct 14 20:25 ..
+-rw-r--r--  1 root root    32845824 Oct 14 17:46 fleet_cache.bin
+-rw-r--r--  1 root root         487 Oct 14 17:46 golden.json
+-rw-r--r--  1 root root    29492654 Oct 14 17:46 golden.npz
+-rw-r--r--  1 root root      221184 Oct 14 17:46 golden_hidden.bin
+-rw-r--r--  1 root root         144 Oct 14 17:46 golden_tokens.txt
+-rw-r--r--  1 root root        3221 Oct 14 19:07 goldens.json
+drwxr-xr-x  2 root root        4096 Oct 14 19:01 r1
+drwxr-xr-x  2 root root        4096 Oct 14 19:02 r2
+drwxr-xr-x  2 root root        4096 Oct 14 19:03 r3
+drwxr-xr-x  2 root root        4096 Oct 14 19:04 r4
+drwxr-xr-x  2 root root        4096 Oct 14 19:05 r5
+drwxr-xr-x  2 root root        4096 Oct 14 19:06 r6
+drwxr-xr-x  2 root root        4096 Oct 14 19:07 r7
+drwxr-xr-x  2 root root        4096 Oct 14 19:07 vllm
+-rw-r--r--  1 root root 31412968448 Oct 14 17:47 weights.bin
+-rw-r--r--  1 root root       30815 Oct 14 17:47 weights.bin.json
+-rw-r--r--  1 root root        9561 Oct 14 17:47 weights.bin.manifest

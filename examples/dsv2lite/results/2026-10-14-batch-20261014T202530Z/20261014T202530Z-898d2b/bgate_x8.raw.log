@@ -1,0 +1,321 @@
+$ stdbuf -oL -eL /root/sess/20261014T202530Z-898d2b/b_x8/run --weights /root/dsv2-data/weights.bin --cache /root/dsv2-data/fleet_cache.bin --golden /root/dsv2-data/golden_tokens.txt --hidden /root/dsv2-data/golden_hidden.bin --tokens 32 --context 1024 --repeat 2 --req-dir /root/dsv2-data/r1 --req-dir /root/dsv2-data/r2 --req-dir /root/dsv2-data/r3 --req-dir /root/dsv2-data/r4 --req-dir /root/dsv2-data/r5 --req-dir /root/dsv2-data/r6 --req-dir /root/dsv2-data/r7
+device: AMD Instinct MI300X VF  arch gfx942:sramecc+:xnack-  CUs 304
+model: hidden 2048 heads 16 kv_lora 512 experts 64 top-6 layers 27 (dense < 1) vocab 102400
+  /root/dsv2-data/weights.bin: 31.4 GB uploaded
+  /root/dsv2-data/fleet_cache.bin: 0.0 GB uploaded
+  /root/dsv2-data/r1/fleet_cache.bin: 0.0 GB uploaded
+  /root/dsv2-data/r2/fleet_cache.bin: 0.0 GB uploaded
+  /root/dsv2-data/r3/fleet_cache.bin: 0.0 GB uploaded
+  /root/dsv2-data/r4/fleet_cache.bin: 0.0 GB uploaded
+BATCHCOLLISION requests 0 and 4: identical 33 greedy tokens; prompts are distinct, the request mix-up check is unavailable for this pair
+  /root/dsv2-data/r5/fleet_cache.bin: 0.0 GB uploaded
+  /root/dsv2-data/r6/fleet_cache.bin: 0.0 GB uploaded
+  /root/dsv2-data/r7/fleet_cache.bin: 0.0 GB uploaded
+etx: 439568 tasks, 12712 event words, 600 workers (8 domains x 75), lds 24576 B (fleet scratch 23408 B)
+run 0 (warm-up) r0: 32/32 tokens match
+run 0 (warm-up) r1: 32/32 tokens match
+run 0 (warm-up) r2: 32/32 tokens match
+run 0 (warm-up) r3: 32/32 tokens match
+run 0 (warm-up) r4: 32/32 tokens match
+run 0 (warm-up) r5: 32/32 tokens match
+run 0 (warm-up) r6: 32/32 tokens match
+run 0 (warm-up) r7: 32/32 tokens match
+r0 token  0:   15.596 ms (device)  step  17.079 ms  out   1780  ok
+r0 token  1:   15.643 ms (device)  step  17.111 ms  out    185  ok
+r0 token  2:   15.533 ms (device)  step  17.003 ms  out    300  ok
+r0 token  3:   15.626 ms (device)  step  17.105 ms  out   1501  ok
+r0 token  4:   15.475 ms (device)  step  16.946 ms  out  11747  ok
+r0 token  5:   15.622 ms (device)  step  17.115 ms  out    254  ok
+r0 token  6:   15.477 ms (device)  step  16.940 ms  out   3510  ok
+r0 token  7:   15.452 ms (device)  step  16.891 ms  out    185  ok
+r0 token  8:   15.562 ms (device)  step  17.051 ms  out   1558  ok
+r0 token  9:   15.608 ms (device)  step  17.072 ms  out   8708  ok
+r0 token 10:   15.546 ms (device)  step  17.044 ms  out      7  ok
+r0 token 11:   15.647 ms (device)  step  17.134 ms  out     77  ok
+r0 token 12:   15.470 ms (device)  step  16.932 ms  out   1780  ok
+r0 token 13:   15.473 ms (device)  step  16.919 ms  out    185  ok
+r0 token 14:   15.634 ms (device)  step  17.086 ms  out    300  ok
+r0 token 15:   15.678 ms (device)  step  17.220 ms  out   1501  ok
+r0 token 16:   15.648 ms (device)  step  17.120 ms  out  11747  ok
+r0 token 17:   15.674 ms (device)  step  17.178 ms  out    254  ok
+r0 token 18:   15.578 ms (device)  step  17.087 ms  out   3510  ok
+r0 token 19:   15.645 ms (device)  step  17.151 ms  out    185  ok
+r0 token 20:   15.513 ms (device)  step  17.005 ms  out   1558  ok
+r0 token 21:   15.460 ms (device)  step  16.920 ms  out   8708  ok
+r0 token 22:   15.584 ms (device)  step  17.007 ms  out      7  ok
+r0 token 23:   15.666 ms (device)  step  17.172 ms  out     77  ok
+r0 token 24:   15.561 ms (device)  step  17.067 ms  out   1780  ok
+r0 token 25:   15.527 ms (device)  step  17.019 ms  out    185  ok
+r0 token 26:   15.515 ms (device)  step  17.030 ms  out    300  ok
+r0 token 27:   15.695 ms (device)  step  17.172 ms  out   1501  ok
+r0 token 28:   15.512 ms (device)  step  16.963 ms  out  11747  ok
+r0 token 29:   15.631 ms (device)  step  17.129 ms  out    254  ok
+r0 token 30:   15.679 ms (device)  step  17.167 ms  out   3510  ok
+r0 token 31:   15.546 ms (device)  step  17.048 ms  out    185  ok
+r1 token  0:   16.644 ms (device)  step  17.079 ms  out   8708  ok
+r1 token  1:   16.679 ms (device)  step  17.111 ms  out      7  ok
+r1 token  2:   16.573 ms (device)  step  17.003 ms  out     77  ok
+r1 token  3:   16.669 ms (device)  step  17.105 ms  out   1780  ok
+r1 token  4:   16.521 ms (device)  step  16.946 ms  out    185  ok
+r1 token  5:   16.675 ms (device)  step  17.115 ms  out    300  ok
+r1 token  6:   16.516 ms (device)  step  16.940 ms  out   1501  ok
+r1 token  7:   16.461 ms (device)  step  16.891 ms  out  11747  ok
+r1 token  8:   16.603 ms (device)  step  17.051 ms  out    254  ok
+r1 token  9:   16.643 ms (device)  step  17.072 ms  out   3510  ok
+r1 token 10:   16.614 ms (device)  step  17.044 ms  out    185  ok
+r1 token 11:   16.698 ms (device)  step  17.134 ms  out   1558  ok
+r1 token 12:   16.507 ms (device)  step  16.932 ms  out   8708  ok
+r1 token 13:   16.483 ms (device)  step  16.919 ms  out      7  ok
+r1 token 14:   16.661 ms (device)  step  17.086 ms  out     77  ok
+r1 token 15:   16.763 ms (device)  step  17.220 ms  out   1780  ok
+r1 token 16:   16.683 ms (device)  step  17.120 ms  out    185  ok
+r1 token 17:   16.742 ms (device)  step  17.178 ms  out    300  ok
+r1 token 18:   16.636 ms (device)  step  17.087 ms  out   1501  ok
+r1 token 19:   16.707 ms (device)  step  17.151 ms  out  11747  ok
+r1 token 20:   16.556 ms (device)  step  17.005 ms  out    254  ok
+r1 token 21:   16.489 ms (device)  step  16.920 ms  out   3510  ok
+r1 token 22:   16.582 ms (device)  step  17.007 ms  out    185  ok
+r1 token 23:   16.726 ms (device)  step  17.172 ms  out   1558  ok
+r1 token 24:   16.618 ms (device)  step  17.067 ms  out   8708  ok
+r1 token 25:   16.586 ms (device)  step  17.019 ms  out      7  ok
+r1 token 26:   16.587 ms (device)  step  17.030 ms  out     77  ok
+r1 token 27:   16.739 ms (device)  step  17.172 ms  out   1780  ok
+r1 token 28:   16.535 ms (device)  step  16.963 ms  out    185  ok
+r1 token 29:   16.690 ms (device)  step  17.129 ms  out    300  ok
+r1 token 30:   16.737 ms (device)  step  17.167 ms  out   1501  ok
+r1 token 31:   16.608 ms (device)  step  17.048 ms  out  11747  ok
+r2 token  0:   15.737 ms (device)  step  17.079 ms  out      7  ok
+r2 token  1:   15.788 ms (device)  step  17.111 ms  out     77  ok
+r2 token  2:   15.678 ms (device)  step  17.003 ms  out   1780  ok
+r2 token  3:   15.768 ms (device)  step  17.105 ms  out    185  ok
+r2 token  4:   15.617 ms (device)  step  16.946 ms  out    300  ok
+r2 token  5:   15.762 ms (device)  step  17.115 ms  out   1501  ok
+r2 token  6:   15.620 ms (device)  step  16.940 ms  out  11747  ok
+r2 token  7:   15.579 ms (device)  step  16.891 ms  out    254  ok
+r2 token  8:   15.700 ms (device)  step  17.051 ms  out   3510  ok
+r2 token  9:   15.750 ms (device)  step  17.072 ms  out    185  ok
+r2 token 10:   15.691 ms (device)  step  17.044 ms  out   1558  ok
+r2 token 11:   15.788 ms (device)  step  17.134 ms  out   8708  ok
+r2 token 12:   15.614 ms (device)  step  16.932 ms  out      7  ok
+r2 token 13:   15.606 ms (device)  step  16.919 ms  out     77  ok
+r2 token 14:   15.775 ms (device)  step  17.086 ms  out   1780  ok
+r2 token 15:   15.820 ms (device)  step  17.220 ms  out    185  ok
+r2 token 16:   15.789 ms (device)  step  17.120 ms  out    300  ok
+r2 token 17:   15.814 ms (device)  step  17.178 ms  out   1501  ok
+r2 token 18:   15.723 ms (device)  step  17.087 ms  out  11747  ok
+r2 token 19:   15.788 ms (device)  step  17.151 ms  out    254  ok
+r2 token 20:   15.654 ms (device)  step  17.005 ms  out   3510  ok
+r2 token 21:   15.598 ms (device)  step  16.920 ms  out    185  ok
+r2 token 22:   15.713 ms (device)  step  17.007 ms  out   1558  ok
+r2 token 23:   15.805 ms (device)  step  17.172 ms  out   8708  ok
+r2 token 24:   15.703 ms (device)  step  17.067 ms  out      7  ok
+r2 token 25:   15.668 ms (device)  step  17.019 ms  out     77  ok
+r2 token 26:   15.658 ms (device)  step  17.030 ms  out   1780  ok
+r2 token 27:   15.835 ms (device)  step  17.172 ms  out    185  ok
+r2 token 28:   15.652 ms (device)  step  16.963 ms  out    300  ok
+r2 token 29:   15.771 ms (device)  step  17.129 ms  out   1501  ok
+r2 token 30:   15.823 ms (device)  step  17.167 ms  out  11747  ok
+r2 token 31:   15.683 ms (device)  step  17.048 ms  out    254  ok
+r3 token  0:   16.747 ms (device)  step  17.079 ms  out     77  ok
+r3 token  1:   16.783 ms (device)  step  17.111 ms  out   1780  ok
+r3 token  2:   16.677 ms (device)  step  17.003 ms  out    185  ok
+r3 token  3:   16.774 ms (device)  step  17.105 ms  out    300  ok
+r3 token  4:   16.623 ms (device)  step  16.946 ms  out   1501  ok
+r3 token  5:   16.782 ms (device)  step  17.115 ms  out  11747  ok
+r3 token  6:   16.616 ms (device)  step  16.940 ms  out    254  ok
+r3 token  7:   16.566 ms (device)  step  16.891 ms  out   3510  ok
+r3 token  8:   16.711 ms (device)  step  17.051 ms  out    185  ok
+r3 token  9:   16.747 ms (device)  step  17.072 ms  out   1558  ok
+r3 token 10:   16.715 ms (device)  step  17.044 ms  out   8708  ok
+r3 token 11:   16.801 ms (device)  step  17.134 ms  out      7  ok
+r3 token 12:   16.608 ms (device)  step  16.932 ms  out     77  ok
+r3 token 13:   16.589 ms (device)  step  16.919 ms  out   1780  ok
+r3 token 14:   16.762 ms (device)  step  17.086 ms  out    185  ok
+r3 token 15:   16.871 ms (device)  step  17.220 ms  out    300  ok
+r3 token 16:   16.788 ms (device)  step  17.120 ms  out   1501  ok
+r3 token 17:   16.845 ms (device)  step  17.178 ms  out  11747  ok
+r3 token 18:   16.744 ms (device)  step  17.087 ms  out    254  ok
+r3 token 19:   16.813 ms (device)  step  17.151 ms  out   3510  ok
+r3 token 20:   16.665 ms (device)  step  17.005 ms  out    185  ok
+r3 token 21:   16.592 ms (device)  step  16.920 ms  out   1558  ok
+r3 token 22:   16.683 ms (device)  step  17.007 ms  out   8708  ok
+r3 token 23:   16.832 ms (device)  step  17.172 ms  out      7  ok
+r3 token 24:   16.726 ms (device)  step  17.067 ms  out     77  ok
+r3 token 25:   16.689 ms (device)  step  17.019 ms  out   1780  ok
+r3 token 26:   16.694 ms (device)  step  17.030 ms  out    185  ok
+r3 token 27:   16.841 ms (device)  step  17.172 ms  out    300  ok
+r3 token 28:   16.636 ms (device)  step  16.963 ms  out   1501  ok
+r3 token 29:   16.794 ms (device)  step  17.129 ms  out  11747  ok
+r3 token 30:   16.839 ms (device)  step  17.167 ms  out    254  ok
+r3 token 31:   16.714 ms (device)  step  17.048 ms  out   3510  ok
+r4 token  0:   15.881 ms (device)  step  17.079 ms  out   1780  ok
+r4 token  1:   15.927 ms (device)  step  17.111 ms  out    185  ok
+r4 token  2:   15.826 ms (device)  step  17.003 ms  out    300  ok
+r4 token  3:   15.912 ms (device)  step  17.105 ms  out   1501  ok
+r4 token  4:   15.763 ms (device)  step  16.946 ms  out  11747  ok
+r4 token  5:   15.906 ms (device)  step  17.115 ms  out    254  ok
+r4 token  6:   15.769 ms (device)  step  16.940 ms  out   3510  ok
+r4 token  7:   15.726 ms (device)  step  16.891 ms  out    185  ok
+r4 token  8:   15.843 ms (device)  step  17.051 ms  out   1558  ok
+r4 token  9:   15.892 ms (device)  step  17.072 ms  out   8708  ok
+r4 token 10:   15.836 ms (device)  step  17.044 ms  out      7  ok
+r4 token 11:   15.930 ms (device)  step  17.134 ms  out     77  ok
+r4 token 12:   15.758 ms (device)  step  16.932 ms  out   1780  ok
+r4 token 13:   15.753 ms (device)  step  16.919 ms  out    185  ok
+r4 token 14:   15.918 ms (device)  step  17.086 ms  out    300  ok
+r4 token 15:   15.963 ms (device)  step  17.220 ms  out   1501  ok
+r4 token 16:   15.935 ms (device)  step  17.120 ms  out  11747  ok
+r4 token 17:   15.960 ms (device)  step  17.178 ms  out    254  ok
+r4 token 18:   15.864 ms (device)  step  17.087 ms  out   3510  ok
+r4 token 19:   15.935 ms (device)  step  17.151 ms  out    185  ok
+r4 token 20:   15.798 ms (device)  step  17.005 ms  out   1558  ok
+r4 token 21:   15.744 ms (device)  step  16.920 ms  out   8708  ok
+r4 token 22:   15.862 ms (device)  step  17.007 ms  out      7  ok
+r4 token 23:   15.951 ms (device)  step  17.172 ms  out     77  ok
+r4 token 24:   15.846 ms (device)  step  17.067 ms  out   1780  ok
+r4 token 25:   15.807 ms (device)  step  17.019 ms  out    185  ok
+r4 token 26:   15.804 ms (device)  step  17.030 ms  out    300  ok
+r4 token 27:   15.980 ms (device)  step  17.172 ms  out   1501  ok
+r4 token 28:   15.797 ms (device)  step  16.963 ms  out  11747  ok
+r4 token 29:   15.911 ms (device)  step  17.129 ms  out    254  ok
+r4 token 30:   15.967 ms (device)  step  17.167 ms  out   3510  ok
+r4 token 31:   15.821 ms (device)  step  17.048 ms  out    185  ok
+r5 token  0:   16.853 ms (device)  step  17.079 ms  out    185  ok
+r5 token  1:   16.887 ms (device)  step  17.111 ms  out    300  ok
+r5 token  2:   16.783 ms (device)  step  17.003 ms  out   1501  ok
+r5 token  3:   16.883 ms (device)  step  17.105 ms  out  11747  ok
+r5 token  4:   16.729 ms (device)  step  16.946 ms  out    254  ok
+r5 token  5:   16.894 ms (device)  step  17.115 ms  out   3510  ok
+r5 token  6:   16.721 ms (device)  step  16.940 ms  out    185  ok
+r5 token  7:   16.672 ms (device)  step  16.891 ms  out   1558  ok
+r5 token  8:   16.824 ms (device)  step  17.051 ms  out   8708  ok
+r5 token  9:   16.850 ms (device)  step  17.072 ms  out      7  ok
+r5 token 10:   16.823 ms (device)  step  17.044 ms  out     77  ok
+r5 token 11:   16.909 ms (device)  step  17.134 ms  out   1780  ok
+r5 token 12:   16.710 ms (device)  step  16.932 ms  out    185  ok
+r5 token 13:   16.696 ms (device)  step  16.919 ms  out    300  ok
+r5 token 14:   16.868 ms (device)  step  17.086 ms  out   1501  ok
+r5 token 15:   16.991 ms (device)  step  17.220 ms  out  11747  ok
+r5 token 16:   16.895 ms (device)  step  17.120 ms  out    254  ok
+r5 token 17:   16.954 ms (device)  step  17.178 ms  out   3510  ok
+r5 token 18:   16.857 ms (device)  step  17.087 ms  out    185  ok
+r5 token 19:   16.922 ms (device)  step  17.151 ms  out   1558  ok
+r5 token 20:   16.776 ms (device)  step  17.005 ms  out   8708  ok
+r5 token 21:   16.701 ms (device)  step  16.920 ms  out      7  ok
+r5 token 22:   16.789 ms (device)  step  17.007 ms  out     77  ok
+r5 token 23:   16.945 ms (device)  step  17.172 ms  out   1780  ok
+r5 token 24:   16.838 ms (device)  step  17.067 ms  out    185  ok
+r5 token 25:   16.796 ms (device)  step  17.019 ms  out    300  ok
+r5 token 26:   16.806 ms (device)  step  17.030 ms  out   1501  ok
+r5 token 27:   16.945 ms (device)  step  17.172 ms  out  11747  ok
+r5 token 28:   16.743 ms (device)  step  16.963 ms  out    254  ok
+r5 token 29:   16.905 ms (device)  step  17.129 ms  out   3510  ok
+r5 token 30:   16.943 ms (device)  step  17.167 ms  out    185  ok
+r5 token 31:   16.824 ms (device)  step  17.048 ms  out   1558  ok
+r6 token  0:   16.011 ms (device)  step  17.079 ms  out    300  ok
+r6 token  1:   16.051 ms (device)  step  17.111 ms  out   1501  ok
+r6 token  2:   15.953 ms (device)  step  17.003 ms  out  11747  ok
+r6 token  3:   16.035 ms (device)  step  17.105 ms  out    254  ok
+r6 token  4:   15.875 ms (device)  step  16.946 ms  out   3510  ok
+r6 token  5:   16.029 ms (device)  step  17.115 ms  out    185  ok
+r6 token  6:   15.887 ms (device)  step  16.940 ms  out   1558  ok
+r6 token  7:   15.858 ms (device)  step  16.891 ms  out   8708  ok
+r6 token  8:   15.965 ms (device)  step  17.051 ms  out      7  ok
+r6 token  9:   16.022 ms (device)  step  17.072 ms  out     77  ok
+r6 token 10:   15.951 ms (device)  step  17.044 ms  out   1780  ok
+r6 token 11:   16.058 ms (device)  step  17.134 ms  out    185  ok
+r6 token 12:   15.880 ms (device)  step  16.932 ms  out    300  ok
+r6 token 13:   15.883 ms (device)  step  16.919 ms  out   1501  ok
+r6 token 14:   16.040 ms (device)  step  17.086 ms  out  11747  ok
+r6 token 15:   16.099 ms (device)  step  17.220 ms  out    254  ok
+r6 token 16:   16.062 ms (device)  step  17.120 ms  out   3510  ok
+r6 token 17:   16.078 ms (device)  step  17.178 ms  out    185  ok
+r6 token 18:   15.990 ms (device)  step  17.087 ms  out   1558  ok
+r6 token 19:   16.053 ms (device)  step  17.151 ms  out   8708  ok
+r6 token 20:   15.914 ms (device)  step  17.005 ms  out      7  ok
+r6 token 21:   15.870 ms (device)  step  16.920 ms  out     77  ok
+r6 token 22:   16.001 ms (device)  step  17.007 ms  out   1780  ok
+r6 token 23:   16.078 ms (device)  step  17.172 ms  out    185  ok
+r6 token 24:   15.972 ms (device)  step  17.067 ms  out    300  ok
+r6 token 25:   15.929 ms (device)  step  17.019 ms  out   1501  ok
+r6 token 26:   15.927 ms (device)  step  17.030 ms  out  11747  ok
+r6 token 27:   16.104 ms (device)  step  17.172 ms  out    254  ok
+r6 token 28:   15.924 ms (device)  step  16.963 ms  out   3510  ok
+r6 token 29:   16.028 ms (device)  step  17.129 ms  out    185  ok
+r6 token 30:   16.092 ms (device)  step  17.167 ms  out   1558  ok
+r6 token 31:   15.947 ms (device)  step  17.048 ms  out   8708  ok
+r7 token  0:   16.960 ms (device)  step  17.079 ms  out   1501  ok
+r7 token  1:   16.994 ms (device)  step  17.111 ms  out  11747  ok
+r7 token  2:   16.885 ms (device)  step  17.003 ms  out    254  ok
+r7 token  3:   16.988 ms (device)  step  17.105 ms  out   3510  ok
+r7 token  4:   16.831 ms (device)  step  16.946 ms  out    185  ok
+r7 token  5:   17.000 ms (device)  step  17.115 ms  out   1558  ok
+r7 token  6:   16.821 ms (device)  step  16.940 ms  out   8708  ok
+r7 token  7:   16.775 ms (device)  step  16.891 ms  out      7  ok
+r7 token  8:   16.933 ms (device)  step  17.051 ms  out     77  ok
+r7 token  9:   16.951 ms (device)  step  17.072 ms  out   1780  ok
+r7 token 10:   16.928 ms (device)  step  17.044 ms  out    185  ok
+r7 token 11:   17.016 ms (device)  step  17.134 ms  out    300  ok
+r7 token 12:   16.812 ms (device)  step  16.932 ms  out   1501  ok
+r7 token 13:   16.800 ms (device)  step  16.919 ms  out  11747  ok
+r7 token 14:   16.970 ms (device)  step  17.086 ms  out    254  ok
+r7 token 15:   17.103 ms (device)  step  17.220 ms  out   3510  ok
+r7 token 16:   16.996 ms (device)  step  17.120 ms  out    185  ok
+r7 token 17:   17.059 ms (device)  step  17.178 ms  out   1558  ok
+r7 token 18:   16.966 ms (device)  step  17.087 ms  out   8708  ok
+r7 token 19:   17.028 ms (device)  step  17.151 ms  out      7  ok
+r7 token 20:   16.878 ms (device)  step  17.005 ms  out     77  ok
+r7 token 21:   16.805 ms (device)  step  16.920 ms  out   1780  ok
+r7 token 22:   16.888 ms (device)  step  17.007 ms  out    185  ok
+r7 token 23:   17.053 ms (device)  step  17.172 ms  out    300  ok
+r7 token 24:   16.946 ms (device)  step  17.067 ms  out   1501  ok
+r7 token 25:   16.897 ms (device)  step  17.019 ms  out  11747  ok
+r7 token 26:   16.914 ms (device)  step  17.030 ms  out    254  ok
+r7 token 27:   17.047 ms (device)  step  17.172 ms  out   3510  ok
+r7 token 28:   16.845 ms (device)  step  16.963 ms  out    185  ok
+r7 token 29:   17.010 ms (device)  step  17.129 ms  out   1558  ok
+r7 token 30:   17.047 ms (device)  step  17.167 ms  out   8708  ok
+r7 token 31:   16.930 ms (device)  step  17.048 ms  out      7  ok
+  r0 consecutive layers within the gate: 27 of 27
+  r1 consecutive layers within the gate: 27 of 27
+  r2 consecutive layers within the gate: 27 of 27
+  r3 consecutive layers within the gate: 27 of 27
+  r4 consecutive layers within the gate: 27 of 27
+  r5 consecutive layers within the gate: 3 of 27
+  r6 consecutive layers within the gate: 27 of 27
+  r7 consecutive layers within the gate: 7 of 27
+
+r0 per-token latency (embed -> argmax on device): median 15.584 ms  mean 15.577 ms; step wall (launch to end) 17.059 ms/token
+r0 tokens: 32/32 match HF greedy
+
+r1 per-token latency (embed -> argmax on device): median 16.636 ms  mean 16.623 ms; step wall (launch to end) 17.059 ms/token
+r1 tokens: 32/32 match HF greedy
+
+r2 per-token latency (embed -> argmax on device): median 15.723 ms  mean 15.718 ms; step wall (launch to end) 17.059 ms/token
+r2 tokens: 32/32 match HF greedy
+
+r3 per-token latency (embed -> argmax on device): median 16.744 ms  mean 16.727 ms; step wall (launch to end) 17.059 ms/token
+r3 tokens: 32/32 match HF greedy
+
+r4 per-token latency (embed -> argmax on device): median 15.864 ms  mean 15.862 ms; step wall (launch to end) 17.059 ms/token
+r4 tokens: 32/32 match HF greedy
+
+r5 per-token latency (embed -> argmax on device): median 16.850 ms  mean 16.835 ms; step wall (launch to end) 17.059 ms/token
+r5 tokens: 32/32 match HF greedy
+
+r6 per-token latency (embed -> argmax on device): median 16.001 ms  mean 15.986 ms; step wall (launch to end) 17.059 ms/token
+r6 tokens: 32/32 match HF greedy
+
+r7 per-token latency (embed -> argmax on device): median 16.951 ms  mean 16.940 ms; step wall (launch to end) 17.059 ms/token
+r7 tokens: 32/32 match HF greedy
+
+RESULT requests=8 step median 17.072 ms -> 468.6 tokens/s (8 tokens per step); tokens 256/256 match
+BATCHREQ r=0 tokens=32/32 layers=27 warmup=32/32 interval_median_ms=17.38072 device_median_ms=15.583600
+BATCHREQ r=1 tokens=32/32 layers=27 warmup=32/32 interval_median_ms=17.37776 device_median_ms=16.635799
+BATCHREQ r=2 tokens=32/32 layers=27 warmup=32/32 interval_median_ms=17.38336 device_median_ms=15.722600
+BATCHREQ r=3 tokens=32/32 layers=27 warmup=32/32 interval_median_ms=17.38032 device_median_ms=16.744320
+BATCHREQ r=4 tokens=32/32 layers=27 warmup=32/32 interval_median_ms=17.38120 device_median_ms=15.864040
+BATCHREQ r=5 tokens=32/32 layers=3 warmup=32/32 interval_median_ms=17.37972 device_median_ms=16.850321
+BATCHREQ r=6 tokens=32/32 layers=27 warmup=32/32 interval_median_ms=17.37900 device_median_ms=16.001040
+BATCHREQ r=7 tokens=32/32 layers=7 warmup=32/32 interval_median_ms=17.38012 device_median_ms=16.950878
+BATCH requests=8 tokens=32 step_median_ms=17.071896
