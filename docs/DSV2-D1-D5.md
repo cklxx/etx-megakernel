@@ -593,3 +593,24 @@ invocation.
 - **Bit identity:** same per-row operations (fma8 on the lane's chunk, wave_sum, lane-0 epilogue; the lane -> chunk map
   is K's). Row coverage over waves is tested (each row once; 1 busy wave -> 4).
 - **Queued** in `examples/sessions/ds_k1.py` right after K1, with the same kept baseline.
+
+## KM: K1 and M1 together (threshold written before the code, 2026-10-14)
+
+**Why.** On 2026-10-14 (`examples/dsv2lite/results/2026-10-14-k1`) K1 and M1 each passed KEEP against `alld4r0l1`,
+measured separately: K1 +41 us (spread 8), M1 +66 us (spread 21) [M]. Their sum is not a measurement. K1 changes
+where kv_a is computed and read (qkv -3.9, attention +1.7 us/layer in the stamped token); M1 changes merge's W_UV
+GEMV, which runs inside the attention tasks that now read kv_a across XCDs. The two can interact.
+
+**Arm `alld4r0l1kvsmw`:** the K1 build (`-DETX_DSV2_KVA_SHARED=1`, `ETX_DSV2_KVA=shared`) plus the lever
+`merge_uv_waves`. No other change.
+
+**Expected [E], not promised.** Additive: about +107 us vs `alld4r0l1`, about +41 us vs `alld4r0l1mw`. If M3's
+shortened chain is hidden behind the cross-XCD kv_a read that K1 adds, the gain over `alld4r0l1mw` shrinks toward 0.
+
+**Rule (KM):** five interleaved rounds, device time, no stamps; each round runs `alld4r0l1`, `alld4r0l1mw`,
+`alld4r0l1kvsmw` (order reversed on even rounds, as every pairs study). 32/32 + 27/27 in every invocation.
+- **KEEP KM** (the new kept arm is `alld4r0l1kvsmw`) if every pair is faster than `alld4r0l1mw`, median >= 30 us
+  and > 2 x spread.
+- **Otherwise** the new kept arm is `alld4r0l1mw` (M1 alone, KEEP on 2026-10-14), and K1 is recorded as not adding
+  on top of M1.
+- The gain vs `alld4r0l1` is reported for attribution only; it decides nothing.
