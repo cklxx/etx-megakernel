@@ -1,0 +1,45 @@
+# job prep_pack gpu=None cwd=/root/etx
+# : "${ETX_DSV2_FLEET:=$HOME/fleet-3fb67a6}"; : "${ETX_DSV2_DATA:=$HOME/dsv2-data}"; export ETX_DSV2_FLEET ETX_DSV2_DATA; cd "$ETX_DSV2_FLEET" && { test -s "$ETX_DSV2_DATA/weights.bin" -a -s "$ETX_DSV2_DATA/weights.bin.manifest" || $HOME/dsv2-prep/.venv/bin/python src/host/pack_weights.py --model $HOME/models/dsv2-lite-base --out "$ETX_DSV2_DATA/weights.bin"; } && ls -la "$ETX_DSV2_DATA"
+loading /root/models/dsv2-lite-base
+Loading checkpoint shards:   0%|          | 0/4 [00:00<?, ?it/s]Loading checkpoint shards:  25%|██▌       | 1/4 [00:00<00:02,  1.49it/s]Loading checkpoint shards:  50%|█████     | 2/4 [00:01<00:01,  1.42it/s]Loading checkpoint shards:  75%|███████▌  | 3/4 [00:02<00:00,  1.40it/s]Loading checkpoint shards: 100%|██████████| 4/4 [00:02<00:00,  1.62it/s]Loading checkpoint shards: 100%|██████████| 4/4 [00:02<00:00,  1.54it/s]
+  layer  0 packed, 1.00 GB
+  layer  1 packed, 2.17 GB
+  layer  2 packed, 3.34 GB
+  layer  3 packed, 4.51 GB
+  layer  4 packed, 5.68 GB
+  layer  5 packed, 6.85 GB
+  layer  6 packed, 8.02 GB
+  layer  7 packed, 9.19 GB
+  layer  8 packed, 10.36 GB
+  layer  9 packed, 11.53 GB
+  layer 10 packed, 12.70 GB
+  layer 11 packed, 13.87 GB
+  layer 12 packed, 15.04 GB
+  layer 13 packed, 16.21 GB
+  layer 14 packed, 17.38 GB
+  layer 15 packed, 18.55 GB
+  layer 16 packed, 19.72 GB
+  layer 17 packed, 20.89 GB
+  layer 18 packed, 22.06 GB
+  layer 19 packed, 23.23 GB
+  layer 20 packed, 24.39 GB
+  layer 21 packed, 25.56 GB
+  layer 22 packed, 26.73 GB
+  layer 23 packed, 27.90 GB
+  layer 24 packed, 29.07 GB
+  layer 25 packed, 30.24 GB
+  layer 26 packed, 31.41 GB
+
+wrote /root/dsv2-data/weights.bin (31.41 GB), /root/dsv2-data/weights.bin.json and /root/dsv2-data/weights.bin.manifest
+  expert stride: 8650752 elems (17.3 MB) — matches design.md §1's 17.3 MB per routed expert
+total 30737888
+drwxr-xr-x  2 root root        4096 Oct 13 11:53 .
+drwx------ 11 root root        4096 Oct 13 11:52 ..
+-rw-r--r--  1 root root    32845824 Oct 13 11:52 fleet_cache.bin
+-rw-r--r--  1 root root         487 Oct 13 11:52 golden.json
+-rw-r--r--  1 root root    29492654 Oct 13 11:52 golden.npz
+-rw-r--r--  1 root root      221184 Oct 13 11:52 golden_hidden.bin
+-rw-r--r--  1 root root         144 Oct 13 11:52 golden_tokens.txt
+-rw-r--r--  1 root root 31412968448 Oct 13 11:53 weights.bin
+-rw-r--r--  1 root root       30815 Oct 13 11:53 weights.bin.json
+-rw-r--r--  1 root root        9561 Oct 13 11:53 weights.bin.manifest

@@ -1,0 +1,24 @@
+# job prep_ref gpu=0 cwd=/root/etx
+# : "${ETX_DSV2_FLEET:=$HOME/fleet-3fb67a6}"; : "${ETX_DSV2_DATA:=$HOME/dsv2-data}"; export ETX_DSV2_FLEET ETX_DSV2_DATA; mkdir -p "$ETX_DSV2_DATA" && cd "$ETX_DSV2_FLEET" && { test -s "$ETX_DSV2_DATA/fleet_cache.bin" -a -s "$ETX_DSV2_DATA/golden_tokens.txt" -a -s "$ETX_DSV2_DATA/golden_hidden.bin" || HIP_VISIBLE_DEVICES=$GPU $HOME/dsv2-prep/.venv/bin/python src/host/reference_run.py --model $HOME/models/dsv2-lite-base --out "$ETX_DSV2_DATA/golden.npz"; } && ls -la "$ETX_DSV2_DATA"
+loading /root/models/dsv2-lite-base (bf16)
+Loading checkpoint shards:   0%|          | 0/4 [00:00<?, ?it/s]Loading checkpoint shards:  25%|██▌       | 1/4 [00:00<00:02,  1.41it/s]Loading checkpoint shards:  50%|█████     | 2/4 [00:01<00:01,  1.37it/s]Loading checkpoint shards:  75%|███████▌  | 3/4 [00:02<00:00,  1.36it/s]Loading checkpoint shards: 100%|██████████| 4/4 [00:02<00:00,  1.58it/s]Loading checkpoint shards: 100%|██████████| 4/4 [00:02<00:00,  1.50it/s]
+/opt/amdgpu/share/libdrm/amdgpu.ids: No such file or directory
+  loaded in 22.2s
+prompt: 1024 tokens
+prefill
+  first token 77, top-2 logit margin 7.8750
+decoding 32 tokens greedily
+  'n):\n    # compute the answer\ndef solve(n):\n    # compute the answer\ndef solve(n):\n    # compute the answer\n'
+wrote /root/dsv2-data/golden.npz and /root/dsv2-data/golden.json
+wrote /root/dsv2-data/fleet_cache.bin  [27][1056][576] cols 0:512 = c (post kv_a_layernorm), 512:576 = k_pe (post RoPE)  -> 32.8 MB bf16
+wrote /root/dsv2-data/golden_tokens.txt (33 tokens)
+wrote /root/dsv2-data/golden_hidden.bin (27, 2048)
+  smallest top-2 margin over the run: 6.6250 (a small margin here is where bf16 drift would flip a token)
+total 61112
+drwxr-xr-x  2 root root     4096 Oct 13 11:52 .
+drwx------ 11 root root     4096 Oct 13 11:52 ..
+-rw-r--r--  1 root root 32845824 Oct 13 11:52 fleet_cache.bin
+-rw-r--r--  1 root root      487 Oct 13 11:52 golden.json
+-rw-r--r--  1 root root 29492654 Oct 13 11:52 golden.npz
+-rw-r--r--  1 root root   221184 Oct 13 11:52 golden_hidden.bin
+-rw-r--r--  1 root root      144 Oct 13 11:52 golden_tokens.txt

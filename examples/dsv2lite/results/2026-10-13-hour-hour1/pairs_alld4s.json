@@ -1,0 +1,181 @@
+{
+  "arm": "alld4s",
+  "condition": "one MI300X, batch 1, context 1024, 32 tokens, repeat 2",
+  "device_ms": {
+    "alld4r0": {
+      "every_positive": false,
+      "gains_us": [
+        -6.0,
+        -18.0,
+        -17.0,
+        -8.0,
+        -13.0
+      ],
+      "go": null,
+      "median_us": -13.0,
+      "spread_us": 12.0
+    },
+    "default": {
+      "every_positive": true,
+      "gains_us": [
+        164.0,
+        159.0,
+        149.0,
+        160.0,
+        153.0
+      ],
+      "go": null,
+      "median_us": 159.0,
+      "spread_us": 15.0
+    }
+  },
+  "keep_vs_alld4r0": {
+    "every_positive": false,
+    "gains_us": [
+      -6.0,
+      -18.0,
+      -17.0,
+      -8.0,
+      -13.0
+    ],
+    "go": false,
+    "keep": false,
+    "median_us": -13.0,
+    "spread_us": 12.0
+  },
+  "rounds": [
+    {
+      "alld4r0": {
+        "device_ms": 3.572,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.607
+      },
+      "alld4s": {
+        "device_ms": 3.578,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.615
+      },
+      "default": {
+        "device_ms": 3.742,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.775
+      }
+    },
+    {
+      "alld4r0": {
+        "device_ms": 3.565,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.601
+      },
+      "alld4s": {
+        "device_ms": 3.583,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.619
+      },
+      "default": {
+        "device_ms": 3.742,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.774
+      }
+    },
+    {
+      "alld4r0": {
+        "device_ms": 3.569,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.603
+      },
+      "alld4s": {
+        "device_ms": 3.586,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.621
+      },
+      "default": {
+        "device_ms": 3.735,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.771
+      }
+    },
+    {
+      "alld4r0": {
+        "device_ms": 3.572,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.607
+      },
+      "alld4s": {
+        "device_ms": 3.58,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.614
+      },
+      "default": {
+        "device_ms": 3.74,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.775
+      }
+    },
+    {
+      "alld4r0": {
+        "device_ms": 3.574,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.609
+      },
+      "alld4s": {
+        "device_ms": 3.587,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.623
+      },
+      "default": {
+        "device_ms": 3.74,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.773
+      }
+    }
+  ],
+  "verdict": {
+    "outcome": "NO-GO",
+    "passed": false,
+    "rule": "KEEP: every pair faster than alld4r0, median >= 30 us, > 2 x spread (rule commit ff15c2c, brief 05)"
+  },
+  "wall_ms": {
+    "alld4r0": {
+      "every_positive": false,
+      "gains_us": [
+        -8.0,
+        -18.0,
+        -18.0,
+        -7.0,
+        -14.0
+      ],
+      "go": false,
+      "median_us": -14.0,
+      "spread_us": 11.0
+    },
+    "default": {
+      "every_positive": true,
+      "gains_us": [
+        160.0,
+        155.0,
+        150.0,
+        161.0,
+        150.0
+      ],
+      "go": true,
+      "median_us": 155.0,
+      "spread_us": 11.0
+    }
+  }
+}

@@ -1,0 +1,128 @@
+{
+  "arm": "alld5",
+  "condition": "one MI300X, batch 1, context 1024, 32 tokens, repeat 2",
+  "d5": {
+    "any_slower": true,
+    "drop": true,
+    "every_positive": false,
+    "gains_us": [
+      2.0,
+      -1.0,
+      8.0,
+      0.0,
+      8.0
+    ],
+    "go": false,
+    "keep": false,
+    "median_us": 2.0,
+    "neutral": true,
+    "spread_us": 9.0
+  },
+  "device_ms": {
+    "all": {
+      "every_positive": false,
+      "gains_us": [
+        2.0,
+        -1.0,
+        8.0,
+        0.0,
+        8.0
+      ],
+      "go": null,
+      "median_us": 2.0,
+      "spread_us": 9.0
+    }
+  },
+  "rounds": [
+    {
+      "all": {
+        "device_ms": 3.645,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.68
+      },
+      "alld5": {
+        "device_ms": 3.643,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.679
+      }
+    },
+    {
+      "all": {
+        "device_ms": 3.645,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.681
+      },
+      "alld5": {
+        "device_ms": 3.646,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.681
+      }
+    },
+    {
+      "all": {
+        "device_ms": 3.651,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.684
+      },
+      "alld5": {
+        "device_ms": 3.643,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.677
+      }
+    },
+    {
+      "all": {
+        "device_ms": 3.642,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.677
+      },
+      "alld5": {
+        "device_ms": 3.642,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.679
+      }
+    },
+    {
+      "all": {
+        "device_ms": 3.651,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.685
+      },
+      "alld5": {
+        "device_ms": 3.643,
+        "layers": 27,
+        "tokens": 32,
+        "wall_ms": 3.678
+      }
+    }
+  ],
+  "verdict": {
+    "outcome": "DROP",
+    "passed": false,
+    "rule": "DROP if |median gain| <= spread or any pair is slower than all; KEEP only if every pair faster than all, median >= 30 us and > 2 x spread; otherwise DROP (D5 rule commit 84eaa1b)"
+  },
+  "wall_ms": {
+    "all": {
+      "every_positive": false,
+      "gains_us": [
+        1.0,
+        0.0,
+        7.0,
+        -2.0,
+        7.0
+      ],
+      "go": false,
+      "median_us": 1.0,
+      "spread_us": 9.0
+    }
+  }
+}
