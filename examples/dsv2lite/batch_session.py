@@ -17,7 +17,7 @@ import os
 from pathlib import Path
 
 from etx.session import batch
-from examples.dsv2lite.arms import BATCH_ARMS, BATCHES
+from examples.dsv2lite.arms import BATCH_ARMS, BATCHES, X8_CANDIDATES
 from examples.dsv2lite.inplace_session import Session, write_json
 
 IMAGE = "vllm/vllm-openai-rocm@sha256:bb44b39aea26798cce43030a98bf48efd0322ca7147367db86e38b96bd80f0e7"
@@ -140,8 +140,9 @@ def main(argv=None):
     a = ap.parse_args(argv)
     s = BatchSession()
     if a.operation == "gate":
-        if a.arm not in [BATCH_ARMS[b] for b in BATCHES if b > 1]:
-            ap.error(f"gate arm must be one of {[BATCH_ARMS[b] for b in BATCHES if b > 1]}")
+        allowed = [BATCH_ARMS[b] for b in BATCHES if b > 1] + list(X8_CANDIDATES)
+        if a.arm not in allowed:
+            ap.error(f"gate arm must be one of {allowed}")
         s.gate(a.arm)
     else:
         getattr(s, a.operation)()
