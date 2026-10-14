@@ -39,7 +39,21 @@ DS_FINAL = ("breport",)
 QWEN_JOBS = ("qwen_preflight", "qwen_build_kept", "qwen_build_kept_l1", "qwen_certify_kept",
              "qwen_certify_kept_l1", "qwen_pairs_kept_l1")
 
-JOBS = [_qwen[n] for n in QWEN_JOBS] + [_by_name[n] for n in DS_GPU] + [_by_name[n] for n in DS_FINAL]
+# The runner refuses a read that names no job in this list, even an optional one (`?etx_env`), so pull in the
+# transitive closure of the selected jobs' dependencies. Those jobs are cheap CPU steps that already ran on this box.
+_every = dict(_by_name, **_qwen)
+_order = list(QWEN_JOBS + DS_GPU + DS_FINAL)
+_selected = []
+for n in _order:
+    if n in _selected:
+        continue
+    _selected.append(n)
+    for r in _every[n].get("reads", []):
+        r = r.lstrip("?")
+        if r in _every and r not in _order:
+            _order.append(r)
+
+JOBS = [_every[n] for n in _selected]
 
 STUDIES = {"DeepSeek batch": ["bgate_x2", "bgate_x4", "bgate_x8", "brounds"],
            "Qwen": ["qwen_pairs_kept_l1"]}
