@@ -105,10 +105,11 @@ ARMS = {a.name: a for a in [
     # box (ROCm 7.14, one compile each, 2026-10-14) the new recipe spilled x2 32, x4 64 and x8 144 B/lane, so x2's
     # allowance rises from 0 to 64 with that measurement; x4's 64 and x8's 192 already covered it.
     *(Arm(f"x{n}", levers=(*LEVERS_ALL, "l1_loads", "merge_uv_waves"),
-          flags=(f"-DETX_DS_REQUESTS={n}", "-DETX_SLOT_BY_CU", "-DETX_DSV2_KVA_SHARED=1"),
-          env=dict(ETX_DSV2_COH="l1", ETX_DSV2_REQUESTS=str(n), ETX_DSV2_COUPLE="none", ETX_DSV2_KVA="shared"),
+          flags=(f"-DETX_DS_REQUESTS={n}", "-DETX_SLOT_BY_CU") + (("-DETX_DSV2_KVA_SHARED=1",) if k1 else ()),
+          env=dict(ETX_DSV2_COH="l1", ETX_DSV2_REQUESTS=str(n), ETX_DSV2_COUPLE="none",
+                   **({"ETX_DSV2_KVA": "shared"} if k1 else {})),
           scratch_allow=allow)
-      for n, allow in ((2, 64), (4, 64), (8, 192))),
+      for n, allow, k1 in ((2, 64, True), (4, 64, True), (8, 192, False))),
     Arm("allnoQ", levers=tuple(x for x in LEVERS_ALL if x != "gemv_no_terminal_all"),
         order=("default", "all", "allnoQ"), references=("default", "all"),
         rule=Rule("device_ms", "all", 0, text="every pair faster, median > 2 x spread")),
