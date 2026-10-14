@@ -493,3 +493,34 @@ def test_duplicate_or_unexpected_sequence_gate_cannot_pass(damage):
     log = line + "\n" + log if damage == "failure_first" else log + line + "\n"
     result = batch.vllm_results(log, "default")[1]
     assert not result["legal"]
+
+
+def test_legacy_verification_keeps_the_supported_rederivation_marker(tmp_path):
+    from etx.session import experiment
+    from examples.dsv2lite import arms
+    (tmp_path / "SHA256SUMS").write_text("")
+    rc, lines = experiment.verify(tmp_path, arms)
+    assert rc == 3                         # Legacy byte integrity remains incomplete.
+    assert any(line.startswith("RE-DERIVED:") and "every available" not in line for line in lines)
+
+
+def test_sealed_batch_report_is_explicitly_excluded_from_semantic_verification(tmp_path):
+    from etx.session import experiment, record
+    from examples.dsv2lite import arms
+    (tmp_path / "batch_report.json").write_text(json.dumps(dict(batches={"8": dict(status="COMPLETE", throughput="WIN")})))
+    rounds = [dict(etx={"8": dict(error="gate failed")}, vllm={}) for _ in range(5)]
+    (tmp_path / "brounds.json").write_text(json.dumps(dict(rounds=rounds)))
+    record.seal(tmp_path, jobs={"breport": "ok"}, plan="test")
+    rc, lines = experiment.verify(tmp_path, arms)
+    assert rc == 3
+    assert any("EXCLUDED batch_report.json" in line and "raw" in line for line in lines)
+    assert not any("every available verdict" in line for line in lines)
+
+
+def test_verifier_checks_the_promised_batch_report(tmp_path):
+    from etx.session import experiment, record
+    from examples.dsv2lite import arms
+    record.seal(tmp_path, jobs={"breport": "ok"}, plan="test")
+    rc, lines = experiment.verify(tmp_path, arms, ROOT / "examples/sessions/ds_batch.py")
+    assert rc == 3
+    assert any("MISSING batch_report.json" in line for line in lines)

@@ -165,6 +165,9 @@ parse = full_result
 
 def checks(d: Path):
     """The re-derivations a DeepSeek record carries besides its pairs: stage tables from trace + stamps + plan."""
+    for f in sorted(d.glob("batch_report*.json")):
+        yield lambda f=f: (None, f"EXCLUDED {f.name}: sealed bytes only; semantic replay needs raw batch selection, "
+                                "invocation failures and routing provenance, which this verifier does not replay")
     archive = archives(d)[0]
     for f in sorted(d.glob("stages_*.json")):
         arm = f.stem.removeprefix("stages_")

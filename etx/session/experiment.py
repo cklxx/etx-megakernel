@@ -170,7 +170,7 @@ def verify(d: Path, registry, session: Path | None = None) -> tuple[int, list[st
     if session is not None:
         from etx.tools.gpu_jobs import load_session
         jobs, _ = load_session(session)
-        expected = [w for j in jobs for w in j.writes if w.startswith(("pairs_", "stages_"))]
+        expected = [w for j in jobs for w in j.writes if w.startswith(("pairs_", "stages_", "batch_report"))]
         missing = [w for w in expected if not (d / w).is_file()]
         incomplete |= bool(missing)
         lines.extend(f"MISSING {w} (promised by {session})" for w in missing)
@@ -198,7 +198,8 @@ def verify(d: Path, registry, session: Path | None = None) -> tuple[int, list[st
     except (OSError, ValueError, KeyError) as exc:
         bad = True
         lines.append(f"DIFF model checks: {exc}")
-    lines.append("RE-DERIVED: every available verdict and table from the raw files" if not bad else "NOT VERIFIED")
+    lines.append("NOT VERIFIED" if bad else "RE-DERIVED: pairs and completed registry checks from raw files; "
+                 "missing inputs / exclusions are listed above")
     return (2 if bad else 3 if incomplete else 0), lines
 
 
