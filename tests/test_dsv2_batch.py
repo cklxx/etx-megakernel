@@ -260,7 +260,9 @@ def test_the_host_prints_exactly_the_fields_the_rule_reads():
     src = (ROOT / "examples/dsv2lite/host.hip").read_text()
     assert 'BATCHREQ r=%d tokens=%d/%d layers=%d warmup=%d/%d interval_median_ms=%llu.%05llu device_median_ms=%.6f' in src
     assert 'BATCH requests=%d tokens=%d step_median_ms=%.6f' in src
-    assert "have the same golden tokens: one prompt twice" in src and '--req-dir' in src
+    # an identical short greedy output is a printed collision, not a refusal (docs/BATCH-2026-10-14.md 4a); prompt
+    # distinctness is enforced by examples/dsv2lite/batch_goldens.py before the host ever runs
+    assert "BATCHCOLLISION requests %d and %d" in src and '--req-dir' in src
 
 
 # ---------------------------------------------------------------- the session

@@ -132,9 +132,13 @@ int main(int argc, char** argv) {
     { const size_t cache_bytes = (size_t)d.layers * kv.max_pos * kv.row * sizeof(__hip_bfloat16);
       __hip_bfloat16* cache_dev = nullptr; HIP_CHECK(hipMalloc(&cache_dev, cache_bytes)); upload_file(cp, cache_dev, cache_bytes); kv.data = cache_dev; }
     q.golden = load_tokens(gp);
-    for (int o = 0; o < r; ++o)        // the same prompt twice would route identically and flatter every batched phase
+    for (int o = 0; o < r; ++o)   // prompt distinctness is checked by examples/dsv2lite/batch_goldens.py before the run;
+                                  // two rotations may still share their short greedy output, which only weakens the
+                                  // mix-up check for that pair (docs/BATCH-2026-10-14.md 4a), so print and continue
       if (!q.golden.empty() && q.golden == reqs[o].golden)
-        die("requests " + std::to_string(o) + " and " + std::to_string(r) + " have the same golden tokens: one prompt twice");
+        std::printf("BATCHCOLLISION requests %d and %d: identical %zu greedy tokens; prompts are distinct, "
+                    "the request mix-up check is unavailable for this pair\n",
+                    o, r, q.golden.size());
     q.first_token = first_token;
     if (q.golden.empty() && q.first_token < 0) die("no golden tokens and no --first-token for request " + std::to_string(r));
     if (q.first_token < 0) q.first_token = q.golden[0];
