@@ -17,8 +17,8 @@ import os
 MAX_SESSION_SECONDS = 7200          # staging (download, pack: [U], nvref allowed 2400 s each) + 2 builds + 16 invocations
 OP = ".venv/bin/python -u -m examples.vllm_llm.g6_session"
 SUMMARY = [r"^(PREFLIGHT|BUILD|CERTIFIED|VERDICT|PAIRS) "]
-# the box's Qwen inputs (examples/vllm_llm/stage_qwen.py writes it); session.sh start does not forward the variable, so
-# every job carries it explicitly
+# The box's Qwen inputs (examples/vllm_llm/stage_qwen.py writes it). session.sh start forwards a laptop override;
+# every job carries the selected path explicitly.
 CONFIG = os.environ.get("ETX_QWEN_G6_CONFIG", os.path.expanduser("~/qwen-g6.json"))
 # staging, pinned BEFORE anything is fetched: the HF revision every Qwen session recorded (docs/NVREF-2026-10-09.md:26,
 # docs/NVREF2-2026-10-09.md:59), the vLLM runtime's release tag (vm_preflight.VLLM_TAG), the repo's golden (its sha256 is

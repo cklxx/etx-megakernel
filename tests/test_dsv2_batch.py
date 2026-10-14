@@ -138,6 +138,38 @@ def test_batch_arms_carry_the_kept_recipe_without_d4():
     assert b1.levers == ARMS["x2"].levers and b1.levers == ARMS["x4"].levers == ARMS["x8"].levers
 
 
+@pytest.mark.parametrize("config", [None, "", "/models/qwen config.json", "/models/qwen'$(touch $ETX_N6_MARKER);config.json"])
+def test_session_start_transports_qwen_config_without_shell_expansion(tmp_path, config):
+    import os
+    import subprocess
+    bindir = tmp_path / "bin"
+    bindir.mkdir()
+    ssh = bindir / "ssh"
+    ssh.write_text("#!/usr/bin/env python3\n"
+                   "import os, subprocess, sys\n"
+                   "sys.stdin.read()\n"
+                   "env = dict(os.environ)\n"
+                   "env.pop('ETX_QWEN_G6_CONFIG', None)\n"
+                   "env.pop('ETX_SESS_MAX_SECONDS', None)\n"
+                   "probe = \"python3 -c 'import json,os; print(json.dumps({k: os.environ.get(k) for k in "
+                   "[\\\"ETX_QWEN_G6_CONFIG\\\", \\\"ETX_SESS_MAX_SECONDS\\\"]}))' > \\\"$TRANSPORT_CAPTURE\\\"\\n\"\n"
+                   "raise SystemExit(subprocess.run(['bash', '-c', ' '.join(sys.argv[6:])], "
+                   "input=probe, text=True, env=env).returncode)\n")
+    ssh.chmod(0o755)
+    capture = tmp_path / "transport.json"
+    marker = tmp_path / "expanded"
+    env = dict(os.environ, PATH=str(bindir) + os.pathsep + os.environ["PATH"],
+               TRANSPORT_CAPTURE=str(capture), ETX_N6_MARKER=str(marker), ETX_SESS_MAX_SECONDS="1200")
+    env.pop("ETX_QWEN_G6_CONFIG", None)
+    if config is not None:
+        env["ETX_QWEN_G6_CONFIG"] = config
+    result = subprocess.run(["bash", str(ROOT / "tools/session.sh"), "start", "offline", "session.py"],
+                            env=env, text=True, capture_output=True, timeout=10)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert json.loads(capture.read_text()) == {"ETX_QWEN_G6_CONFIG": config, "ETX_SESS_MAX_SECONDS": "1200"}
+    assert not marker.exists()
+
+
 # ---------------------------------------------------------------- per-request gates (ETX)
 def etx_log(b, tokens="32/32", layers=27, warm="32/32", steps="5.120000", intervals=None, extra=""):
     lines = [f"BATCHREQ r={r} tokens={tokens if r == b - 1 else '32/32'} layers={layers} warmup={warm} "

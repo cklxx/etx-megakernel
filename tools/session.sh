@@ -93,6 +93,11 @@ REMOTE
       REMOTE_BASH="ETX_SESS_MAX_SECONDS='$CAP' bash"
       printf 'Passing session cap: ETX_SESS_MAX_SECONDS=%s\n' "$ETX_SESS_MAX_SECONDS"
     fi
+    if [ "${ETX_QWEN_G6_CONFIG+x}" = x ]; then
+      QWEN_CONFIG=$(printf '%s' "$ETX_QWEN_G6_CONFIG" | sed "s/'/'\\\\''/g")
+      REMOTE_BASH="ETX_QWEN_G6_CONFIG='$QWEN_CONFIG' $REMOTE_BASH"
+      printf 'Passing Qwen config: ETX_QWEN_G6_CONFIG=%s\n' "$ETX_QWEN_G6_CONFIG"
+    fi
     $SSH "$REMOTE_BASH" -s -- "$SESS" "${GPUS:-auto}" "$M" <<'REMOTE'
 SESS=$1; G=$2; M=$3; [ "$G" = auto ] && G=""
 cd ~/etx || exit 1
