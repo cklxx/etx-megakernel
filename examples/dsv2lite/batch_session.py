@@ -151,6 +151,8 @@ def main(argv=None):
     ap.add_argument("operation", choices=("gate", "vsel", "rounds", "report"))
     ap.add_argument("arm", nargs="?")
     a = ap.parse_args(argv)
+    if a.operation != "gate" and a.arm is not None:
+        ap.error("an arm argument is only valid with gate")
     s = BatchSession()
     if a.operation == "gate":
         allowed = [BATCH_ARMS[b] for b in BATCHES if b > 1] + list(X8_CANDIDATES)

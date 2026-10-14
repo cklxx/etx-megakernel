@@ -576,3 +576,32 @@ def test_host_collision_compares_its_checked_suffix(tmp_path, changed, expected)
                    check=True, capture_output=True)
     out = subprocess.run([str(tmp_path / "collision")], check=True, capture_output=True, text=True)
     assert out.stdout == expected
+
+
+@pytest.mark.parametrize("args", [["--goldens", "unused", "--batch", "8"],
+                                  ["--golden", "unused", "--batches", "1,2,4,8"]])
+def test_vllm_cli_rejects_options_for_the_other_mode(monkeypatch, capsys, args):
+    import sys
+    from types import ModuleType
+    from examples.llm import vllm_bench as vb
+    vllm = ModuleType("vllm")
+    vllm.LLM = vllm.SamplingParams = object
+    inputs = ModuleType("vllm.inputs")
+    inputs.TokensPrompt = object
+    monkeypatch.setitem(sys.modules, "vllm", vllm)
+    monkeypatch.setitem(sys.modules, "vllm.inputs", inputs)
+    monkeypatch.setattr(sys, "argv", ["vllm_bench", "--model", "unused", *args])
+    monkeypatch.setattr(vb, "batch_mode", lambda *a: pytest.fail("incompatible option reached batch mode"))
+    monkeypatch.setattr(vb, "read_golden", lambda *a: pytest.fail("incompatible option reached legacy mode"))
+    with pytest.raises(SystemExit) as exc:
+        vb.main()
+    assert exc.value.code == 2 and "only valid" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("operation", ["rounds", "vsel", "report"])
+def test_batch_cli_rejects_an_ignored_arm(monkeypatch, capsys, operation):
+    from examples.dsv2lite import batch_session as bs
+    monkeypatch.setattr(bs, "BatchSession", lambda: pytest.fail("ignored arm reached session construction"))
+    with pytest.raises(SystemExit) as exc:
+        bs.main([operation, "x8p"])
+    assert exc.value.code == 2 and "only valid" in capsys.readouterr().err

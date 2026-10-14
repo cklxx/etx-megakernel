@@ -129,12 +129,12 @@ def main() -> None:
     ap.add_argument("--model", required=True)
     ap.add_argument("--golden", type=Path, default=None)
     ap.add_argument("--goldens", type=Path, nargs="+", default=None, help="one golden file per sequence (batch mode)")
-    ap.add_argument("--batches", default="1", help="batch mode: the batch sizes one engine measures, e.g. 1,2,4,8")
+    ap.add_argument("--batches", default=None, help="batch mode: the batch sizes one engine measures, e.g. 1,2,4,8")
     ap.add_argument("--tokens", type=int, default=32)
     ap.add_argument("--repeats", type=int, default=3)
     ap.add_argument("--label", default="")
     ap.add_argument("--json", type=Path, default=None)
-    ap.add_argument("--batch", type=int, default=1, help="sequences decoded together (distinct prompts of equal length)")
+    ap.add_argument("--batch", type=int, default=None, help="sequences decoded together (distinct prompts of equal length)")
     ap.add_argument("--custom-ops", default=None, help="'all': vLLM's own HIP ops instead of Inductor-generated ones (the kernels ETX imports)")
     ap.add_argument("--pass-config", default=None, help='compilation_config pass_config as JSON, e.g. {"enable_qk_norm_rope_fusion": true}')
     # vLLM's own fusion ladder: --eager drops torch.compile AND the graphs (one launch per op); --cudagraph-mode NONE
@@ -145,14 +145,20 @@ def main() -> None:
     ap.add_argument("--compile-mode", type=int, default=None, help="CompilationMode: 0 NONE, 1 STOCK_TORCH_COMPILE, 2 DYNAMO_TRACE_ONCE, 3 VLLM_COMPILE")
     a = ap.parse_args()
 
+    if (a.golden is None) == (a.goldens is None):
+        ap.error("give --golden (one prompt) or --goldens (one file per sequence)")
+    if a.goldens and a.batch is not None:
+        ap.error("--batch is only valid with --golden; use --batches with --goldens")
+    if a.golden and a.batches is not None:
+        ap.error("--batches is only valid with --goldens; use --batch with --golden")
+    if a.goldens:
+        a.batches = a.batches or "1"
+        return batch_mode(a, kw_of(a))
+    a.batch = 1 if a.batch is None else a.batch
     import vllm
     from vllm import LLM, SamplingParams
     from vllm.inputs import TokensPrompt
 
-    if (a.golden is None) == (a.goldens is None):
-        ap.error("give --golden (one prompt) or --goldens (one file per sequence)")
-    if a.goldens:
-        return batch_mode(a, kw_of(a))
     prompt_ids, golden = read_golden(a.golden)
     kw = kw_of(a)
     llm = LLM(model=a.model, dtype="bfloat16", trust_remote_code=True,
