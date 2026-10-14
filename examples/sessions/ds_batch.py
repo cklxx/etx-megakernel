@@ -32,11 +32,14 @@ OP = ".venv/bin/python -u -m examples.dsv2lite.batch_session"
 SUMMARY = [r"^(BGATE|VSEL|BROUNDS|BREPORT|BATCH-INCOMPLETE|GOLDENS) "]
 
 # ---------------------------------------------------------------- per-request references (GPU) and the vLLM image (CPU)
-job("prep_goldens", 'set -eu; for r in $(seq 1 ' + str(REQUESTS - 1) + '); do d="$ETX_DSV2_DATA/r$r"; '
-    'if [ -s "$d/fleet_cache.bin" ] && [ -s "$d/golden_tokens.txt" ] && [ -s "$d/golden_hidden.bin" ] && [ -s "$d/golden.npz" ]; '
-    'then echo "request $r: reference present"; else mkdir -p "$d"; '
+job("prep_goldens", 'set -eu; for r in $(seq 0 ' + str(REQUESTS - 1) + '); do '
+    'd="$ETX_DSV2_DATA"; [ "$r" = 0 ] || d="$d/r$r"; '
+    f'if {PREP_PY} -m examples.dsv2lite.batch_goldens "$d" --verify-binding; '
+    'then echo "request $r: certified reference present"; else mkdir -p "$d"; rm -f "$d/golden.binding.json"; '
     f'HIP_VISIBLE_DEVICES=$GPU {PREP_PY} examples/dsv2lite/reference_rotated.py --fleet "$ETX_DSV2_FLEET" '
-    f'--rotate $((97 * r)) -- --model {MODEL} --out "$d/golden.npz"; fi; done; '
+    f'--rotate $((97 * r)) -- --model {MODEL} --out "$d/golden.npz"; '
+    f'{PREP_PY} -m examples.dsv2lite.batch_goldens "$d" --certify; fi; done; '
+    '.venv/bin/python -u -m examples.dsv2lite.inplace_session preflight; '
     f'{PREP_PY} -m examples.dsv2lite.batch_goldens "$ETX_DSV2_DATA" --requests {REQUESTS}',
     lane="gpu", reads=("inputs.json",), writes=[GOLDENS], timeout=1500, summary=SUMMARY + [r"prompt rotated|wrote "])
 job("docker_pull", 'set -eu; S=; [ "$(id -u)" = 0 ] || S=sudo; $S docker --version; '

@@ -30,11 +30,15 @@ def rotate(ids: list[int], r: int) -> list[int]:
     return ids[k:] + ids[:k]
 
 
-def check(prompts: list[list[int]], gens: list[list[int]], token_files: list[list[int]]) -> list[str]:
+def check(prompts: list[list[int]], gens: list[list[int]], token_files: list[list[int]], *,
+          bindings=None, hashes=None) -> list[str]:
     """Every refusal reason; empty when the set is usable. Two requests may share their 32-token greedy output
     (a repetitive prompt does it): that is reported as a collision, not refused. See docs/BATCH-2026-10-14.md 4a."""
     bad = []
     for r, (p, g, t) in enumerate(zip(prompts, gens, token_files)):
+        if bindings is not None and (bindings[r] is None or
+                                    bindings[r] != dict(prompt_ids=p, sha256=hashes[str(r)])):
+            bad.append(f"request {r}: golden binding missing or differs from prompt / execution bytes")
         if p != rotate(prompts[0], r):
             bad.append(f"request {r}: prompt is not prompt 0 rotated by {ROTATE * r}")
         if t != g:
@@ -58,13 +62,41 @@ def sha(path: Path) -> str:
     return h.hexdigest()
 
 
+def binding(data: Path) -> dict:
+    import numpy as np
+    with np.load(data / "golden.npz") as z:
+        prompt = [int(x) for x in z["prompt_ids"].reshape(-1)]
+    return dict(prompt_ids=prompt, sha256={f: sha(data / f) for f in FILES})
+
+
+def read_binding(data: Path):
+    try:
+        return json.loads((data / "golden.binding.json").read_text())
+    except (OSError, ValueError):
+        return None
+
+
 def main(argv=None) -> None:
     import numpy as np
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("data", type=Path)
     ap.add_argument("--requests", type=int, default=8)
+    mode = ap.add_mutually_exclusive_group()
+    mode.add_argument("--certify", action="store_true", help="bind a freshly generated reference tuple")
+    mode.add_argument("--verify-binding", action="store_true", help="verify a tuple before reusing it")
     a = ap.parse_args(argv)
+    if a.certify or a.verify_binding:
+        try:
+            current = binding(a.data)
+        except (OSError, ValueError) as exc:
+            raise SystemExit(f"GOLDENS binding unavailable: {exc}") from exc
+        if a.certify:
+            (a.data / "golden.binding.json").write_text(json.dumps(current, sort_keys=True) + "\n")
+        elif read_binding(a.data) != current:
+            raise SystemExit(f"GOLDENS binding refused: {a.data}")
+        return
     prompts, gens, tokens, hashes = [], [], [], {}
+    bindings = []
     for r in range(a.requests):
         d = request_dir(a.data, r)
         z = np.load(d / "golden.npz")
@@ -72,7 +104,8 @@ def main(argv=None) -> None:
         gens.append([int(x) for x in z["token_ids"].reshape(-1)])
         tokens.append([int(x) for x in (d / "golden_tokens.txt").read_text().split()])
         hashes[str(r)] = {f: sha(d / f) for f in FILES}
-    bad = check(prompts, gens, tokens)
+        bindings.append(read_binding(d))
+    bad = check(prompts, gens, tokens, bindings=bindings, hashes=hashes)
     if bad:
         raise SystemExit("GOLDENS REFUSED\n" + "\n".join(bad))
     coll = collisions(gens)
@@ -82,7 +115,7 @@ def main(argv=None) -> None:
         (out / f"golden_r{r}.txt").write_text("prompt " + " ".join(map(str, prompts[r])) + "\n"
                                               + "gen " + " ".join(map(str, gens[r])) + "\n")
     (a.data / "goldens.json").write_text(json.dumps(
-        dict(requests=a.requests, rotate=ROTATE, sha256=hashes, collisions=coll,
+        dict(requests=a.requests, rotate=ROTATE, sha256=hashes, bindings=bindings, collisions=coll,
              collision_note="pairs with identical 32-token greedy output; the request mix-up check is unavailable "
                             "for those pairs, every other gate still applies"), indent=1) + "\n")
     print(f"GOLDENS OK {a.requests} requests: prompts are the 97 r rotations, pairwise distinct; "
