@@ -47,10 +47,12 @@ for arm in CANDIDATES:
     g.update(name=f"bgate_{arm}", cmd=f"{BATCH} gate {arm}", writes=[f"bgate_{arm}.json"])
     _extra += [b, g]
 
+_after = {j["name"]: j for j in _batch.JOBS}
 CPU = [_by_name[n] for n in PREP]
 CPU += [_qwen[n] for n in QWEN if _qwen[n].get("lane") == "cpu"]
 CPU += [j for j in _extra if j["lane"] == "cpu"]
 GPU = [_qwen[n] for n in QWEN if _qwen[n].get("lane") == "gpu"]
+GPU += [_by_name["prep_goldens"]]        # the per-request references the four gates read; a fresh box has none
 GPU += [j for j in _extra if j["lane"] == "gpu"]
 JOBS = CPU + GPU
 STUDIES = {"DeepSeek batch": [f"bgate_{a}" for a in CANDIDATES], "Qwen": ["qwen_pairs_kept_l1"]}
