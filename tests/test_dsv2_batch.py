@@ -78,8 +78,7 @@ def test_routing_handoff_stays_adjacent_on_its_worker(lowered):
 
 @pytest.mark.parametrize("env,match", [(dict(ETX_DSV2_COUPLE="router"), "ETX_DSV2_COUPLE=none"),
                                        (dict(ETX_DSV2_COUPLE="experts"), "ETX_DSV2_COUPLE=none"),
-                                       (dict(ETX_DSV2_COUPLE="none", ETX_DSV2_D4="1"), "one request"),
-                                       (dict(ETX_DSV2_COUPLE="none", ETX_DSV2_KVA="shared"), "one request")])
+                                       (dict(ETX_DSV2_COUPLE="none", ETX_DSV2_D4="1"), "one request")])
 def test_more_than_two_requests_refuse_what_names_two_or_one(monkeypatch, env, match):
     from examples.dsv2lite import graph
     for k, v in env.items():
@@ -88,24 +87,36 @@ def test_more_than_two_requests_refuse_what_names_two_or_one(monkeypatch, env, m
         graph.build(layers=2, requests=4)
 
 
+def test_shared_kva_is_allowed_on_a_batched_graph(monkeypatch):
+    # docs/BATCH-2026-10-14.md section 10: the batch arms carry K1, so a shared kv_a must build for 4 requests
+    from examples.dsv2lite import graph
+    for k, v in dict(ETX_DSV2_COUPLE="none", ETX_DSV2_KVA="shared").items():
+        monkeypatch.setenv(k, v)
+    g = graph.build(layers=2, requests=4)
+    assert len(g.grids) > 0
+
+
 def test_two_requests_keep_the_historic_slots():
     from examples.dsv2lite.graph import CUS, _Req
     assert [(_Req(r, 2).off, _Req(r, 2).p) for r in range(2)] == [(0, "r0_"), (CUS, "r1_")]
     assert _Req(0, 1).off == 0 and _Req(0, 1).p == ""
 
 
-def test_batch_arms_are_the_kept_recipe_without_d4():
+def test_batch_arms_carry_the_kept_recipe_without_d4():
     kept = ARMS["alld4r0l1"]
     assert BATCH_ARMS == {1: "alld4r0l1kvsmw", 2: "x2", 4: "x4", 8: "x8"} and BATCHES == (1, 2, 4, 8)
+    # section 10: the batch arms carry the kept arm's two levers (M1, K1) as well, so a scaling ratio measures
+    # batching and not a recipe difference
     for b in (2, 4, 8):
         a = ARMS[f"x{b}"]
-        assert a.levers == kept.levers == (*LEVERS_ALL, "l1_loads")
-        assert a.flags == (f"-DETX_DS_REQUESTS={b}", "-DETX_SLOT_BY_CU")
-        assert a.env == dict(ETX_DSV2_COH="l1", ETX_DSV2_REQUESTS=str(b), ETX_DSV2_COUPLE="none")
+        assert a.levers == (*kept.levers, "merge_uv_waves")
+        assert a.flags == (f"-DETX_DS_REQUESTS={b}", "-DETX_SLOT_BY_CU", "-DETX_DSV2_KVA_SHARED=1")
+        assert a.env == dict(ETX_DSV2_COH="l1", ETX_DSV2_REQUESTS=str(b), ETX_DSV2_COUPLE="none", ETX_DSV2_KVA="shared")
         assert a.rule is None and a.order == ()
     assert [ARMS[f"x{b}"].scratch_allow for b in (2, 4, 8)] == [0, 64, 192] and kept.scratch_allow == 0
     b1 = ARMS[BATCH_ARMS[1]]                 # section 9: B = 1 is the kept arm, K1 + M1 on the same recipe
     assert b1.levers == (*kept.levers, "merge_uv_waves") and "-DETX_DSV2_KVA_SHARED=1" in b1.flags
+    assert b1.levers == ARMS["x2"].levers and b1.levers == ARMS["x4"].levers == ARMS["x8"].levers
 
 
 # ---------------------------------------------------------------- per-request gates (ETX)

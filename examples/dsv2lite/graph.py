@@ -269,7 +269,7 @@ def build(layers: int = LAYERS, routing_cached: bool | None = None, requests: in
     kva = os.environ.get("ETX_DSV2_KVA", "replicated")
     if kva not in ("replicated", "shared"):
         raise ValueError(f"ETX_DSV2_KVA={kva!r}: replicated | shared")
-    if kva == "shared" and (requests != 1 or os.environ.get("ETX_DSV2_D5", "0") == "1"):
+    if kva == "shared" and os.environ.get("ETX_DSV2_D5", "0") == "1":
         raise ValueError("ETX_DSV2_KVA=shared supports one request without ETX_DSV2_D5 only")
     g = Graph("dsv2lite_decode" if requests == 1 else f"dsv2lite_decode_x{requests}")
     g.tensor("layer_-1", (1,), role="runtime", bytes_per_elem=4)

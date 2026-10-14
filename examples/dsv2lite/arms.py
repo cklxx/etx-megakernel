@@ -102,8 +102,10 @@ ARMS = {a.name: a for a in [
     # Scratch: x2 0; x4 32 and x8 96 B/lane on the local ROCm 7.2.4 compile (7 / 21 VGPRs holding SGPR spills; the
     # spills grow with the task types, i.e. with the requests). Allowance: twice the local figure, since the box's
     # compiler differs (docs/BATCH-2026-10-14.md, local build evidence).
-    *(Arm(f"x{n}", levers=(*LEVERS_ALL, "l1_loads"), flags=(f"-DETX_DS_REQUESTS={n}", "-DETX_SLOT_BY_CU"),
-          env=dict(ETX_DSV2_COH="l1", ETX_DSV2_REQUESTS=str(n), ETX_DSV2_COUPLE="none"), scratch_allow=allow)
+    *(Arm(f"x{n}", levers=(*LEVERS_ALL, "l1_loads", "merge_uv_waves"),
+          flags=(f"-DETX_DS_REQUESTS={n}", "-DETX_SLOT_BY_CU", "-DETX_DSV2_KVA_SHARED=1"),
+          env=dict(ETX_DSV2_COH="l1", ETX_DSV2_REQUESTS=str(n), ETX_DSV2_COUPLE="none", ETX_DSV2_KVA="shared"),
+          scratch_allow=allow)
       for n, allow in ((2, 0), (4, 64), (8, 192))),
     Arm("allnoQ", levers=tuple(x for x in LEVERS_ALL if x != "gemv_no_terminal_all"),
         order=("default", "all", "allnoQ"), references=("default", "all"),

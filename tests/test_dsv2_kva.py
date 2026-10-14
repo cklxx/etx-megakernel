@@ -24,8 +24,10 @@ def clean_graph_env(monkeypatch):
             monkeypatch.delenv(key)
 
 
-def _plan(layers=27):
-    return compile_graph(dsv.build(layers=layers), "gfx942", {}, {}, PassOptions(inline_tiles=True, relay="on"))
+def _plan(layers=27, requests=None):
+    kw = {} if requests is None else {"requests": requests}
+    return compile_graph(dsv.build(layers=layers, **kw), "gfx942", {}, {},
+                         PassOptions(inline_tiles=True, relay="on"))
 
 
 def test_default_and_explicit_replicated_are_byte_identical(monkeypatch):
@@ -74,13 +76,24 @@ def test_the_kept_recipe_with_shared_kva_compiles(monkeypatch):
 @pytest.mark.parametrize("env, match", [
     ({"ETX_DSV2_KVA": "half"}, "replicated | shared"),
     ({"ETX_DSV2_KVA": "shared", "ETX_DSV2_D5": "1"}, "without ETX_DSV2_D5"),
-    ({"ETX_DSV2_KVA": "shared", "ETX_DSV2_REQUESTS": "2"}, "one request"),
 ])
 def test_unsupported_combinations_are_refused(monkeypatch, env, match):
     for k, v in env.items():
         monkeypatch.setenv(k, v)
     with pytest.raises(ValueError, match=match):
         dsv.build(layers=2)
+
+
+@pytest.mark.parametrize("requests", [2, 4, 8])
+def test_shared_kva_builds_for_more_than_one_request(monkeypatch, requests):
+    # section 10 of docs/BATCH-2026-10-14.md: the batch arms carry K1, so the one-request scope guard is gone; the
+    # qkv event stays device-scope, i.e. every attention task waits for all of that request's qkv tasks
+    for k, v in {"ETX_DSV2_KVA": "shared", "ETX_DSV2_REQUESTS": str(requests),
+                 "ETX_DSV2_COUPLE": "none"}.items():
+        monkeypatch.setenv(k, v)
+    plan = _plan(layers=27, requests=requests)
+    for r in range(requests):
+        assert all(plan.events[f"{'r0_' if r == 0 else f'r{r}_'}E_qkv_{L}"].scope == Scope.DEVICE for L in range(27))
 
 
 def test_the_k1_and_ablation_arms_differ_from_the_kept_arm_in_exactly_one_thing():
