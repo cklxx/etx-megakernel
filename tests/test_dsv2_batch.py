@@ -542,3 +542,11 @@ def test_baseline_refuses_a_model_other_than_the_prepared_model(tmp_path, monkey
     assert str(other) in str(exc.value)
     assert str(prepared) in str(exc.value)
     assert not calls
+
+
+def test_standalone_diagnostic_prepares_its_goldens():
+    from etx.tools.gpu_jobs import load_session
+    jobs, _ = load_session(ROOT / "examples/sessions/x8_diag.py")
+    names = [j.name for j in jobs]
+    assert "prep_goldens" in names
+    assert all(names.index("prep_goldens") < names.index(f"bgate_{a}") for a in ("x8p", "x8m", "x8k", "x8"))

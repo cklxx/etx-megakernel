@@ -45,5 +45,5 @@ for arm in CANDIDATES:
              reads=[f"b_{arm}/run" if p == "b_x8/run" else p for p in g["reads"]], writes=[f"bgate_{arm}.json"])
     _extra += [b, g]
 
-JOBS = [_by_name[n] for n in PREP] + _extra
+JOBS = [_by_name[n] for n in PREP] + [_by_name["prep_goldens"]] + _extra
 STUDIES = {"DeepSeek batch": [f"bgate_{a}" for a in CANDIDATES]}
