@@ -21,6 +21,13 @@ Labels: [M] measured, [E] estimate, [U] unknown. bf16, batch 1, context 1024, 32
 - Qwen alone: `examples/sessions/qwen_g6.py`.
 - Both on one box: `examples/sessions/joint_ds_qwen.py`. It builds no job of its own; it combines the two files'
   jobs, with Qwen prefixed `qwen_` and recorded under `qwen/`.
+- **Everything on one box (`examples/sessions/all_verify.py`):** the two above plus the batch 2/4/8 study
+  (`examples/sessions/ds_batch.py`), one runner, one cap **10800 s (3 h, about $6 at $1.99/h)** and one GPU lane:
+  `qwen_moerows` -> DeepSeek's five studies -> batch's seven jobs -> Qwen's staging, certificates and cache-mode study.
+  It redefines no job: the DeepSeek prep chain is taken once and the runner refuses duplicate names. Not included, with
+  the reason, are the two proposals with no testable arm yet (P3's epoch form, P4's row-partitioned combine).
+  Guard: `tests/test_all_verify.py` (cap, no duplicate names, the GPU order, every read has an earlier writer, no
+  cross-model hard dependency).
 
 ## The seven
 
