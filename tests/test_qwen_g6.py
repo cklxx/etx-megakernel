@@ -63,12 +63,26 @@ def test_job_graph_gates_every_gpu_job_on_what_it_runs():
     from etx.tools.gpu_jobs import load_session
     jobs, limit = load_session(ROOT / "examples/sessions/qwen_g6.py")
     by = {j.name: j for j in jobs}
-    assert [j.name for j in jobs if j.lane == "gpu"] == ["moerows", "certify_kept", "certify_kept_l1", "pairs_kept_l1"]
+    assert [j.name for j in jobs if j.lane == "gpu"] == ["moerows", "stage_pack", "certify_kept", "certify_kept_l1",
+                                                         "pairs_kept_l1"]
     assert by["moerows"].reads == ["b_hw/hw_bench"]                      # microbenchmark first; needs no model input
     assert all(by[f"build_{a}"].reads == ["inputs.json"] for a in ("kept", "kept_l1"))   # preflight refuses first
     assert {"certificate_kept/gate.log", "certificate_kept_l1/gate.log", "inputs.json"} <= set(by["pairs_kept_l1"].reads)
     assert by["certify_kept_l1"].reads == ["inputs.json", "b_kept_l1/arm.json"]
-    assert limit == 3600
+    assert limit == 7200
+
+
+def test_staging_is_pinned_before_anything_is_fetched():
+    from etx.tools.gpu_jobs import load_session
+    from examples.vllm_llm.vm_preflight import VLLM_TAG
+    jobs, _ = load_session(ROOT / "examples/sessions/qwen_g6.py")
+    by = {j.name: j for j in jobs}
+    dl = by["stage_dl"].cmd
+    assert "revision='ad44e777bcd18fa416d9da3bd8f70d33ebb85d39'" in dl and "Qwen/Qwen3-30B-A3B" in dl
+    assert "refusing to reuse it" in dl                                 # an unpinned earlier download is never reused
+    assert f"--branch {VLLM_TAG}" in by["stage_vllm"].cmd and f"rev-parse {VLLM_TAG}^{{commit}}" in by["stage_vllm"].cmd
+    assert "golden_c1024_qwen3-30b-a3b.txt" in by["stage_pack"].cmd and "--maxlen 1072" in by["stage_pack"].cmd
+    assert by["preflight"].reads[-1].endswith("qwen-g6.json")            # preflight waits for the staged config
 
 
 def test_pairs_writes_a_verdict_that_re_derives_from_the_raw_logs(tmp_path, monkeypatch):

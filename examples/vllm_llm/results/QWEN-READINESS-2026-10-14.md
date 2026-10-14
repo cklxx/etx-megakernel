@@ -1,6 +1,11 @@
 # Qwen3-30B-A3B: readiness for the next GPU session (2026-10-14)
 
 Labels: [M] measured, [E] estimate, [U] unknown. bf16 only. **No GPU has been used for anything in this file.**
+
+**Update (later on 2026-10-14):** the box staging in section 3 now runs inside the session as jobs
+(`examples/sessions/qwen_g6.py` stage_env / stage_vllm / stage_dl / stage_pack): the HF download is pinned to revision
+`ad44e777bcd18fa416d9da3bd8f70d33ebb85d39` before anything is fetched, closing section 3's open gap. The joint run with
+DeepSeek and its budget are in docs/EXPERIMENTS-2026-10-14.md.
 Conditions for every Qwen number: one MI300X VF, batch 1, context 1024, 32 tokens.
 
 ## Two questions, kept apart

@@ -28,7 +28,10 @@ INVOCATION_S = 240          # one host invocation: weight load (1-2 min for 16 G
 
 
 def record() -> Path:
-    return Path(os.environ.get("ETX_SESS_LOGDIR", ".")).resolve()
+    """The runner's log directory, or its ETX_QWEN_G6_RECORD subdirectory in a joint run (examples/sessions/joint_ds_qwen.py)."""
+    d = Path(os.environ.get("ETX_SESS_LOGDIR", ".")).resolve() / os.environ.get("ETX_QWEN_G6_RECORD", "")
+    d.mkdir(parents=True, exist_ok=True)
+    return d
 
 
 def config() -> dict:
