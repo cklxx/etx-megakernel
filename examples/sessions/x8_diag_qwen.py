@@ -13,6 +13,7 @@ Run: examples/dsv2lite/reproduce.sh stage <ip> &&
      ETX_SESS_USER=root ETX_SESS_MAX_SECONDS=5400 tools/session.sh start <ip> examples/sessions/x8_diag_qwen.py
 """
 import importlib.util
+import copy
 from pathlib import Path
 
 MAX_SESSION_SECONDS = 5400
@@ -26,7 +27,6 @@ def _load(name):
 
 
 _batch, _q = _load("ds_batch"), _load("qwen_g6")
-job, OP, GOLDENS, SUMMARY = _batch.job, _batch.OP, _batch.GOLDENS, _batch.SUMMARY
 _by_name = {j["name"]: j for j in _batch.JOBS}
 _qwen = {j["name"]: j for j in _q.jobs(prefix="qwen_", sub="qwen", shared_setup=True)}
 
@@ -35,18 +35,22 @@ CANDIDATES = ("x8p", "x8m", "x8k", "x8")
 QWEN = ("qwen_build_hw_bench", "qwen_stage_env", "qwen_stage_vllm", "qwen_stage_dl", "qwen_stage_pack",
         "qwen_preflight", "qwen_build_kept", "qwen_build_kept_l1", "qwen_certify_kept", "qwen_certify_kept_l1",
         "qwen_pairs_kept_l1")
+INPLACE = ".venv/bin/python -u -m examples.dsv2lite.inplace_session"
+BATCH = ".venv/bin/python -u -m examples.dsv2lite.batch_session"
 
+# The extra build/gate jobs copy the study's own jobs, so they inherit the box environment, timeouts and summary lines
+_extra = []
 for arm in CANDIDATES:
-    job(f"build_{arm}", f"build {arm}", lane="cpu", reads=["source.json"], writes=[f"b_{arm}/run"], timeout=1200)
-for arm in CANDIDATES:
-    job(f"bgate_{arm}", f"{OP} gate {arm}", lane="gpu", reads=("inputs.json", GOLDENS, f"b_{arm}/run"),
-        writes=[f"bgate_{arm}.json"], timeout=600, summary=SUMMARY)
+    b = copy.deepcopy(_by_name["build_x8"])
+    b.update(name=f"build_{arm}", cmd=f"{INPLACE} build {arm}", writes=[f"b_{arm}/run"])
+    g = copy.deepcopy(_by_name["bgate_x8"])
+    g.update(name=f"bgate_{arm}", cmd=f"{BATCH} gate {arm}", writes=[f"bgate_{arm}.json"])
+    _extra += [b, g]
 
-_after = {j["name"]: j for j in _batch.JOBS}
 CPU = [_by_name[n] for n in PREP]
 CPU += [_qwen[n] for n in QWEN if _qwen[n].get("lane") == "cpu"]
-CPU += [_after[f"build_{a}"] for a in CANDIDATES]
+CPU += [j for j in _extra if j["lane"] == "cpu"]
 GPU = [_qwen[n] for n in QWEN if _qwen[n].get("lane") == "gpu"]
-GPU += [_after[f"bgate_{a}"] for a in CANDIDATES]
+GPU += [j for j in _extra if j["lane"] == "gpu"]
 JOBS = CPU + GPU
 STUDIES = {"DeepSeek batch": [f"bgate_{a}" for a in CANDIDATES], "Qwen": ["qwen_pairs_kept_l1"]}

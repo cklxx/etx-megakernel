@@ -15,6 +15,7 @@ Only the build and gate jobs run here; the winner's timing is measured by the ba
 Run: examples/dsv2lite/reproduce.sh stage <ip> && ETX_SESS_USER=root ETX_SESS_MAX_SECONDS=2700 \
      tools/session.sh start <ip> examples/sessions/x8_diag.py
 """
+import copy
 import importlib.util
 from pathlib import Path
 
@@ -29,19 +30,19 @@ def _load(name):
 
 
 _batch = _load("ds_batch")
-job, OP, GOLDENS, SUMMARY = _batch.job, _batch.OP, _batch.GOLDENS, _batch.SUMMARY
-
 PREP = ("apt", "etx_env", "prep_env", "source", "prep_dl", "prep_ref", "prep_pack", "preflight")
-_prep = list(_batch.JOBS)          # ds_batch's own list, filtered by name below
-_by_name = {j["name"]: j for j in _prep}
 CANDIDATES = ("x8p", "x8m", "x8k", "x8")
+INPLACE = ".venv/bin/python -u -m examples.dsv2lite.inplace_session"
+BATCH = ".venv/bin/python -u -m examples.dsv2lite.batch_session"
 
+_by_name = {j["name"]: j for j in _batch.JOBS}
+_extra = []
 for arm in CANDIDATES:
-    job(f"build_{arm}", f"build {arm}", lane="cpu", reads=["source.json"], writes=[f"b_{arm}/run"], timeout=1200)
-for arm in CANDIDATES:
-    job(f"bgate_{arm}", f"{OP} gate {arm}", lane="gpu", reads=("inputs.json", GOLDENS, f"b_{arm}/run"),
-        writes=[f"bgate_{arm}.json"], timeout=600, summary=SUMMARY)
+    b = copy.deepcopy(_by_name["build_x8"])       # the existing job carries the box env, timeout and summary lines
+    b.update(name=f"build_{arm}", cmd=f"{INPLACE} build {arm}", writes=[f"b_{arm}/run"])
+    g = copy.deepcopy(_by_name["bgate_x8"])
+    g.update(name=f"bgate_{arm}", cmd=f"{BATCH} gate {arm}", writes=[f"bgate_{arm}.json"])
+    _extra += [b, g]
 
-_after = {j["name"]: j for j in _batch.JOBS}
-JOBS = [_by_name[n] for n in PREP] + [_after[f"build_{a}"] for a in CANDIDATES] + [_after[f"bgate_{a}"] for a in CANDIDATES]
+JOBS = [_by_name[n] for n in PREP] + _extra
 STUDIES = {"DeepSeek batch": [f"bgate_{a}" for a in CANDIDATES]}
