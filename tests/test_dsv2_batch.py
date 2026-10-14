@@ -471,3 +471,10 @@ def test_each_short_vllm_invocation_is_gated(tmp_path, monkeypatch, capsys, bad_
     assert len(shorts) == 6
     result = batch.vllm_results(capsys.readouterr().out, "default")[1]
     assert not result["legal"] and "diverged" in result["reason"]
+
+
+@pytest.mark.parametrize("sample", ["0", "-1", "-0.000001"])
+def test_nonpositive_vllm_sample_is_illegal(sample):
+    log = vllm_log(batches=(1,), per=("5", "5", sample, "5", "5"))
+    result = batch.vllm_results(log, "default")[1]
+    assert not result["legal"] and "nonpositive" in result["reason"]

@@ -87,6 +87,8 @@ def vllm_results(log: str, label: str, tokens: int = 32, samples: int = SAMPLES)
                   f"missing {missing[:4]}" if missing else f"diverged {[(p, r, seen[p, r]['first_divergence']) for p, r in bad[:4]]}")
         if len(per) != samples:
             reason = reason or f"{len(per)} samples, need {samples}"
+        if any(ns(x) <= 0 for x in per):
+            reason = reason or "nonpositive vLLM timing sample"
         if b in out:
             raise ValueError(f"two VLLMB lines for {label} batch {b}")
         out[b] = dict(step_ms=median_text(per) if len(per) % 2 else None, samples_ms=per, legal=not reason,
