@@ -1,0 +1,63 @@
+[08:12:17 +  0m00s] session record: /root/sess/20261014T081217Z-0ef82b
+[08:12:17 +  0m00s] start apt (cpu)
+[08:12:18 +  0m01s] ok      apt rc=0 1s
+[08:12:18 +  0m01s] start etx_env (cpu)
+[08:12:18 +  0m01s] start prep_env (cpu)
+[08:12:21 +  0m04s] ok      etx_env rc=0 3s
+[08:12:21 +  0m04s] start source (cpu)
+[08:12:22 +  0m05s] ok      prep_env rc=0 4s
+[08:12:22 +  0m05s] ok      source rc=0 1s
+    SOURCE OK fleet export 28f5cbb4f39524df etx 87b0a2f5c67c
+[08:12:22 +  0m05s] start prep_dl (cpu)
+[08:12:22 +  0m05s] start build_alld4r0l1 (cpu)
+[08:12:22 +  0m05s] start build_alld4r0l1mw (cpu)
+[08:12:22 +  0m05s] start build_alld4r0l1kvsmw (cpu)
+[08:12:23 +  0m06s] ok      prep_dl rc=0 1s
+[08:12:23 +  0m06s] start prep_ref on GPU 0
+[08:12:24 +  0m07s] ok      prep_ref rc=0 1s
+    # mkdir -p "$ETX_DSV2_DATA" && cd "$ETX_DSV2_FLEET" && { test -s "$ETX_DSV2_DATA/fleet_cache.bin" -a -s "$ETX_DSV2_DATA/golden_tokens.txt" -a -s "$ETX_DSV2_DATA/golden_hidden.bin" || HIP_VISIBLE_DEVICES=$GPU $HOME/dsv2-prep/.venv/bin/python
+    -rw-r--r--  1 root root         487 Oct 14 07:29 golden.json
+    -rw-r--r--  1 root root    29492654 Oct 14 07:29 golden.npz
+    -rw-r--r--  1 root root      221184 Oct 14 07:29 golden_hidden.bin
+    -rw-r--r--  1 root root         144 Oct 14 07:29 golden_tokens.txt
+[08:12:24 +  0m07s] start prep_pack (cpu)
+[08:12:25 +  0m08s] ok      prep_pack rc=0 1s
+[08:12:25 +  0m08s] start preflight (cpu)
+[08:12:46 +  0m29s] ok      preflight rc=0 21s
+    PREFLIGHT hashing /root/dsv2-data/weights.bin bytes=31412968448
+    PREFLIGHT hashing /root/dsv2-data/weights.bin.manifest bytes=9561
+    PREFLIGHT hashing /root/dsv2-data/fleet_cache.bin bytes=32845824
+    PREFLIGHT hashing /root/dsv2-data/golden_tokens.txt bytes=144
+    PREFLIGHT hashing /root/dsv2-data/golden_hidden.bin bytes=221184
+    PREFLIGHT OK inputs are the pinned measured inputs
+[08:12:53 +  0m36s] ok      build_alld4r0l1 rc=0 31s
+    BUILD arm=alld4r0l1 stamped=0 plan_sha256=3379ec89b21ebf97cc0406660ebfd7de63c547c6e50f2ca31bcc0894a3c4bab7 resources={'vgpr': 256, 'agpr': 108, 'sgpr': 106, 'scratch': 0, 'lds': 26668, 'occupancy': 1}
+    BUILD arm=alld4r0l1 OK
+[08:12:54 +  0m37s] ok      build_alld4r0l1mw rc=0 32s
+    BUILD arm=alld4r0l1mw stamped=0 plan_sha256=3379ec89b21ebf97cc0406660ebfd7de63c547c6e50f2ca31bcc0894a3c4bab7 resources={'vgpr': 256, 'agpr': 117, 'sgpr': 106, 'scratch': 0, 'lds': 26668, 'occupancy': 1}
+    BUILD arm=alld4r0l1mw OK
+[08:12:58 +  0m41s] ok      build_alld4r0l1kvsmw rc=0 36s
+    BUILD arm=alld4r0l1kvsmw stamped=0 plan_sha256=f23f959e82edaa9fe19147026c20d3b855e5af6c881a1858289c1c22ce15785f resources={'vgpr': 256, 'agpr': 119, 'sgpr': 108, 'scratch': 0, 'lds': 26668, 'occupancy': 1}
+    BUILD arm=alld4r0l1kvsmw OK
+[08:12:58 +  0m41s] start pairs_alld4r0l1kvsmw on GPU 0
+[08:13:17 +  1m00s] progress: 1 running, 0 waiting, 11 done
+    pairs_alld4r0l1kvsmw [GPU 0] 19s / 1200s: model: hidden 2048 heads 16 kv_lora 512 experts 64 top-6 layers 27 (dense < 1) vocab 102400
+[08:14:17 +  2m00s] progress: 1 running, 0 waiting, 11 done
+    pairs_alld4r0l1kvsmw [GPU 0] 79s / 1200s: model: hidden 2048 heads 16 kv_lora 512 experts 64 top-6 layers 27 (dense < 1) vocab 102400
+[08:14:27 +  2m10s] ok      pairs_alld4r0l1kvsmw rc=0 89s
+    PAIRS arm=alld4r0l1kvsmw device gain vs alld4r0l1 median 120.0 us spread 6.0 every_positive=1
+    PAIRS arm=alld4r0l1kvsmw device gain vs alld4r0l1mw median 52.0 us spread 10.0 every_positive=1
+[08:14:27 +  2m10s] session done
+  job                              status     rc  gpu  seconds
+  apt                              ok          0             1  
+  etx_env                          ok          0             3  
+  prep_env                         ok          0             4  
+  source                           ok          0             1  
+  prep_dl                          ok          0             1  
+  prep_ref                         ok          0    0        1  
+  prep_pack                        ok          0             1  
+  preflight                        ok          0            21  
+  build_alld4r0l1                  ok          0            31  
+  build_alld4r0l1mw                ok          0            32  
+  build_alld4r0l1kvsmw             ok          0            36  
+  pairs_alld4r0l1kvsmw             ok          0    0       89  

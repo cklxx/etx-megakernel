@@ -1,0 +1,98 @@
+[
+ {
+  "name": "apt",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 1.0003376007080078,
+  "note": ""
+ },
+ {
+  "name": "etx_env",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 3.0012142658233643,
+  "note": ""
+ },
+ {
+  "name": "prep_env",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 4.0018346309661865,
+  "note": ""
+ },
+ {
+  "name": "source",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 1.0008599758148193,
+  "note": ""
+ },
+ {
+  "name": "prep_dl",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 1.0021083354949951,
+  "note": ""
+ },
+ {
+  "name": "prep_ref",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 1.0005204677581787,
+  "note": ""
+ },
+ {
+  "name": "prep_pack",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 1.0004518032073975,
+  "note": ""
+ },
+ {
+  "name": "preflight",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 21.003204822540283,
+  "note": ""
+ },
+ {
+  "name": "build_alld4r0l1",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 31.011714220046997,
+  "note": ""
+ },
+ {
+  "name": "build_alld4r0l1mw",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 32.01212167739868,
+  "note": ""
+ },
+ {
+  "name": "build_alld4r0l1kvsmw",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 36.01336097717285,
+  "note": ""
+ },
+ {
+  "name": "pairs_alld4r0l1kvsmw",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 89.01390433311462,
+  "note": ""
+ }
+]

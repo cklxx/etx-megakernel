@@ -1,12 +1,13 @@
-# Experiment index, 2026-10-14: DeepSeek and Qwen, seven studies (five DeepSeek measured) and four open proposals
+# Experiment index, 2026-10-14: DeepSeek and Qwen, eight studies (six DeepSeek measured; new DeepSeek kept arm alld4r0l1kvsmw) and four open proposals
 
 Labels: [M] measured, [E] estimate, [U] unknown. bf16, batch 1, context 1024, 32 tokens throughout. Larger batches
 (2/4/8) are a separate, prepared study with its own session and rules: docs/BATCH-2026-10-14.md,
 `examples/sessions/ds_batch.py` (DeepSeek; not run, not counted below).
 
-**Count:** 7 experiments = 6 decision studies + 1 attribution-only trace.
-- **DeepSeek (5):** K1, M1, two ablations, one trace. **All five measured on 2026-10-14:** K1 KEEP +41 us,
-  M1 KEEP +66 us, both ablated levers STAY, trace recorded. K1 and M1 together are not yet measured.
+**Count:** 8 experiments = 7 decision studies + 1 attribution-only trace.
+- **DeepSeek (6):** K1, M1, two ablations, one trace, KM. **All six measured on 2026-10-14:** K1 KEEP +41 us,
+  M1 KEEP +66 us, both ablated levers STAY, trace recorded, KM (K1 + M1) KEEP +52 us over M1 alone, +120 us over
+  `alld4r0l1`. **The DeepSeek kept arm is now `alld4r0l1kvsmw`.**
 - **Qwen (2):** moerows, the common cache mode.
 - **Not counted:** `certify_kept` / `certify_kept_l1` (correctness gates), `moegather` (moerows' cross-check),
   preflights and builds.
@@ -79,6 +80,18 @@ Labels: [M] measured, [E] estimate, [U] unknown. bf16, batch 1, context 1024, 32
 - **Result (2026-10-14), attribution only:** span 3380.9 us. Against the kept arm's stamped token of 2026-10-13
   (another session): qkv 434.2 -> 329.8 us (−3.9 us/layer, below the −5..−7 estimate), attention 308.7 -> 354.0 us
   (+1.7 us/layer, inside the +1..+4 estimate).
+
+**4b. DeepSeek KM: K1 and M1 together** (`pairs_alld4r0l1kvsmw`, `examples/sessions/ds_km.py`)
+- **Mechanism:** the K1 build plus lever `merge_uv_waves`.
+- **Rationale:** both passed alone; they touch the same attention tasks, so the sum was not a measurement.
+- **Status:** built (ROCm 7.2.4: plan f23f959e = K1's, 79 AGPR, 0 scratch).
+- **Baseline:** `alld4r0l1mw` (deciding); `alld4r0l1` for attribution.
+- **Rule (bf92fd4):** KEEP if every pair is faster than `alld4r0l1mw`, median >= 30 us and > 2 x spread; otherwise
+  M1 alone becomes the kept arm.
+- **Result (2026-10-14, `examples/dsv2lite/results/2026-10-14-km`): KEEP, +52 us over M1 alone [M]** (pairs 48, 52,
+  50, 58, 54; spread 10); +120 us over `alld4r0l1` (spread 6). All 15 runs 32/32, 27/27. Device 3.068-3.075 ms.
+- **Not yet carried over:** the batch study's arms (docs/BATCH-2026-10-14.md) still use `alld4r0l1` as B = 1 and
+  its recipe for x2/x4/x8. K1 needs D4, which refuses multiple requests, so moving them is a separate change.
 
 **5. Qwen moerows: row ownership between MoE workgroups** (`qwen_moerows`, `hw_bench moerows`)
 - **Mechanism:** contiguous vs interleaved rows, Qwen's moe_up shape, cold, checksummed. One kernel for both modes.

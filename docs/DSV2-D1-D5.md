@@ -618,3 +618,7 @@ shortened chain is hidden behind the cross-XCD kv_a read that K1 adds, the gain 
 ### KM local evidence (ROCm 7.2.4, `rocm_build_check.sh --arm alld4r0l1kvsmw`)
 - plan f23f959e (= K1's: M1 is tile code only); 256 VGPR / 79 AGPR (K1 71 + M1's 8) / 0 scratch / 1 wave.
 - Session `examples/sessions/ds_km.py`: the prep chain (skips what the box holds), three builds, one pairs job.
+
+### KM result (2026-10-14, `examples/dsv2lite/results/2026-10-14-km`)
+**KEEP** [M]: +52 us over `alld4r0l1mw` (pairs 48, 52, 50, 58, 54; spread 10), +120 us over `alld4r0l1` (spread 6);
+all 15 runs 32/32 and 27/27. The DeepSeek kept arm is now `alld4r0l1kvsmw` (device 3.068-3.075 ms on this VF).
