@@ -1,0 +1,395 @@
+# job vsel gpu=0 cwd=/root/etx
+# .venv/bin/python -u -m examples.dsv2lite.batch_session vsel
+$ stdbuf -oL -eL docker run --rm --device=/dev/kfd --device=/dev/dri --group-add video --ipc=host --shm-size 16g --security-opt seccomp=unconfined -e HIP_VISIBLE_DEVICES=0 -e PYTHONUNBUFFERED=1 -e VLLM_ROCM_USE_AITER=0 -v /root:/root -w /root/src/5743f6abf68b22ece007377a9072bc3a9ddbc6b1d3a51fc3ca6b6addc373c7dd-20261014T142559Z --entrypoint timeout vllm/vllm-openai-rocm@sha256:bb44b39aea26798cce43030a98bf48efd0322ca7147367db86e38b96bd80f0e7 -k 5 870 python3 examples/llm/vllm_bench.py --model /root/models/dsv2-lite-base --goldens /root/dsv2-data/vllm/golden_r0.txt /root/dsv2-data/vllm/golden_r1.txt /root/dsv2-data/vllm/golden_r2.txt /root/dsv2-data/vllm/golden_r3.txt /root/dsv2-data/vllm/golden_r4.txt /root/dsv2-data/vllm/golden_r5.txt /root/dsv2-data/vllm/golden_r6.txt /root/dsv2-data/vllm/golden_r7.txt --batches 1,2,4,8 --tokens 32 --repeats 5 --label default --echo-config --json /root/sess/20261014T142757Z-03ff3e/vsel_default.json
+INFO 10-14 14:32:38 [api_utils.py:273] non-default args: {'trust_remote_code': True, 'dtype': 'bfloat16', 'max_model_len': 1072, 'gpu_memory_utilization': 0.85, 'disable_log_stats': True, 'model': '/root/models/dsv2-lite-base'}
+INFO 10-14 14:32:38 [model.py:645] Resolved architecture: DeepseekV2ForCausalLM
+INFO 10-14 14:32:38 [model.py:1883] Using max model len 1072
+INFO 10-14 14:32:38 [scheduler.py:242] Chunked prefill is enabled with max_num_batched_tokens=16384.
+INFO 10-14 14:32:38 [kernel.py:306] Final IR op priority after setting platform defaults: IrOpPriorityConfig(rms_norm=['native'], fused_add_rms_norm=['native'])
+WARNING 10-14 14:32:39 [rocm.py:123] Using CUDA_VISIBLE_DEVICES on ROCm is deprecated and support will be removed in vLLM v0.26.0. Please use HIP_VISIBLE_DEVICES instead.
+(EngineCore pid=75) INFO 10-14 14:32:39 [core.py:121] Initializing a V1 LLM engine (v0.27.1) with config: model='/root/models/dsv2-lite-base', speculative_config=None, tokenizer='/root/models/dsv2-lite-base', skip_tokenizer_init=False, tokenizer_mode=auto, revision=None, tokenizer_revision=None, trust_remote_code=True, dtype=torch.bfloat16, max_seq_len=1072, download_dir=None, load_format=auto, tensor_parallel_size=1, pipeline_parallel_size=1, data_parallel_size=1, decode_context_parallel_size=1, dcp_comm_backend=ag_rs, disable_custom_all_reduce=False, quantization=None, quantization_config=None, enforce_eager=False, enable_return_routed_experts=False, kv_cache_dtype=auto, device_config=cuda, structured_outputs_config=StructuredOutputsConfig(backend='auto', disable_any_whitespace=False, disable_additional_properties=False, reasoning_parser='', reasoning_parser_plugin='', enable_in_reasoning=False), observability_config=ObservabilityConfig(show_hidden_metrics_for_version=None, otlp_traces_endpoint=None, collect_detailed_traces=None, kv_cache_metrics=False, kv_cache_metrics_sample=0.01, cudagraph_metrics=False, enable_layerwise_nvtx_tracing=False, enable_mfu_metrics=False, enable_mm_processor_stats=False, enable_logging_iteration_details=False, jit_monitor_mode='warn', jit_monitor_verbose=False), seed=0, served_model_name=/root/models/dsv2-lite-base, enable_prefix_caching=True, enable_chunked_prefill=True, pooler_config=None, compilation_config={'mode': <CompilationMode.VLLM_COMPILE: 3>, 'debug_dump_path': None, 'cache_dir': '', 'compile_cache_save_format': 'binary', 'backend': 'inductor', 'custom_ops': ['+sparse_attn_indexer', 'none'], 'ir_enable_torch_wrap': True, 'splitting_ops': ['vllm::unified_attention_with_output', 'vllm::unified_mla_attention_with_output', 'vllm::mamba_mixer2', 'vllm::mamba_mixer', 'vllm::short_conv', 'vllm::linear_attention', 'vllm::qwen_gdn_attention_core', 'vllm::gdn_attention_core_xpu', 'vllm::olmo_hybrid_gdn_full_forward', 'vllm::sparse_attn_indexer', 'vllm::rocm_aiter_sparse_attn_indexer', 'vllm::deepseek_v4_attention', 'vllm::hpc_rope_norm_forward', 'vllm::unified_kv_cache_update', 'vllm::unified_mla_kv_cache_update'], 'compile_mm_encoder': False, 'cudagraph_mm_encoder': False, 'encoder_cudagraph_token_budgets': [], 'encoder_cudagraph_max_vision_items_per_batch': 0, 'encoder_cudagraph_max_frames_per_batch': None, 'compile_sizes': [], 'compile_ranges_endpoints': [16384], 'inductor_compile_config': {'enable_auto_functionalized_v2': False, 'size_asserts': False, 'alignment_asserts': False, 'scalar_asserts': False, 'combo_kernels': True, 'benchmark_combo_kernel': True}, 'inductor_passes': {}, 'cudagraph_mode': <CUDAGraphMode.FULL_AND_PIECEWISE: (2, 1)>, 'cudagraph_num_of_warmups': 1, 'cudagraph_capture_sizes': [1, 2, 4, 8, 16, 24, 32, 40, 48, 56, 64, 72, 80, 88, 96, 104, 112, 120, 128, 136, 144, 152, 160, 168, 176, 184, 192, 200, 208, 216, 224, 232, 240, 248, 256, 272, 288, 304, 320, 336, 352, 368, 384, 400, 416, 432, 448, 464, 480, 496, 512], 'cudagraph_copy_inputs': False, 'cudagraph_specialize_lora': True, 'use_inductor_graph_partition': False, 'pass_config': {'fuse_norm_quant': False, 'fuse_act_quant': False, 'fuse_attn_quant': False, 'enable_sp': False, 'fuse_gemm_comms': False, 'fuse_allreduce_rms': False, 'enable_qk_norm_rope_fusion': False, 'fuse_rope_kvcache_cat_mla': False, 'fuse_act_padding': False, 'fuse_mla_dual_rms_norm': False, 'fuse_rope_kvcache': False, 'fuse_qk_norm_rope_kvcache': False}, 'max_cudagraph_capture_size': 512, 'dynamic_shapes_config': {'type': <DynamicShapesType.BACKED: 'backed'>, 'evaluate_guards': False, 'assume_32_bit_indexing': False}, 'local_cache_dir': None, 'fast_moe_cold_start': False, 'static_all_moe_layers': []}, kernel_config=KernelConfig(ir_op_priority=IrOpPriorityConfig(rms_norm=['native'], fused_add_rms_norm=['native']), enable_flashinfer_autotune=True, enable_cutedsl_warmup=True, enable_jit_warmup=True, enable_bf16x3_router_gemm=False, moe_backend='auto', linear_backend='auto')
+(EngineCore pid=75) INFO 10-14 14:32:40 [parallel_state.py:1640] world_size=1 rank=0 local_rank=0 distributed_init_method=tcp://172.17.0.3:60385 backend=nccl
+(EngineCore pid=75) INFO 10-14 14:32:40 [parallel_state.py:1977] rank 0 in world size 1 is assigned as DP rank 0, PP rank 0, PCP rank 0, TP rank 0, EP rank 0, EPLB rank N/A
+(EngineCore pid=75) INFO 10-14 14:32:40 [gpu_worker.py:385] Using V2 Model Runner
+(EngineCore pid=75) INFO 10-14 14:32:40 [model_runner.py:308] Loading model from scratch...
+(EngineCore pid=75) INFO 10-14 14:32:40 [rocm.py:660] Using TRITON_MLA backend out of potential backends: ['TRITON_MLA'].
+(EngineCore pid=75) INFO 10-14 14:32:40 [selector.py:190] Using FLASH_ATTN MLA prefill backend.
+(EngineCore pid=75) INFO 10-14 14:32:40 [unquantized.py:304] Using TRITON Unquantized MoE backend out of potential backends: ['TRITON', 'BATCHED_TRITON'].
+(EngineCore pid=75) WARNING 10-14 14:32:41 [compilation.py:1347] Op 'sparse_attn_indexer' not present in model, enabling with '+sparse_attn_indexer' has no effect
+(EngineCore pid=75) INFO 10-14 14:32:41 [weight_utils.py:867] Filesystem type for checkpoints: EXT4. Checkpoint size: 29.26 GiB. Available RAM: 227.51 GiB.
+(EngineCore pid=75) INFO 10-14 14:32:41 [weight_utils.py:890] Auto-prefetch is disabled because the filesystem (EXT4) is not a recognized network FS (NFS/Lustre). If you want to force prefetching, start vLLM with --safetensors-load-strategy=prefetch.
+(EngineCore pid=75) Loading safetensors checkpoint shards:   0% Completed | 0/4 [00:00<?, ?it/s]
+(EngineCore pid=75) Loading safetensors checkpoint shards:  25% Completed | 1/4 [00:03<00:09,  3.25s/it]
+(EngineCore pid=75) Loading safetensors checkpoint shards:  50% Completed | 2/4 [00:06<00:06,  3.46s/it]
+(EngineCore pid=75) Loading safetensors checkpoint shards:  75% Completed | 3/4 [00:10<00:03,  3.46s/it]
+(EngineCore pid=75) Loading safetensors checkpoint shards: 100% Completed | 4/4 [00:12<00:00,  3.10s/it]
+(EngineCore pid=75) Loading safetensors checkpoint shards: 100% Completed | 4/4 [00:12<00:00,  3.21s/it]
+(EngineCore pid=75) 
+(EngineCore pid=75) INFO 10-14 14:32:54 [default_loader.py:430] Loading weights took 13.11 seconds
+(EngineCore pid=75) INFO 10-14 14:32:54 [unquantized.py:383] Using MoEPrepareAndFinalizeNoDPEPModular
+(EngineCore pid=75) INFO 10-14 14:32:54 [unquantized.py:384] Using TritonExperts MoE backend
+(EngineCore pid=75) INFO 10-14 14:32:54 [model_runner.py:329] Model loading took 30.42 GiB and 14.305260 seconds
+(EngineCore pid=75) INFO 10-14 14:32:56 [backends.py:1094] Using cache directory: /root/.cache/vllm/torch_compile_cache/083203550c/rank_0_0/backbone for vLLM's torch.compile
+(EngineCore pid=75) INFO 10-14 14:32:56 [backends.py:1155] Dynamo bytecode transform time: 1.43 s
+(EngineCore pid=75) INFO 10-14 14:32:57 [backends.py:292] Directly load the compiled graph(s) for compile range (1, 16384) from the cache, took 0.833 s
+(EngineCore pid=75) INFO 10-14 14:32:57 [decorators.py:311] Directly load AOT compilation from path /root/.cache/vllm/torch_compile_cache/torch_aot_compile/b66667f68c85ea6c00114f918a2b7d1fc9783b4a42e2292a59290e3a8782d6ae/rank_0_0/model
+(EngineCore pid=75) INFO 10-14 14:32:57 [monitor.py:53] torch.compile took 2.41 s in total
+(EngineCore pid=75) WARNING 10-14 14:32:58 [fused_moe.py:1161] Using default MoE config. Performance might be sub-optimal! Config file not found at /usr/local/lib/python3.12/dist-packages/vllm/model_executor/layers/fused_moe/configs/E=64,N=1408,device_name=AMD_Instinct_MI300X.json
+(EngineCore pid=75) INFO 10-14 14:32:58 [monitor.py:81] Initial profiling/warmup run took 1.00 s
+(EngineCore pid=75) INFO 10-14 14:32:58 [gpu_worker.py:563] Available KV cache memory: 129.98 GiB
+(EngineCore pid=75) INFO 10-14 14:32:58 [kv_cache_utils.py:2235] GPU KV cache size: 4,487,152 tokens
+(EngineCore pid=75) INFO 10-14 14:32:58 [kv_cache_utils.py:2236] Maximum concurrency for 1,072 tokens per request: 4185.78x
+(EngineCore pid=75) INFO 10-14 14:32:59 [ll_bf16.py:30] cuteDSL (CUTLASS Python) not available, ll_bf16_gemm disabled
+PROGRESS invocation=vsel_default elapsed_s=30.2 deadline_s=900
+(EngineCore pid=75) Capturing CUDA graphs (PIECEWISE):   0%|          | 0/51 [00:00<?, ?it/s]Capturing CUDA graphs (PIECEWISE):   2%|▏         | 1/51 [00:01<00:55,  1.12s/it]Capturing CUDA graphs (PIECEWISE):   6%|▌         | 3/51 [00:01<00:17,  2.78it/s]Capturing CUDA graphs (PIECEWISE):  10%|▉         | 5/51 [00:01<00:10,  4.48it/s]Capturing CUDA graphs (PIECEWISE):  14%|█▎        | 7/51 [00:01<00:07,  5.93it/s]Capturing CUDA graphs (PIECEWISE):  18%|█▊        | 9/51 [00:01<00:05,  7.06it/s]Capturing CUDA graphs (PIECEWISE):  22%|██▏       | 11/51 [00:02<00:04,  8.17it/s]Capturing CUDA graphs (PIECEWISE):  25%|██▌       | 13/51 [00:02<00:04,  8.97it/s]Capturing CUDA graphs (PIECEWISE):  29%|██▉       | 15/51 [00:02<00:03,  9.62it/s]Capturing CUDA graphs (PIECEWISE):  33%|███▎      | 17/51 [00:02<00:03, 10.18it/s]Capturing CUDA graphs (PIECEWISE):  37%|███▋      | 19/51 [00:02<00:03, 10.57it/s]Capturing CUDA graphs (PIECEWISE):  41%|████      | 21/51 [00:02<00:02, 10.74it/s]Capturing CUDA graphs (PIECEWISE):  45%|████▌     | 23/51 [00:03<00:02, 10.72it/s]Capturing CUDA graphs (PIECEWISE):  49%|████▉     | 25/51 [00:03<00:02, 10.79it/s]Capturing CUDA graphs (PIECEWISE):  53%|█████▎    | 27/51 [00:03<00:02, 10.99it/s]Capturing CUDA graphs (PIECEWISE):  57%|█████▋    | 29/51 [00:03<00:01, 11.19it/s]Capturing CUDA graphs (PIECEWISE):  61%|██████    | 31/51 [00:03<00:01, 11.11it/s]Capturing CUDA graphs (PIECEWISE):  65%|██████▍   | 33/51 [00:04<00:01, 11.05it/s]Capturing CUDA graphs (PIECEWISE):  69%|██████▊   | 35/51 [00:04<00:01, 11.20it/s]Capturing CUDA graphs (PIECEWISE):  73%|███████▎  | 37/51 [00:04<00:01, 11.23it/s]Capturing CUDA graphs (PIECEWISE):  76%|███████▋  | 39/51 [00:04<00:01, 11.37it/s]Capturing CUDA graphs (PIECEWISE):  80%|████████  | 41/51 [00:04<00:00, 11.18it/s]Capturing CUDA graphs (PIECEWISE):  84%|████████▍ | 43/51 [00:04<00:00, 11.04it/s]Capturing CUDA graphs (PIECEWISE):  88%|████████▊ | 45/51 [00:05<00:00, 11.13it/s]Capturing CUDA graphs (PIECEWISE):  92%|█████████▏| 47/51 [00:05<00:00, 11.29it/s]Capturing CUDA graphs (PIECEWISE):  96%|█████████▌| 49/51 [00:05<00:00, 11.05it/s]Capturing CUDA graphs (PIECEWISE): 100%|██████████| 51/51 [00:05<00:00, 10.22it/s]Capturing CUDA graphs (PIECEWISE): 100%|██████████| 51/51 [00:05<00:00,  8.99it/s]
+(EngineCore pid=75) Capturing CUDA graphs (FULL):   0%|          | 0/51 [00:00<?, ?it/s]Capturing CUDA graphs (FULL):   4%|▍         | 2/51 [00:00<00:04, 11.98it/s]Capturing CUDA graphs (FULL):   8%|▊         | 4/51 [00:00<00:03, 12.76it/s]Capturing CUDA graphs (FULL):  12%|█▏        | 6/51 [00:00<00:03, 12.99it/s]Capturing CUDA graphs (FULL):  16%|█▌        | 8/51 [00:00<00:03, 13.16it/s]Capturing CUDA graphs (FULL):  20%|█▉        | 10/51 [00:00<00:03, 13.26it/s]Capturing CUDA graphs (FULL):  24%|██▎       | 12/51 [00:00<00:02, 13.32it/s]Capturing CUDA graphs (FULL):  27%|██▋       | 14/51 [00:01<00:02, 13.36it/s]Capturing CUDA graphs (FULL):  31%|███▏      | 16/51 [00:01<00:02, 13.31it/s]Capturing CUDA graphs (FULL):  35%|███▌      | 18/51 [00:01<00:02, 13.23it/s]Capturing CUDA graphs (FULL):  39%|███▉      | 20/51 [00:01<00:02, 13.16it/s]Capturing CUDA graphs (FULL):  43%|████▎     | 22/51 [00:01<00:02, 13.22it/s]Capturing CUDA graphs (FULL):  47%|████▋     | 24/51 [00:01<00:02, 13.23it/s]Capturing CUDA graphs (FULL):  51%|█████     | 26/51 [00:01<00:01, 13.28it/s]Capturing CUDA graphs (FULL):  55%|█████▍    | 28/51 [00:02<00:01, 13.27it/s]Capturing CUDA graphs (FULL):  59%|█████▉    | 30/51 [00:02<00:01, 13.30it/s]Capturing CUDA graphs (FULL):  63%|██████▎   | 32/51 [00:02<00:01, 13.26it/s]Capturing CUDA graphs (FULL):  67%|██████▋   | 34/51 [00:02<00:01, 13.30it/s]Capturing CUDA graphs (FULL):  71%|███████   | 36/51 [00:02<00:01, 13.30it/s]Capturing CUDA graphs (FULL):  75%|███████▍  | 38/51 [00:02<00:00, 13.34it/s]Capturing CUDA graphs (FULL):  78%|███████▊  | 40/51 [00:03<00:00, 13.38it/s]Capturing CUDA graphs (FULL):  82%|████████▏ | 42/51 [00:03<00:00, 13.41it/s]Capturing CUDA graphs (FULL):  86%|████████▋ | 44/51 [00:03<00:00, 13.44it/s]Capturing CUDA graphs (FULL):  90%|█████████ | 46/51 [00:03<00:00, 13.49it/s]Capturing CUDA graphs (FULL):  94%|█████████▍| 48/51 [00:03<00:00, 13.53it/s]Capturing CUDA graphs (FULL):  98%|█████████▊| 50/51 [00:03<00:00, 13.98it/s]Capturing CUDA graphs (FULL): 100%|██████████| 51/51 [00:03<00:00, 13.39it/s]
+(EngineCore pid=75) INFO 10-14 14:33:08 [model_runner.py:791] Graph capturing finished in 10 secs, took 3.31 GiB
+(EngineCore pid=75) INFO 10-14 14:33:08 [gpu_worker.py:789] Free memory on device (191.36/191.69 GiB) on startup. Desired GPU memory utilization is (0.85, 162.93 GiB). Actual usage is 32.21 GiB for consumed memory (weights + non-torch), 0.74 GiB for peak activation, and 3.31 GiB for CUDAGraph memory. Replace gpu_memory_utilization config with `--kv-cache-memory=135852231373` (126.52 GiB) to fit into requested memory, or `--kv-cache-memory=166377537024` (154.95 GiB) to fully utilize gpu memory. Current kv cache memory in use is 129.98 GiB.
+(EngineCore pid=75) INFO 10-14 14:33:11 [jit_monitor.py:79] Kernel JIT monitor activated; monitored JIT compilations during inference will use mode=warn.
+(EngineCore pid=75) INFO 10-14 14:33:11 [core.py:348] init engine (profile, create kv cache, warmup model) took 16.76 s (compilation: 2.41 s)
+(EngineCore pid=75) INFO 10-14 14:33:11 [kernel.py:306] Final IR op priority after setting platform defaults: IrOpPriorityConfig(rms_norm=['native'], fused_add_rms_norm=['native'])
+INFO 10-14 14:33:11 [hf.py:540] Detected the chat template content format to be 'string'. You can set `--chat-template-content-format` to override this.
+VLLM-CONFIG {"attention_backend": null, "cudagraph_mode": "FULL_AND_PIECEWISE", "env": {"HIP_FORCE_DEV_KERNARG": "1", "HIP_VISIBLE_DEVICES": "0", "VLLM_ROCM_USE_AITER": "0"}}
+VLLM-BATCH-MODE label=default version=0.27.1 context=1024 batches=1,2,4,8 aiter=0
+VLLM-PROGRESS label=default batch=1 warm-up
+VLLMSEQ label=default batch=1 phase=warmup seq=0 first_divergence=32/32 tokens=32
+(EngineCore pid=75) WARNING 10-14 14:33:12 [jit_monitor.py:135] Triton kernel JIT compilation during inference: merge_attn_states_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.
+VLLMSEQ label=default batch=1 phase=sample0 seq=0 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=1 phase=sample1 seq=0 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=1 phase=sample2 seq=0 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=1 phase=sample3 seq=0 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=1 phase=sample4 seq=0 first_divergence=32/32 tokens=32
+VLLMB label=default batch=1 per_token_ms=7.863613,7.912147,7.855961,7.886438,7.913931
+VLLM-PROGRESS label=default batch=2 warm-up
+(EngineCore pid=75) WARNING 10-14 14:33:13 [jit_monitor.py:135] Triton kernel JIT compilation during inference: mask_empty_context_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.
+VLLMSEQ label=default batch=2 phase=warmup seq=0 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=2 phase=warmup seq=1 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=2 phase=sample0 seq=0 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=2 phase=sample0 seq=1 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=2 phase=sample1 seq=0 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=2 phase=sample1 seq=1 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=2 phase=sample2 seq=0 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=2 phase=sample2 seq=1 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=2 phase=sample3 seq=0 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=2 phase=sample3 seq=1 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=2 phase=sample4 seq=0 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=2 phase=sample4 seq=1 first_divergence=32/32 tokens=32
+VLLMB label=default batch=2 per_token_ms=8.763046,9.697900,9.647755,8.805445,9.663751
+VLLM-PROGRESS label=default batch=4 warm-up
+(EngineCore pid=75) WARNING 10-14 14:33:15 [jit_monitor.py:135] Triton kernel JIT compilation during inference: fused_moe_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.
+VLLMSEQ label=default batch=4 phase=warmup seq=0 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=4 phase=warmup seq=1 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=4 phase=warmup seq=2 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=4 phase=warmup seq=3 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=4 phase=sample0 seq=0 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=4 phase=sample0 seq=1 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=4 phase=sample0 seq=2 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=4 phase=sample0 seq=3 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=4 phase=sample1 seq=0 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=4 phase=sample1 seq=1 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=4 phase=sample1 seq=2 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=4 phase=sample1 seq=3 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=4 phase=sample2 seq=0 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=4 phase=sample2 seq=1 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=4 phase=sample2 seq=2 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=4 phase=sample2 seq=3 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=4 phase=sample3 seq=0 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=4 phase=sample3 seq=1 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=4 phase=sample3 seq=2 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=4 phase=sample3 seq=3 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=4 phase=sample4 seq=0 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=4 phase=sample4 seq=1 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=4 phase=sample4 seq=2 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=4 phase=sample4 seq=3 first_divergence=32/32 tokens=32
+VLLMB label=default batch=4 per_token_ms=10.054065,10.005485,10.689531,10.056974,11.048918
+VLLM-PROGRESS label=default batch=8 warm-up
+VLLMSEQ label=default batch=8 phase=warmup seq=0 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=8 phase=warmup seq=1 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=8 phase=warmup seq=2 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=8 phase=warmup seq=3 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=8 phase=warmup seq=4 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=8 phase=warmup seq=5 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=8 phase=warmup seq=6 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=8 phase=warmup seq=7 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=8 phase=sample0 seq=0 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=8 phase=sample0 seq=1 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=8 phase=sample0 seq=2 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=8 phase=sample0 seq=3 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=8 phase=sample0 seq=4 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=8 phase=sample0 seq=5 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=8 phase=sample0 seq=6 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=8 phase=sample0 seq=7 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=8 phase=sample1 seq=0 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=8 phase=sample1 seq=1 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=8 phase=sample1 seq=2 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=8 phase=sample1 seq=3 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=8 phase=sample1 seq=4 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=8 phase=sample1 seq=5 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=8 phase=sample1 seq=6 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=8 phase=sample1 seq=7 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=8 phase=sample2 seq=0 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=8 phase=sample2 seq=1 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=8 phase=sample2 seq=2 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=8 phase=sample2 seq=3 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=8 phase=sample2 seq=4 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=8 phase=sample2 seq=5 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=8 phase=sample2 seq=6 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=8 phase=sample2 seq=7 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=8 phase=sample3 seq=0 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=8 phase=sample3 seq=1 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=8 phase=sample3 seq=2 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=8 phase=sample3 seq=3 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=8 phase=sample3 seq=4 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=8 phase=sample3 seq=5 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=8 phase=sample3 seq=6 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=8 phase=sample3 seq=7 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=8 phase=sample4 seq=0 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=8 phase=sample4 seq=1 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=8 phase=sample4 seq=2 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=8 phase=sample4 seq=3 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=8 phase=sample4 seq=4 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=8 phase=sample4 seq=5 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=8 phase=sample4 seq=6 first_divergence=32/32 tokens=32
+VLLMSEQ label=default batch=8 phase=sample4 seq=7 first_divergence=32/32 tokens=32
+VLLMB label=default batch=8 per_token_ms=12.854723,12.637024,12.715420,12.863610,13.114460
+INFO 10-14 14:33:21 [utils.py:612] [shutdown] Process manager: send sigterm to process EngineCore
+(EngineCore pid=75) INFO 10-14 14:33:21 [core.py:1332] [shutdown] EngineCore: trigger received signal=SIGTERM
+(EngineCore pid=75) INFO 10-14 14:33:21 [core.py:1468] [shutdown] EngineCore: start mode=abort timeout=0s
+(EngineCore pid=75) INFO 10-14 14:33:21 [core.py:1499] [shutdown] EngineCore: request processing complete; starting resource teardown
+(EngineCore pid=75) INFO 10-14 14:33:21 [core.py:1345] [shutdown] EngineCore: exiting busy loop
+$ stdbuf -oL -eL docker run --rm --device=/dev/kfd --device=/dev/dri --group-add video --ipc=host --shm-size 16g --security-opt seccomp=unconfined -e HIP_VISIBLE_DEVICES=0 -e PYTHONUNBUFFERED=1 -e VLLM_ROCM_USE_AITER=1 -v /root:/root -w /root/src/5743f6abf68b22ece007377a9072bc3a9ddbc6b1d3a51fc3ca6b6addc373c7dd-20261014T142559Z --entrypoint timeout vllm/vllm-openai-rocm@sha256:bb44b39aea26798cce43030a98bf48efd0322ca7147367db86e38b96bd80f0e7 -k 5 870 python3 examples/llm/vllm_bench.py --model /root/models/dsv2-lite-base --goldens /root/dsv2-data/vllm/golden_r0.txt /root/dsv2-data/vllm/golden_r1.txt /root/dsv2-data/vllm/golden_r2.txt /root/dsv2-data/vllm/golden_r3.txt /root/dsv2-data/vllm/golden_r4.txt /root/dsv2-data/vllm/golden_r5.txt /root/dsv2-data/vllm/golden_r6.txt /root/dsv2-data/vllm/golden_r7.txt --batches 1,2,4,8 --tokens 32 --repeats 5 --label aiter --echo-config --json /root/sess/20261014T142757Z-03ff3e/vsel_aiter.json
+INFO 10-14 14:33:33 [api_utils.py:273] non-default args: {'trust_remote_code': True, 'dtype': 'bfloat16', 'max_model_len': 1072, 'gpu_memory_utilization': 0.85, 'disable_log_stats': True, 'model': '/root/models/dsv2-lite-base'}
+INFO 10-14 14:33:33 [model.py:645] Resolved architecture: DeepseekV2ForCausalLM
+INFO 10-14 14:33:33 [model.py:1883] Using max model len 1072
+INFO 10-14 14:33:33 [scheduler.py:242] Chunked prefill is enabled with max_num_batched_tokens=16384.
+INFO 10-14 14:33:33 [kernel.py:306] Final IR op priority after setting platform defaults: IrOpPriorityConfig(rms_norm=['aiter', 'native'], fused_add_rms_norm=['aiter', 'native'])
+INFO 10-14 14:33:33 [compilation.py:329] Enabled custom fusions: norm_quant, act_quant, mla_dual_rms_norm
+WARNING 10-14 14:33:34 [rocm.py:123] Using CUDA_VISIBLE_DEVICES on ROCm is deprecated and support will be removed in vLLM v0.26.0. Please use HIP_VISIBLE_DEVICES instead.
+(EngineCore pid=75) INFO 10-14 14:33:34 [core.py:121] Initializing a V1 LLM engine (v0.27.1) with config: model='/root/models/dsv2-lite-base', speculative_config=None, tokenizer='/root/models/dsv2-lite-base', skip_tokenizer_init=False, tokenizer_mode=auto, revision=None, tokenizer_revision=None, trust_remote_code=True, dtype=torch.bfloat16, max_seq_len=1072, download_dir=None, load_format=auto, tensor_parallel_size=1, pipeline_parallel_size=1, data_parallel_size=1, decode_context_parallel_size=1, dcp_comm_backend=ag_rs, disable_custom_all_reduce=False, quantization=None, quantization_config=None, enforce_eager=False, enable_return_routed_experts=False, kv_cache_dtype=auto, device_config=cuda, structured_outputs_config=StructuredOutputsConfig(backend='auto', disable_any_whitespace=False, disable_additional_properties=False, reasoning_parser='', reasoning_parser_plugin='', enable_in_reasoning=False), observability_config=ObservabilityConfig(show_hidden_metrics_for_version=None, otlp_traces_endpoint=None, collect_detailed_traces=None, kv_cache_metrics=False, kv_cache_metrics_sample=0.01, cudagraph_metrics=False, enable_layerwise_nvtx_tracing=False, enable_mfu_metrics=False, enable_mm_processor_stats=False, enable_logging_iteration_details=False, jit_monitor_mode='warn', jit_monitor_verbose=False), seed=0, served_model_name=/root/models/dsv2-lite-base, enable_prefix_caching=True, enable_chunked_prefill=True, pooler_config=None, compilation_config={'mode': <CompilationMode.VLLM_COMPILE: 3>, 'debug_dump_path': None, 'cache_dir': '', 'compile_cache_save_format': 'binary', 'backend': 'inductor', 'custom_ops': ['+quant_fp8', '+grouped_topk', '+sparse_attn_indexer', 'none'], 'ir_enable_torch_wrap': True, 'splitting_ops': ['vllm::unified_attention_with_output', 'vllm::unified_mla_attention_with_output', 'vllm::mamba_mixer2', 'vllm::mamba_mixer', 'vllm::short_conv', 'vllm::linear_attention', 'vllm::qwen_gdn_attention_core', 'vllm::gdn_attention_core_xpu', 'vllm::olmo_hybrid_gdn_full_forward', 'vllm::sparse_attn_indexer', 'vllm::rocm_aiter_sparse_attn_indexer', 'vllm::deepseek_v4_attention', 'vllm::hpc_rope_norm_forward', 'vllm::unified_kv_cache_update', 'vllm::unified_mla_kv_cache_update'], 'compile_mm_encoder': False, 'cudagraph_mm_encoder': False, 'encoder_cudagraph_token_budgets': [], 'encoder_cudagraph_max_vision_items_per_batch': 0, 'encoder_cudagraph_max_frames_per_batch': None, 'compile_sizes': [], 'compile_ranges_endpoints': [16384], 'inductor_compile_config': {'enable_auto_functionalized_v2': False, 'size_asserts': False, 'alignment_asserts': False, 'scalar_asserts': False, 'combo_kernels': True, 'benchmark_combo_kernel': True}, 'inductor_passes': {}, 'cudagraph_mode': <CUDAGraphMode.FULL_AND_PIECEWISE: (2, 1)>, 'cudagraph_num_of_warmups': 1, 'cudagraph_capture_sizes': [1, 2, 4, 8, 16, 24, 32, 40, 48, 56, 64, 72, 80, 88, 96, 104, 112, 120, 128, 136, 144, 152, 160, 168, 176, 184, 192, 200, 208, 216, 224, 232, 240, 248, 256, 272, 288, 304, 320, 336, 352, 368, 384, 400, 416, 432, 448, 464, 480, 496, 512], 'cudagraph_copy_inputs': False, 'cudagraph_specialize_lora': True, 'use_inductor_graph_partition': False, 'pass_config': {'fuse_norm_quant': True, 'fuse_act_quant': True, 'fuse_attn_quant': False, 'enable_sp': False, 'fuse_gemm_comms': False, 'fuse_allreduce_rms': False, 'enable_qk_norm_rope_fusion': False, 'fuse_rope_kvcache_cat_mla': False, 'fuse_act_padding': False, 'fuse_mla_dual_rms_norm': True, 'fuse_rope_kvcache': False, 'fuse_qk_norm_rope_kvcache': False}, 'max_cudagraph_capture_size': 512, 'dynamic_shapes_config': {'type': <DynamicShapesType.BACKED: 'backed'>, 'evaluate_guards': False, 'assume_32_bit_indexing': False}, 'local_cache_dir': None, 'fast_moe_cold_start': False, 'static_all_moe_layers': []}, kernel_config=KernelConfig(ir_op_priority=IrOpPriorityConfig(rms_norm=['aiter', 'native'], fused_add_rms_norm=['aiter', 'native']), enable_flashinfer_autotune=True, enable_cutedsl_warmup=True, enable_jit_warmup=True, enable_bf16x3_router_gemm=False, moe_backend='auto', linear_backend='auto')
+(EngineCore pid=75) INFO 10-14 14:33:35 [parallel_state.py:1640] world_size=1 rank=0 local_rank=0 distributed_init_method=tcp://172.17.0.3:49415 backend=nccl
+(EngineCore pid=75) INFO 10-14 14:33:35 [parallel_state.py:1977] rank 0 in world size 1 is assigned as DP rank 0, PP rank 0, PCP rank 0, TP rank 0, EP rank 0, EPLB rank N/A
+(EngineCore pid=75) INFO 10-14 14:33:35 [gpu_worker.py:385] Using V2 Model Runner
+(EngineCore pid=75) INFO 10-14 14:33:35 [model_runner.py:308] Loading model from scratch...
+(EngineCore pid=75) INFO 10-14 14:33:36 [rocm.py:660] Using ROCM_AITER_MLA backend out of potential backends: ['ROCM_AITER_MLA', 'TRITON_MLA', 'ROCM_AITER_TRITON_MLA'].
+(EngineCore pid=75) [aiter] import [module_aiter_core] under /usr/local/lib/python3.12/dist-packages/aiter/jit/module_aiter_core.so
+(EngineCore pid=75) INFO 10-14 14:33:36 [selector.py:190] Using ROCM_AITER_FA MLA prefill backend.
+(EngineCore pid=75) INFO 10-14 14:33:36 [unquantized.py:272] Using ROCm AITER Unquantized MoE backend out of potential backends: ['ROCm AITER', 'TRITON', 'BATCHED_TRITON'].
+(EngineCore pid=75) WARNING 10-14 14:33:37 [compilation.py:1347] Op 'grouped_topk' not present in model, enabling with '+grouped_topk' has no effect
+(EngineCore pid=75) WARNING 10-14 14:33:37 [compilation.py:1347] Op 'sparse_attn_indexer' not present in model, enabling with '+sparse_attn_indexer' has no effect
+(EngineCore pid=75) INFO 10-14 14:33:37 [weight_utils.py:867] Filesystem type for checkpoints: EXT4. Checkpoint size: 29.26 GiB. Available RAM: 227.61 GiB.
+(EngineCore pid=75) INFO 10-14 14:33:37 [weight_utils.py:890] Auto-prefetch is disabled because the filesystem (EXT4) is not a recognized network FS (NFS/Lustre). If you want to force prefetching, start vLLM with --safetensors-load-strategy=prefetch.
+(EngineCore pid=75) Loading safetensors checkpoint shards:   0% Completed | 0/4 [00:00<?, ?it/s]
+(EngineCore pid=75) Loading safetensors checkpoint shards:  25% Completed | 1/4 [00:03<00:09,  3.20s/it]
+(EngineCore pid=75) Loading safetensors checkpoint shards:  50% Completed | 2/4 [00:06<00:06,  3.50s/it]
+(EngineCore pid=75) Loading safetensors checkpoint shards:  75% Completed | 3/4 [00:10<00:03,  3.49s/it]
+(EngineCore pid=75) Loading safetensors checkpoint shards: 100% Completed | 4/4 [00:12<00:00,  3.09s/it]
+(EngineCore pid=75) Loading safetensors checkpoint shards: 100% Completed | 4/4 [00:12<00:00,  3.22s/it]
+(EngineCore pid=75) 
+(EngineCore pid=75) INFO 10-14 14:33:50 [default_loader.py:430] Loading weights took 13.12 seconds
+(EngineCore pid=75) INFO 10-14 14:33:50 [unquantized.py:383] Using MoEPrepareAndFinalizeNoDPEPModular
+(EngineCore pid=75) INFO 10-14 14:33:50 [unquantized.py:384] Using AiterExperts MoE backend
+(EngineCore pid=75) [Aiter Triton] Pre-compiling fp8 BMM kernel:   0%|          | 0/1024 [00:00<?, ?it/s][Aiter Triton] Pre-compiling fp8 BMM kernel:   0%|          | 1/1024 [00:00<08:33,  1.99it/s][Aiter Triton] Pre-compiling fp8 BMM kernel:  67%|██████▋   | 681/1024 [00:00<00:00, 1507.08it/s][Aiter Triton] Pre-compiling fp8 BMM kernel: 100%|██████████| 1024/1024 [00:00<00:00, 1596.22it/s]
+(EngineCore pid=75) [Aiter Triton] Pre-compiling fp8 BMM kernel:   0%|          | 0/1024 [00:00<?, ?it/s][Aiter Triton] Pre-compiling fp8 BMM kernel:  86%|████████▌ | 876/1024 [00:00<00:00, 8753.83it/s][Aiter Triton] Pre-compiling fp8 BMM kernel: 100%|██████████| 1024/1024 [00:00<00:00, 8474.63it/s]
+(EngineCore pid=75) [Aiter Triton] Pre-compiling fp8 BMM kernel:   0%|          | 0/1024 [00:00<?, ?it/s][Aiter Triton] Pre-compiling fp8 BMM kernel:  85%|████████▍ | 866/1024 [00:00<00:00, 8654.09it/s][Aiter Triton] Pre-compiling fp8 BMM kernel: 100%|██████████| 1024/1024 [00:00<00:00, 8592.41it/s]
+(EngineCore pid=75) [Aiter Triton] Pre-compiling fp8 BMM kernel:   0%|          | 0/1024 [00:00<?, ?it/s][Aiter Triton] Pre-compiling fp8 BMM kernel:  86%|████████▋ | 884/1024 [00:00<00:00, 8835.69it/s][Aiter Triton] Pre-compiling fp8 BMM kernel: 100%|██████████| 1024/1024 [00:00<00:00, 8834.58it/s]
+(EngineCore pid=75) [Aiter Triton] Pre-compiling fp8 BMM kernel:   0%|          | 0/1024 [00:00<?, ?it/s][Aiter Triton] Pre-compiling fp8 BMM kernel:  87%|████████▋ | 886/1024 [00:00<00:00, 8857.66it/s][Aiter Triton] Pre-compiling fp8 BMM kernel: 100%|██████████| 1024/1024 [00:00<00:00, 8824.51it/s]
+(EngineCore pid=75) [Aiter Triton] Pre-compiling fp8 BMM kernel:   0%|          | 0/1024 [00:00<?, ?it/s][Aiter Triton] Pre-compiling fp8 BMM kernel:  87%|████████▋ | 891/1024 [00:00<00:00, 8904.83it/s][Aiter Triton] Pre-compiling fp8 BMM kernel: 100%|██████████| 1024/1024 [00:00<00:00, 8896.27it/s]
+(EngineCore pid=75) [Aiter Triton] Pre-compiling fp8 BMM kernel:   0%|          | 0/1024 [00:00<?, ?it/s][Aiter Triton] Pre-compiling fp8 BMM kernel:  79%|███████▉  | 813/1024 [00:00<00:00, 8127.86it/s][Aiter Triton] Pre-compiling fp8 BMM kernel: 100%|██████████| 1024/1024 [00:00<00:00, 8251.11it/s]
+(EngineCore pid=75) [Aiter Triton] Pre-compiling fp8 BMM kernel:   0%|          | 0/1024 [00:00<?, ?it/s][Aiter Triton] Pre-compiling fp8 BMM kernel:  85%|████████▌ | 872/1024 [00:00<00:00, 8714.40it/s][Aiter Triton] Pre-compiling fp8 BMM kernel: 100%|██████████| 1024/1024 [00:00<00:00, 8718.78it/s]
+(EngineCore pid=75) [Aiter Triton] Pre-compiling fp8 BMM kernel:   0%|          | 0/1024 [00:00<?, ?it/s][Aiter Triton] Pre-compiling fp8 BMM kernel:  86%|████████▌ | 882/1024 [00:00<00:00, 8812.51it/s][Aiter Triton] Pre-compiling fp8 BMM kernel: 100%|██████████| 1024/1024 [00:00<00:00, 8760.59it/s]
+(EngineCore pid=75) [Aiter Triton] Pre-compiling fp8 BMM kernel:   0%|          | 0/1024 [00:00<?, ?it/s][Aiter Triton] Pre-compiling fp8 BMM kernel:  82%|████████▏ | 842/1024 [00:00<00:00, 8411.22it/s][Aiter Triton] Pre-compiling fp8 BMM kernel: 100%|██████████| 1024/1024 [00:00<00:00, 8464.74it/s]
+(EngineCore pid=75) [Aiter Triton] Pre-compiling fp8 BMM kernel:   0%|          | 0/1024 [00:00<?, ?it/s][Aiter Triton] Pre-compiling fp8 BMM kernel:  77%|███████▋  | 793/1024 [00:00<00:00, 7929.21it/s][Aiter Triton] Pre-compiling fp8 BMM kernel: 100%|██████████| 1024/1024 [00:00<00:00, 8008.59it/s]
+(EngineCore pid=75) [Aiter Triton] Pre-compiling fp8 BMM kernel:   0%|          | 0/1024 [00:00<?, ?it/s][Aiter Triton] Pre-compiling fp8 BMM kernel:  85%|████████▍ | 869/1024 [00:00<00:00, 8681.81it/s][Aiter Triton] Pre-compiling fp8 BMM kernel: 100%|██████████| 1024/1024 [00:00<00:00, 8689.50it/s]
+(EngineCore pid=75) [Aiter Triton] Pre-compiling fp8 BMM kernel:   0%|          | 0/1024 [00:00<?, ?it/s][Aiter Triton] Pre-compiling fp8 BMM kernel:  86%|████████▌ | 877/1024 [00:00<00:00, 8763.05it/s][Aiter Triton] Pre-compiling fp8 BMM kernel: 100%|██████████| 1024/1024 [00:00<00:00, 8758.32it/s]
+(EngineCore pid=75) [Aiter Triton] Pre-compiling fp8 BMM kernel:   0%|          | 0/1024 [00:00<?, ?it/s][Aiter Triton] Pre-compiling fp8 BMM kernel:  86%|████████▋ | 884/1024 [00:00<00:00, 8837.99it/s][Aiter Triton] Pre-compiling fp8 BMM kernel: 100%|██████████| 1024/1024 [00:00<00:00, 8771.95it/s]
+(EngineCore pid=75) [Aiter Triton] Pre-compiling fp8 BMM kernel:   0%|          | 0/1024 [00:00<?, ?it/s][Aiter Triton] Pre-compiling fp8 BMM kernel:  79%|███████▉  | 811/1024 [00:00<00:00, 8105.25it/s][Aiter Triton] Pre-compiling fp8 BMM kernel: 100%|██████████| 1024/1024 [00:00<00:00, 8243.54it/s]
+(EngineCore pid=75) [Aiter Triton] Pre-compiling fp8 BMM kernel:   0%|          | 0/1024 [00:00<?, ?it/s][Aiter Triton] Pre-compiling fp8 BMM kernel:  86%|████████▌ | 881/1024 [00:00<00:00, 8803.48it/s][Aiter Triton] Pre-compiling fp8 BMM kernel: 100%|██████████| 1024/1024 [00:00<00:00, 8794.24it/s]
+(EngineCore pid=75) [Aiter Triton] Pre-compiling fp8 BMM kernel:   0%|          | 0/1024 [00:00<?, ?it/s][Aiter Triton] Pre-compiling fp8 BMM kernel:  87%|████████▋ | 888/1024 [00:00<00:00, 8875.82it/s][Aiter Triton] Pre-compiling fp8 BMM kernel: 100%|██████████| 1024/1024 [00:00<00:00, 8863.17it/s]
+(EngineCore pid=75) [Aiter Triton] Pre-compiling fp8 BMM kernel:   0%|          | 0/1024 [00:00<?, ?it/s][Aiter Triton] Pre-compiling fp8 BMM kernel:  87%|████████▋ | 890/1024 [00:00<00:00, 8890.36it/s][Aiter Triton] Pre-compiling fp8 BMM kernel: 100%|██████████| 1024/1024 [00:00<00:00, 8874.52it/s]
+(EngineCore pid=75) [Aiter Triton] Pre-compiling fp8 BMM kernel:   0%|          | 0/1024 [00:00<?, ?it/s][Aiter Triton] Pre-compiling fp8 BMM kernel:  82%|████████▏ | 835/1024 [00:00<00:00, 8339.17it/s][Aiter Triton] Pre-compiling fp8 BMM kernel: 100%|██████████| 1024/1024 [00:00<00:00, 8321.39it/s]
+(EngineCore pid=75) [Aiter Triton] Pre-compiling fp8 BMM kernel:   0%|          | 0/1024 [00:00<?, ?it/s][Aiter Triton] Pre-compiling fp8 BMM kernel:  84%|████████▍ | 862/1024 [00:00<00:00, 8611.14it/s][Aiter Triton] Pre-compiling fp8 BMM kernel: 100%|██████████| 1024/1024 [00:00<00:00, 8589.68it/s]
+(EngineCore pid=75) [Aiter Triton] Pre-compiling fp8 BMM kernel:   0%|          | 0/1024 [00:00<?, ?it/s][Aiter Triton] Pre-compiling fp8 BMM kernel:  87%|████████▋ | 890/1024 [00:00<00:00, 8892.59it/s][Aiter Triton] Pre-compiling fp8 BMM kernel: 100%|██████████| 1024/1024 [00:00<00:00, 8873.20it/s]
+(EngineCore pid=75) [Aiter Triton] Pre-compiling fp8 BMM kernel:   0%|          | 0/1024 [00:00<?, ?it/s][Aiter Triton] Pre-compiling fp8 BMM kernel:  87%|████████▋ | 890/1024 [00:00<00:00, 8895.51it/s][Aiter Triton] Pre-compiling fp8 BMM kernel: 100%|██████████| 1024/1024 [00:00<00:00, 8870.33it/s]
+(EngineCore pid=75) [Aiter Triton] Pre-compiling fp8 BMM kernel:   0%|          | 0/1024 [00:00<?, ?it/s][Aiter Triton] Pre-compiling fp8 BMM kernel:  86%|████████▌ | 880/1024 [00:00<00:00, 8789.30it/s][Aiter Triton] Pre-compiling fp8 BMM kernel: 100%|██████████| 1024/1024 [00:00<00:00, 8537.68it/s]
+(EngineCore pid=75) [Aiter Triton] Pre-compiling fp8 BMM kernel:   0%|          | 0/1024 [00:00<?, ?it/s][Aiter Triton] Pre-compiling fp8 BMM kernel:  85%|████████▍ | 869/1024 [00:00<00:00, 8689.61it/s][Aiter Triton] Pre-compiling fp8 BMM kernel: 100%|██████████| 1024/1024 [00:00<00:00, 8700.10it/s]
+(EngineCore pid=75) [Aiter Triton] Pre-compiling fp8 BMM kernel:   0%|          | 0/1024 [00:00<?, ?it/s][Aiter Triton] Pre-compiling fp8 BMM kernel:  87%|████████▋ | 890/1024 [00:00<00:00, 8896.68it/s][Aiter Triton] Pre-compiling fp8 BMM kernel: 100%|██████████| 1024/1024 [00:00<00:00, 8871.04it/s]
+(EngineCore pid=75) [Aiter Triton] Pre-compiling fp8 BMM kernel:   0%|          | 0/1024 [00:00<?, ?it/s][Aiter Triton] Pre-compiling fp8 BMM kernel:  86%|████████▌ | 879/1024 [00:00<00:00, 8781.68it/s]PROGRESS invocation=vsel_aiter elapsed_s=30.1 deadline_s=900
+[Aiter Triton] Pre-compiling fp8 BMM kernel: 100%|██████████| 1024/1024 [00:00<00:00, 8734.19it/s]
+(EngineCore pid=75) [Aiter Triton] Pre-compiling fp8 BMM kernel:   0%|          | 0/1024 [00:00<?, ?it/s][Aiter Triton] Pre-compiling fp8 BMM kernel:  86%|████████▋ | 884/1024 [00:00<00:00, 8832.01it/s][Aiter Triton] Pre-compiling fp8 BMM kernel: 100%|██████████| 1024/1024 [00:00<00:00, 8821.77it/s]
+(EngineCore pid=75) INFO 10-14 14:33:54 [model_runner.py:329] Model loading took 29.35 GiB and 18.721484 seconds
+(EngineCore pid=75) INFO 10-14 14:33:55 [backends.py:1094] Using cache directory: /root/.cache/vllm/torch_compile_cache/c114d941f0/rank_0_0/backbone for vLLM's torch.compile
+(EngineCore pid=75) INFO 10-14 14:33:55 [backends.py:1155] Dynamo bytecode transform time: 0.94 s
+(EngineCore pid=75) INFO 10-14 14:33:57 [backends.py:292] Directly load the compiled graph(s) for compile range (1, 16384) from the cache, took 0.860 s
+(EngineCore pid=75) INFO 10-14 14:33:57 [decorators.py:311] Directly load AOT compilation from path /root/.cache/vllm/torch_compile_cache/torch_aot_compile/870c2ed7ef92f44c1e2d8da18f5cf9a9f3ce249cc3cbb263360a839a762a9dad/rank_0_0/model
+(EngineCore pid=75) INFO 10-14 14:33:57 [monitor.py:53] torch.compile took 2.82 s in total
+(EngineCore pid=75) [aiter] import [module_rmsnorm_quant] under /usr/local/lib/python3.12/dist-packages/aiter/jit/module_rmsnorm_quant.so
+(EngineCore pid=75) [aiter] import [module_moe_asm] under /usr/local/lib/python3.12/dist-packages/aiter/jit/module_moe_asm.so
+(EngineCore pid=75) [aiter] merge tuned file under model_configs/ and configs/ /usr/local/lib/python3.12/dist-packages/aiter/configs/tuned_fmoe.csv:/usr/local/lib/python3.12/dist-packages/aiter/configs/model_configs/a8w8_blockscale_tuned_fmoe_minimax-m2_5.csv:/usr/local/lib/python3.12/dist-packages/aiter/configs/model_configs/glm5_fp4_tuned_fmoe.csv:/usr/local/lib/python3.12/dist-packages/aiter/configs/model_configs/minimax_m3_mxfp8_tuned_fmoe.csv:/usr/local/lib/python3.12/dist-packages/aiter/configs/model_configs/a8w8_blockscale_tuned_fmoe_ds_v3.csv:/usr/local/lib/python3.12/dist-packages/aiter/configs/model_configs/kimik3_a8w4_tuned_fmoe.csv:/usr/local/lib/python3.12/dist-packages/aiter/configs/model_configs/glm5_mxfp8_tuned_fmoe.csv:/usr/local/lib/python3.12/dist-packages/aiter/configs/model_configs/mimo_v2_5_pro_tuned_fmoe.csv:/usr/local/lib/python3.12/dist-packages/aiter/configs/model_configs/a8w8_blockscale_tuned_fmoe_qwen3_235b.csv:/usr/local/lib/python3.12/dist-packages/aiter/configs/model_configs/a8w8_blockscale_tuned_fmoe_glm5_1.csv:/usr/local/lib/python3.12/dist-packages/aiter/configs/model_configs/kimik2_fp8fp4_tuned_fmoe.csv:/usr/local/lib/python3.12/dist-packages/aiter/configs/model_configs/gptoss_a16w4_tuned_fmoe.csv:/usr/local/lib/python3.12/dist-packages/aiter/configs/model_configs/kimik2_fp4_tuned_fmoe.csv:/usr/local/lib/python3.12/dist-packages/aiter/configs/model_configs/glm5_ptpc_tuned_fmoe.csv:/usr/local/lib/python3.12/dist-packages/aiter/configs/model_configs/minimax_m25_fp4_tuned_fmoe.csv:/usr/local/lib/python3.12/dist-packages/aiter/configs/model_configs/kimik2_i4_tuned_fmoe.csv:/usr/local/lib/python3.12/dist-packages/aiter/configs/model_configs/kimik3_fp4_tuned_fmoe.csv:/usr/local/lib/python3.12/dist-packages/aiter/configs/model_configs/a8w8_blockscale_tuned_fmoe_glm5.csv:/usr/local/lib/python3.12/dist-packages/aiter/configs/model_configs/glm47_fp8_tuned_fmoe.csv:/usr/local/lib/python3.12/dist-packages/aiter/configs/model_configs/dsv3_fp4_tuned_fmoe.csv:/usr/local/lib/python3.12/dist-packages/aiter/configs/model_configs/qwen3next_80b_fp8_tuned_fmoe.csv:/usr/local/lib/python3.12/dist-packages/aiter/configs/model_configs/gptoss_fp8fp4_tuned_fmoe.csv:/usr/local/lib/python3.12/dist-packages/aiter/configs/model_configs/dsv4_fp8fp4_tuned_fmoe.csv:/usr/local/lib/python3.12/dist-packages/aiter/configs/model_configs/qwen3_235b_bf16_tuned_fmoe.csv:/usr/local/lib/python3.12/dist-packages/aiter/configs/model_configs/gptoss_fp4_tuned_fmoe.csv:/usr/local/lib/python3.12/dist-packages/aiter/configs/model_configs/a8w8_blockscale_tuned_fmoe_qwen3_5_397b.csv:/usr/local/lib/python3.12/dist-packages/aiter/configs/model_configs/minimax_m3_fp4_tuned_fmoe.csv:/usr/local/lib/python3.12/dist-packages/aiter/configs/model_configs/qwen3_5_397b_fp4_tuned_fmoe.csv
+(EngineCore pid=75) [aiter] [fused_moe] duplicate tuned rows after disabling act_type in /tmp/aiter_configs/tuned_fmoe.csv; keeping first match for 449 rows
+(EngineCore pid=75) [aiter] run_1stage = False, xbf16 = False, ksplit = 0 q_type = QuantType.No block_m = 128 use_nt = False, estimated_m_per_expert = 1536
+(EngineCore pid=75) [aiter] [fused_moe] using 2stage default for ('gfx942', 304, 16384, 2048, 1408, 64, 6, 'ActivationType.Silu', 'torch.bfloat16', 'torch.bfloat16', 'torch.bfloat16', 'QuantType.No', True, False) 
+(EngineCore pid=75) [aiter] import [module_moe_sorting_opus] under /usr/local/lib/python3.12/dist-packages/aiter/jit/module_moe_sorting_opus.so
+(EngineCore pid=75) [aiter] import [module_moe_ck2stages_b16_b16_preshuffle_on_b16_silu_no_mulWeightStage2] under /usr/local/lib/python3.12/dist-packages/aiter/jit/module_moe_ck2stages_b16_b16_preshuffle_on_b16_silu_no_mulWeightStage2.so
+(EngineCore pid=75) [aiter] type hints mismatch, override to --> ck_moe_stage1(hidden_states: torch.Tensor, w1: torch.Tensor, w2: torch.Tensor, sorted_token_ids: torch.Tensor, sorted_expert_ids: torch.Tensor, num_valid_ids: torch.Tensor, out: torch.Tensor, topk: int, kernelName: str = None, w1_scale: Optional[torch.Tensor] = None, a1_scale: Optional[torch.Tensor] = None, block_m: Optional[int] = 32, sorted_weights: Optional[torch.Tensor] = None, quant_type: int = 0, activation: int = 0, splitk: Optional[int] = 1, non_temporal_load: bool = False, dst_type: Optional[str] = None, is_shuffled: bool = True) -> None
+(EngineCore pid=75) [aiter] type hints mismatch, override to --> ck_moe_stage2(inter_states: torch.Tensor, w1: torch.Tensor, w2: torch.Tensor, sorted_token_ids: torch.Tensor, sorted_expert_ids: torch.Tensor, num_valid_ids: torch.Tensor, out: torch.Tensor, topk: int, kernelName: str = None, w2_scale: Optional[torch.Tensor] = None, a2_scale: Optional[torch.Tensor] = None, block_m: Optional[int] = 32, sorted_weights: Optional[torch.Tensor] = None, quant_type: int = 0, activation: int = 0, splitk: Optional[int] = 1, non_temporal_load: bool = False, dst_type: Optional[str] = None, is_shuffled: bool = True) -> None
+(EngineCore pid=75) INFO 10-14 14:34:00 [monitor.py:81] Initial profiling/warmup run took 3.49 s
+(EngineCore pid=75) INFO 10-14 14:34:01 [gpu_worker.py:563] Available KV cache memory: 131.02 GiB
+(EngineCore pid=75) INFO 10-14 14:34:01 [kv_cache_utils.py:2235] GPU KV cache size: 4,522,880 tokens
+(EngineCore pid=75) INFO 10-14 14:34:01 [kv_cache_utils.py:2236] Maximum concurrency for 1,072 tokens per request: 4219.10x
+(EngineCore pid=75) INFO 10-14 14:34:01 [ll_bf16.py:30] cuteDSL (CUTLASS Python) not available, ll_bf16_gemm disabled
+(EngineCore pid=75) Capturing CUDA graphs (PIECEWISE):   0%|          | 0/51 [00:00<?, ?it/s][aiter] import [module_mla_metadata] under /usr/local/lib/python3.12/dist-packages/aiter/jit/module_mla_metadata.so
+[aiter] LoadKernel: _ZN5aiter42mla_a16w16_qh16_m16x4_n16x1_coex0_mask1_psE hsaco: /usr/local/lib/python3.12/dist-packages/aiter_meta/hsa//gfx942/mla/mla_a16w16_qh16_m16x4_n16x1_coex0_mask1_ps.co
+(EngineCore pid=75) [aiter] import [module_mla_reduce] under /usr/local/lib/python3.12/dist-packages/aiter/jit/module_mla_reduce.so
+(EngineCore pid=75) [aiter] run_1stage = False, xbf16 = False, ksplit = 0 q_type = QuantType.No block_m = 128 use_nt = True, estimated_m_per_expert = 48
+(EngineCore pid=75) [aiter] [fused_moe] using 2stage default for ('gfx942', 304, 512, 2048, 1408, 64, 6, 'ActivationType.Silu', 'torch.bfloat16', 'torch.bfloat16', 'torch.bfloat16', 'QuantType.No', True, False) 
+(EngineCore pid=75) Capturing CUDA graphs (PIECEWISE):   2%|▏         | 1/51 [00:00<00:09,  5.28it/s]Capturing CUDA graphs (PIECEWISE):   4%|▍         | 2/51 [00:00<00:07,  6.77it/s]Capturing CUDA graphs (PIECEWISE):   6%|▌         | 3/51 [00:00<00:06,  7.21it/s]Capturing CUDA graphs (PIECEWISE):   8%|▊         | 4/51 [00:00<00:06,  7.53it/s]Capturing CUDA graphs (PIECEWISE):  10%|▉         | 5/51 [00:00<00:05,  7.84it/s]Capturing CUDA graphs (PIECEWISE):  12%|█▏        | 6/51 [00:00<00:05,  7.99it/s]Capturing CUDA graphs (PIECEWISE):  14%|█▎        | 7/51 [00:00<00:05,  7.94it/s]Capturing CUDA graphs (PIECEWISE):  16%|█▌        | 8/51 [00:01<00:05,  8.08it/s]Capturing CUDA graphs (PIECEWISE):  18%|█▊        | 9/51 [00:01<00:05,  8.22it/s]Capturing CUDA graphs (PIECEWISE):  20%|█▉        | 10/51 [00:01<00:04,  8.33it/s]Capturing CUDA graphs (PIECEWISE):  22%|██▏       | 11/51 [00:01<00:04,  8.26it/s]Capturing CUDA graphs (PIECEWISE):  24%|██▎       | 12/51 [00:01<00:04,  8.35it/s]Capturing CUDA graphs (PIECEWISE):  25%|██▌       | 13/51 [00:01<00:04,  8.48it/s]Capturing CUDA graphs (PIECEWISE):  27%|██▋       | 14/51 [00:01<00:04,  8.59it/s]Capturing CUDA graphs (PIECEWISE):  29%|██▉       | 15/51 [00:01<00:04,  8.57it/s]Capturing CUDA graphs (PIECEWISE):  31%|███▏      | 16/51 [00:01<00:04,  8.63it/s][aiter] run_1stage = False, xbf16 = False, ksplit = 0 q_type = QuantType.No block_m = 128 use_nt = True, estimated_m_per_expert = 24
+(EngineCore pid=75) [aiter] [fused_moe] using 2stage default for ('gfx942', 304, 256, 2048, 1408, 64, 6, 'ActivationType.Silu', 'torch.bfloat16', 'torch.bfloat16', 'torch.bfloat16', 'QuantType.No', True, False) 
+(EngineCore pid=75) Capturing CUDA graphs (PIECEWISE):  33%|███▎      | 17/51 [00:02<00:03,  8.66it/s]Capturing CUDA graphs (PIECEWISE):  35%|███▌      | 18/51 [00:02<00:03,  8.68it/s]Capturing CUDA graphs (PIECEWISE):  37%|███▋      | 19/51 [00:02<00:03,  8.71it/s]Capturing CUDA graphs (PIECEWISE):  39%|███▉      | 20/51 [00:02<00:03,  8.64it/s]Capturing CUDA graphs (PIECEWISE):  41%|████      | 21/51 [00:02<00:03,  8.69it/s]Capturing CUDA graphs (PIECEWISE):  43%|████▎     | 22/51 [00:02<00:03,  8.75it/s]Capturing CUDA graphs (PIECEWISE):  45%|████▌     | 23/51 [00:02<00:03,  8.75it/s]Capturing CUDA graphs (PIECEWISE):  47%|████▋     | 24/51 [00:02<00:03,  8.62it/s]Capturing CUDA graphs (PIECEWISE):  49%|████▉     | 25/51 [00:03<00:02,  8.69it/s]Capturing CUDA graphs (PIECEWISE):  51%|█████     | 26/51 [00:03<00:02,  8.63it/s]Capturing CUDA graphs (PIECEWISE):  53%|█████▎    | 27/51 [00:03<00:02,  8.62it/s]Capturing CUDA graphs (PIECEWISE):  55%|█████▍    | 28/51 [00:03<00:02,  8.42it/s]Capturing CUDA graphs (PIECEWISE):  57%|█████▋    | 29/51 [00:03<00:02,  8.41it/s]Capturing CUDA graphs (PIECEWISE):  59%|█████▉    | 30/51 [00:03<00:02,  8.48it/s]Capturing CUDA graphs (PIECEWISE):  61%|██████    | 31/51 [00:03<00:02,  8.59it/s]Capturing CUDA graphs (PIECEWISE):  63%|██████▎   | 32/51 [00:03<00:02,  8.67it/s][aiter] run_1stage = False, xbf16 = False, ksplit = 0 q_type = QuantType.No block_m = 64 use_nt = True, estimated_m_per_expert = 12
+(EngineCore pid=75) [aiter] [fused_moe] using 2stage default for ('gfx942', 304, 128, 2048, 1408, 64, 6, 'ActivationType.Silu', 'torch.bfloat16', 'torch.bfloat16', 'torch.bfloat16', 'QuantType.No', True, False) 
+(EngineCore pid=75) Capturing CUDA graphs (PIECEWISE):  65%|██████▍   | 33/51 [00:03<00:02,  8.56it/s]Capturing CUDA graphs (PIECEWISE):  67%|██████▋   | 34/51 [00:04<00:01,  8.68it/s]Capturing CUDA graphs (PIECEWISE):  69%|██████▊   | 35/51 [00:04<00:01,  8.76it/s]Capturing CUDA graphs (PIECEWISE):  71%|███████   | 36/51 [00:04<00:01,  8.71it/s]Capturing CUDA graphs (PIECEWISE):  73%|███████▎  | 37/51 [00:04<00:01,  8.63it/s]Capturing CUDA graphs (PIECEWISE):  75%|███████▍  | 38/51 [00:04<00:01,  8.56it/s]Capturing CUDA graphs (PIECEWISE):  76%|███████▋  | 39/51 [00:04<00:01,  8.62it/s]Capturing CUDA graphs (PIECEWISE):  78%|███████▊  | 40/51 [00:04<00:01,  8.71it/s][aiter] run_1stage = False, xbf16 = False, ksplit = 0 q_type = QuantType.No block_m = 32 use_nt = True, estimated_m_per_expert = 6
+(EngineCore pid=75) [aiter] [fused_moe] using 2stage default for ('gfx942', 304, 64, 2048, 1408, 64, 6, 'ActivationType.Silu', 'torch.bfloat16', 'torch.bfloat16', 'torch.bfloat16', 'QuantType.No', True, False) 
+(EngineCore pid=75) Capturing CUDA graphs (PIECEWISE):  80%|████████  | 41/51 [00:04<00:01,  8.55it/s]Capturing CUDA graphs (PIECEWISE):  82%|████████▏ | 42/51 [00:04<00:01,  8.52it/s]Capturing CUDA graphs (PIECEWISE):  84%|████████▍ | 43/51 [00:05<00:00,  8.36it/s]Capturing CUDA graphs (PIECEWISE):  86%|████████▋ | 44/51 [00:05<00:00,  8.51it/s][aiter] run_1stage = False, xbf16 = False, ksplit = 0 q_type = QuantType.No block_m = 32 use_nt = True, estimated_m_per_expert = 3
+(EngineCore pid=75) [aiter] [fused_moe] using 2stage default for ('gfx942', 304, 32, 2048, 1408, 64, 6, 'ActivationType.Silu', 'torch.bfloat16', 'torch.bfloat16', 'torch.bfloat16', 'QuantType.No', True, False) 
+(EngineCore pid=75) Capturing CUDA graphs (PIECEWISE):  88%|████████▊ | 45/51 [00:05<00:00,  8.59it/s]Capturing CUDA graphs (PIECEWISE):  90%|█████████ | 46/51 [00:05<00:00,  8.58it/s][aiter] run_1stage = False, xbf16 = False, ksplit = 0 q_type = QuantType.No block_m = 32 use_nt = True, estimated_m_per_expert = 1
+(EngineCore pid=75) [aiter] [fused_moe] using 2stage default for ('gfx942', 304, 16, 2048, 1408, 64, 6, 'ActivationType.Silu', 'torch.bfloat16', 'torch.bfloat16', 'torch.bfloat16', 'QuantType.No', True, False) 
+(EngineCore pid=75) Capturing CUDA graphs (PIECEWISE):  92%|█████████▏| 47/51 [00:05<00:00,  8.63it/s][aiter] run_1stage = False, xbf16 = False, ksplit = 0 q_type = QuantType.No block_m = 32 use_nt = True, estimated_m_per_expert = 0
+(EngineCore pid=75) [aiter] [fused_moe] using 2stage default for ('gfx942', 304, 8, 2048, 1408, 64, 6, 'ActivationType.Silu', 'torch.bfloat16', 'torch.bfloat16', 'torch.bfloat16', 'QuantType.No', True, False) 
+(EngineCore pid=75) Capturing CUDA graphs (PIECEWISE):  94%|█████████▍| 48/51 [00:05<00:00,  8.72it/s][aiter] run_1stage = False, xbf16 = False, ksplit = 0 q_type = QuantType.No block_m = 32 use_nt = True, estimated_m_per_expert = 0
+(EngineCore pid=75) [aiter] [fused_moe] using 2stage default for ('gfx942', 304, 4, 2048, 1408, 64, 6, 'ActivationType.Silu', 'torch.bfloat16', 'torch.bfloat16', 'torch.bfloat16', 'QuantType.No', True, False) 
+(EngineCore pid=75) Capturing CUDA graphs (PIECEWISE):  96%|█████████▌| 49/51 [00:05<00:00,  8.50it/s][aiter] run_1stage = False, xbf16 = False, ksplit = 0 q_type = QuantType.No block_m = 32 use_nt = True, estimated_m_per_expert = 0
+(EngineCore pid=75) [aiter] [fused_moe] using 2stage default for ('gfx942', 304, 2, 2048, 1408, 64, 6, 'ActivationType.Silu', 'torch.bfloat16', 'torch.bfloat16', 'torch.bfloat16', 'QuantType.No', True, False) 
+(EngineCore pid=75) Capturing CUDA graphs (PIECEWISE):  98%|█████████▊| 50/51 [00:05<00:00,  8.75it/s][aiter] run_1stage = False, xbf16 = False, ksplit = 0 q_type = QuantType.No block_m = 32 use_nt = True, estimated_m_per_expert = 0
+(EngineCore pid=75) [aiter] [fused_moe] using 2stage default for ('gfx942', 304, 1, 2048, 1408, 64, 6, 'ActivationType.Silu', 'torch.bfloat16', 'torch.bfloat16', 'torch.bfloat16', 'QuantType.No', True, False) 
+(EngineCore pid=75) Capturing CUDA graphs (PIECEWISE): 100%|██████████| 51/51 [00:06<00:00,  7.65it/s]Capturing CUDA graphs (PIECEWISE): 100%|██████████| 51/51 [00:06<00:00,  8.38it/s]
+(EngineCore pid=75) Capturing CUDA graphs (FULL):   0%|          | 0/51 [00:00<?, ?it/s]Capturing CUDA graphs (FULL):   2%|▏         | 1/51 [00:00<00:05,  9.22it/s]Capturing CUDA graphs (FULL):   6%|▌         | 3/51 [00:00<00:04,  9.69it/s]Capturing CUDA graphs (FULL):  10%|▉         | 5/51 [00:00<00:04,  9.92it/s]Capturing CUDA graphs (FULL):  14%|█▎        | 7/51 [00:00<00:04, 10.02it/s]Capturing CUDA graphs (FULL):  16%|█▌        | 8/51 [00:00<00:04,  9.93it/s]Capturing CUDA graphs (FULL):  20%|█▉        | 10/51 [00:01<00:04, 10.06it/s]Capturing CUDA graphs (FULL):  24%|██▎       | 12/51 [00:01<00:03, 10.01it/s]Capturing CUDA graphs (FULL):  25%|██▌       | 13/51 [00:01<00:03,  9.94it/s]Capturing CUDA graphs (FULL):  29%|██▉       | 15/51 [00:01<00:03, 10.06it/s]Capturing CUDA graphs (FULL):  33%|███▎      | 17/51 [00:01<00:03, 10.11it/s]Capturing CUDA graphs (FULL):  37%|███▋      | 19/51 [00:01<00:03, 10.04it/s]Capturing CUDA graphs (FULL):  41%|████      | 21/51 [00:02<00:02, 10.08it/s]Capturing CUDA graphs (FULL):  45%|████▌     | 23/51 [00:02<00:02, 10.00it/s]Capturing CUDA graphs (FULL):  47%|████▋     | 24/51 [00:02<00:02,  9.94it/s]Capturing CUDA graphs (FULL):  51%|█████     | 26/51 [00:02<00:02, 10.00it/s]Capturing CUDA graphs (FULL):  55%|█████▍    | 28/51 [00:02<00:02,  9.97it/s]Capturing CUDA graphs (FULL):  59%|█████▉    | 30/51 [00:03<00:02,  9.99it/s]Capturing CUDA graphs (FULL):  61%|██████    | 31/51 [00:03<00:02,  9.94it/s]Capturing CUDA graphs (FULL):  63%|██████▎   | 32/51 [00:03<00:01,  9.92it/s]Capturing CUDA graphs (FULL):  65%|██████▍   | 33/51 [00:03<00:01,  9.82it/s]Capturing CUDA graphs (FULL):  67%|██████▋   | 34/51 [00:03<00:01,  9.86it/s]Capturing CUDA graphs (FULL):  71%|███████   | 36/51 [00:03<00:01,  9.97it/s]Capturing CUDA graphs (FULL):  75%|███████▍  | 38/51 [00:03<00:01,  9.96it/s]Capturing CUDA graphs (FULL):  78%|███████▊  | 40/51 [00:04<00:01, 10.08it/s]Capturing CUDA graphs (FULL):  82%|████████▏ | 42/51 [00:04<00:00, 10.14it/s]Capturing CUDA graphs (FULL):  86%|████████▋ | 44/51 [00:04<00:00, 10.09it/s]Capturing CUDA graphs (FULL):  90%|█████████ | 46/51 [00:04<00:00, 10.16it/s]Capturing CUDA graphs (FULL):  94%|█████████▍| 48/51 [00:04<00:00, 10.06it/s]Capturing CUDA graphs (FULL):  98%|█████████▊| 50/51 [00:04<00:00, 10.49it/s]Capturing CUDA graphs (FULL): 100%|██████████| 51/51 [00:05<00:00, 10.09it/s]
+(EngineCore pid=75) INFO 10-14 14:34:12 [model_runner.py:791] Graph capturing finished in 11 secs, took 3.24 GiB
+(EngineCore pid=75) INFO 10-14 14:34:12 [gpu_worker.py:789] Free memory on device (191.36/191.69 GiB) on startup. Desired GPU memory utilization is (0.85, 162.93 GiB). Actual usage is 30.79 GiB for consumed memory (weights + non-torch), 1.13 GiB for peak activation, and 3.24 GiB for CUDAGraph memory. Replace gpu_memory_utilization config with `--kv-cache-memory=137043413709` (127.63 GiB) to fit into requested memory, or `--kv-cache-memory=167568719360` (156.06 GiB) to fully utilize gpu memory. Current kv cache memory in use is 131.02 GiB.
+(EngineCore pid=75) [aiter] import [module_fmha_v3_varlen_fwd] under /usr/local/lib/python3.12/dist-packages/aiter/jit/module_fmha_v3_varlen_fwd.so
+(EngineCore pid=75) [aiter] type hints mismatch, override to --> fmha_v3_varlen_fwd(q: torch.Tensor, k: torch.Tensor, v: torch.Tensor, cu_seqlens_q: torch.Tensor, cu_seqlens_k: torch.Tensor, max_seqlen_q: int, max_seqlen_k: int, min_seqlen_q: int, dropout_p: float, softmax_scale: float, logits_soft_cap: float, zero_tensors: bool, is_causal: bool, window_size_left: int, window_size_right: int, return_softmax_lse: bool, return_dropout_randval: bool, how_v3_bf16_cvt: int, out: Optional[torch.Tensor] = None, block_table: Optional[torch.Tensor] = None, bias: Optional[torch.Tensor] = None, alibi_slopes: Optional[torch.Tensor] = None, q_descale: Optional[torch.Tensor] = None, k_descale: Optional[torch.Tensor] = None, v_descale: Optional[torch.Tensor] = None, gen: Optional[torch.Generator] = None, cu_seqlens_q_padded: Optional[torch.Tensor] = None, cu_seqlens_k_padded: Optional[torch.Tensor] = None) -> List[torch.Tensor]
+[aiter] pciChipId: 0x74b5, CU count: 304
+[aiter] LoadKernel: _ZN5aiter41fmha_fwd_hd192x128_bf16_causal_rtna_groupE hsaco: /usr/local/lib/python3.12/dist-packages/aiter_meta/hsa//gfx942/fmha_v3_fwd/MI300/fwd_hd192x128_bf16_causal_rtna_group.co
+(EngineCore pid=75) [aiter] run_1stage = False, xbf16 = False, ksplit = 0 q_type = QuantType.No block_m = 128 use_nt = False, estimated_m_per_expert = 192
+(EngineCore pid=75) [aiter] [fused_moe] using 2stage default for ('gfx942', 304, 2048, 2048, 1408, 64, 6, 'ActivationType.Silu', 'torch.bfloat16', 'torch.bfloat16', 'torch.bfloat16', 'QuantType.No', True, False) 
+(EngineCore pid=75) [aiter] run_1stage = False, xbf16 = False, ksplit = 0 q_type = QuantType.No block_m = 128 use_nt = False, estimated_m_per_expert = 96
+(EngineCore pid=75) [aiter] [fused_moe] using 2stage default for ('gfx942', 304, 1024, 2048, 1408, 64, 6, 'ActivationType.Silu', 'torch.bfloat16', 'torch.bfloat16', 'torch.bfloat16', 'QuantType.No', True, False) 
+(EngineCore pid=75) INFO 10-14 14:34:15 [jit_monitor.py:79] Kernel JIT monitor activated; monitored JIT compilations during inference will use mode=warn.
+(EngineCore pid=75) INFO 10-14 14:34:15 [core.py:348] init engine (profile, create kv cache, warmup model) took 21.12 s (compilation: 2.82 s)
+(EngineCore pid=75) INFO 10-14 14:34:15 [kernel.py:306] Final IR op priority after setting platform defaults: IrOpPriorityConfig(rms_norm=['aiter', 'native'], fused_add_rms_norm=['aiter', 'native'])
+INFO 10-14 14:34:16 [hf.py:540] Detected the chat template content format to be 'string'. You can set `--chat-template-content-format` to override this.
+VLLM-CONFIG {"attention_backend": null, "cudagraph_mode": "FULL_AND_PIECEWISE", "env": {"HIP_FORCE_DEV_KERNARG": "1", "HIP_VISIBLE_DEVICES": "0", "VLLM_ROCM_USE_AITER": "1"}}
+VLLM-BATCH-MODE label=aiter version=0.27.1 context=1024 batches=1,2,4,8 aiter=1
+VLLM-PROGRESS label=aiter batch=1 warm-up
+VLLMSEQ label=aiter batch=1 phase=warmup seq=0 first_divergence=32/32 tokens=32
+[aiter] LoadKernel: _ZN5aiter34fmha_fwd_hd192x128_bf16_rtna_groupE hsaco: /usr/local/lib/python3.12/dist-packages/aiter_meta/hsa//gfx942/fmha_v3_fwd/MI300/fwd_hd192x128_bf16_rtna_group.co
+(EngineCore pid=75) WARNING 10-14 14:34:16 [jit_monitor.py:135] Triton kernel JIT compilation during inference: merge_attn_states_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.
+VLLMSEQ label=aiter batch=1 phase=sample0 seq=0 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=1 phase=sample1 seq=0 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=1 phase=sample2 seq=0 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=1 phase=sample3 seq=0 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=1 phase=sample4 seq=0 first_divergence=32/32 tokens=32
+VLLMB label=aiter batch=1 per_token_ms=4.733561,4.864953,4.833320,4.849658,4.880919
+VLLM-PROGRESS label=aiter batch=2 warm-up
+(EngineCore pid=75) WARNING 10-14 14:34:17 [jit_monitor.py:135] Triton kernel JIT compilation during inference: mask_empty_context_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.
+VLLMSEQ label=aiter batch=2 phase=warmup seq=0 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=2 phase=warmup seq=1 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=2 phase=sample0 seq=0 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=2 phase=sample0 seq=1 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=2 phase=sample1 seq=0 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=2 phase=sample1 seq=1 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=2 phase=sample2 seq=0 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=2 phase=sample2 seq=1 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=2 phase=sample3 seq=0 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=2 phase=sample3 seq=1 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=2 phase=sample4 seq=0 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=2 phase=sample4 seq=1 first_divergence=32/32 tokens=32
+VLLMB label=aiter batch=2 per_token_ms=5.672256,5.604944,5.669042,5.607263,5.620490
+VLLM-PROGRESS label=aiter batch=4 warm-up
+(EngineCore pid=75) [aiter] run_1stage = False, xbf16 = False, ksplit = 0 q_type = QuantType.No block_m = 128 use_nt = False, estimated_m_per_expert = 384
+(EngineCore pid=75) [aiter] [fused_moe] using 2stage default for ('gfx942', 304, 4096, 2048, 1408, 64, 6, 'ActivationType.Silu', 'torch.bfloat16', 'torch.bfloat16', 'torch.bfloat16', 'QuantType.No', True, False) 
+VLLMSEQ label=aiter batch=4 phase=warmup seq=0 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=4 phase=warmup seq=1 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=4 phase=warmup seq=2 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=4 phase=warmup seq=3 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=4 phase=sample0 seq=0 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=4 phase=sample0 seq=1 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=4 phase=sample0 seq=2 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=4 phase=sample0 seq=3 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=4 phase=sample1 seq=0 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=4 phase=sample1 seq=1 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=4 phase=sample1 seq=2 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=4 phase=sample1 seq=3 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=4 phase=sample2 seq=0 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=4 phase=sample2 seq=1 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=4 phase=sample2 seq=2 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=4 phase=sample2 seq=3 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=4 phase=sample3 seq=0 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=4 phase=sample3 seq=1 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=4 phase=sample3 seq=2 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=4 phase=sample3 seq=3 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=4 phase=sample4 seq=0 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=4 phase=sample4 seq=1 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=4 phase=sample4 seq=2 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=4 phase=sample4 seq=3 first_divergence=32/32 tokens=32
+VLLMB label=aiter batch=4 per_token_ms=7.065469,8.099620,6.899749,7.613653,8.178004
+VLLM-PROGRESS label=aiter batch=8 warm-up
+(EngineCore pid=75) [aiter] run_1stage = False, xbf16 = False, ksplit = 0 q_type = QuantType.No block_m = 128 use_nt = False, estimated_m_per_expert = 768
+(EngineCore pid=75) [aiter] [fused_moe] using 2stage default for ('gfx942', 304, 8192, 2048, 1408, 64, 6, 'ActivationType.Silu', 'torch.bfloat16', 'torch.bfloat16', 'torch.bfloat16', 'QuantType.No', True, False) 
+VLLMSEQ label=aiter batch=8 phase=warmup seq=0 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=8 phase=warmup seq=1 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=8 phase=warmup seq=2 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=8 phase=warmup seq=3 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=8 phase=warmup seq=4 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=8 phase=warmup seq=5 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=8 phase=warmup seq=6 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=8 phase=warmup seq=7 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=8 phase=sample0 seq=0 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=8 phase=sample0 seq=1 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=8 phase=sample0 seq=2 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=8 phase=sample0 seq=3 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=8 phase=sample0 seq=4 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=8 phase=sample0 seq=5 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=8 phase=sample0 seq=6 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=8 phase=sample0 seq=7 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=8 phase=sample1 seq=0 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=8 phase=sample1 seq=1 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=8 phase=sample1 seq=2 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=8 phase=sample1 seq=3 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=8 phase=sample1 seq=4 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=8 phase=sample1 seq=5 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=8 phase=sample1 seq=6 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=8 phase=sample1 seq=7 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=8 phase=sample2 seq=0 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=8 phase=sample2 seq=1 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=8 phase=sample2 seq=2 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=8 phase=sample2 seq=3 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=8 phase=sample2 seq=4 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=8 phase=sample2 seq=5 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=8 phase=sample2 seq=6 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=8 phase=sample2 seq=7 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=8 phase=sample3 seq=0 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=8 phase=sample3 seq=1 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=8 phase=sample3 seq=2 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=8 phase=sample3 seq=3 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=8 phase=sample3 seq=4 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=8 phase=sample3 seq=5 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=8 phase=sample3 seq=6 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=8 phase=sample3 seq=7 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=8 phase=sample4 seq=0 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=8 phase=sample4 seq=1 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=8 phase=sample4 seq=2 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=8 phase=sample4 seq=3 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=8 phase=sample4 seq=4 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=8 phase=sample4 seq=5 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=8 phase=sample4 seq=6 first_divergence=32/32 tokens=32
+VLLMSEQ label=aiter batch=8 phase=sample4 seq=7 first_divergence=32/32 tokens=32
+VLLMB label=aiter batch=8 per_token_ms=9.369266,9.418419,9.083562,9.317576,9.355833
+INFO 10-14 14:34:22 [utils.py:612] [shutdown] Process manager: send sigterm to process EngineCore
+(EngineCore pid=75) INFO 10-14 14:34:22 [core.py:1332] [shutdown] EngineCore: trigger received signal=SIGTERM
+(EngineCore pid=75) INFO 10-14 14:34:22 [core.py:1468] [shutdown] EngineCore: start mode=abort timeout=0s
+(EngineCore pid=75) INFO 10-14 14:34:22 [core.py:1499] [shutdown] EngineCore: request processing complete; starting resource teardown
+(EngineCore pid=75) INFO 10-14 14:34:22 [core.py:1345] [shutdown] EngineCore: exiting busy loop
+PROGRESS invocation=vsel_aiter elapsed_s=60.1 deadline_s=900
+VSEL b=1 baseline=aiter step 4.849658 ms
+VSEL b=2 baseline=aiter step 5.620490 ms
+VSEL b=4 baseline=aiter step 7.613653 ms
+VSEL b=8 baseline=aiter step 9.355833 ms

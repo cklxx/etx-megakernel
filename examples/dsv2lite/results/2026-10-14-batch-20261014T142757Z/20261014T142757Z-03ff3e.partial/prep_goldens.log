@@ -1,0 +1,10 @@
+# job prep_goldens gpu=0 cwd=/root/etx
+# set -eu; for r in $(seq 1 7); do d="$ETX_DSV2_DATA/r$r"; if [ -s "$d/fleet_cache.bin" ] && [ -s "$d/golden_tokens.txt" ] && [ -s "$d/golden_hidden.bin" ] && [ -s "$d/golden.npz" ]; then echo "request $r: reference present"; else mkdir -p "$d"; HIP_VISIBLE_DEVICES=$GPU $HOME/dsv2-prep/.venv/bin/python examples/dsv2lite/reference_rotated.py --fleet "$ETX_DSV2_FLEET" --rotate $((97 * r)) -- --model $HOME/models/dsv2-lite-base --out "$d/golden.npz"; fi; done; $HOME/dsv2-prep/.venv/bin/python -m examples.dsv2lite.batch_goldens "$ETX_DSV2_DATA" --requests 8
+request 1: reference present
+request 2: reference present
+request 3: reference present
+request 4: reference present
+request 5: reference present
+request 6: reference present
+request 7: reference present
+GOLDENS OK 8 requests: prompts are the 97 r rotations, pairwise distinct; collisions [[0, 4]]; vLLM files in /root/dsv2-data/vllm
