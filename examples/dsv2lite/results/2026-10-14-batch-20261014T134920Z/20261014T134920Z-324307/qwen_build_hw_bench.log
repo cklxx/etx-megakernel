@@ -1,0 +1,2 @@
+# job qwen_build_hw_bench gpu=None cwd=/root/etx
+# mkdir -p "$ETX_SESS_LOGDIR/qwen/b_hw" && hipcc -O3 -std=c++17 --offload-arch=gfx942 bench/hw/hw_bench.hip -o "$ETX_SESS_LOGDIR/qwen/b_hw/hw_bench"

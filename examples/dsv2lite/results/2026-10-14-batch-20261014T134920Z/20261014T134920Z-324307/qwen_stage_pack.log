@@ -1,0 +1,3 @@
+# job qwen_stage_pack gpu=0 cwd=/root/etx
+# { [ -s $HOME/llm/qwen3-30b-a3b/vl.manifest ] || $HOME/qwen-llmenv/bin/python examples/vllm_llm/prep.py --src $HOME/llm/qwen3-30b-a3b/hf --out $HOME/llm/qwen3-30b-a3b --maxlen 1072; } && cp examples/llm/results/golden_c1024_qwen3-30b-a3b.txt $HOME/llm/qwen3-30b-a3b/golden_c1024.txt && .venv/bin/python -c "import json, os; from examples.vllm_llm.vm_preflight import GOLDEN_SHA256 as G; m = os.path.expandvars('$HOME/llm/qwen3-30b-a3b'); json.dump(dict(model=m, hf=m + '/hf', golden_sha256=G), open('/root/qwen-g6.json', 'w')); print('QWEN-STAGED', m)"
+QWEN-STAGED /root/llm/qwen3-30b-a3b

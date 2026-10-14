@@ -1,0 +1,8 @@
+# job docker_pull gpu=None cwd=/root/etx
+# set -eu; S=; [ "$(id -u)" = 0 ] || S=sudo; $S docker --version; $S docker pull vllm/vllm-openai-rocm@sha256:bb44b39aea26798cce43030a98bf48efd0322ca7147367db86e38b96bd80f0e7; $S docker image inspect --format "IMAGE {{.Id}}" vllm/vllm-openai-rocm@sha256:bb44b39aea26798cce43030a98bf48efd0322ca7147367db86e38b96bd80f0e7
+Docker version 29.7.2, build a7dcaa6
+docker.io/vllm/vllm-openai-rocm@sha256:bb44b39aea26798cce43030a98bf48efd0322ca7147367db86e38b96bd80f0e7: Pulling from vllm/vllm-openai-rocm
+Digest: sha256:bb44b39aea26798cce43030a98bf48efd0322ca7147367db86e38b96bd80f0e7
+Status: Image is up to date for vllm/vllm-openai-rocm@sha256:bb44b39aea26798cce43030a98bf48efd0322ca7147367db86e38b96bd80f0e7
+docker.io/vllm/vllm-openai-rocm@sha256:bb44b39aea26798cce43030a98bf48efd0322ca7147367db86e38b96bd80f0e7
+IMAGE sha256:bb44b39aea26798cce43030a98bf48efd0322ca7147367db86e38b96bd80f0e7

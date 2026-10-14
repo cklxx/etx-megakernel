@@ -1,0 +1,3 @@
+# job qwen_stage_vllm gpu=None cwd=/root/etx
+# [ -d $HOME/vllm/.git ] || git clone --depth 1 --branch v0.27.1 https://github.com/vllm-project/vllm.git $HOME/vllm; test "$(git -C $HOME/vllm rev-parse HEAD)" = "$(git -C $HOME/vllm rev-parse v0.27.1^{commit})" && echo "VLLM $(git -C $HOME/vllm rev-parse HEAD) = v0.27.1" || { echo "VLLM $HOME/vllm is not at v0.27.1: move it aside"; exit 1; }
+VLLM 6e448d0ea9bf3d88d898b65449ca6dc2aec170ac = v0.27.1

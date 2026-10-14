@@ -1,0 +1,12 @@
+# command ["bash", "/root/src/bbf24c5ac6dd70cb7580bb2f68bd41dc3f94ef3ff34313781c3f5ca9b660d54f-20261014T134846Z/examples/vllm_llm/build.sh", "/root/llm/qwen3-30b-a3b"]
+devlibs: /opt/rocm/lib/llvm/amdgcn/bitcode
+== import (attn_mfma16_g8,attn_reduce,rms_norm_2d)
+compile csrc/rocm/attention.cu failed:
+clang++: warning: argument unused during compilation: '--hip-link' [-Wunused-command-line-argument]
+In file included from <built-in>:2:
+/root/src/bbf24c5ac6dd70cb7580bb2f68bd41dc3f94ef3ff34313781c3f5ca9b660d54f-20261014T134846Z/etx/importer/shim/etx_cuda2hip.h:26:10: fatal error: 'torch/headeronly/util/BFloat16.h' file not found
+   26 | #include <torch/headeronly/util/BFloat16.h>
+      |          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+1 error generated when compiling for gfx942.
+failed to execute:/opt/rocm/core-7.14/lib/llvm/bin/clang++  --offload-arch=gfx942 --driver-mode=g++ --hip-link  -x hip --cuda-device-only -nogpulib -std=c++17 -O3 -S -emit-llvm -D__HIP_PLATFORM_AMD__ -DUSE_ROCM -DNDEBUG -isystem /root/rocm-headers/pytorch -include /root/src/bbf24c5ac6dd70cb7580bb2f68bd41dc3f94ef3ff34313781c3f5ca9b660d54f-20261014T134846Z/etx/importer/shim/etx_cuda2hip.h -I /root/src/bbf24c5ac6dd70cb7580bb2f68bd41dc3f94ef3ff34313781c3f5ca9b660d54f-20261014T134846Z/etx/importer/shim -DENABLE_FP8 -I /root/vllm/csrc -I /root/vllm/csrc/rocm -I /root/vllm/csrc/libtorch_stable /root/sess/20261014T134920Z-324307/qwen/b_kept/imp/attention.hip -o "/root/sess/20261014T134920Z-324307/qwen/b_kept/imp/attention.ll"
+

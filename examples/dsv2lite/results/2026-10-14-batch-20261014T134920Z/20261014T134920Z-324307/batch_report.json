@@ -1,0 +1,160 @@
+{
+  "batches": {
+    "1": {
+      "batch": 1,
+      "config": "aiter",
+      "etx_latency_ms": [
+        "3.76904",
+        "3.77300",
+        "3.76512",
+        "3.77764",
+        "3.76716"
+      ],
+      "etx_step_ms": [
+        "3.651733",
+        "3.652526",
+        "3.645231",
+        "3.657734",
+        "3.649875"
+      ],
+      "etx_tokens_per_s": 273.8425837814539,
+      "latency": {
+        "gains_pct": [
+          28.45764438689958,
+          28.50975351179433,
+          29.375929585245622,
+          28.34412490337883,
+          28.278756410664798
+        ],
+        "median_pct": 28.45764438689958,
+        "outcome": "WIN",
+        "spread_pct": 1.097173174580825
+      },
+      "next": {
+        "next": "batch-1 reference point: no batch decision"
+      },
+      "status": "COMPLETE",
+      "throughput": {
+        "gains_pct": [
+          32.58417304879628,
+          32.748486937533094,
+          33.631009941482446,
+          32.55143758403427,
+          32.40086304325491
+        ],
+        "median_pct": 32.58417304879628,
+        "outcome": "WIN",
+        "spread_pct": 1.2301468982275405
+      },
+      "vllm_latency_note": "vLLM advances every sequence each step: its per-request latency is its step time",
+      "vllm_step_ms": [
+        "4.841620",
+        "4.848673",
+        "4.871159",
+        "4.848379",
+        "4.832466"
+      ],
+      "vllm_tokens_per_s": 206.2545027936141
+    },
+    "2": {
+      "batch": 2,
+      "config": "aiter",
+      "next": {
+        "next": "rerun B=2 after a local fix (NOT COMPLETE)"
+      },
+      "problems": [
+        "round 1: ETX not run",
+        "round 2: ETX not run",
+        "round 3: ETX not run",
+        "round 4: ETX not run",
+        "round 5: ETX not run"
+      ],
+      "status": "NOT COMPLETE"
+    },
+    "4": {
+      "batch": 4,
+      "config": "aiter",
+      "etx_latency_inflation": 2.6664901896422104,
+      "etx_latency_ms": [
+        "10.00316",
+        "10.06312",
+        "10.04412",
+        "10.07304",
+        "10.03388"
+      ],
+      "etx_step_ms": [
+        "9.723749",
+        "9.792970",
+        "9.762058",
+        "9.803176",
+        "9.763967"
+      ],
+      "etx_throughput_scaling": 1.4936321828860266,
+      "etx_tokens_per_s": 409.6695533690353,
+      "latency": {
+        "gains_pct": [
+          -26.60523274645212,
+          -25.16509790204231,
+          -29.594608586914532,
+          -24.582151962069048,
+          -29.7601625692155
+        ],
+        "median_pct": -26.60523274645212,
+        "outcome": "LOSS",
+        "spread_pct": 5.17801060714645
+      },
+      "next": {
+        "bound_ms": 6.6076164,
+        "build": true,
+        "next": "design and build column-batched tiles (stage B2), threshold before code",
+        "projection_ms": 5.456555,
+        "vllm_ms": 7.341796
+      },
+      "status": "COMPLETE",
+      "throughput": {
+        "gains_pct": [
+          -24.49624111029604,
+          -23.100693660860802,
+          -27.560336150430576,
+          -22.50603273877772,
+          -27.818467637180667
+        ],
+        "median_pct": -24.49624111029604,
+        "outcome": "LOSS",
+        "spread_pct": 5.312434898402948
+      },
+      "vllm_latency_note": "vLLM advances every sequence each step: its per-request latency is its step time",
+      "vllm_step_ms": [
+        "7.341796",
+        "7.530726",
+        "7.071602",
+        "7.596870",
+        "7.047781"
+      ],
+      "vllm_throughput_scaling": 2.6378395695004326,
+      "vllm_tokens_per_s": 544.8258164623479
+    },
+    "8": {
+      "batch": 8,
+      "config": "aiter",
+      "next": {
+        "next": "rerun B=8 after a local fix (NOT COMPLETE)"
+      },
+      "problems": [
+        "round 1: ETX not run",
+        "round 2: ETX not run",
+        "round 3: ETX not run",
+        "round 4: ETX not run",
+        "round 5: ETX not run"
+      ],
+      "status": "NOT COMPLETE"
+    }
+  },
+  "condition": "docs/BATCH-2026-10-14.md",
+  "union": {
+    "1": 6.0,
+    "2": 11.224974244505496,
+    "4": 19.83008241758242,
+    "8": 31.900240384615383
+  }
+}

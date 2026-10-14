@@ -1,0 +1,28 @@
+{
+  "arm": "x4",
+  "batch": 4,
+  "passed": true,
+  "result": {
+    "latency_ms": "9.93056",
+    "requests": {
+      "0": {
+        "device_ms": "8.898720",
+        "interval_ms": "9.92892"
+      },
+      "1": {
+        "device_ms": "9.458160",
+        "interval_ms": "9.92836"
+      },
+      "2": {
+        "device_ms": "9.057240",
+        "interval_ms": "9.93056"
+      },
+      "3": {
+        "device_ms": "9.582200",
+        "interval_ms": "9.92872"
+      }
+    },
+    "step_ms": "9.658574",
+    "worst_request": 2
+  }
+}

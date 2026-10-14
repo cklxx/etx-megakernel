@@ -1,0 +1,42 @@
+{
+ "complete": false,
+ "jobs": {
+  "apt": "ok",
+  "bgate_x8": "skipped",
+  "bgate_x8k": "skipped",
+  "bgate_x8m": "skipped",
+  "bgate_x8p": "skipped",
+  "build_x8": "fail",
+  "build_x8k": "fail",
+  "build_x8m": "fail",
+  "build_x8p": "fail",
+  "etx_env": "ok",
+  "preflight": "ok",
+  "prep_dl": "ok",
+  "prep_env": "ok",
+  "prep_pack": "ok",
+  "prep_ref": "ok",
+  "qwen_build_hw_bench": "ok",
+  "qwen_build_kept": "fail",
+  "qwen_build_kept_l1": "fail",
+  "qwen_certify_kept": "skipped",
+  "qwen_certify_kept_l1": "skipped",
+  "qwen_pairs_kept_l1": "skipped",
+  "qwen_preflight": "ok",
+  "qwen_stage_dl": "ok",
+  "qwen_stage_env": "ok",
+  "qwen_stage_pack": "ok",
+  "qwen_stage_vllm": "ok",
+  "source": "ok"
+ },
+ "local_only": [
+  "b_*/run",
+  "b_*/fleet_src/*",
+  "*.o"
+ ],
+ "manifest_sha256": "d8019626ab8ff966a06df564a61cba834638a08afe4393a799b05e87b5034511",
+ "plan_sha256": "2a8383a893dd7e3a8c7978e48ae3f85c11847026b310c4c30fff306439fdee2f",
+ "sealed": "2026-10-14T14:46:37Z",
+ "session": "20261014T144608Z-0ce537",
+ "source": "commit 6e1f8396b753f391ebbb579c146ce76ed10121bf\nbranch main\narchive 90162f56e12055ec7e122975cdc8b4bb26662cdc66a23e4c6fba26471d21bdc9\nstaged 2026-10-14T14:45:46Z\n"
+}

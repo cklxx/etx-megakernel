@@ -1,0 +1,266 @@
+[
+ {
+  "name": "qwen_build_hw_bench",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 4.016995191574097,
+  "note": ""
+ },
+ {
+  "name": "qwen_stage_env",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 4.015177011489868,
+  "note": ""
+ },
+ {
+  "name": "qwen_stage_vllm",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 1.0013091564178467,
+  "note": ""
+ },
+ {
+  "name": "qwen_stage_dl",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 1.0011327266693115,
+  "note": ""
+ },
+ {
+  "name": "apt",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 1.001246452331543,
+  "note": ""
+ },
+ {
+  "name": "etx_env",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 1.0025224685668945,
+  "note": ""
+ },
+ {
+  "name": "prep_env",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 4.014334678649902,
+  "note": ""
+ },
+ {
+  "name": "source",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 1.0007960796356201,
+  "note": ""
+ },
+ {
+  "name": "prep_dl",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 1.0011897087097168,
+  "note": ""
+ },
+ {
+  "name": "prep_ref",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 1.0012571811676025,
+  "note": ""
+ },
+ {
+  "name": "prep_pack",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 1.0012295246124268,
+  "note": ""
+ },
+ {
+  "name": "preflight",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 21.00975728034973,
+  "note": ""
+ },
+ {
+  "name": "docker_pull",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 1.0017476081848145,
+  "note": ""
+ },
+ {
+  "name": "build_x2",
+  "status": "fail",
+  "rc": 1,
+  "gpu": null,
+  "seconds": 52.041706562042236,
+  "note": ""
+ },
+ {
+  "name": "build_x4",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 125.08691811561584,
+  "note": ""
+ },
+ {
+  "name": "build_x8",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 369.2109115123749,
+  "note": ""
+ },
+ {
+  "name": "build_alld4r0l1kvsmw",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 35.024760723114014,
+  "note": ""
+ },
+ {
+  "name": "qwen_moerows",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 1.0012340545654297,
+  "note": ""
+ },
+ {
+  "name": "prep_goldens",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 1.0006918907165527,
+  "note": ""
+ },
+ {
+  "name": "bgate_x2",
+  "status": "skipped",
+  "rc": null,
+  "gpu": null,
+  "seconds": null,
+  "note": "b_x2/run: build_x2 fail"
+ },
+ {
+  "name": "bgate_x4",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 7.0035200119018555,
+  "note": ""
+ },
+ {
+  "name": "bgate_x8",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 8.003561973571777,
+  "note": ""
+ },
+ {
+  "name": "vsel",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 124.04504179954529,
+  "note": ""
+ },
+ {
+  "name": "brounds",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 384.1360743045807,
+  "note": ""
+ },
+ {
+  "name": "routing",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 31.015011310577393,
+  "note": ""
+ },
+ {
+  "name": "qwen_stage_pack",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 1.0005483627319336,
+  "note": ""
+ },
+ {
+  "name": "qwen_preflight",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 1.0005910396575928,
+  "note": ""
+ },
+ {
+  "name": "qwen_build_kept",
+  "status": "fail",
+  "rc": 1,
+  "gpu": null,
+  "seconds": 1.001094102859497,
+  "note": ""
+ },
+ {
+  "name": "qwen_build_kept_l1",
+  "status": "fail",
+  "rc": 1,
+  "gpu": null,
+  "seconds": 1.001162052154541,
+  "note": ""
+ },
+ {
+  "name": "qwen_certify_kept",
+  "status": "skipped",
+  "rc": null,
+  "gpu": null,
+  "seconds": null,
+  "note": "qwen/b_kept/arm.json: qwen_build_kept fail"
+ },
+ {
+  "name": "qwen_certify_kept_l1",
+  "status": "skipped",
+  "rc": null,
+  "gpu": null,
+  "seconds": null,
+  "note": "qwen/b_kept_l1/arm.json: qwen_build_kept_l1 fail"
+ },
+ {
+  "name": "qwen_pairs_kept_l1",
+  "status": "skipped",
+  "rc": null,
+  "gpu": null,
+  "seconds": null,
+  "note": "qwen/certificate_kept/gate.log: qwen_certify_kept skipped"
+ },
+ {
+  "name": "breport",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 1.0005772113800049,
+  "note": ""
+ }
+]

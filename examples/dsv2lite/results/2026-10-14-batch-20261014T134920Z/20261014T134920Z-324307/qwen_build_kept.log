@@ -1,0 +1,15 @@
+# job qwen_build_kept gpu=None cwd=/root/etx
+# .venv/bin/python -u -m examples.vllm_llm.g6_session build kept
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/root/src/bbf24c5ac6dd70cb7580bb2f68bd41dc3f94ef3ff34313781c3f5ca9b660d54f-20261014T134846Z/examples/vllm_llm/g6_session.py", line 151, in <module>
+    sys.exit(main())
+             ^^^^^^
+  File "/root/src/bbf24c5ac6dd70cb7580bb2f68bd41dc3f94ef3ff34313781c3f5ca9b660d54f-20261014T134846Z/examples/vllm_llm/g6_session.py", line 146, in main
+    ops[a[0]][0](*a[1:])
+  File "/root/src/bbf24c5ac6dd70cb7580bb2f68bd41dc3f94ef3ff34313781c3f5ca9b660d54f-20261014T134846Z/examples/vllm_llm/g6_session.py", line 91, in build
+    run(f"build_{arm}", ["bash", ROOT / "examples/vllm_llm/build.sh", m],
+  File "/root/src/bbf24c5ac6dd70cb7580bb2f68bd41dc3f94ef3ff34313781c3f5ca9b660d54f-20261014T134846Z/examples/vllm_llm/g6_session.py", line 55, in run
+    raise RuntimeError(f"{name}: NOT COMPLETE rc={rc} ({'deadline' if rc == proc.DEADLINE_RC else 'failed'}), "
+RuntimeError: build_kept: NOT COMPLETE rc=1 (failed), full log /root/sess/20261014T134920Z-324307/qwen/build_kept.raw.log

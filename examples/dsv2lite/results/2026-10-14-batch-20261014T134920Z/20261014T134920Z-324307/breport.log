@@ -1,0 +1,6 @@
+# job breport gpu=None cwd=/root/etx
+# .venv/bin/python -u -m examples.dsv2lite.batch_session report
+BREPORT b=1 vs vLLM aiter: throughput WIN median +32.58% spread 1.23% (274 vs 206 tok/s); per-request latency WIN median +28.46% spread 1.10%; next: batch-1 reference point: no batch decision
+BREPORT b=2 NOT COMPLETE next: rerun B=2 after a local fix (NOT COMPLETE)
+BREPORT b=4 vs vLLM aiter: throughput LOSS median -24.50% spread 5.31% (410 vs 545 tok/s); per-request latency LOSS median -26.61% spread 5.18%; next: design and build column-batched tiles (stage B2), threshold before code
+BREPORT b=8 NOT COMPLETE next: rerun B=8 after a local fix (NOT COMPLETE)

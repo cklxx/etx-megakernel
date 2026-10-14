@@ -1,0 +1,201 @@
+[13:49:20 +  0m00s] session record: /root/sess/20261014T134920Z-324307
+[13:49:20 +  0m00s] start qwen_build_hw_bench (cpu)
+[13:49:20 +  0m00s] start qwen_stage_vllm (cpu)
+[13:49:20 +  0m00s] start apt (cpu)
+[13:49:21 +  0m01s] ok      qwen_stage_vllm rc=0 1s
+    VLLM 6e448d0ea9bf3d88d898b65449ca6dc2aec170ac = v0.27.1
+[13:49:21 +  0m01s] ok      apt rc=0 1s
+[13:49:21 +  0m01s] start qwen_stage_env (cpu)
+[13:49:21 +  0m01s] start etx_env (cpu)
+[13:49:21 +  0m01s] start prep_env (cpu)
+[13:49:21 +  0m01s] start docker_pull (cpu)
+[13:49:22 +  0m02s] ok      etx_env rc=0 1s
+[13:49:22 +  0m02s] ok      docker_pull rc=0 1s
+[13:49:22 +  0m02s] start source (cpu)
+[13:49:23 +  0m03s] ok      source rc=0 1s
+    SOURCE OK fleet export 28f5cbb4f39524df etx 6215580f452b
+[13:49:23 +  0m03s] start build_x2 (cpu)
+[13:49:23 +  0m03s] start build_x4 (cpu)
+[13:49:24 +  0m04s] ok      qwen_build_hw_bench rc=0 4s
+[13:49:24 +  0m04s] start build_x8 (cpu)
+[13:49:25 +  0m05s] ok      qwen_stage_env rc=0 4s
+[13:49:25 +  0m05s] ok      prep_env rc=0 4s
+[13:49:25 +  0m05s] start qwen_stage_dl (cpu)
+[13:49:25 +  0m05s] start prep_dl (cpu)
+[13:49:26 +  0m06s] ok      qwen_stage_dl rc=0 1s
+    HF Qwen/Qwen3-30B-A3B@ad44e777bcd18fa416d9da3bd8f70d33ebb85d39
+[13:49:26 +  0m06s] ok      prep_dl rc=0 1s
+[13:49:26 +  0m06s] start prep_ref on GPU 0
+[13:49:26 +  0m06s] start build_alld4r0l1kvsmw (cpu)
+[13:49:27 +  0m07s] ok      prep_ref rc=0 1s
+    # mkdir -p "$ETX_DSV2_DATA" && cd "$ETX_DSV2_FLEET" && { test -s "$ETX_DSV2_DATA/fleet_cache.bin" -a -s "$ETX_DSV2_DATA/golden_tokens.txt" -a -s "$ETX_DSV2_DATA/golden_hidden.bin" || HIP_VISIBLE_DEVICES=$GPU $HOME/dsv2-prep/.venv/bin/python
+    -rw-r--r--  1 root root         487 Oct 14 11:29 golden.json
+    -rw-r--r--  1 root root    29492654 Oct 14 11:29 golden.npz
+    -rw-r--r--  1 root root      221184 Oct 14 11:29 golden_hidden.bin
+    -rw-r--r--  1 root root         144 Oct 14 11:29 golden_tokens.txt
+    -rw-r--r--  1 root root        3221 Oct 14 12:25 goldens.json
+[13:49:27 +  0m07s] start prep_pack (cpu)
+[13:49:27 +  0m07s] start qwen_moerows on GPU 0
+[13:49:28 +  0m08s] ok      prep_pack rc=0 1s
+[13:49:28 +  0m08s] ok      qwen_moerows rc=0 1s
+    RESULT moerows pair 0 contiguous  span   25.73 us -> 1.96 TB/s, checksum OK
+    RESULT moerows pair 0 interleaved span   16.10 us -> 3.13 TB/s, checksum OK
+    RESULT moerows pair 1 interleaved span   15.53 us -> 3.24 TB/s, checksum OK
+    RESULT moerows pair 1 contiguous  span   14.65 us -> 3.44 TB/s, checksum OK
+    RESULT moerows pair 2 contiguous  span   14.70 us -> 3.42 TB/s, checksum OK
+    RESULT moerows pair 2 interleaved span   15.41 us -> 3.27 TB/s, checksum OK
+    RESULT moerows pair 3 interleaved span   15.76 us -> 3.19 TB/s, checksum OK
+    RESULT moerows pair 3 contiguous  span   14.82 us -> 3.40 TB/s, checksum OK
+    RESULT moerows pair 4 contiguous  span   14.76 us -> 3.41 TB/s, checksum OK
+    RESULT moerows pair 4 interleaved span   15.83 us -> 3.18 TB/s, checksum OK
+    DECISION moerows NO-GO: gains % [37.43 -6.01 -4.83 -6.34 -7.25] median -6.01% spread 44.68% (PASS: every pair faster, median >= 3%, > 2 x spread)
+    RESULT moegather sweep    active 192 x 256 KB (48.0 MB): span   14.48 us  WG median   11.80  -> 3.48 TB/s
+    RESULT moegather split    active 192 x 256 KB (48.0 MB): span   15.83 us  WG median   11.96  -> 3.18 TB/s
+    RESULT moegather gather   active 192 x 256 KB (48.0 MB): span   22.42 us  WG median   17.80  -> 2.24 TB/s
+    RESULT moegather gather+  active 192 x 256 KB (48.0 MB): span   17.60 us  WG median   13.64  -> 2.86 TB/s
+[13:49:28 +  0m08s] start preflight (cpu)
+[13:49:49 +  0m29s] ok      preflight rc=0 21s
+    PREFLIGHT hashing /root/dsv2-data/weights.bin bytes=31412968448
+    PREFLIGHT hashing /root/dsv2-data/weights.bin.manifest bytes=9561
+    PREFLIGHT hashing /root/dsv2-data/fleet_cache.bin bytes=32845824
+    PREFLIGHT hashing /root/dsv2-data/golden_tokens.txt bytes=144
+    PREFLIGHT hashing /root/dsv2-data/golden_hidden.bin bytes=221184
+    PREFLIGHT OK inputs are the pinned measured inputs
+[13:49:49 +  0m29s] start prep_goldens on GPU 0
+[13:49:50 +  0m30s] ok      prep_goldens rc=0 1s
+    GOLDENS OK 8 requests: prompts are the 97 r rotations, pairwise distinct; collisions [[0, 4]]; vLLM files in /root/dsv2-data/vllm
+[13:50:01 +  0m41s] ok      build_alld4r0l1kvsmw rc=0 35s
+    BUILD arm=alld4r0l1kvsmw stamped=0 plan_sha256=f23f959e82edaa9fe19147026c20d3b855e5af6c881a1858289c1c22ce15785f resources={'vgpr': 256, 'agpr': 119, 'sgpr': 108, 'scratch': 0, 'lds': 26668, 'occupancy': 1}
+    BUILD arm=alld4r0l1kvsmw OK
+[13:50:15 +  0m55s] fail    build_x2 rc=1 52s
+      File "/root/src/bbf24c5ac6dd70cb7580bb2f68bd41dc3f94ef3ff34313781c3f5ca9b660d54f-20261014T134846Z/examples/dsv2lite/inplace_session.py", line 260, in main
+        getattr(session, a.operation)(a.arm, *([a.stamped] if a.operation == "build" else []))
+      File "/root/src/bbf24c5ac6dd70cb7580bb2f68bd41dc3f94ef3ff34313781c3f5ca9b660d54f-20261014T134846Z/examples/dsv2lite/inplace_session.py", line 173, in build
+        raise RuntimeError(f"arm {arm} spills to scratch on this box beyond its allowance "
+    RuntimeError: arm x2 spills to scratch on this box beyond its allowance (0 B/lane): {'vgpr': 256, 'agpr': 0, 'sgpr': 108, 'scratch': 32, 'lds': 26668, 'occupancy': 2}
+[13:50:15 +  0m55s] skip    bgate_x2 [b_x2/run: build_x2 fail]
+[13:50:20 +  1m00s] progress: 2 running, 13 waiting, 18 done
+    build_x4 [cpu] 57s / 1200s: /root/sess/20261014T134920Z-324307/b_x4/fleet_src/kernels/fleet_kernel.hip:1150:1: remark:     LDS Size [bytes/block]: 0 [-Rpass-analysis=kernel-resource-usage]
+    build_x8 [cpu] 56s / 1200s: COH-CHECK OK coherent_loads=0 l1_loads=1
+[13:51:20 +  2m00s] progress: 2 running, 13 waiting, 18 done
+    build_x4 [cpu] 117s / 1200s: /root/sess/20261014T134920Z-324307/b_x4/megakernel_d0.hip:20318:1: remark:     LDS Size [bytes/block]: 26668 [-Rpass-analysis=kernel-resource-usage]
+    build_x8 [cpu] 116s / 1200s: PROGRESS invocation=compile_x8 elapsed_s=91.1 deadline_s=900
+[13:51:28 +  2m08s] ok      build_x4 rc=0 125s
+    BUILD arm=x4 stamped=0 plan_sha256=57ede9c7886b00964108f4d8fa175faaa021df0227f3f58f2a652921223808be resources={'vgpr': 256, 'agpr': 0, 'sgpr': 108, 'scratch': 64, 'lds': 26668, 'occupancy': 2}
+    BUILD arm=x4 OK
+[13:51:28 +  2m08s] start bgate_x4 on GPU 0
+[13:51:35 +  2m15s] ok      bgate_x4 rc=0 7s
+    BGATE arm=x4 b=4 PASS
+[13:52:20 +  3m00s] progress: 1 running, 12 waiting, 20 done
+    build_x8 [cpu] 176s / 1200s: PROGRESS invocation=compile_x8 elapsed_s=151.5 deadline_s=900
+[13:53:20 +  4m00s] progress: 1 running, 12 waiting, 20 done
+    build_x8 [cpu] 236s / 1200s: PROGRESS invocation=compile_x8 elapsed_s=211.5 deadline_s=900
+[13:54:20 +  5m00s] progress: 1 running, 12 waiting, 20 done
+    build_x8 [cpu] 296s / 1200s:  483981  482166       00:00 R ps -eo pid,ppid,etime,state,args
+[13:55:20 +  6m00s] progress: 1 running, 12 waiting, 20 done
+    build_x8 [cpu] 356s / 1200s: PROGRESS invocation=compile_x8 elapsed_s=331.7 deadline_s=900
+[13:55:33 +  6m13s] ok      build_x8 rc=0 369s
+    BUILD arm=x8 stamped=0 plan_sha256=6beb4b01bb9ea997aa6ab16968fb043b2453ae85d73632bd7f57cb9d3e8f891d resources={'vgpr': 256, 'agpr': 0, 'sgpr': 108, 'scratch': 144, 'lds': 26668, 'occupancy': 2}
+    BUILD arm=x8 OK
+[13:55:33 +  6m13s] start bgate_x8 on GPU 0
+[13:55:41 +  6m21s] ok      bgate_x8 rc=0 8s
+    BATCH-INCOMPLETE invocation=bgate_x8 arm=x8 b=8: request 5: 3 layers within the gate (need 27)
+    BGATE arm=x8 b=8 NOT COMPLETE: request 5: 3 layers within the gate (need 27)
+[13:55:41 +  6m21s] start vsel on GPU 0
+[13:56:20 +  7m00s] progress: 1 running, 10 waiting, 22 done
+    vsel [GPU 0] 39s / 1900s: Capturing CUDA graphs (PIECEWISE):  76%|███████▋  | 39/51 [00:06<00:01,  6.82it/s]
+[13:57:20 +  8m00s] progress: 1 running, 10 waiting, 22 done
+    vsel [GPU 0] 99s / 1900s: (EngineCore pid=74) INFO 10-14 13:57:20 [monitor.py:81] Initial profiling/warmup run took 3.48 s
+[13:57:45 +  8m25s] ok      vsel rc=0 124s
+    VSEL b=1 baseline=aiter step 4.833368 ms
+    VSEL b=2 baseline=aiter step 5.697327 ms
+    VSEL b=4 baseline=aiter step 7.032626 ms
+    VSEL b=8 baseline=aiter step 9.356861 ms
+[13:57:45 +  8m25s] start brounds on GPU 0
+[13:58:20 +  9m00s] progress: 1 running, 9 waiting, 23 done
+    brounds [GPU 0] 35s / 3600s: Loading safetensors checkpoint shards:  50% Completed | 2/4 [00:06<00:06,  3.37s/it]
+[13:59:20 + 10m00s] progress: 1 running, 9 waiting, 23 done
+    brounds [GPU 0] 95s / 3600s: Loading safetensors checkpoint shards:  25% Completed | 1/4 [00:03<00:09,  3.15s/it]
+[14:00:20 + 11m00s] progress: 1 running, 9 waiting, 23 done
+    brounds [GPU 0] 155s / 3600s: model: hidden 2048 heads 16 kv_lora 512 experts 64 top-6 layers 27 (dense < 1) vocab 102400
+[14:01:20 + 12m00s] progress: 1 running, 9 waiting, 23 done
+    brounds [GPU 0] 215s / 3600s: Capturing CUDA graphs (FULL):  37%|███▋      | 19/51 [00:01<00:03,  9.92it/s]
+[14:02:20 + 13m00s] progress: 1 running, 9 waiting, 23 done
+    brounds [GPU 0] 275s / 3600s: Capturing CUDA graphs (FULL):   4%|▍         | 2/51 [00:00<00:05,  9.21it/s]
+[14:03:20 + 14m00s] progress: 1 running, 9 waiting, 23 done
+    brounds [GPU 0] 335s / 3600s: Loading safetensors checkpoint shards:   0% Completed | 0/4 [00:00<?, ?it/s]
+[14:04:09 + 14m49s] ok      brounds rc=0 384s
+    BROUNDS 5 rounds; arms ['alld4r0l1kvsmw', 'x4']; vLLM ['aiter']
+[14:04:09 + 14m49s] start routing on GPU 0
+[14:04:20 + 15m00s] progress: 1 running, 8 waiting, 24 done
+    routing [GPU 0] 11s / 900s: /opt/amdgpu/share/libdrm/amdgpu.ids: No such file or directory
+[14:04:40 + 15m20s] ok      routing rc=0 31s
+    ROUTING distinct routed experts for 1 sequence(s): measured 6.00, uniform-routing estimate 6.00
+    ROUTING distinct routed experts for 2 sequence(s): measured 11.22, uniform-routing estimate 11.44
+    ROUTING distinct routed experts for 4 sequence(s): measured 19.83, uniform-routing estimate 20.83
+    ROUTING distinct routed experts for 8 sequence(s): measured 31.90, uniform-routing estimate 34.88
+[14:04:40 + 15m20s] start qwen_stage_pack on GPU 0
+[14:04:41 + 15m21s] ok      qwen_stage_pack rc=0 1s
+    QWEN-STAGED /root/llm/qwen3-30b-a3b
+[14:04:41 + 15m21s] start qwen_preflight (cpu)
+[14:04:42 + 15m22s] ok      qwen_preflight rc=0 1s
+    PREFLIGHT PASS
+    PREFLIGHT OK Qwen3-30B-A3B bf16, golden bab2f1fbe12f7017
+[14:04:42 + 15m22s] start qwen_build_kept (cpu)
+[14:04:42 + 15m22s] start qwen_build_kept_l1 (cpu)
+[14:04:43 + 15m23s] fail    qwen_build_kept rc=1 1s
+      File "/root/src/bbf24c5ac6dd70cb7580bb2f68bd41dc3f94ef3ff34313781c3f5ca9b660d54f-20261014T134846Z/examples/vllm_llm/g6_session.py", line 91, in build
+        run(f"build_{arm}", ["bash", ROOT / "examples/vllm_llm/build.sh", m],
+      File "/root/src/bbf24c5ac6dd70cb7580bb2f68bd41dc3f94ef3ff34313781c3f5ca9b660d54f-20261014T134846Z/examples/vllm_llm/g6_session.py", line 55, in run
+        raise RuntimeError(f"{name}: NOT COMPLETE rc={rc} ({'deadline' if rc == proc.DEADLINE_RC else 'failed'}), "
+    RuntimeError: build_kept: NOT COMPLETE rc=1 (failed), full log /root/sess/20261014T134920Z-324307/qwen/build_kept.raw.log
+[14:04:43 + 15m23s] fail    qwen_build_kept_l1 rc=1 1s
+      File "/root/src/bbf24c5ac6dd70cb7580bb2f68bd41dc3f94ef3ff34313781c3f5ca9b660d54f-20261014T134846Z/examples/vllm_llm/g6_session.py", line 91, in build
+        run(f"build_{arm}", ["bash", ROOT / "examples/vllm_llm/build.sh", m],
+      File "/root/src/bbf24c5ac6dd70cb7580bb2f68bd41dc3f94ef3ff34313781c3f5ca9b660d54f-20261014T134846Z/examples/vllm_llm/g6_session.py", line 55, in run
+        raise RuntimeError(f"{name}: NOT COMPLETE rc={rc} ({'deadline' if rc == proc.DEADLINE_RC else 'failed'}), "
+    RuntimeError: build_kept_l1: NOT COMPLETE rc=1 (failed), full log /root/sess/20261014T134920Z-324307/qwen/build_kept_l1.raw.log
+[14:04:43 + 15m23s] skip    qwen_certify_kept [qwen/b_kept/arm.json: qwen_build_kept fail]
+[14:04:43 + 15m23s] skip    qwen_certify_kept_l1 [qwen/b_kept_l1/arm.json: qwen_build_kept_l1 fail]
+[14:04:43 + 15m23s] skip    qwen_pairs_kept_l1 [qwen/certificate_kept/gate.log: qwen_certify_kept skipped]
+[14:04:43 + 15m23s] start breport (cpu)
+[14:04:44 + 15m24s] ok      breport rc=0 1s
+    BREPORT b=1 vs vLLM aiter: throughput WIN median +32.58% spread 1.23% (274 vs 206 tok/s); per-request latency WIN median +28.46% spread 1.10%; next: batch-1 reference point: no batch decision
+    BREPORT b=2 NOT COMPLETE next: rerun B=2 after a local fix (NOT COMPLETE)
+    BREPORT b=4 vs vLLM aiter: throughput LOSS median -24.50% spread 5.31% (410 vs 545 tok/s); per-request latency LOSS median -26.61% spread 5.18%; next: design and build column-batched tiles (stage B2), threshold before code
+    BREPORT b=8 NOT COMPLETE next: rerun B=8 after a local fix (NOT COMPLETE)
+[14:04:44 + 15m24s] session done
+  job                              status     rc  gpu  seconds
+  qwen_build_hw_bench              ok          0             4  
+  qwen_stage_env                   ok          0             4  
+  qwen_stage_vllm                  ok          0             1  
+  qwen_stage_dl                    ok          0             1  
+  apt                              ok          0             1  
+  etx_env                          ok          0             1  
+  prep_env                         ok          0             4  
+  source                           ok          0             1  
+  prep_dl                          ok          0             1  
+  prep_ref                         ok          0    0        1  
+  prep_pack                        ok          0             1  
+  preflight                        ok          0            21  
+  docker_pull                      ok          0             1  
+  build_x2                         fail        1            52  
+  build_x4                         ok          0           125  
+  build_x8                         ok          0           369  
+  build_alld4r0l1kvsmw             ok          0            35  
+  qwen_moerows                     ok          0    0        1  
+  prep_goldens                     ok          0    0        1  
+  bgate_x2                         skipped                      b_x2/run: build_x2 fail
+  bgate_x4                         ok          0    0        7  
+  bgate_x8                         ok          0    0        8  
+  vsel                             ok          0    0      124  
+  brounds                          ok          0    0      384  
+  routing                          ok          0    0       31  
+  qwen_stage_pack                  ok          0    0        1  
+  qwen_preflight                   ok          0             1  
+  qwen_build_kept                  fail        1             1  
+  qwen_build_kept_l1               fail        1             1  
+  qwen_certify_kept                skipped                      qwen/b_kept/arm.json: qwen_build_kept fail
+  qwen_certify_kept_l1             skipped                      qwen/b_kept_l1/arm.json: qwen_build_kept_l1 fail
+  qwen_pairs_kept_l1               skipped                      qwen/certificate_kept/gate.log: qwen_certify_kept skipped
+  breport                          ok          0             1  
