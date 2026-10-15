@@ -29,6 +29,7 @@ The include maps change only container paths to the same host-mounted source fil
 Original sources, native copies, imported bitcode, assembly and host objects are retained as gzip files.
 `final-v7/build-artifacts.json` records uncompressed hashes, formats and native resource fields.
 The two large plan JSON files are losslessly compressed.
+`final-v7/matrix-logs/` retains all 16 variants' unfiltered compiler/plan logs and configurations as gzip.
 
 ## Compiler resource limits
 
