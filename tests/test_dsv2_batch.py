@@ -14,6 +14,16 @@ from examples.dsv2lite.arms import ARMS, BATCH_ARMS, BATCHES, LEVERS_ALL
 ROOT = Path(__file__).resolve().parents[1]
 
 
+@pytest.mark.parametrize("binding", ["requests=8", "requestsz=8"])
+def test_deepseek_cli_rejects_unsupported_bindings_before_compilation(tmp_path, monkeypatch, binding):
+    from etx.tools import cli
+    monkeypatch.setattr(cli, "compile_graph", lambda *args, **kwargs: pytest.fail("unsupported binding reached compiler"))
+    with pytest.raises(ValueError, match="does not accept --bind.*" + binding.split("=")[0]):
+        cli.main(["compile", str(ROOT / "examples/dsv2lite/graph.py"), "--out", str(tmp_path), "--bind", binding])
+    from examples.dsv2lite import graph
+    assert graph.bindings() == {}
+
+
 # ---------------------------------------------------------------- the graph: slots, queue order, LDS hand-offs
 @pytest.fixture(scope="module", params=[2, 4, 8])
 def lowered(request):
@@ -128,6 +138,38 @@ def test_batch_arms_carry_the_kept_recipe_without_d4():
     assert b1.levers == ARMS["x2"].levers and b1.levers == ARMS["x4"].levers == ARMS["x8"].levers
 
 
+@pytest.mark.parametrize("config", [None, "", "/models/qwen config.json", "/models/qwen'$(touch $ETX_N6_MARKER);config.json"])
+def test_session_start_transports_qwen_config_without_shell_expansion(tmp_path, config):
+    import os
+    import subprocess
+    bindir = tmp_path / "bin"
+    bindir.mkdir()
+    ssh = bindir / "ssh"
+    ssh.write_text("#!/usr/bin/env python3\n"
+                   "import os, subprocess, sys\n"
+                   "sys.stdin.read()\n"
+                   "env = dict(os.environ)\n"
+                   "env.pop('ETX_QWEN_G6_CONFIG', None)\n"
+                   "env.pop('ETX_SESS_MAX_SECONDS', None)\n"
+                   "probe = \"python3 -c 'import json,os; print(json.dumps({k: os.environ.get(k) for k in "
+                   "[\\\"ETX_QWEN_G6_CONFIG\\\", \\\"ETX_SESS_MAX_SECONDS\\\"]}))' > \\\"$TRANSPORT_CAPTURE\\\"\\n\"\n"
+                   "raise SystemExit(subprocess.run(['bash', '-c', ' '.join(sys.argv[6:])], "
+                   "input=probe, text=True, env=env).returncode)\n")
+    ssh.chmod(0o755)
+    capture = tmp_path / "transport.json"
+    marker = tmp_path / "expanded"
+    env = dict(os.environ, PATH=str(bindir) + os.pathsep + os.environ["PATH"],
+               TRANSPORT_CAPTURE=str(capture), ETX_N6_MARKER=str(marker), ETX_SESS_MAX_SECONDS="1200")
+    env.pop("ETX_QWEN_G6_CONFIG", None)
+    if config is not None:
+        env["ETX_QWEN_G6_CONFIG"] = config
+    result = subprocess.run(["bash", str(ROOT / "tools/session.sh"), "start", "offline", "session.py"],
+                            env=env, text=True, capture_output=True, timeout=10)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert json.loads(capture.read_text()) == {"ETX_QWEN_G6_CONFIG": config, "ETX_SESS_MAX_SECONDS": "1200"}
+    assert not marker.exists()
+
+
 # ---------------------------------------------------------------- per-request gates (ETX)
 def etx_log(b, tokens="32/32", layers=27, warm="32/32", steps="5.120000", intervals=None, extra=""):
     lines = [f"BATCHREQ r={r} tokens={tokens if r == b - 1 else '32/32'} layers={layers} warmup={warm} "
@@ -161,6 +203,7 @@ def vllm_log(label="default", batches=(1, 2, 4, 8), per=("5.1", "5.0", "5.3", "5
             if diverge and diverge == (b, phase):
                 outs[-1] = outs[-1][:7] + [0] * 25
             out += batch_lines(label, b, phase, goldens, outs, 32)
+            out += batch_lines(label, b, phase + "_short", goldens, [g[:1] for g in goldens], 1)
         out.append(f"VLLMB label={label} batch={b} per_token_ms={','.join(f'{float(x) * b:.6f}' for x in per)}")
     return "\n".join(out) + "\n"
 
@@ -285,6 +328,39 @@ def test_the_host_prints_exactly_the_fields_the_rule_reads():
     assert "BATCHCOLLISION requests %d and %d" in src and '--req-dir' in src
 
 
+def test_rerun_includes_required_artifact_producers_before_their_consumers(tmp_path, monkeypatch):
+    import runpy
+    from etx.tools.gpu_jobs import Runner, load_jobs
+    path = ROOT / "examples/sessions/rerun_skips.py"
+    all_jobs = runpy.run_path(str(path))["_every"]
+    writers = {w.lstrip("?"): name for name, job in all_jobs.items() for w in job.get("writes", [])}
+    jobs = load_jobs(path)     # Also rejects a same-GPU producer placed after its consumer.
+    by = {j.name: j for j in jobs}
+    order = {j.name: i for i, j in enumerate(jobs)}
+    assert {"preflight", "build_x2", "build_x4", "build_x8", "build_alld4r0l1kvsmw"} <= set(by)
+    for job in jobs:
+        for read in job.reads:
+            key = read.lstrip("?")
+            producer = key if key in all_jobs else None if read.startswith("?") else writers.get(key)
+            if producer is not None:
+                assert producer in by, (job.name, read, producer)
+                assert order[producer] < order[job.name], (job.name, read, producer)
+    assert "routing" not in by and "qwen_moerows" not in by
+    runner = Runner(jobs, [0], 2, tmp_path)
+    present = tmp_path / "present"
+    present.touch()
+    monkeypatch.setattr(runner, "path", lambda job, key: present)
+    for job in jobs:
+        job.status = "ok"
+    build, gate = by["build_x2"], by["bgate_x2"]
+    build.status = "running"
+    assert runner._state(gate) == "wait"
+    build.status = "fail"
+    assert runner._state(gate) == "skip" and "build_x2 fail" in gate.note
+    build.status = "ok"
+    assert runner._state(gate) == "ready"
+
+
 # ---------------------------------------------------------------- the session
 @pytest.fixture(scope="module")
 def session():
@@ -349,3 +425,258 @@ def test_gate_runs_the_arm_it_names(tmp_path, monkeypatch):
     for arm in ("x8p", "x8m", "x8k", "x8"):
         rec = json.loads((tmp_path / f"bgate_{arm}.json").read_text())
         assert rec["arm"] == arm and rec["batch"] == 8 and rec["passed"] is False
+
+
+@pytest.mark.parametrize("name", ["x8_diag", "x8_diag_qwen"])
+def test_candidate_gate_declares_its_own_build(name):
+    from etx.tools.gpu_jobs import load_session
+    jobs, _ = load_session(ROOT / f"examples/sessions/{name}.py")
+    by = {j.name: j for j in jobs}
+    for arm in ("x8p", "x8m", "x8k", "x8"):
+        gate = by[f"bgate_{arm}"]
+        assert gate.cmd.endswith(f"gate {arm}")
+        assert {p for p in gate.reads if p.startswith("b_")} == {f"b_{arm}/run"}
+
+
+def test_routing_union_uses_the_executed_request_prefix():
+    import ast
+    from types import SimpleNamespace
+    from itertools import combinations
+    tree = ast.parse((ROOT / "examples/dsv2lite/routing_overlap.py").read_text())
+    fn = next(n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == "mean_union")
+    scope = dict(a=SimpleNamespace(batch=8), combinations=combinations)
+    exec(compile(ast.Module(body=[fn], type_ignores=[]), "routing_overlap.py", "exec"), scope)
+    disjoint = [list(range(6 * r, 6 * r + 6)) for r in range(4)]
+    step = disjoint + [disjoint[0]] * 4
+    assert scope["mean_union"](2, [step]) == 12
+    assert scope["mean_union"](4, [step]) == 24
+    assert scope["mean_union"](8, [step]) == 24
+
+
+def test_report_does_not_project_from_legacy_subset_means(tmp_path, monkeypatch):
+    from examples.dsv2lite import batch_session as bs
+    for k in ("ETX_SESS_LOGDIR", "ETX_DSV2_FLEET", "ETX_DSV2_DATA"):
+        monkeypatch.setenv(k, str(tmp_path))
+    s = bs.BatchSession()
+    selection = {str(b): dict(config="aiter") for b in BATCHES}
+    (tmp_path / "vsel.json").write_text(json.dumps(dict(selection=selection)))
+    rounds = rounds_for({4: "9.0"}, {1: "4.2", 4: "6.0"})
+    (tmp_path / "brounds.json").write_text(json.dumps(dict(rounds=rounds)))
+    (tmp_path / "routing.json").write_text(json.dumps(dict(overall={"4": 15})))
+    s.report()
+    report = json.loads((tmp_path / "batch_report.json").read_text())
+    assert "PENDING" in report["batches"]["4"]["next"]["next"]
+
+
+@pytest.mark.parametrize("damage", ["mixed", "missing", "prompt"])
+def test_golden_certificate_binds_prompt_and_execution_bytes(tmp_path, damage):
+    import hashlib
+    import numpy as np
+    from examples.dsv2lite import batch_goldens as bg
+    for r in range(2):
+        d = bg.request_dir(tmp_path, r)
+        d.mkdir(exist_ok=True)
+        prompt = bg.rotate(list(range(128)), r)
+        np.savez(d / "golden.npz", prompt_ids=prompt, token_ids=[7] * 33)
+        (d / "golden_tokens.txt").write_text(" ".join(["7"] * 33))
+        for name in ("fleet_cache.bin", "golden_hidden.bin"):
+            (d / name).write_bytes(f"{name}: request {r}".encode())
+        cert = dict(prompt_ids=prompt, sha256={f: hashlib.sha256((d / f).read_bytes()).hexdigest() for f in bg.FILES})
+        (d / "golden.binding.json").write_text(json.dumps(cert))
+    if damage == "mixed":
+        for name in ("fleet_cache.bin", "golden_hidden.bin"):
+            (tmp_path / "r1" / name).write_bytes((tmp_path / name).read_bytes())
+    elif damage == "missing":
+        (tmp_path / "r1/golden.binding.json").unlink()
+    else:
+        cert["prompt_ids"] = list(range(128))
+        (tmp_path / "r1/golden.binding.json").write_text(json.dumps(cert))
+    with pytest.raises(SystemExit, match="request 1:.*binding"):
+        bg.main([str(tmp_path), "--requests", "2"])
+
+
+def test_fresh_golden_binding_verifies_and_exports(tmp_path):
+    import numpy as np
+    from examples.dsv2lite import batch_goldens as bg
+    np.savez(tmp_path / "golden.npz", prompt_ids=list(range(128)), token_ids=[7] * 33)
+    (tmp_path / "golden_tokens.txt").write_text(" ".join(["7"] * 33))
+    for name in ("fleet_cache.bin", "golden_hidden.bin"):
+        (tmp_path / name).write_bytes(b"fresh reference")
+    bg.main([str(tmp_path), "--certify"])
+    bg.main([str(tmp_path), "--verify-binding"])
+    bg.main([str(tmp_path), "--requests", "1"])
+    assert (tmp_path / "vllm/golden_r0.txt").read_text().startswith("prompt 0 1 2")
+
+
+@pytest.mark.parametrize("bad_short", range(6))
+def test_each_short_vllm_invocation_is_gated(tmp_path, monkeypatch, capsys, bad_short):
+    import sys
+    from types import ModuleType, SimpleNamespace
+    from examples.llm import vllm_bench as vb
+    clock = [0.0]
+    shorts = []
+    vllm = ModuleType("vllm")
+    vllm.__version__ = "test"
+    vllm.SamplingParams = lambda **kw: SimpleNamespace(**kw)
+
+    class LLM:
+        def __init__(self, **kw):
+            pass
+
+        def generate(self, prompts, sp, **kw):
+            clock[0] += sp.max_tokens * 0.001
+            tokens = list(range(100, 100 + sp.max_tokens))
+            if sp.max_tokens == 1:
+                if len(shorts) == bad_short:
+                    tokens = [999]
+                shorts.append(tokens)
+            return [SimpleNamespace(outputs=[SimpleNamespace(token_ids=tokens)]) for _ in prompts]
+
+    vllm.LLM = LLM
+    inputs = ModuleType("vllm.inputs")
+    inputs.TokensPrompt = lambda **kw: kw
+    monkeypatch.setitem(sys.modules, "vllm", vllm)
+    monkeypatch.setitem(sys.modules, "vllm.inputs", inputs)
+    monkeypatch.setattr(vb.time, "perf_counter", lambda: clock[0])
+    golden = tmp_path / "golden.txt"
+    golden.write_text("prompt 1 2 3\ngen " + " ".join(map(str, range(100, 133))) + "\n")
+    a = SimpleNamespace(goldens=[golden], batches="1", model="test", tokens=32, eager=False,
+                        echo_config=False, label="default", repeats=5, no_detok=False, json=None)
+    vb.batch_mode(a, {})
+    assert len(shorts) == 6
+    result = batch.vllm_results(capsys.readouterr().out, "default")[1]
+    assert not result["legal"] and "diverged" in result["reason"]
+
+
+@pytest.mark.parametrize("sample", ["0", "-1", "-0.000001"])
+def test_nonpositive_vllm_sample_is_illegal(sample):
+    log = vllm_log(batches=(1,), per=("5", "5", sample, "5", "5"))
+    result = batch.vllm_results(log, "default")[1]
+    assert not result["legal"] and "nonpositive" in result["reason"]
+
+
+@pytest.mark.parametrize("damage", ["failure_first", "failure_last", "extra_index", "extra_phase"])
+def test_duplicate_or_unexpected_sequence_gate_cannot_pass(damage):
+    log = vllm_log(batches=(1,))
+    line = next(x for x in log.splitlines() if "phase=sample0 seq=0 " in x)
+    if damage.startswith("failure"):
+        line = line.replace("32/32", "7/32")
+    elif damage == "extra_index":
+        line = line.replace("seq=0", "seq=1")
+    else:
+        line = line.replace("phase=sample0", "phase=sample99")
+    log = line + "\n" + log if damage == "failure_first" else log + line + "\n"
+    result = batch.vllm_results(log, "default")[1]
+    assert not result["legal"]
+
+
+def test_legacy_verification_keeps_the_supported_rederivation_marker(tmp_path):
+    from etx.session import experiment
+    from examples.dsv2lite import arms
+    (tmp_path / "SHA256SUMS").write_text("")
+    rc, lines = experiment.verify(tmp_path, arms)
+    assert rc == 3                         # Legacy byte integrity remains incomplete.
+    assert any(line.startswith("RE-DERIVED:") and "every available" not in line for line in lines)
+
+
+def test_sealed_batch_report_is_explicitly_excluded_from_semantic_verification(tmp_path):
+    from etx.session import experiment, record
+    from examples.dsv2lite import arms
+    (tmp_path / "batch_report.json").write_text(json.dumps(dict(batches={"8": dict(status="COMPLETE", throughput="WIN")})))
+    rounds = [dict(etx={"8": dict(error="gate failed")}, vllm={}) for _ in range(5)]
+    (tmp_path / "brounds.json").write_text(json.dumps(dict(rounds=rounds)))
+    record.seal(tmp_path, jobs={"breport": "ok"}, plan="test")
+    rc, lines = experiment.verify(tmp_path, arms)
+    assert rc == 3
+    assert any("EXCLUDED batch_report.json" in line and "raw" in line for line in lines)
+    assert not any("every available verdict" in line for line in lines)
+
+
+def test_verifier_checks_the_promised_batch_report(tmp_path):
+    from etx.session import experiment, record
+    from examples.dsv2lite import arms
+    record.seal(tmp_path, jobs={"breport": "ok"}, plan="test")
+    rc, lines = experiment.verify(tmp_path, arms, ROOT / "examples/sessions/ds_batch.py")
+    assert rc == 3
+    assert any("MISSING batch_report.json" in line for line in lines)
+
+
+def test_baseline_refuses_a_model_other_than_the_prepared_model(tmp_path, monkeypatch):
+    from examples.dsv2lite import batch_session as bs
+    for k in ("ETX_SESS_LOGDIR", "ETX_DSV2_FLEET", "ETX_DSV2_DATA"):
+        monkeypatch.setenv(k, str(tmp_path))
+    other = tmp_path / "different-model"
+    prepared = tmp_path / "prepared-model"
+    monkeypatch.setattr(bs, "MODEL", prepared)
+    monkeypatch.setenv("ETX_DSV2_MODEL", str(other))
+    s = bs.BatchSession()
+    calls = []
+    monkeypatch.setattr(s, "run", lambda *a, **kw: calls.append(a) or "")
+    with pytest.raises(ValueError) as exc:
+        s.vllm("default", "model_probe")
+    assert str(other) in str(exc.value)
+    assert str(prepared) in str(exc.value)
+    assert not calls
+
+
+def test_standalone_diagnostic_prepares_its_goldens():
+    from etx.tools.gpu_jobs import load_session
+    jobs, _ = load_session(ROOT / "examples/sessions/x8_diag.py")
+    names = [j.name for j in jobs]
+    assert "prep_goldens" in names
+    assert all(names.index("prep_goldens") < names.index(f"bgate_{a}") for a in ("x8p", "x8m", "x8k", "x8"))
+
+
+@pytest.mark.parametrize("changed", [0, 32])
+def test_collision_warning_covers_either_checked_token_window(changed):
+    from examples.dsv2lite.batch_goldens import collisions
+    goldens = [list(range(33)), list(range(33))]
+    goldens[1][changed] = 999
+    assert collisions(goldens) == [[0, 1]]
+
+
+@pytest.mark.parametrize("changed,expected", [(0, "1"), (32, "0")])
+def test_host_collision_compares_its_checked_suffix(tmp_path, changed, expected):
+    import subprocess
+    toolchain = Path("/opt/homebrew/opt/llvm/bin/clang++")
+    src = (ROOT / "examples/dsv2lite/host.hip").read_text()
+    line = next(x.strip() for x in src.splitlines() if x.strip().startswith("if (") and "q.golden" in x and "reqs[o].golden" in x)
+    condition = line[len("if ("):-1]
+    cpp = tmp_path / "collision.cpp"
+    cpp.write_text('#include <vector>\n#include <algorithm>\n#include <iostream>\n'
+                   'int main() { struct Req { std::vector<int> golden; }; Req q; std::vector<Req> reqs(1); '
+                   'int o=0, tokens=32; for(int i=0;i<33;++i) { q.golden.push_back(i); reqs[0].golden.push_back(i); } '
+                   f'q.golden[{changed}]=999; std::cout << ({condition}); }}\n')
+    subprocess.run([str(toolchain) if toolchain.exists() else "c++", "-std=c++17", str(cpp), "-o", str(tmp_path / "collision")],
+                   check=True, capture_output=True)
+    out = subprocess.run([str(tmp_path / "collision")], check=True, capture_output=True, text=True)
+    assert out.stdout == expected
+
+
+@pytest.mark.parametrize("args", [["--goldens", "unused", "--batch", "8"],
+                                  ["--golden", "unused", "--batches", "1,2,4,8"]])
+def test_vllm_cli_rejects_options_for_the_other_mode(monkeypatch, capsys, args):
+    import sys
+    from types import ModuleType
+    from examples.llm import vllm_bench as vb
+    vllm = ModuleType("vllm")
+    vllm.LLM = vllm.SamplingParams = object
+    inputs = ModuleType("vllm.inputs")
+    inputs.TokensPrompt = object
+    monkeypatch.setitem(sys.modules, "vllm", vllm)
+    monkeypatch.setitem(sys.modules, "vllm.inputs", inputs)
+    monkeypatch.setattr(sys, "argv", ["vllm_bench", "--model", "unused", *args])
+    monkeypatch.setattr(vb, "batch_mode", lambda *a: pytest.fail("incompatible option reached batch mode"))
+    monkeypatch.setattr(vb, "read_golden", lambda *a: pytest.fail("incompatible option reached legacy mode"))
+    with pytest.raises(SystemExit) as exc:
+        vb.main()
+    assert exc.value.code == 2 and "only valid" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("operation", ["rounds", "vsel", "report"])
+def test_batch_cli_rejects_an_ignored_arm(monkeypatch, capsys, operation):
+    from examples.dsv2lite import batch_session as bs
+    monkeypatch.setattr(bs, "BatchSession", lambda: pytest.fail("ignored arm reached session construction"))
+    with pytest.raises(SystemExit) as exc:
+        bs.main([operation, "x8p"])
+    assert exc.value.code == 2 and "only valid" in capsys.readouterr().err

@@ -65,15 +65,17 @@ def main() -> None:
     for h in handles:
         h.remove()
 
-    def mean_union(group_size: int, layer_steps: list) -> float:
+    def mean_union(group_size: int, layer_steps: list, *, subsets=False) -> float:
         vals = []
         for step in layer_steps:
-            for g in combinations(range(a.batch), group_size):
+            for g in (combinations(range(a.batch), group_size) if subsets else [range(group_size)]):
                 vals.append(len(set().union(*(set(step[i]) for i in g))))
         return sum(vals) / len(vals)
 
-    per_layer = {L: {s: mean_union(s, st) for s in (1, 2, 4, 8) if s <= a.batch} for L, st in sorted(picks.items())}
+    per_layer = {L: {s: mean_union(s, st, subsets=True) for s in (1, 2, 4, 8) if s <= a.batch} for L, st in sorted(picks.items())}
     overall = {s: sum(v[s] for v in per_layer.values()) / len(per_layer) for s in (1, 2, 4, 8) if s <= a.batch}
+    prefix_layers = {L: {s: mean_union(s, st) for s in overall} for L, st in sorted(picks.items())}
+    executed_prefix = {s: sum(v[s] for v in prefix_layers.values()) / len(prefix_layers) for s in overall}
     k = len(next(iter(picks.values()))[0][0])
     n_routed = model.config.n_routed_experts
     uniform = {s: n_routed * (1 - (1 - k / n_routed) ** s) for s in overall}
@@ -84,7 +86,8 @@ def main() -> None:
         print(f"  layer {L:2d}: " + "  ".join(f"{s} seq {x:5.2f}" for s, x in v.items()))
     if a.json:
         Path(a.json).write_text(json.dumps({"overall": overall, "uniform": uniform, "per_layer": per_layer, "top_k": k,
-                                            "n_routed": n_routed, "steps": a.steps, "batch": a.batch}, indent=1))
+                                            "n_routed": n_routed, "steps": a.steps, "batch": a.batch,
+                                            "executed_prefix": executed_prefix, "prefix_per_layer": prefix_layers}, indent=1))
 
 
 if __name__ == "__main__":

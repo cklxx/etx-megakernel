@@ -135,10 +135,10 @@ int main(int argc, char** argv) {
     for (int o = 0; o < r; ++o)   // prompt distinctness is checked by examples/dsv2lite/batch_goldens.py before the run;
                                   // two rotations may still share their short greedy output, which only weakens the
                                   // mix-up check for that pair (docs/BATCH-2026-10-14.md 4a), so print and continue
-      if (!q.golden.empty() && q.golden == reqs[o].golden)
-        std::printf("BATCHCOLLISION requests %d and %d: identical %zu greedy tokens; prompts are distinct, "
+      if (q.golden.size() > (size_t)tokens && reqs[o].golden.size() > (size_t)tokens && std::equal(q.golden.begin() + 1, q.golden.begin() + tokens + 1, reqs[o].golden.begin() + 1))
+        std::printf("BATCHCOLLISION requests %d and %d: identical %d checked greedy tokens [1:tokens+1]; prompts are distinct, "
                     "the request mix-up check is unavailable for this pair\n",
-                    o, r, q.golden.size());
+                    o, r, tokens);
     q.first_token = first_token;
     if (q.golden.empty() && q.first_token < 0) die("no golden tokens and no --first-token for request " + std::to_string(r));
     if (q.first_token < 0) q.first_token = q.golden[0];

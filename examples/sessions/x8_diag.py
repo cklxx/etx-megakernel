@@ -41,8 +41,9 @@ for arm in CANDIDATES:
     b = copy.deepcopy(_by_name["build_x8"])       # the existing job carries the box env, timeout and summary lines
     b.update(name=f"build_{arm}", cmd=f"{INPLACE} build {arm}", writes=[f"b_{arm}/run"])
     g = copy.deepcopy(_by_name["bgate_x8"])
-    g.update(name=f"bgate_{arm}", cmd=f"{BATCH} gate {arm}", writes=[f"bgate_{arm}.json"])
+    g.update(name=f"bgate_{arm}", cmd=f"{BATCH} gate {arm}",
+             reads=[f"b_{arm}/run" if p == "b_x8/run" else p for p in g["reads"]], writes=[f"bgate_{arm}.json"])
     _extra += [b, g]
 
-JOBS = [_by_name[n] for n in PREP] + _extra
+JOBS = [_by_name[n] for n in PREP] + [_by_name["prep_goldens"]] + _extra
 STUDIES = {"DeepSeek batch": [f"bgate_{a}" for a in CANDIDATES]}
