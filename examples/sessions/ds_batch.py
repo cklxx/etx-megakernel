@@ -6,10 +6,12 @@ same B, on this box, in this session; total throughput and per-request latency d
 Every request of every invocation is gated on its own HF-greedy golden (32/32 tokens, 27/27 layers, 32/32 warm-up); every
 vLLM sequence on its own golden, on the warm-up and on every sample.
 
-Order: the ds_inplace prep chain, then (CPU, in parallel) the vLLM image pull and the four builds; GPU, strictly in
-order: the 7 rotated references (prep_goldens), one gated invocation per x arm, the vLLM selection round, rounds 1-5,
+Order: the ds_inplace prep chain, then (CPU, in parallel) the vLLM image pull and the five builds; GPU, strictly in
+order: the 7 rotated references (prep_goldens), one gated invocation per x arm, the two-invocation B = 1 box control,
+the vLLM selection round, rounds 1-5,
 the measured expert union (routing), the report.
-Budget [E]: ~40-60 min, about $2 at $1.99/h; runner cap 5400 s (docs/BATCH-2026-10-14.md section 6).
+Budget [E]: ~40-60 min, about $2 at $1.99/h, plus ~1 GPU minute for boxcontrol (build excluded);
+runner cap 5400 s (docs/BATCH-2026-10-14.md section 6).
 Run: examples/dsv2lite/reproduce.sh stage <ip> && examples/dsv2lite/reproduce.sh box-setup <ip> &&
      ETX_SESS_USER=root ETX_SESS_MAX_SECONDS=5400 tools/session.sh start <ip> examples/sessions/ds_batch.py
 """
@@ -25,11 +27,12 @@ _full.JOBS = [dict(d) for d in _full.JOBS if d["name"] in
               ("apt", "etx_env", "prep_env", "source", "prep_dl", "prep_ref", "prep_pack", "preflight")]
 job, PREP_PY, MODEL = _full.job, _full.PREP_PY, _full.MODEL
 from examples.dsv2lite.arms import BATCH_ARMS  # noqa: E402
+from examples.dsv2lite.batch_session import BOXCONTROL_PREVIOUS_ARM  # noqa: E402
 IMAGE = "vllm/vllm-openai-rocm@sha256:bb44b39aea26798cce43030a98bf48efd0322ca7147367db86e38b96bd80f0e7"
 REQUESTS = 8
 GOLDENS = "$ETX_DSV2_DATA/goldens.json"
 OP = ".venv/bin/python -u -m examples.dsv2lite.batch_session"
-SUMMARY = [r"^(BGATE|VSEL|BROUNDS|BREPORT|BATCH-INCOMPLETE|GOLDENS) "]
+SUMMARY = [r"^(BGATE|BOXCONTROL|VSEL|BROUNDS|BREPORT|BATCH-INCOMPLETE|GOLDENS) "]
 
 # ---------------------------------------------------------------- per-request references (GPU) and the vLLM image (CPU)
 job("prep_goldens", 'set -eu; for r in $(seq 0 ' + str(REQUESTS - 1) + '); do '
@@ -50,10 +53,13 @@ job("docker_pull", 'set -eu; S=; [ "$(id -u)" = 0 ] || S=sudo; $S docker --versi
 for arm in ("x2", "x4", "x8"):
     job(f"bgate_{arm}", f"{OP} gate {arm}", lane="gpu", reads=("inputs.json", GOLDENS, f"b_{arm}/run"),
         writes=[f"bgate_{arm}.json"], timeout=600, summary=SUMMARY)
+job("boxcontrol", f"{OP} boxcontrol", lane="gpu",
+    reads=("inputs.json", f"b_{BATCH_ARMS[1]}/run", f"b_{BOXCONTROL_PREVIOUS_ARM}/run"),
+    writes=["boxcontrol.json"], timeout=360, summary=SUMMARY)
 job("vsel", f"{OP} vsel", lane="gpu", reads=("docker_pull", GOLDENS, f"{MODEL}/config.json"), writes=["vsel.json"],
     timeout=1900, summary=SUMMARY)
 job("brounds", f"{OP} rounds", lane="gpu",
-    reads=("vsel.json", f"b_{BATCH_ARMS[1]}/run", *(f"?bgate_{a}.json" for a in ("x2", "x4", "x8"))),
+    reads=("vsel.json", "boxcontrol.json", f"b_{BATCH_ARMS[1]}/run", *(f"?bgate_{a}.json" for a in ("x2", "x4", "x8"))),
     writes=["brounds.json"], timeout=3600, summary=SUMMARY)
 job("routing", f"HIP_VISIBLE_DEVICES=$GPU {PREP_PY} examples/dsv2lite/routing_overlap.py --model {MODEL} "
     f'--fleet "$ETX_DSV2_FLEET" --batch {REQUESTS} --json "$ETX_SESS_LOGDIR/routing.json"',

@@ -3,6 +3,7 @@
 Operations, each run by one job of examples/sessions/ds_batch.py; every invocation is a fresh process with its full log
 kept (inplace_session.Session.run: deadline, progress, probes):
   gate <arm>   one invocation of a multi-request arm with every per-request gate -> bgate_<arm>.json
+  boxcontrol   one B = 1 invocation each of the shipped and previous recipes -> boxcontrol.json
   vsel         vLLM round 0: both configurations, B = 1, 2, 4, 8, one engine each -> vsel.json (baseline per B)
   rounds       rounds 1-5: the kept arm, the x arms that passed their gate, the selected vLLM configuration(s);
                order reversed on even rounds -> brounds.json
@@ -17,6 +18,7 @@ import os
 from pathlib import Path
 
 from etx.session import batch
+from etx.session.experiment import ns
 from examples.dsv2lite.arms import BATCH_ARMS, BATCHES, X8_CANDIDATES
 from examples.dsv2lite.inplace_session import Session, write_json
 
@@ -24,6 +26,7 @@ IMAGE = "vllm/vllm-openai-rocm@sha256:bb44b39aea26798cce43030a98bf48efd0322ca714
 CONFIGS = {"default": "0", "aiter": "1"}            # VLLM_ROCM_USE_AITER, in tie-break order
 MODEL = Path.home() / "models/dsv2-lite-base"     # examples/sessions/ds_batch.py prepares and declares this path
 VLLM_DEADLINE_S = 900
+BOXCONTROL_PREVIOUS_ARM = "alld4r0l1"
 
 
 class BatchSession(Session):
@@ -71,6 +74,35 @@ class BatchSession(Session):
         if path.exists():
             raise RuntimeError(f"{path.name} already exists: use a fresh ETX_SESS_LOGDIR")
         return path
+
+    def boxcontrol(self):
+        """Two invocations, estimated ~1 GPU minute, on this study's box. Reuse etx()'s gates and exact host
+        BATCHREQ device median / BATCH step-wall median, never the human wall mean or token interval.
+        Offsets are shipped minus previous; pct is the wall offset / previous wall median x 100.
+        """
+        out = self.fresh(self.logs / "boxcontrol.json")
+        arms = (BATCH_ARMS[1], BOXCONTROL_PREVIOUS_ARM)
+        measurements = {}
+        for arm in arms:
+            result = self.etx(1, f"boxcontrol_{arm}", arm=arm)
+            if "error" in result:
+                raise RuntimeError(f"BOXCONTROL incomplete arm={arm}: {result['error']}")
+            values = dict(device_median_ms=result["requests"][0]["device_ms"], wall_median_ms=result["step_ms"])
+            if any(ns(value) <= 0 for value in values.values()):
+                raise RuntimeError(f"BOXCONTROL incomplete arm={arm}: nonpositive median {values}")
+            measurements[arm] = values
+        shipped, previous = (measurements[arm] for arm in arms)
+        device_ns = ns(shipped["device_median_ms"]) - ns(previous["device_median_ms"])
+        wall_ns = ns(shipped["wall_median_ms"]) - ns(previous["wall_median_ms"])
+        offset = dict(device_ms=f"{device_ns / 1_000_000:+.6f}", wall_ms=f"{wall_ns / 1_000_000:+.6f}",
+                      pct=f"{100 * wall_ns / ns(previous['wall_median_ms']):+.6f}", between=list(arms))
+        write_json(out, dict(arms=measurements, offset=offset))
+        # Emit only after both arms passed: an absent/failed arm must never leave a partial control number.
+        for arm, values in measurements.items():
+            print(f"BOXCONTROL arm={arm} b=1 device_median_ms={values['device_median_ms']} "
+                  f"wall_median_ms={values['wall_median_ms']} tokens=32/32 layers=27/27", flush=True)
+        print(f"BOXCONTROL offset device_ms={offset['device_ms']} wall_ms={offset['wall_ms']} pct={offset['pct']} "
+              f"between {arms[0]} and {arms[1]}", flush=True)
 
     def gate(self, arm: str):
         # the study's own arms carry their batch in BATCH_ARMS; the batch-8 recipe diagnostic's four candidates
@@ -148,7 +180,7 @@ class BatchSession(Session):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("operation", choices=("gate", "vsel", "rounds", "report"))
+    ap.add_argument("operation", choices=("gate", "boxcontrol", "vsel", "rounds", "report"))
     ap.add_argument("arm", nargs="?")
     a = ap.parse_args(argv)
     if a.operation != "gate" and a.arm is not None:

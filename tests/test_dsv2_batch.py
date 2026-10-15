@@ -372,12 +372,112 @@ def session():
 def test_session_order_correctness_first_then_timings_then_captures(session):
     by, jobs, limit = session
     assert limit == 5400
-    assert [j.name for j in jobs if j.lane == "gpu"] == ["prep_ref", "prep_goldens", "bgate_x2", "bgate_x4", "bgate_x8",
+    assert [j.name for j in jobs if j.lane == "gpu"] == ["prep_ref", "prep_goldens", "bgate_x2", "bgate_x4", "bgate_x8", "boxcontrol",
                                                           "vsel", "brounds", "routing"]
-    assert {f"build_{a}" for a in ("alld4r0l1kvsmw", "x2", "x4", "x8")} <= set(by)
+    assert {f"build_{a}" for a in (BATCH_ARMS[1], "alld4r0l1", "x2", "x4", "x8")} <= set(by)
     assert all(by[f"bgate_{a}"].reads[1] == "$ETX_DSV2_DATA/goldens.json" for a in ("x2", "x4", "x8"))
-    assert set(by["brounds"].reads) == {"vsel.json", "b_alld4r0l1kvsmw/run", "?bgate_x2.json", "?bgate_x4.json", "?bgate_x8.json"}
+    assert set(by["brounds"].reads) == {"vsel.json", "boxcontrol.json", "b_alld4r0l1kvsmw/run", "?bgate_x2.json", "?bgate_x4.json", "?bgate_x8.json"}
     assert "docker_pull" in by["vsel"].reads and by["breport"].lane == "final"
+
+
+def test_boxcontrol_job_declares_both_builds_and_preserves_its_offset(session):
+    import re
+    by, jobs, _ = session
+    control = by["boxcontrol"]
+    assert control.cmd.endswith("batch_session boxcontrol")
+    assert set(control.reads) == {"inputs.json", f"b_{BATCH_ARMS[1]}/run", "b_alld4r0l1/run"}
+    assert control.writes == ["boxcontrol.json"]
+    assert "boxcontrol.json" in by["brounds"].reads
+    assert any(re.search(pattern, "BOXCONTROL offset device_ms=0.1") for pattern in control.summary)
+    assert jobs.index(by["build_alld4r0l1"]) < jobs.index(control) < jobs.index(by["brounds"])
+
+
+def test_boxcontrol_prints_exact_host_medians_and_signed_offset(tmp_path, monkeypatch, capsys):
+    import re
+    from examples.dsv2lite import batch_session as bs
+    for k in ("ETX_SESS_LOGDIR", "ETX_DSV2_FLEET", "ETX_DSV2_DATA"):
+        monkeypatch.setenv(k, str(tmp_path))
+    # Follow the registry's current shipped arm, rather than baking today's recipe into the mode.
+    monkeypatch.setattr(bs, "BATCH_ARMS", {**BATCH_ARMS, 1: "shipped"})
+    s = bs.BatchSession()
+    measurements = {"shipped": ("3.200007", "3.300011"), "alld4r0l1": ("3.240013", "3.350017")}
+    calls = []
+
+    def fake_run(name, command, **kw):
+        arm = Path(command[0]).parent.name.removeprefix("b_")
+        calls.append((name, command))
+        dev, wall = measurements[arm]
+        # Human wall output is a mean; interval latency is yet another basis. Neither is the wall median.
+        return etx_log(1, steps=wall, intervals={0: "9.99999"}, extra=
+                       "per-token latency (embed -> argmax on device): median 9.000 ms  mean 9.001 ms; "
+                       "step wall (launch to end) 9.002 ms/token").replace("device_median_ms=3.200000",
+                                                                                    f"device_median_ms={dev}")
+
+    monkeypatch.setattr(s, "run", fake_run)
+    s.boxcontrol()
+    lines = capsys.readouterr().out.splitlines()
+    assert len(lines) == 3
+    parsed = {}
+    for line in lines[:2]:
+        match = re.fullmatch(r"BOXCONTROL arm=(\S+) b=1 device_median_ms=([\d.]+) wall_median_ms=([\d.]+) "
+                             r"tokens=32/32 layers=27/27", line)
+        assert match, line
+        parsed[match[1]] = (match[2], match[3])
+    assert parsed == measurements
+    offset = re.fullmatch(r"BOXCONTROL offset device_ms=([+-]?[\d.]+) wall_ms=([+-]?[\d.]+) pct=([+-]?[\d.]+) "
+                          r"between shipped and alld4r0l1", lines[2])
+    assert offset
+    assert offset.group(1, 2) == ("-0.040006", "-0.050006")
+    assert float(offset[3]) == pytest.approx(-0.050006 / 3.350017 * 100, abs=0.000001)
+    assert len(calls) == 2
+    assert [name for name, _ in calls] == ["boxcontrol_shipped", "boxcontrol_alld4r0l1"]
+    assert all(command[1:] == s.args() and "--req-dir" not in command for _, command in calls)
+    saved = json.loads((tmp_path / "boxcontrol.json").read_text())
+    assert set(saved["arms"]) == set(measurements)
+    with pytest.raises(RuntimeError, match="fresh ETX_SESS_LOGDIR"):
+        s.boxcontrol()
+    assert len(calls) == 2
+
+
+@pytest.mark.parametrize("missing", [BATCH_ARMS[1], "alld4r0l1"])
+def test_boxcontrol_refuses_a_missing_arm_without_partial_numbers(tmp_path, monkeypatch, capsys, missing):
+    from examples.dsv2lite import batch_session as bs
+    for k in ("ETX_SESS_LOGDIR", "ETX_DSV2_FLEET", "ETX_DSV2_DATA"):
+        monkeypatch.setenv(k, str(tmp_path))
+    s = bs.BatchSession()
+
+    def fake_run(name, command, **kw):
+        if Path(command[0]).parent.name == f"b_{missing}":
+            raise RuntimeError("binary is missing")
+        return etx_log(1)
+
+    monkeypatch.setattr(s, "run", fake_run)
+    with pytest.raises(RuntimeError, match=f"BOXCONTROL.*{missing}.*binary is missing"):
+        s.boxcontrol()
+    assert not any(line.startswith("BOXCONTROL ") for line in capsys.readouterr().out.splitlines())
+    assert not (tmp_path / "boxcontrol.json").exists()
+
+
+@pytest.mark.parametrize("damage", [dict(tokens="31/32"), dict(layers=26), dict(warm="31/32")])
+def test_boxcontrol_refuses_failed_correctness_gates(tmp_path, monkeypatch, capsys, damage):
+    from examples.dsv2lite import batch_session as bs
+    for k in ("ETX_SESS_LOGDIR", "ETX_DSV2_FLEET", "ETX_DSV2_DATA"):
+        monkeypatch.setenv(k, str(tmp_path))
+    s = bs.BatchSession()
+    monkeypatch.setattr(s, "run", lambda *args, **kwargs: etx_log(1, **damage))
+    with pytest.raises(RuntimeError, match=f"BOXCONTROL.*{BATCH_ARMS[1]}"):
+        s.boxcontrol()
+    assert not any(line.startswith("BOXCONTROL ") for line in capsys.readouterr().out.splitlines())
+    assert not (tmp_path / "boxcontrol.json").exists()
+
+
+def test_boxcontrol_cli_runs_without_an_arm(monkeypatch):
+    from types import SimpleNamespace
+    from examples.dsv2lite import batch_session as bs
+    calls = []
+    monkeypatch.setattr(bs, "BatchSession", lambda: SimpleNamespace(boxcontrol=lambda: calls.append("boxcontrol")))
+    bs.main(["boxcontrol"])
+    assert calls == ["boxcontrol"]
 
 
 def test_rounds_alternate_and_skip_an_arm_whose_gate_failed(tmp_path, monkeypatch):
@@ -673,7 +773,7 @@ def test_vllm_cli_rejects_options_for_the_other_mode(monkeypatch, capsys, args):
     assert exc.value.code == 2 and "only valid" in capsys.readouterr().err
 
 
-@pytest.mark.parametrize("operation", ["rounds", "vsel", "report"])
+@pytest.mark.parametrize("operation", ["rounds", "vsel", "report", "boxcontrol"])
 def test_batch_cli_rejects_an_ignored_arm(monkeypatch, capsys, operation):
     from examples.dsv2lite import batch_session as bs
     monkeypatch.setattr(bs, "BatchSession", lambda: pytest.fail("ignored arm reached session construction"))
