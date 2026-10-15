@@ -1,0 +1,37 @@
+STAGE interpreter/dependencies OK /Users/ckl/code/etx/.venv
+STAGE interpreter/dependencies OK /Users/ckl/code/etx/.venv
+STAGE ready root=/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/committed-archive-probe/source venv=/Users/ckl/code/etx/.venv
+ACTUAL preflight exit 2 PASS interpreter: /Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/committed-archive-probe/source/.venv/bin/python; yaml, numpy import from .venv
+FAIL vllm_source: not a git checkout: /Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/committed-archive-probe/absent-vllm; supply: git clone --depth 1 --branch v0.27.1 https://github.com/vllm-project/vllm.git /Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/committed-archive-probe/absent-vllm
+FAIL packed_model: /Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/committed-archive-probe/model; vl.bin=28 bytes, vl.manifest=28 bytes, hf/config.json=2 bytes, golden_c1024.txt=28 bytes; golden sha256=5008f23e5531dc09771bb4be691ebb19ae46fea0f5d64d31b78a7261d4bbdd97 expected=bab2f1fbe12f70179711ec40a215c74710845b73169b1cc6a3a6ca50e0a19484; supply: cp /Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/committed-archive-probe/source/examples/llm/results/golden_c1024_qwen3-30b-a3b.txt /Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/committed-archive-probe/model/golden_c1024.txt
+FAIL rocm_headers: ETX_ROCM_HEADERS=/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/committed-archive-probe/absent-headers; requires hip/hip_runtime.h; supply: mkdir -p /Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/committed-archive-probe/absent-headers && rsync -a "${ETX_STAGE_SOURCE:?set ETX_STAGE_SOURCE to the CPU-tested staging directory}/"rocm-headers/inc/ /Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/committed-archive-probe/absent-headers/
+FAIL gpu: /dev/kfd exists=False; rocm-smi=CPU-PROBE-SUBSTITUTE; supply: bash /Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/committed-archive-probe/source/tools/hotaisle_grab.sh 1x
+PREFLIGHT FAIL 4 item(s)
+FAIL phase=preflight reason=box inputs missing: supply each FAIL above with its printed command, then rerun preflight
+EVIDENCE /Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/committed-archive-probe/record
+SAFE resume: session.sh status/fetch; inspect failure; no partial timing claim; lease budget is unchanged
+ 
+ACTUAL report exit 0 VERDICT {"status": "NOT-COMPLETE", "reason": "[Errno 2] No such file or directory: '/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/committed-archive-probe/record/correctness.json'", "performance_claim": false}
+ 
+ACTUAL expert-source-identity exit 0 {"archive": "96c3f782fcd673cb89deed5c44a796bb7d12b3001db98d6d3a53f364255ea989", "branch": "integration/qwen-three-2026-10-15", "commit": "bef4cbf708e5dae66d90a04f81c33435a6f13988", "kind": "staged-archive", "sha256": "cf3395b1628f9863c4a700a9c760cbc92973e8f486fd308d7a90a63171fa78d9", "staged": "2026-10-15T00:00:00Z"}
+ 
+ACTUAL session-qwen_producer exit 0 Session hard stop: 3600s from runner start (includes setup)
+  0 preflight                        cpu      timeout   240s  reads: -  writes: inputs.json
+  1 build_baseline                   cpu      timeout   900s  reads: preflight  writes: b_baseline/run
+  2 build_producer                   cpu      timeout   900s  reads: preflight  writes: b_producer/run
+  3 qualify                          GPU 0    timeout  1500s  reads: build_baseline, build_producer  writes: correctness.json
+  4 measure                          GPU 0    timeout  2700s  reads: correctness.json  writes: measurement.complete.json
+  5 diagnose                         GPU 0    timeout   420s  reads: measurement.complete.json  writes: trace_baseline.json, trace_producer.json
+  6 report                           final    timeout    60s  reads: ?qualify, ?measure, ?diagnose  writes: report.json
+ 
+ACTUAL session-attention_early_merge exit 0 Session hard stop: 2400s from runner start (includes setup)
+  0 c6_build                         cpu      timeout  1800s  reads: -
+  1 c6_measure                       GPU 0    timeout  1800s  reads: c6_build
+ 
+ACTUAL session-qwen_expert_merge exit 0 Session hard stop: 1800s from runner start (includes setup)
+  0 synthetic                        cpu      timeout   120s  reads: -
+  1 build                            cpu      timeout  1200s  reads: synthetic
+  2 correctness                      GPU 0    timeout   360s  reads: build
+  3 pairs                            GPU 0    timeout   240s  reads: correctness
+ 
+COMMITTED ARCHIVE PASS bef4cbf708e5dae66d90a04f81c33435a6f13988

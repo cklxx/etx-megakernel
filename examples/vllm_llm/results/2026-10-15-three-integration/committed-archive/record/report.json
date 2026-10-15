@@ -1,0 +1,5 @@
+{
+  "status": "NOT-COMPLETE",
+  "reason": "[Errno 2] No such file or directory: '/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/committed-archive-probe/record/correctness.json'",
+  "performance_claim": false
+}

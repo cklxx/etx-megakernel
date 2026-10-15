@@ -1,0 +1,16 @@
+{
+  "status": "PASS_COMMITTED_SOURCE_ARCHIVE_LOCAL_ONLY",
+  "revision": "bef4cbf708e5dae66d90a04f81c33435a6f13988",
+  "archive_sha256": "96c3f782fcd673cb89deed5c44a796bb7d12b3001db98d6d3a53f364255ea989",
+  "archive_bytes": 3338240,
+  "source_receipt_accepted": true,
+  "source_keys": 357,
+  "report": {
+    "status": "NOT-COMPLETE",
+    "reason": "[Errno 2] No such file or directory: '/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/committed-archive-probe/record/correctness.json'",
+    "performance_claim": false
+  },
+  "identity": "complete four-field local staged receipt; not remote transport",
+  "gpu_execution": false,
+  "gpu_spend_usd": 0
+}

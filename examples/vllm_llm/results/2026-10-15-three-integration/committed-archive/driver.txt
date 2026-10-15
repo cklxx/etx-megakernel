@@ -1,0 +1,42 @@
+import fcntl,hashlib,json,os,shutil,subprocess,sys,tarfile
+from pathlib import Path
+from examples.vllm_llm import producer_session as ps
+from examples.vllm_llm.producer_stage import attach
+from examples.vllm_llm.expert_merge.prepare import sources as expert_sources
+root=Path.cwd();base=Path('/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence');out=base/'committed-archive-probe';out.mkdir()
+lock=open(base.parent/'qwen-prep-heavy.lock','a+');fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
+assert shutil.disk_usage(base).free>5*1024**3
+revision=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
+assert subprocess.check_output(['git','status','--porcelain'],text=True)==''
+ready=json.loads((ps.ART/'local-ready.json').read_text());assert ready['sources']==ps.local_sources()
+paths=sorted(set(ready['sources'])|set(expert_sources())|{'etx','examples/sessions/attention_early_merge.py','examples/sessions/qwen_expert_merge.py',str((ps.ART/'local-ready.json').relative_to(root))})
+archive=out/'source';archive.mkdir();bundle=out/'source.tar'
+with bundle.open('wb') as f:subprocess.run(['git','archive',revision,'--',*paths],stdout=f,check=True,timeout=20)
+with tarfile.open(bundle) as f:f.extractall(archive,filter='data')
+archive_sha=hashlib.sha256(bundle.read_bytes()).hexdigest()
+(archive/'SOURCE_IDENTITY').write_text(f'commit {revision}\nbranch integration/qwen-three-2026-10-15\narchive {archive_sha}\nstaged 2026-10-15T00:00:00Z\n')
+attach(archive,Path(sys.prefix))
+model=out/'model';hf=model/'hf';hf.mkdir(parents=True)
+for name in ('vl.bin','vl.manifest','golden_c1024.txt'):(model/name).write_text('CPU fixture: never GPU input')
+(hf/'config.json').write_text('{}');config=out/'config.json';config.write_text(json.dumps(dict(model=str(model),hf=str(hf),golden_sha256='synthetic')))
+record=out/'record';record.mkdir();binpath=out/'bin';binpath.mkdir();stub=binpath/'rocm-smi';stub.write_text('#!/bin/sh\necho CPU-PROBE-SUBSTITUTE\n');stub.chmod(0o755)
+env=dict(os.environ,PYTHONPATH=str(archive),ETX_SESS_LOGDIR=str(record),ETX_QWEN_G6_CONFIG=str(config),VLLM=str(out/'absent-vllm'),ETX_ROCM_HEADERS=str(out/'absent-headers'),PATH=str(binpath)+os.pathsep+os.environ['PATH'])
+commands=[]
+def run(name,args,expected):
+ p=subprocess.run(list(map(str,args)),cwd=archive,env=env,capture_output=True,text=True,timeout=30)
+ (out/(name+'.log')).write_text(p.stdout+p.stderr)
+ commands.append(dict(name=name,command=list(map(str,args)),exit=p.returncode,expected=expected))
+ (out/'commands.json').write_text(json.dumps(commands,indent=2)+'\n')
+ print('ACTUAL',name,'exit',p.returncode,p.stdout,p.stderr,flush=True)
+ assert p.returncode==expected
+ return p.stdout+p.stderr
+python=archive/'.venv/bin/python'
+text=run('preflight',[python,'-u','-m','examples.vllm_llm.producer_session','preflight'],2)
+assert 'PASS interpreter:' in text and 'FAIL packed_model:' in text and 'local acceptance missing or source hashes changed' not in text
+run('report',[python,'-u','-m','examples.vllm_llm.producer_session','report'],0)
+report=json.loads((record/'report.json').read_text());assert report['status']=='NOT-COMPLETE' and report['performance_claim'] is False
+run('expert-source-identity',[python,'-c',f'from examples.vllm_llm.expert_merge.capture import source_identity; import json; d=source_identity(); assert d["commit"]=="{revision}" and d["kind"]=="staged-archive"; print(json.dumps(d,sort_keys=True))'],0)
+for job in ('qwen_producer','attention_early_merge','qwen_expert_merge'):
+ run('session-'+job,[python,'-m','etx.tools.gpu_jobs','examples/sessions/'+job+'.py','--gpus','0','--dry-run'],0)
+(out/'acceptance.json').write_text(json.dumps(dict(status='PASS_COMMITTED_SOURCE_ARCHIVE_LOCAL_ONLY',revision=revision,archive_sha256=archive_sha,archive_bytes=bundle.stat().st_size,source_receipt_accepted=True,source_keys=len(ready['sources']),report=report,identity='complete four-field local staged receipt; not remote transport',gpu_execution=False,gpu_spend_usd=0),indent=2)+'\n')
+print('COMMITTED ARCHIVE PASS',revision,flush=True)

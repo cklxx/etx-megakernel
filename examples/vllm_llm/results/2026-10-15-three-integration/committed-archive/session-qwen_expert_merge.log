@@ -1,0 +1,5 @@
+Session hard stop: 1800s from runner start (includes setup)
+  0 synthetic                        cpu      timeout   120s  reads: -
+  1 build                            cpu      timeout  1200s  reads: synthetic
+  2 correctness                      GPU 0    timeout   360s  reads: build
+  3 pairs                            GPU 0    timeout   240s  reads: correctness

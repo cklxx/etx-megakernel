@@ -89,6 +89,15 @@ Heavy work was serialized under `qwen-prep-heavy.lock`, with fixed deadlines,
 progress output, actual child exits and a 4 GiB reserve. More than 6 GiB remained
 at sealing. No other worker's tree/artifacts were altered or deleted.
 
+## Final committed-source archive
+
+The exact integration merge commit `bef4cbf708e5dae66d90a04f81c33435a6f13988` also passed a
+small execution-source archive check (3338240 bytes). The refreshed receipt
+was accepted, the real interpreter passed, synthetic box inputs were refused
+before compute and the real report was NOT-COMPLETE. All three archived session
+graphs and the strict expert staged identity passed. See `committed-archive/`.
+Only evidence metadata follows this source commit; source maps remain identical.
+
 ## Remaining GPU-only work
 
 See the durable [three-path queue](../../../../docs/QWEN-THREE-GPU-QUEUE-2026-10-15.md)

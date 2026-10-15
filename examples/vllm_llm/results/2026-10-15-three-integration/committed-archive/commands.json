@@ -1,0 +1,78 @@
+[
+  {
+    "name": "preflight",
+    "command": [
+      "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/committed-archive-probe/source/.venv/bin/python",
+      "-u",
+      "-m",
+      "examples.vllm_llm.producer_session",
+      "preflight"
+    ],
+    "exit": 2,
+    "expected": 2
+  },
+  {
+    "name": "report",
+    "command": [
+      "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/committed-archive-probe/source/.venv/bin/python",
+      "-u",
+      "-m",
+      "examples.vllm_llm.producer_session",
+      "report"
+    ],
+    "exit": 0,
+    "expected": 0
+  },
+  {
+    "name": "expert-source-identity",
+    "command": [
+      "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/committed-archive-probe/source/.venv/bin/python",
+      "-c",
+      "from examples.vllm_llm.expert_merge.capture import source_identity; import json; d=source_identity(); assert d[\"commit\"]==\"bef4cbf708e5dae66d90a04f81c33435a6f13988\" and d[\"kind\"]==\"staged-archive\"; print(json.dumps(d,sort_keys=True))"
+    ],
+    "exit": 0,
+    "expected": 0
+  },
+  {
+    "name": "session-qwen_producer",
+    "command": [
+      "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/committed-archive-probe/source/.venv/bin/python",
+      "-m",
+      "etx.tools.gpu_jobs",
+      "examples/sessions/qwen_producer.py",
+      "--gpus",
+      "0",
+      "--dry-run"
+    ],
+    "exit": 0,
+    "expected": 0
+  },
+  {
+    "name": "session-attention_early_merge",
+    "command": [
+      "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/committed-archive-probe/source/.venv/bin/python",
+      "-m",
+      "etx.tools.gpu_jobs",
+      "examples/sessions/attention_early_merge.py",
+      "--gpus",
+      "0",
+      "--dry-run"
+    ],
+    "exit": 0,
+    "expected": 0
+  },
+  {
+    "name": "session-qwen_expert_merge",
+    "command": [
+      "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/committed-archive-probe/source/.venv/bin/python",
+      "-m",
+      "etx.tools.gpu_jobs",
+      "examples/sessions/qwen_expert_merge.py",
+      "--gpus",
+      "0",
+      "--dry-run"
+    ],
+    "exit": 0,
+    "expected": 0
+  }
+]
