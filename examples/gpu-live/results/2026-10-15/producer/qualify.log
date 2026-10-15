@@ -1,0 +1,11 @@
+# job qualify gpu=0 cwd=/root/etx
+# .venv/bin/python -u -m examples.vllm_llm.producer_session qualify
+PHASE baseline_check_p0 deadline_s=180 evidence=/root/sess/producer-live-20261015/20261015T153709Z-f24956/baseline_check_p0.raw.log
+PHASE baseline_check_p1040 deadline_s=180 evidence=/root/sess/producer-live-20261015/20261015T153709Z-f24956/baseline_check_p1040.raw.log
+PHASE producer_check_p0 deadline_s=180 evidence=/root/sess/producer-live-20261015/20261015T153709Z-f24956/producer_check_p0.raw.log
+PHASE producer_check_p1040 deadline_s=180 evidence=/root/sess/producer-live-20261015/20261015T153709Z-f24956/producer_check_p1040.raw.log
+PHASE producer_check_p1040 elapsed_s=30.0 log_bytes=6976 evidence=/root/sess/producer-live-20261015/20261015T153709Z-f24956/producer_check_p1040.raw.log
+PHASE producer_check_p1040 elapsed_s=60.0 log_bytes=32572 evidence=/root/sess/producer-live-20261015/20261015T153709Z-f24956/producer_check_p1040.raw.log
+FAIL phase=qualify reason=actual-model acceptance mismatch at position=0 file=L0_mix.bin; performance blocked
+EVIDENCE /root/sess/producer-live-20261015/20261015T153709Z-f24956
+SAFE resume: session.sh status/fetch; inspect failure; no partial timing claim; lease budget is unchanged

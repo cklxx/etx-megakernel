@@ -1,0 +1,3 @@
+# job report gpu=None cwd=/root/etx
+# .venv/bin/python -u -m examples.vllm_llm.producer_session report
+VERDICT {"status": "NOT-COMPLETE", "reason": "[Errno 2] No such file or directory: '/root/sess/producer-live-20261015/20261015T153709Z-f24956/correctness.json'", "performance_claim": false}

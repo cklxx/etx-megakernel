@@ -1,0 +1,38 @@
+$ stdbuf -oL -eL /root/dsv2-prep/.venv/bin/python -u -m examples.dsv2lite.routing_overlap --model /root/models/dsv2-lite-base --fleet /root/fleet-3fb67a6 --batch 4 --steps 32 --context 1024 --reference-data /root/sess/b4-live-20261015/20261015T160946Z-a7e517/references --json /root/sess/b4-live-20261015/20261015T160946Z-a7e517/routing_b4.json
+Loading checkpoint shards:   0%|          | 0/4 [00:00<?, ?it/s]Loading checkpoint shards:  25%|██▌       | 1/4 [00:00<00:02,  1.30it/s]Loading checkpoint shards:  50%|█████     | 2/4 [00:01<00:01,  1.28it/s]Loading checkpoint shards:  75%|███████▌  | 3/4 [00:02<00:00,  1.30it/s]Loading checkpoint shards: 100%|██████████| 4/4 [00:02<00:00,  1.49it/s]Loading checkpoint shards: 100%|██████████| 4/4 [00:02<00:00,  1.41it/s]
+/opt/amdgpu/share/libdrm/amdgpu.ids: No such file or directory
+loaded in 22s
+step 0
+step 8
+step 16
+step 24
+MoE layers 26, top-6 of 64, 32 decode steps x 4 sequences
+ROUTING distinct routed experts for 1 sequence(s): measured 6.00, uniform-routing estimate 6.00
+ROUTING distinct routed experts for 2 sequence(s): measured 11.38, uniform-routing estimate 11.44
+ROUTING distinct routed experts for 4 sequence(s): measured 20.63, uniform-routing estimate 20.83
+  layer  1: 1 seq  6.00  2 seq 11.69  4 seq 22.12
+  layer  2: 1 seq  6.00  2 seq 11.43  4 seq 20.59
+  layer  3: 1 seq  6.00  2 seq 11.34  4 seq 20.59
+  layer  4: 1 seq  6.00  2 seq 11.62  4 seq 21.78
+  layer  5: 1 seq  6.00  2 seq 11.40  4 seq 20.97
+  layer  6: 1 seq  6.00  2 seq 11.41  4 seq 20.53
+  layer  7: 1 seq  6.00  2 seq 11.43  4 seq 20.66
+  layer  8: 1 seq  6.00  2 seq 11.10  4 seq 19.28
+  layer  9: 1 seq  6.00  2 seq 11.13  4 seq 19.62
+  layer 10: 1 seq  6.00  2 seq 11.27  4 seq 20.03
+  layer 11: 1 seq  6.00  2 seq 11.01  4 seq 19.50
+  layer 12: 1 seq  6.00  2 seq 11.29  4 seq 20.22
+  layer 13: 1 seq  6.00  2 seq 11.25  4 seq 19.91
+  layer 14: 1 seq  6.00  2 seq 11.33  4 seq 20.19
+  layer 15: 1 seq  6.00  2 seq 11.20  4 seq 19.81
+  layer 16: 1 seq  6.00  2 seq 11.25  4 seq 20.00
+  layer 17: 1 seq  6.00  2 seq 11.55  4 seq 21.41
+  layer 18: 1 seq  6.00  2 seq 11.34  4 seq 20.59
+  layer 19: 1 seq  6.00  2 seq 11.53  4 seq 21.41
+  layer 20: 1 seq  6.00  2 seq 11.53  4 seq 21.44
+  layer 21: 1 seq  6.00  2 seq 11.37  4 seq 20.62
+  layer 22: 1 seq  6.00  2 seq 11.52  4 seq 21.31
+  layer 23: 1 seq  6.00  2 seq 11.52  4 seq 21.19
+  layer 24: 1 seq  6.00  2 seq 11.49  4 seq 21.12
+  layer 25: 1 seq  6.00  2 seq 11.51  4 seq 21.22
+  layer 26: 1 seq  6.00  2 seq 11.32  4 seq 20.28

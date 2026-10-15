@@ -1,0 +1,54 @@
+Thu Oct 15 15:29:24 UTC 2026
+commit 554133d744b4591c9cf87c68b6817df781137c9b
+branch main
+archive abee09fcda357bb982cfba4d85bb387a6da97ec2385d3d4574f1f7cd4282d5da
+staged 2026-10-15T15:26:30Z
+/root/etx/.venv/bin/python 2.5.4 6.0.3
+   5907       2       02:19 I    kworker/u40:1
+   5946       2       02:14 I    kworker/7:0-cgroup_free
+   6166       2       02:03 I    kworker/14:0-rcu_par_gp
+   6168       2       02:03 I    kworker/18:0-rcu_par_gp
+   6672       1       02:02 Ssl  packagekitd
+   6957       1       01:54 Ssl  fail2ban-server
+   7104       2       01:35 I    kworker/8:0-cgroup_free
+   7105       2       01:35 I    kworker/17:0
+   7107       2       01:32 I    kworker/u44:3-events_power_efficient
+   7243       2       00:49 I<   kworker/u62:1
+   7281       2       00:37 I    kworker/u57:1-events_unbound
+   7289    3779       00:04 Ss   sshd
+   7295       1       00:01 Ss   systemd
+   7296    7295       00:01 S    (sd-pam)
+   7301       2       00:01 I    kworker/1:0
+   7302       2       00:00 S    psimon
+   7386       2       00:00 I<   kworker/u72:1
+   7411    7289       00:00 Ss   bash
+   7434    7411       00:00 R    ps
+   7435    7411       00:00 S    tail
+Selecting previously unselected package amdrocm-llvm-dev7.14.
+(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 171417 files and directories currently installed.)
+Preparing to unpack .../amdrocm-llvm-dev7.14_7.14.1-0_amd64.deb ...
+Unpacking amdrocm-llvm-dev7.14 (7.14.1-0) ...
+Selecting previously unselected package amdrocm-runtime-dev7.14.
+Preparing to unpack .../amdrocm-runtime-dev7.14_7.14.1-0_amd64.deb ...
+Unpacking amdrocm-runtime-dev7.14 (7.14.1-0) ...
+Setting up amdrocm-llvm-dev7.14 (7.14.1-0) ...
+Setting up amdrocm-runtime-dev7.14 (7.14.1-0) ...
+
+Running kernel seems to be up-to-date.
+
+Restarting services...
+
+Service restarts being deferred:
+ systemctl restart unattended-upgrades.service
+
+No containers need to be restarted.
+
+No user sessions are running outdated binaries.
+
+No VM guests are running outdated hypervisor (qemu) binaries on this host.
+clang++: warning: argument unused during compilation: '--hip-link' [-Wunused-command-line-argument]
+7586
+[15:29:34 +  0m00s] session record: /root/sess/expert-live-20261015/20261015T152934Z-af0efa
+[15:29:34 +  0m00s] start synthetic (cpu)
+[15:29:35 +  0m01s] ok      synthetic rc=0 1s
+[15:29:35 +  0m01s] start build (cpu)

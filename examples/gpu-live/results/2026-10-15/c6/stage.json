@@ -1,0 +1,7 @@
+{
+  "stage": "COMPLETE local probe; full-megakernel/wall claim remains unproved",
+  "blocker": null,
+  "evidence": "/root/c6-live-20261015",
+  "deadline": 1792081371.879836,
+  "safe_resume": "python -m examples.vllm_llm.attention_early_merge.session --work /root/c6-live-20261015 --model /root/llm/qwen3-30b-a3b run"
+}

@@ -1,0 +1,22 @@
+Thu Oct 15 15:30:17 UTC 2026
+[15:29:34 +  0m00s] session record: /root/sess/expert-live-20261015/20261015T152934Z-af0efa
+[15:29:34 +  0m00s] start synthetic (cpu)
+[15:29:35 +  0m01s] ok      synthetic rc=0 1s
+[15:29:35 +  0m01s] start build (cpu)
+[15:29:55 +  0m21s] ok      build rc=0 20s
+[15:29:55 +  0m21s] start correctness on GPU 0
+[15:29:59 +  0m25s] ok      correctness rc=0 4s
+[15:29:59 +  0m25s] start pairs on GPU 0
+[15:30:15 +  0m41s] ok      pairs rc=0 16s
+[15:30:15 +  0m41s] session done
+  job                              status     rc  gpu  seconds
+  synthetic                        ok          0             1  
+  build                            ok          0            20  
+  correctness                      ok          0    0        4  
+  pairs                            ok          0    0       16  
+SEALED /root/sess/expert-live-20261015/20261015T152934Z-af0efa complete=True
+DOWNLOAD repo=Qwen/Qwen3-30B-A3B revision=ad44e777bcd18fa416d9da3bd8f70d33ebb85d39 dest=/root/llm/qwen3-30b-a3b/hf time=1792078205.0847483
+Fetching 23 files:   0%|          | 0/23 [00:00<?, ?it/s]Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Fetching 23 files:   9%|▊         | 2/23 [00:00<00:01, 15.11it/s]
+Turn off this advice by setting config variable advice.detachedHead to false
+

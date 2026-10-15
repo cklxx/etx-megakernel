@@ -1,0 +1,17 @@
+Thu Oct 15 15:33:35 UTC 2026
+WARNING: huggingface-hub 2.2.0 does not provide the extra 'hf-transfer'
+/opt/amdgpu/share/libdrm/amdgpu.ids: No such file or directory
+2.10.0+rocm7.0 True 4.44.2
+EXIT 0
+   8384       2       03:21 I<   kworker/u66:3-ttm
+   8385       2       03:21 I<   kworker/u66:4-ttm
+   8386       2       03:21 I<   kworker/u66:5-ttm
+   8387       2       03:21 I<   kworker/u66:6-ttm
+   8388       2       03:21 I<   kworker/u66:7
+   8613    7642       02:44 Ss   rsync
+   8635       2       02:38 I    kworker/u48:2
+   8780    7642       00:53 Ss   sftp-server
+   8805    3779       00:04 Ss   sshd
+   8926    8805       00:00 Ss   bash
+   8932    8926       00:00 R    ps
+   8933    8926       00:00 S    tail

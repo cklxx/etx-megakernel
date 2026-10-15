@@ -1,0 +1,43 @@
+Thu Oct 15 15:40:02 UTC 2026
+    PHASE preflight OK; no image pull or model download
+[15:38:30 +  1m21s] start build_baseline (cpu)
+[15:38:30 +  1m21s] start build_producer (cpu)
+[15:39:09 +  2m00s] progress: 2 running, 4 waiting, 1 done
+    build_baseline [cpu] 39s / 900s: PHASE build_baseline elapsed_s=30.0 log_bytes=1210 evidence=/root/sess/producer-live-20261015/20261015T153709Z-f24956/build_baseline.raw.log
+    build_producer [cpu] 39s / 900s: PHASE build_producer elapsed_s=30.0 log_bytes=1205 evidence=/root/sess/producer-live-20261015/20261015T153709Z-f24956/build_producer.raw.log
+[15:39:18 +  2m09s] ok      build_producer rc=0 48s
+    PHASE build_producer deadline_s=840 evidence=/root/sess/producer-live-20261015/20261015T153709Z-f24956/build_producer.raw.log
+    PHASE build_producer elapsed_s=30.0 log_bytes=1205 evidence=/root/sess/producer-live-20261015/20261015T153709Z-f24956/build_producer.raw.log
+    PLAN {"candidate": true, "owners": 256, "layers": 48, "plan_sha256": "3c29e3b6b83586bab5b89f389c0fd26818f7b7c5ad68f9a29e788ec32b673c3e"}
+[15:39:35 +  2m26s] ok      build_baseline rc=0 65s
+    PHASE build_baseline deadline_s=840 evidence=/root/sess/producer-live-20261015/20261015T153709Z-f24956/build_baseline.raw.log
+    PHASE build_baseline elapsed_s=30.0 log_bytes=1210 evidence=/root/sess/producer-live-20261015/20261015T153709Z-f24956/build_baseline.raw.log
+    PHASE build_baseline elapsed_s=60.0 log_bytes=6976 evidence=/root/sess/producer-live-20261015/20261015T153709Z-f24956/build_baseline.raw.log
+    PLAN {"candidate": false, "owners": 256, "layers": 48, "plan_sha256": "6a97bdba98fd9682290a35af12533980315b6fadff723db60f06f9f852febf3d"}
+[15:39:35 +  2m26s] start qualify on GPU 0
+/root/sess/producer-live-20261015/20261015T153709Z-f24956/build_baseline.raw.log
+warning: linking module '/root/sess/producer-live-20261015/20261015T153709Z-f24956/b_baseline/imports.bc': Linking two modules of different target triples: '/root/sess/producer-live-20261015/20261015T153709Z-f24956/b_baseline/imports.bc' is 'amdgcn-amd-amdhsa' whereas '/root/sess/producer-live-20261015/20261015T153709Z-f24956/b_baseline/imp/orig_table.hip' is 'x86_64-unknown-linux-gnu'
+ [-Wlinker-warnings]
+2 warnings generated when compiling for host.
+built /root/sess/producer-live-20261015/20261015T153709Z-f24956/b_baseline/run (plan /root/sess/producer-live-20261015/20261015T153709Z-f24956/b_baseline/vl_plan.txt)
+/root/sess/producer-live-20261015/20261015T153709Z-f24956/build_producer.raw.log
+warning: linking module '/root/sess/producer-live-20261015/20261015T153709Z-f24956/b_producer/imports.bc': Linking two modules of different target triples: '/root/sess/producer-live-20261015/20261015T153709Z-f24956/b_producer/imports.bc' is 'amdgcn-amd-amdhsa' whereas '/root/sess/producer-live-20261015/20261015T153709Z-f24956/b_producer/imp/orig_table.hip' is 'x86_64-unknown-linux-gnu'
+ [-Wlinker-warnings]
+2 warnings generated when compiling for host.
+built /root/sess/producer-live-20261015/20261015T153709Z-f24956/b_producer/run (plan /root/sess/producer-live-20261015/20261015T153709Z-f24956/b_producer/vl_plan.txt)
+  10315       2       00:03  0.0 I<   kworker/u63:6-ttm
+  10316       2       00:03  0.0 I<   kworker/u63:7-ttm
+  10317       2       00:03  0.0 I<   kworker/u63:8-ttm
+  10318       2       00:03  0.0 I<   kworker/u63:9-ttm
+  10319       2       00:03  0.0 I<   kworker/u63:10-ttm
+  10320       2       00:03  0.0 I<   kworker/u63:11-ttm
+  10321       2       00:03  0.0 I<   kworker/u63:12-ttm
+  10322       2       00:03  0.0 I<   kworker/u63:13-ttm
+  10323       2       00:03  0.0 I<   kworker/u63:14-ttm
+  10324       2       00:03  0.0 I<   kworker/u63:15-ttm
+  10325       2       00:03  0.0 I<   kworker/u63:16
+  10326   10277       00:03  1.3 Ss   python
+  10327   10326       00:02  1.0 Dl   run
+  10331    7642       00:00  0.0 Ss   bash
+  10336   10331       00:00  0.0 R    ps
+  10337   10331       00:00  0.0 S    tail

@@ -1,0 +1,10 @@
+EEM device=AMD Instinct MI300X VF arch=gfx942:sramecc+:xnack- arm=candidate diagnostic=0 consumer=qkv identity=84f6ba6ec839ccd384fa1fa42a9221e4dd123edc0ca5785e817808ffb70d96c9
+EEM TIME progress=0/200
+EEM TIME progress=25/200
+EEM TIME progress=50/200
+EEM TIME progress=75/200
+EEM TIME progress=100/200
+EEM TIME progress=125/200
+EEM TIME progress=150/200
+EEM TIME progress=175/200
+EEM-TIME {"identity":"84f6ba6ec839ccd384fa1fa42a9221e4dd123edc0ca5785e817808ffb70d96c9","arm":"candidate","mode":"fused","n":200,"us":100.430000305,"wall_us":1092.119895000}

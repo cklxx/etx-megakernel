@@ -1,0 +1,1 @@
+clang++: warning: argument unused during compilation: '--hip-link' [-Wunused-command-line-argument]

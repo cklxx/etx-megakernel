@@ -1,0 +1,20 @@
+{
+  "command": [
+    "bash",
+    "/root/src/abee09fcda357bb982cfba4d85bb387a6da97ec2385d3d4574f1f7cd4282d5da-20261015T152622Z/examples/vllm_llm/build.sh",
+    "/root/llm/qwen3-30b-a3b"
+  ],
+  "overrides": {
+    "ETX_VL_CHECK": "1",
+    "ETX_TOPK_KEY32": "1",
+    "ETX_DEV_RESET": "0",
+    "ETX_VL_REQUESTS": "1",
+    "ETX_VL_CU": "256",
+    "ETX_VL_TOUCH": "1",
+    "ETX_PREFETCH_ISOLATE_POLLER": "0",
+    "ETX_VL_ROUTER_NARROW": "1",
+    "C6_REAL_HIPCC": "/opt/rocm/bin/hipcc",
+    "ETX_OUT": "/root/c6-live-20261015/attempt-001/model",
+    "ETX_HIPCC_FLAGS": "-DETX_DSL_WSUM -DETX_DSL_SCALAR -DETX_DSL_GU1 -DETX_DSL_RBATCH -DETX_INBODY_REPORT -DETX_DSL_NORM_HOIST"
+  }
+}

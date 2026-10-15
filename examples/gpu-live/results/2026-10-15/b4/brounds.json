@@ -1,0 +1,941 @@
+{
+  "order": [
+    [
+      "etx",
+      1
+    ],
+    [
+      "etx",
+      2
+    ],
+    [
+      "etx",
+      4
+    ],
+    [
+      "vllm",
+      "aiter"
+    ]
+  ],
+  "rounds": [
+    {
+      "etx": {
+        "1": {
+          "identity": {
+            "arm": "alld4r0l1kvsmw",
+            "batch": 1,
+            "files": {
+              "megakernel_d0.hip": "52e6131a3a6aa82bfe506395a09810b674b43997e81d73341da508fd99d1726c",
+              "plan.json": "f23f959e82edaa9fe19147026c20d3b855e5af6c881a1858289c1c22ce15785f",
+              "resources.json": "d7ddec8f6bbd270649910ccd822a9fb91be4f5c33a2ae6aa071c789cadf9b5c6",
+              "run": "7463b5e12e61983a288004f9fdfa00dc4845fa9231b738ff1dcc4793ce6c88f8"
+            },
+            "references_sha256": "47109548fcd05db6961a76b74ff62966472248439508a3f6427adaccb41bc3a7",
+            "source_sha256": "91ebe1b7b81456c9d7e4585162dbe6185ce16bb1a2759040f3cad219bcc33915"
+          },
+          "latency_ms": "3.23800",
+          "requests": {
+            "0": {
+              "device_ms": "3.088000",
+              "interval_ms": "3.23800"
+            }
+          },
+          "step_ms": "3.220627",
+          "worst_request": 0
+        },
+        "2": {
+          "identity": {
+            "arm": "x2",
+            "batch": 2,
+            "files": {
+              "megakernel_d0.hip": "cc0af175202011217d850060345870686a0895bd16378614c7b7c7e0fb7508f1",
+              "plan.json": "f11da123b012b1a1ab161f556f63dc24048378ec3012c1f45536b032385774cb",
+              "resources.json": "d58ade1281675cee17f7f07544dd377313e113e35f4dc30c49a64349f7bee557",
+              "run": "84d1e8915dc8665bda11265d6f596dbd072292987a758ff403dbba0983207ff6"
+            },
+            "references_sha256": "47109548fcd05db6961a76b74ff62966472248439508a3f6427adaccb41bc3a7",
+            "source_sha256": "91ebe1b7b81456c9d7e4585162dbe6185ce16bb1a2759040f3cad219bcc33915"
+          },
+          "latency_ms": "4.57104",
+          "requests": {
+            "0": {
+              "device_ms": "4.157080",
+              "interval_ms": "4.57104"
+            },
+            "1": {
+              "device_ms": "4.352360",
+              "interval_ms": "4.56872"
+            }
+          },
+          "step_ms": "4.532310",
+          "worst_request": 0
+        },
+        "4": {
+          "identity": {
+            "arm": "x4",
+            "batch": 4,
+            "files": {
+              "megakernel_d0.hip": "9664630b14a3c13bf496145a242e2af9305727f11c3937e7a07a991e34441eef",
+              "plan.json": "57ede9c7886b00964108f4d8fa175faaa021df0227f3f58f2a652921223808be",
+              "resources.json": "26ef708271ed0ccc3271babab3b86d650d8a3c40b2057e7906a946bf000c3865",
+              "run": "9e1550c28f004d504afc1c4e6bebb93e0c7406af94a64336fbd6a1ac27071f21"
+            },
+            "references_sha256": "47109548fcd05db6961a76b74ff62966472248439508a3f6427adaccb41bc3a7",
+            "source_sha256": "91ebe1b7b81456c9d7e4585162dbe6185ce16bb1a2759040f3cad219bcc33915"
+          },
+          "latency_ms": "9.00740",
+          "requests": {
+            "0": {
+              "device_ms": "8.048360",
+              "interval_ms": "8.99880"
+            },
+            "1": {
+              "device_ms": "8.553840",
+              "interval_ms": "9.00560"
+            },
+            "2": {
+              "device_ms": "8.189560",
+              "interval_ms": "8.99108"
+            },
+            "3": {
+              "device_ms": "8.658960",
+              "interval_ms": "9.00740"
+            }
+          },
+          "step_ms": "8.919266",
+          "worst_request": 3
+        }
+      },
+      "graph": {},
+      "vllm": {
+        "aiter": {
+          "1": {
+            "legal": true,
+            "reason": null,
+            "samples_ms": [
+              "4.151527",
+              "4.121869",
+              "4.050961",
+              "4.173716",
+              "4.087890"
+            ],
+            "step_ms": "4.121869"
+          },
+          "2": {
+            "legal": true,
+            "reason": null,
+            "samples_ms": [
+              "4.732610",
+              "4.677811",
+              "5.820263",
+              "4.719702",
+              "5.718824"
+            ],
+            "step_ms": "4.732610"
+          },
+          "4": {
+            "legal": true,
+            "reason": null,
+            "samples_ms": [
+              "6.643144",
+              "7.105967",
+              "5.194940",
+              "6.699840",
+              "6.751023"
+            ],
+            "step_ms": "6.699840"
+          }
+        }
+      }
+    },
+    {
+      "etx": {
+        "1": {
+          "identity": {
+            "arm": "alld4r0l1kvsmw",
+            "batch": 1,
+            "files": {
+              "megakernel_d0.hip": "52e6131a3a6aa82bfe506395a09810b674b43997e81d73341da508fd99d1726c",
+              "plan.json": "f23f959e82edaa9fe19147026c20d3b855e5af6c881a1858289c1c22ce15785f",
+              "resources.json": "d7ddec8f6bbd270649910ccd822a9fb91be4f5c33a2ae6aa071c789cadf9b5c6",
+              "run": "7463b5e12e61983a288004f9fdfa00dc4845fa9231b738ff1dcc4793ce6c88f8"
+            },
+            "references_sha256": "47109548fcd05db6961a76b74ff62966472248439508a3f6427adaccb41bc3a7",
+            "source_sha256": "91ebe1b7b81456c9d7e4585162dbe6185ce16bb1a2759040f3cad219bcc33915"
+          },
+          "latency_ms": "3.24076",
+          "requests": {
+            "0": {
+              "device_ms": "3.095080",
+              "interval_ms": "3.24076"
+            }
+          },
+          "step_ms": "3.223548",
+          "worst_request": 0
+        },
+        "2": {
+          "identity": {
+            "arm": "x2",
+            "batch": 2,
+            "files": {
+              "megakernel_d0.hip": "cc0af175202011217d850060345870686a0895bd16378614c7b7c7e0fb7508f1",
+              "plan.json": "f11da123b012b1a1ab161f556f63dc24048378ec3012c1f45536b032385774cb",
+              "resources.json": "d58ade1281675cee17f7f07544dd377313e113e35f4dc30c49a64349f7bee557",
+              "run": "84d1e8915dc8665bda11265d6f596dbd072292987a758ff403dbba0983207ff6"
+            },
+            "references_sha256": "47109548fcd05db6961a76b74ff62966472248439508a3f6427adaccb41bc3a7",
+            "source_sha256": "91ebe1b7b81456c9d7e4585162dbe6185ce16bb1a2759040f3cad219bcc33915"
+          },
+          "latency_ms": "4.57068",
+          "requests": {
+            "0": {
+              "device_ms": "4.154400",
+              "interval_ms": "4.57068"
+            },
+            "1": {
+              "device_ms": "4.355480",
+              "interval_ms": "4.56860"
+            }
+          },
+          "step_ms": "4.533915",
+          "worst_request": 0
+        },
+        "4": {
+          "identity": {
+            "arm": "x4",
+            "batch": 4,
+            "files": {
+              "megakernel_d0.hip": "9664630b14a3c13bf496145a242e2af9305727f11c3937e7a07a991e34441eef",
+              "plan.json": "57ede9c7886b00964108f4d8fa175faaa021df0227f3f58f2a652921223808be",
+              "resources.json": "26ef708271ed0ccc3271babab3b86d650d8a3c40b2057e7906a946bf000c3865",
+              "run": "9e1550c28f004d504afc1c4e6bebb93e0c7406af94a64336fbd6a1ac27071f21"
+            },
+            "references_sha256": "47109548fcd05db6961a76b74ff62966472248439508a3f6427adaccb41bc3a7",
+            "source_sha256": "91ebe1b7b81456c9d7e4585162dbe6185ce16bb1a2759040f3cad219bcc33915"
+          },
+          "latency_ms": "9.00972",
+          "requests": {
+            "0": {
+              "device_ms": "8.034080",
+              "interval_ms": "9.00832"
+            },
+            "1": {
+              "device_ms": "8.539240",
+              "interval_ms": "9.00556"
+            },
+            "2": {
+              "device_ms": "8.181280",
+              "interval_ms": "9.00972"
+            },
+            "3": {
+              "device_ms": "8.646960",
+              "interval_ms": "9.00672"
+            }
+          },
+          "step_ms": "8.926556",
+          "worst_request": 2
+        }
+      },
+      "graph": {},
+      "vllm": {
+        "aiter": {
+          "1": {
+            "legal": true,
+            "reason": null,
+            "samples_ms": [
+              "4.110786",
+              "4.089758",
+              "4.117754",
+              "4.097482",
+              "4.080842"
+            ],
+            "step_ms": "4.097482"
+          },
+          "2": {
+            "legal": true,
+            "reason": null,
+            "samples_ms": [
+              "5.829720",
+              "4.719119",
+              "4.706590",
+              "4.730857",
+              "4.713823"
+            ],
+            "step_ms": "4.719119"
+          },
+          "4": {
+            "legal": true,
+            "reason": null,
+            "samples_ms": [
+              "5.919047",
+              "6.165512",
+              "5.923437",
+              "6.311726",
+              "6.526546"
+            ],
+            "step_ms": "6.165512"
+          }
+        }
+      }
+    },
+    {
+      "etx": {
+        "1": {
+          "identity": {
+            "arm": "alld4r0l1kvsmw",
+            "batch": 1,
+            "files": {
+              "megakernel_d0.hip": "52e6131a3a6aa82bfe506395a09810b674b43997e81d73341da508fd99d1726c",
+              "plan.json": "f23f959e82edaa9fe19147026c20d3b855e5af6c881a1858289c1c22ce15785f",
+              "resources.json": "d7ddec8f6bbd270649910ccd822a9fb91be4f5c33a2ae6aa071c789cadf9b5c6",
+              "run": "7463b5e12e61983a288004f9fdfa00dc4845fa9231b738ff1dcc4793ce6c88f8"
+            },
+            "references_sha256": "47109548fcd05db6961a76b74ff62966472248439508a3f6427adaccb41bc3a7",
+            "source_sha256": "91ebe1b7b81456c9d7e4585162dbe6185ce16bb1a2759040f3cad219bcc33915"
+          },
+          "latency_ms": "3.24460",
+          "requests": {
+            "0": {
+              "device_ms": "3.095960",
+              "interval_ms": "3.24460"
+            }
+          },
+          "step_ms": "3.228019",
+          "worst_request": 0
+        },
+        "2": {
+          "identity": {
+            "arm": "x2",
+            "batch": 2,
+            "files": {
+              "megakernel_d0.hip": "cc0af175202011217d850060345870686a0895bd16378614c7b7c7e0fb7508f1",
+              "plan.json": "f11da123b012b1a1ab161f556f63dc24048378ec3012c1f45536b032385774cb",
+              "resources.json": "d58ade1281675cee17f7f07544dd377313e113e35f4dc30c49a64349f7bee557",
+              "run": "84d1e8915dc8665bda11265d6f596dbd072292987a758ff403dbba0983207ff6"
+            },
+            "references_sha256": "47109548fcd05db6961a76b74ff62966472248439508a3f6427adaccb41bc3a7",
+            "source_sha256": "91ebe1b7b81456c9d7e4585162dbe6185ce16bb1a2759040f3cad219bcc33915"
+          },
+          "latency_ms": "4.58340",
+          "requests": {
+            "0": {
+              "device_ms": "4.159080",
+              "interval_ms": "4.58340"
+            },
+            "1": {
+              "device_ms": "4.354320",
+              "interval_ms": "4.57676"
+            }
+          },
+          "step_ms": "4.536488",
+          "worst_request": 0
+        },
+        "4": {
+          "identity": {
+            "arm": "x4",
+            "batch": 4,
+            "files": {
+              "megakernel_d0.hip": "9664630b14a3c13bf496145a242e2af9305727f11c3937e7a07a991e34441eef",
+              "plan.json": "57ede9c7886b00964108f4d8fa175faaa021df0227f3f58f2a652921223808be",
+              "resources.json": "26ef708271ed0ccc3271babab3b86d650d8a3c40b2057e7906a946bf000c3865",
+              "run": "9e1550c28f004d504afc1c4e6bebb93e0c7406af94a64336fbd6a1ac27071f21"
+            },
+            "references_sha256": "47109548fcd05db6961a76b74ff62966472248439508a3f6427adaccb41bc3a7",
+            "source_sha256": "91ebe1b7b81456c9d7e4585162dbe6185ce16bb1a2759040f3cad219bcc33915"
+          },
+          "latency_ms": "9.01612",
+          "requests": {
+            "0": {
+              "device_ms": "8.062280",
+              "interval_ms": "9.01008"
+            },
+            "1": {
+              "device_ms": "8.558280",
+              "interval_ms": "9.01280"
+            },
+            "2": {
+              "device_ms": "8.203440",
+              "interval_ms": "9.00644"
+            },
+            "3": {
+              "device_ms": "8.669399",
+              "interval_ms": "9.01612"
+            }
+          },
+          "step_ms": "8.935502",
+          "worst_request": 3
+        }
+      },
+      "graph": {},
+      "vllm": {
+        "aiter": {
+          "1": {
+            "legal": true,
+            "reason": null,
+            "samples_ms": [
+              "4.096782",
+              "4.097652",
+              "4.122688",
+              "4.068316",
+              "4.109251"
+            ],
+            "step_ms": "4.097652"
+          },
+          "2": {
+            "legal": true,
+            "reason": null,
+            "samples_ms": [
+              "5.873154",
+              "4.704290",
+              "4.720083",
+              "4.725142",
+              "4.721152"
+            ],
+            "step_ms": "4.721152"
+          },
+          "4": {
+            "legal": true,
+            "reason": null,
+            "samples_ms": [
+              "6.345519",
+              "6.295119",
+              "5.896361",
+              "5.989250",
+              "5.832362"
+            ],
+            "step_ms": "5.989250"
+          }
+        }
+      }
+    },
+    {
+      "etx": {
+        "1": {
+          "identity": {
+            "arm": "alld4r0l1kvsmw",
+            "batch": 1,
+            "files": {
+              "megakernel_d0.hip": "52e6131a3a6aa82bfe506395a09810b674b43997e81d73341da508fd99d1726c",
+              "plan.json": "f23f959e82edaa9fe19147026c20d3b855e5af6c881a1858289c1c22ce15785f",
+              "resources.json": "d7ddec8f6bbd270649910ccd822a9fb91be4f5c33a2ae6aa071c789cadf9b5c6",
+              "run": "7463b5e12e61983a288004f9fdfa00dc4845fa9231b738ff1dcc4793ce6c88f8"
+            },
+            "references_sha256": "47109548fcd05db6961a76b74ff62966472248439508a3f6427adaccb41bc3a7",
+            "source_sha256": "91ebe1b7b81456c9d7e4585162dbe6185ce16bb1a2759040f3cad219bcc33915"
+          },
+          "latency_ms": "3.23712",
+          "requests": {
+            "0": {
+              "device_ms": "3.090760",
+              "interval_ms": "3.23712"
+            }
+          },
+          "step_ms": "3.220082",
+          "worst_request": 0
+        },
+        "2": {
+          "identity": {
+            "arm": "x2",
+            "batch": 2,
+            "files": {
+              "megakernel_d0.hip": "cc0af175202011217d850060345870686a0895bd16378614c7b7c7e0fb7508f1",
+              "plan.json": "f11da123b012b1a1ab161f556f63dc24048378ec3012c1f45536b032385774cb",
+              "resources.json": "d58ade1281675cee17f7f07544dd377313e113e35f4dc30c49a64349f7bee557",
+              "run": "84d1e8915dc8665bda11265d6f596dbd072292987a758ff403dbba0983207ff6"
+            },
+            "references_sha256": "47109548fcd05db6961a76b74ff62966472248439508a3f6427adaccb41bc3a7",
+            "source_sha256": "91ebe1b7b81456c9d7e4585162dbe6185ce16bb1a2759040f3cad219bcc33915"
+          },
+          "latency_ms": "4.57464",
+          "requests": {
+            "0": {
+              "device_ms": "4.165600",
+              "interval_ms": "4.57464"
+            },
+            "1": {
+              "device_ms": "4.357920",
+              "interval_ms": "4.56816"
+            }
+          },
+          "step_ms": "4.527703",
+          "worst_request": 0
+        },
+        "4": {
+          "identity": {
+            "arm": "x4",
+            "batch": 4,
+            "files": {
+              "megakernel_d0.hip": "9664630b14a3c13bf496145a242e2af9305727f11c3937e7a07a991e34441eef",
+              "plan.json": "57ede9c7886b00964108f4d8fa175faaa021df0227f3f58f2a652921223808be",
+              "resources.json": "26ef708271ed0ccc3271babab3b86d650d8a3c40b2057e7906a946bf000c3865",
+              "run": "9e1550c28f004d504afc1c4e6bebb93e0c7406af94a64336fbd6a1ac27071f21"
+            },
+            "references_sha256": "47109548fcd05db6961a76b74ff62966472248439508a3f6427adaccb41bc3a7",
+            "source_sha256": "91ebe1b7b81456c9d7e4585162dbe6185ce16bb1a2759040f3cad219bcc33915"
+          },
+          "latency_ms": "9.00240",
+          "requests": {
+            "0": {
+              "device_ms": "8.050719",
+              "interval_ms": "9.00240"
+            },
+            "1": {
+              "device_ms": "8.542120",
+              "interval_ms": "8.99844"
+            },
+            "2": {
+              "device_ms": "8.186120",
+              "interval_ms": "9.00124"
+            },
+            "3": {
+              "device_ms": "8.652760",
+              "interval_ms": "9.00084"
+            }
+          },
+          "step_ms": "8.921324",
+          "worst_request": 0
+        }
+      },
+      "graph": {},
+      "vllm": {
+        "aiter": {
+          "1": {
+            "legal": true,
+            "reason": null,
+            "samples_ms": [
+              "4.088943",
+              "4.038309",
+              "3.973978",
+              "4.215428",
+              "4.107684"
+            ],
+            "step_ms": "4.088943"
+          },
+          "2": {
+            "legal": true,
+            "reason": null,
+            "samples_ms": [
+              "5.773127",
+              "4.755641",
+              "4.732781",
+              "4.729133",
+              "4.715718"
+            ],
+            "step_ms": "4.732781"
+          },
+          "4": {
+            "legal": true,
+            "reason": null,
+            "samples_ms": [
+              "6.220742",
+              "6.244292",
+              "5.810263",
+              "5.716759",
+              "6.534059"
+            ],
+            "step_ms": "6.220742"
+          }
+        }
+      }
+    },
+    {
+      "etx": {
+        "1": {
+          "identity": {
+            "arm": "alld4r0l1kvsmw",
+            "batch": 1,
+            "files": {
+              "megakernel_d0.hip": "52e6131a3a6aa82bfe506395a09810b674b43997e81d73341da508fd99d1726c",
+              "plan.json": "f23f959e82edaa9fe19147026c20d3b855e5af6c881a1858289c1c22ce15785f",
+              "resources.json": "d7ddec8f6bbd270649910ccd822a9fb91be4f5c33a2ae6aa071c789cadf9b5c6",
+              "run": "7463b5e12e61983a288004f9fdfa00dc4845fa9231b738ff1dcc4793ce6c88f8"
+            },
+            "references_sha256": "47109548fcd05db6961a76b74ff62966472248439508a3f6427adaccb41bc3a7",
+            "source_sha256": "91ebe1b7b81456c9d7e4585162dbe6185ce16bb1a2759040f3cad219bcc33915"
+          },
+          "latency_ms": "3.23944",
+          "requests": {
+            "0": {
+              "device_ms": "3.092600",
+              "interval_ms": "3.23944"
+            }
+          },
+          "step_ms": "3.222786",
+          "worst_request": 0
+        },
+        "2": {
+          "identity": {
+            "arm": "x2",
+            "batch": 2,
+            "files": {
+              "megakernel_d0.hip": "cc0af175202011217d850060345870686a0895bd16378614c7b7c7e0fb7508f1",
+              "plan.json": "f11da123b012b1a1ab161f556f63dc24048378ec3012c1f45536b032385774cb",
+              "resources.json": "d58ade1281675cee17f7f07544dd377313e113e35f4dc30c49a64349f7bee557",
+              "run": "84d1e8915dc8665bda11265d6f596dbd072292987a758ff403dbba0983207ff6"
+            },
+            "references_sha256": "47109548fcd05db6961a76b74ff62966472248439508a3f6427adaccb41bc3a7",
+            "source_sha256": "91ebe1b7b81456c9d7e4585162dbe6185ce16bb1a2759040f3cad219bcc33915"
+          },
+          "latency_ms": "4.56512",
+          "requests": {
+            "0": {
+              "device_ms": "4.156560",
+              "interval_ms": "4.56276"
+            },
+            "1": {
+              "device_ms": "4.353640",
+              "interval_ms": "4.56512"
+            }
+          },
+          "step_ms": "4.525840",
+          "worst_request": 1
+        },
+        "4": {
+          "identity": {
+            "arm": "x4",
+            "batch": 4,
+            "files": {
+              "megakernel_d0.hip": "9664630b14a3c13bf496145a242e2af9305727f11c3937e7a07a991e34441eef",
+              "plan.json": "57ede9c7886b00964108f4d8fa175faaa021df0227f3f58f2a652921223808be",
+              "resources.json": "26ef708271ed0ccc3271babab3b86d650d8a3c40b2057e7906a946bf000c3865",
+              "run": "9e1550c28f004d504afc1c4e6bebb93e0c7406af94a64336fbd6a1ac27071f21"
+            },
+            "references_sha256": "47109548fcd05db6961a76b74ff62966472248439508a3f6427adaccb41bc3a7",
+            "source_sha256": "91ebe1b7b81456c9d7e4585162dbe6185ce16bb1a2759040f3cad219bcc33915"
+          },
+          "latency_ms": "9.00540",
+          "requests": {
+            "0": {
+              "device_ms": "8.036440",
+              "interval_ms": "8.99672"
+            },
+            "1": {
+              "device_ms": "8.535439",
+              "interval_ms": "8.98044"
+            },
+            "2": {
+              "device_ms": "8.176480",
+              "interval_ms": "9.00540"
+            },
+            "3": {
+              "device_ms": "8.642679",
+              "interval_ms": "8.98268"
+            }
+          },
+          "step_ms": "8.901893",
+          "worst_request": 2
+        }
+      },
+      "graph": {},
+      "vllm": {
+        "aiter": {
+          "1": {
+            "legal": true,
+            "reason": null,
+            "samples_ms": [
+              "4.052388",
+              "4.096947",
+              "4.115572",
+              "4.137387",
+              "4.105037"
+            ],
+            "step_ms": "4.105037"
+          },
+          "2": {
+            "legal": true,
+            "reason": null,
+            "samples_ms": [
+              "4.085184",
+              "4.733938",
+              "5.904458",
+              "4.712231",
+              "5.749752"
+            ],
+            "step_ms": "4.733938"
+          },
+          "4": {
+            "legal": true,
+            "reason": null,
+            "samples_ms": [
+              "5.781619",
+              "5.853569",
+              "5.857597",
+              "5.916626",
+              "6.653020"
+            ],
+            "step_ms": "5.857597"
+          }
+        }
+      }
+    }
+  ],
+  "same_kernel_graph": {
+    "1": {
+      "gate": {
+        "executable_sha256": "7463b5e12e61983a288004f9fdfa00dc4845fa9231b738ff1dcc4793ce6c88f8",
+        "passed": false,
+        "plan_sha256": "f23f959e82edaa9fe19147026c20d3b855e5af6c881a1858289c1c22ce15785f",
+        "result": {
+          "evidence": [
+            "examples/dsv2lite/fleet_shim.hip: FLAG_ROUTING_CACHED",
+            "etx/codegen/kernel.py: _emit_unfused allocates per-launch LDS",
+            "docs/ETX_Technical_Design.md section 15.7: retained wrong-layer unfused result"
+          ],
+          "reason": "gate_up/down routing is handed off through LDS; grid-by-grid launches end that LDS lifetime",
+          "status": "UNAVAILABLE",
+          "unsafe_types": {
+            "down_1": "fleet_d4_routed_down",
+            "down_10": "fleet_d4_routed_down",
+            "down_11": "fleet_d4_routed_down",
+            "down_12": "fleet_d4_routed_down",
+            "down_13": "fleet_d4_routed_down",
+            "down_14": "fleet_d4_routed_down",
+            "down_15": "fleet_d4_routed_down",
+            "down_16": "fleet_d4_routed_down",
+            "down_17": "fleet_d4_routed_down",
+            "down_18": "fleet_d4_routed_down",
+            "down_19": "fleet_d4_routed_down",
+            "down_2": "fleet_d4_routed_down",
+            "down_20": "fleet_d4_routed_down",
+            "down_21": "fleet_d4_routed_down",
+            "down_22": "fleet_d4_routed_down",
+            "down_23": "fleet_d4_routed_down",
+            "down_24": "fleet_d4_routed_down",
+            "down_25": "fleet_d4_routed_down",
+            "down_26": "fleet_d4_routed_down",
+            "down_3": "fleet_d4_routed_down",
+            "down_4": "fleet_d4_routed_down",
+            "down_5": "fleet_d4_routed_down",
+            "down_6": "fleet_d4_routed_down",
+            "down_7": "fleet_d4_routed_down",
+            "down_8": "fleet_d4_routed_down",
+            "down_9": "fleet_d4_routed_down",
+            "sdown_1": "fleet_d4_shared_down",
+            "sdown_10": "fleet_d4_shared_down",
+            "sdown_11": "fleet_d4_shared_down",
+            "sdown_12": "fleet_d4_shared_down",
+            "sdown_13": "fleet_d4_shared_down",
+            "sdown_14": "fleet_d4_shared_down",
+            "sdown_15": "fleet_d4_shared_down",
+            "sdown_16": "fleet_d4_shared_down",
+            "sdown_17": "fleet_d4_shared_down",
+            "sdown_18": "fleet_d4_shared_down",
+            "sdown_19": "fleet_d4_shared_down",
+            "sdown_2": "fleet_d4_shared_down",
+            "sdown_20": "fleet_d4_shared_down",
+            "sdown_21": "fleet_d4_shared_down",
+            "sdown_22": "fleet_d4_shared_down",
+            "sdown_23": "fleet_d4_shared_down",
+            "sdown_24": "fleet_d4_shared_down",
+            "sdown_25": "fleet_d4_shared_down",
+            "sdown_26": "fleet_d4_shared_down",
+            "sdown_3": "fleet_d4_shared_down",
+            "sdown_4": "fleet_d4_shared_down",
+            "sdown_5": "fleet_d4_shared_down",
+            "sdown_6": "fleet_d4_shared_down",
+            "sdown_7": "fleet_d4_shared_down",
+            "sdown_8": "fleet_d4_shared_down",
+            "sdown_9": "fleet_d4_shared_down"
+          }
+        }
+      },
+      "status": "UNAVAILABLE"
+    },
+    "2": {
+      "gate": {
+        "executable_sha256": "84d1e8915dc8665bda11265d6f596dbd072292987a758ff403dbba0983207ff6",
+        "passed": false,
+        "plan_sha256": "f11da123b012b1a1ab161f556f63dc24048378ec3012c1f45536b032385774cb",
+        "result": {
+          "evidence": [
+            "examples/dsv2lite/fleet_shim.hip: FLAG_ROUTING_CACHED",
+            "etx/codegen/kernel.py: _emit_unfused allocates per-launch LDS",
+            "docs/ETX_Technical_Design.md section 15.7: retained wrong-layer unfused result"
+          ],
+          "reason": "gate_up/down routing is handed off through LDS; grid-by-grid launches end that LDS lifetime",
+          "status": "UNAVAILABLE",
+          "unsafe_types": {
+            "r0_down_1": "fleet_expert_down_cached",
+            "r0_down_10": "fleet_expert_down_cached",
+            "r0_down_11": "fleet_expert_down_cached",
+            "r0_down_12": "fleet_expert_down_cached",
+            "r0_down_13": "fleet_expert_down_cached",
+            "r0_down_14": "fleet_expert_down_cached",
+            "r0_down_15": "fleet_expert_down_cached",
+            "r0_down_16": "fleet_expert_down_cached",
+            "r0_down_17": "fleet_expert_down_cached",
+            "r0_down_18": "fleet_expert_down_cached",
+            "r0_down_19": "fleet_expert_down_cached",
+            "r0_down_2": "fleet_expert_down_cached",
+            "r0_down_20": "fleet_expert_down_cached",
+            "r0_down_21": "fleet_expert_down_cached",
+            "r0_down_22": "fleet_expert_down_cached",
+            "r0_down_23": "fleet_expert_down_cached",
+            "r0_down_24": "fleet_expert_down_cached",
+            "r0_down_25": "fleet_expert_down_cached",
+            "r0_down_26": "fleet_expert_down_cached",
+            "r0_down_3": "fleet_expert_down_cached",
+            "r0_down_4": "fleet_expert_down_cached",
+            "r0_down_5": "fleet_expert_down_cached",
+            "r0_down_6": "fleet_expert_down_cached",
+            "r0_down_7": "fleet_expert_down_cached",
+            "r0_down_8": "fleet_expert_down_cached",
+            "r0_down_9": "fleet_expert_down_cached",
+            "r1_down_1": "fleet_expert_down_cached",
+            "r1_down_10": "fleet_expert_down_cached",
+            "r1_down_11": "fleet_expert_down_cached",
+            "r1_down_12": "fleet_expert_down_cached",
+            "r1_down_13": "fleet_expert_down_cached",
+            "r1_down_14": "fleet_expert_down_cached",
+            "r1_down_15": "fleet_expert_down_cached",
+            "r1_down_16": "fleet_expert_down_cached",
+            "r1_down_17": "fleet_expert_down_cached",
+            "r1_down_18": "fleet_expert_down_cached",
+            "r1_down_19": "fleet_expert_down_cached",
+            "r1_down_2": "fleet_expert_down_cached",
+            "r1_down_20": "fleet_expert_down_cached",
+            "r1_down_21": "fleet_expert_down_cached",
+            "r1_down_22": "fleet_expert_down_cached",
+            "r1_down_23": "fleet_expert_down_cached",
+            "r1_down_24": "fleet_expert_down_cached",
+            "r1_down_25": "fleet_expert_down_cached",
+            "r1_down_26": "fleet_expert_down_cached",
+            "r1_down_3": "fleet_expert_down_cached",
+            "r1_down_4": "fleet_expert_down_cached",
+            "r1_down_5": "fleet_expert_down_cached",
+            "r1_down_6": "fleet_expert_down_cached",
+            "r1_down_7": "fleet_expert_down_cached",
+            "r1_down_8": "fleet_expert_down_cached",
+            "r1_down_9": "fleet_expert_down_cached"
+          }
+        }
+      },
+      "status": "UNAVAILABLE"
+    },
+    "4": {
+      "gate": {
+        "executable_sha256": "9e1550c28f004d504afc1c4e6bebb93e0c7406af94a64336fbd6a1ac27071f21",
+        "passed": false,
+        "plan_sha256": "57ede9c7886b00964108f4d8fa175faaa021df0227f3f58f2a652921223808be",
+        "result": {
+          "evidence": [
+            "examples/dsv2lite/fleet_shim.hip: FLAG_ROUTING_CACHED",
+            "etx/codegen/kernel.py: _emit_unfused allocates per-launch LDS",
+            "docs/ETX_Technical_Design.md section 15.7: retained wrong-layer unfused result"
+          ],
+          "reason": "gate_up/down routing is handed off through LDS; grid-by-grid launches end that LDS lifetime",
+          "status": "UNAVAILABLE",
+          "unsafe_types": {
+            "r0_down_1": "fleet_expert_down_cached",
+            "r0_down_10": "fleet_expert_down_cached",
+            "r0_down_11": "fleet_expert_down_cached",
+            "r0_down_12": "fleet_expert_down_cached",
+            "r0_down_13": "fleet_expert_down_cached",
+            "r0_down_14": "fleet_expert_down_cached",
+            "r0_down_15": "fleet_expert_down_cached",
+            "r0_down_16": "fleet_expert_down_cached",
+            "r0_down_17": "fleet_expert_down_cached",
+            "r0_down_18": "fleet_expert_down_cached",
+            "r0_down_19": "fleet_expert_down_cached",
+            "r0_down_2": "fleet_expert_down_cached",
+            "r0_down_20": "fleet_expert_down_cached",
+            "r0_down_21": "fleet_expert_down_cached",
+            "r0_down_22": "fleet_expert_down_cached",
+            "r0_down_23": "fleet_expert_down_cached",
+            "r0_down_24": "fleet_expert_down_cached",
+            "r0_down_25": "fleet_expert_down_cached",
+            "r0_down_26": "fleet_expert_down_cached",
+            "r0_down_3": "fleet_expert_down_cached",
+            "r0_down_4": "fleet_expert_down_cached",
+            "r0_down_5": "fleet_expert_down_cached",
+            "r0_down_6": "fleet_expert_down_cached",
+            "r0_down_7": "fleet_expert_down_cached",
+            "r0_down_8": "fleet_expert_down_cached",
+            "r0_down_9": "fleet_expert_down_cached",
+            "r1_down_1": "fleet_expert_down_cached",
+            "r1_down_10": "fleet_expert_down_cached",
+            "r1_down_11": "fleet_expert_down_cached",
+            "r1_down_12": "fleet_expert_down_cached",
+            "r1_down_13": "fleet_expert_down_cached",
+            "r1_down_14": "fleet_expert_down_cached",
+            "r1_down_15": "fleet_expert_down_cached",
+            "r1_down_16": "fleet_expert_down_cached",
+            "r1_down_17": "fleet_expert_down_cached",
+            "r1_down_18": "fleet_expert_down_cached",
+            "r1_down_19": "fleet_expert_down_cached",
+            "r1_down_2": "fleet_expert_down_cached",
+            "r1_down_20": "fleet_expert_down_cached",
+            "r1_down_21": "fleet_expert_down_cached",
+            "r1_down_22": "fleet_expert_down_cached",
+            "r1_down_23": "fleet_expert_down_cached",
+            "r1_down_24": "fleet_expert_down_cached",
+            "r1_down_25": "fleet_expert_down_cached",
+            "r1_down_26": "fleet_expert_down_cached",
+            "r1_down_3": "fleet_expert_down_cached",
+            "r1_down_4": "fleet_expert_down_cached",
+            "r1_down_5": "fleet_expert_down_cached",
+            "r1_down_6": "fleet_expert_down_cached",
+            "r1_down_7": "fleet_expert_down_cached",
+            "r1_down_8": "fleet_expert_down_cached",
+            "r1_down_9": "fleet_expert_down_cached",
+            "r2_down_1": "fleet_expert_down_cached",
+            "r2_down_10": "fleet_expert_down_cached",
+            "r2_down_11": "fleet_expert_down_cached",
+            "r2_down_12": "fleet_expert_down_cached",
+            "r2_down_13": "fleet_expert_down_cached",
+            "r2_down_14": "fleet_expert_down_cached",
+            "r2_down_15": "fleet_expert_down_cached",
+            "r2_down_16": "fleet_expert_down_cached",
+            "r2_down_17": "fleet_expert_down_cached",
+            "r2_down_18": "fleet_expert_down_cached",
+            "r2_down_19": "fleet_expert_down_cached",
+            "r2_down_2": "fleet_expert_down_cached",
+            "r2_down_20": "fleet_expert_down_cached",
+            "r2_down_21": "fleet_expert_down_cached",
+            "r2_down_22": "fleet_expert_down_cached",
+            "r2_down_23": "fleet_expert_down_cached",
+            "r2_down_24": "fleet_expert_down_cached",
+            "r2_down_25": "fleet_expert_down_cached",
+            "r2_down_26": "fleet_expert_down_cached",
+            "r2_down_3": "fleet_expert_down_cached",
+            "r2_down_4": "fleet_expert_down_cached",
+            "r2_down_5": "fleet_expert_down_cached",
+            "r2_down_6": "fleet_expert_down_cached",
+            "r2_down_7": "fleet_expert_down_cached",
+            "r2_down_8": "fleet_expert_down_cached",
+            "r2_down_9": "fleet_expert_down_cached",
+            "r3_down_1": "fleet_expert_down_cached",
+            "r3_down_10": "fleet_expert_down_cached",
+            "r3_down_11": "fleet_expert_down_cached",
+            "r3_down_12": "fleet_expert_down_cached",
+            "r3_down_13": "fleet_expert_down_cached",
+            "r3_down_14": "fleet_expert_down_cached",
+            "r3_down_15": "fleet_expert_down_cached",
+            "r3_down_16": "fleet_expert_down_cached",
+            "r3_down_17": "fleet_expert_down_cached",
+            "r3_down_18": "fleet_expert_down_cached",
+            "r3_down_19": "fleet_expert_down_cached",
+            "r3_down_2": "fleet_expert_down_cached",
+            "r3_down_20": "fleet_expert_down_cached",
+            "r3_down_21": "fleet_expert_down_cached",
+            "r3_down_22": "fleet_expert_down_cached",
+            "r3_down_23": "fleet_expert_down_cached",
+            "r3_down_24": "fleet_expert_down_cached",
+            "r3_down_25": "fleet_expert_down_cached",
+            "r3_down_26": "fleet_expert_down_cached",
+            "r3_down_3": "fleet_expert_down_cached",
+            "r3_down_4": "fleet_expert_down_cached",
+            "r3_down_5": "fleet_expert_down_cached",
+            "r3_down_6": "fleet_expert_down_cached",
+            "r3_down_7": "fleet_expert_down_cached",
+            "r3_down_8": "fleet_expert_down_cached",
+            "r3_down_9": "fleet_expert_down_cached"
+          }
+        }
+      },
+      "status": "UNAVAILABLE"
+    }
+  },
+  "skipped": [],
+  "status": "COMPLETE"
+}

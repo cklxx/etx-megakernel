@@ -1,0 +1,7 @@
+MISSING b_baseline/imp/orig_attention.o
+MISSING b_baseline/imp/orig_layernorm_kernels.o
+MISSING b_baseline/run
+MISSING b_producer/imp/orig_attention.o
+MISSING b_producer/imp/orig_layernorm_kernels.o
+MISSING b_producer/run
+FAILED: session 20261015T153709Z-f24956, 2033 files match, 6 bad, 0 left on the box by design; INCOMPLETE: not ok: ['diagnose', 'measure', 'qualify']

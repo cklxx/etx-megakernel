@@ -1,0 +1,5 @@
+# job build_producer gpu=None cwd=/root/etx
+# .venv/bin/python -u -m examples.vllm_llm.producer_session build producer
+PHASE build_producer deadline_s=840 evidence=/root/sess/producer-live-20261015/20261015T153709Z-f24956/build_producer.raw.log
+PHASE build_producer elapsed_s=30.0 log_bytes=1205 evidence=/root/sess/producer-live-20261015/20261015T153709Z-f24956/build_producer.raw.log
+PLAN {"candidate": true, "owners": 256, "layers": 48, "plan_sha256": "3c29e3b6b83586bab5b89f389c0fd26818f7b7c5ad68f9a29e788ec32b673c3e"}

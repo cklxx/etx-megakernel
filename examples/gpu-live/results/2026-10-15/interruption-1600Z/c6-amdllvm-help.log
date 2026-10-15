@@ -1,0 +1,138 @@
+amdllvm: binary '/opt/rocm/core-7.14/lib/llvm/bin/llvm' does not exist.
+amdrocm-core-dev7.13 - AMD ROCm core development metapackage
+amdrocm-core-dev7.14-gfx1010 - AMD ROCm core development metapackage
+amdrocm-core-dev7.14-gfx1011 - AMD ROCm core development metapackage
+amdrocm-core-dev7.14-gfx1012 - AMD ROCm core development metapackage
+amdrocm-core-dev7.14-gfx1030 - AMD ROCm core development metapackage
+amdrocm-core-dev7.14-gfx1031 - AMD ROCm core development metapackage
+amdrocm-core-dev7.14-gfx1032 - AMD ROCm core development metapackage
+amdrocm-core-dev7.14-gfx1033 - AMD ROCm core development metapackage
+amdrocm-core-dev7.14-gfx1034 - AMD ROCm core development metapackage
+amdrocm-core-dev7.14-gfx1035 - AMD ROCm core development metapackage
+amdrocm-core-dev7.14-gfx1036 - AMD ROCm core development metapackage
+amdrocm-core-dev7.14-gfx1100 - AMD ROCm core development metapackage
+amdrocm-core-dev7.14-gfx1101 - AMD ROCm core development metapackage
+amdrocm-core-dev7.14-gfx1102 - AMD ROCm core development metapackage
+amdrocm-core-dev7.14-gfx1103 - AMD ROCm core development metapackage
+amdrocm-core-dev7.14-gfx1150 - AMD ROCm core development metapackage
+amdrocm-core-dev7.14-gfx1151 - AMD ROCm core development metapackage
+amdrocm-core-dev7.14-gfx1152 - AMD ROCm core development metapackage
+amdrocm-core-dev7.14-gfx1153 - AMD ROCm core development metapackage
+amdrocm-core-dev7.14-gfx1200 - AMD ROCm core development metapackage
+amdrocm-core-dev7.14-gfx1201 - AMD ROCm core development metapackage
+amdrocm-core-dev7.14-gfx1250 - AMD ROCm core development metapackage
+amdrocm-core-dev7.14-gfx908 - AMD ROCm core development metapackage
+amdrocm-core-dev7.14-gfx90a - AMD ROCm core development metapackage
+amdrocm-core-dev7.14-gfx942 - AMD ROCm core development metapackage
+amdrocm-core-dev7.14-gfx950 - AMD ROCm core development metapackage
+amdrocm-core-dev7.14 - AMD ROCm core development metapackage
+amdrocm-core-dev - AMD ROCm core development metapackage
+amdrocm-core-sdk7.13-gfx1010 - AMD ROCm core sdk metapackage
+amdrocm-core-sdk7.13-gfx1011 - AMD ROCm core sdk metapackage
+amdrocm-core-sdk7.13-gfx1012 - AMD ROCm core sdk metapackage
+amdrocm-core-sdk7.13-gfx1030 - AMD ROCm core sdk metapackage
+amdrocm-core-sdk7.13-gfx1031 - AMD ROCm core sdk metapackage
+amdrocm-core-sdk7.13-gfx1032 - AMD ROCm core sdk metapackage
+amdrocm-core-sdk7.13-gfx1033 - AMD ROCm core sdk metapackage
+amdrocm-core-sdk7.13-gfx1034 - AMD ROCm core sdk metapackage
+amdrocm-core-sdk7.13-gfx1035 - AMD ROCm core sdk metapackage
+amdrocm-core-sdk7.13-gfx1036 - AMD ROCm core sdk metapackage
+amdrocm-core-sdk7.13-gfx1100 - AMD ROCm core sdk metapackage
+amdrocm-core-sdk7.13-gfx1101 - AMD ROCm core sdk metapackage
+amdrocm-core-sdk7.13-gfx1102 - AMD ROCm core sdk metapackage
+amdrocm-core-sdk7.13-gfx1103 - AMD ROCm core sdk metapackage
+amdrocm-core-sdk7.13-gfx1150 - AMD ROCm core sdk metapackage
+amdrocm-core-sdk7.13-gfx1151 - AMD ROCm core sdk metapackage
+amdrocm-core-sdk7.13-gfx1152 - AMD ROCm core sdk metapackage
+amdrocm-core-sdk7.13-gfx1200 - AMD ROCm core sdk metapackage
+amdrocm-core-sdk7.13-gfx1201 - AMD ROCm core sdk metapackage
+amdrocm-core-sdk7.13-gfx908 - AMD ROCm core sdk metapackage
+amdrocm-core-sdk7.13-gfx90a - AMD ROCm core sdk metapackage
+amdrocm-core-sdk7.13-gfx942 - AMD ROCm core sdk metapackage
+amdrocm-core-sdk7.13-gfx950 - AMD ROCm core sdk metapackage
+amdrocm-core-sdk7.13 - AMD ROCm core sdk metapackage
+amdrocm-core-sdk7.14-gfx1010 - AMD ROCm core sdk metapackage
+amdrocm-core-sdk7.14-gfx1011 - AMD ROCm core sdk metapackage
+amdrocm-core-sdk7.14-gfx1012 - AMD ROCm core sdk metapackage
+amdrocm-core-sdk7.14-gfx1030 - AMD ROCm core sdk metapackage
+amdrocm-core-sdk7.14-gfx1031 - AMD ROCm core sdk metapackage
+amdrocm-core-sdk7.14-gfx1032 - AMD ROCm core sdk metapackage
+amdrocm-core-sdk7.14-gfx1033 - AMD ROCm core sdk metapackage
+amdrocm-core-sdk7.14-gfx1034 - AMD ROCm core sdk metapackage
+amdrocm-core-sdk7.14-gfx1035 - AMD ROCm core sdk metapackage
+amdrocm-core-sdk7.14-gfx1036 - AMD ROCm core sdk metapackage
+amdrocm-core-sdk7.14-gfx1100 - AMD ROCm core sdk metapackage
+amdrocm-core-sdk7.14-gfx1101 - AMD ROCm core sdk metapackage
+amdrocm-core-sdk7.14-gfx1102 - AMD ROCm core sdk metapackage
+amdrocm-core-sdk7.14-gfx1103 - AMD ROCm core sdk metapackage
+amdrocm-core-sdk7.14-gfx1150 - AMD ROCm core sdk metapackage
+amdrocm-core-sdk7.14-gfx1151 - AMD ROCm core sdk metapackage
+amdrocm-core-sdk7.14-gfx1152 - AMD ROCm core sdk metapackage
+amdrocm-core-sdk7.14-gfx1153 - AMD ROCm core sdk metapackage
+amdrocm-core-sdk7.14-gfx1200 - AMD ROCm core sdk metapackage
+amdrocm-core-sdk7.14-gfx1201 - AMD ROCm core sdk metapackage
+amdrocm-core-sdk7.14-gfx1250 - AMD ROCm core sdk metapackage
+amdrocm-core-sdk7.14-gfx908 - AMD ROCm core sdk metapackage
+amdrocm-core-sdk7.14-gfx90a - AMD ROCm core sdk metapackage
+amdrocm-core-sdk7.14-gfx942 - AMD ROCm core sdk metapackage
+amdrocm-core-sdk7.14-gfx950 - AMD ROCm core sdk metapackage
+amdrocm-core-sdk7.14 - AMD ROCm core sdk metapackage
+amdrocm-core-sdk - AMD ROCm core sdk metapackage
+amdrocm-core7.13-gfx1010 - AMD ROCm core metapackage
+amdrocm-core7.13-gfx1011 - AMD ROCm core metapackage
+amdrocm-core7.13-gfx1012 - AMD ROCm core metapackage
+amdrocm-core7.13-gfx1030 - AMD ROCm core metapackage
+amdrocm-core7.13-gfx1031 - AMD ROCm core metapackage
+amdrocm-core7.13-gfx1032 - AMD ROCm core metapackage
+amdrocm-core7.13-gfx1033 - AMD ROCm core metapackage
+amdrocm-core7.13-gfx1034 - AMD ROCm core metapackage
+amdrocm-core7.13-gfx1035 - AMD ROCm core metapackage
+amdrocm-core7.13-gfx1036 - AMD ROCm core metapackage
+amdrocm-core7.13-gfx1100 - AMD ROCm core metapackage
+amdrocm-core7.13-gfx1101 - AMD ROCm core metapackage
+amdrocm-core7.13-gfx1102 - AMD ROCm core metapackage
+amdrocm-core7.13-gfx1103 - AMD ROCm core metapackage
+amdrocm-core7.13-gfx1150 - AMD ROCm core metapackage
+amdrocm-core7.13-gfx1151 - AMD ROCm core metapackage
+amdrocm-core7.13-gfx1152 - AMD ROCm core metapackage
+amdrocm-core7.13-gfx1200 - AMD ROCm core metapackage
+amdrocm-core7.13-gfx1201 - AMD ROCm core metapackage
+amdrocm-core7.13-gfx908 - AMD ROCm core metapackage
+amdrocm-core7.13-gfx90a - AMD ROCm core metapackage
+amdrocm-core7.13-gfx942 - AMD ROCm core metapackage
+amdrocm-core7.13-gfx950 - AMD ROCm core metapackage
+amdrocm-core7.13 - AMD ROCm core metapackage
+amdrocm-core7.14-gfx1010 - AMD ROCm core metapackage
+amdrocm-core7.14-gfx1011 - AMD ROCm core metapackage
+amdrocm-core7.14-gfx1012 - AMD ROCm core metapackage
+amdrocm-core7.14-gfx1030 - AMD ROCm core metapackage
+amdrocm-core7.14-gfx1031 - AMD ROCm core metapackage
+amdrocm-core7.14-gfx1032 - AMD ROCm core metapackage
+amdrocm-core7.14-gfx1033 - AMD ROCm core metapackage
+amdrocm-core7.14-gfx1034 - AMD ROCm core metapackage
+amdrocm-core7.14-gfx1035 - AMD ROCm core metapackage
+amdrocm-core7.14-gfx1036 - AMD ROCm core metapackage
+amdrocm-core7.14-gfx1100 - AMD ROCm core metapackage
+amdrocm-core7.14-gfx1101 - AMD ROCm core metapackage
+amdrocm-core7.14-gfx1102 - AMD ROCm core metapackage
+amdrocm-core7.14-gfx1103 - AMD ROCm core metapackage
+amdrocm-core7.14-gfx1150 - AMD ROCm core metapackage
+amdrocm-core7.14-gfx1151 - AMD ROCm core metapackage
+amdrocm-core7.14-gfx1152 - AMD ROCm core metapackage
+amdrocm-core7.14-gfx1153 - AMD ROCm core metapackage
+amdrocm-core7.14-gfx1200 - AMD ROCm core metapackage
+amdrocm-core7.14-gfx1201 - AMD ROCm core metapackage
+amdrocm-core7.14-gfx1250 - AMD ROCm core metapackage
+amdrocm-core7.14-gfx908 - AMD ROCm core metapackage
+amdrocm-core7.14-gfx90a - AMD ROCm core metapackage
+amdrocm-core7.14-gfx942 - AMD ROCm core metapackage
+amdrocm-core7.14-gfx950 - AMD ROCm core metapackage
+amdrocm-core7.14 - AMD ROCm core metapackage
+amdrocm-core - AMD ROCm core metapackage
+amdrocm-llvm-dev7.13 - AMD LLVM compiler libraries
+amdrocm-llvm-dev7.14 - AMD LLVM compiler libraries
+amdrocm-llvm-dev - AMD LLVM compiler libraries
+amdrocm-llvm7.13 - ROCm LLVM compiler
+amdrocm-llvm7.14 - ROCm LLVM compiler
+amdrocm-llvm - ROCm LLVM compiler
+

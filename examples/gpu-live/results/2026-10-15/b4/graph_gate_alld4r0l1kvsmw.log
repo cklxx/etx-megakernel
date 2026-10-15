@@ -1,0 +1,3 @@
+# job graph_gate_alld4r0l1kvsmw gpu=None cwd=/root/etx
+# .venv/bin/python -u -m examples.dsv2lite.batch_attribution graph-eligibility "$ETX_SESS_LOGDIR/b_alld4r0l1kvsmw/plan.json" --output "$ETX_SESS_LOGDIR/graph_gate_alld4r0l1kvsmw.json"
+GRAPH-BASELINE UNAVAILABLE gate_up/down routing is handed off through LDS; grid-by-grid launches end that LDS lifetime

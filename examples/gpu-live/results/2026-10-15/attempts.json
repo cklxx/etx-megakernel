@@ -1,0 +1,24 @@
+{
+  "source": "554133d744b4591c9cf87c68b6817df781137c9b",
+  "target": "root@<GPU_HOST>",
+  "deadline": "2026-10-15T17:22:10Z",
+  "commands": {
+    "stage": "ETX_SESS_USER=root bash tools/session.sh stage <GPU_HOST>",
+    "python-setup": "ssh root@<GPU_HOST>: python3 -m venv /root/etx-python && /root/etx-python/bin/pip install numpy pyyaml huggingface_hub safetensors",
+    "python-setup-02": "ssh root@<GPU_HOST>: apt-get update -qq; apt-get install -y -qq python3.12-venv; python3 -m venv /root/etx-python; /root/etx-python/bin/pip install numpy pyyaml huggingface_hub safetensors; cd /root/etx; /root/etx-python/bin/python -B -m examples.vllm_llm.producer_stage /root/etx-python; printf header | hipcc -x hip --offload-arch=gfx942 -fsyntax-only -",
+    "fleet-transfer": "rsync -az --exclude .git --exclude .venv --exclude build --exclude __pycache__ /LOCAL_WORKSPACE/code/fleet-mi300x/ root@<GPU_HOST>:/root/fleet-mi300x/",
+    "headers-transfer": "rsync -az /LOCAL_WORKSPACE/code/vllm/csrc root@<GPU_HOST>:/root/vllm/ && rsync -az --exclude .git /LOCAL_WORKSPACE/code/rocm-headers/pytorch root@<GPU_HOST>:/root/rocm-headers/ && rsync -azL /LOCAL_WORKSPACE/code/rocm-headers/inc root@<GPU_HOST>:/root/rocm-headers/",
+    "pinned-fleet-transfer": "rsync -az /LOCAL_WORKSPACE/code/etx-cache/fleet-3fb67a6/ root@<GPU_HOST>:/root/fleet-3fb67a6/",
+    "vllm-clone": "ssh root@<GPU_HOST>: git clone --depth 1 --branch v0.27.1 https://github.com/vllm-project/vllm.git /root/vllm-pinned",
+    "ssh-reconcile-01": "ssh -o BatchMode=yes -o ConnectTimeout=10 root@<GPU_HOST>: date -u; cat /root/etx/SOURCE_IDENTITY; ps -eo pid,ppid,etime,stat,comm | tail -25"
+  },
+  "historical_setup_note": "Commands reconstructed from executed tool invocations; raw logs and true exit files retained. Fleet checkout transfer is not pinned accepted input and was never executed. No experiment runner started.",
+  "note": "All five entries terminal; see result.md and status.md for exact current outcomes. Earlier setup commands and failures retained as history.",
+  "terminal_records": {
+    "expert": "/LOCAL_WORKSPACE/.hermes/cache/scratch/etx-gpu-live-20261015-evidence/expert/20261015T152934Z-af0efa",
+    "producer": "/LOCAL_WORKSPACE/.hermes/cache/scratch/etx-gpu-live-20261015-evidence/producer/20261015T153709Z-f24956",
+    "x8": "/LOCAL_WORKSPACE/.hermes/cache/scratch/etx-gpu-live-20261015-evidence/x8/20261015T154549Z-7cdcb2",
+    "b4": "/LOCAL_WORKSPACE/.hermes/cache/scratch/etx-gpu-live-20261015-evidence/b4/20261015T160946Z-a7e517",
+    "c6_work": "/LOCAL_WORKSPACE/.hermes/cache/scratch/etx-gpu-live-20261015-evidence/c6-work"
+  }
+}

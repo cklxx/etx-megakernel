@@ -1,0 +1,186 @@
+[
+ {
+  "name": "apt",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 1.0003716945648193,
+  "note": ""
+ },
+ {
+  "name": "etx_env",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 1.0010254383087158,
+  "note": ""
+ },
+ {
+  "name": "prep_env",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 4.005123615264893,
+  "note": ""
+ },
+ {
+  "name": "source",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 1.0006179809570312,
+  "note": ""
+ },
+ {
+  "name": "prep_dl",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 1.0005676746368408,
+  "note": ""
+ },
+ {
+  "name": "prep_pack",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 1.00057053565979,
+  "note": ""
+ },
+ {
+  "name": "docker_pull",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 1.000502347946167,
+  "note": ""
+ },
+ {
+  "name": "references",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 44.01607012748718,
+  "note": ""
+ },
+ {
+  "name": "build_alld4r0l1kvsmw",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 36.015820264816284,
+  "note": ""
+ },
+ {
+  "name": "bgate_alld4r0l1kvsmw",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 7.0031418800354,
+  "note": ""
+ },
+ {
+  "name": "build_x2",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 54.0221164226532,
+  "note": ""
+ },
+ {
+  "name": "bgate_x2",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 7.012125253677368,
+  "note": ""
+ },
+ {
+  "name": "build_x4",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 129.07211470603943,
+  "note": ""
+ },
+ {
+  "name": "bgate_x4",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 7.004374027252197,
+  "note": ""
+ },
+ {
+  "name": "graph_gate_alld4r0l1kvsmw",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 1.0030579566955566,
+  "note": ""
+ },
+ {
+  "name": "graph_gate_x2",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 1.0039172172546387,
+  "note": ""
+ },
+ {
+  "name": "graph_gate_x4",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 1.0007131099700928,
+  "note": ""
+ },
+ {
+  "name": "vsel",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 185.02924489974976,
+  "note": ""
+ },
+ {
+  "name": "brounds",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 412.1249887943268,
+  "note": ""
+ },
+ {
+  "name": "captures",
+  "status": "fail",
+  "rc": 1,
+  "gpu": 0,
+  "seconds": 16.006967067718506,
+  "note": ""
+ },
+ {
+  "name": "routing",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 159.06026983261108,
+  "note": ""
+ },
+ {
+  "name": "breport",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 1.0005238056182861,
+  "note": ""
+ },
+ {
+  "name": "b4_result",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 1.0005056858062744,
+  "note": ""
+ }
+]

@@ -1,0 +1,29 @@
+STAGE import evidence /root/c6-live-20261015/attempt-000/envelope/import.log
+STAGE dsl evidence /root/c6-live-20261015/attempt-000/envelope/dsl.log
+STAGE adapters evidence /root/c6-live-20261015/attempt-000/envelope/adapters.log
+STAGE bundle evidence /root/c6-live-20261015/attempt-000/envelope/bundle.log
+STAGE control_plan evidence /root/c6-live-20261015/attempt-000/envelope/control_plan.log
+STAGE control_ir evidence /root/c6-live-20261015/attempt-000/envelope/control_ir.log
+STAGE control_isa evidence /root/c6-live-20261015/attempt-000/envelope/control_isa.log
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/root/src/abee09fcda357bb982cfba4d85bb387a6da97ec2385d3d4574f1f7cd4282d5da-20261015T152622Z/examples/vllm_llm/attention_early_merge/offline.py", line 83, in <module>
+    if __name__=='__main__': main()
+                             ^^^^^^
+  File "/root/src/abee09fcda357bb982cfba4d85bb387a6da97ec2385d3d4574f1f7cd4282d5da-20261015T152622Z/examples/vllm_llm/attention_early_merge/offline.py", line 81, in main
+    print(json.dumps(prepare(a.out,a.compiler),indent=2))
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/src/abee09fcda357bb982cfba4d85bb387a6da97ec2385d3d4574f1f7cd4282d5da-20261015T152622Z/examples/vllm_llm/attention_early_merge/offline.py", line 60, in prepare
+    run([llvm/'llc','-mcpu=gfx942','-mtriple=amdgcn-amd-amdhsa','-O3',dest/'mk.ll','-o',dest/'mk.s'],arm+'_isa')
+  File "/root/src/abee09fcda357bb982cfba4d85bb387a6da97ec2385d3d4574f1f7cd4282d5da-20261015T152622Z/examples/vllm_llm/attention_early_merge/offline.py", line 35, in run
+    rc=subprocess.run(cmd,cwd=ROOT,env=env,stdout=log,stderr=subprocess.STDOUT).returncode
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/subprocess.py", line 548, in run
+    with Popen(*popenargs, **kwargs) as process:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/subprocess.py", line 1026, in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+  File "/usr/lib/python3.12/subprocess.py", line 1955, in _execute_child
+    raise child_exception_type(errno_num, err_msg, err_filename)
+FileNotFoundError: [Errno 2] No such file or directory: '/opt/rocm/core-7.14/lib/llvm/bin/llc'

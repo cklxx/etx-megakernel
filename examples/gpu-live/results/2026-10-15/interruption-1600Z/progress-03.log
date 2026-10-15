@@ -1,0 +1,30 @@
+Thu Oct 15 15:31:38 UTC 2026
+DOWNLOAD repo=Qwen/Qwen3-30B-A3B revision=ad44e777bcd18fa416d9da3bd8f70d33ebb85d39 dest=/root/llm/qwen3-30b-a3b/hf time=1792078205.0847483
+Fetching 23 files:   0%|          | 0/23 [00:00<?, ?it/s]Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Fetching 23 files:   9%|▊         | 2/23 [00:00<00:01, 15.11it/s]Fetching 23 files:  13%|█▎        | 3/23 [00:20<00:01, 15.11it/s]Fetching 23 files:  17%|█▋        | 4/23 [00:30<02:48,  8.88s/it]Fetching 23 files:  22%|██▏       | 5/23 [00:31<01:58,  6.58s/it]Fetching 23 files:  26%|██▌       | 6/23 [00:35<01:42,  6.00s/it]Fetching 23 files:  30%|███       | 7/23 [00:37<01:14,  4.68s/it]Fetching 23 files:  35%|███▍      | 8/23 [00:39<00:59,  3.95s/it]Fetching 23 files:  39%|███▉      | 9/23 [00:41<00:46,  3.30s/it]Fetching 23 files:  43%|████▎     | 10/23 [00:42<00:33,  2.60s/it]Fetching 23 files:  48%|████▊     | 11/23 [00:47<00:39,  3.29s/it]Fetching 23 files:  52%|█████▏    | 12/23 [00:52<00:42,  3.83s/it]Fetching 23 files:  61%|██████    | 14/23 [00:53<00:20,  2.31s/it]Fetching 23 files:  74%|███████▍  | 17/23 [00:55<00:09,  1.55s/it]Fetching 23 files:  78%|███████▊  | 18/23 [00:58<00:08,  1.79s/it]Fetching 23 files:  83%|████████▎ | 19/23 [00:58<00:05,  1.43s/it]Fetching 23 files:  87%|████████▋ | 20/23 [01:04<00:07,  2.38s/it]Fetching 23 files:  91%|█████████▏| 21/23 [01:10<00:06,  3.40s/it]Fetching 23 files:  96%|█████████▌| 22/23 [01:10<00:02,  2.54s/it]Fetching 23 files: 100%|██████████| 23/23 [01:12<00:00,  2.39s/it]Fetching 23 files: 100%|██████████| 23/23 [01:12<00:00,  3.17s/it]
+DOWNLOAD COMPLETE repo=Qwen/Qwen3-30B-A3B
+DOWNLOAD repo=deepseek-ai/DeepSeek-Coder-V2-Lite-Base revision=ea9b066cee82f82906fdd58898cb3788b1c5d770 dest=/root/models/dsv2-lite-base time=1792078278.05396
+Fetching 12 files:   0%|          | 0/12 [00:00<?, ?it/s]Fetching 12 files:  17%|█▋        | 2/12 [00:00<00:00, 17.71it/s]Fetching 12 files:  58%|█████▊    | 7/12 [00:00<00:00, 34.47it/s]Fetching 12 files:  67%|██████▋   | 8/12 [00:17<00:00, 34.47it/s]Fetching 12 files:  75%|███████▌  | 9/12 [00:17<00:08,  2.67s/it]Fetching 12 files:  83%|████████▎ | 10/12 [00:19<00:05,  2.61s/it]$HOME/dsv2-prep/.venv/bin/python -c 1 2>/dev/null || { rm -rf $HOME/dsv2-prep; python3 -m venv $HOME/dsv2-prep/.venv; }; . $HOME/dsv2-prep/.venv/bin/activate; pip install -q --upgrade pip; pip install -q numpy 'huggingface_hub[hf_transfer]' hf_transfer; python3 -c 'import torch' 2>/dev/null || pip install -q --index-url https://download.pytorch.org/whl/rocm7.0 torch; pip install -q 'transformers>=4.39,<5' 'tokenizers<0.20' accelerate safetensors; SP=$(python3 -c 'import site;print(site.getsitepackages()[0])'); mkdir -p $SP/flash_attn; echo '# stub: satisfies transformers check_imports only' > $SP/flash_attn/__init__.py; python3 -c 'import torch, transformers; print(torch.__version__, torch.cuda.is_available(), transformers.__version__)'
+WARNING: huggingface-hub 2.2.0 does not provide the extra 'hf-transfer'
+6e448d0ea9bf3d88d898b65449ca6dc2aec170ac
+   8371       2       01:25 I<   kworker/u76:4-ttm
+   8372       2       01:25 I<   kworker/u76:5-ttm
+   8373       2       01:25 I<   kworker/u76:6-ttm
+   8374       2       01:25 I<   kworker/u76:7
+   8383       2       01:24 I<   kworker/u66:2-ttm
+   8384       2       01:24 I<   kworker/u66:3-ttm
+   8385       2       01:24 I<   kworker/u66:4-ttm
+   8386       2       01:24 I<   kworker/u66:5-ttm
+   8387       2       01:24 I<   kworker/u66:6-ttm
+   8388       2       01:24 I<   kworker/u66:7
+   8402       1       01:20 Ss   python
+   8406    8402       01:20 S    bash
+   8482    8406       01:13 R    pip
+   8613    7642       00:46 Ss   rsync
+   8635       2       00:41 I    kworker/u48:2
+   8724    7642       00:00 Ss   bash
+   8729    8724       00:00 R    ps
+   8730    8724       00:00 S    tail
+57G	/root/llm
+25G	/root/models
+11G	/root/dsv2-prep

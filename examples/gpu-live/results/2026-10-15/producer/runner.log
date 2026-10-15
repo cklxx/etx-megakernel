@@ -1,0 +1,51 @@
+[15:37:09 +  0m00s] session record: /root/sess/producer-live-20261015/20261015T153709Z-f24956
+[15:37:09 +  0m00s] start preflight (cpu)
+[15:38:09 +  1m00s] progress: 1 running, 6 waiting, 0 done
+    preflight [cpu] 60s / 240s: PREFLIGHT OK Qwen3-30B-A3B bf16, golden bab2f1fbe12f7017
+[15:38:30 +  1m21s] ok      preflight rc=0 81s
+    PHASE hardware deadline_s=240 evidence=/root/sess/producer-live-20261015/20261015T153709Z-f24956/hardware.raw.log
+    PHASE image deadline_s=30 evidence=/root/sess/producer-live-20261015/20261015T153709Z-f24956/image.raw.log
+    PHASE preflight OK; no image pull or model download
+[15:38:30 +  1m21s] start build_baseline (cpu)
+[15:38:30 +  1m21s] start build_producer (cpu)
+[15:39:09 +  2m00s] progress: 2 running, 4 waiting, 1 done
+    build_baseline [cpu] 39s / 900s: PHASE build_baseline elapsed_s=30.0 log_bytes=1210 evidence=/root/sess/producer-live-20261015/20261015T153709Z-f24956/build_baseline.raw.log
+    build_producer [cpu] 39s / 900s: PHASE build_producer elapsed_s=30.0 log_bytes=1205 evidence=/root/sess/producer-live-20261015/20261015T153709Z-f24956/build_producer.raw.log
+[15:39:18 +  2m09s] ok      build_producer rc=0 48s
+    PHASE build_producer deadline_s=840 evidence=/root/sess/producer-live-20261015/20261015T153709Z-f24956/build_producer.raw.log
+    PHASE build_producer elapsed_s=30.0 log_bytes=1205 evidence=/root/sess/producer-live-20261015/20261015T153709Z-f24956/build_producer.raw.log
+    PLAN {"candidate": true, "owners": 256, "layers": 48, "plan_sha256": "3c29e3b6b83586bab5b89f389c0fd26818f7b7c5ad68f9a29e788ec32b673c3e"}
+[15:39:35 +  2m26s] ok      build_baseline rc=0 65s
+    PHASE build_baseline deadline_s=840 evidence=/root/sess/producer-live-20261015/20261015T153709Z-f24956/build_baseline.raw.log
+    PHASE build_baseline elapsed_s=30.0 log_bytes=1210 evidence=/root/sess/producer-live-20261015/20261015T153709Z-f24956/build_baseline.raw.log
+    PHASE build_baseline elapsed_s=60.0 log_bytes=6976 evidence=/root/sess/producer-live-20261015/20261015T153709Z-f24956/build_baseline.raw.log
+    PLAN {"candidate": false, "owners": 256, "layers": 48, "plan_sha256": "6a97bdba98fd9682290a35af12533980315b6fadff723db60f06f9f852febf3d"}
+[15:39:35 +  2m26s] start qualify on GPU 0
+[15:40:09 +  3m00s] progress: 1 running, 3 waiting, 3 done
+    qualify [GPU 0] 34s / 1500s: PHASE baseline_check_p1040 deadline_s=180 evidence=/root/sess/producer-live-20261015/20261015T153709Z-f24956/baseline_check_p1040.raw.log
+[15:41:09 +  4m00s] progress: 1 running, 3 waiting, 3 done
+    qualify [GPU 0] 94s / 1500s: PHASE producer_check_p1040 deadline_s=180 evidence=/root/sess/producer-live-20261015/20261015T153709Z-f24956/producer_check_p1040.raw.log
+[15:41:54 +  4m45s] fail    qualify rc=2 139s
+    PHASE baseline_check_p0 deadline_s=180 evidence=/root/sess/producer-live-20261015/20261015T153709Z-f24956/baseline_check_p0.raw.log
+    PHASE baseline_check_p1040 deadline_s=180 evidence=/root/sess/producer-live-20261015/20261015T153709Z-f24956/baseline_check_p1040.raw.log
+    PHASE producer_check_p0 deadline_s=180 evidence=/root/sess/producer-live-20261015/20261015T153709Z-f24956/producer_check_p0.raw.log
+    PHASE producer_check_p1040 deadline_s=180 evidence=/root/sess/producer-live-20261015/20261015T153709Z-f24956/producer_check_p1040.raw.log
+    PHASE producer_check_p1040 elapsed_s=30.0 log_bytes=6976 evidence=/root/sess/producer-live-20261015/20261015T153709Z-f24956/producer_check_p1040.raw.log
+    PHASE producer_check_p1040 elapsed_s=60.0 log_bytes=32572 evidence=/root/sess/producer-live-20261015/20261015T153709Z-f24956/producer_check_p1040.raw.log
+    FAIL phase=qualify reason=actual-model acceptance mismatch at position=0 file=L0_mix.bin; performance blocked
+    EVIDENCE /root/sess/producer-live-20261015/20261015T153709Z-f24956
+    SAFE resume: session.sh status/fetch; inspect failure; no partial timing claim; lease budget is unchanged
+[15:41:54 +  4m45s] skip    measure [correctness.json: qualify fail]
+[15:41:54 +  4m45s] skip    diagnose [measurement.complete.json: measure skipped]
+[15:41:54 +  4m45s] start report (cpu)
+[15:41:55 +  4m46s] ok      report rc=0 1s
+    VERDICT {"status": "NOT-COMPLETE", "reason": "[Errno 2] No such file or directory: '/root/sess/producer-live-20261015/20261015T153709Z-f24956/correctness.json'", "performance_claim": false}
+[15:41:55 +  4m46s] session done
+  job                              status     rc  gpu  seconds
+  preflight                        ok          0            81  
+  build_baseline                   ok          0            65  
+  build_producer                   ok          0            48  
+  qualify                          fail        2    0      139  
+  measure                          skipped                      correctness.json: qualify fail
+  diagnose                         skipped                      measurement.complete.json: measure skipped
+  report                           ok          0             1  

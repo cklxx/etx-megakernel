@@ -1,0 +1,12 @@
+{
+  "cmd": [
+    "/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate_diag/run",
+    "/root/sess/expert-live-20261015/20261015T152934Z-af0efa/synthetic",
+    "/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/check-000/candidate_diag_fused",
+    "check",
+    "fused"
+  ],
+  "exit": 0,
+  "seconds": 0.2407101789999615,
+  "timeout": false
+}

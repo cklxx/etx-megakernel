@@ -1,0 +1,162 @@
+{
+  "r0_fused_candidate": {
+    "arm": "candidate",
+    "identity": "84f6ba6ec839ccd384fa1fa42a9221e4dd123edc0ca5785e817808ffb70d96c9",
+    "mode": "fused",
+    "n": 200,
+    "us": 100.870994568,
+    "wall_us": 1090.27891
+  },
+  "r0_fused_control": {
+    "arm": "control",
+    "identity": "b17e5e37f577c6c0170ec59c420d853ba2bdddff8383ddac867fbd621f72d49e",
+    "mode": "fused",
+    "n": 200,
+    "us": 94.255493164,
+    "wall_us": 1087.350995
+  },
+  "r0_graph_candidate": {
+    "arm": "candidate",
+    "identity": "84f6ba6ec839ccd384fa1fa42a9221e4dd123edc0ca5785e817808ffb70d96c9",
+    "mode": "graph",
+    "n": 200,
+    "us": 77.336997986,
+    "wall_us": 1087.383965
+  },
+  "r0_graph_control": {
+    "arm": "control",
+    "identity": "b17e5e37f577c6c0170ec59c420d853ba2bdddff8383ddac867fbd621f72d49e",
+    "mode": "graph",
+    "n": 200,
+    "us": 70.601997375,
+    "wall_us": 1086.68573
+  },
+  "r1_fused_candidate": {
+    "arm": "candidate",
+    "identity": "84f6ba6ec839ccd384fa1fa42a9221e4dd123edc0ca5785e817808ffb70d96c9",
+    "mode": "fused",
+    "n": 200,
+    "us": 100.930496216,
+    "wall_us": 1090.45409
+  },
+  "r1_fused_control": {
+    "arm": "control",
+    "identity": "b17e5e37f577c6c0170ec59c420d853ba2bdddff8383ddac867fbd621f72d49e",
+    "mode": "fused",
+    "n": 200,
+    "us": 94.255493164,
+    "wall_us": 1087.52688
+  },
+  "r1_graph_candidate": {
+    "arm": "candidate",
+    "identity": "84f6ba6ec839ccd384fa1fa42a9221e4dd123edc0ca5785e817808ffb70d96c9",
+    "mode": "graph",
+    "n": 200,
+    "us": 77.136505127,
+    "wall_us": 1086.8302
+  },
+  "r1_graph_control": {
+    "arm": "control",
+    "identity": "b17e5e37f577c6c0170ec59c420d853ba2bdddff8383ddac867fbd621f72d49e",
+    "mode": "graph",
+    "n": 200,
+    "us": 70.401496887,
+    "wall_us": 1086.397485
+  },
+  "r2_fused_candidate": {
+    "arm": "candidate",
+    "identity": "84f6ba6ec839ccd384fa1fa42a9221e4dd123edc0ca5785e817808ffb70d96c9",
+    "mode": "fused",
+    "n": 200,
+    "us": 101.030502319,
+    "wall_us": 1090.74633
+  },
+  "r2_fused_control": {
+    "arm": "control",
+    "identity": "b17e5e37f577c6c0170ec59c420d853ba2bdddff8383ddac867fbd621f72d49e",
+    "mode": "fused",
+    "n": 200,
+    "us": 94.155502319,
+    "wall_us": 1090.50257
+  },
+  "r2_graph_candidate": {
+    "arm": "candidate",
+    "identity": "84f6ba6ec839ccd384fa1fa42a9221e4dd123edc0ca5785e817808ffb70d96c9",
+    "mode": "graph",
+    "n": 200,
+    "us": 77.416503906,
+    "wall_us": 1088.82167
+  },
+  "r2_graph_control": {
+    "arm": "control",
+    "identity": "b17e5e37f577c6c0170ec59c420d853ba2bdddff8383ddac867fbd621f72d49e",
+    "mode": "graph",
+    "n": 200,
+    "us": 70.361000061,
+    "wall_us": 1085.08765
+  },
+  "r3_fused_candidate": {
+    "arm": "candidate",
+    "identity": "84f6ba6ec839ccd384fa1fa42a9221e4dd123edc0ca5785e817808ffb70d96c9",
+    "mode": "fused",
+    "n": 200,
+    "us": 100.430000305,
+    "wall_us": 1092.119895
+  },
+  "r3_fused_control": {
+    "arm": "control",
+    "identity": "b17e5e37f577c6c0170ec59c420d853ba2bdddff8383ddac867fbd621f72d49e",
+    "mode": "fused",
+    "n": 200,
+    "us": 93.492996216,
+    "wall_us": 1091.92061
+  },
+  "r3_graph_candidate": {
+    "arm": "candidate",
+    "identity": "84f6ba6ec839ccd384fa1fa42a9221e4dd123edc0ca5785e817808ffb70d96c9",
+    "mode": "graph",
+    "n": 200,
+    "us": 76.776000977,
+    "wall_us": 1087.734825
+  },
+  "r3_graph_control": {
+    "arm": "control",
+    "identity": "b17e5e37f577c6c0170ec59c420d853ba2bdddff8383ddac867fbd621f72d49e",
+    "mode": "graph",
+    "n": 200,
+    "us": 70.861999512,
+    "wall_us": 1086.160775
+  },
+  "r4_fused_candidate": {
+    "arm": "candidate",
+    "identity": "84f6ba6ec839ccd384fa1fa42a9221e4dd123edc0ca5785e817808ffb70d96c9",
+    "mode": "fused",
+    "n": 200,
+    "us": 99.968505859,
+    "wall_us": 1092.694785
+  },
+  "r4_fused_control": {
+    "arm": "control",
+    "identity": "b17e5e37f577c6c0170ec59c420d853ba2bdddff8383ddac867fbd621f72d49e",
+    "mode": "fused",
+    "n": 200,
+    "us": 94.29599762,
+    "wall_us": 1089.71007
+  },
+  "r4_graph_candidate": {
+    "arm": "candidate",
+    "identity": "84f6ba6ec839ccd384fa1fa42a9221e4dd123edc0ca5785e817808ffb70d96c9",
+    "mode": "graph",
+    "n": 200,
+    "us": 77.737998962,
+    "wall_us": 1091.508495
+  },
+  "r4_graph_control": {
+    "arm": "control",
+    "identity": "b17e5e37f577c6c0170ec59c420d853ba2bdddff8383ddac867fbd621f72d49e",
+    "mode": "graph",
+    "n": 200,
+    "us": 70.120002747,
+    "wall_us": 1089.333655
+  }
+}

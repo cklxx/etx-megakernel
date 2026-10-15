@@ -1,0 +1,87 @@
+{
+  "description": "Offline localization in retained actual-model captures only; does not establish the arithmetic/runtime root cause.",
+  "position": 0,
+  "layer": 0,
+  "files": [
+    {
+      "file": "L0_gamma.bin",
+      "bytes": 4096,
+      "changed_bytes": 0,
+      "equal": true,
+      "baseline_sha256": "893eb1764a5ee47533b0f447a5e16b223b825abb4bb55f9527c4365647b316be",
+      "producer_sha256": "893eb1764a5ee47533b0f447a5e16b223b825abb4bb55f9527c4365647b316be"
+    },
+    {
+      "file": "L0_ids.bin",
+      "bytes": 256,
+      "changed_bytes": 0,
+      "equal": true,
+      "baseline_sha256": "107d4da50c6e88abfeb751d7f64323e891ac28fc3fe492440e8dba9444708038",
+      "producer_sha256": "107d4da50c6e88abfeb751d7f64323e891ac28fc3fe492440e8dba9444708038"
+    },
+    {
+      "file": "L0_logits.bin",
+      "bytes": 256,
+      "changed_bytes": 5,
+      "equal": false,
+      "baseline_sha256": "5abbfe3360c6662db278273f8b4bb7adfa547b6210e1c79c64754db2a79f4ac7",
+      "producer_sha256": "28f8309d727f8216b67515cfd6cf67b1c060da21c39874ed63f0b2427f66ee05"
+    },
+    {
+      "file": "L0_mix.bin",
+      "bytes": 256,
+      "changed_bytes": 136,
+      "equal": false,
+      "baseline_sha256": "c327d27e251f9bd28f7c2f769cf44c5cca783e272bc742effb10b5e85d708c4a",
+      "producer_sha256": "36e65e294d46b0b7f61a7b8bd060fe0ab55c65d105b94732e2203068a07b3bb2"
+    },
+    {
+      "file": "L0_norm.bin",
+      "bytes": 4096,
+      "changed_bytes": 0,
+      "equal": true,
+      "baseline_sha256": "5f41e8f49b114b1224647ebcb6fe13507e24f8325a45a0dfa700e6c6bd53b9f3",
+      "producer_sha256": "5f41e8f49b114b1224647ebcb6fe13507e24f8325a45a0dfa700e6c6bd53b9f3"
+    },
+    {
+      "file": "L0_o.bin",
+      "bytes": 4096,
+      "changed_bytes": 0,
+      "equal": true,
+      "baseline_sha256": "665a8658491423bcc5705df916145365a6ae994814c9fe75e17121a288723a07",
+      "producer_sha256": "665a8658491423bcc5705df916145365a6ae994814c9fe75e17121a288723a07"
+    },
+    {
+      "file": "L0_resid2.bin",
+      "bytes": 4096,
+      "changed_bytes": 0,
+      "equal": true,
+      "baseline_sha256": "77677fc389e71f803fa89ee0c6936b967ea6eb7cf15cd8487034131170e12e23",
+      "producer_sha256": "77677fc389e71f803fa89ee0c6936b967ea6eb7cf15cd8487034131170e12e23"
+    },
+    {
+      "file": "L0_residual.bin",
+      "bytes": 4096,
+      "changed_bytes": 0,
+      "equal": true,
+      "baseline_sha256": "ec27d169fadae966e548ae9046b8f029ed9a6f23c71d7beecb2dbc442f12ee8e",
+      "producer_sha256": "ec27d169fadae966e548ae9046b8f029ed9a6f23c71d7beecb2dbc442f12ee8e"
+    },
+    {
+      "file": "L0_router.bin",
+      "bytes": 524288,
+      "changed_bytes": 0,
+      "equal": true,
+      "baseline_sha256": "5a165372095204aaa0343a67d2d2afde1086b730a825998b59264fb9c49a216d",
+      "producer_sha256": "5a165372095204aaa0343a67d2d2afde1086b730a825998b59264fb9c49a216d"
+    },
+    {
+      "file": "L0_tei.bin",
+      "bytes": 256,
+      "changed_bytes": 0,
+      "equal": true,
+      "baseline_sha256": "de2a1f196d149de48fe4da2b85814aad20b75d676473614bc0b2d8933be18097",
+      "producer_sha256": "de2a1f196d149de48fe4da2b85814aad20b75d676473614bc0b2d8933be18097"
+    }
+  ]
+}

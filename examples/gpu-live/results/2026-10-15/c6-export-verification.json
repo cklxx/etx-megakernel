@@ -1,0 +1,9 @@
+{
+  "status": "VERIFIED",
+  "snapshot_sha256": "5dad8b0456342fdf36c614fb05569ed57431c93159fa69ffbb64b914049b2a30",
+  "verified_regular_files": 7941,
+  "bad": [],
+  "extras": [],
+  "symlinks": [],
+  "note": "Terminal C6 work snapshot, including both attempts and wrapper logs/exits; direct retry is not represented as a sealed gpu_jobs success."
+}

@@ -1,0 +1,36 @@
+Thu Oct 15 15:33:34 UTC 2026
+DOWNLOAD repo=deepseek-ai/DeepSeek-Coder-V2-Lite-Base revision=ea9b066cee82f82906fdd58898cb3788b1c5d770 dest=/root/models/dsv2-lite-base time=1792078278.05396
+Fetching 12 files:   0%|          | 0/12 [00:00<?, ?it/s]Fetching 12 files:  17%|█▋        | 2/12 [00:00<00:00, 17.71it/s]Fetching 12 files:  58%|█████▊    | 7/12 [00:00<00:00, 34.47it/s]Fetching 12 files:  67%|██████▋   | 8/12 [00:17<00:00, 34.47it/s]Fetching 12 files:  75%|███████▌  | 9/12 [00:17<00:08,  2.67s/it]Fetching 12 files:  83%|████████▎ | 10/12 [00:19<00:05,  2.61s/it]Fetching 12 files: 100%|██████████| 12/12 [00:33<00:00,  4.13s/it]Fetching 12 files: 100%|██████████| 12/12 [00:33<00:00,  2.83s/it]
+DOWNLOAD COMPLETE repo=deepseek-ai/DeepSeek-Coder-V2-Lite-Base
+$HOME/dsv2-prep/.venv/bin/python -c 1 2>/dev/null || { rm -rf $HOME/dsv2-prep; python3 -m venv $HOME/dsv2-prep/.venv; }; . $HOME/dsv2-prep/.venv/bin/activate; pip install -q --upgrade pip; pip install -q numpy 'huggingface_hub[hf_transfer]' hf_transfer; python3 -c 'import torch' 2>/dev/null || pip install -q --index-url https://download.pytorch.org/whl/rocm7.0 torch; pip install -q 'transformers>=4.39,<5' 'tokenizers<0.20' accelerate safetensors; SP=$(python3 -c 'import site;print(site.getsitepackages()[0])'); mkdir -p $SP/flash_attn; echo '# stub: satisfies transformers check_imports only' > $SP/flash_attn/__init__.py; python3 -c 'import torch, transformers; print(torch.__version__, torch.cuda.is_available(), transformers.__version__)'
+WARNING: huggingface-hub 2.2.0 does not provide the extra 'hf-transfer'
+/opt/amdgpu/share/libdrm/amdgpu.ids: No such file or directory
+2.10.0+rocm7.0 True 4.44.2
+EXIT 0
+   8386       2       03:20 I<   kworker/u66:5-ttm
+   8387       2       03:20 I<   kworker/u66:6-ttm
+   8388       2       03:20 I<   kworker/u66:7
+   8613    7642       02:42 Ss   rsync
+   8635       2       02:37 I    kworker/u48:2
+   8780    7642       00:51 Ss   sftp-server
+   8805    3779       00:03 Ss   sshd
+   8808    8805       00:00 S    sh
+   8809    8808       00:00 S    run-parts
+   8859    8809       00:00 S    99-one-click
+   8884    7642       00:00 Ss   bash
+   8891    8859       00:00 S    99-one-click
+   8892    8891       00:00 R    python3
+   8893    8891       00:00 S    grep
+   8894    8891       00:00 S    cut
+   8896    8891       00:00 S    xargs
+   8898    8884       00:00 R    ps
+   8899    8884       00:00 S    tail
+    }
+  },
+  "rule": "five gains >0; median >=0.625 us and >2*(max-min)",
+  "spread_us": 1.2644958499999888,
+  "system_baseline": "N/A for isolated subgraph; mandatory strongest legal vLLM for later model trial",
+  "verdict": "STOP-NO-BENEFIT",
+  "window": "device events around captured reset + complete up/down/consumer + runtime retirement"
+}
+tail: cannot open '/root/setup-live/qwen-pack.log' for reading: No such file or directory

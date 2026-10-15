@@ -1,0 +1,18 @@
+Thu Oct 15 15:40:44 UTC 2026
+[15:39:18 +  2m09s] ok      build_producer rc=0 48s
+    PHASE build_producer deadline_s=840 evidence=/root/sess/producer-live-20261015/20261015T153709Z-f24956/build_producer.raw.log
+    PHASE build_producer elapsed_s=30.0 log_bytes=1205 evidence=/root/sess/producer-live-20261015/20261015T153709Z-f24956/build_producer.raw.log
+    PLAN {"candidate": true, "owners": 256, "layers": 48, "plan_sha256": "3c29e3b6b83586bab5b89f389c0fd26818f7b7c5ad68f9a29e788ec32b673c3e"}
+[15:39:35 +  2m26s] ok      build_baseline rc=0 65s
+    PHASE build_baseline deadline_s=840 evidence=/root/sess/producer-live-20261015/20261015T153709Z-f24956/build_baseline.raw.log
+    PHASE build_baseline elapsed_s=30.0 log_bytes=1210 evidence=/root/sess/producer-live-20261015/20261015T153709Z-f24956/build_baseline.raw.log
+    PHASE build_baseline elapsed_s=60.0 log_bytes=6976 evidence=/root/sess/producer-live-20261015/20261015T153709Z-f24956/build_baseline.raw.log
+    PLAN {"candidate": false, "owners": 256, "layers": 48, "plan_sha256": "6a97bdba98fd9682290a35af12533980315b6fadff723db60f06f9f852febf3d"}
+[15:39:35 +  2m26s] start qualify on GPU 0
+[15:40:09 +  3m00s] progress: 1 running, 3 waiting, 3 done
+    qualify [GPU 0] 34s / 1500s: PHASE baseline_check_p1040 deadline_s=180 evidence=/root/sess/producer-live-20261015/20261015T153709Z-f24956/baseline_check_p1040.raw.log
+# job qualify gpu=0 cwd=/root/etx
+# .venv/bin/python -u -m examples.vllm_llm.producer_session qualify
+PHASE baseline_check_p0 deadline_s=180 evidence=/root/sess/producer-live-20261015/20261015T153709Z-f24956/baseline_check_p0.raw.log
+PHASE baseline_check_p1040 deadline_s=180 evidence=/root/sess/producer-live-20261015/20261015T153709Z-f24956/baseline_check_p1040.raw.log
+PHASE producer_check_p0 deadline_s=180 evidence=/root/sess/producer-live-20261015/20261015T153709Z-f24956/producer_check_p0.raw.log

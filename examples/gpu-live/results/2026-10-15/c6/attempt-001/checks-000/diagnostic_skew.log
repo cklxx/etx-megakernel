@@ -1,0 +1,9 @@
+STAGE replay layer=0 position=1040 round=0
+STAGE replay layer=0 position=1040 round=1
+STAGE replay layer=0 position=1040 round=2
+STAGE replay layer=0 position=1040 round=3
+STAGE replay layer=0 position=1040 round=4
+STAGE replay layer=0 position=1040 round=5
+STAGE replay layer=0 position=1040 round=6
+STAGE replay layer=0 position=1040 round=7
+C6-CHECK OK layer=0 position=1040 epochs=16

@@ -1,0 +1,3 @@
+# job b4_result gpu=None cwd=/root/etx
+# $HOME/dsv2-prep/.venv/bin/python -u -m examples.dsv2lite.batch_attribution final
+B4-RESULT INCOMPLETE

@@ -1,0 +1,12 @@
+{
+  "cmd": [
+    "/root/etx-python/bin/python3",
+    "-m",
+    "examples.vllm_llm.expert_merge.prepare",
+    "native",
+    "/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate"
+  ],
+  "exit": 0,
+  "seconds": 4.32218395599989,
+  "timeout": false
+}

@@ -1,0 +1,19 @@
+{
+ "complete": true,
+ "jobs": {
+  "build": "ok",
+  "correctness": "ok",
+  "pairs": "ok",
+  "synthetic": "ok"
+ },
+ "local_only": [
+  "b_*/run",
+  "b_*/fleet_src/*",
+  "*.o"
+ ],
+ "manifest_sha256": "1da5789bc407a915b8c7cc3908e444a5ecaad64eb7b905616359ba3987ecce91",
+ "plan_sha256": "8e25b698db04153c00b971426a1d5ebfc2d26240f145478390388ac8d5407d47",
+ "sealed": "2026-10-15T15:30:15Z",
+ "session": "20261015T152934Z-af0efa",
+ "source": "commit 554133d744b4591c9cf87c68b6817df781137c9b\nbranch main\narchive abee09fcda357bb982cfba4d85bb387a6da97ec2385d3d4574f1f7cd4282d5da\nstaged 2026-10-15T15:26:30Z\n"
+}

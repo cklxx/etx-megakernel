@@ -1,0 +1,14 @@
+{
+  "status": "PASS",
+  "inputs": {
+    "vl.bin": "44a0c85fa1d5b5e7ea6e96b52d7bef26626e9745ee12c52759c6d38388dc5052",
+    "vl.manifest": "d95a244f6a81a6daf3e7b052ab10525a15ddce5115039957968a5c9cac778a0b",
+    "golden_c1024.txt": "bab2f1fbe12f70179711ec40a215c74710845b73169b1cc6a3a6ca50e0a19484"
+  },
+  "capture_sha": "1d182062340cad35a5db8d787d358e02ce7d4760dd4e79843bb5cfe837bb9703",
+  "binaries": {
+    "probe": "0fb30955b3eb45351d772608bfb87803cf127cdeca93ecb6b116fdd98a4f105d",
+    "diagnostic": "87062533aa37ad40741b124dd7892612f0a8310c23e3906426dc674815faf7a6",
+    "model": "93a38042a83d56909bdcbc4a566fa79f3851fbd7fa4d1410a50ccfa650ef47e1"
+  }
+}

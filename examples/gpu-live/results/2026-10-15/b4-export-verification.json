@@ -1,0 +1,47 @@
+{
+  "session": "20261015T160946Z-a7e517",
+  "manifest_sha256": "6f38e7f03b12a005f11c85bd825598079c549cc8d354787d6e8aa21d0123a032",
+  "verified_files": 188,
+  "external_inputs": [
+    {
+      "file": "references/weights.bin",
+      "sha256": "ad7e8290b80490981048eeb85637ec1d0174d6605bf8f40730afe96a07548981",
+      "target": "/root/dsv2-data/weights.bin",
+      "status": "external input not exported; remote seal verification required"
+    },
+    {
+      "file": "references/weights.bin.manifest",
+      "sha256": "1f0f667dd8ab4dad2565666ea5d0284c1a1880d39aac74245eaa85fabc958fd3",
+      "target": "/root/dsv2-data/weights.bin.manifest",
+      "status": "external input not exported; remote seal verification required"
+    }
+  ],
+  "bad": [],
+  "seal_complete": false,
+  "jobs": {
+    "apt": "ok",
+    "b4_result": "ok",
+    "bgate_alld4r0l1kvsmw": "ok",
+    "bgate_x2": "ok",
+    "bgate_x4": "ok",
+    "breport": "ok",
+    "brounds": "ok",
+    "build_alld4r0l1kvsmw": "ok",
+    "build_x2": "ok",
+    "build_x4": "ok",
+    "captures": "fail",
+    "docker_pull": "ok",
+    "etx_env": "ok",
+    "graph_gate_alld4r0l1kvsmw": "ok",
+    "graph_gate_x2": "ok",
+    "graph_gate_x4": "ok",
+    "prep_dl": "ok",
+    "prep_env": "ok",
+    "prep_pack": "ok",
+    "references": "ok",
+    "routing": "ok",
+    "source": "ok",
+    "vsel": "ok"
+  },
+  "status": "EXPORTED_RAW_BYTES_VERIFIED_EXTERNAL_INPUTS_NOT_EXPORTED"
+}

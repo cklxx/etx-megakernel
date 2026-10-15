@@ -1,0 +1,537 @@
+$ stdbuf -oL -eL /root/sess/x8-live-20261015/20261015T154549Z-7cdcb2/b_x8/run --weights /root/sess/x8-live-20261015/20261015T154549Z-7cdcb2/references/weights.bin --cache /root/sess/x8-live-20261015/20261015T154549Z-7cdcb2/references/fleet_cache.bin --golden /root/sess/x8-live-20261015/20261015T154549Z-7cdcb2/references/golden_tokens.txt --hidden /root/sess/x8-live-20261015/20261015T154549Z-7cdcb2/references/golden_hidden.bin --tokens 32 --context 1024 --repeat 2 --req-dir /root/sess/x8-live-20261015/20261015T154549Z-7cdcb2/references/r1 --req-dir /root/sess/x8-live-20261015/20261015T154549Z-7cdcb2/references/r2 --req-dir /root/sess/x8-live-20261015/20261015T154549Z-7cdcb2/references/r3 --req-dir /root/sess/x8-live-20261015/20261015T154549Z-7cdcb2/references/r4 --req-dir /root/sess/x8-live-20261015/20261015T154549Z-7cdcb2/references/r5 --req-dir /root/sess/x8-live-20261015/20261015T154549Z-7cdcb2/references/r6 --req-dir /root/sess/x8-live-20261015/20261015T154549Z-7cdcb2/references/r7
+device: AMD Instinct MI300X VF  arch gfx942:sramecc+:xnack-  CUs 304
+model: hidden 2048 heads 16 kv_lora 512 experts 64 top-6 layers 27 (dense < 1) vocab 102400
+  /root/sess/x8-live-20261015/20261015T154549Z-7cdcb2/references/weights.bin: 31.4 GB uploaded
+  /root/sess/x8-live-20261015/20261015T154549Z-7cdcb2/references/fleet_cache.bin: 0.0 GB uploaded
+  /root/sess/x8-live-20261015/20261015T154549Z-7cdcb2/references/r1/fleet_cache.bin: 0.0 GB uploaded
+  /root/sess/x8-live-20261015/20261015T154549Z-7cdcb2/references/r2/fleet_cache.bin: 0.0 GB uploaded
+  /root/sess/x8-live-20261015/20261015T154549Z-7cdcb2/references/r3/fleet_cache.bin: 0.0 GB uploaded
+  /root/sess/x8-live-20261015/20261015T154549Z-7cdcb2/references/r4/fleet_cache.bin: 0.0 GB uploaded
+BATCHCOLLISION requests 0 and 4: identical 32 checked greedy tokens [1:tokens+1]; prompts are distinct, the request mix-up check is unavailable for this pair
+  /root/sess/x8-live-20261015/20261015T154549Z-7cdcb2/references/r5/fleet_cache.bin: 0.0 GB uploaded
+  /root/sess/x8-live-20261015/20261015T154549Z-7cdcb2/references/r6/fleet_cache.bin: 0.0 GB uploaded
+  /root/sess/x8-live-20261015/20261015T154549Z-7cdcb2/references/r7/fleet_cache.bin: 0.0 GB uploaded
+etx: 439568 tasks, 12712 event words, 600 workers (8 domains x 75), lds 24576 B (fleet scratch 23408 B)
+run 0 (warm-up) r0: 32/32 tokens match
+run 0 (warm-up) r1: 32/32 tokens match
+run 0 (warm-up) r2: 32/32 tokens match
+run 0 (warm-up) r3: 32/32 tokens match
+run 0 (warm-up) r4: 32/32 tokens match
+run 0 (warm-up) r5: 32/32 tokens match
+run 0 (warm-up) r6: 32/32 tokens match
+run 0 (warm-up) r7: 32/32 tokens match
+r0 token  0:   16.128 ms (device)  step  17.848 ms  out   1780  ok
+r0 token  1:   16.116 ms (device)  step  17.828 ms  out    185  ok
+r0 token  2:   16.140 ms (device)  step  17.882 ms  out    300  ok
+r0 token  3:   16.232 ms (device)  step  17.933 ms  out   1501  ok
+r0 token  4:   16.118 ms (device)  step  17.866 ms  out  11747  ok
+r0 token  5:   16.174 ms (device)  step  17.881 ms  out    254  ok
+r0 token  6:   16.046 ms (device)  step  17.740 ms  out   3510  ok
+r0 token  7:   16.070 ms (device)  step  17.786 ms  out    185  ok
+r0 token  8:   16.045 ms (device)  step  17.768 ms  out   1558  ok
+r0 token  9:   16.000 ms (device)  step  17.671 ms  out   8708  ok
+r0 token 10:   16.102 ms (device)  step  17.785 ms  out      7  ok
+r0 token 11:   16.076 ms (device)  step  17.870 ms  out     77  ok
+r0 token 12:   16.224 ms (device)  step  17.915 ms  out   1780  ok
+r0 token 13:   16.097 ms (device)  step  17.789 ms  out    185  ok
+r0 token 14:   16.080 ms (device)  step  17.768 ms  out    300  ok
+r0 token 15:   16.078 ms (device)  step  17.806 ms  out   1501  ok
+r0 token 16:   16.229 ms (device)  step  17.947 ms  out  11747  ok
+r0 token 17:   16.165 ms (device)  step  17.863 ms  out    254  ok
+r0 token 18:   16.130 ms (device)  step  17.830 ms  out   3510  ok
+r0 token 19:   16.069 ms (device)  step  17.796 ms  out    185  ok
+r0 token 20:   16.110 ms (device)  step  17.855 ms  out   1558  ok
+r0 token 21:   16.225 ms (device)  step  17.927 ms  out   8708  ok
+r0 token 22:   16.212 ms (device)  step  17.871 ms  out      7  ok
+r0 token 23:   16.084 ms (device)  step  17.778 ms  out     77  ok
+r0 token 24:   16.179 ms (device)  step  17.872 ms  out   1780  ok
+r0 token 25:   16.134 ms (device)  step  17.827 ms  out    185  ok
+r0 token 26:   16.103 ms (device)  step  17.828 ms  out    300  ok
+r0 token 27:   16.165 ms (device)  step  17.826 ms  out   1501  ok
+r0 token 28:   16.214 ms (device)  step  17.940 ms  out  11747  ok
+r0 token 29:   16.172 ms (device)  step  17.837 ms  out    254  ok
+r0 token 30:   16.132 ms (device)  step  17.827 ms  out   3510  ok
+r0 token 31:   16.117 ms (device)  step  17.808 ms  out    185  ok
+r1 token  0:   17.232 ms (device)  step  17.848 ms  out   8708  ok
+r1 token  1:   17.225 ms (device)  step  17.828 ms  out      7  ok
+r1 token  2:   17.267 ms (device)  step  17.882 ms  out     77  ok
+r1 token  3:   17.327 ms (device)  step  17.933 ms  out   1780  ok
+r1 token  4:   17.247 ms (device)  step  17.866 ms  out    185  ok
+r1 token  5:   17.276 ms (device)  step  17.881 ms  out    300  ok
+r1 token  6:   17.139 ms (device)  step  17.740 ms  out   1501  ok
+r1 token  7:   17.186 ms (device)  step  17.786 ms  out  11747  ok
+r1 token  8:   17.146 ms (device)  step  17.768 ms  out    254  ok
+r1 token  9:   17.073 ms (device)  step  17.671 ms  out   3510  ok
+r1 token 10:   17.197 ms (device)  step  17.785 ms  out    185  ok
+r1 token 11:   17.238 ms (device)  step  17.870 ms  out   1558  ok
+r1 token 12:   17.300 ms (device)  step  17.915 ms  out   8708  ok
+r1 token 13:   17.191 ms (device)  step  17.789 ms  out      7  ok
+r1 token 14:   17.173 ms (device)  step  17.768 ms  out     77  ok
+r1 token 15:   17.202 ms (device)  step  17.806 ms  out   1780  ok
+r1 token 16:   17.339 ms (device)  step  17.947 ms  out    185  ok
+r1 token 17:   17.261 ms (device)  step  17.863 ms  out    300  ok
+r1 token 18:   17.234 ms (device)  step  17.830 ms  out   1501  ok
+r1 token 19:   17.185 ms (device)  step  17.796 ms  out  11747  ok
+r1 token 20:   17.231 ms (device)  step  17.855 ms  out    254  ok
+r1 token 21:   17.324 ms (device)  step  17.927 ms  out   3510  ok
+r1 token 22:   17.281 ms (device)  step  17.871 ms  out    185  ok
+r1 token 23:   17.181 ms (device)  step  17.778 ms  out   1558  ok
+r1 token 24:   17.259 ms (device)  step  17.872 ms  out   8708  ok
+r1 token 25:   17.225 ms (device)  step  17.827 ms  out      7  ok
+r1 token 26:   17.227 ms (device)  step  17.828 ms  out     77  ok
+r1 token 27:   17.232 ms (device)  step  17.826 ms  out   1780  ok
+r1 token 28:   17.318 ms (device)  step  17.940 ms  out    185  ok
+r1 token 29:   17.247 ms (device)  step  17.837 ms  out    300  ok
+r1 token 30:   17.236 ms (device)  step  17.827 ms  out   1501  ok
+r1 token 31:   17.216 ms (device)  step  17.808 ms  out  11747  ok
+r2 token  0:   16.275 ms (device)  step  17.848 ms  out      7  ok
+r2 token  1:   16.261 ms (device)  step  17.828 ms  out     77  ok
+r2 token  2:   16.292 ms (device)  step  17.882 ms  out   1780  ok
+r2 token  3:   16.376 ms (device)  step  17.933 ms  out    185  ok
+r2 token  4:   16.268 ms (device)  step  17.866 ms  out    300  ok
+r2 token  5:   16.323 ms (device)  step  17.881 ms  out   1501  ok
+r2 token  6:   16.195 ms (device)  step  17.740 ms  out  11747  ok
+r2 token  7:   16.216 ms (device)  step  17.786 ms  out    254  ok
+r2 token  8:   16.198 ms (device)  step  17.768 ms  out   3510  ok
+r2 token  9:   16.150 ms (device)  step  17.671 ms  out    185  ok
+r2 token 10:   16.248 ms (device)  step  17.785 ms  out   1558  ok
+r2 token 11:   16.220 ms (device)  step  17.870 ms  out   8708  ok
+r2 token 12:   16.375 ms (device)  step  17.915 ms  out      7  ok
+r2 token 13:   16.250 ms (device)  step  17.789 ms  out     77  ok
+r2 token 14:   16.229 ms (device)  step  17.768 ms  out   1780  ok
+r2 token 15:   16.223 ms (device)  step  17.806 ms  out    185  ok
+r2 token 16:   16.376 ms (device)  step  17.947 ms  out    300  ok
+r2 token 17:   16.317 ms (device)  step  17.863 ms  out   1501  ok
+r2 token 18:   16.277 ms (device)  step  17.830 ms  out  11747  ok
+r2 token 19:   16.217 ms (device)  step  17.796 ms  out    254  ok
+r2 token 20:   16.253 ms (device)  step  17.855 ms  out   3510  ok
+r2 token 21:   16.368 ms (device)  step  17.927 ms  out    185  ok
+r2 token 22:   16.358 ms (device)  step  17.871 ms  out   1558  ok
+r2 token 23:   16.237 ms (device)  step  17.778 ms  out   8708  ok
+r2 token 24:   16.325 ms (device)  step  17.872 ms  out      7  ok
+r2 token 25:   16.285 ms (device)  step  17.827 ms  out     77  ok
+r2 token 26:   16.253 ms (device)  step  17.828 ms  out   1780  ok
+r2 token 27:   16.316 ms (device)  step  17.826 ms  out    185  ok
+r2 token 28:   16.363 ms (device)  step  17.940 ms  out    300  ok
+r2 token 29:   16.317 ms (device)  step  17.837 ms  out   1501  ok
+r2 token 30:   16.283 ms (device)  step  17.827 ms  out  11747  ok
+r2 token 31:   16.269 ms (device)  step  17.808 ms  out    254  ok
+r3 token  0:   17.339 ms (device)  step  17.848 ms  out     77  ok
+r3 token  1:   17.330 ms (device)  step  17.828 ms  out   1780  ok
+r3 token  2:   17.382 ms (device)  step  17.882 ms  out    185  ok
+r3 token  3:   17.434 ms (device)  step  17.933 ms  out    300  ok
+r3 token  4:   17.353 ms (device)  step  17.866 ms  out   1501  ok
+r3 token  5:   17.385 ms (device)  step  17.881 ms  out  11747  ok
+r3 token  6:   17.245 ms (device)  step  17.740 ms  out    254  ok
+r3 token  7:   17.293 ms (device)  step  17.786 ms  out   3510  ok
+r3 token  8:   17.253 ms (device)  step  17.768 ms  out    185  ok
+r3 token  9:   17.182 ms (device)  step  17.671 ms  out   1558  ok
+r3 token 10:   17.303 ms (device)  step  17.785 ms  out   8708  ok
+r3 token 11:   17.351 ms (device)  step  17.870 ms  out      7  ok
+r3 token 12:   17.407 ms (device)  step  17.915 ms  out     77  ok
+r3 token 13:   17.300 ms (device)  step  17.789 ms  out   1780  ok
+r3 token 14:   17.280 ms (device)  step  17.768 ms  out    185  ok
+r3 token 15:   17.313 ms (device)  step  17.806 ms  out    300  ok
+r3 token 16:   17.443 ms (device)  step  17.947 ms  out   1501  ok
+r3 token 17:   17.370 ms (device)  step  17.863 ms  out  11747  ok
+r3 token 18:   17.340 ms (device)  step  17.830 ms  out    254  ok
+r3 token 19:   17.297 ms (device)  step  17.796 ms  out   3510  ok
+r3 token 20:   17.341 ms (device)  step  17.855 ms  out    185  ok
+r3 token 21:   17.432 ms (device)  step  17.927 ms  out   1558  ok
+r3 token 22:   17.386 ms (device)  step  17.871 ms  out   8708  ok
+r3 token 23:   17.291 ms (device)  step  17.778 ms  out      7  ok
+r3 token 24:   17.370 ms (device)  step  17.872 ms  out     77  ok
+r3 token 25:   17.335 ms (device)  step  17.827 ms  out   1780  ok
+r3 token 26:   17.334 ms (device)  step  17.828 ms  out    185  ok
+r3 token 27:   17.338 ms (device)  step  17.826 ms  out    300  ok
+r3 token 28:   17.425 ms (device)  step  17.940 ms  out   1501  ok
+r3 token 29:   17.352 ms (device)  step  17.837 ms  out  11747  ok
+r3 token 30:   17.342 ms (device)  step  17.827 ms  out    254  ok
+r3 token 31:   17.323 ms (device)  step  17.808 ms  out   3510  ok
+r4 token  0:   16.423 ms (device)  step  17.848 ms  out   1780  ok
+r4 token  1:   16.406 ms (device)  step  17.828 ms  out    185  ok
+r4 token  2:   16.442 ms (device)  step  17.882 ms  out    300  ok
+r4 token  3:   16.530 ms (device)  step  17.933 ms  out   1501  ok
+r4 token  4:   16.404 ms (device)  step  17.866 ms  out  11747  ok
+r4 token  5:   16.474 ms (device)  step  17.881 ms  out    254  ok
+r4 token  6:   16.346 ms (device)  step  17.740 ms  out   3510  ok
+r4 token  7:   16.354 ms (device)  step  17.786 ms  out    185  ok
+r4 token  8:   16.338 ms (device)  step  17.768 ms  out   1558  ok
+r4 token  9:   16.304 ms (device)  step  17.671 ms  out   8708  ok
+r4 token 10:   16.402 ms (device)  step  17.785 ms  out      7  ok
+r4 token 11:   16.360 ms (device)  step  17.870 ms  out     77  ok
+r4 token 12:   16.525 ms (device)  step  17.915 ms  out   1780  ok
+r4 token 13:   16.406 ms (device)  step  17.789 ms  out    185  ok
+r4 token 14:   16.379 ms (device)  step  17.768 ms  out    300  ok
+r4 token 15:   16.364 ms (device)  step  17.806 ms  out   1501  ok
+r4 token 16:   16.517 ms (device)  step  17.947 ms  out  11747  ok
+r4 token 17:   16.467 ms (device)  step  17.863 ms  out    254  ok
+r4 token 18:   16.419 ms (device)  step  17.830 ms  out   3510  ok
+r4 token 19:   16.366 ms (device)  step  17.796 ms  out    185  ok
+r4 token 20:   16.406 ms (device)  step  17.855 ms  out   1558  ok
+r4 token 21:   16.521 ms (device)  step  17.927 ms  out   8708  ok
+r4 token 22:   16.514 ms (device)  step  17.871 ms  out      7  ok
+r4 token 23:   16.388 ms (device)  step  17.778 ms  out     77  ok
+r4 token 24:   16.474 ms (device)  step  17.872 ms  out   1780  ok
+r4 token 25:   16.433 ms (device)  step  17.827 ms  out    185  ok
+r4 token 26:   16.397 ms (device)  step  17.828 ms  out    300  ok
+r4 token 27:   16.467 ms (device)  step  17.826 ms  out   1501  ok
+r4 token 28:   16.507 ms (device)  step  17.940 ms  out  11747  ok
+r4 token 29:   16.475 ms (device)  step  17.837 ms  out    254  ok
+r4 token 30:   16.432 ms (device)  step  17.827 ms  out   3510  ok
+r4 token 31:   16.422 ms (device)  step  17.808 ms  out    185  ok
+r5 token  0:   17.448 ms (device)  step  17.848 ms  out    185  ok
+r5 token  1:   17.442 ms (device)  step  17.828 ms  out    300  ok
+r5 token  2:   17.493 ms (device)  step  17.882 ms  out   1501  ok
+r5 token  3:   17.548 ms (device)  step  17.933 ms  out  11747  ok
+r5 token  4:   17.466 ms (device)  step  17.866 ms  out    254  ok
+r5 token  5:   17.500 ms (device)  step  17.881 ms  out   3510  ok
+r5 token  6:   17.355 ms (device)  step  17.740 ms  out    185  ok
+r5 token  7:   17.405 ms (device)  step  17.786 ms  out   1558  ok
+r5 token  8:   17.364 ms (device)  step  17.768 ms  out   8708  ok
+r5 token  9:   17.293 ms (device)  step  17.671 ms  out      7  ok
+r5 token 10:   17.411 ms (device)  step  17.785 ms  out     77  ok
+r5 token 11:   17.465 ms (device)  step  17.870 ms  out   1780  ok
+r5 token 12:   17.515 ms (device)  step  17.915 ms  out    185  ok
+r5 token 13:   17.409 ms (device)  step  17.789 ms  out    300  ok
+r5 token 14:   17.390 ms (device)  step  17.768 ms  out   1501  ok
+r5 token 15:   17.425 ms (device)  step  17.806 ms  out  11747  ok
+r5 token 16:   17.551 ms (device)  step  17.947 ms  out    254  ok
+r5 token 17:   17.485 ms (device)  step  17.863 ms  out   3510  ok
+r5 token 18:   17.447 ms (device)  step  17.830 ms  out    185  ok
+r5 token 19:   17.409 ms (device)  step  17.796 ms  out   1558  ok
+r5 token 20:   17.454 ms (device)  step  17.855 ms  out   8708  ok
+r5 token 21:   17.544 ms (device)  step  17.927 ms  out      7  ok
+r5 token 22:   17.496 ms (device)  step  17.871 ms  out     77  ok
+r5 token 23:   17.398 ms (device)  step  17.778 ms  out   1780  ok
+r5 token 24:   17.476 ms (device)  step  17.872 ms  out    185  ok
+r5 token 25:   17.444 ms (device)  step  17.827 ms  out    300  ok
+r5 token 26:   17.445 ms (device)  step  17.828 ms  out   1501  ok
+r5 token 27:   17.448 ms (device)  step  17.826 ms  out  11747  ok
+r5 token 28:   17.536 ms (device)  step  17.940 ms  out    254  ok
+r5 token 29:   17.463 ms (device)  step  17.837 ms  out   3510  ok
+r5 token 30:   17.451 ms (device)  step  17.827 ms  out    185  ok
+r5 token 31:   17.432 ms (device)  step  17.808 ms  out   1558  ok
+r6 token  0:   16.554 ms (device)  step  17.848 ms  out    300  ok
+r6 token  1:   16.539 ms (device)  step  17.828 ms  out   1501  ok
+r6 token  2:   16.569 ms (device)  step  17.882 ms  out  11747  ok
+r6 token  3:   16.656 ms (device)  step  17.933 ms  out    254  ok
+r6 token  4:   16.541 ms (device)  step  17.866 ms  out   3510  ok
+r6 token  5:   16.602 ms (device)  step  17.881 ms  out    185  ok
+r6 token  6:   16.473 ms (device)  step  17.740 ms  out   1558  ok
+r6 token  7:   16.487 ms (device)  step  17.786 ms  out   8708  ok
+r6 token  8:   16.469 ms (device)  step  17.768 ms  out      7  ok
+r6 token  9:   16.441 ms (device)  step  17.671 ms  out     77  ok
+r6 token 10:   16.529 ms (device)  step  17.785 ms  out   1780  ok
+r6 token 11:   16.503 ms (device)  step  17.870 ms  out    185  ok
+r6 token 12:   16.655 ms (device)  step  17.915 ms  out    300  ok
+r6 token 13:   16.535 ms (device)  step  17.789 ms  out   1501  ok
+r6 token 14:   16.504 ms (device)  step  17.768 ms  out  11747  ok
+r6 token 15:   16.496 ms (device)  step  17.806 ms  out    254  ok
+r6 token 16:   16.650 ms (device)  step  17.947 ms  out   3510  ok
+r6 token 17:   16.586 ms (device)  step  17.863 ms  out    185  ok
+r6 token 18:   16.552 ms (device)  step  17.830 ms  out   1558  ok
+r6 token 19:   16.493 ms (device)  step  17.796 ms  out   8708  ok
+r6 token 20:   16.533 ms (device)  step  17.855 ms  out      7  ok
+r6 token 21:   16.649 ms (device)  step  17.927 ms  out     77  ok
+r6 token 22:   16.648 ms (device)  step  17.871 ms  out   1780  ok
+r6 token 23:   16.517 ms (device)  step  17.778 ms  out    185  ok
+r6 token 24:   16.611 ms (device)  step  17.872 ms  out    300  ok
+r6 token 25:   16.560 ms (device)  step  17.827 ms  out   1501  ok
+r6 token 26:   16.529 ms (device)  step  17.828 ms  out  11747  ok
+r6 token 27:   16.602 ms (device)  step  17.826 ms  out    254  ok
+r6 token 28:   16.636 ms (device)  step  17.940 ms  out   3510  ok
+r6 token 29:   16.612 ms (device)  step  17.837 ms  out    185  ok
+r6 token 30:   16.567 ms (device)  step  17.827 ms  out   1558  ok
+r6 token 31:   16.556 ms (device)  step  17.808 ms  out   8708  ok
+r7 token  0:   17.557 ms (device)  step  17.848 ms  out   1501  ok
+r7 token  1:   17.552 ms (device)  step  17.828 ms  out  11747  ok
+r7 token  2:   17.607 ms (device)  step  17.882 ms  out    254  ok
+r7 token  3:   17.657 ms (device)  step  17.933 ms  out   3510  ok
+r7 token  4:   17.572 ms (device)  step  17.866 ms  out    185  ok
+r7 token  5:   17.607 ms (device)  step  17.881 ms  out   1558  ok
+r7 token  6:   17.466 ms (device)  step  17.740 ms  out   8708  ok
+r7 token  7:   17.513 ms (device)  step  17.786 ms  out      7  ok
+r7 token  8:   17.475 ms (device)  step  17.768 ms  out     77  ok
+r7 token  9:   17.401 ms (device)  step  17.671 ms  out   1780  ok
+r7 token 10:   17.518 ms (device)  step  17.785 ms  out    185  ok
+r7 token 11:   17.577 ms (device)  step  17.870 ms  out    300  ok
+r7 token 12:   17.622 ms (device)  step  17.915 ms  out   1501  ok
+r7 token 13:   17.518 ms (device)  step  17.789 ms  out  11747  ok
+r7 token 14:   17.497 ms (device)  step  17.768 ms  out    254  ok
+r7 token 15:   17.537 ms (device)  step  17.806 ms  out   3510  ok
+r7 token 16:   17.657 ms (device)  step  17.947 ms  out    185  ok
+r7 token 17:   17.588 ms (device)  step  17.863 ms  out   1558  ok
+r7 token 18:   17.558 ms (device)  step  17.830 ms  out   8708  ok
+r7 token 19:   17.521 ms (device)  step  17.796 ms  out      7  ok
+r7 token 20:   17.564 ms (device)  step  17.855 ms  out     77  ok
+r7 token 21:   17.651 ms (device)  step  17.927 ms  out   1780  ok
+r7 token 22:   17.603 ms (device)  step  17.871 ms  out    185  ok
+r7 token 23:   17.505 ms (device)  step  17.778 ms  out    300  ok
+r7 token 24:   17.584 ms (device)  step  17.872 ms  out   1501  ok
+r7 token 25:   17.553 ms (device)  step  17.827 ms  out  11747  ok
+r7 token 26:   17.555 ms (device)  step  17.828 ms  out    254  ok
+r7 token 27:   17.554 ms (device)  step  17.826 ms  out   3510  ok
+r7 token 28:   17.644 ms (device)  step  17.940 ms  out    185  ok
+r7 token 29:   17.568 ms (device)  step  17.837 ms  out   1558  ok
+r7 token 30:   17.557 ms (device)  step  17.827 ms  out   8708  ok
+r7 token 31:   17.537 ms (device)  step  17.808 ms  out      7  ok
+LAYERGATE r=0 layer=0 rel=1.724137931e-03 cosine=0.999996396 pass=1
+LAYERGATE r=0 layer=1 rel=3.125000000e-03 cosine=0.999992694 pass=1
+LAYERGATE r=0 layer=2 rel=2.958579882e-03 cosine=0.999986462 pass=1
+LAYERGATE r=0 layer=3 rel=2.450980392e-03 cosine=0.999984621 pass=1
+LAYERGATE r=0 layer=4 rel=6.535947712e-03 cosine=0.999979380 pass=1
+LAYERGATE r=0 layer=5 rel=4.651162791e-03 cosine=0.999983440 pass=1
+LAYERGATE r=0 layer=6 rel=4.065040650e-03 cosine=0.999983085 pass=1
+LAYERGATE r=0 layer=7 rel=1.760563380e-03 cosine=0.999973968 pass=1
+LAYERGATE r=0 layer=8 rel=1.879699248e-03 cosine=0.999972996 pass=1
+LAYERGATE r=0 layer=9 rel=1.562500000e-03 cosine=0.999979048 pass=1
+LAYERGATE r=0 layer=10 rel=2.106741573e-03 cosine=0.999979538 pass=1
+LAYERGATE r=0 layer=11 rel=4.310344828e-03 cosine=0.999976599 pass=1
+LAYERGATE r=0 layer=12 rel=3.067484663e-03 cosine=0.999985357 pass=1
+LAYERGATE r=0 layer=13 rel=3.225806452e-03 cosine=0.999982966 pass=1
+LAYERGATE r=0 layer=14 rel=1.736111111e-03 cosine=0.999981382 pass=1
+LAYERGATE r=0 layer=15 rel=6.289308176e-03 cosine=0.999978762 pass=1
+LAYERGATE r=0 layer=16 rel=5.714285714e-03 cosine=0.999979183 pass=1
+LAYERGATE r=0 layer=17 rel=5.405405405e-03 cosine=0.999978028 pass=1
+LAYERGATE r=0 layer=18 rel=5.813953488e-03 cosine=0.999922908 pass=1
+LAYERGATE r=0 layer=19 rel=1.020408163e-02 cosine=0.999935139 pass=1
+LAYERGATE r=0 layer=20 rel=8.810572687e-03 cosine=0.999949678 pass=1
+LAYERGATE r=0 layer=21 rel=7.352941176e-03 cosine=0.999940366 pass=1
+LAYERGATE r=0 layer=22 rel=8.333333333e-03 cosine=0.999887456 pass=1
+LAYERGATE r=0 layer=23 rel=4.491017964e-03 cosine=0.999920199 pass=1
+LAYERGATE r=0 layer=24 rel=5.208333333e-03 cosine=0.999925562 pass=1
+LAYERGATE r=0 layer=25 rel=2.631578947e-03 cosine=0.999965983 pass=1
+LAYERGATE r=0 layer=26 rel=6.250000000e-03 cosine=0.999977398 pass=1
+  r0 consecutive layers within the gate: 27 of 27
+LAYERGATE r=1 layer=0 rel=1.308900524e-03 cosine=0.999996843 pass=1
+LAYERGATE r=1 layer=1 rel=2.100840336e-03 cosine=0.999991018 pass=1
+LAYERGATE r=1 layer=2 rel=1.773049645e-03 cosine=0.999982293 pass=1
+LAYERGATE r=1 layer=3 rel=2.525252525e-03 cosine=0.999975805 pass=1
+LAYERGATE r=1 layer=4 rel=1.838235294e-03 cosine=0.999971240 pass=1
+LAYERGATE r=1 layer=5 rel=2.427184466e-03 cosine=0.999973601 pass=1
+LAYERGATE r=1 layer=6 rel=2.380952381e-03 cosine=0.999969202 pass=1
+LAYERGATE r=1 layer=7 rel=2.857142857e-03 cosine=0.999956462 pass=1
+LAYERGATE r=1 layer=8 rel=2.645502646e-03 cosine=0.999955438 pass=1
+LAYERGATE r=1 layer=9 rel=4.926108374e-03 cosine=0.999951254 pass=1
+LAYERGATE r=1 layer=10 rel=8.000000000e-03 cosine=0.999221982 pass=1
+LAYERGATE r=1 layer=11 rel=3.348214286e-03 cosine=0.999650545 pass=1
+LAYERGATE r=1 layer=12 rel=2.948113208e-03 cosine=0.999746344 pass=1
+LAYERGATE r=1 layer=13 rel=5.319148936e-03 cosine=0.999783405 pass=1
+LAYERGATE r=1 layer=14 rel=5.025125628e-03 cosine=0.999810785 pass=1
+LAYERGATE r=1 layer=15 rel=4.629629630e-03 cosine=0.999845419 pass=1
+LAYERGATE r=1 layer=16 rel=3.424657534e-03 cosine=0.999891150 pass=1
+LAYERGATE r=1 layer=17 rel=2.873563218e-03 cosine=0.999916811 pass=1
+LAYERGATE r=1 layer=18 rel=3.214285714e-03 cosine=0.999932746 pass=1
+LAYERGATE r=1 layer=19 rel=5.494505495e-03 cosine=0.999944392 pass=1
+LAYERGATE r=1 layer=20 rel=7.462686567e-03 cosine=0.999959201 pass=1
+LAYERGATE r=1 layer=21 rel=7.042253521e-03 cosine=0.999953157 pass=1
+LAYERGATE r=1 layer=22 rel=5.780346821e-03 cosine=0.999958890 pass=1
+LAYERGATE r=1 layer=23 rel=1.724137931e-03 cosine=0.999938657 pass=1
+LAYERGATE r=1 layer=24 rel=1.524390244e-03 cosine=0.999945590 pass=1
+LAYERGATE r=1 layer=25 rel=1.024590164e-03 cosine=0.999969245 pass=1
+LAYERGATE r=1 layer=26 rel=1.851851852e-03 cosine=0.999972541 pass=1
+  r1 consecutive layers within the gate: 27 of 27
+LAYERGATE r=2 layer=0 rel=1.785714286e-03 cosine=0.999996165 pass=1
+LAYERGATE r=2 layer=1 rel=3.225806452e-03 cosine=0.999989587 pass=1
+LAYERGATE r=2 layer=2 rel=2.958579882e-03 cosine=0.999985721 pass=1
+LAYERGATE r=2 layer=3 rel=2.450980392e-03 cosine=0.999977459 pass=1
+LAYERGATE r=2 layer=4 rel=1.785714286e-03 cosine=0.999979588 pass=1
+LAYERGATE r=2 layer=5 rel=1.136363636e-03 cosine=0.999984882 pass=1
+LAYERGATE r=2 layer=6 rel=1.500000000e-03 cosine=0.999983540 pass=1
+LAYERGATE r=2 layer=7 rel=8.196721311e-03 cosine=0.999741149 pass=1
+LAYERGATE r=2 layer=8 rel=8.438818565e-03 cosine=0.999800096 pass=1
+LAYERGATE r=2 layer=9 rel=7.299270073e-03 cosine=0.999850969 pass=1
+LAYERGATE r=2 layer=10 rel=1.307189542e-02 cosine=0.999872045 pass=1
+LAYERGATE r=2 layer=11 rel=4.761904762e-03 cosine=0.999927272 pass=1
+LAYERGATE r=2 layer=12 rel=6.802721088e-03 cosine=0.999750297 pass=1
+LAYERGATE r=2 layer=13 rel=6.993006993e-03 cosine=0.999545707 pass=1
+LAYERGATE r=2 layer=14 rel=7.575757576e-03 cosine=0.999530598 pass=1
+LAYERGATE r=2 layer=15 rel=6.578947368e-03 cosine=0.999629720 pass=1
+LAYERGATE r=2 layer=16 rel=1.176470588e-02 cosine=0.999691494 pass=1
+LAYERGATE r=2 layer=17 rel=1.092896175e-02 cosine=0.999768197 pass=1
+LAYERGATE r=2 layer=18 rel=1.724137931e-02 cosine=0.999786661 pass=1
+LAYERGATE r=2 layer=19 rel=9.569377990e-03 cosine=0.999755545 pass=1
+LAYERGATE r=2 layer=20 rel=1.153846154e-02 cosine=0.999826753 pass=1
+LAYERGATE r=2 layer=21 rel=4.016064257e-03 cosine=0.999765840 pass=1
+LAYERGATE r=2 layer=22 rel=6.896551724e-03 cosine=0.999711235 pass=1
+LAYERGATE r=2 layer=23 rel=1.025641026e-02 cosine=0.999786094 pass=1
+LAYERGATE r=2 layer=24 rel=8.849557522e-03 cosine=0.999818957 pass=1
+LAYERGATE r=2 layer=25 rel=1.010101010e-02 cosine=0.999907064 pass=1
+LAYERGATE r=2 layer=26 rel=1.176470588e-02 cosine=0.999916609 pass=1
+  r2 consecutive layers within the gate: 27 of 27
+LAYERGATE r=3 layer=0 rel=1.046025105e-03 cosine=0.999997630 pass=1
+LAYERGATE r=3 layer=1 rel=9.541984733e-04 cosine=0.999992886 pass=1
+LAYERGATE r=3 layer=2 rel=1.543209877e-03 cosine=0.999989455 pass=1
+LAYERGATE r=3 layer=3 rel=1.201923077e-03 cosine=0.999984875 pass=1
+LAYERGATE r=3 layer=4 rel=1.266891892e-03 cosine=0.999986936 pass=1
+LAYERGATE r=3 layer=5 rel=4.672897196e-03 cosine=0.999980646 pass=1
+LAYERGATE r=3 layer=6 rel=2.136752137e-03 cosine=0.999980260 pass=1
+LAYERGATE r=3 layer=7 rel=7.299270073e-03 cosine=0.999951492 pass=1
+LAYERGATE r=3 layer=8 rel=7.692307692e-03 cosine=0.999780516 pass=1
+LAYERGATE r=3 layer=9 rel=3.320312500e-03 cosine=0.999646908 pass=1
+LAYERGATE r=3 layer=10 rel=2.994011976e-03 cosine=0.999727992 pass=1
+LAYERGATE r=3 layer=11 rel=3.663277512e-03 cosine=0.999556636 pass=1
+LAYERGATE r=3 layer=12 rel=6.369426752e-03 cosine=0.999715644 pass=1
+LAYERGATE r=3 layer=13 rel=6.711409396e-03 cosine=0.999663985 pass=1
+LAYERGATE r=3 layer=14 rel=7.194244604e-03 cosine=0.999681074 pass=1
+LAYERGATE r=3 layer=15 rel=6.211180124e-03 cosine=0.999641513 pass=1
+LAYERGATE r=3 layer=16 rel=5.617977528e-03 cosine=0.999691478 pass=1
+LAYERGATE r=3 layer=17 rel=5.494505495e-03 cosine=0.999593070 pass=1
+LAYERGATE r=3 layer=18 rel=5.813953488e-03 cosine=0.999565507 pass=1
+LAYERGATE r=3 layer=19 rel=6.377551020e-03 cosine=0.999711976 pass=1
+LAYERGATE r=3 layer=20 rel=4.882812500e-03 cosine=0.999802755 pass=1
+LAYERGATE r=3 layer=21 rel=7.692307692e-03 cosine=0.999779952 pass=1
+LAYERGATE r=3 layer=22 rel=6.802721088e-03 cosine=0.999803678 pass=1
+LAYERGATE r=3 layer=23 rel=4.098360656e-03 cosine=0.999894994 pass=1
+LAYERGATE r=3 layer=24 rel=2.038043478e-03 cosine=0.999907557 pass=1
+LAYERGATE r=3 layer=25 rel=2.155172414e-03 cosine=0.999949814 pass=1
+LAYERGATE r=3 layer=26 rel=2.467105263e-03 cosine=0.999954972 pass=1
+  r3 consecutive layers within the gate: 27 of 27
+LAYERGATE r=4 layer=0 rel=1.724137931e-03 cosine=0.999997109 pass=1
+LAYERGATE r=4 layer=1 rel=1.562500000e-03 cosine=0.999994150 pass=1
+LAYERGATE r=4 layer=2 rel=1.470588235e-03 cosine=0.999991179 pass=1
+LAYERGATE r=4 layer=3 rel=1.213592233e-03 cosine=0.999985812 pass=1
+LAYERGATE r=4 layer=4 rel=1.644736842e-03 cosine=0.999984196 pass=1
+LAYERGATE r=4 layer=5 rel=1.152073733e-03 cosine=0.999985962 pass=1
+LAYERGATE r=4 layer=6 rel=1.270325203e-03 cosine=0.999984550 pass=1
+LAYERGATE r=4 layer=7 rel=1.378676471e-03 cosine=0.999982981 pass=1
+LAYERGATE r=4 layer=8 rel=1.923076923e-03 cosine=0.999981233 pass=1
+LAYERGATE r=4 layer=9 rel=1.644736842e-03 cosine=0.999980505 pass=1
+LAYERGATE r=4 layer=10 rel=5.747126437e-03 cosine=0.999975825 pass=1
+LAYERGATE r=4 layer=11 rel=2.293577982e-03 cosine=0.999982009 pass=1
+LAYERGATE r=4 layer=12 rel=1.677852349e-03 cosine=0.999985676 pass=1
+LAYERGATE r=4 layer=13 rel=2.697841727e-03 cosine=0.999926101 pass=1
+LAYERGATE r=4 layer=14 rel=2.367424242e-03 cosine=0.999901348 pass=1
+LAYERGATE r=4 layer=15 rel=1.724137931e-03 cosine=0.999921048 pass=1
+LAYERGATE r=4 layer=16 rel=1.533742331e-03 cosine=0.999937511 pass=1
+LAYERGATE r=4 layer=17 rel=2.808988764e-03 cosine=0.999949290 pass=1
+LAYERGATE r=4 layer=18 rel=6.097560976e-03 cosine=0.999916381 pass=1
+LAYERGATE r=4 layer=19 rel=5.208333333e-03 cosine=0.999911198 pass=1
+LAYERGATE r=4 layer=20 rel=4.405286344e-03 cosine=0.999938876 pass=1
+LAYERGATE r=4 layer=21 rel=1.005025126e-02 cosine=0.999909062 pass=1
+LAYERGATE r=4 layer=22 rel=4.166666667e-03 cosine=0.999927805 pass=1
+LAYERGATE r=4 layer=23 rel=1.412429379e-03 cosine=0.999952394 pass=1
+LAYERGATE r=4 layer=24 rel=1.168224299e-03 cosine=0.999952756 pass=1
+LAYERGATE r=4 layer=25 rel=1.231527094e-03 cosine=0.999975234 pass=1
+LAYERGATE r=4 layer=26 rel=1.201923077e-03 cosine=0.999980932 pass=1
+  r4 consecutive layers within the gate: 27 of 27
+LAYERGATE r=5 layer=0 rel=4.385964912e-03 cosine=0.999991053 pass=1
+LAYERGATE r=5 layer=1 rel=8.264462810e-03 cosine=0.999975562 pass=1
+LAYERGATE r=5 layer=2 rel=1.324503311e-02 cosine=0.999526509 pass=1
+LAYERGATE r=5 layer=3 rel=1.175902062e-02 cosine=0.996363947 pass=0
+LAYERGATE r=5 layer=4 rel=2.469135802e-02 cosine=0.998123142 pass=0
+LAYERGATE r=5 layer=5 rel=1.715686275e-02 cosine=0.998587273 pass=0
+LAYERGATE r=5 layer=6 rel=2.284263959e-02 cosine=0.997892269 pass=0
+LAYERGATE r=5 layer=7 rel=4.601226994e-02 cosine=0.993972676 pass=0
+LAYERGATE r=5 layer=8 rel=6.363636364e-02 cosine=0.986132997 pass=0
+LAYERGATE r=5 layer=9 rel=6.666666667e-02 cosine=0.980543085 pass=0
+LAYERGATE r=5 layer=10 rel=7.812500000e-02 cosine=0.959057114 pass=0
+LAYERGATE r=5 layer=11 rel=6.500000000e-02 cosine=0.966650885 pass=0
+LAYERGATE r=5 layer=12 rel=8.982035928e-02 cosine=0.950307683 pass=0
+LAYERGATE r=5 layer=13 rel=1.040268456e-01 cosine=0.925489657 pass=0
+LAYERGATE r=5 layer=14 rel=8.787878788e-02 cosine=0.932935744 pass=0
+LAYERGATE r=5 layer=15 rel=1.058823529e-01 cosine=0.926220794 pass=0
+LAYERGATE r=5 layer=16 rel=1.009174312e-01 cosine=0.923981703 pass=0
+LAYERGATE r=5 layer=17 rel=6.578947368e-02 cosine=0.916114650 pass=0
+LAYERGATE r=5 layer=18 rel=1.068702290e-01 cosine=0.917872006 pass=0
+LAYERGATE r=5 layer=19 rel=1.000000000e-01 cosine=0.928878855 pass=0
+LAYERGATE r=5 layer=20 rel=1.382488479e-01 cosine=0.947812549 pass=0
+LAYERGATE r=5 layer=21 rel=1.506024096e-01 cosine=0.942659214 pass=0
+LAYERGATE r=5 layer=22 rel=1.059907834e-01 cosine=0.951740826 pass=0
+LAYERGATE r=5 layer=23 rel=8.000000000e-02 cosine=0.969915188 pass=0
+LAYERGATE r=5 layer=24 rel=6.153846154e-02 cosine=0.978327085 pass=0
+LAYERGATE r=5 layer=25 rel=2.170138889e-02 cosine=0.989497156 pass=0
+LAYERGATE r=5 layer=26 rel=5.232558140e-02 cosine=0.995341041 pass=0
+  r5 consecutive layers within the gate: 3 of 27
+LAYERGATE r=6 layer=0 rel=3.703703704e-03 cosine=0.999994423 pass=1
+LAYERGATE r=6 layer=1 rel=9.469696970e-04 cosine=0.999992413 pass=1
+LAYERGATE r=6 layer=2 rel=3.731343284e-03 cosine=0.999983055 pass=1
+LAYERGATE r=6 layer=3 rel=1.677852349e-03 cosine=0.999982571 pass=1
+LAYERGATE r=6 layer=4 rel=1.324152542e-03 cosine=0.999982315 pass=1
+LAYERGATE r=6 layer=5 rel=1.470588235e-03 cosine=0.999981438 pass=1
+LAYERGATE r=6 layer=6 rel=2.403846154e-03 cosine=0.999977620 pass=1
+LAYERGATE r=6 layer=7 rel=2.941176471e-03 cosine=0.999973276 pass=1
+LAYERGATE r=6 layer=8 rel=2.590673575e-03 cosine=0.999970706 pass=1
+LAYERGATE r=6 layer=9 rel=4.739336493e-03 cosine=0.999958756 pass=1
+LAYERGATE r=6 layer=10 rel=4.016064257e-03 cosine=0.999960956 pass=1
+LAYERGATE r=6 layer=11 rel=2.688172043e-03 cosine=0.999974257 pass=1
+LAYERGATE r=6 layer=12 rel=5.102040816e-03 cosine=0.999966456 pass=1
+LAYERGATE r=6 layer=13 rel=1.111111111e-02 cosine=0.999954181 pass=1
+LAYERGATE r=6 layer=14 rel=5.291005291e-03 cosine=0.999963268 pass=1
+LAYERGATE r=6 layer=15 rel=2.525252525e-03 cosine=0.999962999 pass=1
+LAYERGATE r=6 layer=16 rel=2.066115702e-03 cosine=0.999966576 pass=1
+LAYERGATE r=6 layer=17 rel=3.521126761e-03 cosine=0.999971073 pass=1
+LAYERGATE r=6 layer=18 rel=3.952569170e-03 cosine=0.999972901 pass=1
+LAYERGATE r=6 layer=19 rel=5.780346821e-03 cosine=0.999976655 pass=1
+LAYERGATE r=6 layer=20 rel=1.106194690e-03 cosine=0.999983301 pass=1
+LAYERGATE r=6 layer=21 rel=1.811594203e-03 cosine=0.999974231 pass=1
+LAYERGATE r=6 layer=22 rel=7.751937984e-03 cosine=0.999888385 pass=1
+LAYERGATE r=6 layer=23 rel=2.487562189e-03 cosine=0.999933324 pass=1
+LAYERGATE r=6 layer=24 rel=1.953125000e-03 cosine=0.999947045 pass=1
+LAYERGATE r=6 layer=25 rel=4.385964912e-03 cosine=0.999970801 pass=1
+LAYERGATE r=6 layer=26 rel=6.172839506e-03 cosine=0.999977332 pass=1
+  r6 consecutive layers within the gate: 27 of 27
+LAYERGATE r=7 layer=0 rel=2.192982456e-03 cosine=0.999996891 pass=1
+LAYERGATE r=7 layer=1 rel=2.370459402e-03 cosine=0.999859448 pass=1
+LAYERGATE r=7 layer=2 rel=3.906250000e-03 cosine=0.999824052 pass=1
+LAYERGATE r=7 layer=3 rel=5.494505495e-03 cosine=0.999882360 pass=1
+LAYERGATE r=7 layer=4 rel=8.888888889e-03 cosine=0.999904296 pass=1
+LAYERGATE r=7 layer=5 rel=5.917159763e-03 cosine=0.999933193 pass=1
+LAYERGATE r=7 layer=6 rel=6.944444444e-03 cosine=0.999346340 pass=1
+LAYERGATE r=7 layer=7 rel=1.428571429e-02 cosine=0.997669077 pass=0
+LAYERGATE r=7 layer=8 rel=1.205583756e-02 cosine=0.996565664 pass=0
+LAYERGATE r=7 layer=9 rel=1.659751037e-02 cosine=0.995329238 pass=0
+LAYERGATE r=7 layer=10 rel=3.007518797e-02 cosine=0.995328117 pass=0
+LAYERGATE r=7 layer=11 rel=1.081081081e-02 cosine=0.996638533 pass=0
+LAYERGATE r=7 layer=12 rel=7.407407407e-03 cosine=0.997617213 pass=0
+LAYERGATE r=7 layer=13 rel=1.284584980e-02 cosine=0.996578949 pass=0
+LAYERGATE r=7 layer=14 rel=1.562500000e-02 cosine=0.996567518 pass=0
+LAYERGATE r=7 layer=15 rel=1.346153846e-02 cosine=0.997013968 pass=0
+LAYERGATE r=7 layer=16 rel=1.105442177e-02 cosine=0.997635937 pass=0
+LAYERGATE r=7 layer=17 rel=1.886792453e-02 cosine=0.998176837 pass=0
+LAYERGATE r=7 layer=18 rel=1.689189189e-02 cosine=0.998500349 pass=0
+LAYERGATE r=7 layer=19 rel=1.285714286e-02 cosine=0.998865820 pass=0
+LAYERGATE r=7 layer=20 rel=8.230452675e-03 cosine=0.999299777 pass=1
+LAYERGATE r=7 layer=21 rel=9.009009009e-03 cosine=0.998988777 pass=0
+LAYERGATE r=7 layer=22 rel=8.458646617e-03 cosine=0.999182896 pass=1
+LAYERGATE r=7 layer=23 rel=5.296610169e-03 cosine=0.999563553 pass=1
+LAYERGATE r=7 layer=24 rel=6.711409396e-03 cosine=0.999682596 pass=1
+LAYERGATE r=7 layer=25 rel=3.205128205e-03 cosine=0.999826480 pass=1
+LAYERGATE r=7 layer=26 rel=6.410256410e-03 cosine=0.999881599 pass=1
+  r7 consecutive layers within the gate: 7 of 27
+
+r0 per-token latency (embed -> argmax on device): median 16.128 ms  mean 16.130 ms; step wall (launch to end) 17.837 ms/token
+r0 tokens: 32/32 match HF greedy
+
+r1 per-token latency (embed -> argmax on device): median 17.232 ms  mean 17.232 ms; step wall (launch to end) 17.837 ms/token
+r1 tokens: 32/32 match HF greedy
+
+r2 per-token latency (embed -> argmax on device): median 16.275 ms  mean 16.279 ms; step wall (launch to end) 17.837 ms/token
+r2 tokens: 32/32 match HF greedy
+
+r3 per-token latency (embed -> argmax on device): median 17.340 ms  mean 17.340 ms; step wall (launch to end) 17.837 ms/token
+r3 tokens: 32/32 match HF greedy
+
+r4 per-token latency (embed -> argmax on device): median 16.422 ms  mean 16.427 ms; step wall (launch to end) 17.837 ms/token
+r4 tokens: 32/32 match HF greedy
+
+r5 per-token latency (embed -> argmax on device): median 17.448 ms  mean 17.450 ms; step wall (launch to end) 17.837 ms/token
+r5 tokens: 32/32 match HF greedy
+
+r6 per-token latency (embed -> argmax on device): median 16.554 ms  mean 16.558 ms; step wall (launch to end) 17.837 ms/token
+r6 tokens: 32/32 match HF greedy
+
+r7 per-token latency (embed -> argmax on device): median 17.557 ms  mean 17.559 ms; step wall (launch to end) 17.837 ms/token
+r7 tokens: 32/32 match HF greedy
+
+RESULT requests=8 step median 17.830 ms -> 448.7 tokens/s (8 tokens per step); tokens 256/256 match
+BATCHREQ r=0 tokens=32/32 layers=27 warmup=32/32 interval_median_ms=17.97904 device_median_ms=16.127680
+BATCHREQ r=1 tokens=32/32 layers=27 warmup=32/32 interval_median_ms=17.99160 device_median_ms=17.232000
+BATCHREQ r=2 tokens=32/32 layers=27 warmup=32/32 interval_median_ms=17.98036 device_median_ms=16.275440
+BATCHREQ r=3 tokens=32/32 layers=27 warmup=32/32 interval_median_ms=17.99492 device_median_ms=17.340321
+BATCHREQ r=4 tokens=32/32 layers=27 warmup=32/32 interval_median_ms=17.97336 device_median_ms=16.422279
+BATCHREQ r=5 tokens=32/32 layers=3 warmup=32/32 interval_median_ms=18.00084 device_median_ms=17.447920
+BATCHREQ r=6 tokens=32/32 layers=27 warmup=32/32 interval_median_ms=17.97684 device_median_ms=16.554039
+BATCHREQ r=7 tokens=32/32 layers=7 warmup=32/32 interval_median_ms=18.00188 device_median_ms=17.557240
+BATCH requests=8 tokens=32 step_median_ms=17.829623

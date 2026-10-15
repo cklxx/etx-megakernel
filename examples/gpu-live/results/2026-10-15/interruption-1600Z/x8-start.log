@@ -1,0 +1,7 @@
+[15:45:49 +  0m00s] session record: /root/sess/x8-live-20261015/20261015T154549Z-7cdcb2
+[15:45:49 +  0m00s] start apt (cpu)
+[15:45:50 +  0m01s] ok      apt rc=0 1s
+[15:45:50 +  0m01s] start etx_env (cpu)
+[15:45:50 +  0m01s] start prep_env (cpu)
+amdrocm-llvm7.14: /opt/rocm/core-7.14/lib/llvm/bin/opt
+-rwxr-xr-x 1 root root 331368 Jul  9 22:01 /opt/rocm/core-7.14/lib/llvm/bin/opt

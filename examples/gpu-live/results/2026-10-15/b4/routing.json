@@ -1,0 +1,74 @@
+{
+  "bound_prefix": true,
+  "executed_prefix": {
+    "1": 6.0,
+    "2": 11.49639423076923,
+    "4": 20.631009615384617
+  },
+  "limitation": "HF routing is measured separately at each B; equality to ETX picks is unmeasured",
+  "native_etx_routing_measured": false,
+  "per_batch": {
+    "1": {
+      "identity": {
+        "arm": "alld4r0l1kvsmw",
+        "batch": 1,
+        "files": {
+          "megakernel_d0.hip": "52e6131a3a6aa82bfe506395a09810b674b43997e81d73341da508fd99d1726c",
+          "plan.json": "f23f959e82edaa9fe19147026c20d3b855e5af6c881a1858289c1c22ce15785f",
+          "resources.json": "d7ddec8f6bbd270649910ccd822a9fb91be4f5c33a2ae6aa071c789cadf9b5c6",
+          "run": "7463b5e12e61983a288004f9fdfa00dc4845fa9231b738ff1dcc4793ce6c88f8"
+        },
+        "references_sha256": "47109548fcd05db6961a76b74ff62966472248439508a3f6427adaccb41bc3a7",
+        "source_sha256": "91ebe1b7b81456c9d7e4585162dbe6185ce16bb1a2759040f3cad219bcc33915"
+      },
+      "path": "routing_b1.json",
+      "reference_sha256": {
+        "0": "2c68a75da0cbad0f54504289cf45e8994fb93532d23cfa8d178a5facb63a2106"
+      },
+      "sha256": "56cc97306e0b2cfadef4fda804f3ab0b9c9e455dce13eae4fdbdfc59e20bbe04"
+    },
+    "2": {
+      "identity": {
+        "arm": "x2",
+        "batch": 2,
+        "files": {
+          "megakernel_d0.hip": "cc0af175202011217d850060345870686a0895bd16378614c7b7c7e0fb7508f1",
+          "plan.json": "f11da123b012b1a1ab161f556f63dc24048378ec3012c1f45536b032385774cb",
+          "resources.json": "d58ade1281675cee17f7f07544dd377313e113e35f4dc30c49a64349f7bee557",
+          "run": "84d1e8915dc8665bda11265d6f596dbd072292987a758ff403dbba0983207ff6"
+        },
+        "references_sha256": "47109548fcd05db6961a76b74ff62966472248439508a3f6427adaccb41bc3a7",
+        "source_sha256": "91ebe1b7b81456c9d7e4585162dbe6185ce16bb1a2759040f3cad219bcc33915"
+      },
+      "path": "routing_b2.json",
+      "reference_sha256": {
+        "0": "2c68a75da0cbad0f54504289cf45e8994fb93532d23cfa8d178a5facb63a2106",
+        "1": "f792c934b74a1b058dd4aeb767ade50ab590cef16f64591cfc24272fe96585e1"
+      },
+      "sha256": "f08f083dcc2fe9e1d70cb4a37a60cec169810f86e9362f73d10e71f520c04584"
+    },
+    "4": {
+      "identity": {
+        "arm": "x4",
+        "batch": 4,
+        "files": {
+          "megakernel_d0.hip": "9664630b14a3c13bf496145a242e2af9305727f11c3937e7a07a991e34441eef",
+          "plan.json": "57ede9c7886b00964108f4d8fa175faaa021df0227f3f58f2a652921223808be",
+          "resources.json": "26ef708271ed0ccc3271babab3b86d650d8a3c40b2057e7906a946bf000c3865",
+          "run": "9e1550c28f004d504afc1c4e6bebb93e0c7406af94a64336fbd6a1ac27071f21"
+        },
+        "references_sha256": "47109548fcd05db6961a76b74ff62966472248439508a3f6427adaccb41bc3a7",
+        "source_sha256": "91ebe1b7b81456c9d7e4585162dbe6185ce16bb1a2759040f3cad219bcc33915"
+      },
+      "path": "routing_b4.json",
+      "reference_sha256": {
+        "0": "2c68a75da0cbad0f54504289cf45e8994fb93532d23cfa8d178a5facb63a2106",
+        "1": "f792c934b74a1b058dd4aeb767ade50ab590cef16f64591cfc24272fe96585e1",
+        "2": "832ef36209cee7be727a72e2810bea8b36b30784a963a207e7c959dc2d23dd36",
+        "3": "466542be474ff59f279c905aebd15d701e6e363321275cadd33dd6db0edd3cbb"
+      },
+      "sha256": "12131e61f8b53be1e0c6857a69c2015d1da69fa4b4338f6b71f4f995393e5e96"
+    }
+  },
+  "status": "COMPLETE"
+}

@@ -1,0 +1,74 @@
+Thu Oct 15 15:46:09 UTC 2026
+Desired=Unknown/Install/Remove/Purge/Hold
+| Status=Not/Inst/Conf-files/Unpacked/halF-conf/Half-inst/trig-aWait/Trig-pend
+|/ Err?=(none)/Reinst-required (Status,Err: uppercase=bad)
+||/ Name                 Version      Architecture Description
++++-====================-============-============-=================================
+ii  amdrocm-llvm-dev7.14 7.14.1-0     amd64        AMD LLVM compiler libraries
+ii  amdrocm-llvm7.14     7.14.0-3     amd64        ROCm LLVM compiler
+Package: amdrocm-llvm-dev7.14
+Architecture: amd64
+Version: 7.14.1-0
+Priority: optional
+Section: devel
+Maintainer: ROCm Dev Support <rocm-dev.support@amd.com>
+Installed-Size: 2023431
+Depends: python3, libc6, libstdc++6 | libstdc++8, libstdc++-5-dev | libstdc++-7-dev | libstdc++-11-dev | libstdc++-12-dev | libstdc++-13-dev | libstdc++-14-dev, libgcc-5-dev | libgcc-7-dev | libgcc-11-dev | libgcc-12-dev | libgcc-13-dev | libgcc-14-dev, amdrocm-sysdeps7.14, amdrocm-llvm7.14
+Recommends: gcc, gcc-multilib, g++, g++-multilib
+Filename: pool/main/amdrocm-llvm-dev7.14_7.14.1-0_amd64.deb
+Size: 147533528
+MD5sum: 63ad5068983d2891b675c3b347c15f5d
+SHA1: 2dc1744d24d0ee37a4117d96e54454ea55490b11
+SHA256: 13d53b42aed81c8134c5ae1981c51464664fb332926012cbb6ed7fca1d43d946
+SHA512: aae3c74b49fd97c50f7ea2f87dbdf87c685298c850d6df3d094328fdc83ede4fb38f253ccef1712890a583a9ffd62a431c604a1b1be91231a20a594e2c2ee2b5
+Homepage: https://github.com/ROCm/llvm-project
+Description: AMD LLVM compiler libraries
+ Contains rocm-llvm and  hipcc development files
+Description-md5: 
+
+Package: amdrocm-llvm-dev7.14
+Architecture: amd64
+Version: 7.14.0-3
+Priority: optional
+Section: devel
+Maintainer: ROCm Dev Support <rocm-dev.support@amd.com>
+Installed-Size: 2023432
+Depends: python3, libc6, libstdc++6 | libstdc++8, libstdc++-5-dev | libstdc++-7-dev | libstdc++-11-dev | libstdc++-12-dev | libstdc++-13-dev | libstdc++-14-dev, libgcc-5-dev | libgcc-7-dev | libgcc-11-dev | libgcc-12-dev | libgcc-13-dev | libgcc-14-dev, amdrocm-sysdeps7.14, amdrocm-llvm7.14
+Package: amdrocm-llvm7.14
+Architecture: amd64
+Version: 7.14.1-0
+Priority: optional
+Section: devel
+Maintainer: ROCm Dev Support <rocm-dev.support@amd.com>
+Installed-Size: 859578
+Depends: libc6, libstdc++6 | libstdc++8, libstdc++-5-dev | libstdc++-7-dev | libstdc++-11-dev | libstdc++-12-dev | libstdc++-13-dev | libstdc++-14-dev, libgcc-5-dev | libgcc-7-dev | libgcc-11-dev | libgcc-12-dev | libgcc-13-dev | libgcc-14-dev, amdrocm-sysdeps7.14, amdrocm-runtime7.14
+Recommends: gcc, gcc-multilib, g++, g++-multilib
+Filename: pool/main/amdrocm-llvm7.14_7.14.1-0_amd64.deb
+Size: 145849828
+MD5sum: 2c5358831089a02468d63bbbd1932288
+SHA1: 552ae2cc932719c3c1e3bad8347969d0e4a77b3e
+SHA256: b432094c02da12466e8a050df9138a988c2a25da7e6785acc34efe2b95558d71
+SHA512: 500bbf7c3ab76766d68e2b019b570e8b44743a5f853c3a7ccc995b51d16b8d0b32ea68cbce732cd3803caccc1aec3c9a8cd7ec25dfca7cdc78e8b7fa2250d411
+Homepage: https://github.com/ROCm/llvm-project
+Description: ROCm LLVM compiler
+ ROCm LLVM compiler with rocm-llvm and hipcc
+Description-md5: 
+
+Package: amdrocm-llvm7.14
+Architecture: amd64
+Version: 7.14.0-3
+Priority: optional
+Section: devel
+[15:45:51 +  0m02s] ok      etx_env rc=0 1s
+[15:45:51 +  0m02s] start source (cpu)
+[15:45:52 +  0m03s] ok      source rc=0 1s
+    SOURCE OK fleet export 28f5cbb4f39524df etx 554133d744b4
+[15:45:52 +  0m03s] start build_x1km (cpu)
+[15:45:54 +  0m05s] ok      prep_env rc=0 4s
+[15:45:54 +  0m05s] start prep_dl (cpu)
+[15:45:55 +  0m06s] ok      prep_dl rc=0 1s
+[15:45:55 +  0m06s] start prep_pack (cpu)
+[15:45:56 +  0m07s] ok      prep_pack rc=0 1s
+[15:45:56 +  0m07s] start build_x8 (cpu)
+[15:45:56 +  0m07s] start references on GPU 0
+-rwxr-xr-x 1 root root 331368 Jul  9 22:01 /opt/rocm/core-7.14/lib/llvm/bin/opt

@@ -1,0 +1,6 @@
+# job build_baseline gpu=None cwd=/root/etx
+# .venv/bin/python -u -m examples.vllm_llm.producer_session build baseline
+PHASE build_baseline deadline_s=840 evidence=/root/sess/producer-live-20261015/20261015T153709Z-f24956/build_baseline.raw.log
+PHASE build_baseline elapsed_s=30.0 log_bytes=1210 evidence=/root/sess/producer-live-20261015/20261015T153709Z-f24956/build_baseline.raw.log
+PHASE build_baseline elapsed_s=60.0 log_bytes=6976 evidence=/root/sess/producer-live-20261015/20261015T153709Z-f24956/build_baseline.raw.log
+PLAN {"candidate": false, "owners": 256, "layers": 48, "plan_sha256": "6a97bdba98fd9682290a35af12533980315b6fadff723db60f06f9f852febf3d"}

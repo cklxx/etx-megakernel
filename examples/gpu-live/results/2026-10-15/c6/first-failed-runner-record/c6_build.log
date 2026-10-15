@@ -1,0 +1,5 @@
+# job c6_build gpu=None cwd=/root/etx
+# python -u -m examples.vllm_llm.attention_early_merge.session --work "${C6_WORK:?set absolute C6_WORK}" --model "${C6_MODEL:?set packed C6_MODEL}" build
+{"stage": "build_envelope", "blocker": null, "evidence": "/root/c6-live-20261015", "deadline": 1792081371.879836, "safe_resume": "python -m examples.vllm_llm.attention_early_merge.session --work /root/c6-live-20261015 --model /root/llm/qwen3-30b-a3b build"}
+{"stage": "BLOCKED", "blocker": "build_envelope exit=1; see /root/c6-live-20261015/attempt-000/build_envelope.log", "evidence": "/root/c6-live-20261015", "deadline": 1792081371.879836, "safe_resume": "python -m examples.vllm_llm.attention_early_merge.session --work /root/c6-live-20261015 --model /root/llm/qwen3-30b-a3b build"}
+BLOCKER build_envelope exit=1; see /root/c6-live-20261015/attempt-000/build_envelope.log

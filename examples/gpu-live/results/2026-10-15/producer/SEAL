@@ -1,0 +1,18 @@
+{
+ "complete": false,
+ "jobs": {
+  "build_baseline": "ok",
+  "build_producer": "ok",
+  "diagnose": "skipped",
+  "measure": "skipped",
+  "preflight": "ok",
+  "qualify": "fail",
+  "report": "ok"
+ },
+ "local_only": [],
+ "manifest_sha256": "d2637d232f435e3684c88c337f0bd386a1269efe86d5b7c517deeb76d17d093c",
+ "plan_sha256": "bc9d07f02b84c539c2d1df3a3d49c32c103dddf39256ec9595f9a9a4685e8ff7",
+ "sealed": "2026-10-15T15:41:55Z",
+ "session": "20261015T153709Z-f24956",
+ "source": "commit 554133d744b4591c9cf87c68b6817df781137c9b\nbranch main\narchive abee09fcda357bb982cfba4d85bb387a6da97ec2385d3d4574f1f7cd4282d5da\nstaged 2026-10-15T15:26:30Z\n"
+}

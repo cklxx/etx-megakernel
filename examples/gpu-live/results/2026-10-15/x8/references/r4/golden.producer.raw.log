@@ -1,0 +1,16 @@
+$ stdbuf -oL -eL /root/dsv2-prep/.venv/bin/python examples/dsv2lite/reference_rotated.py --fleet /root/fleet-3fb67a6 --rotate 388 -- --model /root/models/dsv2-lite-base --context 1024 --decode 32 --out /root/sess/x8-live-20261015/20261015T154549Z-7cdcb2/references/r4/golden.npz
+loading /root/models/dsv2-lite-base (bf16)
+Loading checkpoint shards:   0%|          | 0/4 [00:00<?, ?it/s]Loading checkpoint shards:  25%|██▌       | 1/4 [00:00<00:02,  1.38it/s]Loading checkpoint shards:  50%|█████     | 2/4 [00:01<00:01,  1.30it/s]Loading checkpoint shards:  75%|███████▌  | 3/4 [00:02<00:00,  1.29it/s]Loading checkpoint shards: 100%|██████████| 4/4 [00:02<00:00,  1.51it/s]Loading checkpoint shards: 100%|██████████| 4/4 [00:02<00:00,  1.43it/s]
+/opt/amdgpu/share/libdrm/amdgpu.ids: No such file or directory
+  loaded in 53.3s
+prompt rotated by 388 tokens (first ids [77, 1780, 185, 300])
+prompt: 1024 tokens
+prefill
+  first token 77, top-2 logit margin 7.0000
+decoding 32 tokens greedily
+  'n):\n    # compute the answer\ndef solve(n):\n    # compute the answer\ndef solve(n):\n    # compute the answer\n'
+wrote /root/sess/x8-live-20261015/20261015T154549Z-7cdcb2/references/r4/golden.npz and /root/sess/x8-live-20261015/20261015T154549Z-7cdcb2/references/r4/golden.json
+wrote /root/sess/x8-live-20261015/20261015T154549Z-7cdcb2/references/r4/fleet_cache.bin  [27][1056][576] cols 0:512 = c (post kv_a_layernorm), 512:576 = k_pe (post RoPE)  -> 32.8 MB bf16
+wrote /root/sess/x8-live-20261015/20261015T154549Z-7cdcb2/references/r4/golden_tokens.txt (33 tokens)
+wrote /root/sess/x8-live-20261015/20261015T154549Z-7cdcb2/references/r4/golden_hidden.bin (27, 2048)
+  smallest top-2 margin over the run: 5.1250 (a small margin here is where bf16 drift would flip a token)

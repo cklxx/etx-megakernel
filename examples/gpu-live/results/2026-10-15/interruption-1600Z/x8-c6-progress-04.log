@@ -1,0 +1,29 @@
+Thu Oct 15 15:51:33 UTC 2026
+{"stage": "build_envelope", "blocker": null, "evidence": "/root/c6-live-20261015", "deadline": 1792081371.879836, "safe_resume": "python -m examples.vllm_llm.attention_early_merge.session --work /root/c6-live-20261015 --model /root/llm/qwen3-30b-a3b build"}
+PROGRESS stage=build_envelope elapsed=20s evidence=/root/c6-live-20261015/attempt-001/build_envelope.log
+PROGRESS stage=build_envelope elapsed=40s evidence=/root/c6-live-20261015/attempt-001/build_envelope.log
+PROGRESS stage=build_envelope elapsed=60s evidence=/root/c6-live-20261015/attempt-001/build_envelope.log
+    references [GPU 0] 113s / 1600s: loading /root/models/dsv2-lite-base (bf16)
+[15:48:49 +  3m00s] progress: 2 running, 2 waiting, 8 done
+    build_x8 [cpu] 173s / 1200s: PROGRESS invocation=compile_x8 elapsed_s=151.3 deadline_s=900
+    references [GPU 0] 173s / 1600s: /opt/amdgpu/share/libdrm/amdgpu.ids: No such file or directory
+[15:49:49 +  4m00s] progress: 2 running, 2 waiting, 8 done
+    build_x8 [cpu] 233s / 1200s: PROGRESS invocation=compile_x8 elapsed_s=211.4 deadline_s=900
+    references [GPU 0] 233s / 1600s: Loading checkpoint shards:  25%|██▌       | 1/4 [00:00<00:02,  1.39it/s]
+[15:50:49 +  5m00s] progress: 2 running, 2 waiting, 8 done
+    build_x8 [cpu] 293s / 1200s: PROGRESS invocation=compile_x8 elapsed_s=271.5 deadline_s=900
+    references [GPU 0] 293s / 1600s: loading /root/models/dsv2-lite-base (bf16)
+decoding 32 tokens greedily
+  'n):\n    # compute the answer\ndef solve(n):\n    # compute the answer\ndef solve(n):\n    # compute the answer\n'PROGRESS invocation=reference_r4 elapsed_s=61.8 deadline_s=180
+
+wrote /root/sess/x8-live-20261015/20261015T154549Z-7cdcb2/references/r4/golden.npz and /root/sess/x8-live-20261015/20261015T154549Z-7cdcb2/references/r4/golden.json
+/root/c6-live-20261015/attempt-001/envelope/adapters.rc 0
+/root/c6-live-20261015/attempt-001/envelope/bundle.rc 0
+/root/c6-live-20261015/attempt-001/envelope/control_ir.rc 0
+/root/c6-live-20261015/attempt-001/envelope/control_isa.rc 0
+/root/c6-live-20261015/attempt-001/envelope/control_plan.rc 0
+/root/c6-live-20261015/attempt-001/envelope/dsl.rc 0
+/root/c6-live-20261015/attempt-001/envelope/envelope_plan.rc 0
+/root/c6-live-20261015/attempt-001/envelope/hybrid_host_object.rc 0
+/root/c6-live-20261015/attempt-001/envelope/hybrid_host_syntax.rc 0
+/root/c6-live-20261015/attempt-001/envelope/import.rc 0

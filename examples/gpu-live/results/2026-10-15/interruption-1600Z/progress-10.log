@@ -1,0 +1,18 @@
+Thu Oct 15 15:39:05 UTC 2026
+[15:37:09 +  0m00s] session record: /root/sess/producer-live-20261015/20261015T153709Z-f24956
+[15:37:09 +  0m00s] start preflight (cpu)
+[15:38:09 +  1m00s] progress: 1 running, 6 waiting, 0 done
+    preflight [cpu] 60s / 240s: PREFLIGHT OK Qwen3-30B-A3B bf16, golden bab2f1fbe12f7017
+[15:38:30 +  1m21s] ok      preflight rc=0 81s
+    PHASE hardware deadline_s=240 evidence=/root/sess/producer-live-20261015/20261015T153709Z-f24956/hardware.raw.log
+    PHASE image deadline_s=30 evidence=/root/sess/producer-live-20261015/20261015T153709Z-f24956/image.raw.log
+    PHASE preflight OK; no image pull or model download
+[15:38:30 +  1m21s] start build_baseline (cpu)
+[15:38:30 +  1m21s] start build_producer (cpu)
+PASS gpu: /dev/kfd exists=True; rocm-smi============================= ROCm System Management Interface ============================ ====================================== Product Info ====================================== GPU[0]		: Card Series: 		AMD Instinct MI300X VF GPU[0]		: Card Model: 		0x74b5 GPU[0]		: Card Vendor: 		Advanced Micro Devices, Inc. [AMD/ATI] GPU[0]		: Card SKU: 		M3000100 GPU[0]		: Subsystem ID: 	0x74a1 GPU[0]		: Device Rev: 		0x00 GPU[0]		: Node ID: 		1 GPU[0]		: GUID: 		21947 GPU[0]		: GFX Version: 		gfx942 ========================================================================================== ================================== End of ROCm SMI Log ===================================
+PREFLIGHT PASS
+PREFLIGHT OK Qwen3-30B-A3B bf16, golden bab2f1fbe12f7017
+PHASE hardware deadline_s=240 evidence=/root/sess/producer-live-20261015/20261015T153709Z-f24956/hardware.raw.log
+PHASE image deadline_s=30 evidence=/root/sess/producer-live-20261015/20261015T153709Z-f24956/image.raw.log
+PHASE preflight OK; no image pull or model download
+    PID     ELAPSED %CPU STAT COMMAND

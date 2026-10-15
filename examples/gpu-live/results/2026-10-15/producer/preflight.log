@@ -1,0 +1,12 @@
+# job preflight gpu=None cwd=/root/etx
+# .venv/bin/python -u -m examples.vllm_llm.producer_session preflight
+PASS interpreter: /root/src/abee09fcda357bb982cfba4d85bb387a6da97ec2385d3d4574f1f7cd4282d5da-20261015T152622Z/.venv/bin/python; yaml, numpy import from .venv
+PASS vllm_source: /root/vllm-pinned; commit=6e448d0ea9bf3d88d898b65449ca6dc2aec170ac = v0.27.1
+PASS packed_model: /root/llm/qwen3-30b-a3b; vl.bin=61064519680 bytes, vl.manifest=12519 bytes, hf/config.json=963 bytes, golden_c1024.txt=5129 bytes; golden sha256=bab2f1fbe12f70179711ec40a215c74710845b73169b1cc6a3a6ca50e0a19484 expected=bab2f1fbe12f70179711ec40a215c74710845b73169b1cc6a3a6ca50e0a19484
+PASS rocm_headers: ETX_ROCM_HEADERS=/root/rocm-headers/inc; requires hip/hip_runtime.h
+PASS gpu: /dev/kfd exists=True; rocm-smi============================= ROCm System Management Interface ============================ ====================================== Product Info ====================================== GPU[0]		: Card Series: 		AMD Instinct MI300X VF GPU[0]		: Card Model: 		0x74b5 GPU[0]		: Card Vendor: 		Advanced Micro Devices, Inc. [AMD/ATI] GPU[0]		: Card SKU: 		M3000100 GPU[0]		: Subsystem ID: 	0x74a1 GPU[0]		: Device Rev: 		0x00 GPU[0]		: Node ID: 		1 GPU[0]		: GUID: 		21947 GPU[0]		: GFX Version: 		gfx942 ========================================================================================== ================================== End of ROCm SMI Log ===================================
+PREFLIGHT PASS
+PREFLIGHT OK Qwen3-30B-A3B bf16, golden bab2f1fbe12f7017
+PHASE hardware deadline_s=240 evidence=/root/sess/producer-live-20261015/20261015T153709Z-f24956/hardware.raw.log
+PHASE image deadline_s=30 evidence=/root/sess/producer-live-20261015/20261015T153709Z-f24956/image.raw.log
+PHASE preflight OK; no image pull or model download

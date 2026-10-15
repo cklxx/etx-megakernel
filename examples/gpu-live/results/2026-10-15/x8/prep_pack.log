@@ -1,0 +1,8 @@
+# job prep_pack gpu=None cwd=/root/etx
+# mkdir -p "$ETX_DSV2_DATA"; cd "$ETX_DSV2_FLEET" && { test -s "$ETX_DSV2_DATA/weights.bin" -a -s "$ETX_DSV2_DATA/weights.bin.manifest" || $HOME/dsv2-prep/.venv/bin/python src/host/pack_weights.py --model $HOME/models/dsv2-lite-base --out "$ETX_DSV2_DATA/weights.bin"; } && ls -la "$ETX_DSV2_DATA"
+total 30676784
+drwxr-xr-x  2 root root        4096 Oct 15 15:36 .
+drwx------ 19 root root        4096 Oct 15 15:42 ..
+-rw-r--r--  1 root root 31412968448 Oct 15 15:36 weights.bin
+-rw-r--r--  1 root root       30815 Oct 15 15:36 weights.bin.json
+-rw-r--r--  1 root root        9561 Oct 15 15:36 weights.bin.manifest

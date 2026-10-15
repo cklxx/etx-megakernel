@@ -1,0 +1,13 @@
+{
+  "status": "PASS",
+  "source": "554133d744b4591c9cf87c68b6817df781137c9b",
+  "executable_changes": false,
+  "tests_reused": "2190-pass and unchanged compiler preparation evidence",
+  "c6_correctness_status": "PASS",
+  "c6_target_pass": false,
+  "b4_corrected_vllm_status": "COMPLETE",
+  "b4_overall_status": "INCOMPLETE",
+  "b4_attribution_status": "INCOMPLETE",
+  "b4_routing_status": "COMPLETE",
+  "b4_report_matches_official_batch_study": true
+}

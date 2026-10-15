@@ -1,0 +1,49 @@
+Thu Oct 15 15:57:21 UTC 2026
+  etx_env                          ok          0             1  
+  prep_env                         ok          0             4  
+  source                           ok          0             1  
+  prep_dl                          ok          0             1  
+  prep_pack                        ok          0             1  
+  build_x1km                       ok          0            35  
+  build_x8                         ok          0           408  
+  build_alld4r0l1kvsmw             ok          0            40  
+  references                       ok          0    0      580  
+  diagnostics                      ok          0    0       42  
+  summary                          ok          0             1  
+SEALED /root/sess/x8-live-20261015/20261015T154549Z-7cdcb2 complete=True
+BATCHREQ r=1 tokens=32/32 layers=27 warmup=32/32 interval_median_ms=17.99160 device_median_ms=17.232000
+BATCHREQ r=2 tokens=32/32 layers=27 warmup=32/32 interval_median_ms=17.98036 device_median_ms=16.275440
+BATCHREQ r=3 tokens=32/32 layers=27 warmup=32/32 interval_median_ms=17.99492 device_median_ms=17.340321
+BATCHREQ r=4 tokens=32/32 layers=27 warmup=32/32 interval_median_ms=17.97336 device_median_ms=16.422279
+BATCHREQ r=5 tokens=32/32 layers=3 warmup=32/32 interval_median_ms=18.00084 device_median_ms=17.447920
+BATCHREQ r=6 tokens=32/32 layers=27 warmup=32/32 interval_median_ms=17.97684 device_median_ms=16.554039
+BATCHREQ r=7 tokens=32/32 layers=7 warmup=32/32 interval_median_ms=18.00188 device_median_ms=17.557240
+BATCH requests=8 tokens=32 step_median_ms=17.829623
+DIAGNOSTIC name=x8_repeat1 status=FAIL rc=0
+{"stage": "build_diagnostic", "blocker": null, "evidence": "/root/c6-live-20261015", "deadline": 1792081371.879836, "safe_resume": "python -m examples.vllm_llm.attention_early_merge.session --work /root/c6-live-20261015 --model /root/llm/qwen3-30b-a3b build"}
+PROGRESS stage=build_diagnostic elapsed=20s evidence=/root/c6-live-20261015/attempt-001/build_diagnostic.log
+PROGRESS stage=build_diagnostic elapsed=40s evidence=/root/c6-live-20261015/attempt-001/build_diagnostic.log
+PROGRESS stage=build_diagnostic elapsed=60s evidence=/root/c6-live-20261015/attempt-001/build_diagnostic.log
+PROGRESS stage=build_diagnostic elapsed=80s evidence=/root/c6-live-20261015/attempt-001/build_diagnostic.log
+{"stage": "build_model", "blocker": null, "evidence": "/root/c6-live-20261015", "deadline": 1792081371.879836, "safe_resume": "python -m examples.vllm_llm.attention_early_merge.session --work /root/c6-live-20261015 --model /root/llm/qwen3-30b-a3b build"}
+PROGRESS stage=build_model elapsed=20s evidence=/root/c6-live-20261015/attempt-001/build_model.log
+PROGRESS stage=build_model elapsed=40s evidence=/root/c6-live-20261015/attempt-001/build_model.log
+PROGRESS stage=build_model elapsed=60s evidence=/root/c6-live-20261015/attempt-001/build_model.log
+{
+  "builds": {
+    "alld4r0l1kvsmw": {
+      "files": {
+        "megakernel_d0.hip": "52e6131a3a6aa82bfe506395a09810b674b43997e81d73341da508fd99d1726c",
+        "plan.json": "f23f959e82edaa9fe19147026c20d3b855e5af6c881a1858289c1c22ce15785f",
+        "resources.json": "d7ddec8f6bbd270649910ccd822a9fb91be4f5c33a2ae6aa071c789cadf9b5c6",
+        "run": "2a596bbfd8a43405f79d935a1334f2fdf1f6230b2d5cf0de0707ffecaf634aea"
+      },
+      "recipe": {
+        "ETX_CFLAGS": "-Rpass-analysis=kernel-resource-usage -DETX_DSV2_D4=1 -DETX_DSV2_KVA_SHARED=1",
+        "ETX_DSV2_COH": "l1",
+        "ETX_DSV2_D4": "1",
+        "ETX_DSV2_D4_ROWS": "0",
+        "ETX_DSV2_D5": "0",
+        "ETX_DSV2_KCHUNKS": "1",
+        "ETX_DSV2_KVA": "shared",
+        "ETX_FLEET_PATCH": "gemv_no_terminal_all norm_tree_all argmax_tree topk_rank attn_prologue_live l1_loads merge_uv_waves"

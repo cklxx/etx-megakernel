@@ -1,0 +1,2 @@
+# job apt gpu=None cwd=/root/etx
+# python3 -c 'import ensurepip' 2>/dev/null || { sudo apt-get update -qq; sudo apt-get install -y -qq python3.12-venv; }

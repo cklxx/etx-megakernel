@@ -1,0 +1,1818 @@
+$ stdbuf -oL -eL bash examples/dsv2lite/build.sh /root/fleet-3fb67a6 -Rpass-analysis=kernel-resource-usage -DETX_DS_REQUESTS=4 -DETX_SLOT_BY_CU -DETX_DSV2_KVA_SHARED=1
+patched /root/sess/b4-live-20261015/20261015T160946Z-a7e517/b_x4/fleet_src (gemv_no_terminal_all)
+patched /root/sess/b4-live-20261015/20261015T160946Z-a7e517/b_x4/fleet_src (norm_tree_all)
+patched /root/sess/b4-live-20261015/20261015T160946Z-a7e517/b_x4/fleet_src (argmax_tree)
+patched /root/sess/b4-live-20261015/20261015T160946Z-a7e517/b_x4/fleet_src (topk_rank)
+patched /root/sess/b4-live-20261015/20261015T160946Z-a7e517/b_x4/fleet_src (attn_prologue_live)
+patched /root/sess/b4-live-20261015/20261015T160946Z-a7e517/b_x4/fleet_src (l1_loads)
+patched /root/sess/b4-live-20261015/20261015T160946Z-a7e517/b_x4/fleet_src (merge_uv_waves)
+plan: graph=dsv2lite_decode_x4 arch=gfx942 bindings={}
+  devices=1 domains/device=8 workers/domain=75 (wg/CU=2)
+  tasks=219784 events=876 eliminated=[]
+  r0_embed                 static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_embed                 static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_embed                 static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_embed                 static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_qkv_0                 static   S_balance=1.94us <= 1.5x(C_cross=1.31+C_queue=1.53)
+  r0_qabs_0                static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r0_attn_0                static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r0_merge_0               static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_oproj_0               static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_norm_0                static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r0_dense_gu_0            static   S_balance=4.50us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_dense_dn_0            static   S_balance=4.50us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r1_qkv_0                 static   S_balance=1.94us <= 1.5x(C_cross=1.31+C_queue=1.53)
+  r1_qabs_0                static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r1_attn_0                static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r1_merge_0               static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_oproj_0               static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_norm_0                static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r1_dense_gu_0            static   S_balance=4.50us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_dense_dn_0            static   S_balance=4.50us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r2_qkv_0                 static   S_balance=1.94us <= 1.5x(C_cross=1.31+C_queue=1.53)
+  r2_qabs_0                static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r2_attn_0                static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r2_merge_0               static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_oproj_0               static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_norm_0                static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r2_dense_gu_0            static   S_balance=4.50us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_dense_dn_0            static   S_balance=4.50us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r3_qkv_0                 static   S_balance=1.94us <= 1.5x(C_cross=1.31+C_queue=1.53)
+  r3_qabs_0                static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r3_attn_0                static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r3_merge_0               static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_oproj_0               static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_norm_0                static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r3_dense_gu_0            static   S_balance=4.50us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_dense_dn_0            static   S_balance=4.50us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r0_qkv_1                 static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r0_qabs_1                static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r0_attn_1                static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r0_merge_1               static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_oproj_1               static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_router_1              static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r0_gate_up_1             static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_down_1                static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_qkv_1                 static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r1_qabs_1                static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r1_attn_1                static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r1_merge_1               static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_oproj_1               static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_router_1              static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r1_gate_up_1             static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_down_1                static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_qkv_1                 static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r2_qabs_1                static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r2_attn_1                static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r2_merge_1               static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_oproj_1               static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_router_1              static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r2_gate_up_1             static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_down_1                static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_qkv_1                 static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r3_qabs_1                static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r3_attn_1                static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r3_merge_1               static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_oproj_1               static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_router_1              static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r3_gate_up_1             static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_down_1                static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_qkv_2                 static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r0_qabs_2                static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r0_attn_2                static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r0_merge_2               static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_oproj_2               static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_router_2              static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r0_gate_up_2             static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_down_2                static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_qkv_2                 static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r1_qabs_2                static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r1_attn_2                static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r1_merge_2               static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_oproj_2               static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_router_2              static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r1_gate_up_2             static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_down_2                static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_qkv_2                 static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r2_qabs_2                static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r2_attn_2                static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r2_merge_2               static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_oproj_2               static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_router_2              static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r2_gate_up_2             static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_down_2                static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_qkv_2                 static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r3_qabs_2                static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r3_attn_2                static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r3_merge_2               static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_oproj_2               static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_router_2              static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r3_gate_up_2             static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_down_2                static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_qkv_3                 static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r0_qabs_3                static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r0_attn_3                static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r0_merge_3               static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_oproj_3               static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_router_3              static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r0_gate_up_3             static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_down_3                static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_qkv_3                 static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r1_qabs_3                static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r1_attn_3                static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r1_merge_3               static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_oproj_3               static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_router_3              static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r1_gate_up_3             static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_down_3                static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_qkv_3                 static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r2_qabs_3                static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r2_attn_3                static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r2_merge_3               static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_oproj_3               static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_router_3              static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r2_gate_up_3             static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_down_3                static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_qkv_3                 static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r3_qabs_3                static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r3_attn_3                static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r3_merge_3               static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_oproj_3               static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_router_3              static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r3_gate_up_3             static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_down_3                static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_qkv_4                 static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r0_qabs_4                static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r0_attn_4                static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r0_merge_4               static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_oproj_4               static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_router_4              static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r0_gate_up_4             static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_down_4                static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_qkv_4                 static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r1_qabs_4                static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r1_attn_4                static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r1_merge_4               static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_oproj_4               static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_router_4              static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r1_gate_up_4             static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_down_4                static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_qkv_4                 static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r2_qabs_4                static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r2_attn_4                static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r2_merge_4               static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_oproj_4               static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_router_4              static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r2_gate_up_4             static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_down_4                static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_qkv_4                 static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r3_qabs_4                static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r3_attn_4                static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r3_merge_4               static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_oproj_4               static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_router_4              static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r3_gate_up_4             static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_down_4                static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_qkv_5                 static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r0_qabs_5                static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r0_attn_5                static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r0_merge_5               static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_oproj_5               static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_router_5              static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r0_gate_up_5             static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_down_5                static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_qkv_5                 static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r1_qabs_5                static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r1_attn_5                static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r1_merge_5               static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_oproj_5               static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_router_5              static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r1_gate_up_5             static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_down_5                static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_qkv_5                 static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r2_qabs_5                static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r2_attn_5                static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r2_merge_5               static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_oproj_5               static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_router_5              static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r2_gate_up_5             static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_down_5                static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_qkv_5                 static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r3_qabs_5                static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r3_attn_5                static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r3_merge_5               static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_oproj_5               static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_router_5              static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r3_gate_up_5             static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_down_5                static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_qkv_6                 static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r0_qabs_6                static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r0_attn_6                static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r0_merge_6               static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_oproj_6               static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_router_6              static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r0_gate_up_6             static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_down_6                static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_qkv_6                 static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r1_qabs_6                static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r1_attn_6                static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r1_merge_6               static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_oproj_6               static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_router_6              static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r1_gate_up_6             static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_down_6                static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_qkv_6                 static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r2_qabs_6                static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r2_attn_6                static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r2_merge_6               static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_oproj_6               static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_router_6              static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r2_gate_up_6             static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_down_6                static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_qkv_6                 static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r3_qabs_6                static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r3_attn_6                static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r3_merge_6               static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_oproj_6               static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_router_6              static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r3_gate_up_6             static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_down_6                static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_qkv_7                 static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r0_qabs_7                static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r0_attn_7                static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r0_merge_7               static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_oproj_7               static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_router_7              static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r0_gate_up_7             static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_down_7                static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_qkv_7                 static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r1_qabs_7                static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r1_attn_7                static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r1_merge_7               static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_oproj_7               static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_router_7              static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r1_gate_up_7             static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_down_7                static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_qkv_7                 static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r2_qabs_7                static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r2_attn_7                static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r2_merge_7               static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_oproj_7               static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_router_7              static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r2_gate_up_7             static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_down_7                static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_qkv_7                 static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r3_qabs_7                static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r3_attn_7                static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r3_merge_7               static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_oproj_7               static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_router_7              static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r3_gate_up_7             static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_down_7                static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_qkv_8                 static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r0_qabs_8                static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r0_attn_8                static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r0_merge_8               static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_oproj_8               static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_router_8              static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r0_gate_up_8             static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_down_8                static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_qkv_8                 static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r1_qabs_8                static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r1_attn_8                static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r1_merge_8               static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_oproj_8               static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_router_8              static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r1_gate_up_8             static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_down_8                static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_qkv_8                 static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r2_qabs_8                static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r2_attn_8                static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r2_merge_8               static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_oproj_8               static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_router_8              static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r2_gate_up_8             static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_down_8                static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_qkv_8                 static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r3_qabs_8                static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r3_attn_8                static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r3_merge_8               static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_oproj_8               static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_router_8              static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r3_gate_up_8             static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_down_8                static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_qkv_9                 static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r0_qabs_9                static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r0_attn_9                static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r0_merge_9               static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_oproj_9               static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_router_9              static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r0_gate_up_9             static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_down_9                static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_qkv_9                 static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r1_qabs_9                static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r1_attn_9                static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r1_merge_9               static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_oproj_9               static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_router_9              static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r1_gate_up_9             static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_down_9                static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_qkv_9                 static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r2_qabs_9                static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r2_attn_9                static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r2_merge_9               static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_oproj_9               static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_router_9              static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r2_gate_up_9             static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_down_9                static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_qkv_9                 static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r3_qabs_9                static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r3_attn_9                static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r3_merge_9               static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_oproj_9               static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_router_9              static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r3_gate_up_9             static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_down_9                static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_qkv_10                static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r0_qabs_10               static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r0_attn_10               static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r0_merge_10              static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_oproj_10              static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_router_10             static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r0_gate_up_10            static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_down_10               static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_qkv_10                static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r1_qabs_10               static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r1_attn_10               static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r1_merge_10              static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_oproj_10              static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_router_10             static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r1_gate_up_10            static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_down_10               static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_qkv_10                static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r2_qabs_10               static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r2_attn_10               static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r2_merge_10              static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_oproj_10              static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_router_10             static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r2_gate_up_10            static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_down_10               static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_qkv_10                static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r3_qabs_10               static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r3_attn_10               static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r3_merge_10              static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_oproj_10              static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_router_10             static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r3_gate_up_10            static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_down_10               static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_qkv_11                static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r0_qabs_11               static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r0_attn_11               static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r0_merge_11              static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_oproj_11              static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_router_11             static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r0_gate_up_11            static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_down_11               static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_qkv_11                static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r1_qabs_11               static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r1_attn_11               static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r1_merge_11              static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_oproj_11              static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_router_11             static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r1_gate_up_11            static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_down_11               static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_qkv_11                static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r2_qabs_11               static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r2_attn_11               static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r2_merge_11              static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_oproj_11              static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_router_11             static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r2_gate_up_11            static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_down_11               static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_qkv_11                static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r3_qabs_11               static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r3_attn_11               static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r3_merge_11              static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_oproj_11              static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_router_11             static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r3_gate_up_11            static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_down_11               static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_qkv_12                static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r0_qabs_12               static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r0_attn_12               static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r0_merge_12              static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_oproj_12              static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_router_12             static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r0_gate_up_12            static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_down_12               static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_qkv_12                static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r1_qabs_12               static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r1_attn_12               static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r1_merge_12              static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_oproj_12              static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_router_12             static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r1_gate_up_12            static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_down_12               static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_qkv_12                static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r2_qabs_12               static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r2_attn_12               static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r2_merge_12              static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_oproj_12              static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_router_12             static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r2_gate_up_12            static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_down_12               static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_qkv_12                static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r3_qabs_12               static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r3_attn_12               static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r3_merge_12              static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_oproj_12              static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_router_12             static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r3_gate_up_12            static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_down_12               static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_qkv_13                static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r0_qabs_13               static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r0_attn_13               static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r0_merge_13              static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_oproj_13              static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_router_13             static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r0_gate_up_13            static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_down_13               static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_qkv_13                static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r1_qabs_13               static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r1_attn_13               static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r1_merge_13              static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_oproj_13              static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_router_13             static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r1_gate_up_13            static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_down_13               static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_qkv_13                static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r2_qabs_13               static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r2_attn_13               static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r2_merge_13              static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_oproj_13              static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_router_13             static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r2_gate_up_13            static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_down_13               static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_qkv_13                static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r3_qabs_13               static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r3_attn_13               static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r3_merge_13              static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_oproj_13              static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_router_13             static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r3_gate_up_13            static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_down_13               static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_qkv_14                static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r0_qabs_14               static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r0_attn_14               static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r0_merge_14              static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_oproj_14              static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_router_14             static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r0_gate_up_14            static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_down_14               static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_qkv_14                static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r1_qabs_14               static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r1_attn_14               static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r1_merge_14              static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_oproj_14              static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_router_14             static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r1_gate_up_14            static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_down_14               static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_qkv_14                static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r2_qabs_14               static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r2_attn_14               static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r2_merge_14              static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_oproj_14              static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_router_14             static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r2_gate_up_14            static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_down_14               static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_qkv_14                static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r3_qabs_14               static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r3_attn_14               static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r3_merge_14              static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_oproj_14              static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_router_14             static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r3_gate_up_14            static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_down_14               static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_qkv_15                static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r0_qabs_15               static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r0_attn_15               static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r0_merge_15              static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_oproj_15              static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_router_15             static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r0_gate_up_15            static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_down_15               static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_qkv_15                static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r1_qabs_15               static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r1_attn_15               static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r1_merge_15              static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_oproj_15              static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_router_15             static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r1_gate_up_15            static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_down_15               static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_qkv_15                static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r2_qabs_15               static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r2_attn_15               static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r2_merge_15              static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_oproj_15              static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_router_15             static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r2_gate_up_15            static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_down_15               static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_qkv_15                static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r3_qabs_15               static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r3_attn_15               static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r3_merge_15              static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_oproj_15              static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_router_15             static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r3_gate_up_15            static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_down_15               static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_qkv_16                static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r0_qabs_16               static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r0_attn_16               static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r0_merge_16              static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_oproj_16              static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_router_16             static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r0_gate_up_16            static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_down_16               static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_qkv_16                static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r1_qabs_16               static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r1_attn_16               static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r1_merge_16              static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_oproj_16              static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_router_16             static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r1_gate_up_16            static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_down_16               static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_qkv_16                static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r2_qabs_16               static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r2_attn_16               static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r2_merge_16              static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_oproj_16              static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_router_16             static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r2_gate_up_16            static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_down_16               static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_qkv_16                static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r3_qabs_16               static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r3_attn_16               static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r3_merge_16              static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_oproj_16              static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_router_16             static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r3_gate_up_16            static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_down_16               static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_qkv_17                static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r0_qabs_17               static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r0_attn_17               static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r0_merge_17              static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_oproj_17              static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_router_17             static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r0_gate_up_17            static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_down_17               static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_qkv_17                static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r1_qabs_17               static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r1_attn_17               static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r1_merge_17              static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_oproj_17              static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_router_17             static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r1_gate_up_17            static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_down_17               static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_qkv_17                static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r2_qabs_17               static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r2_attn_17               static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r2_merge_17              static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_oproj_17              static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_router_17             static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r2_gate_up_17            static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_down_17               static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_qkv_17                static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r3_qabs_17               static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r3_attn_17               static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r3_merge_17              static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_oproj_17              static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_router_17             static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r3_gate_up_17            static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_down_17               static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_qkv_18                static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r0_qabs_18               static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r0_attn_18               static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r0_merge_18              static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_oproj_18              static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_router_18             static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r0_gate_up_18            static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_down_18               static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_qkv_18                static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r1_qabs_18               static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r1_attn_18               static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r1_merge_18              static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_oproj_18              static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_router_18             static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r1_gate_up_18            static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_down_18               static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_qkv_18                static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r2_qabs_18               static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r2_attn_18               static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r2_merge_18              static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_oproj_18              static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_router_18             static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r2_gate_up_18            static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_down_18               static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_qkv_18                static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r3_qabs_18               static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r3_attn_18               static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r3_merge_18              static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_oproj_18              static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_router_18             static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r3_gate_up_18            static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_down_18               static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_qkv_19                static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r0_qabs_19               static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r0_attn_19               static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r0_merge_19              static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_oproj_19              static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_router_19             static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r0_gate_up_19            static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_down_19               static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_qkv_19                static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r1_qabs_19               static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r1_attn_19               static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r1_merge_19              static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_oproj_19              static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_router_19             static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r1_gate_up_19            static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_down_19               static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_qkv_19                static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r2_qabs_19               static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r2_attn_19               static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r2_merge_19              static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_oproj_19              static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_router_19             static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r2_gate_up_19            static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_down_19               static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_qkv_19                static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r3_qabs_19               static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r3_attn_19               static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r3_merge_19              static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_oproj_19              static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_router_19             static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r3_gate_up_19            static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_down_19               static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_qkv_20                static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r0_qabs_20               static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r0_attn_20               static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r0_merge_20              static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_oproj_20              static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_router_20             static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r0_gate_up_20            static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_down_20               static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_qkv_20                static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r1_qabs_20               static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r1_attn_20               static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r1_merge_20              static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_oproj_20              static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_router_20             static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r1_gate_up_20            static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_down_20               static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_qkv_20                static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r2_qabs_20               static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r2_attn_20               static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r2_merge_20              static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_oproj_20              static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_router_20             static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r2_gate_up_20            static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_down_20               static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_qkv_20                static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r3_qabs_20               static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r3_attn_20               static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r3_merge_20              static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_oproj_20              static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_router_20             static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r3_gate_up_20            static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_down_20               static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_qkv_21                static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r0_qabs_21               static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r0_attn_21               static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r0_merge_21              static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_oproj_21              static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_router_21             static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r0_gate_up_21            static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_down_21               static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_qkv_21                static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r1_qabs_21               static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r1_attn_21               static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r1_merge_21              static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_oproj_21              static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_router_21             static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r1_gate_up_21            static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_down_21               static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_qkv_21                static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r2_qabs_21               static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r2_attn_21               static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r2_merge_21              static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_oproj_21              static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_router_21             static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r2_gate_up_21            static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_down_21               static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_qkv_21                static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r3_qabs_21               static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r3_attn_21               static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r3_merge_21              static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_oproj_21              static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_router_21             static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r3_gate_up_21            static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_down_21               static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_qkv_22                static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r0_qabs_22               static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r0_attn_22               static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r0_merge_22              static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_oproj_22              static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_router_22             static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r0_gate_up_22            static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_down_22               static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_qkv_22                static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r1_qabs_22               static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r1_attn_22               static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r1_merge_22              static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_oproj_22              static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_router_22             static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r1_gate_up_22            static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_down_22               static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_qkv_22                static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r2_qabs_22               static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r2_attn_22               static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r2_merge_22              static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_oproj_22              static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_router_22             static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r2_gate_up_22            static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_down_22               static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_qkv_22                static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r3_qabs_22               static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r3_attn_22               static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r3_merge_22              static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_oproj_22              static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_router_22             static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r3_gate_up_22            static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_down_22               static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_qkv_23                static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r0_qabs_23               static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r0_attn_23               static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r0_merge_23              static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_oproj_23              static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_router_23             static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r0_gate_up_23            static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_down_23               static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_qkv_23                static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r1_qabs_23               static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r1_attn_23               static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r1_merge_23              static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_oproj_23              static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_router_23             static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r1_gate_up_23            static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_down_23               static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_qkv_23                static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r2_qabs_23               static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r2_attn_23               static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r2_merge_23              static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_oproj_23              static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_router_23             static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r2_gate_up_23            static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_down_23               static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_qkv_23                static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r3_qabs_23               static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r3_attn_23               static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r3_merge_23              static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_oproj_23              static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_router_23             static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r3_gate_up_23            static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_down_23               static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_qkv_24                static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r0_qabs_24               static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r0_attn_24               static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r0_merge_24              static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_oproj_24              static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_router_24             static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r0_gate_up_24            static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_down_24               static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_qkv_24                static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r1_qabs_24               static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r1_attn_24               static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r1_merge_24              static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_oproj_24              static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_router_24             static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r1_gate_up_24            static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_down_24               static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_qkv_24                static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r2_qabs_24               static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r2_attn_24               static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r2_merge_24              static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_oproj_24              static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_router_24             static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r2_gate_up_24            static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_down_24               static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_qkv_24                static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r3_qabs_24               static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r3_attn_24               static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r3_merge_24              static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_oproj_24              static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_router_24             static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r3_gate_up_24            static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_down_24               static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_qkv_25                static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r0_qabs_25               static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r0_attn_25               static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r0_merge_25              static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_oproj_25              static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_router_25             static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r0_gate_up_25            static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_down_25               static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_qkv_25                static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r1_qabs_25               static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r1_attn_25               static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r1_merge_25              static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_oproj_25              static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_router_25             static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r1_gate_up_25            static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_down_25               static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_qkv_25                static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r2_qabs_25               static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r2_attn_25               static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r2_merge_25              static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_oproj_25              static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_router_25             static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r2_gate_up_25            static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_down_25               static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_qkv_25                static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r3_qabs_25               static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r3_attn_25               static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r3_merge_25              static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_oproj_25              static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_router_25             static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r3_gate_up_25            static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_down_25               static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_qkv_26                static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r0_qabs_26               static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r0_attn_26               static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r0_merge_26              static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_oproj_26              static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_router_26             static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r0_gate_up_26            static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_down_26               static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_qkv_26                static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r1_qabs_26               static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r1_attn_26               static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r1_merge_26              static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_oproj_26              static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_router_26             static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r1_gate_up_26            static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r1_down_26               static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_qkv_26                static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r2_qabs_26               static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r2_attn_26               static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r2_merge_26              static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_oproj_26              static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_router_26             static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r2_gate_up_26            static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r2_down_26               static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_qkv_26                static   S_balance=1.94us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r3_qabs_26               static   S_balance=0.00us <= 1.5x(C_cross=19.04+C_queue=1.53)
+  r3_attn_26               static   S_balance=3.34us <= 1.5x(C_cross=147.09+C_queue=1.53)
+  r3_merge_26              static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_oproj_26              static   S_balance=1.20us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_router_26             static   S_balance=0.90us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r3_gate_up_26            static   S_balance=3.30us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r3_down_26               static   S_balance=3.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  r0_lm_head               static   S_balance=14.00us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r0_argmax                static   S_balance=0.00us <= 1.5x(C_cross=1.31+C_queue=1.53)
+  r1_lm_head               static   S_balance=14.00us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r1_argmax                static   S_balance=0.00us <= 1.5x(C_cross=1.31+C_queue=1.53)
+  r2_lm_head               static   S_balance=14.00us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r2_argmax                static   S_balance=0.00us <= 1.5x(C_cross=1.31+C_queue=1.53)
+  r3_lm_head               static   S_balance=14.00us <= 1.5x(C_cross=169.96+C_queue=1.53)
+  r3_argmax                static   S_balance=0.00us <= 1.5x(C_cross=1.31+C_queue=1.53)
+  event r0_E_embed       scope=DEVICE  mem=device       numel=1 cross_domain=259 cross_device=0
+  event r1_E_embed       scope=DEVICE  mem=device       numel=1 cross_domain=259 cross_device=0
+  event r2_E_embed       scope=DEVICE  mem=device       numel=1 cross_domain=259 cross_device=0
+  event r3_E_embed       scope=DEVICE  mem=device       numel=1 cross_domain=259 cross_device=0
+  event r0_E_qkv_0       scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r0_E_qabs_0      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r0_E_attn_0      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r0_E_merge_0     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_oproj_0     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r0_E_norm_0      scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_dgu_0       scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r0_E_dense_0     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r1_E_qkv_0       scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r1_E_qabs_0      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r1_E_attn_0      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r1_E_merge_0     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_oproj_0     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r1_E_norm_0      scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_dgu_0       scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r1_E_dense_0     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r2_E_qkv_0       scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r2_E_qabs_0      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r2_E_attn_0      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r2_E_merge_0     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_oproj_0     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r2_E_norm_0      scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_dgu_0       scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r2_E_dense_0     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r3_E_qkv_0       scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r3_E_qabs_0      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r3_E_attn_0      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r3_E_merge_0     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_oproj_0     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r3_E_norm_0      scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_dgu_0       scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r3_E_dense_0     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r0_E_qkv_1       scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r0_E_qabs_1      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r0_E_attn_1      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r0_E_merge_1     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_oproj_1     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r0_E_norm_1      scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_gu_1        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_down_1      scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r1_E_qkv_1       scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r1_E_qabs_1      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r1_E_attn_1      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r1_E_merge_1     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_oproj_1     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r1_E_norm_1      scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_gu_1        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_down_1      scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r2_E_qkv_1       scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r2_E_qabs_1      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r2_E_attn_1      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r2_E_merge_1     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_oproj_1     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r2_E_norm_1      scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_gu_1        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_down_1      scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r3_E_qkv_1       scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r3_E_qabs_1      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r3_E_attn_1      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r3_E_merge_1     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_oproj_1     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r3_E_norm_1      scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_gu_1        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_down_1      scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r0_E_qkv_2       scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r0_E_qabs_2      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r0_E_attn_2      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r0_E_merge_2     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_oproj_2     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r0_E_norm_2      scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_gu_2        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_down_2      scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r1_E_qkv_2       scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r1_E_qabs_2      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r1_E_attn_2      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r1_E_merge_2     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_oproj_2     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r1_E_norm_2      scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_gu_2        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_down_2      scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r2_E_qkv_2       scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r2_E_qabs_2      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r2_E_attn_2      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r2_E_merge_2     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_oproj_2     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r2_E_norm_2      scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_gu_2        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_down_2      scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r3_E_qkv_2       scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r3_E_qabs_2      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r3_E_attn_2      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r3_E_merge_2     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_oproj_2     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r3_E_norm_2      scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_gu_2        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_down_2      scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r0_E_qkv_3       scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r0_E_qabs_3      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r0_E_attn_3      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r0_E_merge_3     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_oproj_3     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r0_E_norm_3      scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_gu_3        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_down_3      scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r1_E_qkv_3       scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r1_E_qabs_3      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r1_E_attn_3      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r1_E_merge_3     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_oproj_3     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r1_E_norm_3      scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_gu_3        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_down_3      scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r2_E_qkv_3       scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r2_E_qabs_3      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r2_E_attn_3      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r2_E_merge_3     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_oproj_3     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r2_E_norm_3      scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_gu_3        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_down_3      scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r3_E_qkv_3       scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r3_E_qabs_3      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r3_E_attn_3      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r3_E_merge_3     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_oproj_3     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r3_E_norm_3      scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_gu_3        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_down_3      scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r0_E_qkv_4       scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r0_E_qabs_4      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r0_E_attn_4      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r0_E_merge_4     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_oproj_4     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r0_E_norm_4      scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_gu_4        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_down_4      scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r1_E_qkv_4       scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r1_E_qabs_4      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r1_E_attn_4      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r1_E_merge_4     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_oproj_4     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r1_E_norm_4      scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_gu_4        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_down_4      scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r2_E_qkv_4       scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r2_E_qabs_4      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r2_E_attn_4      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r2_E_merge_4     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_oproj_4     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r2_E_norm_4      scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_gu_4        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_down_4      scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r3_E_qkv_4       scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r3_E_qabs_4      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r3_E_attn_4      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r3_E_merge_4     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_oproj_4     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r3_E_norm_4      scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_gu_4        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_down_4      scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r0_E_qkv_5       scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r0_E_qabs_5      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r0_E_attn_5      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r0_E_merge_5     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_oproj_5     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r0_E_norm_5      scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_gu_5        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_down_5      scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r1_E_qkv_5       scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r1_E_qabs_5      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r1_E_attn_5      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r1_E_merge_5     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_oproj_5     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r1_E_norm_5      scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_gu_5        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_down_5      scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r2_E_qkv_5       scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r2_E_qabs_5      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r2_E_attn_5      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r2_E_merge_5     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_oproj_5     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r2_E_norm_5      scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_gu_5        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_down_5      scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r3_E_qkv_5       scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r3_E_qabs_5      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r3_E_attn_5      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r3_E_merge_5     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_oproj_5     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r3_E_norm_5      scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_gu_5        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_down_5      scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r0_E_qkv_6       scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r0_E_qabs_6      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r0_E_attn_6      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r0_E_merge_6     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_oproj_6     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r0_E_norm_6      scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_gu_6        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_down_6      scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r1_E_qkv_6       scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r1_E_qabs_6      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r1_E_attn_6      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r1_E_merge_6     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_oproj_6     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r1_E_norm_6      scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_gu_6        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_down_6      scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r2_E_qkv_6       scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r2_E_qabs_6      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r2_E_attn_6      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r2_E_merge_6     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_oproj_6     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r2_E_norm_6      scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_gu_6        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_down_6      scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r3_E_qkv_6       scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r3_E_qabs_6      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r3_E_attn_6      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r3_E_merge_6     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_oproj_6     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r3_E_norm_6      scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_gu_6        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_down_6      scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r0_E_qkv_7       scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r0_E_qabs_7      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r0_E_attn_7      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r0_E_merge_7     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_oproj_7     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r0_E_norm_7      scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_gu_7        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_down_7      scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r1_E_qkv_7       scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r1_E_qabs_7      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r1_E_attn_7      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r1_E_merge_7     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_oproj_7     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r1_E_norm_7      scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_gu_7        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_down_7      scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r2_E_qkv_7       scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r2_E_qabs_7      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r2_E_attn_7      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r2_E_merge_7     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_oproj_7     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r2_E_norm_7      scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_gu_7        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_down_7      scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r3_E_qkv_7       scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r3_E_qabs_7      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r3_E_attn_7      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r3_E_merge_7     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_oproj_7     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r3_E_norm_7      scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_gu_7        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_down_7      scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r0_E_qkv_8       scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r0_E_qabs_8      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r0_E_attn_8      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r0_E_merge_8     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_oproj_8     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r0_E_norm_8      scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_gu_8        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_down_8      scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r1_E_qkv_8       scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r1_E_qabs_8      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r1_E_attn_8      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r1_E_merge_8     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_oproj_8     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r1_E_norm_8      scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_gu_8        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_down_8      scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r2_E_qkv_8       scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r2_E_qabs_8      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r2_E_attn_8      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r2_E_merge_8     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_oproj_8     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r2_E_norm_8      scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_gu_8        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_down_8      scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r3_E_qkv_8       scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r3_E_qabs_8      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r3_E_attn_8      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r3_E_merge_8     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_oproj_8     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r3_E_norm_8      scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_gu_8        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_down_8      scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r0_E_qkv_9       scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r0_E_qabs_9      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r0_E_attn_9      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r0_E_merge_9     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_oproj_9     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r0_E_norm_9      scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_gu_9        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_down_9      scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r1_E_qkv_9       scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r1_E_qabs_9      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r1_E_attn_9      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r1_E_merge_9     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_oproj_9     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r1_E_norm_9      scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_gu_9        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_down_9      scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r2_E_qkv_9       scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r2_E_qabs_9      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r2_E_attn_9      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r2_E_merge_9     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_oproj_9     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r2_E_norm_9      scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_gu_9        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_down_9      scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r3_E_qkv_9       scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r3_E_qabs_9      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r3_E_attn_9      scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r3_E_merge_9     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_oproj_9     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r3_E_norm_9      scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_gu_9        scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_down_9      scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r0_E_qkv_10      scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r0_E_qabs_10     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r0_E_attn_10     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r0_E_merge_10    scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_oproj_10    scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r0_E_norm_10     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_gu_10       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_down_10     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r1_E_qkv_10      scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r1_E_qabs_10     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r1_E_attn_10     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r1_E_merge_10    scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_oproj_10    scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r1_E_norm_10     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_gu_10       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_down_10     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r2_E_qkv_10      scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r2_E_qabs_10     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r2_E_attn_10     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r2_E_merge_10    scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_oproj_10    scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r2_E_norm_10     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_gu_10       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_down_10     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r3_E_qkv_10      scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r3_E_qabs_10     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r3_E_attn_10     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r3_E_merge_10    scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_oproj_10    scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r3_E_norm_10     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_gu_10       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_down_10     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r0_E_qkv_11      scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r0_E_qabs_11     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r0_E_attn_11     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r0_E_merge_11    scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_oproj_11    scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r0_E_norm_11     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_gu_11       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_down_11     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r1_E_qkv_11      scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r1_E_qabs_11     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r1_E_attn_11     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r1_E_merge_11    scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_oproj_11    scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r1_E_norm_11     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_gu_11       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_down_11     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r2_E_qkv_11      scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r2_E_qabs_11     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r2_E_attn_11     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r2_E_merge_11    scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_oproj_11    scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r2_E_norm_11     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_gu_11       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_down_11     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r3_E_qkv_11      scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r3_E_qabs_11     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r3_E_attn_11     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r3_E_merge_11    scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_oproj_11    scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r3_E_norm_11     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_gu_11       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_down_11     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r0_E_qkv_12      scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r0_E_qabs_12     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r0_E_attn_12     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r0_E_merge_12    scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_oproj_12    scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r0_E_norm_12     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_gu_12       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_down_12     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r1_E_qkv_12      scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r1_E_qabs_12     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r1_E_attn_12     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r1_E_merge_12    scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_oproj_12    scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r1_E_norm_12     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_gu_12       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_down_12     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r2_E_qkv_12      scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r2_E_qabs_12     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r2_E_attn_12     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r2_E_merge_12    scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_oproj_12    scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r2_E_norm_12     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_gu_12       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_down_12     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r3_E_qkv_12      scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r3_E_qabs_12     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r3_E_attn_12     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r3_E_merge_12    scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_oproj_12    scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r3_E_norm_12     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_gu_12       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_down_12     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r0_E_qkv_13      scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r0_E_qabs_13     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r0_E_attn_13     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r0_E_merge_13    scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_oproj_13    scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r0_E_norm_13     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_gu_13       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_down_13     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r1_E_qkv_13      scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r1_E_qabs_13     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r1_E_attn_13     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r1_E_merge_13    scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_oproj_13    scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r1_E_norm_13     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_gu_13       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_down_13     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r2_E_qkv_13      scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r2_E_qabs_13     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r2_E_attn_13     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r2_E_merge_13    scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_oproj_13    scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r2_E_norm_13     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_gu_13       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_down_13     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r3_E_qkv_13      scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r3_E_qabs_13     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r3_E_attn_13     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r3_E_merge_13    scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_oproj_13    scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r3_E_norm_13     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_gu_13       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_down_13     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r0_E_qkv_14      scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r0_E_qabs_14     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r0_E_attn_14     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r0_E_merge_14    scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_oproj_14    scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r0_E_norm_14     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_gu_14       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_down_14     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r1_E_qkv_14      scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r1_E_qabs_14     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r1_E_attn_14     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r1_E_merge_14    scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_oproj_14    scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r1_E_norm_14     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_gu_14       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_down_14     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r2_E_qkv_14      scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r2_E_qabs_14     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r2_E_attn_14     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r2_E_merge_14    scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_oproj_14    scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r2_E_norm_14     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_gu_14       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_down_14     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r3_E_qkv_14      scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r3_E_qabs_14     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r3_E_attn_14     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r3_E_merge_14    scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_oproj_14    scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r3_E_norm_14     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_gu_14       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_down_14     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r0_E_qkv_15      scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r0_E_qabs_15     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r0_E_attn_15     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r0_E_merge_15    scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_oproj_15    scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r0_E_norm_15     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_gu_15       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_down_15     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r1_E_qkv_15      scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r1_E_qabs_15     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r1_E_attn_15     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r1_E_merge_15    scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_oproj_15    scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r1_E_norm_15     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_gu_15       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_down_15     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r2_E_qkv_15      scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r2_E_qabs_15     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r2_E_attn_15     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r2_E_merge_15    scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_oproj_15    scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r2_E_norm_15     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_gu_15       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_down_15     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r3_E_qkv_15      scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r3_E_qabs_15     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r3_E_attn_15     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r3_E_merge_15    scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_oproj_15    scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r3_E_norm_15     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_gu_15       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_down_15     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r0_E_qkv_16      scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r0_E_qabs_16     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r0_E_attn_16     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r0_E_merge_16    scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_oproj_16    scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r0_E_norm_16     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_gu_16       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_down_16     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r1_E_qkv_16      scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r1_E_qabs_16     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r1_E_attn_16     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r1_E_merge_16    scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_oproj_16    scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r1_E_norm_16     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_gu_16       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_down_16     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r2_E_qkv_16      scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r2_E_qabs_16     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r2_E_attn_16     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r2_E_merge_16    scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_oproj_16    scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r2_E_norm_16     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_gu_16       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_down_16     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r3_E_qkv_16      scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r3_E_qabs_16     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r3_E_attn_16     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r3_E_merge_16    scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_oproj_16    scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r3_E_norm_16     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_gu_16       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_down_16     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r0_E_qkv_17      scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r0_E_qabs_17     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r0_E_attn_17     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r0_E_merge_17    scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_oproj_17    scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r0_E_norm_17     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_gu_17       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_down_17     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r1_E_qkv_17      scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r1_E_qabs_17     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r1_E_attn_17     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r1_E_merge_17    scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_oproj_17    scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r1_E_norm_17     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_gu_17       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_down_17     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r2_E_qkv_17      scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r2_E_qabs_17     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r2_E_attn_17     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r2_E_merge_17    scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_oproj_17    scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r2_E_norm_17     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_gu_17       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_down_17     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r3_E_qkv_17      scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r3_E_qabs_17     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r3_E_attn_17     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r3_E_merge_17    scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_oproj_17    scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r3_E_norm_17     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_gu_17       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_down_17     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r0_E_qkv_18      scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r0_E_qabs_18     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r0_E_attn_18     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r0_E_merge_18    scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_oproj_18    scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r0_E_norm_18     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_gu_18       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_down_18     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r1_E_qkv_18      scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r1_E_qabs_18     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r1_E_attn_18     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r1_E_merge_18    scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_oproj_18    scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r1_E_norm_18     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_gu_18       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_down_18     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r2_E_qkv_18      scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r2_E_qabs_18     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r2_E_attn_18     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r2_E_merge_18    scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_oproj_18    scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r2_E_norm_18     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_gu_18       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_down_18     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r3_E_qkv_18      scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r3_E_qabs_18     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r3_E_attn_18     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r3_E_merge_18    scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_oproj_18    scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r3_E_norm_18     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_gu_18       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_down_18     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r0_E_qkv_19      scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r0_E_qabs_19     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r0_E_attn_19     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r0_E_merge_19    scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_oproj_19    scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r0_E_norm_19     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_gu_19       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_down_19     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r1_E_qkv_19      scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r1_E_qabs_19     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r1_E_attn_19     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r1_E_merge_19    scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_oproj_19    scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r1_E_norm_19     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_gu_19       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_down_19     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r2_E_qkv_19      scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r2_E_qabs_19     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r2_E_attn_19     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r2_E_merge_19    scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_oproj_19    scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r2_E_norm_19     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_gu_19       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_down_19     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r3_E_qkv_19      scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r3_E_qabs_19     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r3_E_attn_19     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r3_E_merge_19    scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_oproj_19    scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r3_E_norm_19     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_gu_19       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_down_19     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r0_E_qkv_20      scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r0_E_qabs_20     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r0_E_attn_20     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r0_E_merge_20    scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_oproj_20    scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r0_E_norm_20     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_gu_20       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_down_20     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r1_E_qkv_20      scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r1_E_qabs_20     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r1_E_attn_20     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r1_E_merge_20    scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_oproj_20    scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r1_E_norm_20     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_gu_20       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_down_20     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r2_E_qkv_20      scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r2_E_qabs_20     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r2_E_attn_20     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r2_E_merge_20    scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_oproj_20    scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r2_E_norm_20     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_gu_20       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_down_20     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r3_E_qkv_20      scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r3_E_qabs_20     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r3_E_attn_20     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r3_E_merge_20    scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_oproj_20    scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r3_E_norm_20     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_gu_20       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_down_20     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r0_E_qkv_21      scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r0_E_qabs_21     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r0_E_attn_21     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r0_E_merge_21    scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_oproj_21    scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r0_E_norm_21     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_gu_21       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_down_21     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r1_E_qkv_21      scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r1_E_qabs_21     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r1_E_attn_21     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r1_E_merge_21    scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_oproj_21    scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r1_E_norm_21     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_gu_21       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_down_21     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r2_E_qkv_21      scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r2_E_qabs_21     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r2_E_attn_21     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r2_E_merge_21    scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_oproj_21    scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r2_E_norm_21     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_gu_21       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_down_21     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r3_E_qkv_21      scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r3_E_qabs_21     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r3_E_attn_21     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r3_E_merge_21    scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_oproj_21    scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r3_E_norm_21     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_gu_21       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_down_21     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r0_E_qkv_22      scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r0_E_qabs_22     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r0_E_attn_22     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r0_E_merge_22    scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_oproj_22    scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r0_E_norm_22     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_gu_22       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_down_22     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r1_E_qkv_22      scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r1_E_qabs_22     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r1_E_attn_22     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r1_E_merge_22    scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_oproj_22    scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r1_E_norm_22     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_gu_22       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_down_22     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r2_E_qkv_22      scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r2_E_qabs_22     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r2_E_attn_22     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r2_E_merge_22    scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_oproj_22    scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r2_E_norm_22     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_gu_22       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_down_22     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r3_E_qkv_22      scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r3_E_qabs_22     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r3_E_attn_22     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r3_E_merge_22    scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_oproj_22    scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r3_E_norm_22     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_gu_22       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_down_22     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r0_E_qkv_23      scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r0_E_qabs_23     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r0_E_attn_23     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r0_E_merge_23    scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_oproj_23    scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r0_E_norm_23     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_gu_23       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_down_23     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r1_E_qkv_23      scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r1_E_qabs_23     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r1_E_attn_23     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r1_E_merge_23    scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_oproj_23    scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r1_E_norm_23     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_gu_23       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_down_23     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r2_E_qkv_23      scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r2_E_qabs_23     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r2_E_attn_23     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r2_E_merge_23    scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_oproj_23    scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r2_E_norm_23     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_gu_23       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_down_23     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r3_E_qkv_23      scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r3_E_qabs_23     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r3_E_attn_23     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r3_E_merge_23    scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_oproj_23    scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r3_E_norm_23     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_gu_23       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_down_23     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r0_E_qkv_24      scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r0_E_qabs_24     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r0_E_attn_24     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r0_E_merge_24    scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_oproj_24    scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r0_E_norm_24     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_gu_24       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_down_24     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r1_E_qkv_24      scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r1_E_qabs_24     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r1_E_attn_24     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r1_E_merge_24    scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_oproj_24    scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r1_E_norm_24     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_gu_24       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_down_24     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r2_E_qkv_24      scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r2_E_qabs_24     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r2_E_attn_24     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r2_E_merge_24    scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_oproj_24    scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r2_E_norm_24     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_gu_24       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_down_24     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r3_E_qkv_24      scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r3_E_qabs_24     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r3_E_attn_24     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r3_E_merge_24    scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_oproj_24    scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r3_E_norm_24     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_gu_24       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_down_24     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r0_E_qkv_25      scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r0_E_qabs_25     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r0_E_attn_25     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r0_E_merge_25    scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_oproj_25    scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r0_E_norm_25     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_gu_25       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_down_25     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r1_E_qkv_25      scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r1_E_qabs_25     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r1_E_attn_25     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r1_E_merge_25    scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_oproj_25    scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r1_E_norm_25     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_gu_25       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_down_25     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r2_E_qkv_25      scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r2_E_qabs_25     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r2_E_attn_25     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r2_E_merge_25    scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_oproj_25    scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r2_E_norm_25     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_gu_25       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_down_25     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r3_E_qkv_25      scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r3_E_qabs_25     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r3_E_attn_25     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r3_E_merge_25    scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_oproj_25    scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r3_E_norm_25     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_gu_25       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_down_25     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r0_E_qkv_26      scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r0_E_qabs_26     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r0_E_attn_26     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r0_E_merge_26    scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_oproj_26    scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r0_E_norm_26     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_gu_26       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r0_E_down_26     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r1_E_qkv_26      scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r1_E_qabs_26     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r1_E_attn_26     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r1_E_merge_26    scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_oproj_26    scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r1_E_norm_26     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_gu_26       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r1_E_down_26     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r2_E_qkv_26      scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r2_E_qabs_26     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r2_E_attn_26     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r2_E_merge_26    scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_oproj_26    scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r2_E_norm_26     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_gu_26       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r2_E_down_26     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r3_E_qkv_26      scope=DEVICE  mem=device       numel=1 cross_domain=74592 cross_device=0
+  event r3_E_qabs_26     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r3_E_attn_26     scope=DOMAIN  mem=device       numel=16 cross_domain=0 cross_device=0
+  event r3_E_merge_26    scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_oproj_26    scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r3_E_norm_26     scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_gu_26       scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event r3_E_down_26     scope=DEVICE  mem=device       numel=1 cross_domain=76664 cross_device=0
+  event r0_E_lm          scope=DEVICE  mem=device       numel=1 cross_domain=259 cross_device=0
+  event r0_E_argmax      scope=DOMAIN  mem=device       numel=1 cross_domain=0 cross_device=0
+  event r1_E_lm          scope=DEVICE  mem=device       numel=1 cross_domain=259 cross_device=0
+  event r1_E_argmax      scope=DOMAIN  mem=device       numel=1 cross_domain=0 cross_device=0
+  event r2_E_lm          scope=DEVICE  mem=device       numel=1 cross_domain=259 cross_device=0
+  event r2_E_argmax      scope=DOMAIN  mem=device       numel=1 cross_domain=0 cross_device=0
+  event r3_E_lm          scope=DEVICE  mem=device       numel=1 cross_domain=259 cross_device=0
+  event r3_E_argmax      scope=DOMAIN  mem=device       numel=1 cross_domain=0 cross_device=0
+  prefetch entries=0
+sources to link: ['examples/dsv2lite/fleet_shim.hip']
+wrote /root/sess/b4-live-20261015/20261015T160946Z-a7e517/b_x4/
+COH-CHECK OK coherent_loads=0 l1_loads=1
+In file included from /root/sess/b4-live-20261015/20261015T160946Z-a7e517/b_x4/megakernel_d0.hip:45:
+In file included from /root/etx/examples/dsv2lite/fleet_shim.hip:19:
+/root/sess/b4-live-20261015/20261015T160946Z-a7e517/b_x4/fleet_src/kernels/fleet_kernel.hip:1037:1: remark: Function Name: fleet_decode_step [-Rpass-analysis=kernel-resource-usage]
+ 1037 |                        Activations act, KVCache kv) {
+      | ^
+/root/sess/b4-live-20261015/20261015T160946Z-a7e517/b_x4/fleet_src/kernels/fleet_kernel.hip:1037:1: remark:     TotalSGPRs: 106 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/b4-live-20261015/20261015T160946Z-a7e517/b_x4/fleet_src/kernels/fleet_kernel.hip:1037:1: remark:     VGPRs: 256 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/b4-live-20261015/20261015T160946Z-a7e517/b_x4/fleet_src/kernels/fleet_kernel.hip:1037:1: remark:     AGPRs: 174 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/b4-live-20261015/20261015T160946Z-a7e517/b_x4/fleet_src/kernels/fleet_kernel.hip:1037:1: remark:     ScratchSize [bytes/lane]: 48 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/b4-live-20261015/20261015T160946Z-a7e517/b_x4/fleet_src/kernels/fleet_kernel.hip:1037:1: remark:     Dynamic Stack: False [-Rpass-analysis=kernel-resource-usage]
+/root/sess/b4-live-20261015/20261015T160946Z-a7e517/b_x4/fleet_src/kernels/fleet_kernel.hip:1037:1: remark:     Occupancy [waves/SIMD]: 1 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/b4-live-20261015/20261015T160946Z-a7e517/b_x4/fleet_src/kernels/fleet_kernel.hip:1037:1: remark:     SGPRs Spill: 709 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/b4-live-20261015/20261015T160946Z-a7e517/b_x4/fleet_src/kernels/fleet_kernel.hip:1037:1: remark:     VGPRs Spill: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/b4-live-20261015/20261015T160946Z-a7e517/b_x4/fleet_src/kernels/fleet_kernel.hip:1037:1: remark:     LDS Size [bytes/block]: 25488 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/b4-live-20261015/20261015T160946Z-a7e517/b_x4/fleet_src/kernels/fleet_kernel.hip:1150:1: remark: Function Name: _Z15fleet_probe_xccPj [-Rpass-analysis=kernel-resource-usage]
+ 1150 | __global__ void fleet_probe_xcc(uint32_t* hist) {
+      | ^
+/root/sess/b4-live-20261015/20261015T160946Z-a7e517/b_x4/fleet_src/kernels/fleet_kernel.hip:1150:1: remark:     TotalSGPRs: 14 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/b4-live-20261015/20261015T160946Z-a7e517/b_x4/fleet_src/kernels/fleet_kernel.hip:1150:1: remark:     VGPRs: 2 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/b4-live-20261015/20261015T160946Z-a7e517/b_x4/fleet_src/kernels/fleet_kernel.hip:1150:1: remark:     AGPRs: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/b4-live-20261015/20261015T160946Z-a7e517/b_x4/fleet_src/kernels/fleet_kernel.hip:1150:1: remark:     ScratchSize [bytes/lane]: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/b4-live-20261015/20261015T160946Z-a7e517/b_x4/fleet_src/kernels/fleet_kernel.hip:1150:1: remark:     Dynamic Stack: False [-Rpass-analysis=kernel-resource-usage]
+/root/sess/b4-live-20261015/20261015T160946Z-a7e517/b_x4/fleet_src/kernels/fleet_kernel.hip:1150:1: remark:     Occupancy [waves/SIMD]: 8 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/b4-live-20261015/20261015T160946Z-a7e517/b_x4/fleet_src/kernels/fleet_kernel.hip:1150:1: remark:     SGPRs Spill: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/b4-live-20261015/20261015T160946Z-a7e517/b_x4/fleet_src/kernels/fleet_kernel.hip:1150:1: remark:     VGPRs Spill: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/b4-live-20261015/20261015T160946Z-a7e517/b_x4/fleet_src/kernels/fleet_kernel.hip:1150:1: remark:     LDS Size [bytes/block]: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/b4-live-20261015/20261015T160946Z-a7e517/b_x4/megakernel_d0.hip:20318:1: remark: Function Name: etx_megakernel_d0 [-Rpass-analysis=kernel-resource-usage]
+ 20318 | extern "C" __global__ void __launch_bounds__(ETX_THREADS, ETX_MIN_WG_PER_CU) etx_megakernel_d0(etx_params p) {
+       | ^
+/root/sess/b4-live-20261015/20261015T160946Z-a7e517/b_x4/megakernel_d0.hip:20318:1: remark:     TotalSGPRs: 108 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/b4-live-20261015/20261015T160946Z-a7e517/b_x4/megakernel_d0.hip:20318:1: remark:     VGPRs: 256 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/b4-live-20261015/20261015T160946Z-a7e517/b_x4/megakernel_d0.hip:20318:1: remark:     AGPRs: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/b4-live-20261015/20261015T160946Z-a7e517/b_x4/megakernel_d0.hip:20318:1: remark:     ScratchSize [bytes/lane]: 64 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/b4-live-20261015/20261015T160946Z-a7e517/b_x4/megakernel_d0.hip:20318:1: remark:     Dynamic Stack: False [-Rpass-analysis=kernel-resource-usage]
+/root/sess/b4-live-20261015/20261015T160946Z-a7e517/b_x4/megakernel_d0.hip:20318:1: remark:     Occupancy [waves/SIMD]: 2 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/b4-live-20261015/20261015T160946Z-a7e517/b_x4/megakernel_d0.hip:20318:1: remark:     SGPRs Spill: 1299 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/b4-live-20261015/20261015T160946Z-a7e517/b_x4/megakernel_d0.hip:20318:1: remark:     VGPRs Spill: 15 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/b4-live-20261015/20261015T160946Z-a7e517/b_x4/megakernel_d0.hip:20318:1: remark:     LDS Size [bytes/block]: 26668 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/b4-live-20261015/20261015T160946Z-a7e517/b_x4/megakernel_d0.hip:20376:1: remark: Function Name: etx_unfused_d0 [-Rpass-analysis=kernel-resource-usage]
+ 20376 | extern "C" __global__ void __launch_bounds__(ETX_THREADS, ETX_MIN_WG_PER_CU) etx_unfused_d0(etx_params p, int32_t first) {
+       | ^
+/root/sess/b4-live-20261015/20261015T160946Z-a7e517/b_x4/megakernel_d0.hip:20376:1: remark:     TotalSGPRs: 81 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/b4-live-20261015/20261015T160946Z-a7e517/b_x4/megakernel_d0.hip:20376:1: remark:     VGPRs: 246 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/b4-live-20261015/20261015T160946Z-a7e517/b_x4/megakernel_d0.hip:20376:1: remark:     AGPRs: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/b4-live-20261015/20261015T160946Z-a7e517/b_x4/megakernel_d0.hip:20376:1: remark:     ScratchSize [bytes/lane]: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/b4-live-20261015/20261015T160946Z-a7e517/b_x4/megakernel_d0.hip:20376:1: remark:     Dynamic Stack: False [-Rpass-analysis=kernel-resource-usage]
+/root/sess/b4-live-20261015/20261015T160946Z-a7e517/b_x4/megakernel_d0.hip:20376:1: remark:     Occupancy [waves/SIMD]: 2 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/b4-live-20261015/20261015T160946Z-a7e517/b_x4/megakernel_d0.hip:20376:1: remark:     SGPRs Spill: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/b4-live-20261015/20261015T160946Z-a7e517/b_x4/megakernel_d0.hip:20376:1: remark:     VGPRs Spill: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/b4-live-20261015/20261015T160946Z-a7e517/b_x4/megakernel_d0.hip:20376:1: remark:     LDS Size [bytes/block]: 26628 [-Rpass-analysis=kernel-resource-usage]
+built /root/sess/b4-live-20261015/20261015T160946Z-a7e517/b_x4/run  (run it from /root/fleet-3fb67a6 so build/weights.bin, fleet_cache.bin, golden_tokens.txt resolve)

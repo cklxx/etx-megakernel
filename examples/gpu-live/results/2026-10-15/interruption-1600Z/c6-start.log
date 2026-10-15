@@ -1,0 +1,19 @@
+Thu Oct 15 15:42:51 UTC 2026
+[15:41:54 +  4m45s] skip    measure [correctness.json: qualify fail]
+[15:41:54 +  4m45s] skip    diagnose [measurement.complete.json: measure skipped]
+[15:41:54 +  4m45s] start report (cpu)
+[15:41:55 +  4m46s] ok      report rc=0 1s
+    VERDICT {"status": "NOT-COMPLETE", "reason": "[Errno 2] No such file or directory: '/root/sess/producer-live-20261015/20261015T153709Z-f24956/correctness.json'", "performance_claim": false}
+[15:41:55 +  4m46s] session done
+  job                              status     rc  gpu  seconds
+  preflight                        ok          0            81  
+  build_baseline                   ok          0            65  
+  build_producer                   ok          0            48  
+  qualify                          fail        2    0      139  
+  measure                          skipped                      correctness.json: qualify fail
+  diagnose                         skipped                      measurement.complete.json: measure skipped
+  report                           ok          0             1  
+SEALED /root/sess/producer-live-20261015/20261015T153709Z-f24956 complete=False
+[15:42:51 +  0m00s] session record: /root/sess/c6-live-20261015/20261015T154251Z-33cc38
+[15:42:51 +  0m00s] start c6_build (cpu)
+VERIFIED: session 20261015T153709Z-f24956, 2033 files match, 0 bad, 0 left on the box by design; INCOMPLETE: not ok: ['diagnose', 'measure', 'qualify']

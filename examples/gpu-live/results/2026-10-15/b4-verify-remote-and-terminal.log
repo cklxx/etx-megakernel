@@ -1,0 +1,11 @@
+VERIFIED: session 20261015T160946Z-a7e517, 190 files match, 0 bad, 0 left on the box by design; INCOMPLETE: not ok: ['captures']
+VERIFY_EXIT=3
+Thu Oct 15 16:27:25 UTC 2026
+d9c7be411641 rocm Up About an hour
+
+
+============================ ROCm System Management Interface ============================
+=================================== % time GPU is busy ===================================
+GPU[0]		: GPU use (%): 0
+==========================================================================================
+================================== End of ROCm SMI Log ===================================

@@ -1,0 +1,85 @@
+{
+  "schema": "etx.c6.measurement.v1",
+  "positions": {
+    "0": {
+      "basis": "sum of 48 captured local segment device spans; NOT host-wall step speedup",
+      "gains_ns": [
+        151032,
+        -63185,
+        -46108,
+        65342,
+        69719
+      ],
+      "median_ns": 65342,
+      "spread_ns": 214217,
+      "every_positive": false,
+      "combined_50us_target": "CLOSE",
+      "general_30us_rule": "DROP",
+      "target_next": "close registered target lever",
+      "net_full_step_target": "PENDING runtime integration, reset and queue costs",
+      "wall_gain": "UNPROVEN"
+    },
+    "1023": {
+      "basis": "sum of 48 captured local segment device spans; NOT host-wall step speedup",
+      "gains_ns": [
+        110173,
+        -102635,
+        -48283,
+        -1202,
+        24490
+      ],
+      "median_ns": -1202,
+      "spread_ns": 212808,
+      "every_positive": false,
+      "combined_50us_target": "CLOSE",
+      "general_30us_rule": "DROP",
+      "target_next": "close registered target lever",
+      "net_full_step_target": "PENDING runtime integration, reset and queue costs",
+      "wall_gain": "UNPROVEN"
+    },
+    "1024": {
+      "basis": "sum of 48 captured local segment device spans; NOT host-wall step speedup",
+      "gains_ns": [
+        157596,
+        -78700,
+        -93215,
+        14470,
+        12825
+      ],
+      "median_ns": 12825,
+      "spread_ns": 250811,
+      "every_positive": false,
+      "combined_50us_target": "CLOSE",
+      "general_30us_rule": "DROP",
+      "target_next": "close registered target lever",
+      "net_full_step_target": "PENDING runtime integration, reset and queue costs",
+      "wall_gain": "UNPROVEN"
+    },
+    "1040": {
+      "basis": "sum of 48 captured local segment device spans; NOT host-wall step speedup",
+      "gains_ns": [
+        115457,
+        -90961,
+        -56968,
+        995,
+        -7578
+      ],
+      "median_ns": -7578,
+      "spread_ns": 206418,
+      "every_positive": false,
+      "combined_50us_target": "CLOSE",
+      "general_30us_rule": "DROP",
+      "target_next": "close registered target lever",
+      "net_full_step_target": "PENDING runtime integration, reset and queue costs",
+      "wall_gain": "UNPROVEN"
+    }
+  },
+  "correctness_sha": "8b3ba91085f236558e1999b5c804696c0dd19988dd51c3978894186253caff38",
+  "probe_identity_sha": "1815a526967486a0232612e42d80c9d5af4da0445478e8bbfbeee6ebdb02e948",
+  "model_identity_sha": "0dda449af2d1613107d3390ac48e05d481413a2f538f4835f87feff4ebb01a0b",
+  "wall_gain": "UNPROVEN",
+  "reset": "same reset in both arms; reset/copies outside local window",
+  "control": "resident separate-task protocol; not ETX scheduler or graph wall baseline",
+  "diagnostic_timing": "NOT_USED",
+  "target_pass": false
+}

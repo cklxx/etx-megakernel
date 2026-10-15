@@ -1,0 +1,37 @@
+{
+  "check_enabled": true,
+  "compiler": "HIP version: 7.14.60850-0000000\nAMD clang version 23.0.0git (https://github.com/ROCm/llvm-project.git 46fcb339fb61119b337f973c7ca9e710a319fdd0+PATCHED:440716f8b87be9d8e20ed910e10e5b6d14d57cf6)\nTarget: x86_64-unknown-linux-gnu\nThread model: posix\nInstalledDir: /opt/rocm/core-7.14/lib/llvm/bin",
+  "files": {
+    "compiler_command": "49133acd9e0f598926d6c12b7bb955ef0d1123c8ce330fdc165865717c2e7072",
+    "compiler_output": "11675cf9907e5f3a5fc87ad7c2d02fb201d36b808963f7984e5abb487c149200",
+    "device_source/dsl_tiles.hip": "f60fb24c74beb3e57724f48961f629e4fb41515a652eae1ff2d624e3dab4c34a",
+    "device_source/imp_tiles.hip": "d4bf266ae86001573f550586cc3dda518d1719e97590cc15db71681d171595eb",
+    "device_source/megakernel_d0.hip": "9785cc73be5fce6914796ffd796ceef0475391962064ef4e4f26359043daf7be",
+    "executable": "717cc84a7ee1797da52f11c1156f701f450e4d006632734dbaaee684af572d28",
+    "golden": "bab2f1fbe12f70179711ec40a215c74710845b73169b1cc6a3a6ca50e0a19484",
+    "import_metadata": "448fb75d0a0851449038277d0d83f234e267141beca93175907367a085fc294c",
+    "imports": "bde345f238dda831768f4a103f6bcae5e9dae0bc1da6abfecac903738773fc76",
+    "original/orig_attention.hip": "6735281a0c8a7ce33a976b135c0c320fbc79c30951a5924a5e034783132f6df9",
+    "original/orig_attention.o": "f58bdc6da2d1625318b9ab4a3618dcaed69b9004e9468de59390312c10b917e9",
+    "original/orig_layernorm_kernels.hip": "9e1640f46e92e556850e715f0141d835b25888c80035ee57da22fff056867587",
+    "original/orig_layernorm_kernels.o": "d0f1dbfb3809ae4e3b47802962d2b32aa05e810b32204541d5596c5a6eae98a4",
+    "original/orig_table.hip": "d6538566243e01ea7bf012620bae1a0d76f6de501ae65efc9eb87624be602cbd",
+    "plan": "f7e7905b49d00f23c9f76745b91bfd7f32d99caa9555015f19fdc642c7182f31",
+    "plan_header": "758a96cb9c2a1c8bb77cebb10172c4e5e9a3209d9c9336999e2f117cf2a10880",
+    "plan_json": "6a97bdba98fd9682290a35af12533980315b6fadff723db60f06f9f852febf3d",
+    "weights_manifest": "d95a244f6a81a6daf3e7b052ab10525a15ddce5115039957968a5c9cac778a0b"
+  },
+  "hipcc_flags": "-DETX_DSL_WSUM -DETX_DSL_SCALAR -DETX_DSL_GU1 -DETX_DSL_RBATCH -DETX_INBODY_REPORT -DETX_DSL_NORM_HOIST",
+  "overrides": {
+    "ETX_DEV_RESET": "0",
+    "ETX_PREFETCH_ISOLATE_POLLER": "0",
+    "ETX_VL_CHECK": "1",
+    "ETX_VL_CU": "256",
+    "ETX_VL_DSL_EXT": "0",
+    "ETX_VL_PRODUCER_SCORE": "0",
+    "ETX_VL_REQUESTS": "1",
+    "ETX_VL_ROUTER_NARROW": "1",
+    "ETX_VL_TOUCH": "1"
+  },
+  "schema": 1
+}

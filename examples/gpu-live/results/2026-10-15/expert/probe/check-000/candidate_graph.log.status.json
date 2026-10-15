@@ -1,0 +1,12 @@
+{
+  "cmd": [
+    "/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate/run",
+    "/root/sess/expert-live-20261015/20261015T152934Z-af0efa/synthetic",
+    "/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/check-000/candidate_graph",
+    "check",
+    "graph"
+  ],
+  "exit": 0,
+  "seconds": 0.21796701799985385,
+  "timeout": false
+}

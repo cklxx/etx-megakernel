@@ -1,0 +1,109 @@
+# command ["sudo", "docker", "image", "inspect", "vllm/vllm-openai-rocm@sha256:bb44b39aea26798cce43030a98bf48efd0322ca7147367db86e38b96bd80f0e7"]
+[
+    {
+        "Id": "sha256:bb44b39aea26798cce43030a98bf48efd0322ca7147367db86e38b96bd80f0e7",
+        "RepoTags": [
+            "vllm/vllm-openai-rocm:v0.27.1"
+        ],
+        "RepoDigests": [
+            "vllm/vllm-openai-rocm@sha256:bb44b39aea26798cce43030a98bf48efd0322ca7147367db86e38b96bd80f0e7"
+        ],
+        "Comment": "buildkit.dockerfile.v0",
+        "Created": "2026-08-11T09:15:57.255970813Z",
+        "Config": {
+            "Env": [
+                "PATH=/opt/rocm/llvm/bin:/opt/rocm/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+                "ROCM_PATH=/opt/rocm",
+                "LD_LIBRARY_PATH=/opt/rocm/lib:/usr/local/lib:",
+                "PYTORCH_ROCM_ARCH=gfx90a;gfx942;gfx950;gfx1100;gfx1101;gfx1200;gfx1201;gfx1150;gfx1151",
+                "AITER_ROCM_ARCH=gfx942;gfx950",
+                "HSA_NO_SCRATCH_RECLAIM=1",
+                "PYTHON_VERSION=3.12",
+                "DEBIAN_FRONTEND=noninteractive",
+                "SCCACHE_BUCKET=",
+                "SCCACHE_REGION=",
+                "SCCACHE_S3_NO_CREDENTIALS=",
+                "SCCACHE_IDLE_TIMEOUT=",
+                "UV_HTTP_TIMEOUT=500",
+                "UV_INDEX_STRATEGY=unsafe-best-match",
+                "UV_LINK_MODE=copy",
+                "CCACHE_DIR=/root/.cache/ccache",
+                "CCACHE_COMPILERCHECK=content",
+                "MAX_JOBS=16",
+                "SCCACHE_ENDPOINT=",
+                "HSA_ENABLE_IPC_MODE_LEGACY=1",
+                "UCX_RMA_PPLN_ENABLE=y",
+                "UCX_ROCM_COPY_SIGPOOL_MAX_ELEMS=inf",
+                "TOKENIZERS_PARALLELISM=false",
+                "SAFETENSORS_FAST_GPU=1",
+                "HIP_FORCE_DEV_KERNARG=1",
+                "PYTORCH_NVML_BASED_CUDA_CHECK=1",
+                "KINETO_CONFIG=/app/libkineto.conf"
+            ],
+            "Entrypoint": [
+                "vllm",
+                "serve"
+            ],
+            "WorkingDir": "/app",
+            "Labels": {
+                "maintainer": "dl.mlsedevops@amd.com",
+                "org.opencontainers.image.version": "22.04"
+            },
+            "ArgsEscaped": true
+        },
+        "Architecture": "amd64",
+        "Os": "linux",
+        "Size": 11260032397,
+        "RootFS": {
+            "Type": "layers",
+            "Layers": [
+                "sha256:39fbf5f8fe523b2ea819cd8eb2bf68807d8eaee383549f7ab80a44503ed6860b",
+                "sha256:af144750eb33b110fd2cd65b129dd3fea0f85f2a0ec34d5dbd7fb974494498e4",
+                "sha256:ac14068d925a2840ed5c82f953c01a0a9229c2225c83da15773c52e9020efd89",
+                "sha256:fe8169f5a458252747187abbc026a3bed67ec3f8e6da4fa195fb1ef5a657e955",
+                "sha256:415aec3249759998addd7cc9a4348d273d06124f433e2795eeaca6ffabb0b9ef",
+                "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+                "sha256:3ca977db809cc62c0021924aac3b2bd19f56537f4c11474ea5793a6638f6b24c",
+                "sha256:33e33ec3e957b72611fbc58c8271944f091a5ee6c6aba5208d15464badb11e00",
+                "sha256:8dc5efebcaaefdb0e53961bd4acf618f985a4c6c5bff318c41c5b9295132e978",
+                "sha256:53242ad56ce27bfc7655215350589ccdb6bc508c296e213d2b0daa03a25d0d9d",
+                "sha256:10aa66bfcbfbc387b747aeac47aaed5407087706ebe83b30f2ab28e481e41fc9",
+                "sha256:b663e2378fcfdc8550ee820e4b5663cf40f91242fd3d99c49397d976ab3b7384",
+                "sha256:c238c23fb322bcc2cdb08663a22e68a8b13cc6359aa42be2957fdbd573f3b55f",
+                "sha256:ca48745d7841c04553d4ff8e4404ca09e647e468c5d92a8a0df9c89d9e05c52f",
+                "sha256:64dc5b45b2a6c7c1da2578cdfefd658cbdd9968995b5b5abb06e2a4d22e82169",
+                "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+                "sha256:4eef35ad9d7ab1fa0eb026689f769b54b8ae1f174859277a60202feb3dfcf196",
+                "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+                "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+                "sha256:0f533b403b2a68f4daf8df575464f66d43c25d1d5baf32f225b8d80e353e6f7d",
+                "sha256:66e20b73ed71472b410877bdde0f1b41a1924cce4c6b891c4b306d400fc59cd2",
+                "sha256:94bc725a9d7cbed1a06e410f25dc005c67772c674a4197b69309d475e5094ca5",
+                "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+                "sha256:d84e45c34eea10116be65e4ba05dd52b54b9b8f81bba1e504c4cc623f10c9524",
+                "sha256:5a144060512495a29283a7b333cc7f83616dcc897423a3dc3bc9a2becbf6afe6",
+                "sha256:fab1666781beff0183801861b65295d75f5467e8772177fe4561a129ed74e695",
+                "sha256:4325fee3da171502c22a7ed7abb28d79d5c6862b4873548e0ac58fbdf7c742c4",
+                "sha256:c22201b14e46ecf6e5fad82450ee7764a010421b921939a128fb055067419dd8",
+                "sha256:de1b26ea72e0d09cff9391b32590c479979eda9bc415a0b9cea33305d1c4c9b7",
+                "sha256:f741bc0b0b72783adf2a956c0575c3b87bf78e9462dc4b44420fee3fc299132e",
+                "sha256:945a42631bf258d4c85a907461806051c4b266cad9b31b01b4a9d9b305ffebea"
+            ]
+        },
+        "Metadata": {
+            "LastTagTime": "2026-08-26T20:39:07.744399942Z"
+        },
+        "Descriptor": {
+            "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+            "digest": "sha256:bb44b39aea26798cce43030a98bf48efd0322ca7147367db86e38b96bd80f0e7",
+            "size": 6809
+        },
+        "Identity": {
+            "Pull": [
+                {
+                    "Repository": "docker.io/vllm/vllm-openai-rocm"
+                }
+            ]
+        }
+    }
+]

@@ -1,0 +1,36 @@
+$ stdbuf -oL -eL /root/dsv2-prep/.venv/bin/python -u -m examples.dsv2lite.routing_overlap --model /root/models/dsv2-lite-base --fleet /root/fleet-3fb67a6 --batch 1 --steps 32 --context 1024 --reference-data /root/sess/b4-live-20261015/20261015T160946Z-a7e517/references --json /root/sess/b4-live-20261015/20261015T160946Z-a7e517/routing_b1.json
+Loading checkpoint shards:   0%|          | 0/4 [00:00<?, ?it/s]Loading checkpoint shards:  25%|██▌       | 1/4 [00:00<00:02,  1.37it/s]Loading checkpoint shards:  50%|█████     | 2/4 [00:01<00:01,  1.35it/s]Loading checkpoint shards:  75%|███████▌  | 3/4 [00:02<00:00,  1.29it/s]Loading checkpoint shards: 100%|██████████| 4/4 [00:02<00:00,  1.51it/s]Loading checkpoint shards: 100%|██████████| 4/4 [00:02<00:00,  1.44it/s]
+/opt/amdgpu/share/libdrm/amdgpu.ids: No such file or directory
+loaded in 22s
+step 0
+step 8
+step 16
+step 24
+MoE layers 26, top-6 of 64, 32 decode steps x 1 sequences
+ROUTING distinct routed experts for 1 sequence(s): measured 6.00, uniform-routing estimate 6.00
+  layer  1: 1 seq  6.00
+  layer  2: 1 seq  6.00
+  layer  3: 1 seq  6.00
+  layer  4: 1 seq  6.00
+  layer  5: 1 seq  6.00
+  layer  6: 1 seq  6.00
+  layer  7: 1 seq  6.00
+  layer  8: 1 seq  6.00
+  layer  9: 1 seq  6.00
+  layer 10: 1 seq  6.00
+  layer 11: 1 seq  6.00
+  layer 12: 1 seq  6.00
+  layer 13: 1 seq  6.00
+  layer 14: 1 seq  6.00
+  layer 15: 1 seq  6.00
+  layer 16: 1 seq  6.00
+  layer 17: 1 seq  6.00
+  layer 18: 1 seq  6.00
+  layer 19: 1 seq  6.00
+  layer 20: 1 seq  6.00
+  layer 21: 1 seq  6.00
+  layer 22: 1 seq  6.00
+  layer 23: 1 seq  6.00
+  layer 24: 1 seq  6.00
+  layer 25: 1 seq  6.00
+  layer 26: 1 seq  6.00

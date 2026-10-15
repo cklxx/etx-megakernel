@@ -1,0 +1,167 @@
+# job build gpu=None cwd=/root/src/abee09fcda357bb982cfba4d85bb387a6da97ec2385d3d4574f1f7cd4282d5da-20261015T152622Z
+# python3 -m examples.vllm_llm.expert_merge.runner build "$ETX_SESS_LOGDIR/probe" --input "$ETX_SESS_LOGDIR/synthetic"
+STAGE /root/etx-python/bin/python3 -m etx compile /root/src/abee09fcda357bb982cfba4d85bb387a6da97ec2385d3d4574f1f7cd4282d5da-20261015T152622Z/examples/vllm_llm/expert_merge/graph.py --arch gfx942 --out /root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/control_diag --inline-tiles --sim
+plan: graph=qwen_expert_merge_control arch=gfx942 bindings={}
+  devices=1 domains/device=8 workers/domain=38 (wg/CU=1)
+  tasks=704 events=2 eliminated=[]
+  moe_up                   static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  moe_down                 static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  consumer                 static   S_balance=0.00us <= 1.5x(C_cross=253.89+C_queue=1.20)
+  event up_done          scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event down_done        scope=DEVICE  mem=device       numel=1 cross_domain=57344 cross_device=0
+  prefetch entries=0
+sources to link: ['/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/control_diag/tiles.hip']
+wrote /root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/control_diag/
+sim: makespan 10.4 us | busy 2112.0 wait 865.1 sched 0.0 | utilisation 66.9% over 304 workers
+GENERATED b6cc76ede40707016d01b19a3e5a3eba5a6e932fa0e707bee3223019efeeb651 /root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/control_diag
+STAGE exec ['/root/etx-python/bin/python3', '-m', 'examples.vllm_llm.expert_merge.prepare', 'native', PosixPath('/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/control_diag')] evidence /root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/control_diag_build.log
+STAGE hipcc -O3 -std=c++17 --offload-arch=gfx942 -Ietx/runtime/include -I /root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/control_diag -I. -DETX_DSL_WSUM -DETX_DSL_SCALAR -DETX_DSL_GU1 -DETX_DSL_RBATCH -DETX_DSL_NORM_HOIST -DETX_DSL_VECNORM -DETX_TOPK_KEY32 -Rpass-analysis=kernel-resource-usage /root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/control_diag/megakernel_d0.hip /root/src/abee09fcda357bb982cfba4d85bb387a6da97ec2385d3d4574f1f7cd4282d5da-20261015T152622Z/examples/vllm_llm/expert_merge/host.hip -o /root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/control_diag/run
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/control_diag/megakernel_d0.hip:158:1: remark: Function Name: etx_megakernel_d0 [-Rpass-analysis=kernel-resource-usage]
+  158 | extern "C" __global__ void __launch_bounds__(ETX_THREADS, ETX_MIN_WG_PER_CU) etx_megakernel_d0(etx_params p) {
+      | ^
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/control_diag/megakernel_d0.hip:158:1: remark:     TotalSGPRs: 106 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/control_diag/megakernel_d0.hip:158:1: remark:     VGPRs: 89 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/control_diag/megakernel_d0.hip:158:1: remark:     AGPRs: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/control_diag/megakernel_d0.hip:158:1: remark:     ScratchSize [bytes/lane]: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/control_diag/megakernel_d0.hip:158:1: remark:     Dynamic Stack: False [-Rpass-analysis=kernel-resource-usage]
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/control_diag/megakernel_d0.hip:158:1: remark:     Occupancy [waves/SIMD]: 5 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/control_diag/megakernel_d0.hip:158:1: remark:     SGPRs Spill: 27 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/control_diag/megakernel_d0.hip:158:1: remark:     VGPRs Spill: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/control_diag/megakernel_d0.hip:158:1: remark:     LDS Size [bytes/block]: 21152 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/control_diag/megakernel_d0.hip:212:1: remark: Function Name: etx_unfused_d0 [-Rpass-analysis=kernel-resource-usage]
+  212 | extern "C" __global__ void __launch_bounds__(ETX_THREADS, ETX_MIN_WG_PER_CU) etx_unfused_d0(etx_params p, int32_t first) {
+      | ^
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/control_diag/megakernel_d0.hip:212:1: remark:     TotalSGPRs: 84 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/control_diag/megakernel_d0.hip:212:1: remark:     VGPRs: 58 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/control_diag/megakernel_d0.hip:212:1: remark:     AGPRs: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/control_diag/megakernel_d0.hip:212:1: remark:     ScratchSize [bytes/lane]: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/control_diag/megakernel_d0.hip:212:1: remark:     Dynamic Stack: False [-Rpass-analysis=kernel-resource-usage]
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/control_diag/megakernel_d0.hip:212:1: remark:     Occupancy [waves/SIMD]: 8 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/control_diag/megakernel_d0.hip:212:1: remark:     SGPRs Spill: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/control_diag/megakernel_d0.hip:212:1: remark:     VGPRs Spill: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/control_diag/megakernel_d0.hip:212:1: remark:     LDS Size [bytes/block]: 21120 [-Rpass-analysis=kernel-resource-usage]
+NATIVE compile/link OK; load/execute pending
+STAGE /root/etx-python/bin/python3 -m etx compile /root/src/abee09fcda357bb982cfba4d85bb387a6da97ec2385d3d4574f1f7cd4282d5da-20261015T152622Z/examples/vllm_llm/expert_merge/graph.py --arch gfx942 --out /root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate_diag --inline-tiles --sim
+plan: graph=qwen_expert_merge_candidate arch=gfx942 bindings={}
+  devices=1 domains/device=8 workers/domain=38 (wg/CU=1)
+  tasks=704 events=2 eliminated=[]
+  moe_up                   static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  moe_down                 static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  consumer                 static   S_balance=0.00us <= 1.5x(C_cross=253.89+C_queue=1.20)
+  event up_done          scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event down_done        scope=DEVICE  mem=device       numel=1 cross_domain=57344 cross_device=0
+  prefetch entries=0
+sources to link: ['/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate_diag/tiles.hip']
+wrote /root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate_diag/
+sim: makespan 10.4 us | busy 2112.0 wait 865.1 sched 0.0 | utilisation 66.9% over 304 workers
+GENERATED 1748be889860893b12a91ff47034a75220f4d23cf5e70bfb346a087b85231f7d /root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate_diag
+STAGE exec ['/root/etx-python/bin/python3', '-m', 'examples.vllm_llm.expert_merge.prepare', 'native', PosixPath('/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate_diag')] evidence /root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate_diag_build.log
+STAGE hipcc -O3 -std=c++17 --offload-arch=gfx942 -Ietx/runtime/include -I /root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate_diag -I. -DETX_DSL_WSUM -DETX_DSL_SCALAR -DETX_DSL_GU1 -DETX_DSL_RBATCH -DETX_DSL_NORM_HOIST -DETX_DSL_VECNORM -DETX_TOPK_KEY32 -Rpass-analysis=kernel-resource-usage /root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate_diag/megakernel_d0.hip /root/src/abee09fcda357bb982cfba4d85bb387a6da97ec2385d3d4574f1f7cd4282d5da-20261015T152622Z/examples/vllm_llm/expert_merge/host.hip -o /root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate_diag/run
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate_diag/megakernel_d0.hip:158:1: remark: Function Name: etx_megakernel_d0 [-Rpass-analysis=kernel-resource-usage]
+  158 | extern "C" __global__ void __launch_bounds__(ETX_THREADS, ETX_MIN_WG_PER_CU) etx_megakernel_d0(etx_params p) {
+      | ^
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate_diag/megakernel_d0.hip:158:1: remark:     TotalSGPRs: 106 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate_diag/megakernel_d0.hip:158:1: remark:     VGPRs: 83 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate_diag/megakernel_d0.hip:158:1: remark:     AGPRs: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate_diag/megakernel_d0.hip:158:1: remark:     ScratchSize [bytes/lane]: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate_diag/megakernel_d0.hip:158:1: remark:     Dynamic Stack: False [-Rpass-analysis=kernel-resource-usage]
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate_diag/megakernel_d0.hip:158:1: remark:     Occupancy [waves/SIMD]: 5 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate_diag/megakernel_d0.hip:158:1: remark:     SGPRs Spill: 11 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate_diag/megakernel_d0.hip:158:1: remark:     VGPRs Spill: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate_diag/megakernel_d0.hip:158:1: remark:     LDS Size [bytes/block]: 21152 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate_diag/megakernel_d0.hip:212:1: remark: Function Name: etx_unfused_d0 [-Rpass-analysis=kernel-resource-usage]
+  212 | extern "C" __global__ void __launch_bounds__(ETX_THREADS, ETX_MIN_WG_PER_CU) etx_unfused_d0(etx_params p, int32_t first) {
+      | ^
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate_diag/megakernel_d0.hip:212:1: remark:     TotalSGPRs: 62 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate_diag/megakernel_d0.hip:212:1: remark:     VGPRs: 54 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate_diag/megakernel_d0.hip:212:1: remark:     AGPRs: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate_diag/megakernel_d0.hip:212:1: remark:     ScratchSize [bytes/lane]: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate_diag/megakernel_d0.hip:212:1: remark:     Dynamic Stack: False [-Rpass-analysis=kernel-resource-usage]
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate_diag/megakernel_d0.hip:212:1: remark:     Occupancy [waves/SIMD]: 8 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate_diag/megakernel_d0.hip:212:1: remark:     SGPRs Spill: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate_diag/megakernel_d0.hip:212:1: remark:     VGPRs Spill: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate_diag/megakernel_d0.hip:212:1: remark:     LDS Size [bytes/block]: 21120 [-Rpass-analysis=kernel-resource-usage]
+NATIVE compile/link OK; load/execute pending
+STAGE /root/etx-python/bin/python3 -m etx compile /root/src/abee09fcda357bb982cfba4d85bb387a6da97ec2385d3d4574f1f7cd4282d5da-20261015T152622Z/examples/vllm_llm/expert_merge/graph.py --arch gfx942 --out /root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/control --inline-tiles --sim
+plan: graph=qwen_expert_merge_control arch=gfx942 bindings={}
+  devices=1 domains/device=8 workers/domain=38 (wg/CU=1)
+  tasks=704 events=2 eliminated=[]
+  moe_up                   static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  moe_down                 static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  consumer                 static   S_balance=0.00us <= 1.5x(C_cross=253.89+C_queue=1.20)
+  event up_done          scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event down_done        scope=DEVICE  mem=device       numel=1 cross_domain=57344 cross_device=0
+  prefetch entries=0
+sources to link: ['/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/control/tiles.hip']
+wrote /root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/control/
+sim: makespan 10.4 us | busy 2112.0 wait 865.1 sched 0.0 | utilisation 66.9% over 304 workers
+GENERATED b17e5e37f577c6c0170ec59c420d853ba2bdddff8383ddac867fbd621f72d49e /root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/control
+STAGE exec ['/root/etx-python/bin/python3', '-m', 'examples.vllm_llm.expert_merge.prepare', 'native', PosixPath('/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/control')] evidence /root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/control_build.log
+STAGE hipcc -O3 -std=c++17 --offload-arch=gfx942 -Ietx/runtime/include -I /root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/control -I. -DETX_DSL_WSUM -DETX_DSL_SCALAR -DETX_DSL_GU1 -DETX_DSL_RBATCH -DETX_DSL_NORM_HOIST -DETX_DSL_VECNORM -DETX_TOPK_KEY32 -Rpass-analysis=kernel-resource-usage /root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/control/megakernel_d0.hip /root/src/abee09fcda357bb982cfba4d85bb387a6da97ec2385d3d4574f1f7cd4282d5da-20261015T152622Z/examples/vllm_llm/expert_merge/host.hip -o /root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/control/run
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/control/megakernel_d0.hip:158:1: remark: Function Name: etx_megakernel_d0 [-Rpass-analysis=kernel-resource-usage]
+  158 | extern "C" __global__ void __launch_bounds__(ETX_THREADS, ETX_MIN_WG_PER_CU) etx_megakernel_d0(etx_params p) {
+      | ^
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/control/megakernel_d0.hip:158:1: remark:     TotalSGPRs: 106 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/control/megakernel_d0.hip:158:1: remark:     VGPRs: 89 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/control/megakernel_d0.hip:158:1: remark:     AGPRs: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/control/megakernel_d0.hip:158:1: remark:     ScratchSize [bytes/lane]: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/control/megakernel_d0.hip:158:1: remark:     Dynamic Stack: False [-Rpass-analysis=kernel-resource-usage]
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/control/megakernel_d0.hip:158:1: remark:     Occupancy [waves/SIMD]: 5 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/control/megakernel_d0.hip:158:1: remark:     SGPRs Spill: 24 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/control/megakernel_d0.hip:158:1: remark:     VGPRs Spill: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/control/megakernel_d0.hip:158:1: remark:     LDS Size [bytes/block]: 21152 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/control/megakernel_d0.hip:212:1: remark: Function Name: etx_unfused_d0 [-Rpass-analysis=kernel-resource-usage]
+  212 | extern "C" __global__ void __launch_bounds__(ETX_THREADS, ETX_MIN_WG_PER_CU) etx_unfused_d0(etx_params p, int32_t first) {
+      | ^
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/control/megakernel_d0.hip:212:1: remark:     TotalSGPRs: 84 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/control/megakernel_d0.hip:212:1: remark:     VGPRs: 58 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/control/megakernel_d0.hip:212:1: remark:     AGPRs: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/control/megakernel_d0.hip:212:1: remark:     ScratchSize [bytes/lane]: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/control/megakernel_d0.hip:212:1: remark:     Dynamic Stack: False [-Rpass-analysis=kernel-resource-usage]
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/control/megakernel_d0.hip:212:1: remark:     Occupancy [waves/SIMD]: 8 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/control/megakernel_d0.hip:212:1: remark:     SGPRs Spill: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/control/megakernel_d0.hip:212:1: remark:     VGPRs Spill: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/control/megakernel_d0.hip:212:1: remark:     LDS Size [bytes/block]: 21120 [-Rpass-analysis=kernel-resource-usage]
+NATIVE compile/link OK; load/execute pending
+STAGE /root/etx-python/bin/python3 -m etx compile /root/src/abee09fcda357bb982cfba4d85bb387a6da97ec2385d3d4574f1f7cd4282d5da-20261015T152622Z/examples/vllm_llm/expert_merge/graph.py --arch gfx942 --out /root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate --inline-tiles --sim
+plan: graph=qwen_expert_merge_candidate arch=gfx942 bindings={}
+  devices=1 domains/device=8 workers/domain=38 (wg/CU=1)
+  tasks=704 events=2 eliminated=[]
+  moe_up                   static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  moe_down                 static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  consumer                 static   S_balance=0.00us <= 1.5x(C_cross=253.89+C_queue=1.20)
+  event up_done          scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event down_done        scope=DEVICE  mem=device       numel=1 cross_domain=57344 cross_device=0
+  prefetch entries=0
+sources to link: ['/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate/tiles.hip']
+wrote /root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate/
+sim: makespan 10.4 us | busy 2112.0 wait 865.1 sched 0.0 | utilisation 66.9% over 304 workers
+GENERATED 84f6ba6ec839ccd384fa1fa42a9221e4dd123edc0ca5785e817808ffb70d96c9 /root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate
+STAGE exec ['/root/etx-python/bin/python3', '-m', 'examples.vllm_llm.expert_merge.prepare', 'native', PosixPath('/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate')] evidence /root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate_build.log
+STAGE hipcc -O3 -std=c++17 --offload-arch=gfx942 -Ietx/runtime/include -I /root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate -I. -DETX_DSL_WSUM -DETX_DSL_SCALAR -DETX_DSL_GU1 -DETX_DSL_RBATCH -DETX_DSL_NORM_HOIST -DETX_DSL_VECNORM -DETX_TOPK_KEY32 -Rpass-analysis=kernel-resource-usage /root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate/megakernel_d0.hip /root/src/abee09fcda357bb982cfba4d85bb387a6da97ec2385d3d4574f1f7cd4282d5da-20261015T152622Z/examples/vllm_llm/expert_merge/host.hip -o /root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate/run
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate/megakernel_d0.hip:158:1: remark: Function Name: etx_megakernel_d0 [-Rpass-analysis=kernel-resource-usage]
+  158 | extern "C" __global__ void __launch_bounds__(ETX_THREADS, ETX_MIN_WG_PER_CU) etx_megakernel_d0(etx_params p) {
+      | ^
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate/megakernel_d0.hip:158:1: remark:     TotalSGPRs: 106 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate/megakernel_d0.hip:158:1: remark:     VGPRs: 84 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate/megakernel_d0.hip:158:1: remark:     AGPRs: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate/megakernel_d0.hip:158:1: remark:     ScratchSize [bytes/lane]: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate/megakernel_d0.hip:158:1: remark:     Dynamic Stack: False [-Rpass-analysis=kernel-resource-usage]
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate/megakernel_d0.hip:158:1: remark:     Occupancy [waves/SIMD]: 5 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate/megakernel_d0.hip:158:1: remark:     SGPRs Spill: 9 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate/megakernel_d0.hip:158:1: remark:     VGPRs Spill: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate/megakernel_d0.hip:158:1: remark:     LDS Size [bytes/block]: 21152 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate/megakernel_d0.hip:212:1: remark: Function Name: etx_unfused_d0 [-Rpass-analysis=kernel-resource-usage]
+  212 | extern "C" __global__ void __launch_bounds__(ETX_THREADS, ETX_MIN_WG_PER_CU) etx_unfused_d0(etx_params p, int32_t first) {
+      | ^
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate/megakernel_d0.hip:212:1: remark:     TotalSGPRs: 62 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate/megakernel_d0.hip:212:1: remark:     VGPRs: 54 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate/megakernel_d0.hip:212:1: remark:     AGPRs: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate/megakernel_d0.hip:212:1: remark:     ScratchSize [bytes/lane]: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate/megakernel_d0.hip:212:1: remark:     Dynamic Stack: False [-Rpass-analysis=kernel-resource-usage]
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate/megakernel_d0.hip:212:1: remark:     Occupancy [waves/SIMD]: 8 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate/megakernel_d0.hip:212:1: remark:     SGPRs Spill: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate/megakernel_d0.hip:212:1: remark:     VGPRs Spill: 0 [-Rpass-analysis=kernel-resource-usage]
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate/megakernel_d0.hip:212:1: remark:     LDS Size [bytes/block]: 21120 [-Rpass-analysis=kernel-resource-usage]
+NATIVE compile/link OK; load/execute pending
+STAGE BUILT; next: python -m examples.vllm_llm.expert_merge.runner check /root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe

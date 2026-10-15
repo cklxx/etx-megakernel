@@ -1,0 +1,99 @@
+$ stdbuf -oL -eL /root/sess/x8-live-20261015/20261015T154549Z-7cdcb2/b_x1km/run --weights /root/sess/x8-live-20261015/20261015T154549Z-7cdcb2/references/weights.bin --cache /root/sess/x8-live-20261015/20261015T154549Z-7cdcb2/references/r5/fleet_cache.bin --golden /root/sess/x8-live-20261015/20261015T154549Z-7cdcb2/references/r5/golden_tokens.txt --hidden /root/sess/x8-live-20261015/20261015T154549Z-7cdcb2/references/r5/golden_hidden.bin --tokens 32 --context 1024 --repeat 2
+device: AMD Instinct MI300X VF  arch gfx942:sramecc+:xnack-  CUs 304
+model: hidden 2048 heads 16 kv_lora 512 experts 64 top-6 layers 27 (dense < 1) vocab 102400
+  /root/sess/x8-live-20261015/20261015T154549Z-7cdcb2/references/weights.bin: 31.4 GB uploaded
+  /root/sess/x8-live-20261015/20261015T154549Z-7cdcb2/references/r5/fleet_cache.bin: 0.0 GB uploaded
+etx: 54946 tasks, 1589 event words, 296 workers (8 domains x 37), lds 24576 B (fleet scratch 23408 B)
+run 0 (warm-up): 32/32 tokens match
+token  0:    3.132 ms (device)  step   3.269 ms  out    185  ok
+token  1:    3.131 ms (device)  step   3.265 ms  out    300  ok
+token  2:    3.133 ms (device)  step   3.266 ms  out   1501  ok
+token  3:    3.134 ms (device)  step   3.270 ms  out  11747  ok
+token  4:    3.131 ms (device)  step   3.261 ms  out    254  ok
+token  5:    3.131 ms (device)  step   3.263 ms  out   3510  ok
+token  6:    3.136 ms (device)  step   3.269 ms  out    185  ok
+token  7:    3.137 ms (device)  step   3.288 ms  out   1558  ok
+token  8:    3.141 ms (device)  step   3.273 ms  out   8708  ok
+token  9:    3.145 ms (device)  step   3.278 ms  out      7  ok
+token 10:    3.134 ms (device)  step   3.265 ms  out     77  ok
+token 11:    3.135 ms (device)  step   3.268 ms  out   1780  ok
+token 12:    3.134 ms (device)  step   3.265 ms  out    185  ok
+token 13:    3.132 ms (device)  step   3.267 ms  out    300  ok
+token 14:    3.136 ms (device)  step   3.271 ms  out   1501  ok
+token 15:    3.137 ms (device)  step   3.270 ms  out  11747  ok
+token 16:    3.141 ms (device)  step   3.275 ms  out    254  ok
+token 17:    3.142 ms (device)  step   3.279 ms  out   3510  ok
+token 18:    3.146 ms (device)  step   3.281 ms  out    185  ok
+token 19:    3.138 ms (device)  step   3.276 ms  out   1558  ok
+token 20:    3.148 ms (device)  step   3.284 ms  out   8708  ok
+token 21:    3.143 ms (device)  step   3.277 ms  out      7  ok
+token 22:    3.142 ms (device)  step   3.277 ms  out     77  ok
+token 23:    3.142 ms (device)  step   3.278 ms  out   1780  ok
+token 24:    3.140 ms (device)  step   3.272 ms  out    185  ok
+token 25:    3.140 ms (device)  step   3.272 ms  out    300  ok
+token 26:    3.134 ms (device)  step   3.283 ms  out   1501  ok
+token 27:    3.166 ms (device)  step   3.299 ms  out  11747  ok
+token 28:    3.142 ms (device)  step   3.278 ms  out    254  ok
+token 29:    3.145 ms (device)  step   3.275 ms  out   3510  ok
+token 30:    3.140 ms (device)  step   3.271 ms  out    185  ok
+token 31:    3.145 ms (device)  step   3.287 ms  out   1558  ok
+  layer  0 dense: max rel  4.39e-03  cosine 0.999991  [ok]
+LAYERGATE r=0 layer=0 rel=4.385964912e-03 cosine=0.999991053 pass=1
+  layer  1 moe  : max rel  8.26e-03  cosine 0.999976  [ok]
+LAYERGATE r=0 layer=1 rel=8.264462810e-03 cosine=0.999975562 pass=1
+  layer  2 moe  : max rel  1.32e-02  cosine 0.999527  [ok]
+LAYERGATE r=0 layer=2 rel=1.324503311e-02 cosine=0.999526509 pass=1
+  layer  3 moe  : max rel  1.18e-02  cosine 0.996364  [FAIL]
+LAYERGATE r=0 layer=3 rel=1.175902062e-02 cosine=0.996363947 pass=0
+  layer  4 moe  : max rel  2.47e-02  cosine 0.998123  [FAIL]
+LAYERGATE r=0 layer=4 rel=2.469135802e-02 cosine=0.998123142 pass=0
+  layer  5 moe  : max rel  1.72e-02  cosine 0.998587  [FAIL]
+LAYERGATE r=0 layer=5 rel=1.715686275e-02 cosine=0.998587273 pass=0
+  layer  6 moe  : max rel  2.28e-02  cosine 0.997892  [FAIL]
+LAYERGATE r=0 layer=6 rel=2.284263959e-02 cosine=0.997892269 pass=0
+  layer  7 moe  : max rel  4.60e-02  cosine 0.993973  [FAIL]
+LAYERGATE r=0 layer=7 rel=4.601226994e-02 cosine=0.993972676 pass=0
+  layer  8 moe  : max rel  6.36e-02  cosine 0.986133  [FAIL]
+LAYERGATE r=0 layer=8 rel=6.363636364e-02 cosine=0.986132997 pass=0
+  layer  9 moe  : max rel  6.67e-02  cosine 0.980543  [FAIL]
+LAYERGATE r=0 layer=9 rel=6.666666667e-02 cosine=0.980543085 pass=0
+  layer 10 moe  : max rel  7.81e-02  cosine 0.959057  [FAIL]
+LAYERGATE r=0 layer=10 rel=7.812500000e-02 cosine=0.959057114 pass=0
+  layer 11 moe  : max rel  6.50e-02  cosine 0.966651  [FAIL]
+LAYERGATE r=0 layer=11 rel=6.500000000e-02 cosine=0.966650885 pass=0
+  layer 12 moe  : max rel  8.98e-02  cosine 0.950308  [FAIL]
+LAYERGATE r=0 layer=12 rel=8.982035928e-02 cosine=0.950307683 pass=0
+  layer 13 moe  : max rel  1.04e-01  cosine 0.925490  [FAIL]
+LAYERGATE r=0 layer=13 rel=1.040268456e-01 cosine=0.925489657 pass=0
+  layer 14 moe  : max rel  8.79e-02  cosine 0.932936  [FAIL]
+LAYERGATE r=0 layer=14 rel=8.787878788e-02 cosine=0.932935744 pass=0
+  layer 15 moe  : max rel  1.06e-01  cosine 0.926221  [FAIL]
+LAYERGATE r=0 layer=15 rel=1.058823529e-01 cosine=0.926220794 pass=0
+  layer 16 moe  : max rel  1.01e-01  cosine 0.923982  [FAIL]
+LAYERGATE r=0 layer=16 rel=1.009174312e-01 cosine=0.923981703 pass=0
+  layer 17 moe  : max rel  6.58e-02  cosine 0.916115  [FAIL]
+LAYERGATE r=0 layer=17 rel=6.578947368e-02 cosine=0.916114650 pass=0
+  layer 18 moe  : max rel  1.07e-01  cosine 0.917872  [FAIL]
+LAYERGATE r=0 layer=18 rel=1.068702290e-01 cosine=0.917872006 pass=0
+  layer 19 moe  : max rel  1.00e-01  cosine 0.928879  [FAIL]
+LAYERGATE r=0 layer=19 rel=1.000000000e-01 cosine=0.928878855 pass=0
+  layer 20 moe  : max rel  1.38e-01  cosine 0.947813  [FAIL]
+LAYERGATE r=0 layer=20 rel=1.382488479e-01 cosine=0.947812549 pass=0
+  layer 21 moe  : max rel  1.51e-01  cosine 0.942659  [FAIL]
+LAYERGATE r=0 layer=21 rel=1.506024096e-01 cosine=0.942659214 pass=0
+  layer 22 moe  : max rel  1.06e-01  cosine 0.951741  [FAIL]
+LAYERGATE r=0 layer=22 rel=1.059907834e-01 cosine=0.951740826 pass=0
+  layer 23 moe  : max rel  8.00e-02  cosine 0.969915  [FAIL]
+LAYERGATE r=0 layer=23 rel=8.000000000e-02 cosine=0.969915188 pass=0
+  layer 24 moe  : max rel  6.15e-02  cosine 0.978327  [FAIL]
+LAYERGATE r=0 layer=24 rel=6.153846154e-02 cosine=0.978327085 pass=0
+  layer 25 moe  : max rel  2.17e-02  cosine 0.989497  [FAIL]
+LAYERGATE r=0 layer=25 rel=2.170138889e-02 cosine=0.989497156 pass=0
+  layer 26 moe  : max rel  5.23e-02  cosine 0.995341  [FAIL]
+LAYERGATE r=0 layer=26 rel=5.232558140e-02 cosine=0.995341041 pass=0
+  consecutive layers within the gate: 3 of 27
+
+per-token latency (embed -> argmax on device): median 3.140 ms  mean 3.139 ms; step wall (launch to end) 3.274 ms/token
+tokens: 32/32 match HF greedy
+BATCHREQ r=0 tokens=32/32 layers=3 warmup=32/32 interval_median_ms=3.29088 device_median_ms=3.139760
+BATCH requests=1 tokens=32 step_median_ms=3.272622

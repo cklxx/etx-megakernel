@@ -1,0 +1,67 @@
+[15:45:49 +  0m00s] session record: /root/sess/x8-live-20261015/20261015T154549Z-7cdcb2
+[15:45:49 +  0m00s] start apt (cpu)
+[15:45:50 +  0m01s] ok      apt rc=0 1s
+[15:45:50 +  0m01s] start etx_env (cpu)
+[15:45:50 +  0m01s] start prep_env (cpu)
+[15:45:51 +  0m02s] ok      etx_env rc=0 1s
+[15:45:51 +  0m02s] start source (cpu)
+[15:45:52 +  0m03s] ok      source rc=0 1s
+    SOURCE OK fleet export 28f5cbb4f39524df etx 554133d744b4
+[15:45:52 +  0m03s] start build_x1km (cpu)
+[15:45:54 +  0m05s] ok      prep_env rc=0 4s
+[15:45:54 +  0m05s] start prep_dl (cpu)
+[15:45:55 +  0m06s] ok      prep_dl rc=0 1s
+[15:45:55 +  0m06s] start prep_pack (cpu)
+[15:45:56 +  0m07s] ok      prep_pack rc=0 1s
+[15:45:56 +  0m07s] start build_x8 (cpu)
+[15:45:56 +  0m07s] start references on GPU 0
+[15:46:27 +  0m38s] ok      build_x1km rc=0 35s
+[15:46:27 +  0m38s] start build_alld4r0l1kvsmw (cpu)
+[15:46:49 +  1m00s] progress: 3 running, 2 waiting, 7 done
+    build_x8 [cpu] 53s / 1200s: PROGRESS invocation=compile_x8 elapsed_s=30.1 deadline_s=900
+    build_alld4r0l1kvsmw [cpu] 22s / 1200s: /root/sess/x8-live-20261015/20261015T154549Z-7cdcb2/b_alld4r0l1kvsmw/fleet_src/kernels/fleet_kernel.hip:1150:1: remark:     LDS Size [bytes/block]: 0 [-Rpass-an
+    references [GPU 0] 53s / 1600s: PROGRESS invocation=reference_r0 elapsed_s=30.0 deadline_s=180
+[15:47:07 +  1m18s] ok      build_alld4r0l1kvsmw rc=0 40s
+[15:47:49 +  2m00s] progress: 2 running, 2 waiting, 8 done
+    build_x8 [cpu] 113s / 1200s: PROGRESS invocation=compile_x8 elapsed_s=90.7 deadline_s=900
+    references [GPU 0] 113s / 1600s: loading /root/models/dsv2-lite-base (bf16)
+[15:48:49 +  3m00s] progress: 2 running, 2 waiting, 8 done
+    build_x8 [cpu] 173s / 1200s: PROGRESS invocation=compile_x8 elapsed_s=151.3 deadline_s=900
+    references [GPU 0] 173s / 1600s: /opt/amdgpu/share/libdrm/amdgpu.ids: No such file or directory
+[15:49:49 +  4m00s] progress: 2 running, 2 waiting, 8 done
+    build_x8 [cpu] 233s / 1200s: PROGRESS invocation=compile_x8 elapsed_s=211.4 deadline_s=900
+    references [GPU 0] 233s / 1600s: Loading checkpoint shards:  25%|██▌       | 1/4 [00:00<00:02,  1.39it/s]
+[15:50:49 +  5m00s] progress: 2 running, 2 waiting, 8 done
+    build_x8 [cpu] 293s / 1200s: PROGRESS invocation=compile_x8 elapsed_s=271.5 deadline_s=900
+    references [GPU 0] 293s / 1600s: loading /root/models/dsv2-lite-base (bf16)
+[15:51:49 +  6m00s] progress: 2 running, 2 waiting, 8 done
+    build_x8 [cpu] 353s / 1200s: PROGRESS invocation=compile_x8 elapsed_s=331.6 deadline_s=900
+    references [GPU 0] 353s / 1600s: loading /root/models/dsv2-lite-base (bf16)
+[15:52:44 +  6m55s] ok      build_x8 rc=0 408s
+[15:52:49 +  7m00s] progress: 1 running, 2 waiting, 9 done
+    references [GPU 0] 413s / 1600s: $ stdbuf -oL -eL /root/dsv2-prep/.venv/bin/python examples/dsv2lite/reference_rotated.py --fleet /root/fleet-3fb67a6 --rotate 582 -- --model /root/models/dsv2-l
+[15:53:49 +  8m00s] progress: 1 running, 2 waiting, 9 done
+    references [GPU 0] 473s / 1600s: PROGRESS invocation=reference_r6 elapsed_s=61.3 deadline_s=180
+[15:54:49 +  9m00s] progress: 1 running, 2 waiting, 9 done
+    references [GPU 0] 533s / 1600s: /opt/amdgpu/share/libdrm/amdgpu.ids: No such file or directory
+[15:55:36 +  9m47s] ok      references rc=0 580s
+[15:55:36 +  9m47s] start diagnostics on GPU 0
+[15:55:49 + 10m00s] progress: 1 running, 1 waiting, 10 done
+    diagnostics [GPU 0] 13s / 1150s: model: hidden 2048 heads 16 kv_lora 512 experts 64 top-6 layers 27 (dense < 1) vocab 102400
+[15:56:18 + 10m29s] ok      diagnostics rc=0 42s
+[15:56:18 + 10m29s] start summary (cpu)
+[15:56:19 + 10m30s] ok      summary rc=0 1s
+[15:56:19 + 10m30s] session done
+  job                              status     rc  gpu  seconds
+  apt                              ok          0             1  
+  etx_env                          ok          0             1  
+  prep_env                         ok          0             4  
+  source                           ok          0             1  
+  prep_dl                          ok          0             1  
+  prep_pack                        ok          0             1  
+  build_x1km                       ok          0            35  
+  build_x8                         ok          0           408  
+  build_alld4r0l1kvsmw             ok          0            40  
+  references                       ok          0    0      580  
+  diagnostics                      ok          0    0       42  
+  summary                          ok          0             1  

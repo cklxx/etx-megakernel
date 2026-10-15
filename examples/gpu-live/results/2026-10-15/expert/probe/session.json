@@ -1,0 +1,9 @@
+{
+  "deadline_unix": 1792079975.5412028,
+  "head": false,
+  "input": "/root/sess/expert-live-20261015/20261015T152934Z-af0efa/synthetic",
+  "input_sha256": "3e43507f3ee6b633c682105fc1346692d2863bda80732d0a7cb63e30f143d64d",
+  "kind": "synthetic",
+  "schema": 1,
+  "start_unix": 1792078175.5412025
+}

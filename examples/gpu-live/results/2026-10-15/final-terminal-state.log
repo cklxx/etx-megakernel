@@ -1,0 +1,18 @@
+Thu Oct 15 16:30:56 UTC 2026
+0
+1
+  21054   13505       00:00 bash -c date -u; cat /root/setup-live/c6-container-run.exit /root/setup-live/b4-run.exit; ps -eo pid,ppid,etime,args | awk "/[g]pu_jobs|[a]ttention_early_merge.session|[b]atch_attribution|[r]outing_overlap|[v]llm_bench|[c]6-container-run|[b]4-run.sh/ {print}"; docker ps --format "{{.ID}} {{.Names}} {{.Status}}"; rocm-smi --showuse; cat /root/etx/SOURCE_IDENTITY; sha256sum /root/c6-live-20261015/SNAPSHOT_SHA256SUMS /root/setup-live/b4-run.sh
+d9c7be411641 rocm Up About an hour
+
+
+============================ ROCm System Management Interface ============================
+=================================== % time GPU is busy ===================================
+GPU[0]		: GPU use (%): 0
+==========================================================================================
+================================== End of ROCm SMI Log ===================================
+commit 554133d744b4591c9cf87c68b6817df781137c9b
+branch main
+archive abee09fcda357bb982cfba4d85bb387a6da97ec2385d3d4574f1f7cd4282d5da
+staged 2026-10-15T15:26:30Z
+5dad8b0456342fdf36c614fb05569ed57431c93159fa69ffbb64b914049b2a30  /root/c6-live-20261015/SNAPSHOT_SHA256SUMS
+6050697a024d22e75fb3cf07c71305277d3cf0bd3427dede74133d38fcb1d7ac  /root/setup-live/b4-run.sh

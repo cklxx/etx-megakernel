@@ -1,0 +1,401 @@
+# job pairs gpu=0 cwd=/root/src/abee09fcda357bb982cfba4d85bb387a6da97ec2385d3d4574f1f7cd4282d5da-20261015T152622Z
+# python3 -m examples.vllm_llm.expert_merge.runner time "$ETX_SESS_LOGDIR/probe"
+STAGE exec [PosixPath('/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/control/run'), '/root/sess/expert-live-20261015/20261015T152934Z-af0efa/synthetic', PosixPath('/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/time-000/r0_fused_control'), 'time', 'fused', '200'] evidence /root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/time-000/r0_fused_control.log
+EEM device=AMD Instinct MI300X VF arch=gfx942:sramecc+:xnack- arm=control diagnostic=0 consumer=qkv identity=b17e5e37f577c6c0170ec59c420d853ba2bdddff8383ddac867fbd621f72d49e
+EEM TIME progress=0/200
+EEM TIME progress=25/200
+EEM TIME progress=50/200
+EEM TIME progress=75/200
+EEM TIME progress=100/200
+EEM TIME progress=125/200
+EEM TIME progress=150/200
+EEM TIME progress=175/200
+EEM-TIME {"identity":"b17e5e37f577c6c0170ec59c420d853ba2bdddff8383ddac867fbd621f72d49e","arm":"control","mode":"fused","n":200,"us":94.255493164,"wall_us":1087.350995000}
+STAGE exec [PosixPath('/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate/run'), '/root/sess/expert-live-20261015/20261015T152934Z-af0efa/synthetic', PosixPath('/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/time-000/r0_fused_candidate'), 'time', 'fused', '200'] evidence /root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/time-000/r0_fused_candidate.log
+EEM device=AMD Instinct MI300X VF arch=gfx942:sramecc+:xnack- arm=candidate diagnostic=0 consumer=qkv identity=84f6ba6ec839ccd384fa1fa42a9221e4dd123edc0ca5785e817808ffb70d96c9
+EEM TIME progress=0/200
+EEM TIME progress=25/200
+EEM TIME progress=50/200
+EEM TIME progress=75/200
+EEM TIME progress=100/200
+EEM TIME progress=125/200
+EEM TIME progress=150/200
+EEM TIME progress=175/200
+EEM-TIME {"identity":"84f6ba6ec839ccd384fa1fa42a9221e4dd123edc0ca5785e817808ffb70d96c9","arm":"candidate","mode":"fused","n":200,"us":100.870994568,"wall_us":1090.278910000}
+STAGE exec [PosixPath('/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/control/run'), '/root/sess/expert-live-20261015/20261015T152934Z-af0efa/synthetic', PosixPath('/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/time-000/r0_graph_control'), 'time', 'graph', '200'] evidence /root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/time-000/r0_graph_control.log
+EEM device=AMD Instinct MI300X VF arch=gfx942:sramecc+:xnack- arm=control diagnostic=0 consumer=qkv identity=b17e5e37f577c6c0170ec59c420d853ba2bdddff8383ddac867fbd621f72d49e
+EEM TIME progress=0/200
+EEM TIME progress=25/200
+EEM TIME progress=50/200
+EEM TIME progress=75/200
+EEM TIME progress=100/200
+EEM TIME progress=125/200
+EEM TIME progress=150/200
+EEM TIME progress=175/200
+EEM-TIME {"identity":"b17e5e37f577c6c0170ec59c420d853ba2bdddff8383ddac867fbd621f72d49e","arm":"control","mode":"graph","n":200,"us":70.601997375,"wall_us":1086.685730000}
+STAGE exec [PosixPath('/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate/run'), '/root/sess/expert-live-20261015/20261015T152934Z-af0efa/synthetic', PosixPath('/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/time-000/r0_graph_candidate'), 'time', 'graph', '200'] evidence /root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/time-000/r0_graph_candidate.log
+EEM device=AMD Instinct MI300X VF arch=gfx942:sramecc+:xnack- arm=candidate diagnostic=0 consumer=qkv identity=84f6ba6ec839ccd384fa1fa42a9221e4dd123edc0ca5785e817808ffb70d96c9
+EEM TIME progress=0/200
+EEM TIME progress=25/200
+EEM TIME progress=50/200
+EEM TIME progress=75/200
+EEM TIME progress=100/200
+EEM TIME progress=125/200
+EEM TIME progress=150/200
+EEM TIME progress=175/200
+EEM-TIME {"identity":"84f6ba6ec839ccd384fa1fa42a9221e4dd123edc0ca5785e817808ffb70d96c9","arm":"candidate","mode":"graph","n":200,"us":77.336997986,"wall_us":1087.383965000}
+STAGE exec [PosixPath('/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate/run'), '/root/sess/expert-live-20261015/20261015T152934Z-af0efa/synthetic', PosixPath('/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/time-000/r1_fused_candidate'), 'time', 'fused', '200'] evidence /root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/time-000/r1_fused_candidate.log
+EEM device=AMD Instinct MI300X VF arch=gfx942:sramecc+:xnack- arm=candidate diagnostic=0 consumer=qkv identity=84f6ba6ec839ccd384fa1fa42a9221e4dd123edc0ca5785e817808ffb70d96c9
+EEM TIME progress=0/200
+EEM TIME progress=25/200
+EEM TIME progress=50/200
+EEM TIME progress=75/200
+EEM TIME progress=100/200
+EEM TIME progress=125/200
+EEM TIME progress=150/200
+EEM TIME progress=175/200
+EEM-TIME {"identity":"84f6ba6ec839ccd384fa1fa42a9221e4dd123edc0ca5785e817808ffb70d96c9","arm":"candidate","mode":"fused","n":200,"us":100.930496216,"wall_us":1090.454090000}
+STAGE exec [PosixPath('/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/control/run'), '/root/sess/expert-live-20261015/20261015T152934Z-af0efa/synthetic', PosixPath('/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/time-000/r1_fused_control'), 'time', 'fused', '200'] evidence /root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/time-000/r1_fused_control.log
+EEM device=AMD Instinct MI300X VF arch=gfx942:sramecc+:xnack- arm=control diagnostic=0 consumer=qkv identity=b17e5e37f577c6c0170ec59c420d853ba2bdddff8383ddac867fbd621f72d49e
+EEM TIME progress=0/200
+EEM TIME progress=25/200
+EEM TIME progress=50/200
+EEM TIME progress=75/200
+EEM TIME progress=100/200
+EEM TIME progress=125/200
+EEM TIME progress=150/200
+EEM TIME progress=175/200
+EEM-TIME {"identity":"b17e5e37f577c6c0170ec59c420d853ba2bdddff8383ddac867fbd621f72d49e","arm":"control","mode":"fused","n":200,"us":94.255493164,"wall_us":1087.526880000}
+STAGE exec [PosixPath('/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate/run'), '/root/sess/expert-live-20261015/20261015T152934Z-af0efa/synthetic', PosixPath('/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/time-000/r1_graph_candidate'), 'time', 'graph', '200'] evidence /root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/time-000/r1_graph_candidate.log
+EEM device=AMD Instinct MI300X VF arch=gfx942:sramecc+:xnack- arm=candidate diagnostic=0 consumer=qkv identity=84f6ba6ec839ccd384fa1fa42a9221e4dd123edc0ca5785e817808ffb70d96c9
+EEM TIME progress=0/200
+EEM TIME progress=25/200
+EEM TIME progress=50/200
+EEM TIME progress=75/200
+EEM TIME progress=100/200
+EEM TIME progress=125/200
+EEM TIME progress=150/200
+EEM TIME progress=175/200
+EEM-TIME {"identity":"84f6ba6ec839ccd384fa1fa42a9221e4dd123edc0ca5785e817808ffb70d96c9","arm":"candidate","mode":"graph","n":200,"us":77.136505127,"wall_us":1086.830200000}
+STAGE exec [PosixPath('/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/control/run'), '/root/sess/expert-live-20261015/20261015T152934Z-af0efa/synthetic', PosixPath('/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/time-000/r1_graph_control'), 'time', 'graph', '200'] evidence /root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/time-000/r1_graph_control.log
+EEM device=AMD Instinct MI300X VF arch=gfx942:sramecc+:xnack- arm=control diagnostic=0 consumer=qkv identity=b17e5e37f577c6c0170ec59c420d853ba2bdddff8383ddac867fbd621f72d49e
+EEM TIME progress=0/200
+EEM TIME progress=25/200
+EEM TIME progress=50/200
+EEM TIME progress=75/200
+EEM TIME progress=100/200
+EEM TIME progress=125/200
+EEM TIME progress=150/200
+EEM TIME progress=175/200
+EEM-TIME {"identity":"b17e5e37f577c6c0170ec59c420d853ba2bdddff8383ddac867fbd621f72d49e","arm":"control","mode":"graph","n":200,"us":70.401496887,"wall_us":1086.397485000}
+STAGE exec [PosixPath('/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/control/run'), '/root/sess/expert-live-20261015/20261015T152934Z-af0efa/synthetic', PosixPath('/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/time-000/r2_fused_control'), 'time', 'fused', '200'] evidence /root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/time-000/r2_fused_control.log
+EEM device=AMD Instinct MI300X VF arch=gfx942:sramecc+:xnack- arm=control diagnostic=0 consumer=qkv identity=b17e5e37f577c6c0170ec59c420d853ba2bdddff8383ddac867fbd621f72d49e
+EEM TIME progress=0/200
+EEM TIME progress=25/200
+EEM TIME progress=50/200
+EEM TIME progress=75/200
+EEM TIME progress=100/200
+EEM TIME progress=125/200
+EEM TIME progress=150/200
+EEM TIME progress=175/200
+EEM-TIME {"identity":"b17e5e37f577c6c0170ec59c420d853ba2bdddff8383ddac867fbd621f72d49e","arm":"control","mode":"fused","n":200,"us":94.155502319,"wall_us":1090.502570000}
+STAGE exec [PosixPath('/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate/run'), '/root/sess/expert-live-20261015/20261015T152934Z-af0efa/synthetic', PosixPath('/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/time-000/r2_fused_candidate'), 'time', 'fused', '200'] evidence /root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/time-000/r2_fused_candidate.log
+EEM device=AMD Instinct MI300X VF arch=gfx942:sramecc+:xnack- arm=candidate diagnostic=0 consumer=qkv identity=84f6ba6ec839ccd384fa1fa42a9221e4dd123edc0ca5785e817808ffb70d96c9
+EEM TIME progress=0/200
+EEM TIME progress=25/200
+EEM TIME progress=50/200
+EEM TIME progress=75/200
+EEM TIME progress=100/200
+EEM TIME progress=125/200
+EEM TIME progress=150/200
+EEM TIME progress=175/200
+EEM-TIME {"identity":"84f6ba6ec839ccd384fa1fa42a9221e4dd123edc0ca5785e817808ffb70d96c9","arm":"candidate","mode":"fused","n":200,"us":101.030502319,"wall_us":1090.746330000}
+STAGE exec [PosixPath('/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/control/run'), '/root/sess/expert-live-20261015/20261015T152934Z-af0efa/synthetic', PosixPath('/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/time-000/r2_graph_control'), 'time', 'graph', '200'] evidence /root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/time-000/r2_graph_control.log
+EEM device=AMD Instinct MI300X VF arch=gfx942:sramecc+:xnack- arm=control diagnostic=0 consumer=qkv identity=b17e5e37f577c6c0170ec59c420d853ba2bdddff8383ddac867fbd621f72d49e
+EEM TIME progress=0/200
+EEM TIME progress=25/200
+EEM TIME progress=50/200
+EEM TIME progress=75/200
+EEM TIME progress=100/200
+EEM TIME progress=125/200
+EEM TIME progress=150/200
+EEM TIME progress=175/200
+EEM-TIME {"identity":"b17e5e37f577c6c0170ec59c420d853ba2bdddff8383ddac867fbd621f72d49e","arm":"control","mode":"graph","n":200,"us":70.361000061,"wall_us":1085.087650000}
+STAGE exec [PosixPath('/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate/run'), '/root/sess/expert-live-20261015/20261015T152934Z-af0efa/synthetic', PosixPath('/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/time-000/r2_graph_candidate'), 'time', 'graph', '200'] evidence /root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/time-000/r2_graph_candidate.log
+EEM device=AMD Instinct MI300X VF arch=gfx942:sramecc+:xnack- arm=candidate diagnostic=0 consumer=qkv identity=84f6ba6ec839ccd384fa1fa42a9221e4dd123edc0ca5785e817808ffb70d96c9
+EEM TIME progress=0/200
+EEM TIME progress=25/200
+EEM TIME progress=50/200
+EEM TIME progress=75/200
+EEM TIME progress=100/200
+EEM TIME progress=125/200
+EEM TIME progress=150/200
+EEM TIME progress=175/200
+EEM-TIME {"identity":"84f6ba6ec839ccd384fa1fa42a9221e4dd123edc0ca5785e817808ffb70d96c9","arm":"candidate","mode":"graph","n":200,"us":77.416503906,"wall_us":1088.821670000}
+STAGE exec [PosixPath('/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate/run'), '/root/sess/expert-live-20261015/20261015T152934Z-af0efa/synthetic', PosixPath('/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/time-000/r3_fused_candidate'), 'time', 'fused', '200'] evidence /root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/time-000/r3_fused_candidate.log
+EEM device=AMD Instinct MI300X VF arch=gfx942:sramecc+:xnack- arm=candidate diagnostic=0 consumer=qkv identity=84f6ba6ec839ccd384fa1fa42a9221e4dd123edc0ca5785e817808ffb70d96c9
+EEM TIME progress=0/200
+EEM TIME progress=25/200
+EEM TIME progress=50/200
+EEM TIME progress=75/200
+EEM TIME progress=100/200
+EEM TIME progress=125/200
+EEM TIME progress=150/200
+EEM TIME progress=175/200
+EEM-TIME {"identity":"84f6ba6ec839ccd384fa1fa42a9221e4dd123edc0ca5785e817808ffb70d96c9","arm":"candidate","mode":"fused","n":200,"us":100.430000305,"wall_us":1092.119895000}
+STAGE exec [PosixPath('/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/control/run'), '/root/sess/expert-live-20261015/20261015T152934Z-af0efa/synthetic', PosixPath('/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/time-000/r3_fused_control'), 'time', 'fused', '200'] evidence /root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/time-000/r3_fused_control.log
+EEM device=AMD Instinct MI300X VF arch=gfx942:sramecc+:xnack- arm=control diagnostic=0 consumer=qkv identity=b17e5e37f577c6c0170ec59c420d853ba2bdddff8383ddac867fbd621f72d49e
+EEM TIME progress=0/200
+EEM TIME progress=25/200
+EEM TIME progress=50/200
+EEM TIME progress=75/200
+EEM TIME progress=100/200
+EEM TIME progress=125/200
+EEM TIME progress=150/200
+EEM TIME progress=175/200
+EEM-TIME {"identity":"b17e5e37f577c6c0170ec59c420d853ba2bdddff8383ddac867fbd621f72d49e","arm":"control","mode":"fused","n":200,"us":93.492996216,"wall_us":1091.920610000}
+STAGE exec [PosixPath('/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate/run'), '/root/sess/expert-live-20261015/20261015T152934Z-af0efa/synthetic', PosixPath('/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/time-000/r3_graph_candidate'), 'time', 'graph', '200'] evidence /root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/time-000/r3_graph_candidate.log
+EEM device=AMD Instinct MI300X VF arch=gfx942:sramecc+:xnack- arm=candidate diagnostic=0 consumer=qkv identity=84f6ba6ec839ccd384fa1fa42a9221e4dd123edc0ca5785e817808ffb70d96c9
+EEM TIME progress=0/200
+EEM TIME progress=25/200
+EEM TIME progress=50/200
+EEM TIME progress=75/200
+EEM TIME progress=100/200
+EEM TIME progress=125/200
+EEM TIME progress=150/200
+EEM TIME progress=175/200
+EEM-TIME {"identity":"84f6ba6ec839ccd384fa1fa42a9221e4dd123edc0ca5785e817808ffb70d96c9","arm":"candidate","mode":"graph","n":200,"us":76.776000977,"wall_us":1087.734825000}
+STAGE exec [PosixPath('/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/control/run'), '/root/sess/expert-live-20261015/20261015T152934Z-af0efa/synthetic', PosixPath('/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/time-000/r3_graph_control'), 'time', 'graph', '200'] evidence /root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/time-000/r3_graph_control.log
+EEM device=AMD Instinct MI300X VF arch=gfx942:sramecc+:xnack- arm=control diagnostic=0 consumer=qkv identity=b17e5e37f577c6c0170ec59c420d853ba2bdddff8383ddac867fbd621f72d49e
+EEM TIME progress=0/200
+EEM TIME progress=25/200
+EEM TIME progress=50/200
+EEM TIME progress=75/200
+EEM TIME progress=100/200
+EEM TIME progress=125/200
+EEM TIME progress=150/200
+EEM TIME progress=175/200
+EEM-TIME {"identity":"b17e5e37f577c6c0170ec59c420d853ba2bdddff8383ddac867fbd621f72d49e","arm":"control","mode":"graph","n":200,"us":70.861999512,"wall_us":1086.160775000}
+STAGE exec [PosixPath('/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/control/run'), '/root/sess/expert-live-20261015/20261015T152934Z-af0efa/synthetic', PosixPath('/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/time-000/r4_fused_control'), 'time', 'fused', '200'] evidence /root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/time-000/r4_fused_control.log
+EEM device=AMD Instinct MI300X VF arch=gfx942:sramecc+:xnack- arm=control diagnostic=0 consumer=qkv identity=b17e5e37f577c6c0170ec59c420d853ba2bdddff8383ddac867fbd621f72d49e
+EEM TIME progress=0/200
+EEM TIME progress=25/200
+EEM TIME progress=50/200
+EEM TIME progress=75/200
+EEM TIME progress=100/200
+EEM TIME progress=125/200
+EEM TIME progress=150/200
+EEM TIME progress=175/200
+EEM-TIME {"identity":"b17e5e37f577c6c0170ec59c420d853ba2bdddff8383ddac867fbd621f72d49e","arm":"control","mode":"fused","n":200,"us":94.295997620,"wall_us":1089.710070000}
+STAGE exec [PosixPath('/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate/run'), '/root/sess/expert-live-20261015/20261015T152934Z-af0efa/synthetic', PosixPath('/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/time-000/r4_fused_candidate'), 'time', 'fused', '200'] evidence /root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/time-000/r4_fused_candidate.log
+EEM device=AMD Instinct MI300X VF arch=gfx942:sramecc+:xnack- arm=candidate diagnostic=0 consumer=qkv identity=84f6ba6ec839ccd384fa1fa42a9221e4dd123edc0ca5785e817808ffb70d96c9
+EEM TIME progress=0/200
+EEM TIME progress=25/200
+EEM TIME progress=50/200
+EEM TIME progress=75/200
+EEM TIME progress=100/200
+EEM TIME progress=125/200
+EEM TIME progress=150/200
+EEM TIME progress=175/200
+EEM-TIME {"identity":"84f6ba6ec839ccd384fa1fa42a9221e4dd123edc0ca5785e817808ffb70d96c9","arm":"candidate","mode":"fused","n":200,"us":99.968505859,"wall_us":1092.694785000}
+STAGE exec [PosixPath('/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/control/run'), '/root/sess/expert-live-20261015/20261015T152934Z-af0efa/synthetic', PosixPath('/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/time-000/r4_graph_control'), 'time', 'graph', '200'] evidence /root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/time-000/r4_graph_control.log
+EEM device=AMD Instinct MI300X VF arch=gfx942:sramecc+:xnack- arm=control diagnostic=0 consumer=qkv identity=b17e5e37f577c6c0170ec59c420d853ba2bdddff8383ddac867fbd621f72d49e
+EEM TIME progress=0/200
+EEM TIME progress=25/200
+EEM TIME progress=50/200
+EEM TIME progress=75/200
+EEM TIME progress=100/200
+EEM TIME progress=125/200
+EEM TIME progress=150/200
+EEM TIME progress=175/200
+EEM-TIME {"identity":"b17e5e37f577c6c0170ec59c420d853ba2bdddff8383ddac867fbd621f72d49e","arm":"control","mode":"graph","n":200,"us":70.120002747,"wall_us":1089.333655000}
+STAGE exec [PosixPath('/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate/run'), '/root/sess/expert-live-20261015/20261015T152934Z-af0efa/synthetic', PosixPath('/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/time-000/r4_graph_candidate'), 'time', 'graph', '200'] evidence /root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/time-000/r4_graph_candidate.log
+EEM device=AMD Instinct MI300X VF arch=gfx942:sramecc+:xnack- arm=candidate diagnostic=0 consumer=qkv identity=84f6ba6ec839ccd384fa1fa42a9221e4dd123edc0ca5785e817808ffb70d96c9
+EEM TIME progress=0/200
+EEM TIME progress=25/200
+EEM TIME progress=50/200
+EEM TIME progress=75/200
+EEM TIME progress=100/200
+EEM TIME progress=125/200
+EEM TIME progress=150/200
+EEM TIME progress=175/200
+EEM-TIME {"identity":"84f6ba6ec839ccd384fa1fa42a9221e4dd123edc0ca5785e817808ffb70d96c9","arm":"candidate","mode":"graph","n":200,"us":77.737998962,"wall_us":1091.508495000}
+{
+  "gains_us": [
+    -6.615501404,
+    -6.675003051999994,
+    -6.875,
+    -6.937004088999998,
+    -5.67250823900001
+  ],
+  "median_gain_us": -6.675003051999994,
+  "spread_us": 1.2644958499999888,
+  "rule": "five gains >0; median >=0.625 us and >2*(max-min)",
+  "verdict": "STOP-NO-BENEFIT",
+  "full_model": "OFF; no KEEP, fusion or strongest-vLLM claim",
+  "input_sha256": "3e43507f3ee6b633c682105fc1346692d2863bda80732d0a7cb63e30f143d64d",
+  "results": {
+    "r0_fused_control": {
+      "identity": "b17e5e37f577c6c0170ec59c420d853ba2bdddff8383ddac867fbd621f72d49e",
+      "arm": "control",
+      "mode": "fused",
+      "n": 200,
+      "us": 94.255493164,
+      "wall_us": 1087.350995
+    },
+    "r0_fused_candidate": {
+      "identity": "84f6ba6ec839ccd384fa1fa42a9221e4dd123edc0ca5785e817808ffb70d96c9",
+      "arm": "candidate",
+      "mode": "fused",
+      "n": 200,
+      "us": 100.870994568,
+      "wall_us": 1090.27891
+    },
+    "r0_graph_control": {
+      "identity": "b17e5e37f577c6c0170ec59c420d853ba2bdddff8383ddac867fbd621f72d49e",
+      "arm": "control",
+      "mode": "graph",
+      "n": 200,
+      "us": 70.601997375,
+      "wall_us": 1086.68573
+    },
+    "r0_graph_candidate": {
+      "identity": "84f6ba6ec839ccd384fa1fa42a9221e4dd123edc0ca5785e817808ffb70d96c9",
+      "arm": "candidate",
+      "mode": "graph",
+      "n": 200,
+      "us": 77.336997986,
+      "wall_us": 1087.383965
+    },
+    "r1_fused_candidate": {
+      "identity": "84f6ba6ec839ccd384fa1fa42a9221e4dd123edc0ca5785e817808ffb70d96c9",
+      "arm": "candidate",
+      "mode": "fused",
+      "n": 200,
+      "us": 100.930496216,
+      "wall_us": 1090.45409
+    },
+    "r1_fused_control": {
+      "identity": "b17e5e37f577c6c0170ec59c420d853ba2bdddff8383ddac867fbd621f72d49e",
+      "arm": "control",
+      "mode": "fused",
+      "n": 200,
+      "us": 94.255493164,
+      "wall_us": 1087.52688
+    },
+    "r1_graph_candidate": {
+      "identity": "84f6ba6ec839ccd384fa1fa42a9221e4dd123edc0ca5785e817808ffb70d96c9",
+      "arm": "candidate",
+      "mode": "graph",
+      "n": 200,
+      "us": 77.136505127,
+      "wall_us": 1086.8302
+    },
+    "r1_graph_control": {
+      "identity": "b17e5e37f577c6c0170ec59c420d853ba2bdddff8383ddac867fbd621f72d49e",
+      "arm": "control",
+      "mode": "graph",
+      "n": 200,
+      "us": 70.401496887,
+      "wall_us": 1086.397485
+    },
+    "r2_fused_control": {
+      "identity": "b17e5e37f577c6c0170ec59c420d853ba2bdddff8383ddac867fbd621f72d49e",
+      "arm": "control",
+      "mode": "fused",
+      "n": 200,
+      "us": 94.155502319,
+      "wall_us": 1090.50257
+    },
+    "r2_fused_candidate": {
+      "identity": "84f6ba6ec839ccd384fa1fa42a9221e4dd123edc0ca5785e817808ffb70d96c9",
+      "arm": "candidate",
+      "mode": "fused",
+      "n": 200,
+      "us": 101.030502319,
+      "wall_us": 1090.74633
+    },
+    "r2_graph_control": {
+      "identity": "b17e5e37f577c6c0170ec59c420d853ba2bdddff8383ddac867fbd621f72d49e",
+      "arm": "control",
+      "mode": "graph",
+      "n": 200,
+      "us": 70.361000061,
+      "wall_us": 1085.08765
+    },
+    "r2_graph_candidate": {
+      "identity": "84f6ba6ec839ccd384fa1fa42a9221e4dd123edc0ca5785e817808ffb70d96c9",
+      "arm": "candidate",
+      "mode": "graph",
+      "n": 200,
+      "us": 77.416503906,
+      "wall_us": 1088.82167
+    },
+    "r3_fused_candidate": {
+      "identity": "84f6ba6ec839ccd384fa1fa42a9221e4dd123edc0ca5785e817808ffb70d96c9",
+      "arm": "candidate",
+      "mode": "fused",
+      "n": 200,
+      "us": 100.430000305,
+      "wall_us": 1092.119895
+    },
+    "r3_fused_control": {
+      "identity": "b17e5e37f577c6c0170ec59c420d853ba2bdddff8383ddac867fbd621f72d49e",
+      "arm": "control",
+      "mode": "fused",
+      "n": 200,
+      "us": 93.492996216,
+      "wall_us": 1091.92061
+    },
+    "r3_graph_candidate": {
+      "identity": "84f6ba6ec839ccd384fa1fa42a9221e4dd123edc0ca5785e817808ffb70d96c9",
+      "arm": "candidate",
+      "mode": "graph",
+      "n": 200,
+      "us": 76.776000977,
+      "wall_us": 1087.734825
+    },
+    "r3_graph_control": {
+      "identity": "b17e5e37f577c6c0170ec59c420d853ba2bdddff8383ddac867fbd621f72d49e",
+      "arm": "control",
+      "mode": "graph",
+      "n": 200,
+      "us": 70.861999512,
+      "wall_us": 1086.160775
+    },
+    "r4_fused_control": {
+      "identity": "b17e5e37f577c6c0170ec59c420d853ba2bdddff8383ddac867fbd621f72d49e",
+      "arm": "control",
+      "mode": "fused",
+      "n": 200,
+      "us": 94.29599762,
+      "wall_us": 1089.71007
+    },
+    "r4_fused_candidate": {
+      "identity": "84f6ba6ec839ccd384fa1fa42a9221e4dd123edc0ca5785e817808ffb70d96c9",
+      "arm": "candidate",
+      "mode": "fused",
+      "n": 200,
+      "us": 99.968505859,
+      "wall_us": 1092.694785
+    },
+    "r4_graph_control": {
+      "identity": "b17e5e37f577c6c0170ec59c420d853ba2bdddff8383ddac867fbd621f72d49e",
+      "arm": "control",
+      "mode": "graph",
+      "n": 200,
+      "us": 70.120002747,
+      "wall_us": 1089.333655
+    },
+    "r4_graph_candidate": {
+      "identity": "84f6ba6ec839ccd384fa1fa42a9221e4dd123edc0ca5785e817808ffb70d96c9",
+      "arm": "candidate",
+      "mode": "graph",
+      "n": 200,
+      "us": 77.737998962,
+      "wall_us": 1091.508495
+    }
+  },
+  "window": "device events around captured reset + complete up/down/consumer + runtime retirement",
+  "system_baseline": "N/A for isolated subgraph; mandatory strongest legal vLLM for later model trial"
+}

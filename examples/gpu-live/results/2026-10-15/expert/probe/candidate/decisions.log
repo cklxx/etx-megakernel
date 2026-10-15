@@ -1,0 +1,10 @@
+P1: register/LDS union -> 1 wg/CU set by moe_up; 38 workers/domain x 8 domains x 1 device(s); classes={'rc1': ['moe_up', 'moe_down', 'consumer']}
+P2: tasks per domain {0: 88, 1: 88, 2: 88, 3: 88, 4: 88, 5: 88, 6: 88, 7: 88}; events: up_done=DOMAIN(x0/0), down_done=DEVICE(x57344/0)
+P4: moe_up: static (S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51))
+P4: moe_down: static (S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51))
+P4: consumer: static (S_balance=0.00us <= 1.5x(C_cross=253.89+C_queue=1.20))
+P5: static tasks=704 in 304 worker queues; local queue capacities={}; global={0: 16}; push lists=0
+P6: events up_done:device, down_done:device; tensors impargs:device, merged:device, partials:device, inverse:device, counts:device, staged:device, order:device, owners:device
+P7: 0 prefetch entries via l2_warm; 0 skipped for LDS budget
+note: Plain and sc0 loads hit the stale per-CU L1 and never observe an arrive (measured); poll via buffer_inv sc0 + load or agent atomic load.
+note: Workgroup k landed on XCD (k+6) mod 8 on the 2026-09-22 VM: round-robin with an offset, so discovery via HW_ID is mandatory.

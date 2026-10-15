@@ -1,0 +1,27 @@
+Thu Oct 15 15:44:15 UTC 2026
+[15:43:46 +  0m55s] fail    c6_build rc=2 55s
+    # job c6_build gpu=None cwd=/root/etx
+    # python -u -m examples.vllm_llm.attention_early_merge.session --work "${C6_WORK:?set absolute C6_WORK}" --model "${C6_MODEL:?set packed C6_MODEL}" build
+    {"stage": "build_envelope", "blocker": null, "evidence": "/root/c6-live-20261015", "deadline": 1792081371.879836, "safe_resume": "python -m examples.vllm_llm.attention_early_merge.session --work /root/c6-live-20261015 --model /root/llm/qwen
+    {"stage": "BLOCKED", "blocker": "build_envelope exit=1; see /root/c6-live-20261015/attempt-000/build_envelope.log", "evidence": "/root/c6-live-20261015", "deadline": 1792081371.879836, "safe_resume": "python -m examples.vllm_llm.attention_e
+    BLOCKER build_envelope exit=1; see /root/c6-live-20261015/attempt-000/build_envelope.log
+[15:43:46 +  0m55s] skip    c6_measure [c6_build: c6_build fail]
+[15:43:46 +  0m55s] session done
+  job                              status     rc  gpu  seconds
+  c6_build                         fail        2            55  
+  c6_measure                       skipped                      c6_build: c6_build fail
+SEALED /root/sess/c6-live-20261015/20261015T154251Z-33cc38 complete=False
+{
+  "stage": "BLOCKED",
+  "blocker": "build_envelope exit=1; see /root/c6-live-20261015/attempt-000/build_envelope.log",
+  "evidence": "/root/c6-live-20261015",
+  "deadline": 1792081371.879836,
+  "safe_resume": "python -m examples.vllm_llm.attention_early_merge.session --work /root/c6-live-20261015 --model /root/llm/qwen3-30b-a3b build"
+}
+/root/c6-live-20261015/attempt-000/build_envelope.rc
+/root/c6-live-20261015/attempt-000/envelope/control_ir.rc
+/root/c6-live-20261015/attempt-000/envelope/bundle.rc
+/root/c6-live-20261015/attempt-000/envelope/adapters.rc
+/root/c6-live-20261015/attempt-000/envelope/control_plan.rc
+/root/c6-live-20261015/attempt-000/envelope/dsl.rc
+/root/c6-live-20261015/attempt-000/envelope/import.rc

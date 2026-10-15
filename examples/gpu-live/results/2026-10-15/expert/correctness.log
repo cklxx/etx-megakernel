@@ -1,0 +1,115 @@
+# job correctness gpu=0 cwd=/root/src/abee09fcda357bb982cfba4d85bb387a6da97ec2385d3d4574f1f7cd4282d5da-20261015T152622Z
+# python3 -m examples.vllm_llm.expert_merge.runner check "$ETX_SESS_LOGDIR/probe"
+STAGE exec [PosixPath('/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/control_diag/run'), '/root/sess/expert-live-20261015/20261015T152934Z-af0efa/synthetic', PosixPath('/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/check-000/control_diag_fused'), 'check', 'fused'] evidence /root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/check-000/control_diag_fused.log
+EEM device=AMD Instinct MI300X VF arch=gfx942:sramecc+:xnack- arm=control diagnostic=1 consumer=qkv identity=b6cc76ede40707016d01b19a3e5a3eba5a6e932fa0e707bee3223019efeeb651
+EEM CHECK round=0 mode=fused complete
+EEM CHECK round=1 mode=fused complete
+EEM CHECK round=2 mode=fused complete
+EEM CHECK round=3 mode=fused complete
+EEM CHECK round=4 mode=fused complete
+EEM CHECK round=5 mode=fused complete
+EEM CHECK round=6 mode=fused complete
+EEM CHECK round=7 mode=fused complete
+EEM CHECK round=8 mode=fused complete
+EEM CHECK round=9 mode=fused complete
+EEM CHECK round=10 mode=fused complete
+EEM CHECK round=11 mode=fused complete
+STAGE exec [PosixPath('/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/control_diag/run'), '/root/sess/expert-live-20261015/20261015T152934Z-af0efa/synthetic', PosixPath('/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/check-000/control_diag_graph'), 'check', 'graph'] evidence /root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/check-000/control_diag_graph.log
+EEM device=AMD Instinct MI300X VF arch=gfx942:sramecc+:xnack- arm=control diagnostic=1 consumer=qkv identity=b6cc76ede40707016d01b19a3e5a3eba5a6e932fa0e707bee3223019efeeb651
+EEM CHECK round=0 mode=graph complete
+EEM CHECK round=1 mode=graph complete
+EEM CHECK round=2 mode=graph complete
+EEM CHECK round=3 mode=graph complete
+EEM CHECK round=4 mode=graph complete
+EEM CHECK round=5 mode=graph complete
+EEM CHECK round=6 mode=graph complete
+EEM CHECK round=7 mode=graph complete
+EEM CHECK round=8 mode=graph complete
+EEM CHECK round=9 mode=graph complete
+EEM CHECK round=10 mode=graph complete
+EEM CHECK round=11 mode=graph complete
+STAGE exec [PosixPath('/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate_diag/run'), '/root/sess/expert-live-20261015/20261015T152934Z-af0efa/synthetic', PosixPath('/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/check-000/candidate_diag_fused'), 'check', 'fused'] evidence /root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/check-000/candidate_diag_fused.log
+EEM device=AMD Instinct MI300X VF arch=gfx942:sramecc+:xnack- arm=candidate diagnostic=1 consumer=qkv identity=1748be889860893b12a91ff47034a75220f4d23cf5e70bfb346a087b85231f7d
+EEM CHECK round=0 mode=fused complete
+EEM CHECK round=1 mode=fused complete
+EEM CHECK round=2 mode=fused complete
+EEM CHECK round=3 mode=fused complete
+EEM CHECK round=4 mode=fused complete
+EEM CHECK round=5 mode=fused complete
+EEM CHECK round=6 mode=fused complete
+EEM CHECK round=7 mode=fused complete
+EEM CHECK round=8 mode=fused complete
+EEM CHECK round=9 mode=fused complete
+EEM CHECK round=10 mode=fused complete
+EEM CHECK round=11 mode=fused complete
+STAGE exec [PosixPath('/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate_diag/run'), '/root/sess/expert-live-20261015/20261015T152934Z-af0efa/synthetic', PosixPath('/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/check-000/candidate_diag_graph'), 'check', 'graph'] evidence /root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/check-000/candidate_diag_graph.log
+EEM device=AMD Instinct MI300X VF arch=gfx942:sramecc+:xnack- arm=candidate diagnostic=1 consumer=qkv identity=1748be889860893b12a91ff47034a75220f4d23cf5e70bfb346a087b85231f7d
+EEM CHECK round=0 mode=graph complete
+EEM CHECK round=1 mode=graph complete
+EEM CHECK round=2 mode=graph complete
+EEM CHECK round=3 mode=graph complete
+EEM CHECK round=4 mode=graph complete
+EEM CHECK round=5 mode=graph complete
+EEM CHECK round=6 mode=graph complete
+EEM CHECK round=7 mode=graph complete
+EEM CHECK round=8 mode=graph complete
+EEM CHECK round=9 mode=graph complete
+EEM CHECK round=10 mode=graph complete
+EEM CHECK round=11 mode=graph complete
+STAGE exec [PosixPath('/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/control/run'), '/root/sess/expert-live-20261015/20261015T152934Z-af0efa/synthetic', PosixPath('/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/check-000/control_fused'), 'check', 'fused'] evidence /root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/check-000/control_fused.log
+EEM device=AMD Instinct MI300X VF arch=gfx942:sramecc+:xnack- arm=control diagnostic=0 consumer=qkv identity=b17e5e37f577c6c0170ec59c420d853ba2bdddff8383ddac867fbd621f72d49e
+EEM CHECK round=0 mode=fused complete
+EEM CHECK round=1 mode=fused complete
+EEM CHECK round=2 mode=fused complete
+EEM CHECK round=3 mode=fused complete
+EEM CHECK round=4 mode=fused complete
+EEM CHECK round=5 mode=fused complete
+EEM CHECK round=6 mode=fused complete
+EEM CHECK round=7 mode=fused complete
+EEM CHECK round=8 mode=fused complete
+EEM CHECK round=9 mode=fused complete
+EEM CHECK round=10 mode=fused complete
+EEM CHECK round=11 mode=fused complete
+STAGE exec [PosixPath('/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/control/run'), '/root/sess/expert-live-20261015/20261015T152934Z-af0efa/synthetic', PosixPath('/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/check-000/control_graph'), 'check', 'graph'] evidence /root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/check-000/control_graph.log
+EEM device=AMD Instinct MI300X VF arch=gfx942:sramecc+:xnack- arm=control diagnostic=0 consumer=qkv identity=b17e5e37f577c6c0170ec59c420d853ba2bdddff8383ddac867fbd621f72d49e
+EEM CHECK round=0 mode=graph complete
+EEM CHECK round=1 mode=graph complete
+EEM CHECK round=2 mode=graph complete
+EEM CHECK round=3 mode=graph complete
+EEM CHECK round=4 mode=graph complete
+EEM CHECK round=5 mode=graph complete
+EEM CHECK round=6 mode=graph complete
+EEM CHECK round=7 mode=graph complete
+EEM CHECK round=8 mode=graph complete
+EEM CHECK round=9 mode=graph complete
+EEM CHECK round=10 mode=graph complete
+EEM CHECK round=11 mode=graph complete
+STAGE exec [PosixPath('/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate/run'), '/root/sess/expert-live-20261015/20261015T152934Z-af0efa/synthetic', PosixPath('/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/check-000/candidate_fused'), 'check', 'fused'] evidence /root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/check-000/candidate_fused.log
+EEM device=AMD Instinct MI300X VF arch=gfx942:sramecc+:xnack- arm=candidate diagnostic=0 consumer=qkv identity=84f6ba6ec839ccd384fa1fa42a9221e4dd123edc0ca5785e817808ffb70d96c9
+EEM CHECK round=0 mode=fused complete
+EEM CHECK round=1 mode=fused complete
+EEM CHECK round=2 mode=fused complete
+EEM CHECK round=3 mode=fused complete
+EEM CHECK round=4 mode=fused complete
+EEM CHECK round=5 mode=fused complete
+EEM CHECK round=6 mode=fused complete
+EEM CHECK round=7 mode=fused complete
+EEM CHECK round=8 mode=fused complete
+EEM CHECK round=9 mode=fused complete
+EEM CHECK round=10 mode=fused complete
+EEM CHECK round=11 mode=fused complete
+STAGE exec [PosixPath('/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate/run'), '/root/sess/expert-live-20261015/20261015T152934Z-af0efa/synthetic', PosixPath('/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/check-000/candidate_graph'), 'check', 'graph'] evidence /root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/check-000/candidate_graph.log
+EEM device=AMD Instinct MI300X VF arch=gfx942:sramecc+:xnack- arm=candidate diagnostic=0 consumer=qkv identity=84f6ba6ec839ccd384fa1fa42a9221e4dd123edc0ca5785e817808ffb70d96c9
+EEM CHECK round=0 mode=graph complete
+EEM CHECK round=1 mode=graph complete
+EEM CHECK round=2 mode=graph complete
+EEM CHECK round=3 mode=graph complete
+EEM CHECK round=4 mode=graph complete
+EEM CHECK round=5 mode=graph complete
+EEM CHECK round=6 mode=graph complete
+EEM CHECK round=7 mode=graph complete
+EEM CHECK round=8 mode=graph complete
+EEM CHECK round=9 mode=graph complete
+EEM CHECK round=10 mode=graph complete
+EEM CHECK round=11 mode=graph complete
+STAGE BYTE-CHECK OK /root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/check-000 next: python -m examples.vllm_llm.expert_merge.runner time /root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe

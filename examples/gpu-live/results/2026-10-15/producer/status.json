@@ -1,0 +1,58 @@
+[
+ {
+  "name": "preflight",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 81.01083135604858,
+  "note": ""
+ },
+ {
+  "name": "build_baseline",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 65.0130877494812,
+  "note": ""
+ },
+ {
+  "name": "build_producer",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 48.00946402549744,
+  "note": ""
+ },
+ {
+  "name": "qualify",
+  "status": "fail",
+  "rc": 2,
+  "gpu": 0,
+  "seconds": 139.02043199539185,
+  "note": ""
+ },
+ {
+  "name": "measure",
+  "status": "skipped",
+  "rc": null,
+  "gpu": null,
+  "seconds": null,
+  "note": "correctness.json: qualify fail"
+ },
+ {
+  "name": "diagnose",
+  "status": "skipped",
+  "rc": null,
+  "gpu": null,
+  "seconds": null,
+  "note": "measurement.complete.json: measure skipped"
+ },
+ {
+  "name": "report",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 1.000412940979004,
+  "note": ""
+ }
+]

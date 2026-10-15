@@ -1,0 +1,107 @@
+Thu Oct 15 16:24:55 UTC 2026
+$ stdbuf -oL -eL rocprofv3 --pmc FETCH_SIZE --output-format csv -d /root/sess/b4-live-20261015/20261015T160946Z-a7e517/traffic_alld4r0l1kvsmw -- /root/sess/b4-live-20261015/20261015T160946Z-a7e517/b_alld4r0l1kvsmw/run --weights /root/sess/b4-live-20261015/20261015T160946Z-a7e517/references/weights.bin --cache /root/sess/b4-live-20261015/20261015T160946Z-a7e517/references/fleet_cache.bin --golden /root/sess/b4-live-20261015/20261015T160946Z-a7e517/references/golden_tokens.txt --hidden /root/sess/b4-live-20261015/20261015T160946Z-a7e517/references/golden_hidden.bin --tokens 32 --context 1024 --repeat 2
+W1015 16:22:49.666413   20483 simple_timer.cpp:55] [rocprofv3] tool initialization ::     0.238042 sec
+W1015 16:22:49.667307   20483 simple_timer.cpp:55] [rocprofv3] '/root/sess/b4-live-20261015/20261015T160946Z-a7e517/b_alld4r0l1kvsmw/run --weights /root/sess/b4-live-20261015/20261015T160946Z-a7e517/references/weights.bin --cache /root/sess/b4-live-20261015/20261015T160946Z-a7e517/references/fleet_cache.bin --golden /root/sess/b4-live-20261015/20261015T160946Z-a7e517/references/golden_tokens.txt --hidden /root/sess/b4-live-20261015/20261015T160946Z-a7e517/references/golden_hidden.bin --tokens 32 --context 1024 --repeat 2' ::     0.000000 sec
+W1015 16:22:49.679415   20483 tool.cpp:3082] HSA version 1.21.0 initialized (instance=0)
+device: AMD Instinct MI300X VF  arch gfx942:sramecc+:xnack-  CUs 304
+model: hidden 2048 heads 16 kv_lora 512 experts 64 top-6 layers 27 (dense < 1) vocab 102400
+  /root/sess/b4-live-20261015/20261015T160946Z-a7e517/references/weights.bin: 31.4 GB uploaded
+  /root/sess/b4-live-20261015/20261015T160946Z-a7e517/references/fleet_cache.bin: 0.0 GB uploaded
+etx: 53022 tasks, 1537 event words, 296 workers (8 domains x 37), lds 24576 B (fleet scratch 23408 B)
+run 0 (warm-up): 32/32 tokens match
+token  0:    3.095 ms (device)  step   3.880 ms  out   1780  ok
+token  1:    3.097 ms (device)  step   3.877 ms  out    185  ok
+token  2:    3.094 ms (device)  step   3.866 ms  out    300  ok
+token  3:    3.105 ms (device)  step   3.885 ms  out   1501  ok
+token  4:    3.100 ms (device)  step   3.883 ms  out  11747  ok
+token  5:    3.113 ms (device)  step   3.896 ms  out    254  ok
+token  6:    3.095 ms (device)  step   3.871 ms  out   3510  ok
+token  7:    3.096 ms (device)  step   3.870 ms  out    185  ok
+token  8:    3.109 ms (device)  step   3.890 ms  out   1558  ok
+token  9:    3.096 ms (device)  step   3.882 ms  out   8708  ok
+token 10:    3.095 ms (device)  step   3.876 ms  out      7  ok
+token 11:    3.110 ms (device)  step   3.885 ms  out     77  ok
+token 12:    3.105 ms (device)  step   3.892 ms  out   1780  ok
+token 13:    3.091 ms (device)  step   3.863 ms  out    185  ok
+token 14:    3.105 ms (device)  step   3.889 ms  out    300  ok
+token 15:    3.108 ms (device)  step   3.895 ms  out   1501  ok
+token 16:    3.097 ms (device)  step   3.891 ms  out  11747  ok
+token 17:    3.105 ms (device)  step   3.886 ms  out    254  ok
+token 18:    3.100 ms (device)  step   3.879 ms  out   3510  ok
+token 19:    3.118 ms (device)  step   3.903 ms  out    185  ok
+token 20:    3.105 ms (device)  step   3.883 ms  out   1558  ok
+token 21:    3.102 ms (device)  step   3.873 ms  out   8708  ok
+token 22:    3.107 ms (device)  step   3.881 ms  out      7  ok
+token 23:    3.107 ms (device)  step   3.891 ms  out     77  ok
+token 24:    3.112 ms (device)  step   3.901 ms  out   1780  ok
+token 25:    3.112 ms (device)  step   3.901 ms  out    185  ok
+token 26:    3.116 ms (device)  step   3.899 ms  out    300  ok
+token 27:    3.106 ms (device)  step   3.892 ms  out   1501  ok
+token 28:    3.112 ms (device)  step   3.894 ms  out  11747  ok
+token 29:    3.104 ms (device)  step   3.898 ms  out    254  ok
+token 30:    3.113 ms (device)  step   3.891 ms  out   3510  ok
+token 31:    3.108 ms (device)  step   3.887 ms  out    185  ok
+  layer  0 dense: max rel  1.72e-03  cosine 0.999996  [ok]
+  layer  1 moe  : max rel  3.13e-03  cosine 0.999993  [ok]
+  layer  2 moe  : max rel  2.96e-03  cosine 0.999986  [ok]
+  layer  3 moe  : max rel  2.45e-03  cosine 0.999985  [ok]
+  layer  4 moe  : max rel  6.54e-03  cosine 0.999979  [ok]
+  layer  5 moe  : max rel  4.65e-03  cosine 0.999983  [ok]
+  layer  6 moe  : max rel  4.07e-03  cosine 0.999983  [ok]
+  layer  7 moe  : max rel  1.76e-03  cosine 0.999974  [ok]
+  layer  8 moe  : max rel  1.88e-03  cosine 0.999973  [ok]
+  layer  9 moe  : max rel  1.56e-03  cosine 0.999979  [ok]
+  layer 10 moe  : max rel  2.11e-03  cosine 0.999980  [ok]
+  layer 11 moe  : max rel  4.31e-03  cosine 0.999977  [ok]
+  layer 12 moe  : max rel  3.07e-03  cosine 0.999985  [ok]
+  layer 13 moe  : max rel  3.23e-03  cosine 0.999983  [ok]
+  layer 14 moe  : max rel  1.74e-03  cosine 0.999981  [ok]
+  layer 15 moe  : max rel  6.29e-03  cosine 0.999979  [ok]
+  layer 16 moe  : max rel  5.71e-03  cosine 0.999979  [ok]
+  layer 17 moe  : max rel  5.41e-03  cosine 0.999978  [ok]
+  layer 18 moe  : max rel  5.81e-03  cosine 0.999923  [ok]
+  layer 19 moe  : max rel  1.02e-02  cosine 0.999935  [ok]
+  layer 20 moe  : max rel  8.81e-03  cosine 0.999950  [ok]
+  layer 21 moe  : max rel  7.35e-03  cosine 0.999940  [ok]
+  layer 22 moe  : max rel  8.33e-03  cosine 0.999887  [ok]
+  layer 23 moe  : max rel  4.49e-03  cosine 0.999920  [ok]
+  layer 24 moe  : max rel  5.21e-03  cosine 0.999926  [ok]
+  layer 25 moe  : max rel  2.63e-03  cosine 0.999966  [ok]
+  layer 26 moe  : max rel  6.25e-03  cosine 0.999977  [ok]
+  consecutive layers within the gate: 27 of 27
+
+per-token latency (embed -> argmax on device): median 3.105 ms  mean 3.104 ms; step wall (launch to end) 3.886 ms/token
+tokens: 32/32 match HF greedy
+BATCHREQ r=0 tokens=32/32 layers=27 warmup=32/32 interval_median_ms=4.06860 device_median_ms=3.104920
+BATCH requests=1 tokens=32 step_median_ms=3.886704
+W1015 16:22:54.940482   20483 simple_timer.cpp:55] [rocprofv3] '/root/sess/b4-live-20261015/20261015T160946Z-a7e517/b_alld4r0l1kvsmw/run --weights /root/sess/b4-live-20261015/20261015T160946Z-a7e517/references/weights.bin --cache /root/sess/b4-live-20261015/20261015T160946Z-a7e517/references/fleet_cache.bin --golden /root/sess/b4-live-20261015/20261015T160946Z-a7e517/references/golden_tokens.txt --hidden /root/sess/b4-live-20261015/20261015T160946Z-a7e517/references/golden_hidden.bin --tokens 32 --context 1024 --repeat 2' ::     5.273174 sec
+E1015 16:22:54.946683   20483 output_stream.cpp:111] Opened result file: /root/sess/b4-live-20261015/20261015T160946Z-a7e517/traffic_alld4r0l1kvsmw/0/20483_counter_collection.csv
+E1015 16:22:54.954248   20483 output_stream.cpp:111] Opened result file: /root/sess/b4-live-20261015/20261015T160946Z-a7e517/traffic_alld4r0l1kvsmw/0/20483_agent_info.csv
+W1015 16:22:54.955681   20483 simple_timer.cpp:55] [rocprofv3] output generation ::     0.014614 sec
+W1015 16:22:54.955716   20483 simple_timer.cpp:55] [rocprofv3] tool finalization ::     0.014653 sec
+*** SIGSEGV received at time=1792081374 on cpu 4 ***
+[symbolize_elf.inc : 379] RAW: Unable to get high fd: rc=0, limit=1024
+PC: @     0x7746fece2ad6  (unknown)  rocr::HSA::hsa_signal_store_screlease()
+    @               0x21       4832  (unknown)
+    @     0x77470380d8b8  (unknown)  (unknown)
+    @ ... and at least 1 more frames
+-rw-r--r-- 1 root root 145K Oct 15 16:22 /root/sess/b4-live-20261015/20261015T160946Z-a7e517/rocprof_metrics.raw.log
+-rw-r--r-- 1 root root 145K Oct 15 16:22 /root/sess/b4-live-20261015/20261015T160946Z-a7e517/rocprof_metrics.raw.log
+-rw-r--r-- 1 root root  371 Oct 15 16:22 /root/sess/b4-live-20261015/20261015T160946Z-a7e517/rocprof_version.raw.log
+-rw-r--r-- 1 root root 7.1K Oct 15 16:22 /root/sess/b4-live-20261015/20261015T160946Z-a7e517/traffic_alld4r0l1kvsmw.raw.log
+
+/root/sess/b4-live-20261015/20261015T160946Z-a7e517/traffic_alld4r0l1kvsmw:
+total 4.0K
+drwxr-xr-x 2 root root 4.0K Oct 15 16:22 0
+    captures [GPU 0] 7s / 3300s: model: hidden 2048 heads 16 kv_lora 512 experts 64 top-6 layers 27 (dense < 1) vocab 102400
+[16:22:55 + 13m09s] fail    captures rc=1 16s
+        return super().run(name, command, **kw)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+      File "/root/src/abee09fcda357bb982cfba4d85bb387a6da97ec2385d3d4574f1f7cd4282d5da-20261015T152622Z/examples/dsv2lite/inplace_session.py", line 102, in run
+        raise RuntimeError(f"invocation {name} failed rc={rc}; full log {path}")
+    RuntimeError: invocation traffic_alld4r0l1kvsmw failed rc=-11; full log /root/sess/b4-live-20261015/20261015T160946Z-a7e517/traffic_alld4r0l1kvsmw.raw.log
+[16:22:55 + 13m09s] start routing on GPU 0
+[16:23:46 + 14m00s] progress: 1 running, 2 waiting, 20 done
+    routing [GPU 0] 51s / 1000s: step 16
+[16:24:46 + 15m00s] progress: 1 running, 2 waiting, 20 done
+    routing [GPU 0] 111s / 1000s: $ stdbuf -oL -eL /root/dsv2-prep/.venv/bin/python -u -m examples.dsv2lite.routing_overlap --model /root/models/dsv2-lite-base --fleet /root/fleet-3fb67a6 --batc

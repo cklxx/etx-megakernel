@@ -1,0 +1,39 @@
+Thu Oct 15 15:56:01 UTC 2026
+PROGRESS stage=build_probe elapsed=40s evidence=/root/c6-live-20261015/attempt-001/build_probe.log
+PROGRESS stage=build_probe elapsed=60s evidence=/root/c6-live-20261015/attempt-001/build_probe.log
+PROGRESS stage=build_probe elapsed=80s evidence=/root/c6-live-20261015/attempt-001/build_probe.log
+{"stage": "build_diagnostic", "blocker": null, "evidence": "/root/c6-live-20261015", "deadline": 1792081371.879836, "safe_resume": "python -m examples.vllm_llm.attention_early_merge.session --work /root/c6-live-20261015 --model /root/llm/qwen3-30b-a3b build"}
+PROGRESS stage=build_diagnostic elapsed=20s evidence=/root/c6-live-20261015/attempt-001/build_diagnostic.log
+PROGRESS stage=build_diagnostic elapsed=40s evidence=/root/c6-live-20261015/attempt-001/build_diagnostic.log
+PROGRESS stage=build_diagnostic elapsed=60s evidence=/root/c6-live-20261015/attempt-001/build_diagnostic.log
+PROGRESS stage=build_diagnostic elapsed=80s evidence=/root/c6-live-20261015/attempt-001/build_diagnostic.log
+{"stage": "build_model", "blocker": null, "evidence": "/root/c6-live-20261015", "deadline": 1792081371.879836, "safe_resume": "python -m examples.vllm_llm.attention_early_merge.session --work /root/c6-live-20261015 --model /root/llm/qwen3-30b-a3b build"}
+PROGRESS stage=build_model elapsed=20s evidence=/root/c6-live-20261015/attempt-001/build_model.log
+    references [GPU 0] 353s / 1600s: loading /root/models/dsv2-lite-base (bf16)
+[15:52:44 +  6m55s] ok      build_x8 rc=0 408s
+[15:52:49 +  7m00s] progress: 1 running, 2 waiting, 9 done
+    references [GPU 0] 413s / 1600s: $ stdbuf -oL -eL /root/dsv2-prep/.venv/bin/python examples/dsv2lite/reference_rotated.py --fleet /root/fleet-3fb67a6 --rotate 582 -- --model /root/models/dsv2-l
+[15:53:49 +  8m00s] progress: 1 running, 2 waiting, 9 done
+    references [GPU 0] 473s / 1600s: PROGRESS invocation=reference_r6 elapsed_s=61.3 deadline_s=180
+[15:54:49 +  9m00s] progress: 1 running, 2 waiting, 9 done
+    references [GPU 0] 533s / 1600s: /opt/amdgpu/share/libdrm/amdgpu.ids: No such file or directory
+[15:55:36 +  9m47s] ok      references rc=0 580s
+[15:55:36 +  9m47s] start diagnostics on GPU 0
+[15:55:49 + 10m00s] progress: 1 running, 1 waiting, 10 done
+    diagnostics [GPU 0] 13s / 1150s: model: hidden 2048 heads 16 kv_lora 512 experts 64 top-6 layers 27 (dense < 1) vocab 102400
+per-token latency (embed -> argmax on device): median 3.095 ms  mean 3.095 ms; step wall (launch to end) 3.227 ms/token
+tokens: 32/32 match HF greedy
+BATCHREQ r=0 tokens=32/32 layers=3 warmup=32/32 interval_median_ms=3.24372 device_median_ms=3.095240
+BATCH requests=1 tokens=32 step_median_ms=3.227197
+DIAGNOSTIC name=kept_r5 status=FAIL rc=0
+$ stdbuf -oL -eL /root/sess/x8-live-20261015/20261015T154549Z-7cdcb2/b_alld4r0l1kvsmw/run --weights /root/sess/x8-live-20261015/20261015T154549Z-7cdcb2/references/weights.bin --cache /root/sess/x8-live-20261015/20261015T154549Z-7cdcb2/references/r7/fleet_cache.bin --golden /root/sess/x8-live-20261015/20261015T154549Z-7cdcb2/references/r7/golden_tokens.txt --hidden /root/sess/x8-live-20261015/20261015T154549Z-7cdcb2/references/r7/golden_hidden.bin --tokens 32 --context 1024 --repeat 2
+device: AMD Instinct MI300X VF  arch gfx942:sramecc+:xnack-  CUs 304
+model: hidden 2048 heads 16 kv_lora 512 experts 64 top-6 layers 27 (dense < 1) vocab 102400
+{
+  "data": "/root/sess/x8-live-20261015/20261015T154549Z-7cdcb2/references",
+  "original_payload_recovered": false,
+  "requests": [
+    {
+      "mode": "new_inputs",
+      "receipt": {
+        "binding": {

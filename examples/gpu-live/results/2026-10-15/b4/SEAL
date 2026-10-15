@@ -1,0 +1,38 @@
+{
+ "complete": false,
+ "jobs": {
+  "apt": "ok",
+  "b4_result": "ok",
+  "bgate_alld4r0l1kvsmw": "ok",
+  "bgate_x2": "ok",
+  "bgate_x4": "ok",
+  "breport": "ok",
+  "brounds": "ok",
+  "build_alld4r0l1kvsmw": "ok",
+  "build_x2": "ok",
+  "build_x4": "ok",
+  "captures": "fail",
+  "docker_pull": "ok",
+  "etx_env": "ok",
+  "graph_gate_alld4r0l1kvsmw": "ok",
+  "graph_gate_x2": "ok",
+  "graph_gate_x4": "ok",
+  "prep_dl": "ok",
+  "prep_env": "ok",
+  "prep_pack": "ok",
+  "references": "ok",
+  "routing": "ok",
+  "source": "ok",
+  "vsel": "ok"
+ },
+ "local_only": [
+  "b_*/run",
+  "b_*/fleet_src/*",
+  "*.o"
+ ],
+ "manifest_sha256": "6f38e7f03b12a005f11c85bd825598079c549cc8d354787d6e8aa21d0123a032",
+ "plan_sha256": "86866ef507f668968d1daffd037d42d9544e6aca4c3e55c6f0250442eb8dce69",
+ "sealed": "2026-10-15T16:25:58Z",
+ "session": "20261015T160946Z-a7e517",
+ "source": "commit 554133d744b4591c9cf87c68b6817df781137c9b\nbranch main\narchive abee09fcda357bb982cfba4d85bb387a6da97ec2385d3d4574f1f7cd4282d5da\nstaged 2026-10-15T15:26:30Z\n"
+}

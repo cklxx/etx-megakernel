@@ -1,0 +1,10 @@
+MISSING synthetic/consumer.bin
+MISSING synthetic/ids.bin
+MISSING synthetic/norm.bin
+MISSING synthetic/residual.bin
+MISSING synthetic/role.bin
+MISSING synthetic/w13.bin
+MISSING synthetic/w2.bin
+MISSING synthetic/wts.bin
+MISSING synthetic/x.bin
+FAILED: session 20261015T152934Z-af0efa, 846 files match, 9 bad, 0 left on the box by design; complete

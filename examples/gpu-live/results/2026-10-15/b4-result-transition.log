@@ -1,0 +1,21 @@
+Thu Oct 15 16:26:27 UTC 2026
+  bgate_alld4r0l1kvsmw             ok          0    0        7  
+  build_x2                         ok          0            54  
+  bgate_x2                         ok          0    0        7  
+  build_x4                         ok          0           129  
+  bgate_x4                         ok          0    0        7  
+  graph_gate_alld4r0l1kvsmw        ok          0             1  
+  graph_gate_x2                    ok          0             1  
+  graph_gate_x4                    ok          0             1  
+  vsel                             ok          0    0      185  
+  brounds                          ok          0    0      412  
+  captures                         fail        1    0       16  
+  routing                          ok          0    0      159  
+  breport                          ok          0             1  
+  b4_result                        ok          0             1  
+SEALED /root/sess/b4-live-20261015/20261015T160946Z-a7e517 complete=False
+1
+{'attribution_status': 'INCOMPLETE', 'corrected_vllm_status': 'COMPLETE', 'performance_claim_status': 'INCOMPLETE: requires both legal baselines', 'status': 'INCOMPLETE'}
+routing COMPLETE {'1': 6.0, '2': 11.49639423076923, '4': 20.631009615384617}
+batches {'1': ({'gains_pct': [27.983433039591358, 27.110934907747612, 26.94014502392954, 26.982573735699898, 27.375413694859045], 'median_pct': 27.110934907747612, 'outcome': 'WIN', 'spread_pct': 1.043288015661822}, {'next': 'batch-1 reference point: no batch decision'}), '2': ({'gains_pct': [4.419379962976937, 4.084858229587454, 4.070637903153276, 4.529404865999382, 4.597997277853393], 'median_pct': 4.419379962976937, 'outcome': 'WIN', 'spread_pct': 0.5273593747001167}, {'next': "replication is ETX's batch mode at this B; record it; Qwen batch study next"}), '4': ({'gains_pct': [-24.8835049879665, -30.93067471934305, -32.972428409730085, -30.271089806849297, -34.198299170749415], 'median_pct': -30.93067471934305, 'outcome': 'LOSS', 'spread_pct': 9.314794182782913}, {'bound_ms': 5.5489608, 'build': True, 'next': 'design and build column-batched tiles (stage B2), threshold before code', 'projection_ms': 5.130547, 'vllm_ms': 6.165512})}
+SEALED_PRESENT

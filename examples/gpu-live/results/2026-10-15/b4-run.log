@@ -1,0 +1,150 @@
+C6 preceding terminal exit: 0
+B4 original-global-bound cap 4043; UTC Thu Oct 15 16:09:46 UTC 2026
+commit 554133d744b4591c9cf87c68b6817df781137c9b
+branch main
+archive abee09fcda357bb982cfba4d85bb387a6da97ec2385d3d4574f1f7cd4282d5da
+staged 2026-10-15T15:26:30Z
+HIP version: 7.14.60850-0000000
+AMD clang version 23.0.0git (https://github.com/ROCm/llvm-project.git 46fcb339fb61119b337f973c7ca9e710a319fdd0+PATCHED:440716f8b87be9d8e20ed910e10e5b6d14d57cf6)
+Target: x86_64-unknown-linux-gnu
+Thread model: posix
+InstalledDir: /opt/rocm/core-7.14/lib/llvm/bin
+[16:09:46 +  0m00s] session record: /root/sess/b4-live-20261015/20261015T160946Z-a7e517
+[16:09:46 +  0m00s] start apt (cpu)
+[16:09:47 +  0m01s] ok      apt rc=0 1s
+[16:09:47 +  0m01s] start etx_env (cpu)
+[16:09:47 +  0m01s] start prep_env (cpu)
+[16:09:48 +  0m02s] ok      etx_env rc=0 1s
+[16:09:48 +  0m02s] start source (cpu)
+[16:09:49 +  0m03s] ok      source rc=0 1s
+    SOURCE OK fleet export 28f5cbb4f39524df etx 554133d744b4
+[16:09:49 +  0m03s] start docker_pull (cpu)
+[16:09:50 +  0m04s] ok      docker_pull rc=0 1s
+[16:09:50 +  0m04s] start build_alld4r0l1kvsmw (cpu)
+[16:09:51 +  0m05s] ok      prep_env rc=0 4s
+[16:09:51 +  0m05s] start prep_dl (cpu)
+[16:09:52 +  0m06s] ok      prep_dl rc=0 1s
+[16:09:52 +  0m06s] start prep_pack (cpu)
+[16:09:53 +  0m07s] ok      prep_pack rc=0 1s
+[16:09:53 +  0m07s] start references on GPU 0
+[16:09:53 +  0m07s] start build_x2 (cpu)
+[16:10:26 +  0m40s] ok      build_alld4r0l1kvsmw rc=0 36s
+    BUILD arm=alld4r0l1kvsmw stamped=0 plan_sha256=f23f959e82edaa9fe19147026c20d3b855e5af6c881a1858289c1c22ce15785f resources={'vgpr': 256, 'agpr': 119, 'sgpr': 108, 'scratch': 0, 'lds': 26668, 'occupancy': 1}
+    BUILD arm=alld4r0l1kvsmw OK
+[16:10:26 +  0m40s] start build_x4 (cpu)
+[16:10:37 +  0m51s] ok      references rc=0 44s
+    REFERENCES request=0 mode=reused_producer_bound
+    REFERENCES request=1 mode=reused_producer_bound
+    REFERENCES request=2 mode=reused_producer_bound
+    REFERENCES request=3 mode=reused_producer_bound
+[16:10:37 +  0m51s] start bgate_alld4r0l1kvsmw on GPU 0
+[16:10:44 +  0m58s] ok      bgate_alld4r0l1kvsmw rc=0 7s
+    BGATE arm=alld4r0l1kvsmw b=1 PASS
+[16:10:46 +  1m00s] progress: 2 running, 11 waiting, 10 done
+    build_x2 [cpu] 53s / 1200s: /root/sess/b4-live-20261015/20261015T160946Z-a7e517/b_x2/megakernel_d0.hip:10272:1: remark:     LDS Size [bytes/block]: 26628 [-Rpass-analysis=kernel-resource-u
+    build_x4 [cpu] 20s / 1200s: patched /root/sess/b4-live-20261015/20261015T160946Z-a7e517/b_x4/fleet_src (merge_uv_waves)
+[16:10:47 +  1m01s] ok      build_x2 rc=0 54s
+    BUILD arm=x2 stamped=0 plan_sha256=f11da123b012b1a1ab161f556f63dc24048378ec3012c1f45536b032385774cb resources={'vgpr': 256, 'agpr': 0, 'sgpr': 108, 'scratch': 32, 'lds': 26668, 'occupancy': 2}
+    BUILD arm=x2 OK
+[16:10:47 +  1m01s] start bgate_x2 on GPU 0
+[16:10:47 +  1m01s] start graph_gate_alld4r0l1kvsmw (cpu)
+[16:10:48 +  1m02s] ok      graph_gate_alld4r0l1kvsmw rc=0 1s
+[16:10:48 +  1m02s] start graph_gate_x2 (cpu)
+[16:10:49 +  1m03s] ok      graph_gate_x2 rc=0 1s
+[16:10:54 +  1m08s] ok      bgate_x2 rc=0 7s
+    BGATE arm=x2 b=2 PASS
+[16:11:46 +  2m00s] progress: 1 running, 8 waiting, 14 done
+    build_x4 [cpu] 80s / 1200s: PROGRESS invocation=compile_x4 elapsed_s=60.4 deadline_s=900
+[16:12:35 +  2m49s] ok      build_x4 rc=0 129s
+    BUILD arm=x4 stamped=0 plan_sha256=57ede9c7886b00964108f4d8fa175faaa021df0227f3f58f2a652921223808be resources={'vgpr': 256, 'agpr': 0, 'sgpr': 108, 'scratch': 64, 'lds': 26668, 'occupancy': 2}
+    BUILD arm=x4 OK
+[16:12:35 +  2m49s] start bgate_x4 on GPU 0
+[16:12:35 +  2m49s] start graph_gate_x4 (cpu)
+[16:12:36 +  2m50s] ok      graph_gate_x4 rc=0 1s
+[16:12:42 +  2m56s] ok      bgate_x4 rc=0 7s
+    BGATE arm=x4 b=4 PASS
+[16:12:42 +  2m56s] start vsel on GPU 0
+[16:12:46 +  3m00s] progress: 1 running, 5 waiting, 17 done
+    vsel [GPU 0] 4s / 1900s: $ stdbuf -oL -eL docker run --rm --device=/dev/kfd --device=/dev/dri --group-add video --ipc=host --shm-size 16g --security-opt seccomp=unconfined -e HIP_VISIBL
+[16:13:46 +  4m00s] progress: 1 running, 5 waiting, 17 done
+    vsel [GPU 0] 64s / 1900s: (EngineCore pid=163) INFO 10-15 16:13:45 [monitor.py:53] torch.compile took 13.01 s in total
+[16:14:46 +  5m00s] progress: 1 running, 5 waiting, 17 done
+    vsel [GPU 0] 124s / 1900s: Loading safetensors checkpoint shards:  25% Completed | 1/4 [00:03<00:09,  3.25s/it]
+[16:15:46 +  6m00s] progress: 1 running, 5 waiting, 17 done
+    vsel [GPU 0] 184s / 1900s: (EngineCore pid=76) INFO 10-15 16:15:44 [core.py:1345] [shutdown] EngineCore: exiting busy loop
+[16:15:47 +  6m01s] ok      vsel rc=0 185s
+    PROGRESS invocation=vsel_default elapsed_s=30.2 deadline_s=900
+    PROGRESS invocation=vsel_default elapsed_s=60.7 deadline_s=900
+    PROGRESS invocation=vsel_default elapsed_s=91.0 deadline_s=900
+    VSEL b=1 baseline=aiter step 4.072009 ms
+    VSEL b=2 baseline=aiter step 4.713401 ms
+    VSEL b=4 baseline=aiter step 5.873295 ms
+[16:15:47 +  6m01s] start brounds on GPU 0
+[16:16:46 +  7m00s] progress: 1 running, 4 waiting, 18 done
+    brounds [GPU 0] 59s / 3600s: (EngineCore pid=75) [aiter] import [module_moe_asm] under /usr/local/lib/python3.12/dist-packages/aiter/jit/module_moe_asm.so
+[16:17:46 +  8m00s] progress: 1 running, 4 waiting, 18 done
+    brounds [GPU 0] 119s / 3600s: [Aiter Triton] Pre-compiling fp8 BMM kernel:  85%|████████▍ | 867/1024 [00:00<00:00, 8661.62it/s]
+[16:18:46 +  9m00s] progress: 1 running, 4 waiting, 18 done
+    brounds [GPU 0] 179s / 3600s: model: hidden 2048 heads 16 kv_lora 512 experts 64 top-6 layers 27 (dense < 1) vocab 102400
+[16:19:46 + 10m00s] progress: 1 running, 4 waiting, 18 done
+    brounds [GPU 0] 239s / 3600s: Capturing CUDA graphs (FULL):  63%|██████▎   | 32/51 [00:03<00:02,  9.22it/s]
+[16:20:46 + 11m00s] progress: 1 running, 4 waiting, 18 done
+    brounds [GPU 0] 299s / 3600s: Capturing CUDA graphs (FULL):  57%|█████▋    | 29/51 [00:03<00:02,  9.45it/s]
+[16:21:46 + 12m00s] progress: 1 running, 4 waiting, 18 done
+    brounds [GPU 0] 359s / 3600s: $ stdbuf -oL -eL docker run --rm --device=/dev/kfd --device=/dev/dri --group-add video --ipc=host --shm-size 16g --security-opt seccomp=unconfined -e HIP_VISIBL
+[16:22:39 + 12m53s] ok      brounds rc=0 412s
+    PROGRESS invocation=b1_vllm_aiter elapsed_s=60.1 deadline_s=900
+    PROGRESS invocation=b3_vllm_aiter elapsed_s=60.0 deadline_s=900
+    BROUNDS five corrected-vLLM pairs at B1/B2/B4; same-kernel graph eligibility recorded separately
+[16:22:39 + 12m53s] start captures on GPU 0
+[16:22:46 + 13m00s] progress: 1 running, 3 waiting, 19 done
+    captures [GPU 0] 7s / 3300s: model: hidden 2048 heads 16 kv_lora 512 experts 64 top-6 layers 27 (dense < 1) vocab 102400
+[16:22:55 + 13m09s] fail    captures rc=1 16s
+        return super().run(name, command, **kw)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+      File "/root/src/abee09fcda357bb982cfba4d85bb387a6da97ec2385d3d4574f1f7cd4282d5da-20261015T152622Z/examples/dsv2lite/inplace_session.py", line 102, in run
+        raise RuntimeError(f"invocation {name} failed rc={rc}; full log {path}")
+    RuntimeError: invocation traffic_alld4r0l1kvsmw failed rc=-11; full log /root/sess/b4-live-20261015/20261015T160946Z-a7e517/traffic_alld4r0l1kvsmw.raw.log
+[16:22:55 + 13m09s] start routing on GPU 0
+[16:23:46 + 14m00s] progress: 1 running, 2 waiting, 20 done
+    routing [GPU 0] 51s / 1000s: step 16
+[16:24:46 + 15m00s] progress: 1 running, 2 waiting, 20 done
+    routing [GPU 0] 111s / 1000s: $ stdbuf -oL -eL /root/dsv2-prep/.venv/bin/python -u -m examples.dsv2lite.routing_overlap --model /root/models/dsv2-lite-base --fleet /root/fleet-3fb67a6 --batc
+[16:25:34 + 15m48s] ok      routing rc=0 159s
+    PROGRESS invocation=routing_b1 elapsed_s=30.1 deadline_s=300
+    PROGRESS invocation=routing_b2 elapsed_s=30.5 deadline_s=300
+    PROGRESS invocation=routing_b4 elapsed_s=30.7 deadline_s=300
+[16:25:34 + 15m48s] start breport (cpu)
+[16:25:35 + 15m49s] ok      breport rc=0 1s
+    BREPORT b=1 vs vLLM aiter: throughput WIN median +27.11% spread 1.04% (310 vs 244 tok/s); per-request latency WIN median +26.44% spread 1.01%; next: batch-1 reference point: no batch decision
+    BREPORT b=2 vs vLLM aiter: throughput WIN median +4.42% spread 0.53% (441 vs 423 tok/s); per-request latency WIN median +3.46% spread 0.69%; next: replication is ETX's batch mode at this B; record it; Qwen batch study next
+    BREPORT b=4 vs vLLM aiter: throughput LOSS median -30.93% spread 9.31% (448 vs 649 tok/s); per-request latency LOSS median -31.57% spread 9.34%; next: design and build column-batched tiles (stage B2), threshold before code
+[16:25:35 + 15m49s] start b4_result (cpu)
+[16:25:36 + 15m50s] ok      b4_result rc=0 1s
+    B4-RESULT INCOMPLETE
+[16:25:36 + 15m50s] session done
+  job                              status     rc  gpu  seconds
+  apt                              ok          0             1  
+  etx_env                          ok          0             1  
+  prep_env                         ok          0             4  
+  source                           ok          0             1  
+  prep_dl                          ok          0             1  
+  prep_pack                        ok          0             1  
+  docker_pull                      ok          0             1  
+  references                       ok          0    0       44  
+  build_alld4r0l1kvsmw             ok          0            36  
+  bgate_alld4r0l1kvsmw             ok          0    0        7  
+  build_x2                         ok          0            54  
+  bgate_x2                         ok          0    0        7  
+  build_x4                         ok          0           129  
+  bgate_x4                         ok          0    0        7  
+  graph_gate_alld4r0l1kvsmw        ok          0             1  
+  graph_gate_x2                    ok          0             1  
+  graph_gate_x4                    ok          0             1  
+  vsel                             ok          0    0      185  
+  brounds                          ok          0    0      412  
+  captures                         fail        1    0       16  
+  routing                          ok          0    0      159  
+  breport                          ok          0             1  
+  b4_result                        ok          0             1  
+SEALED /root/sess/b4-live-20261015/20261015T160946Z-a7e517 complete=False

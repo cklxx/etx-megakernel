@@ -1,0 +1,28 @@
+Thu Oct 15 15:47:13 UTC 2026
+/opt/rocm/core-7.14/lib/cmake/llvm
+/opt/rocm/core-7.14/lib/llvm
+/opt/rocm/core-7.14/llvm
+/opt/rocm/core-7.14/lib/llvm
+/opt/rocm/core-7.14/lib/llvm/include/clang-tidy/llvm
+/opt/rocm/core-7.14/lib/llvm/include/llvm
+/opt/rocm/core-7.14/lib/llvm/lib/cmake/llvm
+
+/opt/rocm-7.2.3/lib/llvm/bin/llc
+HIP version: 7.2.53211-c2d9476115
+AMD clang version 22.0.0git (https://github.com/RadeonOpenCompute/llvm-project roc-7.2.3 26084 f58b06dce1f9c15707c5f808fd002e18c2accf7e)
+Target: x86_64-unknown-linux-gnu
+[15:45:56 +  0m07s] ok      prep_pack rc=0 1s
+[15:45:56 +  0m07s] start build_x8 (cpu)
+[15:45:56 +  0m07s] start references on GPU 0
+[15:46:27 +  0m38s] ok      build_x1km rc=0 35s
+[15:46:27 +  0m38s] start build_alld4r0l1kvsmw (cpu)
+[15:46:49 +  1m00s] progress: 3 running, 2 waiting, 7 done
+    build_x8 [cpu] 53s / 1200s: PROGRESS invocation=compile_x8 elapsed_s=30.1 deadline_s=900
+    build_alld4r0l1kvsmw [cpu] 22s / 1200s: /root/sess/x8-live-20261015/20261015T154549Z-7cdcb2/b_alld4r0l1kvsmw/fleet_src/kernels/fleet_kernel.hip:1150:1: remark:     LDS Size [bytes/block]: 0 [-Rpass-an
+    references [GPU 0] 53s / 1600s: PROGRESS invocation=reference_r0 elapsed_s=30.0 deadline_s=180
+[15:47:07 +  1m18s] ok      build_alld4r0l1kvsmw rc=0 40s
+/opt/amdgpu/share/libdrm/amdgpu.ids: No such file or directory
+  loaded in 53.3s
+prompt rotated by 0 tokens (first ids [100000, 1558, 8708, 7])
+prompt: 1024 tokens
+prefill

@@ -1,0 +1,50 @@
+Thu Oct 15 15:30:50 UTC 2026
+[15:29:34 +  0m00s] session record: /root/sess/expert-live-20261015/20261015T152934Z-af0efa
+[15:29:34 +  0m00s] start synthetic (cpu)
+[15:29:35 +  0m01s] ok      synthetic rc=0 1s
+[15:29:35 +  0m01s] start build (cpu)
+[15:29:55 +  0m21s] ok      build rc=0 20s
+[15:29:55 +  0m21s] start correctness on GPU 0
+[15:29:59 +  0m25s] ok      correctness rc=0 4s
+[15:29:59 +  0m25s] start pairs on GPU 0
+[15:30:15 +  0m41s] ok      pairs rc=0 16s
+[15:30:15 +  0m41s] session done
+  job                              status     rc  gpu  seconds
+  synthetic                        ok          0             1  
+  build                            ok          0            20  
+  correctness                      ok          0    0        4  
+  pairs                            ok          0    0       16  
+SEALED /root/sess/expert-live-20261015/20261015T152934Z-af0efa complete=True
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate/build.json
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate/identity.json
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate/plan.json
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/certificate.json
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate_diag_build.log.status.json
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/candidate_build.log.status.json
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/control/build.json
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/control/identity.json
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/control/plan.json
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/time-000/partial.json
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/time-000/r2_graph_candidate.log.status.json
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/time-000/r0_graph_candidate.log.status.json
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/time-000/r2_graph_control.log.status.json
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/time-000/r0_graph_control.log.status.json
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/time-000/r0_fused_candidate.log.status.json
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/time-000/r4_graph_control.log.status.json
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/time-000/r3_graph_candidate.log.status.json
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/time-000/r3_graph_control.log.status.json
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/time-000/r1_graph_candidate.log.status.json
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/time-000/r4_fused_candidate.log.status.json
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/time-000/report.json
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/time-000/r1_fused_control.log.status.json
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/time-000/r1_fused_candidate.log.status.json
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/time-000/r4_graph_candidate.log.status.json
+/root/sess/expert-live-20261015/20261015T152934Z-af0efa/probe/time-000/r1_graph_control.log.status.json
+DOWNLOAD repo=Qwen/Qwen3-30B-A3B revision=ad44e777bcd18fa416d9da3bd8f70d33ebb85d39 dest=/root/llm/qwen3-30b-a3b/hf time=1792078205.0847483
+Fetching 23 files:   0%|          | 0/23 [00:00<?, ?it/s]Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Fetching 23 files:   9%|▊         | 2/23 [00:00<00:01, 15.11it/s]Fetching 23 files:  13%|█▎        | 3/23 [00:20<00:01, 15.11it/s]Fetching 23 files:  17%|█▋        | 4/23 [00:30<02:48,  8.88s/it]Fetching 23 files:  22%|██▏       | 5/23 [00:31<01:58,  6.58s/it]Fetching 23 files:  26%|██▌       | 6/23 [00:35<01:42,  6.00s/it]Fetching 23 files:  30%|███       | 7/23 [00:37<01:14,  4.68s/it]Fetching 23 files:  35%|███▍      | 8/23 [00:39<00:59,  3.95s/it]Fetching 23 files:  39%|███▉      | 9/23 [00:41<00:46,  3.30s/it]Fetching 23 files:  43%|████▎     | 10/23 [00:42<00:33,  2.60s/it]$HOME/dsv2-prep/.venv/bin/python -c 1 2>/dev/null || { rm -rf $HOME/dsv2-prep; python3 -m venv $HOME/dsv2-prep/.venv; }; . $HOME/dsv2-prep/.venv/bin/activate; pip install -q --upgrade pip; pip install -q numpy 'huggingface_hub[hf_transfer]' hf_transfer; python3 -c 'import torch' 2>/dev/null || pip install -q --index-url https://download.pytorch.org/whl/rocm7.0 torch; pip install -q 'transformers>=4.39,<5' 'tokenizers<0.20' accelerate safetensors; SP=$(python3 -c 'import site;print(site.getsitepackages()[0])'); mkdir -p $SP/flash_attn; echo '# stub: satisfies transformers check_imports only' > $SP/flash_attn/__init__.py; python3 -c 'import torch, transformers; print(torch.__version__, torch.cuda.is_available(), transformers.__version__)'
+WARNING: huggingface-hub 2.2.0 does not provide the extra 'hf-transfer'
+150M	/root/sess/expert-live-20261015
+/root/fleet-3fb67a6
+/opt/rocm/core-7.14/lib/llvm/bin/llvm-link
+/opt/rocm/core-7.14/lib/llvm/amdgcn/bitcode/ocml.bc

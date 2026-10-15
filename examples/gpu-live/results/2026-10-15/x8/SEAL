@@ -1,0 +1,27 @@
+{
+ "complete": true,
+ "jobs": {
+  "apt": "ok",
+  "build_alld4r0l1kvsmw": "ok",
+  "build_x1km": "ok",
+  "build_x8": "ok",
+  "diagnostics": "ok",
+  "etx_env": "ok",
+  "prep_dl": "ok",
+  "prep_env": "ok",
+  "prep_pack": "ok",
+  "references": "ok",
+  "source": "ok",
+  "summary": "ok"
+ },
+ "local_only": [
+  "b_*/run",
+  "b_*/fleet_src/*",
+  "*.o"
+ ],
+ "manifest_sha256": "67fd59920f5cc71f366807285ba1675a577b6cd7a95a6a2229110cbc8f3dc125",
+ "plan_sha256": "8a5cfdf82b1501d150e287bd8cba8f916f4ad6018efd7dad184f85c8985f7770",
+ "sealed": "2026-10-15T15:56:40Z",
+ "session": "20261015T154549Z-7cdcb2",
+ "source": "commit 554133d744b4591c9cf87c68b6817df781137c9b\nbranch main\narchive abee09fcda357bb982cfba4d85bb387a6da97ec2385d3d4574f1f7cd4282d5da\nstaged 2026-10-15T15:26:30Z\n"
+}

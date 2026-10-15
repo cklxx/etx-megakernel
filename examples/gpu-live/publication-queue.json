@@ -1,0 +1,575 @@
+{
+  "source_branch_tip": "1606dcd6c10d20d68b7635bddc50845e5fe872a7",
+  "integration": "sanitized squash; original branch retained locally",
+  "original_seals": "unchanged; bind original raw bytes, not redacted derivatives",
+  "derivatives": [
+    {
+      "file": "examples/gpu-live/results/2026-10-15-setup-blocker/attempts.json",
+      "source_commit": "1606dcd6c10d20d68b7635bddc50845e5fe872a7",
+      "original_sha256": "4355163390096739de5ac247ba689070f2dfc366da0a8e02f4c7381f919154ba",
+      "published_sha256": "50a78a64540c18ae81ca518845823fce270a902ce5738a047883405f769a52ab",
+      "redactions": [
+        {
+          "category": "GPU connection address",
+          "replacements": 11
+        },
+        {
+          "category": "local user filesystem path",
+          "replacements": 5
+        }
+      ]
+    },
+    {
+      "file": "examples/gpu-live/results/2026-10-15-setup-blocker/headers-transfer.log",
+      "source_commit": "1606dcd6c10d20d68b7635bddc50845e5fe872a7",
+      "original_sha256": "abc35b2775cdfe81e019dabb266698c5204f504930c9f7230b3003220fbca4c2",
+      "published_sha256": "087789e3f7651051133579a1a7f07751d999f441e623d4847281eabd66b7c392",
+      "redactions": [
+        {
+          "category": "GPU connection address",
+          "replacements": 1
+        }
+      ]
+    },
+    {
+      "file": "examples/gpu-live/results/2026-10-15-setup-blocker/pinned-fleet-transfer.log",
+      "source_commit": "1606dcd6c10d20d68b7635bddc50845e5fe872a7",
+      "original_sha256": "defcfec6989ef90f3464c919e08aac79affc9ffb824f908686f6eeba10bae3e8",
+      "published_sha256": "8a48ea55f0b27faf11eaf63ca1cf737d2b890efb26dde606ac23af0cc27fc336",
+      "redactions": [
+        {
+          "category": "GPU connection address",
+          "replacements": 1
+        }
+      ]
+    },
+    {
+      "file": "examples/gpu-live/results/2026-10-15-setup-blocker/result.md",
+      "source_commit": "1606dcd6c10d20d68b7635bddc50845e5fe872a7",
+      "original_sha256": "fc2c8c3488644ef7d256d88c56347babcd01f2202c434d5eba2d41ec68c8f1cb",
+      "published_sha256": "b715113a2da9aa4efb6e3ceba1cb0952e97a2ef1842a8ed2dfb4c9db5633aa7d",
+      "redactions": [
+        {
+          "category": "GPU connection address",
+          "replacements": 2
+        },
+        {
+          "category": "provider resource ID",
+          "replacements": 1
+        },
+        {
+          "category": "local user filesystem path",
+          "replacements": 1
+        }
+      ]
+    },
+    {
+      "file": "examples/gpu-live/results/2026-10-15-setup-blocker/ssh-reconcile-01.log",
+      "source_commit": "1606dcd6c10d20d68b7635bddc50845e5fe872a7",
+      "original_sha256": "40703291e98863661a15b098302cd9277ce4485cc33989c3d47bf91c435944b7",
+      "published_sha256": "c3f5e83d731306cf535b2c35c1a9a5fcf17aa9df81d0152dba6e31db7590dfb2",
+      "redactions": [
+        {
+          "category": "GPU connection address",
+          "replacements": 1
+        }
+      ]
+    },
+    {
+      "file": "examples/gpu-live/results/2026-10-15-setup-blocker/status.md",
+      "source_commit": "1606dcd6c10d20d68b7635bddc50845e5fe872a7",
+      "original_sha256": "8011233ca12895ced3e5f5bc587926e2c0dc1ff8633918204b6d346cd5c98889",
+      "published_sha256": "88cce8f59111e10b9923fa10aebd291408ad1274319fe44f6589c913646e0fd9",
+      "redactions": [
+        {
+          "category": "GPU connection address",
+          "replacements": 1
+        },
+        {
+          "category": "provider resource ID",
+          "replacements": 1
+        },
+        {
+          "category": "local user filesystem path",
+          "replacements": 1
+        }
+      ]
+    },
+    {
+      "file": "examples/gpu-live/results/2026-10-15-setup-blocker/vllm-clone.log",
+      "source_commit": "1606dcd6c10d20d68b7635bddc50845e5fe872a7",
+      "original_sha256": "40703291e98863661a15b098302cd9277ce4485cc33989c3d47bf91c435944b7",
+      "published_sha256": "c3f5e83d731306cf535b2c35c1a9a5fcf17aa9df81d0152dba6e31db7590dfb2",
+      "redactions": [
+        {
+          "category": "GPU connection address",
+          "replacements": 1
+        }
+      ]
+    },
+    {
+      "file": "examples/gpu-live/results/2026-10-15/README.md",
+      "source_commit": "1606dcd6c10d20d68b7635bddc50845e5fe872a7",
+      "original_sha256": "1b3f69a8522beaaadfca576bc84dd603f0d43fbcec3e7f8f5a4a7a1e0d0ad608",
+      "published_sha256": "734030a775b5b27bd4b0a3687ab32362edc5d870b4b2e7fc7df86c69b64251b4",
+      "redactions": [
+        {
+          "category": "local user filesystem path",
+          "replacements": 1
+        }
+      ]
+    },
+    {
+      "file": "examples/gpu-live/results/2026-10-15/attempts.json",
+      "source_commit": "1606dcd6c10d20d68b7635bddc50845e5fe872a7",
+      "original_sha256": "c61cc8acc696b93fc79e3e8c0a59e773ba288e10d296d1cc50f5e1bebb7aa77d",
+      "published_sha256": "fb07262eae8a8d3fc68ea95a04c8d49cda19de124afa9d525463f5659aee2801",
+      "redactions": [
+        {
+          "category": "GPU connection address",
+          "replacements": 11
+        },
+        {
+          "category": "local user filesystem path",
+          "replacements": 10
+        }
+      ]
+    },
+    {
+      "file": "examples/gpu-live/results/2026-10-15/b4-export-symlink-materialization.json",
+      "source_commit": "1606dcd6c10d20d68b7635bddc50845e5fe872a7",
+      "original_sha256": "c624c07402ea2c9461d84e1ec371fac9477142dbd613a450a64ea7960ad69d4a",
+      "published_sha256": "f69d538b2b9f6947c7b29479ffa7785e666a3a59302668502de5c8dfcaef0658",
+      "redactions": [
+        {
+          "category": "local user filesystem path",
+          "replacements": 28
+        }
+      ]
+    },
+    {
+      "file": "examples/gpu-live/results/2026-10-15/b4/CURATED_EXPORT.json",
+      "source_commit": "1606dcd6c10d20d68b7635bddc50845e5fe872a7",
+      "original_sha256": "2236b794032ebdb976b4e0bf0058b19740e17a84ea5b5dd307c48145342af4b8",
+      "published_sha256": "165d79eb9296d6571c628a7508f35fff2a281fdc920c1352f7724a2fb5ec3fa9",
+      "redactions": [
+        {
+          "category": "local user filesystem path",
+          "replacements": 1
+        }
+      ]
+    },
+    {
+      "file": "examples/gpu-live/results/2026-10-15/b4/b1_vllm_aiter.raw.log",
+      "source_commit": "1606dcd6c10d20d68b7635bddc50845e5fe872a7",
+      "original_sha256": "ae3807e10542c0a964088f689ef3799adfbd4793077742dac07475daa9665e95",
+      "published_sha256": "e5daf813d45aa5ef0774e243c97ab0d01f948570b6e186e967537909a076cf17",
+      "redactions": [
+        {
+          "category": "private network address",
+          "replacements": 1
+        },
+        {
+          "category": "private distributed rendezvous port",
+          "replacements": 1
+        }
+      ]
+    },
+    {
+      "file": "examples/gpu-live/results/2026-10-15/b4/b2_vllm_aiter.raw.log",
+      "source_commit": "1606dcd6c10d20d68b7635bddc50845e5fe872a7",
+      "original_sha256": "a89419b71089e47e4748e804c7206276d202746d60aafae0791397858b6a1814",
+      "published_sha256": "399dbd721b2a16bfbdc6b6168224b5495481f6d94ab568631d5156c1c2026ce4",
+      "redactions": [
+        {
+          "category": "private network address",
+          "replacements": 1
+        },
+        {
+          "category": "private distributed rendezvous port",
+          "replacements": 1
+        }
+      ]
+    },
+    {
+      "file": "examples/gpu-live/results/2026-10-15/b4/b3_vllm_aiter.raw.log",
+      "source_commit": "1606dcd6c10d20d68b7635bddc50845e5fe872a7",
+      "original_sha256": "d5626e7a7ff546b12cce200ff7de1d7b12f266d285c847c298847237d8d336f9",
+      "published_sha256": "a963bcaffedc5b5539f681a1156f99d2f1a46bcfdb1502f1eac07ca74fad6497",
+      "redactions": [
+        {
+          "category": "private network address",
+          "replacements": 1
+        },
+        {
+          "category": "private distributed rendezvous port",
+          "replacements": 1
+        }
+      ]
+    },
+    {
+      "file": "examples/gpu-live/results/2026-10-15/b4/b4_vllm_aiter.raw.log",
+      "source_commit": "1606dcd6c10d20d68b7635bddc50845e5fe872a7",
+      "original_sha256": "e8613714790b6248141c30b718c2cf3013881ffbb4d07f2b18a82a96698e7b01",
+      "published_sha256": "34e8bc6e2bba548bcd49cb7a2522346761289c2eff676ecdcb49b1b87923b11c",
+      "redactions": [
+        {
+          "category": "private network address",
+          "replacements": 1
+        },
+        {
+          "category": "private distributed rendezvous port",
+          "replacements": 1
+        }
+      ]
+    },
+    {
+      "file": "examples/gpu-live/results/2026-10-15/b4/b5_vllm_aiter.raw.log",
+      "source_commit": "1606dcd6c10d20d68b7635bddc50845e5fe872a7",
+      "original_sha256": "b7049c6206e5ebdd7ee6fd82e0a15725676af97bcb62da3792e0fcdd11b6d343",
+      "published_sha256": "608f7b46e947d6e68c383cc3dbfcd527048ccf23495d60449a9a8d7fb8ae3700",
+      "redactions": [
+        {
+          "category": "private network address",
+          "replacements": 1
+        },
+        {
+          "category": "private distributed rendezvous port",
+          "replacements": 1
+        }
+      ]
+    },
+    {
+      "file": "examples/gpu-live/results/2026-10-15/b4/brounds.log",
+      "source_commit": "1606dcd6c10d20d68b7635bddc50845e5fe872a7",
+      "original_sha256": "de461e65ca8488b05915a0573f75bf0c4b0ed57067187f02b737dcbc5e370a74",
+      "published_sha256": "03614084008c5218a37574c05fc0bc37d8634065998d3818eaebd17c3e235a68",
+      "redactions": [
+        {
+          "category": "private network address",
+          "replacements": 1
+        },
+        {
+          "category": "private network address",
+          "replacements": 1
+        },
+        {
+          "category": "private network address",
+          "replacements": 1
+        },
+        {
+          "category": "private network address",
+          "replacements": 1
+        },
+        {
+          "category": "private network address",
+          "replacements": 1
+        },
+        {
+          "category": "private distributed rendezvous port",
+          "replacements": 5
+        }
+      ]
+    },
+    {
+      "file": "examples/gpu-live/results/2026-10-15/b4/vsel.log",
+      "source_commit": "1606dcd6c10d20d68b7635bddc50845e5fe872a7",
+      "original_sha256": "253ba5adb2ac2f2fb95b081c363c93a5878238d349c73dcfbdebc3b683a77e12",
+      "published_sha256": "b87bad8232291add189b63c8ca6d1350c269dc1a30f68c517dc730701f08114b",
+      "redactions": [
+        {
+          "category": "private network address",
+          "replacements": 1
+        },
+        {
+          "category": "private network address",
+          "replacements": 1
+        },
+        {
+          "category": "private distributed rendezvous port",
+          "replacements": 2
+        }
+      ]
+    },
+    {
+      "file": "examples/gpu-live/results/2026-10-15/b4/vsel_aiter.raw.log",
+      "source_commit": "1606dcd6c10d20d68b7635bddc50845e5fe872a7",
+      "original_sha256": "b05ec0f3b8880e3acd0d5db06278a506244a04e1bd642c9c390798d8d7912544",
+      "published_sha256": "46c1434e1278a39d46951fb90503fad52eae69a95ec9abe9c636a72a628de9bf",
+      "redactions": [
+        {
+          "category": "private network address",
+          "replacements": 1
+        },
+        {
+          "category": "private distributed rendezvous port",
+          "replacements": 1
+        }
+      ]
+    },
+    {
+      "file": "examples/gpu-live/results/2026-10-15/b4/vsel_default.raw.log",
+      "source_commit": "1606dcd6c10d20d68b7635bddc50845e5fe872a7",
+      "original_sha256": "6e4778efde3ebaf1cbf2f1720b22dc7d7e8a94a7f2ce39a4775cad7ab73078fb",
+      "published_sha256": "3b938ae6a1e5d91461cd244705b22dc4fe2326eeeec70acc7a041000202a2bf1",
+      "redactions": [
+        {
+          "category": "private network address",
+          "replacements": 1
+        },
+        {
+          "category": "private distributed rendezvous port",
+          "replacements": 1
+        }
+      ]
+    },
+    {
+      "file": "examples/gpu-live/results/2026-10-15/c6/CURATED_EXPORT.json",
+      "source_commit": "1606dcd6c10d20d68b7635bddc50845e5fe872a7",
+      "original_sha256": "b97ce3b9b26853549f7e295383da2ed8d5d993bb4418dfac3ae4094a9b31d6ef",
+      "published_sha256": "c9263c3116bbbd649b119737096bd563d6e7c703ef0a75276e113570a0348d49",
+      "redactions": [
+        {
+          "category": "local user filesystem path",
+          "replacements": 1
+        }
+      ]
+    },
+    {
+      "file": "examples/gpu-live/results/2026-10-15/interruption-1600Z/headers-transfer.log",
+      "source_commit": "1606dcd6c10d20d68b7635bddc50845e5fe872a7",
+      "original_sha256": "abc35b2775cdfe81e019dabb266698c5204f504930c9f7230b3003220fbca4c2",
+      "published_sha256": "087789e3f7651051133579a1a7f07751d999f441e623d4847281eabd66b7c392",
+      "redactions": [
+        {
+          "category": "GPU connection address",
+          "replacements": 1
+        }
+      ]
+    },
+    {
+      "file": "examples/gpu-live/results/2026-10-15/interruption-1600Z/pinned-fleet-transfer.log",
+      "source_commit": "1606dcd6c10d20d68b7635bddc50845e5fe872a7",
+      "original_sha256": "defcfec6989ef90f3464c919e08aac79affc9ffb824f908686f6eeba10bae3e8",
+      "published_sha256": "8a48ea55f0b27faf11eaf63ca1cf737d2b890efb26dde606ac23af0cc27fc336",
+      "redactions": [
+        {
+          "category": "GPU connection address",
+          "replacements": 1
+        }
+      ]
+    },
+    {
+      "file": "examples/gpu-live/results/2026-10-15/interruption-1600Z/result.md",
+      "source_commit": "1606dcd6c10d20d68b7635bddc50845e5fe872a7",
+      "original_sha256": "5b92a8ddd67a09970dbe83bbac2d11114dfb5e78608c2077b1cf2785b9e75e60",
+      "published_sha256": "3216584e77c4796a1948dc39777e84af972cb584b0c412cd9fcde7c77dbe5ed2",
+      "redactions": [
+        {
+          "category": "GPU connection address",
+          "replacements": 1
+        },
+        {
+          "category": "provider resource ID",
+          "replacements": 1
+        },
+        {
+          "category": "local user filesystem path",
+          "replacements": 1
+        }
+      ]
+    },
+    {
+      "file": "examples/gpu-live/results/2026-10-15/interruption-1600Z/ssh-reconcile-01.log",
+      "source_commit": "1606dcd6c10d20d68b7635bddc50845e5fe872a7",
+      "original_sha256": "40703291e98863661a15b098302cd9277ce4485cc33989c3d47bf91c435944b7",
+      "published_sha256": "c3f5e83d731306cf535b2c35c1a9a5fcf17aa9df81d0152dba6e31db7590dfb2",
+      "redactions": [
+        {
+          "category": "GPU connection address",
+          "replacements": 1
+        }
+      ]
+    },
+    {
+      "file": "examples/gpu-live/results/2026-10-15/interruption-1600Z/status.md",
+      "source_commit": "1606dcd6c10d20d68b7635bddc50845e5fe872a7",
+      "original_sha256": "62567d40ca02ce4c02e7287d5df67dc6acc2c673043d5eca7179120e2cd4c340",
+      "published_sha256": "5336cbb0d864cde051ca6d72a2d2d0b3054fef975d870ba652407a3315c96ea2",
+      "redactions": [
+        {
+          "category": "GPU connection address",
+          "replacements": 1
+        },
+        {
+          "category": "provider resource ID",
+          "replacements": 1
+        },
+        {
+          "category": "local user filesystem path",
+          "replacements": 1
+        }
+      ]
+    },
+    {
+      "file": "examples/gpu-live/results/2026-10-15/interruption-1600Z/transport-reconcile-03.log",
+      "source_commit": "1606dcd6c10d20d68b7635bddc50845e5fe872a7",
+      "original_sha256": "e29bba0887ee7c3ec93839aa09c354944a4ad8b0ce35d12ecc4bf93beae34150",
+      "published_sha256": "ee0de78549c7167893996dfadb6b78a3d642a370d037555a9da4f6f3d0511713",
+      "redactions": [
+        {
+          "category": "GPU connection address",
+          "replacements": 1
+        }
+      ]
+    },
+    {
+      "file": "examples/gpu-live/results/2026-10-15/interruption-1600Z/vllm-clone.log",
+      "source_commit": "1606dcd6c10d20d68b7635bddc50845e5fe872a7",
+      "original_sha256": "40703291e98863661a15b098302cd9277ce4485cc33989c3d47bf91c435944b7",
+      "published_sha256": "c3f5e83d731306cf535b2c35c1a9a5fcf17aa9df81d0152dba6e31db7590dfb2",
+      "redactions": [
+        {
+          "category": "GPU connection address",
+          "replacements": 1
+        }
+      ]
+    },
+    {
+      "file": "examples/gpu-live/results/2026-10-15/interruption-1600Z/x8-export-first.log",
+      "source_commit": "1606dcd6c10d20d68b7635bddc50845e5fe872a7",
+      "original_sha256": "1b35d78ce5832b5f8c3b5d7a1e446520e09503eeedda0abc7f1bc3095a593b69",
+      "published_sha256": "0417e6a0cd6eaf14c63c5f69bb5b3a5d96d049cd84bde63e4d6f2b6023c3e355",
+      "redactions": [
+        {
+          "category": "GPU connection address",
+          "replacements": 1
+        }
+      ]
+    },
+    {
+      "file": "examples/gpu-live/results/2026-10-15/result.md",
+      "source_commit": "1606dcd6c10d20d68b7635bddc50845e5fe872a7",
+      "original_sha256": "f8860ee6ea6bc1c8fddadfacb7aa79eb547f9ae3b03293cb0f55dd2179ff3e04",
+      "published_sha256": "e7106796275be0c46639cf2cbf6df1878b81084731a000152593ddc753cf9b5b",
+      "redactions": [
+        {
+          "category": "GPU connection address",
+          "replacements": 1
+        },
+        {
+          "category": "provider resource ID",
+          "replacements": 1
+        },
+        {
+          "category": "local user filesystem path",
+          "replacements": 1
+        }
+      ]
+    },
+    {
+      "file": "examples/gpu-live/results/2026-10-15/status.md",
+      "source_commit": "1606dcd6c10d20d68b7635bddc50845e5fe872a7",
+      "original_sha256": "4ee4060a861585852379e60cfca4c5360468b25f8be363933cb1bd59d916516f",
+      "published_sha256": "084757ea8aa772947f7818c1b9a749d584d954799c83b456d92622756de540f7",
+      "redactions": [
+        {
+          "category": "local user filesystem path",
+          "replacements": 2
+        }
+      ]
+    },
+    {
+      "file": "examples/gpu-live/results/2026-10-15/x8/CURATED_EXPORT.json",
+      "source_commit": "1606dcd6c10d20d68b7635bddc50845e5fe872a7",
+      "original_sha256": "6a20626945b575f0eacf0302828b5156b46654856dc0b7c6d1fc442dfdcf051e",
+      "published_sha256": "0869b2a0a15a3d92b6716f2164be2a76f80f87b0c7221fe427814a287d98ac4f",
+      "redactions": [
+        {
+          "category": "local user filesystem path",
+          "replacements": 1
+        }
+      ]
+    },
+    {
+      "file": "examples/gpu-live/results/2026-10-15/x8/build_x8.log",
+      "source_commit": "1606dcd6c10d20d68b7635bddc50845e5fe872a7",
+      "original_sha256": "a11d0dfae25f5692a923550cb05952103a98cbdb9cf2edc2e48d4c2833886e23",
+      "published_sha256": "2de2ed474aaf6f55cc80d7e4fd484f31bb73070180227b204db0c4403b0ed0bc",
+      "redactions": [
+        {
+          "category": "private network address",
+          "replacements": 1
+        },
+        {
+          "category": "private network address",
+          "replacements": 1
+        },
+        {
+          "category": "private network address",
+          "replacements": 1
+        },
+        {
+          "category": "private network address",
+          "replacements": 1
+        },
+        {
+          "category": "private network address",
+          "replacements": 1
+        },
+        {
+          "category": "private network address",
+          "replacements": 1
+        },
+        {
+          "category": "private network address",
+          "replacements": 1
+        },
+        {
+          "category": "private network address",
+          "replacements": 1
+        }
+      ]
+    },
+    {
+      "file": "examples/gpu-live/results/2026-10-15/x8/compile_x8.raw.log",
+      "source_commit": "1606dcd6c10d20d68b7635bddc50845e5fe872a7",
+      "original_sha256": "f9abe8516aee2a9a07727522f9d8b5fb9e9c761989bafdc65d179f9893351d78",
+      "published_sha256": "ffe30502937da03c413d26ca86ab73217cd405e01b43aeca93509db0ac350d05",
+      "redactions": [
+        {
+          "category": "private network address",
+          "replacements": 1
+        },
+        {
+          "category": "private network address",
+          "replacements": 1
+        },
+        {
+          "category": "private network address",
+          "replacements": 1
+        },
+        {
+          "category": "private network address",
+          "replacements": 1
+        },
+        {
+          "category": "private network address",
+          "replacements": 1
+        },
+        {
+          "category": "private network address",
+          "replacements": 1
+        },
+        {
+          "category": "private network address",
+          "replacements": 1
+        },
+        {
+          "category": "private network address",
+          "replacements": 1
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,210 @@
+[
+  {
+    "file": "references/fleet_cache.bin",
+    "original_target": "/root/sess/x8-live-20261015/20261015T154549Z-7cdcb2/references/fleet_cache.bin",
+    "sha256": "61f526227ca7d004b4f607bda9306d0aa3acfb19e13e3f999bbd010eafbe82d2",
+    "status": "materialized from checksum-verified exported x8 reference",
+    "local_source": "/LOCAL_WORKSPACE/.hermes/cache/scratch/etx-gpu-live-20261015-evidence/x8/20261015T154549Z-7cdcb2/references/fleet_cache.bin"
+  },
+  {
+    "file": "references/golden.binding.json",
+    "original_target": "/root/sess/x8-live-20261015/20261015T154549Z-7cdcb2/references/golden.binding.json",
+    "sha256": "ffa1a35ce2137081652c20e489eb6c6f3446eafa4e9e5d1269a24a0c6ecbbfac",
+    "status": "materialized from checksum-verified exported x8 reference",
+    "local_source": "/LOCAL_WORKSPACE/.hermes/cache/scratch/etx-gpu-live-20261015-evidence/x8/20261015T154549Z-7cdcb2/references/golden.binding.json"
+  },
+  {
+    "file": "references/golden.npz",
+    "original_target": "/root/sess/x8-live-20261015/20261015T154549Z-7cdcb2/references/golden.npz",
+    "sha256": "492569b5285b3877da1e0ee59068babaafafd7ba554cd0b033bbbe6f80cc1752",
+    "status": "materialized from checksum-verified exported x8 reference",
+    "local_source": "/LOCAL_WORKSPACE/.hermes/cache/scratch/etx-gpu-live-20261015-evidence/x8/20261015T154549Z-7cdcb2/references/golden.npz"
+  },
+  {
+    "file": "references/golden.producer.json",
+    "original_target": "/root/sess/x8-live-20261015/20261015T154549Z-7cdcb2/references/golden.producer.json",
+    "sha256": "2c68a75da0cbad0f54504289cf45e8994fb93532d23cfa8d178a5facb63a2106",
+    "status": "materialized from checksum-verified exported x8 reference",
+    "local_source": "/LOCAL_WORKSPACE/.hermes/cache/scratch/etx-gpu-live-20261015-evidence/x8/20261015T154549Z-7cdcb2/references/golden.producer.json"
+  },
+  {
+    "file": "references/golden.producer.raw.log",
+    "original_target": "/root/sess/x8-live-20261015/20261015T154549Z-7cdcb2/references/golden.producer.raw.log",
+    "sha256": "f4f9f5f50b11166c6727ae78ed435e0fc9411e296cfd3a344b83b3810a7f427e",
+    "status": "materialized from checksum-verified exported x8 reference",
+    "local_source": "/LOCAL_WORKSPACE/.hermes/cache/scratch/etx-gpu-live-20261015-evidence/x8/20261015T154549Z-7cdcb2/references/golden.producer.raw.log"
+  },
+  {
+    "file": "references/golden_hidden.bin",
+    "original_target": "/root/sess/x8-live-20261015/20261015T154549Z-7cdcb2/references/golden_hidden.bin",
+    "sha256": "dccd2f4818ae3d93067490a0a98c97612e67d317f808174a78cda2be479664ce",
+    "status": "materialized from checksum-verified exported x8 reference",
+    "local_source": "/LOCAL_WORKSPACE/.hermes/cache/scratch/etx-gpu-live-20261015-evidence/x8/20261015T154549Z-7cdcb2/references/golden_hidden.bin"
+  },
+  {
+    "file": "references/golden_tokens.txt",
+    "original_target": "/root/sess/x8-live-20261015/20261015T154549Z-7cdcb2/references/golden_tokens.txt",
+    "sha256": "7ca30d0e843eff0e7900400ade527a78dcd9f8854f5efc3bffc40327c619ab3c",
+    "status": "materialized from checksum-verified exported x8 reference",
+    "local_source": "/LOCAL_WORKSPACE/.hermes/cache/scratch/etx-gpu-live-20261015-evidence/x8/20261015T154549Z-7cdcb2/references/golden_tokens.txt"
+  },
+  {
+    "file": "references/r1/fleet_cache.bin",
+    "original_target": "/root/sess/x8-live-20261015/20261015T154549Z-7cdcb2/references/r1/fleet_cache.bin",
+    "sha256": "8baff0cf8511096669f055a113984d460bda748c3334b04e7e442dd392f1158c",
+    "status": "materialized from checksum-verified exported x8 reference",
+    "local_source": "/LOCAL_WORKSPACE/.hermes/cache/scratch/etx-gpu-live-20261015-evidence/x8/20261015T154549Z-7cdcb2/references/r1/fleet_cache.bin"
+  },
+  {
+    "file": "references/r1/golden.binding.json",
+    "original_target": "/root/sess/x8-live-20261015/20261015T154549Z-7cdcb2/references/r1/golden.binding.json",
+    "sha256": "05f8cfe21aef48555249aa6f41a99c8ee05c269bf86e16a9727e7a77b0eda6c5",
+    "status": "materialized from checksum-verified exported x8 reference",
+    "local_source": "/LOCAL_WORKSPACE/.hermes/cache/scratch/etx-gpu-live-20261015-evidence/x8/20261015T154549Z-7cdcb2/references/r1/golden.binding.json"
+  },
+  {
+    "file": "references/r1/golden.npz",
+    "original_target": "/root/sess/x8-live-20261015/20261015T154549Z-7cdcb2/references/r1/golden.npz",
+    "sha256": "bbfc06c98b599e61c11cbbda4cde9bdc83e5c971b89aaef42cd9feb1e91f574b",
+    "status": "materialized from checksum-verified exported x8 reference",
+    "local_source": "/LOCAL_WORKSPACE/.hermes/cache/scratch/etx-gpu-live-20261015-evidence/x8/20261015T154549Z-7cdcb2/references/r1/golden.npz"
+  },
+  {
+    "file": "references/r1/golden.producer.json",
+    "original_target": "/root/sess/x8-live-20261015/20261015T154549Z-7cdcb2/references/r1/golden.producer.json",
+    "sha256": "f792c934b74a1b058dd4aeb767ade50ab590cef16f64591cfc24272fe96585e1",
+    "status": "materialized from checksum-verified exported x8 reference",
+    "local_source": "/LOCAL_WORKSPACE/.hermes/cache/scratch/etx-gpu-live-20261015-evidence/x8/20261015T154549Z-7cdcb2/references/r1/golden.producer.json"
+  },
+  {
+    "file": "references/r1/golden.producer.raw.log",
+    "original_target": "/root/sess/x8-live-20261015/20261015T154549Z-7cdcb2/references/r1/golden.producer.raw.log",
+    "sha256": "1ec6127716017988ebf5d5d7519cc00773edd9805126c70464bf8292519254d5",
+    "status": "materialized from checksum-verified exported x8 reference",
+    "local_source": "/LOCAL_WORKSPACE/.hermes/cache/scratch/etx-gpu-live-20261015-evidence/x8/20261015T154549Z-7cdcb2/references/r1/golden.producer.raw.log"
+  },
+  {
+    "file": "references/r1/golden_hidden.bin",
+    "original_target": "/root/sess/x8-live-20261015/20261015T154549Z-7cdcb2/references/r1/golden_hidden.bin",
+    "sha256": "8fcc1453fdfa71cc2842d754549c9b7fb7a6a78dec703990710bd9a1c98d34f5",
+    "status": "materialized from checksum-verified exported x8 reference",
+    "local_source": "/LOCAL_WORKSPACE/.hermes/cache/scratch/etx-gpu-live-20261015-evidence/x8/20261015T154549Z-7cdcb2/references/r1/golden_hidden.bin"
+  },
+  {
+    "file": "references/r1/golden_tokens.txt",
+    "original_target": "/root/sess/x8-live-20261015/20261015T154549Z-7cdcb2/references/r1/golden_tokens.txt",
+    "sha256": "4f9f0bbe7b3a9671f34322c21c5093c7eec01457198b346c9c2258d9de01808a",
+    "status": "materialized from checksum-verified exported x8 reference",
+    "local_source": "/LOCAL_WORKSPACE/.hermes/cache/scratch/etx-gpu-live-20261015-evidence/x8/20261015T154549Z-7cdcb2/references/r1/golden_tokens.txt"
+  },
+  {
+    "file": "references/r2/fleet_cache.bin",
+    "original_target": "/root/sess/x8-live-20261015/20261015T154549Z-7cdcb2/references/r2/fleet_cache.bin",
+    "sha256": "cb80d0b42d4ee5c06d849531c5f7f3fdfe2f4fe8c4c2ccc2808c5e13cb08f30e",
+    "status": "materialized from checksum-verified exported x8 reference",
+    "local_source": "/LOCAL_WORKSPACE/.hermes/cache/scratch/etx-gpu-live-20261015-evidence/x8/20261015T154549Z-7cdcb2/references/r2/fleet_cache.bin"
+  },
+  {
+    "file": "references/r2/golden.binding.json",
+    "original_target": "/root/sess/x8-live-20261015/20261015T154549Z-7cdcb2/references/r2/golden.binding.json",
+    "sha256": "79f0788620089de64f9e5e664511572971fdec3164ca2fcafc8d689ae172aa74",
+    "status": "materialized from checksum-verified exported x8 reference",
+    "local_source": "/LOCAL_WORKSPACE/.hermes/cache/scratch/etx-gpu-live-20261015-evidence/x8/20261015T154549Z-7cdcb2/references/r2/golden.binding.json"
+  },
+  {
+    "file": "references/r2/golden.npz",
+    "original_target": "/root/sess/x8-live-20261015/20261015T154549Z-7cdcb2/references/r2/golden.npz",
+    "sha256": "00a1df14f3cfc6b2cc9aa52d28861cec357574d5165e44ed29d5ccc1cf46e6c2",
+    "status": "materialized from checksum-verified exported x8 reference",
+    "local_source": "/LOCAL_WORKSPACE/.hermes/cache/scratch/etx-gpu-live-20261015-evidence/x8/20261015T154549Z-7cdcb2/references/r2/golden.npz"
+  },
+  {
+    "file": "references/r2/golden.producer.json",
+    "original_target": "/root/sess/x8-live-20261015/20261015T154549Z-7cdcb2/references/r2/golden.producer.json",
+    "sha256": "832ef36209cee7be727a72e2810bea8b36b30784a963a207e7c959dc2d23dd36",
+    "status": "materialized from checksum-verified exported x8 reference",
+    "local_source": "/LOCAL_WORKSPACE/.hermes/cache/scratch/etx-gpu-live-20261015-evidence/x8/20261015T154549Z-7cdcb2/references/r2/golden.producer.json"
+  },
+  {
+    "file": "references/r2/golden.producer.raw.log",
+    "original_target": "/root/sess/x8-live-20261015/20261015T154549Z-7cdcb2/references/r2/golden.producer.raw.log",
+    "sha256": "3ddf6882d932c583a22f2614c12e232d908de47c63c965e2d2f8ba08bf348b12",
+    "status": "materialized from checksum-verified exported x8 reference",
+    "local_source": "/LOCAL_WORKSPACE/.hermes/cache/scratch/etx-gpu-live-20261015-evidence/x8/20261015T154549Z-7cdcb2/references/r2/golden.producer.raw.log"
+  },
+  {
+    "file": "references/r2/golden_hidden.bin",
+    "original_target": "/root/sess/x8-live-20261015/20261015T154549Z-7cdcb2/references/r2/golden_hidden.bin",
+    "sha256": "3999a2ae29913d986650a1e566ddab39ccc9551c92fa0aa5e029972a6a38fca8",
+    "status": "materialized from checksum-verified exported x8 reference",
+    "local_source": "/LOCAL_WORKSPACE/.hermes/cache/scratch/etx-gpu-live-20261015-evidence/x8/20261015T154549Z-7cdcb2/references/r2/golden_hidden.bin"
+  },
+  {
+    "file": "references/r2/golden_tokens.txt",
+    "original_target": "/root/sess/x8-live-20261015/20261015T154549Z-7cdcb2/references/r2/golden_tokens.txt",
+    "sha256": "279b4d7c4c0c5a2658f543dffc451b4baa25e2c7232db696eb68b0393426df31",
+    "status": "materialized from checksum-verified exported x8 reference",
+    "local_source": "/LOCAL_WORKSPACE/.hermes/cache/scratch/etx-gpu-live-20261015-evidence/x8/20261015T154549Z-7cdcb2/references/r2/golden_tokens.txt"
+  },
+  {
+    "file": "references/r3/fleet_cache.bin",
+    "original_target": "/root/sess/x8-live-20261015/20261015T154549Z-7cdcb2/references/r3/fleet_cache.bin",
+    "sha256": "8ee0dfaa705241a492ff5fcf090aad13a5f4f560d97fa41cac814a984f6fc545",
+    "status": "materialized from checksum-verified exported x8 reference",
+    "local_source": "/LOCAL_WORKSPACE/.hermes/cache/scratch/etx-gpu-live-20261015-evidence/x8/20261015T154549Z-7cdcb2/references/r3/fleet_cache.bin"
+  },
+  {
+    "file": "references/r3/golden.binding.json",
+    "original_target": "/root/sess/x8-live-20261015/20261015T154549Z-7cdcb2/references/r3/golden.binding.json",
+    "sha256": "45c4a1378f31716f44fd9142984c293296dbac840a7ce2d5900d8731a1cd0781",
+    "status": "materialized from checksum-verified exported x8 reference",
+    "local_source": "/LOCAL_WORKSPACE/.hermes/cache/scratch/etx-gpu-live-20261015-evidence/x8/20261015T154549Z-7cdcb2/references/r3/golden.binding.json"
+  },
+  {
+    "file": "references/r3/golden.npz",
+    "original_target": "/root/sess/x8-live-20261015/20261015T154549Z-7cdcb2/references/r3/golden.npz",
+    "sha256": "b0b3bf6f2eb839df2bb5a57f444b8a24e9f5830fd398627757ed600e8a4e7fc8",
+    "status": "materialized from checksum-verified exported x8 reference",
+    "local_source": "/LOCAL_WORKSPACE/.hermes/cache/scratch/etx-gpu-live-20261015-evidence/x8/20261015T154549Z-7cdcb2/references/r3/golden.npz"
+  },
+  {
+    "file": "references/r3/golden.producer.json",
+    "original_target": "/root/sess/x8-live-20261015/20261015T154549Z-7cdcb2/references/r3/golden.producer.json",
+    "sha256": "466542be474ff59f279c905aebd15d701e6e363321275cadd33dd6db0edd3cbb",
+    "status": "materialized from checksum-verified exported x8 reference",
+    "local_source": "/LOCAL_WORKSPACE/.hermes/cache/scratch/etx-gpu-live-20261015-evidence/x8/20261015T154549Z-7cdcb2/references/r3/golden.producer.json"
+  },
+  {
+    "file": "references/r3/golden.producer.raw.log",
+    "original_target": "/root/sess/x8-live-20261015/20261015T154549Z-7cdcb2/references/r3/golden.producer.raw.log",
+    "sha256": "37bcc17648e3939197a4b3a577872ff6408746b43dcdddfd45c89eb53e60cdc8",
+    "status": "materialized from checksum-verified exported x8 reference",
+    "local_source": "/LOCAL_WORKSPACE/.hermes/cache/scratch/etx-gpu-live-20261015-evidence/x8/20261015T154549Z-7cdcb2/references/r3/golden.producer.raw.log"
+  },
+  {
+    "file": "references/r3/golden_hidden.bin",
+    "original_target": "/root/sess/x8-live-20261015/20261015T154549Z-7cdcb2/references/r3/golden_hidden.bin",
+    "sha256": "cedd3e0edde8d7faf4257552b2c301a98932ea5b8056948188172e39a862068d",
+    "status": "materialized from checksum-verified exported x8 reference",
+    "local_source": "/LOCAL_WORKSPACE/.hermes/cache/scratch/etx-gpu-live-20261015-evidence/x8/20261015T154549Z-7cdcb2/references/r3/golden_hidden.bin"
+  },
+  {
+    "file": "references/r3/golden_tokens.txt",
+    "original_target": "/root/sess/x8-live-20261015/20261015T154549Z-7cdcb2/references/r3/golden_tokens.txt",
+    "sha256": "8d9cc09d9e29a0b4a424d84348000bcd8f8b4645e1b9a4db7d149a076adec599",
+    "status": "materialized from checksum-verified exported x8 reference",
+    "local_source": "/LOCAL_WORKSPACE/.hermes/cache/scratch/etx-gpu-live-20261015-evidence/x8/20261015T154549Z-7cdcb2/references/r3/golden_tokens.txt"
+  },
+  {
+    "file": "references/weights.bin",
+    "original_target": "/root/dsv2-data/weights.bin",
+    "sha256": "ad7e8290b80490981048eeb85637ec1d0174d6605bf8f40730afe96a07548981",
+    "status": "external input retained as original symlink; not exported"
+  },
+  {
+    "file": "references/weights.bin.manifest",
+    "original_target": "/root/dsv2-data/weights.bin.manifest",
+    "sha256": "1f0f667dd8ab4dad2565666ea5d0284c1a1880d39aac74245eaa85fabc958fd3",
+    "status": "external input retained as original symlink; not exported"
+  }
+]

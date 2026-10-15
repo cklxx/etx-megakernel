@@ -1,0 +1,34 @@
+[
+ {
+  "name": "synthetic",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 1.0003283023834229,
+  "note": ""
+ },
+ {
+  "name": "build",
+  "status": "ok",
+  "rc": 0,
+  "gpu": null,
+  "seconds": 20.003161907196045,
+  "note": ""
+ },
+ {
+  "name": "correctness",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 4.0009002685546875,
+  "note": ""
+ },
+ {
+  "name": "pairs",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 16.00269865989685,
+  "note": ""
+ }
+]

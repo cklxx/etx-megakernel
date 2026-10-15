@@ -1,0 +1,18 @@
+[
+ {
+  "name": "c6_build",
+  "status": "fail",
+  "rc": 2,
+  "gpu": null,
+  "seconds": 55.007516622543335,
+  "note": ""
+ },
+ {
+  "name": "c6_measure",
+  "status": "skipped",
+  "rc": null,
+  "gpu": null,
+  "seconds": null,
+  "note": "c6_build: c6_build fail"
+ }
+]

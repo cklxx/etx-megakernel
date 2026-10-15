@@ -1,0 +1,21 @@
+{"stage": "build_envelope", "blocker": null, "evidence": "/root/c6-live-20261015", "deadline": 1792081371.879836, "safe_resume": "python -m examples.vllm_llm.attention_early_merge.session --work /root/c6-live-20261015 --model /root/llm/qwen3-30b-a3b build"}
+PROGRESS stage=build_envelope elapsed=20s evidence=/root/c6-live-20261015/attempt-001/build_envelope.log
+PROGRESS stage=build_envelope elapsed=40s evidence=/root/c6-live-20261015/attempt-001/build_envelope.log
+PROGRESS stage=build_envelope elapsed=60s evidence=/root/c6-live-20261015/attempt-001/build_envelope.log
+PROGRESS stage=build_envelope elapsed=80s evidence=/root/c6-live-20261015/attempt-001/build_envelope.log
+PROGRESS stage=build_envelope elapsed=100s evidence=/root/c6-live-20261015/attempt-001/build_envelope.log
+{"stage": "build_probe", "blocker": null, "evidence": "/root/c6-live-20261015", "deadline": 1792081371.879836, "safe_resume": "python -m examples.vllm_llm.attention_early_merge.session --work /root/c6-live-20261015 --model /root/llm/qwen3-30b-a3b build"}
+PROGRESS stage=build_probe elapsed=20s evidence=/root/c6-live-20261015/attempt-001/build_probe.log
+PROGRESS stage=build_probe elapsed=40s evidence=/root/c6-live-20261015/attempt-001/build_probe.log
+PROGRESS stage=build_probe elapsed=60s evidence=/root/c6-live-20261015/attempt-001/build_probe.log
+PROGRESS stage=build_probe elapsed=80s evidence=/root/c6-live-20261015/attempt-001/build_probe.log
+{"stage": "build_diagnostic", "blocker": null, "evidence": "/root/c6-live-20261015", "deadline": 1792081371.879836, "safe_resume": "python -m examples.vllm_llm.attention_early_merge.session --work /root/c6-live-20261015 --model /root/llm/qwen3-30b-a3b build"}
+PROGRESS stage=build_diagnostic elapsed=20s evidence=/root/c6-live-20261015/attempt-001/build_diagnostic.log
+PROGRESS stage=build_diagnostic elapsed=40s evidence=/root/c6-live-20261015/attempt-001/build_diagnostic.log
+PROGRESS stage=build_diagnostic elapsed=60s evidence=/root/c6-live-20261015/attempt-001/build_diagnostic.log
+PROGRESS stage=build_diagnostic elapsed=80s evidence=/root/c6-live-20261015/attempt-001/build_diagnostic.log
+{"stage": "build_model", "blocker": null, "evidence": "/root/c6-live-20261015", "deadline": 1792081371.879836, "safe_resume": "python -m examples.vllm_llm.attention_early_merge.session --work /root/c6-live-20261015 --model /root/llm/qwen3-30b-a3b build"}
+PROGRESS stage=build_model elapsed=20s evidence=/root/c6-live-20261015/attempt-001/build_model.log
+PROGRESS stage=build_model elapsed=40s evidence=/root/c6-live-20261015/attempt-001/build_model.log
+PROGRESS stage=build_model elapsed=60s evidence=/root/c6-live-20261015/attempt-001/build_model.log
+{"stage": "BUILT; mandatory device checks pending", "blocker": null, "evidence": "/root/c6-live-20261015", "deadline": 1792081371.879836, "safe_resume": "python -m examples.vllm_llm.attention_early_merge.session --work /root/c6-live-20261015 --model /root/llm/qwen3-30b-a3b build"}

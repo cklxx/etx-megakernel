@@ -1,0 +1,323 @@
+# command ["/root/src/abee09fcda357bb982cfba4d85bb387a6da97ec2385d3d4574f1f7cd4282d5da-20261015T152622Z/.venv/bin/python", "-u", "-m", "examples.vllm_llm.import_certificate", "--run-build", "/root/sess/producer-live-20261015/20261015T153709Z-f24956/b_baseline", "--model", "/root/llm/qwen3-30b-a3b", "--", "--check", "48", "--check-pos", "1040"]
+BUILD-IDENTITY phase=before sha256=3465fe436e58bd5f5eb8760819610d2eba5e6abc2b127c4290ac3cb6de85cc1b
+ETX_ENV ETX_UNFUSED_SYNC= ETX_UNFUSED_NOGRAPH=
+etx: 60362 tasks, 1403 event words, 304 workers (8 domains x 38), 434 grid instances, 189568 B of argument blocks
+CHECK position 1040 partitions 5
+CHECK prefix step 0/1040
+CHECK prefix step 64/1040
+CHECK prefix step 128/1040
+CHECK prefix step 192/1040
+CHECK prefix step 256/1040
+CHECK prefix step 320/1040
+CHECK prefix step 384/1040
+CHECK prefix step 448/1040
+CHECK prefix step 512/1040
+CHECK prefix step 576/1040
+CHECK prefix step 640/1040
+CHECK prefix step 704/1040
+CHECK prefix step 768/1040
+CHECK prefix step 832/1040
+CHECK prefix step 896/1040
+CHECK prefix step 960/1040
+CHECK prefix step 1024/1040
+  in_norm    L0   rms_norm_2d          identical  original  527.6 us  imported   10.5 us
+CHECK-INSTANCE {"id":0,"layer":0,"export":"rms_norm_2d","replicas":8,"grid":[1,1,1],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  attn       L0   attn_mfma16_g8       identical  original  583.6 us  imported   11.3 us
+CHECK-INSTANCE {"id":3,"layer":0,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L0   attn_reduce          identical  original    9.7 us  imported   11.9 us
+CHECK-INSTANCE {"id":4,"layer":0,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+PRODUCER-CAPTURE layer=0 position=1040 role=o_proj base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+PRODUCER-CAPTURE layer=0 position=1040 role=topk base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+  attn       L1   attn_mfma16_g8       identical  original    9.1 us  imported   10.2 us
+CHECK-INSTANCE {"id":12,"layer":1,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L1   attn_reduce          identical  original    6.5 us  imported   10.4 us
+CHECK-INSTANCE {"id":13,"layer":1,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+PRODUCER-CAPTURE layer=1 position=1040 role=o_proj base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+PRODUCER-CAPTURE layer=1 position=1040 role=topk base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+  attn       L2   attn_mfma16_g8       identical  original    9.3 us  imported   10.7 us
+CHECK-INSTANCE {"id":21,"layer":2,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L2   attn_reduce          identical  original    9.1 us  imported   10.2 us
+CHECK-INSTANCE {"id":22,"layer":2,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+PRODUCER-CAPTURE layer=2 position=1040 role=o_proj base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+PRODUCER-CAPTURE layer=2 position=1040 role=topk base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+  attn       L3   attn_mfma16_g8       identical  original    8.5 us  imported   10.3 us
+CHECK-INSTANCE {"id":30,"layer":3,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L3   attn_reduce          identical  original    7.0 us  imported   10.7 us
+CHECK-INSTANCE {"id":31,"layer":3,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+PRODUCER-CAPTURE layer=3 position=1040 role=o_proj base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+PRODUCER-CAPTURE layer=3 position=1040 role=topk base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+  attn       L4   attn_mfma16_g8       identical  original    8.7 us  imported   10.3 us
+CHECK-INSTANCE {"id":39,"layer":4,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L4   attn_reduce          identical  original    6.6 us  imported   10.5 us
+CHECK-INSTANCE {"id":40,"layer":4,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+PRODUCER-CAPTURE layer=4 position=1040 role=o_proj base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+PRODUCER-CAPTURE layer=4 position=1040 role=topk base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+  attn       L5   attn_mfma16_g8       identical  original    8.7 us  imported   10.8 us
+CHECK-INSTANCE {"id":48,"layer":5,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L5   attn_reduce          identical  original    9.6 us  imported   11.3 us
+CHECK-INSTANCE {"id":49,"layer":5,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+PRODUCER-CAPTURE layer=5 position=1040 role=o_proj base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+PRODUCER-CAPTURE layer=5 position=1040 role=topk base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+  attn       L6   attn_mfma16_g8       identical  original    9.5 us  imported   11.2 us
+CHECK-INSTANCE {"id":57,"layer":6,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L6   attn_reduce          identical  original    9.3 us  imported   10.2 us
+CHECK-INSTANCE {"id":58,"layer":6,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+PRODUCER-CAPTURE layer=6 position=1040 role=o_proj base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+PRODUCER-CAPTURE layer=6 position=1040 role=topk base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+  attn       L7   attn_mfma16_g8       identical  original    8.3 us  imported   11.1 us
+CHECK-INSTANCE {"id":66,"layer":7,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L7   attn_reduce          identical  original    6.7 us  imported   10.2 us
+CHECK-INSTANCE {"id":67,"layer":7,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+PRODUCER-CAPTURE layer=7 position=1040 role=o_proj base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+PRODUCER-CAPTURE layer=7 position=1040 role=topk base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+  attn       L8   attn_mfma16_g8       identical  original    8.3 us  imported   10.0 us
+CHECK-INSTANCE {"id":75,"layer":8,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L8   attn_reduce          identical  original    9.0 us  imported   10.1 us
+CHECK-INSTANCE {"id":76,"layer":8,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+PRODUCER-CAPTURE layer=8 position=1040 role=o_proj base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+PRODUCER-CAPTURE layer=8 position=1040 role=topk base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+  attn       L9   attn_mfma16_g8       identical  original    8.3 us  imported   10.1 us
+CHECK-INSTANCE {"id":84,"layer":9,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L9   attn_reduce          identical  original   11.3 us  imported   10.9 us
+CHECK-INSTANCE {"id":85,"layer":9,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+PRODUCER-CAPTURE layer=9 position=1040 role=o_proj base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+PRODUCER-CAPTURE layer=9 position=1040 role=topk base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+  attn       L10  attn_mfma16_g8       identical  original    9.2 us  imported   10.9 us
+CHECK-INSTANCE {"id":93,"layer":10,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L10  attn_reduce          identical  original    6.7 us  imported   10.7 us
+CHECK-INSTANCE {"id":94,"layer":10,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+PRODUCER-CAPTURE layer=10 position=1040 role=o_proj base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+PRODUCER-CAPTURE layer=10 position=1040 role=topk base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+  attn       L11  attn_mfma16_g8       identical  original    9.1 us  imported   10.9 us
+CHECK-INSTANCE {"id":102,"layer":11,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L11  attn_reduce          identical  original    6.3 us  imported   10.2 us
+CHECK-INSTANCE {"id":103,"layer":11,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+PRODUCER-CAPTURE layer=11 position=1040 role=o_proj base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+PRODUCER-CAPTURE layer=11 position=1040 role=topk base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+  attn       L12  attn_mfma16_g8       identical  original    9.4 us  imported   10.1 us
+CHECK-INSTANCE {"id":111,"layer":12,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L12  attn_reduce          identical  original    6.5 us  imported    9.9 us
+CHECK-INSTANCE {"id":112,"layer":12,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+PRODUCER-CAPTURE layer=12 position=1040 role=o_proj base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+PRODUCER-CAPTURE layer=12 position=1040 role=topk base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+  attn       L13  attn_mfma16_g8       identical  original    8.5 us  imported    9.9 us
+CHECK-INSTANCE {"id":120,"layer":13,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L13  attn_reduce          identical  original    6.5 us  imported    9.9 us
+CHECK-INSTANCE {"id":121,"layer":13,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+PRODUCER-CAPTURE layer=13 position=1040 role=o_proj base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+PRODUCER-CAPTURE layer=13 position=1040 role=topk base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+  attn       L14  attn_mfma16_g8       identical  original    8.5 us  imported   10.3 us
+CHECK-INSTANCE {"id":129,"layer":14,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L14  attn_reduce          identical  original    9.3 us  imported    9.9 us
+CHECK-INSTANCE {"id":130,"layer":14,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+PRODUCER-CAPTURE layer=14 position=1040 role=o_proj base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+PRODUCER-CAPTURE layer=14 position=1040 role=topk base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+  attn       L15  attn_mfma16_g8       identical  original    8.8 us  imported    9.9 us
+CHECK-INSTANCE {"id":138,"layer":15,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L15  attn_reduce          identical  original    6.4 us  imported   10.0 us
+CHECK-INSTANCE {"id":139,"layer":15,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+PRODUCER-CAPTURE layer=15 position=1040 role=o_proj base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+PRODUCER-CAPTURE layer=15 position=1040 role=topk base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+  attn       L16  attn_mfma16_g8       identical  original    8.3 us  imported    9.7 us
+CHECK-INSTANCE {"id":147,"layer":16,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L16  attn_reduce          identical  original   12.1 us  imported    9.8 us
+CHECK-INSTANCE {"id":148,"layer":16,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+PRODUCER-CAPTURE layer=16 position=1040 role=o_proj base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+PRODUCER-CAPTURE layer=16 position=1040 role=topk base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+  attn       L17  attn_mfma16_g8       identical  original   10.0 us  imported   10.2 us
+CHECK-INSTANCE {"id":156,"layer":17,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L17  attn_reduce          identical  original    6.4 us  imported   10.2 us
+CHECK-INSTANCE {"id":157,"layer":17,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+PRODUCER-CAPTURE layer=17 position=1040 role=o_proj base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+PRODUCER-CAPTURE layer=17 position=1040 role=topk base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+  attn       L18  attn_mfma16_g8       identical  original    8.2 us  imported   10.1 us
+CHECK-INSTANCE {"id":165,"layer":18,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L18  attn_reduce          identical  original    8.9 us  imported    9.7 us
+CHECK-INSTANCE {"id":166,"layer":18,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+PRODUCER-CAPTURE layer=18 position=1040 role=o_proj base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+PRODUCER-CAPTURE layer=18 position=1040 role=topk base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+  attn       L19  attn_mfma16_g8       identical  original    8.4 us  imported    9.8 us
+CHECK-INSTANCE {"id":174,"layer":19,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L19  attn_reduce          identical  original    6.5 us  imported   10.4 us
+CHECK-INSTANCE {"id":175,"layer":19,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+PRODUCER-CAPTURE layer=19 position=1040 role=o_proj base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+PRODUCER-CAPTURE layer=19 position=1040 role=topk base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+  attn       L20  attn_mfma16_g8       identical  original    8.2 us  imported   10.1 us
+CHECK-INSTANCE {"id":183,"layer":20,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L20  attn_reduce          identical  original    5.7 us  imported    9.7 us
+CHECK-INSTANCE {"id":184,"layer":20,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+PRODUCER-CAPTURE layer=20 position=1040 role=o_proj base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+PRODUCER-CAPTURE layer=20 position=1040 role=topk base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+  attn       L21  attn_mfma16_g8       identical  original    8.7 us  imported   10.1 us
+CHECK-INSTANCE {"id":192,"layer":21,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L21  attn_reduce          identical  original    6.5 us  imported   10.1 us
+CHECK-INSTANCE {"id":193,"layer":21,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+PRODUCER-CAPTURE layer=21 position=1040 role=o_proj base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+PRODUCER-CAPTURE layer=21 position=1040 role=topk base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+  attn       L22  attn_mfma16_g8       identical  original    9.3 us  imported    9.9 us
+CHECK-INSTANCE {"id":201,"layer":22,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L22  attn_reduce          identical  original    6.6 us  imported    9.9 us
+CHECK-INSTANCE {"id":202,"layer":22,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+PRODUCER-CAPTURE layer=22 position=1040 role=o_proj base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+PRODUCER-CAPTURE layer=22 position=1040 role=topk base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+  attn       L23  attn_mfma16_g8       identical  original    8.4 us  imported   10.2 us
+CHECK-INSTANCE {"id":210,"layer":23,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L23  attn_reduce          identical  original    6.5 us  imported   10.5 us
+CHECK-INSTANCE {"id":211,"layer":23,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+PRODUCER-CAPTURE layer=23 position=1040 role=o_proj base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+PRODUCER-CAPTURE layer=23 position=1040 role=topk base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+  attn       L24  attn_mfma16_g8       identical  original    8.6 us  imported    9.7 us
+CHECK-INSTANCE {"id":219,"layer":24,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L24  attn_reduce          identical  original    6.4 us  imported    9.8 us
+CHECK-INSTANCE {"id":220,"layer":24,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+PRODUCER-CAPTURE layer=24 position=1040 role=o_proj base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+PRODUCER-CAPTURE layer=24 position=1040 role=topk base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+  attn       L25  attn_mfma16_g8       identical  original    8.3 us  imported    9.9 us
+CHECK-INSTANCE {"id":228,"layer":25,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L25  attn_reduce          identical  original    9.2 us  imported    9.9 us
+CHECK-INSTANCE {"id":229,"layer":25,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+PRODUCER-CAPTURE layer=25 position=1040 role=o_proj base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+PRODUCER-CAPTURE layer=25 position=1040 role=topk base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+  attn       L26  attn_mfma16_g8       identical  original    8.6 us  imported    9.7 us
+CHECK-INSTANCE {"id":237,"layer":26,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L26  attn_reduce          identical  original    6.5 us  imported   10.5 us
+CHECK-INSTANCE {"id":238,"layer":26,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+PRODUCER-CAPTURE layer=26 position=1040 role=o_proj base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+PRODUCER-CAPTURE layer=26 position=1040 role=topk base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+  attn       L27  attn_mfma16_g8       identical  original    8.5 us  imported    9.9 us
+CHECK-INSTANCE {"id":246,"layer":27,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L27  attn_reduce          identical  original    6.5 us  imported   10.6 us
+CHECK-INSTANCE {"id":247,"layer":27,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+PRODUCER-CAPTURE layer=27 position=1040 role=o_proj base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+PRODUCER-CAPTURE layer=27 position=1040 role=topk base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+  attn       L28  attn_mfma16_g8       identical  original    8.6 us  imported    9.9 us
+CHECK-INSTANCE {"id":255,"layer":28,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L28  attn_reduce          identical  original    8.9 us  imported    9.9 us
+CHECK-INSTANCE {"id":256,"layer":28,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+PRODUCER-CAPTURE layer=28 position=1040 role=o_proj base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+PRODUCER-CAPTURE layer=28 position=1040 role=topk base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+  attn       L29  attn_mfma16_g8       identical  original   10.7 us  imported    9.8 us
+CHECK-INSTANCE {"id":264,"layer":29,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L29  attn_reduce          identical  original    6.4 us  imported    9.9 us
+CHECK-INSTANCE {"id":265,"layer":29,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+PRODUCER-CAPTURE layer=29 position=1040 role=o_proj base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+PRODUCER-CAPTURE layer=29 position=1040 role=topk base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+  attn       L30  attn_mfma16_g8       identical  original    8.1 us  imported   10.0 us
+CHECK-INSTANCE {"id":273,"layer":30,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L30  attn_reduce          identical  original    6.3 us  imported    9.9 us
+CHECK-INSTANCE {"id":274,"layer":30,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+PRODUCER-CAPTURE layer=30 position=1040 role=o_proj base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+PRODUCER-CAPTURE layer=30 position=1040 role=topk base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+  attn       L31  attn_mfma16_g8       identical  original    8.9 us  imported    9.8 us
+CHECK-INSTANCE {"id":282,"layer":31,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L31  attn_reduce          identical  original    6.7 us  imported   10.2 us
+CHECK-INSTANCE {"id":283,"layer":31,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+PRODUCER-CAPTURE layer=31 position=1040 role=o_proj base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+PRODUCER-CAPTURE layer=31 position=1040 role=topk base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+  attn       L32  attn_mfma16_g8       identical  original    8.5 us  imported    9.9 us
+CHECK-INSTANCE {"id":291,"layer":32,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L32  attn_reduce          identical  original    6.5 us  imported   10.1 us
+CHECK-INSTANCE {"id":292,"layer":32,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+PRODUCER-CAPTURE layer=32 position=1040 role=o_proj base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+PRODUCER-CAPTURE layer=32 position=1040 role=topk base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+  attn       L33  attn_mfma16_g8       identical  original    8.5 us  imported   10.0 us
+CHECK-INSTANCE {"id":300,"layer":33,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L33  attn_reduce          identical  original    6.4 us  imported   10.3 us
+CHECK-INSTANCE {"id":301,"layer":33,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+PRODUCER-CAPTURE layer=33 position=1040 role=o_proj base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+PRODUCER-CAPTURE layer=33 position=1040 role=topk base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+  attn       L34  attn_mfma16_g8       identical  original    8.5 us  imported    9.8 us
+CHECK-INSTANCE {"id":309,"layer":34,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L34  attn_reduce          identical  original    6.5 us  imported   10.1 us
+CHECK-INSTANCE {"id":310,"layer":34,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+PRODUCER-CAPTURE layer=34 position=1040 role=o_proj base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+PRODUCER-CAPTURE layer=34 position=1040 role=topk base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+  attn       L35  attn_mfma16_g8       identical  original    8.3 us  imported    9.9 us
+CHECK-INSTANCE {"id":318,"layer":35,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L35  attn_reduce          identical  original    9.1 us  imported   10.2 us
+CHECK-INSTANCE {"id":319,"layer":35,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+PRODUCER-CAPTURE layer=35 position=1040 role=o_proj base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+PRODUCER-CAPTURE layer=35 position=1040 role=topk base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+  attn       L36  attn_mfma16_g8       identical  original    8.2 us  imported   10.3 us
+CHECK-INSTANCE {"id":327,"layer":36,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L36  attn_reduce          identical  original    9.0 us  imported   10.3 us
+CHECK-INSTANCE {"id":328,"layer":36,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+PRODUCER-CAPTURE layer=36 position=1040 role=o_proj base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+PRODUCER-CAPTURE layer=36 position=1040 role=topk base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+  attn       L37  attn_mfma16_g8       identical  original    9.1 us  imported   10.5 us
+CHECK-INSTANCE {"id":336,"layer":37,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L37  attn_reduce          identical  original    6.5 us  imported    9.8 us
+CHECK-INSTANCE {"id":337,"layer":37,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+PRODUCER-CAPTURE layer=37 position=1040 role=o_proj base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+PRODUCER-CAPTURE layer=37 position=1040 role=topk base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+  attn       L38  attn_mfma16_g8       identical  original   10.2 us  imported    9.7 us
+CHECK-INSTANCE {"id":345,"layer":38,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L38  attn_reduce          identical  original    6.4 us  imported   10.1 us
+CHECK-INSTANCE {"id":346,"layer":38,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+PRODUCER-CAPTURE layer=38 position=1040 role=o_proj base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+PRODUCER-CAPTURE layer=38 position=1040 role=topk base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+  attn       L39  attn_mfma16_g8       identical  original    8.3 us  imported    9.9 us
+CHECK-INSTANCE {"id":354,"layer":39,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L39  attn_reduce          identical  original    9.0 us  imported   10.0 us
+CHECK-INSTANCE {"id":355,"layer":39,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+PRODUCER-CAPTURE layer=39 position=1040 role=o_proj base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+PRODUCER-CAPTURE layer=39 position=1040 role=topk base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+  attn       L40  attn_mfma16_g8       identical  original    8.4 us  imported    9.8 us
+CHECK-INSTANCE {"id":363,"layer":40,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L40  attn_reduce          identical  original    6.7 us  imported    9.8 us
+CHECK-INSTANCE {"id":364,"layer":40,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+PRODUCER-CAPTURE layer=40 position=1040 role=o_proj base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+PRODUCER-CAPTURE layer=40 position=1040 role=topk base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+  attn       L41  attn_mfma16_g8       identical  original    8.4 us  imported    9.6 us
+CHECK-INSTANCE {"id":372,"layer":41,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L41  attn_reduce          identical  original    8.4 us  imported   10.7 us
+CHECK-INSTANCE {"id":373,"layer":41,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+PRODUCER-CAPTURE layer=41 position=1040 role=o_proj base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+PRODUCER-CAPTURE layer=41 position=1040 role=topk base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+  attn       L42  attn_mfma16_g8       identical  original    8.5 us  imported   10.2 us
+CHECK-INSTANCE {"id":381,"layer":42,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L42  attn_reduce          identical  original    6.6 us  imported   10.2 us
+CHECK-INSTANCE {"id":382,"layer":42,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+PRODUCER-CAPTURE layer=42 position=1040 role=o_proj base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+PRODUCER-CAPTURE layer=42 position=1040 role=topk base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+  attn       L43  attn_mfma16_g8       identical  original    8.4 us  imported    9.9 us
+CHECK-INSTANCE {"id":390,"layer":43,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L43  attn_reduce          identical  original    9.2 us  imported   10.2 us
+CHECK-INSTANCE {"id":391,"layer":43,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+PRODUCER-CAPTURE layer=43 position=1040 role=o_proj base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+PRODUCER-CAPTURE layer=43 position=1040 role=topk base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+  attn       L44  attn_mfma16_g8       identical  original    8.6 us  imported   10.1 us
+CHECK-INSTANCE {"id":399,"layer":44,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L44  attn_reduce          identical  original    9.2 us  imported    9.9 us
+CHECK-INSTANCE {"id":400,"layer":44,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+PRODUCER-CAPTURE layer=44 position=1040 role=o_proj base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+PRODUCER-CAPTURE layer=44 position=1040 role=topk base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+  attn       L45  attn_mfma16_g8       identical  original    8.5 us  imported   10.1 us
+CHECK-INSTANCE {"id":408,"layer":45,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L45  attn_reduce          identical  original    6.5 us  imported   10.1 us
+CHECK-INSTANCE {"id":409,"layer":45,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+PRODUCER-CAPTURE layer=45 position=1040 role=o_proj base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+PRODUCER-CAPTURE layer=45 position=1040 role=topk base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+  attn       L46  attn_mfma16_g8       identical  original    8.8 us  imported    9.8 us
+CHECK-INSTANCE {"id":417,"layer":46,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L46  attn_reduce          identical  original    9.1 us  imported    9.9 us
+CHECK-INSTANCE {"id":418,"layer":46,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+PRODUCER-CAPTURE layer=46 position=1040 role=o_proj base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+PRODUCER-CAPTURE layer=46 position=1040 role=topk base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+  attn       L47  attn_mfma16_g8       identical  original    8.3 us  imported   10.0 us
+CHECK-INSTANCE {"id":426,"layer":47,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L47  attn_reduce          identical  original    9.3 us  imported   10.3 us
+CHECK-INSTANCE {"id":427,"layer":47,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+PRODUCER-CAPTURE layer=47 position=1040 role=o_proj base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+PRODUCER-CAPTURE layer=47 position=1040 role=topk base=/root/sess/producer-live-20261015/20261015T153709Z-f24956/capture_baseline_p1040
+  prologue (ETX)       imported    7.4 us  (1 task(s))
+  argmax (ETX)         imported   13.2 us  (1 task(s))
+kernel time, summed over the checked launches (GPU events, one launch each):
+  attn_mfma16_g8       original    993.3 us  imported    486.7 us  (-51%)
+  attn_reduce          original    366.7 us  imported    490.3 us  (+34%)
+  rms_norm_2d          original    527.6 us  imported     10.5 us  (-98%)
+  total                original   1887.5 us  imported    987.5 us
+CHECK-IMPORTED checked=97 planned=97 replicas=104 position=1040
+CHECK NOT-IMPORTED: 337 instance(s): dsl_gemv, dsl_attnprep, dsl_gemv, dsl_gemv_router_fold, dsl_topk, ...
+CHECK OK: 0 launch(es) differ
+BUILD-IDENTITY phase=after sha256=3465fe436e58bd5f5eb8760819610d2eba5e6abc2b127c4290ac3cb6de85cc1b

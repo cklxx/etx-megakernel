@@ -1,0 +1,8 @@
+# job references gpu=0 cwd=/root/etx
+# $HOME/dsv2-prep/.venv/bin/python -u -m examples.dsv2lite.reference_prepare --model $HOME/models/dsv2-lite-base --requests 4 --regenerate-missing
+/opt/amdgpu/share/libdrm/amdgpu.ids: No such file or directory
+REFERENCES request=0 mode=reused_producer_bound
+REFERENCES request=1 mode=reused_producer_bound
+REFERENCES request=2 mode=reused_producer_bound
+REFERENCES request=3 mode=reused_producer_bound
+GOLDENS OK 4 requests: prompts are the 97 r rotations, pairwise distinct; collisions by gate (vLLM [0:32], ETX [1:33]) {'vllm': [], 'etx': []}; vLLM files in /root/sess/b4-live-20261015/20261015T160946Z-a7e517/references/vllm

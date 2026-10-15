@@ -1,0 +1,15 @@
+[15:29:34 +  0m00s] session record: /root/sess/expert-live-20261015/20261015T152934Z-af0efa
+[15:29:34 +  0m00s] start synthetic (cpu)
+[15:29:35 +  0m01s] ok      synthetic rc=0 1s
+[15:29:35 +  0m01s] start build (cpu)
+[15:29:55 +  0m21s] ok      build rc=0 20s
+[15:29:55 +  0m21s] start correctness on GPU 0
+[15:29:59 +  0m25s] ok      correctness rc=0 4s
+[15:29:59 +  0m25s] start pairs on GPU 0
+[15:30:15 +  0m41s] ok      pairs rc=0 16s
+[15:30:15 +  0m41s] session done
+  job                              status     rc  gpu  seconds
+  synthetic                        ok          0             1  
+  build                            ok          0            20  
+  correctness                      ok          0    0        4  
+  pairs                            ok          0    0       16  

@@ -1,0 +1,274 @@
+BUILD-IDENTITY phase=before sha256=c6db86067823a8cee84677d21a8da605338331cce15855aa2a6bd47d5ae96abe
+ETX_ENV ETX_UNFUSED_SYNC= ETX_UNFUSED_NOGRAPH=
+etx: 60362 tasks, 1403 event words, 304 workers (8 domains x 38), 434 grid instances, 189568 B of argument blocks
+CHECK position 1040 partitions 5
+CHECK prefix step 0/1040
+CHECK prefix step 64/1040
+CHECK prefix step 128/1040
+CHECK prefix step 192/1040
+CHECK prefix step 256/1040
+CHECK prefix step 320/1040
+CHECK prefix step 384/1040
+CHECK prefix step 448/1040
+CHECK prefix step 512/1040
+CHECK prefix step 576/1040
+CHECK prefix step 640/1040
+CHECK prefix step 704/1040
+CHECK prefix step 768/1040
+CHECK prefix step 832/1040
+CHECK prefix step 896/1040
+CHECK prefix step 960/1040
+CHECK prefix step 1024/1040
+  in_norm    L0   rms_norm_2d          identical  original  478.1 us  imported   10.7 us
+CHECK-INSTANCE {"id":0,"layer":0,"export":"rms_norm_2d","replicas":8,"grid":[1,1,1],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  attn       L0   attn_mfma16_g8       identical  original  544.0 us  imported   12.2 us
+CHECK-INSTANCE {"id":3,"layer":0,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L0   attn_reduce          identical  original   11.5 us  imported   11.5 us
+CHECK-INSTANCE {"id":4,"layer":0,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+C6-CAPTURE complete=/root/c6-live-20261015/attempt-001/checks-000/capture/p1040/L0
+  attn       L1   attn_mfma16_g8       identical  original    8.7 us  imported    9.8 us
+CHECK-INSTANCE {"id":12,"layer":1,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L1   attn_reduce          identical  original    5.9 us  imported   10.9 us
+CHECK-INSTANCE {"id":13,"layer":1,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+C6-CAPTURE complete=/root/c6-live-20261015/attempt-001/checks-000/capture/p1040/L1
+  attn       L2   attn_mfma16_g8       identical  original    8.6 us  imported    9.8 us
+CHECK-INSTANCE {"id":21,"layer":2,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L2   attn_reduce          identical  original    6.4 us  imported   10.6 us
+CHECK-INSTANCE {"id":22,"layer":2,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+C6-CAPTURE complete=/root/c6-live-20261015/attempt-001/checks-000/capture/p1040/L2
+  attn       L3   attn_mfma16_g8       identical  original   12.8 us  imported    9.6 us
+CHECK-INSTANCE {"id":30,"layer":3,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L3   attn_reduce          identical  original    6.5 us  imported   11.2 us
+CHECK-INSTANCE {"id":31,"layer":3,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+C6-CAPTURE complete=/root/c6-live-20261015/attempt-001/checks-000/capture/p1040/L3
+  attn       L4   attn_mfma16_g8       identical  original   13.1 us  imported   10.1 us
+CHECK-INSTANCE {"id":39,"layer":4,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L4   attn_reduce          identical  original    9.1 us  imported   10.7 us
+CHECK-INSTANCE {"id":40,"layer":4,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+C6-CAPTURE complete=/root/c6-live-20261015/attempt-001/checks-000/capture/p1040/L4
+  attn       L5   attn_mfma16_g8       identical  original   12.7 us  imported    9.8 us
+CHECK-INSTANCE {"id":48,"layer":5,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L5   attn_reduce          identical  original    9.9 us  imported   12.1 us
+CHECK-INSTANCE {"id":49,"layer":5,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+C6-CAPTURE complete=/root/c6-live-20261015/attempt-001/checks-000/capture/p1040/L5
+  attn       L6   attn_mfma16_g8       identical  original    9.5 us  imported    9.8 us
+CHECK-INSTANCE {"id":57,"layer":6,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L6   attn_reduce          identical  original    8.9 us  imported   10.7 us
+CHECK-INSTANCE {"id":58,"layer":6,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+C6-CAPTURE complete=/root/c6-live-20261015/attempt-001/checks-000/capture/p1040/L6
+  attn       L7   attn_mfma16_g8       identical  original   12.9 us  imported    9.5 us
+CHECK-INSTANCE {"id":66,"layer":7,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L7   attn_reduce          identical  original    9.1 us  imported   11.1 us
+CHECK-INSTANCE {"id":67,"layer":7,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+C6-CAPTURE complete=/root/c6-live-20261015/attempt-001/checks-000/capture/p1040/L7
+  attn       L8   attn_mfma16_g8       identical  original    8.3 us  imported    9.7 us
+CHECK-INSTANCE {"id":75,"layer":8,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L8   attn_reduce          identical  original    6.5 us  imported   10.7 us
+CHECK-INSTANCE {"id":76,"layer":8,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+C6-CAPTURE complete=/root/c6-live-20261015/attempt-001/checks-000/capture/p1040/L8
+  attn       L9   attn_mfma16_g8       identical  original   13.0 us  imported    9.7 us
+CHECK-INSTANCE {"id":84,"layer":9,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L9   attn_reduce          identical  original    8.5 us  imported   10.9 us
+CHECK-INSTANCE {"id":85,"layer":9,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+C6-CAPTURE complete=/root/c6-live-20261015/attempt-001/checks-000/capture/p1040/L9
+  attn       L10  attn_mfma16_g8       identical  original    9.7 us  imported    9.3 us
+CHECK-INSTANCE {"id":93,"layer":10,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L10  attn_reduce          identical  original    8.9 us  imported   10.5 us
+CHECK-INSTANCE {"id":94,"layer":10,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+C6-CAPTURE complete=/root/c6-live-20261015/attempt-001/checks-000/capture/p1040/L10
+  attn       L11  attn_mfma16_g8       identical  original   12.6 us  imported    9.5 us
+CHECK-INSTANCE {"id":102,"layer":11,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L11  attn_reduce          identical  original    6.4 us  imported   11.3 us
+CHECK-INSTANCE {"id":103,"layer":11,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+C6-CAPTURE complete=/root/c6-live-20261015/attempt-001/checks-000/capture/p1040/L11
+  attn       L12  attn_mfma16_g8       identical  original    8.2 us  imported   12.2 us
+CHECK-INSTANCE {"id":111,"layer":12,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L12  attn_reduce          identical  original    6.5 us  imported   10.4 us
+CHECK-INSTANCE {"id":112,"layer":12,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+C6-CAPTURE complete=/root/c6-live-20261015/attempt-001/checks-000/capture/p1040/L12
+  attn       L13  attn_mfma16_g8       identical  original    8.0 us  imported    9.3 us
+CHECK-INSTANCE {"id":120,"layer":13,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L13  attn_reduce          identical  original    8.9 us  imported   10.8 us
+CHECK-INSTANCE {"id":121,"layer":13,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+C6-CAPTURE complete=/root/c6-live-20261015/attempt-001/checks-000/capture/p1040/L13
+  attn       L14  attn_mfma16_g8       identical  original    8.2 us  imported    9.3 us
+CHECK-INSTANCE {"id":129,"layer":14,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L14  attn_reduce          identical  original    9.1 us  imported   10.6 us
+CHECK-INSTANCE {"id":130,"layer":14,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+C6-CAPTURE complete=/root/c6-live-20261015/attempt-001/checks-000/capture/p1040/L14
+  attn       L15  attn_mfma16_g8       identical  original    8.3 us  imported    9.1 us
+CHECK-INSTANCE {"id":138,"layer":15,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L15  attn_reduce          identical  original    8.9 us  imported   10.9 us
+CHECK-INSTANCE {"id":139,"layer":15,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+C6-CAPTURE complete=/root/c6-live-20261015/attempt-001/checks-000/capture/p1040/L15
+  attn       L16  attn_mfma16_g8       identical  original   13.0 us  imported    9.6 us
+CHECK-INSTANCE {"id":147,"layer":16,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L16  attn_reduce          identical  original    9.0 us  imported   10.3 us
+CHECK-INSTANCE {"id":148,"layer":16,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+C6-CAPTURE complete=/root/c6-live-20261015/attempt-001/checks-000/capture/p1040/L16
+  attn       L17  attn_mfma16_g8       identical  original   12.6 us  imported    9.2 us
+CHECK-INSTANCE {"id":156,"layer":17,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L17  attn_reduce          identical  original    8.7 us  imported   11.1 us
+CHECK-INSTANCE {"id":157,"layer":17,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+C6-CAPTURE complete=/root/c6-live-20261015/attempt-001/checks-000/capture/p1040/L17
+  attn       L18  attn_mfma16_g8       identical  original   12.7 us  imported    9.2 us
+CHECK-INSTANCE {"id":165,"layer":18,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L18  attn_reduce          identical  original    9.3 us  imported   10.6 us
+CHECK-INSTANCE {"id":166,"layer":18,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+C6-CAPTURE complete=/root/c6-live-20261015/attempt-001/checks-000/capture/p1040/L18
+  attn       L19  attn_mfma16_g8       identical  original   12.6 us  imported   12.0 us
+CHECK-INSTANCE {"id":174,"layer":19,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L19  attn_reduce          identical  original    9.1 us  imported   10.9 us
+CHECK-INSTANCE {"id":175,"layer":19,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+C6-CAPTURE complete=/root/c6-live-20261015/attempt-001/checks-000/capture/p1040/L19
+  attn       L20  attn_mfma16_g8       identical  original    8.5 us  imported    9.7 us
+CHECK-INSTANCE {"id":183,"layer":20,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L20  attn_reduce          identical  original    9.1 us  imported   10.5 us
+CHECK-INSTANCE {"id":184,"layer":20,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+C6-CAPTURE complete=/root/c6-live-20261015/attempt-001/checks-000/capture/p1040/L20
+  attn       L21  attn_mfma16_g8       identical  original    8.3 us  imported    9.4 us
+CHECK-INSTANCE {"id":192,"layer":21,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L21  attn_reduce          identical  original    9.0 us  imported   10.5 us
+CHECK-INSTANCE {"id":193,"layer":21,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+C6-CAPTURE complete=/root/c6-live-20261015/attempt-001/checks-000/capture/p1040/L21
+  attn       L22  attn_mfma16_g8       identical  original   12.6 us  imported    9.5 us
+CHECK-INSTANCE {"id":201,"layer":22,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L22  attn_reduce          identical  original    6.5 us  imported   10.4 us
+CHECK-INSTANCE {"id":202,"layer":22,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+C6-CAPTURE complete=/root/c6-live-20261015/attempt-001/checks-000/capture/p1040/L22
+  attn       L23  attn_mfma16_g8       identical  original   12.9 us  imported    9.1 us
+CHECK-INSTANCE {"id":210,"layer":23,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L23  attn_reduce          identical  original    9.1 us  imported   10.8 us
+CHECK-INSTANCE {"id":211,"layer":23,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+C6-CAPTURE complete=/root/c6-live-20261015/attempt-001/checks-000/capture/p1040/L23
+  attn       L24  attn_mfma16_g8       identical  original   12.7 us  imported    9.3 us
+CHECK-INSTANCE {"id":219,"layer":24,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L24  attn_reduce          identical  original    6.4 us  imported   10.4 us
+CHECK-INSTANCE {"id":220,"layer":24,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+C6-CAPTURE complete=/root/c6-live-20261015/attempt-001/checks-000/capture/p1040/L24
+  attn       L25  attn_mfma16_g8       identical  original   12.6 us  imported    9.4 us
+CHECK-INSTANCE {"id":228,"layer":25,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L25  attn_reduce          identical  original    8.9 us  imported   10.8 us
+CHECK-INSTANCE {"id":229,"layer":25,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+C6-CAPTURE complete=/root/c6-live-20261015/attempt-001/checks-000/capture/p1040/L25
+  attn       L26  attn_mfma16_g8       identical  original   12.6 us  imported    9.3 us
+CHECK-INSTANCE {"id":237,"layer":26,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L26  attn_reduce          identical  original    6.5 us  imported   10.4 us
+CHECK-INSTANCE {"id":238,"layer":26,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+C6-CAPTURE complete=/root/c6-live-20261015/attempt-001/checks-000/capture/p1040/L26
+  attn       L27  attn_mfma16_g8       identical  original   12.8 us  imported    9.5 us
+CHECK-INSTANCE {"id":246,"layer":27,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L27  attn_reduce          identical  original    8.7 us  imported   10.5 us
+CHECK-INSTANCE {"id":247,"layer":27,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+C6-CAPTURE complete=/root/c6-live-20261015/attempt-001/checks-000/capture/p1040/L27
+  attn       L28  attn_mfma16_g8       identical  original    8.2 us  imported    9.3 us
+CHECK-INSTANCE {"id":255,"layer":28,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L28  attn_reduce          identical  original    9.1 us  imported   10.0 us
+CHECK-INSTANCE {"id":256,"layer":28,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+C6-CAPTURE complete=/root/c6-live-20261015/attempt-001/checks-000/capture/p1040/L28
+  attn       L29  attn_mfma16_g8       identical  original   12.9 us  imported    9.1 us
+CHECK-INSTANCE {"id":264,"layer":29,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L29  attn_reduce          identical  original    9.1 us  imported   11.1 us
+CHECK-INSTANCE {"id":265,"layer":29,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+C6-CAPTURE complete=/root/c6-live-20261015/attempt-001/checks-000/capture/p1040/L29
+  attn       L30  attn_mfma16_g8       identical  original   12.5 us  imported    9.4 us
+CHECK-INSTANCE {"id":273,"layer":30,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L30  attn_reduce          identical  original    8.5 us  imported   10.3 us
+CHECK-INSTANCE {"id":274,"layer":30,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+C6-CAPTURE complete=/root/c6-live-20261015/attempt-001/checks-000/capture/p1040/L30
+  attn       L31  attn_mfma16_g8       identical  original   12.7 us  imported    9.4 us
+CHECK-INSTANCE {"id":282,"layer":31,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L31  attn_reduce          identical  original    9.3 us  imported   10.6 us
+CHECK-INSTANCE {"id":283,"layer":31,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+C6-CAPTURE complete=/root/c6-live-20261015/attempt-001/checks-000/capture/p1040/L31
+  attn       L32  attn_mfma16_g8       identical  original   12.4 us  imported    9.3 us
+CHECK-INSTANCE {"id":291,"layer":32,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L32  attn_reduce          identical  original    8.9 us  imported   10.5 us
+CHECK-INSTANCE {"id":292,"layer":32,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+C6-CAPTURE complete=/root/c6-live-20261015/attempt-001/checks-000/capture/p1040/L32
+  attn       L33  attn_mfma16_g8       identical  original    8.0 us  imported    9.1 us
+CHECK-INSTANCE {"id":300,"layer":33,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L33  attn_reduce          identical  original    8.7 us  imported   10.9 us
+CHECK-INSTANCE {"id":301,"layer":33,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+C6-CAPTURE complete=/root/c6-live-20261015/attempt-001/checks-000/capture/p1040/L33
+  attn       L34  attn_mfma16_g8       identical  original   12.7 us  imported    9.2 us
+CHECK-INSTANCE {"id":309,"layer":34,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L34  attn_reduce          identical  original    9.1 us  imported   10.4 us
+CHECK-INSTANCE {"id":310,"layer":34,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+C6-CAPTURE complete=/root/c6-live-20261015/attempt-001/checks-000/capture/p1040/L34
+  attn       L35  attn_mfma16_g8       identical  original   12.8 us  imported    9.3 us
+CHECK-INSTANCE {"id":318,"layer":35,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L35  attn_reduce          identical  original    9.0 us  imported   10.6 us
+CHECK-INSTANCE {"id":319,"layer":35,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+C6-CAPTURE complete=/root/c6-live-20261015/attempt-001/checks-000/capture/p1040/L35
+  attn       L36  attn_mfma16_g8       identical  original   12.7 us  imported    9.9 us
+CHECK-INSTANCE {"id":327,"layer":36,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L36  attn_reduce          identical  original    9.1 us  imported   11.4 us
+CHECK-INSTANCE {"id":328,"layer":36,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+C6-CAPTURE complete=/root/c6-live-20261015/attempt-001/checks-000/capture/p1040/L36
+  attn       L37  attn_mfma16_g8       identical  original    8.1 us  imported    9.1 us
+CHECK-INSTANCE {"id":336,"layer":37,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L37  attn_reduce          identical  original    9.1 us  imported   10.6 us
+CHECK-INSTANCE {"id":337,"layer":37,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+C6-CAPTURE complete=/root/c6-live-20261015/attempt-001/checks-000/capture/p1040/L37
+  attn       L38  attn_mfma16_g8       identical  original   12.8 us  imported    9.2 us
+CHECK-INSTANCE {"id":345,"layer":38,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L38  attn_reduce          identical  original    9.3 us  imported   10.3 us
+CHECK-INSTANCE {"id":346,"layer":38,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+C6-CAPTURE complete=/root/c6-live-20261015/attempt-001/checks-000/capture/p1040/L38
+  attn       L39  attn_mfma16_g8       identical  original   13.0 us  imported    9.2 us
+CHECK-INSTANCE {"id":354,"layer":39,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L39  attn_reduce          identical  original   10.0 us  imported   11.7 us
+CHECK-INSTANCE {"id":355,"layer":39,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+C6-CAPTURE complete=/root/c6-live-20261015/attempt-001/checks-000/capture/p1040/L39
+  attn       L40  attn_mfma16_g8       identical  original    8.8 us  imported   10.1 us
+CHECK-INSTANCE {"id":363,"layer":40,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L40  attn_reduce          identical  original    8.9 us  imported   10.4 us
+CHECK-INSTANCE {"id":364,"layer":40,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+C6-CAPTURE complete=/root/c6-live-20261015/attempt-001/checks-000/capture/p1040/L40
+  attn       L41  attn_mfma16_g8       identical  original   12.6 us  imported    9.3 us
+CHECK-INSTANCE {"id":372,"layer":41,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L41  attn_reduce          identical  original    8.7 us  imported   10.9 us
+CHECK-INSTANCE {"id":373,"layer":41,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+C6-CAPTURE complete=/root/c6-live-20261015/attempt-001/checks-000/capture/p1040/L41
+  attn       L42  attn_mfma16_g8       identical  original   12.7 us  imported   12.0 us
+CHECK-INSTANCE {"id":381,"layer":42,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L42  attn_reduce          identical  original    9.1 us  imported   10.6 us
+CHECK-INSTANCE {"id":382,"layer":42,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+C6-CAPTURE complete=/root/c6-live-20261015/attempt-001/checks-000/capture/p1040/L42
+  attn       L43  attn_mfma16_g8       identical  original   12.8 us  imported    9.1 us
+CHECK-INSTANCE {"id":390,"layer":43,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L43  attn_reduce          identical  original    8.9 us  imported   15.5 us
+CHECK-INSTANCE {"id":391,"layer":43,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+C6-CAPTURE complete=/root/c6-live-20261015/attempt-001/checks-000/capture/p1040/L43
+  attn       L44  attn_mfma16_g8       identical  original   12.8 us  imported    9.1 us
+CHECK-INSTANCE {"id":399,"layer":44,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L44  attn_reduce          identical  original    6.5 us  imported   10.2 us
+CHECK-INSTANCE {"id":400,"layer":44,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+C6-CAPTURE complete=/root/c6-live-20261015/attempt-001/checks-000/capture/p1040/L44
+  attn       L45  attn_mfma16_g8       identical  original    8.2 us  imported    9.3 us
+CHECK-INSTANCE {"id":408,"layer":45,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L45  attn_reduce          identical  original    8.9 us  imported   10.7 us
+CHECK-INSTANCE {"id":409,"layer":45,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+C6-CAPTURE complete=/root/c6-live-20261015/attempt-001/checks-000/capture/p1040/L45
+  attn       L46  attn_mfma16_g8       identical  original   12.9 us  imported    9.0 us
+CHECK-INSTANCE {"id":417,"layer":46,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L46  attn_reduce          identical  original    8.9 us  imported   10.4 us
+CHECK-INSTANCE {"id":418,"layer":46,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+C6-CAPTURE complete=/root/c6-live-20261015/attempt-001/checks-000/capture/p1040/L46
+  attn       L47  attn_mfma16_g8       identical  original   13.2 us  imported    8.9 us
+CHECK-INSTANCE {"id":426,"layer":47,"export":"attn_mfma16_g8","replicas":1,"grid":[1,5,4],"block":[256,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+  reduce     L47  attn_reduce          identical  original    8.9 us  imported   10.7 us
+CHECK-INSTANCE {"id":427,"layer":47,"export":"attn_reduce","replicas":1,"grid":[32,1,1],"block":[128,1,1],"position":1040,"bytes":106104832,"result":"identical","first_byte":-1}
+C6-CAPTURE complete=/root/c6-live-20261015/attempt-001/checks-000/capture/p1040/L47
+  prologue (ETX)       imported    7.4 us  (1 task(s))
+  argmax (ETX)         imported   18.5 us  (1 task(s))
+kernel time, summed over the checked launches (GPU events, one launch each):
+  attn_mfma16_g8       original   1075.1 us  imported    462.1 us  (-57%)
+  attn_reduce          original    409.1 us  imported    520.1 us  (+27%)
+  rms_norm_2d          original    478.1 us  imported     10.7 us  (-98%)
+  total                original   1962.2 us  imported    992.9 us
+CHECK-IMPORTED checked=97 planned=97 replicas=104 position=1040
+CHECK NOT-IMPORTED: 337 instance(s): dsl_gemv, dsl_attnprep, dsl_gemv, dsl_gemv_router_fold, dsl_topk, ...
+CHECK OK: 0 launch(es) differ
+BUILD-IDENTITY phase=after sha256=c6db86067823a8cee84677d21a8da605338331cce15855aa2a6bd47d5ae96abe

@@ -1,0 +1,13 @@
+EEM device=AMD Instinct MI300X VF arch=gfx942:sramecc+:xnack- arm=control diagnostic=0 consumer=qkv identity=b17e5e37f577c6c0170ec59c420d853ba2bdddff8383ddac867fbd621f72d49e
+EEM CHECK round=0 mode=graph complete
+EEM CHECK round=1 mode=graph complete
+EEM CHECK round=2 mode=graph complete
+EEM CHECK round=3 mode=graph complete
+EEM CHECK round=4 mode=graph complete
+EEM CHECK round=5 mode=graph complete
+EEM CHECK round=6 mode=graph complete
+EEM CHECK round=7 mode=graph complete
+EEM CHECK round=8 mode=graph complete
+EEM CHECK round=9 mode=graph complete
+EEM CHECK round=10 mode=graph complete
+EEM CHECK round=11 mode=graph complete

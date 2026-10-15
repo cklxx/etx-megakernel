@@ -1,0 +1,15 @@
+# GPU queue terminal — 2026-10-15T16:32Z
+
+All five entries executed; no experiment runner remains. Final observation 16:30:56Z: GPU use 0%, only the checking shell matched the text filter, owned experiment containers absent; pre-existing rocm container remains. All required raw-result exports are verified. Original execution/export deadline 17:22:10Z was preserved; no executable source changes or new experiments.
+
+- Expert: COMPLETE, STOP-NO-BENEFIT, all five gains negative; median −6.675003052µs.
+- Producer: NOT-COMPLETE; exact actual-model payload mismatch at position 0, L0_mix.bin. Later full-model gates/timing not reached. First-layer inputs/weights/IDs match; logits and mix differ. Precise cause unproven.
+- x8: collection COMPLETE, all six strict diagnostics FAIL. Single-request controls fail too; concurrency is not necessary. Eight regenerated tuple/producer-bound references, original payloads not recovered.
+- Attention C6: COMPLETE local probe, correctness PASS, target CLOSE/general rule DROP at all four positions. Mixed signs and large spreads; no wall gain. Attempt 000 missing llc preserved; unchanged attempt 001 used existing ROCm7.2.3/LLVM22 container and original lease.
+- B4: all correctness gates and five corrected-vLLM pairs COMPLETE. AITER selected at all B. Throughput: B1 WIN +27.110935%, B2 WIN +4.419380%, B4 LOSS −30.930675%. B4 median ETX/vLLM step 8.921324/6.165512ms. Attribution INCOMPLETE: first profiled B1 traffic process SIGSEGV after successful model output and profiler finalization, rocr::HSA::hsa_signal_store_screlease. HF per-B exact-prefix routing COMPLETE. Conditional projection 5.130547ms < 5.5489608ms trigger; ETX pick equality unmeasured. Graph baseline UNAVAILABLE due LDS lifetime; overall two-baseline/fusion claim INCOMPLETE.
+
+Exports: expert 846/0 bad, producer 2033/0 bad, C6 first failed record 3/0 bad plus terminal work 7941/0 bad. x8 remote 177/0 bad and local 175 raw files verified; B4 remote 190/0 bad and local 188 verified. Two external weight inputs are explicitly unexported in each DeepSeek copy. All hashes, true exits, failed attempts, source/compiler/input bindings and profiler partials are retained; no failed gate or nonzero profiler exit was waived.
+
+Accepted/published source 554133d744b4591c9cf87c68b6817df781137c9b, deployment archive abee09fcda357bb982cfba4d85bb387a6da97ec2385d3d4574f1f7cd4282d5da. Raw evidence /LOCAL_WORKSPACE/.hermes/cache/scratch/etx-gpu-live-20261015-evidence; final details /LOCAL_WORKSPACE/.hermes/cache/scratch/etx-gpu-live-20261015-result.md; committed receipts examples/gpu-live/results/2026-10-15. Valid 2190-pass/compiler preparation reused; no broad rerun, push or main merge.
+
+Remaining: producer/x8 correctness work, valid complete profiler captures and replay-safe graph baseline before the corresponding claims. Expert/C6 screens close their levers. Amber owns teardown; provider deletion/billing stop and spend are not verified. No provider action or credential retry. Completion event follows the final evidence commit.

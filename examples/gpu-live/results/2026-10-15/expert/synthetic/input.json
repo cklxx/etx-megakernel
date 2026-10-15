@@ -1,0 +1,51 @@
+{
+  "M": 5120,
+  "files": {
+    "consumer.bin": {
+      "bytes": 20971520,
+      "sha256": "d2938170e2ff61dc81b3a9af08b5350dbf75f186cdb0b9361229c0191beab7e9"
+    },
+    "ids.bin": {
+      "bytes": 32,
+      "sha256": "ff1f6ee5d67458cfac950f62e93042e21fcb867e2234dcc8721801231064ad40"
+    },
+    "norm.bin": {
+      "bytes": 4096,
+      "sha256": "f94f732262163eca50d517b5524a7212d441e66836bcd4a6d4b81ef3f81b8e34"
+    },
+    "residual.bin": {
+      "bytes": 4096,
+      "sha256": "d9ef6d6f7e54b6a4c6948341b43cfae96eb6f873a7c6e9c36f87c001764b43d1"
+    },
+    "role.bin": {
+      "bytes": 1,
+      "sha256": "6e340b9cffb37a989ca544e6bb780a2c78901d3fb33738768511a30617afa01d"
+    },
+    "w13.bin": {
+      "bytes": 50331648,
+      "sha256": "1a3ff96ec874eb6b5eb5c678711186a4d5cdf7e552b6df8d1f2c6f1485df4b01"
+    },
+    "w2.bin": {
+      "bytes": 25165824,
+      "sha256": "08a1bffb19bc1d6437a28cb55cde43496b88c3f8f84d7fb1d426caa0768911d6"
+    },
+    "wts.bin": {
+      "bytes": 32,
+      "sha256": "8460ab15617002d066719084235d074f87cae589b79a5bf87842e960ed9f683a"
+    },
+    "x.bin": {
+      "bytes": 4096,
+      "sha256": "4aef5d88842e6e7aa2eef096594087ce9079a1d17fe57ed2ead3585b5358898b"
+    }
+  },
+  "head": false,
+  "imports": "N/A: zero imported kernels in this isolated DSL subgraph",
+  "kind": "synthetic",
+  "provenance": {
+    "limitation": "Synthetic mechanism probe only. No real-input or model acceptance.",
+    "model_activations": false,
+    "seed": 20261015
+  },
+  "schema": 1,
+  "tokens": "PENDING: no full-model acceptance from this probe"
+}
