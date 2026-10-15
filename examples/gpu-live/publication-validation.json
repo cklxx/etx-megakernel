@@ -1,0 +1,67 @@
+{
+  "status": "PASS",
+  "scope": "local integrated publication acceptance; no GPU, full suite or compiler matrix rerun",
+  "tests": {
+    "command": ".venv/bin/python -m pytest -q tests/test_multibatch_trace.py tests/test_multibatch_trace_summary.py tests/test_timeline.py tests/test_dsv2_batch.py tests/test_dsv2_batch_attribution.py",
+    "exit_code": 0,
+    "result": "155 passed in 14.45s",
+    "initial_environment_failure": "exit2: sparse checkout omitted historical pinned inputs.json; restored tracked fixture and reran same focused command"
+  },
+  "real_trace_reanalysis": {
+    "command": "analyze(original_plan, original_raw_trace) == published trace report for all nine round/batch tuples",
+    "exit_code": 0,
+    "complete_traces": 9,
+    "exact_matches": 9,
+    "summary_exact_match": true
+  },
+  "sealed_raw_record": {
+    "command": "python -m etx.session.record verify <LOCAL_EVIDENCE_ROOT>/etx-multibatch-continuation-20261016-evidence/raw/20261015T164723Z-d0e0cb",
+    "exit_code": 0,
+    "files_match": 32,
+    "bad": 0,
+    "omitted": 0
+  },
+  "publication_checksums": {
+    "exit_code": 0,
+    "verified_entries": 746
+  },
+  "redacted_derivatives": 39,
+  "original_binding_files_byte_identical": 15,
+  "integrated_source_sha256": {
+    "examples/dsv2lite/multibatch_trace.py": "50e8ebf90d11dcdc479d4ba766354b3d16a7dba4f0aff4369f6ce32a3d366f6f",
+    "examples/dsv2lite/multibatch_trace_summary.py": "eb4697b3846f36041ec83e65c8ccbc5423d4109e0bd2a289d004fde1ebfce7dd",
+    "examples/sessions/ds_multibatch_trace.py": "0fb1a987eaad5bf32ecf9442797f48dd957a8a998ad3866ae60b86969cde3b26",
+    "tests/test_multibatch_trace.py": "6f9b4d56be42d0767c0b4cefe7262df2b6b5d850dcea890673d470c7b6385795",
+    "tests/test_multibatch_trace_summary.py": "0757a0848338cee7b799166a2044b02717edc2b8b0903b4ed1fac4fdb551e9d3"
+  },
+  "source_matches_original_branch": true,
+  "reused_prior_evidence": "2190-pass and unchanged compiler preparation; accepted executable source554133d744b4591c9cf87c68b6817df781137c9b",
+  "cancelled_prototype": "No edits/build/deploy/measurement; not part of this publication",
+  "integration": "sanitized squash of both completed branch tips; originals retained locally",
+  "publication_audit": {
+    "status": "PASS",
+    "outgoing_text_files": 674,
+    "largest_blob_bytes": 960371,
+    "credential_or_private_connection_findings": 0,
+    "AGENTS_edits": false,
+    "model_weights_or_binary_files": false
+  },
+  "shell_syntax": {
+    "command": "bash -n <five retained historical .sh receipts>",
+    "exit_code": 0
+  },
+  "session_declaration": {
+    "command": "load_session(examples/sessions/ds_multibatch_trace.py)",
+    "exit_code": 0,
+    "jobs": 1,
+    "gpu": 0,
+    "cap_seconds": 900,
+    "job_timeout_seconds": 850,
+    "executed": false
+  },
+  "source_and_new_docs_whitespace": {
+    "command": "git diff 554133d --check -- <changed source/tests and new documentation>",
+    "exit_code": 0,
+    "note": "Historical raw-log whitespace retained verbatim"
+  }
+}

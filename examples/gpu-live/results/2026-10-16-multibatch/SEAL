@@ -1,0 +1,12 @@
+{
+ "complete": true,
+ "jobs": {
+  "multibatch_trace": "ok"
+ },
+ "local_only": [],
+ "manifest_sha256": "91f63452b962ef7cf760e9b2b447d2b40f575d59c9e3c33d559e4390ce391c15",
+ "plan_sha256": "92c29c4018b3e66ae4ab0eb7c69be599409f2a7f2d501df3f010654b14082b0e",
+ "sealed": "2026-10-15T16:48:59Z",
+ "session": "20261015T164723Z-d0e0cb",
+ "source": "commit edd7457a333fd25dcf90402c91b8af24cb563cfe\nbranch task/multibatch-continuation-20261016\nbaseline_commit 554133d744b4591c9cf87c68b6817df781137c9b\nbaseline_archive abee09fcda357bb982cfba4d85bb387a6da97ec2385d3d4574f1f7cd4282d5da\nscope orchestration only; baseline executables and references unchanged\n"
+}

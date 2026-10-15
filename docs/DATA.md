@@ -106,3 +106,19 @@ No complete retained Qwen router activation and weight set was found.
 Actual-model capture and replay are prepared but pending GPU execution.
 There is no new GPU measurement in this set.
 See `docs/QWEN-PRODUCER-PREP-2026-10-15.md` and its runbook.
+
+## Measured GPU queue and multibatch traces, 2026-10-15 UTC
+
+The [results index](../examples/gpu-live/README.md) links the completed queue's exact source bindings,
+five-pair baselines, rejected correctness gates and profiler failure. Reuse these measurements; the expert
+screen lost all five pairs, attention had mixed signs, and the producer and x8 paths did not pass correctness.
+
+`examples/gpu-live/results/2026-10-16-multibatch/` contains the nine gated final-token trace summaries,
+the original raw-record seal/manifest, and a deterministic summary derivation. B2 has 109,892 tasks and
+B4 has 219,784; their median instrumented spans are 4.339200 and 8.670160 ms. These are attribution data,
+not new unprofiled candidate performance or accepted HBM counters. The full 32-file local raw export was
+verified complete; its manifest SHA256 is `91f63452b962ef7cf760e9b2b447d2b40f575d59c9e3c33d559e4390ce391c15`.
+
+Published receipts omit connection details as described in the publication metadata. Original seals bind
+the original bytes, and public derivative checksums are separate. No model weight pack or executable binary
+is included. The shared-weight prototype was cancelled before edits, build or measurement.

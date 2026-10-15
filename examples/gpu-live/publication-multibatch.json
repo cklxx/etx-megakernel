@@ -1,0 +1,71 @@
+{
+  "source_branch_tip": "7a9eff2499b2c852ff41eec1ac23093be3ad83b8",
+  "integration": "sanitized squash; original branch retained locally",
+  "original_seals": "unchanged; bind original raw bytes, not redacted derivatives",
+  "derivatives": [
+    {
+      "file": "examples/gpu-live/results/2026-10-16-multibatch/README.md",
+      "source_commit": "7a9eff2499b2c852ff41eec1ac23093be3ad83b8",
+      "original_sha256": "f75e1ee9eaffa577d28c45a28209986d8329905ee147b42539693acff36fbbeb",
+      "published_sha256": "914da8e91ebb5147c5c5c555b020ef1dfb78202489b97cf59b527750e0439ca1",
+      "redactions": [
+        {
+          "category": "local user filesystem path",
+          "replacements": 2
+        }
+      ]
+    },
+    {
+      "file": "examples/gpu-live/results/2026-10-16-multibatch/export-verification.txt",
+      "source_commit": "7a9eff2499b2c852ff41eec1ac23093be3ad83b8",
+      "original_sha256": "5b76fad465bcc78be21910ffb8e7bfde41b405d70678b89ff6ffd717c62b414d",
+      "published_sha256": "fbae275c666415e9084d1410065a1d7957c246a8991b3b008a434653371d9bd8",
+      "redactions": [
+        {
+          "category": "local user filesystem path",
+          "replacements": 1
+        }
+      ]
+    },
+    {
+      "file": "examples/gpu-live/results/2026-10-16-multibatch/result.md",
+      "source_commit": "7a9eff2499b2c852ff41eec1ac23093be3ad83b8",
+      "original_sha256": "ddbfec3ef6cb112344819c6bcab029ed09eba476c346f70b7d2ada43b5b896d4",
+      "published_sha256": "166de13b1a26558f1ee1325b741e8093d15a352e4724f24be15c053d91979118",
+      "redactions": [
+        {
+          "category": "local user filesystem path",
+          "replacements": 1
+        },
+        {
+          "category": "SSH fingerprint",
+          "replacements": 1
+        }
+      ]
+    },
+    {
+      "file": "examples/gpu-live/results/2026-10-16-multibatch/status.md",
+      "source_commit": "7a9eff2499b2c852ff41eec1ac23093be3ad83b8",
+      "original_sha256": "be2994fbce487de5d4ebd15994a9425b2576c47967e529246388521f5e1a6e01",
+      "published_sha256": "02bbd0ef797bdf61cc9206e7f1ca2b1261642c07719498ed3490b04d963ee7c5",
+      "redactions": [
+        {
+          "category": "local user filesystem path",
+          "replacements": 2
+        }
+      ]
+    },
+    {
+      "file": "examples/gpu-live/results/2026-10-16-multibatch/terminal-state.txt",
+      "source_commit": "7a9eff2499b2c852ff41eec1ac23093be3ad83b8",
+      "original_sha256": "d17a590f6e99bb697883a0c5e28fe7a550d08cf76a0dedaccdd569b181b5e4bf",
+      "published_sha256": "8e73889101904e1d1d8536de511f2b81ba0c05fca39052b72338086f42d9eb05",
+      "redactions": [
+        {
+          "category": "GPU connection address",
+          "replacements": 1
+        }
+      ]
+    }
+  ]
+}

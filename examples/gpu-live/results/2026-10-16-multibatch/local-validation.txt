@@ -1,0 +1,9 @@
+commit edd7457a333fd25dcf90402c91b8af24cb563cfe
+.venv/bin/python -m pytest -q tests/test_multibatch_trace.py
+9 passed in 0.05s
+load_session: one GPU0 job, cap900s/job850s PASS
+git diff --check PASS
+Retained full B1 real trace: strict row validation and latency analysis PASS,53022tasks,3115.44us. No GPU used by local validation.
+.venv/bin/python -m pytest -q tests/test_multibatch_trace_summary.py
+3 passed in0.01s
+All nine per-trace CP body+dependency+queue decompositions equal trace span (rounding<1e-6us).

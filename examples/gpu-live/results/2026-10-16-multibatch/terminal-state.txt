@@ -1,0 +1,4 @@
+Observed2026-10-15T16:50:02Z on root@<GPU_HOST>
+GPU0 use0%; no gpu_jobs, multibatch_trace.py or selected B1/B2/B4 run process in ps output.
+Deployment SHA checks all OK after execution; runner.exit0.
+All continuation project execution terminal16:48:59Z. No containers launched, no provider/cloud actions. Amber owns teardown; teardown NOT CLAIMED.

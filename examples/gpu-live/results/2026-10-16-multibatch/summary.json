@@ -1,0 +1,1475 @@
+{
+  "b4_over_b2": {
+    "all_cp_gaps_us": 2.2069996015407187,
+    "body_work_us": 1.9821451248092563,
+    "cp_body_us": 1.9695554865446605,
+    "span_us": 1.9981010324483777,
+    "tasks": 2.0,
+    "wait_work_us": 1.8958670987757296
+  },
+  "batches": {
+    "1": {
+      "families": {
+        "argmax": {
+          "body_work_us": {
+            "maximum": 2.480000000000018,
+            "median": 2.3200000000001637,
+            "minimum": 2.119999999999891
+          },
+          "cp_body_us": {
+            "maximum": 2.480000000000018,
+            "median": 2.3200000000001637,
+            "minimum": 2.119999999999891
+          },
+          "cp_dep_gap_us": {
+            "maximum": 2.0700000000001637,
+            "median": 2.0700000000001637,
+            "minimum": 1.9600000000000364
+          },
+          "cp_queue_gap_us": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0
+          },
+          "tasks": 1,
+          "wait_work_us": {
+            "maximum": 5.119999999999891,
+            "median": 4.960000000000036,
+            "minimum": 4.720000000000255
+          }
+        },
+        "attn": {
+          "body_work_us": {
+            "maximum": 105105.31999999999,
+            "median": 104281.51999999995,
+            "minimum": 104114.68000000002
+          },
+          "cp_body_us": {
+            "maximum": 428.87999999999977,
+            "median": 424.32000000000164,
+            "minimum": 423.1599999999999
+          },
+          "cp_dep_gap_us": {
+            "maximum": 68.30999999999901,
+            "median": 68.00000000000004,
+            "minimum": 67.0600000000008
+          },
+          "cp_queue_gap_us": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0
+          },
+          "tasks": 6912,
+          "wait_work_us": {
+            "maximum": 11552.920000000027,
+            "median": 11464.83999999999,
+            "minimum": 11217.360000000004
+          }
+        },
+        "dense_dn": {
+          "body_work_us": {
+            "maximum": 6251.520000000004,
+            "median": 6107.680000000006,
+            "minimum": 6094.440000000006
+          },
+          "cp_body_us": {
+            "maximum": 22.28,
+            "median": 21.64,
+            "minimum": 21.52000000000001
+          },
+          "cp_dep_gap_us": {
+            "maximum": 2.730000000000004,
+            "median": 2.549999999999997,
+            "minimum": 2.5
+          },
+          "cp_queue_gap_us": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0
+          },
+          "tasks": 296,
+          "wait_work_us": {
+            "maximum": 662.0400000000006,
+            "median": 568.0400000000004,
+            "minimum": 526.9600000000003
+          }
+        },
+        "dense_gu": {
+          "body_work_us": {
+            "maximum": 7923.960000000009,
+            "median": 7920.199999999999,
+            "minimum": 7888.680000000007
+          },
+          "cp_body_us": {
+            "maximum": 27.439999999999998,
+            "median": 27.200000000000003,
+            "minimum": 27.120000000000005
+          },
+          "cp_dep_gap_us": {
+            "maximum": 1.759999999999991,
+            "median": 1.7199999999999989,
+            "minimum": 1.7199999999999989
+          },
+          "cp_queue_gap_us": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0
+          },
+          "tasks": 296,
+          "wait_work_us": {
+            "maximum": 159.72000000000008,
+            "median": 158.9599999999998,
+            "minimum": 157.99999999999994
+          }
+        },
+        "down": {
+          "body_work_us": {
+            "maximum": 88896.28000000001,
+            "median": 88767.36,
+            "minimum": 88082.67999999998
+          },
+          "cp_body_us": {
+            "maximum": 416.31999999999965,
+            "median": 414.55999999999943,
+            "minimum": 409.9600000000004
+          },
+          "cp_dep_gap_us": {
+            "maximum": 52.68000000000069,
+            "median": 47.72000000000094,
+            "minimum": 42.60000000000008
+          },
+          "cp_queue_gap_us": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0
+          },
+          "tasks": 5772,
+          "wait_work_us": {
+            "maximum": 7931.280000000027,
+            "median": 7340.480000000001,
+            "minimum": 7283.359999999993
+          }
+        },
+        "embed": {
+          "body_work_us": {
+            "maximum": 4.5600000000000005,
+            "median": 4.44,
+            "minimum": 4.24
+          },
+          "cp_body_us": {
+            "maximum": 4.5600000000000005,
+            "median": 4.44,
+            "minimum": 4.24
+          },
+          "cp_dep_gap_us": {
+            "maximum": 2.75,
+            "median": 1.58,
+            "minimum": 1.5
+          },
+          "cp_queue_gap_us": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0
+          },
+          "tasks": 1,
+          "wait_work_us": {
+            "maximum": 1.24,
+            "median": 1.24,
+            "minimum": 1.1199999999999999
+          }
+        },
+        "gate_up": {
+          "body_work_us": {
+            "maximum": 166188.67999999996,
+            "median": 166127.03999999998,
+            "minimum": 165894.12000000002
+          },
+          "cp_body_us": {
+            "maximum": 786.5599999999993,
+            "median": 786.2400000000007,
+            "minimum": 781.3599999999998
+          },
+          "cp_dep_gap_us": {
+            "maximum": 40.400000000000574,
+            "median": 39.719999999999715,
+            "minimum": 38.959999999999695
+          },
+          "cp_queue_gap_us": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0
+          },
+          "tasks": 5772,
+          "wait_work_us": {
+            "maximum": 3565.3599999999924,
+            "median": 3493.4800000000027,
+            "minimum": 3454.6399999999953
+          }
+        },
+        "lm_head": {
+          "body_work_us": {
+            "maximum": 36176.360000000015,
+            "median": 36076.51999999999,
+            "minimum": 35704.520000000004
+          },
+          "cp_body_us": {
+            "maximum": 125.72000000000025,
+            "median": 125.55999999999995,
+            "minimum": 124.83999999999969
+          },
+          "cp_dep_gap_us": {
+            "maximum": 1.930000000000291,
+            "median": 1.8799999999996544,
+            "minimum": 1.680000000000291
+          },
+          "cp_queue_gap_us": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0
+          },
+          "tasks": 296,
+          "wait_work_us": {
+            "maximum": 1446.7199999999943,
+            "median": 1370.5199999999859,
+            "minimum": 1248.7999999999902
+          }
+        },
+        "merge": {
+          "body_work_us": {
+            "maximum": 32688.28000000002,
+            "median": 32547.039999999954,
+            "minimum": 32546.199999999983
+          },
+          "cp_body_us": {
+            "maximum": 133.11999999999986,
+            "median": 132.03999999999934,
+            "minimum": 131.31999999999874
+          },
+          "cp_dep_gap_us": {
+            "maximum": 43.479999999999734,
+            "median": 41.12000000000069,
+            "minimum": 40.759999999999934
+          },
+          "cp_queue_gap_us": {
+            "maximum": 2.839999999999918,
+            "median": 0.0,
+            "minimum": 0.0
+          },
+          "tasks": 6912,
+          "wait_work_us": {
+            "maximum": 17469.480000000025,
+            "median": 17367.99999999999,
+            "minimum": 17343.08000000001
+          }
+        },
+        "norm": {
+          "body_work_us": {
+            "maximum": 1612.3600000000042,
+            "median": 1599.68,
+            "minimum": 1588.0400000000025
+          },
+          "cp_body_us": {
+            "maximum": 6.039999999999999,
+            "median": 5.760000000000005,
+            "minimum": 5.520000000000003
+          },
+          "cp_dep_gap_us": {
+            "maximum": 2.3100000000000023,
+            "median": 2.229999999999997,
+            "minimum": 2.0899999999999963
+          },
+          "cp_queue_gap_us": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0
+          },
+          "tasks": 296,
+          "wait_work_us": {
+            "maximum": 527.2399999999997,
+            "median": 495.31999999999994,
+            "minimum": 448.9599999999999
+          }
+        },
+        "oproj": {
+          "body_work_us": {
+            "maximum": 53065.88000000005,
+            "median": 52533.12000000001,
+            "minimum": 52242.96000000002
+          },
+          "cp_body_us": {
+            "maximum": 183.51999999999927,
+            "median": 181.16000000000133,
+            "minimum": 180.08000000000087
+          },
+          "cp_dep_gap_us": {
+            "maximum": 57.99999999999953,
+            "median": 57.3599999999992,
+            "minimum": 55.12000000000038
+          },
+          "cp_queue_gap_us": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0
+          },
+          "tasks": 7992,
+          "wait_work_us": {
+            "maximum": 10834.00000000001,
+            "median": 10743.319999999989,
+            "minimum": 10740.519999999979
+          }
+        },
+        "qabs": {
+          "body_work_us": {
+            "maximum": 3191.9599999999955,
+            "median": 3173.800000000004,
+            "minimum": 3164.7999999999993
+          },
+          "cp_body_us": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0
+          },
+          "cp_dep_gap_us": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0
+          },
+          "cp_queue_gap_us": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0
+          },
+          "tasks": 864,
+          "wait_work_us": {
+            "maximum": 1457.2000000000053,
+            "median": 1437.2799999999982,
+            "minimum": 1396.0399999999981
+          }
+        },
+        "qkv": {
+          "body_work_us": {
+            "maximum": 104365.67999999992,
+            "median": 104125.75999999995,
+            "minimum": 104092.15999999995
+          },
+          "cp_body_us": {
+            "maximum": 366.7600000000002,
+            "median": 365.12000000000006,
+            "minimum": 363.4399999999996
+          },
+          "cp_dep_gap_us": {
+            "maximum": 60.65000000000043,
+            "median": 56.44999999999945,
+            "minimum": 56.430000000000035
+          },
+          "cp_queue_gap_us": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0
+          },
+          "tasks": 7992,
+          "wait_work_us": {
+            "maximum": 37301.400000000045,
+            "median": 37033.320000000014,
+            "minimum": 36302.760000000046
+          }
+        },
+        "router": {
+          "body_work_us": {
+            "maximum": 47328.00000000007,
+            "median": 47004.68000000001,
+            "minimum": 46778.76
+          },
+          "cp_body_us": {
+            "maximum": 225.800000000001,
+            "median": 225.519999999999,
+            "minimum": 222.51999999999924
+          },
+          "cp_dep_gap_us": {
+            "maximum": 58.88999999999993,
+            "median": 56.87999999999974,
+            "minimum": 55.650000000000375
+          },
+          "cp_queue_gap_us": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0
+          },
+          "tasks": 5772,
+          "wait_work_us": {
+            "maximum": 11554.999999999985,
+            "median": 10909.959999999923,
+            "minimum": 10170.120000000008
+          }
+        },
+        "sdown": {
+          "body_work_us": {
+            "maximum": 31898.8,
+            "median": 31827.75999999999,
+            "minimum": 31738.520000000015
+          },
+          "cp_body_us": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0
+          },
+          "cp_dep_gap_us": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0
+          },
+          "cp_queue_gap_us": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0
+          },
+          "tasks": 1924,
+          "wait_work_us": {
+            "maximum": 2316.599999999974,
+            "median": 1924.360000000005,
+            "minimum": 1684.8400000000024
+          }
+        },
+        "shgu": {
+          "body_work_us": {
+            "maximum": 55504.079999999994,
+            "median": 55266.4,
+            "minimum": 54951.04
+          },
+          "cp_body_us": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0
+          },
+          "cp_dep_gap_us": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0
+          },
+          "cp_queue_gap_us": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0
+          },
+          "tasks": 1924,
+          "wait_work_us": {
+            "maximum": 4325.079999999982,
+            "median": 4141.560000000023,
+            "minimum": 3304.9599999999946
+          }
+        }
+      },
+      "reused_baseline": {
+        "config": "aiter",
+        "etx_request_interval_ms": 3.23944,
+        "etx_step_ms": 3.222786,
+        "etx_tokens_per_s": 310.2905374418283,
+        "latency": {
+          "gains_pct": [
+            27.296757257566398,
+            26.435836038460113,
+            26.29143808173581,
+            26.3142237544484,
+            26.720575161138964
+          ],
+          "median_pct": 26.435836038460113,
+          "outcome": "WIN",
+          "spread_pct": 1.0053191758305917
+        },
+        "throughput": {
+          "gains_pct": [
+            27.983433039591358,
+            27.110934907747612,
+            26.94014502392954,
+            26.982573735699898,
+            27.375413694859045
+          ],
+          "median_pct": 27.110934907747612,
+          "outcome": "WIN",
+          "spread_pct": 1.043288015661822
+        },
+        "vllm_step_ms": 4.097652,
+        "vllm_tokens_per_s": 244.04219782451023
+      },
+      "tasks": 53022,
+      "totals": {
+        "all_cp_gaps_us": {
+          "maximum": 385.2199999999986,
+          "median": 382.1800000000021,
+          "minimum": 378.7100000000008
+        },
+        "body_work_us": {
+          "maximum": 739064.4,
+          "median": 737261.24,
+          "minimum": 736131.8399999999
+        },
+        "cp_body_us": {
+          "maximum": 2718.599999999998,
+          "median": 2715.7199999999993,
+          "minimum": 2708.2400000000016
+        },
+        "cp_dep_gap_us": {
+          "maximum": 385.2199999999986,
+          "median": 379.3400000000022,
+          "minimum": 378.7100000000008
+        },
+        "cp_queue_gap_us": {
+          "maximum": 2.839999999999918,
+          "median": 0.0,
+          "minimum": 0.0
+        },
+        "span_us": {
+          "maximum": 3100.78,
+          "median": 3094.4300000000003,
+          "minimum": 3093.46
+        },
+        "wait_work_us": {
+          "maximum": 108993.40000000002,
+          "median": 108213.04000000002,
+          "minimum": 107645.83999999995
+        }
+      }
+    },
+    "2": {
+      "families": {
+        "argmax": {
+          "body_work_us": {
+            "maximum": 6.880000000000109,
+            "median": 5.400000000000546,
+            "minimum": 5.1599999999998545
+          },
+          "cp_body_us": {
+            "maximum": 2.680000000000291,
+            "median": 2.4799999999995634,
+            "minimum": 2.2799999999997453
+          },
+          "cp_dep_gap_us": {
+            "maximum": 2.3900000000003274,
+            "median": 2.130000000000109,
+            "minimum": 1.8800000000001091
+          },
+          "cp_queue_gap_us": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0
+          },
+          "tasks": 2,
+          "wait_work_us": {
+            "maximum": 23.23999999999978,
+            "median": 23.079999999999927,
+            "minimum": 18.00000000000091
+          }
+        },
+        "attn": {
+          "body_work_us": {
+            "maximum": 258323.96000000002,
+            "median": 255767.19999999995,
+            "minimum": 252654.91999999998
+          },
+          "cp_body_us": {
+            "maximum": 474.4799999999992,
+            "median": 472.63999999999976,
+            "minimum": 457.4400000000006
+          },
+          "cp_dep_gap_us": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0
+          },
+          "cp_queue_gap_us": {
+            "maximum": 69.83999999999868,
+            "median": 69.67999999999967,
+            "minimum": 67.15999999999974
+          },
+          "tasks": 13824,
+          "wait_work_us": {
+            "maximum": 34744.00000000003,
+            "median": 34576.64,
+            "minimum": 32922.67999999996
+          }
+        },
+        "dense_dn": {
+          "body_work_us": {
+            "maximum": 17190.440000000017,
+            "median": 15851.319999999996,
+            "minimum": 15514.999999999996
+          },
+          "cp_body_us": {
+            "maximum": 27.400000000000006,
+            "median": 27.080000000000013,
+            "minimum": 26.399999999999977
+          },
+          "cp_dep_gap_us": {
+            "maximum": 7.839999999999989,
+            "median": 3.8799999999999955,
+            "minimum": 3.7200000000000273
+          },
+          "cp_queue_gap_us": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0
+          },
+          "tasks": 592,
+          "wait_work_us": {
+            "maximum": 3016.240000000002,
+            "median": 2906.72,
+            "minimum": 2546.920000000001
+          }
+        },
+        "dense_gu": {
+          "body_work_us": {
+            "maximum": 23412.640000000007,
+            "median": 22415.400000000005,
+            "minimum": 21712.159999999996
+          },
+          "cp_body_us": {
+            "maximum": 41.480000000000004,
+            "median": 39.36,
+            "minimum": 36.87999999999998
+          },
+          "cp_dep_gap_us": {
+            "maximum": 6.160000000000011,
+            "median": 4.599999999999994,
+            "minimum": 3.1200000000000045
+          },
+          "cp_queue_gap_us": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0
+          },
+          "tasks": 592,
+          "wait_work_us": {
+            "maximum": 1031.2400000000005,
+            "median": 866.68,
+            "minimum": 640.039999999999
+          }
+        },
+        "down": {
+          "body_work_us": {
+            "maximum": 343506.44,
+            "median": 342478.80000000005,
+            "minimum": 337253.95999999996
+          },
+          "cp_body_us": {
+            "maximum": 598.6000000000001,
+            "median": 596.2000000000002,
+            "minimum": 595.5199999999986
+          },
+          "cp_dep_gap_us": {
+            "maximum": 80.12000000000086,
+            "median": 71.32000000000028,
+            "minimum": 68.76000000000107
+          },
+          "cp_queue_gap_us": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0
+          },
+          "tasks": 15392,
+          "wait_work_us": {
+            "maximum": 37487.92000000001,
+            "median": 33584.83999999997,
+            "minimum": 33487.64000000003
+          }
+        },
+        "embed": {
+          "body_work_us": {
+            "maximum": 9.6,
+            "median": 9.56,
+            "minimum": 8.56
+          },
+          "cp_body_us": {
+            "maximum": 5.68,
+            "median": 5.5600000000000005,
+            "minimum": 4.36
+          },
+          "cp_dep_gap_us": {
+            "maximum": 4.8100000000000005,
+            "median": 3.16,
+            "minimum": 2.68
+          },
+          "cp_queue_gap_us": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0
+          },
+          "tasks": 2,
+          "wait_work_us": {
+            "maximum": 1.6400000000000003,
+            "median": 1.3600000000000003,
+            "minimum": 1.0000000000000004
+          }
+        },
+        "gate_up": {
+          "body_work_us": {
+            "maximum": 590421.1600000001,
+            "median": 566034.3600000001,
+            "minimum": 563830.64
+          },
+          "cp_body_us": {
+            "maximum": 1078.1599999999994,
+            "median": 1048.9600000000005,
+            "minimum": 1040.7999999999997
+          },
+          "cp_dep_gap_us": {
+            "maximum": 75.51999999999964,
+            "median": 70.79999999999836,
+            "minimum": 68.63999999999905
+          },
+          "cp_queue_gap_us": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0
+          },
+          "tasks": 15392,
+          "wait_work_us": {
+            "maximum": 20135.119999999923,
+            "median": 20118.07999999993,
+            "minimum": 19726.039999999964
+          }
+        },
+        "lm_head": {
+          "body_work_us": {
+            "maximum": 79111.03999999998,
+            "median": 73863.44000000002,
+            "minimum": 72971.04000000004
+          },
+          "cp_body_us": {
+            "maximum": 122.11999999999989,
+            "median": 120.67999999999938,
+            "minimum": 117.88000000000011
+          },
+          "cp_dep_gap_us": {
+            "maximum": 2.350000000000364,
+            "median": 2.300000000000182,
+            "minimum": 2.2200000000002547
+          },
+          "cp_queue_gap_us": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0
+          },
+          "tasks": 592,
+          "wait_work_us": {
+            "maximum": 2588.7999999999497,
+            "median": 1864.3599999999738,
+            "minimum": 1755.640000000014
+          }
+        },
+        "merge": {
+          "body_work_us": {
+            "maximum": 85994.03999999998,
+            "median": 85588.32,
+            "minimum": 84695.12
+          },
+          "cp_body_us": {
+            "maximum": 215.8800000000003,
+            "median": 203.320000000001,
+            "minimum": 203.20000000000127
+          },
+          "cp_dep_gap_us": {
+            "maximum": 55.51999999999933,
+            "median": 52.15999999999942,
+            "minimum": 51.4399999999998
+          },
+          "cp_queue_gap_us": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0
+          },
+          "tasks": 13824,
+          "wait_work_us": {
+            "maximum": 26996.880000000005,
+            "median": 25885.19999999999,
+            "minimum": 25767.56000000005
+          }
+        },
+        "norm": {
+          "body_work_us": {
+            "maximum": 3765.24,
+            "median": 3571.1199999999985,
+            "minimum": 3316.519999999997
+          },
+          "cp_body_us": {
+            "maximum": 10.0,
+            "median": 9.64,
+            "minimum": 8.079999999999998
+          },
+          "cp_dep_gap_us": {
+            "maximum": 2.7299999999999898,
+            "median": 2.480000000000004,
+            "minimum": 2.009999999999991
+          },
+          "cp_queue_gap_us": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0
+          },
+          "tasks": 592,
+          "wait_work_us": {
+            "maximum": 2570.479999999999,
+            "median": 1908.1599999999994,
+            "minimum": 1821.6000000000013
+          }
+        },
+        "oproj": {
+          "body_work_us": {
+            "maximum": 139165.44,
+            "median": 138710.19999999998,
+            "minimum": 133246.88000000003
+          },
+          "cp_body_us": {
+            "maximum": 265.3999999999992,
+            "median": 259.72000000000025,
+            "minimum": 243.9600000000007
+          },
+          "cp_dep_gap_us": {
+            "maximum": 83.31999999999918,
+            "median": 81.67999999999886,
+            "minimum": 77.16000000000076
+          },
+          "cp_queue_gap_us": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0
+          },
+          "tasks": 15984,
+          "wait_work_us": {
+            "maximum": 110050.95999999996,
+            "median": 108988.43999999999,
+            "minimum": 107150.92
+          }
+        },
+        "qabs": {
+          "body_work_us": {
+            "maximum": 7539.280000000001,
+            "median": 7490.960000000008,
+            "minimum": 7374.799999999994
+          },
+          "cp_body_us": {
+            "maximum": 129.68000000000015,
+            "median": 128.84000000000123,
+            "minimum": 124.60000000000142
+          },
+          "cp_dep_gap_us": {
+            "maximum": 80.46000000000049,
+            "median": 79.99999999999943,
+            "minimum": 78.88000000000025
+          },
+          "cp_queue_gap_us": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0
+          },
+          "tasks": 1728,
+          "wait_work_us": {
+            "maximum": 4745.239999999994,
+            "median": 4599.720000000003,
+            "minimum": 4438.599999999999
+          }
+        },
+        "qkv": {
+          "body_work_us": {
+            "maximum": 271642.9199999999,
+            "median": 266503.00000000006,
+            "minimum": 266443.8800000001
+          },
+          "cp_body_us": {
+            "maximum": 508.23999999999944,
+            "median": 497.0799999999997,
+            "minimum": 495.23999999999927
+          },
+          "cp_dep_gap_us": {
+            "maximum": 77.39999999999935,
+            "median": 76.38000000000025,
+            "minimum": 75.06000000000142
+          },
+          "cp_queue_gap_us": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0
+          },
+          "tasks": 15984,
+          "wait_work_us": {
+            "maximum": 70982.35999999993,
+            "median": 69705.75999999997,
+            "minimum": 69416.56
+          }
+        },
+        "router": {
+          "body_work_us": {
+            "maximum": 157700.60000000003,
+            "median": 154946.96000000005,
+            "minimum": 151931.76000000004
+          },
+          "cp_body_us": {
+            "maximum": 325.6800000000012,
+            "median": 311.96000000000015,
+            "minimum": 311.91999999999894
+          },
+          "cp_dep_gap_us": {
+            "maximum": 84.40999999999997,
+            "median": 79.3900000000003,
+            "minimum": 78.01000000000153
+          },
+          "cp_queue_gap_us": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0
+          },
+          "tasks": 15392,
+          "wait_work_us": {
+            "maximum": 59698.56000000001,
+            "median": 56643.11999999998,
+            "minimum": 54878.55999999997
+          }
+        }
+      },
+      "reused_baseline": {
+        "config": "aiter",
+        "etx_request_interval_ms": 4.57104,
+        "etx_step_ms": 4.53231,
+        "etx_tokens_per_s": 441.276082174432,
+        "latency": {
+          "gains_pct": [
+            3.534644194756554,
+            3.2476349252190047,
+            3.0054544661168565,
+            3.4569058986062293,
+            3.6979969858404598
+          ],
+          "median_pct": 3.4569058986062293,
+          "outcome": "WIN",
+          "spread_pct": 0.6925425197236034
+        },
+        "throughput": {
+          "gains_pct": [
+            4.419379962976937,
+            4.084858229587454,
+            4.070637903153276,
+            4.529404865999382,
+            4.597997277853393
+          ],
+          "median_pct": 4.419379962976937,
+          "outcome": "WIN",
+          "spread_pct": 0.5273593747001167
+        },
+        "vllm_step_ms": 4.73261,
+        "vllm_tokens_per_s": 422.5997916583027
+      },
+      "tasks": 109892,
+      "totals": {
+        "all_cp_gaps_us": {
+          "maximum": 611.8499999999996,
+          "median": 602.3199999999975,
+          "minimum": 599.4000000000019
+        },
+        "body_work_us": {
+          "maximum": 1944873.4000000004,
+          "median": 1943155.56,
+          "minimum": 1933957.1600000001
+        },
+        "cp_body_us": {
+          "maximum": 3739.799999999998,
+          "median": 3735.3200000000006,
+          "minimum": 3722.440000000003
+        },
+        "cp_dep_gap_us": {
+          "maximum": 542.17,
+          "median": 532.4799999999989,
+          "minimum": 532.2400000000022
+        },
+        "cp_queue_gap_us": {
+          "maximum": 69.83999999999868,
+          "median": 69.67999999999967,
+          "minimum": 67.15999999999974
+        },
+        "span_us": {
+          "maximum": 4347.17,
+          "median": 4339.2,
+          "minimum": 4324.76
+        },
+        "wait_work_us": {
+          "maximum": 370187.1199999998,
+          "median": 361168.0799999998,
+          "minimum": 358961.4
+        }
+      }
+    },
+    "4": {
+      "families": {
+        "argmax": {
+          "body_work_us": {
+            "maximum": 13.280000000000655,
+            "median": 12.5600000000004,
+            "minimum": 11.839999999998327
+          },
+          "cp_body_us": {
+            "maximum": 5.319999999999709,
+            "median": 5.280000000000655,
+            "minimum": 5.279999999998836
+          },
+          "cp_dep_gap_us": {
+            "maximum": 6.150000000001455,
+            "median": 5.93999999999869,
+            "minimum": 5.6599999999998545
+          },
+          "cp_queue_gap_us": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0
+          },
+          "tasks": 4,
+          "wait_work_us": {
+            "maximum": 33.840000000000146,
+            "median": 21.079999999999927,
+            "minimum": 20.040000000000873
+          }
+        },
+        "attn": {
+          "body_work_us": {
+            "maximum": 547055.32,
+            "median": 544329.76,
+            "minimum": 532459.4000000001
+          },
+          "cp_body_us": {
+            "maximum": 985.2400000000048,
+            "median": 973.0800000000036,
+            "minimum": 952.7599999999991
+          },
+          "cp_dep_gap_us": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0
+          },
+          "cp_queue_gap_us": {
+            "maximum": 148.07999999999774,
+            "median": 144.75999999999794,
+            "minimum": 142.71999999999687
+          },
+          "tasks": 27648,
+          "wait_work_us": {
+            "maximum": 115614.08,
+            "median": 115096.47999999998,
+            "minimum": 107348.6000000001
+          }
+        },
+        "dense_dn": {
+          "body_work_us": {
+            "maximum": 30982.280000000002,
+            "median": 30780.480000000003,
+            "minimum": 30255.44
+          },
+          "cp_body_us": {
+            "maximum": 52.87999999999997,
+            "median": 51.48000000000002,
+            "minimum": 49.75999999999999
+          },
+          "cp_dep_gap_us": {
+            "maximum": 10.0,
+            "median": 8.819999999999993,
+            "minimum": 7.469999999999999
+          },
+          "cp_queue_gap_us": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0
+          },
+          "tasks": 1184,
+          "wait_work_us": {
+            "maximum": 6273.48,
+            "median": 6095.680000000004,
+            "minimum": 5983.920000000003
+          }
+        },
+        "dense_gu": {
+          "body_work_us": {
+            "maximum": 42617.4,
+            "median": 41837.52000000001,
+            "minimum": 41270.4
+          },
+          "cp_body_us": {
+            "maximum": 80.88000000000002,
+            "median": 76.19999999999996,
+            "minimum": 75.8
+          },
+          "cp_dep_gap_us": {
+            "maximum": 6.759999999999991,
+            "median": 5.8799999999999955,
+            "minimum": 5.320000000000036
+          },
+          "cp_queue_gap_us": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0
+          },
+          "tasks": 1184,
+          "wait_work_us": {
+            "maximum": 1399.7199999999996,
+            "median": 1358.7199999999993,
+            "minimum": 1334.36
+          }
+        },
+        "down": {
+          "body_work_us": {
+            "maximum": 669398.88,
+            "median": 663595.2400000002,
+            "minimum": 662849.36
+          },
+          "cp_body_us": {
+            "maximum": 1196.2800000000034,
+            "median": 1174.8000000000009,
+            "minimum": 1159.3200000000024
+          },
+          "cp_dep_gap_us": {
+            "maximum": 154.60000000000042,
+            "median": 140.80000000000194,
+            "minimum": 139.08000000000038
+          },
+          "cp_queue_gap_us": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0
+          },
+          "tasks": 30784,
+          "wait_work_us": {
+            "maximum": 65342.67999999986,
+            "median": 64369.48000000004,
+            "minimum": 64074.72000000015
+          }
+        },
+        "embed": {
+          "body_work_us": {
+            "maximum": 20.28,
+            "median": 19.040000000000003,
+            "minimum": 18.04
+          },
+          "cp_body_us": {
+            "maximum": 10.200000000000001,
+            "median": 9.640000000000004,
+            "minimum": 9.200000000000001
+          },
+          "cp_dep_gap_us": {
+            "maximum": 3.34,
+            "median": 2.88,
+            "minimum": 2.4
+          },
+          "cp_queue_gap_us": {
+            "maximum": 4.76,
+            "median": 4.039999999999999,
+            "minimum": 3.719999999999999
+          },
+          "tasks": 4,
+          "wait_work_us": {
+            "maximum": 3.4399999999999977,
+            "median": 3.079999999999999,
+            "minimum": 2.199999999999999
+          }
+        },
+        "gate_up": {
+          "body_work_us": {
+            "maximum": 1101006.4400000002,
+            "median": 1094396.56,
+            "minimum": 1085130.44
+          },
+          "cp_body_us": {
+            "maximum": 2031.9199999999987,
+            "median": 2021.8399999999992,
+            "minimum": 2009.5599999999968
+          },
+          "cp_dep_gap_us": {
+            "maximum": 144.84000000000106,
+            "median": 140.2399999999996,
+            "minimum": 127.32000000000312
+          },
+          "cp_queue_gap_us": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0
+          },
+          "tasks": 30784,
+          "wait_work_us": {
+            "maximum": 40278.12000000003,
+            "median": 36601.919999999845,
+            "minimum": 36346.0399999999
+          }
+        },
+        "lm_head": {
+          "body_work_us": {
+            "maximum": 153432.83999999994,
+            "median": 149081.12,
+            "minimum": 146876.36
+          },
+          "cp_body_us": {
+            "maximum": 226.08000000000175,
+            "median": 225.1999999999989,
+            "minimum": 223.59999999999854
+          },
+          "cp_dep_gap_us": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0
+          },
+          "cp_queue_gap_us": {
+            "maximum": 4.759999999998399,
+            "median": 4.640000000001237,
+            "minimum": 4.56000000000131
+          },
+          "tasks": 1184,
+          "wait_work_us": {
+            "maximum": 872.4000000000206,
+            "median": 840.9600000000437,
+            "minimum": 836.440000000006
+          }
+        },
+        "merge": {
+          "body_work_us": {
+            "maximum": 180216.91999999998,
+            "median": 177624.75999999995,
+            "minimum": 177281.39999999994
+          },
+          "cp_body_us": {
+            "maximum": 461.6800000000029,
+            "median": 439.95999999999935,
+            "minimum": 430.83999999999907
+          },
+          "cp_dep_gap_us": {
+            "maximum": 117.2400000000024,
+            "median": 116.27999999999767,
+            "minimum": 111.68000000000012
+          },
+          "cp_queue_gap_us": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0
+          },
+          "tasks": 27648,
+          "wait_work_us": {
+            "maximum": 55316.760000000024,
+            "median": 53895.19999999996,
+            "minimum": 53848.55999999982
+          }
+        },
+        "norm": {
+          "body_work_us": {
+            "maximum": 9091.600000000002,
+            "median": 8915.760000000007,
+            "minimum": 8848.520000000004
+          },
+          "cp_body_us": {
+            "maximum": 23.599999999999994,
+            "median": 22.840000000000003,
+            "minimum": 20.92
+          },
+          "cp_dep_gap_us": {
+            "maximum": 4.969999999999999,
+            "median": 4.920000000000002,
+            "minimum": 4.760000000000005
+          },
+          "cp_queue_gap_us": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0
+          },
+          "tasks": 1184,
+          "wait_work_us": {
+            "maximum": 3274.1200000000003,
+            "median": 2955.039999999998,
+            "minimum": 2833.0
+          }
+        },
+        "oproj": {
+          "body_work_us": {
+            "maximum": 283673.99999999994,
+            "median": 283143.84,
+            "minimum": 282884.2399999999
+          },
+          "cp_body_us": {
+            "maximum": 520.7600000000007,
+            "median": 513.3600000000025,
+            "minimum": 510.8799999999978
+          },
+          "cp_dep_gap_us": {
+            "maximum": 181.3599999999987,
+            "median": 177.59999999999815,
+            "minimum": 171.00000000000165
+          },
+          "cp_queue_gap_us": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0
+          },
+          "tasks": 31968,
+          "wait_work_us": {
+            "maximum": 244798.60000000003,
+            "median": 242962.15999999997,
+            "minimum": 238463.67999999993
+          }
+        },
+        "qabs": {
+          "body_work_us": {
+            "maximum": 16718.52000000003,
+            "median": 16537.879999999997,
+            "minimum": 16068.479999999972
+          },
+          "cp_body_us": {
+            "maximum": 294.7999999999993,
+            "median": 282.8800000000013,
+            "minimum": 274.5200000000019
+          },
+          "cp_dep_gap_us": {
+            "maximum": 172.05000000000155,
+            "median": 169.85000000000133,
+            "minimum": 163.1499999999998
+          },
+          "cp_queue_gap_us": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0
+          },
+          "tasks": 3456,
+          "wait_work_us": {
+            "maximum": 16490.280000000035,
+            "median": 16363.639999999987,
+            "minimum": 14926.360000000008
+          }
+        },
+        "qkv": {
+          "body_work_us": {
+            "maximum": 525535.6800000002,
+            "median": 525129.3200000001,
+            "minimum": 525013.3200000002
+          },
+          "cp_body_us": {
+            "maximum": 939.9200000000006,
+            "median": 926.2799999999997,
+            "minimum": 915.2799999999991
+          },
+          "cp_dep_gap_us": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0
+          },
+          "cp_queue_gap_us": {
+            "maximum": 225.19999999999965,
+            "median": 212.63999999999703,
+            "minimum": 210.91999999999624
+          },
+          "tasks": 31968,
+          "wait_work_us": {
+            "maximum": 35142.07999999998,
+            "median": 34595.67999999989,
+            "minimum": 34244.00000000001
+          }
+        },
+        "router": {
+          "body_work_us": {
+            "maximum": 312977.6399999998,
+            "median": 312581.7999999999,
+            "minimum": 312180.1999999999
+          },
+          "cp_body_us": {
+            "maximum": 626.3999999999976,
+            "median": 621.5999999999963,
+            "minimum": 619.8399999999963
+          },
+          "cp_dep_gap_us": {
+            "maximum": 188.87000000000177,
+            "median": 183.53000000000043,
+            "minimum": 178.14000000000152
+          },
+          "cp_queue_gap_us": {
+            "maximum": 0.0,
+            "median": 0.0,
+            "minimum": 0.0
+          },
+          "tasks": 30784,
+          "wait_work_us": {
+            "maximum": 116676.36000000003,
+            "median": 110861.92000000007,
+            "minimum": 107764.55999999998
+          }
+        }
+      },
+      "reused_baseline": {
+        "config": "aiter",
+        "etx_request_interval_ms": 9.0074,
+        "etx_step_ms": 8.921324,
+        "etx_tokens_per_s": 448.36394239240724,
+        "latency": {
+          "gains_pct": [
+            -25.618491462575214,
+            -31.56821743627993,
+            -33.57175813986504,
+            -30.899071358748778,
+            -34.954616119217356
+          ],
+          "median_pct": -31.56821743627993,
+          "outcome": "LOSS",
+          "spread_pct": 9.336124656642143
+        },
+        "throughput": {
+          "gains_pct": [
+            -24.8835049879665,
+            -30.93067471934305,
+            -32.972428409730085,
+            -30.271089806849297,
+            -34.198299170749415
+          ],
+          "median_pct": -30.93067471934305,
+          "outcome": "LOSS",
+          "spread_pct": 9.314794182782913
+        },
+        "vllm_step_ms": 6.165512,
+        "vllm_tokens_per_s": 648.7701264712484
+      },
+      "tasks": 219784,
+      "totals": {
+        "all_cp_gaps_us": {
+          "maximum": 1336.720000000001,
+          "median": 1329.3200000000004,
+          "minimum": 1307.6599999999967
+        },
+        "body_work_us": {
+          "maximum": 3852422.84,
+          "median": 3851616.3200000003,
+          "minimum": 3837835.0
+        },
+        "cp_body_us": {
+          "maximum": 7360.199999999999,
+          "median": 7356.920000000003,
+          "minimum": 7340.839999999999
+        },
+        "cp_dep_gap_us": {
+          "maximum": 963.120000000007,
+          "median": 955.0800000000022,
+          "minimum": 944.7000000000023
+        },
+        "cp_queue_gap_us": {
+          "maximum": 381.6399999999986,
+          "median": 366.1999999999934,
+          "minimum": 362.9599999999944
+        },
+        "span_us": {
+          "maximum": 8696.92,
+          "median": 8670.16,
+          "minimum": 8664.58
+        },
+        "wait_work_us": {
+          "maximum": 688271.4399999998,
+          "median": 684726.6800000002,
+          "minimum": 682565.3599999998
+        }
+      }
+    }
+  },
+  "candidate": "NOT IMPLEMENTED/NOT MEASURED",
+  "registered_target": {
+    "etx_step_ms": 8.921324,
+    "note": "Host target versus instrumented device trace is a scale comparison, not a performance prediction.",
+    "required_reduction_ms": 3.3723632000000006,
+    "required_reduction_pct": 37.80115148827686,
+    "target_ms": 5.5489608
+  },
+  "scope": "instrumented final-token task trace; no accepted hardware traffic counters; no performance verdict"
+}

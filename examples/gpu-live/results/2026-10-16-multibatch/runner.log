@@ -1,0 +1,22 @@
+[16:47:23 +  0m00s] session record: /root/sess/multibatch-continuation-20261015-edd7457/20261015T164723Z-d0e0cb
+[16:47:23 +  0m00s] start multibatch_trace on GPU 0
+[16:47:53 +  0m30s] progress: 1 running, 0 waiting, 0 done
+    multibatch_trace [GPU 0] 30s / 850s: model: hidden 2048 heads 16 kv_lora 512 experts 64 top-6 layers 27 (dense < 1) vocab 102400
+[16:48:23 +  1m00s] progress: 1 running, 0 waiting, 0 done
+    multibatch_trace [GPU 0] 60s / 850s: model: hidden 2048 heads 16 kv_lora 512 experts 64 top-6 layers 27 (dense < 1) vocab 102400
+[16:48:53 +  1m30s] progress: 1 running, 0 waiting, 0 done
+    multibatch_trace [GPU 0] 90s / 850s:   /root/sess/b4-live-20261015/20261015T160946Z-a7e517/references/r2/fleet_cache.bin: 0.0 GB uploaded
+[16:48:59 +  1m36s] ok      multibatch_trace rc=0 96s
+    TRACE COMPLETE round=1 b=1 tasks=53022 span_us=3094.430
+    TRACE COMPLETE round=1 b=2 tasks=109892 span_us=4347.170
+    TRACE COMPLETE round=1 b=4 tasks=219784 span_us=8696.920
+    TRACE COMPLETE round=2 b=4 tasks=219784 span_us=8670.160
+    TRACE COMPLETE round=2 b=2 tasks=109892 span_us=4324.760
+    TRACE COMPLETE round=2 b=1 tasks=53022 span_us=3100.780
+    TRACE COMPLETE round=3 b=1 tasks=53022 span_us=3093.460
+    TRACE COMPLETE round=3 b=2 tasks=109892 span_us=4339.200
+    TRACE COMPLETE round=3 b=4 tasks=219784 span_us=8664.580
+[16:48:59 +  1m36s] session done
+  job                              status     rc  gpu  seconds
+  multibatch_trace                 ok          0    0       96  
+SEALED /root/sess/multibatch-continuation-20261015-edd7457/20261015T164723Z-d0e0cb complete=True

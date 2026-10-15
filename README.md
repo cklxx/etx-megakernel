@@ -16,6 +16,10 @@ Proposed scope, evidence limits, and staged acceptance gates: [project roadmap](
 
 CPU acceptance target and one-command checks: [G0 readiness](docs/CPU-READINESS.md).
 
+Latest measured GPU outcomes (2026-10-15 UTC), including the corrected DeepSeek B4 loss,
+Qwen correctness blockers and multibatch task traces: [results index](examples/gpu-live/README.md).
+The shared-weight prototype was cancelled before implementation; these records claim no new candidate speedup.
+
 ## Fusing the state-of-the-art kernels (2026-09-25)
 
 ETX now imports compiled kernels instead of implementations that ETX authors rewrite.

@@ -1,0 +1,189 @@
+{
+  "batches": {
+    "1": {
+      "batch": 1,
+      "config": "aiter",
+      "etx_latency_ms": [
+        "3.23800",
+        "3.24076",
+        "3.24460",
+        "3.23712",
+        "3.23944"
+      ],
+      "etx_step_ms": [
+        "3.220627",
+        "3.223548",
+        "3.228019",
+        "3.220082",
+        "3.222786"
+      ],
+      "etx_tokens_per_s": 310.2905374418283,
+      "latency": {
+        "gains_pct": [
+          27.296757257566398,
+          26.435836038460113,
+          26.29143808173581,
+          26.3142237544484,
+          26.720575161138964
+        ],
+        "median_pct": 26.435836038460113,
+        "outcome": "WIN",
+        "spread_pct": 1.0053191758305917
+      },
+      "next": {
+        "next": "batch-1 reference point: no batch decision"
+      },
+      "status": "COMPLETE",
+      "throughput": {
+        "gains_pct": [
+          27.983433039591358,
+          27.110934907747612,
+          26.94014502392954,
+          26.982573735699898,
+          27.375413694859045
+        ],
+        "median_pct": 27.110934907747612,
+        "outcome": "WIN",
+        "spread_pct": 1.043288015661822
+      },
+      "vllm_latency_note": "vLLM advances every sequence each step: its per-request latency is its step time",
+      "vllm_step_ms": [
+        "4.121869",
+        "4.097482",
+        "4.097652",
+        "4.088943",
+        "4.105037"
+      ],
+      "vllm_tokens_per_s": 244.04219782451023
+    },
+    "2": {
+      "batch": 2,
+      "config": "aiter",
+      "etx_latency_inflation": 1.4116862260654726,
+      "etx_latency_ms": [
+        "4.57104",
+        "4.57068",
+        "4.58340",
+        "4.57464",
+        "4.56512"
+      ],
+      "etx_step_ms": [
+        "4.532310",
+        "4.533915",
+        "4.536488",
+        "4.527703",
+        "4.525840"
+      ],
+      "etx_throughput_scaling": 1.4223910004697746,
+      "etx_tokens_per_s": 441.276082174432,
+      "latency": {
+        "gains_pct": [
+          3.534644194756554,
+          3.2476349252190047,
+          3.0054544661168565,
+          3.4569058986062293,
+          3.6979969858404598
+        ],
+        "median_pct": 3.4569058986062293,
+        "outcome": "WIN",
+        "spread_pct": 0.6925425197236034
+      },
+      "next": {
+        "next": "replication is ETX's batch mode at this B; record it; Qwen batch study next"
+      },
+      "status": "COMPLETE",
+      "throughput": {
+        "gains_pct": [
+          4.419379962976937,
+          4.084858229587454,
+          4.070637903153276,
+          4.529404865999382,
+          4.597997277853393
+        ],
+        "median_pct": 4.419379962976937,
+        "outcome": "WIN",
+        "spread_pct": 0.5273593747001167
+      },
+      "vllm_latency_note": "vLLM advances every sequence each step: its per-request latency is its step time",
+      "vllm_step_ms": [
+        "4.732610",
+        "4.719119",
+        "4.721152",
+        "4.732781",
+        "4.733938"
+      ],
+      "vllm_throughput_scaling": 1.7358695504825938,
+      "vllm_tokens_per_s": 422.5997916583027
+    },
+    "4": {
+      "batch": 4,
+      "config": "aiter",
+      "etx_latency_inflation": 2.780125649538997,
+      "etx_latency_ms": [
+        "9.00740",
+        "9.00972",
+        "9.01612",
+        "9.00240",
+        "9.00540"
+      ],
+      "etx_step_ms": [
+        "8.919266",
+        "8.926556",
+        "8.935502",
+        "8.921324",
+        "8.901893"
+      ],
+      "etx_throughput_scaling": 1.44447556257979,
+      "etx_tokens_per_s": 448.36394239240724,
+      "latency": {
+        "gains_pct": [
+          -25.618491462575214,
+          -31.56821743627993,
+          -33.57175813986504,
+          -30.899071358748778,
+          -34.954616119217356
+        ],
+        "median_pct": -31.56821743627993,
+        "outcome": "LOSS",
+        "spread_pct": 9.336124656642143
+      },
+      "next": {
+        "bound_ms": 5.5489608,
+        "build": true,
+        "next": "design and build column-batched tiles (stage B2), threshold before code",
+        "projection_ms": 5.130547,
+        "vllm_ms": 6.165512
+      },
+      "status": "COMPLETE",
+      "throughput": {
+        "gains_pct": [
+          -24.8835049879665,
+          -30.93067471934305,
+          -32.972428409730085,
+          -30.271089806849297,
+          -34.198299170749415
+        ],
+        "median_pct": -30.93067471934305,
+        "outcome": "LOSS",
+        "spread_pct": 9.314794182782913
+      },
+      "vllm_latency_note": "vLLM advances every sequence each step: its per-request latency is its step time",
+      "vllm_step_ms": [
+        "6.699840",
+        "6.165512",
+        "5.989250",
+        "6.220742",
+        "5.857597"
+      ],
+      "vllm_throughput_scaling": 2.6583239153536637,
+      "vllm_tokens_per_s": 648.7701264712484
+    }
+  },
+  "condition": "docs/BATCH-2026-10-14.md",
+  "projection_scope": "conditional estimate from per-B HF expert union; native ETX picks are unmeasured",
+  "union": {
+    "1": 6.0,
+    "2": 11.49639423076923,
+    "4": 20.631009615384617
+  }
+}

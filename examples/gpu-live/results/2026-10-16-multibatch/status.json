@@ -1,0 +1,10 @@
+[
+ {
+  "name": "multibatch_trace",
+  "status": "ok",
+  "rc": 0,
+  "gpu": 0,
+  "seconds": 96.01580548286438,
+  "note": ""
+ }
+]
