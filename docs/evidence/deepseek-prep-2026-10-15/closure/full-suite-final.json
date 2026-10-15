@@ -1,0 +1,25 @@
+{
+  "name": "full-suite-final",
+  "command": [
+    ".venv/bin/python",
+    "-m",
+    "pytest",
+    "-q",
+    "-ra",
+    "-p",
+    "bounded_archive_plugin",
+    "--basetemp=/Users/ckl/.hermes/cache/scratch/deepseek-closure-evidence/final-pytest",
+    "-o",
+    "tmp_path_retention_policy=failed"
+  ],
+  "cwd": "/Users/ckl/code/.wt/etx-deepseek-two-gaps",
+  "revision": "fcb5f649463573c9dc728f8d4de46d5bb5a27c7a",
+  "source_sha256": {
+    "etx/session/proc.py": "99c02014a8ed9a0350dd7220213fa056feb8f09f2e853d6c57b431a7ccda2c3c",
+    "tests/test_session_proc.py": "09adbb56f533bd222299757a0b910820bf653dce5542151dd028e3f4c153e10f"
+  },
+  "exit": 0,
+  "stop": null,
+  "seconds": 510.87,
+  "free_bytes": 6824628224
+}

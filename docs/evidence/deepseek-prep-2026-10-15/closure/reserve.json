@@ -1,0 +1,10 @@
+{
+  "action": "lossless compression of own reproducible source tar and removal of duplicate extracted source only",
+  "archive": "/Users/ckl/.hermes/cache/scratch/deepseek-open-prep-evidence/source-a0c3e72.tar.gz",
+  "decompressed_sha256": "465824e7d42c90fafd88a20b4050b24751f12d89042ee05bf417668dc3f70e5c",
+  "compressed_bytes": 336575137,
+  "removed_duplicate": "/Users/ckl/.hermes/cache/scratch/deepseek-open-prep-evidence/465824e7d42c90fafd88a20b4050b24751f12d89042ee05bf417668dc3f70e5c-deepseek-prep",
+  "raw_logs_and_build_artifacts": "retained",
+  "free_before": 2268315648,
+  "free_after": 7226105856
+}

@@ -1,0 +1,10 @@
+{
+  "source": "fcb5f649463573c9dc728f8d4de46d5bb5a27c7a",
+  "fixture_commit": "48d6a9232637f760d627e9f7be8fe30b11d9d0ed",
+  "copied_files": 1955,
+  "excluded_files": 1864,
+  "excluded_prefix": "examples/dsv2lite/results/",
+  "fixture_manifest_sha256": "0be028adc57fe5137076d27348eee6c85c78a334f6c4f10c96fdd270e380fe0c",
+  "full_manifest": "/Users/ckl/.hermes/cache/scratch/deepseek-closure-evidence/fixture.json",
+  "scope": "Only ROOT for the two archive transport tests uses this real committed fixture; all tests and all other inputs use the pinned worktree."
+}

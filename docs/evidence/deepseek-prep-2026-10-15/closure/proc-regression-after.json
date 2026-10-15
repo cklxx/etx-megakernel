@@ -1,0 +1,24 @@
+{
+  "name": "proc-regression-after",
+  "command": [
+    ".venv/bin/python",
+    "-m",
+    "pytest",
+    "-q",
+    "-ra",
+    "tests/test_session_proc.py",
+    "tests/test_gpu_jobs.py",
+    "tests/test_deepseek_open_prep.py",
+    "tests/test_dsv2_batch_attribution.py"
+  ],
+  "cwd": "/Users/ckl/code/.wt/etx-deepseek-two-gaps",
+  "revision": "1a23336e1bdf1c78c63ec35f3dab136f88acc2b0",
+  "source_sha256": {
+    "etx/session/proc.py": "99c02014a8ed9a0350dd7220213fa056feb8f09f2e853d6c57b431a7ccda2c3c",
+    "tests/test_session_proc.py": "09adbb56f533bd222299757a0b910820bf653dce5542151dd028e3f4c153e10f"
+  },
+  "exit": 0,
+  "stop": null,
+  "seconds": 10.03,
+  "free_bytes": 6945320960
+}

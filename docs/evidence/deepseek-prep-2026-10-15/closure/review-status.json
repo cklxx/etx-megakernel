@@ -1,0 +1,8 @@
+{
+  "status": "PENDING",
+  "requested_revision": "fcb5f649463573c9dc728f8d4de46d5bb5a27c7a",
+  "original_preparation_pin": "1a23336e1bdf1c78c63ec35f3dab136f88acc2b0",
+  "report": "/Users/ckl/.hermes/cache/scratch/cc-gpt-deepseek-final-review.md",
+  "missing_is_pass": false,
+  "reason": "External review driver reached 30-turn limit without the required report; bounded recheck must also cover process cleanup in fcb5f6"
+}

@@ -1,0 +1,15 @@
+{
+  "revision": "fcb5f649463573c9dc728f8d4de46d5bb5a27c7a",
+  "reviewed_preparation_pin": "1a23336e1bdf1c78c63ec35f3dab136f88acc2b0",
+  "changed_implementation": [
+    "etx/session/proc.py"
+  ],
+  "changed_tests": [
+    "tests/test_session_proc.py"
+  ],
+  "cause": "Final full suite exposed asynchronous group death on macOS fallback without /proc",
+  "minimum_recheck": "Review bounded process-cleanup diff; original two diagnostics still require the independent final review report",
+  "compiler_rerun": "Not required; all DeepSeek generated/build sources unchanged",
+  "before_fix": "proc-regression-before.log; 2 failed",
+  "after_fix": "proc-regression-after.log; 61 passed, 1 skipped"
+}

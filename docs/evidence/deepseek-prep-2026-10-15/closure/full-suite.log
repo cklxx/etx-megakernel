@@ -1,0 +1,66 @@
+.....................................................ss................. [  3%]
+........................................................................ [  6%]
+........................................................................ [  9%]
+...................................................................s.sss [ 13%]
+........................................................................ [ 16%]
+........................................................................ [ 19%]
+........................................................................ [ 23%]
+........................................................................ [ 26%]
+........................................................................ [ 29%]
+........................................................................ [ 33%]
+........................................................................ [ 36%]
+......................................................................s. [ 39%]
+.....s.................................................................. [ 42%]
+..s..................................................................... [ 46%]
+.............s.......................................................... [ 49%]
+........................................................................ [ 52%]
+........................................................................ [ 56%]
+........................................................................ [ 59%]
+........................................................................ [ 62%]
+......ss...............................................s................ [ 66%]
+........................................................................ [ 69%]
+........................................................................ [ 72%]
+........................................................................ [ 75%]
+........................................................................ [ 79%]
+..................F..................................................... [ 82%]
+........................................................................ [ 85%]
+........................................................................ [ 89%]
+........................................................................ [ 92%]
+........................................s............................... [ 95%]
+........................................................................ [ 99%]
+....................                                                     [100%]
+=================================== FAILURES ===================================
+______________ test_a_background_child_does_not_outlive_its_step _______________
+
+tmp_path = PosixPath('/Users/ckl/.hermes/cache/scratch/deepseek-closure-evidence/full-pytest/test_a_background_child_does_n0')
+
+    def test_a_background_child_does_not_outlive_its_step(tmp_path):
+        pidfile = tmp_path / "pid"
+        log = io.StringIO()
+        with (tmp_path / "out.log").open("w") as sink:
+            assert proc.run(["bash", "-c", f"sleep 30 & echo $! > {pidfile}"], sink=sink, log=log) == 0
+>       assert not _alive(int(pidfile.read_text()))
+E       AssertionError: assert not True
+E        +  where True = _alive(38783)
+E        +    where 38783 = int('38783\n')
+E        +      where '38783\n' = read_text()
+E        +        where read_text = PosixPath('/Users/ckl/.hermes/cache/scratch/deepseek-closure-evidence/full-pytest/test_a_background_child_does_n0/pid').read_text
+
+tests/test_session_proc.py:41: AssertionError
+=========================== short test summary info ============================
+SKIPPED [1] tests/test_acquire_contract.py:459: real build not present: /Users/ckl/code/.wt/etx-deepseek-two-gaps/build/rocm22/qwen3-30b-a3b_xcd_qknr (set ETX_CONTRACT_BUILDS)
+SKIPPED [1] tests/test_acquire_contract.py:459: real build not present: /Users/ckl/code/.wt/etx-deepseek-two-gaps/build/rocm22/mixtral-8x7b_imported (set ETX_CONTRACT_BUILDS)
+SKIPPED [1] tests/test_codegen.py:50: hipcc not installed
+SKIPPED [1] tests/test_coh_model.py:19: measured plan not on this machine
+SKIPPED [1] tests/test_coh_model.py:28: measured plan not on this machine
+SKIPPED [1] tests/test_coh_model.py:33: measured plan not on this machine
+SKIPPED [1] tests/test_floors.py:115: ISA recount needs ETX_ISA_S and ETX_ISA_MAP
+SKIPPED [1] tests/test_floors.py:226: set VLLM_SRC to a vLLM v0.27.1 checkout
+SKIPPED [1] tests/test_gpu_jobs.py:210: descendant sweep reads /proc (Linux, the box)
+SKIPPED [1] tests/test_importer.py:51: local toolchain unavailable; set ETX_LLVM, ETX_VLLM and ETX_ROCM_HEADERS
+SKIPPED [1] tests/test_phase_model.py:51: plans not present
+SKIPPED [1] tests/test_phase_model.py:57: plans not present
+SKIPPED [1] tests/test_producer.py:140: offline device output not present; local preflight runs this audit
+SKIPPED [1] tests/test_vlbest_session.py:348: set ETX_VLLM_SOURCE_ROOT to inject a vLLM source checkout
+FAILED tests/test_session_proc.py::test_a_background_child_does_not_outlive_its_step
+1 failed, 2165 passed, 14 skipped in 512.73s (0:08:32)

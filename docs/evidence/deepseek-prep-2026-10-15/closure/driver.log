@@ -1,0 +1,122 @@
+STAGE remaining-graph-collect
+PROGRESS remaining-graph-collect 0 s; log_bytes 0 free_bytes 7239192576
+DONE remaining-graph-collect 0 None
+STAGE remaining-14-graph-tests
+PROGRESS remaining-14-graph-tests 0 s; log_bytes 0 free_bytes 7238787072
+PROGRESS remaining-14-graph-tests 5 s; log_bytes 6 free_bytes 7238418432
+DONE remaining-14-graph-tests 0 None
+STAGE fixture-init
+PROGRESS fixture-init 0 s; log_bytes 0 free_bytes 7146229760
+DONE fixture-init 0 None
+STAGE fixture-add
+PROGRESS fixture-add 0 s; log_bytes 0 free_bytes 7145156608
+DONE fixture-add 0 None
+STAGE fixture-commit
+PROGRESS fixture-commit 0 s; log_bytes 0 free_bytes 7090667520
+DONE fixture-commit 0 None
+STAGE full-suite
+PROGRESS full-suite 0 s; log_bytes 0 free_bytes 7086686208
+PROGRESS full-suite 5 s; log_bytes 145 free_bytes 7080996864
+PROGRESS full-suite 10 s; log_bytes 175 free_bytes 7081123840
+PROGRESS full-suite 15 s; log_bytes 178 free_bytes 7080714240
+PROGRESS full-suite 20 s; log_bytes 181 free_bytes 7080546304
+PROGRESS full-suite 25 s; log_bytes 185 free_bytes 7080603648
+PROGRESS full-suite 30 s; log_bytes 333 free_bytes 7080484864
+PROGRESS full-suite 35 s; log_bytes 333 free_bytes 7080603648
+PROGRESS full-suite 40 s; log_bytes 334 free_bytes 7080574976
+PROGRESS full-suite 45 s; log_bytes 351 free_bytes 7080615936
+PROGRESS full-suite 50 s; log_bytes 363 free_bytes 7080656896
+PROGRESS full-suite 55 s; log_bytes 364 free_bytes 7080353792
+PROGRESS full-suite 60 s; log_bytes 365 free_bytes 7080022016
+PROGRESS full-suite 65 s; log_bytes 366 free_bytes 7079759872
+PROGRESS full-suite 70 s; log_bytes 370 free_bytes 7079731200
+PROGRESS full-suite 75 s; log_bytes 379 free_bytes 7079522304
+PROGRESS full-suite 80 s; log_bytes 405 free_bytes 7079354368
+PROGRESS full-suite 85 s; log_bytes 428 free_bytes 7075536896
+PROGRESS full-suite 90 s; log_bytes 490 free_bytes 7075205120
+PROGRESS full-suite 95 s; log_bytes 502 free_bytes 7075319808
+PROGRESS full-suite 100 s; log_bytes 618 free_bytes 7074799616
+PROGRESS full-suite 105 s; log_bytes 665 free_bytes 7074783232
+PROGRESS full-suite 110 s; log_bytes 667 free_bytes 7074869248
+PROGRESS full-suite 115 s; log_bytes 686 free_bytes 7027781632
+PROGRESS full-suite 120 s; log_bytes 686 free_bytes 6999855104
+PROGRESS full-suite 125 s; log_bytes 729 free_bytes 7073382400
+PROGRESS full-suite 130 s; log_bytes 729 free_bytes 7073501184
+PROGRESS full-suite 135 s; log_bytes 732 free_bytes 7073497088
+PROGRESS full-suite 140 s; log_bytes 735 free_bytes 7073153024
+PROGRESS full-suite 145 s; log_bytes 735 free_bytes 7073095680
+PROGRESS full-suite 150 s; log_bytes 736 free_bytes 7073009664
+PROGRESS full-suite 155 s; log_bytes 736 free_bytes 7072870400
+PROGRESS full-suite 160 s; log_bytes 736 free_bytes 7072808960
+PROGRESS full-suite 165 s; log_bytes 736 free_bytes 7072505856
+PROGRESS full-suite 170 s; log_bytes 736 free_bytes 7072292864
+PROGRESS full-suite 175 s; log_bytes 737 free_bytes 7072309248
+PROGRESS full-suite 180 s; log_bytes 737 free_bytes 7071248384
+PROGRESS full-suite 185 s; log_bytes 737 free_bytes 7070711808
+PROGRESS full-suite 190 s; log_bytes 737 free_bytes 7070797824
+PROGRESS full-suite 195 s; log_bytes 737 free_bytes 7070650368
+PROGRESS full-suite 200 s; log_bytes 737 free_bytes 7070498816
+PROGRESS full-suite 205 s; log_bytes 737 free_bytes 7070597120
+PROGRESS full-suite 210 s; log_bytes 737 free_bytes 7070597120
+PROGRESS full-suite 215 s; log_bytes 737 free_bytes 7070748672
+PROGRESS full-suite 220 s; log_bytes 737 free_bytes 7070490624
+PROGRESS full-suite 225 s; log_bytes 737 free_bytes 7070691328
+PROGRESS full-suite 230 s; log_bytes 737 free_bytes 7070609408
+PROGRESS full-suite 235 s; log_bytes 737 free_bytes 7070474240
+PROGRESS full-suite 240 s; log_bytes 753 free_bytes 7069540352
+PROGRESS full-suite 245 s; log_bytes 764 free_bytes 7069495296
+PROGRESS full-suite 250 s; log_bytes 764 free_bytes 7069782016
+PROGRESS full-suite 255 s; log_bytes 780 free_bytes 7071027200
+PROGRESS full-suite 260 s; log_bytes 782 free_bytes 7071203328
+PROGRESS full-suite 265 s; log_bytes 809 free_bytes 7067222016
+PROGRESS full-suite 270 s; log_bytes 818 free_bytes 7067078656
+PROGRESS full-suite 275 s; log_bytes 836 free_bytes 7067267072
+PROGRESS full-suite 280 s; log_bytes 838 free_bytes 7067136000
+PROGRESS full-suite 285 s; log_bytes 838 free_bytes 7066755072
+PROGRESS full-suite 290 s; log_bytes 838 free_bytes 7065997312
+PROGRESS full-suite 295 s; log_bytes 838 free_bytes 7065956352
+PROGRESS full-suite 300 s; log_bytes 839 free_bytes 7073665024
+PROGRESS full-suite 305 s; log_bytes 906 free_bytes 7016148992
+PROGRESS full-suite 310 s; log_bytes 1011 free_bytes 7073460224
+PROGRESS full-suite 316 s; log_bytes 1027 free_bytes 7073505280
+PROGRESS full-suite 321 s; log_bytes 1130 free_bytes 7072813056
+PROGRESS full-suite 326 s; log_bytes 1271 free_bytes 6968012800
+PROGRESS full-suite 331 s; log_bytes 1443 free_bytes 6967795712
+PROGRESS full-suite 336 s; log_bytes 1451 free_bytes 6967484416
+PROGRESS full-suite 341 s; log_bytes 1458 free_bytes 6967037952
+PROGRESS full-suite 346 s; log_bytes 1479 free_bytes 4555956224
+PROGRESS full-suite 351 s; log_bytes 1548 free_bytes 6967939072
+PROGRESS full-suite 356 s; log_bytes 1560 free_bytes 6952599552
+PROGRESS full-suite 361 s; log_bytes 1560 free_bytes 6951915520
+PROGRESS full-suite 366 s; log_bytes 1560 free_bytes 6951915520
+PROGRESS full-suite 371 s; log_bytes 1560 free_bytes 6949199872
+PROGRESS full-suite 376 s; log_bytes 1560 free_bytes 6949203968
+PROGRESS full-suite 381 s; log_bytes 1583 free_bytes 6949040128
+PROGRESS full-suite 386 s; log_bytes 1605 free_bytes 6828670976
+PROGRESS full-suite 391 s; log_bytes 1606 free_bytes 6921891840
+PROGRESS full-suite 396 s; log_bytes 1606 free_bytes 6860730368
+PROGRESS full-suite 401 s; log_bytes 1805 free_bytes 6954098688
+PROGRESS full-suite 406 s; log_bytes 1805 free_bytes 6954979328
+PROGRESS full-suite 411 s; log_bytes 1829 free_bytes 6955130880
+PROGRESS full-suite 416 s; log_bytes 1933 free_bytes 6954561536
+PROGRESS full-suite 421 s; log_bytes 2047 free_bytes 6954274816
+PROGRESS full-suite 426 s; log_bytes 2049 free_bytes 6953709568
+PROGRESS full-suite 431 s; log_bytes 2052 free_bytes 6953205760
+PROGRESS full-suite 436 s; log_bytes 2058 free_bytes 6952763392
+PROGRESS full-suite 441 s; log_bytes 2065 free_bytes 6952542208
+PROGRESS full-suite 446 s; log_bytes 2112 free_bytes 6948593664
+PROGRESS full-suite 451 s; log_bytes 2281 free_bytes 6948306944
+PROGRESS full-suite 456 s; log_bytes 2286 free_bytes 6948458496
+PROGRESS full-suite 461 s; log_bytes 2324 free_bytes 6948188160
+PROGRESS full-suite 466 s; log_bytes 2329 free_bytes 6947250176
+PROGRESS full-suite 471 s; log_bytes 2335 free_bytes 6947004416
+PROGRESS full-suite 476 s; log_bytes 2340 free_bytes 6946541568
+PROGRESS full-suite 481 s; log_bytes 2345 free_bytes 6945415168
+PROGRESS full-suite 486 s; log_bytes 2351 free_bytes 6945075200
+PROGRESS full-suite 491 s; log_bytes 2356 free_bytes 6949072896
+PROGRESS full-suite 496 s; log_bytes 2361 free_bytes 6948884480
+PROGRESS full-suite 501 s; log_bytes 2366 free_bytes 6948528128
+PROGRESS full-suite 506 s; log_bytes 2371 free_bytes 6948134912
+PROGRESS full-suite 511 s; log_bytes 2413 free_bytes 6947708928
+DONE full-suite 1 None
+full-suite failed

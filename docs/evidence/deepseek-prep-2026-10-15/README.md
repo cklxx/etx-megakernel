@@ -43,5 +43,34 @@ already reports the LDS/in-body-wait failure. No invalid replay is queued. B4 at
 data may complete; the final two-baseline performance claim remains INCOMPLETE. Native ETX expert picks are not
 measured by the separate per-B HF routing estimate.
 
-The Qwen heavy lock was left intact. No full test suite, full device compiler matrix, cloud command, provider action,
-purchase, account change, main merge, or push was performed.
+The initial preparation left the Qwen heavy lock intact and did not run the full suite or integrate.
+
+## Final local acceptance (SOL_CLOSE)
+
+The tested final revision is `fcb5f649463573c9dc728f8d4de46d5bb5a27c7a`, DeepSeek implementation `a0c3e72` unchanged, plus process-cleanup fix `fcb5f6`. The previously excluded graph tests
+passed: **14 passed, 83 deselected in 6.90 seconds**. The final complete suite returned exit 0: **2168 passed, 14 skipped in 508.28s (0:08:28)**.
+No tests were deselected in the full run. Skips are reported in its raw log; they are not passes.
+
+[Closure evidence](closure/) retains full logs, exact commands/exits, drivers, source-fixture provenance and
+[the review status](closure/review-status.json). The two existing Qwen archive transport tests use a real
+committed source fixture without historical DeepSeek GPU data, as in the earlier Qwen integration; their source bytes
+and commands are unchanged. All other tests use the pinned worktree. This is local transport/test evidence.
+The combined-source Qwen readiness receipt was refreshed for the changed process supervisor, optional batch
+profiler wrapper and new tests. Its other 354 source bindings and all compiler inputs are unchanged. The prior
+compiler records are reused with an explicit source delta, not recertified as fresh builds. The refreshed receipt
+matches all 359 keys in the real committed source fixture; both real archive transport cases were rechecked after
+that refresh. This preserves the existing Qwen preparation without adding an experiment.
+The shared advisory lock was acquired correctly; its stale filename did not block work. A 4 GiB disk reserve was
+monitored throughout. To restore the reserve, our source tar was compressed losslessly to
+`deepseek-open-prep-evidence/source-a0c3e72.tar.gz`; its decompressed SHA256 remains
+`465824e7d42c90fafd88a20b4050b24751f12d89042ee05bf417668dc3f70e5c`. The duplicate extraction was removed.
+Raw logs and build artifacts remain retained. Historical paths in the initial receipt describe that initial run.
+
+Independent review status at evidence sealing: **independent review pending**. A missing report prevents main integration and
+push; it is not a pass. The first full run returned exit 1: 1 failed, 2165 passed, 14 skipped in 512.73 seconds. The failure exposed
+asynchronous process-group cleanup on macOS without `/proc`. The bounded fix `fcb5f6` changes only the supervisor
+and two regression tests; both tests fail before the fix. Relevant tests then passed (61 passed, 1 Linux-only skip),
+and the complete final suite above passed on the frozen revised source. The original failed run remains in the raw
+logs. The independent review must cover both the original two diagnostics and this bounded cleanup diff.
+DeepSeek implementation/build sources are unchanged. Valid compiler evidence above is reused. No GPU, cloud,
+provider, purchasing or account operation was performed. The same-kernel replay limitation remains unresolved.

@@ -1,0 +1,22 @@
+{
+  "name": "proc-regression-before",
+  "command": [
+    ".venv/bin/python",
+    "-m",
+    "pytest",
+    "-q",
+    "tests/test_session_proc.py",
+    "-k",
+    "without_proc"
+  ],
+  "cwd": "/Users/ckl/code/.wt/etx-deepseek-two-gaps",
+  "revision": "1a23336e1bdf1c78c63ec35f3dab136f88acc2b0",
+  "source_sha256": {
+    "etx/session/proc.py": "24045d39ed74269b186f5d0b59d0beb95019f3d3ae74e9a428b77596c1fad618",
+    "tests/test_session_proc.py": "09adbb56f533bd222299757a0b910820bf653dce5542151dd028e3f4c153e10f"
+  },
+  "exit": 1,
+  "stop": null,
+  "seconds": 5.02,
+  "free_bytes": 6950801408
+}

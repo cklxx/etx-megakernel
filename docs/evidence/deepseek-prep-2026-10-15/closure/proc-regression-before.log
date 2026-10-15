@@ -1,0 +1,42 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+______________ test_sweep_waits_for_async_group_exit_without_proc ______________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x104284510>
+
+    def test_sweep_waits_for_async_group_exit_without_proc(monkeypatch):
+        # A successful SIGKILL does not mean the OS has removed the group yet.
+        state = {"alive": True}
+        monkeypatch.setattr(proc, "_parents", lambda: {})
+    
+        def killpg(group, sig):
+            assert group == 123 and sig == proc.signal.SIGKILL
+            if not state["alive"]:
+                raise ProcessLookupError
+    
+        monkeypatch.setattr(proc.os, "killpg", killpg)
+        monkeypatch.setattr(proc.time, "sleep", lambda _: state.update(alive=False))
+        assert proc.sweep(group=123) == []
+>       assert not state["alive"]
+E       assert not True
+
+tests/test_session_proc.py:57: AssertionError
+___________ test_sweep_reports_group_that_does_not_exit_without_proc ___________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x104284180>
+
+    def test_sweep_reports_group_that_does_not_exit_without_proc(monkeypatch):
+        monkeypatch.setattr(proc, "_parents", lambda: {})
+        monkeypatch.setattr(proc.os, "killpg", lambda group, sig: None)
+        monkeypatch.setattr(proc, "SWEEP_S", 0.0)
+>       assert proc.sweep(group=123) == [123]
+E       assert [] == [123]
+E         
+E         Right contains one more item: 123
+E         Use -v to get more diff
+
+tests/test_session_proc.py:64: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_session_proc.py::test_sweep_waits_for_async_group_exit_without_proc
+FAILED tests/test_session_proc.py::test_sweep_reports_group_that_does_not_exit_without_proc
+2 failed, 4 deselected in 0.03s

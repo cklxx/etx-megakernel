@@ -80,8 +80,10 @@ configurations claim is permitted.
 
 The [local evidence index](evidence/deepseek-prep-2026-10-15/README.md) records exact tested source hashes, raw logs,
 actual exit codes, generated-source comparisons, compiler identities, device objects, and host objects.
-The frozen source archive of `a0c3e72` passed **278 focused tests**, with 14 graph-lowering tests excluded under the
-Qwen heavy lock, in 15.26 seconds. Both queue dependency dry runs and outer/embedded shell syntax checks passed.
+The frozen source archive of `a0c3e72` passed **278 focused tests**, with 14 graph-lowering tests initially excluded under the
+Qwen heavy lock, in 15.26 seconds. SOL_CLOSE then passed all 14 (6.90 seconds) and the complete suite:
+**2168 passed, 14 skipped in 508.28s (0:08:28)**, exit 0. The full run has no test deselection. The two Qwen archive transport cases use the
+established real committed source fixture without historical GPU data; see the evidence index. Both queue dependency dry runs and outer/embedded shell syntax checks passed.
 The new x1km device/assembly/full-host checks passed with ROCm 7.2.4 and native LLVM 23. All five relevant final
 host objects compile. The CPU runner success and dependency-failure paths pass. Real r5/r7 cache checks refuse
 with exit 1. Their original payloads remain absent. Unchanged retained builds are reused only after
@@ -94,6 +96,7 @@ The installed offline compiler is ROCm 7.2.4; the future DigitalOcean image and 
 execution. Missing local HIP runtime libraries prevent final HIP executable linking here. Native link, runtime load,
 real-input correctness, profiler metric/marker support, and all device measurements remain explicit execution gates.
 
-The implementation and registered queues are committed in the isolated preparation branch. No main merge or push
-is part of this task. Local preparation is complete within the two existing experiment scopes. Same-kernel graph
+The implementation and registered queues are committed. SOL_CLOSE adds final local acceptance and the independent review status
+to this record for serialized main integration and dual-remote publication after a nonblocking review report. Local preparation is complete within the
+two existing experiment scopes; a GPU run still needs a separate spending decision. Same-kernel graph
 replay is a named existing implementation blocker, not a placeholder or a proposed third experiment.

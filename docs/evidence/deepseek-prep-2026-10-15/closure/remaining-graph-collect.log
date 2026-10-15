@@ -1,0 +1,16 @@
+tests/test_dsv2_batch.py::test_every_request_runs_on_its_slot_two_workgroups_per_cu[2]
+tests/test_dsv2_batch.py::test_static_queues_keep_creation_order_so_in_body_waits_cannot_deadlock[2]
+tests/test_dsv2_batch.py::test_routing_handoff_stays_adjacent_on_its_worker[2]
+tests/test_dsv2_batch.py::test_every_request_runs_on_its_slot_two_workgroups_per_cu[4]
+tests/test_dsv2_batch.py::test_static_queues_keep_creation_order_so_in_body_waits_cannot_deadlock[4]
+tests/test_dsv2_batch.py::test_routing_handoff_stays_adjacent_on_its_worker[4]
+tests/test_dsv2_batch.py::test_every_request_runs_on_its_slot_two_workgroups_per_cu[8]
+tests/test_dsv2_batch.py::test_static_queues_keep_creation_order_so_in_body_waits_cannot_deadlock[8]
+tests/test_dsv2_batch.py::test_routing_handoff_stays_adjacent_on_its_worker[8]
+tests/test_dsv2_batch.py::test_more_than_two_requests_refuse_what_names_two_or_one[env0-ETX_DSV2_COUPLE=none]
+tests/test_dsv2_batch.py::test_more_than_two_requests_refuse_what_names_two_or_one[env1-ETX_DSV2_COUPLE=none]
+tests/test_dsv2_batch.py::test_more_than_two_requests_refuse_what_names_two_or_one[env2-one request]
+tests/test_dsv2_batch.py::test_shared_kva_is_allowed_on_a_batched_graph
+tests/test_dsv2_batch.py::test_two_requests_keep_the_historic_slots
+
+14/97 tests collected (83 deselected) in 0.03s

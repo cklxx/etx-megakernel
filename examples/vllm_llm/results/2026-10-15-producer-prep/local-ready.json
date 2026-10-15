@@ -85,7 +85,7 @@
     "etx/session/batch.py": "77d847e41a0795345c43141ee74ca765f321bc91dd3023cf0279e5482b524214",
     "etx/session/experiment.py": "7c4db52e92886cb10e371e46f527c0b6a7462d32b7903b3af1ec3ea41bb848bb",
     "etx/session/lease.py": "e14c490033f3e3ae7b76ac69ca951d615a6b35d3d72c96fcac8695803cc67b94",
-    "etx/session/proc.py": "24045d39ed74269b186f5d0b59d0beb95019f3d3ae74e9a428b77596c1fad618",
+    "etx/session/proc.py": "99c02014a8ed9a0350dd7220213fa056feb8f09f2e853d6c57b431a7ccda2c3c",
     "etx/session/record.py": "3d1a3b49087f7ca60ed22ac20849065087f1a3272143dabfe23eff2688d15b50",
     "etx/sim/__init__.py": "3c584f5a7855fd46a36ed86a497aee0e48c3a9bf3605745bf9892bc546a6fc27",
     "etx/sim/phase.py": "754e2fe2920b452fd709d0bc4810ab77447bdfe6375fa73547596fb490a193a4",
@@ -114,7 +114,7 @@
     "etx/tools/verify_gaps.py": "7ebfb23e01e73be667aab31e5077d8a368802d86e76fe87ed337558ff9a6d64f",
     "etx/tools/watchdog.py": "9049f57667dfd9f4706804a064a482442cdb64f2de8abf4a620a9607a3bc0b54",
     "examples/llm/configs/qwen3-30b-a3b.json": "c214108014d8495d762a4009ff74f9548d7a9e215cda85f941147011f56ae7ba",
-    "examples/llm/vllm_bench.py": "ba6613b556edeb8e4d17bf663741097a2570c1ef7d4f53a6592109fbca0e64a0",
+    "examples/llm/vllm_bench.py": "f20b61275c733190adf8be474894109d31b3a659d49284d1d934bb2e00993e56",
     "examples/sessions/qwen300.py": "f32634429be2d57853e6daaf84fa0403556466ac9bdf7b67202debe19c060a37",
     "examples/sessions/qwen300_hour.py": "a2082a6b12c8a96623980b8cfe7be198bf6ef74194da50c74241046b324fd1a8",
     "examples/sessions/qwen300_hour_arms.json": "1565e9534841b545d1d3b7164c2742874e8070e6ebf67c9d76fbd3b6503a6f6e",
@@ -284,6 +284,7 @@
     "tests/test_gpu_jobs.py": "334944b442e45950e5f3d34004ba57cfa574252870363552e0c553b8b73c5df4",
     "tests/test_nvref2.py": "f97302a62b47f7f13708c9379fb9b48fc73615d99398902ed5ffac16f6c716c5",
     "tests/test_dsv2_d4.py": "5bf773c8cfdda7863d7d03dbdcbf47c032cfafc62408c45ec5e9b349b920d51b",
+    "tests/test_dsv2_batch_attribution.py": "178c37696e0a1228c3e7ca3f84dd06a547b398fc9e12bbb318a77b3282cd587e",
     "tests/test_reset_pair.py": "3b53b4a7cff9b77dc874532efed0044e6f647bd51f8b1b83d9eeac1302c69fe9",
     "tests/test_importer.py": "656f2b88a6721b5eb16adc216aac0b0ce5e817938a1ed4f8573840896addf008",
     "tests/test_floors.py": "f0ab8d7c9ce098c5ed179a38921afbf9c821d4036c15eb2c5b19486769989b6e",
@@ -292,7 +293,7 @@
     "tests/test_load_phases.py": "1ff5cb8e70b37d134c3fed1b351d3cf3cbc97e22b14307057e76cf5f413ecb1d",
     "tests/test_dsv2_lever_merge_uv_waves.py": "7bee46a23e7aac13b2e027d47cd9ace572d33446129c15a860f3661c2c41d528",
     "tests/test_timeline.py": "ef59993b555f4928f0b34ad7a8392787d80de8d7d995b3643e46b22d099825e8",
-    "tests/test_session_proc.py": "702689405d07607757b5901d26f7b2f6a409b8d57aecb29e653667f6e10b9606",
+    "tests/test_session_proc.py": "09adbb56f533bd222299757a0b910820bf653dce5542151dd028e3f4c153e10f",
     "tests/test_vlbest_session.py": "a6a2683c740674072ba121a05795bcafade8149fb2ad31fb641170a11c5cfc32",
     "tests/test_coh_model.py": "1b8d72e5e7db61661b6b983a2f8a6d6af4212b67c82724ac193450e2980ef2fb",
     "tests/test_ref_numpy.py": "09a3c0983eeaa48219b2709a0595a3ac016388d284ef0b6fd141dde84efcb9b2",
@@ -333,6 +334,7 @@
     "tests/test_dsv2_lever_topk_rank.py": "6a2a5a3f16cd8977e14983aedbee001453bb62ba99b89c5ea7202814b7a81cca",
     "tests/test_qwen_g6.py": "e6dcbc0059d40048ad45df2dc30c438ea746cfc5e8973c8fd1fd0ba3298ae7c7",
     "tests/test_coherence_mode.py": "d4f6bc39683efd6f0a82b5b7bfbc260d89ee84d26f94a7b42ebe54c9c3d84bd2",
+    "tests/test_deepseek_open_prep.py": "a1c533b6661f161f9c350a893423e0d0264da3ed8d22deaebea67eb80d63f46b",
     "tests/test_prims.py": "cca46075c158423dcb9c3ff67122cf21c36a5fa559080ce7b49f618b1b51618f",
     "tests/test_tile_ab.py": "a64459107642e8d3f2b17b073a08905a1ad295dc567e53f8f305ecb83009f554",
     "tests/test_bar2_argpf.py": "96b8c844f4a3b0babdece320675bf98c00ee29b71db7ae89ba094137c985f194",
@@ -1274,20 +1276,53 @@
       "expected_exit": 1,
       "stop": null,
       "log": "examples/vllm_llm/results/2026-10-15-three-integration/archive-expert-attest-malformed.log"
+    },
+    {
+      "name": "full-suite-final",
+      "command": [
+        ".venv/bin/python",
+        "-m",
+        "pytest",
+        "-q",
+        "-ra",
+        "-p",
+        "bounded_archive_plugin",
+        "--basetemp=/Users/ckl/.hermes/cache/scratch/deepseek-closure-evidence/final-pytest",
+        "-o",
+        "tmp_path_retention_policy=failed"
+      ],
+      "cwd": "/Users/ckl/code/.wt/etx-deepseek-two-gaps",
+      "revision": "fcb5f649463573c9dc728f8d4de46d5bb5a27c7a",
+      "source_sha256": {
+        "etx/session/proc.py": "99c02014a8ed9a0350dd7220213fa056feb8f09f2e853d6c57b431a7ccda2c3c",
+        "tests/test_session_proc.py": "09adbb56f533bd222299757a0b910820bf653dce5542151dd028e3f4c153e10f"
+      },
+      "exit": 0,
+      "stop": null,
+      "seconds": 510.87,
+      "free_bytes": 6824628224,
+      "log": "docs/evidence/deepseek-prep-2026-10-15/closure/full-suite-final.log"
     }
   ],
   "reused_compile_evidence": {
     "status": "historical producer matrix/compiler evidence reused for unchanged inputs only",
     "comparison": "../2026-10-15-three-integration/producer-compile-reuse.json",
-    "base": "bcc3c98b421164ae70e42d566bf836d0da35425f"
+    "base": "bcc3c98b421164ae70e42d566bf836d0da35425f",
+    "deepseek_closure": {
+      "comparison": "docs/evidence/deepseek-prep-2026-10-15/closure/qwen-compile-reuse.json",
+      "scope": "Reuse the prior producer/attention/expert compiler evidence only for unchanged device/host generation inputs. Changed files are the process supervisor, optional batch profiler markers, and tests; no kernel, C++ host, emitter, graph, import or compiler flag input changed. Shared runtime and wrappers are covered by the final full suite and bounded archive transport tests."
+    }
   },
   "integration_evidence": "../2026-10-15-three-integration/",
   "limitations": [
     "GPU executable link/load/execution pending: macOS has no Linux HIP runtime",
     "real-model capture/replay pending; no retained Qwen router tensors found",
-    "GPU performance and memory visibility unknown"
+    "GPU performance and memory visibility unknown",
+    "DeepSeek integration refresh reuses unchanged compiler inputs; shared Python runtime/optional profiler wrapper changes have local CPU coverage only. Independent final review and the bounded process-cleanup recheck are still required before publication."
   ],
   "gpu_spend_usd": 0,
   "archive_acceptance": "../2026-10-15-three-integration/archive-acceptance.json",
-  "archive_acceptance_sha256": "d9a7c1098a30f9a5e521448d7321d55a8a7cb1f96ab1d6516c4e479c40e8e6bb"
+  "archive_acceptance_sha256": "d9a7c1098a30f9a5e521448d7321d55a8a7cb1f96ab1d6516c4e479c40e8e6bb",
+  "deepseek_closure_evidence": "docs/evidence/deepseek-prep-2026-10-15/closure/",
+  "deepseek_archive_acceptance": "docs/evidence/deepseek-prep-2026-10-15/closure/archive-after-receipt.json"
 }

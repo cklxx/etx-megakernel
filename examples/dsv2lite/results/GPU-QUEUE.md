@@ -1,5 +1,29 @@
 # What still needs a GPU, and why nothing else on the list belongs here
 
+## Current two-gap follow-ups, 2026-10-15
+
+The existing x8 correctness and B4 attribution follow-ups now have implemented queues, final local test acceptance
+and independent review pending. See [preparation and evidence](../../../docs/DEEPSEEK-PREP-TWO-GAPS-2026-10-15.md).
+The independent review must be nonblocking before integration. The native/device gates below also remain for these
+two diagnostics. No GPU run or spending is authorized.
+
+- `examples/sessions/x8_correctness.py`: verify the target toolchain/runtime, produce or reuse strictly certified
+  references, then run recipe-matched x1km r5/r7, kept B1 r5/r7, and x8 twice. Strict token AND hidden gates;
+  correctness classification only. Separate hard cap 3600 seconds.
+- `examples/sessions/ds_b4_attribution.py`: target/runtime/profiler support, certified B1/B2/B4 model gates, corrected
+  vLLM full/short selection and five pairs, measured FETCH_SIZE, task body/wait/critical path, and separate bound
+  HF routing per B. Separate hard cap 7200 seconds. HF projection is conditional; ETX picks are unmeasured.
+
+Current DeepSeek same-kernel HIP-graph replay remains UNAVAILABLE because the down tasks consume LDS routing across
+kernel boundaries. The session refuses this path; diagnostic attribution may complete, but the required two-baseline
+performance claim stays INCOMPLETE. Original lost r5/r7 payload recovery is not claimed. Confirm the actual tariff,
+billing minimum, available one-GPU shape and separate spending approval before provisioning.
+
+## Historical ds_inplace queue
+
+The entries below retain the older queue and its original cost assumptions. Completed work is not queued again by
+this update; consult [the experiment log](EXPERIMENT-LOG.md) for the measured D1/D2/D4/compiler dispositions.
+
 Only device-only work. Everything with a CPU alternative is already done and is not repeated here.
 One box, one session: `examples/dsv2lite/stage_inplace.sh <ip>`, then
 `ETX_SESS_MAX_SECONDS=7200 tools/session.sh start <ip> examples/sessions/ds_inplace.py`.
