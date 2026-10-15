@@ -35,6 +35,15 @@ fixed/blocked inventory are in [the closure status](REPORT-STATUS-2026-10-15.md)
   arm yet (P3's epoch form, P4's row-partitioned combine). Guard: `tests/test_all_verify.py` (cap, no duplicate names,
   no already-measured study, the GPU order, every read has an earlier writer, no cross-model hard dependency).
 
+## Three additional Qwen preparations, unmeasured (2026-10-15)
+
+Exactly three OFF-by-default paths are now prepared: producer score, C6 attention,
+and expert merge. They do not change the historical eight-study count above.
+See [combined registration](QWEN-THREE-EXPERIMENTS-2026-10-15.md) for their distinct
+correctness and decision gates, and [GPU-only queue](QWEN-THREE-GPU-QUEUE-2026-10-15.md)
+for original deadlines, remaining inputs and separately budgeted launches.
+Local preparation is not device acceptance or authorization to run.
+
 ## The seven
 
 **1. DeepSeek K1: kv_a computed once** (`pairs_alld4r0l1kvs`)

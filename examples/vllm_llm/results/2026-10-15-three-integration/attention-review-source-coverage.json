@@ -1,0 +1,23 @@
+{
+  "pin": "db1694bcdbd2345401f42a58e5f41b4b4ee43d02",
+  "identical_files": {
+    "examples/vllm_llm/attention_early_merge/EXPERIMENT.md": "e317b9ab3a5d34e9d582e9cef15bb1d17698d7398f2c3fe625acb61da38fa7f9",
+    "examples/vllm_llm/attention_early_merge/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "examples/vllm_llm/attention_early_merge/build.py": "85ed19353c699e59193097b5955c408a579e1e702079b5c160a807a7ccfa3a3a",
+    "examples/vllm_llm/attention_early_merge/build_model.py": "f79a3c92c9ec3b6d7c37f6fc188b1132c9e670c7cf79c27a8f30ef287f018370",
+    "examples/vllm_llm/attention_early_merge/capture.h": "a941e67dc776ee0a83d72ed63bde4c48577758d0b4b37dd6c0fe3711de296fd3",
+    "examples/vllm_llm/attention_early_merge/evidence.py": "595b7d9e885356934d513d6f9f4e4da9ae3465661936b2f9f1794aa77fd4cb35",
+    "examples/vllm_llm/attention_early_merge/footprint_model.py": "2a39138ff4a59a47a6e7e40763f3b57a7cb6a3dc4c0a455f161eb168a4767830",
+    "examples/vllm_llm/attention_early_merge/hybrid.h": "c7cc6f9857e82783bf5d2a3bc8b3a580f9772b356a97e2ea6095badcb654fdc7",
+    "examples/vllm_llm/attention_early_merge/launcher.hip": "9aa2741c9197c06ae573d81794c8eec0693a63221920c121a7e3155098f0686c",
+    "examples/vllm_llm/attention_early_merge/offline.py": "54556d329fe71b10b482ee9ed2a03581e6cad79ab870e7e80b82cad71e1e21a1",
+    "examples/vllm_llm/attention_early_merge/probe.h": "1b098d91abca1c1a4d2a9aac3a790071d5f423433f06e6e55e0fdc5e06ccfe6a",
+    "examples/vllm_llm/attention_early_merge/probe.hip": "9c04f5b4f4420a9d7f6f732f953963647b942e5aa67c082c4f26b0cf78471e70",
+    "examples/vllm_llm/attention_early_merge/rocm_check.sh": "429ca08a4b0b6901d5aee7973bdbf8556dcf86607a7337014e494b6b0962ba96",
+    "examples/vllm_llm/attention_early_merge/session.py": "bb7ea3997b30c614a8e21d6fc53d297625faa66e1ac2a1eaf89212cda6ab07ab",
+    "examples/vllm_llm/attention_early_merge/simulate.py": "4ff7d7c604a4984568d215eee31b6c6aa2a766f6bce5feec5acb52f896429b9a",
+    "examples/sessions/attention_early_merge.py": "893e83e0ee78afb28cd3f876499a8cc67c2935167027a791751c4fc5727a6271",
+    "tests/test_attention_early_merge.py": "533be597b07dd8626f51814e4f7a829f8d18f533359e69347b13f8b4bb28563f"
+  },
+  "scope": "Source files unchanged from attention review pin. Combined dependencies freshly compiled and generated; final independent review decision still required."
+}

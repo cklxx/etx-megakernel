@@ -1,0 +1,5 @@
+{
+  "data_view": "/Users/ckl/code/.wt/etx-qwen-three-integration/examples/dsv2lite/results",
+  "target": "/Users/ckl/code/.wt/etx-mainverify/examples/dsv2lite/results",
+  "reason": "Two tests import historical inputs directly, ignoring ETX_DATA_ROOT. Temporary symlink to existing immutable main data; no data duplicated or tracked source modified."
+}

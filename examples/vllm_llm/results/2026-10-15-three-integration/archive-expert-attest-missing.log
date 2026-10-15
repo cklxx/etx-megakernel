@@ -1,0 +1,11 @@
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/combined-archive/examples/vllm_llm/expert_merge/capture.py", line 139, in <module>
+    elif a.action=="attest": attest(a.out,a.host_build)
+                             ~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/combined-archive/examples/vllm_llm/expert_merge/capture.py", line 79, in attest
+    identity=source_identity()
+  File "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/combined-archive/examples/vllm_llm/expert_merge/capture.py", line 61, in source_identity
+    raise ValueError("missing or malformed SOURCE_IDENTITY; use tools/session.sh stage")
+ValueError: missing or malformed SOURCE_IDENTITY; use tools/session.sh stage

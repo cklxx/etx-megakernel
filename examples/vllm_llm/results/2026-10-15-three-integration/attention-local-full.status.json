@@ -1,0 +1,15 @@
+{
+  "name": "attention-local-full",
+  "command": [
+    "/Users/ckl/code/.wt/etx-qwen-three-integration/.venv/bin/python",
+    "-m",
+    "examples.vllm_llm.attention_early_merge.offline",
+    "--out",
+    "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/attention/local-full"
+  ],
+  "exit": 0,
+  "stop": null,
+  "seconds": 180.17,
+  "log": "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/attention-local-full.log",
+  "free_bytes": 7636889600
+}

@@ -1,0 +1,14 @@
+STAGE /Users/ckl/code/etx/.venv/bin/python -m etx compile /Users/ckl/code/.wt/etx-qwen-three-integration/examples/vllm_llm/expert_merge/graph.py --arch gfx942 --out /Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/expert/qkv-candidate --inline-tiles --sim
+plan: graph=qwen_expert_merge_candidate arch=gfx942 bindings={}
+  devices=1 domains/device=8 workers/domain=38 (wg/CU=1)
+  tasks=704 events=2 eliminated=[]
+  moe_up                   static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  moe_down                 static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  consumer                 static   S_balance=0.00us <= 1.5x(C_cross=253.89+C_queue=1.20)
+  event up_done          scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event down_done        scope=DEVICE  mem=device       numel=1 cross_domain=57344 cross_device=0
+  prefetch entries=0
+sources to link: ['/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/expert/qkv-candidate/tiles.hip']
+wrote /Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/expert/qkv-candidate/
+sim: makespan 10.4 us | busy 2112.0 wait 865.1 sched 0.0 | utilisation 66.9% over 304 workers
+GENERATED 765f51317c09fc064dfe55d56ef9764de240e0b1c9c9e5ab091355f0239e4f78 /Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/expert/qkv-candidate

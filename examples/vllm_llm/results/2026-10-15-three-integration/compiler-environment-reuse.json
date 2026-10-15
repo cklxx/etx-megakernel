@@ -1,0 +1,6 @@
+{
+  "local_clang_version": "Homebrew clang version 23.1.1\nTarget: arm64-apple-darwin24.6.0\nThread model: posix\nInstalledDir: /opt/homebrew/Cellar/llvm/23.1.1_1/bin\nConfiguration file: /opt/homebrew/Cellar/llvm/23.1.1_1/etc/clang/arm64-apple-darwin24.cfg\n",
+  "unchanged_vs_producer": true,
+  "rocm_image": "sha256:084a446de60ebf2192b2000d1da2fc784aea0f48a8b3e7cf672f0b60a26314af",
+  "imports": "All old/current C6 local and ROCm import .ll files match after strict provenance normalization; canonical and raw hashes retained separately."
+}

@@ -1,0 +1,17 @@
+{
+  "name": "session-qwen_producer",
+  "command": [
+    "/Users/ckl/code/.wt/etx-qwen-three-integration/.venv/bin/python",
+    "-m",
+    "etx.tools.gpu_jobs",
+    "examples/sessions/qwen_producer.py",
+    "--gpus",
+    "0",
+    "--dry-run"
+  ],
+  "exit": 0,
+  "stop": null,
+  "seconds": 10.01,
+  "log": "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/session-qwen_producer.log",
+  "free_bytes": 7439118336
+}

@@ -1,0 +1,13 @@
+usage: runner.py [-h] [--input INPUT] {build,check,time,status} root
+
+Fail-closed one-GPU experiment runner. No provisioning or remote execution.
+The session deadline is fixed at its first build. Retry gets a new attempt
+directory within that deadline. Logs and certificates are never overwritten.
+
+positional arguments:
+  {build,check,time,status}
+  root
+
+options:
+  -h, --help            show this help message and exit
+  --input INPUT

@@ -1,0 +1,11 @@
+usage: build_model.py [-h] --model MODEL --out OUT
+
+Build an isolated check/capture/hybrid host with the ordinary model plan. The
+compiler shim changes only the final link sources. Import capture calls pass
+straight to hipcc. All actual arguments are recorded. No shared file is
+rewritten. The extra C6 kernel is a separate entry in the model executable.
+
+options:
+  -h, --help     show this help message and exit
+  --model MODEL
+  --out OUT

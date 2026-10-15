@@ -1,0 +1,15 @@
+{
+  "name": "attention-simulation",
+  "command": [
+    "/Users/ckl/code/.wt/etx-qwen-three-integration/.venv/bin/python",
+    "-m",
+    "examples.vllm_llm.attention_early_merge.simulate",
+    "--out",
+    "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/attention-simulation.json"
+  ],
+  "exit": 0,
+  "stop": null,
+  "seconds": 10.01,
+  "log": "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/attention-simulation.log",
+  "free_bytes": 7439941632
+}

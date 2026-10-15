@@ -1,0 +1,23 @@
+{
+  "binary": "3b45d69c39cc0c1141fa3e6e6fa8871eb6842034b4a0e23a262578dc22c7b35d",
+  "command": [
+    "non-executable-fixture",
+    "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/archive-expert-capture/capture_host.hip"
+  ],
+  "emitted": "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/archive-expert-capture",
+  "plan": "56970199fe66e40055d326339cda815b1a828ae748ba04bacba625f7f9e3be9d",
+  "revision": "31efbfc16a088819f3b7ad3b33fa6c6fb9377d9f",
+  "source": {
+    "capture_header": "9654645d9a942fe7306a34b45ed349355ec4a1d05d63c916ac37dad65317af1b",
+    "generated_host": "b787546e42283a2f501c5f0741078e45751e773c2318bc4290bbdfbbf7e72f2c",
+    "source_host": "28570234c305ab6608fe0e24126d3022beeab259cd0b232c39fe6ad1afb802d8"
+  },
+  "source_identity": {
+    "archive": "146ce302ff8553d72066dbeda5e29406c8deccd73a6f07955e78e7a290b951d2",
+    "branch": "bounded-combined-fixture",
+    "commit": "31efbfc16a088819f3b7ad3b33fa6c6fb9377d9f",
+    "kind": "staged-archive",
+    "sha256": "c582c6b1c95e32f41c8edb0c260f7f7169708f67c8f8207a4c0b40061f223ec4",
+    "staged": "2026-10-15T00:00:00Z"
+  }
+}

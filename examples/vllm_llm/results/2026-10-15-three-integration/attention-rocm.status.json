@@ -1,0 +1,13 @@
+{
+  "name": "attention-rocm",
+  "command": [
+    "bash",
+    "examples/vllm_llm/attention_early_merge/rocm_check.sh",
+    "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/attention/rocm"
+  ],
+  "exit": 0,
+  "stop": null,
+  "seconds": 240.17,
+  "log": "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/attention-rocm.log",
+  "free_bytes": 7464525824
+}

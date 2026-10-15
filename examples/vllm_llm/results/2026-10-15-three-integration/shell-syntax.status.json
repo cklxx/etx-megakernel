@@ -1,0 +1,15 @@
+{
+  "name": "shell-syntax",
+  "command": [
+    "bash",
+    "-n",
+    "tools/session.sh",
+    "examples/vllm_llm/attention_early_merge/rocm_check.sh",
+    "examples/vllm_llm/expert_merge/offline.sh"
+  ],
+  "exit": 0,
+  "stop": null,
+  "seconds": 10.01,
+  "log": "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/shell-syntax.log",
+  "free_bytes": 7442055168
+}

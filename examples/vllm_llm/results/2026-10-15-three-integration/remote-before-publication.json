@@ -1,0 +1,17 @@
+{
+  "origin": {
+    "url": "https://github.com/cklxx/etx-megakernel.git",
+    "exit": 0,
+    "main": "bcc3c98b421164ae70e42d566bf836d0da35425f"
+  },
+  "amd": {
+    "url": "https://github.com/metalopscloud/amdproject.git",
+    "exit": 0,
+    "main": "bcc3c98b421164ae70e42d566bf836d0da35425f"
+  },
+  "local_main": {
+    "clean": true,
+    "revision": "bcc3c98b421164ae70e42d566bf836d0da35425f"
+  },
+  "operation": "ls-remote read only; no push performed"
+}

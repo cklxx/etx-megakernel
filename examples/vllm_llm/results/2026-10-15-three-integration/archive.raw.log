@@ -1,0 +1,49 @@
+STAGE fixture-git-init
+PROGRESS fixture-git-init 0 seconds
+DONE fixture-git-init 0
+STAGE fixture-git-add
+PROGRESS fixture-git-add 0 seconds
+DONE fixture-git-add 0
+STAGE fixture-git-commit
+PROGRESS fixture-git-commit 0 seconds
+DONE fixture-git-commit 0
+STAGE bounded-archive-tests
+PROGRESS bounded-archive-tests 0 seconds
+PROGRESS bounded-archive-tests 5 seconds
+PROGRESS bounded-archive-tests 10 seconds
+PROGRESS bounded-archive-tests 15 seconds
+DONE bounded-archive-tests 0
+STAGE archive-help-session
+PROGRESS archive-help-session 0 seconds
+DONE archive-help-session 0
+STAGE archive-help-build_model
+PROGRESS archive-help-build_model 0 seconds
+DONE archive-help-build_model 0
+STAGE archive-help-runner
+PROGRESS archive-help-runner 0 seconds
+DONE archive-help-runner 0
+STAGE archive-help-producer_session
+PROGRESS archive-help-producer_session 0 seconds
+DONE archive-help-producer_session 0
+STAGE archive-session-qwen_producer
+PROGRESS archive-session-qwen_producer 0 seconds
+DONE archive-session-qwen_producer 0
+STAGE archive-session-attention_early_merge
+PROGRESS archive-session-attention_early_merge 0 seconds
+DONE archive-session-attention_early_merge 0
+STAGE archive-session-qwen_expert_merge
+PROGRESS archive-session-qwen_expert_merge 0 seconds
+DONE archive-session-qwen_expert_merge 0
+STAGE archive-expert-emit
+PROGRESS archive-expert-emit 0 seconds
+DONE archive-expert-emit 0
+STAGE archive-expert-attest-valid
+PROGRESS archive-expert-attest-valid 0 seconds
+DONE archive-expert-attest-valid 0
+STAGE archive-expert-attest-missing
+PROGRESS archive-expert-attest-missing 0 seconds
+DONE archive-expert-attest-missing 1
+STAGE archive-expert-attest-malformed
+PROGRESS archive-expert-attest-malformed 0 seconds
+DONE archive-expert-attest-malformed 1
+ARCHIVE COMPLETE; no GPU operations

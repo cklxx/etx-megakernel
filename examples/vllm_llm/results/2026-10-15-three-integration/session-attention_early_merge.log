@@ -1,0 +1,3 @@
+Session hard stop: 2400s from runner start (includes setup)
+  0 c6_build                         cpu      timeout  1800s  reads: -
+  1 c6_measure                       GPU 0    timeout  1800s  reads: c6_build

@@ -1,0 +1,13 @@
+{
+  "name": "qkv-candidate-diag-rocm",
+  "command": [
+    "bash",
+    "examples/vllm_llm/expert_merge/offline.sh",
+    "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/expert/qkv-candidate-diag"
+  ],
+  "exit": 0,
+  "stop": null,
+  "seconds": 20.02,
+  "log": "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/qkv-candidate-diag-rocm.log",
+  "free_bytes": 7455039488
+}

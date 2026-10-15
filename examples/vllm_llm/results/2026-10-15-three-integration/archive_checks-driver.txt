@@ -1,0 +1,82 @@
+import fcntl,hashlib,json,os,shutil,signal,subprocess,sys,tarfile,time
+from pathlib import Path
+root=Path.cwd();base=Path('/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence');sys.path.insert(0,str(root))
+from examples.vllm_llm import producer_session as ps
+lock=open(base.parent/'qwen-prep-heavy.lock','a+');fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
+assert shutil.disk_usage(base).free>5*1024**3
+commands=[]
+def run(name,cmd,cwd=root,expected=0,env=None):
+    start=time.monotonic();log=base/(name+'.log');stop=None
+    print('STAGE',name,flush=True)
+    with log.open('x') as out:
+        p=subprocess.Popen(list(map(str,cmd)),cwd=cwd,env=env,stdout=out,stderr=subprocess.STDOUT,start_new_session=True)
+        while p.poll() is None:
+            if time.monotonic()-start>180 or shutil.disk_usage(base).free<4*1024**3:
+                os.killpg(p.pid,signal.SIGTERM)
+                try:p.wait(timeout=5)
+                except subprocess.TimeoutExpired:os.killpg(p.pid,signal.SIGKILL);p.wait()
+                stop='archive deadline/reserve';break
+            print('PROGRESS',name,int(time.monotonic()-start),'seconds',flush=True)
+            time.sleep(5)
+    r=dict(name=name,command=list(map(str,cmd)),cwd=str(cwd),exit=p.returncode,seconds=time.monotonic()-start,expected_exit=expected,stop=stop)
+    commands.append(r);(base/'archive-commands.json').write_text(json.dumps(commands,indent=2)+'\n')
+    assert p.returncode==expected and stop is None,r
+    print('DONE',name,p.returncode,flush=True)
+# Preserve old readiness bytes. New receipt binds all combined sources to recorded fresh
+# checks plus explicitly unchanged producer compiles. No new device result is claimed.
+old=json.loads((base/'previous-producer-local-ready.json').read_text())
+assert json.loads((base/'build-and-tests-complete.json').read_text())['status']=='PASS_LOCAL_ONLY'
+ready=dict(ready=True,sources=ps.local_sources(),commands=json.loads((base/'commands.json').read_text()),
+    reused_compile_evidence=dict(status='historical producer matrix/compiler evidence reused for unchanged inputs only',comparison='../2026-10-15-three-integration/producer-compile-reuse.json',base='bcc3c98b421164ae70e42d566bf836d0da35425f'),
+    integration_evidence='../2026-10-15-three-integration/',limitations=old['limitations'],gpu_spend_usd=0)
+# Receipt's commands will be made repository-relative during sealing, after these archive tests.
+(ps.ART/'local-ready.json').write_text(json.dumps(ready,indent=2)+'\n')
+fixture=base/'combined-source-fixture';fixture.mkdir()
+paths=subprocess.check_output(['git','ls-files','-z'],cwd=root).decode().split('\0')
+excluded=[];copied=[]
+for name in paths:
+    if not name:continue
+    if name.startswith('examples/dsv2lite/results/'):
+        excluded.append(name);continue
+    p=root/name
+    if not p.exists() and not p.is_symlink():raise RuntimeError('unexpected missing source '+name)
+    dest=fixture/name;dest.parent.mkdir(parents=True,exist_ok=True)
+    if p.is_symlink():dest.symlink_to(os.readlink(p))
+    else:shutil.copy2(p,dest)
+    copied.append(name)
+# New registry docs are part of bounded combined source too.
+for name in ('docs/QWEN-THREE-EXPERIMENTS-2026-10-15.md','docs/QWEN-THREE-GPU-QUEUE-2026-10-15.md'):
+    shutil.copy2(root/name,fixture/name);copied.append(name)
+assert all((fixture/n).is_file() and hashlib.sha256((fixture/n).read_bytes()).hexdigest()==h for n,h in ps.local_sources().items())
+run('fixture-git-init',['git','init','-q'],fixture)
+run('fixture-git-add',['git','add','-f','-A'],fixture)
+run('fixture-git-commit',['git','-c','user.name=Integration validation fixture','-c','user.email=fixture@localhost','commit','-qm','Bounded combined-source archive fixture; no historical GPU data'],fixture)
+fixture_commit=subprocess.check_output(['git','rev-parse','HEAD'],cwd=fixture,text=True).strip()
+plugin=base/'bounded_archive_plugin.py'
+plugin.write_text('''import os\nfrom pathlib import Path\nimport pytest\n@pytest.fixture(autouse=True)\ndef bounded_combined_archive(request,monkeypatch):\n    if request.module.__name__.endswith("test_producer_readiness"):\n        monkeypatch.setattr(request.module,"ROOT",Path(os.environ["QWEN_ARCHIVE_FIXTURE"]))\n''')
+env=dict(os.environ,PYTHONPATH=str(base)+os.pathsep+str(root),QWEN_ARCHIVE_FIXTURE=str(fixture),TMPDIR=str(base/'tmp'))
+run('bounded-archive-tests',[root/'.venv/bin/python','-m','pytest','-q','-s','tests/test_producer_readiness.py::test_fresh_archive_interpreter_preflight_and_failure_report','tests/test_producer_readiness.py::test_documented_push_stage_attach_start_with_local_transport','-p','bounded_archive_plugin','--basetemp='+str(base/'archive-pytest'),'-o','tmp_path_retention_policy=failed'],env=env)
+# Real no-Git CLI entrypoints from one bounded archive, including expert strict
+# provenance attestation. Binary/plan below are non-executable transport fixtures.
+archive=base/'combined-archive';archive.mkdir();bundle=base/'combined-source.tar'
+with bundle.open('wb') as out:subprocess.run(['git','archive','HEAD'],cwd=fixture,stdout=out,check=True)
+with tarfile.open(bundle) as tar:tar.extractall(archive,filter='data')
+archive_sha=hashlib.sha256(bundle.read_bytes()).hexdigest()
+(archive/'SOURCE_IDENTITY').write_text('commit '+fixture_commit+'\nbranch bounded-combined-fixture\narchive '+archive_sha+'\nstaged 2026-10-15T00:00:00Z\n')
+py=root/'.venv/bin/python';clean=dict(os.environ,PYTHONPATH=str(archive))
+for module in ('examples.vllm_llm.attention_early_merge.session','examples.vllm_llm.attention_early_merge.build_model','examples.vllm_llm.expert_merge.runner','examples.vllm_llm.producer_session'):
+    run('archive-help-'+module.rsplit('.',1)[-1],[py,'-m',module,'--help'],archive,env=clean)
+for job in ('qwen_producer','attention_early_merge','qwen_expert_merge'):
+    run('archive-session-'+job,[py,'-m','etx.tools.gpu_jobs','examples/sessions/'+job+'.py','--gpus','0','--dry-run'],archive,env=clean)
+run('archive-expert-emit',[py,'-m','examples.vllm_llm.expert_merge.capture','emit',base/'archive-expert-capture'],archive,env=clean)
+for label,receipt,exitcode in [('valid',(archive/'SOURCE_IDENTITY').read_text(),0),('missing',None,1),('malformed','commit invalid\n',1)]:
+    p=archive/'SOURCE_IDENTITY'
+    if receipt is None:p.unlink(missing_ok=True)
+    else:p.write_text(receipt)
+    build=base/('archive-expert-attest-'+label);build.mkdir()
+    (build/'run').write_bytes(b'NON-EXECUTABLE TRANSPORT FIXTURE')
+    (build/'vl_plan.txt').write_text('NON-EXECUTABLE TRANSPORT FIXTURE\n')
+    (build/'hipcc_command.json').write_text(json.dumps(['non-executable-fixture',str(base/'archive-expert-capture/capture_host.hip')]))
+    run('archive-expert-attest-'+label,[py,'-m','examples.vllm_llm.expert_merge.capture','attest',base/'archive-expert-capture','--host-build',build],archive,expected=exitcode,env=clean)
+(base/'archive-acceptance.json').write_text(json.dumps(dict(status='PASS_LOCAL_TRANSPORT_ONLY',fixture_commit=fixture_commit,combined_sources=ps.local_sources(),excluded_prefix='examples/dsv2lite/results/',excluded_files=len(excluded),copied_files=len(copied),archive_sha256=archive_sha,archive_bytes=bundle.stat().st_size,adaptation='Two unchanged tests use ROOT monkeypatch pointing to a committed real bounded combined-source Git repository; no historical GPU data copied, all producer source keys match. Tests exercise real archive, independent env attachment, runner and fail-closed reports with labelled local transport/compute substitutes.',native_execution='NOT_RUN',gpu_spend_usd=0),indent=2)+'\n')
+print('ARCHIVE COMPLETE; no GPU operations',flush=True)

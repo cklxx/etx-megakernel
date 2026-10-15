@@ -1,0 +1,18 @@
+{
+  "name": "attention-local-probe",
+  "command": [
+    "/Users/ckl/code/.wt/etx-qwen-three-integration/.venv/bin/python",
+    "-m",
+    "examples.vllm_llm.attention_early_merge.build",
+    "--local",
+    "--footprint",
+    "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/attention/local-full",
+    "--out",
+    "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/attention/local-probe"
+  ],
+  "exit": 0,
+  "stop": null,
+  "seconds": 90.09,
+  "log": "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/attention-local-probe.log",
+  "free_bytes": 7593852928
+}

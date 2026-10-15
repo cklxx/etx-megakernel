@@ -1,0 +1,33 @@
+import fcntl,json,os,shutil,signal,subprocess,time
+from pathlib import Path
+root=Path.cwd();base=Path('/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence')
+lock=open(base.parent/'qwen-prep-heavy.lock','a+');fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
+link=root/'examples/dsv2lite/results';data=Path('/Users/ckl/code/.wt/etx-mainverify/examples/dsv2lite/results')
+assert not link.exists() and data.is_dir()
+link.symlink_to(data,target_is_directory=True)
+record=dict(data_view=str(link),target=str(data),reason='Two tests import historical inputs directly, ignoring ETX_DATA_ROOT. Temporary symlink to existing immutable main data; no data duplicated or tracked source modified.')
+(base/'historical-data-view.json').write_text(json.dumps(record,indent=2)+'\n')
+cmd=[str(root/'.venv/bin/python'),'-m','pytest','-q','-ra','--basetemp='+str(base/'pytest-retry'),'-o','tmp_path_retention_policy=failed','-k','not test_fresh_archive_interpreter_preflight_and_failure_report and not test_documented_push_stage_attach_start_with_local_transport']
+env=dict(os.environ,TMPDIR=str(base/'tmp'),ETX_DATA_ROOT='/Users/ckl/code/etx',ETX_REFERENCE_ROOT='/Users/ckl/code/etx',ETX_DEVLIBS='/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode')
+start=time.monotonic();stop=None
+try:
+  with (base/'full-suite-retry.log').open('x') as out:
+    p=subprocess.Popen(cmd,cwd=root,env=env,stdout=out,stderr=subprocess.STDOUT,start_new_session=True)
+    while p.poll() is None:
+      elapsed=time.monotonic()-start
+      if elapsed>1200 or shutil.disk_usage(base).free<4*1024**3:
+        stop='deadline/reserve';os.killpg(p.pid,signal.SIGTERM)
+        try:p.wait(timeout=5)
+        except subprocess.TimeoutExpired:os.killpg(p.pid,signal.SIGKILL);p.wait()
+        break
+      print('PROGRESS full-suite-retry',int(elapsed),'seconds; log_bytes',(base/'full-suite-retry.log').stat().st_size,flush=True);time.sleep(10)
+  r=dict(name='full-suite-retry',command=cmd,exit=p.returncode,stop=stop,seconds=time.monotonic()-start,log=str(base/'full-suite-retry.log'),free_bytes=shutil.disk_usage(base).free)
+  (base/'full-suite-retry.status.json').write_text(json.dumps(r,indent=2)+'\n')
+  commands=json.loads((base/'commands.json').read_text());commands.append(r);(base/'commands.json').write_text(json.dumps(commands,indent=2)+'\n')
+  if p.returncode or stop:raise SystemExit('full-suite retry failed')
+  from examples.vllm_llm import producer_session as ps
+  assert ps.local_sources()==json.loads((base/'sources.json').read_text())
+  (base/'build-and-tests-complete.json').write_text(json.dumps(dict(status='PASS_LOCAL_ONLY',sources=ps.local_sources(),device_execution='NOT_RUN',native_executable_link='UNAVAILABLE_LOCAL_HIP_RUNTIME',gpu_spend_usd=0,archive_tests='Separate bounded combined-source Git fixture still required. Initial full-suite collection failure preserved; retry uses temporary existing-data symlink.'),indent=2)+'\n')
+  print('FULL SUITE PASS; archive checks remain',flush=True)
+finally:
+  assert link.is_symlink();link.unlink()

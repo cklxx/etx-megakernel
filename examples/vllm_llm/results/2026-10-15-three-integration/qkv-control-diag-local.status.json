@@ -1,0 +1,15 @@
+{
+  "name": "qkv-control-diag-local",
+  "command": [
+    "/Users/ckl/code/.wt/etx-qwen-three-integration/.venv/bin/python",
+    "-m",
+    "examples.vllm_llm.expert_merge.prepare",
+    "local",
+    "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/expert/qkv-control-diag"
+  ],
+  "exit": 0,
+  "stop": null,
+  "seconds": 10.01,
+  "log": "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/qkv-control-diag-local.log",
+  "free_bytes": 7463018496
+}

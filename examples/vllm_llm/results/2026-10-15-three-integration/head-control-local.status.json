@@ -1,0 +1,15 @@
+{
+  "name": "head-control-local",
+  "command": [
+    "/Users/ckl/code/.wt/etx-qwen-three-integration/.venv/bin/python",
+    "-m",
+    "examples.vllm_llm.expert_merge.prepare",
+    "local",
+    "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/expert/head-control"
+  ],
+  "exit": 0,
+  "stop": null,
+  "seconds": 10.01,
+  "log": "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/head-control-local.log",
+  "free_bytes": 7452585984
+}

@@ -1,0 +1,14 @@
+usage: session.py [-h] --work WORK --model MODEL {build,run,status}
+
+Bounded C6 preparation/measurement pipeline. No provisioning or remote calls.
+The caller must select exactly one GPU. A work directory has one fixed
+deadline. Each build retry has a new attempt. A run never trusts an earlier
+correctness gate.
+
+positional arguments:
+  {build,run,status}
+
+options:
+  -h, --help          show this help message and exit
+  --work WORK
+  --model MODEL

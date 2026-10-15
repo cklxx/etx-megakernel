@@ -1,0 +1,19 @@
+{
+  "name": "head-control-diag-generate",
+  "command": [
+    "/Users/ckl/code/.wt/etx-qwen-three-integration/.venv/bin/python",
+    "-m",
+    "examples.vllm_llm.expert_merge.prepare",
+    "generate",
+    "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/expert/head-control-diag",
+    "--arm",
+    "control",
+    "--head",
+    "--diagnostic"
+  ],
+  "exit": 0,
+  "stop": null,
+  "seconds": 10.01,
+  "log": "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/head-control-diag-generate.log",
+  "free_bytes": 7451602944
+}

@@ -1,0 +1,4 @@
+{
+  "exit": 1,
+  "reason": "All build/auxiliary stages passed; full suite failed collection because sparse historical dataset absent. Raw full-suite.log retained. Retry runs identical tests using existing-data symlink."
+}

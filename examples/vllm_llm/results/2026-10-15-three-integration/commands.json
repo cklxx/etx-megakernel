@@ -1,0 +1,662 @@
+[
+  {
+    "name": "attention-local-full",
+    "command": [
+      "/Users/ckl/code/.wt/etx-qwen-three-integration/.venv/bin/python",
+      "-m",
+      "examples.vllm_llm.attention_early_merge.offline",
+      "--out",
+      "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/attention/local-full"
+    ],
+    "exit": 0,
+    "stop": null,
+    "seconds": 180.17,
+    "log": "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/attention-local-full.log",
+    "free_bytes": 7636889600
+  },
+  {
+    "name": "attention-local-probe",
+    "command": [
+      "/Users/ckl/code/.wt/etx-qwen-three-integration/.venv/bin/python",
+      "-m",
+      "examples.vllm_llm.attention_early_merge.build",
+      "--local",
+      "--footprint",
+      "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/attention/local-full",
+      "--out",
+      "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/attention/local-probe"
+    ],
+    "exit": 0,
+    "stop": null,
+    "seconds": 90.09,
+    "log": "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/attention-local-probe.log",
+    "free_bytes": 7593852928
+  },
+  {
+    "name": "attention-local-diagnostic",
+    "command": [
+      "/Users/ckl/code/.wt/etx-qwen-three-integration/.venv/bin/python",
+      "-m",
+      "examples.vllm_llm.attention_early_merge.build",
+      "--local",
+      "--diagnostic",
+      "--footprint",
+      "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/attention/local-full",
+      "--out",
+      "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/attention/local-diagnostic"
+    ],
+    "exit": 0,
+    "stop": null,
+    "seconds": 90.09,
+    "log": "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/attention-local-diagnostic.log",
+    "free_bytes": 7558311936
+  },
+  {
+    "name": "attention-rocm",
+    "command": [
+      "bash",
+      "examples/vllm_llm/attention_early_merge/rocm_check.sh",
+      "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/attention/rocm"
+    ],
+    "exit": 0,
+    "stop": null,
+    "seconds": 240.17,
+    "log": "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/attention-rocm.log",
+    "free_bytes": 7464525824
+  },
+  {
+    "name": "qkv-control-generate",
+    "command": [
+      "/Users/ckl/code/.wt/etx-qwen-three-integration/.venv/bin/python",
+      "-m",
+      "examples.vllm_llm.expert_merge.prepare",
+      "generate",
+      "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/expert/qkv-control",
+      "--arm",
+      "control"
+    ],
+    "exit": 0,
+    "stop": null,
+    "seconds": 10.01,
+    "log": "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/qkv-control-generate.log",
+    "free_bytes": 7465840640
+  },
+  {
+    "name": "qkv-control-local",
+    "command": [
+      "/Users/ckl/code/.wt/etx-qwen-three-integration/.venv/bin/python",
+      "-m",
+      "examples.vllm_llm.expert_merge.prepare",
+      "local",
+      "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/expert/qkv-control"
+    ],
+    "exit": 0,
+    "stop": null,
+    "seconds": 10.01,
+    "log": "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/qkv-control-local.log",
+    "free_bytes": 7464267776
+  },
+  {
+    "name": "qkv-control-rocm",
+    "command": [
+      "bash",
+      "examples/vllm_llm/expert_merge/offline.sh",
+      "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/expert/qkv-control"
+    ],
+    "exit": 0,
+    "stop": null,
+    "seconds": 20.02,
+    "log": "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/qkv-control-rocm.log",
+    "free_bytes": 7465201664
+  },
+  {
+    "name": "qkv-control-diag-generate",
+    "command": [
+      "/Users/ckl/code/.wt/etx-qwen-three-integration/.venv/bin/python",
+      "-m",
+      "examples.vllm_llm.expert_merge.prepare",
+      "generate",
+      "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/expert/qkv-control-diag",
+      "--arm",
+      "control",
+      "--diagnostic"
+    ],
+    "exit": 0,
+    "stop": null,
+    "seconds": 10.01,
+    "log": "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/qkv-control-diag-generate.log",
+    "free_bytes": 7464656896
+  },
+  {
+    "name": "qkv-control-diag-local",
+    "command": [
+      "/Users/ckl/code/.wt/etx-qwen-three-integration/.venv/bin/python",
+      "-m",
+      "examples.vllm_llm.expert_merge.prepare",
+      "local",
+      "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/expert/qkv-control-diag"
+    ],
+    "exit": 0,
+    "stop": null,
+    "seconds": 10.01,
+    "log": "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/qkv-control-diag-local.log",
+    "free_bytes": 7463018496
+  },
+  {
+    "name": "qkv-control-diag-rocm",
+    "command": [
+      "bash",
+      "examples/vllm_llm/expert_merge/offline.sh",
+      "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/expert/qkv-control-diag"
+    ],
+    "exit": 0,
+    "stop": null,
+    "seconds": 20.02,
+    "log": "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/qkv-control-diag-rocm.log",
+    "free_bytes": 7462666240
+  },
+  {
+    "name": "qkv-candidate-generate",
+    "command": [
+      "/Users/ckl/code/.wt/etx-qwen-three-integration/.venv/bin/python",
+      "-m",
+      "examples.vllm_llm.expert_merge.prepare",
+      "generate",
+      "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/expert/qkv-candidate",
+      "--arm",
+      "candidate"
+    ],
+    "exit": 0,
+    "stop": null,
+    "seconds": 10.01,
+    "log": "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/qkv-candidate-generate.log",
+    "free_bytes": 7462232064
+  },
+  {
+    "name": "qkv-candidate-local",
+    "command": [
+      "/Users/ckl/code/.wt/etx-qwen-three-integration/.venv/bin/python",
+      "-m",
+      "examples.vllm_llm.expert_merge.prepare",
+      "local",
+      "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/expert/qkv-candidate"
+    ],
+    "exit": 0,
+    "stop": null,
+    "seconds": 10.01,
+    "log": "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/qkv-candidate-local.log",
+    "free_bytes": 7460417536
+  },
+  {
+    "name": "qkv-candidate-rocm",
+    "command": [
+      "bash",
+      "examples/vllm_llm/expert_merge/offline.sh",
+      "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/expert/qkv-candidate"
+    ],
+    "exit": 0,
+    "stop": null,
+    "seconds": 20.02,
+    "log": "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/qkv-candidate-rocm.log",
+    "free_bytes": 7457480704
+  },
+  {
+    "name": "qkv-candidate-diag-generate",
+    "command": [
+      "/Users/ckl/code/.wt/etx-qwen-three-integration/.venv/bin/python",
+      "-m",
+      "examples.vllm_llm.expert_merge.prepare",
+      "generate",
+      "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/expert/qkv-candidate-diag",
+      "--arm",
+      "candidate",
+      "--diagnostic"
+    ],
+    "exit": 0,
+    "stop": null,
+    "seconds": 10.01,
+    "log": "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/qkv-candidate-diag-generate.log",
+    "free_bytes": 7457230848
+  },
+  {
+    "name": "qkv-candidate-diag-local",
+    "command": [
+      "/Users/ckl/code/.wt/etx-qwen-three-integration/.venv/bin/python",
+      "-m",
+      "examples.vllm_llm.expert_merge.prepare",
+      "local",
+      "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/expert/qkv-candidate-diag"
+    ],
+    "exit": 0,
+    "stop": null,
+    "seconds": 10.01,
+    "log": "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/qkv-candidate-diag-local.log",
+    "free_bytes": 7455666176
+  },
+  {
+    "name": "qkv-candidate-diag-rocm",
+    "command": [
+      "bash",
+      "examples/vllm_llm/expert_merge/offline.sh",
+      "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/expert/qkv-candidate-diag"
+    ],
+    "exit": 0,
+    "stop": null,
+    "seconds": 20.02,
+    "log": "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/qkv-candidate-diag-rocm.log",
+    "free_bytes": 7455039488
+  },
+  {
+    "name": "head-control-generate",
+    "command": [
+      "/Users/ckl/code/.wt/etx-qwen-three-integration/.venv/bin/python",
+      "-m",
+      "examples.vllm_llm.expert_merge.prepare",
+      "generate",
+      "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/expert/head-control",
+      "--arm",
+      "control",
+      "--head"
+    ],
+    "exit": 0,
+    "stop": null,
+    "seconds": 10.01,
+    "log": "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/head-control-generate.log",
+    "free_bytes": 7454150656
+  },
+  {
+    "name": "head-control-local",
+    "command": [
+      "/Users/ckl/code/.wt/etx-qwen-three-integration/.venv/bin/python",
+      "-m",
+      "examples.vllm_llm.expert_merge.prepare",
+      "local",
+      "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/expert/head-control"
+    ],
+    "exit": 0,
+    "stop": null,
+    "seconds": 10.01,
+    "log": "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/head-control-local.log",
+    "free_bytes": 7452585984
+  },
+  {
+    "name": "head-control-rocm",
+    "command": [
+      "bash",
+      "examples/vllm_llm/expert_merge/offline.sh",
+      "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/expert/head-control"
+    ],
+    "exit": 0,
+    "stop": null,
+    "seconds": 20.02,
+    "log": "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/head-control-rocm.log",
+    "free_bytes": 7451906048
+  },
+  {
+    "name": "head-control-diag-generate",
+    "command": [
+      "/Users/ckl/code/.wt/etx-qwen-three-integration/.venv/bin/python",
+      "-m",
+      "examples.vllm_llm.expert_merge.prepare",
+      "generate",
+      "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/expert/head-control-diag",
+      "--arm",
+      "control",
+      "--head",
+      "--diagnostic"
+    ],
+    "exit": 0,
+    "stop": null,
+    "seconds": 10.01,
+    "log": "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/head-control-diag-generate.log",
+    "free_bytes": 7451602944
+  },
+  {
+    "name": "head-control-diag-local",
+    "command": [
+      "/Users/ckl/code/.wt/etx-qwen-three-integration/.venv/bin/python",
+      "-m",
+      "examples.vllm_llm.expert_merge.prepare",
+      "local",
+      "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/expert/head-control-diag"
+    ],
+    "exit": 0,
+    "stop": null,
+    "seconds": 10.01,
+    "log": "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/head-control-diag-local.log",
+    "free_bytes": 7449985024
+  },
+  {
+    "name": "head-control-diag-rocm",
+    "command": [
+      "bash",
+      "examples/vllm_llm/expert_merge/offline.sh",
+      "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/expert/head-control-diag"
+    ],
+    "exit": 0,
+    "stop": null,
+    "seconds": 20.02,
+    "log": "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/head-control-diag-rocm.log",
+    "free_bytes": 7448477696
+  },
+  {
+    "name": "head-candidate-generate",
+    "command": [
+      "/Users/ckl/code/.wt/etx-qwen-three-integration/.venv/bin/python",
+      "-m",
+      "examples.vllm_llm.expert_merge.prepare",
+      "generate",
+      "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/expert/head-candidate",
+      "--arm",
+      "candidate",
+      "--head"
+    ],
+    "exit": 0,
+    "stop": null,
+    "seconds": 10.01,
+    "log": "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/head-candidate-generate.log",
+    "free_bytes": 7448137728
+  },
+  {
+    "name": "head-candidate-local",
+    "command": [
+      "/Users/ckl/code/.wt/etx-qwen-three-integration/.venv/bin/python",
+      "-m",
+      "examples.vllm_llm.expert_merge.prepare",
+      "local",
+      "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/expert/head-candidate"
+    ],
+    "exit": 0,
+    "stop": null,
+    "seconds": 10.01,
+    "log": "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/head-candidate-local.log",
+    "free_bytes": 7446552576
+  },
+  {
+    "name": "head-candidate-rocm",
+    "command": [
+      "bash",
+      "examples/vllm_llm/expert_merge/offline.sh",
+      "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/expert/head-candidate"
+    ],
+    "exit": 0,
+    "stop": null,
+    "seconds": 20.02,
+    "log": "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/head-candidate-rocm.log",
+    "free_bytes": 7448260608
+  },
+  {
+    "name": "head-candidate-diag-generate",
+    "command": [
+      "/Users/ckl/code/.wt/etx-qwen-three-integration/.venv/bin/python",
+      "-m",
+      "examples.vllm_llm.expert_merge.prepare",
+      "generate",
+      "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/expert/head-candidate-diag",
+      "--arm",
+      "candidate",
+      "--head",
+      "--diagnostic"
+    ],
+    "exit": 0,
+    "stop": null,
+    "seconds": 10.01,
+    "log": "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/head-candidate-diag-generate.log",
+    "free_bytes": 7445360640
+  },
+  {
+    "name": "head-candidate-diag-local",
+    "command": [
+      "/Users/ckl/code/.wt/etx-qwen-three-integration/.venv/bin/python",
+      "-m",
+      "examples.vllm_llm.expert_merge.prepare",
+      "local",
+      "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/expert/head-candidate-diag"
+    ],
+    "exit": 0,
+    "stop": null,
+    "seconds": 10.01,
+    "log": "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/head-candidate-diag-local.log",
+    "free_bytes": 7443705856
+  },
+  {
+    "name": "head-candidate-diag-rocm",
+    "command": [
+      "bash",
+      "examples/vllm_llm/expert_merge/offline.sh",
+      "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/expert/head-candidate-diag"
+    ],
+    "exit": 0,
+    "stop": null,
+    "seconds": 20.02,
+    "log": "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/head-candidate-diag-rocm.log",
+    "free_bytes": 7441330176
+  },
+  {
+    "name": "expert-capture-emit",
+    "command": [
+      "/Users/ckl/code/.wt/etx-qwen-three-integration/.venv/bin/python",
+      "-m",
+      "examples.vllm_llm.expert_merge.capture",
+      "emit",
+      "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/expert-capture"
+    ],
+    "exit": 0,
+    "stop": null,
+    "seconds": 10.01,
+    "log": "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/expert-capture-emit.log",
+    "free_bytes": 7441170432
+  },
+  {
+    "name": "expert-capture-syntax",
+    "command": [
+      "/opt/homebrew/opt/llvm/bin/clang++",
+      "-x",
+      "hip",
+      "--cuda-host-only",
+      "-fsyntax-only",
+      "-nogpuinc",
+      "-nogpulib",
+      "--offload-arch=gfx942",
+      "-std=c++17",
+      "-isystem",
+      "/Users/ckl/code/rocm-headers/clang",
+      "-isystem",
+      "/Users/ckl/code/rocm-headers/inc",
+      "-include",
+      "__clang_hip_runtime_wrapper.h",
+      "-isystem",
+      "/Users/ckl/code/.wt/etx-qwen-three-integration/etx/importer/shim/mac",
+      "-D__HIP_PLATFORM_AMD__",
+      "-DETX_VL_CHECK",
+      "-I",
+      "/Users/ckl/code/.wt/etx-qwen-three-integration/etx/runtime/include",
+      "-I",
+      "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/attention/local-full/control",
+      "-I",
+      "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/attention/local-full",
+      "-I",
+      "/Users/ckl/code/.wt/etx-qwen-three-integration",
+      "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/expert-capture/capture_host.hip"
+    ],
+    "exit": 0,
+    "stop": null,
+    "seconds": 10.01,
+    "log": "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/expert-capture-syntax.log",
+    "free_bytes": 7441006592
+  },
+  {
+    "name": "attention-capture-syntax",
+    "command": [
+      "/opt/homebrew/opt/llvm/bin/clang++",
+      "-x",
+      "hip",
+      "--cuda-host-only",
+      "-fsyntax-only",
+      "-nogpuinc",
+      "-nogpulib",
+      "--offload-arch=gfx942",
+      "-std=c++17",
+      "-isystem",
+      "/Users/ckl/code/rocm-headers/clang",
+      "-isystem",
+      "/Users/ckl/code/rocm-headers/inc",
+      "-include",
+      "__clang_hip_runtime_wrapper.h",
+      "-isystem",
+      "/Users/ckl/code/.wt/etx-qwen-three-integration/etx/importer/shim/mac",
+      "-D__HIP_PLATFORM_AMD__",
+      "-DETX_VL_CHECK",
+      "-I",
+      "/Users/ckl/code/.wt/etx-qwen-three-integration/etx/runtime/include",
+      "-I",
+      "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/attention/local-full/control",
+      "-I",
+      "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/attention/local-full",
+      "-I",
+      "/Users/ckl/code/.wt/etx-qwen-three-integration",
+      "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/attention/local-probe/capture_host.hip"
+    ],
+    "exit": 0,
+    "stop": null,
+    "seconds": 10.01,
+    "log": "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/attention-capture-syntax.log",
+    "free_bytes": 7440109568
+  },
+  {
+    "name": "attention-simulation",
+    "command": [
+      "/Users/ckl/code/.wt/etx-qwen-three-integration/.venv/bin/python",
+      "-m",
+      "examples.vllm_llm.attention_early_merge.simulate",
+      "--out",
+      "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/attention-simulation.json"
+    ],
+    "exit": 0,
+    "stop": null,
+    "seconds": 10.01,
+    "log": "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/attention-simulation.log",
+    "free_bytes": 7439941632
+  },
+  {
+    "name": "producer-simulation",
+    "command": [
+      "/Users/ckl/code/.wt/etx-qwen-three-integration/.venv/bin/python",
+      "-m",
+      "examples.vllm_llm.producer_replay",
+      "--out",
+      "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/producer-simulation.json"
+    ],
+    "exit": 0,
+    "stop": null,
+    "seconds": 10.01,
+    "log": "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/producer-simulation.log",
+    "free_bytes": 7439687680
+  },
+  {
+    "name": "session-qwen_producer",
+    "command": [
+      "/Users/ckl/code/.wt/etx-qwen-three-integration/.venv/bin/python",
+      "-m",
+      "etx.tools.gpu_jobs",
+      "examples/sessions/qwen_producer.py",
+      "--gpus",
+      "0",
+      "--dry-run"
+    ],
+    "exit": 0,
+    "stop": null,
+    "seconds": 10.01,
+    "log": "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/session-qwen_producer.log",
+    "free_bytes": 7439118336
+  },
+  {
+    "name": "session-attention_early_merge",
+    "command": [
+      "/Users/ckl/code/.wt/etx-qwen-three-integration/.venv/bin/python",
+      "-m",
+      "etx.tools.gpu_jobs",
+      "examples/sessions/attention_early_merge.py",
+      "--gpus",
+      "0",
+      "--dry-run"
+    ],
+    "exit": 0,
+    "stop": null,
+    "seconds": 10.01,
+    "log": "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/session-attention_early_merge.log",
+    "free_bytes": 7439097856
+  },
+  {
+    "name": "session-qwen_expert_merge",
+    "command": [
+      "/Users/ckl/code/.wt/etx-qwen-three-integration/.venv/bin/python",
+      "-m",
+      "etx.tools.gpu_jobs",
+      "examples/sessions/qwen_expert_merge.py",
+      "--gpus",
+      "0",
+      "--dry-run"
+    ],
+    "exit": 0,
+    "stop": null,
+    "seconds": 10.01,
+    "log": "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/session-qwen_expert_merge.log",
+    "free_bytes": 7438954496
+  },
+  {
+    "name": "shell-syntax",
+    "command": [
+      "bash",
+      "-n",
+      "tools/session.sh",
+      "examples/vllm_llm/attention_early_merge/rocm_check.sh",
+      "examples/vllm_llm/expert_merge/offline.sh"
+    ],
+    "exit": 0,
+    "stop": null,
+    "seconds": 10.01,
+    "log": "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/shell-syntax.log",
+    "free_bytes": 7442055168
+  },
+  {
+    "name": "full-suite",
+    "command": [
+      "/Users/ckl/code/.wt/etx-qwen-three-integration/.venv/bin/python",
+      "-m",
+      "pytest",
+      "-q",
+      "-ra",
+      "--basetemp=/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/pytest",
+      "-o",
+      "tmp_path_retention_policy=failed",
+      "-k",
+      "not test_fresh_archive_interpreter_preflight_and_failure_report and not test_documented_push_stage_attach_start_with_local_transport"
+    ],
+    "exit": 2,
+    "stop": null,
+    "seconds": 10.01,
+    "log": "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/full-suite.log",
+    "free_bytes": 7435816960
+  },
+  {
+    "name": "full-suite-retry",
+    "command": [
+      "/Users/ckl/code/.wt/etx-qwen-three-integration/.venv/bin/python",
+      "-m",
+      "pytest",
+      "-q",
+      "-ra",
+      "--basetemp=/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/pytest-retry",
+      "-o",
+      "tmp_path_retention_policy=failed",
+      "-k",
+      "not test_fresh_archive_interpreter_preflight_and_failure_report and not test_documented_push_stage_attach_start_with_local_transport"
+    ],
+    "exit": 0,
+    "stop": null,
+    "seconds": 500.4510831250809,
+    "log": "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/full-suite-retry.log",
+    "free_bytes": 7304708096
+  }
+]

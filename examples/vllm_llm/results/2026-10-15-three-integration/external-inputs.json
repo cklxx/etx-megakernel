@@ -1,0 +1,6 @@
+{
+  "vllm_revision": "f46a9dfe2c5f57bebbd29556cbbb25eabd874226",
+  "vllm_status": "",
+  "vllm_attention_sha256": "a2d0af86509d95fc488cfd3fcbf7a08c30defd0e0a8b73c7778b8112b8f886a7",
+  "rocm_image": "sha256:084a446de60ebf2192b2000d1da2fc784aea0f48a8b3e7cf672f0b60a26314af"
+}

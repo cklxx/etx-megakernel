@@ -1,0 +1,64 @@
+[
+  {
+    "previous": "/Users/ckl/.hermes/cache/scratch/attention-early-merge-prep-evidence/final-v4/local-full/imp",
+    "current": "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/attention/local-full/imp",
+    "files": {
+      "attention.ll": {
+        "previous_raw": "c2f8d8a4d96d898bae5ad8ae35114f39a4baa1e74c50326e0b204bfe99c18473",
+        "current_raw": "2b229e1bc81ed5b8dd43c11faffd94334af38403756fc26f05ed516bb553c33a",
+        "canonical_sha256": "23b600a273674ec0f711c90f24d02ff0f432e52048b06dcb8d8c9976239a3037"
+      },
+      "attn_mfma16_g8.ll": {
+        "previous_raw": "579638e22d1e4d58bff54cdd4a37c0fa1c2952354167d23cd3ea03f98ece8249",
+        "current_raw": "2573adbc35683965fe77a66a324e8509559ece9e00589da0cbd264c518eee59a",
+        "canonical_sha256": "3873a0c8387cfedba8588d5fb95232107f1d95e76b2f2b89aa2cd507a5045b23"
+      },
+      "attn_reduce.ll": {
+        "previous_raw": "18ce209b18c3e08b01447c70f8a6310748ed2210c9ad6e9b6fecd6c4ea5bf3c7",
+        "current_raw": "567847b115391246108169c27c2755e15e9c2c4a9c35774b1de8209d192e7dc3",
+        "canonical_sha256": "7a9075b4e33679e4a023ab1f0e81670a66a21646a42bfb6fa4b1b6d1a530a074"
+      },
+      "layernorm_kernels.ll": {
+        "previous_raw": "2ac32d5fd584056d23b4e20259aac065152c14cc9ce8c6d0cc4cdd1587908d9a",
+        "current_raw": "c74a60334ede413e3f7ca4acdb1449942ff54590a3dede7721105c4946c4c2a0",
+        "canonical_sha256": "799c7ac47aad058a1edc5009c76627e04980a86783a6035ef524378a5181425d"
+      },
+      "rms_norm_2d.ll": {
+        "previous_raw": "bbb4f852f3ebba1931e218c9e755e7e18f8a3526770f95a3c05809bc9dcca44c",
+        "current_raw": "a6e7a66c29cd79324203d3ec20de4566362adc481124f06204bdcfa72e4ac027",
+        "canonical_sha256": "a51055908b3ffecb93cab675330b7d6b61cf8bd8cd071866c188a9d8a0ea6fd4"
+      }
+    }
+  },
+  {
+    "previous": "/Users/ckl/.hermes/cache/scratch/attention-early-merge-prep-evidence/final-v4/rocm/full/imp",
+    "current": "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/attention/rocm/full/imp",
+    "files": {
+      "attention.ll": {
+        "previous_raw": "63654ef1d49547c7cf570c0d8b2c2f9f654ebf04ea366bc74913357b45b80af0",
+        "current_raw": "f083a904e221119d0abfeea72f5967a50b9ef6f4400138f6528e1eb36614433e",
+        "canonical_sha256": "5a9bef3b2345c7d761229ab06916f64d1192d8353686f23951d77b98f1b48206"
+      },
+      "attn_mfma16_g8.ll": {
+        "previous_raw": "0ffa74c88b89dbb5228e075b815141090d1f6d1893f1d02bae6401854c4c34f3",
+        "current_raw": "209ec56dcdb5c7dfc0a19c8d098da394eb1ff0e84dd91f5e97b02c908e409f2a",
+        "canonical_sha256": "0a6fa6fe9ba090e730f99150bc6e8445a2d2eaa556c7f77383d9b7874fe1b944"
+      },
+      "attn_reduce.ll": {
+        "previous_raw": "8f42fa1754a1be3b7d7a6f0adebfe92faebd425ad4e2a150dcc3b965fdd70cd8",
+        "current_raw": "7a60ac7714c1201134c9c438aac7d78b295a102a7cd15c11ecbd2ad8427a3910",
+        "canonical_sha256": "ea42dadc4ecb7427e8afedc9b50d008619b5344d7f7d7138770e827efb21c21d"
+      },
+      "layernorm_kernels.ll": {
+        "previous_raw": "54d0a35795d387dc344bac7295496e0faeb477988ffc6970114fbc91655bed8e",
+        "current_raw": "f05c3d307ef6983b19bb697afb0cb840effa9ae2b00f4405b6afebaf106c46c3",
+        "canonical_sha256": "f63ef5fe46b1688401b4187e2443bb2d2efa9d0a2291d9b6f25a14ef62148679"
+      },
+      "rms_norm_2d.ll": {
+        "previous_raw": "77ff14d8dd77bf38aae06df14f5a9effab7103eabf6f56ebac7416160844bde3",
+        "current_raw": "c851588052c7e1a77f31a9f394a9ba276acf61bc7a8a2b25158494af5289b0ba",
+        "canonical_sha256": "16a2148273fbee9e3ea3e1cd61fdea7a69fe050bdf02f63461f734c321a6952d"
+      }
+    }
+  }
+]

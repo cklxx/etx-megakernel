@@ -1,0 +1,64 @@
+{
+  "provenance": "synthetic inputs AND synthetic weights; not captured activations",
+  "samples": 32,
+  "header_sha256": "50d4f8ad450571eea4d6c36be585866a7b087d176da8228257e69337b362ce79",
+  "near_tie": {
+    "logit_bits_different": 1,
+    "ordered_ids_equal": false,
+    "expert_set_equal": false,
+    "weights_bits_equal": false,
+    "max_logit_abs": 0.0078125,
+    "max_slot_weight_abs": 1.4901161193847656e-08,
+    "reference_ids": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+    ],
+    "candidate_ids": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      8
+    ]
+  },
+  "protocol_epochs": 96,
+  "actual_model_replay": "PENDING: no retained inputs/weights found",
+  "summary": {
+    "ordered_ids_equal": 30,
+    "expert_set_equal": 32,
+    "weights_bits_equal": 0
+  },
+  "schedule": {
+    "last_producer_ready_us": 14.0,
+    "all_expert_inputs_and_routes_ready_us": 22.1,
+    "exposed_last_producer_scoring_us": 1,
+    "status": "assumed schedule only"
+  },
+  "performance": {
+    "current_net_gain_us": null,
+    "router_bytes": 524288,
+    "router_bandwidth_floor_us": 0.12192744186046511,
+    "extra_partial_write_read_bytes": 264192,
+    "assumption": "4.3 TB/s; no fewer matrix operations",
+    "measured_costs": "none for candidate",
+    "unknown": [
+      "producer interference",
+      "publication",
+      "readback reduction",
+      "scale",
+      "topk integration",
+      "normalized expert input",
+      "fanout",
+      "matching baseline trace"
+    ]
+  }
+}

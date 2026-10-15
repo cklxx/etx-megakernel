@@ -1,0 +1,18 @@
+{
+  "name": "qkv-candidate-diag-generate",
+  "command": [
+    "/Users/ckl/code/.wt/etx-qwen-three-integration/.venv/bin/python",
+    "-m",
+    "examples.vllm_llm.expert_merge.prepare",
+    "generate",
+    "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/expert/qkv-candidate-diag",
+    "--arm",
+    "candidate",
+    "--diagnostic"
+  ],
+  "exit": 0,
+  "stop": null,
+  "seconds": 10.01,
+  "log": "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/qkv-candidate-diag-generate.log",
+  "free_bytes": 7457230848
+}

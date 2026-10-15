@@ -1,0 +1,14 @@
+usage: producer_session.py [-h]
+                           {preflight,build,qualify,measure,report,diagnose,s3-worker}
+                           [{baseline,producer}]
+
+Bounded producer experiment operations. No provisioning or remote action. Run
+only through examples/sessions/qwen_producer.py after explicit GPU approval.
+The report can run offline. It refuses partial correctness or timing evidence.
+
+positional arguments:
+  {preflight,build,qualify,measure,report,diagnose,s3-worker}
+  {baseline,producer}
+
+options:
+  -h, --help            show this help message and exit

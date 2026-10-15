@@ -1,0 +1,90 @@
+STAGE interpreter/dependencies OK /Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/archive-pytest/test_fresh_archive_interpreter0/independent-env
+STAGE interpreter/dependencies OK /Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/archive-pytest/test_fresh_archive_interpreter0/independent-env
+ARCHIVE before attach exit=127: bash: .venv/bin/python: No such file or directory
+STAGE ready root=/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/archive-pytest/test_fresh_archive_interpreter0/archive venv=/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/archive-pytest/test_fresh_archive_interpreter0/independent-env
+PASS interpreter: /Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/archive-pytest/test_fresh_archive_interpreter0/archive/.venv/bin/python; yaml, numpy import from .venv
+PREFLIGHT PASS
+
+ARCHIVE runner exit= 1 
+ [09:19:29 +  0m00s] session record: /Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/archive-pytest/test_fresh_archive_interpreter0/records/20261015T091929Z-ae6786
+[09:19:29 +  0m00s] start preflight (cpu)
+[09:19:30 +  0m01s] fail    preflight rc=2 1s
+    FAIL phase=preflight reason=[Errno 2] No such file or directory: '/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/archive-pytest/test_fresh_archive_interpreter0/archive/SOURCE_IDENTITY'
+    EVIDENCE /Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/archive-pytest/test_fresh_archive_interpreter0/records/20261015T091929Z-ae6786
+    SAFE resume: session.sh status/fetch; inspect failure; no partial timing claim; lease budget is unchanged
+[09:19:30 +  0m01s] skip    build_baseline [preflight: preflight fail]
+[09:19:30 +  0m01s] skip    build_producer [preflight: preflight fail]
+[09:19:30 +  0m01s] skip    qualify [build_baseline: build_baseline skipped]
+[09:19:30 +  0m01s] skip    measure [correctness.json: qualify skipped]
+[09:19:30 +  0m01s] skip    diagnose [measurement.complete.json: measure skipped]
+[09:19:30 +  0m01s] start report (cpu)
+[09:19:30 +  0m01s] progress: 1 running, 0 waiting, 6 done
+    report [cpu] 0s / 10s: # .venv/bin/python -u -m examples.vllm_llm.producer_session report
+[09:19:31 +  0m02s] ok      report rc=0 1s
+    VERDICT {"status": "NOT-COMPLETE", "reason": "[Errno 2] No such file or directory: '/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/archive-pytest/test_fresh_archive_interpreter0/records/20261015T091929Z-ae6786/correctness.
+[09:19:31 +  0m02s] session done
+  job                              status     rc  gpu  seconds
+  preflight                        fail        2             1  
+  build_baseline                   skipped                      preflight: preflight fail
+  build_producer                   skipped                      preflight: preflight fail
+  qualify                          skipped                      build_baseline: build_baseline skipped
+  measure                          skipped                      correctness.json: qualify skipped
+  diagnose                         skipped                      measurement.complete.json: measure skipped
+  report                           ok          0             1  
+SEALED /Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/archive-pytest/test_fresh_archive_interpreter0/records/20261015T091929Z-ae6786 complete=False
+ 
+# job preflight gpu=None cwd=/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/archive-pytest/test_fresh_archive_interpreter0/archive
+# .venv/bin/python -u -m examples.vllm_llm.producer_session preflight
+FAIL phase=preflight reason=[Errno 2] No such file or directory: '/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/archive-pytest/test_fresh_archive_interpreter0/archive/SOURCE_IDENTITY'
+EVIDENCE /Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/archive-pytest/test_fresh_archive_interpreter0/records/20261015T091929Z-ae6786
+SAFE resume: session.sh status/fetch; inspect failure; no partial timing claim; lease budget is unchanged
+
+ARCHIVE actual report: {"status": "NOT-COMPLETE", "reason": "[Errno 2] No such file or directory: '/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/archive-pytest/test_fresh_archive_interpreter0/records/20261015T091929Z-ae6786/correctness.json'", "performance_claim": false}
+.LOCAL PUSH/STAGE/ATTACH/START
+STAGE command bash /Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/combined-source-fixture/tools/session.sh push local-fixture timeout_s=300.0
+STAGED ~/etx -> /Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/archive-pytest/test_documented_push_stage_att0/home/src/f67457dffc7dd0276e748f697fee508152a4063374b36c861b33ccf594e69f50-20261015T091934Z
+commit 31efbfc16a088819f3b7ad3b33fa6c6fb9377d9f
+branch master
+archive f67457dffc7dd0276e748f697fee508152a4063374b36c861b33ccf594e69f50
+staged 2026-10-15T09:19:35Z
+LOCAL-TRANSPORT-SUBSTITUTE rsync
+LOCAL-TRANSPORT-SUBSTITUTE rsync
+LOCAL-TRANSPORT-SUBSTITUTE rsync
+LOCAL-TRANSPORT-SUBSTITUTE rsync
+GPUs: 1
+cores: 1
+/dev/disk3s1   228Gi   197Gi   6.6Gi    97%    2.1M   69M    3%   /System/Volumes/Data
+STAGE command ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new hotaisle@local-fixture 'cd ~/etx && python3 -B -m examples.vllm_llm.producer_stage /Users/ckl/code/etx/.venv' timeout_s=294.8
+STAGE interpreter/dependencies OK /Users/ckl/code/etx/.venv
+STAGE interpreter/dependencies OK /Users/ckl/code/etx/.venv
+STAGE ready root=/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/archive-pytest/test_documented_push_stage_att0/home/src/f67457dffc7dd0276e748f697fee508152a4063374b36c861b33ccf594e69f50-20261015T091934Z venv=/Users/ckl/code/etx/.venv
+STAGE command bash /Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/combined-source-fixture/tools/session.sh start local-fixture examples/sessions/qwen_producer.py 0 A timeout_s=15.0
+Passing session cap: ETX_SESS_MAX_SECONDS=579
+Passing Qwen config: ETX_QWEN_G6_CONFIG=/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/archive-pytest/test_documented_push_stage_att0/home/config.json
+runner started: machine A, GPUs 0; startup log: /Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/archive-pytest/test_documented_push_stage_att0/home/sess/startup.JGzlT1
+[09:19:37 +  0m00s] session record: /Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/archive-pytest/test_documented_push_stage_att0/home/sess/20261015T091937Z-528143
+[09:19:37 +  0m00s] start preflight (cpu)
+[09:19:38 +  0m01s] fail    preflight rc=2 1s
+    FAIL vllm_source: not a git checkout: /Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/archive-pytest/test_documented_push_stage_att0/home/vllm; supply: git clone --depth 1 --branch v0.27.1 https://github.com/vllm-project/vl
+    FAIL packed_model: /Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/archive-pytest/test_documented_push_stage_att0/home/model; vl.bin=22 bytes, vl.manifest=22 bytes, hf/config.json=20 bytes, golden_c1024.txt=22 bytes; golden
+runner started: machine A, GPUs 0; startup log: /Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/archive-pytest/test_documented_push_stage_att0/home/sess/startup.JGzlT1
+[09:19:37 +  0m00s] session record: /Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/archive-pytest/test_documented_push_stage_att0/home/sess/20261015T091937Z-528143
+[09:19:37 +  0m00s] start preflight (cpu)
+[09:19:38 +  0m01s] fail    preflight rc=2 1s
+    FAIL vllm_source: not a git checkout: /Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/archive-pytest/test_documented_push_stage_att0/home/vllm; supply: git clone --depth 1 --branch v0.27.1 https://github.com/vllm-project/vl
+    FAIL packed_model: /Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/archive-pytest/test_documented_push_stage_att0/home/model; vl.bin=22 bytes, vl.manifest=22 bytes, hf/config.json=20 bytes, golden_c1024.txt=22 bytes; golden
+
+# job preflight gpu=None cwd=/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/archive-pytest/test_documented_push_stage_att0/home/etx
+# .venv/bin/python -u -m examples.vllm_llm.producer_session preflight
+PASS interpreter: /Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/archive-pytest/test_documented_push_stage_att0/home/src/f67457dffc7dd0276e748f697fee508152a4063374b36c861b33ccf594e69f50-20261015T091934Z/.venv/bin/python; yaml, numpy import from .venv
+FAIL vllm_source: not a git checkout: /Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/archive-pytest/test_documented_push_stage_att0/home/vllm; supply: git clone --depth 1 --branch v0.27.1 https://github.com/vllm-project/vllm.git /Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/archive-pytest/test_documented_push_stage_att0/home/vllm
+FAIL packed_model: /Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/archive-pytest/test_documented_push_stage_att0/home/model; vl.bin=22 bytes, vl.manifest=22 bytes, hf/config.json=20 bytes, golden_c1024.txt=22 bytes; golden sha256=77ad03965c63b4e1c0fa590cdd8cb85db5fbff6627aadb1324b853a24df820f4 expected=bab2f1fbe12f70179711ec40a215c74710845b73169b1cc6a3a6ca50e0a19484; supply: cp /Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/archive-pytest/test_documented_push_stage_att0/home/src/f67457dffc7dd0276e748f697fee508152a4063374b36c861b33ccf594e69f50-20261015T091934Z/examples/llm/results/golden_c1024_qwen3-30b-a3b.txt /Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/archive-pytest/test_documented_push_stage_att0/home/model/golden_c1024.txt
+FAIL rocm_headers: ETX_ROCM_HEADERS=/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/archive-pytest/test_documented_push_stage_att0/home/rocm-headers/inc; requires hip/hip_runtime.h; supply: mkdir -p /Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/archive-pytest/test_documented_push_stage_att0/home/rocm-headers/inc && rsync -a "${ETX_STAGE_SOURCE:?set ETX_STAGE_SOURCE to the CPU-tested staging directory}/"rocm-headers/inc/ /Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/archive-pytest/test_documented_push_stage_att0/home/rocm-headers/inc/
+FAIL gpu: /dev/kfd exists=False; rocm-smi=Card Series: CPU-SUBSTITUTE; supply: bash /Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/archive-pytest/test_documented_push_stage_att0/home/src/f67457dffc7dd0276e748f697fee508152a4063374b36c861b33ccf594e69f50-20261015T091934Z/tools/hotaisle_grab.sh 1x
+PREFLIGHT FAIL 4 item(s)
+FAIL phase=preflight reason=box inputs missing: supply each FAIL above with its printed command, then rerun preflight
+EVIDENCE /Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/archive-pytest/test_documented_push_stage_att0/home/sess/20261015T091937Z-528143
+SAFE resume: session.sh status/fetch; inspect failure; no partial timing claim; lease budget is unchanged
+
+.
+2 passed in 15.67s

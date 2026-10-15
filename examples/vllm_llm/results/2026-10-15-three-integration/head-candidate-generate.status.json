@@ -1,0 +1,18 @@
+{
+  "name": "head-candidate-generate",
+  "command": [
+    "/Users/ckl/code/.wt/etx-qwen-three-integration/.venv/bin/python",
+    "-m",
+    "examples.vllm_llm.expert_merge.prepare",
+    "generate",
+    "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/expert/head-candidate",
+    "--arm",
+    "candidate",
+    "--head"
+  ],
+  "exit": 0,
+  "stop": null,
+  "seconds": 10.01,
+  "log": "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/head-candidate-generate.log",
+  "free_bytes": 7448137728
+}

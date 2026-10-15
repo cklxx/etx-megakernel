@@ -1,0 +1,101 @@
+{
+  "schema": "etx.c6.cpu.v1",
+  "synthetic": true,
+  "gpu_visibility": "NOT_TESTED",
+  "completed_epochs": 1440,
+  "orders_per_active_case": 120,
+  "active_partitions": [
+    0,
+    1,
+    4,
+    5
+  ],
+  "cancellation": {
+    "original_order": 1.0,
+    "arrival_order_results": [
+      0.0,
+      1.0,
+      2.0
+    ]
+  },
+  "slot_blocks": [
+    [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+    ],
+    [
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+    ],
+    [
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23
+    ],
+    [
+      24,
+      25,
+      26,
+      27,
+      28,
+      29,
+      30,
+      31
+    ]
+  ],
+  "schedule": {
+    "control_workers_per_head": 7,
+    "candidate_workers_per_head": 5,
+    "launch_blocks": 304,
+    "owner_ticket": 0,
+    "head_xcds": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "consumer_xcd": 7
+  },
+  "costs": {
+    "measured_here": null,
+    "derived_historical_zero_tax_local_advance_us": "101.82",
+    "historical_local_advance_is_wall_forecast": false,
+    "gross_registered_budget_us": 96,
+    "retained_payload_floor_ms_estimate": "1.440",
+    "byte_ledger_gb": "6.1904",
+    "bandwidth_tb_s": "4.3",
+    "required_net_step_us": 50,
+    "general_keep_us": 30,
+    "combined_tax_budget_us_per_layer": "0.9583333333",
+    "retained_body_hop_credit_us": 0,
+    "unknown": [
+      "publication/acquisition",
+      "all-wave drain",
+      "mask/election",
+      "reduce argument setup",
+      "cache reuse",
+      "output flush",
+      "reset and copies",
+      "queue interference",
+      "spills"
+    ]
+  },
+  "source_sha256": "4ff7d7c604a4984568d215eee31b6c6aa2a766f6bce5feec5acb52f896429b9a"
+}

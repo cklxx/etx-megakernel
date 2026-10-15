@@ -1,0 +1,24 @@
+/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/expert/qkv-control/megakernel_d0.hip:158:1: remark: Function Name: etx_megakernel_d0 [-Rpass-analysis=kernel-resource-usage]
+  158 | extern "C" __global__ void __launch_bounds__(ETX_THREADS, ETX_MIN_WG_PER_CU) etx_megakernel_d0(etx_params p) {
+      | ^
+/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/expert/qkv-control/megakernel_d0.hip:158:1: remark:     TotalSGPRs: 106 [-Rpass-analysis=kernel-resource-usage]
+/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/expert/qkv-control/megakernel_d0.hip:158:1: remark:     VGPRs: 87 [-Rpass-analysis=kernel-resource-usage]
+/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/expert/qkv-control/megakernel_d0.hip:158:1: remark:     AGPRs: 0 [-Rpass-analysis=kernel-resource-usage]
+/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/expert/qkv-control/megakernel_d0.hip:158:1: remark:     ScratchSize [bytes/lane]: 0 [-Rpass-analysis=kernel-resource-usage]
+/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/expert/qkv-control/megakernel_d0.hip:158:1: remark:     Dynamic Stack: False [-Rpass-analysis=kernel-resource-usage]
+/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/expert/qkv-control/megakernel_d0.hip:158:1: remark:     Occupancy [waves/SIMD]: 5 [-Rpass-analysis=kernel-resource-usage]
+/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/expert/qkv-control/megakernel_d0.hip:158:1: remark:     SGPRs Spill: 19 [-Rpass-analysis=kernel-resource-usage]
+/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/expert/qkv-control/megakernel_d0.hip:158:1: remark:     VGPRs Spill: 0 [-Rpass-analysis=kernel-resource-usage]
+/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/expert/qkv-control/megakernel_d0.hip:158:1: remark:     LDS Size [bytes/block]: 21152 [-Rpass-analysis=kernel-resource-usage]
+/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/expert/qkv-control/megakernel_d0.hip:212:1: remark: Function Name: etx_unfused_d0 [-Rpass-analysis=kernel-resource-usage]
+  212 | extern "C" __global__ void __launch_bounds__(ETX_THREADS, ETX_MIN_WG_PER_CU) etx_unfused_d0(etx_params p, int32_t first) {
+      | ^
+/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/expert/qkv-control/megakernel_d0.hip:212:1: remark:     TotalSGPRs: 85 [-Rpass-analysis=kernel-resource-usage]
+/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/expert/qkv-control/megakernel_d0.hip:212:1: remark:     VGPRs: 56 [-Rpass-analysis=kernel-resource-usage]
+/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/expert/qkv-control/megakernel_d0.hip:212:1: remark:     AGPRs: 0 [-Rpass-analysis=kernel-resource-usage]
+/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/expert/qkv-control/megakernel_d0.hip:212:1: remark:     ScratchSize [bytes/lane]: 0 [-Rpass-analysis=kernel-resource-usage]
+/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/expert/qkv-control/megakernel_d0.hip:212:1: remark:     Dynamic Stack: False [-Rpass-analysis=kernel-resource-usage]
+/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/expert/qkv-control/megakernel_d0.hip:212:1: remark:     Occupancy [waves/SIMD]: 8 [-Rpass-analysis=kernel-resource-usage]
+/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/expert/qkv-control/megakernel_d0.hip:212:1: remark:     SGPRs Spill: 0 [-Rpass-analysis=kernel-resource-usage]
+/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/expert/qkv-control/megakernel_d0.hip:212:1: remark:     VGPRs Spill: 0 [-Rpass-analysis=kernel-resource-usage]
+/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/expert/qkv-control/megakernel_d0.hip:212:1: remark:     LDS Size [bytes/block]: 21120 [-Rpass-analysis=kernel-resource-usage]

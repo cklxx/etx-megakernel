@@ -1,0 +1,9 @@
+{
+  "exit": 0,
+  "archive_tests": "2 passed in 15.67s",
+  "expected_refusals": {
+    "missing_identity": 1,
+    "malformed_identity": 1
+  },
+  "gpu_execution": false
+}

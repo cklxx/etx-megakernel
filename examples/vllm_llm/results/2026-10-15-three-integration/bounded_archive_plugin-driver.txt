@@ -1,0 +1,7 @@
+import os
+from pathlib import Path
+import pytest
+@pytest.fixture(autouse=True)
+def bounded_combined_archive(request,monkeypatch):
+    if request.module.__name__.endswith("test_producer_readiness"):
+        monkeypatch.setattr(request.module,"ROOT",Path(os.environ["QWEN_ARCHIVE_FIXTURE"]))

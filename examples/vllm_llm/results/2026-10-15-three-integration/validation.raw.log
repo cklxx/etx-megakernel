@@ -1,0 +1,179 @@
+STAGE attention-local-full
+PROGRESS attention-local-full 0 seconds; log_bytes 0
+PROGRESS attention-local-full 10 seconds; log_bytes 732
+PROGRESS attention-local-full 20 seconds; log_bytes 732
+PROGRESS attention-local-full 30 seconds; log_bytes 861
+PROGRESS attention-local-full 40 seconds; log_bytes 861
+PROGRESS attention-local-full 50 seconds; log_bytes 861
+PROGRESS attention-local-full 60 seconds; log_bytes 861
+PROGRESS attention-local-full 70 seconds; log_bytes 861
+PROGRESS attention-local-full 80 seconds; log_bytes 861
+PROGRESS attention-local-full 90 seconds; log_bytes 1280
+PROGRESS attention-local-full 100 seconds; log_bytes 1409
+PROGRESS attention-local-full 110 seconds; log_bytes 1409
+PROGRESS attention-local-full 120 seconds; log_bytes 1540
+PROGRESS attention-local-full 130 seconds; log_bytes 1540
+PROGRESS attention-local-full 140 seconds; log_bytes 1540
+PROGRESS attention-local-full 150 seconds; log_bytes 1540
+PROGRESS attention-local-full 160 seconds; log_bytes 1540
+PROGRESS attention-local-full 170 seconds; log_bytes 1540
+DONE attention-local-full 0 None
+STAGE attention-local-probe
+PROGRESS attention-local-probe 0 seconds; log_bytes 0
+PROGRESS attention-local-probe 10 seconds; log_bytes 126
+PROGRESS attention-local-probe 20 seconds; log_bytes 126
+PROGRESS attention-local-probe 30 seconds; log_bytes 254
+PROGRESS attention-local-probe 40 seconds; log_bytes 254
+PROGRESS attention-local-probe 50 seconds; log_bytes 254
+PROGRESS attention-local-probe 60 seconds; log_bytes 254
+PROGRESS attention-local-probe 70 seconds; log_bytes 254
+PROGRESS attention-local-probe 80 seconds; log_bytes 254
+DONE attention-local-probe 0 None
+STAGE attention-local-diagnostic
+PROGRESS attention-local-diagnostic 0 seconds; log_bytes 0
+PROGRESS attention-local-diagnostic 10 seconds; log_bytes 131
+PROGRESS attention-local-diagnostic 20 seconds; log_bytes 131
+PROGRESS attention-local-diagnostic 30 seconds; log_bytes 264
+PROGRESS attention-local-diagnostic 40 seconds; log_bytes 264
+PROGRESS attention-local-diagnostic 50 seconds; log_bytes 264
+PROGRESS attention-local-diagnostic 60 seconds; log_bytes 264
+PROGRESS attention-local-diagnostic 70 seconds; log_bytes 264
+PROGRESS attention-local-diagnostic 80 seconds; log_bytes 264
+DONE attention-local-diagnostic 0 None
+STAGE attention-rocm
+PROGRESS attention-rocm 0 seconds; log_bytes 0
+PROGRESS attention-rocm 10 seconds; log_bytes 600
+PROGRESS attention-rocm 20 seconds; log_bytes 726
+PROGRESS attention-rocm 30 seconds; log_bytes 854
+PROGRESS attention-rocm 40 seconds; log_bytes 854
+PROGRESS attention-rocm 50 seconds; log_bytes 854
+PROGRESS attention-rocm 60 seconds; log_bytes 854
+PROGRESS attention-rocm 70 seconds; log_bytes 1270
+PROGRESS attention-rocm 80 seconds; log_bytes 1398
+PROGRESS attention-rocm 90 seconds; log_bytes 1528
+PROGRESS attention-rocm 100 seconds; log_bytes 1528
+PROGRESS attention-rocm 110 seconds; log_bytes 1528
+PROGRESS attention-rocm 120 seconds; log_bytes 1528
+PROGRESS attention-rocm 130 seconds; log_bytes 37613
+PROGRESS attention-rocm 140 seconds; log_bytes 37613
+PROGRESS attention-rocm 150 seconds; log_bytes 37740
+PROGRESS attention-rocm 160 seconds; log_bytes 37740
+PROGRESS attention-rocm 170 seconds; log_bytes 37740
+PROGRESS attention-rocm 180 seconds; log_bytes 69152
+PROGRESS attention-rocm 190 seconds; log_bytes 69152
+PROGRESS attention-rocm 200 seconds; log_bytes 69284
+PROGRESS attention-rocm 210 seconds; log_bytes 69284
+PROGRESS attention-rocm 220 seconds; log_bytes 69284
+PROGRESS attention-rocm 230 seconds; log_bytes 69418
+DONE attention-rocm 0 None
+STAGE qkv-control-generate
+PROGRESS qkv-control-generate 0 seconds; log_bytes 0
+DONE qkv-control-generate 0 None
+STAGE qkv-control-local
+PROGRESS qkv-control-local 0 seconds; log_bytes 0
+DONE qkv-control-local 0 None
+STAGE qkv-control-rocm
+PROGRESS qkv-control-rocm 0 seconds; log_bytes 0
+PROGRESS qkv-control-rocm 10 seconds; log_bytes 16267
+DONE qkv-control-rocm 0 None
+STAGE qkv-control-diag-generate
+PROGRESS qkv-control-diag-generate 0 seconds; log_bytes 0
+DONE qkv-control-diag-generate 0 None
+STAGE qkv-control-diag-local
+PROGRESS qkv-control-diag-local 0 seconds; log_bytes 0
+DONE qkv-control-diag-local 0 None
+STAGE qkv-control-diag-rocm
+PROGRESS qkv-control-diag-rocm 0 seconds; log_bytes 0
+PROGRESS qkv-control-diag-rocm 10 seconds; log_bytes 16366
+DONE qkv-control-diag-rocm 0 None
+STAGE qkv-candidate-generate
+PROGRESS qkv-candidate-generate 0 seconds; log_bytes 0
+DONE qkv-candidate-generate 0 None
+STAGE qkv-candidate-local
+PROGRESS qkv-candidate-local 0 seconds; log_bytes 0
+DONE qkv-candidate-local 0 None
+STAGE qkv-candidate-rocm
+PROGRESS qkv-candidate-rocm 0 seconds; log_bytes 0
+PROGRESS qkv-candidate-rocm 10 seconds; log_bytes 16309
+DONE qkv-candidate-rocm 0 None
+STAGE qkv-candidate-diag-generate
+PROGRESS qkv-candidate-diag-generate 0 seconds; log_bytes 0
+DONE qkv-candidate-diag-generate 0 None
+STAGE qkv-candidate-diag-local
+PROGRESS qkv-candidate-diag-local 0 seconds; log_bytes 0
+DONE qkv-candidate-diag-local 0 None
+STAGE qkv-candidate-diag-rocm
+PROGRESS qkv-candidate-diag-rocm 0 seconds; log_bytes 0
+PROGRESS qkv-candidate-diag-rocm 10 seconds; log_bytes 16408
+DONE qkv-candidate-diag-rocm 0 None
+STAGE head-control-generate
+PROGRESS head-control-generate 0 seconds; log_bytes 0
+DONE head-control-generate 0 None
+STAGE head-control-local
+PROGRESS head-control-local 0 seconds; log_bytes 0
+DONE head-control-local 0 None
+STAGE head-control-rocm
+PROGRESS head-control-rocm 0 seconds; log_bytes 0
+PROGRESS head-control-rocm 10 seconds; log_bytes 16288
+DONE head-control-rocm 0 None
+STAGE head-control-diag-generate
+PROGRESS head-control-diag-generate 0 seconds; log_bytes 0
+DONE head-control-diag-generate 0 None
+STAGE head-control-diag-local
+PROGRESS head-control-diag-local 0 seconds; log_bytes 0
+DONE head-control-diag-local 0 None
+STAGE head-control-diag-rocm
+PROGRESS head-control-diag-rocm 0 seconds; log_bytes 0
+PROGRESS head-control-diag-rocm 10 seconds; log_bytes 16387
+DONE head-control-diag-rocm 0 None
+STAGE head-candidate-generate
+PROGRESS head-candidate-generate 0 seconds; log_bytes 0
+DONE head-candidate-generate 0 None
+STAGE head-candidate-local
+PROGRESS head-candidate-local 0 seconds; log_bytes 0
+DONE head-candidate-local 0 None
+STAGE head-candidate-rocm
+PROGRESS head-candidate-rocm 0 seconds; log_bytes 0
+PROGRESS head-candidate-rocm 10 seconds; log_bytes 16330
+DONE head-candidate-rocm 0 None
+STAGE head-candidate-diag-generate
+PROGRESS head-candidate-diag-generate 0 seconds; log_bytes 0
+DONE head-candidate-diag-generate 0 None
+STAGE head-candidate-diag-local
+PROGRESS head-candidate-diag-local 0 seconds; log_bytes 0
+DONE head-candidate-diag-local 0 None
+STAGE head-candidate-diag-rocm
+PROGRESS head-candidate-diag-rocm 0 seconds; log_bytes 0
+PROGRESS head-candidate-diag-rocm 10 seconds; log_bytes 16429
+DONE head-candidate-diag-rocm 0 None
+STAGE expert-capture-emit
+PROGRESS expert-capture-emit 0 seconds; log_bytes 0
+DONE expert-capture-emit 0 None
+STAGE expert-capture-syntax
+PROGRESS expert-capture-syntax 0 seconds; log_bytes 0
+DONE expert-capture-syntax 0 None
+STAGE attention-capture-syntax
+PROGRESS attention-capture-syntax 0 seconds; log_bytes 0
+DONE attention-capture-syntax 0 None
+STAGE attention-simulation
+PROGRESS attention-simulation 0 seconds; log_bytes 0
+DONE attention-simulation 0 None
+STAGE producer-simulation
+PROGRESS producer-simulation 0 seconds; log_bytes 0
+DONE producer-simulation 0 None
+STAGE session-qwen_producer
+PROGRESS session-qwen_producer 0 seconds; log_bytes 0
+DONE session-qwen_producer 0 None
+STAGE session-attention_early_merge
+PROGRESS session-attention_early_merge 0 seconds; log_bytes 0
+DONE session-attention_early_merge 0 None
+STAGE session-qwen_expert_merge
+PROGRESS session-qwen_expert_merge 0 seconds; log_bytes 0
+DONE session-qwen_expert_merge 0 None
+STAGE shell-syntax
+PROGRESS shell-syntax 0 seconds; log_bytes 0
+DONE shell-syntax 0 None
+STAGE full-suite
+PROGRESS full-suite 0 seconds; log_bytes 0
+DONE full-suite 2 None
+full-suite failed

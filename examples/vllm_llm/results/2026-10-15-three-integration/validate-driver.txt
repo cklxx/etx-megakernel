@@ -1,0 +1,98 @@
+import fcntl,hashlib,json,os,shutil,signal,subprocess,sys,time
+from pathlib import Path
+root=Path.cwd(); base=Path('/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence')
+lock=open(base.parent/'qwen-prep-heavy.lock','a+')
+fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
+lock.seek(0);lock.truncate();lock.write(f'integration pid={os.getpid()}\n');lock.flush()
+sys.path.insert(0,str(root))
+from examples.vllm_llm import producer_session as ps
+from examples.vllm_llm.expert_merge import prepare as ep
+from examples.vllm_llm.attention_early_merge import evidence as ae
+sources=ps.local_sources(); (base/'sources.json').write_text(json.dumps(sources,indent=2)+'\n')
+def sha(p):return hashlib.sha256(Path(p).read_bytes()).hexdigest()
+def save(n,v):(base/n).write_text(json.dumps(v,indent=2)+'\n')
+env=dict(os.environ,PYTHONPATH=str(root),TMPDIR=str(base/'tmp'),ETX_DATA_ROOT='/Users/ckl/code/etx',ETX_REFERENCE_ROOT='/Users/ckl/code/etx',ETX_DEVLIBS='/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode')
+(base/'tmp').mkdir(exist_ok=True);commands=[]
+def run(name,cmd,limit=900,overrides=None,cwd=None):
+    if ps.local_sources()!=sources:raise RuntimeError('source changed')
+    assert shutil.disk_usage(base).free>4.7*1024**3,'reserve before '+name
+    log=base/(name+'.log');start=time.monotonic();stop=None
+    print('STAGE',name,flush=True)
+    with log.open('x') as out:
+        p=subprocess.Popen(list(map(str,cmd)),cwd=cwd or root,env=env|dict(overrides or {}),stdout=out,stderr=subprocess.STDOUT,start_new_session=True)
+        while p.poll() is None:
+            elapsed=time.monotonic()-start
+            if elapsed>limit or shutil.disk_usage(base).free<4*1024**3:
+                stop='deadline' if elapsed>limit else 'disk reserve'
+                os.killpg(p.pid,signal.SIGTERM)
+                try:p.wait(timeout=5)
+                except subprocess.TimeoutExpired:os.killpg(p.pid,signal.SIGKILL);p.wait()
+                break
+            print('PROGRESS',name,int(elapsed),'seconds; log_bytes',log.stat().st_size,flush=True);time.sleep(10)
+    record=dict(name=name,command=list(map(str,cmd)),exit=p.returncode,stop=stop,seconds=round(time.monotonic()-start,2),log=str(log),free_bytes=shutil.disk_usage(base).free)
+    commands.append(record);save('commands.json',commands);save(name+'.status.json',record)
+    print('DONE',name,p.returncode,stop,flush=True)
+    if p.returncode or stop:raise SystemExit(name+' failed')
+py=str(root/'.venv/bin/python')
+# Every old producer input still matches; only isolated experiment files are added.
+old= json.loads((ps.ART/'local-ready.json').read_text())
+shutil.copyfile(ps.ART/'local-ready.json',base/'previous-producer-local-ready.json')
+changed={n:dict(old=h,new=sources.get(n)) for n,h in old['sources'].items() if sources.get(n)!=h}
+assert not changed,changed
+added={n:h for n,h in sources.items() if n not in old['sources']}
+assert all(n.startswith(('examples/vllm_llm/attention_early_merge/','examples/vllm_llm/expert_merge/')) or n in ('tests/test_attention_early_merge.py','tests/test_expert_merge.py') for n in added),added
+save('producer-compile-reuse.json',dict(base='bcc3c98b421164ae70e42d566bf836d0da35425f',old_receipt_sha256=sha(base/'previous-producer-local-ready.json'),unchanged=old['sources'],added_isolated_files=added,changed=changed,decision='Reuse historical 16-variant matrix and producer compiler evidence: every prior source byte matches; added isolated modules are not reached from producer builds. No fresh producer compile claimed.',historical_reuse=old.get('reused_compile_evidence')))
+# Expert code covered by the independent reviews remains byte-identical.
+covered={}
+for prefix in ('examples/vllm_llm/expert_merge','examples/sessions/qwen_expert_merge.py','tests/test_expert_merge.py'):
+    names=subprocess.check_output(['git','ls-tree','-r','--name-only','11743ed0c18ce4a2acc4af5493c678af1a62691a','--',prefix],text=True).splitlines()
+    for n in names:
+        content=subprocess.check_output(['git','show','11743ed0c18ce4a2acc4af5493c678af1a62691a:'+n]);assert hashlib.sha256(content).hexdigest()==sha(root/n);covered[n]=sha(root/n)
+save('expert-review-coverage.json',dict(reviewed_commit='11743ed0c18ce4a2acc4af5493c678af1a62691a',identical_files=covered,combined_dependency_builds='fresh generation and local/ROCm compiles below; no claim that prior review covers unreviewed new behavior'))
+run('attention-local-full',[py,'-m','examples.vllm_llm.attention_early_merge.offline','--out',base/'attention/local-full'])
+for label,flags in [('probe',[]),('diagnostic',['--diagnostic'])]:
+    run('attention-local-'+label,[py,'-m','examples.vllm_llm.attention_early_merge.build','--local',*flags,'--footprint',base/'attention/local-full','--out',base/('attention/local-'+label)])
+run('attention-rocm',['bash','examples/vllm_llm/attention_early_merge/rocm_check.sh',base/'attention/rocm'],1200)
+expert={}
+oldprobe=base.parent/'expert-final-fixes-evidence/probe'
+for head in (False,True):
+  for arm in ('control','candidate'):
+    for diag in (False,True):
+      name=('head' if head else 'qkv')+'-'+arm+('-diag' if diag else '')
+      out=base/'expert'/name
+      run(name+'-generate',[py,'-m','examples.vllm_llm.expert_merge.prepare','generate',out,'--arm',arm,*(['--head'] if head else []),*(['--diagnostic'] if diag else [])])
+      identity=ep.verify(out)
+      comparison={}
+      for f in ('tiles.hip','plan_data.h'):
+        assert sha(out/f)==sha(oldprobe/name/f),(name,f)
+        comparison[f]=sha(out/f)
+      expert[name]=dict(id=identity['id'],generated=identity['generated'],byte_equal_reviewed_generated=comparison)
+      run(name+'-local',[py,'-m','examples.vllm_llm.expert_merge.prepare','local',out])
+      run(name+'-rocm',['bash','examples/vllm_llm/expert_merge/offline.sh',out])
+save('expert-identities.json',expert)
+run('expert-capture-emit',[py,'-m','examples.vllm_llm.expert_merge.capture','emit',base/'expert-capture'])
+# Compile regenerated capture host using the fresh combined ordinary kept plan.
+r=Path.home()/'code/rocm-headers';llvm=Path('/opt/homebrew/opt/llvm/bin');full=base/'attention/local-full'
+host=[llvm/'clang++','-x','hip','--cuda-host-only','-fsyntax-only','-nogpuinc','-nogpulib','--offload-arch=gfx942','-std=c++17','-isystem',r/'clang','-isystem',r/'inc','-include','__clang_hip_runtime_wrapper.h','-isystem',root/'etx/importer/shim/mac','-D__HIP_PLATFORM_AMD__','-DETX_VL_CHECK','-I',root/'etx/runtime/include','-I',full/'control','-I',full,'-I',root]
+run('expert-capture-syntax',host+[base/'expert-capture/capture_host.hip'])
+run('attention-capture-syntax',host+[base/'attention/local-probe/capture_host.hip'])
+identities={}
+for tool in ('local','rocm'):
+  full=base/('attention/local-full' if tool=='local' else 'attention/rocm/full')
+  ident=ae.identity(full,'offline.json',runnable=False)
+  if tool=='rocm':ae.resource_gate(ident['resources']['envelope'])
+  identities[str(full.relative_to(base))]=dict(manifest_sha256=sha(full/'offline.json'),resources=ident['resources'])
+  for label in ('probe','diagnostic'):
+    b=base/('attention/local-'+label if tool=='local' else 'attention/rocm/'+label)
+    ident=ae.identity(b,runnable=False);ae.resource_gate(ident['resources'])
+    ae.same_imports(full/'imp',b/'imp',['attention.ll','attn_reduce.ll'])
+    identities[str(b.relative_to(base))]=dict(manifest_sha256=sha(b/'identity.json'),resources=ident['resources'])
+save('attention-identities.json',identities)
+run('attention-simulation',[py,'-m','examples.vllm_llm.attention_early_merge.simulate','--out',base/'attention-simulation.json'])
+run('producer-simulation',[py,'-m','examples.vllm_llm.producer_replay','--out',base/'producer-simulation.json'])
+for name in ('qwen_producer','attention_early_merge','qwen_expert_merge'):
+    run('session-'+name,[py,'-m','etx.tools.gpu_jobs','examples/sessions/'+name+'.py','--gpus','0','--dry-run'])
+run('shell-syntax',['bash','-n','tools/session.sh','examples/vllm_llm/attention_early_merge/rocm_check.sh','examples/vllm_llm/expert_merge/offline.sh'])
+run('full-suite',[py,'-m','pytest','-q','-ra','--basetemp='+str(base/'pytest'),'-o','tmp_path_retention_policy=failed','-k','not test_fresh_archive_interpreter_preflight_and_failure_report and not test_documented_push_stage_attach_start_with_local_transport'],1200)
+save('build-and-tests-complete.json',dict(status='PASS_LOCAL_ONLY',sources=sources,device_execution='NOT_RUN',native_executable_link='UNAVAILABLE_LOCAL_HIP_RUNTIME',gpu_spend_usd=0,archive_tests='Separate bounded combined-source Git fixture required; excluded above, not claimed yet'))
+print('BUILD AND TESTS COMPLETE; archive check and review checkpoint remain',flush=True)

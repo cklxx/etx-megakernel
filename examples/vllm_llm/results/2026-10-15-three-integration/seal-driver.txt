@@ -1,0 +1,54 @@
+"""Seal only completed integration logs; no Git mutation, remote or GPU action."""
+import hashlib,json,shutil,sys
+from pathlib import Path
+root=Path.cwd();sys.path.insert(0,str(root))
+from examples.vllm_llm import producer_session as ps
+from examples.vllm_llm.kept_build import source_hashes
+from examples.vllm_llm.expert_merge import prepare as ep
+base=Path('/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence')
+dest=root/'examples/vllm_llm/results/2026-10-15-three-integration';dest.mkdir(exist_ok=True)
+def sha(p):return hashlib.sha256(Path(p).read_bytes()).hexdigest()
+def save(p,v):p.write_text(json.dumps(v,indent=2)+'\n')
+assert json.loads((base/'archive-acceptance.json').read_text())['status']=='PASS_LOCAL_TRANSPORT_ONLY'
+assert json.loads((base/'build-and-tests-complete.json').read_text())['sources']==ps.local_sources()
+# Keep reproducible drivers as .txt: adding executable source under results would
+# expand kept_build.source_hashes and invalidate all just-generated manifests.
+for name in ('validate.py','resume_tests.py','archive_checks.py','bounded_archive_plugin.py','seal.py'):
+    shutil.copy2(base/name,dest/(name.replace('.py','-driver.txt')))
+for p in base.iterdir():
+    if p.is_file() and (p.suffix in ('.log','.json') or p.name in ('previous-producer-SHA256SUMS',)):
+        shutil.copy2(p,dest/p.name)
+artifacts={}
+for folder in ('attention','expert','expert-capture','archive-expert-capture','archive-expert-attest-valid'):
+    for p in (base/folder).rglob('*'):
+        if not p.is_file():continue
+        rel=p.relative_to(base);artifacts[str(rel)]=dict(sha256=sha(p),bytes=p.stat().st_size)
+        if p.suffix in ('.json','.log','.rc'):
+            out=dest/rel;out.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(p,out)
+# Preserve failed/initial index setup and merge receipts, plus all raw build logs.
+# Compiler .s/.ll/.bc/.o are retained at scratch paths and indexed by exact hash.
+save(dest/'generated-artifacts.json',artifacts)
+review_dir=dest/'reviews';review_dir.mkdir(exist_ok=True)
+reviews={}
+for name in ('astra-expert-final-code-review.md','astra-expert-fixes-rereview.md','astra-attention-final-code-review.md'):
+    p=base.parent/name
+    if p.exists():
+        shutil.copy2(p,review_dir/name);reviews[name]=dict(sha256=sha(p),source=str(p))
+    else:reviews[name]=dict(status='MISSING: publication blocked')
+save(dest/'reviews.json',reviews)
+# Refresh only the producer receipt and its one checksum line. Preserve originals.
+ready=json.loads((ps.ART/'local-ready.json').read_text())
+ready['sources']=ps.local_sources()
+ready['commands']=[]
+for c in json.loads((base/'commands.json').read_text())+json.loads((base/'archive-commands.json').read_text()):
+    c=dict(c);c['log']=str((dest/(c['name']+'.log')).relative_to(root));ready['commands'].append(c)
+ready['archive_acceptance']='../2026-10-15-three-integration/archive-acceptance.json'
+ready['archive_acceptance_sha256']=sha(dest/'archive-acceptance.json')
+ready['integration_evidence']='../2026-10-15-three-integration/'
+save(ps.ART/'local-ready.json',ready)
+sums=ps.ART/'SHA256SUMS';original=(base/'previous-producer-SHA256SUMS').read_text()
+assert sums.read_text()==original
+sums.write_text(''.join((sha(ps.ART/'local-ready.json')+'  local-ready.json\n') if line.split(None,1)[1].strip()=='local-ready.json' else line for line in original.splitlines(keepends=True)))
+assert ready['sources']==ps.local_sources()
+save(dest/'identity-summary.json',dict(producer=dict(source_count=len(ps.local_sources()),receipt_sha256=sha(ps.ART/'local-ready.json'),receipt_sources_equal=True),attention=dict(source_count=len(source_hashes()),builds=json.loads((base/'attention-identities.json').read_text())),expert=dict(source_count=len(ep.sources()),builds=json.loads((base/'expert-identities.json').read_text())),shared_runtime='Identical to bcc3c98; only isolated experiment source additions, shared index/documents and evidence/receipt integration.',gpu_execution='NOT_RUN',gpu_spend_usd=0))
+print('SEALED',dest,'sources',len(ps.local_sources()),'free_gib',round(shutil.disk_usage(root).free/1024**3,2))

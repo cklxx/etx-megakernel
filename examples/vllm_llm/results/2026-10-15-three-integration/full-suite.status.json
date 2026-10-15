@@ -1,0 +1,20 @@
+{
+  "name": "full-suite",
+  "command": [
+    "/Users/ckl/code/.wt/etx-qwen-three-integration/.venv/bin/python",
+    "-m",
+    "pytest",
+    "-q",
+    "-ra",
+    "--basetemp=/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/pytest",
+    "-o",
+    "tmp_path_retention_policy=failed",
+    "-k",
+    "not test_fresh_archive_interpreter_preflight_and_failure_report and not test_documented_push_stage_attach_start_with_local_transport"
+  ],
+  "exit": 2,
+  "stop": null,
+  "seconds": 10.01,
+  "log": "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/full-suite.log",
+  "free_bytes": 7435816960
+}

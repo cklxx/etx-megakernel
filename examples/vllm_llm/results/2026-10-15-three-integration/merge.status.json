@@ -1,0 +1,1 @@
+{"command": ["git", "merge", "--no-ff", "--no-commit", "db1694bcdbd2345401f42a58e5f41b4b4ee43d02", "11743ed0c18ce4a2acc4af5493c678af1a62691a"], "exit": 0}

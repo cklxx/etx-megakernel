@@ -1,0 +1,44 @@
+{
+  "shared_files_unchanged_against_main": "bcc3c98b421164ae70e42d566bf836d0da35425f",
+  "paths": [
+    "etx",
+    "examples/vllm_llm/model.py",
+    "examples/vllm_llm/host.hip",
+    "tools/session.sh",
+    "tools/producer_start.py"
+  ],
+  "changed_paths": [],
+  "default": "OFF: no shared model/runtime source change; experiment jobs are explicit isolated entrypoints",
+  "document_links": [
+    {
+      "source": "docs/QWEN-THREE-EXPERIMENTS-2026-10-15.md",
+      "target": "QWEN-PRODUCER-PREP-2026-10-15.md",
+      "exists": true
+    },
+    {
+      "source": "docs/QWEN-THREE-EXPERIMENTS-2026-10-15.md",
+      "target": "QWEN-PRODUCER-RUNBOOK.md",
+      "exists": true
+    },
+    {
+      "source": "docs/QWEN-THREE-EXPERIMENTS-2026-10-15.md",
+      "target": "QWEN-PRODUCER-READINESS-2026-10-15.md",
+      "exists": true
+    },
+    {
+      "source": "docs/QWEN-THREE-EXPERIMENTS-2026-10-15.md",
+      "target": "../examples/vllm_llm/attention_early_merge/EXPERIMENT.md",
+      "exists": true
+    },
+    {
+      "source": "docs/QWEN-THREE-EXPERIMENTS-2026-10-15.md",
+      "target": "EXPERIMENT-qwen-expert-merge-2026-10-15.md",
+      "exists": true
+    },
+    {
+      "source": "docs/QWEN-THREE-EXPERIMENTS-2026-10-15.md",
+      "target": "QWEN-THREE-GPU-QUEUE-2026-10-15.md",
+      "exists": true
+    }
+  ]
+}

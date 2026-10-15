@@ -1,0 +1,242 @@
+[
+  {
+    "name": "fixture-git-init",
+    "command": [
+      "git",
+      "init",
+      "-q"
+    ],
+    "cwd": "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/combined-source-fixture",
+    "exit": 0,
+    "seconds": 5.012423541862518,
+    "expected_exit": 0,
+    "stop": null
+  },
+  {
+    "name": "fixture-git-add",
+    "command": [
+      "git",
+      "add",
+      "-f",
+      "-A"
+    ],
+    "cwd": "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/combined-source-fixture",
+    "exit": 0,
+    "seconds": 5.016823917161673,
+    "expected_exit": 0,
+    "stop": null
+  },
+  {
+    "name": "fixture-git-commit",
+    "command": [
+      "git",
+      "-c",
+      "user.name=Integration validation fixture",
+      "-c",
+      "user.email=fixture@localhost",
+      "commit",
+      "-qm",
+      "Bounded combined-source archive fixture; no historical GPU data"
+    ],
+    "cwd": "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/combined-source-fixture",
+    "exit": 0,
+    "seconds": 5.017529041040689,
+    "expected_exit": 0,
+    "stop": null
+  },
+  {
+    "name": "bounded-archive-tests",
+    "command": [
+      "/Users/ckl/code/.wt/etx-qwen-three-integration/.venv/bin/python",
+      "-m",
+      "pytest",
+      "-q",
+      "-s",
+      "tests/test_producer_readiness.py::test_fresh_archive_interpreter_preflight_and_failure_report",
+      "tests/test_producer_readiness.py::test_documented_push_stage_attach_start_with_local_transport",
+      "-p",
+      "bounded_archive_plugin",
+      "--basetemp=/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/archive-pytest",
+      "-o",
+      "tmp_path_retention_policy=failed"
+    ],
+    "cwd": "/Users/ckl/code/.wt/etx-qwen-three-integration",
+    "exit": 0,
+    "seconds": 20.045026207808405,
+    "expected_exit": 0,
+    "stop": null
+  },
+  {
+    "name": "archive-help-session",
+    "command": [
+      "/Users/ckl/code/.wt/etx-qwen-three-integration/.venv/bin/python",
+      "-m",
+      "examples.vllm_llm.attention_early_merge.session",
+      "--help"
+    ],
+    "cwd": "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/combined-archive",
+    "exit": 0,
+    "seconds": 5.012218416668475,
+    "expected_exit": 0,
+    "stop": null
+  },
+  {
+    "name": "archive-help-build_model",
+    "command": [
+      "/Users/ckl/code/.wt/etx-qwen-three-integration/.venv/bin/python",
+      "-m",
+      "examples.vllm_llm.attention_early_merge.build_model",
+      "--help"
+    ],
+    "cwd": "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/combined-archive",
+    "exit": 0,
+    "seconds": 5.017349416855723,
+    "expected_exit": 0,
+    "stop": null
+  },
+  {
+    "name": "archive-help-runner",
+    "command": [
+      "/Users/ckl/code/.wt/etx-qwen-three-integration/.venv/bin/python",
+      "-m",
+      "examples.vllm_llm.expert_merge.runner",
+      "--help"
+    ],
+    "cwd": "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/combined-archive",
+    "exit": 0,
+    "seconds": 5.016311958897859,
+    "expected_exit": 0,
+    "stop": null
+  },
+  {
+    "name": "archive-help-producer_session",
+    "command": [
+      "/Users/ckl/code/.wt/etx-qwen-three-integration/.venv/bin/python",
+      "-m",
+      "examples.vllm_llm.producer_session",
+      "--help"
+    ],
+    "cwd": "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/combined-archive",
+    "exit": 0,
+    "seconds": 5.009279999881983,
+    "expected_exit": 0,
+    "stop": null
+  },
+  {
+    "name": "archive-session-qwen_producer",
+    "command": [
+      "/Users/ckl/code/.wt/etx-qwen-three-integration/.venv/bin/python",
+      "-m",
+      "etx.tools.gpu_jobs",
+      "examples/sessions/qwen_producer.py",
+      "--gpus",
+      "0",
+      "--dry-run"
+    ],
+    "cwd": "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/combined-archive",
+    "exit": 0,
+    "seconds": 5.016127458773553,
+    "expected_exit": 0,
+    "stop": null
+  },
+  {
+    "name": "archive-session-attention_early_merge",
+    "command": [
+      "/Users/ckl/code/.wt/etx-qwen-three-integration/.venv/bin/python",
+      "-m",
+      "etx.tools.gpu_jobs",
+      "examples/sessions/attention_early_merge.py",
+      "--gpus",
+      "0",
+      "--dry-run"
+    ],
+    "cwd": "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/combined-archive",
+    "exit": 0,
+    "seconds": 5.01610599970445,
+    "expected_exit": 0,
+    "stop": null
+  },
+  {
+    "name": "archive-session-qwen_expert_merge",
+    "command": [
+      "/Users/ckl/code/.wt/etx-qwen-three-integration/.venv/bin/python",
+      "-m",
+      "etx.tools.gpu_jobs",
+      "examples/sessions/qwen_expert_merge.py",
+      "--gpus",
+      "0",
+      "--dry-run"
+    ],
+    "cwd": "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/combined-archive",
+    "exit": 0,
+    "seconds": 5.017087124753743,
+    "expected_exit": 0,
+    "stop": null
+  },
+  {
+    "name": "archive-expert-emit",
+    "command": [
+      "/Users/ckl/code/.wt/etx-qwen-three-integration/.venv/bin/python",
+      "-m",
+      "examples.vllm_llm.expert_merge.capture",
+      "emit",
+      "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/archive-expert-capture"
+    ],
+    "cwd": "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/combined-archive",
+    "exit": 0,
+    "seconds": 5.0174339157529175,
+    "expected_exit": 0,
+    "stop": null
+  },
+  {
+    "name": "archive-expert-attest-valid",
+    "command": [
+      "/Users/ckl/code/.wt/etx-qwen-three-integration/.venv/bin/python",
+      "-m",
+      "examples.vllm_llm.expert_merge.capture",
+      "attest",
+      "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/archive-expert-capture",
+      "--host-build",
+      "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/archive-expert-attest-valid"
+    ],
+    "cwd": "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/combined-archive",
+    "exit": 0,
+    "seconds": 5.015937415882945,
+    "expected_exit": 0,
+    "stop": null
+  },
+  {
+    "name": "archive-expert-attest-missing",
+    "command": [
+      "/Users/ckl/code/.wt/etx-qwen-three-integration/.venv/bin/python",
+      "-m",
+      "examples.vllm_llm.expert_merge.capture",
+      "attest",
+      "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/archive-expert-capture",
+      "--host-build",
+      "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/archive-expert-attest-missing"
+    ],
+    "cwd": "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/combined-archive",
+    "exit": 1,
+    "seconds": 5.016405791044235,
+    "expected_exit": 1,
+    "stop": null
+  },
+  {
+    "name": "archive-expert-attest-malformed",
+    "command": [
+      "/Users/ckl/code/.wt/etx-qwen-three-integration/.venv/bin/python",
+      "-m",
+      "examples.vllm_llm.expert_merge.capture",
+      "attest",
+      "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/archive-expert-capture",
+      "--host-build",
+      "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/archive-expert-attest-malformed"
+    ],
+    "cwd": "/Users/ckl/.hermes/cache/scratch/qwen-three-integration-evidence/combined-archive",
+    "exit": 1,
+    "seconds": 5.0160785829648376,
+    "expected_exit": 1,
+    "stop": null
+  }
+]

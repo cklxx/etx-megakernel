@@ -1,0 +1,21 @@
+{
+  "reviewed_commit": "11743ed0c18ce4a2acc4af5493c678af1a62691a",
+  "identical_files": {
+    "examples/vllm_llm/expert_merge/__init__.py": "679d3e384d4b796f737e157439ee505dd9209d71d765e4642f28e895ffb39daf",
+    "examples/vllm_llm/expert_merge/capture.h": "9654645d9a942fe7306a34b45ed349355ec4a1d05d63c916ac37dad65317af1b",
+    "examples/vllm_llm/expert_merge/capture.py": "c4eb6a38aa78adf183e12abe8292f361a54dd597d91feacd753b56e6cd389b9e",
+    "examples/vllm_llm/expert_merge/cpu.py": "375c800a6eecfe836867cc338f0a5d8603ca95b7e2a1c3faa0c08bc28068d826",
+    "examples/vllm_llm/expert_merge/graph.py": "dce72aff5ff5a976205990209a1e9ac5caa3cf91796ec182107d3327c3769c7d",
+    "examples/vllm_llm/expert_merge/host.hip": "36a967d8c0d352dedb965f6a3a06d8246ad65c98e4d3ab40303dedefef65a07b",
+    "examples/vllm_llm/expert_merge/inputs.py": "9efaf23c84a3517611804cddf764c062ec59981c148baf099aceab407d6478d1",
+    "examples/vllm_llm/expert_merge/offline.sh": "58ad9b53dfaa29a0b9f9f70bf332ee8c687e2bd4c66703936524b851423e5cbd",
+    "examples/vllm_llm/expert_merge/prepare.py": "6c0795bcb63b4d5532637237e48c64bc1b5a6963d558d2839a38a423292c7aee",
+    "examples/vllm_llm/expert_merge/protocol.py": "e3b0c3ff0159bd9266af0d6bf3eee1095592c50aa3fe815089ab58975e082220",
+    "examples/vllm_llm/expert_merge/runner.py": "779efdea2f2912bf840124af2803d09d0a9f5f51b9313285956ae1b12b2bdee2",
+    "examples/vllm_llm/expert_merge/source.py": "97a3fbefe90b7aad4b158ce639295487d2b331f3713714eb8a1bd5d966a316b3",
+    "examples/vllm_llm/expert_merge/validate.py": "51a5a55eb611c552a90fd5045e15cd766e7927a33318d06ae250da42ebf7fe01",
+    "examples/sessions/qwen_expert_merge.py": "5d240e988ebba3bf5b7cbb03c77373978168ab99009ce4776032f05a4fa624cf",
+    "tests/test_expert_merge.py": "927dd2f3bbb41e478ec2653122479caf29b4c8f58b661ec3e8ec2d8be74b2ef6"
+  },
+  "combined_dependency_builds": "fresh generation and local/ROCm compiles below; no claim that prior review covers unreviewed new behavior"
+}
