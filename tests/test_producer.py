@@ -216,6 +216,11 @@ def test_complete_report_recomputes_rule_and_refuses_partial(tmp_path,monkeypatc
     from examples.vllm_llm.import_certificate import digest
     monkeypatch.setattr(session,'require_correctness',lambda *a,**k:None)
     session.save(tmp_path/'measurement.complete.json',dict(rounds=5,basis='host RESULT wall_ms',complete=True))
+    hashes={'packed/golden_c1024.txt':'fixture'}
+    binding=dict(model='/model',hf='/model/hf',golden='/model/golden',prompt='/model/golden',
+                 input_sha256_digest=digest(hashes),golden_sha256='fixture',prompt_sha256='fixture')
+    session.save(tmp_path/'experiment.json',dict(input_binding=binding,input_sha256=hashes))
+    launch=dict(model='/model/hf',attention_backend='ROCM_AITER_UNIFIED_ATTN')
     identity={'test_fixture':True};tag=digest(identity)
     for arm in session.ARMS:
         d=tmp_path/f'certificate_{arm}';d.mkdir();session.save(d/'build_identity.json',identity)
@@ -231,11 +236,20 @@ BUILD-IDENTITY phase=after sha256={tag}
             (tmp_path/f'r{rnd}_{arm}_{mode}.raw.log').write_text(text)
         refdir=tmp_path/f's3_r{rnd}';refdir.mkdir()
         full=[31*4.3+10]*5;one=[10]*5;per=[(a-b)/31 for a,b in zip(full,one)]
-        session.save(refdir/'bf16_bar.json',dict(correct=32,image=session.IMAGE,launch={'attention_backend':'ROCM_AITER_UNIFIED_ATTN'},
+        session.save(refdir/'bf16_bar.json',dict(correct=32,image=session.IMAGE,launch=launch,input_binding=binding,
                     full_ms=full,one_ms=one,per_token_ms=per,median_ms=per[0]))
-        (tmp_path/f'r{rnd}_s3.raw.log').write_text('CORRECTNESS OK 32/32 precision=bf16\n'*6+'BENCH-PROGRESS sample=5/5 correctness=32/32\n')
+        (tmp_path/f'r{rnd}_s3.raw.log').write_text('EXACT-LLM-ARGS '+json.dumps(launch)+'\nINPUT-BINDING '+json.dumps(binding)+'\n'+'CORRECTNESS OK 32/32 precision=bf16\n'*6+'BENCH-PROGRESS sample=5/5 correctness=32/32\n')
     report=session.result(tmp_path)
     assert report['incremental']=='KEEP' and report['fusion']['established'] is True
+    refpath=tmp_path/'s3_r0/bf16_bar.json'
+    valid=refpath.read_text();bad=json.loads(valid);bad['launch']['model']='/unhashed/hf'
+    refpath.write_text(json.dumps(bad))
+    with pytest.raises(ValueError,match='identity'):session.result(tmp_path)
+    refpath.write_text(valid)
+    rawpath=tmp_path/'r0_s3.raw.log';valid_raw=rawpath.read_text()
+    rawpath.write_text(valid_raw.replace('/model/hf','/other/hf'))
+    with pytest.raises(ValueError,match='raw launch'):session.result(tmp_path)
+    rawpath.write_text(valid_raw)
     for rnd in range(5):
         path=tmp_path/f'r{rnd}_producer_fused.raw.log'
         path.write_text(path.read_text().replace('wall_ms=4.0','wall_ms=4.07'))
@@ -286,11 +300,11 @@ def test_trace_endpoints_and_coverage_refusal():
     from examples.vllm_llm.producer_trace import summarize
     types={};rows=[]
     for layer in range(48):
-        for name,ready,start,end in [(f'o_proj_{layer}',0,10,20),(f'moe_up_{layer}',25,26,30)]:
-            ty=len(types);types[name]=dict(id=ty,grid=[1]);rows.append([ty,0,0,0,0,ready,start,end,0])
+        for name,taken,ready,end in [(f'o_proj_{layer}',0,10,20),(f'moe_up_{layer}',25,26,30)]:
+            ty=len(types);types[name]=dict(id=ty,grid=[1]);rows.append([ty,0,0,0,0,taken,ready,end,0])
     raw=np.asarray(rows,dtype='<i8').tobytes()
     out=summarize({'types':types},raw,True)
-    assert out['layers'][0]['o_start_to_all_expert_tasks_ready_us']==.15
+    assert out['layers'][0]['o_start_to_all_expert_tasks_ready_us']==.16
     with pytest.raises(ValueError,match='truncated'):summarize({'types':types},raw[:-1],True)
     with pytest.raises(ValueError,match='coverage'):summarize({'types':types},raw[:-72],True)
 

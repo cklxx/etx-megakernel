@@ -31,9 +31,15 @@ The box must already have these inputs:
 
 - The bf16 packed Qwen checkpoint, `vl.manifest`, pinned HF files and `golden_c1024.txt`.
 - A `qwen-g6.json` with `model`, `hf`, and `golden_sha256` paths or values.
-- The existing build environment: Python, NumPy, HIP compiler, ROCm headers and vLLM source.
+- An independent Python >=3.11 venv outside all checkouts, with NumPy and PyYAML installed inside it.
+- The existing build environment: HIP compiler, ROCm headers and vLLM source.
 - The content-addressed vLLM image from `examples/vllm_llm/qwen300_config.py`.
 - The committed local-ready receipt with matching source hashes.
+
+The resolved `hf` path must equal the resolved `model/hf` path. A symlink to the same tree is valid.
+S3 reads both its prompt and expected tokens from the hashed `model/golden_c1024.txt`.
+The reference JSON and raw log retain the actual launch path and the input digest.
+The offline report checks these bindings as well as the token and timing gates.
 
 The preflight verifies these inputs. It does not install, download or pull them.
 The session hashes the complete packed weight file and the HF reference files.
@@ -54,13 +60,22 @@ Slow model loads can make this session NOT-COMPLETE.
 Only after separate GPU authorization, stage the committed source and start:
 
 ```sh
-tools/session.sh push IP
-ETX_QWEN_G6_CONFIG=/home/hotaisle/qwen-g6.json \
-ETX_SESS_MAX_SECONDS=3300 \
-  tools/session.sh start IP examples/sessions/qwen_producer.py 0 A
+python3 -m tools.producer_start IP \
+  --venv /home/hotaisle/envs/etx \
+  --config /home/hotaisle/qwen-g6.json \
+  --allocation-deadline ORIGINAL_ALLOCATION_END_UNIX_SECONDS
 ```
 
-Use the correct absolute config path for the chosen box.
+Use the original allocation end time, no later than allocation start plus 3,600 seconds.
+Use the correct absolute config and independent venv paths for the chosen box.
+This wrapper runs the real `session.sh push` (fresh archive and dependency transfer),
+then attaches the supplied venv at the new root and probes Python, NumPy and PyYAML.
+It performs no install or download. The old checkout's `.venv` is not used.
+Push and attachment share a 300-second deadline. A failure prevents start.
+The runner cap is at most 3,300 seconds and also fits the remaining allocation time,
+with a 15-second SSH startup margin. Keep the same allocation deadline on retry.
+The persistent lease can refuse a retry whose cap differs; do not reset it.
+Fetch and stop in that case. Setup cannot silently extend the funded budget.
 The existing lifecycle owner must enforce the allocation deadline.
 The runner cap starts at runner launch, not VM allocation.
 The job file's absolute maximum is 3,600 seconds.

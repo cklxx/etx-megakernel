@@ -171,14 +171,19 @@ def download(precision):
     print('DOWNLOAD COMPLETE', flush=True)
 
 
-def vllm_run(precision, mode):
+def vllm_run(precision, mode, *, input_binding=None):
     import torch
     import vllm
     from vllm import LLM, SamplingParams
     from vllm.inputs import TokensPrompt
-    prompt = list(map(int, GOLDEN.read_text().splitlines()[0].split()[1:]))
+    prompt_file = Path(input_binding['prompt']) if input_binding else GOLDEN
+    golden_file = Path(input_binding['golden']) if input_binding else golden(precision)
+    checkpoint = input_binding['hf'] if input_binding else str(model(precision) / 'hf')
+    if input_binding:
+        print('INPUT-BINDING '+json.dumps(input_binding, sort_keys=True), flush=True)
+    prompt = list(map(int, prompt_file.read_text().splitlines()[0].split()[1:]))
     assert len(prompt) == 1024
-    kw = dict(model=str(model(precision) / 'hf'), dtype='bfloat16', trust_remote_code=True,
+    kw = dict(model=checkpoint, dtype='bfloat16', trust_remote_code=True,
               max_model_len=1072, gpu_memory_utilization=.85, enforce_eager=False,
               attention_backend='ROCM_AITER_UNIFIED_ATTN', enable_prefix_caching=True)
     print('EXACT-LLM-ARGS ' + json.dumps(kw, sort_keys=True), flush=True)
@@ -197,7 +202,7 @@ def vllm_run(precision, mode):
         print(f'GENERATE complete tokens={len(tokens)}', flush=True)
         return elapsed, tokens
     def check(tokens):
-        expected = list(map(int, golden(precision).read_text().splitlines()[1].split()[1:]))
+        expected = list(map(int, golden_file.read_text().splitlines()[1].split()[1:]))
         if len(expected) != 32 or tokens != expected:
             raise RuntimeError(f'CORRECTNESS FAILED precision={precision}: expected={expected}, actual={tokens}')
         print(f'CORRECTNESS OK 32/32 precision={precision} HF={HF[precision]}', flush=True)
@@ -223,7 +228,7 @@ def vllm_run(precision, mode):
         raise RuntimeError('nonpositive wall sample')
     data = dict(precision=precision, basis='host wall', batch=1, context=1024, tokens=32,
                 image=IMAGE, rocm=torch.version.hip, gpu=torch.cuda.get_device_name(0),
-                launch=kw, full_ms=full, one_ms=one, per_token_ms=costs,
+                input_binding=input_binding, launch=kw, full_ms=full, one_ms=one, per_token_ms=costs,
                 median_ms=statistics.median(costs), correct=32)
     (root() / f'{precision}_bar.json').write_text(json.dumps(data, indent=2))
     print(f'BAR {condition(precision, "host wall")} median_ms={data["median_ms"]:.6f} '

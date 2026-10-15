@@ -95,14 +95,43 @@ def audit_plan(build, candidate):
 def local_sources():
     files=source_hashes()
     files.update({str(p.relative_to(ROOT)):cert.sha(p) for p in (ROOT/'tests').rglob('*.py')})
-    for name in ('examples/sessions/qwen_producer.py','pyproject.toml'):
+    for name in ('examples/sessions/qwen_producer.py','examples/sessions/qwen300.py',
+                 'tools/producer_start.py','tools/session.sh','pyproject.toml'):
         files[name]=cert.sha(ROOT/name)
     return files
 
 
 
+def input_paths(config):
+    model=Path(config['model']).expanduser().resolve(strict=True)
+    hf=Path(config['hf']).expanduser().resolve(strict=True)
+    if hf != (model/'hf').resolve(strict=True):
+        raise ValueError('HF path differs from the model/hf launch path')
+    golden=(model/'golden_c1024.txt').resolve(strict=True)
+    return dict(model=str(model),hf=str(hf),golden=str(golden),prompt=str(golden))
+
+
+def input_binding(config, hashes):
+    return dict(**input_paths(config),input_sha256_digest=cert.digest(hashes),
+                golden_sha256=hashes['packed/golden_c1024.txt'],
+                prompt_sha256=hashes['packed/golden_c1024.txt'])
+
+
+def validate_reference(ref, experiment):
+    expected=experiment['input_binding']
+    if expected['input_sha256_digest'] != cert.digest(experiment['input_sha256']):
+        raise ValueError('S3 input digest mismatch')
+    if (expected['golden'] != expected['prompt'] or
+        expected['golden_sha256'] != experiment['input_sha256']['packed/golden_c1024.txt'] or
+        expected['prompt_sha256'] != expected['golden_sha256'] or
+        ref.get('input_binding') != expected or
+        ref.get('launch',{}).get('model') != expected['hf']):
+        raise ValueError('S3 checkpoint/golden/prompt identity mismatch')
+
+
 def input_identity(config):
-    model=Path(config['model']);hf=Path(config['hf'])
+    paths=input_paths(config)
+    model=Path(paths['model']);hf=Path(paths['hf'])
     files={f'packed/{n}':model/n for n in ('vl.bin','vl.manifest','golden_c1024.txt')}
     checkpoint_files=[p for p in hf.rglob('*') if p.is_file() and '.cache' not in p.relative_to(hf).parts]
     if not any(p.suffix=='.safetensors' for p in checkpoint_files):
@@ -114,6 +143,7 @@ def input_identity(config):
 
 
 def preflight():
+    input_paths(g6.config())  # Reject a path mismatch before any probe/build/compute.
     ready=json.loads((ART/'local-ready.json').read_text())
     if ready['sources']!=local_sources() or ready['ready'] is not True:
         raise ValueError('local acceptance missing or source hashes changed; rerun local preflight')
@@ -129,7 +159,8 @@ def preflight():
     c=g6.config();model=Path(c['model'])
     # Full packed input identity. Manifest-only identity is insufficient here.
     data=json.loads((g6.record()/'inputs.json').read_text())
-    data.update(input_sha256=input_identity(c),
+    hashes=input_identity(c)
+    data.update(input_sha256=hashes,input_binding=input_binding(c,hashes),
                 source_hashes=local_sources(),source_identity=source_identity,
                 rule=RULE,condition='one MI300X, bf16, B1, context1024, 32 HF greedy',
                 budget_seconds=3600,evidence_reserve_seconds=RESERVE)
@@ -258,13 +289,21 @@ def s3_command(name,seconds=180):
 def s3_worker():
     from examples.sessions import qwen300
     # Reuse the established estimator and S3 options with the staged model.
-    model=Path(g6.config()['model'])
-    qwen300.model=lambda precision:model
-    qwen300.golden=lambda precision:model/'golden_c1024.txt'
-    qwen300.vllm_run('bf16','bench')
+    c=g6.config();binding=input_binding(c,input_identity(c))
+    experiment=json.loads((g6.record().parent/'experiment.json').read_text())
+    if binding != experiment['input_binding']:
+        raise ValueError('S3 input changed before launch')
+    qwen300.vllm_run('bf16','bench',input_binding=binding)
+    ref=json.loads((g6.record()/'bf16_bar.json').read_text())
+    validate_reference(ref,experiment)
+    if binding != input_binding(c,input_identity(c)):
+        raise ValueError('S3 input changed during launch')
 
 
 def measure():
+    inputs=json.loads((g6.record()/'experiment.json').read_text())
+    if input_binding(g6.config(),input_identity(g6.config())) != inputs['input_binding']:
+        raise ValueError('S3 input changed before compute')
     require_correctness(g6.record())
     for rnd in range(5):
         order=[('baseline','fused'),('producer','fused'),('producer','graph')]
@@ -299,6 +338,7 @@ def result(record):
     complete=json.loads((record/'measurement.complete.json').read_text())
     if complete!={'rounds':5,'basis':'host RESULT wall_ms','complete':True}:
         raise ValueError('incomplete measurement population')
+    experiment=json.loads((record/'experiment.json').read_text())
     rows=[]
     for rnd in range(5):
         row={}
@@ -312,6 +352,11 @@ def result(record):
         if raw.count('CORRECTNESS OK 32/32 precision=bf16')!=6 or 'BENCH-PROGRESS sample=5/5 correctness=32/32' not in raw:
             raise ValueError('S3 raw correctness/timing evidence missing')
         ref=json.loads((record/f's3_r{rnd}/bf16_bar.json').read_text())
+        validate_reference(ref,experiment)
+        launches=[json.loads(line.removeprefix('EXACT-LLM-ARGS ')) for line in raw.splitlines() if line.startswith('EXACT-LLM-ARGS ')]
+        bindings=[json.loads(line.removeprefix('INPUT-BINDING ')) for line in raw.splitlines() if line.startswith('INPUT-BINDING ')]
+        if launches != [ref['launch']] or bindings != [ref['input_binding']]:
+            raise ValueError('S3 raw launch identity mismatch')
         if ref.get('correct')!=32 or ref.get('image')!=IMAGE or ref.get('launch',{}).get('attention_backend')!='ROCM_AITER_UNIFIED_ATTN':
             raise ValueError('S3 reference not correct or changed')
         for field in ('full_ms','one_ms','per_token_ms'):

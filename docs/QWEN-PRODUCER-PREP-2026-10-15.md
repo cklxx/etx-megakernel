@@ -185,8 +185,13 @@ The current net gain is unknown.
 
 After correctness, the session collects uninstrumented wall pairs first.
 It then collects a same-build trace for each arm if the budget permits.
-The trace report gives o_proj start, all output publication, and all expert-task readiness.
-All endpoints use one trace clock.
+The raw trace columns are type, four coordinates, taken (5), ready (6),
+body done (7), and worker. Body done is stamped before phase-three release and event arrival.
+The trace report gives o_proj ready/start to routing body completion and to all expert tasks ready.
+A task can be taken before the producer finishes and become ready afterward.
+The body-done-to-consumer-ready tail includes unresolved publication and scheduling work;
+it is not an isolated publication cost. No exact output-publication stamp exists.
+All endpoints use one trace clock. These diagnostics do not change the untraced KEEP basis.
 The report does not subtract device stage intervals from host wall medians.
 Scoring, interference, counter traffic, scale and top-k are not stamped separately.
 Those individual costs stay unknown. Trace overhead is not calibrated.
