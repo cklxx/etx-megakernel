@@ -1,0 +1,124 @@
+{
+  "retained_source_commit": "8d4ec985df145a31e5bae96bb3ceb3eda562d6ae",
+  "device_include_closure": {
+    "etx/runtime/include/etx/abi.h": {
+      "equal_to_retained_source": true,
+      "sha256": "e466cfe8557acb886073bad8e8db041a11c54fe5fcafd392fa50270679f91deb"
+    },
+    "etx/runtime/include/etx/host.h": {
+      "equal_to_retained_source": true,
+      "sha256": "e07fb97470f43281a3fcb426627ae7395775fcdfc3ec4fdda3fe7361b944c53b"
+    },
+    "etx/runtime/include/etx/import.h": {
+      "equal_to_retained_source": true,
+      "sha256": "79f237ad6e1c962e1c28bc7907b541d49ff1b206f9338523bbe602561fbdf3ca"
+    },
+    "etx/runtime/include/etx/inbody.h": {
+      "equal_to_retained_source": true,
+      "sha256": "aa1b6f607bf6b0d3e2f515aa4983b7959e08c869dd6dc841a74ce5130b938950"
+    },
+    "etx/runtime/include/etx/primitives.h": {
+      "equal_to_retained_source": true,
+      "sha256": "beeee7dd773c6cf27051ef7251766504e401fff05f89b942abd9623a92e1a99e"
+    },
+    "etx/runtime/include/etx/primitives_amdgcn.h": {
+      "equal_to_retained_source": true,
+      "sha256": "cb7703b330d6af98b411b9629311e2253ea007402486c164dadda601db1a514b"
+    },
+    "etx/runtime/include/etx/primitives_nvptx.h": {
+      "equal_to_retained_source": true,
+      "sha256": "d8f720916bae3ae9c6304149097af25417795be0d026cdecc6d7e8bd2f1b76c6"
+    },
+    "etx/runtime/include/etx/selection.h": {
+      "equal_to_retained_source": true,
+      "sha256": "a389ed938ce9bdb8b3336a5d88f1ce43dc8d5dd0cde8739e52d13d917e8d65ac"
+    },
+    "etx/runtime/include/etx/tile_util.h": {
+      "equal_to_retained_source": true,
+      "sha256": "85ec95e41fff47b33fb36e06e6536bd41af53bdd86dcd04c1004d0b7f0e63da0"
+    },
+    "examples/dsv2lite/fleet_d5.hip": {
+      "equal_to_retained_source": true,
+      "sha256": "a7cfbd9570c6d693b62b44fa16cc9df3e51132a54177f300dbbfdbbae5b19115"
+    },
+    "examples/dsv2lite/fleet_shim.hip": {
+      "equal_to_retained_source": true,
+      "sha256": "c4e589ec59596fc01ae07a2b1f6f260f921223b3524c489541733ba722531b90"
+    },
+    "examples/dsv2lite/graph.py": {
+      "equal_to_retained_source": true,
+      "sha256": "fe78123b0b53555a5c228995466a616bf43a1968eed4cfb02832816ea59da129"
+    },
+    "examples/dsv2lite/levers/__init__.py": {
+      "equal_to_retained_source": true,
+      "sha256": "9caf31238b8d9bcebb7d693499a84789cd99e79bd3f34e93772146f84fef8efe"
+    },
+    "examples/dsv2lite/levers/argmax_tree.py": {
+      "equal_to_retained_source": true,
+      "sha256": "911c234b37003339d5054229a90a1c0c1e1cebd2326d7182cd3c3b3881ea3eb8"
+    },
+    "examples/dsv2lite/levers/attn_prologue_live.py": {
+      "equal_to_retained_source": true,
+      "sha256": "36f7337d4ac07c7ef33ec4194e83f3ffc61c8bf32ceb2d909fef1c0cbecad18b"
+    },
+    "examples/dsv2lite/levers/coherent_loads.py": {
+      "equal_to_retained_source": true,
+      "sha256": "008b40a53da7331027f6b0042769324c2e453a4d8583d8dfcd74c00d19be681c"
+    },
+    "examples/dsv2lite/levers/gemv_no_terminal.py": {
+      "equal_to_retained_source": true,
+      "sha256": "e333d589d9f73e688ecfa145b125fedd6386e3fc8e627023998c70b4716b57a4"
+    },
+    "examples/dsv2lite/levers/gemv_no_terminal_all.py": {
+      "equal_to_retained_source": true,
+      "sha256": "448a63106faece7ec6678066c52f26f566c2215eb3c6c9130215a7f37f0e412f"
+    },
+    "examples/dsv2lite/levers/kchunk352.py": {
+      "equal_to_retained_source": true,
+      "sha256": "d3d9cfb4db84d293d07c24f6bd195420744d650c277f0254545827141509f919"
+    },
+    "examples/dsv2lite/levers/l1_loads.py": {
+      "equal_to_retained_source": true,
+      "sha256": "d1717a317da1f6b0d20b8bd597f8ec3b0bc6fc6f93a4cc6f8d0cddb5bf88d565"
+    },
+    "examples/dsv2lite/levers/merge_uv_waves.py": {
+      "equal_to_retained_source": true,
+      "sha256": "99e2f0841793cb9baaf8687133f0942017c71fc90b03e1039a3cea510896323a"
+    },
+    "examples/dsv2lite/levers/norm_gamma_early.py": {
+      "equal_to_retained_source": true,
+      "sha256": "faa311fdf31ce7f7448a91885dcd687ee0dd094a9eb8b9deeff361e4d88a6d6e"
+    },
+    "examples/dsv2lite/levers/norm_tree.py": {
+      "equal_to_retained_source": true,
+      "sha256": "132958a977f00fe7d8397aa04cf0115a5b4d407bd2070f7224e6864c3c71b420"
+    },
+    "examples/dsv2lite/levers/norm_tree_all.py": {
+      "equal_to_retained_source": true,
+      "sha256": "eef6a22f466e299bf867d074cb108273928507cf07bb919ac71bfc7be4a13925"
+    },
+    "examples/dsv2lite/levers/topk_rank.py": {
+      "equal_to_retained_source": true,
+      "sha256": "2bc3ace37cbd2fc437412cc1a1307e7cd6616721b0d5d2204ee3fe266e913eec"
+    },
+    "examples/dsv2lite/patch_fleet.py": {
+      "equal_to_retained_source": true,
+      "sha256": "3c41a1ab28722dbf689a8eea1287ad6fffaf95f28a8faff280ad8c60ade4b0ef"
+    },
+    "examples/dsv2lite/patch_stamps.py": {
+      "equal_to_retained_source": true,
+      "sha256": "866e610d38708bdec1f183ef7d488c64ccf07c40cfddbd050c6bb406a0660bab"
+    }
+  },
+  "compiler": "ROCm 7.2.4 clang 22.0.0git roc-7.2.4 26084 f58b06dce1f9c15707c5f808fd002e18c2accf7e",
+  "host_source_changed": true,
+  "host_evidence": "host-wall-*.raw.log and host-refresh.exit",
+  "device_checks": "build-identity.json; exact plan/generated/patched-Fleet/artifact hashes",
+  "executable_link": {
+    "status": "UNAVAILABLE",
+    "reason": "local libamdhip64.so absent",
+    "exit_code": 77
+  },
+  "native_runtime_acceptance": "NOT RUN",
+  "target_compiler_compatibility": "NOT ESTABLISHED for a future DigitalOcean image"
+}

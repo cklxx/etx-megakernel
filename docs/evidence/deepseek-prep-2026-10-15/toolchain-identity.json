@@ -1,0 +1,392 @@
+{
+  "files": {
+    "/Users/ckl/code/rocm-headers/rocm-llvm/opt/rocm-7.2.4/lib/llvm/bin/clang++": {
+      "sha256": "beaae27cf876812ec1d32f8731317ba837175536a847590f5e51c409c2831b48",
+      "bytes": 179881440,
+      "resolved": "/Users/ckl/code/rocm-headers/rocm-llvm/opt/rocm-7.2.4/lib/llvm/bin/clang-22"
+    },
+    "/Users/ckl/code/rocm-headers/rocm-llvm/opt/rocm-7.2.4/lib/llvm/bin/llvm-mc": {
+      "sha256": "6cdaebe34b2baa811ec098dfd566c39c088d1492ce162e68ecf76f23d8ca4771",
+      "bytes": 26620016,
+      "resolved": "/Users/ckl/code/rocm-headers/rocm-llvm/opt/rocm-7.2.4/lib/llvm/bin/llvm-mc"
+    },
+    "/Users/ckl/code/rocm-headers/rocm-llvm/opt/rocm-7.2.4/lib/llvm/bin/llvm-objcopy": {
+      "sha256": "af1af263c9e269d02d73c8eae75b21146e1f52b1c549126defaf117e3d27de11",
+      "bytes": 7032960,
+      "resolved": "/Users/ckl/code/rocm-headers/rocm-llvm/opt/rocm-7.2.4/lib/llvm/bin/llvm-objcopy"
+    },
+    "/opt/homebrew/opt/llvm/bin/clang++": {
+      "sha256": "371e5f22cb9c6af1fb8bf9ebd81f702bf071d2be87314f0098ab48cec619bfb4",
+      "bytes": 137848,
+      "resolved": "/opt/homebrew/Cellar/llvm/23.1.1_1/bin/clang-23"
+    },
+    "/opt/homebrew/opt/llvm/bin/llc": {
+      "sha256": "55e4935683f554b2844bcf6d44aa8f98471d9a31f0013250d0195ed6ad2b6482",
+      "bytes": 208032,
+      "resolved": "/opt/homebrew/Cellar/llvm/23.1.1_1/bin/llc"
+    },
+    "/opt/homebrew/opt/llvm/bin/llvm-mc": {
+      "sha256": "369671c3b2a3cf6ad1f7369bad70f6078ee0860e209e594d7fdecbf6512bc882",
+      "bytes": 106888,
+      "resolved": "/opt/homebrew/Cellar/llvm/23.1.1_1/bin/llvm-mc"
+    },
+    "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/asanrtl.bc": {
+      "sha256": "3ce3ea078d885eccdd900b6f689e8a5798edb04884fafc78c11d0ff81fd8f617",
+      "bytes": 35148,
+      "resolved": "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/asanrtl.bc"
+    },
+    "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/hip.bc": {
+      "sha256": "2c8fbee76c21e76ea1fd0768c743f4eee62682c08109ccd148b3054fb9897f28",
+      "bytes": 2292,
+      "resolved": "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/hip.bc"
+    },
+    "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/ockl.bc": {
+      "sha256": "cf32a60cb9369f4869f822db0a4307a9a9f54315f5a7b8e74235760867d1e52a",
+      "bytes": 266372,
+      "resolved": "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/ockl.bc"
+    },
+    "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_abi_version_400.bc": {
+      "sha256": "38da18c125178658df6ab3602e275450eeeca2a5b72e28c3b106d1ca0b311556",
+      "bytes": 2368,
+      "resolved": "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_abi_version_400.bc"
+    },
+    "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_abi_version_500.bc": {
+      "sha256": "d61b9f3a073c9b67a3f0997e5279f35426a392b7d03df6cd3ae98677b39cfccc",
+      "bytes": 2368,
+      "resolved": "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_abi_version_500.bc"
+    },
+    "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_abi_version_600.bc": {
+      "sha256": "ffe2160a4ce7f76b4fbe5a43be75ce9a5cd683e2d703373c0086b11eefe84d68",
+      "bytes": 2368,
+      "resolved": "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_abi_version_600.bc"
+    },
+    "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_correctly_rounded_sqrt_off.bc": {
+      "sha256": "2c8fbee76c21e76ea1fd0768c743f4eee62682c08109ccd148b3054fb9897f28",
+      "bytes": 2292,
+      "resolved": "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_correctly_rounded_sqrt_off.bc"
+    },
+    "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_correctly_rounded_sqrt_on.bc": {
+      "sha256": "2c8fbee76c21e76ea1fd0768c743f4eee62682c08109ccd148b3054fb9897f28",
+      "bytes": 2292,
+      "resolved": "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_correctly_rounded_sqrt_on.bc"
+    },
+    "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_daz_opt_off.bc": {
+      "sha256": "2c8fbee76c21e76ea1fd0768c743f4eee62682c08109ccd148b3054fb9897f28",
+      "bytes": 2292,
+      "resolved": "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_daz_opt_off.bc"
+    },
+    "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_daz_opt_on.bc": {
+      "sha256": "2c8fbee76c21e76ea1fd0768c743f4eee62682c08109ccd148b3054fb9897f28",
+      "bytes": 2292,
+      "resolved": "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_daz_opt_on.bc"
+    },
+    "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_finite_only_off.bc": {
+      "sha256": "f3138eeee65c1d83234260728d124f635f021abb37c495f4ed027dfe92bcb1dd",
+      "bytes": 2376,
+      "resolved": "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_finite_only_off.bc"
+    },
+    "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_finite_only_on.bc": {
+      "sha256": "18d0cdf6d766aec4a7f9d04af7e1849675150f3bebf9b75abc2419bb4210619f",
+      "bytes": 2376,
+      "resolved": "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_finite_only_on.bc"
+    },
+    "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_10-1-generic.bc": {
+      "sha256": "7bdeb4e68940f990a90f95592462b12b349cc9d7eb9a226e8323773be560d112",
+      "bytes": 2368,
+      "resolved": "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_10-1-generic.bc"
+    },
+    "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_10-3-generic.bc": {
+      "sha256": "2315cae4dfc16ff9738c6501a582245d5ecd6fe905cbf7a9d4c870942acb00e5",
+      "bytes": 2368,
+      "resolved": "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_10-3-generic.bc"
+    },
+    "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_1010.bc": {
+      "sha256": "7bdeb4e68940f990a90f95592462b12b349cc9d7eb9a226e8323773be560d112",
+      "bytes": 2368,
+      "resolved": "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_1010.bc"
+    },
+    "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_1011.bc": {
+      "sha256": "44d5619f2e5f6993cbe131ed63d79fa9deef8a572cce66ec3a3b1d5412cd683f",
+      "bytes": 2368,
+      "resolved": "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_1011.bc"
+    },
+    "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_1012.bc": {
+      "sha256": "b378b3d3758fa96de50a282aea2a06aa0d5ce999def9ac9966df28481b9bc029",
+      "bytes": 2368,
+      "resolved": "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_1012.bc"
+    },
+    "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_1013.bc": {
+      "sha256": "cdbfec83e91dd8602a5907f7a9fbdb2863ee546254803498ac73956b1d0a6cdb",
+      "bytes": 2368,
+      "resolved": "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_1013.bc"
+    },
+    "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_1030.bc": {
+      "sha256": "2315cae4dfc16ff9738c6501a582245d5ecd6fe905cbf7a9d4c870942acb00e5",
+      "bytes": 2368,
+      "resolved": "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_1030.bc"
+    },
+    "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_1031.bc": {
+      "sha256": "046fe5569f9a34e464ccbadbc66ef25772412cd79a8c5f4ac29b62c2183c0cba",
+      "bytes": 2368,
+      "resolved": "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_1031.bc"
+    },
+    "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_1032.bc": {
+      "sha256": "f7cd661355cde31492909d374607128022a5f9b91abaf0981292962794f4a0e3",
+      "bytes": 2368,
+      "resolved": "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_1032.bc"
+    },
+    "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_1033.bc": {
+      "sha256": "f0e427fc119d9c0d10748a74a964de1f9dec04c65b721d5e8a7b9990c8397e3f",
+      "bytes": 2368,
+      "resolved": "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_1033.bc"
+    },
+    "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_1034.bc": {
+      "sha256": "662a572d87a603a9d90b81167c3bf48d0c5ad31ac2f50d80c2c6d568f56fca11",
+      "bytes": 2368,
+      "resolved": "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_1034.bc"
+    },
+    "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_1035.bc": {
+      "sha256": "b1ea69df4a579f22b6ca0ab06e2920b9c4d2a1d46a1c0e738bc57523f38485aa",
+      "bytes": 2368,
+      "resolved": "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_1035.bc"
+    },
+    "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_1036.bc": {
+      "sha256": "7bc5fc30ff0f2cb6ced3ac88256632f760ab9af6086299140a630dadcba4ac74",
+      "bytes": 2368,
+      "resolved": "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_1036.bc"
+    },
+    "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_11-generic.bc": {
+      "sha256": "a8dc62ab661e7e14cc13922d7b883a00fac72c6bb449f4e0c81011d6dc43843c",
+      "bytes": 2368,
+      "resolved": "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_11-generic.bc"
+    },
+    "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_1100.bc": {
+      "sha256": "12b874bc5d1c9afabe1dc7807babac9ff33bf3cbad2af35df6f67bbd54efdd48",
+      "bytes": 2368,
+      "resolved": "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_1100.bc"
+    },
+    "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_1101.bc": {
+      "sha256": "837aa24a31995681cddd1039a3194063125b0f37de0ea72a284a41547261b3ac",
+      "bytes": 2368,
+      "resolved": "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_1101.bc"
+    },
+    "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_1102.bc": {
+      "sha256": "8e9cd150288e59318ed2d78d5aacb5e2de304e7b3729221e890f1d8521d06ea6",
+      "bytes": 2368,
+      "resolved": "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_1102.bc"
+    },
+    "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_1103.bc": {
+      "sha256": "a8dc62ab661e7e14cc13922d7b883a00fac72c6bb449f4e0c81011d6dc43843c",
+      "bytes": 2368,
+      "resolved": "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_1103.bc"
+    },
+    "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_1150.bc": {
+      "sha256": "fa4d10e6924ee82a2e88e2dabe4ac2d7fb6e37fb1e6638494db9fca805f005b3",
+      "bytes": 2368,
+      "resolved": "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_1150.bc"
+    },
+    "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_1151.bc": {
+      "sha256": "9b492b5360fb9c3b1ca6440c4e498c9d647c9aa4e8559b9fa27771dc919ca93e",
+      "bytes": 2368,
+      "resolved": "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_1151.bc"
+    },
+    "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_1152.bc": {
+      "sha256": "6ca3260cacd1c810f4c2bcbfa8ff2edc6a8bd5ebcf2ce630760f2d79da2460c4",
+      "bytes": 2368,
+      "resolved": "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_1152.bc"
+    },
+    "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_1153.bc": {
+      "sha256": "7478e3c0e22f97060a6aefb04054059992d317be250899ae792995f16ee62c1c",
+      "bytes": 2368,
+      "resolved": "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_1153.bc"
+    },
+    "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_12-generic.bc": {
+      "sha256": "9bb6ba9193c08f126955bf36d6d9c98d60134a3cf04a715d24c638d600ba6d82",
+      "bytes": 2368,
+      "resolved": "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_12-generic.bc"
+    },
+    "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_1200.bc": {
+      "sha256": "9bb6ba9193c08f126955bf36d6d9c98d60134a3cf04a715d24c638d600ba6d82",
+      "bytes": 2368,
+      "resolved": "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_1200.bc"
+    },
+    "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_1201.bc": {
+      "sha256": "80bcdbce53b400ceb92e3c197720aa35f80622d12def1d34c1578cd97fd5b7a8",
+      "bytes": 2368,
+      "resolved": "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_1201.bc"
+    },
+    "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_1250.bc": {
+      "sha256": "26638520b972ba3fa377cca902abf9d76050646941f1c1ba9fd0bc0263aafe23",
+      "bytes": 2368,
+      "resolved": "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_1250.bc"
+    },
+    "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_1251.bc": {
+      "sha256": "07fcee4ec5cc078fb922a6b072d57df71fce59c5dbb92c7d86bfd240569d0e72",
+      "bytes": 2368,
+      "resolved": "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_1251.bc"
+    },
+    "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_600.bc": {
+      "sha256": "c8d845fd0b0a1b46e7ee2a8ef0d1d2704845a1f597130cea6c4db3295ecd553f",
+      "bytes": 2368,
+      "resolved": "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_600.bc"
+    },
+    "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_601.bc": {
+      "sha256": "8b6c4d6932cf0ed3656ea9f76052a11fefa941af68fd3a52d4953abf5827d00d",
+      "bytes": 2368,
+      "resolved": "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_601.bc"
+    },
+    "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_602.bc": {
+      "sha256": "50a0297e8560560eb7424f5294092d02ba5ec596dc9ae9510537f84d1a3ccdf8",
+      "bytes": 2368,
+      "resolved": "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_602.bc"
+    },
+    "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_700.bc": {
+      "sha256": "e2ffe832453a69bffbf25827a8260a1d9cbbb2c943d9398183113829afaedfae",
+      "bytes": 2368,
+      "resolved": "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_700.bc"
+    },
+    "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_701.bc": {
+      "sha256": "ef20ebce98d5930d186af88975342e8c9b8bd18b96af0775665b622ac0509ac4",
+      "bytes": 2368,
+      "resolved": "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_701.bc"
+    },
+    "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_702.bc": {
+      "sha256": "0df0bcfab0c7c8326344caf24db52cf78521757246b97b154a4fd72633e3e86d",
+      "bytes": 2368,
+      "resolved": "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_702.bc"
+    },
+    "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_703.bc": {
+      "sha256": "e2b3715784496bcc22501b8b4d59f9db0245146bf96b38c48fe6d1587c32d499",
+      "bytes": 2368,
+      "resolved": "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_703.bc"
+    },
+    "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_704.bc": {
+      "sha256": "308f1707747b0ee487376857a88e62f69255d868a5463afc26971554f76312e1",
+      "bytes": 2368,
+      "resolved": "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_704.bc"
+    },
+    "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_705.bc": {
+      "sha256": "f714fb66e19906cd2afb37038bfef9883663c8dd2716126ecb6f3043282742de",
+      "bytes": 2368,
+      "resolved": "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_705.bc"
+    },
+    "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_801.bc": {
+      "sha256": "504f9f9467185c5dfb57d882ccba1e25f892f3ca3ded12ada1c903e4c14e134e",
+      "bytes": 2368,
+      "resolved": "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_801.bc"
+    },
+    "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_802.bc": {
+      "sha256": "718a93d77ef6d1fa46afa340f55d24335eb9a9c456a0590e3be650e516fe1887",
+      "bytes": 2368,
+      "resolved": "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_802.bc"
+    },
+    "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_803.bc": {
+      "sha256": "49a34d688eb42aab7b37b553552c80af0739f7acde0c4ae482f948e4ec57cc5a",
+      "bytes": 2368,
+      "resolved": "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_803.bc"
+    },
+    "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_805.bc": {
+      "sha256": "4cdcce926d73aca91037244d78906af85e09b67fdd52960294f595425a12457a",
+      "bytes": 2368,
+      "resolved": "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_805.bc"
+    },
+    "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_810.bc": {
+      "sha256": "bad28a81037c99bd76e8548581d0a4f203f96080b801bee18de3da78f5fc9868",
+      "bytes": 2368,
+      "resolved": "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_810.bc"
+    },
+    "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_9-4-generic.bc": {
+      "sha256": "580d540cc738c0f9554c8710575bbc9b51ebacdcbc29aa0074ed05d3691dea1d",
+      "bytes": 2368,
+      "resolved": "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_9-4-generic.bc"
+    },
+    "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_9-generic.bc": {
+      "sha256": "b07f1f77ca6f312478dfb06f46d3d324256c4f9f395754e36af41c5adf141ba8",
+      "bytes": 2368,
+      "resolved": "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_9-generic.bc"
+    },
+    "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_900.bc": {
+      "sha256": "b07f1f77ca6f312478dfb06f46d3d324256c4f9f395754e36af41c5adf141ba8",
+      "bytes": 2368,
+      "resolved": "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_900.bc"
+    },
+    "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_902.bc": {
+      "sha256": "0c2de298cc22736fa3b9fa78459a58aa88b1c8477b07295cfe70db06d3b6b990",
+      "bytes": 2368,
+      "resolved": "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_902.bc"
+    },
+    "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_904.bc": {
+      "sha256": "1aef3f12a61f89218f0de52aa4bca3168e76ca6e409b7fcf4be75ce94be0cb5a",
+      "bytes": 2368,
+      "resolved": "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_904.bc"
+    },
+    "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_906.bc": {
+      "sha256": "9d6ee2492562be709dd4aedc3d3998ee69df5b291857ff9fd0eba51fe91a544a",
+      "bytes": 2368,
+      "resolved": "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_906.bc"
+    },
+    "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_908.bc": {
+      "sha256": "fa2d1c2668822854a27daaf30956a588798ae4332ecb5447e7bb2c07f9b094d7",
+      "bytes": 2368,
+      "resolved": "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_908.bc"
+    },
+    "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_909.bc": {
+      "sha256": "4c24852ccb61a9e98b874a95902ec9850ec6889ded379404298f27e259518c05",
+      "bytes": 2368,
+      "resolved": "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_909.bc"
+    },
+    "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_90a.bc": {
+      "sha256": "538812a56bcb5efe5ef7fb5ee57327ba69d69812189e57d965822b0e03b12eec",
+      "bytes": 2368,
+      "resolved": "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_90a.bc"
+    },
+    "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_90c.bc": {
+      "sha256": "99546d530e4a6bba705214a43d570c79fa584e2359ed9559e76d1d86982b2d14",
+      "bytes": 2368,
+      "resolved": "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_90c.bc"
+    },
+    "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_942.bc": {
+      "sha256": "580d540cc738c0f9554c8710575bbc9b51ebacdcbc29aa0074ed05d3691dea1d",
+      "bytes": 2368,
+      "resolved": "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_942.bc"
+    },
+    "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_950.bc": {
+      "sha256": "b0962e1a370b559207c8e22fcba294952af3057658da75c94560e5970c6e8900",
+      "bytes": 2368,
+      "resolved": "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_isa_version_950.bc"
+    },
+    "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_unsafe_math_off.bc": {
+      "sha256": "22c799b9154389f050f8f3368762636b9954a2ea25622199c359366bbd84657f",
+      "bytes": 2376,
+      "resolved": "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_unsafe_math_off.bc"
+    },
+    "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_unsafe_math_on.bc": {
+      "sha256": "1b2772131f29a303ef8d448ccf0d84d9eb68bd76244af998510514938ec877ab",
+      "bytes": 2376,
+      "resolved": "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_unsafe_math_on.bc"
+    },
+    "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_wavefrontsize64_off.bc": {
+      "sha256": "c9b9ff0e9fdb1e41562a73c29e16094c9591bcddc57daa4bc10ab105647495ef",
+      "bytes": 2444,
+      "resolved": "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_wavefrontsize64_off.bc"
+    },
+    "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_wavefrontsize64_on.bc": {
+      "sha256": "476a9f2c767c7449612b158fc14f39b5d6c555c83775157521584984c9544dc8",
+      "bytes": 2444,
+      "resolved": "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/oclc_wavefrontsize64_on.bc"
+    },
+    "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/ocml.bc": {
+      "sha256": "cfe97fe9ee29379f522e5f20ae55aae1cdb96eb41d6aa250ea11c4941c54e019",
+      "bytes": 206684,
+      "resolved": "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/ocml.bc"
+    },
+    "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/opencl.bc": {
+      "sha256": "98fd9fe8c711e6b46a9a5648bda18e5cacddad1e44f299215079ac60b9cdf7cb",
+      "bytes": 2734956,
+      "resolved": "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode/opencl.bc"
+    }
+  },
+  "native_version": "Homebrew clang version 23.1.1\nTarget: arm64-apple-darwin24.6.0\nThread model: posix\nInstalledDir: /opt/homebrew/Cellar/llvm/23.1.1_1/bin\nConfiguration file: /opt/homebrew/Cellar/llvm/23.1.1_1/etc/clang/arm64-apple-darwin24.cfg\n",
+  "rocm_image": "sha256:084a446de60ebf2192b2000d1da2fc784aea0f48a8b3e7cf672f0b60a26314af",
+  "recorded": "current offline build tools; retained artifact source/plan checks are separate"
+}

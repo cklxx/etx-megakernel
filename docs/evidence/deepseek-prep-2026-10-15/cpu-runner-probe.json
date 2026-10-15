@@ -1,0 +1,38 @@
+{
+  "dependency-success": {
+    "exit_code": 0,
+    "jobs": {
+      "references": {
+        "status": "ok",
+        "exit_code": 0
+      },
+      "diagnostics": {
+        "status": "ok",
+        "exit_code": 0
+      },
+      "summary": {
+        "status": "ok",
+        "exit_code": 0
+      }
+    },
+    "path": "/Users/ckl/.hermes/cache/scratch/deepseek-open-prep-evidence/dependency-success/20261015T094104Z-5b28e0"
+  },
+  "dependency-refusal": {
+    "exit_code": 1,
+    "jobs": {
+      "references": {
+        "status": "fail",
+        "exit_code": 9
+      },
+      "diagnostics": {
+        "status": "skipped",
+        "exit_code": null
+      },
+      "summary": {
+        "status": "ok",
+        "exit_code": 0
+      }
+    },
+    "path": "/Users/ckl/.hermes/cache/scratch/deepseek-open-prep-evidence/dependency-refusal/20261015T094104Z-731fd1"
+  }
+}

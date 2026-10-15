@@ -1,0 +1,80 @@
+{
+  "commit": "a0c3e724dbd1a342d96812d232f04ced902d6496",
+  "archive_sha256": "465824e7d42c90fafd88a20b4050b24751f12d89042ee05bf417668dc3f70e5c",
+  "path": "/Users/ckl/.hermes/cache/scratch/deepseek-open-prep-evidence/465824e7d42c90fafd88a20b4050b24751f12d89042ee05bf417668dc3f70e5c-deepseek-prep",
+  "checks": [
+    {
+      "name": "focused",
+      "exit_code": 0,
+      "command": [
+        "/Users/ckl/.hermes/cache/scratch/deepseek-open-prep-evidence/465824e7d42c90fafd88a20b4050b24751f12d89042ee05bf417668dc3f70e5c-deepseek-prep/.venv/bin/python",
+        "-m",
+        "pytest",
+        "-q",
+        "tests/test_deepseek_open_prep.py",
+        "tests/test_dsv2_batch_attribution.py",
+        "tests/test_dsv2_batch.py",
+        "tests/test_dsv2_layer_gate.py",
+        "tests/test_dsv2_inplace_session.py",
+        "tests/test_session_references.py",
+        "tests/test_dsv2_acquire.py",
+        "-k",
+        "not every_request and not static_queues and not routing_handoff and not two_requests_keep and not more_than_two and not shared_kva"
+      ]
+    },
+    {
+      "name": "x8_correctness-dry-run",
+      "exit_code": 0,
+      "command": [
+        "/Users/ckl/.hermes/cache/scratch/deepseek-open-prep-evidence/465824e7d42c90fafd88a20b4050b24751f12d89042ee05bf417668dc3f70e5c-deepseek-prep/.venv/bin/python",
+        "-m",
+        "etx.tools.gpu_jobs",
+        "examples/sessions/x8_correctness.py",
+        "--gpus",
+        "0",
+        "--logdir",
+        "/Users/ckl/.hermes/cache/scratch/deepseek-open-prep-evidence/never-executed",
+        "--dry-run"
+      ]
+    },
+    {
+      "name": "ds_b4_attribution-dry-run",
+      "exit_code": 0,
+      "command": [
+        "/Users/ckl/.hermes/cache/scratch/deepseek-open-prep-evidence/465824e7d42c90fafd88a20b4050b24751f12d89042ee05bf417668dc3f70e5c-deepseek-prep/.venv/bin/python",
+        "-m",
+        "etx.tools.gpu_jobs",
+        "examples/sessions/ds_b4_attribution.py",
+        "--gpus",
+        "0",
+        "--logdir",
+        "/Users/ckl/.hermes/cache/scratch/deepseek-open-prep-evidence/never-executed",
+        "--dry-run"
+      ]
+    },
+    {
+      "name": "shell-syntax",
+      "exit_code": 0,
+      "command": [
+        "bash",
+        "-n",
+        "examples/dsv2lite/rocm_build_check.sh"
+      ]
+    }
+  ],
+  "source_sha256": {
+    "examples/dsv2lite/arms.py": "0d035bfc9ed8e6ca80c8c8fcdc4589ef3b71de43672c221429d0b16c6779edc7",
+    "examples/dsv2lite/batch_attribution.py": "a8ce0ebbf58e2f5525616bc8eaf68609bdf9b88742caf0b5800b05d8871ee6d2",
+    "examples/dsv2lite/batch_session.py": "4389f39089c00feccff484386f4552a07b07bbc02a68e6b6ec3d1e63eb08cca5",
+    "examples/dsv2lite/host.hip": "eca5de023ecace1551b59a4a20b3356fb9ba708d157cef6c31e887f2fa8a7b1c",
+    "examples/dsv2lite/reference_prepare.py": "f4d713c48fb8b6deb513f44fc57b5414f5f258115594bc59914868d7cb54110d",
+    "examples/dsv2lite/rocm_build_check.sh": "a1a57bd19836a1f816bcdafadd944756e1171a27c6667132d3185d898207ee35",
+    "examples/dsv2lite/routing_overlap.py": "de93f2445d318131949d0acb6595a698ff5fd150a2cc70cc3f83c65c9b64f774",
+    "examples/dsv2lite/x8_correctness.py": "15d7272c16b42a4c0b8f1501b2a798b73b29d6705b1434f7b983ddd1f986e779",
+    "examples/llm/vllm_bench.py": "f20b61275c733190adf8be474894109d31b3a659d49284d1d934bb2e00993e56",
+    "examples/sessions/ds_b4_attribution.py": "167f1bcfe8ad8228e7b85dc4675afc396a2bfce7423ecec8c4590f8be0e7e544",
+    "examples/sessions/x8_correctness.py": "35323b474e1d4d6808ece62a3d52bf8c09679773a2e7cccc3e5ce5bf1b6a8eab",
+    "tests/test_deepseek_open_prep.py": "a1c533b6661f161f9c350a893423e0d0264da3ed8d22deaebea67eb80d63f46b",
+    "tests/test_dsv2_batch_attribution.py": "178c37696e0a1228c3e7ca3f84dd06a547b398fc9e12bbb318a77b3282cd587e"
+  }
+}

@@ -1,0 +1,197 @@
+{
+  "x1km": {
+    "generated_sha256": {
+      "plan.json": "dc6f51b6352a017f1ac01beed91275a7a8bc457076d9d10e3fa3da5b73064bb1",
+      "plan_data.h": "704b640602782ade14e596beade809da2a97eae4d19ebed5b0caf30239900cb1",
+      "megakernel_d0.hip": "942530bb72e2545fe92fa84b25e95b61e76687326722a8250656b3b80a325ea3",
+      "etx_tiles.h": "33c958b3207928a57cc351dc2cbeddf6cfc7b0cfc4648e47439340865bb210e0",
+      "etx_lowering.h": "bf740ec9af9dee829a9da6220591d8c95d75424a63ce31f8563975509a8c0ac3"
+    },
+    "retained": "/Users/ckl/.hermes/cache/scratch/deepseek-open-prep-evidence/rocm-x1/x1km",
+    "generated_equal": {
+      "plan.json": true,
+      "plan_data.h": true,
+      "megakernel_d0.hip": true,
+      "etx_tiles.h": true,
+      "etx_lowering.h": true
+    },
+    "env": {
+      "ETX_DSV2_COH": "l1",
+      "ETX_DSV2_D4": "0",
+      "ETX_DSV2_KCHUNKS": "1",
+      "ETX_DSV2_D5": "0",
+      "ETX_DSV2_REQUESTS": "1",
+      "ETX_DSV2_COUPLE": "none",
+      "ETX_DSV2_KVA": "shared",
+      "ETX_FLEET_PATCH": "gemv_no_terminal_all norm_tree_all argmax_tree topk_rank attn_prologue_live l1_loads merge_uv_waves",
+      "ETX_CFLAGS": "-Rpass-analysis=kernel-resource-usage -DETX_DS_REQUESTS=1 -DETX_SLOT_BY_CU -DETX_DSV2_KVA_SHARED=1"
+    },
+    "fleet_patched_src_sha256": "b75aefc98ce71d0f60c99e7e4e262d37a86faa25a7ade490ea330cebd81e08fb",
+    "patched_fleet_equal": true,
+    "retained_verified_sha256": {
+      "plan.json": "dc6f51b6352a017f1ac01beed91275a7a8bc457076d9d10e3fa3da5b73064bb1",
+      "plan_data.h": "704b640602782ade14e596beade809da2a97eae4d19ebed5b0caf30239900cb1",
+      "megakernel_d0.hip": "942530bb72e2545fe92fa84b25e95b61e76687326722a8250656b3b80a325ea3",
+      "mk.s": "2acc3f9fd343fea2d7bf76cfa26dd45e8ac0d2916be620afcfeb6a8f6ea13ac8",
+      "isa.bin": "483e1643998db72271c0e6aa1fa38d5de40bdebcf04f4d947634032f9a41c9c0"
+    },
+    "host_source_sha256": "b81dbec67390064448120c6042466cee46662f7e79e9e6b4bd12389042875beb",
+    "host_object_sha256": "42e5717a7b9e5f36fe1f45c7183a9971f00914a642ff11ee2b6d6c67526fecee",
+    "native_artifacts": {
+      "mk.ll": "103b3b7707e8f9b879a7fd807dcb19591d86495fd4134553c27e758ba3fbf03a",
+      "native.s": "e4d488fc20ff97f289a4eff939cd6e9dc7f0004432c4972676a68c4a8e05797b",
+      "native.o": "5af09a1d11feec95b7c72df8fb035b9bf5b3bb7f9aa3c0b7d399b94e9a20750c",
+      "host.ll": "84e4f2934c9bb005fab67677f0399f6f167ab814996c397af7a30886b1bb525f"
+    },
+    "host_wall_source_sha256": "eca5de023ecace1551b59a4a20b3356fb9ba708d157cef6c31e887f2fa8a7b1c",
+    "host_wall_object_sha256": "29351aa2f3070d13ba03996f0a5add1564a110f4e7608dc05254445fb9760bdc",
+    "host_wall_native_ir_sha256": "4ea4d3a5cc32d7383359601ea1b5ddb7554b11ac2e1decb297ae338755578a02"
+  },
+  "alld4r0l1kvsmw": {
+    "generated_sha256": {
+      "plan.json": "f23f959e82edaa9fe19147026c20d3b855e5af6c881a1858289c1c22ce15785f",
+      "plan_data.h": "90d57ca40a6a943af35df58987b79f4017910180931a81d35e6b5c0f3596e59d",
+      "megakernel_d0.hip": "52e6131a3a6aa82bfe506395a09810b674b43997e81d73341da508fd99d1726c",
+      "etx_tiles.h": "21ed57785b6dbd26ba75a5eb026e1b96189318ed92f1b5c6c8f42363c316a140",
+      "etx_lowering.h": "bf740ec9af9dee829a9da6220591d8c95d75424a63ce31f8563975509a8c0ac3"
+    },
+    "retained": "/Users/ckl/.hermes/cache/scratch/etx-close-known-issues-evidence/rocm-kept/alld4r0l1kvsmw",
+    "generated_equal": {
+      "plan.json": true,
+      "plan_data.h": true,
+      "megakernel_d0.hip": true,
+      "etx_tiles.h": true,
+      "etx_lowering.h": true
+    },
+    "env": {
+      "ETX_DSV2_COH": "l1",
+      "ETX_DSV2_D4": "1",
+      "ETX_DSV2_KCHUNKS": "1",
+      "ETX_DSV2_D5": "0",
+      "ETX_DSV2_D4_ROWS": "0",
+      "ETX_DSV2_KVA": "shared",
+      "ETX_FLEET_PATCH": "gemv_no_terminal_all norm_tree_all argmax_tree topk_rank attn_prologue_live l1_loads merge_uv_waves",
+      "ETX_CFLAGS": "-Rpass-analysis=kernel-resource-usage -DETX_DSV2_D4=1 -DETX_DSV2_KVA_SHARED=1"
+    },
+    "fleet_patched_src_sha256": "b75aefc98ce71d0f60c99e7e4e262d37a86faa25a7ade490ea330cebd81e08fb",
+    "patched_fleet_equal": true,
+    "retained_verified_sha256": {
+      "plan.json": "f23f959e82edaa9fe19147026c20d3b855e5af6c881a1858289c1c22ce15785f",
+      "plan_data.h": "90d57ca40a6a943af35df58987b79f4017910180931a81d35e6b5c0f3596e59d",
+      "megakernel_d0.hip": "52e6131a3a6aa82bfe506395a09810b674b43997e81d73341da508fd99d1726c",
+      "mk.s": "f5dbfd87925697acf6edc173fb7034c445dd28f3c74aa69fd5eba1555929289b",
+      "isa.bin": "832e635d831c7c0ca87713765de3e76a8c75ac265c1e07766140ca4af14ed579"
+    },
+    "host_source_sha256": "b81dbec67390064448120c6042466cee46662f7e79e9e6b4bd12389042875beb",
+    "host_object_sha256": "551563b65f0214a5dc9d0a36ebcf92a6e678ad3896039f3d829cccb95c8c8ee4",
+    "host_wall_source_sha256": "eca5de023ecace1551b59a4a20b3356fb9ba708d157cef6c31e887f2fa8a7b1c",
+    "host_wall_object_sha256": "62b00eb1cef49979af52ad7a049f73cfd24c6f114841da34459e32e1944c29ba"
+  },
+  "x8": {
+    "generated_sha256": {
+      "plan.json": "6beb4b01bb9ea997aa6ab16968fb043b2453ae85d73632bd7f57cb9d3e8f891d",
+      "plan_data.h": "c066a7a482c85064a09035bbd4a3ed97284410d3a676acec25c4dde9e38c7e81",
+      "megakernel_d0.hip": "4824f24e27a6a0f9a93fd5b51cf9b41b62409d061c3f7b8f793eaa6690b4ae38",
+      "etx_tiles.h": "19e1f3d857dccca9aa07bb5f3600570fc021602d59109e3630b05661f54d3b36",
+      "etx_lowering.h": "bf740ec9af9dee829a9da6220591d8c95d75424a63ce31f8563975509a8c0ac3"
+    },
+    "retained": "/Users/ckl/.hermes/cache/scratch/etx-close-known-issues-evidence/rocm-x8/x8",
+    "generated_equal": {
+      "plan.json": true,
+      "plan_data.h": true,
+      "megakernel_d0.hip": true,
+      "etx_tiles.h": true,
+      "etx_lowering.h": true
+    },
+    "env": {
+      "ETX_DSV2_COH": "l1",
+      "ETX_DSV2_D4": "0",
+      "ETX_DSV2_KCHUNKS": "1",
+      "ETX_DSV2_D5": "0",
+      "ETX_DSV2_REQUESTS": "8",
+      "ETX_DSV2_COUPLE": "none",
+      "ETX_DSV2_KVA": "shared",
+      "ETX_FLEET_PATCH": "gemv_no_terminal_all norm_tree_all argmax_tree topk_rank attn_prologue_live l1_loads merge_uv_waves",
+      "ETX_CFLAGS": "-Rpass-analysis=kernel-resource-usage -DETX_DS_REQUESTS=8 -DETX_SLOT_BY_CU -DETX_DSV2_KVA_SHARED=1"
+    },
+    "fleet_patched_src_sha256": "b75aefc98ce71d0f60c99e7e4e262d37a86faa25a7ade490ea330cebd81e08fb",
+    "patched_fleet_equal": true,
+    "retained_verified_sha256": {
+      "plan.json": "6beb4b01bb9ea997aa6ab16968fb043b2453ae85d73632bd7f57cb9d3e8f891d",
+      "plan_data.h": "c066a7a482c85064a09035bbd4a3ed97284410d3a676acec25c4dde9e38c7e81",
+      "megakernel_d0.hip": "4824f24e27a6a0f9a93fd5b51cf9b41b62409d061c3f7b8f793eaa6690b4ae38",
+      "mk.s": "ebf2ee83d5889149f3ffc99bc4ca137042d33ceb60b09290d5bfa4fa8683b565",
+      "isa.bin": "0604c7354501e4e452910929ae8d014a2bab70cc33810b6cd30b0fc1dadc01da"
+    },
+    "host_source_sha256": "b81dbec67390064448120c6042466cee46662f7e79e9e6b4bd12389042875beb",
+    "host_object_sha256": "ae0d8258bebe2cf5befe56b908fcc4101876d8b0f5da55b2837b30107f2873ae",
+    "host_wall_source_sha256": "eca5de023ecace1551b59a4a20b3356fb9ba708d157cef6c31e887f2fa8a7b1c",
+    "host_wall_object_sha256": "879151d4db69e19079c3861333aa85f792fe5e72705784d75fb0aead7cbe1479"
+  },
+  "x2": {
+    "generated_sha256": {
+      "plan.json": "f11da123b012b1a1ab161f556f63dc24048378ec3012c1f45536b032385774cb",
+      "plan_data.h": "e214b39a2d94f395b886210bed10f2015c89a8f70e00d5d1fdd646fe9a1f41e2",
+      "megakernel_d0.hip": "cc0af175202011217d850060345870686a0895bd16378614c7b7c7e0fb7508f1",
+      "etx_tiles.h": "981df89dbac811a1dfc875d241a39d33198d731e27d7c7ac7169da5c26e3b47c",
+      "etx_lowering.h": "bf740ec9af9dee829a9da6220591d8c95d75424a63ce31f8563975509a8c0ac3"
+    },
+    "retained": "/Users/ckl/code/.wt/etx-deepseek-two-gaps/examples/dsv2lite/results/2026-10-14-batch-20261014T142757Z/20261014T142757Z-03ff3e/b_x2",
+    "generated_equal": {
+      "plan.json": true,
+      "plan_data.h": true,
+      "megakernel_d0.hip": true,
+      "etx_tiles.h": true,
+      "etx_lowering.h": true
+    },
+    "env": {
+      "ETX_DSV2_COH": "l1",
+      "ETX_DSV2_D4": "0",
+      "ETX_DSV2_KCHUNKS": "1",
+      "ETX_DSV2_D5": "0",
+      "ETX_DSV2_REQUESTS": "2",
+      "ETX_DSV2_COUPLE": "none",
+      "ETX_DSV2_KVA": "shared",
+      "ETX_FLEET_PATCH": "gemv_no_terminal_all norm_tree_all argmax_tree topk_rank attn_prologue_live l1_loads merge_uv_waves",
+      "ETX_CFLAGS": "-Rpass-analysis=kernel-resource-usage -DETX_DS_REQUESTS=2 -DETX_SLOT_BY_CU -DETX_DSV2_KVA_SHARED=1"
+    },
+    "fleet_patched_src_sha256": "b75aefc98ce71d0f60c99e7e4e262d37a86faa25a7ade490ea330cebd81e08fb",
+    "host_source_sha256": "b81dbec67390064448120c6042466cee46662f7e79e9e6b4bd12389042875beb",
+    "host_object_sha256": "2f50f686f23383affb7e386235a5cb3fd067007d8409965adf3b0b07f3566ae8",
+    "host_wall_source_sha256": "eca5de023ecace1551b59a4a20b3356fb9ba708d157cef6c31e887f2fa8a7b1c",
+    "host_wall_object_sha256": "69e1b9a35b0741c9a644ec4e5124b4b2ad043cdc995965067f69979d2f686a41"
+  },
+  "x4": {
+    "generated_sha256": {
+      "plan.json": "57ede9c7886b00964108f4d8fa175faaa021df0227f3f58f2a652921223808be",
+      "plan_data.h": "d04e5e01b664a1dddf79aa4942c497fd650fa864d4addd3aa17e79fc731b10af",
+      "megakernel_d0.hip": "9664630b14a3c13bf496145a242e2af9305727f11c3937e7a07a991e34441eef",
+      "etx_tiles.h": "4819125d4217dc9d22f3496315108e7f1d9e3b8d774483ab29e9dd4ffd2beb1e",
+      "etx_lowering.h": "bf740ec9af9dee829a9da6220591d8c95d75424a63ce31f8563975509a8c0ac3"
+    },
+    "retained": "/Users/ckl/code/.wt/etx-deepseek-two-gaps/examples/dsv2lite/results/2026-10-14-batch-20261014T142757Z/20261014T142757Z-03ff3e/b_x4",
+    "generated_equal": {
+      "plan.json": true,
+      "plan_data.h": true,
+      "megakernel_d0.hip": true,
+      "etx_tiles.h": true,
+      "etx_lowering.h": true
+    },
+    "env": {
+      "ETX_DSV2_COH": "l1",
+      "ETX_DSV2_D4": "0",
+      "ETX_DSV2_KCHUNKS": "1",
+      "ETX_DSV2_D5": "0",
+      "ETX_DSV2_REQUESTS": "4",
+      "ETX_DSV2_COUPLE": "none",
+      "ETX_DSV2_KVA": "shared",
+      "ETX_FLEET_PATCH": "gemv_no_terminal_all norm_tree_all argmax_tree topk_rank attn_prologue_live l1_loads merge_uv_waves",
+      "ETX_CFLAGS": "-Rpass-analysis=kernel-resource-usage -DETX_DS_REQUESTS=4 -DETX_SLOT_BY_CU -DETX_DSV2_KVA_SHARED=1"
+    },
+    "fleet_patched_src_sha256": "b75aefc98ce71d0f60c99e7e4e262d37a86faa25a7ade490ea330cebd81e08fb",
+    "host_source_sha256": "b81dbec67390064448120c6042466cee46662f7e79e9e6b4bd12389042875beb",
+    "host_object_sha256": "bea7b00728a9ca0502adb36b3e86067ea5f76022aacaa01cbc0d82e827c97c8f",
+    "host_wall_source_sha256": "eca5de023ecace1551b59a4a20b3356fb9ba708d157cef6c31e887f2fa8a7b1c",
+    "host_wall_object_sha256": "1cbc62908bf5926778f0e7a6ebfc7bc77ac83d7b474d654f6daa9ee60a820134"
+  }
+}

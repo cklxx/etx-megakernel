@@ -1,0 +1,30 @@
+{
+  "alld4r0l1kvsmw": {
+    "status": "REUSED_NOT_REBUILT",
+    "generated_source_equal": {
+      "plan.json": true,
+      "plan_data.h": true,
+      "megakernel_d0.hip": true,
+      "etx_lowering.h": true,
+      "etx_tiles.h": true
+    },
+    "artifact": "/Users/ckl/.hermes/cache/scratch/etx-close-known-issues-evidence/local-compile/alld4r0l1kvsmw/mk.s",
+    "sha256": "09429d2879e708c7f5b50490e6cdfb4e7db3b7e1b4c1e741119db24914d3843d",
+    "provenance": "prior local_compile.py and retained native build logs; current device include source closure unchanged",
+    "current_host_check": "fresh ROCm host-wall object; old native host IR not transferred"
+  },
+  "x8": {
+    "status": "REUSED_NOT_REBUILT",
+    "generated_source_equal": {
+      "plan.json": true,
+      "plan_data.h": true,
+      "megakernel_d0.hip": true,
+      "etx_lowering.h": true,
+      "etx_tiles.h": true
+    },
+    "artifact": "/Users/ckl/.hermes/cache/scratch/etx-close-known-issues-evidence/resumed/native-x8.s",
+    "sha256": "2c66095cea6215974974900c739b226b124c0a636fe289b577f1ba5f472c76ae",
+    "provenance": "prior local_compile.py and retained native build logs; current device include source closure unchanged",
+    "current_host_check": "fresh ROCm host-wall object; old native host IR not transferred"
+  }
+}

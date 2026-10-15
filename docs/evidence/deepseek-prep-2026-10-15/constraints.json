@@ -1,0 +1,19 @@
+{
+  "gpu_spend_usd": 0,
+  "gpu_commands_run": false,
+  "cloud_commands_run": false,
+  "qwen_lock_untouched": true,
+  "full_suite_run": false,
+  "full_device_compiler_matrix_run": false,
+  "new_device_arm": "x1km",
+  "host_only_refresh_arms": [
+    "x1km",
+    "alld4r0l1kvsmw",
+    "x8",
+    "x2",
+    "x4"
+  ],
+  "provider": "DigitalOcean",
+  "tariff": "NOT ESTABLISHED",
+  "spend_approval": false
+}

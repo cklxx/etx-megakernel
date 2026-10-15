@@ -78,8 +78,13 @@ configurations claim is permitted.
 
 ## Local acceptance and remaining gates
 
-The local evidence index will record exact tested source hashes, raw logs, actual exit codes, generated-source
-comparisons, compiler identities, device objects, and host objects. Unchanged retained builds are reused only after
+The [local evidence index](evidence/deepseek-prep-2026-10-15/README.md) records exact tested source hashes, raw logs,
+actual exit codes, generated-source comparisons, compiler identities, device objects, and host objects.
+The frozen source archive of `a0c3e72` passed **278 focused tests**, with 14 graph-lowering tests excluded under the
+Qwen heavy lock, in 15.26 seconds. Both queue dependency dry runs and outer/embedded shell syntax checks passed.
+The new x1km device/assembly/full-host checks passed with ROCm 7.2.4 and native LLVM 23. All five relevant final
+host objects compile. The CPU runner success and dependency-failure paths pass. Real r5/r7 cache checks refuse
+with exit 1. Their original payloads remain absent. Unchanged retained builds are reused only after
 explicit generated source, plan, patched Fleet source, and artifact checksum comparisons. Reuse is not a fresh
 compiler pass.
 
@@ -88,3 +93,7 @@ has no reusable producer-certified full reference set. The registered producer p
 The installed offline compiler is ROCm 7.2.4; the future DigitalOcean image and ROCm version must be checked before
 execution. Missing local HIP runtime libraries prevent final HIP executable linking here. Native link, runtime load,
 real-input correctness, profiler metric/marker support, and all device measurements remain explicit execution gates.
+
+The implementation and registered queues are committed in the isolated preparation branch. No main merge or push
+is part of this task. Local preparation is complete within the two existing experiment scopes. Same-kernel graph
+replay is a named existing implementation blocker, not a placeholder or a proposed third experiment.
