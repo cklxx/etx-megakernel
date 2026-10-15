@@ -73,5 +73,5 @@ CC review at `3a449a7` found no blocking x8/cleanup issue and two B4 blockers. R
 batch/configuration subsets and requires exact scoped kernel-trace/FETCH_SIZE coverage, preserving all correctness
 gates and explicit measured zeros. Four old-code regressions fail. Final local acceptance: **2190 passed, 14 skipped in 490.55s (0:08:10)**, exit 0, no deselection;
 focused **308 passed in 25.98s**; refreshed archive **2 passed in 13.86s**. See the linked preparation index for the stopped reserve-guard
-attempt, raw logs, receipt refresh and compiler reuse. Independent scoped R1/R2 recheck is pending; no main merge/push,
-new experiment or GPU spend. Both diagnostic queues remain unexecuted.
+attempt, raw logs, receipt refresh and compiler reuse. Independent scoped R1/R2 recheck CLOSED both findings with no blocking repair regression. Serialized publication
+is authorized; no new experiment or GPU spend. Exact review and source bindings are retained in the preparation index. Both diagnostic queues remain unexecuted.

@@ -1,6 +1,6 @@
 # DeepSeek: two prepared experiments, 2026-10-15
 
-Status: B4 R1/R2 repairs implemented and locally accepted; independent scoped recheck pending before main merge/push. Local acceptance is recorded below. No GPU run, rental, or spend. This change prepares only the two open
+Status: B4 R1/R2 repairs implemented and locally accepted; independent scoped recheck CLOSED R1/R2 with no blocking repair regression; serialized publication authorized. Local acceptance is recorded below. No GPU run, rental, or spend. This change prepares only the two open
 experiments in `NEXT-GPU-2026-10-15.md`. It does not recover the lost historical r5/r7 payloads.
 
 ## Queue 1: eight-request correctness
@@ -97,8 +97,8 @@ execution. Missing local HIP runtime libraries prevent final HIP executable link
 real-input correctness, profiler metric/marker support, and all device measurements remain explicit execution gates.
 
 The implementation and registered queues are committed. The initial SOL_CLOSE records above remain historical evidence.
-The received CC review found no blocking x8 or cleanup defect, but blocked B4 on R1/R2. The repairs need an independent
-scoped recheck before serialized main integration or publication. Local repair acceptance is complete within the
+The received CC review found no blocking x8 or cleanup defect, but blocked B4 on R1/R2. The independent
+scoped repair recheck CLOSED both findings with no blocking repair regression; serialized integration/publication is authorized. Local repair acceptance is complete within the
 two existing experiment scopes; a GPU run still needs a separate spending decision. Same-kernel graph
 replay is a named existing implementation blocker, not a placeholder or a proposed third experiment.
 
@@ -125,6 +125,6 @@ and 163 original raw evidence files match. The active Qwen receipt changes one t
 All 359 bindings match the committed fixture after refresh.
 
 [Repair evidence and scoped handoff](evidence/deepseek-prep-2026-10-15/b4-review-repair/README.md) retain exact commands,
-source hashes, actual exits, original review and before/after failures. **Independent scoped R1/R2 recheck is pending.**
+source hashes, actual exits, original review and before/after failures. **Independent scoped R1/R2 recheck CLOSED both findings with no blocking repair regression.** The exact report and recomputed source bindings are retained in `b4-review-repair/review-acceptance.json` in the evidence directory.
 No new experiment, GPU/cloud action, spend, main merge or push occurred. Same-kernel replay remains UNAVAILABLE and
 the full two-baseline performance claim INCOMPLETE.

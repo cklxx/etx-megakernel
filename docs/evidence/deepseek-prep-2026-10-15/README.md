@@ -2,9 +2,9 @@
 
 This is local preparation evidence. No GPU result is present. GPU spending is $0.
 
-Current status: B4 R1/R2 repaired at `40ddf36`, local acceptance complete; independent scoped repair recheck pending.
+Current status: B4 R1/R2 repaired at `40ddf36`, local acceptance complete; independent scoped repair recheck CLOSED R1/R2 with no blocking repair regression.
 See [the current repair record](b4-review-repair/README.md). Original CC found no blocking x8 or cleanup finding.
-No main integration/push or GPU spending. The sections below preserve the earlier evidence.
+Serialized integration/publication is authorized. No GPU spending. The sections below preserve the earlier evidence; pending-review statements at earlier sealing are historical. Current review status is in `b4-review-repair/review-acceptance.json`.
 
 Original preparation source commit: `a0c3e72` (`prep/deepseek-two-gaps-2026-10-15`, base `24eabf5`). The later evidence commit changes
 only documents and evidence metadata. `archive-acceptance.json` binds the tested code, tests, queues, archive hash,
@@ -102,6 +102,6 @@ and 163 original raw evidence files match. The active Qwen receipt changes one t
 All 359 bindings match the committed fixture after refresh.
 
 [Repair evidence and scoped handoff](b4-review-repair/README.md) retain exact commands,
-source hashes, actual exits, original review and before/after failures. **Independent scoped R1/R2 recheck is pending.**
+source hashes, actual exits, original review and before/after failures. **Independent scoped R1/R2 recheck CLOSED both findings with no blocking repair regression.** The exact report and recomputed source bindings are retained in `b4-review-repair/review-acceptance.json` in the evidence directory.
 No new experiment, GPU/cloud action, spend, main merge or push occurred. Same-kernel replay remains UNAVAILABLE and
 the full two-baseline performance claim INCOMPLETE.

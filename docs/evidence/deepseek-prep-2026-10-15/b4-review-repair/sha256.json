@@ -1,11 +1,15 @@
 {
   "README.md": {
-    "sha256": "00c8cf75f3c203bf53a496ea5a27b93b76df22f42760c8491f3ac2cb69c12bef",
-    "bytes": 2539
+    "sha256": "e97fe8e2b919aacaa03a7b0c130ad072726d684845b8017e1ca01b297a6e3e02",
+    "bytes": 3059
   },
-  "acceptance.json": {
+  "acceptance-before-review.json": {
     "sha256": "22eef61c2c0d65b1f7f3ff4d9ee7583cb5725d8734896915536920b0b732fff2",
     "bytes": 2490
+  },
+  "acceptance.json": {
+    "sha256": "955a0f142b7495d326070d93bd8f2ed44ceaea5a8bf414d904b7616d1c50e948",
+    "bytes": 2707
   },
   "after-driver.log": {
     "sha256": "67b2699876e00517c69e950a489a36d06591f53f47c46e19be77de965ba1bb7d",
@@ -199,6 +203,10 @@
     "sha256": "51284fece1cccd1aa2a012b732720391c6ada8337d34feacf9e4cde6648f6d3e",
     "bytes": 12840
   },
+  "repair-recheck.md": {
+    "sha256": "694cab9f077efc3bf886d609125595b2681d7b25a337607f7618a013688df70e",
+    "bytes": 7260
+  },
   "reserve-recovery.json": {
     "sha256": "f41f084c5bc4509c0084d3a5c59c7448a3f02c36edae42b9a56addde799b0abc",
     "bytes": 716
@@ -206,6 +214,10 @@
   "reserve_recovery.py": {
     "sha256": "a50038774aa86b2bb352471cd7693558500a12bb60f875d9b846700947cdc0f7",
     "bytes": 2560
+  },
+  "review-acceptance.json": {
+    "sha256": "4150f73b61c3f9a49057c8b754ce3a9918a956bd4be8be63cc3fb06c7b5d53fc",
+    "bytes": 1583
   },
   "review-before-repair.md": {
     "sha256": "8814e241a354fb054350fb186b6253ac1e994553ea589e38c5a32a06aa3bb262",
@@ -222,6 +234,10 @@
   "seal_repair.py": {
     "sha256": "7c6a9d2d90573c22fbb1857fed2de079306bd7f32dfbbb112849a47a68a1f46d",
     "bytes": 15464
+  },
+  "sha256-before-review.json": {
+    "sha256": "8cf503148b5da901419fd028cc8cf3c5eb8adbd97d700b9fa2ed781edef3eb73",
+    "bytes": 7733
   },
   "source-freeze.json": {
     "sha256": "0729812506aa34ca3247eb3834ce7d8fb5949e7de027ac6d4565ff7922a46b61",

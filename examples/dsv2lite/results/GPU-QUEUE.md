@@ -3,9 +3,9 @@
 ## Current two-gap follow-ups, 2026-10-15
 
 The existing x8 correctness and B4 attribution follow-ups now have implemented queues, final local test acceptance
-and B4 R1/R2 repair review pending. CC found no blocking x8/cleanup issue. B4 repairs at `40ddf36`
-passed local acceptance; independent scoped R1/R2 recheck is required before main merge/push. See [preparation and evidence](../../../docs/DEEPSEEK-PREP-TWO-GAPS-2026-10-15.md).
-The independent review must be nonblocking before integration. The native/device gates below also remain for these
+and closed B4 R1/R2 repair review. CC found no blocking x8/cleanup issue. B4 repairs at `40ddf36`
+passed local acceptance; independent scoped R1/R2 recheck CLOSED both findings with no blocking repair regression. See [preparation and evidence](../../../docs/DEEPSEEK-PREP-TWO-GAPS-2026-10-15.md).
+The independent review gate is satisfied for serialized integration/publication. The native/device gates below also remain for these
 two diagnostics. No GPU run or spending is authorized.
 
 - `examples/sessions/x8_correctness.py`: verify the target toolchain/runtime, produce or reuse strictly certified

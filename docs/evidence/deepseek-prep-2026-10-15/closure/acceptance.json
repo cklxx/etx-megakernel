@@ -228,7 +228,7 @@
   "compiler_evidence": "Reused unchanged DeepSeek and Qwen kernel/host-generation inputs, with exact original evidence/source hash checks; changed process supervisor, optional profiler wrapper and tests have fresh CPU acceptance. No compiler rerun.",
   "archive_adaptation": "fixture.json; real committed source fixture excludes historical DeepSeek GPU data for only the two Qwen archive transport cases",
   "qwen_source_binding": "Refreshed readiness sources; exact committed-fixture source match and both archive transport tests passed",
-  "independent_review": "PENDING unless separate final report and explicit bounded-recheck verdict exist; missing is not pass",
+  "independent_review": "COMPLETE: original x8/cleanup scope nonblocking; B4 R1/R2 CLOSED at 40ddf36. See review-status.json and ../b4-review-repair/review-acceptance.json",
   "gpu_spend_usd": 0,
   "gpu_execution": false
 }

@@ -1,0 +1,234 @@
+{
+  "status": "PASS_LOCAL_ONLY",
+  "revision": "fcb5f649463573c9dc728f8d4de46d5bb5a27c7a",
+  "initial_preparation_pin": "1a23336e1bdf1c78c63ec35f3dab136f88acc2b0",
+  "implementation": "a0c3e724dbd1a342d96812d232f04ced902d6496",
+  "process_cleanup_fix": "fcb5f649463573c9dc728f8d4de46d5bb5a27c7a",
+  "commands": [
+    {
+      "name": "remaining-graph-collect",
+      "command": [
+        "/Users/ckl/code/.wt/etx-deepseek-two-gaps/.venv/bin/python",
+        "-m",
+        "pytest",
+        "--collect-only",
+        "-q",
+        "tests/test_dsv2_batch.py",
+        "-k",
+        "every_request or static_queues or routing_handoff or two_requests_keep or more_than_two or shared_kva"
+      ],
+      "cwd": "/Users/ckl/code/.wt/etx-deepseek-two-gaps",
+      "exit": 0,
+      "stop": null,
+      "seconds": 5.01,
+      "log": "/Users/ckl/.hermes/cache/scratch/deepseek-closure-evidence/remaining-graph-collect.log",
+      "free_bytes": 7238795264
+    },
+    {
+      "name": "remaining-14-graph-tests",
+      "command": [
+        "/Users/ckl/code/.wt/etx-deepseek-two-gaps/.venv/bin/python",
+        "-m",
+        "pytest",
+        "-q",
+        "-ra",
+        "tests/test_dsv2_batch.py",
+        "-k",
+        "every_request or static_queues or routing_handoff or two_requests_keep or more_than_two or shared_kva",
+        "--basetemp=/Users/ckl/.hermes/cache/scratch/deepseek-closure-evidence/graph-pytest",
+        "-o",
+        "tmp_path_retention_policy=failed"
+      ],
+      "cwd": "/Users/ckl/code/.wt/etx-deepseek-two-gaps",
+      "exit": 0,
+      "stop": null,
+      "seconds": 10.02,
+      "log": "/Users/ckl/.hermes/cache/scratch/deepseek-closure-evidence/remaining-14-graph-tests.log",
+      "free_bytes": 7238483968
+    },
+    {
+      "name": "fixture-init",
+      "command": [
+        "git",
+        "init",
+        "-q"
+      ],
+      "cwd": "/Users/ckl/.hermes/cache/scratch/deepseek-closure-evidence/source-fixture",
+      "exit": 0,
+      "stop": null,
+      "seconds": 5.01,
+      "log": "/Users/ckl/.hermes/cache/scratch/deepseek-closure-evidence/fixture-init.log",
+      "free_bytes": 7145160704
+    },
+    {
+      "name": "fixture-add",
+      "command": [
+        "git",
+        "add",
+        "-f",
+        "-A"
+      ],
+      "cwd": "/Users/ckl/.hermes/cache/scratch/deepseek-closure-evidence/source-fixture",
+      "exit": 0,
+      "stop": null,
+      "seconds": 5.02,
+      "log": "/Users/ckl/.hermes/cache/scratch/deepseek-closure-evidence/fixture-add.log",
+      "free_bytes": 7090671616
+    },
+    {
+      "name": "fixture-commit",
+      "command": [
+        "git",
+        "-c",
+        "user.name=Local source acceptance",
+        "-c",
+        "user.email=fixture@localhost",
+        "commit",
+        "-qm",
+        "Pinned source transport fixture without historical GPU data"
+      ],
+      "cwd": "/Users/ckl/.hermes/cache/scratch/deepseek-closure-evidence/source-fixture",
+      "exit": 0,
+      "stop": null,
+      "seconds": 5.02,
+      "log": "/Users/ckl/.hermes/cache/scratch/deepseek-closure-evidence/fixture-commit.log",
+      "free_bytes": 7087067136
+    },
+    {
+      "name": "full-suite",
+      "command": [
+        "/Users/ckl/code/.wt/etx-deepseek-two-gaps/.venv/bin/python",
+        "-m",
+        "pytest",
+        "-q",
+        "-ra",
+        "-p",
+        "bounded_archive_plugin",
+        "--basetemp=/Users/ckl/.hermes/cache/scratch/deepseek-closure-evidence/full-pytest",
+        "-o",
+        "tmp_path_retention_policy=failed"
+      ],
+      "cwd": "/Users/ckl/code/.wt/etx-deepseek-two-gaps",
+      "exit": 1,
+      "stop": null,
+      "seconds": 515.85,
+      "log": "/Users/ckl/.hermes/cache/scratch/deepseek-closure-evidence/full-suite.log",
+      "free_bytes": 6947958784
+    },
+    {
+      "name": "proc-regression-before",
+      "command": [
+        ".venv/bin/python",
+        "-m",
+        "pytest",
+        "-q",
+        "tests/test_session_proc.py",
+        "-k",
+        "without_proc"
+      ],
+      "cwd": "/Users/ckl/code/.wt/etx-deepseek-two-gaps",
+      "revision": "1a23336e1bdf1c78c63ec35f3dab136f88acc2b0",
+      "source_sha256": {
+        "etx/session/proc.py": "24045d39ed74269b186f5d0b59d0beb95019f3d3ae74e9a428b77596c1fad618",
+        "tests/test_session_proc.py": "09adbb56f533bd222299757a0b910820bf653dce5542151dd028e3f4c153e10f"
+      },
+      "exit": 1,
+      "stop": null,
+      "seconds": 5.02,
+      "free_bytes": 6950801408
+    },
+    {
+      "name": "proc-regression-after",
+      "command": [
+        ".venv/bin/python",
+        "-m",
+        "pytest",
+        "-q",
+        "-ra",
+        "tests/test_session_proc.py",
+        "tests/test_gpu_jobs.py",
+        "tests/test_deepseek_open_prep.py",
+        "tests/test_dsv2_batch_attribution.py"
+      ],
+      "cwd": "/Users/ckl/code/.wt/etx-deepseek-two-gaps",
+      "revision": "1a23336e1bdf1c78c63ec35f3dab136f88acc2b0",
+      "source_sha256": {
+        "etx/session/proc.py": "99c02014a8ed9a0350dd7220213fa056feb8f09f2e853d6c57b431a7ccda2c3c",
+        "tests/test_session_proc.py": "09adbb56f533bd222299757a0b910820bf653dce5542151dd028e3f4c153e10f"
+      },
+      "exit": 0,
+      "stop": null,
+      "seconds": 10.03,
+      "free_bytes": 6945320960
+    },
+    {
+      "name": "full-suite-final",
+      "command": [
+        ".venv/bin/python",
+        "-m",
+        "pytest",
+        "-q",
+        "-ra",
+        "-p",
+        "bounded_archive_plugin",
+        "--basetemp=/Users/ckl/.hermes/cache/scratch/deepseek-closure-evidence/final-pytest",
+        "-o",
+        "tmp_path_retention_policy=failed"
+      ],
+      "cwd": "/Users/ckl/code/.wt/etx-deepseek-two-gaps",
+      "revision": "fcb5f649463573c9dc728f8d4de46d5bb5a27c7a",
+      "source_sha256": {
+        "etx/session/proc.py": "99c02014a8ed9a0350dd7220213fa056feb8f09f2e853d6c57b431a7ccda2c3c",
+        "tests/test_session_proc.py": "09adbb56f533bd222299757a0b910820bf653dce5542151dd028e3f4c153e10f"
+      },
+      "exit": 0,
+      "stop": null,
+      "seconds": 510.87,
+      "free_bytes": 6824628224
+    },
+    {
+      "name": "archive-after-receipt",
+      "command": [
+        ".venv/bin/python",
+        "-m",
+        "pytest",
+        "-q",
+        "-ra",
+        "-s",
+        "-p",
+        "bounded_archive_plugin",
+        "tests/test_producer_readiness.py::test_fresh_archive_interpreter_preflight_and_failure_report",
+        "tests/test_producer_readiness.py::test_documented_push_stage_attach_start_with_local_transport",
+        "--basetemp=/Users/ckl/.hermes/cache/scratch/deepseek-closure-evidence/receipt-archive-pytest",
+        "-o",
+        "tmp_path_retention_policy=failed"
+      ],
+      "cwd": "/Users/ckl/code/.wt/etx-deepseek-two-gaps",
+      "revision": "fcb5f649463573c9dc728f8d4de46d5bb5a27c7a",
+      "source_sha256": {
+        "etx/session/proc.py": "99c02014a8ed9a0350dd7220213fa056feb8f09f2e853d6c57b431a7ccda2c3c",
+        "tests/test_session_proc.py": "09adbb56f533bd222299757a0b910820bf653dce5542151dd028e3f4c153e10f"
+      },
+      "exit": 0,
+      "stop": null,
+      "seconds": 20.04,
+      "free_bytes": 6818447360
+    }
+  ],
+  "first_full_suite": {
+    "exit": 1,
+    "result": "1 failed, 2165 passed, 14 skipped in 512.73s",
+    "log": "full-suite.log"
+  },
+  "final_full_suite": {
+    "exit": 0,
+    "result": "2168 passed, 14 skipped in 508.28s (0:08:28)",
+    "log": "full-suite-final.log"
+  },
+  "compiler_evidence": "Reused unchanged DeepSeek and Qwen kernel/host-generation inputs, with exact original evidence/source hash checks; changed process supervisor, optional profiler wrapper and tests have fresh CPU acceptance. No compiler rerun.",
+  "archive_adaptation": "fixture.json; real committed source fixture excludes historical DeepSeek GPU data for only the two Qwen archive transport cases",
+  "qwen_source_binding": "Refreshed readiness sources; exact committed-fixture source match and both archive transport tests passed",
+  "independent_review": "PENDING unless separate final report and explicit bounded-recheck verdict exist; missing is not pass",
+  "gpu_spend_usd": 0,
+  "gpu_execution": false
+}

@@ -1345,7 +1345,7 @@
     "GPU executable link/load/execution pending: macOS has no Linux HIP runtime",
     "real-model capture/replay pending; no retained Qwen router tensors found",
     "GPU performance and memory visibility unknown",
-    "DeepSeek integration refresh reuses unchanged compiler inputs; shared Python runtime/optional profiler wrapper changes have local CPU coverage only. Original CC review found no blocking x8/cleanup issue. Its B4 R1/R2 repairs require an independent scoped recheck before publication."
+    "DeepSeek integration refresh reuses unchanged compiler inputs; shared Python runtime/optional profiler wrapper changes have local CPU coverage only. Original CC review found no blocking x8/cleanup issue. Independent scoped recheck CLOSED B4 R1/R2 with no blocking repair regression. Qwen receipt metadata was not independently audited; source bindings are verified by closure."
   ],
   "gpu_spend_usd": 0,
   "archive_acceptance": "../2026-10-15-three-integration/archive-acceptance.json",
@@ -1357,6 +1357,7 @@
     "evidence": "docs/evidence/deepseek-prep-2026-10-15/b4-review-repair/",
     "compiler_reuse": "docs/evidence/deepseek-prep-2026-10-15/b4-review-repair/compiler-reuse.json",
     "archive_acceptance": "docs/evidence/deepseek-prep-2026-10-15/b4-review-repair/archive-after-receipt.json",
-    "review": "Independent scoped R1/R2 recheck pending; no main merge/push or GPU spending authorized"
+    "review": "CLOSED R1/R2; no blocking repair regression. Serialized publication authorized; GPU spending still requires separate authorization.",
+    "review_acceptance": "docs/evidence/deepseek-prep-2026-10-15/b4-review-repair/review-acceptance.json"
   }
 }

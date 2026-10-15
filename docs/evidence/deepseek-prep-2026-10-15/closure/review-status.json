@@ -1,8 +1,24 @@
 {
-  "status": "PENDING",
-  "requested_revision": "fcb5f649463573c9dc728f8d4de46d5bb5a27c7a",
-  "original_preparation_pin": "1a23336e1bdf1c78c63ec35f3dab136f88acc2b0",
-  "report": "/Users/ckl/.hermes/cache/scratch/cc-gpt-deepseek-final-review.md",
-  "missing_is_pass": false,
-  "reason": "External review driver reached 30-turn limit without the required report; bounded recheck must also cover process cleanup in fcb5f6"
+  "status": "NONBLOCKING: original review plus closed B4 repair recheck",
+  "repair_code_revision": "40ddf3677e8a351c62ba2ece0ef493044f633cd6",
+  "reviewed_evidence_revision": "62b529df7000a013c8cb3e78e861c07c1ae37c53",
+  "previous_reviewed_revision": "3a449a7db98f44eaf42f259011e3bcf996327b9b",
+  "original_report": "review-before-repair.md",
+  "original_report_sha256": "8814e241a354fb054350fb186b6253ac1e994553ea589e38c5a32a06aa3bb262",
+  "repair_report": "repair-recheck.md",
+  "repair_report_sha256": "694cab9f077efc3bf886d609125595b2681d7b25a337607f7618a013688df70e",
+  "source_sha256": {
+    "examples/dsv2lite/batch_attribution.py": "217dcc2b18744cc9e40e0e00752f720a0ddefc6253fedb56f95abf717fa3aa8f",
+    "examples/dsv2lite/batch_session.py": "b06f6fcbeafb04f7d2cf26a5b23be71939044dbf20c40c98789fd358cfcfacc1",
+    "tests/test_dsv2_batch_attribution.py": "4bbf0886f5b6138e6c6bf27352b21f9c37c0dff3712da066d4d825418532a2b8"
+  },
+  "closure_hash_check": "All three current source files independently recomputed by closure and match retained full-suite/repair bindings. Reviewer did not independently calculate source hashes or rerun tests.",
+  "findings": {
+    "R1": "CLOSED",
+    "R2": "CLOSED"
+  },
+  "blocking_repair_regressions": 0,
+  "scope": "B4 selected-call and traffic completeness repair only; original review found no blocking x8 or process-cleanup finding; Qwen receipt not independently audited",
+  "limits": "No device acceptance or performance verdict. Same-kernel replay UNAVAILABLE; full two-baseline claim INCOMPLETE. GPU spending requires separate authorization.",
+  "repair_review_acceptance": "../b4-review-repair/review-acceptance.json"
 }

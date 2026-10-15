@@ -1,7 +1,7 @@
 # B4 R1/R2 repair acceptance
 
 Code pin: `40ddf3677e8a351c62ba2ece0ef493044f633cd6`; reviewed base: `3a449a7db98f44eaf42f259011e3bcf996327b9b`.
-Only two B4 findings were repaired. Independent scoped recheck remains **PENDING**; no main merge/push or GPU spend.
+Only two B4 findings were repaired. Independent scoped recheck **CLOSED R1/R2**, with no blocking repair regression. Serialized integration/publication is authorized; no GPU spend.
 
 - `review-before-repair.md`: original CC blockers; no blocking x8/cleanup finding.
 - `source-freeze.json`: exact repaired Python/test hashes and commit.
@@ -23,3 +23,8 @@ Raw evidence: `/Users/ckl/.hermes/cache/scratch/deepseek-b4-review-repair-eviden
 Real profiler CSV format/semantics, native linking/loading, producer/model correctness and all measurements remain
 device gates. Full-minus-short traffic is an estimate. Same-kernel replay remains UNAVAILABLE; full two-baseline
 performance claims remain INCOMPLETE. No x8, cleanup, compiler, kernel or queue source change is part of this repair.
+
+The received `repair-recheck.md` and `review-acceptance.json` bind the review to code `40ddf36` and evidence `62b529d`.
+Closure recomputed all three source hashes; they match the accepted suite. No executable source changed, so the
+2190-pass suite and compiler evidence are reused without a redundant rerun. Pre-review acceptance/manifests are
+retained under `*-before-review.json`. The reviewer did not recheck Qwen receipt metadata or run tests/builds.

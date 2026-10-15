@@ -1,6 +1,6 @@
 # DeepSeek B4 controlled attribution: preparation
 
-Status: prepared, not run. CC review found B4 R1/R2 blockers; the local repairs at `40ddf36` passed acceptance. Independent scoped repair recheck is pending before main integration/push. This is the existing B4 follow-up in BATCH-2026-10-14.md section 12. It adds no kernel
+Status: prepared, not run. CC review found B4 R1/R2 blockers; the local repairs at `40ddf36` passed acceptance. Independent scoped repair recheck CLOSED both findings with no blocking repair regression; serialized publication is authorized. This is the existing B4 follow-up in BATCH-2026-10-14.md section 12. It adds no kernel
 candidate. It is separate from the x8 correctness session. No GPU use, rental or spending is authorized by this file.
 The current provider is DigitalOcean. Its available one-GPU shape, tariff and billing minimum have not been checked.
 
@@ -110,4 +110,4 @@ the changed host requires its own compiler check. No fresh device-code pass is i
 
 Local R1/R2 repair evidence, before/after regressions and exact commands are in
 [the repair acceptance record](evidence/deepseek-prep-2026-10-15/b4-review-repair/acceptance.json).
-Independent scoped repair review remains pending; CPU acceptance is not profiler/device certification.
+Independent scoped repair review CLOSED R1/R2; see the retained repair review and source bindings. CPU acceptance is not profiler/device certification.

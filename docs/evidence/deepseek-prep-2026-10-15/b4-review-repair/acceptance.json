@@ -1,5 +1,5 @@
 {
-  "status": "LOCAL ACCEPTANCE COMPLETE; INDEPENDENT SCOPED R1/R2 RECHECK PENDING",
+  "status": "LOCAL ACCEPTANCE COMPLETE; INDEPENDENT SCOPED R1/R2 RECHECK CLOSED",
   "code_revision": "40ddf3677e8a351c62ba2ece0ef493044f633cd6",
   "reviewed_base": "3a449a7db98f44eaf42f259011e3bcf996327b9b",
   "source_sha256": {
@@ -43,19 +43,23 @@
   "review": {
     "original_report": "review-before-repair.md",
     "original_verdict": "BLOCKED: B4 R1/R2; no blocking x8 or process-cleanup finding",
-    "repair_recheck": "PENDING",
-    "handoff": "scoped-recheck.md"
+    "repair_recheck": "CLOSED: R1/R2; no new blocking repair regression",
+    "handoff": "scoped-recheck.md",
+    "acceptance": "review-acceptance.json",
+    "report": "repair-recheck.md"
   },
-  "constraints": {
+  "limits": [
+    "same-kernel replay UNAVAILABLE; full two-baseline performance claim INCOMPLETE",
+    "Native profiler format/semantics, model/reference execution, linking/loading and all GPU results remain device gates",
+    "CPU fixtures prove parser/runner contracts, not device correctness"
+  ],
+  "constraints_at_local_acceptance_sealing": {
     "gpu_spend_usd": 0,
     "new_experiments": 0,
     "compiler_matrix_reruns": 0,
     "main_merge": false,
     "push": false
   },
-  "limits": [
-    "same-kernel replay UNAVAILABLE; full two-baseline performance claim INCOMPLETE",
-    "Native profiler format/semantics, model/reference execution, linking/loading and all GPU results remain device gates",
-    "CPU fixtures prove parser/runner contracts, not device correctness"
-  ]
+  "publication_authorized": true,
+  "gpu_spending_authorized": false
 }
