@@ -43,7 +43,9 @@ class BatchSession(Session):
         """
         arm = arm or BATCH_ARMS[b]
         try:
-            text = self.run(name, [self.out(arm) / "run", *self.etx_args(b)])
+            # Session.run strips caller ETX_* overrides. Forward only this opt-in host diagnostic.
+            options = dict(env=dict(ETX_DS_LAYER_METRICS="1")) if os.environ.get("ETX_DS_LAYER_METRICS") == "1" else {}
+            text = self.run(name, [self.out(arm) / "run", *self.etx_args(b)], **options)
             return batch.etx_result(text, b)
         except (RuntimeError, ValueError) as exc:
             print(f"BATCH-INCOMPLETE invocation={name} arm={arm} b={b}: {exc}", flush=True)

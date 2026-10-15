@@ -5,6 +5,8 @@ examples/dsv2lite/arms.py; the decisions are etx/session/experiment.py's, on int
   build <arm> [--stamped]   the arm's build (fleet: fleet's own)
   pairs <arm>     5 interleaved rounds in the arm's order (reversed on odd rounds), every invocation 32/32 + 27/27
   trace <arm>     one stamped token of the arm's STAMPS2 build: the measured per-stage table
+  layers <arm> --reference-dir <dir>   one full single-request invocation against that request's own reference,
+                                      with ETX_DS_LAYER_METRICS=1; the same correctness gates still apply
   report          every pairs report found + measured per-stage savings next to stage_table.json's expected ones
 No invocation here provisions a GPU or downloads; inputs are prepared by the prep_* jobs. Unfiltered output is kept.
 """
@@ -100,9 +102,10 @@ class Session:
             raise RuntimeError(f"invocation {name} failed rc={rc}; full log {path}")
         return "".join(text)
 
-    def args(self) -> list[str]:
-        return ["--weights", str(self.data / "weights.bin"), "--cache", str(self.data / "fleet_cache.bin"),
-                "--golden", str(self.data / "golden_tokens.txt"), "--hidden", str(self.data / "golden_hidden.bin"),
+    def args(self, reference_dir: Path | None = None) -> list[str]:
+        reference = self.data if reference_dir is None else reference_dir
+        return ["--weights", str(self.data / "weights.bin"), "--cache", str(reference / "fleet_cache.bin"),
+                "--golden", str(reference / "golden_tokens.txt"), "--hidden", str(reference / "golden_hidden.bin"),
                 "--tokens", "32", "--context", "1024", "--repeat", "2"]
 
     def out(self, arm: str, stamped: bool = False) -> Path:
@@ -181,6 +184,12 @@ class Session:
             command += ["--graph", self.out(arm) / "taskgraph_d16.bin"]
         return full_result(self.run(name, command))
 
+    def layers(self, arm: str, reference_dir: Path) -> dict:
+        """One request's own cache and goldens; print every boundary before applying the unchanged full gate."""
+        reference = reference_dir.resolve()
+        return full_result(self.run(f"layers_{arm}_{reference.name}", [self.out(arm) / "run", *self.args(reference)],
+                                    env=dict(ETX_DS_LAYER_METRICS="1")))
+
     def pairs(self, arm: str):
         """Five interleaved rounds; order reversed on odd rounds; every invocation a fresh process with all gates."""
         if (self.logs / f"pairs_{arm}.json").exists():
@@ -247,17 +256,25 @@ class Session:
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("operation", choices=("source", "preflight", "build", "pairs", "trace", "d4trace", "report"))
+    ap.add_argument("operation", choices=("source", "preflight", "build", "pairs", "trace", "layers", "d4trace", "report"))
     ap.add_argument("arm", nargs="?")
     ap.add_argument("--stamped", action="store_true")
+    ap.add_argument("--reference-dir", type=Path, help="layers only: request's own fleet_cache.bin and goldens")
     a = ap.parse_args(argv)
-    session = Session()
+    if a.reference_dir is not None and a.operation != "layers":
+        ap.error("--reference-dir is only valid for layers")
+    if a.operation == "layers" and a.reference_dir is None:
+        ap.error("layers requires --reference-dir")
     allowed = dict(build=[n for n, x in ARMS.items() if x.builder in ("etx", "fleet")], pairs=[n for n, x in ARMS.items() if x.order],
-                   trace=[n for n, x in ARMS.items() if x.stamped])
+                   trace=[n for n, x in ARMS.items() if x.stamped],
+                   layers=[n for n, x in ARMS.items() if x.builder == "etx" and x.env.get("ETX_DSV2_REQUESTS", "1") == "1"])
     if a.operation in allowed:
         if a.arm not in allowed[a.operation]:
             ap.error(f"{a.operation} arm must be one of {allowed[a.operation]}")
-        getattr(session, a.operation)(a.arm, *([a.stamped] if a.operation == "build" else []))
+    session = Session()
+    if a.operation in allowed:
+        extra = [a.stamped] if a.operation == "build" else [a.reference_dir] if a.operation == "layers" else []
+        getattr(session, a.operation)(a.arm, *extra)
     else:
         getattr(session, a.operation)()
 

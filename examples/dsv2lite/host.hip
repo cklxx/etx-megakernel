@@ -232,6 +232,9 @@ int main(int argc, char** argv) {
   for (int r = 0; r < R; ++r) {
     Req& q = reqs[r];
     if (q.golden_hidden.empty()) continue;
+    // Opt-in visibility only: retain the consecutive-prefix gate and every legacy line when disabled.
+    const char* layer_metrics_env = getenv("ETX_DS_LAYER_METRICS");
+    const bool layer_metrics = layer_metrics_env && !strcmp(layer_metrics_env, "1");
     std::vector<float> ours((size_t)d.layers * d.hidden);
     HIP_CHECK(hipMemcpy(ours.data(), q.act.layer_dump, ours.size() * 4, hipMemcpyDeviceToHost));
     q.layers_ok = 0; bool chain = true;
@@ -242,6 +245,7 @@ int main(int argc, char** argv) {
       const double rel = max_abs / std::max(max_ref, 1e-12), cos = dot / (std::sqrt(na) * std::sqrt(nb) + 1e-30);
       const bool ok = rel <= 2e-2 && cos >= 0.999; if (chain && ok) ++q.layers_ok; else chain = false;
       if (R == 1) std::printf("  layer %2d %s: max rel %9.2e  cosine %.6f  [%s]\n", L, L < d.first_k_dense ? "dense" : "moe  ", rel, cos, ok ? "ok" : "FAIL");
+      if (layer_metrics) std::printf("LAYERGATE r=%d layer=%d rel=%.9e cosine=%.9f pass=%d\n", r, L, rel, cos, ok ? 1 : 0);
     }
     std::printf("  %sconsecutive layers within the gate: %d of %d\n", R > 1 ? ("r" + std::to_string(r) + " ").c_str() : "", q.layers_ok, d.layers);
   }
