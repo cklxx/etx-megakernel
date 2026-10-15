@@ -19,6 +19,8 @@ Archive an older local receipt before a new acceptance run.
 A source change invalidates the old receipt.
 Commit the source and receipt before staging.
 The final preparation record contains the exact commands, exit codes and skip reasons.
+See [the readiness repair evidence](QWEN-PRODUCER-READINESS-2026-10-15.md) for the current receipt
+and the explicit reuse of unchanged compile inputs.
 
 ## Prerequisites for a later approved run
 

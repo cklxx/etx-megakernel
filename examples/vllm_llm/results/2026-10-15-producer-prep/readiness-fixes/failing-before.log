@@ -1,0 +1,80 @@
+FFF                                                                      [100%]
+=================================== FAILURES ===================================
+_______________ test_checkpoint_mismatch_rejected_before_compute _______________
+
+tmp_path = PosixPath('/private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1314/test_checkpoint_mismatch_rejec0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x107488e90>
+
+    def test_checkpoint_mismatch_rejected_before_compute(tmp_path, monkeypatch):
+        c = inputs(tmp_path)
+        c['hf'] = str(tmp_path/'different-hf')
+        Path(c['hf']).mkdir()
+        for p in (Path(c['model'])/'hf').iterdir():
+            (Path(c['hf'])/p.name).write_bytes(p.read_bytes())
+        monkeypatch.setattr(ps.g6, 'config', lambda: c)
+        calls = []
+        monkeypatch.setattr(ps, 'run', lambda *a, **k: calls.append(a))
+>       with pytest.raises(ValueError, match='HF path'):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE ValueError
+
+tests/test_producer_readiness.py:35: Failed
+________________ test_trace_taken_before_producer_done_is_legal ________________
+
+    def test_trace_taken_before_producer_done_is_legal():
+        from examples.vllm_llm.producer_trace import summarize
+        types, rows = {}, []
+        for layer in range(48):
+            for name, taken, ready, done in [(f'o_proj_{layer}', 0, 10, 20),
+                                             (f'moe_up_{layer}', 15, 29, 35)]:
+                ty = len(types)
+                types[name] = dict(id=ty, grid=[1])
+                rows.append([ty, 0, 0, 0, 0, taken, ready, done, 0])
+>       out = summarize({'types': types}, np.array(rows, dtype='<i8').tobytes(), True)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_producer_readiness.py:49: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+plan = {'types': {'o_proj_0': {'id': 0, 'grid': [1]}, 'moe_up_0': {'id': 1, 'grid': [1]}, 'o_proj_1': {'id': 2, 'grid': [1]}, 'moe_up_1': {'id': 3, 'grid': [1]}, ...}}
+raw = b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00...0\x00\x00\x00\x00\x00\x00\x1d\x00\x00\x00\x00\x00\x00\x00#\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'
+candidate = True
+
+    def summarize(plan, raw, candidate):
+        if len(raw)%72:raise ValueError('truncated trace')
+        data=np.frombuffer(raw,dtype='<i8')
+        if not data.size or data.size%9:raise ValueError('truncated or empty trace')
+        data=data.reshape(-1,9)
+        if np.any(data[:,5]>data[:,6]) or np.any(data[:,6]>data[:,7]):raise ValueError('trace timestamps')
+        def tasks(name):
+            rows=data[data[:,0]==plan['types'][name]['id']]
+            expected=int(np.prod(plan['types'][name]['grid']))
+            if len(rows)!=expected:raise ValueError('trace coverage '+name)
+            return rows
+        layers=[]
+        for layer in range(48):
+            o=tasks(f'o_proj_{layer}');moe=tasks(f'moe_up_{layer}')
+            start=int(o[:,6].min())
+            if candidate:publish=int(o[:,7].max())
+            else:publish=int(tasks(f'topk_{layer}_x')[:,7].max());tasks(f'router_{layer}')
+            ready=int(moe[:,5].max())
+>           if ready<publish:raise ValueError('consumer ready precedes all required publication')
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E           ValueError: consumer ready precedes all required publication
+
+examples/vllm_llm/producer_trace.py:24: ValueError
+_______________________ test_stage_attach_external_venv ________________________
+
+tmp_path = PosixPath('/private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1314/test_stage_attach_external_ven0')
+
+    def test_stage_attach_external_venv(tmp_path):
+        # Real interpreter/dependency probe; no preceding checkout .venv is used.
+>       from examples.vllm_llm.producer_stage import attach
+E       ModuleNotFoundError: No module named 'examples.vllm_llm.producer_stage'
+
+tests/test_producer_readiness.py:60: ModuleNotFoundError
+=========================== short test summary info ============================
+FAILED tests/test_producer_readiness.py::test_checkpoint_mismatch_rejected_before_compute
+FAILED tests/test_producer_readiness.py::test_trace_taken_before_producer_done_is_legal
+FAILED tests/test_producer_readiness.py::test_stage_attach_external_venv - Mo...
+3 failed in 0.12s

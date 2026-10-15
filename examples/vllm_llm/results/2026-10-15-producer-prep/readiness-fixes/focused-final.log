@@ -1,0 +1,293 @@
+# command ["/Users/ckl/code/.wt/etx-producer-readiness/.venv/bin/python", "-m", "pytest", "-q", "-s", "tests/test_producer_readiness.py", "tests/test_producer.py", "tests/test_host_import_check.py", "tests/test_qwen300_session.py", "tests/test_vm_preflight.py"]
+..STAGE interpreter/dependencies OK /Users/ckl/code/etx/.venv
+STAGE interpreter/dependencies OK /Users/ckl/code/etx/.venv
+STAGE ready root=/Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-2/test_stage_attach_external_ven0/fresh venv=/Users/ckl/code/etx/.venv
+.....STAGE command bash /Users/ckl/code/.wt/etx-producer-readiness/tools/session.sh push test-only timeout_s=300.0
+STAGE command ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new hotaisle@test-only 'cd ~/etx && python3 -B -m examples.vllm_llm.producer_stage /env' timeout_s=280.0
+STAGE command bash /Users/ckl/code/.wt/etx-producer-readiness/tools/session.sh start test-only examples/sessions/qwen_producer.py 0 A timeout_s=15.0
+STAGE command bash /Users/ckl/code/.wt/etx-producer-readiness/tools/session.sh push test-only timeout_s=300.0
+.STAGE interpreter/dependencies OK /Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-2/test_fresh_archive_interpreter0/independent-env
+STAGE interpreter/dependencies OK /Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-2/test_fresh_archive_interpreter0/independent-env
+ARCHIVE before attach exit=127: bash: .venv/bin/python: No such file or directory
+STAGE ready root=/Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-2/test_fresh_archive_interpreter0/archive venv=/Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-2/test_fresh_archive_interpreter0/independent-env
+PASS interpreter: /Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-2/test_fresh_archive_interpreter0/archive/.venv/bin/python; yaml, numpy import from .venv
+PREFLIGHT PASS
+
+ARCHIVE runner exit= 1 
+ [06:13:33 +  0m00s] session record: /Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-2/test_fresh_archive_interpreter0/records/20261015T061333Z-aa4674
+[06:13:33 +  0m00s] start preflight (cpu)
+[06:13:34 +  0m01s] fail    preflight rc=2 1s
+    FAIL phase=preflight reason=local acceptance missing or source hashes changed; rerun local preflight
+    EVIDENCE /Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-2/test_fresh_archive_interpreter0/records/20261015T061333Z-aa4674
+    SAFE resume: session.sh status/fetch; inspect failure; no partial timing claim; lease budget is unchanged
+[06:13:34 +  0m01s] skip    build_baseline [preflight: preflight fail]
+[06:13:34 +  0m01s] skip    build_producer [preflight: preflight fail]
+[06:13:34 +  0m01s] skip    qualify [build_baseline: build_baseline skipped]
+[06:13:34 +  0m01s] skip    measure [correctness.json: qualify skipped]
+[06:13:34 +  0m01s] skip    diagnose [measurement.complete.json: measure skipped]
+[06:13:34 +  0m01s] start report (cpu)
+[06:13:34 +  0m01s] progress: 1 running, 0 waiting, 6 done
+    report [cpu] 0s / 10s: # .venv/bin/python -u -m examples.vllm_llm.producer_session report
+[06:13:35 +  0m02s] ok      report rc=0 1s
+    VERDICT {"status": "NOT-COMPLETE", "reason": "[Errno 2] No such file or directory: '/Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-2/test_fresh_archive_interpreter0/records/20261015T061333Z-aa4674/correctness.j
+[06:13:35 +  0m02s] session done
+  job                              status     rc  gpu  seconds
+  preflight                        fail        2             1  
+  build_baseline                   skipped                      preflight: preflight fail
+  build_producer                   skipped                      preflight: preflight fail
+  qualify                          skipped                      build_baseline: build_baseline skipped
+  measure                          skipped                      correctness.json: qualify skipped
+  diagnose                         skipped                      measurement.complete.json: measure skipped
+  report                           ok          0             1  
+SEALED /Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-2/test_fresh_archive_interpreter0/records/20261015T061333Z-aa4674 complete=False
+ 
+# job preflight gpu=None cwd=/Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-2/test_fresh_archive_interpreter0/archive
+# .venv/bin/python -u -m examples.vllm_llm.producer_session preflight
+FAIL phase=preflight reason=local acceptance missing or source hashes changed; rerun local preflight
+EVIDENCE /Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-2/test_fresh_archive_interpreter0/records/20261015T061333Z-aa4674
+SAFE resume: session.sh status/fetch; inspect failure; no partial timing claim; lease budget is unchanged
+
+ARCHIVE actual report: {"status": "NOT-COMPLETE", "reason": "[Errno 2] No such file or directory: '/Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-2/test_fresh_archive_interpreter0/records/20261015T061333Z-aa4674/correctness.json'", "performance_claim": false}
+.LOCAL PUSH/STAGE/ATTACH/START
+STAGE command bash /Users/ckl/code/.wt/etx-producer-readiness/tools/session.sh push local-fixture timeout_s=300.0
+STAGED ~/etx -> /Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-2/test_documented_push_stage_att0/home/src/f1bd7f8324536297866abc63cd6056634a568162c55b9b55c2545e14e62930eb-20261015T061412Z
+commit 5b8afb3e53886d8ee43fed84f3aa3f04ee7a9a29
+branch fix/producer-readiness
+archive f1bd7f8324536297866abc63cd6056634a568162c55b9b55c2545e14e62930eb
+staged 2026-10-15T06:14:15Z
+LOCAL-TRANSPORT-SUBSTITUTE rsync
+LOCAL-TRANSPORT-SUBSTITUTE rsync
+LOCAL-TRANSPORT-SUBSTITUTE rsync
+LOCAL-TRANSPORT-SUBSTITUTE rsync
+GPUs: 1
+cores: 1
+/dev/disk3s1   228Gi   186Gi    17Gi    92%    2.0M  176M    1%   /System/Volumes/Data
+STAGE command ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new hotaisle@local-fixture 'cd ~/etx && python3 -B -m examples.vllm_llm.producer_stage /Users/ckl/code/etx/.venv' timeout_s=259.4
+STAGE interpreter/dependencies OK /Users/ckl/code/etx/.venv
+STAGE interpreter/dependencies OK /Users/ckl/code/etx/.venv
+STAGE ready root=/Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-2/test_documented_push_stage_att0/home/src/f1bd7f8324536297866abc63cd6056634a568162c55b9b55c2545e14e62930eb-20261015T061412Z venv=/Users/ckl/code/etx/.venv
+STAGE command bash /Users/ckl/code/.wt/etx-producer-readiness/tools/session.sh start local-fixture examples/sessions/qwen_producer.py 0 A timeout_s=15.0
+Passing session cap: ETX_SESS_MAX_SECONDS=544
+Passing Qwen config: ETX_QWEN_G6_CONFIG=/Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-2/test_documented_push_stage_att0/home/config.json
+runner started: machine A, GPUs 0; startup log: /Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-2/test_documented_push_stage_att0/home/sess/startup.JOieNp
+[06:14:17 +  0m00s] session record: /Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-2/test_documented_push_stage_att0/home/sess/20261015T061417Z-99c015
+[06:14:17 +  0m00s] start preflight (cpu)
+[06:14:18 +  0m01s] fail    preflight rc=2 1s
+    FAIL phase=preflight reason=local acceptance missing or source hashes changed; rerun local preflight
+    EVIDENCE /Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-2/test_documented_push_stage_att0/home/sess/20261015T061417Z-99c015
+runner started: machine A, GPUs 0; startup log: /Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-2/test_documented_push_stage_att0/home/sess/startup.JOieNp
+[06:14:17 +  0m00s] session record: /Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-2/test_documented_push_stage_att0/home/sess/20261015T061417Z-99c015
+[06:14:17 +  0m00s] start preflight (cpu)
+[06:14:18 +  0m01s] fail    preflight rc=2 1s
+    FAIL phase=preflight reason=local acceptance missing or source hashes changed; rerun local preflight
+    EVIDENCE /Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-2/test_documented_push_stage_att0/home/sess/20261015T061417Z-99c015
+
+# job preflight gpu=None cwd=/Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-2/test_documented_push_stage_att0/home/etx
+# .venv/bin/python -u -m examples.vllm_llm.producer_session preflight
+FAIL phase=preflight reason=local acceptance missing or source hashes changed; rerun local preflight
+EVIDENCE /Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-2/test_documented_push_stage_att0/home/sess/20261015T061417Z-99c015
+SAFE resume: session.sh status/fetch; inspect failure; no partial timing claim; lease budget is unchanged
+
+......s..Session hard stop: 3600s from runner start (includes setup)
+  0 preflight                        cpu      timeout   240s  reads: -  writes: inputs.json
+  1 build_baseline                   cpu      timeout   900s  reads: preflight  writes: b_baseline/run
+  2 build_producer                   cpu      timeout   900s  reads: preflight  writes: b_producer/run
+  3 qualify                          GPU 0    timeout  1500s  reads: build_baseline, build_producer  writes: correctness.json
+  4 measure                          GPU 0    timeout  2700s  reads: correctness.json  writes: measurement.complete.json
+  5 diagnose                         GPU 0    timeout   420s  reads: measurement.complete.json  writes: trace_baseline.json, trace_producer.json
+  6 report                           final    timeout    60s  reads: ?qualify, ?measure, ?diagnose  writes: report.json
+.VERDICT {"status": "NOT-COMPLETE", "reason": "[Errno 2] No such file or directory: '/Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-2/test_missing_correctness_refus0/correctness.json'", "performance_claim": false}
+.PHASE timeout deadline_s=0.1 evidence=/Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-2/test_deadline_and_logs_are_fai0/timeout.raw.log
+PHASE timeout deadline_s=1 evidence=/Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-2/test_deadline_and_logs_are_fai0/timeout.raw.log
+PHASE failed deadline_s=1 evidence=/Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-2/test_deadline_and_logs_are_fai0/failed.raw.log
+...[06:14:22 +  0m00s] session record: /Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-2/test_runner_failed_qualify_ski0/records/20261015T061422Z-6fd4f5
+[06:14:22 +  0m00s] start qualify on GPU 0
+[06:14:23 +  0m01s] fail    qualify rc=2 1s
+    # job qualify gpu=0 cwd=/Users/ckl/code/.wt/etx-producer-readiness
+    # exit 2
+[06:14:23 +  0m01s] skip    measure [correctness.json: qualify fail]
+[06:14:23 +  0m01s] session done
+  job                              status     rc  gpu  seconds
+  qualify                          fail        2    0        1  
+  measure                          skipped                      correctness.json: qualify fail
+SEALED /Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-2/test_runner_failed_qualify_ski0/records/20261015T061422Z-6fd4f5 complete=False
+[06:14:23 +  0m00s] session record: /Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-2/test_runner_failed_qualify_ski0/records/20261015T061423Z-600190
+[06:14:23 +  0m00s] start qualify on GPU 0
+[06:14:24 +  0m01s] fail    qualify rc=2 1s
+    # job qualify gpu=0 cwd=/Users/ckl/code/.wt/etx-producer-readiness
+    # exit 2
+[06:14:24 +  0m01s] skip    measure [correctness.json: qualify fail]
+[06:14:24 +  0m01s] session done
+  job                              status     rc  gpu  seconds
+  qualify                          fail        2    0        1  
+  measure                          skipped                      correctness.json: qualify fail
+SEALED /Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-2/test_runner_failed_qualify_ski0/records/20261015T061423Z-600190 complete=False
+.............................usage: __main__.py [-h] (--dry-run | --job {1,2} |
+                   --inside {download,bench,trace}) [--precision {bf16}]
+__main__.py: error: argument --job: invalid choice: '3' (choose from 1, 2)
+.usage: __main__.py [-h] (--dry-run | --job {1,2} |
+                   --inside {download,bench,trace}) [--precision {bf16}]
+__main__.py: error: argument --inside: invalid choice: 'hf' (choose from download, bench, trace)
+.usage: __main__.py [-h] (--dry-run | --job {1,2} |
+                   --inside {download,bench,trace}) [--precision {bf16}]
+__main__.py: error: argument --inside: invalid choice: 'probe' (choose from download, bench, trace)
+.usage: __main__.py [-h] (--dry-run | --job {1,2} |
+                   --inside {download,bench,trace}) [--precision {bf16}]
+__main__.py: error: argument --precision: invalid choice: 'fp8' (choose from bf16)
+.LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=0 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=1 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=2 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=3 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=4 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=5 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=6 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=7 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=8 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=9 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=10 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=11 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=12 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=13 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=14 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=15 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=16 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=17 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=18 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=19 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=20 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=21 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=22 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=23 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=24 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=25 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=26 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=27 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=28 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=29 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=30 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=31 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=32 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=33 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=34 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=35 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=36 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=37 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=38 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=39 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=40 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=41 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=42 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=43 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=44 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=45 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=46 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=47 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+PRICING Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device moe_us_per_layer=21.000000 IMPORT-CANDIDATE >=0.28ms estimated recovery; multi-week target
+CEILING Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device span_ms=1.200000 busy_ms=1.200000 gap_ms=0.000000
+..ROUTING-AUDIT OK position=0 layers=48 replicas=8 ids=identical weights=bit-identical
+ROUTING-AUDIT OK position=1040 layers=48 replicas=8 ids=identical weights=bit-identical
+ROUTING-AUDIT OK position=0 layers=48 replicas=8 ids=identical weights=bit-identical
+..COMMAND failure deadline=10s bash -c 'echo full-output; exit 7'
+FINISH failure rc=7 full_log=/Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-2/test_step_failure_retains_full0/failure.log
+# job failure gpu=0
+# bash -c 'echo full-output; exit 7'
+full-output
+
+.COMMAND retry deadline=10s bash -c 'echo first-stdout; echo first-stderr >&2; exit 0'
+FINISH retry rc=0 full_log=/Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-2/test_step_retry_keeps_both_ful0/retry.log
+ARCHIVE /Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-2/test_step_retry_keeps_both_ful0/retry.log -> /Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-2/test_step_retry_keeps_both_ful0/log_history/retry/attempt1/retry.log
+COMMAND retry deadline=10s bash -c 'echo second-stdout; echo second-stderr >&2'
+FINISH retry rc=0 full_log=/Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-2/test_step_retry_keeps_both_ful0/retry.log
+ARCHIVE /Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-2/test_step_retry_keeps_both_ful0/retry.log -> /Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-2/test_step_retry_keeps_both_ful0/log_history/retry/attempt2/retry.log
+COMMAND retry deadline=10s bash -c 'echo third'
+FINISH retry rc=0 full_log=/Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-2/test_step_retry_keeps_both_ful0/retry.log
+.COMMAND retry deadline=10s bash -c 'echo first-stdout; echo first-stderr >&2; exit 7'
+FINISH retry rc=7 full_log=/Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-2/test_step_retry_keeps_both_ful1/retry.log
+# job retry gpu=0
+# bash -c 'echo first-stdout; echo first-stderr >&2; exit 7'
+first-stdout
+first-stderr
+
+ARCHIVE /Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-2/test_step_retry_keeps_both_ful1/retry.log -> /Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-2/test_step_retry_keeps_both_ful1/log_history/retry/attempt1/retry.log
+COMMAND retry deadline=10s bash -c 'echo second-stdout; echo second-stderr >&2'
+FINISH retry rc=0 full_log=/Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-2/test_step_retry_keeps_both_ful1/retry.log
+ARCHIVE /Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-2/test_step_retry_keeps_both_ful1/retry.log -> /Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-2/test_step_retry_keeps_both_ful1/log_history/retry/attempt2/retry.log
+COMMAND retry deadline=10s bash -c 'echo third'
+FINISH retry rc=0 full_log=/Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-2/test_step_retry_keeps_both_ful1/retry.log
+.BUILD-CONDITION arm=off KEY32=0 CHECK=1 flags=-DETX_DSL_WSUM -DETX_DSL_SCALAR -DETX_DSL_GU1 -DETX_DSL_RBATCH fold=shipped-default
+BUILD-CONDITION arm=on KEY32=1 CHECK=1 flags=-DETX_DSL_WSUM -DETX_DSL_SCALAR -DETX_DSL_GU1 -DETX_DSL_RBATCH fold=shipped-default
+CERT {}
+CERT {}
+BUILD-CONDITION arm=off KEY32=0 CHECK=1 flags=-DETX_DSL_WSUM -DETX_DSL_SCALAR -DETX_DSL_GU1 -DETX_DSL_RBATCH fold=shipped-default
+BUILD-CONDITION arm=on KEY32=1 CHECK=1 flags=-DETX_DSL_WSUM -DETX_DSL_SCALAR -DETX_DSL_GU1 -DETX_DSL_RBATCH fold=shipped-default
+ARCHIVE /Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-2/test_job2_retry_keeps_director0/off_compile.log -> /Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-2/test_job2_retry_keeps_director0/log_history/off_compile/attempt1/off_compile.log
+ARCHIVE /Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-2/test_job2_retry_keeps_director0/on_compile.log -> /Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-2/test_job2_retry_keeps_director0/log_history/on_compile/attempt1/on_compile.log
+ARCHIVE /Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-2/test_job2_retry_keeps_director0/on_hipcc.log -> /Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-2/test_job2_retry_keeps_director0/log_history/on_hipcc/attempt1/on_hipcc.log
+ARCHIVE /Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-2/test_job2_retry_keeps_director0/off_hipcc.log -> /Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-2/test_job2_retry_keeps_director0/log_history/off_hipcc/attempt1/off_hipcc.log
+ARCHIVE /Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-2/test_job2_retry_keeps_director0/off_compiler_version.txt -> /Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-2/test_job2_retry_keeps_director0/log_history/off_compiler_version/attempt1/off_compiler_version.txt
+ARCHIVE /Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-2/test_job2_retry_keeps_director0/on_compiler_version.txt -> /Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-2/test_job2_retry_keeps_director0/log_history/on_compiler_version/attempt1/on_compiler_version.txt
+CERT {}
+CERT {}
+.LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=0 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=1 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=2 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=3 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=4 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=5 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=6 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=7 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=8 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=9 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=10 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=11 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=12 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=13 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=14 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=15 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=16 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=17 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=18 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=19 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=20 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=21 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=22 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=23 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=24 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=25 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=26 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=27 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=28 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=29 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=30 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=31 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=32 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=33 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=34 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=35 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=36 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=37 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=38 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=39 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=40 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=41 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=42 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=43 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=44 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=45 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=46 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+LAYER Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device kernels us layer=47 {"stage1": 13.0, "stage2": 8.0, "attention": 3.0, "reduce": 1.0}
+PRICING Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device moe_us_per_layer=21.000000 IMPORT-CANDIDATE >=0.28ms estimated recovery; multi-week target
+CEILING Qwen3-30B-A3B precision=bf16 GPU=MI300X GPU_ID=0 batch=1 context=1024 tokens=32 basis=device span_ms=1.200000 busy_ms=1.200000 gap_ms=0.000000
+..............................................PASS interpreter: /Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-2/test_fix_restores_registered_g0/repo/.venv/bin/python; yaml, numpy import from .venv
+PASS vllm_source: /Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-2/test_fix_restores_registered_g0/vllm; commit=2317f35835e5b0ec83bb5543d04a58e94d3d25c7 = v0.27.1
+FIX packed_model: cp /Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-2/test_fix_restores_registered_g0/repo/examples/llm/results/golden_c1024_qwen3-30b-a3b.txt /Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-2/test_fix_restores_registered_g0/llm/qwen3-30b-a3b/golden_c1024.txt
+PASS packed_model: /Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-2/test_fix_restores_registered_g0/llm/qwen3-30b-a3b; vl.bin=7 bytes, vl.manifest=7 bytes, hf/config.json=7 bytes, golden_c1024.txt=5129 bytes; golden sha256=bab2f1fbe12f70179711ec40a215c74710845b73169b1cc6a3a6ca50e0a19484 expected=bab2f1fbe12f70179711ec40a215c74710845b73169b1cc6a3a6ca50e0a19484
+PASS arms: arms=/Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-2/test_fix_restores_registered_g0/arms; must exist and be writable
+PASS rocm_headers: ETX_ROCM_HEADERS=/Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-2/test_fix_restores_registered_g0/rocm-headers/inc; requires hip/hip_runtime.h
+PASS runtime_image: vllm/vllm-openai-rocm@sha256:bb44b39aea26798cce43030a98bf48efd0322ca7147367db86e38b96bd80f0e7; sha256:fixture
+PASS gpu: /Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-2/test_fix_restores_registered_g0/dev/kfd exists=True; rocm-smi=Card Series: AMD Instinct MI300X
+PASS gates: /Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-2/test_fix_restores_registered_g0/cpu-gates.json; pytest=True, gfx942=True, dry_run=True, shell=True, local_matrix_16=True, rocm_build_check=True
+PREFLIGHT PASS
+.....bash: ETX_STAGE_SOURCE: set ETX_STAGE_SOURCE to the CPU-tested staging directory
+....
+118 passed, 1 skipped in 101.21s (0:01:41)

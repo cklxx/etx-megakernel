@@ -1,0 +1,61 @@
+[
+  {
+    "phase": "focused-final",
+    "command": [
+      "/Users/ckl/code/.wt/etx-producer-readiness/.venv/bin/python",
+      "-m",
+      "pytest",
+      "-q",
+      "-s",
+      "tests/test_producer_readiness.py",
+      "tests/test_producer.py",
+      "tests/test_host_import_check.py",
+      "tests/test_qwen300_session.py",
+      "tests/test_vm_preflight.py"
+    ],
+    "exit": 0,
+    "reason": null,
+    "seconds": 101.42557708267123,
+    "log": "examples/vllm_llm/results/2026-10-15-producer-prep/readiness-fixes/focused-final.log"
+  },
+  {
+    "phase": "full-suite",
+    "command": [
+      "/Users/ckl/code/.wt/etx-producer-readiness/.venv/bin/python",
+      "-m",
+      "pytest",
+      "-q",
+      "-ra"
+    ],
+    "exit": 0,
+    "reason": null,
+    "seconds": 524.016534499824,
+    "log": "examples/vllm_llm/results/2026-10-15-producer-prep/readiness-fixes/full-suite.log"
+  },
+  {
+    "phase": "shell",
+    "command": [
+      "bash",
+      "-n",
+      "tools/session.sh"
+    ],
+    "exit": 0,
+    "reason": null,
+    "seconds": 0.006864333059638739,
+    "log": "examples/vllm_llm/results/2026-10-15-producer-prep/readiness-fixes/shell.log"
+  },
+  {
+    "phase": "session-dry",
+    "command": [
+      "/Users/ckl/code/.wt/etx-producer-readiness/.venv/bin/python",
+      "-m",
+      "etx.tools.gpu_jobs",
+      "examples/sessions/qwen_producer.py",
+      "--dry-run"
+    ],
+    "exit": 0,
+    "reason": null,
+    "seconds": 0.08982370840385556,
+    "log": "examples/vllm_llm/results/2026-10-15-producer-prep/readiness-fixes/session-dry.log"
+  }
+]

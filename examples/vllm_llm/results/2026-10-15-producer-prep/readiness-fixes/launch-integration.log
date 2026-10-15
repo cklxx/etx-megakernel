@@ -1,0 +1,127 @@
+..STAGE interpreter/dependencies OK /Users/ckl/code/etx/.venv
+STAGE interpreter/dependencies OK /Users/ckl/code/etx/.venv
+STAGE ready root=/Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-3/test_stage_attach_external_ven0/fresh venv=/Users/ckl/code/etx/.venv
+.....STAGE command bash /Users/ckl/code/.wt/etx-producer-readiness/tools/session.sh push test-only timeout_s=300.0
+STAGE command ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new hotaisle@test-only 'cd ~/etx && python3 -B -m examples.vllm_llm.producer_stage /env' timeout_s=280.0
+STAGE command bash /Users/ckl/code/.wt/etx-producer-readiness/tools/session.sh start test-only examples/sessions/qwen_producer.py 0 A timeout_s=15.0
+STAGE command bash /Users/ckl/code/.wt/etx-producer-readiness/tools/session.sh push test-only timeout_s=300.0
+.STAGE interpreter/dependencies OK /Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-3/test_fresh_archive_interpreter0/independent-env
+STAGE interpreter/dependencies OK /Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-3/test_fresh_archive_interpreter0/independent-env
+ARCHIVE before attach exit=127: bash: .venv/bin/python: No such file or directory
+STAGE ready root=/Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-3/test_fresh_archive_interpreter0/archive venv=/Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-3/test_fresh_archive_interpreter0/independent-env
+PASS interpreter: /Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-3/test_fresh_archive_interpreter0/archive/.venv/bin/python; yaml, numpy import from .venv
+PREFLIGHT PASS
+
+ARCHIVE runner exit= 1 
+ [06:10:32 +  0m00s] session record: /Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-3/test_fresh_archive_interpreter0/records/20261015T061032Z-4eced6
+[06:10:32 +  0m00s] start preflight (cpu)
+[06:10:33 +  0m01s] fail    preflight rc=2 1s
+    FAIL phase=preflight reason=local acceptance missing or source hashes changed; rerun local preflight
+    EVIDENCE /Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-3/test_fresh_archive_interpreter0/records/20261015T061032Z-4eced6
+    SAFE resume: session.sh status/fetch; inspect failure; no partial timing claim; lease budget is unchanged
+[06:10:33 +  0m01s] skip    build_baseline [preflight: preflight fail]
+[06:10:33 +  0m01s] skip    build_producer [preflight: preflight fail]
+[06:10:33 +  0m01s] skip    qualify [build_baseline: build_baseline skipped]
+[06:10:33 +  0m01s] skip    measure [correctness.json: qualify skipped]
+[06:10:33 +  0m01s] skip    diagnose [measurement.complete.json: measure skipped]
+[06:10:33 +  0m01s] start report (cpu)
+[06:10:33 +  0m01s] progress: 1 running, 0 waiting, 6 done
+    report [cpu] 0s / 10s: # .venv/bin/python -u -m examples.vllm_llm.producer_session report
+[06:10:34 +  0m02s] ok      report rc=0 1s
+    VERDICT {"status": "NOT-COMPLETE", "reason": "[Errno 2] No such file or directory: '/Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-3/test_fresh_archive_interpreter0/records/20261015T061032Z-4eced6/correctness.j
+[06:10:34 +  0m02s] session done
+  job                              status     rc  gpu  seconds
+  preflight                        fail        2             1  
+  build_baseline                   skipped                      preflight: preflight fail
+  build_producer                   skipped                      preflight: preflight fail
+  qualify                          skipped                      build_baseline: build_baseline skipped
+  measure                          skipped                      correctness.json: qualify skipped
+  diagnose                         skipped                      measurement.complete.json: measure skipped
+  report                           ok          0             1  
+SEALED /Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-3/test_fresh_archive_interpreter0/records/20261015T061032Z-4eced6 complete=False
+ 
+# job preflight gpu=None cwd=/Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-3/test_fresh_archive_interpreter0/archive
+# .venv/bin/python -u -m examples.vllm_llm.producer_session preflight
+FAIL phase=preflight reason=local acceptance missing or source hashes changed; rerun local preflight
+EVIDENCE /Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-3/test_fresh_archive_interpreter0/records/20261015T061032Z-4eced6
+SAFE resume: session.sh status/fetch; inspect failure; no partial timing claim; lease budget is unchanged
+
+ARCHIVE actual report: {"status": "NOT-COMPLETE", "reason": "[Errno 2] No such file or directory: '/Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-3/test_fresh_archive_interpreter0/records/20261015T061032Z-4eced6/correctness.json'", "performance_claim": false}
+.F
+=================================== FAILURES ===================================
+_________ test_documented_push_stage_attach_start_with_local_transport _________
+
+tmp_path = PosixPath('/Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-3/test_documented_push_stage_att0')
+
+    def test_documented_push_stage_attach_start_with_local_transport(tmp_path):
+        """Execute the real shell archive/push/start path. Transport/probes only are local substitutes.
+    
+        SSH never contacts a host; rsync, product probes and key management are labelled
+        no-ops. The real preflight fails closed on synthetic inputs; compute cannot run.
+        """
+        import os
+        import time
+        home = tmp_path/'home'
+        (home/'code').mkdir(parents=True)
+        binpath = tmp_path/'bin'
+        binpath.mkdir()
+        c = inputs(home)
+        config = home/'config.json'
+        config.write_text(json.dumps(c))
+        def script(name, body):
+            p = binpath/name
+            p.write_text(body)
+            p.chmod(0o755)
+        script('ssh', f'''#!{sys.executable}
+    import subprocess, sys
+    args=sys.argv[1:]
+    while args and args[0]=='-o': args=args[2:]
+    assert args.pop(0)=='hotaisle@local-fixture'
+    raise SystemExit(subprocess.call(['bash','-c',' '.join(args)]))
+    ''')
+        for name in ('rsync','ssh-keygen'):
+            script(name, '#!/bin/sh\necho LOCAL-TRANSPORT-SUBSTITUTE '+name+'\n')
+        script('rocm-smi', '#!/bin/sh\necho "Card Series: CPU-SUBSTITUTE"\n')
+        script('nproc', '#!/bin/sh\necho 1\n')
+        script('setsid', '#!/bin/sh\nexec "$@"\n')
+        # The independent-venv archive test above verifies dependency staging itself.
+        (binpath/'python3').symlink_to(sys.executable)
+        env = dict(os.environ, HOME=str(home), PATH=str(binpath)+os.pathsep+os.environ['PATH'])
+        command = [sys.executable, '-u', '-m', 'tools.producer_start', 'local-fixture',
+                   '--venv', sys.prefix, '--config', str(config), '--allocation-deadline', str(time.time()+600)]
+>       started = subprocess.run(command, cwd=ROOT, env=env, capture_output=True, text=True, timeout=45)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_producer_readiness.py:279: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/opt/homebrew/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/subprocess.py:556: in run
+    stdout, stderr = process.communicate(input, timeout=timeout)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/opt/homebrew/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/subprocess.py:1222: in communicate
+    stdout, stderr = self._communicate(input, endtime, timeout)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/opt/homebrew/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/subprocess.py:2129: in _communicate
+    self._check_timeout(endtime, orig_timeout, stdout, stderr)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <Popen: returncode: -9 args: ['/Users/ckl/code/etx/.venv/bin/python', '-u', ...>
+endtime = 3064385.697407458, orig_timeout = 45
+stdout_seq = [b'STAGE command bash /Users/ckl/code/.wt/etx-producer-readiness/tools/session.sh push local-fixture timeout_s=300.0\n...LOCAL-TRANSPORT-SUBSTITUTE rsync\n', b'LOCAL-TRANSPORT-SUBSTITUTE rsync\n', b'LOCAL-TRANSPORT-SUBSTITUTE rsync\n', ...]
+stderr_seq = [], skip_check_and_raise = False
+
+    def _check_timeout(self, endtime, orig_timeout, stdout_seq, stderr_seq,
+                       skip_check_and_raise=False):
+        """Convenience for checking if a timeout has expired."""
+        if endtime is None:
+            return
+        if skip_check_and_raise or _time() > endtime:
+>           raise TimeoutExpired(
+                    self.args, orig_timeout,
+                    output=b''.join(stdout_seq) if stdout_seq else None,
+                    stderr=b''.join(stderr_seq) if stderr_seq else None)
+E           subprocess.TimeoutExpired: Command '['/Users/ckl/code/etx/.venv/bin/python', '-u', '-m', 'tools.producer_start', 'local-fixture', '--venv', '/Users/ckl/code/etx/.venv', '--config', '/Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/pytest-of-ckl/pytest-3/test_documented_push_stage_att0/home/config.json', '--allocation-deadline', '1792045234.750359']' timed out after 45 seconds
+
+/opt/homebrew/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/subprocess.py:1269: TimeoutExpired
+=========================== short test summary info ============================
+FAILED tests/test_producer_readiness.py::test_documented_push_stage_attach_start_with_local_transport
+1 failed, 9 passed in 58.31s

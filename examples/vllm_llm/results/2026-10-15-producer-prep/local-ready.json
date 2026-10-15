@@ -115,7 +115,7 @@
     "etx/tools/watchdog.py": "9049f57667dfd9f4706804a064a482442cdb64f2de8abf4a620a9607a3bc0b54",
     "examples/llm/configs/qwen3-30b-a3b.json": "c214108014d8495d762a4009ff74f9548d7a9e215cda85f941147011f56ae7ba",
     "examples/llm/vllm_bench.py": "ba6613b556edeb8e4d17bf663741097a2570c1ef7d4f53a6592109fbca0e64a0",
-    "examples/sessions/qwen300.py": "29ea9184f7645bdb606562db1814e211a57d855148359ec13ebc07eb8f1819ee",
+    "examples/sessions/qwen300.py": "f32634429be2d57853e6daaf84fa0403556466ac9bdf7b67202debe19c060a37",
     "examples/sessions/qwen300_hour.py": "a2082a6b12c8a96623980b8cfe7be198bf6ef74194da50c74241046b324fd1a8",
     "examples/sessions/qwen300_hour_arms.json": "1565e9534841b545d1d3b7164c2742874e8070e6ebf67c9d76fbd3b6503a6f6e",
     "examples/vllm_llm/arms.py": "2f0e70378b4916f0d160bf996609dd9716cf90ce2dd495a2f9643f7ab3a249cf",
@@ -172,8 +172,9 @@
     "examples/vllm_llm/prep.py": "417ae88ad7bc141ae507cf0cf7e1aeaf852f85cb65b5be1978e12a2343947d7d",
     "examples/vllm_llm/producer_local.py": "029881cbbdb458590d177bfbbebe9b83ccb91b4eafeb73e21966f55daf5da6e8",
     "examples/vllm_llm/producer_replay.py": "d1157a5e93d1e0561e5ba32a84bfd9ff3d5ed5b982812708535149c49e9dbb7f",
-    "examples/vllm_llm/producer_session.py": "6376489287d79653fa836aae191677951213724037db1a76d5035195847e35bb",
-    "examples/vllm_llm/producer_trace.py": "7c9cd44fa13534be637fd382fb122e188e10a0910951526e7d5caf75b007c73d",
+    "examples/vllm_llm/producer_session.py": "d78b1fffb33c2cc117e8dd93a189d36be4a5edff20a3fbaf263273ee03c79a50",
+    "examples/vllm_llm/producer_stage.py": "6264723435a0b6ed7bc5366f39eaa60f5e8df6bb2683602cfae9a1f75c1fa706",
+    "examples/vllm_llm/producer_trace.py": "125b1511ae19d0427d30f2845649698848be20c6cbc522c302afa73d5f22b0a5",
     "examples/vllm_llm/qwen300_config.py": "ae32fa9e8089fd510ee7803f99505380c8b89c60f3eefa91f5a8feda67a0f37b",
     "examples/vllm_llm/reset_pair.py": "5e45c88cec53cbf9f5dc25c4d0c0712a677bb495aad13aee90b00da96feeffb6",
     "examples/vllm_llm/results/2026-10-09-check-certificate/stage2/guard_mutations.py": "2e45534894acc763385530e535eab7567ee4451d90aec21f01228f42e41099da",
@@ -234,7 +235,7 @@
     "tests/test_bench_params.py": "17fc7f1a777bbbcbf435f3912bbdf0b3c32b8f9a219598d25603c6980b88168e",
     "tests/test_dsv2_lever_l1_loads.py": "64055146edfeb9ad07183ec44a9d47dcafdd2ba72474bbc457dc92c75606a99d",
     "tests/test_dsv2_lever_norm_gamma_early.py": "44e17d13fbb7fa355dc36815f76195c2dcc15086df7ef83b64e3629824647bb7",
-    "tests/test_producer.py": "8a2ecb20929483a7ea0ca70650c55f35b1d0a53bb67b149ca46f689e771d468c",
+    "tests/test_producer.py": "aeb20f4d3c2a9b3321f8e860354da15ca65be0c365253a0b2ecf0203dc7e4727",
     "tests/test_no_arch_branches.py": "afffe4b8c22a71a5f9a5b00a037d7d639a5256323ce6ccf948c67523b6e9f4f5",
     "tests/test_session_references.py": "c18ccdecbd7096fa085683a61e81a70346541682685fcc70d2baf839bd5504ca",
     "tests/test_ktrace.py": "23a1ba41a6a828466ca7442a8d97034f580e611d08875447bb4447f0ff9afc9c",
@@ -244,6 +245,7 @@
     "tests/test_all_verify.py": "30142b44dd46ccc12af0a6db1e46497c70f88304386085ebca41a18957c2c001",
     "tests/test_routing_stats.py": "1109449e1e2359334893f9246d0c95fbef672b3b9367285aca118442a6d91cd3",
     "tests/test_nvref_report.py": "7130e7c4887ff10a987019c3736761cda7b34d4aea9fea54e2ace75ae6333c0f",
+    "tests/test_producer_readiness.py": "26056da0e0f29571da80aa985fddb3eb30709eda0ef98ca9fc2e758b44859b25",
     "tests/test_plan_exports.py": "ebe438932163847043e80ec6551c5622ac3bd520da52ef572a1c92fd40f012e4",
     "tests/test_bench_sim.py": "4720d0af0e2e98f39508575e47f31f98008fbf5701c3f5b2dd70e6b5094d590f",
     "tests/test_operator_spec.py": "143cd43cfee20b6defdf0438ddcb4e7492ef98c4f9c8cfd6287053dc5d3766f1",
@@ -324,319 +326,79 @@
     "tests/test_decode_entry.py": "4bf3fecdf2730c57d3d0c827dc1e3fc4b92c7b079c1af7303b648905170f45e8",
     "tests/test_bf16_300.py": "1af427ff4c6822edac98e9055af5b157e41c1903e74ac9ad56f7af19a78ecb3e",
     "examples/sessions/qwen_producer.py": "6bbfe3e285cb3a7b4d259729d1d7ab7c5788539c3f16b3122f3fbe51b4bb7faa",
+    "tools/producer_start.py": "eea64b4b5ece74e68531181c96ec607b8418d1a524c71f793215fe798cd39792",
+    "tools/session.sh": "83037c2aa368cbf24cd97616d614c28ce3538c5b61a4f3837d2334fc1a4b3111",
     "pyproject.toml": "7d365b0aa18fecbebbac3a34a294a9f8539e2377f8e1b5ea7dd62a1ff5720c4c"
   },
   "commands": [
     {
-      "phase": "shell-build",
+      "phase": "focused-final",
       "command": [
-        "bash",
-        "-n",
-        "examples/vllm_llm/build.sh"
-      ],
-      "exit": 0,
-      "seconds": 0.0112271667458117,
-      "log": "examples/vllm_llm/results/2026-10-15-producer-prep/final-v7/shell-build.log"
-    },
-    {
-      "phase": "shell-local_matrix",
-      "command": [
-        "bash",
-        "-n",
-        "examples/vllm_llm/local_matrix.sh"
-      ],
-      "exit": 0,
-      "seconds": 0.010958000086247921,
-      "log": "examples/vllm_llm/results/2026-10-15-producer-prep/final-v7/shell-local_matrix.log"
-    },
-    {
-      "phase": "shell-rocm_build_check",
-      "command": [
-        "bash",
-        "-n",
-        "examples/vllm_llm/rocm_build_check.sh"
-      ],
-      "exit": 0,
-      "seconds": 0.01088262489065528,
-      "log": "examples/vllm_llm/results/2026-10-15-producer-prep/final-v7/shell-rocm_build_check.log"
-    },
-    {
-      "phase": "shell-session",
-      "command": [
-        "bash",
-        "-n",
-        "tools/session.sh"
-      ],
-      "exit": 0,
-      "seconds": 0.010893709026277065,
-      "log": "examples/vllm_llm/results/2026-10-15-producer-prep/final-v7/shell-session.log"
-    },
-    {
-      "phase": "focused",
-      "command": [
-        "/Users/ckl/code/etx/.venv/bin/python",
+        "/Users/ckl/code/.wt/etx-producer-readiness/.venv/bin/python",
         "-m",
         "pytest",
         "-q",
+        "-s",
+        "tests/test_producer_readiness.py",
         "tests/test_producer.py",
         "tests/test_host_import_check.py",
-        "tests/test_router_study.py",
-        "tests/test_gpu_jobs.py",
-        "tests/test_session_references.py",
-        "tests/test_test_paths.py"
+        "tests/test_qwen300_session.py",
+        "tests/test_vm_preflight.py"
       ],
       "exit": 0,
-      "seconds": 17.26515387510881,
-      "log": "examples/vllm_llm/results/2026-10-15-producer-prep/final-v7/focused.log"
-    },
-    {
-      "phase": "simulation",
-      "command": [
-        "/Users/ckl/code/etx/.venv/bin/python",
-        "-u",
-        "-m",
-        "examples.vllm_llm.producer_replay",
-        "--out",
-        "examples/vllm_llm/results/2026-10-15-producer-prep/final-v7/simulation.json"
-      ],
-      "exit": 0,
-      "seconds": 0.9649630840867758,
-      "log": "examples/vllm_llm/results/2026-10-15-producer-prep/final-v7/simulation.log"
-    },
-    {
-      "phase": "session-dry",
-      "command": [
-        "/Users/ckl/code/etx/.venv/bin/python",
-        "-m",
-        "etx.tools.gpu_jobs",
-        "examples/sessions/qwen_producer.py",
-        "--dry-run"
-      ],
-      "exit": 0,
-      "seconds": 0.06478250026702881,
-      "log": "examples/vllm_llm/results/2026-10-15-producer-prep/final-v7/session-dry.log"
-    },
-    {
-      "phase": "matrix",
-      "command": [
-        "bash",
-        "examples/vllm_llm/local_matrix.sh",
-        "/Users/ckl/code/.wt/etx-producer-scoring/build/producer-final-v7-matrix"
-      ],
-      "exit": 0,
-      "seconds": 257.08306516706944,
-      "log": "examples/vllm_llm/results/2026-10-15-producer-prep/final-v7/matrix.log"
-    },
-    {
-      "phase": "rocm-baseline",
-      "command": [
-        "bash",
-        "examples/vllm_llm/rocm_build_check.sh",
-        "qwen3-30b-a3b",
-        "default",
-        "/Users/ckl/code/.wt/etx-producer-scoring/build/producer-final-v7-baseline"
-      ],
-      "exit": 0,
-      "seconds": 74.4217661251314,
-      "log": "examples/vllm_llm/results/2026-10-15-producer-prep/final-v7/rocm-baseline.log"
-    },
-    {
-      "phase": "llvm-ir-baseline",
-      "command": [
-        "bash",
-        "etx/importer/hip_ir_local.sh",
-        "/Users/ckl/code/.wt/etx-producer-scoring/build/producer-final-v7-baseline/native_megakernel.hip",
-        "/Users/ckl/code/.wt/etx-producer-scoring/build/producer-final-v7-baseline/local.ll",
-        "-Ietx/runtime/include",
-        "-I",
-        "/Users/ckl/code/.wt/etx-producer-scoring/build/producer-final-v7-baseline",
-        "-I.",
-        "-DETX_DSL_WSUM",
-        "-DETX_DSL_SCALAR",
-        "-DETX_DSL_GU1",
-        "-DETX_DSL_RBATCH",
-        "-DETX_INBODY_REPORT",
-        "-DETX_DSL_NORM_HOIST",
-        "-DETX_DSL_VECNORM",
-        "-DETX_TOPK_KEY32",
-        "-Xclang",
-        "-mlink-builtin-bitcode",
-        "-Xclang",
-        "/Users/ckl/code/.wt/etx-producer-scoring/build/producer-final-v7-baseline/imports.bc"
-      ],
-      "exit": 0,
-      "seconds": 24.589732250198722,
-      "log": "examples/vllm_llm/results/2026-10-15-producer-prep/final-v7/llvm-ir-baseline.log"
-    },
-    {
-      "phase": "llvm-asm-baseline",
-      "command": [
-        "/opt/homebrew/opt/llvm/bin/llc",
-        "-mtriple=amdgcn-amd-amdhsa",
-        "-mcpu=gfx942",
-        "-O3",
-        "/Users/ckl/code/.wt/etx-producer-scoring/build/producer-final-v7-baseline/local.ll",
-        "-o",
-        "/Users/ckl/code/.wt/etx-producer-scoring/build/producer-final-v7-baseline/local.s"
-      ],
-      "exit": 0,
-      "seconds": 60.83006549999118,
-      "log": "examples/vllm_llm/results/2026-10-15-producer-prep/final-v7/llvm-asm-baseline.log"
-    },
-    {
-      "phase": "host-object-baseline",
-      "command": [
-        "/opt/homebrew/opt/llvm/bin/clang++",
-        "-x",
-        "hip",
-        "--cuda-host-only",
-        "-nogpuinc",
-        "-nogpulib",
-        "--offload-arch=gfx942",
-        "-std=c++17",
-        "-isystem",
-        "/Users/ckl/code/rocm-headers/clang",
-        "-isystem",
-        "/Users/ckl/code/rocm-headers/inc",
-        "-include",
-        "__clang_hip_runtime_wrapper.h",
-        "-isystem",
-        "etx/importer/shim/mac",
-        "-D__HIP_PLATFORM_AMD__",
-        "-DETX_VL_CHECK",
-        "-Ietx/runtime/include",
-        "-I",
-        "/Users/ckl/code/.wt/etx-producer-scoring/build/producer-final-v7-baseline",
-        "-I.",
-        "-DETX_DSL_WSUM",
-        "-DETX_DSL_SCALAR",
-        "-DETX_DSL_GU1",
-        "-DETX_DSL_RBATCH",
-        "-DETX_INBODY_REPORT",
-        "-DETX_DSL_NORM_HOIST",
-        "-DETX_DSL_VECNORM",
-        "-DETX_TOPK_KEY32",
-        "-c",
-        "examples/vllm_llm/host.hip",
-        "-o",
-        "/Users/ckl/code/.wt/etx-producer-scoring/build/producer-final-v7-baseline/host-local.o"
-      ],
-      "exit": 0,
-      "seconds": 1.1218505422584713,
-      "log": "examples/vllm_llm/results/2026-10-15-producer-prep/final-v7/host-object-baseline.log"
-    },
-    {
-      "phase": "rocm-producer",
-      "command": [
-        "bash",
-        "examples/vllm_llm/rocm_build_check.sh",
-        "qwen3-30b-a3b",
-        "default",
-        "/Users/ckl/code/.wt/etx-producer-scoring/build/producer-final-v7-producer"
-      ],
-      "exit": 0,
-      "seconds": 51.97879425017163,
-      "log": "examples/vllm_llm/results/2026-10-15-producer-prep/final-v7/rocm-producer.log"
-    },
-    {
-      "phase": "llvm-ir-producer",
-      "command": [
-        "bash",
-        "etx/importer/hip_ir_local.sh",
-        "/Users/ckl/code/.wt/etx-producer-scoring/build/producer-final-v7-producer/native_megakernel.hip",
-        "/Users/ckl/code/.wt/etx-producer-scoring/build/producer-final-v7-producer/local.ll",
-        "-Ietx/runtime/include",
-        "-I",
-        "/Users/ckl/code/.wt/etx-producer-scoring/build/producer-final-v7-producer",
-        "-I.",
-        "-DETX_DSL_WSUM",
-        "-DETX_DSL_SCALAR",
-        "-DETX_DSL_GU1",
-        "-DETX_DSL_RBATCH",
-        "-DETX_INBODY_REPORT",
-        "-DETX_DSL_NORM_HOIST",
-        "-DETX_DSL_VECNORM",
-        "-DETX_TOPK_KEY32",
-        "-Xclang",
-        "-mlink-builtin-bitcode",
-        "-Xclang",
-        "/Users/ckl/code/.wt/etx-producer-scoring/build/producer-final-v7-producer/imports.bc"
-      ],
-      "exit": 0,
-      "seconds": 12.35615716734901,
-      "log": "examples/vllm_llm/results/2026-10-15-producer-prep/final-v7/llvm-ir-producer.log"
-    },
-    {
-      "phase": "llvm-asm-producer",
-      "command": [
-        "/opt/homebrew/opt/llvm/bin/llc",
-        "-mtriple=amdgcn-amd-amdhsa",
-        "-mcpu=gfx942",
-        "-O3",
-        "/Users/ckl/code/.wt/etx-producer-scoring/build/producer-final-v7-producer/local.ll",
-        "-o",
-        "/Users/ckl/code/.wt/etx-producer-scoring/build/producer-final-v7-producer/local.s"
-      ],
-      "exit": 0,
-      "seconds": 29.44316712487489,
-      "log": "examples/vllm_llm/results/2026-10-15-producer-prep/final-v7/llvm-asm-producer.log"
-    },
-    {
-      "phase": "host-object-producer",
-      "command": [
-        "/opt/homebrew/opt/llvm/bin/clang++",
-        "-x",
-        "hip",
-        "--cuda-host-only",
-        "-nogpuinc",
-        "-nogpulib",
-        "--offload-arch=gfx942",
-        "-std=c++17",
-        "-isystem",
-        "/Users/ckl/code/rocm-headers/clang",
-        "-isystem",
-        "/Users/ckl/code/rocm-headers/inc",
-        "-include",
-        "__clang_hip_runtime_wrapper.h",
-        "-isystem",
-        "etx/importer/shim/mac",
-        "-D__HIP_PLATFORM_AMD__",
-        "-DETX_VL_CHECK",
-        "-Ietx/runtime/include",
-        "-I",
-        "/Users/ckl/code/.wt/etx-producer-scoring/build/producer-final-v7-producer",
-        "-I.",
-        "-DETX_DSL_WSUM",
-        "-DETX_DSL_SCALAR",
-        "-DETX_DSL_GU1",
-        "-DETX_DSL_RBATCH",
-        "-DETX_INBODY_REPORT",
-        "-DETX_DSL_NORM_HOIST",
-        "-DETX_DSL_VECNORM",
-        "-DETX_TOPK_KEY32",
-        "-c",
-        "examples/vllm_llm/host.hip",
-        "-o",
-        "/Users/ckl/code/.wt/etx-producer-scoring/build/producer-final-v7-producer/host-local.o"
-      ],
-      "exit": 0,
-      "seconds": 1.572165624704212,
-      "log": "examples/vllm_llm/results/2026-10-15-producer-prep/final-v7/host-object-producer.log"
+      "reason": null,
+      "seconds": 101.42557708267123,
+      "log": "examples/vllm_llm/results/2026-10-15-producer-prep/readiness-fixes/focused-final.log"
     },
     {
       "phase": "full-suite",
       "command": [
-        "/Users/ckl/code/etx/.venv/bin/python",
+        "/Users/ckl/code/.wt/etx-producer-readiness/.venv/bin/python",
         "-m",
         "pytest",
         "-q",
         "-ra"
       ],
       "exit": 0,
-      "seconds": 590.3759878752753,
-      "log": "examples/vllm_llm/results/2026-10-15-producer-prep/final-v7/full-suite.log"
+      "reason": null,
+      "seconds": 524.016534499824,
+      "log": "examples/vllm_llm/results/2026-10-15-producer-prep/readiness-fixes/full-suite.log"
+    },
+    {
+      "phase": "shell",
+      "command": [
+        "bash",
+        "-n",
+        "tools/session.sh"
+      ],
+      "exit": 0,
+      "reason": null,
+      "seconds": 0.006864333059638739,
+      "log": "examples/vllm_llm/results/2026-10-15-producer-prep/readiness-fixes/shell.log"
+    },
+    {
+      "phase": "session-dry",
+      "command": [
+        "/Users/ckl/code/.wt/etx-producer-readiness/.venv/bin/python",
+        "-m",
+        "etx.tools.gpu_jobs",
+        "examples/sessions/qwen_producer.py",
+        "--dry-run"
+      ],
+      "exit": 0,
+      "reason": null,
+      "seconds": 0.08982370840385556,
+      "log": "examples/vllm_llm/results/2026-10-15-producer-prep/readiness-fixes/session-dry.log"
     }
   ],
+  "manifest": "readiness-fixes/manifest.json",
+  "manifest_sha256": "808aff75f2665736551250bde8e66e290b191723b6f043868159905b883c992f",
+  "reused_compile_evidence": {
+    "status": "reused for unchanged compile inputs; no new compile run",
+    "source_commit": "2fdbed13a5574f1d86ee10602a8fe71a30c720b6",
+    "receipt": "previous-local-ready.json",
+    "reason": "No device emitter, kernel, model, host HIP source, build script, header, compiler flag or kept recipe changed. Changes are Python launch/report/trace code and tests."
+  },
   "limitations": [
     "GPU executable link/load/execution pending: macOS has no Linux HIP runtime",
     "real-model capture/replay pending; no retained Qwen router tensors found",

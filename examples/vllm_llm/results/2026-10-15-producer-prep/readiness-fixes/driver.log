@@ -1,0 +1,34 @@
+LOCK acquired; free GiB 19.2471923828125
+RUN focused-final
+PROGRESS focused-final 0s free=19.2GiB log=262 bytes
+PROGRESS focused-final 30s free=19.1GiB log=5239 bytes
+PROGRESS focused-final 60s free=19.2GiB log=12270 bytes
+PROGRESS focused-final 90s free=19.2GiB log=36981 bytes
+FINISH focused-final 0 None
+RUN full-suite
+PROGRESS full-suite 0s free=19.2GiB log=103 bytes
+PROGRESS full-suite 30s free=19.2GiB log=397 bytes
+PROGRESS full-suite 60s free=19.2GiB log=438 bytes
+PROGRESS full-suite 90s free=19.2GiB log=557 bytes
+PROGRESS full-suite 120s free=19.1GiB log=762 bytes
+PROGRESS full-suite 150s free=19.1GiB log=769 bytes
+PROGRESS full-suite 180s free=19.1GiB log=770 bytes
+PROGRESS full-suite 210s free=19.1GiB log=770 bytes
+PROGRESS full-suite 240s free=19.1GiB log=797 bytes
+PROGRESS full-suite 270s free=19.1GiB log=871 bytes
+PROGRESS full-suite 300s free=19.1GiB log=1032 bytes
+PROGRESS full-suite 330s free=16.5GiB log=1532 bytes
+PROGRESS full-suite 360s free=16.5GiB log=1585 bytes
+PROGRESS full-suite 390s free=16.4GiB log=1600 bytes
+PROGRESS full-suite 420s free=14.1GiB log=1600 bytes
+PROGRESS full-suite 450s free=16.5GiB log=2044 bytes
+PROGRESS full-suite 480s free=16.5GiB log=2307 bytes
+PROGRESS full-suite 510s free=16.5GiB log=2355 bytes
+FINISH full-suite 0 None
+RUN shell
+PROGRESS shell 0s free=16.5GiB log=45 bytes
+FINISH shell 0 None
+RUN session-dry
+PROGRESS session-dry 0s free=16.5GiB log=153 bytes
+FINISH session-dry 0 None
+VALIDATION COMPLETE

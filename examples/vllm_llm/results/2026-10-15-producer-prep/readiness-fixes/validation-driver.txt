@@ -1,0 +1,50 @@
+import fcntl,json,os,shutil,signal,subprocess,time
+from pathlib import Path
+root=Path('/Users/ckl/code/.wt/etx-producer-readiness')
+scratch=Path('/Users/ckl/.hermes/cache/scratch/producer-readiness')
+evidence=scratch/'evidence'
+lock=Path('/Users/ckl/.hermes/cache/scratch/qwen-prep-heavy.lock').open('a+')
+wait=time.monotonic()
+while True:
+    try: fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB);break
+    except BlockingIOError:
+        if time.monotonic()-wait>1200: raise SystemExit('shared lock wait exceeded 1200s')
+        print('WAIT shared heavy lock',flush=True);time.sleep(30)
+lock.seek(0);lock.truncate();lock.write(f'producer readiness pid={os.getpid()} stage=final validation\n');lock.flush()
+print('LOCK acquired; free GiB',shutil.disk_usage(root).free/2**30,flush=True)
+if shutil.disk_usage(root).free<10*2**30:raise SystemExit('need 10GiB before full validation')
+py=str(root/'.venv/bin/python')
+r=Path.home()/'code/rocm-headers'
+env=dict(os.environ,TMPDIR=str(scratch/'tmp'),ETX_PYTHON=py,
+ ETX_ROCM_HEADERS=str(r),ETX_DEVLIBS=str(r/'devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode'),
+ ETX_LLVM='/opt/homebrew/opt/llvm/bin')
+commands=[]
+for name,argv,limit in [
+ ('focused-final',[py,'-m','pytest','-q','-s','tests/test_producer_readiness.py','tests/test_producer.py','tests/test_host_import_check.py','tests/test_qwen300_session.py','tests/test_vm_preflight.py'],300),
+ ('full-suite',[py,'-m','pytest','-q','-ra'],1800),
+ ('shell',['bash','-n','tools/session.sh'],20),
+ ('session-dry',[py,'-m','etx.tools.gpu_jobs','examples/sessions/qwen_producer.py','--dry-run'],30),
+]:
+ start=time.monotonic();log=evidence/f'{name}.log'
+ print('RUN',name,flush=True)
+ with log.open('w') as out:
+    out.write('# command '+json.dumps(argv)+'\n');out.flush()
+    p=subprocess.Popen(argv,cwd=root,env=env,stdout=out,stderr=subprocess.STDOUT,start_new_session=True)
+    reason=None
+    while p.poll() is None:
+        elapsed=time.monotonic()-start;free=shutil.disk_usage(root).free/2**30
+        if elapsed>limit or free<5:
+            reason='deadline' if elapsed>limit else 'disk below 5 GiB'
+            os.killpg(p.pid,signal.SIGTERM)
+            try:p.wait(timeout=10)
+            except subprocess.TimeoutExpired:os.killpg(p.pid,signal.SIGKILL);p.wait()
+            break
+        print(f'PROGRESS {name} {elapsed:.0f}s free={free:.1f}GiB log={log.stat().st_size} bytes',flush=True)
+        try:p.wait(timeout=30)
+        except subprocess.TimeoutExpired:pass
+ rc=p.returncode
+ commands.append(dict(phase=name,command=argv,exit=rc,reason=reason,seconds=time.monotonic()-start,log=str(log)))
+ (evidence/'commands.json').write_text(json.dumps(commands,indent=2)+'\n')
+ print('FINISH',name,rc,reason,flush=True)
+ if rc or reason:raise SystemExit(1)
+print('VALIDATION COMPLETE',flush=True)
