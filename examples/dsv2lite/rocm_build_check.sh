@@ -101,6 +101,21 @@ declare -p COMMON > "$OUT/compiler_args.txt"
 "$RL/bin/llvm-objcopy" --dump-section .text="$OUT/isa.bin" "$OUT/mk.o"
 "$RL/bin/clang++" "${COMMON[@]}" --cuda-device-only -S examples/dsv2lite/host.hip -o "$OUT/host_dev.s" > "$OUT/host_dev.log" 2>&1
 "$RL/bin/clang++" "${COMMON[@]}" --cuda-host-only -fsyntax-only examples/dsv2lite/host.hip > "$OUT/host_syntax.log" 2>&1
+"$RL/bin/clang++" "${COMMON[@]}" --cuda-host-only -c examples/dsv2lite/host.hip -o "$OUT/host.o" > "$OUT/host_object.log" 2>&1
+# A device object plus a host object is not a linked HIP executable. Probe the local
+# runtime separately; record the missing dependency and keep all compile evidence.
+if [ -f /rocm/lib/libamdhip64.so ]; then
+  set +e
+  "$RL/bin/clang++" "${COMMON[@]}" "$OUT/megakernel_d0.hip" examples/dsv2lite/host.hip \
+    -L/rocm/lib -lamdhip64 -o "$OUT/run" > "$OUT/link.log" 2>&1
+  LINK_RC=$?
+  set -e
+  echo "$LINK_RC" > "$OUT/link.exit"
+  [ "$LINK_RC" = 0 ] || { cat "$OUT/link.log"; exit "$LINK_RC"; }
+else
+  echo "UNAVAILABLE: local libamdhip64.so is absent; executable/native runtime load is a remaining gate" > "$OUT/link.log"
+  echo 77 > "$OUT/link.exit"
+fi
 sha256sum "$OUT/plan.json" "$OUT/plan_data.h" "$OUT/megakernel_d0.hip" "$OUT/mk.s" "$OUT/isa.bin" > "$OUT/SHA256SUMS"
 sha256sum "$OUT/plan.json"
 echo "$NAME: device and host passes OK"

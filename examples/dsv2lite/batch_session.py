@@ -30,6 +30,8 @@ BOXCONTROL_PREVIOUS_ARM = "alld4r0l1"
 
 
 class BatchSession(Session):
+    batches = BATCHES
+
     def etx_args(self, b: int) -> list[str]:
         return [*self.args(), *(a for r in range(1, b) for a in ("--req-dir", str(self.data / f"r{r}")))]
 
@@ -56,7 +58,7 @@ class BatchSession(Session):
         requested = Path(os.environ.get("ETX_DSV2_MODEL", MODEL)).expanduser()
         if requested.resolve() != MODEL.resolve():
             raise ValueError(f"ETX_DSV2_MODEL {requested} differs from prepared model {MODEL}; refused")
-        goldens = [str(self.data / "vllm" / f"golden_r{r}.txt") for r in range(max(BATCHES))]
+        goldens = [str(self.data / "vllm" / f"golden_r{r}.txt") for r in range(max(self.batches))]
         sudo = [] if os.geteuid() == 0 else ["sudo"]
         command = [*sudo, "docker", "run", "--rm", "--device=/dev/kfd", "--device=/dev/dri", "--group-add", "video",
                    "--ipc=host", "--shm-size", "16g", "--security-opt", "seccomp=unconfined",
@@ -64,7 +66,7 @@ class BatchSession(Session):
                    "-e", f"VLLM_ROCM_USE_AITER={CONFIGS[config]}", "-v", f"{Path.home()}:{Path.home()}",
                    "-w", str(self.root), "--entrypoint", "timeout", IMAGE, "-k", "5", str(VLLM_DEADLINE_S - 30),
                    "python3", "examples/llm/vllm_bench.py", "--model", str(MODEL), "--goldens", *goldens,
-                   "--batches", ",".join(map(str, BATCHES)), "--tokens", "32", "--repeats", str(batch.SAMPLES),
+                   "--batches", ",".join(map(str, self.batches)), "--tokens", "32", "--repeats", str(batch.SAMPLES),
                    "--label", config, "--echo-config", "--json", str(self.logs / f"{name}.json")]
         try:
             return batch.vllm_results(self.run(name, command, timeout=VLLM_DEADLINE_S), config)
@@ -124,7 +126,7 @@ class BatchSession(Session):
     def vsel(self):
         out = self.fresh(self.logs / "vsel.json")
         round0 = {c: self.vllm(c, f"vsel_{c}") for c in CONFIGS}
-        sel = batch.select({c: r for c, r in round0.items() if "error" not in r}, BATCHES)
+        sel = batch.select({c: r for c, r in round0.items() if "error" not in r}, self.batches)
         write_json(out, dict(round0=round0, selection={str(b): s for b, s in sel.items()}))
         for b, s in sel.items():
             print(f"VSEL b={b} " + (f"baseline={s['config']} step {s['step_ms']} ms" if s["config"] else
@@ -138,7 +140,7 @@ class BatchSession(Session):
             return f.exists() and json.loads(f.read_text())["passed"]
         gated = {b for b, a in BATCH_ARMS.items() if b == 1 or passed(a)}
         configs = list(dict.fromkeys(s["config"] for s in sel.values() if s["config"]))
-        order = [*(("etx", b) for b in BATCHES if b in gated), *(("vllm", c) for c in configs)]
+        order = [*(("etx", b) for b in self.batches if b in gated), *(("vllm", c) for c in configs)]
         rounds = []
         for k in range(1, batch.ROUNDS + 1):
             r = dict(etx={}, vllm={})
@@ -149,9 +151,9 @@ class BatchSession(Session):
                     r["vllm"][x] = self.vllm(x, f"b{k}_vllm_{x}")
             rounds.append(r)
             write_json(out.with_suffix(".partial.json"), dict(rounds=rounds))
-        write_json(out, dict(order=[list(o) for o in order], skipped=[BATCH_ARMS[b] for b in BATCHES if b not in gated],
+        write_json(out, dict(order=[list(o) for o in order], skipped=[BATCH_ARMS[b] for b in self.batches if b not in gated],
                              rounds=[dict(etx={str(b): e for b, e in r["etx"].items()}, vllm=r["vllm"]) for r in rounds]))
-        print(f"BROUNDS {batch.ROUNDS} rounds; arms {[BATCH_ARMS[b] for b in BATCHES if b in gated]}; vLLM {configs}", flush=True)
+        print(f"BROUNDS {batch.ROUNDS} rounds; arms {[BATCH_ARMS[b] for b in self.batches if b in gated]}; vLLM {configs}", flush=True)
 
     def report(self):
         from examples.dsv2lite.batch_floor import step_bytes
@@ -160,7 +162,7 @@ class BatchSession(Session):
         rounds = [dict(etx={int(b): e for b, e in r["etx"].items()},
                        vllm={c: (v if "error" in v else {int(b): x for b, x in v.items()}) for c, v in r["vllm"].items()})
                   for r in raw]
-        res = batch.study(rounds, sel, BATCHES)
+        res = batch.study(rounds, sel, self.batches)
         routing = self.logs / "routing.json"
         union = json.loads(routing.read_text()).get("executed_prefix", {}) if routing.exists() else {}
         kept = res.get(1, {})
@@ -193,7 +195,7 @@ def main(argv=None):
         ap.error("an arm argument is only valid with gate")
     s = BatchSession()
     if a.operation == "gate":
-        allowed = [BATCH_ARMS[b] for b in BATCHES if b > 1] + list(X8_CANDIDATES)
+        allowed = [BATCH_ARMS[b] for b in s.batches if b > 1] + list(X8_CANDIDATES)
         if a.arm not in allowed:
             ap.error(f"gate arm must be one of {allowed}")
         s.gate(a.arm)

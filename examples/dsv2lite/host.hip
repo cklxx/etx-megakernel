@@ -208,9 +208,13 @@ int main(int argc, char** argv) {
         HIP_CHECK(hipMemcpy(reqs[r].d_fp, &fp, sizeof(fp), hipMemcpyHostToDevice));
         fleet_set_params(&fp, hst.stream, r);
       }
+      // last_ms is a HIP-event DEVICE duration on both paths. BATCH reports a
+      // host-wall interval instead: the same clock boundary for fused and graph.
+      const auto step_begin = std::chrono::steady_clock::now();
       if (unfused) { if (!hst.run_unfused()) { std::printf("token %d: unfused step failed\n", t); return 2; } }
       else if (!hst.run(20.0)) { std::printf("token %d: ETX step failed\n", t); return 2; }
-      wall_total += hst.last_ms; step_ms.push_back(hst.last_ms);
+      const double step_wall_ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - step_begin).count();
+      wall_total += step_wall_ms; step_ms.push_back(step_wall_ms);
     }
     for (int r = 0; r < R; ++r) {
       Req& q = reqs[r];

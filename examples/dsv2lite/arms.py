@@ -97,6 +97,10 @@ ARMS = {a.name: a for a in [
         order=("alld4r0l1", "alld4r0l1mw", "alld4r0l1kvsmw"), references=("alld4r0l1", "alld4r0l1mw"),
         rule=Rule("device_ms", "alld4r0l1mw", 30, text="KM: KEEP if every pair faster than alld4r0l1mw, median >= 30 us, "
                   "> 2 x spread; otherwise the kept arm is alld4r0l1mw (rule commit bf92fd4)", labels=("KEEP", "M1-ONLY"))),
+    # Correctness discriminator only: x8 recipe at one request, without D4.
+    Arm("x1km", levers=(*LEVERS_ALL, "l1_loads", "merge_uv_waves"),
+        flags=("-DETX_DS_REQUESTS=1", "-DETX_SLOT_BY_CU", "-DETX_DSV2_KVA_SHARED=1"),
+        env=dict(ETX_DSV2_COH="l1", ETX_DSV2_REQUESTS="1", ETX_DSV2_COUPLE="none", ETX_DSV2_KVA="shared")),
     # batch 2 / 4 / 8 (docs/BATCH-2026-10-14.md, rules written before the code, 0fc38c9): the kept recipe without D4
     # (D4 refuses multiple requests), two workgroups per CU paired by CU, request r on slot r mod 2, no coupling.
     # Measured by examples/dsv2lite/batch_session.py against vLLM at the same B, not by `pairs`: no Rule here.

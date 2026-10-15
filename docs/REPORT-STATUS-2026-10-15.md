@@ -5,6 +5,10 @@ favoured ETX at B=1/2 and favoured vLLM at B=4; B=8 failed its hidden-state gate
 short-run correctness gates now required by the harness, so those comparisons are historical evidence, **not a fresh
 certification under the repaired protocol**. The batch-8 numerical cause and batch-4 performance cause remain open.
 
+Clock correction from the two-gap preparation: the historical DeepSeek `BATCH` step field used a HIP-event device
+span, despite its wall label. Its application pairs mixed ETX device time with vLLM's host full-minus-short estimate.
+The new host uses matching host-clock brackets. Historical wall labels below are subject to this correction.
+
 Scope: code, experiment tooling and reporting, including the earlier single-request studies, both Qwen studies,
 batching, design-only proposals and interrupted experiments. No paid resource or remote experiment was used for this
 closure. Operational watchdogs outside this repository were neither changed nor independently verified.
@@ -182,6 +186,18 @@ build outcomes are recorded in the closure result alongside the unfiltered logs:
 `/Users/ckl/.hermes/cache/scratch/etx-close-known-issues-evidence/`. The recomputation script and JSON there retain
 raw-log arithmetic and explicitly mark the historical batch certification gap. Synthetic regression logs test the
 harness only; they are never substituted for GPU measurements.
+
+## Preparation update, no new GPU evidence
+
+The [two-gap preparation](DEEPSEEK-PREP-TWO-GAPS-2026-10-15.md) implements the missing recipe-matched B1 control,
+producer-bound reference refusal/regeneration path, and a correctness-only x8 queue. It also prepares the separate
+B1/B2/B4 attribution and corrected-baseline queue. The prior closure's missing-implementation statements below are
+historical; the linked acceptance record gives current local checks and remaining native/device gates.
+No new performance verdict or historical-reference certification is claimed. The preparation review also found that
+DeepSeek's old `BATCH step_median_ms` read `hst.last_ms`, a HIP-event device duration, despite its wall label.
+The old comparison mixed this ETX device field with vLLM's host full-minus-short estimate. The new host brackets
+both fused and graph paths with the same host clock. Earlier numerical arithmetic remains reproducible, but a matched
+host-wall verdict requires the new session. Older wall descriptions in this historical report are subject to this correction.
 
 ## Minimal next paid experiment, not authorized or executed here
 

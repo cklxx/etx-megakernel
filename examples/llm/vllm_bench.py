@@ -23,10 +23,40 @@ import json
 import os
 import statistics
 import time
+from contextlib import contextmanager
 from pathlib import Path
 
 
 CONFIG_PREFIX = "VLLM-CONFIG "
+
+
+@contextmanager
+def profile_range(label: str, enabled: bool):
+    """Optional profiler-only boundary; never used for unprofiled timing verdicts."""
+    if not enabled:
+        yield
+        return
+    import ctypes
+    import torch
+    roctx = None
+    for lib in ('librocprofiler-sdk-roctx.so', '/opt/rocm/lib/librocprofiler-sdk-roctx.so', 'libroctx64.so'):
+        try:
+            roctx = ctypes.CDLL(lib)
+            break
+        except OSError:
+            pass
+    if roctx is None:
+        raise RuntimeError('ROCTx unavailable; cannot delimit measured traffic')
+    roctx.roctxRangePushA.argtypes = [ctypes.c_char_p]
+    roctx.roctxRangePushA.restype = ctypes.c_int
+    roctx.roctxRangePop.restype = ctypes.c_int
+    torch.cuda.synchronize()
+    roctx.roctxRangePushA(label.encode())
+    try:
+        yield
+        torch.cuda.synchronize()
+    finally:
+        roctx.roctxRangePop()
 
 
 def encode_config(config):
@@ -94,21 +124,23 @@ def batch_mode(a, kw) -> None:
         prompts = [TokensPrompt(prompt_token_ids=p) for p, _ in files[:b]]
         goldens = [g for _, g in files[:b]]
 
-        def gen(n_new: int):
+        def gen(n_new: int, phase: str):
             sp = SamplingParams(temperature=0.0, max_tokens=n_new, ignore_eos=True, detokenize=not a.no_detok)
-            t0 = time.perf_counter()
-            outs = llm.generate(prompts, sp, use_tqdm=False)
-            return (time.perf_counter() - t0) * 1e3, [list(o.outputs[0].token_ids) for o in outs]
+            with profile_range(f'ds_b4:b{b}:{phase}', getattr(a, 'profile_ranges', False)):
+                t0 = time.perf_counter()
+                outs = llm.generate(prompts, sp, use_tqdm=False)
+                elapsed = (time.perf_counter() - t0) * 1e3
+            return elapsed, [list(o.outputs[0].token_ids) for o in outs]
 
         print(f"VLLM-PROGRESS label={a.label} batch={b} warm-up", flush=True)
-        _, outs = gen(a.tokens)
+        _, outs = gen(a.tokens, 'warmup')
         print("\n".join(batch_lines(a.label, b, "warmup", goldens, outs, a.tokens)), flush=True)
-        _, short = gen(1)
+        _, short = gen(1, 'warmup_short')
         print("\n".join(batch_lines(a.label, b, "warmup_short", goldens, short, 1)), flush=True)
         per = []
         for k in range(a.repeats):
-            full, outs = gen(a.tokens)
-            one, short = gen(1)
+            full, outs = gen(a.tokens, f'sample{k}')
+            one, short = gen(1, f'sample{k}_short')
             per.append((full - one) / (a.tokens - 1))
             print("\n".join(batch_lines(a.label, b, f"sample{k}", goldens, outs, a.tokens)), flush=True)
             print("\n".join(batch_lines(a.label, b, f"sample{k}_short", goldens, short, 1)), flush=True)
@@ -126,6 +158,7 @@ def main() -> None:
     ap.add_argument("--no-detok", action="store_true")
     ap.add_argument("--echo-config", action="store_true")
     ap.add_argument("--gate-warmup", action="store_true", help="check the full warmup before timing; print burst progress outside timers")
+    ap.add_argument("--profile-ranges", action="store_true", help="ROCTx call ranges for traffic attribution; profiler timings have no performance verdict")
     ap.add_argument("--model", required=True)
     ap.add_argument("--golden", type=Path, default=None)
     ap.add_argument("--goldens", type=Path, nargs="+", default=None, help="one golden file per sequence (batch mode)")

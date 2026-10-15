@@ -48,3 +48,19 @@ withdrawn. See [complete status](../../../docs/REPORT-STATUS-2026-10-15.md) and
 - expected for the ETX combination: 531–533 us. Delivered: 92 us, then 108 us after dropping the dead lever. 17–20% realised.
 - Fleet's older counter capture measured 5.20 GB/token; it is not ETX's current traffic. The ETX bulk-payload model at context 1024 is 4.934 GB/request, or 1.148 ms at an assumed 4.3 TB/s. Cache reuse, spills, dependencies and other work prevent treating this estimate as an achievable runtime or a measured HBM bound.
 - fleet 3.568 ms = 280 tok/s was the best measured on the ETX box in an earlier session (2026-10-13 run 1). **The current kept ETX arm is `alld4r0l1kvsmw`: 3.068-3.075 ms device, 2026-10-14 (`results/2026-10-14-km`), five rounds, every run 32/32 and 27/27.** The 2026-10-13 paid hour measured its predecessor `alld4r0l1` at 3.238 ms device / 3.272 ms wall, so a tok/s figure quoted from that hour describes `alld4r0l1`, not the kept arm. Fleet was not timed alongside either arm, so no speedup over fleet is claimed across sessions.
+
+## Registered preparation: two existing gaps, 2026-10-15
+
+No GPU execution or spend. [Preparation and acceptance](../../../docs/DEEPSEEK-PREP-TWO-GAPS-2026-10-15.md).
+
+- **X8 correctness discriminator:** `examples/sessions/x8_correctness.py`, 3600-second hard cap. Compare bound r5/r7
+  on x1km (x8 numerical recipe, one request, no D4), then kept B1, then x8 twice. Strict token AND hidden-state gates.
+  Go: a complete reproducible classification. No-go: incomplete provenance, metrics, or inconsistent repeats.
+  A failure is diagnostic evidence, not a throughput result. Original lost payload recovery is not claimed.
+- **B4 attribution and corrected baseline:** `examples/sessions/ds_b4_attribution.py`, separate 7200-second cap.
+  Gated B1/B2/B4 traffic, body/wait spans, exact-prefix routing, five corrected vLLM pairs, and a local same-kernel graph eligibility gate.
+  The cached-LDS handoff currently refuses separate graph launches; the two-baseline speed claim stays INCOMPLETE.
+  Go: complete gates, exact identities and measured attribution inputs, then apply the existing registered rules.
+  No-go: absent counters, trace/routing bindings, short-call gates, or incomplete pairs. No new kernel experiment.
+
+Both queues are committed for later review. DigitalOcean tariff, billing minimum and spending approval remain unknown.
