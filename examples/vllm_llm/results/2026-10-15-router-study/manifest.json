@@ -1,0 +1,58 @@
+{
+  "base_commit": "8d4ec985df145a31e5bae96bb3ceb3eda562d6ae",
+  "python": "3.13.5 (main, Jun 11 2025, 15:36:57) [Clang 17.0.0 (clang-1700.0.13.3)]",
+  "numpy": "2.5.3",
+  "platform": "macOS-15.6.1-arm64-arm-64bit-Mach-O",
+  "source_hashes": {
+    "examples/vllm_llm/model.py": "a81ee2b52e534ee730cb729cd32433defa039152abab9d332afca9136808610a",
+    "examples/vllm_llm/host.hip": "f24987ed0cf994d65291792fd69d30be8c1aae6a07dd36336c21c577dba882f4",
+    "etx/ops/gemv.py": "845fa7030b24ca8e274e2a224aec6b5255c9c90146637642794d5379c0a1f851",
+    "etx/ops/topk.py": "c5fbac373f00dfd6ad6b6c2397b3ace4294ed49444f9d3769ee32bbccf47ae9a",
+    "etx/ops/topk_key32.py": "8caaa3a184f9db41f7488d8acb715575a76e08a051c56bce2fafdd2b7aef2483",
+    "etx/runtime/include/etx/tile_util.h": "85ec95e41fff47b33fb36e06e6536bd41af53bdd86dcd04c1004d0b7f0e63da0",
+    "etx/machine/arch/gfx942.yaml": "87a9039276e95d25884e567ee6a6e3b506aa2ffe5b270214b58201a76bf96e13",
+    "examples/vllm_llm/kept_build.py": "a62d2e2f831d23f1633c60765787982958912b3eb1e4f98df8cdd4ba36fbd0f0",
+    "examples/vllm_llm/build.sh": "13193d69a0671310e3b979415bbd65f913fbf7f54fbc8e31303ee43717282be2",
+    "examples/llm/configs/qwen3-30b-a3b.json": "c214108014d8495d762a4009ff74f9548d7a9e215cda85f941147011f56ae7ba",
+    "docs/DATA.md": "7948707157caa685d51790577bebb36021cc21772d5596eced4326e7813909ad",
+    "docs/GAINS-LEDGER.md": "f81d878813634c80a876b019e0d0d52cb66731f5eda91a6b0e41658d745e37e3",
+    "docs/PROPOSALS-2026-10-14.md": "793dc8bf3358f9196981781fc37f2f67a1cc765bf88edf3fa69db133a7616472",
+    "docs/REPORT-STATUS-2026-10-15.md": "cd25aae788cf42c4eca1c3b9772201e0358b444d59239368482e9c00ffb30b28",
+    "docs/BASELINE-STATE-2026-10-12.md": "36818af41dab0d3e1de555ffefac47be6c0c098b384d6d902481688c963425f3",
+    "docs/XCD-TIMELINE-2026-10-11.md": "50437d89acdcf374a8d92cc0e954f4bd387d6071d64bc8561ea3618312d6dbea",
+    "docs/MASTER-TABLE-2026-10-11.md": "502a6bb96bd2c8254f858a7bc12bc47c9e05613af4671079b97e9eeff9fe4158",
+    "docs/ISA-FIXES-2026-10-11.md": "9148440dfa4f9cc277eef1d8c7c1ef31f2e4acd639986060ce781a37e62de705",
+    "docs/TILES-2026-10-07.md": "95338204d158c595c667e337eb0ce9afc5ea20588526707ae0f959cd65b396cd",
+    "docs/DEP-GAP-LEDGER-2026-10-11.md": "a10e3ae3b78f9b2938005744731911bbf8be222705ac3f1686a54947a7940a01",
+    "docs/ETX_Technical_Design.md": "516c90f817f821b625b3f93013cb4c90d078d85963d1bf69974d931282b3ed2d",
+    "examples/vllm_llm/results/2026-10-12/fleet-port.md": "a3eda51beb229322197fd7ceec14e409ca19249d05a8e73e613a31733b88fdc5",
+    "examples/dsv2lite/results/2026-10-14-batch-20261014T183414Z/20261014T183414Z-68d6f6/qwen/pairs_kept_l1.json": "f47b87cb9ca588989cecf45aa8eb8af72eef83d3615926e98865f03bd319f6c2"
+  },
+  "external_sources": {
+    "/Users/ckl/code/fleet-mi300x/docs/STATUS.md": "3f4824f5edc51f680846204d67567322da1217e46228a729013f1de6ecef7bb6"
+  },
+  "fleet_head": "3fb67a6722bebfe309944b13d3603e30063a1f13",
+  "trace_source": "/Users/ckl/code/etx/results_qwen300_2026-10-11/tr_off.bin",
+  "trace_log_source": "/Users/ckl/code/etx/results_qwen300_2026-10-11/tr_off.log",
+  "trace_plan_available": false,
+  "numerical_input": "synthetic rng seed 20261015; no model weights or norm inputs found",
+  "search_commands": [
+    "git log --all --oneline --grep=router\\|top-k\\|topk\\|norm\\ hoist -i",
+    "git log --all --oneline -G partial.*router|router.*partial|defer.*norm|scale.*router -- etx/ops/gemv.py examples/vllm_llm/model.py",
+    "rg -n -i partial.*router|router.*partial|scale.*router|router.*scale|o_proj.*router|router.*o_proj docs/PROPOSALS* docs/EXPERIMENTS* ~/code/fleet-mi300x/results ~/code/fleet-mi300x/src"
+  ],
+  "gpu_spend_usd": 0,
+  "gpu_candidate_implemented": false,
+  "study_source_hashes": {
+    "examples/vllm_llm/router_study.py": "781bc4c8c34bd9233e88c924006db5e8daea203fd53834161a3478587dfa1133",
+    "examples/vllm_llm/router_study_guards.py": "590654977e5d01bc9ab42ad642ca8b626b507955caf802f434b03e5f9c451765",
+    "tests/test_router_study.py": "d2b288a3a1fe5f26fd4c19921f510c1736f823f3946800f63f804db192287c99"
+  },
+  "commands_executed": [
+    ".venv/bin/python -u -m examples.vllm_llm.router_study",
+    ".venv/bin/python -u -m examples.vllm_llm.router_study --out /tmp/etx-router-replay-20261015",
+    ".venv/bin/python -u -m examples.vllm_llm.router_study_guards --out examples/vllm_llm/results/2026-10-15-router-study",
+    ".venv/bin/python -m pytest -q tests/test_router_study.py",
+    ".venv/bin/python -m pytest -q -ra"
+  ]
+}

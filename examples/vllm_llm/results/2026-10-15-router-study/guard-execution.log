@@ -1,0 +1,5 @@
+cross-build-transfer: pytest exit=1, expected=1
+missing-normalized-input: pytest exit=1, expected=1
+visibility-counter-only: pytest exit=1, expected=1
+..............                                                           [100%]
+14 passed in 0.18s

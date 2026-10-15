@@ -1,0 +1,14 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+______________ test_normalized_input_is_required_on_critical_path ______________
+
+    def test_normalized_input_is_required_on_critical_path():
+>       assert s.finish_times([-4,0],1,1,1,1,10,1)==13
+E       assert 5 == 13
+E        +  where 5 = <function <lambda> at 0x104e08cc0>([-4, 0], 1, 1, 1, 1, 10, 1)
+E        +    where <function <lambda> at 0x104e08cc0> = s.finish_times
+
+tests/test_router_study.py:87: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_router_study.py::test_normalized_input_is_required_on_critical_path
+1 failed in 0.03s

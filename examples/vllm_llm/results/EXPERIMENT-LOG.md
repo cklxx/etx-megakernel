@@ -1,6 +1,6 @@
 # Qwen3-30B-A3B experiment log: four columns
 
-This log covers the two recent measured experiments and four design-only proposals.
+This log covers two recent measured experiments, four design-only proposals, and the CPU-only producer-router study.
 Updated from the captured results on 2026-10-15; no new GPU run was performed.
 Earlier measured history is in [the gains ledger](../../../docs/GAINS-LEDGER.md) and
 [the baseline record](../../../docs/BASELINE-STATE-2026-10-12.md).
@@ -30,3 +30,13 @@ not a replacement for those raw invocation logs.
 | Epoch-tagged events, static-only reset (P3, `epoch_reset`) | Team proposal: reset submission is 0.0386 ms per step, measured in two sessions. The device loop is closed by the bar and the device reset lost (-0.008 ms wall) | not yet — design only; not worth a box now: best case 0.022 ms by the device-reset decomposition | Reopens on a host-only diagnostic showing >= 0.030 ms of wall behind the reset submissions |
 | Producer-side combine, row-partitioned moe_down (P4, `moe_rowsum`) | Team proposal: QK2 refolds residual + 8 slot rows in all 256 qkv tasks; ceiling 0.073 ms. The combine phase (+4.10 us/layer) and Fleet's one-writer fold already lost | not yet — design only; gated on X6 stamps (QK2 exposed >= 0.625 us/layer) before any code | None |
 | Last-arriver top-k (P5, `topk_lastarr`) | Team proposal (jyoti): removes the 74.0 us/step router -> top-k handoff; Qwen's top-k is already serial, unlike Fleet's lost `--topk-published` | not yet — design only; a sync_bench mode decides first (GO if >= 0.625 us/layer saved) | Estimate 0.040-0.052 ms if visibility is not paid, -0.003 to +0.017 ms if it is |
+
+## Producer-side router fusion study (2026-10-15)
+
+[Executed study, plan and conditional GPU experiment](../../../docs/QWEN-ROUTER-FUSION-STUDY-2026-10-15.md).
+The exact mechanism is o_proj slice scoring before normalization, with delayed RMS scale
+and last-arriver reduction/top-k; it is distinct from P5 above.
+
+| Experiment | Why we think it is a good experiment | Run on GPU? | Result |
+|---|---|---|---|
+| o_proj producer scoring + delayed RMS scale + last-arriver top-k | Test whether normalization's global dependency can move after router dot products | **No — CPU simulation/tests executed; conditional successor hardware design only; $0 GPU spend** | **Not yet supported; NO-GO as an exact bf16 rewrite.** Synthetic counterexample changes eighth expert 7→8. 64 synthetic cases: ordered IDs differ 6/64, sets 1/64, mixing-weight bits 64/64; not actual-model correctness. Current gain unknown. Historical trace sensitivity is not transferable to 4.051 ms kept wall time. No implementation/run of this exact mechanism found in searched history. |

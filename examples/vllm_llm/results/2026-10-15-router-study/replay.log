@@ -1,0 +1,37 @@
+CPU ONLY; synthetic numerical inputs; historical trace sensitivity
+{
+  "deferred8": {
+    "ordered_id_mismatches": 6,
+    "set_mismatches": 1,
+    "weight_mismatches": 64,
+    "logit_mismatches": 3455
+  },
+  "deferred64": {
+    "ordered_id_mismatches": 6,
+    "set_mismatches": 1,
+    "weight_mismatches": 64,
+    "logit_mismatches": 3456
+  },
+  "deferred8_reverse": {
+    "ordered_id_mismatches": 6,
+    "set_mismatches": 1,
+    "weight_mismatches": 64,
+    "logit_mismatches": 3456
+  },
+  "same_dot_scale_after": {
+    "ordered_id_mismatches": 6,
+    "set_mismatches": 1,
+    "weight_mismatches": 64,
+    "logit_mismatches": 3455
+  },
+  "omit_gamma": {
+    "ordered_id_mismatches": 64,
+    "set_mismatches": 63,
+    "weight_mismatches": 64,
+    "logit_mismatches": 8130
+  }
+}
+counterexample: {"u": 129, "z0": 3, "other_z": 1, "gamma": 1, "scale": 0.9980521202087402, "w7_0": 0.50390625, "w8_1": 1.515625, "reference_logits": [2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 1.515625, 1.515625, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "candidate_logits": [2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 1.5078125, 1.515625, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "comparison": {"logit_bits_different": 1, "ordered_ids_equal": false, "expert_set_equal": false, "weights_bits_equal": false, "max_logit_abs": 0.0078125, "max_slot_weight_abs": 1.4901161193847656e-08, "reference_ids": [0, 1, 2, 3, 4, 5, 6, 7], "candidate_ids": [0, 1, 2, 3, 4, 5, 6, 8]}}
+retained routing: {"status": "real retained KEY32 off/on outputs; NOT a candidate correctness check", "files": 384, "layer_position_cases": 96, "replica_mismatches": 0, "id_cases_different": 0, "weight_cases_different": 0}
+trace: 60362 436 4303.54 5e3a64b30f5b596ddcec0a7b255e1fe8a3b3b26e5420cd64daf203ed73e7fb7e
+ASSUMED sweep historical sum saving us: -607.45 666.95 current gain UNKNOWN

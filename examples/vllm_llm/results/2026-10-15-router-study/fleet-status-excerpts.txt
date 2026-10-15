@@ -1,0 +1,84 @@
+SOURCE: /Users/ckl/code/fleet-mi300x/docs/STATUS.md
+29: | Top-k published once per XCD by the router's last arriver (`--topk-published`) | 3.670–3.678 ms over three runs: **slower**. The gate_up prologue falls 5.7 → 1.5 µs, but the router phase grows 12 → 18 µs because one worker does the 36-shuffle reduction while 36 wait. Off |
+41: | Payload visibility (`microbench (d)(d')(d''')`) | fenced protocol 0 stale in 16.4 M; 37 producers + last-arriver flush 0 stale in 151 M each; agent-scope atomic payload without fences 0 stale in 16.4 M. MTYPE-UC memory without fences (d''): 12.3 M of 16.4 M stale — not usable on this VM |
+67: | **v0.11** — fold once by the last-arriving down worker, gate_up→down tiled in 512-row K-chunks, o_proj K-split per XCD (merge→o_proj XCD-local), 2 global events/layer | 4.80 ms (**slower**) | the per-layer timeline (`scripts/trace_timeline.py`) showed why: the one-writer fold serialises ~4 µs at each of the two fold points; the tiled down cannot start before gate_up ends because both run on the *same* 37 workers (down's first ready at 120.6 µs, gate_up's last done at 122.1); the K=256 o_proj GEMV left half of every wave's lanes idle (8.4 → 11 µs) |
+69: | **v0.12** — every consumer folds the 8 partials in its own prologue (o_proj partials in the router, expert partials in the next q/kv_a), worker (0,0) publishes to the other `x` buffer; half-wave GEMV for K ≤ 256 | 4.06 ms | the parallel fold costs ~1 µs on the prologue instead of ~4 µs serial; o_proj 11 → 6.8 µs |
+78: | **v0.16** — three more candidates, all measured, all rejected: publish the top-k once per XCD instead of per task; prefetch the next task's first rows across its event wait; re-test `--coherent-acts` on an equal graph | 3.661–3.665 ms, i.e. unchanged | the publication trades 4 µs of gate_up prologue for 6 µs of serialised router tail — the same shape as the v0.11 one-writer fold; the prefetch's 8 held loads cost 4%; the coherent protocol is within noise of the fenced one. The kernel keeps all three behind flags and ships none |
+520: 1. ~~Publish the top-k from the router's last arriver~~ — done and
+521:    measured slower (above); the routing stays per task.
+524:    load is; the only way out is fewer of them, e.g. the router's fold
+546:    removes the 8 fp32 partials the router prologue folds, and pays a
+commit 72aa66604c56fd35d4e0df7bdcc621f00eeaf954
+Author: cklxx <q1293822641@gmail.com>
+Date:   Mon Sep 14 16:46:31 2026 +0800
+
+    v0.16: three more candidates measured and rejected; per-task routing stays the default
+
+    Published top-k (--topk-published): the router's last arriver turns the 64
+    logits into the top-k once and the expert tasks read 64 B. gate_up's
+    prologue falls 5.7 -> 1.5 us, but the router phase grows 12 -> 18 us
+    because one worker runs the 36-shuffle reduction while 36 wait: 3.670-3.678
+    vs 3.661-3.665 ms. Same shape as the v0.11 one-writer fold.
+
+    Cross-task prefetch (--prefetch-next): 3.812-3.815 vs 3.673-3.682, 4%
+    slower. --coherent-acts re-tested on an equal (kv_a-replicated) graph:
+    3.718 vs 3.712 fenced, within noise.
+
+    Default confirmed at 3.661-3.665 ms free-running, 3.654 teacher-forced,
+    32/32 tokens and 27/27 layers. Docs record all three rejections and correct
+    the kv_a saving to 0.45 GB (7 redundant copies, not 8).
+
+ README.md                                  |   2 +-
+ docs/STATUS.md                             |  49 ++++++----
+ docs/design.md                             |   6 +-
+ results/decode_coh_coherent_kvarep_r1.json |   9 ++
+ results/decode_coh_coherent_kvarep_r2.json |   9 ++
+ results/decode_coh_fenced_kvarep_r1.json   |   9 ++
+ results/decode_coh_fenced_kvarep_r2.json   |   9 ++
+ results/decode_free.json                   |   4 +-
+ results/decode_nt_d16_fenced.json          |   4 +-
+ results/decode_nt_d16_fenced_b.json        |   4 +-
+ results/decode_nt_d16_kchunk512.json       |   4 +-
+ results/decode_nt_d16_kvarep.json          |   9 ++
+ results/decode_nt_d16_pfnext.json          |   9 ++
+ results/decode_nt_d16_pfnext_b.json        |   9 ++
+ results/decode_nt_d16_prefetch.json        |   4 +-
+ results/decode_nt_d16_split18.json         |   4 +-
+ results/decode_nt_d16_split18_k512.json    |   4 +-
+ results/decode_nt_d16_split22_k512.json    |   4 +-
+ results/decode_nt_d16_v1.json              |   4 +-
+ results/decode_nt_d8.json                  |   4 +-
+ results/decode_plain_d16.json              |   4 +-
+ results/decode_teacher.json                |   4 +-
+ results/decode_v16_default_r1.json         |   9 ++
+ results/decode_v16_default_r2.json         |   9 ++
+ results/decode_v16_default_r3.json         |   9 ++
+ results/decode_v16_default_teacher.json    |   9 ++
+ results/decode_v16_pertask_r1.json         |   9 ++
+ results/decode_v16_pertask_r2.json         |   9 ++
+ results/decode_v16_pertask_r3.json         |   9 ++
+ results/decode_v16_published_r1.json       |   9 ++
+ results/decode_v16_published_r2.json       |   9 ++
+ results/decode_v16_published_r3.json       |   9 ++
+ results/decode_v16_teacher.json            |   9 ++
+ results/isa_summary.txt                    |  16 ++--
+ results/kernel_resource_usage.txt          |  44 ++++-----
+ results/microbench.json                    |   6 +-
+ results/microbench_summary.txt             |  16 ++--
+ results/prof_fetch_v1.csv                  | 148 ++++++++++++++---------------
+ results/timeline_free_L5.txt               |  16 ++--
+ results/timeline_kvarep_L5.txt             |   9 ++
+ results/timeline_split18_k512_L5.txt       |  16 ++--
+ results/timeline_v16_L5.txt                |   9 ++
+ results/timeline_v16_default_L5.txt        |   9 ++
+ results/trace_free_summary.txt             |  30 +++---
+ results/trace_v16_default_summary.txt      |  15 +++
+ results/trace_v16_summary.txt              |  15 +++
+ scripts/hotaisle_bootstrap.sh              |   6 +-
+ src/host/fleet_launch.hip                  |   2 +
+ src/host/taskgraph.py                      |  39 ++++++--
+ src/kernels/fleet_kernel.hip               |  67 +++++++++----
+ src/runtime/fleet_runtime.h                |   5 +
+ src/runtime/fleet_types.h                  |   2 +
+ tests/test_queue_simulation.py             |   3 +
+ 53 files changed, 519 insertions(+), 221 deletions(-)

@@ -1,0 +1,48 @@
+.....................................................ss................. [  3%]
+..................................s..................................... [  7%]
+........................................................................ [ 10%]
+....................................s.sss............................... [ 14%]
+........................................................................ [ 17%]
+........................................................................ [ 21%]
+........................................................................ [ 24%]
+........................................................................ [ 28%]
+........................................................................ [ 31%]
+........................................................................ [ 35%]
+.................................................s......ss.............. [ 38%]
+.....................................................s.................. [ 42%]
+...............................................................s........ [ 45%]
+........................................................................ [ 49%]
+.................................................s...................... [ 52%]
+........................................................................ [ 56%]
+........................................................................ [ 59%]
+.....................................s..................ss.............. [ 63%]
+........................................................................ [ 66%]
+........................................................................ [ 70%]
+........................................................................ [ 73%]
+........................................................................ [ 77%]
+........................................................................ [ 80%]
+........................................................................ [ 84%]
+........................................................................ [ 88%]
+........................................................................ [ 91%]
+.................................................s...................... [ 95%]
+........................................................................ [ 98%]
+.............................                                            [100%]
+=========================== short test summary info ============================
+SKIPPED [1] tests/test_acquire_contract.py:459: real build not present: /Users/ckl/code/.wt/etx-router-study/build/rocm22/qwen3-30b-a3b_xcd_qknr (set ETX_CONTRACT_BUILDS)
+SKIPPED [1] tests/test_acquire_contract.py:459: real build not present: /Users/ckl/code/.wt/etx-router-study/build/rocm22/mixtral-8x7b_imported (set ETX_CONTRACT_BUILDS)
+SKIPPED [1] tests/test_bandwidth_phases.py:64: Round11 acceptance needs ETX_DATA_ROOT with the archived pair
+SKIPPED [1] tests/test_codegen.py:50: hipcc not installed
+SKIPPED [1] tests/test_coh_model.py:19: measured plan not on this machine
+SKIPPED [1] tests/test_coh_model.py:28: measured plan not on this machine
+SKIPPED [1] tests/test_coh_model.py:33: measured plan not on this machine
+SKIPPED [1] tests/test_floors.py:115: ISA recount needs ETX_ISA_S and ETX_ISA_MAP
+SKIPPED [1] tests/test_floors.py:226: set VLLM_SRC to a vLLM v0.27.1 checkout
+SKIPPED [1] tests/test_floors.py:240: Round11 floors check needs ETX_DATA_ROOT with the archived pair
+SKIPPED [1] tests/test_gpu_jobs.py:210: descendant sweep reads /proc (Linux, the box)
+SKIPPED [1] tests/test_importer.py:51: local toolchain unavailable; set ETX_LLVM, ETX_VLLM and ETX_ROCM_HEADERS
+SKIPPED [1] tests/test_layer_budget.py:50: Round11 acceptance gate did not run: data set is missing. Set ETX_DATA_ROOT to its parent directory.
+SKIPPED [1] tests/test_pairs.py:162: round48 log not present at /Users/ckl/code/.wt/etx-router-study/results_2026-10-01/round48/interleave.log (set ETX_DATA_ROOT)
+SKIPPED [1] tests/test_phase_model.py:51: plans not present
+SKIPPED [1] tests/test_phase_model.py:57: plans not present
+SKIPPED [1] tests/test_vlbest_session.py:348: set ETX_VLLM_SOURCE_ROOT to inject a vLLM source checkout
+2028 passed, 17 skipped in 471.24s (0:07:51)

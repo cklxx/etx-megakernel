@@ -1,0 +1,8 @@
+{
+  "status": "real retained KEY32 off/on outputs; NOT a candidate correctness check",
+  "files": 384,
+  "layer_position_cases": 96,
+  "replica_mismatches": 0,
+  "id_cases_different": 0,
+  "weight_cases_different": 0
+}

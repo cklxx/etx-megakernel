@@ -1,0 +1,66 @@
+f7b6279 Review 07 fixes: the paid-hour session cannot waste the hour or corrupt a result in the 11 ways Astra found
+c6af33c results: expert-weight prefetch by prediction - ceiling, account and threshold (NO-GO, no code)
+57277ed D4: shared experts start during routing, routed slices run on the shared XCDs, build-time placement refusal
+6535047 D2: coherent payload loads for fleet's tiles; the plan drops their acquire invalidates, producers keep the write-back
+30ea071 results: ds_inplace session 2026-10-13 (MI300X VF, ROCm 7.14): combined levers -92 us/token, GO
+4b563aa session: ds_inplace measures every passing lever as whole tokens; decision on the combined arm
+bc02036 session: combined arm verified locally (Q-all + norm_tree_all + argmax_tree + topk_rank + attn_prologue_live): 256 V / 86 A / 0 scratch / 1 wave; 41 dsv2 CPU gates pass
+979d600 Merge branch 'dsv2-lever-topk' into dsv2-session
+7682688 lever topk_rank: verification record (CPU gates pass, 0 skips; ROCm 7.2.4: 256 V / 50 A (+2) / 0 scratch / 1 wave; default ISA a105cb16 unchanged)
+8fc0585 lever topk_rank: expert selection by rank (64 independent readlanes) instead of 84 serial bpermutes
+ff9b74d lever Q-all (gemv_no_terminal_all): no pipelined GEMV issues its never-reduced terminal group
+15288c9 lever N (norm_gamma_early, norm_tree): qkv and router norms load gamma before the ordered reduction; norm_tree keeps the add DAG in 3 barriers
+f8358aa dsv2lite: pinned inputs and the device-time accounts, from the archived stride-32 trace
+bd79622 dsv2lite: the 300 tok/s device account and the chain work-item account, from the stride-32 trace
+d0b100d topk: keep the paired coherent-load variant behind a flag, closed by static judgement
+45e1d36 kept: absorb router narrowing and the norm hoist into the baseline
+9a1bebe moe_up: make rows per task a knob, default unchanged
+bff0279 Merge wf/synctax: audit of the four-layer synchronisation taxonomy
+960dbe4 Merge wf/isafixes: two opt-in tile changes, three closed by the kill bar
+2ac1fdd test: register C5 norm hoist as a tile-local scheduling flag
+f8542bc perf: add opt-in fixed-shape router instantiation with CPU ISA evidence
+21b3007 Keep stamp lifetimes short and support shipped standalone-topk MoE arguments
+5b7b074 docs: per-XCD timeline and wait account of one Qwen decode step
+b67e6cf test: probe the host C++ compiler in the selection manifest test
+ec9460e fix: topk SIMT harness builds with any working host C++20 compiler
+292e7f7 docs: ETX_TOPK_KEY32 both callers use the lane-t form; fold numbers on this branch
+fbe36bb ETX_TOPK_KEY32: dsl_topk_lds back to the lane-t form; on this tree the lane-0 form adds 11 spilled VGPRs to the fold build
+70f7b0c docs: ETX_TOPK_KEY32 fold configuration, output forms, verify_flag results
+3604e1c ETX_TOPK_KEY32: dsl_topk_lds output form per plan (lane 0 form when the top-k is folded); K <= 64 host check; #error with ETX_ABL_TOPK_NOSTORE
+db87644 ETX_TOPK_KEY32: fold top-k stores per round from lane 0 (etx_topk_key32_lds); the fold build keeps spill 13, scratch 48
+7a780b4 docs: ETX_TOPK_KEY32 design, numerics, ISA counts and GPU checks
+130bcf4 ETX_TOPK_KEY32: top-k selection on one 32-bit key per expert with a DPP wave max (default off)
+5f6b603 Merge pull request #11 from cklxx/fix/importer-p5-topk-shim-guards
+e575873 Take phase floors from hop counts and probes, not from measured bodies
+5ef3882 Fix the PhiMoE NaN: the LayerNorm fold's mean pass read the staged xs before any barrier (mode 1 never needed one; NaN only at full occupancy, so the lone relaunch passed); clamp the sparsemixer winner index so NaN logits can never emit a sentinel expert id; ETX_UNFUSED_SYNC debug mode; check-dsl prints device topk ids and uses the sparsemixer reference in the fold branch
+3ab6178 PhiMoE support: sparsemixer routing (topk mode 2), LayerNorm fold (mode 4), o_proj/lm_head bias, LongRoPE prep; all behind the feature manifest, Qwen plan byte-identical
+9105fef generality: Phi-3.5-MoE refused at the config — sparsemixer routing is out of contract; the validated class is softmax-topk routed MoE
+1dc9a56 round 42: Mixtral-8x7B 32/32 — two shape-keyed scalar bugs fixed
+1293174 round 41: MoE dispatch refuted as the bug from vLLM source (both shapes take the naive path; host wiring is verbatim-correct); DSL-topk probe refutes routing. Bug is upstream: G=4 attention or ETX tiles
+e46e602 round 40: top-k!=8 blocker localised to MoE dispatch values (expert_ids ordering / num_valid), not kernels or layout; --check is blind to it by construction. Next: capture vLLM's moe_align arrays and diff
+7938417 mixtral: harvest the top-2 fused_moe Triton entries (shape-keyed); every imported launch now byte-identical to vLLM (--check 32: 0/384 differ). Remaining divergence is the MoE dispatch metadata for top-k != 8, not a kernel
+2d956d5 mixtral: shape-keyed topk/moe_sum imports (template args are shapes), generality findings doc; the Triton cache entries remain Qwen-shaped and are the open item
+6613ef2 mixtral-8x7b through the imported path: config, always-renormalised top-k, Mixtral weight naming in prep, load_dims as the check script's one derivation, silu block capped at the workgroup
+6012b5b expert slot -> XCD mapping: affine iff TOPK % NX == 0 (whole slots per XCD, TOPK == NX is the identity, no tile change for multiples); other top-k shapes run the MoE block unpinned with one top-k copy instead of refusing
+ff9ef92 whole-layer batching (round 33): topk waves per column, MoE as requests x slots tasks, one join per layer -- correct, 32/32 both requests, and 0.58 ms slower than replicating at B=2; the trace attributes it to worker oversubscription and lost cross-request overlap, recorded in-source
+f439088 fold_topk reaches the tile through the feature manifest, not a -D: build.sh defaulted it to fold while the plan derived keep, costing 0.63 ms
+2b7ea13 round 27: only 0.026 of the 0.119 ms is recoverable; guard ETX_VL_NOREP against the top-k host contract
+0691aa0 budget: correct the achievable column to the tile's 1024-thread width; MoE residual 0.532 -> 0.476, router 0.164 -> 0.046
+d5599d5 budget: round 13 settles topk -- bound by coherent publication, not the scan; batching and dropping tei both negative
+55eba53 topk: guarded timing-only ablations (skip / noload / nostore / notei) with the round-13 numbers in the source
+b617b12 MoE: the top-k fold made all 448 expert tasks of a layer recompute the same top-k (0.676 ms/token by ablation); ETX_VL_FOLD_TOPK=0 restores one launch, 5.291 -> 5.060. ETX_VL_ABLATE for the in-tile ablations
+0ed6236 check-dsl: locate a launch by its type name and expect rep tasks for an x-form instance (the non-fold topk died at launch 573)
+98a7b8d fold: residual alternation fixed (layer 0 has no qkv fold: router reads X writes Y, qkv reads Y writes X)
+86df586 Build 3: the folds (ETX_VL_DSL_FOLD): norms into the GEMV prologues (two residual buffers), the top-k into the expert tasks; host args + check-dsl; session = build 3, build 2 fallback, two requests; section 16
+3b2d70d Second review: check-dsl one-request guard and launch assertion, absolute tolerance floor, K/E shape checks, TOPK == NX assertion
+65d17cf etx.ops.topk (the router's softmax + top-k), etx.ops.emit; ETX_VL_DSL_TOPK=1; session build = GEMVs + top-k, predicted 4.42 sim / ~4.9 ms
+1b412fb MoE with ETX_VL_XCD: one selected expert per XCD (top-k and moe_sum replicated, gate_up / silu / down XCD-affine with XCD-local hand-offs); silu one row per task as vLLM; tests for the MoE graph
+4687097 MoE graph end to end (Qwen3-30B-A3B, vLLM's kernels incl. Triton fused_moe): prep packs router/w13/w2, model.py MoE roles, host argument blocks + Triton originals for --check (hipModuleLaunchKernel), chunked weight upload; ROCm 7.2.4 device build check in an x86 container (reproduces the VM's register report); event offsets opaque at stride > 1 (Qwen3-8B 35 -> 0 spills, MoE 21 -> 1)
+c8af21d MoE import, local part 1: topk_softmax and moe_sum manifest entries, Triton import (LLVM 23 IR -> LLVM 22: NaN literals, new attributes, debug info; dynamic LDS), slicer enters namespaces; vLLM MoE layer trace and pre-registered prediction (docs/MODEL-moe.md)
+8f04931 Two-request interleave for DeepSeek-V2-Lite: graph (ETX_DSV2_REQUESTS=2, couplings router/experts/none), ETX_SLOT_BY_CU pairing, per-request host, rotated reference, gemv_noinline build patch; ds_interleave session; correct the cap256 claim
+4a87282 sliced MoE: gate_up task 0 publishes the top-k for the down tasks
+ae2b424 sliced MoE: back to the router phase (router inside every expert task measured +28 us/layer); keep the parallel top-k
+ff4b01d topk_local: rank every logit in parallel from LDS instead of a serial wave-shuffle chain
+9483311 sliced MoE: drop the router phase; every expert gate_up task computes the router from L2 and task 0 publishes the logits for down
+bb91c38 merge_head: chunk groups in parallel; expert tasks compute the top-k locally again (parallel beats the serial publish)
+8bf66ef phase 1 v3: interleaved gate/up (one stream), norm and top-k done once per XCD in the fold/router tasks, merge in o_proj prologue, q post in attention and K/V post by the chunk holding the newest position; weights layout 2

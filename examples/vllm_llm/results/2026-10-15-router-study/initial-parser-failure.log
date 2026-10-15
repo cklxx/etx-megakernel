@@ -1,0 +1,12 @@
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/Users/ckl/code/.wt/etx-router-study/examples/vllm_llm/router_study.py", line 247, in <module>
+    if __name__=='__main__': main()
+                             ~~~~^^
+  File "/Users/ckl/code/.wt/etx-router-study/examples/vllm_llm/router_study.py", line 236, in main
+    w=trace_windows(gzip.decompress((a.inputs/'tr_off.bin.gz').read_bytes()),(a.inputs/'tr_off.log').read_text())
+  File "/Users/ckl/code/.wt/etx-router-study/examples/vllm_llm/router_study.py", line 181, in trace_windows
+    o=groups[f'o_proj_{layer}']; r=groups[f'router_{layer}']; t=groups[f'topk_{layer}_x']; m=groups[f'moe_up_{layer}_x']
+                                                                                             ~~~~~~^^^^^^^^^^^^^^^^^^^^^
+KeyError: 'moe_up_0_x'

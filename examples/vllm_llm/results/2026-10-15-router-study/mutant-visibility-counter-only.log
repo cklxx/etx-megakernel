@@ -1,0 +1,15 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+___________________________ test_publication_guards ____________________________
+
+    def test_publication_guards():
+        for seed in range(20):
+            assert s.publication(seed)['reads']==256
+>           with pytest.raises(ValueError,match='visibility'): s.publication(seed,release=False)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E           Failed: DID NOT RAISE ValueError
+
+tests/test_router_study.py:101: Failed
+=========================== short test summary info ============================
+FAILED tests/test_router_study.py::test_publication_guards - Failed: DID NOT ...
+1 failed in 0.03s

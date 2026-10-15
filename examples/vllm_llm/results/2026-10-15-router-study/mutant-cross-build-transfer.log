@@ -1,0 +1,13 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+________________ test_current_gain_refuses_cross_build_transfer ________________
+
+    def test_current_gain_refuses_cross_build_transfer():
+>       with pytest.raises(ValueError,match='identity'):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE ValueError
+
+tests/test_router_study.py:93: Failed
+=========================== short test summary info ============================
+FAILED tests/test_router_study.py::test_current_gain_refuses_cross_build_transfer
+1 failed in 0.03s
