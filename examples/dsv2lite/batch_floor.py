@@ -2,7 +2,7 @@
 
 Two ways to serve B requests in one step:
   replicated  each request reads every weight itself (ETX today: ETX_DSV2_REQUESTS=B): B x the batch-1 bytes.
-  batched     every weight read once for the B columns (vLLM's way, ETX's column-batched tiles if built): the dense
+  batched     every weight read once for the B columns (idealized column-batched model, not measured vLLM traffic): the dense
               weights, the shared experts and lm_head once, the routed experts once per DISTINCT expert the B requests
               select in a layer, the latent KV cache once per request.
 The distinct-expert count E(B) is the uniform-routing expectation 64 * (1 - (1 - 6/64)^B) unless a measured mean is
@@ -31,14 +31,16 @@ def uniform_union(b: int) -> float:
 def step_bytes(b: int, context: int = 1024, union: float | None = None) -> dict[str, float]:
     """Bytes of one step serving b requests: replicated and batched (weights once)."""
     p = per_layer(context)
-    attn_w = p["qkv"] + p["qabs"] + p["merge"] + p["oproj"] + p["router"]          # per layer, request-independent
+    attn_w = p["qkv"] + p["qabs"] + p["merge"] + p["oproj"]   # every layer
     kv = p["attn"]                                                                 # per layer, per request
     dense_mlp = p["dense_gu"] + p["dense_dn"]
     moe_layers = LAYERS - FIRST_DENSE
-    one = (LAYERS * (attn_w + kv) + FIRST_DENSE * dense_mlp + moe_layers * (TOPK + SHARED) * EXPERT
+    # The first dense layer normalizes but returns before the router GEMV.
+    routers = moe_layers * p["router"]
+    one = (LAYERS * (attn_w + kv) + routers + FIRST_DENSE * dense_mlp + moe_layers * (TOPK + SHARED) * EXPERT
            + p["lm_head"] + p["embed"])
     e = uniform_union(b) if union is None else union
-    batched = (LAYERS * (attn_w + b * kv) + FIRST_DENSE * dense_mlp + moe_layers * (e + SHARED) * EXPERT
+    batched = (LAYERS * (attn_w + b * kv) + routers + FIRST_DENSE * dense_mlp + moe_layers * (e + SHARED) * EXPERT
                + p["lm_head"] + b * p["embed"])
     return dict(replicated=b * one, batched=batched, union=e, one=one)
 

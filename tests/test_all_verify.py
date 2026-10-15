@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SESSION = ROOT / "examples/sessions/all_verify.py"
 MEASURED = ["pairs_alld4r0l1kvs", "pairs_alld4r0l1mw", "pairs_alld4r0l1noQ", "pairs_alld4r0l1noA",
             "trace_alld4r0l1kvs", "pairs_alld4r0l1kvsmw"]       # results/2026-10-14-k1 and -km: never rerun here
-BATCH_GPU = ["prep_goldens", "bgate_x2", "bgate_x4", "bgate_x8", "vsel", "brounds", "routing"]
+BATCH_GPU = ["prep_goldens", "bgate_x2", "bgate_x4", "bgate_x8", "boxcontrol", "vsel", "brounds", "routing"]
 QWEN_GPU = ["qwen_moerows", "qwen_stage_pack", "qwen_certify_kept", "qwen_certify_kept_l1", "qwen_pairs_kept_l1"]
 CAP = 10800
 
@@ -48,7 +48,7 @@ def test_no_already_measured_deepseek_study_and_no_build_only_it_needs(plan):
     by, jobs, _ = plan
     assert not set(MEASURED) & set(by)
     assert {n for n in by if n.startswith("build_")} == {
-        "build_alld4r0l1kvsmw", "build_x2", "build_x4", "build_x8"}
+        "build_alld4r0l1kvsmw", "build_alld4r0l1", "build_x2", "build_x4", "build_x8"}
     assert "b_alld4r0l1kvsmw/run" in by["brounds"].reads
 
 

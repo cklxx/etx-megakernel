@@ -164,7 +164,7 @@ on the GPU.
 ## GPU results 2026-10-13 (box 165.245.139.183, ROCm 7.14; runs `$ETX_CACHE/results_2026-10-13-d1d5/run{1,2}`)
 
 Every invocation 32/32 + 27/27. Device medians: default 3.668-3.672, fleet 3.542, all 3.564 (-108, GO), relaxed 3.439
-(-232, D1 cost as expected), coh 3.677 (+9: **D2 NO-GO**, (a) and (b) fail; 237 us behind relaxed), d4 3.936 (+271:
+(-232, D1 cost as expected), coh 3.677 (+9 us time, -9 us gain: **D2 NO-GO**, (a) and (b) fail; 237 us behind relaxed), d4 3.936 (+271:
 **D4 NO-GO**; criterion (a) holds, shared gate_up ready 11.5 us before routing completes in 26/26 layers).
 
 ## Next two arms, thresholds written before the code (2026-10-13, same box)
@@ -226,7 +226,7 @@ blanked to None -- a reporting defect that made a decided arm look undecided.
 | arm | rule (as fixed) | rule fixed in | measured in | outcome |
 |---|---|---|---|---|
 | all | GO: every pair faster than default, median >= 70 us, > 2 x spread | inplace_session GO_US (10-12) | run 1 | **GO** (-108 us, spread 18) |
-| coh (D2) | (a) every pair faster than default, median >= 70 us; (b) within max(2 x relaxed spread, 20 us) of relaxed | 84eaa1b | run 2 | **NO-GO** (+9 us; 237 us behind relaxed) |
+| coh (D2) | (a) every pair faster than default, median >= 70 us; (b) within max(2 x relaxed spread, 20 us) of relaxed | 84eaa1b | run 2 | **NO-GO** (-9 us gain; 237 us behind relaxed) |
 | d4 (D4) | KEEP: every pair faster than default, median >= 30 us, > 2 x spread | 84eaa1b | run 2 | **NO-GO** (+271 us) |
 | alld4r0 | KEEP: every pair faster than `all`, median >= 30 us, > 2 x spread | **7e08d27, 05:12:12 UTC**; the measuring session started 05:12:30 UTC from that commit (`run4/runner.log`, SOURCE_IDENTITY) | run 4 | **KEEP** (-61 us vs all, spread 8, 5/5 pairs faster; `keep_vs_all.keep = true`). 3.506 ms device median |
 | l1 (D2b) | D2's rule | 8d69e52 | **NOT COMPLETE** (box destroyed in round 3 of 5) | none |
@@ -235,12 +235,18 @@ blanked to None -- a reporting defect that made a decided arm look undecided.
 
 The 3.506 ms figure is a measurement; the decision to keep alld4r0 rests on the rule above, fixed before its run.
 
-## Incomplete: D2b (l1), run of 05:25 UTC, box destroyed mid-session
+## Interrupted attempt: D2b (l1), 05:25 UTC, box destroyed mid-session
+
+**Status correction, 2026-10-15:** this attempt remains incomplete, but the experiment was subsequently completed
+in `examples/dsv2lite/results/2026-10-13-hour/`. D2b was NO-GO under its equivalence rule (+330 us vs default,
+99 us faster than relaxed, beyond its 26-us tolerance). The separate `alld4r0l1` study passed KEEP (+334 us vs
+`alld4r0`). That session also captured the default/D4r0/D4r0+L1 stage tables. The register above and missing-trace
+notes below describe the earlier attempts only; they are not today's rerun queue. See [complete status](REPORT-STATUS-2026-10-15.md).
 
 `examples/dsv2lite/results/2026-10-13-runs/sess/l1_r{0,1,2}_*.raw.log`: three of five rounds, every invocation 32/32 +
 27/27. Device medians, ms -- default 3.661 / 3.671 / 3.665, relaxed 3.445 / 3.441 / 3.432, **l1 3.333 / 3.341 / 3.329**.
-NOT a result: the rule needs five interleaved rounds, and round 3 was cut. It is the first measurement to repeat; the
-alld4r0l1 arm (the best arm + D2b) never ran.
+NOT a result: the rule needs five interleaved rounds, and round 3 was cut. At that point it was the first measurement to repeat;
+`alld4r0l1` had not yet run. Both were completed in the later full-hour session noted above.
 
 ## Known losses and provenance (2026-10-13)
 

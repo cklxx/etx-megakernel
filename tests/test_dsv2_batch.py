@@ -315,7 +315,7 @@ def test_goldens_refuse_a_wrong_rotation_a_duplicate_and_a_token_file_mismatch()
 def test_floors_match_the_design_table():
     from examples.dsv2lite.batch_floor import floors
     f = floors()
-    assert [f[b]["replicated_floor_ms"] for b in BATCHES] == [1.148, 2.295, 4.59, 9.181]
+    assert [f[b]["replicated_floor_ms"] for b in BATCHES] == [1.148, 2.295, 4.59, 9.18]
     assert [f[b]["batched_floor_ms"] for b in BATCHES] == [1.148, 1.724, 2.721, 4.221]
 
 
@@ -380,7 +380,7 @@ def test_session_order_correctness_first_then_timings_then_captures(session):
     assert "docker_pull" in by["vsel"].reads and by["breport"].lane == "final"
 
 
-def test_boxcontrol_job_declares_both_builds_and_preserves_its_offset(session):
+def test_boxcontrol_job_declares_both_builds_and_preserves_its_recipe_difference(session):
     import re
     by, jobs, _ = session
     control = by["boxcontrol"]
@@ -388,11 +388,11 @@ def test_boxcontrol_job_declares_both_builds_and_preserves_its_offset(session):
     assert set(control.reads) == {"inputs.json", f"b_{BATCH_ARMS[1]}/run", "b_alld4r0l1/run"}
     assert control.writes == ["boxcontrol.json"]
     assert "boxcontrol.json" in by["brounds"].reads
-    assert any(re.search(pattern, "BOXCONTROL offset device_ms=0.1") for pattern in control.summary)
+    assert any(re.search(pattern, "BOXCONTROL recipe_difference device_ms=0.1") for pattern in control.summary)
     assert jobs.index(by["build_alld4r0l1"]) < jobs.index(control) < jobs.index(by["brounds"])
 
 
-def test_boxcontrol_prints_exact_host_medians_and_signed_offset(tmp_path, monkeypatch, capsys):
+def test_boxcontrol_prints_exact_host_medians_and_signed_recipe_difference(tmp_path, monkeypatch, capsys):
     import re
     from examples.dsv2lite import batch_session as bs
     for k in ("ETX_SESS_LOGDIR", "ETX_DSV2_FLEET", "ETX_DSV2_DATA"):
@@ -424,7 +424,7 @@ def test_boxcontrol_prints_exact_host_medians_and_signed_offset(tmp_path, monkey
         assert match, line
         parsed[match[1]] = (match[2], match[3])
     assert parsed == measurements
-    offset = re.fullmatch(r"BOXCONTROL offset device_ms=([+-]?[\d.]+) wall_ms=([+-]?[\d.]+) pct=([+-]?[\d.]+) "
+    offset = re.fullmatch(r"BOXCONTROL recipe_difference device_ms=([+-]?[\d.]+) wall_ms=([+-]?[\d.]+) pct=([+-]?[\d.]+) "
                           r"between shipped and alld4r0l1", lines[2])
     assert offset
     assert offset.group(1, 2) == ("-0.040006", "-0.050006")
@@ -434,6 +434,11 @@ def test_boxcontrol_prints_exact_host_medians_and_signed_offset(tmp_path, monkey
     assert all(command[1:] == s.args() and "--req-dir" not in command for _, command in calls)
     saved = json.loads((tmp_path / "boxcontrol.json").read_text())
     assert set(saved["arms"]) == set(measurements)
+    assert "offset" not in saved
+    assert saved["measurement_kind"] == "within_session_recipe_difference"
+    assert saved["invocations_per_arm"] == 1
+    assert saved["machine_offset_measured"] is False
+    assert saved["recipe_difference"]["between"] == ["shipped", "alld4r0l1"]
     with pytest.raises(RuntimeError, match="fresh ETX_SESS_LOGDIR"):
         s.boxcontrol()
     assert len(calls) == 2
@@ -780,3 +785,18 @@ def test_batch_cli_rejects_an_ignored_arm(monkeypatch, capsys, operation):
     with pytest.raises(SystemExit) as exc:
         bs.main([operation, "x8p"])
     assert exc.value.code == 2 and "only valid" in capsys.readouterr().err
+
+
+def test_bulk_floor_excludes_router_weights_in_the_dense_layer():
+    from examples.dsv2lite.batch_floor import step_bytes
+    # Independently count the pinned model: 27 attention projections, 26 MoE routers,
+    # one dense MLP, 26*(6 routed + 2 shared) experts, embedding and vocabulary projection.
+    weights = (27 * (2048 * 16 * 192 + 2048 * 576 + 2 * 512 * 16 * 128 + 16 * 128 * 2048)
+               + 26 * 2048 * 64 + 3 * 10944 * 2048 + 26 * 8 * 3 * 1408 * 2048
+               + 2048 + 102400 * 2048) * 2
+    assert weights == 4_902_621_184
+    for b in (1, 2, 4, 8):
+        s = step_bytes(b, context=1024)
+        assert s["one"] == weights + 27 * 1024 * 576 * 2
+        assert s["replicated"] == b * s["one"]
+    assert step_bytes(1)["batched"] == step_bytes(1)["one"]

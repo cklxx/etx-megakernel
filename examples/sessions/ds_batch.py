@@ -1,4 +1,4 @@
-"""PREPARED, NOT RUN: the batch 2 / 4 / 8 study on DeepSeek-V2-Lite (docs/BATCH-2026-10-14.md, rules committed before
+"""Historical batch study; current harness fixes await GPU revalidation: the batch 2 / 4 / 8 study on DeepSeek-V2-Lite (docs/BATCH-2026-10-14.md, rules committed before
 the code in 0fc38c9). One MI300X, GPU 0. No provisioning without the owner's approval.
 
 ETX at B = 1 (the kept arm alld4r0l1kvsmw, section 9), 2, 4, 8 (arms x2, x4, x8) against the strongest legal vLLM configuration at the
@@ -7,7 +7,7 @@ Every request of every invocation is gated on its own HF-greedy golden (32/32 to
 vLLM sequence on its own golden, on the warm-up and on every sample.
 
 Order: the ds_inplace prep chain, then (CPU, in parallel) the vLLM image pull and the five builds; GPU, strictly in
-order: the 7 rotated references (prep_goldens), one gated invocation per x arm, the two-invocation B = 1 box control,
+order: the 7 rotated references (prep_goldens), one gated invocation per x arm, the two-invocation B = 1 recipe control (not a machine-offset measurement),
 the vLLM selection round, rounds 1-5,
 the measured expert union (routing), the report.
 Budget [E]: ~40-60 min, about $2 at $1.99/h, plus ~1 GPU minute for boxcontrol (build excluded);

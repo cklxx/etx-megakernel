@@ -1,4 +1,4 @@
-"""Everything still unmeasured, on ONE box, one runner: DeepSeek's batch 2/4/8 study + Qwen's studies, combined.
+"""Combined historical studies, on ONE box, one runner: DeepSeek's batch 2/4/8 study + Qwen's studies, combined.
 
 kailun asked for one verification run instead of separate rentals. Nothing is redefined here: the two session files'
 own jobs are composed, exactly as examples/sessions/joint_ds_qwen.py composes two of them.
@@ -25,7 +25,7 @@ microbenchmark gates nothing else.
 
 GPU lane, strictly in this order (the runner runs one GPU job at a time, in list order):
   prep_ref -> qwen_moerows (no model input, seconds) -> prep_goldens (7 rotated references) ->
-  bgate_x2/x4/x8 (one gated invocation each) -> vsel (vLLM selection) -> brounds (rounds 1-5) -> routing ->
+  bgate_x2/x4/x8 (one gated invocation each) -> boxcontrol (same-session recipe difference) -> vsel (vLLM selection) -> brounds (rounds 1-5) -> routing ->
   qwen_stage_pack -> qwen_certify_kept -> qwen_certify_kept_l1 -> qwen_pairs_kept_l1
 DeepSeek, the active priority, produces its numbers first; Qwen's download and environment build on the CPU meanwhile.
 
@@ -52,7 +52,7 @@ def _load(name):
 _batch, _q = _load("ds_batch"), _load("qwen_g6")
 
 PREP = ("apt", "etx_env", "prep_env", "source", "prep_dl", "prep_ref", "prep_pack", "preflight")
-BATCH_GPU = ("prep_goldens", "bgate_x2", "bgate_x4", "bgate_x8", "vsel", "brounds", "routing")
+BATCH_GPU = tuple(j["name"] for j in _batch.JOBS if j.get("lane") == "gpu" and j["name"] not in PREP)
 BATCH_FINAL = ("breport",)
 
 _by_name = {j["name"]: dict(j) for j in _batch.JOBS}

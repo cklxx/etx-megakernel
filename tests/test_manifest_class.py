@@ -62,13 +62,24 @@ def test_every_macro_the_tiles_test_is_either_published_or_tile_local():
                   # tile code only, same argument layout and output bits (docs/TILES-2026-10-07.md)
                   "ETX_DSL_WSUM", "ETX_DSL_SCALAR", "ETX_DSL_GU1", "ETX_DSL_RBATCH",
                   "ETX_DSL_NORM_HOIST",  # cached weight scheduling only; no host/ABI counterpart
+                  # Alternate GEMV row ownership / constant segment count: same tile arguments and layout.
+                  "ETX_DSL_ROW_WAVE", "ETX_DSL_ROW_WAVE_FIXED_SPR",
                   # top-k selection on a 32-bit key: tile code only, same arguments and outputs (docs/TOPK-KEY32-2026-10-08.md)
                   "ETX_TOPK_KEY32"}
     published = {m for m, _, _ in manifest.FEATURES.values()}
+    # These are runtime protocol switches, NOT tile-local features. local_fold only tests them to
+    # reject unsafe builds. Require that rejection at each use; do not silently whitelist them.
+    forbidden = {"ETX_ACQUIRE_DOMAIN_RELAXED", "ETX_NO_ALLWAVE_DRAIN"}
     tested = set()
     for f in (ROOT / "etx/ops").glob("*.py"):
-        for m in re.finditer(r"#if(?:n?def)?\s+!?\s*([A-Z][A-Z_0-9]+)", f.read_text()):
-            tested.add(m.group(1))
+        source = f.read_text()
+        for m in re.finditer(r"#if(?:n?def)?\s+!?\s*([A-Z][A-Z_0-9]+)", source):
+            macro = m.group(1)
+            if macro in forbidden:
+                assert re.match(r"#ifdef " + macro + r'\s*\n#error "[^"\n]+"\s*\n#endif', source[m.start():]), (
+                    f"{f.name}: {macro} must only reject an unsafe protocol")
+            else:
+                tested.add(macro)
     unknown = {m for m in tested if m not in tile_local and m not in published and not m.startswith(("DSL_ABLATE_", "ETX_ABL_"))}
     assert not unknown, f"tile macros that are neither published nor tile-local: {sorted(unknown)}"
 
@@ -83,3 +94,18 @@ def test_the_trap_fires_on_a_command_line_define():
                          input=block, capture_output=True, text=True)
     assert good.returncode == 0, good.stderr
     assert bad.returncode != 0 and "must not be defined on the command line" in bad.stderr
+
+
+def test_protocol_rejection_exceptions_cannot_become_tile_features(tmp_path, monkeypatch):
+    import pytest
+    import sys
+    monkeypatch.setattr(sys.modules[__name__], "ROOT", tmp_path)
+    ops = tmp_path / "etx/ops"
+    ops.mkdir(parents=True)
+    source = ops / "probe.py"
+    for macro in ("ETX_ACQUIRE_DOMAIN_RELAXED", "ETX_NO_ALLWAVE_DRAIN"):
+        source.write_text(f'#ifdef {macro}\n#error "unsafe protocol"\n#endif\n')
+        test_every_macro_the_tiles_test_is_either_published_or_tile_local()
+        source.write_text(f'#ifdef {macro}\nint changes_device_behavior;\n#endif\n')
+        with pytest.raises(AssertionError, match="must only reject"):
+            test_every_macro_the_tiles_test_is_either_published_or_tile_local()

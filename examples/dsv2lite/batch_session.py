@@ -80,7 +80,9 @@ class BatchSession(Session):
     def boxcontrol(self):
         """Two invocations, estimated ~1 GPU minute, on this study's box. Reuse etx()'s gates and exact host
         BATCHREQ device median / BATCH step-wall median, never the human wall mean or token interval.
-        Offsets are shipped minus previous; pct is the wall offset / previous wall median x 100.
+        This is a within-session recipe difference (shipped minus previous), not a machine offset.
+        One invocation per recipe cannot establish a performance verdict or convert times between machines.
+        pct is the wall difference / previous wall median x 100.
         """
         out = self.fresh(self.logs / "boxcontrol.json")
         arms = (BATCH_ARMS[1], BOXCONTROL_PREVIOUS_ARM)
@@ -96,14 +98,16 @@ class BatchSession(Session):
         shipped, previous = (measurements[arm] for arm in arms)
         device_ns = ns(shipped["device_median_ms"]) - ns(previous["device_median_ms"])
         wall_ns = ns(shipped["wall_median_ms"]) - ns(previous["wall_median_ms"])
-        offset = dict(device_ms=f"{device_ns / 1_000_000:+.6f}", wall_ms=f"{wall_ns / 1_000_000:+.6f}",
+        difference = dict(device_ms=f"{device_ns / 1_000_000:+.6f}", wall_ms=f"{wall_ns / 1_000_000:+.6f}",
                       pct=f"{100 * wall_ns / ns(previous['wall_median_ms']):+.6f}", between=list(arms))
-        write_json(out, dict(arms=measurements, offset=offset))
+        write_json(out, dict(arms=measurements, recipe_difference=difference,
+                             measurement_kind="within_session_recipe_difference", invocations_per_arm=1,
+                             machine_offset_measured=False))
         # Emit only after both arms passed: an absent/failed arm must never leave a partial control number.
         for arm, values in measurements.items():
             print(f"BOXCONTROL arm={arm} b=1 device_median_ms={values['device_median_ms']} "
                   f"wall_median_ms={values['wall_median_ms']} tokens=32/32 layers=27/27", flush=True)
-        print(f"BOXCONTROL offset device_ms={offset['device_ms']} wall_ms={offset['wall_ms']} pct={offset['pct']} "
+        print(f"BOXCONTROL recipe_difference device_ms={difference['device_ms']} wall_ms={difference['wall_ms']} pct={difference['pct']} "
               f"between {arms[0]} and {arms[1]}", flush=True)
 
     def gate(self, arm: str):

@@ -1,8 +1,9 @@
 # Experiment index, 2026-10-14: DeepSeek and Qwen, eight studies (six DeepSeek measured; new DeepSeek kept arm alld4r0l1kvsmw) and four open proposals
 
 Labels: [M] measured, [E] estimate, [U] unknown. bf16, batch 1, context 1024, 32 tokens throughout. Larger batches
-(2/4/8) are a separate, prepared study with its own session and rules: docs/BATCH-2026-10-14.md,
-`examples/sessions/ds_batch.py` (DeepSeek; not run, not counted below).
+(2/4/8) are a separate historical study with its own session and rules: docs/BATCH-2026-10-14.md,
+`examples/sessions/ds_batch.py` (DeepSeek; measured B1/B2/B4, B8 incomplete; not counted below). Current certification limits and the complete
+fixed/blocked inventory are in [the closure status](REPORT-STATUS-2026-10-15.md).
 
 **Count:** 8 experiments = 7 decision studies + 1 attribution-only trace.
 - **DeepSeek (6):** K1, M1, two ablations, one trace, KM. **All six measured on 2026-10-14:** K1 KEEP +41 us,
@@ -25,10 +26,10 @@ Labels: [M] measured, [E] estimate, [U] unknown. bf16, batch 1, context 1024, 32
 - Qwen alone: `examples/sessions/qwen_g6.py`.
 - Both on one box: `examples/sessions/joint_ds_qwen.py`. It builds no job of its own; it combines the two files'
   jobs, with Qwen prefixed `qwen_` and recorded under `qwen/`.
-- **Everything still unmeasured, on one box (`examples/sessions/all_verify.py`):** the batch 2/4/8 study
+- **Historical combined run definition, on one box (`examples/sessions/all_verify.py`):** the batch 2/4/8 study
   (`examples/sessions/ds_batch.py`, B = 1 arm `alld4r0l1kvsmw` per docs/BATCH-2026-10-14.md section 9) plus Qwen
   (`qwen_g6.py`), one runner, one cap **10800 s (3 h, about $6 at $1.99/h)** and one GPU lane: `qwen_moerows` ->
-  batch's seven jobs -> Qwen's staging, certificates and cache-mode study. It redefines no job and the runner refuses
+  batch's jobs including the recipe control -> Qwen's staging, certificates and cache-mode study. It redefines no job and the runner refuses
   duplicate names. Not included, with the reason: DeepSeek's six studies above (K1, M1, KM, two ablations, trace), all
   measured in `examples/dsv2lite/results/2026-10-14-k1` and `-km` (AGENTS.md 2.5); the two proposals with no testable
   arm yet (P3's epoch form, P4's row-partitioned combine). Guard: `tests/test_all_verify.py` (cap, no duplicate names,
@@ -59,7 +60,7 @@ Labels: [M] measured, [E] estimate, [U] unknown. bf16, batch 1, context 1024, 32
   dominate). Estimate 27-80 us/token [E].
 - **Sources:** DSV2-D1-D5.md "M1"; tests/test_dsv2_lever_merge_uv_waves.py.
 - **Result (2026-10-14): KEEP, +66 us device [M]** (pairs 76, 65, 55, 74, 66; spread 21; wall +68). All runs 32/32,
-  27/27. Measured alone against the kept arm; K1 and M1 together are not measured.
+  27/27. Measured alone against the kept arm; K1 and M1 together were subsequently measured in KM below.
 
 **2. DeepSeek ablation: remove gemv_no_terminal_all** (`pairs_alld4r0l1noQ`)
 - **Mechanism:** the kept recipe without that lever.
@@ -102,8 +103,8 @@ Labels: [M] measured, [E] estimate, [U] unknown. bf16, batch 1, context 1024, 32
   M1 alone becomes the kept arm.
 - **Result (2026-10-14, `examples/dsv2lite/results/2026-10-14-km`): KEEP, +52 us over M1 alone [M]** (pairs 48, 52,
   50, 58, 54; spread 10); +120 us over `alld4r0l1` (spread 6). All 15 runs 32/32, 27/27. Device 3.068-3.075 ms.
-- **Not yet carried over:** the batch study's arms (docs/BATCH-2026-10-14.md) still use `alld4r0l1` as B = 1 and
-  its recipe for x2/x4/x8. K1 needs D4, which refuses multiple requests, so moving them is a separate change.
+- **Batch carry-over:** B1 uses KM; B2/B4 later gained K1+M1 without D4 (BATCH sections 9–10). B8 remains
+  incorrect; the four-candidate diagnostic cannot distinguish recipes.
 
 **5. Qwen moerows: row ownership between MoE workgroups** (`qwen_moerows`, `hw_bench moerows`)
 - **Mechanism:** contiguous vs interleaved rows, Qwen's moe_up shape, cold, checksummed. One kernel for both modes.
@@ -125,12 +126,13 @@ Labels: [M] measured, [E] estimate, [U] unknown. bf16, batch 1, context 1024, 32
 
 **6. Qwen common cache mode** (`qwen_pairs_kept_l1`)
 - **Mechanism:** `ETX_COHERENCE=l1` on the kept build: one compiler switch for both models.
-- **Rationale:** the reuse criterion, "one mode, two models, one rule". DeepSeek's half: +330 us, KEEP [M].
+- **Rationale:** the reuse criterion, "one mode, two models, one rule". DeepSeek's standalone L1 half: +330 us but NO-GO under its equivalence condition;
+  the kept-combination L1 arm separately passed KEEP at +334 us [M].
 - **Status:** built and ISA-checked: 82 system-scope loads move to agent scope; 0 acquires removed.
 - **Baseline:** `kept`, device time.
 - **Rule:** KEEP if every pair is faster, median >= 30 us and > 2 x spread; otherwise NO-GO. Both builds pass the
   same-build import certificate + 32/32 first.
-- **GPU-only unknown:** correctness on the device and any gain. Expect far less than DeepSeek's [E].
+- **Original prediction:** correctness and gain were GPU-only unknowns before the completed result below.
 - **Sources:** INVENTORY 4.1; tests/test_qwen_g6.py.
 - **Result (2026-10-14, box session `20261014T183414Z-68d6f6`, `results/2026-10-14-batch-20261014T183414Z`): NO-GO.**
   Both builds came out of the same tree (`BUILD kept OK`, `BUILD kept_l1 OK`) and both passed the import certificate
@@ -138,8 +140,8 @@ Labels: [M] measured, [E] estimate, [U] unknown. bf16, batch 1, context 1024, 32
   switch is correct on Qwen. The timing rule then refused it: `PAIRS arm=kept_l1 vs kept median 9.0 us spread 19.0 us
   every_positive=0` (gains 9.0, 10.0, -5.0, 14.0, 0.0: three faster, one slower, one equal — `every_positive=0` means
   not every pair was faster) — **+9 us against DeepSeek's +330 us, and the median is inside 2x the
-  spread.** The reuse criterion therefore reads: one switch, two models, one rule — and **the rule is not portable**.
-  The switch compiles and stays correct on both models, but the gain that made it a KEEP on DeepSeek does not appear on
+  spread.** The reuse criterion therefore reads: one switch, two models, one rule — and **the measured gain does not transfer**.
+  The switch compiles and stays correct on both models, but the gain that made the kept-combination arm a KEEP on DeepSeek does not appear on
   Qwen. That is a measured answer to the system goal's cross-model half, and it is the first Qwen arm this project has
   taken all the way to a verdict.
 
@@ -184,7 +186,7 @@ import certificate and 32/32 first.
 - **Mechanism:** each moe_down task owns output rows across all 8 selected experts, sums them and adds the residual
   once. The qkv tasks then read one finished vector instead of folding residual + 8 slot rows (QK2).
 - **Rationale:** QK2 is repeated by all 256 qkv tasks (`docs/MASTER-TABLE-2026-10-11.md:185,195`).
-- **Status:** not built. A separate combine phase lost 4.10 us/layer [M] (`docs/PHASES-2026-10-01.md:33`). Fleet's
+- **Status:** not built. Phase attribution charged a separate combine 4.10 us/layer [M, not an isolated full-model trial] (`docs/PHASES-2026-10-01.md:33`). Fleet's
   one-writer fold lost, 4.80 vs 4.38 / 4.06 ms [M] (`~/code/fleet-mi300x/docs/STATUS.md:66-68`). Atomics are
   excluded because they break bit-reproducibility.
 - **Baseline:** `kept`, device time.
