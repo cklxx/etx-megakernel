@@ -45,6 +45,12 @@ NumPy and PyYAML. Before attachment, the real command exits 127. After attachmen
 the interpreter probe succeeds. A failed actual preflight skips compute and writes
 a NOT-COMPLETE report through the real final job.
 
+After receipt refresh, `receipt-probe.log` verifies a 3,102,720-byte committed
+source-only archive. The real preflight accepts the current source receipt and
+interpreter, then rejects the synthetic box before compute. The real report writes
+NOT-COMPLETE. This small check excludes historical result trees; the full push/start
+path was already exercised by both final test runs.
+
 The S3 test runs the actual estimator with CPU torch/vLLM substitutes. It observes
 the checkpoint argument and prompt tokens. It makes the former prompt and golden
 paths unreadable. Offline tests reject changed checkpoint, golden, prompt, digest

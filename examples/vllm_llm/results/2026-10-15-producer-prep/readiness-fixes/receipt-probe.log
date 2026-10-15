@@ -1,0 +1,17 @@
+LIGHT ARCHIVE bytes 3102720
+STAGE interpreter/dependencies OK /Users/ckl/code/etx/.venv
+STAGE interpreter/dependencies OK /Users/ckl/code/etx/.venv
+STAGE ready root=/Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/receipt-probe-c5megflo/archive venv=/Users/ckl/code/etx/.venv
+ACTUAL preflight exit 2 PASS interpreter: /Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/receipt-probe-c5megflo/archive/.venv/bin/python; yaml, numpy import from .venv
+FAIL vllm_source: not a git checkout: /Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/receipt-probe-c5megflo/absent-vllm; supply: git clone --depth 1 --branch v0.27.1 https://github.com/vllm-project/vllm.git /Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/receipt-probe-c5megflo/absent-vllm
+FAIL packed_model: /Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/receipt-probe-c5megflo/model; vl.bin=28 bytes, vl.manifest=28 bytes, hf/config.json=2 bytes, golden_c1024.txt=28 bytes; golden sha256=38bfda0f10f408afde06731190dcc75ded4634e8ef525684bfcb0d49e16076d8 expected=bab2f1fbe12f70179711ec40a215c74710845b73169b1cc6a3a6ca50e0a19484; supply: cp /Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/receipt-probe-c5megflo/archive/examples/llm/results/golden_c1024_qwen3-30b-a3b.txt /Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/receipt-probe-c5megflo/model/golden_c1024.txt
+FAIL rocm_headers: ETX_ROCM_HEADERS=/Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/receipt-probe-c5megflo/absent-headers; requires hip/hip_runtime.h; supply: mkdir -p /Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/receipt-probe-c5megflo/absent-headers && rsync -a "${ETX_STAGE_SOURCE:?set ETX_STAGE_SOURCE to the CPU-tested staging directory}/"rocm-headers/inc/ /Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/receipt-probe-c5megflo/absent-headers/
+FAIL gpu: /dev/kfd exists=False; rocm-smi=CPU-PROBE-SUBSTITUTE; supply: bash /Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/receipt-probe-c5megflo/archive/tools/hotaisle_grab.sh 1x
+PREFLIGHT FAIL 4 item(s)
+FAIL phase=preflight reason=box inputs missing: supply each FAIL above with its printed command, then rerun preflight
+EVIDENCE /Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/receipt-probe-c5megflo/record
+SAFE resume: session.sh status/fetch; inspect failure; no partial timing claim; lease budget is unchanged
+ 
+ACTUAL report exit 0 VERDICT {"status": "NOT-COMPLETE", "reason": "[Errno 2] No such file or directory: '/Users/ckl/.hermes/cache/scratch/producer-readiness/tmp/receipt-probe-c5megflo/record/correctness.json'", "performance_claim": false}
+ 
+RECEIPT PROBE PASS: current source receipt accepted; synthetic box refused before compute; real report written

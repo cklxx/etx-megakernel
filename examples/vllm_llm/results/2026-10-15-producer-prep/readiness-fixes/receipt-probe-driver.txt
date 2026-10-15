@@ -1,0 +1,45 @@
+"""Light receipt probe: archive committed source files, not historical result trees."""
+import hashlib,json,os,shutil,subprocess,sys,tarfile,tempfile
+from pathlib import Path
+from examples.vllm_llm import producer_session as ps
+from examples.vllm_llm.producer_stage import attach
+root=ps.ROOT
+scratch=Path('/Users/ckl/.hermes/cache/scratch/producer-readiness')
+ready=json.loads((ps.ART/'local-ready.json').read_text())
+assert ready['sources']==ps.local_sources()
+assert ready['manifest_sha256']==ps.cert.sha(ps.ART/ready['manifest'])
+work=Path(tempfile.mkdtemp(prefix='receipt-probe-',dir=scratch/'tmp'))
+archive=work/'archive';archive.mkdir()
+paths=sorted(set(ready['sources'])|{'etx',str((ps.ART/'local-ready.json').relative_to(root))})
+with (work/'source.tar').open('wb') as f:
+ subprocess.run(['git','archive','HEAD','--',*paths],cwd=root,stdout=f,check=True,timeout=20)
+print('LIGHT ARCHIVE bytes', (work/'source.tar').stat().st_size,flush=True)
+with tarfile.open(work/'source.tar') as f:f.extractall(archive,filter='data')
+commit=subprocess.check_output(['git','rev-parse','HEAD'],cwd=root,text=True).strip()
+(archive/'SOURCE_IDENTITY').write_text(f'commit {commit}\nfixture source-only receipt probe\n')
+attach(archive,Path(sys.prefix))
+model=work/'model';hf=model/'hf';hf.mkdir(parents=True)
+for name in ('vl.bin','vl.manifest','golden_c1024.txt'):(model/name).write_text('CPU fixture, never GPU input')
+(hf/'config.json').write_text('{}')
+config=work/'config.json';config.write_text(json.dumps(dict(model=str(model),hf=str(hf),golden_sha256='synthetic')))
+record=work/'record';record.mkdir()
+binpath=work/'bin';binpath.mkdir()
+probe=binpath/'rocm-smi';probe.write_text('#!/bin/sh\necho CPU-PROBE-SUBSTITUTE\n');probe.chmod(0o755)
+env=dict(os.environ,ETX_SESS_LOGDIR=str(record),ETX_QWEN_G6_CONFIG=str(config),VLLM=str(work/'absent-vllm'),
+ ETX_ROCM_HEADERS=str(work/'absent-headers'),PATH=str(binpath)+os.pathsep+os.environ['PATH'])
+for op in ('preflight','report'):
+ run=subprocess.run([str(archive/'.venv/bin/python'),'-u','-m','examples.vllm_llm.producer_session',op],
+     cwd=archive,env=env,capture_output=True,text=True,timeout=25)
+ print('ACTUAL',op,'exit',run.returncode,run.stdout,run.stderr,flush=True)
+ if op=='preflight':
+  assert run.returncode==2
+  assert 'PASS interpreter:' in run.stdout
+  assert 'FAIL packed_model:' in run.stdout
+  assert 'local acceptance missing or source hashes changed' not in run.stdout
+ else:
+  assert run.returncode==0
+  assert json.loads((record/'report.json').read_text())['performance_claim'] is False
+out=scratch/'evidence/receipt-probe-record'
+shutil.copytree(record,out)
+shutil.rmtree(work)
+print('RECEIPT PROBE PASS: current source receipt accepted; synthetic box refused before compute; real report written',flush=True)

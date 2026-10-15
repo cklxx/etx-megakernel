@@ -392,7 +392,7 @@
     }
   ],
   "manifest": "readiness-fixes/manifest.json",
-  "manifest_sha256": "808aff75f2665736551250bde8e66e290b191723b6f043868159905b883c992f",
+  "manifest_sha256": "39626fe25cb2dba15d38daa1ad7c90f22d93da11c6b8e3747b99a3add1e6106b",
   "reused_compile_evidence": {
     "status": "reused for unchanged compile inputs; no new compile run",
     "source_commit": "2fdbed13a5574f1d86ee10602a8fe71a30c720b6",

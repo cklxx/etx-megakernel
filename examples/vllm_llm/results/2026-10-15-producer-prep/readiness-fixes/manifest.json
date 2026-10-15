@@ -424,5 +424,16 @@
   },
   "gpu_spend_usd": 0,
   "linux_hip_link_load": "not rerun; remains unvalidated here",
-  "gpu_execution": false
+  "gpu_execution": false,
+  "post_receipt_probe": {
+    "exit": 0,
+    "archive_bytes": 3102720,
+    "scope": "committed source-only archive; no historical results; full push/start path is covered by final focused and full suite",
+    "log": "receipt-probe.log",
+    "driver": "receipt-probe-driver.txt",
+    "source_receipt_accepted": true,
+    "interpreter_passed": true,
+    "synthetic_box_rejected": true,
+    "real_report": "NOT-COMPLETE"
+  }
 }
