@@ -1,0 +1,48 @@
+{
+  "revision": "40ddf3677e8a351c62ba2ece0ef493044f633cd6",
+  "reviewed_base": "3a449a7db98f44eaf42f259011e3bcf996327b9b",
+  "implementation_files": [
+    "examples/dsv2lite/batch_attribution.py",
+    "examples/dsv2lite/batch_session.py"
+  ],
+  "tests": [
+    "tests/test_dsv2_batch_attribution.py"
+  ],
+  "source_sha256": {
+    "examples/dsv2lite/batch_attribution.py": "217dcc2b18744cc9e40e0e00752f720a0ddefc6253fedb56f95abf717fa3aa8f",
+    "examples/dsv2lite/batch_session.py": "b06f6fcbeafb04f7d2cf26a5b23be71939044dbf20c40c98789fd358cfcfacc1",
+    "tests/test_dsv2_batch_attribution.py": "4bbf0886f5b6138e6c6bf27352b21f9c37c0dff3712da066d4d825418532a2b8"
+  },
+  "commands": [
+    {
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exit": 0
+    },
+    {
+      "command": [
+        "git",
+        "add",
+        "examples/dsv2lite/batch_attribution.py",
+        "examples/dsv2lite/batch_session.py",
+        "tests/test_dsv2_batch_attribution.py"
+      ],
+      "exit": 0
+    },
+    {
+      "command": [
+        "git",
+        "commit",
+        "-m",
+        "Fix selected B4 calls and require complete dispatch traffic coverage"
+      ],
+      "exit": 0
+    }
+  ],
+  "compiler_reruns": 0,
+  "review": "Original CC R1/R2 repair; independent scoped recheck still required",
+  "gpu_spend_usd": 0
+}

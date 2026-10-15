@@ -1,6 +1,6 @@
 # DeepSeek: two prepared experiments, 2026-10-15
 
-Status: implemented; local acceptance is recorded below. No GPU run, rental, or spend. This change prepares only the two open
+Status: B4 R1/R2 repairs implemented and locally accepted; independent scoped recheck pending before main merge/push. Local acceptance is recorded below. No GPU run, rental, or spend. This change prepares only the two open
 experiments in `NEXT-GPU-2026-10-15.md`. It does not recover the lost historical r5/r7 payloads.
 
 ## Queue 1: eight-request correctness
@@ -96,7 +96,35 @@ The installed offline compiler is ROCm 7.2.4; the future DigitalOcean image and 
 execution. Missing local HIP runtime libraries prevent final HIP executable linking here. Native link, runtime load,
 real-input correctness, profiler metric/marker support, and all device measurements remain explicit execution gates.
 
-The implementation and registered queues are committed. SOL_CLOSE adds final local acceptance and the independent review status
-to this record for serialized main integration and dual-remote publication after a nonblocking review report. Local preparation is complete within the
+The implementation and registered queues are committed. The initial SOL_CLOSE records above remain historical evidence.
+The received CC review found no blocking x8 or cleanup defect, but blocked B4 on R1/R2. The repairs need an independent
+scoped recheck before serialized main integration or publication. Local repair acceptance is complete within the
 two existing experiment scopes; a GPU run still needs a separate spending decision. Same-kernel graph
 replay is a named existing implementation blocker, not a placeholder or a proposed third experiment.
+
+## B4 review repair acceptance
+
+CC reviewed `3a449a7` and reported R1 (unselected batch/configuration calls in timed rounds) and R2 (missing
+counter dispatches accepted without comparison to the kernel trace). Repair commit `40ddf3677e8a351c62ba2ece0ef493044f633cd6` changes only
+`batch_session.py`, `batch_attribution.py` and their attribution tests. Each selected configuration now invokes
+only its assigned B subset; exact returned keys and every invoked warm-up/full/short gate are required. Any selected
+failure stops timing and captures. Traffic requires exact process/agent/dispatch coverage and matching spans against
+the retained trace. Explicit measured zeros remain records; full-minus-short traffic remains a positive conditional estimate.
+
+The four primary regressions fail against the reviewed implementation (exit 1). The same source hashes as the repair
+commit then pass focused acceptance: **308 passed in 25.98s**, exit 0, including all 14 graph cases. Final full suite:
+**2190 passed, 14 skipped in 490.55s (0:08:10)**, exit 0, no deselection. Post-receipt archive transport tests: **2 passed in 13.86s**, exit 0.
+Fresh no-Git B4 help and the registered dependency dry run return 0. Skips remain skips; reasons are in the raw log.
+
+The first full-suite attempt stopped at the disk-reserve guard (exit -15, 350.63 s); it is not reported as a pass.
+Its packaging test copied 2.6 GiB of historical results. Only that reproducible temporary project copy was removed.
+Packaging and the two Qwen archive transport tests use the established committed source fixture without historical
+DeepSeek results. All 122 packaging metadata, test and package inputs match; all other tests use the frozen worktree.
+The advisory lock and 4 GiB reserve guard remain active. No compiler matrix was rerun: all 27 device include hashes
+and 163 original raw evidence files match. The active Qwen receipt changes one test binding; the other 358 are unchanged.
+All 359 bindings match the committed fixture after refresh.
+
+[Repair evidence and scoped handoff](evidence/deepseek-prep-2026-10-15/b4-review-repair/README.md) retain exact commands,
+source hashes, actual exits, original review and before/after failures. **Independent scoped R1/R2 recheck is pending.**
+No new experiment, GPU/cloud action, spend, main merge or push occurred. Same-kernel replay remains UNAVAILABLE and
+the full two-baseline performance claim INCOMPLETE.

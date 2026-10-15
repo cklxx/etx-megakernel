@@ -1,0 +1,48 @@
+{
+  "source_revision": "40ddf3677e8a351c62ba2ece0ef493044f633cd6",
+  "fixture_commit": "39b6c557b0b49e57e8e203ed2e171f3936ac68e7",
+  "commands": [
+    {
+      "name": "archive-b4-help",
+      "command": [
+        "/Users/ckl/code/.wt/etx-deepseek-two-gaps/.venv/bin/python",
+        "-m",
+        "examples.dsv2lite.batch_attribution",
+        "--help"
+      ],
+      "exit": 0,
+      "cwd": "fresh no-Git source archive of 39b6c557b0b49e57e8e203ed2e171f3936ac68e7"
+    },
+    {
+      "name": "archive-b4-dry-run",
+      "command": [
+        "/Users/ckl/code/.wt/etx-deepseek-two-gaps/.venv/bin/python",
+        "-m",
+        "etx.tools.gpu_jobs",
+        "examples/sessions/ds_b4_attribution.py",
+        "--gpus",
+        "0",
+        "--dry-run"
+      ],
+      "exit": 0,
+      "cwd": "fresh no-Git source archive of 39b6c557b0b49e57e8e203ed2e171f3936ac68e7"
+    },
+    {
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exit": 0
+    }
+  ],
+  "retained_input_manifest": {
+    "path": "examples/dsv2lite/results/2026-10-13-ds_inplace/inputs.json",
+    "source_revision": "40ddf3677e8a351c62ba2ece0ef493044f633cd6",
+    "sha256": "8df24e48310512b3ca97c70eeafe0cfa39a1dd8ed6618fb40e6e144d4e9a23cd",
+    "bytes": 510
+  },
+  "initial_fixture_probe": "archive-b4-help-fixture-missing-inputs.log (exit 1; bounded fixture excluded required historical recipe metadata, not a source regression)",
+  "free_bytes": 6461988864,
+  "no_gpu_execution": true
+}

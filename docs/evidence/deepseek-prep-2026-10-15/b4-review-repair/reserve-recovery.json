@@ -1,0 +1,9 @@
+{
+  "stopped_attempt": "full-suite-reserve-stop.json",
+  "removed_only": "/Users/ckl/.hermes/cache/scratch/deepseek-b4-review-repair-evidence/full-pytest/test_wheel_contains_importer_s0/project",
+  "reproducible_temporary_copy_bytes": 2634591452,
+  "free_bytes": 6586855424,
+  "fixture_packaging_files_verified": 122,
+  "plugin_sha256": "87d179e8cf636f0f0c5d8265f5b99ad81f79315b593e6166bd1ac68e310873b7",
+  "reason": "Packaging copies the entire checkout including historical DeepSeek results. Use the same committed source fixture already used by two archive transport tests; unchanged packaging metadata, all package source/header bytes and test logic verified. No test deselection or repository source change."
+}

@@ -1,0 +1,25 @@
+{
+  "name": "regression-after",
+  "command": [
+    ".venv/bin/python",
+    "-m",
+    "pytest",
+    "-q",
+    "-ra",
+    "tests/test_dsv2_batch_attribution.py",
+    "tests/test_dsv2_batch.py",
+    "-k",
+    "not every_request and not static_queues and not routing_handoff and not two_requests_keep and not more_than_two and not shared_kva"
+  ],
+  "cwd": "/Users/ckl/code/.wt/etx-deepseek-two-gaps",
+  "revision": "3a449a7db98f44eaf42f259011e3bcf996327b9b",
+  "source_sha256": {
+    "examples/dsv2lite/batch_attribution.py": "217dcc2b18744cc9e40e0e00752f720a0ddefc6253fedb56f95abf717fa3aa8f",
+    "examples/dsv2lite/batch_session.py": "b06f6fcbeafb04f7d2cf26a5b23be71939044dbf20c40c98789fd358cfcfacc1",
+    "tests/test_dsv2_batch_attribution.py": "795d98191f09c8aa0a856b8356015817c8eda713815cc2eca6ccfe6203b64149"
+  },
+  "exit": 0,
+  "stop": null,
+  "seconds": 10.02,
+  "free_bytes": 6803546112
+}

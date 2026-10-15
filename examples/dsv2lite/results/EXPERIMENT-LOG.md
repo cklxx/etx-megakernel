@@ -63,8 +63,15 @@ No GPU execution or spend. [Preparation and acceptance](../../../docs/DEEPSEEK-P
   Go: complete gates, exact identities and measured attribution inputs, then apply the existing registered rules.
   No-go: absent counters, trace/routing bindings, short-call gates, or incomplete pairs. No new kernel experiment.
 
-Final SOL_CLOSE local acceptance: the remaining 14 graph tests passed; complete suite **2168 passed, 14 skipped in 508.28s (0:08:28)**, exit 0,
+Initial SOL_CLOSE local acceptance: the remaining 14 graph tests passed; complete suite **2168 passed, 14 skipped in 508.28s (0:08:28)**, exit 0,
 with no deselection. The independent final-code review status and exact raw evidence are in the linked preparation index.
 DeepSeek implementation `a0c3e72` is unchanged by closure. A full-suite failure required the separately committed
 process-group cleanup fix `fcb5f6`; before/after regressions and the failed first full run are retained. Both diagnostic queues remain unexecuted. DigitalOcean tariff,
 billing minimum and spending approval remain unknown. Same-kernel replay is still UNAVAILABLE; no fusion claim.
+
+CC review at `3a449a7` found no blocking x8/cleanup issue and two B4 blockers. Repair `40ddf36` invokes only selected
+batch/configuration subsets and requires exact scoped kernel-trace/FETCH_SIZE coverage, preserving all correctness
+gates and explicit measured zeros. Four old-code regressions fail. Final local acceptance: **2190 passed, 14 skipped in 490.55s (0:08:10)**, exit 0, no deselection;
+focused **308 passed in 25.98s**; refreshed archive **2 passed in 13.86s**. See the linked preparation index for the stopped reserve-guard
+attempt, raw logs, receipt refresh and compiler reuse. Independent scoped R1/R2 recheck is pending; no main merge/push,
+new experiment or GPU spend. Both diagnostic queues remain unexecuted.

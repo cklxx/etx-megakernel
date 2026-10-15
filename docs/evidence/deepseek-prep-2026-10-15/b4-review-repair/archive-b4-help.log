@@ -1,0 +1,14 @@
+usage: batch_attribution.py [-h] [--output OUTPUT]
+                            {graph-eligibility,gate,graph-gate,vsel,rounds,report,check-rounds,captures,routing,final}
+                            [arm]
+
+Bound B1/B2/B4 follow-up. Raw counters and instrumented spans never supply a
+timing verdict.
+
+positional arguments:
+  {graph-eligibility,gate,graph-gate,vsel,rounds,report,check-rounds,captures,routing,final}
+  arm
+
+options:
+  -h, --help            show this help message and exit
+  --output OUTPUT

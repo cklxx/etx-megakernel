@@ -1,0 +1,7 @@
+PROGRESS focused-final 0 s; bytes 0 free 6802808832
+PROGRESS focused-final 5 s; bytes 61 free 6800609280
+PROGRESS focused-final 10 s; bytes 80 free 6800486400
+PROGRESS focused-final 15 s; bytes 297 free 6779092992
+PROGRESS focused-final 20 s; bytes 297 free 6726139904
+PROGRESS focused-final 25 s; bytes 298 free 6704779264
+{"name": "focused-final", "command": [".venv/bin/python", "-m", "pytest", "-q", "-ra", "tests/test_dsv2_batch_attribution.py", "tests/test_deepseek_open_prep.py", "tests/test_dsv2_batch.py", "tests/test_session_references.py", "tests/test_dsv2_layer_gate.py", "tests/test_dsv2_inplace_session.py"], "cwd": "/Users/ckl/code/.wt/etx-deepseek-two-gaps", "revision": "3a449a7db98f44eaf42f259011e3bcf996327b9b", "source_sha256": {"examples/dsv2lite/batch_attribution.py": "217dcc2b18744cc9e40e0e00752f720a0ddefc6253fedb56f95abf717fa3aa8f", "examples/dsv2lite/batch_session.py": "b06f6fcbeafb04f7d2cf26a5b23be71939044dbf20c40c98789fd358cfcfacc1", "tests/test_dsv2_batch_attribution.py": "4bbf0886f5b6138e6c6bf27352b21f9c37c0dff3712da066d4d825418532a2b8"}, "exit": 0, "stop": null, "seconds": 30.06, "free_bytes": 6704365568}

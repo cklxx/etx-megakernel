@@ -1,6 +1,6 @@
 # DeepSeek B4 controlled attribution: preparation
 
-Status: prepared, not run. This is the existing B4 follow-up in BATCH-2026-10-14.md section 12. It adds no kernel
+Status: prepared, not run. CC review found B4 R1/R2 blockers; the local repairs at `40ddf36` passed acceptance. Independent scoped repair recheck is pending before main integration/push. This is the existing B4 follow-up in BATCH-2026-10-14.md section 12. It adds no kernel
 candidate. It is separate from the x8 correctness session. No GPU use, rental or spending is authorized by this file.
 The current provider is DigitalOcean. Its available one-GPU shape, tariff and billing minimum have not been checked.
 
@@ -46,6 +46,9 @@ This cap is independent of the x8 correctness cap. There is no quoted dollar bud
    `vllm/vllm-openai-rocm@sha256:bb44b39aea26798cce43030a98bf48efd0322ca7147367db86e38b96bd80f0e7`.
    Every full and one-token subtraction call is checked, including warm-up. This is strongest only among the two
    tested configurations. Preserve the effective configuration and exact image identity from the existing jobs.
+   In timed rounds each configuration invokes only the B values assigned to it by selection. The prompt/golden set
+   covers those calls; returned batch keys must match the invoked subset exactly. Captures invoke only their selected B.
+   Unselected, illegal configuration/B combinations are excluded; every invoked full/short gate remains mandatory.
 5. Run five interleaved rounds of fused ETX and selected vLLM. Reverse the order on even rounds. Keep every
    independent correctness gate. A failed timed gate stops the remaining timing rounds and captures. The host now
    brackets both fused and unfused calls with the same steady host clock; HIP event durations are not used as wall
@@ -61,8 +64,12 @@ This cap is independent of the x8 correctness cap. There is no quoted dollar bud
    (32 tokens, two repetitions). Report the raw derived FETCH_SIZE values in the target metric's KB units, dispatch
    durations and device spans. These are measured counter values, not shape-byte estimates or unprofiled bandwidth.
    They exclude host DMA and do not distinguish spill, repeated weight and activation traffic.
-8. Mark vLLM warm-up/full/short calls with synchronized ROCTx ranges. Each range must have complete counter dispatches;
-   missing, duplicate or boundary-crossing records refuse attribution. Retain full and short traffic separately.
+8. Mark vLLM warm-up/full/short calls with synchronized ROCTx ranges. Require the retained kernel-dispatch trace.
+   Within every nonoverlapping call range, FETCH_SIZE and trace records must match exactly by Process_Id, Agent_Id,
+   Dispatch_Id and start/end timestamps. Missing, extra, duplicate, misscoped or boundary-crossing records refuse
+   attribution. Worker and marker processes may differ; trace/counter scope binds the dispatch identity.
+   An explicit zero value is a measured record, including an all-zero short call. Missing records cannot become zeros.
+   Retain full and short traffic separately; all five full-minus-short estimates must remain positive.
    `(full traffic - short traffic) / 31` is explicitly an estimate from measured calls: cancellation of prefill/cache
    effects is not independently established. No profiled time enters a performance verdict.
 9. Run HF routing separately at B1, B2 and B4, using that run's first B bound prompts. Check its entire 33-token greedy trajectory against the receipts and
@@ -100,3 +107,7 @@ available locally. Native HIP executable linking, GPU loading, target compiler c
 availability and all model correctness/performance results remain real-input or device gates. Target ROCm may differ
 from the retained 7.2.4 device evidence. Reuse of device evidence requires an exact generated-source/plan identity check;
 the changed host requires its own compiler check. No fresh device-code pass is implied by a retained artifact.
+
+Local R1/R2 repair evidence, before/after regressions and exact commands are in
+[the repair acceptance record](evidence/deepseek-prep-2026-10-15/b4-review-repair/acceptance.json).
+Independent scoped repair review remains pending; CPU acceptance is not profiler/device certification.

@@ -1,0 +1,24 @@
+Session hard stop: 7200s from runner start (includes setup)
+  0 apt                              cpu      timeout   600s  reads: -
+  1 etx_env                          cpu      timeout   600s  reads: apt
+  2 prep_env                         cpu      timeout  1800s  reads: apt
+  3 source                           cpu      timeout   300s  reads: etx_env  writes: source.json
+  4 prep_dl                          cpu      timeout  1800s  reads: prep_env  writes: $HOME/models/dsv2-lite-base/config.json
+  5 prep_pack                        cpu      timeout  1200s  reads: $HOME/models/dsv2-lite-base/config.json, source.json  writes: $ETX_DSV2_DATA/weights.bin, $ETX_DSV2_DATA/weights.bin.manifest
+  6 docker_pull                      cpu      timeout  1500s  reads: apt
+  7 references                       GPU 0    timeout  1500s  reads: source.json, prep_env, prep_pack, $HOME/models/dsv2-lite-base/config.json  writes: references_ready.json
+  8 build_alld4r0l1kvsmw             cpu      timeout  1200s  reads: source.json  writes: b_alld4r0l1kvsmw/run
+  9 bgate_alld4r0l1kvsmw             GPU 0    timeout   600s  reads: references_ready.json, b_alld4r0l1kvsmw/run  writes: bgate_alld4r0l1kvsmw.json
+ 10 build_x2                         cpu      timeout  1200s  reads: source.json  writes: b_x2/run
+ 11 bgate_x2                         GPU 0    timeout   600s  reads: references_ready.json, b_x2/run  writes: bgate_x2.json
+ 12 build_x4                         cpu      timeout  1200s  reads: source.json  writes: b_x4/run
+ 13 bgate_x4                         GPU 0    timeout   600s  reads: references_ready.json, b_x4/run  writes: bgate_x4.json
+ 14 graph_gate_alld4r0l1kvsmw        cpu      timeout    60s  reads: b_alld4r0l1kvsmw/run  writes: graph_gate_alld4r0l1kvsmw.json
+ 15 graph_gate_x2                    cpu      timeout    60s  reads: b_x2/run  writes: graph_gate_x2.json
+ 16 graph_gate_x4                    cpu      timeout    60s  reads: b_x4/run  writes: graph_gate_x4.json
+ 17 vsel                             GPU 0    timeout  1900s  reads: references_ready.json, docker_pull, bgate_alld4r0l1kvsmw.json, graph_gate_alld4r0l1kvsmw.json, bgate_x2.json, graph_gate_x2.json, bgate_x4.json, graph_gate_x4.json  writes: vsel.json
+ 18 brounds                          GPU 0    timeout  3600s  reads: vsel.json, bgate_alld4r0l1kvsmw.json, graph_gate_alld4r0l1kvsmw.json, bgate_x2.json, graph_gate_x2.json, bgate_x4.json, graph_gate_x4.json  writes: brounds.json
+ 19 captures                         GPU 0    timeout  3300s  reads: vsel.json, brounds.json, bgate_alld4r0l1kvsmw.json, graph_gate_alld4r0l1kvsmw.json, bgate_x2.json, graph_gate_x2.json, bgate_x4.json, graph_gate_x4.json  writes: attribution.json
+ 20 routing                          GPU 0    timeout  1000s  reads: brounds.json, references_ready.json  writes: routing.json, routing_b1.json, routing_b2.json, routing_b4.json
+ 21 breport                          final    timeout   120s  reads: brounds.json, vsel.json, ?routing.json  writes: batch_report.json
+ 22 b4_result                        final    timeout   120s  reads: ?breport, ?captures, ?routing  writes: b4_result.json

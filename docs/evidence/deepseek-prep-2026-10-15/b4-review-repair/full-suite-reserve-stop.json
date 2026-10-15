@@ -1,0 +1,26 @@
+{
+  "name": "full-suite",
+  "command": [
+    ".venv/bin/python",
+    "-m",
+    "pytest",
+    "-q",
+    "-ra",
+    "-p",
+    "bounded_archive_plugin",
+    "--basetemp=/Users/ckl/.hermes/cache/scratch/deepseek-b4-review-repair-evidence/full-pytest",
+    "-o",
+    "tmp_path_retention_policy=failed"
+  ],
+  "cwd": "/Users/ckl/code/.wt/etx-deepseek-two-gaps",
+  "revision": "40ddf3677e8a351c62ba2ece0ef493044f633cd6",
+  "source_sha256": {
+    "examples/dsv2lite/batch_attribution.py": "217dcc2b18744cc9e40e0e00752f720a0ddefc6253fedb56f95abf717fa3aa8f",
+    "examples/dsv2lite/batch_session.py": "b06f6fcbeafb04f7d2cf26a5b23be71939044dbf20c40c98789fd358cfcfacc1",
+    "tests/test_dsv2_batch_attribution.py": "4bbf0886f5b6138e6c6bf27352b21f9c37c0dff3712da066d4d825418532a2b8"
+  },
+  "exit": -15,
+  "stop": "deadline/reserve",
+  "seconds": 350.63,
+  "free_bytes": 3943989248
+}

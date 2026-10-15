@@ -1,0 +1,61 @@
+{
+  "status": "LOCAL ACCEPTANCE COMPLETE; INDEPENDENT SCOPED R1/R2 RECHECK PENDING",
+  "code_revision": "40ddf3677e8a351c62ba2ece0ef493044f633cd6",
+  "reviewed_base": "3a449a7db98f44eaf42f259011e3bcf996327b9b",
+  "source_sha256": {
+    "examples/dsv2lite/batch_attribution.py": "217dcc2b18744cc9e40e0e00752f720a0ddefc6253fedb56f95abf717fa3aa8f",
+    "examples/dsv2lite/batch_session.py": "b06f6fcbeafb04f7d2cf26a5b23be71939044dbf20c40c98789fd358cfcfacc1",
+    "tests/test_dsv2_batch_attribution.py": "4bbf0886f5b6138e6c6bf27352b21f9c37c0dff3712da066d4d825418532a2b8"
+  },
+  "results": {
+    "focused-final": {
+      "summary": "308 passed in 25.98s",
+      "record": "focused-final.json",
+      "exit": 0
+    },
+    "full-suite": {
+      "summary": "2190 passed, 14 skipped in 490.55s (0:08:10)",
+      "record": "full-suite.json",
+      "exit": 0
+    },
+    "archive-after-receipt": {
+      "summary": "2 passed in 13.86s",
+      "record": "archive-after-receipt.json",
+      "exit": 0
+    }
+  },
+  "before_fix": {
+    "record": "regression-before.json",
+    "summary": "4 failed; both mixed-selection directions and missing dispatch parser/capture regression",
+    "exit": 1
+  },
+  "interrupted_full_attempt": {
+    "record": "full-suite-reserve-stop.json",
+    "exit": -15,
+    "stop": "disk reserve; not a completed test suite",
+    "recovery": "reserve-recovery.json"
+  },
+  "archive_fixture": "fixture.json",
+  "entrypoints": "entrypoint-probe.json",
+  "entrypoint_fixture_omission": "Initial bounded-fixture B4 help exit 1: required historical inputs.json excluded with result trees. Retained failure; final no-Git probe includes that exact tracked recipe manifest from code pin, with hash recorded. No repository source change.",
+  "compiler_reuse": "compiler-reuse.json",
+  "qwen_source_bindings": 359,
+  "review": {
+    "original_report": "review-before-repair.md",
+    "original_verdict": "BLOCKED: B4 R1/R2; no blocking x8 or process-cleanup finding",
+    "repair_recheck": "PENDING",
+    "handoff": "scoped-recheck.md"
+  },
+  "constraints": {
+    "gpu_spend_usd": 0,
+    "new_experiments": 0,
+    "compiler_matrix_reruns": 0,
+    "main_merge": false,
+    "push": false
+  },
+  "limits": [
+    "same-kernel replay UNAVAILABLE; full two-baseline performance claim INCOMPLETE",
+    "Native profiler format/semantics, model/reference execution, linking/loading and all GPU results remain device gates",
+    "CPU fixtures prove parser/runner contracts, not device correctness"
+  ]
+}

@@ -284,7 +284,7 @@
     "tests/test_gpu_jobs.py": "334944b442e45950e5f3d34004ba57cfa574252870363552e0c553b8b73c5df4",
     "tests/test_nvref2.py": "f97302a62b47f7f13708c9379fb9b48fc73615d99398902ed5ffac16f6c716c5",
     "tests/test_dsv2_d4.py": "5bf773c8cfdda7863d7d03dbdcbf47c032cfafc62408c45ec5e9b349b920d51b",
-    "tests/test_dsv2_batch_attribution.py": "178c37696e0a1228c3e7ca3f84dd06a547b398fc9e12bbb318a77b3282cd587e",
+    "tests/test_dsv2_batch_attribution.py": "4bbf0886f5b6138e6c6bf27352b21f9c37c0dff3712da066d4d825418532a2b8",
     "tests/test_reset_pair.py": "3b53b4a7cff9b77dc874532efed0044e6f647bd51f8b1b83d9eeac1302c69fe9",
     "tests/test_importer.py": "656f2b88a6721b5eb16adc216aac0b0ce5e817938a1ed4f8573840896addf008",
     "tests/test_floors.py": "f0ab8d7c9ce098c5ed179a38921afbf9c821d4036c15eb2c5b19486769989b6e",
@@ -1302,6 +1302,33 @@
       "seconds": 510.87,
       "free_bytes": 6824628224,
       "log": "docs/evidence/deepseek-prep-2026-10-15/closure/full-suite-final.log"
+    },
+    {
+      "name": "full-suite",
+      "command": [
+        ".venv/bin/python",
+        "-m",
+        "pytest",
+        "-q",
+        "-ra",
+        "-p",
+        "bounded_archive_plugin",
+        "--basetemp=/Users/ckl/.hermes/cache/scratch/deepseek-b4-review-repair-evidence/full-final-pytest",
+        "-o",
+        "tmp_path_retention_policy=failed"
+      ],
+      "cwd": "/Users/ckl/code/.wt/etx-deepseek-two-gaps",
+      "revision": "40ddf3677e8a351c62ba2ece0ef493044f633cd6",
+      "source_sha256": {
+        "examples/dsv2lite/batch_attribution.py": "217dcc2b18744cc9e40e0e00752f720a0ddefc6253fedb56f95abf717fa3aa8f",
+        "examples/dsv2lite/batch_session.py": "b06f6fcbeafb04f7d2cf26a5b23be71939044dbf20c40c98789fd358cfcfacc1",
+        "tests/test_dsv2_batch_attribution.py": "4bbf0886f5b6138e6c6bf27352b21f9c37c0dff3712da066d4d825418532a2b8"
+      },
+      "exit": 0,
+      "stop": null,
+      "seconds": 495.85,
+      "free_bytes": 6465138688,
+      "log": "docs/evidence/deepseek-prep-2026-10-15/b4-review-repair/full-suite.log"
     }
   ],
   "reused_compile_evidence": {
@@ -1318,11 +1345,18 @@
     "GPU executable link/load/execution pending: macOS has no Linux HIP runtime",
     "real-model capture/replay pending; no retained Qwen router tensors found",
     "GPU performance and memory visibility unknown",
-    "DeepSeek integration refresh reuses unchanged compiler inputs; shared Python runtime/optional profiler wrapper changes have local CPU coverage only. Independent final review and the bounded process-cleanup recheck are still required before publication."
+    "DeepSeek integration refresh reuses unchanged compiler inputs; shared Python runtime/optional profiler wrapper changes have local CPU coverage only. Original CC review found no blocking x8/cleanup issue. Its B4 R1/R2 repairs require an independent scoped recheck before publication."
   ],
   "gpu_spend_usd": 0,
   "archive_acceptance": "../2026-10-15-three-integration/archive-acceptance.json",
   "archive_acceptance_sha256": "d9a7c1098a30f9a5e521448d7321d55a8a7cb1f96ab1d6516c4e479c40e8e6bb",
   "deepseek_closure_evidence": "docs/evidence/deepseek-prep-2026-10-15/closure/",
-  "deepseek_archive_acceptance": "docs/evidence/deepseek-prep-2026-10-15/closure/archive-after-receipt.json"
+  "deepseek_archive_acceptance": "docs/evidence/deepseek-prep-2026-10-15/closure/archive-after-receipt.json",
+  "b4_review_repair": {
+    "revision": "40ddf3677e8a351c62ba2ece0ef493044f633cd6",
+    "evidence": "docs/evidence/deepseek-prep-2026-10-15/b4-review-repair/",
+    "compiler_reuse": "docs/evidence/deepseek-prep-2026-10-15/b4-review-repair/compiler-reuse.json",
+    "archive_acceptance": "docs/evidence/deepseek-prep-2026-10-15/b4-review-repair/archive-after-receipt.json",
+    "review": "Independent scoped R1/R2 recheck pending; no main merge/push or GPU spending authorized"
+  }
 }

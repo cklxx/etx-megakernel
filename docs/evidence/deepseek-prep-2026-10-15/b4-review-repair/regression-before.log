@@ -1,0 +1,219 @@
+FFFF                                                                     [100%]
+=================================== FAILURES ===================================
+___ test_review_r1_mixed_legal_subsets_complete_all_selected_pairs[default] ____
+
+tmp_path = PosixPath('/Users/ckl/.hermes/cache/scratch/deepseek-b4-review-repair-evidence/tmp/pytest-of-ckl/pytest-0/test_review_r1_mixed_legal_sub0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x104708510>
+b1_config = 'default'
+
+    @pytest.mark.parametrize('b1_config', ['default', 'aiter'])
+    def test_review_r1_mixed_legal_subsets_complete_all_selected_pairs(tmp_path, monkeypatch, b1_config):
+        s = bare_session(tmp_path)
+        s.root, s.data = ROOT, tmp_path/'references'
+        monkeypatch.setattr(s, 'require_gates', lambda: None)
+        other = 'aiter' if b1_config == 'default' else 'default'
+        assigned = {b1_config: (1,), other: (2, 4)}
+        (tmp_path/'vsel.json').write_text(json.dumps(dict(selection={
+            str(b): dict(config=b1_config if b == 1 else other) for b in a.BATCHES})))
+        for b in a.BATCHES:
+            (tmp_path/f'graph_gate_{a.BATCH_ARMS[b]}.json').write_text('{"passed":false}')
+        monkeypatch.setattr(s, 'etx', lambda b, name: dict(step_ms='3', latency_ms='3'))
+        calls = []
+    
+        def run(name, command, **kw):
+            config = next(c for c in assigned if name.endswith('_'+c))
+            batches = tuple(map(int, command[command.index('--batches')+1].split(',')))
+            calls.append((config, batches))
+            return vllm_log(config, batches, assigned[config])
+    
+        monkeypatch.setattr(s, 'run', run)
+>       s.rounds()
+
+tests/test_dsv2_batch_attribution.py:88: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <examples.dsv2lite.batch_attribution.AttributionSession object at 0x10402b4d0>
+
+    def rounds(self):
+        self.require_gates()
+        out = self.fresh(self.logs/'brounds.json')
+        selection = json.loads((self.logs/'vsel.json').read_text())['selection']
+        if any(not selection[str(b)]['config'] for b in BATCHES):
+            raise ValueError('no legal corrected vLLM baseline; timing refused')
+        configs = list(dict.fromkeys(s['config'] for s in selection.values()))
+        available_graphs = {b for b in BATCHES if json.loads((self.logs/f'graph_gate_{BATCH_ARMS[b]}.json').read_text())['passed']}
+        order = [(kind,b) for b in BATCHES for kind in (('etx','graph') if b in available_graphs else ('etx',))] + [('vllm',c) for c in configs]
+        rounds = []
+        failed = False
+        for k in range(1, batch.ROUNDS+1):
+            r = dict(etx={}, graph={}, vllm={})
+            for kind, x in (order if k % 2 else order[::-1]):
+                if kind == 'vllm':
+                    r[kind][x] = self.vllm(x, f'b{k}_vllm_{x}')
+                else:
+                    r[kind][str(x)] = getattr(self, kind)(x, f'b{k}_{kind}_{BATCH_ARMS[x]}')
+                value = r[kind][x if kind == 'vllm' else str(x)]
+                if 'error' in value or (kind == 'vllm' and any(not value.get(b, {}).get('legal') for b in BATCHES)):
+                    failed = True
+                    break
+            rounds.append(r)
+            write_json(out.with_suffix('.partial.json'), dict(rounds=rounds))
+            if failed:
+                break
+        graph_verdicts = {}
+        for b in BATCHES:
+            if b not in available_graphs:
+                graph_verdicts[str(b)] = dict(status='UNAVAILABLE',
+                    gate=json.loads((self.logs/f'graph_gate_{BATCH_ARMS[b]}.json').read_text()))
+                continue
+            pairs = [(r['etx'].get(str(b), {'error':'not run'}), r['graph'].get(str(b), {'error':'not run'})) for r in rounds]
+            graph_verdicts[str(b)] = (dict(status='COMPLETE', clock='host_wall',
+                throughput=batch.verdict([batch.gain(g['step_ms'],e['step_ms']) for e,g in pairs]))
+                if len(pairs) == batch.ROUNDS and all('error' not in x for pair in pairs for x in pair) else dict(status='INCOMPLETE'))
+        write_json(out, dict(status='INCOMPLETE' if failed else 'COMPLETE', order=order, skipped=[], rounds=rounds, same_kernel_graph=graph_verdicts))
+        if failed:
+>           raise RuntimeError('a timed correctness/identity gate failed; remaining timings and captures stopped')
+E           RuntimeError: a timed correctness/identity gate failed; remaining timings and captures stopped
+
+examples/dsv2lite/batch_attribution.py:212: RuntimeError
+____ test_review_r1_mixed_legal_subsets_complete_all_selected_pairs[aiter] _____
+
+tmp_path = PosixPath('/Users/ckl/.hermes/cache/scratch/deepseek-b4-review-repair-evidence/tmp/pytest-of-ckl/pytest-0/test_review_r1_mixed_legal_sub1')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x104708180>
+b1_config = 'aiter'
+
+    @pytest.mark.parametrize('b1_config', ['default', 'aiter'])
+    def test_review_r1_mixed_legal_subsets_complete_all_selected_pairs(tmp_path, monkeypatch, b1_config):
+        s = bare_session(tmp_path)
+        s.root, s.data = ROOT, tmp_path/'references'
+        monkeypatch.setattr(s, 'require_gates', lambda: None)
+        other = 'aiter' if b1_config == 'default' else 'default'
+        assigned = {b1_config: (1,), other: (2, 4)}
+        (tmp_path/'vsel.json').write_text(json.dumps(dict(selection={
+            str(b): dict(config=b1_config if b == 1 else other) for b in a.BATCHES})))
+        for b in a.BATCHES:
+            (tmp_path/f'graph_gate_{a.BATCH_ARMS[b]}.json').write_text('{"passed":false}')
+        monkeypatch.setattr(s, 'etx', lambda b, name: dict(step_ms='3', latency_ms='3'))
+        calls = []
+    
+        def run(name, command, **kw):
+            config = next(c for c in assigned if name.endswith('_'+c))
+            batches = tuple(map(int, command[command.index('--batches')+1].split(',')))
+            calls.append((config, batches))
+            return vllm_log(config, batches, assigned[config])
+    
+        monkeypatch.setattr(s, 'run', run)
+>       s.rounds()
+
+tests/test_dsv2_batch_attribution.py:88: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <examples.dsv2lite.batch_attribution.AttributionSession object at 0x1047856d0>
+
+    def rounds(self):
+        self.require_gates()
+        out = self.fresh(self.logs/'brounds.json')
+        selection = json.loads((self.logs/'vsel.json').read_text())['selection']
+        if any(not selection[str(b)]['config'] for b in BATCHES):
+            raise ValueError('no legal corrected vLLM baseline; timing refused')
+        configs = list(dict.fromkeys(s['config'] for s in selection.values()))
+        available_graphs = {b for b in BATCHES if json.loads((self.logs/f'graph_gate_{BATCH_ARMS[b]}.json').read_text())['passed']}
+        order = [(kind,b) for b in BATCHES for kind in (('etx','graph') if b in available_graphs else ('etx',))] + [('vllm',c) for c in configs]
+        rounds = []
+        failed = False
+        for k in range(1, batch.ROUNDS+1):
+            r = dict(etx={}, graph={}, vllm={})
+            for kind, x in (order if k % 2 else order[::-1]):
+                if kind == 'vllm':
+                    r[kind][x] = self.vllm(x, f'b{k}_vllm_{x}')
+                else:
+                    r[kind][str(x)] = getattr(self, kind)(x, f'b{k}_{kind}_{BATCH_ARMS[x]}')
+                value = r[kind][x if kind == 'vllm' else str(x)]
+                if 'error' in value or (kind == 'vllm' and any(not value.get(b, {}).get('legal') for b in BATCHES)):
+                    failed = True
+                    break
+            rounds.append(r)
+            write_json(out.with_suffix('.partial.json'), dict(rounds=rounds))
+            if failed:
+                break
+        graph_verdicts = {}
+        for b in BATCHES:
+            if b not in available_graphs:
+                graph_verdicts[str(b)] = dict(status='UNAVAILABLE',
+                    gate=json.loads((self.logs/f'graph_gate_{BATCH_ARMS[b]}.json').read_text()))
+                continue
+            pairs = [(r['etx'].get(str(b), {'error':'not run'}), r['graph'].get(str(b), {'error':'not run'})) for r in rounds]
+            graph_verdicts[str(b)] = (dict(status='COMPLETE', clock='host_wall',
+                throughput=batch.verdict([batch.gain(g['step_ms'],e['step_ms']) for e,g in pairs]))
+                if len(pairs) == batch.ROUNDS and all('error' not in x for pair in pairs for x in pair) else dict(status='INCOMPLETE'))
+        write_json(out, dict(status='INCOMPLETE' if failed else 'COMPLETE', order=order, skipped=[], rounds=rounds, same_kernel_graph=graph_verdicts))
+        if failed:
+>           raise RuntimeError('a timed correctness/identity gate failed; remaining timings and captures stopped')
+E           RuntimeError: a timed correctness/identity gate failed; remaining timings and captures stopped
+
+examples/dsv2lite/batch_attribution.py:212: RuntimeError
+____ test_review_r2_missing_one_counter_of_two_traced_dispatches_is_refused ____
+
+tmp_path = PosixPath('/Users/ckl/.hermes/cache/scratch/deepseek-b4-review-repair-evidence/tmp/pytest-of-ckl/pytest-0/test_review_r2_missing_one_cou0')
+
+    def test_review_r2_missing_one_counter_of_two_traced_dispatches_is_refused(tmp_path):
+        _, counters = marker_fixture(tmp_path)
+        trace = [{k:v for k,v in r.items() if k not in ('Counter_Name', 'Counter_Value')} for r in counters]
+        trace.append({k:v for k,v in row(100, start=240, end=260).items() if k not in ('Counter_Name', 'Counter_Value')})
+        write_csv(tmp_path/'test_kernel_trace.csv', trace)
+>       with pytest.raises(ValueError, match='dispatch coverage'):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE ValueError
+
+tests/test_dsv2_batch_attribution.py:125: Failed
+___________ test_review_r2_partial_dispatch_capture_stays_incomplete ___________
+
+tmp_path = PosixPath('/Users/ckl/.hermes/cache/scratch/deepseek-b4-review-repair-evidence/tmp/pytest-of-ckl/pytest-0/test_review_r2_partial_dispatc0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x1046fda30>
+
+    def test_review_r2_partial_dispatch_capture_stays_incomplete(tmp_path, monkeypatch):
+        from etx.tools import timeline
+        s = bare_session(tmp_path)
+        s.capture_batch = None
+        monkeypatch.setattr(s, 'require_gates', lambda: None)
+        monkeypatch.setattr(s, 'check_rounds', lambda: None)
+        monkeypatch.setattr(s, 'identity', lambda b: dict(batch=b))
+        monkeypatch.setattr(s, 'out', lambda arm: tmp_path/arm)
+        monkeypatch.setattr(s, 'etx_args', lambda b: [])
+        monkeypatch.setattr(a.batch, 'etx_result', lambda *args: {})
+        for f in ('load_plan', 'read_raw', 'build_trace', 'latency_report'):
+            monkeypatch.setattr(timeline, f, lambda *args: {})
+        (tmp_path/'vsel.json').write_text(json.dumps(dict(selection={str(b):dict(config='aiter') for b in a.BATCHES})))
+        for b in a.BATCHES:
+            (tmp_path/f'bgate_{a.BATCH_ARMS[b]}.json').write_text('{"passed":true}')
+    
+        def run(name, command, **kw):
+            if name.startswith('traffic_'):
+                directory = tmp_path/name
+                directory.mkdir()
+                write_csv(directory/'test_counter_collection.csv', [row(i, start=i*100+10, end=i*100+20) for i in range(64)])
+            return ''
+    
+        def vllm(config, name, **kw):
+            b = s.capture_batch
+            directory = tmp_path/name
+            directory.mkdir()
+            _, counters = marker_fixture(directory, b)
+            trace = [{k:v for k,v in r.items() if k not in ('Counter_Name', 'Counter_Value')} for r in counters]
+            trace.append({k:v for k,v in row(100, start=240, end=260).items() if k not in ('Counter_Name', 'Counter_Value')})
+            write_csv(directory/'test_kernel_trace.csv', trace)
+            return {b: dict(legal=True)}
+    
+        monkeypatch.setattr(s, 'run', run)
+        monkeypatch.setattr(s, 'vllm', vllm)
+>       with pytest.raises(ValueError, match='dispatch coverage'):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE ValueError
+
+tests/test_dsv2_batch_attribution.py:164: Failed
+=========================== short test summary info ============================
+FAILED tests/test_dsv2_batch_attribution.py::test_review_r1_mixed_legal_subsets_complete_all_selected_pairs[default]
+FAILED tests/test_dsv2_batch_attribution.py::test_review_r1_mixed_legal_subsets_complete_all_selected_pairs[aiter]
+FAILED tests/test_dsv2_batch_attribution.py::test_review_r2_missing_one_counter_of_two_traced_dispatches_is_refused
+FAILED tests/test_dsv2_batch_attribution.py::test_review_r2_partial_dispatch_capture_stays_incomplete
+4 failed, 23 deselected in 0.11s

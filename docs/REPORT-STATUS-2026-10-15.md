@@ -204,7 +204,9 @@ host-wall verdict requires the new session. Older wall descriptions in this hist
 The [actionable experiment plan](NEXT-GPU-2026-10-15.md) specifies the controls, exact acceptance thresholds,
 decision branches, local readiness blockers and a 30-minute target / 60-minute hard cap (estimated $1–$2 at the
 historical $1.99/GPU-hour rate, subject to an actual quote). The matching B1 control and correctness-only session are now implemented and locally validated; SOL_CLOSE records
-final full-suite acceptance and the independent review status in the linked preparation evidence. Certified r5/r7 payloads are
+final full-suite acceptance and the independent review status in the linked preparation evidence. CC found no blocking
+x8/cleanup issue. Its B4 R1/R2 fixes at `40ddf36` pass local acceptance; independent scoped repair recheck is pending
+before main merge/push. Certified r5/r7 payloads are
 unavailable locally, and final HIP linking/runtime compatibility remain execution gates. The current provider tariff
 and spending approval are still unknown; this is prepared for a separate spend decision, not rental authorization. No reservation or spending was authorized here.
 

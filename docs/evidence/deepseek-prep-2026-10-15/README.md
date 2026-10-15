@@ -2,7 +2,11 @@
 
 This is local preparation evidence. No GPU result is present. GPU spending is $0.
 
-Source commit: `a0c3e72` (`prep/deepseek-two-gaps-2026-10-15`, base `24eabf5`). The later evidence commit changes
+Current status: B4 R1/R2 repaired at `40ddf36`, local acceptance complete; independent scoped repair recheck pending.
+See [the current repair record](b4-review-repair/README.md). Original CC found no blocking x8 or cleanup finding.
+No main integration/push or GPU spending. The sections below preserve the earlier evidence.
+
+Original preparation source commit: `a0c3e72` (`prep/deepseek-two-gaps-2026-10-15`, base `24eabf5`). The later evidence commit changes
 only documents and evidence metadata. `archive-acceptance.json` binds the tested code, tests, queues, archive hash,
 and actual check exit codes. The source map must remain identical after that commit.
 
@@ -74,3 +78,30 @@ and the complete final suite above passed on the frozen revised source. The orig
 logs. The independent review must cover both the original two diagnostics and this bounded cleanup diff.
 DeepSeek implementation/build sources are unchanged. Valid compiler evidence above is reused. No GPU, cloud,
 provider, purchasing or account operation was performed. The same-kernel replay limitation remains unresolved.
+
+## B4 R1/R2 repair
+
+CC reviewed `3a449a7` and reported R1 (unselected batch/configuration calls in timed rounds) and R2 (missing
+counter dispatches accepted without comparison to the kernel trace). Repair commit `40ddf3677e8a351c62ba2ece0ef493044f633cd6` changes only
+`batch_session.py`, `batch_attribution.py` and their attribution tests. Each selected configuration now invokes
+only its assigned B subset; exact returned keys and every invoked warm-up/full/short gate are required. Any selected
+failure stops timing and captures. Traffic requires exact process/agent/dispatch coverage and matching spans against
+the retained trace. Explicit measured zeros remain records; full-minus-short traffic remains a positive conditional estimate.
+
+The four primary regressions fail against the reviewed implementation (exit 1). The same source hashes as the repair
+commit then pass focused acceptance: **308 passed in 25.98s**, exit 0, including all 14 graph cases. Final full suite:
+**2190 passed, 14 skipped in 490.55s (0:08:10)**, exit 0, no deselection. Post-receipt archive transport tests: **2 passed in 13.86s**, exit 0.
+Fresh no-Git B4 help and the registered dependency dry run return 0. Skips remain skips; reasons are in the raw log.
+
+The first full-suite attempt stopped at the disk-reserve guard (exit -15, 350.63 s); it is not reported as a pass.
+Its packaging test copied 2.6 GiB of historical results. Only that reproducible temporary project copy was removed.
+Packaging and the two Qwen archive transport tests use the established committed source fixture without historical
+DeepSeek results. All 122 packaging metadata, test and package inputs match; all other tests use the frozen worktree.
+The advisory lock and 4 GiB reserve guard remain active. No compiler matrix was rerun: all 27 device include hashes
+and 163 original raw evidence files match. The active Qwen receipt changes one test binding; the other 358 are unchanged.
+All 359 bindings match the committed fixture after refresh.
+
+[Repair evidence and scoped handoff](b4-review-repair/README.md) retain exact commands,
+source hashes, actual exits, original review and before/after failures. **Independent scoped R1/R2 recheck is pending.**
+No new experiment, GPU/cloud action, spend, main merge or push occurred. Same-kernel replay remains UNAVAILABLE and
+the full two-baseline performance claim INCOMPLETE.

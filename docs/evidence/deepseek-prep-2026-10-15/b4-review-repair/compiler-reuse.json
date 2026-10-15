@@ -1,0 +1,20 @@
+{
+  "base": "3a449a7db98f44eaf42f259011e3bcf996327b9b",
+  "revision": "40ddf3677e8a351c62ba2ece0ef493044f633cd6",
+  "changed_sources": [
+    "examples/dsv2lite/batch_attribution.py",
+    "examples/dsv2lite/batch_session.py",
+    "tests/test_dsv2_batch_attribution.py"
+  ],
+  "device_include_closure_verified": 27,
+  "original_raw_files_verified": 163,
+  "qwen_changed_bindings": {
+    "tests/test_dsv2_batch_attribution.py": {
+      "old": "178c37696e0a1228c3e7ca3f84dd06a547b398fc9e12bbb318a77b3282cd587e",
+      "new": "4bbf0886f5b6138e6c6bf27352b21f9c37c0dff3712da066d4d825418532a2b8"
+    }
+  },
+  "qwen_unchanged_bindings": 358,
+  "compiler_reruns": 0,
+  "decision": "Reuse existing DeepSeek and Qwen compiler matrices: changes are Python launch selection, traffic parsing and tests only. Device/host C++ sources, plan/emitter/import inputs, compiler flags, build scripts and queues are unchanged from the reviewed base. No new compiler or device result is claimed."
+}
