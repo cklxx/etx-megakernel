@@ -41,6 +41,29 @@ def test_a_background_child_does_not_outlive_its_step(tmp_path):
     assert not _alive(int(pidfile.read_text()))
 
 
+def test_sweep_waits_for_async_group_exit_without_proc(monkeypatch):
+    # A successful SIGKILL does not mean the OS has removed the group yet.
+    state = {"alive": True}
+    monkeypatch.setattr(proc, "_parents", lambda: {})
+
+    def killpg(group, sig):
+        assert group == 123 and sig == proc.signal.SIGKILL
+        if not state["alive"]:
+            raise ProcessLookupError
+
+    monkeypatch.setattr(proc.os, "killpg", killpg)
+    monkeypatch.setattr(proc.time, "sleep", lambda _: state.update(alive=False))
+    assert proc.sweep(group=123) == []
+    assert not state["alive"]
+
+
+def test_sweep_reports_group_that_does_not_exit_without_proc(monkeypatch):
+    monkeypatch.setattr(proc, "_parents", lambda: {})
+    monkeypatch.setattr(proc.os, "killpg", lambda group, sig: None)
+    monkeypatch.setattr(proc, "SWEEP_S", 0.0)
+    assert proc.sweep(group=123) == [123]
+
+
 def test_a_raising_callback_stops_the_step(tmp_path):
     def watchdog(elapsed):
         raise TimeoutError("stuck")

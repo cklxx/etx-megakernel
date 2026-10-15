@@ -52,18 +52,25 @@ def tree(roots, parents) -> set[int]:
 
 def sweep(keep=frozenset(), group=None) -> list[int]:
     """SIGKILL every descendant of this process outside the subtrees at `keep` (and the process group `group`, all
-    that reaches orphans without a subreaper), reap ours, repeat until none is left. Returns survivors after SWEEP_S."""
+    that reaches orphans without a subreaper), reap ours, repeat until none is left. Returns surviving process IDs
+    after SWEEP_S, including the group ID if that group still exists (membership is unavailable without /proc)."""
     me, end = os.getpid(), time.monotonic() + SWEEP_S
     while True:
+        group_alive = False
         if group is not None:
             try:
                 os.killpg(group, signal.SIGKILL)
-            except (ProcessLookupError, PermissionError):
+                group_alive = True  # Signal delivery is asynchronous; wait until the group disappears.
+            except ProcessLookupError:
                 pass
+            except PermissionError:
+                group_alive = True
         parents = _parents()
         victims = tree([p for p, pp in parents.items() if pp == me and p not in keep], parents) - tree(keep, parents)
-        if not victims or time.monotonic() > end:
-            return sorted(victims)
+        if not victims and not group_alive:
+            return []
+        if time.monotonic() > end:
+            return sorted(victims | ({group} if group_alive else set()))
         for pid in victims:
             try:
                 os.kill(pid, signal.SIGKILL)
