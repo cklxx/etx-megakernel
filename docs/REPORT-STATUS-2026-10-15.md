@@ -13,9 +13,19 @@ number below was produced in one session on one box, with the two engines measur
 | 4 | 410 | 567 | **-27.7%** | LOSS (spread 6.2%) |
 | 8 | — | — | — | not measured; the arm is incorrect (section 5) |
 
-Best single-request latency observed, from a separate session at the current configuration: **3.068–3.075 ms per token
-on device** (about 326 tok/s). The table's 274 tok/s is the decision number: it is the same-session, interleaved
-comparison against vLLM, so it is the only one that supports a claim about the other engine.
+**Every absolute number below belongs to one machine, and the machines differ by more than any optimisation we have
+measured.** The batch table's 274 tok/s is the shipped recipe on the batch box. The same binary on an earlier box
+measured **3.068–3.075 ms per token on device (about 326 tok/s)** across five rounds, while on the batch box it
+measured **3.609–3.615 ms** across its five rounds: a **+17.6% offset (+542 µs/token)**, stable to 6 µs inside each box
+and larger than every change in section 2 combined (41–120 µs each). The batch table's 274 tok/s is the decision number
+because it is the same-box, interleaved comparison against vLLM, and only that comparison supports a claim about the
+other engine; the 326 tok/s figure is a different machine's capability and must not be read against that table.
+
+**A box offset is now a measured quantity, not an assumption.** The batch session never re-ran the previous
+configuration on its own box, so it cannot say whether the offset is the machine, the batch harness at batch 1, or
+both. Every future session runs a **box control**: the shipped recipe at batch 1, plus the previous shipped recipe,
+on the same box as the study, so the machine's offset is measured and every absolute number can be converted between
+boxes instead of assumed equal.
 
 **Total throughput and per-request latency move in opposite directions**, so both are reported. At batch 2, total
 throughput rises 14% while per-request latency rises 10%.

@@ -118,6 +118,12 @@ kept before them, `alld4r0l1` (3.188-3.195 ms device, measured in the same sessi
 | ablation: remove `gemv_no_terminal_all` (`noQ`) | removing it costs **-29 us** (pairs -29, -29, -23, -32, -22; spread 10) | [M] | `examples/dsv2lite/results/2026-10-14-k1/RESULT.md` | `alld4r0l1` kept arm in the same session (3.185-3.193 ms device) | same rule shape; a lever that is dead alone may be live inside the combination | DROP the ablation, keep the lever | remove the lever | **lever STAYS** |
 | ablation: remove `argmax_tree` (`noA`) | removing it costs **-13 us** (pairs -13, -6, -21, -6, -14; spread 15) | [M] | `examples/dsv2lite/results/2026-10-14-k1/RESULT.md` | `alld4r0l1` kept arm in the same session | every pair slower, but the median is inside 2x spread | DROP the ablation, keep the lever | remove the lever | **lever STAYS, weakest of the pair** |
 
+**Box offset (2026-10-15):** the kept arm measured **3.068-3.075 ms** device on one MI300X VF and **3.609-3.615 ms** on
+another across five rounds each, a **+542 us (+17.6%) machine offset** stable to 6 us inside each box. That is larger
+than every row in this ledger, so every absolute time here is a statement about one machine; the paired gains
+themselves are same-box and unaffected. Sessions now print a `BOXCONTROL` (shipped recipe at B = 1 plus the previous
+recipe) so the offset is measured rather than assumed.
+
 Open, not banked: the batch 2/4/8 study (docs/BATCH-2026-10-14.md). Its reference set is built and two of its three
 correctness gates have passed on the box (B = 2 and B = 4, 2026-10-14); the B = 8 gate and the five timed rounds are
 not measured, so no throughput number is claimed here. The batch-8 recipe diagnostic that ran on 2026-10-14 is withdrawn as evidence: its four gates all executed one arm's binary (docs/BATCH-2026-10-14.md section 13, corrected 2026-10-15). The two levers' sum (+107 us measured separately) is **not** a
