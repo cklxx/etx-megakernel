@@ -46,6 +46,9 @@ def emit(candidate: bool, diagnostic: bool) -> str:
         # Diagnostics observe the original values. Only blk 0 owns these copies.
         observe = '''
 #if EEM_DIAGNOSTIC
+  // The copy's scalar index reads values folded by other waves. Join all
+  // writers before any diagnostic reader; store is block-uniform.
+  __syncthreads();
   if (store) {
     if (threadIdx.x < 256) dsl_a_stf((float*)c->args[2] + threadIdx.x, ss);
     for (int i = (int)threadIdx.x; i < K; i += blockDim.x)

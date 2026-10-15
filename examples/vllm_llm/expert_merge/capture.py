@@ -4,6 +4,7 @@ This generates a private host/build script. Shared attention/router files are
 not changed. The added hook runs only on the existing --check sequential path.
 """
 import argparse
+from datetime import datetime
 import json
 import os
 import re
@@ -44,6 +45,29 @@ def emit(out):
     print("CAPTURE HOST GENERATED",out,"; no full-model build or run done")
 
 
+def source_identity():
+    if (ROOT/".git").exists():
+        revision=subprocess.check_output(["git","rev-parse","HEAD"],cwd=ROOT,text=True).strip()
+        if not re.fullmatch(r"[0-9a-f]{40}",revision):
+            raise ValueError("malformed Git revision")
+        return dict(kind="git",commit=revision)
+    # tools/session.sh stage extracts a clean archive without Git metadata.
+    # Require its complete receipt; never pick up a parent repository's HEAD.
+    path=ROOT/"SOURCE_IDENTITY"
+    text=path.read_text() if path.is_file() else ""
+    match=re.fullmatch(r"commit ([0-9a-f]{40})\nbranch ([^\r\n]*)\n"
+                      r"archive ([0-9a-f]{64})\nstaged ([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z)\n",text)
+    if not match:
+        raise ValueError("missing or malformed SOURCE_IDENTITY; use tools/session.sh stage")
+    revision,branch,archive,staged=match.groups()
+    try:
+        datetime.strptime(staged,"%Y-%m-%dT%H:%M:%SZ")
+    except ValueError as exc:
+        raise ValueError("malformed SOURCE_IDENTITY staged timestamp") from exc
+    return dict(kind="staged-archive",commit=revision,branch=branch,archive=archive,
+                staged=staged,sha256=sha(path))
+
+
 def attest(emitted, host_build):
     e=Path(emitted).resolve(); b=Path(host_build).resolve()
     source=json.loads((e/"source.json").read_text())
@@ -52,9 +76,10 @@ def attest(emitted, host_build):
     command=json.loads((b/"hipcc_command.json").read_text())
     if str(e/"capture_host.hip") not in command:
         raise ValueError("build did not compile the capture host")
+    identity=source_identity()
     record=dict(source=source, emitted=str(e), binary=sha(b/"run"),
                 plan=sha(b/"vl_plan.txt"), command=command,
-                revision=subprocess.check_output(["git","rev-parse","HEAD"],cwd=ROOT,text=True).strip())
+                revision=identity["commit"],source_identity=identity)
     (b/"capture-build.json").write_text(json.dumps(record,indent=2,sort_keys=True)+"\n")
 
 

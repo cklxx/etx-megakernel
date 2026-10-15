@@ -55,6 +55,26 @@ def test_generated_graph_and_identity(tmp_path,monkeypatch):
             prepare.verify(out)
 
 
+@pytest.mark.parametrize('head',[False,True])
+def test_control_diagnostic_joins_cross_wave_readers(tmp_path,head):
+    out=tmp_path/'control-diag'
+    prepare.generate(out,'control',diagnostic=True,head=head)
+    text=(out/'tiles.hip').read_text()
+    stage=text[text.index('void eem_stage_norm('):]
+    _,fold=source.parts()
+    end=stage.index(fold)+len(fold)
+    copy=stage.index('dsl_a_stbf((__hip_bfloat16*)c->args[1] + i')
+    # Writer thread 64 folds xs[512], but reader thread 512 (wave 8) has
+    # no fold work. It can overtake wave 1 unless ALL waves join first.
+    between=stage[end:copy]
+    code='\n'.join(line.split('//')[0] for line in between.splitlines())
+    assert '#if EEM_DIAGNOSTIC\n' in code
+    diagnostic=code.split('#if EEM_DIAGNOSTIC\n',1)[1].strip()
+    assert diagnostic.startswith('__syncthreads();\n  if (store) {')
+    assert '#endif' not in diagnostic  # the join cannot affect timed builds
+    assert 'return' not in code
+
+
 def test_protocol_reset_order_and_publication():
     assert protocol.exercise(tokens=128)['row_owners']==4096
     p=protocol.Protocol()
@@ -232,6 +252,68 @@ def test_capture_entrypoint_and_failed_receipt(tmp_path):
     (b/'run').write_bytes(b'not a device binary'); (b/'vl_plan.txt').write_text('test')
     runner.dump(c/'build.json',dict(binary=prepare.sha(b/'run'),plan=prepare.sha(b/'vl_plan.txt')))
     with pytest.raises(ValueError,match='completed successful'): capture.seal(c,b)
+
+
+@pytest.fixture
+def archive_capture(tmp_path,monkeypatch):
+    root=tmp_path/'archive'; root.mkdir()
+    emitted=tmp_path/'emitted'; emitted.mkdir()
+    build=tmp_path/'build'; build.mkdir()
+    # Receipt-only stand-ins: neither an executable nor a model capture.
+    (emitted/'capture_host.hip').write_text('// test-only capture host\n')
+    (build/'run').write_bytes(b'non-executable attestation fixture')
+    (build/'vl_plan.txt').write_text('test-only plan\n')
+    runner.dump(emitted/'source.json',dict(source_host='test-only',
+        generated_host=prepare.sha(emitted/'capture_host.hip'),capture_header=prepare.sha(capture.HERE/'capture.h')))
+    runner.dump(build/'hipcc_command.json',['hipcc',str(emitted/'capture_host.hip'),'-o',str(build/'run')])
+    monkeypatch.setattr(capture,'ROOT',root)
+    def no_git(*args,**kwargs):
+        pytest.fail('archive attestation must not invoke Git')
+    monkeypatch.setattr(capture.subprocess,'check_output',no_git)
+    return root,emitted,build
+
+
+ARCHIVE_IDENTITY=('commit '+'1'*40+'\nbranch experiment/qwen-expert-early-merge\n'
+                  'archive '+'a'*64+'\nstaged 2026-10-15T06:00:00Z\n')
+
+
+def test_capture_attests_no_git_archive(archive_capture):
+    root,emitted,build=archive_capture
+    assert not (root/'.git').exists()
+    (root/'SOURCE_IDENTITY').write_text(ARCHIVE_IDENTITY)
+    capture.attest(emitted,build)
+    record=json.loads((build/'capture-build.json').read_text())
+    assert record['revision']=='1'*40
+    assert record['source_identity']==dict(kind='staged-archive',commit='1'*40,
+        branch='experiment/qwen-expert-early-merge',archive='a'*64,staged='2026-10-15T06:00:00Z',
+        sha256=prepare.sha(root/'SOURCE_IDENTITY'))
+    assert record['source']==json.loads((emitted/'source.json').read_text())
+    assert record['binary']==prepare.sha(build/'run')
+    assert record['plan']==prepare.sha(build/'vl_plan.txt')
+    assert record['command']==json.loads((build/'hipcc_command.json').read_text())
+
+
+@pytest.mark.parametrize('identity',[None,'',ARCHIVE_IDENTITY.replace('1'*40,'unknown'),
+    ARCHIVE_IDENTITY.replace('a'*64,'bad'),ARCHIVE_IDENTITY.replace('2026-10-15','2026-02-30'),
+    ARCHIVE_IDENTITY.replace('branch experiment/qwen-expert-early-merge\n',''),
+    ARCHIVE_IDENTITY+'commit '+'2'*40+'\n'])
+def test_capture_archive_refuses_missing_malformed_identity(archive_capture,identity):
+    root,emitted,build=archive_capture
+    if identity is not None: (root/'SOURCE_IDENTITY').write_text(identity)
+    with pytest.raises(ValueError,match='SOURCE_IDENTITY'):
+        capture.attest(emitted,build)
+    assert not (build/'capture-build.json').exists()
+
+
+def test_capture_git_identity(tmp_path,monkeypatch):
+    capture.subprocess.run(['git','init','-q',str(tmp_path)],check=True)
+    capture.subprocess.run(['git','-c','user.name=Attestation Test','-c','user.email=test@example.invalid',
+                            '-c','commit.gpgsign=false','-c','core.hooksPath=/dev/null',
+                            'commit','-q','--allow-empty','-m','test fixture'],cwd=tmp_path,check=True)
+    monkeypatch.setattr(capture,'ROOT',tmp_path)
+    identity=capture.source_identity()
+    assert identity['kind']=='git'
+    assert len(identity['commit'])==40
 
 
 @pytest.mark.parametrize('layer,consumer_layer,role',[(23,24,'qkv'),(47,-1,'head')])

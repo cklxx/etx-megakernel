@@ -1,7 +1,7 @@
 # Qwen expert row merge probe
 
 Registration: `QWEN-EXPERT-ROW-MERGE-2026-10-15`.
-Status: executable local preparation. No GPU result. Full-model default: OFF.
+Status: local preparation with the two final-code review findings repaired; final independent re-review pending. No GPU result. Full-model default: OFF.
 Owner branch: `experiment/qwen-expert-early-merge`.
 Base: `c432c77b7f778799ecbb89db9af89902d5923c00`.
 
@@ -103,13 +103,19 @@ EEM_INPUT=/local/capture-L23-P1040 python3 -m etx.tools.gpu_jobs \
   examples/sessions/qwen_expert_merge.py --gpus 0 --cpu-slots 1 --logdir /local/real-expert-session-new
 ```
 
-The generated build attests that its compiler command used the private capture host. Capture sealing requires its binary/plan identity, successful command receipt, complete same-position imported-launch coverage, all capture markers, input sizes and hashes. An incomplete capture stays blocked. Capture and prefix replay need their own explicit GPU time budget; they are not hidden inside the 30-minute isolated screen. Do not recapture retained valid inputs.
+The generated build attests that its compiler command used the private capture host. A checkout records its Git revision. An archive without `.git` requires the complete `tools/session.sh stage` `SOURCE_IDENTITY` receipt (commit, branch, archive SHA-256 and UTC staging timestamp); missing or malformed receipts are rejected. The attestation retains the receipt hash and provenance alongside the source, binary and plan hashes and the compiler command. Capture sealing requires its binary/plan identity, successful command receipt, complete same-position imported-launch coverage, all capture markers, input sizes and hashes. An incomplete capture stays blocked. Capture and prefix replay need their own explicit GPU time budget; they are not hidden inside the 30-minute isolated screen. Do not recapture retained valid inputs.
 
 ## Integration
 
 All implementation files are new under `expert_merge/`, plus one session file and one test file. No shared index, model, host, lease or production default is changed. Preserve main's router work at `2fdbed13a5574f1d86ee10602a8fe71a30c720b6`. After serialized integration, regenerate source identities and private capture hosts and rerun acceptance. Source anchors must fail closed if the merged host or GEMV changes. Shared experiment-index registration is deferred to that integration step.
 
 ## Preparation evidence
+
+The original evidence below belongs to preparation commit `172a22f3809f0ef9a31ebd369fe48fb175dcddd0`. The independent final-code review at `/Users/ckl/.hermes/cache/scratch/astra-expert-final-code-review.md` found two pre-GPU blockers in that commit. The review is preserved. The scoped repair adds an all-thread block join between the control's vector-fold writes and its cross-wave diagnostic LDS copy, inside `EEM_DIAGNOSTIC` and before the block-uniform `store` branch. Both qkv and head use this path. Performance builds contain no added join. The second repair accepts and validates the staged archive identity described above. Neither repair changes the byte gates, repeated payload checks, timing authorization, performance thresholds or full-model default.
+
+Repair evidence is under `/Users/ckl/.hermes/cache/scratch/expert-final-fixes-evidence/`; the scoped result is `/Users/ckl/.hermes/cache/scratch/codex-expert-final-fixes-result.md`. All eight build identities were regenerated because the manifest includes the changed source files. Unaffected compiler evidence is retained only with explicit source/preprocessed-code equivalence; the two changed control diagnostic configurations were freshly compiled. This local repair does not constitute a passed independent re-review or a device result.
+
+Actual repair acceptance: the new regressions fail three times on the reviewed source (both consumer roles and archive attestation), then pass all three after the repair. The full experiment and session-transport test files pass **46 tests in 27.15 seconds**. They include successful no-Git receipt attestation, seven missing/malformed identity refusals, a normal Git checkout, and the original strict correctness/timing refusals. All eight identities were regenerated; `build-reuse.json` records old/new identities and preprocessing hashes. The six unaffected device translation units match after build-path/identity normalization. Both changed control diagnostic builds freshly pass LLVM 23 gfx942 compilation with device libraries and host syntax, ROCm 7.2.4 LLVM 22 device assembly/host compilation, and HSA gfx942 device linking with `--no-undefined`. The private capture host was regenerated and passed syntax checking; its generated source hash matches the original. No native GPU executable was linked or run. Original arithmetic, protocol, 16-build matrix and full-suite evidence is retained as historical evidence, not relabelled as a new run. Raw logs, expected failure exits and final archive receipts are indexed in the repair result.
 
 Durable local evidence is under `/Users/ckl/.hermes/cache/scratch/expert-early-merge-prep-evidence/resume-final/`. The final result is `/Users/ckl/.hermes/cache/scratch/codex-expert-early-merge-prep-result.md`. Its `validation.json` and `SHA256SUMS` identify the committed sources, commands, true exits, all eight probe identities and compiler reports. Failed attempts remain in that directory.
 
