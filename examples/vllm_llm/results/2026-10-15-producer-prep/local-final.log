@@ -1,0 +1,23 @@
+LOCAL phase=shell-build evidence=examples/vllm_llm/results/2026-10-15-producer-prep/final/shell-build.log
+LOCAL phase=shell-build exit=0
+LOCAL phase=shell-local_matrix evidence=examples/vllm_llm/results/2026-10-15-producer-prep/final/shell-local_matrix.log
+LOCAL phase=shell-local_matrix exit=0
+LOCAL phase=shell-rocm_build_check evidence=examples/vllm_llm/results/2026-10-15-producer-prep/final/shell-rocm_build_check.log
+LOCAL phase=shell-rocm_build_check exit=0
+LOCAL phase=shell-session evidence=examples/vllm_llm/results/2026-10-15-producer-prep/final/shell-session.log
+LOCAL phase=shell-session exit=0
+LOCAL phase=focused evidence=examples/vllm_llm/results/2026-10-15-producer-prep/final/focused.log
+LOCAL phase=focused exit=0
+LOCAL phase=full-suite evidence=examples/vllm_llm/results/2026-10-15-producer-prep/final/full-suite.log
+LOCAL phase=full-suite exit=2
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/Users/ckl/code/.wt/etx-producer-scoring/examples/vllm_llm/producer_local.py", line 77, in <module>
+  File "/Users/ckl/code/.wt/etx-producer-scoring/examples/vllm_llm/producer_local.py", line 47, in main
+    run('focused',[sys.executable,'-m','pytest','-q','tests/test_producer.py','tests/test_router_study.py','tests/test_gpu_jobs.py','tests/test_session_references.py'],env=env)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/ckl/code/.wt/etx-producer-scoring/examples/vllm_llm/producer_local.py", line 38, in run
+    (a.out/'commands.json').write_text(json.dumps(results,indent=2)+'\n')
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+RuntimeError: full-suite failed, exit 2: inspect examples/vllm_llm/results/2026-10-15-producer-prep/final/full-suite.log

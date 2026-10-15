@@ -1,0 +1,39 @@
+LOCAL phase=shell-build evidence=examples/vllm_llm/results/2026-10-15-producer-prep/final-v5/shell-build.log
+LOCAL phase=shell-build exit=0
+LOCAL phase=shell-local_matrix evidence=examples/vllm_llm/results/2026-10-15-producer-prep/final-v5/shell-local_matrix.log
+LOCAL phase=shell-local_matrix exit=0
+LOCAL phase=shell-rocm_build_check evidence=examples/vllm_llm/results/2026-10-15-producer-prep/final-v5/shell-rocm_build_check.log
+LOCAL phase=shell-rocm_build_check exit=0
+LOCAL phase=shell-session evidence=examples/vllm_llm/results/2026-10-15-producer-prep/final-v5/shell-session.log
+LOCAL phase=shell-session exit=0
+LOCAL phase=focused evidence=examples/vllm_llm/results/2026-10-15-producer-prep/final-v5/focused.log
+LOCAL phase=focused exit=0
+LOCAL phase=full-suite evidence=examples/vllm_llm/results/2026-10-15-producer-prep/final-v5/full-suite.log
+LOCAL phase=full-suite exit=0
+LOCAL phase=simulation evidence=examples/vllm_llm/results/2026-10-15-producer-prep/final-v5/simulation.log
+LOCAL phase=simulation exit=0
+LOCAL phase=session-dry evidence=examples/vllm_llm/results/2026-10-15-producer-prep/final-v5/session-dry.log
+LOCAL phase=session-dry exit=0
+LOCAL phase=matrix evidence=examples/vllm_llm/results/2026-10-15-producer-prep/final-v5/matrix.log
+LOCAL phase=matrix exit=0
+LOCAL phase=rocm-baseline evidence=examples/vllm_llm/results/2026-10-15-producer-prep/final-v5/rocm-baseline.log
+LOCAL phase=rocm-baseline exit=0
+LOCAL phase=llvm-ir-baseline evidence=examples/vllm_llm/results/2026-10-15-producer-prep/final-v5/llvm-ir-baseline.log
+LOCAL phase=llvm-ir-baseline exit=1
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/Users/ckl/code/.wt/etx-producer-scoring/examples/vllm_llm/producer_local.py", line 78, in <module>
+    if __name__=='__main__':main()
+                            ~~~~^^
+  File "/Users/ckl/code/.wt/etx-producer-scoring/examples/vllm_llm/producer_local.py", line 59, in main
+    run(f'llvm-ir-{arm}',['bash','etx/importer/hip_ir_local.sh',b/'megakernel_d0.hip',b/'local.ll',
+    ~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                         '-Ietx/runtime/include','-I',b,'-I.',*flags,
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                         '-Xclang','-mlink-builtin-bitcode','-Xclang',b/'imports.bc'],env=env)
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/ckl/code/.wt/etx-producer-scoring/examples/vllm_llm/producer_local.py", line 39, in run
+    if rc:raise RuntimeError(f'{name} failed, exit {rc}: inspect {log}')
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+RuntimeError: llvm-ir-baseline failed, exit 1: inspect examples/vllm_llm/results/2026-10-15-producer-prep/final-v5/llvm-ir-baseline.log

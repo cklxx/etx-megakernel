@@ -1,0 +1,311 @@
+[
+  {
+    "phase": "shell-build",
+    "command": [
+      "bash",
+      "-n",
+      "examples/vllm_llm/build.sh"
+    ],
+    "exit": 0,
+    "seconds": 0.0112271667458117,
+    "log": "examples/vllm_llm/results/2026-10-15-producer-prep/final-v7/shell-build.log"
+  },
+  {
+    "phase": "shell-local_matrix",
+    "command": [
+      "bash",
+      "-n",
+      "examples/vllm_llm/local_matrix.sh"
+    ],
+    "exit": 0,
+    "seconds": 0.010958000086247921,
+    "log": "examples/vllm_llm/results/2026-10-15-producer-prep/final-v7/shell-local_matrix.log"
+  },
+  {
+    "phase": "shell-rocm_build_check",
+    "command": [
+      "bash",
+      "-n",
+      "examples/vllm_llm/rocm_build_check.sh"
+    ],
+    "exit": 0,
+    "seconds": 0.01088262489065528,
+    "log": "examples/vllm_llm/results/2026-10-15-producer-prep/final-v7/shell-rocm_build_check.log"
+  },
+  {
+    "phase": "shell-session",
+    "command": [
+      "bash",
+      "-n",
+      "tools/session.sh"
+    ],
+    "exit": 0,
+    "seconds": 0.010893709026277065,
+    "log": "examples/vllm_llm/results/2026-10-15-producer-prep/final-v7/shell-session.log"
+  },
+  {
+    "phase": "focused",
+    "command": [
+      "/Users/ckl/code/etx/.venv/bin/python",
+      "-m",
+      "pytest",
+      "-q",
+      "tests/test_producer.py",
+      "tests/test_host_import_check.py",
+      "tests/test_router_study.py",
+      "tests/test_gpu_jobs.py",
+      "tests/test_session_references.py",
+      "tests/test_test_paths.py"
+    ],
+    "exit": 0,
+    "seconds": 17.26515387510881,
+    "log": "examples/vllm_llm/results/2026-10-15-producer-prep/final-v7/focused.log"
+  },
+  {
+    "phase": "simulation",
+    "command": [
+      "/Users/ckl/code/etx/.venv/bin/python",
+      "-u",
+      "-m",
+      "examples.vllm_llm.producer_replay",
+      "--out",
+      "examples/vllm_llm/results/2026-10-15-producer-prep/final-v7/simulation.json"
+    ],
+    "exit": 0,
+    "seconds": 0.9649630840867758,
+    "log": "examples/vllm_llm/results/2026-10-15-producer-prep/final-v7/simulation.log"
+  },
+  {
+    "phase": "session-dry",
+    "command": [
+      "/Users/ckl/code/etx/.venv/bin/python",
+      "-m",
+      "etx.tools.gpu_jobs",
+      "examples/sessions/qwen_producer.py",
+      "--dry-run"
+    ],
+    "exit": 0,
+    "seconds": 0.06478250026702881,
+    "log": "examples/vllm_llm/results/2026-10-15-producer-prep/final-v7/session-dry.log"
+  },
+  {
+    "phase": "matrix",
+    "command": [
+      "bash",
+      "examples/vllm_llm/local_matrix.sh",
+      "/Users/ckl/code/.wt/etx-producer-scoring/build/producer-final-v7-matrix"
+    ],
+    "exit": 0,
+    "seconds": 257.08306516706944,
+    "log": "examples/vllm_llm/results/2026-10-15-producer-prep/final-v7/matrix.log"
+  },
+  {
+    "phase": "rocm-baseline",
+    "command": [
+      "bash",
+      "examples/vllm_llm/rocm_build_check.sh",
+      "qwen3-30b-a3b",
+      "default",
+      "/Users/ckl/code/.wt/etx-producer-scoring/build/producer-final-v7-baseline"
+    ],
+    "exit": 0,
+    "seconds": 74.4217661251314,
+    "log": "examples/vllm_llm/results/2026-10-15-producer-prep/final-v7/rocm-baseline.log"
+  },
+  {
+    "phase": "llvm-ir-baseline",
+    "command": [
+      "bash",
+      "etx/importer/hip_ir_local.sh",
+      "/Users/ckl/code/.wt/etx-producer-scoring/build/producer-final-v7-baseline/native_megakernel.hip",
+      "/Users/ckl/code/.wt/etx-producer-scoring/build/producer-final-v7-baseline/local.ll",
+      "-Ietx/runtime/include",
+      "-I",
+      "/Users/ckl/code/.wt/etx-producer-scoring/build/producer-final-v7-baseline",
+      "-I.",
+      "-DETX_DSL_WSUM",
+      "-DETX_DSL_SCALAR",
+      "-DETX_DSL_GU1",
+      "-DETX_DSL_RBATCH",
+      "-DETX_INBODY_REPORT",
+      "-DETX_DSL_NORM_HOIST",
+      "-DETX_DSL_VECNORM",
+      "-DETX_TOPK_KEY32",
+      "-Xclang",
+      "-mlink-builtin-bitcode",
+      "-Xclang",
+      "/Users/ckl/code/.wt/etx-producer-scoring/build/producer-final-v7-baseline/imports.bc"
+    ],
+    "exit": 0,
+    "seconds": 24.589732250198722,
+    "log": "examples/vllm_llm/results/2026-10-15-producer-prep/final-v7/llvm-ir-baseline.log"
+  },
+  {
+    "phase": "llvm-asm-baseline",
+    "command": [
+      "/opt/homebrew/opt/llvm/bin/llc",
+      "-mtriple=amdgcn-amd-amdhsa",
+      "-mcpu=gfx942",
+      "-O3",
+      "/Users/ckl/code/.wt/etx-producer-scoring/build/producer-final-v7-baseline/local.ll",
+      "-o",
+      "/Users/ckl/code/.wt/etx-producer-scoring/build/producer-final-v7-baseline/local.s"
+    ],
+    "exit": 0,
+    "seconds": 60.83006549999118,
+    "log": "examples/vllm_llm/results/2026-10-15-producer-prep/final-v7/llvm-asm-baseline.log"
+  },
+  {
+    "phase": "host-object-baseline",
+    "command": [
+      "/opt/homebrew/opt/llvm/bin/clang++",
+      "-x",
+      "hip",
+      "--cuda-host-only",
+      "-nogpuinc",
+      "-nogpulib",
+      "--offload-arch=gfx942",
+      "-std=c++17",
+      "-isystem",
+      "/Users/ckl/code/rocm-headers/clang",
+      "-isystem",
+      "/Users/ckl/code/rocm-headers/inc",
+      "-include",
+      "__clang_hip_runtime_wrapper.h",
+      "-isystem",
+      "etx/importer/shim/mac",
+      "-D__HIP_PLATFORM_AMD__",
+      "-DETX_VL_CHECK",
+      "-Ietx/runtime/include",
+      "-I",
+      "/Users/ckl/code/.wt/etx-producer-scoring/build/producer-final-v7-baseline",
+      "-I.",
+      "-DETX_DSL_WSUM",
+      "-DETX_DSL_SCALAR",
+      "-DETX_DSL_GU1",
+      "-DETX_DSL_RBATCH",
+      "-DETX_INBODY_REPORT",
+      "-DETX_DSL_NORM_HOIST",
+      "-DETX_DSL_VECNORM",
+      "-DETX_TOPK_KEY32",
+      "-c",
+      "examples/vllm_llm/host.hip",
+      "-o",
+      "/Users/ckl/code/.wt/etx-producer-scoring/build/producer-final-v7-baseline/host-local.o"
+    ],
+    "exit": 0,
+    "seconds": 1.1218505422584713,
+    "log": "examples/vllm_llm/results/2026-10-15-producer-prep/final-v7/host-object-baseline.log"
+  },
+  {
+    "phase": "rocm-producer",
+    "command": [
+      "bash",
+      "examples/vllm_llm/rocm_build_check.sh",
+      "qwen3-30b-a3b",
+      "default",
+      "/Users/ckl/code/.wt/etx-producer-scoring/build/producer-final-v7-producer"
+    ],
+    "exit": 0,
+    "seconds": 51.97879425017163,
+    "log": "examples/vllm_llm/results/2026-10-15-producer-prep/final-v7/rocm-producer.log"
+  },
+  {
+    "phase": "llvm-ir-producer",
+    "command": [
+      "bash",
+      "etx/importer/hip_ir_local.sh",
+      "/Users/ckl/code/.wt/etx-producer-scoring/build/producer-final-v7-producer/native_megakernel.hip",
+      "/Users/ckl/code/.wt/etx-producer-scoring/build/producer-final-v7-producer/local.ll",
+      "-Ietx/runtime/include",
+      "-I",
+      "/Users/ckl/code/.wt/etx-producer-scoring/build/producer-final-v7-producer",
+      "-I.",
+      "-DETX_DSL_WSUM",
+      "-DETX_DSL_SCALAR",
+      "-DETX_DSL_GU1",
+      "-DETX_DSL_RBATCH",
+      "-DETX_INBODY_REPORT",
+      "-DETX_DSL_NORM_HOIST",
+      "-DETX_DSL_VECNORM",
+      "-DETX_TOPK_KEY32",
+      "-Xclang",
+      "-mlink-builtin-bitcode",
+      "-Xclang",
+      "/Users/ckl/code/.wt/etx-producer-scoring/build/producer-final-v7-producer/imports.bc"
+    ],
+    "exit": 0,
+    "seconds": 12.35615716734901,
+    "log": "examples/vllm_llm/results/2026-10-15-producer-prep/final-v7/llvm-ir-producer.log"
+  },
+  {
+    "phase": "llvm-asm-producer",
+    "command": [
+      "/opt/homebrew/opt/llvm/bin/llc",
+      "-mtriple=amdgcn-amd-amdhsa",
+      "-mcpu=gfx942",
+      "-O3",
+      "/Users/ckl/code/.wt/etx-producer-scoring/build/producer-final-v7-producer/local.ll",
+      "-o",
+      "/Users/ckl/code/.wt/etx-producer-scoring/build/producer-final-v7-producer/local.s"
+    ],
+    "exit": 0,
+    "seconds": 29.44316712487489,
+    "log": "examples/vllm_llm/results/2026-10-15-producer-prep/final-v7/llvm-asm-producer.log"
+  },
+  {
+    "phase": "host-object-producer",
+    "command": [
+      "/opt/homebrew/opt/llvm/bin/clang++",
+      "-x",
+      "hip",
+      "--cuda-host-only",
+      "-nogpuinc",
+      "-nogpulib",
+      "--offload-arch=gfx942",
+      "-std=c++17",
+      "-isystem",
+      "/Users/ckl/code/rocm-headers/clang",
+      "-isystem",
+      "/Users/ckl/code/rocm-headers/inc",
+      "-include",
+      "__clang_hip_runtime_wrapper.h",
+      "-isystem",
+      "etx/importer/shim/mac",
+      "-D__HIP_PLATFORM_AMD__",
+      "-DETX_VL_CHECK",
+      "-Ietx/runtime/include",
+      "-I",
+      "/Users/ckl/code/.wt/etx-producer-scoring/build/producer-final-v7-producer",
+      "-I.",
+      "-DETX_DSL_WSUM",
+      "-DETX_DSL_SCALAR",
+      "-DETX_DSL_GU1",
+      "-DETX_DSL_RBATCH",
+      "-DETX_INBODY_REPORT",
+      "-DETX_DSL_NORM_HOIST",
+      "-DETX_DSL_VECNORM",
+      "-DETX_TOPK_KEY32",
+      "-c",
+      "examples/vllm_llm/host.hip",
+      "-o",
+      "/Users/ckl/code/.wt/etx-producer-scoring/build/producer-final-v7-producer/host-local.o"
+    ],
+    "exit": 0,
+    "seconds": 1.572165624704212,
+    "log": "examples/vllm_llm/results/2026-10-15-producer-prep/final-v7/host-object-producer.log"
+  },
+  {
+    "phase": "full-suite",
+    "command": [
+      "/Users/ckl/code/etx/.venv/bin/python",
+      "-m",
+      "pytest",
+      "-q",
+      "-ra"
+    ],
+    "exit": 0,
+    "seconds": 590.3759878752753,
+    "log": "examples/vllm_llm/results/2026-10-15-producer-prep/final-v7/full-suite.log"
+  }
+]

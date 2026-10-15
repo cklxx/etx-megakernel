@@ -379,7 +379,15 @@ int main(int argc, char** argv) {
 
 #include "operator_helpers.inc"
     // the DSL GEMVs (etx.ops.gemv): W, x, out, ids, wts, expert stride, M, K, rows per task, tasks per expert
-    if (x.exp == "dsl_gemv") {
+    if (x.exp == "dsl_gemv_producer") {
+      if (!(r == "o_proj" && H == 2048 && E == 128 && TOPK == 8 && NR == 8 && x.M == 2048 && x.K == 4096
+            && x.gx == 256 && x.gy == 1 && x.gz == 1 && x.rep == 1 && x.nb == 1 && nreq == 1
+            && !ln_norm && !bias && norm_topk && !sparsemixer)) die("unsupported producer-scoring host shape");
+      a.ptr(W(pl+"wo")).ptr(attn_out).ptr(o).ptr(topk_ids).ptr(topk_w).i64(0).i32(H).i32(x.K).i32(8).i32(0)
+       .ptr(nullptr).ptr(resid).ptr(resid2).ptr(W(pl+"ln2")).i32(1).f32(eps).i32(0).i32(E).ptr(rlog)
+       ETX_VL_NOBATCH .ptr(W(pl+"wr")).ptr(ox).ptr(tei);
+    }
+    else if (x.exp == "dsl_gemv") {
       const int nblk = x.gx * x.gy * x.gz, rpt = (xM + nblk - 1) / nblk;
       if (x.K > 4096 || x.K % 256) die("dsl_gemv: K must be a multiple of 256 and <= 4096 (etx/ops/gemv.py)");
       const void* w; const void* in; void* out; size_t sx = 0, sout = 0;   // sx / sout: the request stride of in / out
@@ -610,6 +618,31 @@ int main(int argc, char** argv) {
 #ifdef ETX_BF16_CAPTURE
         capture.after();
 #endif
+        // Diagnostic capture is host-only and runs only inside --check.
+        if (const char* base = getenv("ETX_PRODUCER_CAPTURE")) {
+          if (x.req == 0 && x.layer >= 0 && (x.role == "o_proj" || x.role == "topk")) {
+            auto save = [&](const char* kind, const void* ptr, size_t n) {
+              const std::string path = std::string(base)+"/L"+std::to_string(x.layer)+"_"+kind+".bin";
+              FILE* f = fopen(path.c_str(), "wx");
+              if (!f) die("capture exists or cannot create: "+path);
+              std::vector<unsigned char> data(n);
+              ETX_CHECK(hipMemcpy(data.data(),ptr,n,hipMemcpyDeviceToHost));
+              if (fwrite(data.data(),1,n,f) != n || fclose(f)) die("capture write: "+path);
+            };
+            if (x.role == "o_proj") {
+              save("o",o,H*2); save("residual",resid,H*2);
+              save("gamma",W("L"+std::to_string(x.layer)+".ln2"),H*2);
+              save("router",W("L"+std::to_string(x.layer)+".wr"),(size_t)E*H*2);
+            }
+            if (x.role == "topk" || x.exp == "dsl_gemv_producer") {
+              save("norm",ox,(size_t)H*2); save("resid2",resid2,H*2);
+              save("logits",rlog,E*2); save("ids",topk_ids,n_tk*4);
+              save("mix",topk_w,n_tk*4); save("tei",tei,n_tk*4);
+            }
+            printf("PRODUCER-CAPTURE layer=%d position=%d role=%s base=%s\n",x.layer,check_pos,x.role.c_str(),base);
+            fflush(stdout);
+          }
+        }
         // CPU-prepared KEY32 session: preserve each layer's actual routing
         // output during the existing sequential import check. This is a host
         // copy only, absent from the timed path and the device kernel.
@@ -931,9 +964,13 @@ int main(int argc, char** argv) {
       for (int li = 1; li < n_launch; ++li) if (named(li)) return li;                 // the plan order drifted: search
       die("--check-dsl: no launch of type " + n1 + " (or " + n2 + ")"); return -1;
     };
+    const bool producer_score = std::any_of(insts.begin(), insts.end(), [](const Inst& x) { return x.exp == "dsl_gemv_producer"; });
     auto relaunch = [&](const char* role, const char* exp) {
+      if (producer_score && std::string(role) == "router") return; // o_proj already produced routing
+
       for (const Inst& x : insts) if (x.layer == Lc && x.role == role && x.req == 0) {
-        const std::string want = (std::string(role) == "router" && x.exp == "dsl_gemv_router_fold") ? x.exp : is_fold(role) ? std::string(exp) + "_fold" : std::string(exp);
+        const std::string want = ((std::string(role) == "router" && x.exp == "dsl_gemv_router_fold") ||
+                                  (std::string(role) == "o_proj" && x.exp == "dsl_gemv_producer")) ? x.exp : is_fold(role) ? std::string(exp) + "_fold" : std::string(exp);
         if (x.exp != want) die(std::string("--check-dsl: ") + role + " is " + x.exp + ", not " + want);
         const int li = launch_of(x);
         if (etx_launch_count[li] != inst_tasks(x)) die(std::string("--check-dsl: launch ") + std::to_string(li) + " of " + role + " has " +
@@ -998,7 +1035,7 @@ int main(int argc, char** argv) {
       add_bias(ref, host_w_opt(pl + "bo", H)); cmp("o_proj", dev(o, H), ref); }
     if (E > 0) {
       const bf* on = NR > 1 ? ox : o; std::vector<float> x = tof(dev(on, H));
-      if (is_fold("router")) x = norm_fold(dev(o, H), 1, dev(resid, H), host_w(pl + "ln2", 0, H), host_w_opt(pl + "ln2b", H));
+      if (producer_score || is_fold("router")) x = norm_fold(dev(o, H), 1, dev(resid, H), host_w(pl + "ln2", 0, H), host_w_opt(pl + "ln2b", H));
       { auto Wm = host_w(pl + "wr", 0, (size_t)E * H); relaunch("router", "dsl_gemv");
         std::vector<float> ref(E); for (int r = 0; r < E; ++r) ref[r] = dot(Wm.data() + (size_t)r * H, x, H); cmp("router", dev(rlog, E), ref); }
       for (const Inst& x2 : insts) if (x2.layer == Lc && x2.role == "topk" && x2.exp == "dsl_topk") { relaunch("topk", "dsl_topk"); break; }

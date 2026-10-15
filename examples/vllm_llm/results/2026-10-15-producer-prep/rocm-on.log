@@ -1,0 +1,11 @@
+== import (attn_mfma16_g8,attn_reduce,rms_norm_2d)
+attn_mfma16_g8         (256, 1, 1) slots=1 args=160B lds=8192B barriers=7
+attn_reduce            (128, 1, 1) slots=8 args=80B lds=2176B barriers=1
+rms_norm_2d            (256, 1, 1) slots=4 args=100B lds=320B barriers=2
+dsl ops attnprep,gemv: /code/.wt/etx-producer-scoring/build/producer-rocm-on/dsl_tiles.hip; /code/.wt/etx-producer-scoring/build/producer-rocm-on/imp/imports.json updated
+== plan
+  tasks=47690 events=340 eliminated=[]
+== device code (ROCm clang 22)
+/code/.wt/etx-producer-scoring/build/producer-rocm-on/dsl_tiles.hip:1544:34: error: use of undeclared identifier 'etx_producer_dot8'
+/code/.wt/etx-producer-scoring/build/producer-rocm-on/dsl_tiles.hip:1547:36: error: use of undeclared identifier 'etx_producer_square8'
+2 errors generated when compiling for gfx942.

@@ -1,0 +1,20 @@
+# command ["/Users/ckl/code/etx/.venv/bin/python", "-m", "pytest", "-q", "-ra"]
+.....................................................ss................. [  3%]
+..................................s..................................... [  6%]
+........................................................................ [ 10%]
+....................................s.sss............................... [ 13%]
+........................................................................ [ 17%]
+........................................................................ [ 20%]
+..................................................
+=========================== short test summary info ============================
+SKIPPED [1] tests/test_acquire_contract.py:459: real build not present: /Users/ckl/code/.wt/etx-producer-scoring/build/rocm22/qwen3-30b-a3b_xcd_qknr (set ETX_CONTRACT_BUILDS)
+SKIPPED [1] tests/test_acquire_contract.py:459: real build not present: /Users/ckl/code/.wt/etx-producer-scoring/build/rocm22/mixtral-8x7b_imported (set ETX_CONTRACT_BUILDS)
+SKIPPED [1] tests/test_bandwidth_phases.py:64: Round11 acceptance needs ETX_DATA_ROOT with the archived pair
+SKIPPED [1] tests/test_codegen.py:50: hipcc not installed
+SKIPPED [1] tests/test_coh_model.py:19: measured plan not on this machine
+SKIPPED [1] tests/test_coh_model.py:28: measured plan not on this machine
+SKIPPED [1] tests/test_coh_model.py:33: measured plan not on this machine
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! KeyboardInterrupt !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+/opt/homebrew/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/selectors.py:398: KeyboardInterrupt
+(to show a full traceback on KeyboardInterrupt use --full-trace)
+475 passed, 7 skipped in 95.08s (0:01:35)

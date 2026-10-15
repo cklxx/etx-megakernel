@@ -1,0 +1,5 @@
+# command ["/Users/ckl/code/etx/.venv/bin/python", "-m", "pytest", "-q", "tests/test_producer.py", "tests/test_host_import_check.py", "tests/test_router_study.py", "tests/test_gpu_jobs.py", "tests/test_session_references.py"]
+...................................................s.................... [ 46%]
+........................................................................ [ 92%]
+...........                                                              [100%]
+154 passed, 1 skipped in 14.34s

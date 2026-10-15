@@ -1,0 +1,9 @@
+# command ["/Users/ckl/code/etx/.venv/bin/python", "-m", "etx.tools.gpu_jobs", "examples/sessions/qwen_producer.py", "--dry-run"]
+Session hard stop: 3600s from runner start (includes setup)
+  0 preflight                        cpu      timeout   240s  reads: -  writes: inputs.json
+  1 build_baseline                   cpu      timeout   900s  reads: preflight  writes: b_baseline/run
+  2 build_producer                   cpu      timeout   900s  reads: preflight  writes: b_producer/run
+  3 qualify                          GPU 0    timeout  1500s  reads: build_baseline, build_producer  writes: correctness.json
+  4 measure                          GPU 0    timeout  2700s  reads: correctness.json  writes: measurement.complete.json
+  5 diagnose                         GPU 0    timeout   420s  reads: measurement.complete.json  writes: trace_baseline.json, trace_producer.json
+  6 report                           final    timeout    60s  reads: ?qualify, ?measure, ?diagnose  writes: report.json

@@ -1,0 +1,1 @@
+# command ["/opt/homebrew/opt/llvm/bin/llc", "-mtriple=amdgcn-amd-amdhsa", "-mcpu=gfx942", "-O3", "/Users/ckl/code/.wt/etx-producer-scoring/build/producer-final-v7-producer/local.ll", "-o", "/Users/ckl/code/.wt/etx-producer-scoring/build/producer-final-v7-producer/local.s"]

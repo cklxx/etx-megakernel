@@ -104,7 +104,7 @@ def session_limit(limit: float | None) -> float | None:
 
 
 def load_session(path: str | Path) -> tuple[list[Job], float | None]:
-    jobs, limit, _ = _load(path)
+    jobs, limit, _, _ = _load(path)
     return jobs, limit
 
 
@@ -142,7 +142,7 @@ def _load(path):
                     p.gpu is None or j.gpu is None or p.gpu == j.gpu):
                 raise SystemExit(f"job {j.name}: reads {p.name!r}, a later job on its GPU lane (it would never run)")
     limit = session_limit(getattr(mod, "MAX_SESSION_SECONDS", None))
-    return jobs, limit, tuple(getattr(mod, "LOCAL_ONLY", record.LOCAL_ONLY))
+    return jobs, limit, tuple(getattr(mod, "LOCAL_ONLY", record.LOCAL_ONLY)), getattr(mod, "SESSION_LEASE", None)
 
 
 def load_jobs(path: str | Path) -> list[Job]:
@@ -416,7 +416,7 @@ def main(argv=None) -> int:
     ap.add_argument("--progress-s", type=float, default=60.0)
     ap.add_argument("--dry-run", action="store_true", help="print the plan (order, lanes, dependencies) and exit")
     a = ap.parse_args(argv)
-    jobs, max_seconds, local_only = _load(a.session)
+    jobs, max_seconds, local_only, lease_path = _load(a.session)
     jobs = [j for j in jobs if j.machine == a.machine]
     if a.only:
         keep = {j.name for j in jobs if re.search(a.only, j.name)}
@@ -434,8 +434,19 @@ def main(argv=None) -> int:
             print(f"{i:3d} {j.name:32} {pin:8} timeout {j.timeout:5.0f}s  reads: {', '.join(j.reads) or '-'}"
                   + (f"  writes: {', '.join(j.writes)}" if j.writes else ""))
         return 0
-    logdir = record.create(Path(os.path.expanduser(a.logdir)))
-    return Runner(jobs, gpus, a.cpu_slots, logdir, a.progress_s, max_seconds=max_seconds, local_only=local_only).run()
+    lease = None
+    if lease_path is not None:
+        if a.only or gpus != [0] or a.machine != "A" or max_seconds is None:
+            raise SystemExit("leased session requires complete graph, one GPU lane 0, machine A, finite cap")
+        from etx.session.lease import Lease
+        lease = Lease(lease_path, max_seconds)
+        max_seconds = lease.remaining
+    try:
+        logdir = record.create(Path(os.path.expanduser(a.logdir)))
+        return Runner(jobs, gpus, a.cpu_slots, logdir, a.progress_s, max_seconds=max_seconds, local_only=local_only).run()
+    finally:
+        if lease is not None:
+            lease.close()
 
 
 if __name__ == "__main__":

@@ -1,0 +1,5 @@
+# command ["bash", "etx/importer/hip_ir_local.sh", "/Users/ckl/code/.wt/etx-producer-scoring/build/producer-final-baseline/megakernel_d0.hip", "/Users/ckl/code/.wt/etx-producer-scoring/build/producer-final-baseline/local.ll", "-Ietx/runtime/include", "-I", "/Users/ckl/code/.wt/etx-producer-scoring/build/producer-final-baseline", "-I.", "-DETX_DSL_WSUM", "-DETX_DSL_SCALAR", "-DETX_DSL_GU1", "-DETX_DSL_RBATCH", "-DETX_INBODY_REPORT", "-DETX_DSL_NORM_HOIST", "-DETX_DSL_VECNORM", "-DETX_TOPK_KEY32", "-Xclang", "-mlink-builtin-bitcode", "-Xclang", "/Users/ckl/code/.wt/etx-producer-scoring/build/producer-final-baseline/imports.bc"]
+/Users/ckl/code/.wt/etx-producer-scoring/build/producer-final-baseline/megakernel_d0.hip:46:10: fatal error: '/code/.wt/etx-producer-scoring/examples/vllm_llm/vl_tiles.hip' file not found
+   46 | #include "/code/.wt/etx-producer-scoring/examples/vllm_llm/vl_tiles.hip"
+      |          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+1 error generated when compiling for gfx942.

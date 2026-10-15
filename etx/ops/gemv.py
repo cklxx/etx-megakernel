@@ -107,9 +107,13 @@ LDS_BYTES = 4 * (DSL_NB * K_MAX + 2 * RCH + DSL_NB * (THREADS // 64) * RCH + 32)
 def import_entries(threads: int = 1024) -> dict:
     """imports.json entries for the three forms (what the adapter's host header and model.py read)."""
     ps = [{"ty": ty, "name": f"%{n}", "size": sz, "align": min(sz, 8), "offset": off} for n, (_, ty, off, sz) in enumerate(PARAMS)]
-    return {e: {"dsl": form, "export": f"etx_tile_{e}", "kernel": e, "block": [threads, 1, 1], "threads": threads, "slots": 1,
+    entries = {e: {"dsl": form, "export": f"etx_tile_{e}", "kernel": e, "block": [threads, 1, 1], "threads": threads, "slots": 1,
                 "slot_threads": threads, "params": ps, "grid_offset": GRID_OFF, "arg_bytes": ARG_BYTES, "lds_bytes_per_slot": LDS_BYTES,
                 "lds_bytes": LDS_BYTES, "barriers": 0, "slot_barrier": False, "spec": f"ETX DSL GEMV ({form})"} for e, form in FORMS.items()}
+    from etx.ops import producer
+    if producer.enabled():
+        entries[producer.NAME] = producer.import_entry(entries["dsl_gemv"])
+    return entries
 
 
 STREAM = r'''
@@ -991,6 +995,9 @@ def emit_tiles(lds_floats: int = 8192, machine=None) -> str:
     from etx.ops import local_fold
     if local_fold.enabled():
         source += local_fold.emit(STREAM, BODIES["plain"])
+    from etx.ops import producer
+    if producer.enabled():
+        source += producer.emit()
     if _os.environ.get("ETX_INBODY_EMIT") == "1":
         from etx.codegen.load_stamps import instrument
         source = instrument(source)

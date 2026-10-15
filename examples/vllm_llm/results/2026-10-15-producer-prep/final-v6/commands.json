@@ -1,0 +1,76 @@
+[
+  {
+    "phase": "shell-build",
+    "command": [
+      "bash",
+      "-n",
+      "examples/vllm_llm/build.sh"
+    ],
+    "exit": 0,
+    "seconds": 0.010120207909494638,
+    "log": "examples/vllm_llm/results/2026-10-15-producer-prep/final-v6/shell-build.log"
+  },
+  {
+    "phase": "shell-local_matrix",
+    "command": [
+      "bash",
+      "-n",
+      "examples/vllm_llm/local_matrix.sh"
+    ],
+    "exit": 0,
+    "seconds": 0.010796917136758566,
+    "log": "examples/vllm_llm/results/2026-10-15-producer-prep/final-v6/shell-local_matrix.log"
+  },
+  {
+    "phase": "shell-rocm_build_check",
+    "command": [
+      "bash",
+      "-n",
+      "examples/vllm_llm/rocm_build_check.sh"
+    ],
+    "exit": 0,
+    "seconds": 0.010807916056364775,
+    "log": "examples/vllm_llm/results/2026-10-15-producer-prep/final-v6/shell-rocm_build_check.log"
+  },
+  {
+    "phase": "shell-session",
+    "command": [
+      "bash",
+      "-n",
+      "tools/session.sh"
+    ],
+    "exit": 0,
+    "seconds": 0.010766040999442339,
+    "log": "examples/vllm_llm/results/2026-10-15-producer-prep/final-v6/shell-session.log"
+  },
+  {
+    "phase": "focused",
+    "command": [
+      "/Users/ckl/code/etx/.venv/bin/python",
+      "-m",
+      "pytest",
+      "-q",
+      "tests/test_producer.py",
+      "tests/test_host_import_check.py",
+      "tests/test_router_study.py",
+      "tests/test_gpu_jobs.py",
+      "tests/test_session_references.py"
+    ],
+    "exit": 0,
+    "seconds": 15.620375084225088,
+    "log": "examples/vllm_llm/results/2026-10-15-producer-prep/final-v6/focused.log"
+  },
+  {
+    "phase": "full-suite",
+    "command": [
+      "/Users/ckl/code/etx/.venv/bin/python",
+      "-m",
+      "pytest",
+      "-q",
+      "-ra"
+    ],
+    "exit": 1,
+    "seconds": 510.8123868331313,
+    "log": "examples/vllm_llm/results/2026-10-15-producer-prep/final-v6/full-suite.log"
+  }
+]

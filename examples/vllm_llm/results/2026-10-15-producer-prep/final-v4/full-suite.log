@@ -1,0 +1,970 @@
+# command ["/Users/ckl/code/etx/.venv/bin/python", "-m", "pytest", "-q", "-ra"]
+.....................................................ss................. [  3%]
+..................................s..................................... [  6%]
+........................................................................ [ 10%]
+....................................s.sss............................... [ 13%]
+........................................................................ [ 17%]
+........................................................................ [ 20%]
+........................................................................ [ 24%]
+........................................................................ [ 27%]
+........................................................................ [ 31%]
+........................................................................ [ 34%]
+.................................................s......ss.............. [ 38%]
+.....................................................s.................E [ 41%]
+EEEEEEE........................................................s........ [ 45%]
+........................................................................ [ 48%]
+.................................................s...................... [ 52%]
+........................................................................ [ 55%]
+........................................................................ [ 59%]
+.....................................s..................ss.............. [ 62%]
+........................................................................ [ 66%]
+........................................................................ [ 69%]
+........................................................................ [ 73%]
+........................................................................ [ 76%]
+........................................................................ [ 80%]
+........................................................................ [ 83%]
+........................................................................ [ 87%]
+........................................................................ [ 90%]
+......................................................................s. [ 94%]
+........................................................................ [ 97%]
+..................................................                       [100%]
+==================================== ERRORS ====================================
+___________ ERROR at setup of test_dsl_skips_comparison_but_executes ___________
+
+tmp_path_factory = TempPathFactory(_given_basetemp=None, _trace=<pluggy._tracing.TagTracerSub object at 0x10619f230>, _basetemp=PosixPath...r/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306'), _retention_count=3, _retention_policy='all')
+
+    @pytest.fixture(scope="module")
+    def check_dispatch(tmp_path_factory):
+        host = Path("examples/vllm_llm/host.hip").read_text()
+        start = host.index('      // Same DSL namespace')
+        end = host.index('      const int xtasks', start)
+        dispatch = host[start:end]
+        summary_start = host.index('    printf("CHECK NOT-IMPORTED:')
+        return_start = host.index("    return bad ? 4 : 0;", summary_start)
+        summary = host[summary_start:return_start]
+        return_line = host[return_start:host.index("\n", return_start)]
+        src = r'''
+    #include <string>
+    #include <map>
+    #include <cstdio>
+    #include <cstdlib>
+    #include <vector>
+    #include <cstring>
+    struct etx_imp_desc {};
+    using hipFunction_t = void*;
+    using hipModule_t = void*;
+    struct { int stream; } hst;
+    int launches = 0, lookups = 0;
+    int topk_ids[64] = {17}, n_tk = 64, check_pos = 1040, NR = 8;
+    float topk_w[64] = {0.5f};
+    constexpr int hipMemcpyDeviceToHost = 1;
+    int hipMemcpy(void* dst, const void* src, size_t n, int) { memcpy(dst, src, n); return 0; }
+    void launch_imported(int) { ++launches; }
+    bool wait_stream(int, double) { return true; }
+    void die(const std::string& s) { fprintf(stderr, "%s\n", s.c_str()); exit(1); }
+    const etx_imp_desc* etx_imp_find(const char*) { return nullptr; }
+    const void* etx_orig_find(const char*) { ++lookups; return nullptr; }
+    bool etx_orig_triton(const char*, const char**, const char**, int*) { return false; }
+    int hipModuleLoad(hipModule_t*, const char*) { return 0; }
+    int hipModuleGetFunction(hipFunction_t*, hipModule_t, const char*) { return 0; }
+    #define ETX_CHECK(x) (void)(x)
+    int main(int argc, char** argv) {
+      int bad = getenv("CHECK_TEST_BAD") ? 1 : 0, not_imported = 0;
+      std::string not_imported_names;
+      struct Inst { std::string exp; int n; std::string role; int req; int layer; };
+      for (int n = 1; n < argc; ++n) {
+        Inst x{argv[n], n, std::string(argv[n]) == "dsl_topk" ? "topk" : "other", 0, n};
+    ''' + dispatch + r'''
+      }
+    ''' + summary + r'''
+      printf("launches=%d lookups=%d\n", launches, lookups);
+    ''' + return_line + r'''
+    }
+    '''
+        directory = tmp_path_factory.mktemp("check_dispatch")
+        source, binary = directory / "check.cc", directory / "check"
+        source.write_text(src)
+        # This repo's local toolchain supplies libc++ where Apple's c++ may not.
+        llvm = Path("/opt/homebrew/opt/llvm/bin/clang++")
+        compiler = os.environ.get("CXX", str(llvm) if llvm.exists() else "c++")
+        build = subprocess.run([compiler, "-std=c++17", str(source), "-o", str(binary)], capture_output=True, text=True)
+>       assert build.returncode == 0, build.stderr
+E       AssertionError: /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:66:24: error: use of undeclared identifier 'o'
+E            66 |               save("o",o,H*2); save("residual",resid,H*2);
+E               |                        ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:66:26: error: use of undeclared identifier 'H'
+E            66 |               save("o",o,H*2); save("residual",resid,H*2);
+E               |                          ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:66:48: error: use of undeclared identifier 'resid'
+E            66 |               save("o",o,H*2); save("residual",resid,H*2);
+E               |                                                ^~~~~
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:66:54: error: use of undeclared identifier 'H'
+E            66 |               save("o",o,H*2); save("residual",resid,H*2);
+E               |                                                      ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:67:28: error: use of undeclared identifier 'W'
+E            67 |               save("gamma",W("L"+std::to_string(x.layer)+".ln2"),H*2);
+E               |                            ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:67:66: error: use of undeclared identifier 'H'
+E            67 |               save("gamma",W("L"+std::to_string(x.layer)+".ln2"),H*2);
+E               |                                                                  ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:68:29: error: use of undeclared identifier 'W'
+E            68 |               save("router",W("L"+std::to_string(x.layer)+".wr"),(size_t)E*H*2);
+E               |                             ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:68:74: error: use of undeclared identifier 'E'
+E            68 |               save("router",W("L"+std::to_string(x.layer)+".wr"),(size_t)E*H*2);
+E               |                                                                          ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:68:76: error: use of undeclared identifier 'H'
+E            68 |               save("router",W("L"+std::to_string(x.layer)+".wr"),(size_t)E*H*2);
+E               |                                                                            ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:71:27: error: use of undeclared identifier 'ox'
+E            71 |               save("norm",ox,(size_t)H*2); save("resid2",resid2,H*2);
+E               |                           ^~
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:71:38: error: use of undeclared identifier 'H'
+E            71 |               save("norm",ox,(size_t)H*2); save("resid2",resid2,H*2);
+E               |                                      ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:71:58: error: use of undeclared identifier 'resid2'
+E            71 |               save("norm",ox,(size_t)H*2); save("resid2",resid2,H*2);
+E               |                                                          ^~~~~~
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:71:65: error: use of undeclared identifier 'H'
+E            71 |               save("norm",ox,(size_t)H*2); save("resid2",resid2,H*2);
+E               |                                                                 ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:72:29: error: use of undeclared identifier 'rlog'
+E            72 |               save("logits",rlog,E*2); save("ids",topk_ids,n_tk*4);
+E               |                             ^~~~
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:72:34: error: use of undeclared identifier 'E'
+E            72 |               save("logits",rlog,E*2); save("ids",topk_ids,n_tk*4);
+E               |                                  ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:73:53: error: use of undeclared identifier 'tei'
+E            73 |               save("mix",topk_w,n_tk*4); save("tei",tei,n_tk*4);
+E               |                                                     ^~~
+E         16 errors generated.
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/opt/homebrew/opt/llvm/bin/clang++', '-std=c++17', '/private/var/folders/tb/g6324rs52jz3skf78x...*4); save("tei",tei,n_tk*4);\n      |                                                     ^~~\n16 errors generated.\n').returncode
+
+tests/test_host_import_check.py:64: AssertionError
+___ ERROR at setup of test_non_dsl_without_original_still_dies[rms_norm_2d] ____
+
+tmp_path_factory = TempPathFactory(_given_basetemp=None, _trace=<pluggy._tracing.TagTracerSub object at 0x10619f230>, _basetemp=PosixPath...r/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306'), _retention_count=3, _retention_policy='all')
+
+    @pytest.fixture(scope="module")
+    def check_dispatch(tmp_path_factory):
+        host = Path("examples/vllm_llm/host.hip").read_text()
+        start = host.index('      // Same DSL namespace')
+        end = host.index('      const int xtasks', start)
+        dispatch = host[start:end]
+        summary_start = host.index('    printf("CHECK NOT-IMPORTED:')
+        return_start = host.index("    return bad ? 4 : 0;", summary_start)
+        summary = host[summary_start:return_start]
+        return_line = host[return_start:host.index("\n", return_start)]
+        src = r'''
+    #include <string>
+    #include <map>
+    #include <cstdio>
+    #include <cstdlib>
+    #include <vector>
+    #include <cstring>
+    struct etx_imp_desc {};
+    using hipFunction_t = void*;
+    using hipModule_t = void*;
+    struct { int stream; } hst;
+    int launches = 0, lookups = 0;
+    int topk_ids[64] = {17}, n_tk = 64, check_pos = 1040, NR = 8;
+    float topk_w[64] = {0.5f};
+    constexpr int hipMemcpyDeviceToHost = 1;
+    int hipMemcpy(void* dst, const void* src, size_t n, int) { memcpy(dst, src, n); return 0; }
+    void launch_imported(int) { ++launches; }
+    bool wait_stream(int, double) { return true; }
+    void die(const std::string& s) { fprintf(stderr, "%s\n", s.c_str()); exit(1); }
+    const etx_imp_desc* etx_imp_find(const char*) { return nullptr; }
+    const void* etx_orig_find(const char*) { ++lookups; return nullptr; }
+    bool etx_orig_triton(const char*, const char**, const char**, int*) { return false; }
+    int hipModuleLoad(hipModule_t*, const char*) { return 0; }
+    int hipModuleGetFunction(hipFunction_t*, hipModule_t, const char*) { return 0; }
+    #define ETX_CHECK(x) (void)(x)
+    int main(int argc, char** argv) {
+      int bad = getenv("CHECK_TEST_BAD") ? 1 : 0, not_imported = 0;
+      std::string not_imported_names;
+      struct Inst { std::string exp; int n; std::string role; int req; int layer; };
+      for (int n = 1; n < argc; ++n) {
+        Inst x{argv[n], n, std::string(argv[n]) == "dsl_topk" ? "topk" : "other", 0, n};
+    ''' + dispatch + r'''
+      }
+    ''' + summary + r'''
+      printf("launches=%d lookups=%d\n", launches, lookups);
+    ''' + return_line + r'''
+    }
+    '''
+        directory = tmp_path_factory.mktemp("check_dispatch")
+        source, binary = directory / "check.cc", directory / "check"
+        source.write_text(src)
+        # This repo's local toolchain supplies libc++ where Apple's c++ may not.
+        llvm = Path("/opt/homebrew/opt/llvm/bin/clang++")
+        compiler = os.environ.get("CXX", str(llvm) if llvm.exists() else "c++")
+        build = subprocess.run([compiler, "-std=c++17", str(source), "-o", str(binary)], capture_output=True, text=True)
+>       assert build.returncode == 0, build.stderr
+E       AssertionError: /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:66:24: error: use of undeclared identifier 'o'
+E            66 |               save("o",o,H*2); save("residual",resid,H*2);
+E               |                        ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:66:26: error: use of undeclared identifier 'H'
+E            66 |               save("o",o,H*2); save("residual",resid,H*2);
+E               |                          ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:66:48: error: use of undeclared identifier 'resid'
+E            66 |               save("o",o,H*2); save("residual",resid,H*2);
+E               |                                                ^~~~~
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:66:54: error: use of undeclared identifier 'H'
+E            66 |               save("o",o,H*2); save("residual",resid,H*2);
+E               |                                                      ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:67:28: error: use of undeclared identifier 'W'
+E            67 |               save("gamma",W("L"+std::to_string(x.layer)+".ln2"),H*2);
+E               |                            ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:67:66: error: use of undeclared identifier 'H'
+E            67 |               save("gamma",W("L"+std::to_string(x.layer)+".ln2"),H*2);
+E               |                                                                  ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:68:29: error: use of undeclared identifier 'W'
+E            68 |               save("router",W("L"+std::to_string(x.layer)+".wr"),(size_t)E*H*2);
+E               |                             ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:68:74: error: use of undeclared identifier 'E'
+E            68 |               save("router",W("L"+std::to_string(x.layer)+".wr"),(size_t)E*H*2);
+E               |                                                                          ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:68:76: error: use of undeclared identifier 'H'
+E            68 |               save("router",W("L"+std::to_string(x.layer)+".wr"),(size_t)E*H*2);
+E               |                                                                            ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:71:27: error: use of undeclared identifier 'ox'
+E            71 |               save("norm",ox,(size_t)H*2); save("resid2",resid2,H*2);
+E               |                           ^~
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:71:38: error: use of undeclared identifier 'H'
+E            71 |               save("norm",ox,(size_t)H*2); save("resid2",resid2,H*2);
+E               |                                      ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:71:58: error: use of undeclared identifier 'resid2'
+E            71 |               save("norm",ox,(size_t)H*2); save("resid2",resid2,H*2);
+E               |                                                          ^~~~~~
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:71:65: error: use of undeclared identifier 'H'
+E            71 |               save("norm",ox,(size_t)H*2); save("resid2",resid2,H*2);
+E               |                                                                 ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:72:29: error: use of undeclared identifier 'rlog'
+E            72 |               save("logits",rlog,E*2); save("ids",topk_ids,n_tk*4);
+E               |                             ^~~~
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:72:34: error: use of undeclared identifier 'E'
+E            72 |               save("logits",rlog,E*2); save("ids",topk_ids,n_tk*4);
+E               |                                  ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:73:53: error: use of undeclared identifier 'tei'
+E            73 |               save("mix",topk_w,n_tk*4); save("tei",tei,n_tk*4);
+E               |                                                     ^~~
+E         16 errors generated.
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/opt/homebrew/opt/llvm/bin/clang++', '-std=c++17', '/private/var/folders/tb/g6324rs52jz3skf78x...*4); save("tei",tei,n_tk*4);\n      |                                                     ^~~\n16 errors generated.\n').returncode
+
+tests/test_host_import_check.py:64: AssertionError
+___ ERROR at setup of test_non_dsl_without_original_still_dies[not_dsl_gemv] ___
+
+tmp_path_factory = TempPathFactory(_given_basetemp=None, _trace=<pluggy._tracing.TagTracerSub object at 0x10619f230>, _basetemp=PosixPath...r/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306'), _retention_count=3, _retention_policy='all')
+
+    @pytest.fixture(scope="module")
+    def check_dispatch(tmp_path_factory):
+        host = Path("examples/vllm_llm/host.hip").read_text()
+        start = host.index('      // Same DSL namespace')
+        end = host.index('      const int xtasks', start)
+        dispatch = host[start:end]
+        summary_start = host.index('    printf("CHECK NOT-IMPORTED:')
+        return_start = host.index("    return bad ? 4 : 0;", summary_start)
+        summary = host[summary_start:return_start]
+        return_line = host[return_start:host.index("\n", return_start)]
+        src = r'''
+    #include <string>
+    #include <map>
+    #include <cstdio>
+    #include <cstdlib>
+    #include <vector>
+    #include <cstring>
+    struct etx_imp_desc {};
+    using hipFunction_t = void*;
+    using hipModule_t = void*;
+    struct { int stream; } hst;
+    int launches = 0, lookups = 0;
+    int topk_ids[64] = {17}, n_tk = 64, check_pos = 1040, NR = 8;
+    float topk_w[64] = {0.5f};
+    constexpr int hipMemcpyDeviceToHost = 1;
+    int hipMemcpy(void* dst, const void* src, size_t n, int) { memcpy(dst, src, n); return 0; }
+    void launch_imported(int) { ++launches; }
+    bool wait_stream(int, double) { return true; }
+    void die(const std::string& s) { fprintf(stderr, "%s\n", s.c_str()); exit(1); }
+    const etx_imp_desc* etx_imp_find(const char*) { return nullptr; }
+    const void* etx_orig_find(const char*) { ++lookups; return nullptr; }
+    bool etx_orig_triton(const char*, const char**, const char**, int*) { return false; }
+    int hipModuleLoad(hipModule_t*, const char*) { return 0; }
+    int hipModuleGetFunction(hipFunction_t*, hipModule_t, const char*) { return 0; }
+    #define ETX_CHECK(x) (void)(x)
+    int main(int argc, char** argv) {
+      int bad = getenv("CHECK_TEST_BAD") ? 1 : 0, not_imported = 0;
+      std::string not_imported_names;
+      struct Inst { std::string exp; int n; std::string role; int req; int layer; };
+      for (int n = 1; n < argc; ++n) {
+        Inst x{argv[n], n, std::string(argv[n]) == "dsl_topk" ? "topk" : "other", 0, n};
+    ''' + dispatch + r'''
+      }
+    ''' + summary + r'''
+      printf("launches=%d lookups=%d\n", launches, lookups);
+    ''' + return_line + r'''
+    }
+    '''
+        directory = tmp_path_factory.mktemp("check_dispatch")
+        source, binary = directory / "check.cc", directory / "check"
+        source.write_text(src)
+        # This repo's local toolchain supplies libc++ where Apple's c++ may not.
+        llvm = Path("/opt/homebrew/opt/llvm/bin/clang++")
+        compiler = os.environ.get("CXX", str(llvm) if llvm.exists() else "c++")
+        build = subprocess.run([compiler, "-std=c++17", str(source), "-o", str(binary)], capture_output=True, text=True)
+>       assert build.returncode == 0, build.stderr
+E       AssertionError: /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:66:24: error: use of undeclared identifier 'o'
+E            66 |               save("o",o,H*2); save("residual",resid,H*2);
+E               |                        ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:66:26: error: use of undeclared identifier 'H'
+E            66 |               save("o",o,H*2); save("residual",resid,H*2);
+E               |                          ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:66:48: error: use of undeclared identifier 'resid'
+E            66 |               save("o",o,H*2); save("residual",resid,H*2);
+E               |                                                ^~~~~
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:66:54: error: use of undeclared identifier 'H'
+E            66 |               save("o",o,H*2); save("residual",resid,H*2);
+E               |                                                      ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:67:28: error: use of undeclared identifier 'W'
+E            67 |               save("gamma",W("L"+std::to_string(x.layer)+".ln2"),H*2);
+E               |                            ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:67:66: error: use of undeclared identifier 'H'
+E            67 |               save("gamma",W("L"+std::to_string(x.layer)+".ln2"),H*2);
+E               |                                                                  ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:68:29: error: use of undeclared identifier 'W'
+E            68 |               save("router",W("L"+std::to_string(x.layer)+".wr"),(size_t)E*H*2);
+E               |                             ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:68:74: error: use of undeclared identifier 'E'
+E            68 |               save("router",W("L"+std::to_string(x.layer)+".wr"),(size_t)E*H*2);
+E               |                                                                          ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:68:76: error: use of undeclared identifier 'H'
+E            68 |               save("router",W("L"+std::to_string(x.layer)+".wr"),(size_t)E*H*2);
+E               |                                                                            ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:71:27: error: use of undeclared identifier 'ox'
+E            71 |               save("norm",ox,(size_t)H*2); save("resid2",resid2,H*2);
+E               |                           ^~
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:71:38: error: use of undeclared identifier 'H'
+E            71 |               save("norm",ox,(size_t)H*2); save("resid2",resid2,H*2);
+E               |                                      ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:71:58: error: use of undeclared identifier 'resid2'
+E            71 |               save("norm",ox,(size_t)H*2); save("resid2",resid2,H*2);
+E               |                                                          ^~~~~~
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:71:65: error: use of undeclared identifier 'H'
+E            71 |               save("norm",ox,(size_t)H*2); save("resid2",resid2,H*2);
+E               |                                                                 ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:72:29: error: use of undeclared identifier 'rlog'
+E            72 |               save("logits",rlog,E*2); save("ids",topk_ids,n_tk*4);
+E               |                             ^~~~
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:72:34: error: use of undeclared identifier 'E'
+E            72 |               save("logits",rlog,E*2); save("ids",topk_ids,n_tk*4);
+E               |                                  ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:73:53: error: use of undeclared identifier 'tei'
+E            73 |               save("mix",topk_w,n_tk*4); save("tei",tei,n_tk*4);
+E               |                                                     ^~~
+E         16 errors generated.
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/opt/homebrew/opt/llvm/bin/clang++', '-std=c++17', '/private/var/folders/tb/g6324rs52jz3skf78x...*4); save("tei",tei,n_tk*4);\n      |                                                     ^~~\n16 errors generated.\n').returncode
+
+tests/test_host_import_check.py:64: AssertionError
+_______ ERROR at setup of test_non_dsl_without_original_still_dies[dsl] ________
+
+tmp_path_factory = TempPathFactory(_given_basetemp=None, _trace=<pluggy._tracing.TagTracerSub object at 0x10619f230>, _basetemp=PosixPath...r/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306'), _retention_count=3, _retention_policy='all')
+
+    @pytest.fixture(scope="module")
+    def check_dispatch(tmp_path_factory):
+        host = Path("examples/vllm_llm/host.hip").read_text()
+        start = host.index('      // Same DSL namespace')
+        end = host.index('      const int xtasks', start)
+        dispatch = host[start:end]
+        summary_start = host.index('    printf("CHECK NOT-IMPORTED:')
+        return_start = host.index("    return bad ? 4 : 0;", summary_start)
+        summary = host[summary_start:return_start]
+        return_line = host[return_start:host.index("\n", return_start)]
+        src = r'''
+    #include <string>
+    #include <map>
+    #include <cstdio>
+    #include <cstdlib>
+    #include <vector>
+    #include <cstring>
+    struct etx_imp_desc {};
+    using hipFunction_t = void*;
+    using hipModule_t = void*;
+    struct { int stream; } hst;
+    int launches = 0, lookups = 0;
+    int topk_ids[64] = {17}, n_tk = 64, check_pos = 1040, NR = 8;
+    float topk_w[64] = {0.5f};
+    constexpr int hipMemcpyDeviceToHost = 1;
+    int hipMemcpy(void* dst, const void* src, size_t n, int) { memcpy(dst, src, n); return 0; }
+    void launch_imported(int) { ++launches; }
+    bool wait_stream(int, double) { return true; }
+    void die(const std::string& s) { fprintf(stderr, "%s\n", s.c_str()); exit(1); }
+    const etx_imp_desc* etx_imp_find(const char*) { return nullptr; }
+    const void* etx_orig_find(const char*) { ++lookups; return nullptr; }
+    bool etx_orig_triton(const char*, const char**, const char**, int*) { return false; }
+    int hipModuleLoad(hipModule_t*, const char*) { return 0; }
+    int hipModuleGetFunction(hipFunction_t*, hipModule_t, const char*) { return 0; }
+    #define ETX_CHECK(x) (void)(x)
+    int main(int argc, char** argv) {
+      int bad = getenv("CHECK_TEST_BAD") ? 1 : 0, not_imported = 0;
+      std::string not_imported_names;
+      struct Inst { std::string exp; int n; std::string role; int req; int layer; };
+      for (int n = 1; n < argc; ++n) {
+        Inst x{argv[n], n, std::string(argv[n]) == "dsl_topk" ? "topk" : "other", 0, n};
+    ''' + dispatch + r'''
+      }
+    ''' + summary + r'''
+      printf("launches=%d lookups=%d\n", launches, lookups);
+    ''' + return_line + r'''
+    }
+    '''
+        directory = tmp_path_factory.mktemp("check_dispatch")
+        source, binary = directory / "check.cc", directory / "check"
+        source.write_text(src)
+        # This repo's local toolchain supplies libc++ where Apple's c++ may not.
+        llvm = Path("/opt/homebrew/opt/llvm/bin/clang++")
+        compiler = os.environ.get("CXX", str(llvm) if llvm.exists() else "c++")
+        build = subprocess.run([compiler, "-std=c++17", str(source), "-o", str(binary)], capture_output=True, text=True)
+>       assert build.returncode == 0, build.stderr
+E       AssertionError: /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:66:24: error: use of undeclared identifier 'o'
+E            66 |               save("o",o,H*2); save("residual",resid,H*2);
+E               |                        ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:66:26: error: use of undeclared identifier 'H'
+E            66 |               save("o",o,H*2); save("residual",resid,H*2);
+E               |                          ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:66:48: error: use of undeclared identifier 'resid'
+E            66 |               save("o",o,H*2); save("residual",resid,H*2);
+E               |                                                ^~~~~
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:66:54: error: use of undeclared identifier 'H'
+E            66 |               save("o",o,H*2); save("residual",resid,H*2);
+E               |                                                      ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:67:28: error: use of undeclared identifier 'W'
+E            67 |               save("gamma",W("L"+std::to_string(x.layer)+".ln2"),H*2);
+E               |                            ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:67:66: error: use of undeclared identifier 'H'
+E            67 |               save("gamma",W("L"+std::to_string(x.layer)+".ln2"),H*2);
+E               |                                                                  ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:68:29: error: use of undeclared identifier 'W'
+E            68 |               save("router",W("L"+std::to_string(x.layer)+".wr"),(size_t)E*H*2);
+E               |                             ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:68:74: error: use of undeclared identifier 'E'
+E            68 |               save("router",W("L"+std::to_string(x.layer)+".wr"),(size_t)E*H*2);
+E               |                                                                          ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:68:76: error: use of undeclared identifier 'H'
+E            68 |               save("router",W("L"+std::to_string(x.layer)+".wr"),(size_t)E*H*2);
+E               |                                                                            ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:71:27: error: use of undeclared identifier 'ox'
+E            71 |               save("norm",ox,(size_t)H*2); save("resid2",resid2,H*2);
+E               |                           ^~
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:71:38: error: use of undeclared identifier 'H'
+E            71 |               save("norm",ox,(size_t)H*2); save("resid2",resid2,H*2);
+E               |                                      ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:71:58: error: use of undeclared identifier 'resid2'
+E            71 |               save("norm",ox,(size_t)H*2); save("resid2",resid2,H*2);
+E               |                                                          ^~~~~~
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:71:65: error: use of undeclared identifier 'H'
+E            71 |               save("norm",ox,(size_t)H*2); save("resid2",resid2,H*2);
+E               |                                                                 ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:72:29: error: use of undeclared identifier 'rlog'
+E            72 |               save("logits",rlog,E*2); save("ids",topk_ids,n_tk*4);
+E               |                             ^~~~
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:72:34: error: use of undeclared identifier 'E'
+E            72 |               save("logits",rlog,E*2); save("ids",topk_ids,n_tk*4);
+E               |                                  ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:73:53: error: use of undeclared identifier 'tei'
+E            73 |               save("mix",topk_w,n_tk*4); save("tei",tei,n_tk*4);
+E               |                                                     ^~~
+E         16 errors generated.
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/opt/homebrew/opt/llvm/bin/clang++', '-std=c++17', '/private/var/folders/tb/g6324rs52jz3skf78x...*4); save("tei",tei,n_tk*4);\n      |                                                     ^~~\n16 errors generated.\n').returncode
+
+tests/test_host_import_check.py:64: AssertionError
+_____ ERROR at setup of test_non_dsl_without_original_still_dies[DSL_gemv] _____
+
+tmp_path_factory = TempPathFactory(_given_basetemp=None, _trace=<pluggy._tracing.TagTracerSub object at 0x10619f230>, _basetemp=PosixPath...r/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306'), _retention_count=3, _retention_policy='all')
+
+    @pytest.fixture(scope="module")
+    def check_dispatch(tmp_path_factory):
+        host = Path("examples/vllm_llm/host.hip").read_text()
+        start = host.index('      // Same DSL namespace')
+        end = host.index('      const int xtasks', start)
+        dispatch = host[start:end]
+        summary_start = host.index('    printf("CHECK NOT-IMPORTED:')
+        return_start = host.index("    return bad ? 4 : 0;", summary_start)
+        summary = host[summary_start:return_start]
+        return_line = host[return_start:host.index("\n", return_start)]
+        src = r'''
+    #include <string>
+    #include <map>
+    #include <cstdio>
+    #include <cstdlib>
+    #include <vector>
+    #include <cstring>
+    struct etx_imp_desc {};
+    using hipFunction_t = void*;
+    using hipModule_t = void*;
+    struct { int stream; } hst;
+    int launches = 0, lookups = 0;
+    int topk_ids[64] = {17}, n_tk = 64, check_pos = 1040, NR = 8;
+    float topk_w[64] = {0.5f};
+    constexpr int hipMemcpyDeviceToHost = 1;
+    int hipMemcpy(void* dst, const void* src, size_t n, int) { memcpy(dst, src, n); return 0; }
+    void launch_imported(int) { ++launches; }
+    bool wait_stream(int, double) { return true; }
+    void die(const std::string& s) { fprintf(stderr, "%s\n", s.c_str()); exit(1); }
+    const etx_imp_desc* etx_imp_find(const char*) { return nullptr; }
+    const void* etx_orig_find(const char*) { ++lookups; return nullptr; }
+    bool etx_orig_triton(const char*, const char**, const char**, int*) { return false; }
+    int hipModuleLoad(hipModule_t*, const char*) { return 0; }
+    int hipModuleGetFunction(hipFunction_t*, hipModule_t, const char*) { return 0; }
+    #define ETX_CHECK(x) (void)(x)
+    int main(int argc, char** argv) {
+      int bad = getenv("CHECK_TEST_BAD") ? 1 : 0, not_imported = 0;
+      std::string not_imported_names;
+      struct Inst { std::string exp; int n; std::string role; int req; int layer; };
+      for (int n = 1; n < argc; ++n) {
+        Inst x{argv[n], n, std::string(argv[n]) == "dsl_topk" ? "topk" : "other", 0, n};
+    ''' + dispatch + r'''
+      }
+    ''' + summary + r'''
+      printf("launches=%d lookups=%d\n", launches, lookups);
+    ''' + return_line + r'''
+    }
+    '''
+        directory = tmp_path_factory.mktemp("check_dispatch")
+        source, binary = directory / "check.cc", directory / "check"
+        source.write_text(src)
+        # This repo's local toolchain supplies libc++ where Apple's c++ may not.
+        llvm = Path("/opt/homebrew/opt/llvm/bin/clang++")
+        compiler = os.environ.get("CXX", str(llvm) if llvm.exists() else "c++")
+        build = subprocess.run([compiler, "-std=c++17", str(source), "-o", str(binary)], capture_output=True, text=True)
+>       assert build.returncode == 0, build.stderr
+E       AssertionError: /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:66:24: error: use of undeclared identifier 'o'
+E            66 |               save("o",o,H*2); save("residual",resid,H*2);
+E               |                        ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:66:26: error: use of undeclared identifier 'H'
+E            66 |               save("o",o,H*2); save("residual",resid,H*2);
+E               |                          ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:66:48: error: use of undeclared identifier 'resid'
+E            66 |               save("o",o,H*2); save("residual",resid,H*2);
+E               |                                                ^~~~~
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:66:54: error: use of undeclared identifier 'H'
+E            66 |               save("o",o,H*2); save("residual",resid,H*2);
+E               |                                                      ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:67:28: error: use of undeclared identifier 'W'
+E            67 |               save("gamma",W("L"+std::to_string(x.layer)+".ln2"),H*2);
+E               |                            ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:67:66: error: use of undeclared identifier 'H'
+E            67 |               save("gamma",W("L"+std::to_string(x.layer)+".ln2"),H*2);
+E               |                                                                  ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:68:29: error: use of undeclared identifier 'W'
+E            68 |               save("router",W("L"+std::to_string(x.layer)+".wr"),(size_t)E*H*2);
+E               |                             ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:68:74: error: use of undeclared identifier 'E'
+E            68 |               save("router",W("L"+std::to_string(x.layer)+".wr"),(size_t)E*H*2);
+E               |                                                                          ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:68:76: error: use of undeclared identifier 'H'
+E            68 |               save("router",W("L"+std::to_string(x.layer)+".wr"),(size_t)E*H*2);
+E               |                                                                            ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:71:27: error: use of undeclared identifier 'ox'
+E            71 |               save("norm",ox,(size_t)H*2); save("resid2",resid2,H*2);
+E               |                           ^~
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:71:38: error: use of undeclared identifier 'H'
+E            71 |               save("norm",ox,(size_t)H*2); save("resid2",resid2,H*2);
+E               |                                      ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:71:58: error: use of undeclared identifier 'resid2'
+E            71 |               save("norm",ox,(size_t)H*2); save("resid2",resid2,H*2);
+E               |                                                          ^~~~~~
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:71:65: error: use of undeclared identifier 'H'
+E            71 |               save("norm",ox,(size_t)H*2); save("resid2",resid2,H*2);
+E               |                                                                 ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:72:29: error: use of undeclared identifier 'rlog'
+E            72 |               save("logits",rlog,E*2); save("ids",topk_ids,n_tk*4);
+E               |                             ^~~~
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:72:34: error: use of undeclared identifier 'E'
+E            72 |               save("logits",rlog,E*2); save("ids",topk_ids,n_tk*4);
+E               |                                  ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:73:53: error: use of undeclared identifier 'tei'
+E            73 |               save("mix",topk_w,n_tk*4); save("tei",tei,n_tk*4);
+E               |                                                     ^~~
+E         16 errors generated.
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/opt/homebrew/opt/llvm/bin/clang++', '-std=c++17', '/private/var/folders/tb/g6324rs52jz3skf78x...*4); save("tei",tei,n_tk*4);\n      |                                                     ^~~\n16 errors generated.\n').returncode
+
+tests/test_host_import_check.py:64: AssertionError
+___________ ERROR at setup of test_not_imported_count_and_name_limit ___________
+
+tmp_path_factory = TempPathFactory(_given_basetemp=None, _trace=<pluggy._tracing.TagTracerSub object at 0x10619f230>, _basetemp=PosixPath...r/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306'), _retention_count=3, _retention_policy='all')
+
+    @pytest.fixture(scope="module")
+    def check_dispatch(tmp_path_factory):
+        host = Path("examples/vllm_llm/host.hip").read_text()
+        start = host.index('      // Same DSL namespace')
+        end = host.index('      const int xtasks', start)
+        dispatch = host[start:end]
+        summary_start = host.index('    printf("CHECK NOT-IMPORTED:')
+        return_start = host.index("    return bad ? 4 : 0;", summary_start)
+        summary = host[summary_start:return_start]
+        return_line = host[return_start:host.index("\n", return_start)]
+        src = r'''
+    #include <string>
+    #include <map>
+    #include <cstdio>
+    #include <cstdlib>
+    #include <vector>
+    #include <cstring>
+    struct etx_imp_desc {};
+    using hipFunction_t = void*;
+    using hipModule_t = void*;
+    struct { int stream; } hst;
+    int launches = 0, lookups = 0;
+    int topk_ids[64] = {17}, n_tk = 64, check_pos = 1040, NR = 8;
+    float topk_w[64] = {0.5f};
+    constexpr int hipMemcpyDeviceToHost = 1;
+    int hipMemcpy(void* dst, const void* src, size_t n, int) { memcpy(dst, src, n); return 0; }
+    void launch_imported(int) { ++launches; }
+    bool wait_stream(int, double) { return true; }
+    void die(const std::string& s) { fprintf(stderr, "%s\n", s.c_str()); exit(1); }
+    const etx_imp_desc* etx_imp_find(const char*) { return nullptr; }
+    const void* etx_orig_find(const char*) { ++lookups; return nullptr; }
+    bool etx_orig_triton(const char*, const char**, const char**, int*) { return false; }
+    int hipModuleLoad(hipModule_t*, const char*) { return 0; }
+    int hipModuleGetFunction(hipFunction_t*, hipModule_t, const char*) { return 0; }
+    #define ETX_CHECK(x) (void)(x)
+    int main(int argc, char** argv) {
+      int bad = getenv("CHECK_TEST_BAD") ? 1 : 0, not_imported = 0;
+      std::string not_imported_names;
+      struct Inst { std::string exp; int n; std::string role; int req; int layer; };
+      for (int n = 1; n < argc; ++n) {
+        Inst x{argv[n], n, std::string(argv[n]) == "dsl_topk" ? "topk" : "other", 0, n};
+    ''' + dispatch + r'''
+      }
+    ''' + summary + r'''
+      printf("launches=%d lookups=%d\n", launches, lookups);
+    ''' + return_line + r'''
+    }
+    '''
+        directory = tmp_path_factory.mktemp("check_dispatch")
+        source, binary = directory / "check.cc", directory / "check"
+        source.write_text(src)
+        # This repo's local toolchain supplies libc++ where Apple's c++ may not.
+        llvm = Path("/opt/homebrew/opt/llvm/bin/clang++")
+        compiler = os.environ.get("CXX", str(llvm) if llvm.exists() else "c++")
+        build = subprocess.run([compiler, "-std=c++17", str(source), "-o", str(binary)], capture_output=True, text=True)
+>       assert build.returncode == 0, build.stderr
+E       AssertionError: /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:66:24: error: use of undeclared identifier 'o'
+E            66 |               save("o",o,H*2); save("residual",resid,H*2);
+E               |                        ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:66:26: error: use of undeclared identifier 'H'
+E            66 |               save("o",o,H*2); save("residual",resid,H*2);
+E               |                          ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:66:48: error: use of undeclared identifier 'resid'
+E            66 |               save("o",o,H*2); save("residual",resid,H*2);
+E               |                                                ^~~~~
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:66:54: error: use of undeclared identifier 'H'
+E            66 |               save("o",o,H*2); save("residual",resid,H*2);
+E               |                                                      ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:67:28: error: use of undeclared identifier 'W'
+E            67 |               save("gamma",W("L"+std::to_string(x.layer)+".ln2"),H*2);
+E               |                            ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:67:66: error: use of undeclared identifier 'H'
+E            67 |               save("gamma",W("L"+std::to_string(x.layer)+".ln2"),H*2);
+E               |                                                                  ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:68:29: error: use of undeclared identifier 'W'
+E            68 |               save("router",W("L"+std::to_string(x.layer)+".wr"),(size_t)E*H*2);
+E               |                             ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:68:74: error: use of undeclared identifier 'E'
+E            68 |               save("router",W("L"+std::to_string(x.layer)+".wr"),(size_t)E*H*2);
+E               |                                                                          ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:68:76: error: use of undeclared identifier 'H'
+E            68 |               save("router",W("L"+std::to_string(x.layer)+".wr"),(size_t)E*H*2);
+E               |                                                                            ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:71:27: error: use of undeclared identifier 'ox'
+E            71 |               save("norm",ox,(size_t)H*2); save("resid2",resid2,H*2);
+E               |                           ^~
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:71:38: error: use of undeclared identifier 'H'
+E            71 |               save("norm",ox,(size_t)H*2); save("resid2",resid2,H*2);
+E               |                                      ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:71:58: error: use of undeclared identifier 'resid2'
+E            71 |               save("norm",ox,(size_t)H*2); save("resid2",resid2,H*2);
+E               |                                                          ^~~~~~
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:71:65: error: use of undeclared identifier 'H'
+E            71 |               save("norm",ox,(size_t)H*2); save("resid2",resid2,H*2);
+E               |                                                                 ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:72:29: error: use of undeclared identifier 'rlog'
+E            72 |               save("logits",rlog,E*2); save("ids",topk_ids,n_tk*4);
+E               |                             ^~~~
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:72:34: error: use of undeclared identifier 'E'
+E            72 |               save("logits",rlog,E*2); save("ids",topk_ids,n_tk*4);
+E               |                                  ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:73:53: error: use of undeclared identifier 'tei'
+E            73 |               save("mix",topk_w,n_tk*4); save("tei",tei,n_tk*4);
+E               |                                                     ^~~
+E         16 errors generated.
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/opt/homebrew/opt/llvm/bin/clang++', '-std=c++17', '/private/var/folders/tb/g6324rs52jz3skf78x...*4); save("tei",tei,n_tk*4);\n      |                                                     ^~~\n16 errors generated.\n').returncode
+
+tests/test_host_import_check.py:64: AssertionError
+___________ ERROR at setup of test_difference_summary_remains_failed ___________
+
+tmp_path_factory = TempPathFactory(_given_basetemp=None, _trace=<pluggy._tracing.TagTracerSub object at 0x10619f230>, _basetemp=PosixPath...r/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306'), _retention_count=3, _retention_policy='all')
+
+    @pytest.fixture(scope="module")
+    def check_dispatch(tmp_path_factory):
+        host = Path("examples/vllm_llm/host.hip").read_text()
+        start = host.index('      // Same DSL namespace')
+        end = host.index('      const int xtasks', start)
+        dispatch = host[start:end]
+        summary_start = host.index('    printf("CHECK NOT-IMPORTED:')
+        return_start = host.index("    return bad ? 4 : 0;", summary_start)
+        summary = host[summary_start:return_start]
+        return_line = host[return_start:host.index("\n", return_start)]
+        src = r'''
+    #include <string>
+    #include <map>
+    #include <cstdio>
+    #include <cstdlib>
+    #include <vector>
+    #include <cstring>
+    struct etx_imp_desc {};
+    using hipFunction_t = void*;
+    using hipModule_t = void*;
+    struct { int stream; } hst;
+    int launches = 0, lookups = 0;
+    int topk_ids[64] = {17}, n_tk = 64, check_pos = 1040, NR = 8;
+    float topk_w[64] = {0.5f};
+    constexpr int hipMemcpyDeviceToHost = 1;
+    int hipMemcpy(void* dst, const void* src, size_t n, int) { memcpy(dst, src, n); return 0; }
+    void launch_imported(int) { ++launches; }
+    bool wait_stream(int, double) { return true; }
+    void die(const std::string& s) { fprintf(stderr, "%s\n", s.c_str()); exit(1); }
+    const etx_imp_desc* etx_imp_find(const char*) { return nullptr; }
+    const void* etx_orig_find(const char*) { ++lookups; return nullptr; }
+    bool etx_orig_triton(const char*, const char**, const char**, int*) { return false; }
+    int hipModuleLoad(hipModule_t*, const char*) { return 0; }
+    int hipModuleGetFunction(hipFunction_t*, hipModule_t, const char*) { return 0; }
+    #define ETX_CHECK(x) (void)(x)
+    int main(int argc, char** argv) {
+      int bad = getenv("CHECK_TEST_BAD") ? 1 : 0, not_imported = 0;
+      std::string not_imported_names;
+      struct Inst { std::string exp; int n; std::string role; int req; int layer; };
+      for (int n = 1; n < argc; ++n) {
+        Inst x{argv[n], n, std::string(argv[n]) == "dsl_topk" ? "topk" : "other", 0, n};
+    ''' + dispatch + r'''
+      }
+    ''' + summary + r'''
+      printf("launches=%d lookups=%d\n", launches, lookups);
+    ''' + return_line + r'''
+    }
+    '''
+        directory = tmp_path_factory.mktemp("check_dispatch")
+        source, binary = directory / "check.cc", directory / "check"
+        source.write_text(src)
+        # This repo's local toolchain supplies libc++ where Apple's c++ may not.
+        llvm = Path("/opt/homebrew/opt/llvm/bin/clang++")
+        compiler = os.environ.get("CXX", str(llvm) if llvm.exists() else "c++")
+        build = subprocess.run([compiler, "-std=c++17", str(source), "-o", str(binary)], capture_output=True, text=True)
+>       assert build.returncode == 0, build.stderr
+E       AssertionError: /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:66:24: error: use of undeclared identifier 'o'
+E            66 |               save("o",o,H*2); save("residual",resid,H*2);
+E               |                        ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:66:26: error: use of undeclared identifier 'H'
+E            66 |               save("o",o,H*2); save("residual",resid,H*2);
+E               |                          ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:66:48: error: use of undeclared identifier 'resid'
+E            66 |               save("o",o,H*2); save("residual",resid,H*2);
+E               |                                                ^~~~~
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:66:54: error: use of undeclared identifier 'H'
+E            66 |               save("o",o,H*2); save("residual",resid,H*2);
+E               |                                                      ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:67:28: error: use of undeclared identifier 'W'
+E            67 |               save("gamma",W("L"+std::to_string(x.layer)+".ln2"),H*2);
+E               |                            ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:67:66: error: use of undeclared identifier 'H'
+E            67 |               save("gamma",W("L"+std::to_string(x.layer)+".ln2"),H*2);
+E               |                                                                  ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:68:29: error: use of undeclared identifier 'W'
+E            68 |               save("router",W("L"+std::to_string(x.layer)+".wr"),(size_t)E*H*2);
+E               |                             ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:68:74: error: use of undeclared identifier 'E'
+E            68 |               save("router",W("L"+std::to_string(x.layer)+".wr"),(size_t)E*H*2);
+E               |                                                                          ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:68:76: error: use of undeclared identifier 'H'
+E            68 |               save("router",W("L"+std::to_string(x.layer)+".wr"),(size_t)E*H*2);
+E               |                                                                            ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:71:27: error: use of undeclared identifier 'ox'
+E            71 |               save("norm",ox,(size_t)H*2); save("resid2",resid2,H*2);
+E               |                           ^~
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:71:38: error: use of undeclared identifier 'H'
+E            71 |               save("norm",ox,(size_t)H*2); save("resid2",resid2,H*2);
+E               |                                      ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:71:58: error: use of undeclared identifier 'resid2'
+E            71 |               save("norm",ox,(size_t)H*2); save("resid2",resid2,H*2);
+E               |                                                          ^~~~~~
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:71:65: error: use of undeclared identifier 'H'
+E            71 |               save("norm",ox,(size_t)H*2); save("resid2",resid2,H*2);
+E               |                                                                 ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:72:29: error: use of undeclared identifier 'rlog'
+E            72 |               save("logits",rlog,E*2); save("ids",topk_ids,n_tk*4);
+E               |                             ^~~~
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:72:34: error: use of undeclared identifier 'E'
+E            72 |               save("logits",rlog,E*2); save("ids",topk_ids,n_tk*4);
+E               |                                  ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:73:53: error: use of undeclared identifier 'tei'
+E            73 |               save("mix",topk_w,n_tk*4); save("tei",tei,n_tk*4);
+E               |                                                     ^~~
+E         16 errors generated.
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/opt/homebrew/opt/llvm/bin/clang++', '-std=c++17', '/private/var/folders/tb/g6324rs52jz3skf78x...*4); save("tei",tei,n_tk*4);\n      |                                                     ^~~\n16 errors generated.\n').returncode
+
+tests/test_host_import_check.py:64: AssertionError
+________ ERROR at setup of test_routing_audit_copies_actual_layer_bytes ________
+
+tmp_path_factory = TempPathFactory(_given_basetemp=None, _trace=<pluggy._tracing.TagTracerSub object at 0x10619f230>, _basetemp=PosixPath...r/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306'), _retention_count=3, _retention_policy='all')
+
+    @pytest.fixture(scope="module")
+    def check_dispatch(tmp_path_factory):
+        host = Path("examples/vllm_llm/host.hip").read_text()
+        start = host.index('      // Same DSL namespace')
+        end = host.index('      const int xtasks', start)
+        dispatch = host[start:end]
+        summary_start = host.index('    printf("CHECK NOT-IMPORTED:')
+        return_start = host.index("    return bad ? 4 : 0;", summary_start)
+        summary = host[summary_start:return_start]
+        return_line = host[return_start:host.index("\n", return_start)]
+        src = r'''
+    #include <string>
+    #include <map>
+    #include <cstdio>
+    #include <cstdlib>
+    #include <vector>
+    #include <cstring>
+    struct etx_imp_desc {};
+    using hipFunction_t = void*;
+    using hipModule_t = void*;
+    struct { int stream; } hst;
+    int launches = 0, lookups = 0;
+    int topk_ids[64] = {17}, n_tk = 64, check_pos = 1040, NR = 8;
+    float topk_w[64] = {0.5f};
+    constexpr int hipMemcpyDeviceToHost = 1;
+    int hipMemcpy(void* dst, const void* src, size_t n, int) { memcpy(dst, src, n); return 0; }
+    void launch_imported(int) { ++launches; }
+    bool wait_stream(int, double) { return true; }
+    void die(const std::string& s) { fprintf(stderr, "%s\n", s.c_str()); exit(1); }
+    const etx_imp_desc* etx_imp_find(const char*) { return nullptr; }
+    const void* etx_orig_find(const char*) { ++lookups; return nullptr; }
+    bool etx_orig_triton(const char*, const char**, const char**, int*) { return false; }
+    int hipModuleLoad(hipModule_t*, const char*) { return 0; }
+    int hipModuleGetFunction(hipFunction_t*, hipModule_t, const char*) { return 0; }
+    #define ETX_CHECK(x) (void)(x)
+    int main(int argc, char** argv) {
+      int bad = getenv("CHECK_TEST_BAD") ? 1 : 0, not_imported = 0;
+      std::string not_imported_names;
+      struct Inst { std::string exp; int n; std::string role; int req; int layer; };
+      for (int n = 1; n < argc; ++n) {
+        Inst x{argv[n], n, std::string(argv[n]) == "dsl_topk" ? "topk" : "other", 0, n};
+    ''' + dispatch + r'''
+      }
+    ''' + summary + r'''
+      printf("launches=%d lookups=%d\n", launches, lookups);
+    ''' + return_line + r'''
+    }
+    '''
+        directory = tmp_path_factory.mktemp("check_dispatch")
+        source, binary = directory / "check.cc", directory / "check"
+        source.write_text(src)
+        # This repo's local toolchain supplies libc++ where Apple's c++ may not.
+        llvm = Path("/opt/homebrew/opt/llvm/bin/clang++")
+        compiler = os.environ.get("CXX", str(llvm) if llvm.exists() else "c++")
+        build = subprocess.run([compiler, "-std=c++17", str(source), "-o", str(binary)], capture_output=True, text=True)
+>       assert build.returncode == 0, build.stderr
+E       AssertionError: /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:66:24: error: use of undeclared identifier 'o'
+E            66 |               save("o",o,H*2); save("residual",resid,H*2);
+E               |                        ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:66:26: error: use of undeclared identifier 'H'
+E            66 |               save("o",o,H*2); save("residual",resid,H*2);
+E               |                          ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:66:48: error: use of undeclared identifier 'resid'
+E            66 |               save("o",o,H*2); save("residual",resid,H*2);
+E               |                                                ^~~~~
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:66:54: error: use of undeclared identifier 'H'
+E            66 |               save("o",o,H*2); save("residual",resid,H*2);
+E               |                                                      ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:67:28: error: use of undeclared identifier 'W'
+E            67 |               save("gamma",W("L"+std::to_string(x.layer)+".ln2"),H*2);
+E               |                            ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:67:66: error: use of undeclared identifier 'H'
+E            67 |               save("gamma",W("L"+std::to_string(x.layer)+".ln2"),H*2);
+E               |                                                                  ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:68:29: error: use of undeclared identifier 'W'
+E            68 |               save("router",W("L"+std::to_string(x.layer)+".wr"),(size_t)E*H*2);
+E               |                             ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:68:74: error: use of undeclared identifier 'E'
+E            68 |               save("router",W("L"+std::to_string(x.layer)+".wr"),(size_t)E*H*2);
+E               |                                                                          ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:68:76: error: use of undeclared identifier 'H'
+E            68 |               save("router",W("L"+std::to_string(x.layer)+".wr"),(size_t)E*H*2);
+E               |                                                                            ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:71:27: error: use of undeclared identifier 'ox'
+E            71 |               save("norm",ox,(size_t)H*2); save("resid2",resid2,H*2);
+E               |                           ^~
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:71:38: error: use of undeclared identifier 'H'
+E            71 |               save("norm",ox,(size_t)H*2); save("resid2",resid2,H*2);
+E               |                                      ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:71:58: error: use of undeclared identifier 'resid2'
+E            71 |               save("norm",ox,(size_t)H*2); save("resid2",resid2,H*2);
+E               |                                                          ^~~~~~
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:71:65: error: use of undeclared identifier 'H'
+E            71 |               save("norm",ox,(size_t)H*2); save("resid2",resid2,H*2);
+E               |                                                                 ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:72:29: error: use of undeclared identifier 'rlog'
+E            72 |               save("logits",rlog,E*2); save("ids",topk_ids,n_tk*4);
+E               |                             ^~~~
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:72:34: error: use of undeclared identifier 'E'
+E            72 |               save("logits",rlog,E*2); save("ids",topk_ids,n_tk*4);
+E               |                                  ^
+E         /private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1306/check_dispatch0/check.cc:73:53: error: use of undeclared identifier 'tei'
+E            73 |               save("mix",topk_w,n_tk*4); save("tei",tei,n_tk*4);
+E               |                                                     ^~~
+E         16 errors generated.
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/opt/homebrew/opt/llvm/bin/clang++', '-std=c++17', '/private/var/folders/tb/g6324rs52jz3skf78x...*4); save("tei",tei,n_tk*4);\n      |                                                     ^~~\n16 errors generated.\n').returncode
+
+tests/test_host_import_check.py:64: AssertionError
+=========================== short test summary info ============================
+SKIPPED [1] tests/test_acquire_contract.py:459: real build not present: /Users/ckl/code/.wt/etx-producer-scoring/build/rocm22/qwen3-30b-a3b_xcd_qknr (set ETX_CONTRACT_BUILDS)
+SKIPPED [1] tests/test_acquire_contract.py:459: real build not present: /Users/ckl/code/.wt/etx-producer-scoring/build/rocm22/mixtral-8x7b_imported (set ETX_CONTRACT_BUILDS)
+SKIPPED [1] tests/test_bandwidth_phases.py:64: Round11 acceptance needs ETX_DATA_ROOT with the archived pair
+SKIPPED [1] tests/test_codegen.py:50: hipcc not installed
+SKIPPED [1] tests/test_coh_model.py:19: measured plan not on this machine
+SKIPPED [1] tests/test_coh_model.py:28: measured plan not on this machine
+SKIPPED [1] tests/test_coh_model.py:33: measured plan not on this machine
+SKIPPED [1] tests/test_floors.py:115: ISA recount needs ETX_ISA_S and ETX_ISA_MAP
+SKIPPED [1] tests/test_floors.py:226: set VLLM_SRC to a vLLM v0.27.1 checkout
+SKIPPED [1] tests/test_floors.py:240: Round11 floors check needs ETX_DATA_ROOT with the archived pair
+SKIPPED [1] tests/test_gpu_jobs.py:210: descendant sweep reads /proc (Linux, the box)
+SKIPPED [1] tests/test_importer.py:51: local toolchain unavailable; set ETX_LLVM, ETX_VLLM and ETX_ROCM_HEADERS
+SKIPPED [1] tests/test_layer_budget.py:50: Round11 acceptance gate did not run: data set is missing. Set ETX_DATA_ROOT to its parent directory.
+SKIPPED [1] tests/test_pairs.py:162: round48 log not present at /Users/ckl/code/.wt/etx-producer-scoring/results_2026-10-01/round48/interleave.log (set ETX_DATA_ROOT)
+SKIPPED [1] tests/test_phase_model.py:51: plans not present
+SKIPPED [1] tests/test_phase_model.py:57: plans not present
+SKIPPED [1] tests/test_vlbest_session.py:348: set ETX_VLLM_SOURCE_ROOT to inject a vLLM source checkout
+ERROR tests/test_host_import_check.py::test_dsl_skips_comparison_but_executes
+ERROR tests/test_host_import_check.py::test_non_dsl_without_original_still_dies[rms_norm_2d]
+ERROR tests/test_host_import_check.py::test_non_dsl_without_original_still_dies[not_dsl_gemv]
+ERROR tests/test_host_import_check.py::test_non_dsl_without_original_still_dies[dsl]
+ERROR tests/test_host_import_check.py::test_non_dsl_without_original_still_dies[DSL_gemv]
+ERROR tests/test_host_import_check.py::test_not_imported_count_and_name_limit
+ERROR tests/test_host_import_check.py::test_difference_summary_remains_failed
+ERROR tests/test_host_import_check.py::test_routing_audit_copies_actual_layer_bytes
+2041 passed, 17 skipped, 8 errors in 511.70s (0:08:31)

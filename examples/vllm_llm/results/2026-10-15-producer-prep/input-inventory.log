@@ -1,0 +1,7 @@
+ROOT /Users/ckl/models exists True
+candidate router replay inputs: []
+ROOT /Users/ckl/llm exists False
+ROOT /Users/ckl/.cache/huggingface/hub exists False
+ROOT /Users/ckl/code/etx-cache exists True
+candidate router replay inputs: []
+Prior inventory and retained-output evidence: docs/QWEN-ROUTER-FUSION-STUDY-2026-10-15.md lines 185 onward

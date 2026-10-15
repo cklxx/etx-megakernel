@@ -1,0 +1,130 @@
+{
+  "baseline": {
+    "files": {
+      "mk.s": {
+        "sha256": "5ce51a8534c2fd7a49ce112610f3ad19e317152ce313e204bf876f7129eda5b1",
+        "artifact": "baseline-mk.s.gz",
+        "size": 5230568
+      },
+      "local.s": {
+        "sha256": "285c194021556ada6a47a8605b0ab367406442126e1c1cebe7c997dfa56af643",
+        "artifact": "baseline-local.s.gz",
+        "size": 7882283
+      },
+      "host-local.o": {
+        "sha256": "1976c634c08c323ae6ea343c09c0d900f470ef6193c363cabf360d7cf59c1728",
+        "artifact": "baseline-host-local.o.gz",
+        "size": 2747760
+      },
+      "megakernel_d0.hip": {
+        "sha256": "b389a20df39ab1eca86086aa9730120deb1efdb9275f1b34159bb48a168a3c84",
+        "artifact": "baseline-megakernel_d0.hip.gz",
+        "size": 540456
+      },
+      "native_megakernel.hip": {
+        "sha256": "b98d8a284845c3c8572cceaa2334e9732eb83765063ef632ee7483177a97dd30",
+        "artifact": "baseline-native_megakernel.hip.gz",
+        "size": 540486
+      },
+      "imports.bc": {
+        "sha256": "9c5d4de99add973441c2f065affacf82cb1e1f44acf1beeecc51d8d66c2e3683",
+        "artifact": "baseline-imports.bc.gz",
+        "size": 69040
+      },
+      "imp/imports.json": {
+        "sha256": "448fb75d0a0851449038277d0d83f234e267141beca93175907367a085fc294c",
+        "artifact": "baseline-imp-imports.json.gz",
+        "size": 35234
+      },
+      "plan_data.h": {
+        "sha256": "14a46d13577a67442e0f0a93137c27ba0c6c87791910010c7c86ce36aec666ec",
+        "artifact": "baseline-plan_data.h.gz",
+        "size": 2724689
+      },
+      "imports.h": {
+        "sha256": "b55e9dbc843244f6d536bd3424998d982d37830a468710bef68f46b011cab0a5",
+        "artifact": "baseline-imports.h.gz",
+        "size": 6901
+      }
+    },
+    "native_llvm23_resources": [
+      {
+        "kernel": "etx_megakernel_d0",
+        "vgpr": 128,
+        "spill": 13113,
+        "lds": 29736
+      },
+      {
+        "kernel": "etx_unfused_d0",
+        "vgpr": 103,
+        "spill": 0,
+        "lds": 29704
+      }
+    ],
+    "host_object_format": "build/producer-final-v7-baseline/host-local.o: Mach-O 64-bit object arm64"
+  },
+  "producer": {
+    "files": {
+      "mk.s": {
+        "sha256": "f9677bb467c6836bef437b98adf2312f7cac29186b48331acd5d8067df173dbb",
+        "artifact": "producer-mk.s.gz",
+        "size": 4175553
+      },
+      "local.s": {
+        "sha256": "262149172ab6366aca48ba7054b8249ef2233dfcb689a947f5e605153e87f168",
+        "artifact": "producer-local.s.gz",
+        "size": 6026484
+      },
+      "host-local.o": {
+        "sha256": "0f63ba928d8b2b7639d3d0003f47cda80ce7683d0cfd89f1e87b7937a8fcf83a",
+        "artifact": "producer-host-local.o.gz",
+        "size": 2368136
+      },
+      "megakernel_d0.hip": {
+        "sha256": "b00ed208f1926d52f2446d99f5665c15514ddca24cb16b409aabe8198d069a83",
+        "artifact": "producer-megakernel_d0.hip.gz",
+        "size": 419491
+      },
+      "native_megakernel.hip": {
+        "sha256": "52e76b776ae912843b230bd65f3fadcfa6c8b1fd8aaaa8908ce50106ca2ccb62",
+        "artifact": "producer-native_megakernel.hip.gz",
+        "size": 419521
+      },
+      "imports.bc": {
+        "sha256": "9c5d4de99add973441c2f065affacf82cb1e1f44acf1beeecc51d8d66c2e3683",
+        "artifact": "producer-imports.bc.gz",
+        "size": 69040
+      },
+      "imp/imports.json": {
+        "sha256": "eff72e28afc4b22f2200a1e9274323b93be5eba15a66381d3bc2c5331ff90583",
+        "artifact": "producer-imp-imports.json.gz",
+        "size": 37304
+      },
+      "plan_data.h": {
+        "sha256": "c3b64441453be9c4a01788a9cae7ee3c15a5eb1b209c726dfe49189aea52ee2a",
+        "artifact": "producer-plan_data.h.gz",
+        "size": 2123864
+      },
+      "imports.h": {
+        "sha256": "c3e51f7a780ad9c44e14d47662ae2994f77c443b5abbbe7da34f1902718f6049",
+        "artifact": "producer-imports.h.gz",
+        "size": 7053
+      }
+    },
+    "native_llvm23_resources": [
+      {
+        "kernel": "etx_megakernel_d0",
+        "vgpr": 128,
+        "spill": 7358,
+        "lds": 29736
+      },
+      {
+        "kernel": "etx_unfused_d0",
+        "vgpr": 103,
+        "spill": 0,
+        "lds": 29704
+      }
+    ],
+    "host_object_format": "build/producer-final-v7-producer/host-local.o: Mach-O 64-bit object arm64"
+  }
+}

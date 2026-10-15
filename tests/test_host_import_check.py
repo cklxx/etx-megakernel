@@ -30,6 +30,13 @@ struct { int stream; } hst;
 int launches = 0, lookups = 0;
 int topk_ids[64] = {17}, n_tk = 64, check_pos = 1040, NR = 8;
 float topk_w[64] = {0.5f};
+constexpr int H=2048,E=128;
+unsigned short o[H]={0x3f80},resid[H]={0x4000},gamma[H]={0x3f80};
+unsigned short router_weights[E*H]={0x3f00},ox[8*H]={0x4040},resid2[H]={0x4080},rlog[E]={0x40a0};
+int tei[64]={3};
+const void* W(const std::string& name) {
+  return name.find(".ln2")!=std::string::npos ? (const void*)gamma : (const void*)router_weights;
+}
 constexpr int hipMemcpyDeviceToHost = 1;
 int hipMemcpy(void* dst, const void* src, size_t n, int) { memcpy(dst, src, n); return 0; }
 void launch_imported(int) { ++launches; }
@@ -47,6 +54,7 @@ int main(int argc, char** argv) {
   struct Inst { std::string exp; int n; std::string role; int req; int layer; };
   for (int n = 1; n < argc; ++n) {
     Inst x{argv[n], n, std::string(argv[n]) == "dsl_topk" ? "topk" : "other", 0, n};
+    if (x.exp=="dsl_gemv_producer") {x.role="o_proj";x.layer=0;}
 ''' + dispatch + r'''
   }
 ''' + summary + r'''
@@ -104,3 +112,23 @@ def test_routing_audit_copies_actual_layer_bytes(check_dispatch, tmp_path):
     assert (tmp_path / "L2_ids.bin").read_bytes() == struct.pack("64i", 17, *([0]*63))
     assert (tmp_path / "L2_weights.bin").read_bytes() == struct.pack("64f", .5, *([0.]*63))
     assert len(list(tmp_path.iterdir())) == 2
+
+
+def test_producer_capture_executes_host_writer_and_refuses_overwrite(check_dispatch,tmp_path):
+    from examples.vllm_llm import producer_replay as replay
+    import struct
+    env={**os.environ,"ETX_PRODUCER_CAPTURE":str(tmp_path)}
+    run=subprocess.run([str(check_dispatch),"dsl_gemv_producer"],env=env,capture_output=True,text=True)
+    assert run.returncode==0,run.stderr
+    for kind,size in replay.KINDS.items():
+        assert (tmp_path/f"L0_{kind}.bin").stat().st_size==size
+    assert (tmp_path/"L0_o.bin").read_bytes()[:2]==struct.pack("<H",0x3f80)
+    assert (tmp_path/"L0_norm.bin").read_bytes()[:2]==struct.pack("<H",0x4040)
+    assert (tmp_path/"L0_mix.bin").read_bytes()[:4]==struct.pack("<f",.5)
+    before={p.name:p.read_bytes() for p in tmp_path.iterdir()}
+    retry=subprocess.run([str(check_dispatch),"dsl_gemv_producer"],env=env,capture_output=True,text=True)
+    assert retry.returncode==1 and "capture exists or cannot create" in retry.stderr
+    assert before=={p.name:p.read_bytes() for p in tmp_path.iterdir()}
+    replay.seal(tmp_path,identity="CPU-host-dispatch-fixture",provenance="synthetic-test-fixture",positions=[1040],layers=1)
+    replay.read_capture(tmp_path)
+    with pytest.raises(ValueError,match="provenance"):replay.read_capture(tmp_path,actual=True)

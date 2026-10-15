@@ -1,0 +1,155 @@
+[
+  {
+    "phase": "shell-build",
+    "command": [
+      "bash",
+      "-n",
+      "examples/vllm_llm/build.sh"
+    ],
+    "exit": 0,
+    "seconds": 0.011402125004678965,
+    "log": "examples/vllm_llm/results/2026-10-15-producer-prep/final-v5/shell-build.log"
+  },
+  {
+    "phase": "shell-local_matrix",
+    "command": [
+      "bash",
+      "-n",
+      "examples/vllm_llm/local_matrix.sh"
+    ],
+    "exit": 0,
+    "seconds": 0.010935500264167786,
+    "log": "examples/vllm_llm/results/2026-10-15-producer-prep/final-v5/shell-local_matrix.log"
+  },
+  {
+    "phase": "shell-rocm_build_check",
+    "command": [
+      "bash",
+      "-n",
+      "examples/vllm_llm/rocm_build_check.sh"
+    ],
+    "exit": 0,
+    "seconds": 0.010709499940276146,
+    "log": "examples/vllm_llm/results/2026-10-15-producer-prep/final-v5/shell-rocm_build_check.log"
+  },
+  {
+    "phase": "shell-session",
+    "command": [
+      "bash",
+      "-n",
+      "tools/session.sh"
+    ],
+    "exit": 0,
+    "seconds": 0.0043045831844210625,
+    "log": "examples/vllm_llm/results/2026-10-15-producer-prep/final-v5/shell-session.log"
+  },
+  {
+    "phase": "focused",
+    "command": [
+      "/Users/ckl/code/etx/.venv/bin/python",
+      "-m",
+      "pytest",
+      "-q",
+      "tests/test_producer.py",
+      "tests/test_host_import_check.py",
+      "tests/test_router_study.py",
+      "tests/test_gpu_jobs.py",
+      "tests/test_session_references.py"
+    ],
+    "exit": 0,
+    "seconds": 14.635075833182782,
+    "log": "examples/vllm_llm/results/2026-10-15-producer-prep/final-v5/focused.log"
+  },
+  {
+    "phase": "full-suite",
+    "command": [
+      "/Users/ckl/code/etx/.venv/bin/python",
+      "-m",
+      "pytest",
+      "-q",
+      "-ra"
+    ],
+    "exit": 0,
+    "seconds": 503.85732491733506,
+    "log": "examples/vllm_llm/results/2026-10-15-producer-prep/final-v5/full-suite.log"
+  },
+  {
+    "phase": "simulation",
+    "command": [
+      "/Users/ckl/code/etx/.venv/bin/python",
+      "-u",
+      "-m",
+      "examples.vllm_llm.producer_replay",
+      "--out",
+      "examples/vllm_llm/results/2026-10-15-producer-prep/final-v5/simulation.json"
+    ],
+    "exit": 0,
+    "seconds": 1.128055749926716,
+    "log": "examples/vllm_llm/results/2026-10-15-producer-prep/final-v5/simulation.log"
+  },
+  {
+    "phase": "session-dry",
+    "command": [
+      "/Users/ckl/code/etx/.venv/bin/python",
+      "-m",
+      "etx.tools.gpu_jobs",
+      "examples/sessions/qwen_producer.py",
+      "--dry-run"
+    ],
+    "exit": 0,
+    "seconds": 0.09009225014597178,
+    "log": "examples/vllm_llm/results/2026-10-15-producer-prep/final-v5/session-dry.log"
+  },
+  {
+    "phase": "matrix",
+    "command": [
+      "bash",
+      "examples/vllm_llm/local_matrix.sh",
+      "/Users/ckl/code/.wt/etx-producer-scoring/build/producer-final-matrix"
+    ],
+    "exit": 0,
+    "seconds": 231.16810045810416,
+    "log": "examples/vllm_llm/results/2026-10-15-producer-prep/final-v5/matrix.log"
+  },
+  {
+    "phase": "rocm-baseline",
+    "command": [
+      "bash",
+      "examples/vllm_llm/rocm_build_check.sh",
+      "qwen3-30b-a3b",
+      "default",
+      "/Users/ckl/code/.wt/etx-producer-scoring/build/producer-final-baseline"
+    ],
+    "exit": 0,
+    "seconds": 69.32609074981883,
+    "log": "examples/vllm_llm/results/2026-10-15-producer-prep/final-v5/rocm-baseline.log"
+  },
+  {
+    "phase": "llvm-ir-baseline",
+    "command": [
+      "bash",
+      "etx/importer/hip_ir_local.sh",
+      "/Users/ckl/code/.wt/etx-producer-scoring/build/producer-final-baseline/megakernel_d0.hip",
+      "/Users/ckl/code/.wt/etx-producer-scoring/build/producer-final-baseline/local.ll",
+      "-Ietx/runtime/include",
+      "-I",
+      "/Users/ckl/code/.wt/etx-producer-scoring/build/producer-final-baseline",
+      "-I.",
+      "-DETX_DSL_WSUM",
+      "-DETX_DSL_SCALAR",
+      "-DETX_DSL_GU1",
+      "-DETX_DSL_RBATCH",
+      "-DETX_INBODY_REPORT",
+      "-DETX_DSL_NORM_HOIST",
+      "-DETX_DSL_VECNORM",
+      "-DETX_TOPK_KEY32",
+      "-Xclang",
+      "-mlink-builtin-bitcode",
+      "-Xclang",
+      "/Users/ckl/code/.wt/etx-producer-scoring/build/producer-final-baseline/imports.bc"
+    ],
+    "exit": 1,
+    "seconds": 0.5686630420386791,
+    "log": "examples/vllm_llm/results/2026-10-15-producer-prep/final-v5/llvm-ir-baseline.log"
+  }
+]

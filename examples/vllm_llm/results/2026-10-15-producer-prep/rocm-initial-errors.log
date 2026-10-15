@@ -1,0 +1,8 @@
+In file included from /code/.wt/etx-producer-scoring/build/producer-rocm-on/megakernel_d0.hip:48:
+/code/.wt/etx-producer-scoring/build/producer-rocm-on/dsl_tiles.hip:1544:34: error: use of undeclared identifier 'etx_producer_dot8'
+ 1544 |     dsl_a_stf(scratch+blk*129+e, etx_producer_dot8(w, xs, xs+8));
+      |                                  ^~~~~~~~~~~~~~~~~
+/code/.wt/etx-producer-scoring/build/producer-rocm-on/dsl_tiles.hip:1547:36: error: use of undeclared identifier 'etx_producer_square8'
+ 1547 |     dsl_a_stf(scratch+blk*129+128, etx_producer_square8(xs));
+      |                                    ^~~~~~~~~~~~~~~~~~~~
+2 errors generated when compiling for gfx942.

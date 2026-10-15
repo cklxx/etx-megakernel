@@ -290,8 +290,18 @@ def instances(d) -> list[dict]:
             grid = expected
         out.append({"export": export, "layer": layer, "role": role, "grid": grid, **kw})
 
+    from etx.ops import producer
+    PS = producer.enabled()
+    if PS:
+        producer.validate(d, fold=FOLD, gemv=DSL_GEMV, topk=DSL or DSL_TOPK,
+                          fold_topk=FOLD_TOPK, cu=CU, requests=REQUESTS, batch=BATCH,
+                          coh=COH, uc=os.environ.get("ETX_VL_UC", "0") == "1")
+
     def gemv(layer, role, m, k):
         key = phase_key(layer, role)
+        if PS and role == "o_proj":
+            add(producer.NAME, layer, role, (256, 1, 1), override=True, M=m, K=k, wvprgrp=0)
+            return
         if DSL_GEMV and selected[key].kind == "dsl":   # else: the planner's fallback
             # rows per task = ceil(M / CU): at 304, 17 (qkv), 7 (o_proj), 1 (router)
             fold = FOLD and (role in ("router", "lm_head") or (role == "qkv" and (layer > 0 or getattr(d, "ln_norm", False))))
@@ -354,7 +364,8 @@ def instances(d) -> list[dict]:
         if not FOLD:
             add("fused_add_rms_norm", L, "post_norm", None)
         if d.moe:
-            gemv(L, "router", d.E, d.H)
+            if not PS:
+                gemv(L, "router", d.E, d.H)
             # The XCD-affine expert path (slot -> XCD, per-XCD events) is correct exactly when every top-k slot's
             # tasks land on one XCD: slot s = task / tpe is a contiguous block, so XCD x holds whole slots
             # [x * TOPK / NX, (x + 1) * TOPK / NX) iff TOPK % NX == 0 (TOPK == NX, the shape this began as, is the
@@ -366,7 +377,7 @@ def instances(d) -> list[dict]:
             # stream if the few slots were pinned. The top-k then keeps ONE copy (rep = 1): the unpinned expert
             # tasks all read copy 0, which is the host's rr = 0 block (host.hip addresses copies as rr * TOPK).
             noaff = XCD and d.TOPK % NX != 0
-            if not FOLD or not FOLD_TOPK:
+            if not PS and (not FOLD or not FOLD_TOPK):
                 add("dsl_topk" if (DSL or DSL_TOPK) else f"topk_softmax_e{d.E}", L, "topk", (1, 1, 1),
                     override=DSL or IMPORTED or "ETX_VL_DSL_TOPK" in os.environ, noaff=noaff)
             if DSL_GEMV:                                      # 32 gate + 32 up rows (256 KB) per task; 64 down rows (96 KB)
@@ -481,7 +492,7 @@ def build() -> Graph:
         return DSL_FILE if i["export"].startswith("dsl_") else adapters
 
     def touch_of(i, x):                                        # the touch hook of the dense DSL GEMVs (plain or x form)
-        return f"etx_touch_{'x_' if x else ''}{i['export']}" if TOUCH and i["export"] in ("dsl_gemv", "dsl_gemv_fold", "dsl_gemv_router_fold") else None
+        return f"etx_touch_{'x_' if x else ''}{i['export']}" if TOUCH and i["export"] in ("dsl_gemv", "dsl_gemv_fold", "dsl_gemv_router_fold", "dsl_gemv_producer") else None
 
     def coh_of(i):                                             # the DSL tiles are the coherent ones (their source is ours)
         return "coherent" if COH and i["export"].startswith("dsl_") else "imported"
@@ -656,6 +667,9 @@ def build() -> Graph:
     from etx.ops import local_fold
     if local_fold.enabled():
         local_fold.apply(g, d)
+    from etx.ops import producer
+    if producer.enabled():
+        producer.apply(g, d)
     plan = os.environ.get("ETX_VL_PLAN")
     if plan:
         Path(str(plan) + '.imports-check.json').write_text(json.dumps(import_validation, indent=2) + '\n')

@@ -23,6 +23,6 @@ build-backend = "setuptools.build_meta"
 include = ["etx*"]
 
 [tool.setuptools.package-data]
-etx = ["machine/arch/*.yaml", "runtime/include/etx/*.h", "importer/specs/*.json",
+etx = ["ops/*.h", "machine/arch/*.yaml", "runtime/include/etx/*.h", "importer/specs/*.json",
        "importer/*.sh", "importer/shim/**/*.h", "importer/shim/**/*.cuh",
        "importer/shim_nofp8/**/*.h", "importer/shim_nofp8/**/*.cuh"]

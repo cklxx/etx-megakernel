@@ -92,3 +92,17 @@ its pattern will fail on a fresh box. The working tag on 2026-10-01 was `vllm/vl
 - ETX_EV_STRIDE 32 vs 1 on the vLLM-kernel Qwen graphs (0.5-3%), the imported MoE kernels' per-launch cost against vLLM (2026-09-28).
 
 - **backup data-2026-10-02** (releases on cklxx/etx-data and metalopscloud/amdproject): results_2026-09-30 + results_2026-10-01 as one tarball, sha256 5f1b9d3a0bd439e8..., download-verified. Covers every round of the 2026-10-01/02 session.
+
+## Qwen producer-scoring CPU preparation, 2026-10-15
+
+`examples/vllm_llm/results/2026-10-15-producer-prep/` holds the executed local checks.
+It includes numerical and schedule simulations, command receipts, full test logs,
+plan proofs, and offline compiler reports.
+Its `SHA256SUMS` file binds the retained artifacts.
+The simulation executes the shared production scoring header.
+Its weights and activations are synthetic. They are not model captures.
+The sparse near-tie witness and historical trace questions reuse the prior router study.
+No complete retained Qwen router activation and weight set was found.
+Actual-model capture and replay are prepared but pending GPU execution.
+There is no new GPU measurement in this set.
+See `docs/QWEN-PRODUCER-PREP-2026-10-15.md` and its runbook.

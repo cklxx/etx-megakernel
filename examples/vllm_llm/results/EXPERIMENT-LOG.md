@@ -40,3 +40,41 @@ and last-arriver reduction/top-k; it is distinct from P5 above.
 | Experiment | Why we think it is a good experiment | Run on GPU? | Result |
 |---|---|---|---|
 | o_proj producer scoring + delayed RMS scale + last-arriver top-k | Test whether normalization's global dependency can move after router dot products | **No — CPU simulation/tests executed; conditional successor hardware design only; $0 GPU spend** | **Not yet supported; NO-GO as an exact bf16 rewrite.** Synthetic counterexample changes eighth expert 7→8. 64 synthetic cases: ordered IDs differ 6/64, sets 1/64, mixing-weight bits 64/64; not actual-model correctness. Current gain unknown. Historical trace sensitivity is not transferable to 4.051 ms kept wall time. No implementation/run of this exact mechanism found in searched history. |
+
+## Original producer-scoring implementation preparation (2026-10-15)
+
+The user requested implementation of the original hypothesis after the study.
+This work does not substitute P5 or re-label KEY32 as producer scoring.
+`ETX_VL_PRODUCER_SCORE=1` selects an explicit, default-off o_proj producer candidate.
+Each row owner scores its completed residual slice before the RMS scale.
+The last producer folds the partials, writes the normalized expert input, and calls the existing top-k.
+
+[Design and limits](../../../docs/QWEN-PRODUCER-PREP-2026-10-15.md).
+[Bounded session runbook](../../../docs/QWEN-PRODUCER-RUNBOOK.md).
+[Local execution record](2026-10-15-producer-prep/).
+
+CPU simulation executes the shared production scoring header.
+It retains the sparse eighth-expert change and tests reordered completion and reuse.
+The synthetic 32-case run has 30/32 ordered-ID matches, 32/32 expert-set matches,
+and 0/32 bit-exact mixing-weight matches.
+These are synthetic counts. They are not actual Qwen pass rates.
+Real-model capture and replay are prepared. No complete retained input set was found.
+
+Status: implementation and local preparation only. No GPU execution. GPU spend $0.
+No real-model correctness pass, imported-launch certificate, token pass, KEEP,
+ESTABLISHED fusion, system LEAD, or speed gain is claimed for this candidate.
+The GPU script blocks timing on any required routing or expert-input byte, import, DSL, or token gate failure.
+Raw logit-bit changes remain diagnostic under the existing numerical gate.
+The registered incremental wall rule remains five positive pairs, median >=30 us,
+and median greater than twice the spread.
+The candidate and kept recipe remain separate. The default is unchanged.
+
+
+Final local preparation acceptance: **2,052 passed, 17 skipped, zero failures**.
+The focused suite passed **165**, with one platform skip.
+All **16/16** local matrix builds passed.
+Both arms passed ROCm 7.2.4 device and host-device compilation, LLVM 23 IR and assembly,
+and native host object compilation.
+The source-bound receipt covers **324 source files** and **17 successful commands**.
+These are offline checks. Linux HIP executable linking, loading and GPU execution remain pending.
+See [the exact commands, skip reasons and compiler limits](2026-10-15-producer-prep/validation.md).

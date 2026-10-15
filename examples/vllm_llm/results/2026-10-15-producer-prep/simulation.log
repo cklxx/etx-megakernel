@@ -1,0 +1,18 @@
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/Users/ckl/code/.wt/etx-producer-scoring/examples/vllm_llm/producer_replay.py", line 239, in <module>
+    if __name__=='__main__': main()
+                             ~~~~^^
+  File "/Users/ckl/code/.wt/etx-producer-scoring/examples/vllm_llm/producer_replay.py", line 235, in main
+    result=replay(args.capture,Arithmetic(),actual=args.require_actual) if args.capture else simulate(args.samples)
+                                                                                             ~~~~~~~~^^^^^^^^^^^^^^
+  File "/Users/ckl/code/.wt/etx-producer-scoring/examples/vllm_llm/producer_replay.py", line 189, in simulate
+    a=Arithmetic(); protocol=Protocol(); rows=[]
+  File "/Users/ckl/code/.wt/etx-producer-scoring/examples/vllm_llm/producer_replay.py", line 51, in __init__
+    subprocess.run(self.command, check=True, capture_output=True, text=True, timeout=60)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/subprocess.py", line 577, in run
+    raise CalledProcessError(retcode, process.args,
+                             output=stdout, stderr=stderr)
+subprocess.CalledProcessError: Command '['/usr/bin/clang++', '-std=c++17', '-O2', '-ffp-contract=off', '-shared', '-fPIC', '-I', '/Users/ckl/code/.wt/etx-producer-scoring', '/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/etx-producer-math-b515379p/math.cpp', '-o', '/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/etx-producer-math-b515379p/math.so']' returned non-zero exit status 1.

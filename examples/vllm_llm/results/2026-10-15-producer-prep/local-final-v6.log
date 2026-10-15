@@ -1,0 +1,25 @@
+LOCAL phase=shell-build evidence=examples/vllm_llm/results/2026-10-15-producer-prep/final-v6/shell-build.log
+LOCAL phase=shell-build exit=0
+LOCAL phase=shell-local_matrix evidence=examples/vllm_llm/results/2026-10-15-producer-prep/final-v6/shell-local_matrix.log
+LOCAL phase=shell-local_matrix exit=0
+LOCAL phase=shell-rocm_build_check evidence=examples/vllm_llm/results/2026-10-15-producer-prep/final-v6/shell-rocm_build_check.log
+LOCAL phase=shell-rocm_build_check exit=0
+LOCAL phase=shell-session evidence=examples/vllm_llm/results/2026-10-15-producer-prep/final-v6/shell-session.log
+LOCAL phase=shell-session exit=0
+LOCAL phase=focused evidence=examples/vllm_llm/results/2026-10-15-producer-prep/final-v6/focused.log
+LOCAL phase=focused exit=0
+LOCAL phase=full-suite evidence=examples/vllm_llm/results/2026-10-15-producer-prep/final-v6/full-suite.log
+LOCAL phase=full-suite exit=1
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/Users/ckl/code/.wt/etx-producer-scoring/examples/vllm_llm/producer_local.py", line 99, in <module>
+    if __name__=='__main__':main()
+                            ~~~~^^
+  File "/Users/ckl/code/.wt/etx-producer-scoring/examples/vllm_llm/producer_local.py", line 67, in main
+    run('full-suite',[sys.executable,'-m','pytest','-q','-ra'],timeout=1800,env=env)
+    ~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/ckl/code/.wt/etx-producer-scoring/examples/vllm_llm/producer_local.py", line 58, in run
+    if rc:raise RuntimeError(f'{name} failed, exit {rc}: inspect {log}')
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+RuntimeError: full-suite failed, exit 1: inspect examples/vllm_llm/results/2026-10-15-producer-prep/final-v6/full-suite.log

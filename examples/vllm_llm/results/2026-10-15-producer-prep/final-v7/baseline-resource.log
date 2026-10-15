@@ -1,0 +1,24 @@
+/code/.wt/etx-producer-scoring/build/producer-final-v7-baseline/megakernel_d0.hip:11623:1: remark: Function Name: etx_megakernel_d0 [-Rpass-analysis=kernel-resource-usage]
+ 11623 | extern "C" __global__ void __launch_bounds__(ETX_THREADS, ETX_MIN_WG_PER_CU) etx_megakernel_d0(etx_params p) {
+       | ^
+/code/.wt/etx-producer-scoring/build/producer-final-v7-baseline/megakernel_d0.hip:11623:1: remark:     TotalSGPRs: 106 [-Rpass-analysis=kernel-resource-usage]
+/code/.wt/etx-producer-scoring/build/producer-final-v7-baseline/megakernel_d0.hip:11623:1: remark:     VGPRs: 128 [-Rpass-analysis=kernel-resource-usage]
+/code/.wt/etx-producer-scoring/build/producer-final-v7-baseline/megakernel_d0.hip:11623:1: remark:     AGPRs: 0 [-Rpass-analysis=kernel-resource-usage]
+/code/.wt/etx-producer-scoring/build/producer-final-v7-baseline/megakernel_d0.hip:11623:1: remark:     ScratchSize [bytes/lane]: 36 [-Rpass-analysis=kernel-resource-usage]
+/code/.wt/etx-producer-scoring/build/producer-final-v7-baseline/megakernel_d0.hip:11623:1: remark:     Dynamic Stack: False [-Rpass-analysis=kernel-resource-usage]
+/code/.wt/etx-producer-scoring/build/producer-final-v7-baseline/megakernel_d0.hip:11623:1: remark:     Occupancy [waves/SIMD]: 4 [-Rpass-analysis=kernel-resource-usage]
+/code/.wt/etx-producer-scoring/build/producer-final-v7-baseline/megakernel_d0.hip:11623:1: remark:     SGPRs Spill: 261 [-Rpass-analysis=kernel-resource-usage]
+/code/.wt/etx-producer-scoring/build/producer-final-v7-baseline/megakernel_d0.hip:11623:1: remark:     VGPRs Spill: 8 [-Rpass-analysis=kernel-resource-usage]
+/code/.wt/etx-producer-scoring/build/producer-final-v7-baseline/megakernel_d0.hip:11623:1: remark:     LDS Size [bytes/block]: 29736 [-Rpass-analysis=kernel-resource-usage]
+/code/.wt/etx-producer-scoring/build/producer-final-v7-baseline/megakernel_d0.hip:11677:1: remark: Function Name: etx_unfused_d0 [-Rpass-analysis=kernel-resource-usage]
+ 11677 | extern "C" __global__ void __launch_bounds__(ETX_THREADS, ETX_MIN_WG_PER_CU) etx_unfused_d0(etx_params p, int32_t first) {
+       | ^
+/code/.wt/etx-producer-scoring/build/producer-final-v7-baseline/megakernel_d0.hip:11677:1: remark:     TotalSGPRs: 99 [-Rpass-analysis=kernel-resource-usage]
+/code/.wt/etx-producer-scoring/build/producer-final-v7-baseline/megakernel_d0.hip:11677:1: remark:     VGPRs: 103 [-Rpass-analysis=kernel-resource-usage]
+/code/.wt/etx-producer-scoring/build/producer-final-v7-baseline/megakernel_d0.hip:11677:1: remark:     AGPRs: 0 [-Rpass-analysis=kernel-resource-usage]
+/code/.wt/etx-producer-scoring/build/producer-final-v7-baseline/megakernel_d0.hip:11677:1: remark:     ScratchSize [bytes/lane]: 0 [-Rpass-analysis=kernel-resource-usage]
+/code/.wt/etx-producer-scoring/build/producer-final-v7-baseline/megakernel_d0.hip:11677:1: remark:     Dynamic Stack: False [-Rpass-analysis=kernel-resource-usage]
+/code/.wt/etx-producer-scoring/build/producer-final-v7-baseline/megakernel_d0.hip:11677:1: remark:     Occupancy [waves/SIMD]: 4 [-Rpass-analysis=kernel-resource-usage]
+/code/.wt/etx-producer-scoring/build/producer-final-v7-baseline/megakernel_d0.hip:11677:1: remark:     SGPRs Spill: 0 [-Rpass-analysis=kernel-resource-usage]
+/code/.wt/etx-producer-scoring/build/producer-final-v7-baseline/megakernel_d0.hip:11677:1: remark:     VGPRs Spill: 0 [-Rpass-analysis=kernel-resource-usage]
+/code/.wt/etx-producer-scoring/build/producer-final-v7-baseline/megakernel_d0.hip:11677:1: remark:     LDS Size [bytes/block]: 29704 [-Rpass-analysis=kernel-resource-usage]
