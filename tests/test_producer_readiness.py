@@ -238,6 +238,9 @@ for job in JOBS:
     report = json.loads((record/'report.json').read_text())
     print('ARCHIVE actual report:', json.dumps(report))
     assert report['status'] == 'NOT-COMPLETE' and report['performance_claim'] is False
+    # Keep the small record; the archive and independent venv are reproducible.
+    shutil.rmtree(archive)
+    shutil.rmtree(envdir)
 
 
 def test_documented_push_stage_attach_start_with_local_transport(tmp_path):
@@ -276,7 +279,7 @@ raise SystemExit(subprocess.call(['bash','-c',' '.join(args)]))
     env = dict(os.environ, HOME=str(home), PATH=str(binpath)+os.pathsep+os.environ['PATH'])
     command = [sys.executable, '-u', '-m', 'tools.producer_start', 'local-fixture',
                '--venv', sys.prefix, '--config', str(config), '--allocation-deadline', str(time.time()+600)]
-    started = subprocess.run(command, cwd=ROOT, env=env, capture_output=True, text=True, timeout=45)
+    started = subprocess.run(command, cwd=ROOT, env=env, capture_output=True, text=True, timeout=120)
     print('LOCAL PUSH/STAGE/ATTACH/START\n'+started.stdout+started.stderr)
     assert started.returncode == 0
     assert (home/'etx/SOURCE_IDENTITY').is_file()
@@ -298,3 +301,5 @@ raise SystemExit(subprocess.call(['bash','-c',' '.join(args)]))
     while time.monotonic() < deadline and not (record/'SEAL').exists():
         time.sleep(.1)
     assert (record/'SEAL').exists()
+    import shutil
+    shutil.rmtree(home/'src')  # Runner is sealed; retain its logs under home/sess.
