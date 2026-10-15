@@ -30,7 +30,7 @@ def counter_rows(path: Path) -> list[dict]:
     return rows
 
 
-def traffic(rows: list[dict], *, kernel=None, expected=None) -> dict:
+def traffic(rows: list[dict], *, kernel=None, expected=None, allow_zero=False) -> dict:
     """Actual counter values, no shape-byte substitution or profiler-time correction."""
     selected = [r for r in rows if r.get('Counter_Name') == COUNTER and
                 (kernel is None or kernel in r.get('Kernel_Name', ''))]
@@ -40,7 +40,7 @@ def traffic(rows: list[dict], *, kernel=None, expected=None) -> dict:
     if expected is not None and len(selected) != expected:
         raise ValueError(f'{len(selected)} dispatches, expected {expected}')
     vals = [float(r['Counter_Value']) for r in selected]
-    if any(not math.isfinite(x) or x < 0 for x in vals) or sum(vals) <= 0:
+    if any(not math.isfinite(x) or x < 0 for x in vals) or (sum(vals) == 0 and not allow_zero):
         raise ValueError('nonpositive or nonfinite traffic')
     spans = [(int(r['Start_Timestamp']), int(r['End_Timestamp'])) for r in selected]
     if any(hi <= lo for lo, hi in spans):
@@ -51,27 +51,69 @@ def traffic(rows: list[dict], *, kernel=None, expected=None) -> dict:
                 scope='selected GPU kernel dispatches; excludes host DMA; not useful-payload bytes')
 
 
+def dispatch_key(row: dict) -> tuple[str, str, str]:
+    fields = ('Process_Id', 'Agent_Id', 'Dispatch_Id')
+    if any(row.get(k) is None or not str(row.get(k, '')).strip() for k in fields):
+        raise ValueError('dispatch coverage requires Process_Id, Agent_Id and Dispatch_Id')
+    return tuple(str(row[k]).strip() for k in fields)
+
+
+def dispatch_span(row: dict) -> tuple[int, int]:
+    try:
+        lo, hi = int(row['Start_Timestamp']), int(row['End_Timestamp'])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ValueError('invalid profiler timestamp fields') from exc
+    if lo < 0 or hi <= lo:
+        raise ValueError('invalid profiler span')
+    return lo, hi
+
+
 def ranged_traffic(path: Path, b: int) -> dict:
-    rows = counter_rows(path)
-    markers = []
+    rows = [r for r in counter_rows(path) if r.get('Counter_Name') == COUNTER]
+    markers, kernels = [], []
     for file in sorted(path.rglob('*marker_api_trace.csv')):
         with file.open() as f:
             markers.extend(csv.DictReader(f))
+    for file in sorted(path.rglob('*kernel_trace.csv')):
+        with file.open() as f:
+            kernels.extend(csv.DictReader(f))
+    if not kernels:
+        raise ValueError('dispatch coverage requires a retained kernel-dispatch trace')
+    # A GPU worker may be a child of the process emitting ROCTx. Match trace and counter
+    # identities across the complete capture, rather than assuming the marker PID owns GPU work.
+    def inside(records, lo, hi, label):
+        out = {}
+        for row in records:
+            key, (start, end) = dispatch_key(row), dispatch_span(row)
+            if start < hi and end > lo:
+                if start < lo or end > hi:
+                    raise ValueError(f'dispatch crosses {label}; traffic attribution refused')
+                if key in out:
+                    raise ValueError(f'duplicate dispatch coverage record in {label}: {key}')
+                out[key] = row
+        return out
+
     result = {}
+    ranges = []
     for phase in ['warmup', 'warmup_short', *(p for k in range(batch.SAMPLES) for p in (f'sample{k}', f'sample{k}_short'))]:
         label = f'ds_b4:b{b}:{phase}'
         match = [r for r in markers if r.get('Function', r.get('Name')) == label]
         if len(match) != 1:
             raise ValueError(f'need exactly one profiler marker {label}')
-        lo, hi = int(match[0]['Start_Timestamp']), int(match[0]['End_Timestamp'])
-        inside = []
-        for r in rows:
-            start, end = int(r['Start_Timestamp']), int(r['End_Timestamp'])
-            if start < hi and end > lo:
-                if start < lo or end > hi:
-                    raise ValueError(f'dispatch crosses {label}; traffic attribution refused')
-                inside.append(r)
-        result[phase] = traffic(inside)
+        lo, hi = dispatch_span(match[0])
+        if any(lo < end and hi > start for start, end in ranges):
+            raise ValueError('overlapping profiler call ranges; traffic attribution refused')
+        ranges.append((lo, hi))
+        traced, measured = inside(kernels, lo, hi, label), inside(rows, lo, hi, label)
+        missing, extra = traced.keys() - measured.keys(), measured.keys() - traced.keys()
+        if not traced or missing or extra:
+            raise ValueError(f'dispatch coverage mismatch in {label}: traced={len(traced)} '
+                             f'missing={sorted(missing)} extra={sorted(extra)}')
+        if any(dispatch_span(traced[k]) != dispatch_span(measured[k]) for k in traced):
+            raise ValueError(f'dispatch coverage timestamp mismatch in {label}')
+        result[phase] = dict(traffic(list(measured.values()), allow_zero=True),
+                             dispatch_coverage=dict(status='COMPLETE', traced=len(traced), measured=len(measured),
+                                                    identity_fields=['Process_Id', 'Agent_Id', 'Dispatch_Id']))
     # This subtraction is an estimate from measured call traffic. Prefill is not independently isolated.
     net = [(result[f'sample{k}']['total_fetch_kb'] - result[f'sample{k}_short']['total_fetch_kb']) / 31
            for k in range(batch.SAMPLES)]
@@ -112,7 +154,8 @@ class AttributionSession(BatchSession):
         if self.capture_batch is not None and 'examples/llm/vllm_bench.py' in command:
             command = list(map(str, command))
             at = command.index('--batches')
-            command[at+1] = str(self.capture_batch)
+            if command[at+1] != str(self.capture_batch):
+                raise ValueError('profiled vLLM call must invoke only its selected batch')
             command += ['--profile-ranges']
             at = command.index('python3', command.index('--entrypoint'))
             command[at:at] = ['rocprofv3', '--kernel-trace', '--marker-trace', '--pmc', COUNTER,
@@ -177,7 +220,8 @@ class AttributionSession(BatchSession):
         selection = json.loads((self.logs/'vsel.json').read_text())['selection']
         if any(not selection[str(b)]['config'] for b in BATCHES):
             raise ValueError('no legal corrected vLLM baseline; timing refused')
-        configs = list(dict.fromkeys(s['config'] for s in selection.values()))
+        configs = list(dict.fromkeys(selection[str(b)]['config'] for b in BATCHES))
+        assigned = {c: tuple(b for b in BATCHES if selection[str(b)]['config'] == c) for c in configs}
         available_graphs = {b for b in BATCHES if json.loads((self.logs/f'graph_gate_{BATCH_ARMS[b]}.json').read_text())['passed']}
         order = [(kind,b) for b in BATCHES for kind in (('etx','graph') if b in available_graphs else ('etx',))] + [('vllm',c) for c in configs]
         rounds = []
@@ -186,11 +230,12 @@ class AttributionSession(BatchSession):
             r = dict(etx={}, graph={}, vllm={})
             for kind, x in (order if k % 2 else order[::-1]):
                 if kind == 'vllm':
-                    r[kind][x] = self.vllm(x, f'b{k}_vllm_{x}')
+                    r[kind][x] = self.vllm(x, f'b{k}_vllm_{x}', batches=assigned[x])
                 else:
                     r[kind][str(x)] = getattr(self, kind)(x, f'b{k}_{kind}_{BATCH_ARMS[x]}')
                 value = r[kind][x if kind == 'vllm' else str(x)]
-                if 'error' in value or (kind == 'vllm' and any(not value.get(b, {}).get('legal') for b in BATCHES)):
+                if 'error' in value or (kind == 'vllm' and
+                        (set(value) != set(assigned[x]) or any(not value.get(b, {}).get('legal') for b in assigned[x]))):
                     failed = True
                     break
             rounds.append(r)
@@ -254,7 +299,7 @@ class AttributionSession(BatchSession):
                 name = f'traffic_vllm_b{b}_{config}'
                 self.capture_batch = b
                 try:
-                    parsed = self.vllm(config, name)
+                    parsed = self.vllm(config, name, batches=(b,))
                 finally:
                     self.capture_batch = None
                 if b not in parsed or not parsed[b]['legal']:

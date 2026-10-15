@@ -53,12 +53,15 @@ class BatchSession(Session):
             print(f"BATCH-INCOMPLETE invocation={name} arm={arm} b={b}: {exc}", flush=True)
             return dict(error=str(exc))
 
-    def vllm(self, config: str, name: str) -> dict:
-        """One vLLM process measuring every batch size; per-sequence gates are read from its log, never filtered."""
+    def vllm(self, config: str, name: str, *, batches=None) -> dict:
+        """One process for the requested batch sizes; every invoked full/short gate is read without filtering."""
+        invoked = tuple(self.batches if batches is None else batches)
+        if not invoked or len(set(invoked)) != len(invoked) or any(b not in self.batches for b in invoked):
+            raise ValueError(f'invalid vLLM batch subset: {invoked}')
         requested = Path(os.environ.get("ETX_DSV2_MODEL", MODEL)).expanduser()
         if requested.resolve() != MODEL.resolve():
             raise ValueError(f"ETX_DSV2_MODEL {requested} differs from prepared model {MODEL}; refused")
-        goldens = [str(self.data / "vllm" / f"golden_r{r}.txt") for r in range(max(self.batches))]
+        goldens = [str(self.data / "vllm" / f"golden_r{r}.txt") for r in range(max(invoked))]
         sudo = [] if os.geteuid() == 0 else ["sudo"]
         command = [*sudo, "docker", "run", "--rm", "--device=/dev/kfd", "--device=/dev/dri", "--group-add", "video",
                    "--ipc=host", "--shm-size", "16g", "--security-opt", "seccomp=unconfined",
@@ -66,10 +69,13 @@ class BatchSession(Session):
                    "-e", f"VLLM_ROCM_USE_AITER={CONFIGS[config]}", "-v", f"{Path.home()}:{Path.home()}",
                    "-w", str(self.root), "--entrypoint", "timeout", IMAGE, "-k", "5", str(VLLM_DEADLINE_S - 30),
                    "python3", "examples/llm/vllm_bench.py", "--model", str(MODEL), "--goldens", *goldens,
-                   "--batches", ",".join(map(str, self.batches)), "--tokens", "32", "--repeats", str(batch.SAMPLES),
+                   "--batches", ",".join(map(str, invoked)), "--tokens", "32", "--repeats", str(batch.SAMPLES),
                    "--label", config, "--echo-config", "--json", str(self.logs / f"{name}.json")]
         try:
-            return batch.vllm_results(self.run(name, command, timeout=VLLM_DEADLINE_S), config)
+            result = batch.vllm_results(self.run(name, command, timeout=VLLM_DEADLINE_S), config)
+            if batches is not None and set(result) != set(invoked):
+                raise ValueError(f'vLLM batch outputs {sorted(result)} differ from invoked subset {invoked}')
+            return result
         except (RuntimeError, ValueError) as exc:
             print(f"BATCH-INCOMPLETE invocation={name} vllm={config}: {exc}", flush=True)
             return dict(error=str(exc))
