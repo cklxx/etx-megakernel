@@ -238,3 +238,63 @@ for job in JOBS:
     report = json.loads((record/'report.json').read_text())
     print('ARCHIVE actual report:', json.dumps(report))
     assert report['status'] == 'NOT-COMPLETE' and report['performance_claim'] is False
+
+
+def test_documented_push_stage_attach_start_with_local_transport(tmp_path):
+    """Execute the real shell archive/push/start path. Transport/probes only are local substitutes.
+
+    SSH never contacts a host; rsync, product probes and key management are labelled
+    no-ops. The real preflight fails closed on synthetic inputs; compute cannot run.
+    """
+    import os
+    import time
+    home = tmp_path/'home'
+    (home/'code').mkdir(parents=True)
+    binpath = tmp_path/'bin'
+    binpath.mkdir()
+    c = inputs(home)
+    config = home/'config.json'
+    config.write_text(json.dumps(c))
+    def script(name, body):
+        p = binpath/name
+        p.write_text(body)
+        p.chmod(0o755)
+    script('ssh', f'''#!{sys.executable}
+import subprocess, sys
+args=sys.argv[1:]
+while args and args[0]=='-o': args=args[2:]
+assert args.pop(0)=='hotaisle@local-fixture'
+raise SystemExit(subprocess.call(['bash','-c',' '.join(args)]))
+''')
+    for name in ('rsync','ssh-keygen'):
+        script(name, '#!/bin/sh\necho LOCAL-TRANSPORT-SUBSTITUTE '+name+'\n')
+    script('rocm-smi', '#!/bin/sh\necho "Card Series: CPU-SUBSTITUTE"\n')
+    script('nproc', '#!/bin/sh\necho 1\n')
+    script('setsid', '#!/bin/sh\nexec "$@"\n')
+    # The independent-venv archive test above verifies dependency staging itself.
+    (binpath/'python3').symlink_to(sys.executable)
+    env = dict(os.environ, HOME=str(home), PATH=str(binpath)+os.pathsep+os.environ['PATH'])
+    command = [sys.executable, '-u', '-m', 'tools.producer_start', 'local-fixture',
+               '--venv', sys.prefix, '--config', str(config), '--allocation-deadline', str(time.time()+600)]
+    started = subprocess.run(command, cwd=ROOT, env=env, capture_output=True, text=True, timeout=45)
+    print('LOCAL PUSH/STAGE/ATTACH/START\n'+started.stdout+started.stderr)
+    assert started.returncode == 0
+    assert (home/'etx/SOURCE_IDENTITY').is_file()
+    deadline = time.monotonic()+30
+    while time.monotonic() < deadline:
+        reports = list((home/'sess').glob('*/report.json'))
+        if reports:
+            break
+        time.sleep(.1)
+    assert len(reports) == 1
+    assert json.loads(reports[0].read_text())['status'] == 'NOT-COMPLETE'
+    record = reports[0].parent
+    print((record/'preflight.log').read_text())
+    assert 'FAIL phase=preflight' in (record/'preflight.log').read_text()
+    assert not (record/'build_baseline.log').exists()
+    assert not (record/'measure.log').exists()
+    assert 'VERDICT ' in (record/'report.log').read_text()
+    # The session may need one more tick to seal. Do not leave an active runner.
+    while time.monotonic() < deadline and not (record/'SEAL').exists():
+        time.sleep(.1)
+    assert (record/'SEAL').exists()
