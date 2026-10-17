@@ -55,21 +55,22 @@ def qwen_assets(path, hash_weights):
                 weights='hashed' if hash_weights else 'size only')
 
 
-def glm_stage(path, full_hash):
+def glm_stage(path, full_hash, gate='production'):
     from examples.glm53 import stage
-    from examples.glm53.prepare import EVIDENCE, MODEL, metadata, sha
+    from examples.glm53.prepare import gate_identity, metadata, sha
 
+    evidence, model = gate_identity(gate)
     stage_json = path / 'stage.json'
     if not stage_json.is_file():
         raise Fail(f'missing {stage_json}')
     record = json.loads(stage_json.read_text())
-    cfg, api = metadata()
+    cfg, api = metadata(evidence)
     if record.get('schema') != 1:
         raise Fail('stage.json schema is not 1')
-    if record.get('model') != MODEL or record.get('revision') != api['sha']:
-        raise Fail('staged model/revision is not the pinned GLM-5.3-Flash checkpoint')
-    if record.get('config_sha256') != sha(EVIDENCE / 'glm-config.json'):
-        raise Fail('staged config is not the pinned GLM config')
+    if record.get('model') != model or record.get('revision') != api['sha']:
+        raise Fail(f'staged model/revision is not the pinned {model.split("/")[-1]} checkpoint ({gate} gate)')
+    if record.get('config_sha256') != sha(evidence / 'glm-config.json'):
+        raise Fail(f'staged config is not the pinned {gate}-gate GLM config')
     if record.get('fixture'):
         raise Fail('synthetic fixtures cannot qualify the production model')
     if not isinstance(record.get('config'), dict) or not isinstance(record.get('dimensions'), dict) \
@@ -110,26 +111,26 @@ def glm_stage(path, full_hash):
         except Exception as exc:
             raise Fail(f'{name}: {exc}') from exc
     if full_hash:
-        stage.validate(path)
+        stage.validate(path, gate=gate)
     summary = dict(layers=layers, ranks=[[r['layers'][0], r['layers'][-1]] for r in ranks],
                    payload_bytes=sum(w['blob_bytes'] for w in record['weights'].values()),
                    hashes='verified' if full_hash else 'not recomputed (--hash)')
     return summary, record
 
 
-def glm_reference(path, staged, expected_batch):
+def glm_reference(path, staged, expected_batch, gate='production'):
     from examples.glm53 import reference
-    from examples.glm53.prepare import metadata
+    from examples.glm53.prepare import gate_identity, metadata
 
     if not path.is_file():
         raise Fail(f'missing {path}')
     ref = json.loads(path.read_text())
-    for key, value in reference.identity().items():
+    for key, value in reference.identity(gate).items():
         if ref.get(key) != value:
             raise Fail(f'{key} is {ref.get(key)!r}, expected {value!r}')
     if ref.get('backend') != 'hf':
         raise Fail(f"backend is {ref.get('backend')!r}, expected 'hf'")
-    cfg, _ = metadata()
+    cfg, _ = metadata(gate_identity(gate)[0])
     text = cfg['text_config']
     batch = ref.get('batch')
     if type(batch) is not int or batch not in (1, 2, 4, 8):
@@ -183,6 +184,8 @@ def main(argv=None):
     ap.add_argument('--glm-stage', type=Path, help='staged GLM-5.3-Flash directory')
     ap.add_argument('--glm-reference', type=Path, help='HF reference .json (its .logits must sit beside it)')
     ap.add_argument('--glm-batch', type=int, choices=[1, 2, 4, 8], help='batch the GLM session will run')
+    ap.add_argument('--glm-gate', choices=['production', 'module'], default='production',
+                    help='pinned GLM identity: the release, or the synthetic module-gate checkpoint')
     ap.add_argument('--hash', action='store_true', help='also re-hash every staged file (minutes)')
     ap.add_argument('--json', type=Path, help='write the result record here')
     args = ap.parse_args(argv)
@@ -203,7 +206,7 @@ def main(argv=None):
     staged = None
     if args.glm_stage:
         try:
-            summary, staged = glm_stage(args.glm_stage.resolve(), args.hash)
+            summary, staged = glm_stage(args.glm_stage.resolve(), args.hash, args.glm_gate)
             print(f"PREFLIGHT OK glm-stage: {summary['layers']} layers, ranks "
                   f"{summary['ranks'][0][0]}-{summary['ranks'][0][1]}/{summary['ranks'][1][0]}-{summary['ranks'][1][1]}, "
                   f"{summary['payload_bytes'] / 2**30:.2f} GiB payload, hashes {summary['hashes']}")
@@ -217,7 +220,7 @@ def main(argv=None):
         try:
             if staged is None and args.glm_stage:
                 raise Fail('not checked: glm-stage did not validate')
-            summary = glm_reference(args.glm_reference.resolve(), staged, args.glm_batch)
+            summary = glm_reference(args.glm_reference.resolve(), staged, args.glm_batch, args.glm_gate)
             print(f"PREFLIGHT OK glm-reference: batch {summary['batch']}, prompt {summary['prompt']}, "
                   f"{summary['steps']} steps, {summary['logits_mib']} MiB logits"
                   + (f"; run the GLM session with ETX_GLM_BATCH={summary['batch']}"))

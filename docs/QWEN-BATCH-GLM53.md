@@ -148,6 +148,12 @@ The operator sequence — one fail-closed preflight, ordered Qwen then GLM
 sessions, strict pass criteria, budget, evidence and teardown — is in
 [QWEN-BATCH-GLM53-RUNBOOK.md](QWEN-BATCH-GLM53-RUNBOOK.md).
 
+The release checkpoint is not fetched (owner direction, 2026-10-17). The GPU gate
+for this path is the [module gate](QWEN-BATCH-GLM53-RUNBOOK.md#module-gate): a
+synthetic 4-layer native-FP8 checkpoint (`examples/glm53/module_gate.py`) run
+through this same stager, reference, build, launcher and qualification with
+`gate=module`.
+
 All commands below require already available local weights; none fetches or
 provisions. Preserve snapshot provenance and place the exact commit in
 `SNAPSHOT/REVISION`. The stager requires the byte-identical pinned config and

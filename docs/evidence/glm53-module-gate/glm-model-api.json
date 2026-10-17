@@ -1,0 +1,21 @@
+{
+  "id": "etx-synthetic/GLM-5.3-Flash-module-gate",
+  "sha": "b27dc870264093473eb6d573567464f8e15335e3",
+  "kind": "synthetic module-gate checkpoint; not a released model",
+  "generator": "python -m examples.glm53.module_gate",
+  "seed": 20261017,
+  "weights_sha256": "63947bf9097fad21b7ad44a2657ae689e7036f6c821f11c7b8b5ab6392f196d4",
+  "derived_from": {
+    "model": "zai-org/GLM-5.3-Flash",
+    "revision": "46a050bec13002ad29ee795c16e61cf4fa3c4a9c",
+    "config_sha256": "bb8f01c42cb92a52ca72e65afb4d5bd8d11aef083cd210e8de25dfb904f23e9f"
+  },
+  "safetensors": {
+    "parameters": {
+      "BF16": 8949248,
+      "F32": 2040,
+      "F8_E4M3": 12713984
+    },
+    "total": 21665272
+  }
+}

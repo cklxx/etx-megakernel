@@ -7,13 +7,14 @@ speculative=false, backend='hf'/'etx-pp2', requests=[{prompt_ids, generated_ids}
 import argparse
 import json
 from pathlib import Path
-from examples.glm53.prepare import MODEL, metadata, sha, EVIDENCE
+from examples.glm53.prepare import gate_identity, metadata, sha
 
 
-def compare(reference, candidate):
-    cfg, api = metadata()
-    identity = dict(schema=1, model=MODEL, revision=api['sha'],
-                    config_sha256=sha(EVIDENCE / 'glm-config.json'), mode='greedy', speculative=False)
+def compare(reference, candidate, gate='production'):
+    evidence, model = gate_identity(gate)
+    cfg, api = metadata(evidence)
+    identity = dict(schema=1, model=model, revision=api['sha'],
+                    config_sha256=sha(evidence / 'glm-config.json'), mode='greedy', speculative=False)
     for record, backend in ((reference, 'hf'), (candidate, 'etx-pp2')):
         if any(record.get(k) != v for k, v in identity.items()) or record.get('backend') != backend:
             raise ValueError('wrong model/revision/config, decode mode or backend')
@@ -50,9 +51,10 @@ def main():
     ap.add_argument('--reference', type=Path, required=True)
     ap.add_argument('--candidate', type=Path, required=True)
     ap.add_argument('--out', type=Path, required=True)
+    ap.add_argument('--gate', choices=['production', 'module'], default='production')
     a = ap.parse_args()
     try:
-        result = compare(json.loads(a.reference.read_text()), json.loads(a.candidate.read_text()))
+        result = compare(json.loads(a.reference.read_text()), json.loads(a.candidate.read_text()), a.gate)
     except (ValueError, KeyError, TypeError) as exc:
         result = dict(schema=1, status='FAILED', error=str(exc), model_certified=False)
     a.out.write_text(json.dumps(result, indent=2) + '\n')

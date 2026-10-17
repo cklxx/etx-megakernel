@@ -12,7 +12,7 @@ import math
 from pathlib import Path
 import struct
 
-from examples.glm53.prepare import EVIDENCE, MODEL, metadata, partition, sha
+from examples.glm53.prepare import gate_identity, metadata, partition, sha
 
 def file_sha(path):
     h=hashlib.sha256()
@@ -171,13 +171,13 @@ class Snapshot:
         return dict(index_sha256=self.index_sha256,shards=self.shard_hashes)
 
 
-def stage(src, out, maxlen=1072):
-    cfg,api=metadata()
-    if sha(src/'config.json')!=sha(EVIDENCE/'glm-config.json') or (src/'REVISION').read_text().strip()!=api['sha']:
-        raise ValueError('snapshot is not the exact pinned GLM checkpoint/config')
+def stage(src, out, maxlen=1072, gate='production'):
+    evidence,model=gate_identity(gate);cfg,api=metadata(evidence)
+    if sha(src/'config.json')!=sha(evidence/'glm-config.json') or (src/'REVISION').read_text().strip()!=api['sha']:
+        raise ValueError(f'snapshot is not the exact pinned GLM checkpoint/config ({gate} gate)')
     out.mkdir(parents=True,exist_ok=False)
     t=cfg['text_config']; d=dimensions(t,maxlen);ranks=partition(t);reader=Snapshot(src)
-    result=dict(schema=1,model=MODEL,revision=api['sha'],config_sha256=sha(src/'config.json'),fixture=False,
+    result=dict(schema=1,model=model,revision=api['sha'],config_sha256=sha(src/'config.json'),fixture=False,
                 config=t,dimensions=d,ranks=ranks,weights={},numerics='native FP8 -> BF16 per block; FP32 accumulators; no activation quantization')
     for i in range(t['num_hidden_layers']):
         result['weights'][f'l{i}']=write_blob(out,f'l{i}',shapes(t,i),lambda k,i=i:reader(f'model.layers.{i}.{k}'),slot_names(t))
@@ -187,13 +187,16 @@ def stage(src, out, maxlen=1072):
     for name,(key,shape) in outer.items():result['weights'][name]=write_blob(out,name,{key:shape},reader,[key])
     result['snapshot_inputs']=reader.verified_inputs()
     (out/'stage.json').write_text(json.dumps(result,indent=2)+'\n');(out/'glm53_spec.h').write_text(header(d))
-    validate(out)
+    validate(out,gate=gate)
     return result
 
 
-def validate(out, allow_fixture=False):
-    r=json.loads((out/'stage.json').read_text());cfg,api=metadata()
-    if r.get('schema')!=1 or r.get('model')!=MODEL or r.get('revision')!=api['sha'] or r.get('config_sha256')!=sha(EVIDENCE/'glm-config.json'):raise ValueError('wrong staged model identity')
+def validate(out, allow_fixture=False, gate='production'):
+    """The one staging validator. `gate` selects which pinned identity the stage must carry
+    (the release, or the synthetic module-gate checkpoint); every other check is the same."""
+    evidence,model=gate_identity(gate)
+    r=json.loads((out/'stage.json').read_text());cfg,api=metadata(evidence)
+    if r.get('schema')!=1 or r.get('model')!=model or r.get('revision')!=api['sha'] or r.get('config_sha256')!=sha(evidence/'glm-config.json'):raise ValueError(f'wrong staged model identity for the {gate} gate')
     if r.get('fixture') and not allow_fixture:raise ValueError('synthetic fixtures cannot qualify the production model')
     if not r.get('fixture') and r['dimensions']['BF16']!=1:raise ValueError('production activations must be BF16')
     if not r.get('fixture') and r['config']!=cfg['text_config']:raise ValueError('changed production config')
@@ -213,7 +216,8 @@ def validate(out, allow_fixture=False):
 
 def main():
     ap=argparse.ArgumentParser(description=__doc__);ap.add_argument('--src',type=Path,required=True);ap.add_argument('--out',type=Path,required=True);ap.add_argument('--maxlen',type=int,default=1072)
-    a=ap.parse_args();stage(a.src,a.out,a.maxlen)
+    ap.add_argument('--gate',choices=['production','module'],default='production')
+    a=ap.parse_args();stage(a.src,a.out,a.maxlen,a.gate)
 
 
 

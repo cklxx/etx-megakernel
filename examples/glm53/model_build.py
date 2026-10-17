@@ -34,7 +34,8 @@ def generate(spec,out,batch=1):
 
 def main():
     ap=argparse.ArgumentParser(description=__doc__);ap.add_argument('--stage',type=Path,required=True);ap.add_argument('--out',type=Path,required=True);ap.add_argument('--batch',type=int,default=1);ap.add_argument('--allow-fixture',action='store_true')
-    a=ap.parse_args();spec=stage.validate(a.stage,allow_fixture=a.allow_fixture);p=generate(spec,a.out,a.batch)
+    ap.add_argument('--gate',choices=['production','module'],default='production')
+    a=ap.parse_args();spec=stage.validate(a.stage,allow_fixture=a.allow_fixture,gate=a.gate);p=generate(spec,a.out,a.batch)
     print(f'GLM-MODEL-PLAN layers={spec["config"]["num_hidden_layers"]} devices={p.n_devices} tasks={len(p.tasks)} fixture={spec["fixture"]}',flush=True)
 
 

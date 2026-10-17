@@ -98,13 +98,18 @@ def qwen(record):
     return summary
 
 
-def glm(record):
+def glm(record, gate='production'):
+    from examples.glm53.prepare import gate_identity
+    _, model = gate_identity(gate)
     item = 'qualification/qualification.json'
     r = receipt(record / item)
     if r.get('status') != 'TOKENS-EQUAL':
         raise Fail(f'{item}: status {r.get("status")!r} (error: {r.get("error")})')
-    if r.get('model') != 'zai-org/GLM-5.3-Flash' or not re.fullmatch('[0-9a-f]{40}', str(r.get('revision'))):
-        raise Fail(f'{item}: missing pinned model/revision identity')
+    # Receipts written before the module gate existed carry no gate field: they are production.
+    if r.get('gate', 'production') != gate:
+        raise Fail(f'{item}: a {r.get("gate")!r}-gate receipt cannot pass the {gate} gate')
+    if r.get('model') != model or not re.fullmatch('[0-9a-f]{40}', str(r.get('revision'))):
+        raise Fail(f'{item}: missing pinned model/revision identity for the {gate} gate')
     if r.get('performance') != 'unmeasured':
         raise Fail(f'{item}: a correctness receipt must not report performance')
     batch = r.get('batch')
@@ -136,6 +141,12 @@ def glm(record):
             raise Fail(f'{item}: repetition {rep} does not report 32 finite per-step logit errors')
         if v.get('logit_argmax_equal') is not True:
             raise Fail(f'{item}: repetition {rep} logit argmax differs from HF')
+        if gate == 'module':
+            from examples.glm53.module_gate import MEDIAN_LOGIT_BOUND, module_rule
+            ok, median = module_rule(v)
+            if not ok:
+                raise Fail(f'{item}: repetition {rep} median per-step logit error {median:.4g} exceeds the '
+                           f'pre-registered module-gate bound {MEDIAN_LOGIT_BOUND}')
     if r.get('logit_gate') not in ('REPORTED', 'ENFORCED'):
         raise Fail(f'{item}: no receipt-level full-logit gate')
     build_hashes = r.get('build_hashes') or {}
@@ -146,9 +157,13 @@ def glm(record):
     reference_hashes = r.get('reference_hashes') or {}
     if len(reference_hashes) != 2 or not all(HEX64.fullmatch(str(v)) for v in reference_hashes.values()):
         raise Fail(f'{item}: missing reference/logits hashes')
-    return dict(batch=batch, repetitions=2, matched_each=[32] * batch,
-                logit_gate=r.get('logit_gate'),
-                logit_max_abs=max(v['logit_max_abs'] for v in verdicts))
+    out = dict(gate=gate, batch=batch, repetitions=2, matched_each=[32] * batch,
+               logit_gate=r.get('logit_gate'),
+               logit_max_abs=max(v['logit_max_abs'] for v in verdicts))
+    if gate == 'module':
+        import statistics
+        out['median_logit_max_abs'] = [statistics.median(v['logit_max_abs_per_step']) for v in verdicts]
+    return out
 
 
 def sealed(record):
@@ -166,6 +181,8 @@ def main(argv=None):
     which.add_argument('--qwen-only', action='store_true', help='check only qualify_b*/correctness.json')
     which.add_argument('--glm-only', action='store_true', help='check only qualification/qualification.json')
     ap.add_argument('--require-seal', action='store_true', help='the record must also verify against its SEAL')
+    ap.add_argument('--gate', choices=['production', 'module'], default='production',
+                    help='GLM identity to require; module also applies the pre-registered median-logit rule')
     ap.add_argument('--out', type=Path, help='write the verification record here')
     args = ap.parse_args(argv)
     record = args.record.resolve()
@@ -193,10 +210,11 @@ def main(argv=None):
             print(f'VERIFY FAIL qwen: {exc}')
     if not args.qwen_only:
         try:
-            result['glm'] = glm(record)
-            print(f'VERIFY OK glm: batch {result["glm"]["batch"]}, 2 repetitions, '
+            result['glm'] = glm(record, args.gate)
+            print(f'VERIFY OK glm{" (module gate)" if args.gate == "module" else ""}: batch {result["glm"]["batch"]}, 2 repetitions, '
                   f'32 tokens/request, logit gate {result["glm"]["logit_gate"]}, '
-                  f'max |logit-HF| {result["glm"]["logit_max_abs"]:.3g}')
+                  f'max |logit-HF| {result["glm"]["logit_max_abs"]:.3g}'
+                  + (f', median {max(result["glm"]["median_logit_max_abs"]):.3g}' if args.gate == 'module' else ''))
         except Exception as exc:
             failed = 1
             result['glm'] = dict(error=str(exc))

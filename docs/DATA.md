@@ -122,3 +122,25 @@ verified complete; its manifest SHA256 is `91f63452b962ef7cf760e9b2b447d2b40f575
 Published receipts omit connection details as described in the publication metadata. Original seals bind
 the original bytes, and public derivative checksums are separate. No model weight pack or executable binary
 is included. The shared-weight prototype was cancelled before edits, build or measurement.
+
+## GLM-5.3-Flash module-gate offline artefacts, 2026-10-17
+
+`~/code/etx-cache/glm53-module/` (outside git) holds the output of
+`python -m examples.glm53.module_gate prepare`. That is a synthetic native-FP8
+checkpoint (deterministic: `weights_sha256` is pinned in
+`docs/evidence/glm53-module-gate/glm-model-api.json`), its production stage, the HF
+reference and the CPU prediction of the native body. No GPU measurement is in this
+set. Push `stage/` and `reference.{json,logits}` to the box; do not regenerate them
+there. The box has no torch, and the reference is bound to these exact shard bytes.
+
+| file | sha256 (first 16) |
+|---|---|
+| `checkpoint/model.safetensors` | 4a0ddc1ba6fbf6f0 |
+| `stage/stage.json` | 7234a63c2b9171a6 |
+| `reference.json` | aac9bc165a215023 |
+| `reference.logits` | bad0ed0d913e95e7 |
+| `cpu-prediction.json` | 4f66242113f00334 |
+
+The CPU prediction: 32/32 tokens for both requests, median per-step logit error
+0.453, maximum 4.98, HF minimum top-2 margin 3.56. See
+[the runbook's module gate](QWEN-BATCH-GLM53-RUNBOOK.md#module-gate).

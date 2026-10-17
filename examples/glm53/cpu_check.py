@@ -114,9 +114,10 @@ def fixture(out, bf16=False, fp8=False, selection=False, fp32_conv=True, product
     return r,hf,head
 
 
-def compile_cpu(out):
-    root=Path(__file__).resolve().parents[2]
-    source=out/'cpu.cpp'
+def compile_cpu(out,work=None,root=None):
+    """Build the native body for the stage `out` (its glm53_spec.h) into `work` (default: out)."""
+    root=root or Path(__file__).resolve().parents[2];work=work or out
+    source=work/'cpu.cpp'
     source.write_text('''#define GLM53_CPU 1
 #include "examples/glm53/native.h"
 extern "C" void run_layer(const void* b,const void* w,const void* x,void* y,void* state,void* tmp,int pos,int lin,int moe){
@@ -139,16 +140,16 @@ extern "C" void run_head(const void* in,const void* nb,const void* nw,const void
  glm_mv((const uint8_t*)hb,((const glm_weight*)hw)[0],y,logits);
 }
 ''')
-    lib=out/'cpu.dylib'
+    lib=work/'cpu.dylib'
     subprocess.run(['c++','-std=c++17','-O3','-ffp-contract=off','-shared','-fPIC','-I',str(root),'-I',str(out),str(source),'-o',str(lib)],check=True,timeout=120)
     return lib
 
 
 class CPUModel:
-    def __init__(self,out):
+    def __init__(self,out,gate='production',work=None,root=None):
         import numpy as np
-        self.np=np;self.spec=stage.validate(out,allow_fixture=True);self.d=self.spec['dimensions']
-        self.lib=ctypes.CDLL(str(compile_cpu(out)))
+        self.np=np;self.spec=stage.validate(out,allow_fixture=True,gate=gate);self.d=self.spec['dimensions']
+        self.lib=ctypes.CDLL(str(compile_cpu(out,work,root)))
         ptr=ctypes.c_void_p;integer=ctypes.c_int
         self.lib.run_layer.argtypes=[ptr]*6+[integer]*3
         self.lib.run_embed.argtypes=[ptr,ptr,integer,ptr]

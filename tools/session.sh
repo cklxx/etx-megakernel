@@ -99,8 +99,8 @@ REMOTE
       REMOTE_BASH="ETX_QWEN_G6_CONFIG='$QWEN_CONFIG' $REMOTE_BASH"
       printf 'Passing Qwen config: ETX_QWEN_G6_CONFIG=%s\n' "$ETX_QWEN_G6_CONFIG"
     fi
-    # Session inputs that live on the box: the packed Qwen model, the GLM stage, its HF reference and batch.
-    for name in ETX_QWEN_BATCH_MODEL ETX_GLM_STAGE ETX_GLM_REFERENCE ETX_GLM_BATCH; do
+    # Session inputs that live on the box: the packed Qwen model, the GLM stage, its HF reference, batch and gate.
+    for name in ETX_QWEN_BATCH_MODEL ETX_GLM_STAGE ETX_GLM_REFERENCE ETX_GLM_BATCH ETX_GLM_GATE; do
       [ "${!name+x}" = x ] || continue
       value=$(printf '%s' "${!name}" | sed "s/'/'\\\\''/g")
       REMOTE_BASH="$name='$value' $REMOTE_BASH"

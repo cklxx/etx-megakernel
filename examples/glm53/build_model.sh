@@ -6,7 +6,7 @@ STAGE=${1:?validated staged model directory}
 OUT=${2:?new build directory}
 PY=${ETX_PYTHON:-.venv/bin/python}
 export ETX_GLM_STAGE="$STAGE"
-"$PY" -m examples.glm53.model_build --stage "$STAGE" --out "$OUT" --batch "${ETX_GLM_BATCH:-1}" ${ETX_GLM_FIXTURE:+--allow-fixture}
+"$PY" -m examples.glm53.model_build --stage "$STAGE" --out "$OUT" --batch "${ETX_GLM_BATCH:-1}" --gate "${ETX_GLM_GATE:-production}" ${ETX_GLM_FIXTURE:+--allow-fixture}
 if [ "${3:-}" = --local ]; then
   for d in 0 1; do
     bash etx/importer/hip_ir_local.sh "$OUT/megakernel_d$d.hip" "$OUT/mk$d.ll" -Ietx/runtime/include -I "$OUT" -I .

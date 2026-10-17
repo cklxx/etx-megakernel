@@ -57,7 +57,7 @@ def build_from(stage, batch=1):
 
 def build():
     path=Path(os.environ['ETX_GLM_STAGE'])
-    return build_from(validate(path,allow_fixture=os.environ.get('ETX_GLM_FIXTURE')=='1'))
+    return build_from(validate(path,allow_fixture=os.environ.get('ETX_GLM_FIXTURE')=='1',gate=os.environ.get('ETX_GLM_GATE','production')))
 
 def bindings(**overrides):
     b=dict(B=int(os.environ.get('ETX_GLM_BATCH','1')));b.update(overrides)

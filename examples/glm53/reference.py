@@ -7,41 +7,51 @@ Can use Accelerate disk offload for the BF16 reference, which does NOT fit on
 import argparse
 import json
 from pathlib import Path
-from examples.glm53.prepare import MODEL,EVIDENCE,metadata,sha
+from examples.glm53.prepare import gate_identity,metadata,sha
 
 
-def identity():
-    _,api=metadata()
-    return dict(schema=1,model=MODEL,revision=api['sha'],config_sha256=sha(EVIDENCE/'glm-config.json'),
+def identity(gate='production'):
+    evidence,model=gate_identity(gate);_,api=metadata(evidence)
+    return dict(schema=1,model=model,revision=api['sha'],config_sha256=sha(evidence/'glm-config.json'),
                 mode='greedy',speculative=False)
 
 
-def prompts(path):
-    cfg,_=metadata();p=json.loads(path.read_text())
+def prompts(path,gate='production'):
+    cfg,_=metadata(gate_identity(gate)[0]);p=json.loads(path.read_text())
     if not isinstance(p,list) or len(p) not in (1,2,4,8) or len({tuple(x) for x in p})!=len(p):raise ValueError('distinct prompts required for B1/2/4/8')
     if len({len(x) for x in p})!=1 or not p[0] or len(p[0])+32>cfg['text_config']['max_position_embeddings']:raise ValueError('equal nonempty prompt lengths required')
     if any(type(x) is not int or not 0<=x<cfg['text_config']['vocab_size'] for row in p for x in row):raise ValueError('invalid prompt ID')
     return p
 
 
-def run(src,prompt_path,out,offload,max_memory):
+def run(src,prompt_path,out,offload,max_memory,gate='production'):
     import torch
     import transformers
     from transformers import AutoConfig,AutoModelForImageTextToText,FineGrainedFP8Config
-    cfg,api=metadata()
+    evidence,_=gate_identity(gate);cfg,api=metadata(evidence)
     if out.exists() or out.with_suffix('.logits').exists():raise ValueError('reference output must be new')
-    if sha(src/'config.json')!=sha(EVIDENCE/'glm-config.json') or (src/'REVISION').read_text().strip()!=api['sha']:raise ValueError('wrong checkpoint')
+    if sha(src/'config.json')!=sha(evidence/'glm-config.json') or (src/'REVISION').read_text().strip()!=api['sha']:raise ValueError('wrong checkpoint')
     from examples.glm53.stage import Snapshot
     snapshot=Snapshot(src)
     for key in snapshot.index:snapshot.shard(key)
-    p=prompts(prompt_path);record=dict(identity(),backend='hf',batch=len(p),requests=[])
+    p=prompts(prompt_path,gate);record=dict(identity(gate),backend='hf',batch=len(p),requests=[])
     # The saved release config names DSA differently from the library cache ABI.
     config=AutoConfig.from_pretrained(src,local_files_only=True,trust_remote_code=False)
     config.text_config.layer_types=['indexed_attention' if x=='deepseek_sparse_attention' else x for x in config.text_config.layer_types]
     config.text_config._experts_implementation='eager'
-    model=AutoModelForImageTextToText.from_pretrained(src,config=config,local_files_only=True,trust_remote_code=False,
+    # Placement/offload only: the release does not fit and needs Accelerate; a checkpoint
+    # that fits one device (the module gate) loads without them (max_memory=None).
+    placement={} if max_memory is None else dict(device_map='auto',max_memory=max_memory,offload_folder=str(offload))
+    model,info=AutoModelForImageTextToText.from_pretrained(src,config=config,local_files_only=True,trust_remote_code=False,
         dtype=torch.bfloat16,quantization_config=FineGrainedFP8Config(dequantize=True),
-        attn_implementation='eager',device_map='auto',max_memory=max_memory,offload_folder=str(offload)).eval()
+        attn_implementation='eager',output_loading_info=True,**placement)
+    model.eval()
+    # A tensor HF could not map is silently random-initialized: refuse instead. The
+    # module-gate checkpoint carries no vision tower (text-only gate), so only there
+    # may the vision weights be missing.
+    missing=[k for k in info['missing_keys'] if not (gate=='module' and k.startswith('model.visual.'))]
+    bad=dict(missing=missing,unexpected=list(info['unexpected_keys']),mismatched=list(info['mismatched_keys']),errors=list(info['error_msgs']))
+    if any(bad.values()):raise ValueError(f'HF did not load the checkpoint exactly: {bad}')
     device=model.get_input_embeddings().weight.device
     if device.type=='meta':device=torch.device('cuda:0')
     ids=torch.tensor(p,device=device);cache=None;generated=[[] for _ in p];logits=[]
@@ -63,6 +73,7 @@ def run(src,prompt_path,out,offload,max_memory):
 
 def main():
     ap=argparse.ArgumentParser(description=__doc__);ap.add_argument('--src',type=Path,required=True);ap.add_argument('--prompts',type=Path,required=True);ap.add_argument('--out',type=Path,required=True);ap.add_argument('--offload',type=Path,required=True);ap.add_argument('--max-memory',required=True,help='JSON map, e.g. {"0":"80GiB","1":"80GiB","cpu":"32GiB"}')
-    a=ap.parse_args();m={int(k) if k.isdigit() else k:v for k,v in json.loads(a.max_memory).items()};run(a.src,a.prompts,a.out,a.offload,m)
+    ap.add_argument('--gate',choices=['production','module'],default='production')
+    a=ap.parse_args();m={int(k) if k.isdigit() else k:v for k,v in json.loads(a.max_memory).items()};run(a.src,a.prompts,a.out,a.offload,m,a.gate)
 
 if __name__=='__main__':main()

@@ -37,11 +37,11 @@ done
 unset ETX_SESS_MAX_SECONDS
 # The two-GPU session inputs reach the box, quoted for spaces and apostrophes.
 ETX_QWEN_BATCH_MODEL="/models/qwen 3" ETX_GLM_STAGE="/staged/glm'53" \
-ETX_GLM_REFERENCE=/staged/glm53-reference.json ETX_GLM_BATCH=2 \
+ETX_GLM_REFERENCE=/staged/glm53-reference.json ETX_GLM_BATCH=2 ETX_GLM_GATE=module \
   bash "$SCRIPT" start offline session.py > "$TMP/output"
 [ "$(cat "$CAP_LOG")" = unset ]
 cat > "$TMP/expected" <<'EOF'
-ETX_GLM_BATCH='2' ETX_GLM_REFERENCE='/staged/glm53-reference.json' ETX_GLM_STAGE='/staged/glm'\''53' ETX_QWEN_BATCH_MODEL='/models/qwen 3' bash -s -- session.py auto A
+ETX_GLM_GATE='module' ETX_GLM_BATCH='2' ETX_GLM_REFERENCE='/staged/glm53-reference.json' ETX_GLM_STAGE='/staged/glm'\''53' ETX_QWEN_BATCH_MODEL='/models/qwen 3' bash -s -- session.py auto A
 EOF
 cmp "$TMP/expected" "$COMMAND_LOG"
 grep -F 'Passing ETX_GLM_BATCH=2' "$TMP/output" >/dev/null
