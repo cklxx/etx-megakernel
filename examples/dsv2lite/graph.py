@@ -90,6 +90,13 @@ def _xb() -> bool:
     return v == "1"
 
 
+def _xbo() -> bool:
+    v = os.environ.get("ETX_DSV2_OPROJ_XB", "0")
+    if v not in ("0", "1"):
+        raise ValueError(f"ETX_DSV2_OPROJ_XB={v!r}: 0 | 1")
+    return v == "1"
+
+
 def _res(lds: int = SCRATCH_BYTES, paired: bool = False) -> Resource:
     # paired: two workgroups per CU (one per request) -> at most 256 registers per lane (measured cost 0.8%, design 15.12)
     return Resource(threads=256, vgpr=256, agpr=0 if paired else 72, lds_bytes=lds)
@@ -127,10 +134,12 @@ def _layer_tensor(g: Graph, L: int) -> None:
 
 
 def build_attention_block(g: Graph, q: _Req, L: int, e_in: str, e_in_map: str, fold: bool, extra_in: dict | None = None,
-                          xb: bool = False) -> str:
+                          xb: bool = False, xbo: bool = False) -> str:
     """qkv -> (qabs, attention) -> merge -> o_proj; returns the global o_proj event name. extra_in: more in-edges of qkv
     (the interleave's cross-request ordering). xb: the layer's column-batched qkv grid (build_xb_qkv) was created
-    before this request's block and already created and signals E_qkv; this block adds everything after qkv."""
+    before this request's block and already created and signals E_qkv; this block adds everything after qkv.
+    xbo: the block stops after merge; the batched o_proj grid (build_xb_oproj, created after every request's merge)
+    creates and signals E_oproj."""
     _layer_tensor(g, L)
     n = q.n
     # K1 (docs/DSV2-D1-D5.md), ETX_DSV2_KVA=shared: kv_a is computed once, 1/8 per XCD (fleet's FLAG_KVA_SHARED), so the
@@ -143,7 +152,8 @@ def build_attention_block(g: Graph, q: _Req, L: int, e_in: str, e_in_map: str, f
     g.etensor(n(f"E_qabs_{L}"), (HEADS,), wait_count=QABS)
     g.etensor(n(f"E_attn_{L}"), (HEADS,), wait_count=KV_CHUNKS)
     g.etensor(n(f"E_merge_{L}"), (XCDS,), wait_count=(HEADS // XCDS) * KV_CHUNKS)
-    g.etensor(n(f"E_oproj_{L}"), (1,), wait_count=XCDS * W)
+    if not xbo:
+        g.etensor(n(f"E_oproj_{L}"), (1,), wait_count=XCDS * W)
     if not xb:
         qkv_in = {e_in: e_in_map, **(extra_in or {})}
         _chiplet(g, q, f"qkv_{L}", ("fleet_qkv_fused_fold" if fold else "fleet_qkv_fused") + sfx, L, qkv_in,
@@ -162,14 +172,21 @@ def build_attention_block(g: Graph, q: _Req, L: int, e_in: str, e_in_map: str, f
     g.call_device(n(f"merge_{L}"), (HEADS, KV_CHUNKS), _tile("fleet_merge_uv"), resource=_res(paired=q.paired), args=[q.fleet, f"layer_{L}"],
                   consts=(L, q.r), domain_map="hc->(h/2)", worker_map=q.wmap("hc->((h%2)*16+c+OFF)"),
                   in_edges={n(f"E_attn_{L}"): "hc->h"}, out_edges={n(f"E_merge_{L}"): "hc->(h/2)"}, duration_us=DUR["merge"])
-    _chiplet(g, q, f"oproj_{L}", "fleet_o_proj", L, {n(f"E_merge_{L}"): "xw->x"}, {n(f"E_oproj_{L}"): "xw->(0)"}, DUR["oproj"])
+    if not xbo:
+        _chiplet(g, q, f"oproj_{L}", "fleet_o_proj", L, {n(f"E_merge_{L}"): "xw->x"}, {n(f"E_oproj_{L}"): "xw->(0)"},
+                 DUR["oproj"])
     return n(f"E_oproj_{L}")
 
 
 def build_moe_layer(g: Graph, q: _Req, L: int, e_in: str, e_in_map: str, fold: bool, routing_cached: bool, extra_in=None,
                     extra_gu=None, xb: bool = False) -> str:
-    n = q.n
     e_oproj = build_attention_block(g, q, L, e_in, e_in_map, fold, extra_in, xb=xb)
+    return build_moe_tail(g, q, L, e_oproj, routing_cached, extra_gu)
+
+
+def build_moe_tail(g: Graph, q: _Req, L: int, e_oproj: str, routing_cached: bool, extra_gu=None) -> str:
+    """router -> gate_up -> down after the attention block's global o_proj event e_oproj."""
+    n = q.n
     kchunks = os.environ.get("ETX_DSV2_KCHUNKS", "1") == "4"
     g.etensor(n(f"E_norm_{L}"), (XCDS,), wait_count=W)
     if not kchunks:                     # event creation order is part of the plan: unchanged for the default path
@@ -227,8 +244,13 @@ def build_moe_layer_d4(g: Graph, q: _Req, L: int, e_in: str, e_in_map: str, fold
 
 
 def build_dense_layer(g: Graph, q: _Req, L: int, e_in: str, e_in_map: str, fold: bool, extra_in=None, xb: bool = False) -> str:
-    n = q.n
     e_oproj = build_attention_block(g, q, L, e_in, e_in_map, fold, extra_in, xb=xb)
+    return build_dense_tail(g, q, L, e_oproj)
+
+
+def build_dense_tail(g: Graph, q: _Req, L: int, e_oproj: str) -> str:
+    """norm -> dense gate_up -> dense down after the attention block's global o_proj event e_oproj."""
+    n = q.n
     g.etensor(n(f"E_norm_{L}"), (XCDS,), wait_count=W)
     g.etensor(n(f"E_dgu_{L}"), (1,), wait_count=XCDS * W)
     g.etensor(n(f"E_dense_{L}"), (1,), wait_count=XCDS * W)
@@ -289,6 +311,40 @@ def build_xb_qkv(g: Graph, qs: list, L: int, ins: dict, fold: bool) -> None:
                   duration_us=xb_qkv_us(len(qs)), duration_cv=0.05)
 
 
+# ETX_DSV2_OPROJ_XB=1 (B = 4 only, on top of ETX_DSV2_QKV_XB=1): one column-batched o_proj grid per layer
+# (build_xb_oproj, fleet_xb.hip fleet_oproj_xb). Duration model (no measurement yet), microseconds: the stage copies
+# B x 1 KB of o slices from L2 into LDS, then the task streams half the rows of an x<n> o_proj task (74 workers, not
+# 37) -- the same rule as xb_qkv_us. /workspace/bound_batch_gemv.md (fix, 2026-10-18): 27-layer simulator, B = 4 on
+# x4xb, 7825.8 -> 7334.2 us (-492 us) at this model; -310 us if the batched task stays at 14 us (latency-bound case).
+XBO_REQUESTS = 4           # B = 2 loses 40 us in the latency-bound case: it waits for a GPU A/B
+
+
+def xb_oproj_us(requests: int) -> float:
+    return XB_STAGE_US * requests + DUR["oproj"] * W / XB_W
+
+
+def build_xb_oproj(g: Graph, qs: list, L: int) -> None:
+    """ETX_DSV2_OPROJ_XB=1: ONE o_proj grid for all requests of layer L, created after every request's layer-L merge
+    and before every request's layer-L router (or dense norm).
+
+    Grid xb_oproj_L (8 XCDs, 74): fleet's K-split o_proj (this XCD's 256 columns of W_o, all 2048 rows, fp32 partial
+    into act.oproj_partial[xcd]) for every request, each weight chunk loaded once per layer (it was B times). A task on
+    XCD x waits for every request's XCD-local E_merge_L[x] (the merge tasks of XCD x write its o slice) and signals
+    every request's global E_oproj_L (wait count 8 x 74). Workers w < 37 are slot 0's, w >= 37 slot 1's, as in
+    build_xb_qkv. Each request's router folds the 8 partials as today.
+
+    Deadlock freedom: the same argument as build_xb_qkv -- every in-edge of a grid comes from a grid created before
+    it, and every static queue runs in creation order."""
+    for q in qs:
+        g.etensor(q.n(f"E_oproj_{L}"), (1,), wait_count=XCDS * XB_W)
+    # consts: (layer, workers per XCD of this grid, first request = 0)
+    g.call_device(f"xb_oproj_{L}", (XCDS, XB_W), _tile("fleet_oproj_xb"), resource=_res(paired=True),
+                  args=[qs[0].fleet, f"layer_{L}"], consts=(L, XB_W, 0), domain_map="xw->x",
+                  worker_map=f"xw->(w%{W}+(w/{W})*{CUS})", in_edges={q.n(f"E_merge_{L}"): "xw->x" for q in qs},
+                  out_edges={q.n(f"E_oproj_{L}"): "xw->(0)" for q in qs}, duration_us=xb_oproj_us(len(qs)),
+                  duration_cv=0.05)
+
+
 def build(layers: int = LAYERS, routing_cached: bool | None = None, requests: int | None = None) -> Graph:
     # ETX_DSV2_ROUTING_CACHED=0: expert_down recomputes the top-k instead of reusing its worker's LDS
     # (needed for the unfused baseline, where LDS does not survive the kernel boundary)
@@ -339,6 +395,14 @@ def build(layers: int = LAYERS, routing_cached: bool | None = None, requests: in
         raise ValueError("ETX_DSV2_KVA=shared supports one request without ETX_DSV2_D5 only")
     # ETX_DSV2_QKV_XB=1: one column-batched qkv grid per layer for all requests (build_xb_qkv, fleet_xb.hip)
     xb = _xb()
+    # ETX_DSV2_OPROJ_XB=1: one column-batched o_proj grid per layer for all requests (build_xb_oproj); B = 4 only
+    xbo = _xbo()
+    if xbo:
+        if not xb:
+            raise ValueError("ETX_DSV2_OPROJ_XB=1 needs ETX_DSV2_QKV_XB=1: the tile is in fleet_xb.hip's translation unit")
+        if requests != XBO_REQUESTS:
+            raise ValueError(f"ETX_DSV2_OPROJ_XB=1 needs {XBO_REQUESTS} requests, not {requests}: B = 2 waits for a GPU A/B "
+                             "(/workspace/bound_batch_gemv.md: +40 us in the latency-bound case)")
     if xb:
         if not 2 <= requests <= XB_MAX_REQUESTS:
             raise ValueError(f"ETX_DSV2_QKV_XB=1 needs 2..{XB_MAX_REQUESTS} requests (fleet_xb.hip LDS slots), not {requests}")
@@ -364,6 +428,20 @@ def build(layers: int = LAYERS, routing_cached: bool | None = None, requests: in
     for L in range(layers):
         if xb:
             build_xb_qkv(g, qs, L, {q.r: state[q.r][:2] for q in qs}, fold=state[qs[0].r][2])
+        if xbo:
+            # every request's qabs .. merge, then the batched o_proj, then every request's router .. down (or the dense
+            # norm .. down): the queue order of a worker is r, r + 2, o_proj, r, r + 2
+            for q in qs:
+                e, m, prev_moe = state[q.r]
+                build_attention_block(g, q, L, e, m, fold=prev_moe, xb=True, xbo=True)
+            build_xb_oproj(g, qs, L)
+            for q in qs:
+                e_oproj = q.n(f"E_oproj_{L}")
+                if L < FIRST_DENSE:
+                    state[q.r] = (build_dense_tail(g, q, L, e_oproj), "xw->(0)", False)
+                else:
+                    state[q.r] = (build_moe_tail(g, q, L, e_oproj, routing_cached), "xw->(0)", True)
+            continue
         for q in qs:
             e, m, prev_moe = state[q.r]
             extra = extra_gu = None

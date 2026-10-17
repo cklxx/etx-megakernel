@@ -20,6 +20,17 @@
 // LDS: no new allocation. Slots 0..B-1 of the bf16 vectors are fleet::Scratch regions (part: 2 slots, row + q_c +
 // q_pe: 1 slot, vec: 1 slot); the 3 x B pointers live in s.logits (unused by fleet's qkv). The tile's LDS use is
 // sizeof(fleet::Scratch), the same as every other tile (graph.py SCRATCH_BYTES).
+//
+// ETX_DSV2_OPROJ_XB=1 (B = 4 only, stacked on ETX_DSV2_QKV_XB=1; graph.py build_xb_oproj) adds a third tile:
+//   fleet_oproj_xb the batched o_proj grid (8 XCDs x 74 workers): fleet's K-split TASK_O_PROJ for B requests at once.
+//                  It copies the B fp32 o slices of its XCD (256 columns each, 1 KB) into s.vec, then ONE pass over
+//                  this worker's rows of the XCD's [2048, 256] column block of W_o: each 16-byte weight chunk is loaded
+//                  once and multiplied with all B slices. Same layout as fleet's gemv_rows_pipelined_half<8> (one row
+//                  per half-wave, 4 rows per half-wave per group, two groups in flight), the same per-lane order and
+//                  the same half-wave butterfly, so every partial is bitwise the value of fleet's per-request task.
+//                  The fp32 partials go to request j's act.oproj_partial[xcd] with fleet's coherent store (EPI_NONE);
+//                  the router prologue of each request folds them as today. No norm, no new LDS: the 2 x B pointers
+//                  live in s.logits.
 #include "examples/dsv2lite/fleet_shim.hip"
 #include <stddef.h>
 
@@ -258,7 +269,108 @@ __device__ __forceinline__ void qkv(const etx_ctx* c) {
                kvs ? fleet::kNumXCDs : 1, worker, nw);
 }
 
+// ---------------------------------------------------------------- fleet_oproj_xb
+constexpr int kOprojK = 256;                     // K-split columns per XCD: heads * v_head / kNumXCDs (16 * 128 / 8)
+constexpr int kOH = 4;                           // rows per half-wave per group: fleet's gemv_rows_pipelined_half<8>
+static_assert(kOprojK / 8 == fleet::kWaveLanes / 2, "one K-split row = one 16-byte chunk per lane of a half-wave");
+static_assert(sizeof(fleet::Scratch::vec) >= (size_t)kMaxB * kOprojK * sizeof(float), "s.vec holds the B fp32 o slices");
+static_assert(kMaxB * kOprojK / 4 <= fleet::kBlockThreads, "one 16-byte chunk per thread for all B slices");
+static_assert(sizeof(fleet::Scratch::logits) >= 2 * kMaxB * sizeof(void*), "s.logits holds the 2 x B pointers");
+
+// fleet::gemv_rows(w, ld, x, y, nullptr, EPI_NONE, 1.f, N, kOprojK, 0, 1, worker, n_workers, coh) for kB vectors at
+// once, through fleet's half-wave path: rows first + k * n_workers, row k + 2 j + half of a group on half-wave `half`,
+// lane hl owns 16-byte chunk hl of the row (all 32 chunks valid at K = 256). xs: s.vec, slice j at j * kOprojK.
+// ys: the B output pointers, in LDS, read by the storing lane.
+__device__ __forceinline__ void gemv_rows_half_xb(const __hip_bfloat16* __restrict__ w, int ld, const float* xs,
+                                                  float* const* ys, int N, int worker, int n_workers, bool coh) {
+  const int first = worker;
+  if (first >= N) return;
+  const int cnt = (N - first + n_workers - 1) / n_workers;
+  int tid = (int)threadIdx.x;                    // see gemv_rows_xb: keeps the lane offsets inside the task
+  asm volatile("" : "+v"(tid));
+  const int wave = tid / fleet::kWaveLanes;
+  const int lane = tid % fleet::kWaveLanes;
+  const int half = lane >> 5, hl = lane & 31;
+  const int stride = 2 * kOH * fleet::kWaves;
+  int k = 2 * kOH * wave;
+  if (k >= cnt) return;
+  uint4 bufA[kOH], bufB[kOH];
+#define XBO_ROW(KK, J) (w + (int64_t)(first + min((KK) + 2 * (J) + half, cnt - 1) * n_workers) * ld)
+#define XBO_ISSUE(BUF, KK)                                                                  \
+  _Pragma("unroll") for (int j = 0; j < kOH; ++j)                                           \
+    BUF[j] = fleet::load_weight(reinterpret_cast<const uint4*>(XBO_ROW(KK, j)) + hl);
+#define XBO_REDUCE(BUF, KK)                                                                 \
+  {                                                                                         \
+    float acc[kOH][kB];                                                                     \
+    _Pragma("unroll") for (int j = 0; j < kOH; ++j)                                         \
+      _Pragma("unroll") for (int b = 0; b < kB; ++b) acc[j][b] = 0.f;                       \
+    _Pragma("unroll") for (int b = 0; b < kB; ++b) {                                        \
+      const float* x8 = xs + b * kOprojK + hl * 8;                                          \
+      _Pragma("unroll") for (int j = 0; j < kOH; ++j) fleet::fma8(BUF[j], x8, acc[j][b]);   \
+    }                                                                                       \
+    _Pragma("unroll") for (int j = 0; j < kOH; ++j)                                         \
+      _Pragma("unroll") for (int b = 0; b < kB; ++b) acc[j][b] = fleet::half_wave_sum(acc[j][b]); \
+    if (hl == 0) {                                                                          \
+      _Pragma("unroll") for (int j = 0; j < kOH; ++j) {                                     \
+        const int r = (KK) + 2 * j + half;                                                  \
+        if (r < cnt) {                                                                      \
+          const int n = first + r * n_workers;                                              \
+          _Pragma("unroll") for (int b = 0; b < kB; ++b) fleet::epi_st(ys[b] + n, acc[j][b], coh); \
+        }                                                                                   \
+      }                                                                                     \
+    }                                                                                       \
+  }
+  XBO_ISSUE(bufA, k)
+  while (true) {
+    const int k2 = k + stride;
+    XBO_ISSUE(bufB, k2)
+    XBO_REDUCE(bufA, k)
+    if (k2 >= cnt) break;
+    const int k3 = k2 + stride;
+    XBO_ISSUE(bufA, k3)
+    XBO_REDUCE(bufB, k2)
+    if (k3 >= cnt) break;
+    k = k3;
+  }
+#undef XBO_ROW
+#undef XBO_ISSUE
+#undef XBO_REDUCE
+}
+
+// grid constants (layer, workers per XCD, first request). The first request is always 0 (graph.py), a grid constant
+// for the same reason as in qkv().
+__device__ __forceinline__ void oproj(const etx_ctx* c) {
+  const int L = LAYER(c), xcd = (int)c->domain, worker = (int)c->coord[1], nw = (int)c->cst[1], r0 = (int)c->cst[2];
+  fleet::Scratch& s = *reinterpret_cast<fleet::Scratch*>(c->lds);
+  const FleetParams* fq = &etx_fleet_const[r0];
+  const fleet::ModelDims& d = fq->d;
+  const int hv = d.heads * d.v_head;                                  // 2048: W_o's row length
+  const int kc = hv / fleet::kNumXCDs;                                // 256: this XCD's columns
+  const __hip_bfloat16* wo = fq->w.layer_o_proj[L];
+  // per-request pointers, one thread per request, into LDS (s.logits): [0, kMaxB) this XCD's act.oproj_partial
+  // slice, [kMaxB, 2 kMaxB) this XCD's act.o slice (merge_uv's output)
+  void** tab = reinterpret_cast<void**>(s.logits);
+  if (threadIdx.x < kB) {
+    const FleetParams& p = fq[threadIdx.x];
+    // one weight stream serves every request only if they share it; the half-wave layout needs K = 256
+    if (p.w.layer_o_proj[L] != wo || p.d.hidden != d.hidden || kc != kOprojK) __builtin_trap();
+    tab[threadIdx.x] = p.act.oproj_partial + (int64_t)xcd * d.hidden;
+    tab[kMaxB + threadIdx.x] = p.act.o + (int64_t)xcd * kc;
+  }
+  __syncthreads();
+  const bool coh = run_task_coh(fq->rt);
+  // the B o slices into s.vec: thread t loads 16-byte chunk t % 64 of request t / 64 (fleet's stage_vector, with the
+  // build's activation loads)
+  if ((int)threadIdx.x < kB * kOprojK / 4) {
+    const int j = (int)threadIdx.x / (kOprojK / 4), i = (int)threadIdx.x % (kOprojK / 4);
+    reinterpret_cast<uint4*>(s.vec)[threadIdx.x] = ld_act16(reinterpret_cast<const uint4*>(tab[kMaxB + j]) + i, coh);
+  }
+  __syncthreads();
+  gemv_rows_half_xb(wo + (int64_t)xcd * kc, hv, s.vec, reinterpret_cast<float* const*>(tab), d.hidden, worker, nw, coh);
+}
+
 }  // namespace etx_xb
 
 extern "C" __device__ void fleet_xb_norm(const etx_ctx* c) { etx_xb::norm(c); }
 extern "C" __device__ void fleet_qkv_xb(const etx_ctx* c) { etx_xb::qkv(c); }
+extern "C" __device__ void fleet_oproj_xb(const etx_ctx* c) { etx_xb::oproj(c); }

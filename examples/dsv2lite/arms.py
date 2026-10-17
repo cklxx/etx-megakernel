@@ -138,6 +138,14 @@ ARMS = {a.name: a for a in [
     *(Arm(f"x{n}xb", levers=ARMS_X[n].levers, flags=ARMS_X[n].flags, env=dict(ARMS_X[n].env, ETX_DSV2_QKV_XB="1"),
           scratch_allow={2: ARMS_X[2].scratch_allow, 4: 80}[n])
       for n in (2, 4)),
+    # Stage B2, o_proj on top of qkv (graph.py build_xb_oproj, fleet_xb.hip fleet_oproj_xb): x4xb plus ONE
+    # column-batched o_proj grid per layer for the 4 requests (each W_o chunk read once per layer, not 4 times). The only
+    # difference to x4xb is ETX_DSV2_OPROJ_XB=1, so a same-box A/B against x4xb measures that change. B = 4 only: B = 2
+    # loses 40 us in the latency-bound case (/workspace/bound_batch_gemv.md), so x2 waits for this arm's GPU A/B.
+    # (RESULTS: see the x4xbo notes below this table.)
+    Arm("x4xbo", levers=ARMS_X[4].levers, flags=ARMS_X[4].flags, env=dict(ARMS_X[4].env, ETX_DSV2_QKV_XB="1",
+                                                                            ETX_DSV2_OPROJ_XB="1"),
+        scratch_allow=80),
     # B = 8 is a diagnostic: with M1 alone the eight-request gate failed (request 5, 3/27 layers), so the three
     # recipes are built side by side and the gate says which one is correct at eight requests. x8p is the plain
     # replication recipe (the pre-section-10 arm), x8m adds M1, x8k adds K1.
