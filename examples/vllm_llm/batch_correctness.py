@@ -46,7 +46,8 @@ def clean_env(batch):
                 TRANSFORMERS_OFFLINE='1', PYTHONUNBUFFERED='1')
 
 
-def inputs(model, batch):
+def inputs(model, batch, *, hash_weights=True):
+    """Validate the staged assets. hash_weights=False keeps the 60 GiB blob out of structure-only preflight."""
     config = model / 'hf/config.json'
     c = json.loads(config.read_text())
     reference = json.loads((ROOT / 'examples/llm/configs/qwen3-30b-a3b.json').read_text())
@@ -82,9 +83,13 @@ def inputs(model, batch):
     if not (model / 'vl.bin').is_file():
         raise ValueError('missing pre-packed vl.bin')
     # Hash the packed weights too: a changed blob must not reuse a receipt.
-    paths.append(model / 'vl.bin')
+    files = {str(p.relative_to(model)): cert.sha(p) for p in paths}
+    if hash_weights:
+        files[str((model / 'vl.bin').relative_to(model))] = cert.sha(model / 'vl.bin')
+    else:
+        files[str((model / 'vl.bin').relative_to(model))] = dict(bytes=(model / 'vl.bin').stat().st_size)
     return dict(model='Qwen/Qwen3-30B-A3B', revision=revision, batch=batch,
-                context=CONTEXT, gen=GEN, files={str(p.relative_to(model)): cert.sha(p) for p in paths})
+                context=CONTEXT, gen=GEN, files=files)
 
 
 def execution_package(model=None):

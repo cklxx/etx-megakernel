@@ -144,6 +144,10 @@ and host syntax checks are additional gates, not GPU correctness.
 
 ## Staging and two-GPU execution
 
+The operator sequence — one fail-closed preflight, ordered Qwen then GLM
+sessions, strict pass criteria, budget, evidence and teardown — is in
+[QWEN-BATCH-GLM53-RUNBOOK.md](QWEN-BATCH-GLM53-RUNBOOK.md).
+
 All commands below require already available local weights; none fetches or
 provisions. Preserve snapshot provenance and place the exact commit in
 `SNAPSHOT/REVISION`. The stager requires the byte-identical pinned config and

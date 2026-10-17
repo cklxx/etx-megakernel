@@ -106,6 +106,8 @@ def test_model_session_has_real_model_and_two_visible_devices():
     assert jobs[1].env['HIP_VISIBLE_DEVICES']=='0,1'
     assert 'examples.glm53.run' in jobs[1].cmd and 'qualify' in jobs[1].cmd
     assert jobs[1].reads==['model/run']
+    assert jobs[2].lane=='final' and 'tools/two_gpu_verify.py' in jobs[2].cmd
+    assert jobs[2].reads==['?qualification/qualification.json']
 
 
 def test_fixture_cannot_enter_hardware_qualification(native,tmp_path):

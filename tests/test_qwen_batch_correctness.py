@@ -78,9 +78,14 @@ def test_environment_is_fixed(monkeypatch):
 
 def test_session_is_gpu_free_to_load_and_orders_qualifications():
     jobs, _ = load_session(bc.ROOT / 'examples/sessions/qwen_batch_correctness.py')
-    assert len(jobs) == 6
+    assert len(jobs) == 7
     assert [j.gpu for j in jobs if j.lane == 'gpu'] == [0, 0, 0]
     assert 'qualify_b4/correctness.json' in next(j for j in jobs if j.name == 'qualify_b8').reads
+    verify = next(j for j in jobs if j.name == 'verify')
+    assert verify.lane == 'final' and 'tools/two_gpu_verify.py' in verify.cmd
+    # "?" makes it run after a failed qualification too; it writes the verdict file.
+    assert verify.reads == [f'?qualify_b{b}/correctness.json' for b in (2, 4, 8)]
+    assert verify.writes == ['qwen-verification.json']
 
 
 def test_failure_writes_incomplete_receipt(tmp_path):
