@@ -129,9 +129,11 @@ ARMS = {a.name: a for a in [
     #               x2 256 + 0, 32, 2;  x2xb 256 + 0, 32, 2;  x4 256 + 0, 64, 2;  x4xb 256 + 0, 80, 2
     #   ROCm 7.2.4: x2 248 + 6, 16, 2;  x2xb 248 + 6, 16, 2;  x4 248 + 6, 64, 2;  x4xb 248 + 6, 64, 2 (no VGPR headroom:
     #               2 more VGPRs give 1 workgroup per CU, which the session's occupancy gate refuses)
-    # Allowance: x2xb x2's 64; x4xb the measured 80 (x4: 64). The extra 16 B on 7.14 is not one live range: it moves with
-    # the megakernel's whole allocation (both xb tiles together; either alone stays at 64), and none of single weight
-    # buffer, serialized staging, one-chunk staging, a shared symbol for both tiles, or scheduling barriers removed it.
+    # Allowance: x2xb x2's 64; x4xb the measured 80 (x4: 64). Scratch is the sum of the spill slots, rounded up to 16 B:
+    # x4 64 B, x4xb 72 B -> 80 B. x4xb has two more slots (fix's analysis, 2026-10-18): (1) one VGPR spill of
+    # threadIdx.x * 8 in fleet_xb.hip qkv(), hoisted to the kernel start and reloaded 3 times (removing it gives 68 B,
+    # still 80 B after rounding); (2) one more VGPR that holds SGPR spills, from a second table of about 278 64-bit
+    # addresses in the lowered dispatch code (base = a kernel argument + s6), not in the xb tile (SGPR spill +420).
     # The session also refuses fewer than 2 workgroups per CU (inplace_session.required_wg_per_cu).
     *(Arm(f"x{n}xb", levers=ARMS_X[n].levers, flags=ARMS_X[n].flags, env=dict(ARMS_X[n].env, ETX_DSV2_QKV_XB="1"),
           scratch_allow={2: ARMS_X[2].scratch_allow, 4: 80}[n])
