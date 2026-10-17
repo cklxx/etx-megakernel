@@ -2,6 +2,7 @@
 import argparse
 import itertools
 import json
+import os
 import sys
 import time
 from pathlib import Path
@@ -38,7 +39,7 @@ def fake(tmp_path, arm, base, step=0.0, extra=""):
     return f"{sys.executable} {script} {arm} {base} {step} {tmp_path / ('n_' + arm)} {extra}"
 
 
-def args(tmp_path, a, b, c=None, rounds=6, timeout=60, min_gain=0.0, metric=METRIC, identity_cmd=None):
+def args(tmp_path, a, b, c=None, rounds=6, timeout=60, min_gain=1.0, metric=METRIC, identity_cmd=None):
     return argparse.Namespace(a=a, b=b, control=c, metric=metric, rounds=rounds, timeout=timeout,
                               label="qkv_b4", out=str(tmp_path / "out"), min_gain=min_gain,
                               identity_cmd=identity_cmd)
@@ -84,7 +85,7 @@ def test_faster_candidate_is_a_win_and_the_extractor_reads_it(tmp_path):
     assert len(ab_lines(tmp_path, "ABWARM")) == 3 and len(ab_lines(tmp_path, "ABRUN")) == 18
     assert all(len(v) == 6 for v in r["values"].values()) and set(r["warmup"]) == {"A", "B", "C"}
     (report,) = ab_lines(tmp_path, "ABREPORT")
-    assert " p=0.015625 " in report and "min_gain=0%" in report and report.endswith("verdict=WIN")
+    assert " p=0.015625 " in report and "min_gain=1%" in report and report.endswith("verdict=WIN")
     key = extract(tmp_path)
     assert key["verdict"]["value"] == "COMPLETE"
     assert len(key["runs"]) == 21 and all(x["rc"] == 0 for x in key["runs"])
@@ -112,11 +113,19 @@ def test_effect_inside_the_control_noise_is_no_diff(tmp_path):
 
 # M3: minimum effect size and the sign test.
 def test_min_gain_blocks_a_tiny_deterministic_win(tmp_path):
-    r = ab_same_box.run(args(tmp_path, fake(tmp_path, "A", 10.0), fake(tmp_path, "B", 9.999)), identity=lambda: "m")
-    assert r["verdict"] == "WIN"  # controls are all 0, so 0.01 % wins without --min-gain
-    r = ab_same_box.run(args(tmp_path, fake(tmp_path, "A", 10.0), fake(tmp_path, "B", 9.999), min_gain=1.0),
+    r = ab_same_box.run(args(tmp_path, fake(tmp_path, "A", 10.0), fake(tmp_path, "B", 9.999), min_gain=0.0),
                         identity=lambda: "m")
+    assert r["verdict"] == "WIN"  # controls are all 0, so 0.01 % wins with --min-gain 0
+    r = ab_same_box.run(args(tmp_path, fake(tmp_path, "A", 10.0), fake(tmp_path, "B", 9.999)), identity=lambda: "m")
     assert r["verdict"] == "NO-DIFF" and "min_gain=1%" in ab_lines(tmp_path, "ABREPORT")[0]
+
+
+def test_cli_default_min_gain_is_one_percent(tmp_path):
+    rc = ab_same_box.main(["--a", fake(tmp_path, "A", 10.0), "--b", fake(tmp_path, "B", 9.95), "--metric", METRIC,
+                           "--identity-cmd", "echo m", "--out", str(tmp_path / "out")])
+    assert rc == 0
+    (report,) = ab_lines(tmp_path, "ABREPORT")
+    assert "min_gain=1%" in report and report.endswith("verdict=NO-DIFF")  # a 0.5 % gain is below 1 %
 
 
 def test_sign_test_p_values():
@@ -148,6 +157,92 @@ def test_failed_warm_up_is_incomplete(tmp_path):
                         identity=lambda: "m")
     assert r["verdict"] == "INCOMPLETE" and "warm-up arm B rc=3" in r["rule"]
     assert not ab_lines(tmp_path, "ABRUN")
+
+
+# Review 2, N1: the whole run sequence, warm-up included.
+EXPECTED_ROUNDS = "ABC" "CAB" "BAC" "CBA" "ACB" "BCA"
+
+
+@pytest.mark.parametrize("rounds", [6, 12])
+def test_full_run_sequence_with_warm_up(tmp_path, rounds):
+    ab_same_box.run(args(tmp_path, fake(tmp_path, "A", 10.0), fake(tmp_path, "B", 9.0), rounds=rounds),
+                    identity=lambda: "m")
+    arms = [l.split("arm=")[1][0] for l in (tmp_path / "out/ab.log").read_text().splitlines()
+            if l.startswith(("ABWARM", "ABRUN"))]
+    seq = "".join(arms)
+    assert seq == "ABC" + EXPECTED_ROUNDS * (rounds // 6)
+    body = seq[3:]
+    for k in range(rounds):  # each round is a permutation; the last arm of a round starts the next round
+        assert sorted(body[3 * k:3 * k + 3]) == ["A", "B", "C"]
+        if k + 1 < rounds:
+            assert body[3 * k + 2] == body[3 * k + 3]
+    pairs = {}
+    for x, y in zip(body, body[1:]):
+        if x != y:
+            pairs[(x, y)] = pairs.get((x, y), 0) + 1
+    assert len(pairs) == 6 and set(pairs.values()) == {2 * rounds // 6}
+    for pos in range(3):
+        assert {a: sum(body[3 * k + pos] == a for k in range(rounds)) for a in "ABC"} == {a: rounds // 3 for a in "ABC"}
+
+
+# Review 2, N2: the process group is killed after every run, and the wait after a kill is bounded.
+def _alive(pid):
+    try:
+        state = Path(f"/proc/{pid}/status").read_text()
+    except FileNotFoundError:
+        return False
+    return "\nState:\tZ" not in state
+
+
+def test_background_child_is_killed_after_a_normal_run(tmp_path):
+    pidf = tmp_path / "pid"
+    rc, text = ab_same_box.run_command(f"sleep 60 >/dev/null 2>&1 & echo $! > {pidf}; echo step_ms=1", timeout=20)
+    assert rc == 0 and "step_ms=1" in text
+    pid = int(pidf.read_text())
+    deadline = time.monotonic() + 5
+    while _alive(pid) and time.monotonic() < deadline:
+        time.sleep(0.05)
+    assert not _alive(pid)
+
+
+def test_wait_after_a_timeout_kill_is_bounded(tmp_path):
+    pidf = tmp_path / "pid"
+    # setsid puts the child outside the process group; it keeps the output pipe open.
+    cmd = f"setsid sh -c 'echo $$ > {pidf}; exec sleep 60' & sleep 60"
+    t0 = time.monotonic()
+    try:
+        rc, text = ab_same_box.run_command(cmd, timeout=1, kill_wait=1)
+        assert rc == "timeout" and "output lost" in text
+        assert time.monotonic() - t0 < 8
+    finally:
+        if pidf.exists():
+            try:
+                os.kill(int(pidf.read_text()), 9)
+            except ProcessLookupError:
+                pass
+
+
+# Review 2, N4: run() checks its arguments.
+@pytest.mark.parametrize("field,value,msg", [
+    ("rounds", 0, "--rounds"), ("rounds", 5, "--rounds"), ("rounds", -6, "--rounds"), ("rounds", 6.0, "--rounds"),
+    ("timeout", 0, "--timeout"), ("timeout", -1, "--timeout"), ("timeout", float("inf"), "--timeout"),
+    ("min_gain", -1, "--min-gain"), ("min_gain", float("nan"), "--min-gain"),
+    ("label", "a b", "--label"), ("label", "", "--label"),
+    ("metric", r"x", "exactly 1 group"), ("metric", r"(", "not a valid regex"),
+    ("a", "", "--a"), ("b", None, "--b")])
+def test_run_rejects_bad_arguments(tmp_path, field, value, msg):
+    a = args(tmp_path, "true", "true")
+    setattr(a, field, value)
+    with pytest.raises(ValueError, match=msg.replace("-", r"\-")):
+        ab_same_box.run(a, identity=lambda: "m")
+    assert not (tmp_path / "out").exists()  # nothing runs, nothing is written
+
+
+@pytest.mark.parametrize("extra", [["--timeout", "0"], ["--min-gain", "-1"], ["--rounds", "0"]])
+def test_cli_maps_bad_arguments_to_exit_2(tmp_path, extra):
+    with pytest.raises(SystemExit) as e:
+        ab_same_box.main(["--a", "true", "--b", "true", "--metric", METRIC, "--out", str(tmp_path / "o"), *extra])
+    assert e.value.code == 2
 
 
 # H1: every INCOMPLETE form gives INCOMPLETE in the extractor, with a comparison row.

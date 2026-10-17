@@ -28,16 +28,19 @@ python tools/ab_same_box.py --a "<baseline run>" --b "<candidate run>" \
 ```
 
 - Warm-up: each arm runs once before round 0. The warm-up values do not count. `ab.log` records them as `ABWARM` lines.
-- Order: the rounds cycle through all 6 orders of A, B and C. Each arm is in each position equally often. Each arm runs directly after each other arm equally often. `--rounds` must be a multiple of 6. The default is 6.
+- Order: the rounds cycle through the 6 orders ABC, CAB, BAC, CBA, ACB, BCA. Each arm is in each position equally often. The last arm of each round is the first arm of the next round. So, over the whole run sequence, each arm runs directly after each other arm equally often. `--rounds` must be a multiple of 6. The default is 6.
 - The paired gain of each round is `A/B - 1`. The control gain is `A/C - 1`. It measures the noise of the machine.
-- `p` is the one-sided exact sign-test p-value of the gains. 6 positive gains out of 6 give p = 0.5^6 = 0.0156.
-- WIN: every gain is above 0, the median gain is above max(`--min-gain`, max |control|), and p <= 0.05. LOSS is the same rule with the opposite sign. Any other result is NO-DIFF. `--min-gain` is in percent. The default is 0.
+- `p` is the exact sign-test p-value of the gains. It is one-sided in the observed direction (the sign of the median gain). 6 positive gains out of 6 give p = 0.5^6 = 0.0156.
+- WIN: every gain is above 0, the median gain is above max(`--min-gain`, max |control|), and p <= 0.05. LOSS is the same rule with the opposite sign. Any other result is NO-DIFF. `--min-gain` is in percent. The default is 1. A PR that uses another value must give the value and the reason.
 - INCOMPLETE: a run exits nonzero or times out, a run prints no value, a value is not a positive number, the identity command fails, or the machine identity changes. The script stops at the first problem. `ab.log` and `ab.json` keep the completed runs.
+- Timeout: `--timeout` is the limit for one run. After every run, also after a normal exit, the script kills the process group of the run, so a background child cannot hold the GPU during the next arm. After a timeout kill the script waits at most 10 s for the output pipe, then records `rc=timeout`.
+- Timeout over ssh: a local kill stops only the local ssh client. The remote GPU process can continue and disturb the next session. Use `ssh -tt` (the remote process gets a hangup when the client dies), or put a remote timeout around the GPU command, for example `ssh <host> 'timeout -k 10 1700 <gpu command>'` with a limit below `--timeout`.
 - `--metric` must have exactly one group. Otherwise the script exits with code 2 before any run.
 - Machine identity: the script reads it at the start, before every round and at the end. The default is the local host name and GPU serial. When the runs go over ssh, give `--identity-cmd`. Otherwise the check reads the controller, not the GPU host. An `ABWARN` line shows that no GPU serial was read.
 - The commands run in a shell. Do not pass untrusted text. `--label` must not contain white space.
-- The exit code is 0 for WIN, LOSS and NO-DIFF, 1 for INCOMPLETE and 2 for bad arguments.
+- The exit code is 0 for WIN, LOSS and NO-DIFF, 1 for INCOMPLETE and 2 for bad arguments. `run()` checks the same arguments and raises `ValueError` before any run.
 - The script writes `ab.log`. Add `ab.log` to the experiment's `inputs` in `registry.json`. `tools/extract_key.py` then puts the result into `comparisons` and each run into `runs`. An INCOMPLETE session gives an `INCOMPLETE` comparison row and the verdict INCOMPLETE. `tools/check_results.py` prints each verdict and lists every experiment that is not COMPLETE on a `NOT COMPLETE` line.
+- `tools/check_results.py` returns 0 for an INCOMPLETE experiment, because older INCOMPLETE results are committed on purpose. CI therefore does not block an INCOMPLETE A/B session. A reviewer must read the `NOT COMPLETE` line of the check output.
 
 ## Result files
 

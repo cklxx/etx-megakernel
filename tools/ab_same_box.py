@@ -2,17 +2,18 @@
 
 The script runs three arms on one machine: A (the baseline), B (the candidate) and C (a second copy of A, the
 control). First, every arm runs once as a warm-up. The warm-up values do not count. Then every round runs each arm
-once. The rounds cycle through all 6 orders of A, B and C, so each arm is in each position equally often and each
-arm runs directly after each other arm equally often. --rounds must be a multiple of 6.
+once. The rounds cycle through all 6 orders of A, B and C (ORDERS), so each arm is in each position equally often and,
+over the whole run sequence, each arm runs directly after each other arm equally often. --rounds must be a multiple
+of 6.
 Each run prints one timing value. A regular expression with exactly one group reads the value from the run output.
 
 For each round the script computes two paired gains (lower is better):
   gain    = A / B - 1     the gain of the candidate
   control = A / C - 1     the gain of A over itself; this is the noise of the machine and of the order
-p is the one-sided exact sign-test p-value of the gains in the direction of the median gain (6 positive gains out
+p is the one-sided exact sign-test p-value of the gains in the observed direction (the sign of the median gain) (6 positive gains out
 of 6 give p = 0.5^6 = 0.0156). The verdict uses only these paired gains, never a number from another session or
 another machine:
-  WIN      every gain > 0, median gain > max(--min-gain, max |control|) and p <= 0.05
+  WIN      every gain > 0, median gain > max(--min-gain, max |control|) and p <= 0.05 (--min-gain default 1 %)
   LOSS     every gain < 0, -median gain > max(--min-gain, max |control|) and p <= 0.05
   NO-DIFF  otherwise
   INCOMPLETE  a run fails or times out, a run prints no value, a value is not a positive number, the identity
@@ -47,8 +48,12 @@ import sys
 from pathlib import Path
 
 ARMS = ("A", "B", "C")
-# The 6 orders of 3 arms (a Williams design): position and first-order carry-over are both balanced.
-ORDERS = (("A", "B", "C"), ("B", "C", "A"), ("C", "A", "B"), ("A", "C", "B"), ("B", "A", "C"), ("C", "B", "A"))
+# The 6 orders of 3 arms. Each arm is in each position twice. Inside the rounds each ordered pair of different
+# arms is adjacent twice. The last arm of each order is the first arm of the next order (also from BCA back to
+# ABC), so the round boundaries add only A->A, B->B and C->C. Over the whole run sequence the 6 cross-arm pairs
+# are therefore equally frequent.
+ORDERS = (("A", "B", "C"), ("C", "A", "B"), ("B", "A", "C"), ("C", "B", "A"), ("A", "C", "B"), ("B", "C", "A"))
+KILL_WAIT = 10.0  # seconds to wait for the output pipe after the process group is killed
 ALPHA = 0.05
 
 
@@ -85,23 +90,46 @@ def command_identity(cmd: str, timeout: float = 120):
     return identity
 
 
-def run_command(cmd: str, timeout: float, merge: bool = True):
+def kill_group(p: subprocess.Popen) -> None:
+    try:
+        os.killpg(p.pid, signal.SIGKILL)
+    except (ProcessLookupError, PermissionError):
+        pass
+
+
+def run_command(cmd: str, timeout: float, merge: bool = True, kill_wait: float = KILL_WAIT):
     """Run a shell command in its own process group. Return (rc, output); rc is "timeout" on a timeout.
 
-    On a timeout the whole process group is killed, so a child that keeps the output pipe open cannot hang us.
+    After every run, also after rc=0, the whole process group gets SIGKILL, so a background child cannot hold the
+    GPU during the next arm. On a timeout the group is killed first; then the script waits at most kill_wait
+    seconds for the output pipe. A child outside the group (setsid) can keep the pipe open; then the pipe is closed
+    and the rest of its output is lost. Over ssh a local kill stops only the local ssh client: see
+    docs/EXPERIMENTS.md.
     """
     p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT if merge else subprocess.PIPE,
                          text=True, errors="replace", start_new_session=True)
     try:
-        out, err = p.communicate(timeout=timeout)
-        return p.returncode, out or ""
-    except subprocess.TimeoutExpired:
         try:
-            os.killpg(p.pid, signal.SIGKILL)
-        except (ProcessLookupError, PermissionError):
+            out, _ = p.communicate(timeout=timeout)
+            return p.returncode, out or ""
+        except subprocess.TimeoutExpired:
+            kill_group(p)
+            note = f"\n[ab_same_box] timeout after {timeout} s; process group killed\n"
+            try:
+                out, _ = p.communicate(timeout=kill_wait)
+            except subprocess.TimeoutExpired:
+                out = ""
+                note += f"[ab_same_box] the output pipe stayed open {kill_wait} s after the kill; output lost\n"
+            return "timeout", (out or "") + note
+    finally:
+        kill_group(p)
+        for pipe in (p.stdout, p.stderr):
+            if pipe is not None:
+                pipe.close()
+        try:
+            p.wait(timeout=kill_wait)
+        except subprocess.TimeoutExpired:
             p.kill()
-        out, _ = p.communicate()
-        return "timeout", (out or "") + f"\n[ab_same_box] timeout after {timeout} s; process group killed\n"
 
 
 def order(round_index: int) -> tuple[str, ...]:
@@ -160,11 +188,36 @@ def verdict(gains: list[float], controls: list[float], min_gain: float = 0.0) ->
     return "NO-DIFF", f"median {med:+.6%}; {tail}", p
 
 
+def check_args(args: argparse.Namespace) -> None:
+    """Raise ValueError with a clear message when an argument is not valid. main() maps it to exit code 2."""
+    for name in ("a", "b", "out"):
+        if not isinstance(getattr(args, name, None), str) or not getattr(args, name).strip():
+            raise ValueError(f"--{name} must be a non-empty string")
+    rounds = getattr(args, "rounds", None)
+    if not isinstance(rounds, int) or isinstance(rounds, bool) or rounds < 6 or rounds % 6:
+        raise ValueError(f"--rounds must be a multiple of 6 (6, 12, ...), not {rounds!r}: "
+                         "the rounds cycle through all 6 arm orders")
+    timeout = getattr(args, "timeout", None)
+    if not isinstance(timeout, (int, float)) or not math.isfinite(timeout) or timeout <= 0:
+        raise ValueError(f"--timeout must be a finite number of seconds above 0, not {timeout!r}")
+    min_gain = getattr(args, "min_gain", 1.0)
+    if not isinstance(min_gain, (int, float)) or not math.isfinite(min_gain) or min_gain < 0:
+        raise ValueError(f"--min-gain must be a finite percent of 0 or more, not {min_gain!r}")
+    label = getattr(args, "label", None)
+    if not isinstance(label, str) or not label or re.search(r"\s", label):
+        raise ValueError(f"--label must be non-empty and contain no white space, not {label!r}")
+    try:
+        check_metric(args.metric)
+    except re.error as exc:
+        raise ValueError(f"--metric is not a valid regex: {exc}") from None
+
+
 def run(args: argparse.Namespace, identity=None) -> dict:
+    check_args(args)
     out = Path(args.out)
     (out / "runs").mkdir(parents=True, exist_ok=True)
     pattern = check_metric(args.metric)
-    min_gain = getattr(args, "min_gain", 0.0) / 100
+    min_gain = getattr(args, "min_gain", 1.0) / 100
     identity_cmd = getattr(args, "identity_cmd", None)
     if identity is None:
         identity = command_identity(identity_cmd) if identity_cmd else local_identity
@@ -259,22 +312,17 @@ def main(argv=None) -> int:
     ap.add_argument("--control", help="control command; default: the baseline command again (A/A)")
     ap.add_argument("--metric", required=True, help="regex with exactly one group: the timing value, lower is better")
     ap.add_argument("--rounds", type=int, default=6, help="a multiple of 6 (default 6)")
-    ap.add_argument("--min-gain", type=float, default=0.0, help="smallest median gain in percent for WIN or LOSS")
+    ap.add_argument("--min-gain", type=float, default=1.0,
+                    help="smallest median gain in percent for WIN or LOSS (default 1)")
     ap.add_argument("--identity-cmd", help="shell command whose stdout is the machine identity (for ssh runs)")
     ap.add_argument("--timeout", type=float, default=1800, help="seconds per run; a timeout makes INCOMPLETE")
     ap.add_argument("--label", default="ab", help="a name with no white space")
     ap.add_argument("--out", required=True)
     args = ap.parse_args(argv)
-    if args.rounds < 6 or args.rounds % 6:
-        ap.error("--rounds must be a multiple of 6 (6, 12, ...): the rounds cycle through all 6 arm orders")
-    if not args.label or re.search(r"\s", args.label):
-        ap.error("--label must not be empty or contain white space")
-    if args.min_gain < 0:
-        ap.error("--min-gain must be 0 or more")
     try:
-        check_metric(args.metric)
-    except (ValueError, re.error) as exc:
-        ap.error(str(exc))
+        check_args(args)
+    except ValueError as exc:
+        ap.error(str(exc))  # exit code 2
     r = run(args)
     print((Path(args.out) / "ab.log").read_text(), end="")
     return 0 if r["verdict"] != "INCOMPLETE" else 1
