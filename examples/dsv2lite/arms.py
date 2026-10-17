@@ -135,6 +135,12 @@ ARMS = {a.name: a for a in [
     # still 80 B after rounding); (2) one more VGPR that holds SGPR spills, from a second table of about 278 64-bit
     # addresses in the lowered dispatch code (base = a kernel argument + s6), not in the xb tile (SGPR spill +420).
     # The session also refuses fewer than 2 workgroups per CU (inplace_session.required_wg_per_cu).
+    # gemv_no_terminal_all in the qkv GEMV (2026-10-18): gemv_rows_xb peels its last group, so no wave loads a group it
+    # does not reduce. Per layer (kv_a shared) this removes 2944 dead groups of 4 KB (11.5 MiB issued; the clamped row
+    # is one the workgroup also loads, so mostly L2 hits). The protocol simulator uses fixed task times and does not
+    # model these loads. Resources after the change (VGPR + AGPR, scratch, SGPR spill, VGPR spill, WG/CU, LDS):
+    #   ROCm 7.14 (gate):     x2xb 256 + 0, 32, 737, 6, 2, 26668;   x4xb 256 + 0, 80, 1719, 17, 2, 26668 (no change)
+    #   ROCm 7.2.4 (record):  x2xb 248 + 6, 16, 727, 3, 2, 26668 (SGPR spill 728 before);  x4xb 248 + 6, 64, 1683, 13, 2
     *(Arm(f"x{n}xb", levers=ARMS_X[n].levers, flags=ARMS_X[n].flags, env=dict(ARMS_X[n].env, ETX_DSV2_QKV_XB="1"),
           scratch_allow={2: ARMS_X[2].scratch_allow, 4: 80}[n])
       for n in (2, 4)),
@@ -168,7 +174,8 @@ ARMS = {a.name: a for a in [
     # without a DROP. Local compiles of etx_megakernel_d0 (VGPR + AGPR, scratch B/lane, SGPR spill, VGPR spill,
     # workgroups per CU), 2026-10-18:
     #   ROCm 7.14 (gate):     x4xb 256 + 0, 80, 1719, 17, 2;  x4xbo 256 + 0, 80, 1753, 16, 2
-    #   ROCm 7.2.4 (record):  x4xb 248 + 6, 64, 1683, 13, 2;  x4xbo 248 + 6, 64, 1725, 14, 2
+    #   ROCm 7.2.4 (record):  x4xb 248 + 6, 64, 1683, 13, 2;  x4xbo 248 + 6, 64, 1724, 14, 2
+    # (after the merge of the peeled qkv GEMV loop, feat/ds-qkv-noterm: 7.14 unchanged; 7.2.4 x4xbo SGPR spill 1725 -> 1724)
     # x4xbo includes the peeled GEMV loop (gemv_no_terminal_all: no dead group of loads at the end of a wave; before
     # the peel 1750 / 1721 SGPR spill). LDS 26668 B in all four. SGPR spill +34 / +42: the grid reuses the batched qkv
     # grid's arguments, so the lowered dispatch code gets no new address table (the qkv tile's second table cost
@@ -195,6 +202,9 @@ ARMS = {a.name: a for a in [
     # per CU), 2026-10-18. ROCm 7.14 is the gate compiler; 7.2.4 is recorded only:
     #   ROCm 7.14:  x4xbo 256 + 0, 80, 1750, 16, 2;  x4xbl 256 + 0, 80, 1803, 16, 2
     #   ROCm 7.2.4: x4xbo 248 + 6, 64, 1721, 14, 2;  x4xbl 248 + 6, 64, 1787, 14, 2 (no VGPR headroom)
+    # After the merge of feat/ds-oproj-colbatch (peeled o_proj and qkv GEMV loops, one gemv_rows_xb loop), 2026-10-18:
+    #   ROCm 7.14 (gate):     x4xbo 256 + 0, 80, 1753, 16, 2;  x4xbl 256 + 0, 80, 1807, 16, 2
+    #   ROCm 7.2.4 (record):  x4xbo 248 + 6, 64, 1724, 14, 2;  x4xbl 248 + 6, 64, 1793, 14, 2
     # LDS 26668 B in all four. SGPR spill +53 / +66: the new grids use existing arguments (fleet<r>, layer_-1), so no
     # new address table. Allowance: x4xbo's 80.
     Arm("x4xbl", levers=ARMS_X[4].levers, flags=ARMS_X[4].flags, env=dict(ARMS_X[4].env, ETX_DSV2_QKV_XB="1",

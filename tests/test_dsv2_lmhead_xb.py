@@ -222,7 +222,7 @@ def test_source_lines():
                  "input_norm(rank2{}, d, fp->w.final_norm, s.vec, s.smem);",
                  "tab[threadIdx.x] = p.act.logits;",
                  "tab[2 * kMaxB + threadIdx.x] = p.act.x_norm + (int64_t)xcd * d.hidden;",
-                 "gemv_rows_xb<true>(wl, d.hidden, s, reinterpret_cast<float* const*>(tab), d.vocab, d.hidden, xcd, fleet::kNumXCDs, worker, nw);",
+                 "gemv_rows_xb(wl, d.hidden, s, reinterpret_cast<float* const*>(tab), d.vocab, d.hidden, xcd, fleet::kNumXCDs, worker, nw);",
                  "fleet::lm_head_candidate(fp->d, act, (int)c->domain, (int)c->coord[1], fleet::kWorkersPerXCD, s.smem, s.ids_blk,",
                  "if (p.w.lm_head != wl || p.d.hidden != d.hidden || p.d.vocab != d.vocab) __builtin_trap();",
                  'extern "C" __device__ void fleet_lm_head_xb(const etx_ctx* c) { etx_xb::lm_head(c); }'):
@@ -242,7 +242,7 @@ def test_row_split_writes_every_logit_exactly_once():
 
 
 def _rows_no_terminal(N, xcd, n_xcds, worker, nw, waves=4):
-    """Python mirror of gemv_rows_xb<true>'s loop (kRPI = 1): which rows it reduces, and how many groups it issues."""
+    """Python mirror of gemv_rows_xb's loop (kRPI = 1): which rows it reduces, and how many groups it issues."""
     per = (N + n_xcds - 1) // n_xcds
     begin, end = xcd * per, min(N, xcd * per + per)
     first = begin + worker
@@ -268,10 +268,11 @@ def _rows_no_terminal(N, xcd, n_xcds, worker, nw, waves=4):
 
 
 def test_no_terminal_loop_reduces_the_same_rows_and_issues_no_dead_group():
-    """gemv_rows_xb<true> (lever gemv_no_terminal_all's loop) reduces exactly the rows of the default loop, and every
-    issued group is reduced (the default loop issues one clamped group per wave after the last)."""
-    for line in ("template <bool kNoTerminal = false>", "while (k + 2 * stride < cnt) {", "if (k + stride < cnt) {"):
+    """gemv_rows_xb (lever gemv_no_terminal_all's loop, for the qkv and the lm_head tile since the merge of
+    feat/ds-qkv-noterm) reduces exactly the rows of the row split, and every issued group is reduced."""
+    for line in ("while (k + 2 * stride < cnt) {", "if (k + stride < cnt) {"):
         assert line in XB_SRC, line
+    assert "kNoTerminal" not in XB_SRC and "gemv_rows_xb<" not in XB_SRC   # one loop, no opt-in variant
     for xcd in (0, 7):
         for w in (0, 1, 36, 73):
             rows, issued = _rows_no_terminal(VOCAB, xcd, dsv.XCDS, w, dsv.XB_W)
