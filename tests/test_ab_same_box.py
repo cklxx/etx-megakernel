@@ -170,7 +170,8 @@ def test_full_run_sequence_with_warm_up(tmp_path, rounds):
     arms = [l.split("arm=")[1][0] for l in (tmp_path / "out/ab.log").read_text().splitlines()
             if l.startswith(("ABWARM", "ABRUN"))]
     seq = "".join(arms)
-    assert seq == "ABC" + EXPECTED_ROUNDS * (rounds // 6)
+    assert seq == "BCA" + EXPECTED_ROUNDS * (rounds // 6)
+    assert seq[2] == seq[3] == "A"  # R1: the warm-up ends with the first arm of round 0
     body = seq[3:]
     for k in range(rounds):  # each round is a permutation; the last arm of a round starts the next round
         assert sorted(body[3 * k:3 * k + 3]) == ["A", "B", "C"]

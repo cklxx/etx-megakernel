@@ -52,6 +52,8 @@ ARMS = ("A", "B", "C")
 # arms is adjacent twice. The last arm of each order is the first arm of the next order (also from BCA back to
 # ABC), so the round boundaries add only A->A, B->B and C->C. Over the whole run sequence the 6 cross-arm pairs
 # are therefore equally frequent.
+# The warm-up ends with A, the first arm of round 0, so the counted runs get no extra C->A step (review 3, R1).
+WARM_ORDER = ("B", "C", "A")
 ORDERS = (("A", "B", "C"), ("C", "A", "B"), ("B", "A", "C"), ("C", "B", "A"), ("A", "C", "B"), ("B", "C", "A"))
 KILL_WAIT = 10.0  # seconds to wait for the output pipe after the process group is killed
 ALPHA = 0.05
@@ -269,7 +271,7 @@ def run(args: argparse.Namespace, identity=None) -> dict:
     finished = False
     try:
         if check_identity("start"):
-            for arm in ARMS:
+            for arm in WARM_ORDER:
                 warm[arm] = one("ABWARM", f"warm_{arm}", arm)
                 if problems:
                     break
