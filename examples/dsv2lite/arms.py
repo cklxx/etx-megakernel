@@ -180,7 +180,23 @@ ARMS = {a.name: a for a in [
     # fleet_lm_head_xb / fleet_xb_lm_cand): x4xbo plus, per token, a final-norm grid per request, ONE column-batched
     # lm_head grid for the 4 requests (W_lm, 419 MB, read once per token, not 4 times) and a per-request candidate
     # grid feeding fleet's argmax. The only difference to x4xbo is ETX_DSV2_LMHEAD_XB=1. B = 4 only.
-    # (RESULTS: x4xbl notes are filled in after the resource compiles.)
+    # Per-slot timing model at the token end (graph.py xb_lm_us; no measurement yet): x4xbo runs 2 lm_head tasks per
+    # slot, 2 x 140 = 280 us; x4xbl runs 1 final-norm task 7.4 + 1 batched task (0.5 x 4 stage + max(132.6 x 37 / 74,
+    # 80.7 us HBM floor for 419.4 MB at 5.2 TB/s) = 82.7) + 2 candidate tasks 2 x 2.0 = 94.1 us.
+    # 27-layer protocol simulator (3 seeds, kv_a shared, COH=l1, COUPLE=none, 2026-10-18), x4xbo 7349.5 us:
+    #   model 82.7 us -> 7148.7 (-201 us); no candidate cost -> 7146.5 (-203); batched task 140 us (no gain from 74
+    #   workers, the pessimistic end) -> 7255.5 (-94 us). The model does not charge x4xbo for HBM contention (2 slots
+    #   x 419 MB in 140 us is 6.0 TB/s), so the real gain can be larger.
+    # Threshold, written before any GPU measurement: KEEP only if every token gate of x4xbl passes and the same-box
+    # A/B (tools/ab_same_box.py, 6 rounds in all 6 orders, A = x4xbo, B = x4xbl) gives verdict WIN (every round
+    # faster, p <= 0.05, median gain > max(--min-gain, max |A/A control|)) and a median step saving (A - B, in ms,
+    # from ab.json) >= 0.10 ms (the pessimistic simulated end, -94 us x 1.055 host scale); otherwise DROP.
+    # Resources, local compiles of etx_megakernel_d0 (VGPR + AGPR, scratch B/lane, SGPR spill, VGPR spill, workgroups
+    # per CU), 2026-10-18. ROCm 7.14 is the gate compiler; 7.2.4 is recorded only:
+    #   ROCm 7.14:  x4xbo 256 + 0, 80, 1750, 16, 2;  x4xbl 256 + 0, 80, 1803, 16, 2
+    #   ROCm 7.2.4: x4xbo 248 + 6, 64, 1721, 14, 2;  x4xbl 248 + 6, 64, 1787, 14, 2 (no VGPR headroom)
+    # LDS 26668 B in all four. SGPR spill +53 / +66: the new grids use existing arguments (fleet<r>, layer_-1), so no
+    # new address table. Allowance: x4xbo's 80.
     Arm("x4xbl", levers=ARMS_X[4].levers, flags=ARMS_X[4].flags, env=dict(ARMS_X[4].env, ETX_DSV2_QKV_XB="1",
                                                                             ETX_DSV2_OPROJ_XB="1", ETX_DSV2_LMHEAD_XB="1"),
         scratch_allow=80),
