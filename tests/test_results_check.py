@@ -26,6 +26,8 @@ def test_pattern_registry_kinds():
         "    BGATE arm=x2 b=2 PASS": "gate",
         "    TRACE COMPLETE round=1 b=1 tasks=53022 span_us=3094.430": "timing",
         "commit 554133d744b4591c9cf87c68b6817df781137c9b": "meta",
+        "ABREPORT label=x verdict=INCOMPLETE reason=round 0 arm B rc=3": "ab",
+        "ABMACHINE start host | error: no FAIL here": "ab",
         " systemctl restart fail2ban.service": None,
     }
     for text, kind in cases.items():
