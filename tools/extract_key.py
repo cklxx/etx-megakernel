@@ -43,13 +43,17 @@ PATTERNS = [
     # Correctness gates and completion seals.
     ("gate", re.compile(r"\bBGATE\b|\bSEALED\b|\bB4-RESULT\b|\bGATE\b|\b(PASS|FAIL)\b|\b\d+ (passed|failed)\b")),
     # Timing summary lines.
-    ("timing", re.compile(r"\bBREPORT\b|\bTRACE COMPLETE\b|\bmedian\b")),
+    # ABREPORT and ABRUN come from tools/ab_same_box.py; ABRUN rc!=0 also counts as a failed run.
+    ("timing", re.compile(r"\bBREPORT\b|\bABREPORT\b|\bABRUN\b|\bTRACE COMPLETE\b|\bmedian\b")),
     # Experiment identity.
     ("meta", re.compile(r"Marketing Name:\s+(AMD|NVIDIA)|\bgfx9\d\d\b|\bMI300X\b|\b[0-9a-f]{40}\b")),
 ]
 
 BREPORT = re.compile(r"BREPORT b=(\d+) vs vLLM (\S+): throughput (\w+) median ([+-]?[\d.]+)% spread ([\d.]+)%"
                      r".*?per-request latency (\w+) median ([+-]?[\d.]+)% spread ([\d.]+)%")
+ABREPORT = re.compile(r"ABREPORT label=(\S+) B vs A: gain median ([+-]?[\d.]+)% spread ([\d.]+)% "
+                      r"control median ([+-]?[\d.]+)% spread ([\d.]+)% rounds=(\d+) verdict=(\S+)")
+ABRUN = re.compile(r"ABRUN round=(\d+) arm=(\w) rc=(-?\d+)")
 TRACE = re.compile(r"TRACE COMPLETE round=(\d+) b=(\d+) tasks=(\d+) span_us=([\d.]+)")
 META = {
     "commit": re.compile(r"(?:[Cc]ommit|revision)[^0-9a-f\n]{0,20}([0-9a-f]{40})\b"),
@@ -136,7 +140,19 @@ def extract(directory: Path, entry: dict) -> dict:
             elif kind == "timing":
                 b = BREPORT.search(text)
                 t = TRACE.search(text)
-                if b:
+                ab = ABREPORT.search(text)
+                abr = ABRUN.search(text)
+                if ab:
+                    label, gmed, gspr, cmed, cspr, rounds, outcome = ab.groups()
+                    comparisons.append(dict(batch=label, baseline="A (same machine, interleaved)",
+                                            metric=f"paired gain, {rounds} rounds, control median {cmed}% "
+                                                   f"spread {cspr}%", outcome=outcome,
+                                            median_pct=float(gmed), spread_pct=float(gspr), src=src))
+                elif abr:
+                    rnd, arm, rc = abr.groups()
+                    runs.append(dict(job=f"ab r{rnd} {arm}", status="ok" if rc == "0" else "fail", rc=int(rc),
+                                     src=src))
+                elif b:
                     batch, base, tout, tmed, tspr, lout, lmed, lspr = b.groups()
                     comparisons += [
                         dict(batch=int(batch), baseline=f"vLLM {base}", metric="throughput gain", outcome=tout,

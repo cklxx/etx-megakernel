@@ -16,6 +16,20 @@ This document gives the rules for GPU experiments in this repository.
 3. Report the median delta and the spread (max - min) of the paired rounds.
 4. Report every correctness gate. A failed gate makes the verdict FAIL. A nonzero exit makes the verdict INCOMPLETE.
 
+### Same-machine A/B script
+
+`tools/ab_same_box.py` applies these rules. It runs three arms on one machine: A (baseline), B (candidate) and C (a second copy of A, the control). The arm order rotates each round. Use 3 rounds or more.
+
+```sh
+python tools/ab_same_box.py --a "<baseline run>" --b "<candidate run>" \
+    --metric 'step_ms=([\d.]+)' --rounds 5 --label qkv_b4 --out examples/gpu-live/results/<date>-<name>
+```
+
+- The paired gain of each round is `A/B - 1`. The control gain is `A/C - 1`. It measures the noise of the machine.
+- WIN: every gain is above 0 and the median gain is above the largest control gain. LOSS is the same rule with the opposite sign. Any other result is NO-DIFF.
+- INCOMPLETE: a run exits nonzero, a run prints no value, or the machine identity (host name and GPU serial) changes during the session.
+- The script writes `ab.log`. Add `ab.log` to the experiment's `inputs` in `registry.json`. `tools/extract_key.py` then puts the result into `comparisons` and each run into `runs`.
+
 ## Result files
 
 Each experiment folder under `examples/gpu-live/results/<date>-<name>/` commits two generated files:
