@@ -62,3 +62,13 @@ KEEP only if every token gate passes and `tools/ab_same_box.py` (6 rounds, all 6
 A = x4xbor, B = x4xbora = x4xbor + ETX_DSV2_ATTN_XB=1 + -DETX_DSV2_ATTN_XB=1) gives verdict WIN (6/6 rounds faster,
 p <= 0.05, median gain > max |A/A control|) and a median step saving (A - B, from ab.json) >= 0.587 ms
 (pessimistic -556.3 us x 1.055). Otherwise DROP.
+
+## Step 2 (built): ETX_DSV2_ATTN_XB=1, arm x4xbora
+
+- The real x4xbora graph (graph.py, durations attn 20.3 / merge 7.6 us) in the same simulator: seeds
+  [6145.8, 6145.9, 6151.1], mean 6147.6 us. This is the optimistic case of the bound (the bound script and the graph
+  agree).
+- Resources, etx_megakernel_d0 (VGPR + AGPR, scratch B/lane, SGPR spill, VGPR spill, WG/CU, LDS B):
+  - ROCm 7.14 (gate): x4xbor 256 + 0, 80, 1796, 17, 2, 26668; x4xbora 256 + 0, 80, 1794, 17, 2, 26668.
+  - ROCm 7.2.4 (record): x4xbor 248 + 6, 64, 1756, 14, 2, 26668; x4xbora 248 + 6, 64, 1754, 14, 2, 26668.
+- Equality: not bitwise to x4xbor. tests/test_dsv2_attn_xb.py states the fp32 tolerance against the 16-chunk path.

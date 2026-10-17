@@ -208,7 +208,7 @@ def test_arm_differs_from_x4xbo_only_by_the_switch(monkeypatch):
     assert (b.levers, b.flags, b.scratch_allow) == (a.levers, a.flags, a.scratch_allow)
     assert build_env(b) == {**build_env(a), "ETX_DSV2_LMHEAD_XB": "1"}
     assert "norm_tree_all" in b.levers and b.rule is None and sess.required_wg_per_cu(b) == 2
-    assert {n for n in ARMS if "ETX_DSV2_LMHEAD_XB" in ARMS[n].env} == {"x4xbl", "x4xboq", "x4xbor"}   # x4xbo[qr]: stacked on x4xbl
+    assert {n for n in ARMS if "ETX_DSV2_LMHEAD_XB" in ARMS[n].env} == {"x4xbl", "x4xboq", "x4xbor", "x4xbora"}   # x4xbo[qr], x4xbora: stacked on x4xbl
     # the arm's own build environment passes the lever guard
     for k, v in build_env(b).items():
         if k.startswith("ETX_DSV2_") or k == "ETX_FLEET_PATCH":

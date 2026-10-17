@@ -233,6 +233,27 @@ ARMS = {a.name: a for a in [
     Arm("x4xbor", levers=ARMS_X[4].levers, flags=(*ARMS_X[4].flags, "-DETX_DSV2_ROUTER_SPREAD=1"),
         env=dict(ARMS_X[4].env, ETX_DSV2_QKV_XB="1", ETX_DSV2_OPROJ_XB="1", ETX_DSV2_LMHEAD_XB="1",
                  ETX_DSV2_ROUTER_FIRST="1", ETX_DSV2_ROUTER_SPREAD="1"), scratch_allow=80),
+    # Attention blocking on top of x4xbor (graph.py build_attention_block, fleet_xb.hip fleet_attention8* /
+    # fleet_merge_uv8; docs/ATTN-XB-BOUND-2026-10-18.md): x4xbor plus ETX_DSV2_ATTN_XB=1 and -DETX_DSV2_ATTN_XB=1.
+    # Each request's qabs (16, 2), attention (16, 8) and merge (16, 8) on 16 workers (r // 2) * 16 .. of its slot, so
+    # the 2 requests of a slot run in one wave (x4xbor: attention and merge (16, 16), one request after the other).
+    # The merge order changes (8 partials, not 16): the result is not bitwise x4xbor's (test_dsv2_attn_xb.py).
+    # Per-slot timing model per layer (attention phase): x4xbor 2 x (qabs 4.0 + attn 16.7 + merge 7.6) = 56.6 us;
+    # x4xbora qabs 4.0 + attn 20.3 + merge 7.6 = 31.9 us (pessimistic: attn 24.0, merge 9.0 -> 37.0 us).
+    # 27-layer protocol simulator (3 seeds, kv_a shared, COH=l1, COUPLE=none, 2026-10-18), x4xbor 6866.9 us:
+    # optimistic 6147.6 (-719.3 us), pessimistic 6310.6 (-556.3), stress (qabs 6, attn 24, merge 11) 6418.6 (-448.3).
+    # Threshold, written before any GPU measurement: KEEP only if every token gate passes and the same-box A/B
+    # (tools/ab_same_box.py, 6 rounds in all 6 orders, --identity-cmd, A = x4xbor, B = x4xbora) gives verdict WIN
+    # (6/6 rounds faster, p <= 0.05, median gain > max |A/A control|) and a median step saving (A - B, ms, ab.json)
+    # >= 0.587 ms (pessimistic -556.3 us x 1.055 host scale); otherwise DROP.
+    # Resources (etx_megakernel_d0: VGPR + AGPR, scratch B/lane, SGPR spill, VGPR spill, WG/CU), 0c641ec + this arm:
+    #   ROCm 7.14 (gate):     x4xbor 256 + 0, 80, 1796, 17, 2;  x4xbora 256 + 0, 80, 1794, 17, 2
+    #   ROCm 7.2.4 (record):  x4xbor 248 + 6, 64, 1756, 14, 2;  x4xbora 248 + 6, 64, 1754, 14, 2
+    # LDS 26668 B in all four. The tiles use the attention / merge grids' own arguments (fleetN, layer_L): no new
+    # kernel-argument base address.
+    Arm("x4xbora", levers=ARMS_X[4].levers, flags=(*ARMS_X[4].flags, "-DETX_DSV2_ROUTER_SPREAD=1", "-DETX_DSV2_ATTN_XB=1"),
+        env=dict(ARMS_X[4].env, ETX_DSV2_QKV_XB="1", ETX_DSV2_OPROJ_XB="1", ETX_DSV2_LMHEAD_XB="1",
+                 ETX_DSV2_ROUTER_FIRST="1", ETX_DSV2_ROUTER_SPREAD="1", ETX_DSV2_ATTN_XB="1"), scratch_allow=80),
     # B = 8 is a diagnostic: with M1 alone the eight-request gate failed (request 5, 3/27 layers), so the three
     # recipes are built side by side and the gate says which one is correct at eight requests. x8p is the plain
     # replication recipe (the pre-section-10 arm), x8m adds M1, x8k adds K1.

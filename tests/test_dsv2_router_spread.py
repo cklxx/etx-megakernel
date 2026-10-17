@@ -203,7 +203,7 @@ def test_arms():
     assert q.env == dict(base.env, ETX_DSV2_ROUTER_FIRST="1") and q.levers == base.levers and q.flags == base.flags
     assert r.env == dict(base.env, ETX_DSV2_ROUTER_FIRST="1", ETX_DSV2_ROUTER_SPREAD="1")
     assert r.levers == base.levers and r.flags == (*base.flags, "-DETX_DSV2_ROUTER_SPREAD=1")
-    assert {n for n, a in ARMS.items() if "ETX_DSV2_ROUTER_SPREAD" in a.env} == {"x4xbor"}
+    assert {n for n, a in ARMS.items() if "ETX_DSV2_ROUTER_SPREAD" in a.env} == {"x4xbor", "x4xbora"}   # x4xbora: stacked on x4xbor
 
 
 def test_duration_model():

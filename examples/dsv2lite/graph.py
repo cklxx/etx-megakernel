@@ -163,6 +163,20 @@ def _layer_tensor(g: Graph, L: int) -> None:
         g.tensor(f"layer_{L}", (1,), role="runtime", bytes_per_elem=4)
 
 
+# ETX_DSV2_ATTN_XB=1 (B = 4 only, with ETX_DSV2_OPROJ_XB=1; docs/ATTN-XB-BOUND-2026-10-18.md): attention blocking.
+# Request r's qabs (16, 2), attention (16, ATTN_XB_CHUNKS) and merge (16, ATTN_XB_CHUNKS) go on the 16 workers
+# off + (r // 2) * 16 .. of its slot, so the 2 requests of a slot run qabs .. merge in one wave (today: one after the
+# other on workers 0..15). The tiles are fleet_xb.hip's fleet_attention8* / fleet_merge_uv8 (n_split = 8, a compile-time
+# constant); the arm passes -DETX_DSV2_ATTN_XB=1. Durations (model, no measurement yet): attention 20.3 us (fix's
+# optimistic end; pessimistic 24.0), merge 7.6 us (pessimistic 9.0: 16 W_UV rows per task, 8 partials).
+ATTN_XB_CHUNKS = 8
+ATTN_XB_DUR = {"attn": 20.3, "merge": 7.6}
+
+
+def _attn_xb() -> bool:
+    return _switch("ETX_DSV2_ATTN_XB")
+
+
 def build_attention_block(g: Graph, q: _Req, L: int, e_in: str, e_in_map: str, fold: bool, extra_in: dict | None = None,
                           xb: bool = False, xbo: bool = False) -> str:
     """qkv -> (qabs, attention) -> merge -> o_proj; returns the global o_proj event name. extra_in: more in-edges of qkv
@@ -172,6 +186,15 @@ def build_attention_block(g: Graph, q: _Req, L: int, e_in: str, e_in_map: str, f
     creates and signals E_oproj."""
     _layer_tensor(g, L)
     n = q.n
+    axb = _attn_xb()
+    if axb and not xbo:
+        raise ValueError("ETX_DSV2_ATTN_XB=1 needs ETX_DSV2_OPROJ_XB=1 (so ETX_DSV2_QKV_XB=1 and 4 requests): with one "
+                         "request per slot the attention of a slot is not serialized")
+    chunks = ATTN_XB_CHUNKS if axb else KV_CHUNKS
+    # worker block of the request: today head h's chunk c on worker (h % 2) * 16 + c + off; with ATTN_XB, on
+    # (h % 2) * 8 + c + off + (r // 2) * 16, and qabs on the first 4 workers of that block (created first: ahead of
+    # attention in each worker's queue, so attention's in-body q_c wait cannot block its own qabs)
+    blk = f"OFF+{(q.r // 2) * 2 * ATTN_XB_CHUNKS}" if axb else "OFF"
     # K1 (docs/DSV2-D1-D5.md), ETX_DSV2_KVA=shared: kv_a is computed once, 1/8 per XCD (fleet's FLAG_KVA_SHARED), so the
     # qkv event is global -- every attention/q_absorb task waits for all 296 qkv tasks and reads the one kv_a buffer.
     # Default `replicated`: every XCD computes its own full kv_a, the event stays XCD-local (today's graph).
@@ -180,8 +203,8 @@ def build_attention_block(g: Graph, q: _Req, L: int, e_in: str, e_in_map: str, f
     if not xb:
         g.etensor(n(f"E_qkv_{L}"), (1,) if kvs else (XCDS,), wait_count=XCDS * W if kvs else W)
     g.etensor(n(f"E_qabs_{L}"), (HEADS,), wait_count=QABS)
-    g.etensor(n(f"E_attn_{L}"), (HEADS,), wait_count=KV_CHUNKS)
-    g.etensor(n(f"E_merge_{L}"), (XCDS,), wait_count=(HEADS // XCDS) * KV_CHUNKS)
+    g.etensor(n(f"E_attn_{L}"), (HEADS,), wait_count=chunks)
+    g.etensor(n(f"E_merge_{L}"), (XCDS,), wait_count=(HEADS // XCDS) * chunks)
     if not xbo:
         g.etensor(n(f"E_oproj_{L}"), (1,), wait_count=XCDS * W)
     if not xb:
@@ -189,19 +212,20 @@ def build_attention_block(g: Graph, q: _Req, L: int, e_in: str, e_in_map: str, f
         _chiplet(g, q, f"qkv_{L}", ("fleet_qkv_fused_fold" if fold else "fleet_qkv_fused") + sfx, L, qkv_in,
                  {n(f"E_qkv_{L}"): "xw->(0)" if kvs else "xw->x"}, DUR["qkv"])
     g.call_device(n(f"qabs_{L}"), (HEADS, QABS), _tile("fleet_q_absorb"), resource=_res(paired=q.paired), args=[q.fleet, f"layer_{L}"],
-                  consts=(L, q.r), domain_map="hs->(h/2)", worker_map=q.wmap("hs->((h%2)*2+s+OFF)"),
+                  consts=(L, q.r), domain_map="hs->(h/2)", worker_map=q.wmap(f"hs->((h%2)*2+s+{blk})"),
                   in_edges={n(f"E_qkv_{L}"): "hs->(0)" if kvs else "hs->(h/2)"}, out_edges={n(f"E_qabs_{L}"): "hs->h"},
                   duration_us=DUR["qabs"])
-    g.call_device(n(f"attn_{L}"), (HEADS, KV_CHUNKS), _tile("fleet_attention" + sfx), resource=_res(paired=q.paired), args=[q.fleet, f"layer_{L}"],
+    g.call_device(n(f"attn_{L}"), (HEADS, chunks), _tile(("fleet_attention8" if axb else "fleet_attention") + sfx), resource=_res(paired=q.paired), args=[q.fleet, f"layer_{L}"],
                   consts=(L, q.r),
                   # E_qabs is consumed INSIDE the attention body (fleet's PUB_WAIT, kept for overlap; see fleet_shim.hip);
                   # ETX still orders attention after E_qkv, and qabs after E_qkv, so the in-body wait is deadlock-free.
-                  domain_map="hc->(h/2)", worker_map=q.wmap("hc->((h%2)*16+c+OFF)"),
+                  domain_map="hc->(h/2)", worker_map=q.wmap(f"hc->((h%2)*{chunks}+c+{blk})"),
                   in_edges={n(f"E_qkv_{L}"): "hc->(0)" if kvs else "hc->(h/2)"},
-                  out_edges={n(f"E_attn_{L}"): "hc->h"}, duration_us=DUR["attn"], duration_cv=0.1)
-    g.call_device(n(f"merge_{L}"), (HEADS, KV_CHUNKS), _tile("fleet_merge_uv"), resource=_res(paired=q.paired), args=[q.fleet, f"layer_{L}"],
-                  consts=(L, q.r), domain_map="hc->(h/2)", worker_map=q.wmap("hc->((h%2)*16+c+OFF)"),
-                  in_edges={n(f"E_attn_{L}"): "hc->h"}, out_edges={n(f"E_merge_{L}"): "hc->(h/2)"}, duration_us=DUR["merge"])
+                  out_edges={n(f"E_attn_{L}"): "hc->h"}, duration_us=(ATTN_XB_DUR if axb else DUR)["attn"], duration_cv=0.1)
+    g.call_device(n(f"merge_{L}"), (HEADS, chunks), _tile("fleet_merge_uv8" if axb else "fleet_merge_uv"), resource=_res(paired=q.paired), args=[q.fleet, f"layer_{L}"],
+                  consts=(L, q.r), domain_map="hc->(h/2)", worker_map=q.wmap(f"hc->((h%2)*{chunks}+c+{blk})"),
+                  in_edges={n(f"E_attn_{L}"): "hc->h"}, out_edges={n(f"E_merge_{L}"): "hc->(h/2)"},
+                  duration_us=(ATTN_XB_DUR if axb else DUR)["merge"])
     if not xbo:
         _chiplet(g, q, f"oproj_{L}", "fleet_o_proj", L, {n(f"E_merge_{L}"): "xw->x"}, {n(f"E_oproj_{L}"): "xw->(0)"},
                  DUR["oproj"])

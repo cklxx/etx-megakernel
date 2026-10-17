@@ -548,3 +548,51 @@ __device__ __forceinline__ void norm_router_spread(const etx_ctx* c) {
 }  // namespace etx_xb
 extern "C" __device__ void fleet_norm_router_spread(const etx_ctx* c) { etx_xb::norm_router_spread(c); }
 #endif
+#if defined(ETX_DSV2_ATTN_XB) && ETX_DSV2_ATTN_XB
+// ETX_DSV2_ATTN_XB=1 (graph.py build_attention_block; the arm passes -DETX_DSV2_ATTN_XB=1; B = 4 only): attention
+// blocking. Each request's attention and merge grids are (16 heads, kAttnXbChunks) instead of (16, kMaxKvChunks = 16),
+// on a 16-worker block of the request's slot, so the 2 requests of a slot run in one wave. The bodies are fleet's
+// TASK_ATTENTION and TASK_MERGE_UV with n_split = kAttnXbChunks, a compile-time constant (fleet_shim.hip passes
+// kMaxKvChunks). fleet takes the chunk count at run time: attention_chunk splits the positions into
+// ceil(seq_len / n_split) per chunk, the partials of head h go to attn_partial + h * n_split * kPartialStride, and
+// merge_and_uv merges n_split partials (its loops are unrolled to kMaxKvChunks and predicated) and applies the task's
+// v_head / n_split = 16 W_UV rows from row kv_chunk * 16. The KV cache writer stays head 0, chunk 0. The merge order
+// changes (8 partials, not 16), so the result is not bitwise the 16-chunk result (tests/test_dsv2_attn_xb.py states
+// the tolerance). Same FleetParams, stamps and in-body q_c wait as fleet_attention: no new kernel argument, no new
+// base address, no new LDS. Compiled only in that build, so the x4xbor translation unit is unchanged.
+namespace etx_xb {
+constexpr int kAttnXbChunks = 8;
+static_assert(kAttnXbChunks <= fleet::kMaxKvChunks, "merge_and_uv unrolls to kMaxKvChunks partials");
+static_assert(fleet::kMaxKvChunks % kAttnXbChunks == 0, "v_head / n_split W_UV rows per merge task");
+template <int kFlags>
+__device__ __forceinline__ void attention8(const etx_ctx* c) {   // fleet_attention with n_split = kAttnXbChunks
+  const FleetParams* fp = FP(c);
+  const int32_t L = LAYER(c);
+  fleet::TaskDescriptor t{};
+  t.kind = fleet::TASK_ATTENTION; t.layer = (int16_t)L; t.xcd = (int16_t)c->domain; t.worker = 0;
+  t.wait_event = -1; t.signal_event = -1; t.n_split = kAttnXbChunks; t.head = (int16_t)c->coord[0];
+  t.kv_chunk = (int16_t)c->coord[1]; t.expert_slot = -1; t.wait_count = fleet::kQAbsSlices;
+  t.local_event = (int16_t)QABS_EVENT(L, c->coord[0]); t.flags = (decltype(t.flags))kFlags;
+  fleet::TokenCtx tc;
+  tc.tok = fp->tok; tc.epoch = fp->epoch; tc.pos = fp->pos; tc.seq_len = fp->pos + 1;
+  tc.cos = fp->act.cos + (int64_t)fp->pos * fp->d.qk_rope; tc.sin = fp->act.sin + (int64_t)fp->pos * fp->d.qk_rope;
+  tc.dump = fp->dump != 0; tc.trace = false;
+  fleet::Activations& act = *const_cast<fleet::Activations*>(&fp->act);
+  fleet::KVCache& kv = *const_cast<fleet::KVCache*>(&fp->kv);
+  fleet::Scratch& s = *reinterpret_cast<fleet::Scratch*>(c->lds);
+  uint64_t t0 = 0;
+  pro_begin(fp, tc, s, t0);
+  fleet::run_task(t, fp->rt, fp->d, fp->w, act, kv, s, tc, (int)c->domain, 0);
+  pro_end(fp, s, PRO_SLOT(L, fleet::TASK_ATTENTION, c), t0);
+}
+}  // namespace etx_xb
+extern "C" __device__ void fleet_attention8(const etx_ctx* c) { etx_xb::attention8<fleet::FLAG_PUB_WAIT>(c); }
+#if defined(ETX_DSV2_KVA_SHARED) && ETX_DSV2_KVA_SHARED
+extern "C" __device__ void fleet_attention8_kvs(const etx_ctx* c) {
+  etx_xb::attention8<fleet::FLAG_PUB_WAIT | fleet::FLAG_KVA_SHARED>(c);
+}
+#endif
+extern "C" __device__ void fleet_merge_uv8(const etx_ctx* c) {
+  fleet_call(c, fleet::TASK_MERGE_UV, 0, c->coord[0], c->coord[1], etx_xb::kAttnXbChunks, -1, 0);
+}
+#endif
