@@ -18,17 +18,26 @@ This document gives the rules for GPU experiments in this repository.
 
 ### Same-machine A/B script
 
-`tools/ab_same_box.py` applies these rules. It runs three arms on one machine: A (baseline), B (candidate) and C (a second copy of A, the control). The arm order rotates each round. Use 3 rounds or more.
+`tools/ab_same_box.py` applies these rules. It runs three arms on one machine: A (baseline), B (candidate) and C (a second copy of A, the control).
 
 ```sh
 python tools/ab_same_box.py --a "<baseline run>" --b "<candidate run>" \
-    --metric 'step_ms=([\d.]+)' --rounds 5 --label qkv_b4 --out examples/gpu-live/results/<date>-<name>
+    --metric 'step_ms=([\d.]+)' --rounds 6 --min-gain 1 --label qkv_b4 \
+    --identity-cmd "ssh <gpu host> 'hostname; rocm-smi --showserial --json'" \
+    --out examples/gpu-live/results/<date>-<name>
 ```
 
+- Warm-up: each arm runs once before round 0. The warm-up values do not count. `ab.log` records them as `ABWARM` lines.
+- Order: the rounds cycle through all 6 orders of A, B and C. Each arm is in each position equally often. Each arm runs directly after each other arm equally often. `--rounds` must be a multiple of 6. The default is 6.
 - The paired gain of each round is `A/B - 1`. The control gain is `A/C - 1`. It measures the noise of the machine.
-- WIN: every gain is above 0 and the median gain is above the largest control gain. LOSS is the same rule with the opposite sign. Any other result is NO-DIFF.
-- INCOMPLETE: a run exits nonzero, a run prints no value, or the machine identity (host name and GPU serial) changes during the session.
-- The script writes `ab.log`. Add `ab.log` to the experiment's `inputs` in `registry.json`. `tools/extract_key.py` then puts the result into `comparisons` and each run into `runs`.
+- `p` is the one-sided exact sign-test p-value of the gains. 6 positive gains out of 6 give p = 0.5^6 = 0.0156.
+- WIN: every gain is above 0, the median gain is above max(`--min-gain`, max |control|), and p <= 0.05. LOSS is the same rule with the opposite sign. Any other result is NO-DIFF. `--min-gain` is in percent. The default is 0.
+- INCOMPLETE: a run exits nonzero or times out, a run prints no value, a value is not a positive number, the identity command fails, or the machine identity changes. The script stops at the first problem. `ab.log` and `ab.json` keep the completed runs.
+- `--metric` must have exactly one group. Otherwise the script exits with code 2 before any run.
+- Machine identity: the script reads it at the start, before every round and at the end. The default is the local host name and GPU serial. When the runs go over ssh, give `--identity-cmd`. Otherwise the check reads the controller, not the GPU host. An `ABWARN` line shows that no GPU serial was read.
+- The commands run in a shell. Do not pass untrusted text. `--label` must not contain white space.
+- The exit code is 0 for WIN, LOSS and NO-DIFF, 1 for INCOMPLETE and 2 for bad arguments.
+- The script writes `ab.log`. Add `ab.log` to the experiment's `inputs` in `registry.json`. `tools/extract_key.py` then puts the result into `comparisons` and each run into `runs`. An INCOMPLETE session gives an `INCOMPLETE` comparison row and the verdict INCOMPLETE. `tools/check_results.py` prints each verdict and lists every experiment that is not COMPLETE on a `NOT COMPLETE` line.
 
 ## Result files
 
@@ -43,6 +52,7 @@ The extractor keeps only the lines that a pattern in `PATTERNS` matches. The pat
 
 | Kind | Examples |
 |---|---|
+| `ab` | `tools/ab_same_box.py` lines: `ABREPORT`, `ABRUN`, `ABWARM`, `ABMACHINE`, `ABWARN` |
 | `resource` | Compiler remarks: VGPRs, AGPRs, ScratchSize, SGPRs Spill, VGPRs Spill, LDS Size, Occupancy |
 | `build` | `BUILD arm=... resources={...}` |
 | `exit` | Runner job results: `ok name rc=0`, `fail name rc=1` |

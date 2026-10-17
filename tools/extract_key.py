@@ -30,6 +30,9 @@ MAX_TEXT = 300
 # Pattern registry. The first matching kind wins, in this order.
 # Add a pattern here when a new runner prints a new key line.
 PATTERNS = [
+    # tools/ab_same_box.py lines. This kind is first, so free text in these lines (an identity string, a
+    # reason) cannot make them an error or a gate line.
+    ("ab", re.compile(r"^AB(REPORT|RUN|WARM|MACHINE|WARN)\b")),
     # Compiler resource remarks (-Rpass-analysis=kernel-resource-usage).
     ("resource", re.compile(r"remark: +(Function Name|VGPRs|AGPRs|ScratchSize \[bytes/lane\]|SGPRs Spill"
                             r"|VGPRs Spill|LDS Size \[bytes/block\]|Occupancy \[waves/SIMD\]): (\S+)")),
@@ -43,17 +46,18 @@ PATTERNS = [
     # Correctness gates and completion seals.
     ("gate", re.compile(r"\bBGATE\b|\bSEALED\b|\bB4-RESULT\b|\bGATE\b|\b(PASS|FAIL)\b|\b\d+ (passed|failed)\b")),
     # Timing summary lines.
-    # ABREPORT and ABRUN come from tools/ab_same_box.py; ABRUN rc!=0 also counts as a failed run.
-    ("timing", re.compile(r"\bBREPORT\b|\bABREPORT\b|\bABRUN\b|\bTRACE COMPLETE\b|\bmedian\b")),
+    ("timing", re.compile(r"\bBREPORT\b|\bTRACE COMPLETE\b|\bmedian\b")),
     # Experiment identity.
     ("meta", re.compile(r"Marketing Name:\s+(AMD|NVIDIA)|\bgfx9\d\d\b|\bMI300X\b|\b[0-9a-f]{40}\b")),
 ]
 
 BREPORT = re.compile(r"BREPORT b=(\d+) vs vLLM (\S+): throughput (\w+) median ([+-]?[\d.]+)% spread ([\d.]+)%"
                      r".*?per-request latency (\w+) median ([+-]?[\d.]+)% spread ([\d.]+)%")
-ABREPORT = re.compile(r"ABREPORT label=(\S+) B vs A: gain median ([+-]?[\d.]+)% spread ([\d.]+)% "
-                      r"control median ([+-]?[\d.]+)% spread ([\d.]+)% rounds=(\d+) verdict=(\S+)")
-ABRUN = re.compile(r"ABRUN round=(\d+) arm=(\w) rc=(-?\d+)")
+ABREPORT = re.compile(r"^ABREPORT label=(\S+) B vs A: gain median ([+-]?[\d.]+)% spread ([\d.]+)% "
+                      r"control median ([+-]?[\d.]+)% spread ([\d.]+)%(?: max\|control\| ([\d.]+)%)? "
+                      r"rounds=(\d+)(?: p=([\d.eE+-]+))?(?: min_gain=([\d.eE+-]+)%)? verdict=(\S+)")
+ABREPORT_INCOMPLETE = re.compile(r"^ABREPORT label=(\S+) verdict=(\S+) reason=(.*)$")
+ABRUN = re.compile(r"^AB(RUN|WARM) (?:round=(\d+) )?arm=(\w) rc=(-?\d+|timeout)")
 TRACE = re.compile(r"TRACE COMPLETE round=(\d+) b=(\d+) tasks=(\d+) span_us=([\d.]+)")
 META = {
     "commit": re.compile(r"(?:[Cc]ommit|revision)[^0-9a-f\n]{0,20}([0-9a-f]{40})\b"),
@@ -108,6 +112,7 @@ def extract(directory: Path, entry: dict) -> dict:
         names += [p for p in found if p not in names]
     sources, lines = [], []
     builds, runs, gates, errors, comparisons, traces, resources = [], [], [], [], [], [], []
+    ab_reports = []  # the verdict of each ABREPORT line
     meta = {}
     for path in names:
         rel = Path(os.path.relpath(path, directory)).as_posix()
@@ -137,22 +142,40 @@ def extract(directory: Path, entry: dict) -> dict:
                 errors.append(dict(text=text.strip()[:MAX_TEXT], src=src))
             elif kind == "gate":
                 gates.append(dict(text=text.strip()[:MAX_TEXT], verdict=gate_verdict(text), src=src))
+            elif kind == "ab":
+                ab = ABREPORT.search(text)
+                abi = ABREPORT_INCOMPLETE.search(text)
+                abr = ABRUN.search(text)
+                if ab:
+                    label, gmed, gspr, cmed, cspr, noise, rounds, p, min_gain, outcome = ab.groups()
+                    metric = f"paired gain, {rounds} rounds, control median {cmed}% spread {cspr}%"
+                    if noise is not None:
+                        metric += f", max |control| {noise}%"
+                    if p is not None:
+                        metric += f", sign test p={p}"
+                    if min_gain is not None:
+                        metric += f", min gain {min_gain}%"
+                    comparisons.append(dict(batch=label, baseline="A (same machine, interleaved)", metric=metric,
+                                            outcome=outcome, median_pct=float(gmed), spread_pct=float(gspr),
+                                            src=src))
+                    ab_reports.append(outcome)
+                elif abi:
+                    label, outcome, reason = abi.groups()
+                    comparisons.append(dict(batch=label, baseline="A (same machine, interleaved)",
+                                            metric=f"no paired gain: {reason}"[:MAX_TEXT], outcome=outcome,
+                                            median_pct=None, spread_pct=None, src=src))
+                    ab_reports.append(outcome)
+                elif abr:
+                    tag, rnd, arm, rc = abr.groups()
+                    job = f"ab r{rnd} {arm}" if tag == "RUN" else f"ab warm-up {arm}"
+                    if rc == "timeout":
+                        runs.append(dict(job=job, status="timeout", rc=None, src=src))
+                    else:
+                        runs.append(dict(job=job, status="ok" if rc == "0" else "fail", rc=int(rc), src=src))
             elif kind == "timing":
                 b = BREPORT.search(text)
                 t = TRACE.search(text)
-                ab = ABREPORT.search(text)
-                abr = ABRUN.search(text)
-                if ab:
-                    label, gmed, gspr, cmed, cspr, rounds, outcome = ab.groups()
-                    comparisons.append(dict(batch=label, baseline="A (same machine, interleaved)",
-                                            metric=f"paired gain, {rounds} rounds, control median {cmed}% "
-                                                   f"spread {cspr}%", outcome=outcome,
-                                            median_pct=float(gmed), spread_pct=float(gspr), src=src))
-                elif abr:
-                    rnd, arm, rc = abr.groups()
-                    runs.append(dict(job=f"ab r{rnd} {arm}", status="ok" if rc == "0" else "fail", rc=int(rc),
-                                     src=src))
-                elif b:
+                if b:
                     batch, base, tout, tmed, tspr, lout, lmed, lspr = b.groups()
                     comparisons += [
                         dict(batch=int(batch), baseline=f"vLLM {base}", metric="throughput gain", outcome=tout,
@@ -183,6 +206,10 @@ def extract(directory: Path, entry: dict) -> dict:
         verdict, reason = "FAIL", "a correctness gate line reports FAIL"
     elif any(g["verdict"] == "INCOMPLETE" for g in gates):
         verdict, reason = "INCOMPLETE", "a gate or seal line reports INCOMPLETE"
+    elif any(v not in ("WIN", "LOSS", "NO-DIFF") for v in ab_reports):
+        verdict, reason = "INCOMPLETE", "an A/B report line (ABREPORT) reports INCOMPLETE"
+    elif any(r["job"].startswith("ab ") for r in runs) and not ab_reports:
+        verdict, reason = "INCOMPLETE", "A/B runs (ABRUN) are present but no ABREPORT line"
     elif any(r["rc"] != 0 for r in runs) or any(e["rc"] != 0 for e in exits):
         verdict, reason = "INCOMPLETE", "a job or exit receipt is nonzero"
     elif errors:
