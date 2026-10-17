@@ -222,7 +222,9 @@ def test_arms_differ_from_their_reference_only_by_the_switch():
     from examples.dsv2lite.arms import ARMS, build_env
     for n in (2, 4):
         a, b = ARMS[f"x{n}"], ARMS[f"x{n}xb"]
-        assert (b.levers, b.flags, b.scratch_allow) == (a.levers, a.flags, a.scratch_allow)
+        assert (b.levers, b.flags) == (a.levers, a.flags)
+        # x2xb: x2's allowance; x4xb: the measured ROCm 7.14 figure, 16 B over x4 (arms.py)
+        assert b.scratch_allow == {2: a.scratch_allow, 4: 80}[n] and ARMS["x4"].scratch_allow == 64
         assert build_env(b) == {**build_env(a), "ETX_DSV2_QKV_XB": "1"}
         assert f"-DETX_DS_REQUESTS={n}" in b.flags and b.rule is None and b.order == ()
     assert "ETX_DSV2_QKV_XB" not in ARMS["x4"].env

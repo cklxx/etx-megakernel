@@ -124,12 +124,17 @@ ARMS = {a.name: a for a in [
     # Threshold, written before any GPU measurement: KEEP only if every token gate of x<n>xb passes and the same-box A/B
     # (tools/ab_same_box.py, 6 rounds in all 6 orders, A = x<n>, B = x<n>xb) gives every round faster, sign-test
     # p <= 0.05 and a median step gain >= 0.28 ms (the low end of the CPU estimate for B = 4); otherwise DROP.
-    # Resources, local compiles of etx_megakernel_d0 (VGPR + AGPR, scratch B/lane, workgroups per CU):
-    #   ROCm 7.2.4 (the GPU box's compiler): x2 248 + 6, 16, 2;  x2xb 248 + 6, 16, 2;  x4 248 + 6, 64, 2;  x4xb 248 + 6, 64, 2
-    #   ROCm 7.14:                           x2 256 + 0, 32, 2;  x4 256 + 0, 64, 2;  x4xb 256 + 0, 80, 2 (16 B over x4)
-    # Allowance: x<n>'s own; the session also refuses fewer than 2 workgroups per CU (inplace_session.required_wg_per_cu).
+    # Resources, local compiles of etx_megakernel_d0 (VGPR + AGPR, scratch B/lane, workgroups per CU), 2026-10-17:
+    #   ROCm 7.14 (the GPU machine's compiler; its 2026-10-14 compiles above match this column):
+    #               x2 256 + 0, 32, 2;  x2xb 256 + 0, 32, 2;  x4 256 + 0, 64, 2;  x4xb 256 + 0, 80, 2
+    #   ROCm 7.2.4: x2 248 + 6, 16, 2;  x2xb 248 + 6, 16, 2;  x4 248 + 6, 64, 2;  x4xb 248 + 6, 64, 2 (no VGPR headroom:
+    #               2 more VGPRs give 1 workgroup per CU, which the session's occupancy gate refuses)
+    # Allowance: x2xb x2's 64; x4xb the measured 80 (x4: 64). The extra 16 B on 7.14 is not one live range: it moves with
+    # the megakernel's whole allocation (both xb tiles together; either alone stays at 64), and none of single weight
+    # buffer, serialized staging, one-chunk staging, a shared symbol for both tiles, or scheduling barriers removed it.
+    # The session also refuses fewer than 2 workgroups per CU (inplace_session.required_wg_per_cu).
     *(Arm(f"x{n}xb", levers=ARMS_X[n].levers, flags=ARMS_X[n].flags, env=dict(ARMS_X[n].env, ETX_DSV2_QKV_XB="1"),
-          scratch_allow=ARMS_X[n].scratch_allow)
+          scratch_allow={2: ARMS_X[2].scratch_allow, 4: 80}[n])
       for n in (2, 4)),
     # B = 8 is a diagnostic: with M1 alone the eight-request gate failed (request 5, 3/27 layers), so the three
     # recipes are built side by side and the gate says which one is correct at eight requests. x8p is the plain
