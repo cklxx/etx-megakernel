@@ -28,6 +28,10 @@ fi
 OUT=${1:-$ROOT/build/dsv2lite-rocm22}
 mkdir -p "$OUT"; OUT="$(cd "$OUT" && pwd)"
 if [ -e "$FLEET/.git" ]; then echo 'refusing a fleet checkout; use git archive 3fb67a6' >&2; exit 2; fi
+PY="$ROOT/.venv/bin/python"; [ -x "$PY" ] || PY=python3
+(cd "$ROOT" && "$PY" -c 'import sys; from pathlib import Path; from examples.dsv2lite.pinned import source_sha, FLEET_SRC_SHA256, FLEET_COMMIT
+got = source_sha(Path(sys.argv[1]) / "src")
+sys.exit(0 if got == FLEET_SRC_SHA256 else f"fleet source {sys.argv[1]}/src is not the pinned fleet {FLEET_COMMIT}: {got} != {FLEET_SRC_SHA256}")' "$FLEET" ) || exit 2
 if ! docker image inspect etx-rocm22 >/dev/null 2>&1; then
   echo 'Missing local image. Not pulling or building.' >&2
   echo 'docker build --platform linux/amd64 -t etx-rocm22 -f examples/vllm_llm/rocm_build_check.Dockerfile .' >&2

@@ -19,6 +19,7 @@ else ARM=${1:?arm}; shift; fi
 OUT=${1:-$ROOT/build/dsv2lite-local-$TC}
 mkdir -p "$OUT"; OUT="$(cd "$OUT" && pwd)"
 if [ -e "$FLEET/.git" ]; then echo 'refusing a fleet checkout; use git archive 3fb67a6' >&2; exit 2; fi
+cd "$ROOT"
 case "$TC" in
   7.2.4) S=${ETX_ROCM_724:-/workspace/rocm724deb/stage/opt/rocm-7.2.4}; RL=$S/lib/llvm; DL=$S/amdgcn/bitcode; INC=$S/include;;
   7.14)  S=${ETX_ROCM_714:-/workspace/rocm714venv/lib/python3.13/site-packages/_rocm_sdk_core}; RL=$S/lib/llvm
@@ -28,6 +29,11 @@ esac
 for f in "$RL/bin/clang++" "$RL/bin/llvm-mc" "$RL/bin/llvm-objcopy" "$DL/ockl.bc" "$INC/hip/hip_runtime.h"; do
   [ -e "$f" ] || { echo "local ROCm $TC incomplete: missing $f" >&2; exit 2; }
 done
+# the fleet source must be the pinned export (examples/dsv2lite/pinned.py FLEET_SRC_SHA256): a build from another fleet
+# commit gives other resource numbers under the same arm name
+"$PY" -c 'import sys; from pathlib import Path; from examples.dsv2lite.pinned import source_sha, FLEET_SRC_SHA256, FLEET_COMMIT
+got = source_sha(Path(sys.argv[1]) / "src")
+sys.exit(0 if got == FLEET_SRC_SHA256 else f"fleet source {sys.argv[1]}/src is not the pinned fleet {FLEET_COMMIT}: {got} != {FLEET_SRC_SHA256}")' "$FLEET" || exit 2
 if [ -n "$REGISTERED" ]; then
   # an arm never inherits ambient plan switches or flags (as rocm_build_check.sh --arm and the session)
   while IFS= read -r name; do case "$name" in ETX_*|FLEET_*) unset "$name";; esac; done < <(compgen -e)

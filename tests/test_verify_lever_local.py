@@ -82,3 +82,20 @@ def test_committed_d4_records_have_the_report_fields():
         assert {"resources", "static"} <= set(rec["arm_build"]) and "summary" in rec["cpu_gates"]
         assert rec["compiler"]["mode"] in ("docker", "local") and rec["compiler"]["clang_commit"]
         assert rec["verdict"] == "PASS" and "prior_record" in rec
+
+
+def test_local_script_refuses_an_unpinned_fleet_source(tmp_path):
+    """A fleet export whose src hash is not pinned.FLEET_SRC_SHA256 (e.g. a copy of another fleet commit) fails the build."""
+    import sys
+    rocm = tmp_path / "rocm"
+    for f in ["lib/llvm/bin/clang++", "lib/llvm/bin/llvm-mc", "lib/llvm/bin/llvm-objcopy", "amdgcn/bitcode/ockl.bc",
+              "include/hip/hip_runtime.h"]:
+        (rocm / f).parent.mkdir(parents=True, exist_ok=True)
+        (rocm / f).write_text("")
+    fleet = tmp_path / "fleet"
+    (fleet / "src").mkdir(parents=True)
+    (fleet / "src/kernel.hip").write_text("// not fleet 3fb67a6\n")
+    r = subprocess.run(["bash", str(SCRIPT), "7.2.4", str(fleet), "default", str(tmp_path / "o")], capture_output=True, text=True,
+                       env={"PATH": "/usr/bin:/bin", "ETX_ROCM_724": str(rocm), "ETX_PYTHON": sys.executable})
+    assert r.returncode == 2 and "is not the pinned fleet 3fb67a6" in r.stderr
+    assert not (tmp_path / "o/default").exists()
