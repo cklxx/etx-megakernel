@@ -210,17 +210,26 @@ __device__ __forceinline__ void gemv_rows_xb(const __hip_bfloat16* __restrict__ 
       }                                                                                     \
     }                                                                                       \
   }
+  // the loop of lever gemv_no_terminal_all: the last group is peeled, so no wave issues the loads of a group it does
+  // not reduce (the unpatched loop issued group k + stride before it checked k + stride < cnt). Same reduces, same
+  // order, so the outputs do not change.
   XB_ISSUE(bufA, k)
-  while (true) {
+  while (k + 2 * stride < cnt) {
     const int k2 = k + stride;
     XB_ISSUE(bufB, k2)
     XB_REDUCE(bufA, k)
-    if (k2 >= cnt) break;
     const int k3 = k2 + stride;
     XB_ISSUE(bufA, k3)
     XB_REDUCE(bufB, k2)
-    if (k3 >= cnt) break;
     k = k3;
+  }
+  if (k + stride < cnt) {
+    const int k2 = k + stride;
+    XB_ISSUE(bufB, k2)
+    XB_REDUCE(bufA, k)
+    XB_REDUCE(bufB, k2)
+  } else {
+    XB_REDUCE(bufA, k)
   }
 #undef XB_ROW
 #undef XB_ISSUE
