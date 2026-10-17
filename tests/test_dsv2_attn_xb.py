@@ -32,7 +32,21 @@ from examples.dsv2lite import graph as dsv
 
 ROOT = Path(__file__).resolve().parents[1]
 XB_SRC = (ROOT / dsv.XB_T).read_text()
-FLEET_SRC = Path(os.environ.get("ETX_FLEET_SRC", "/workspace/fleet-mi300x/src"))
+
+
+def _pinned_fleet_src():
+    """fleet's src at the pinned commit (pinned.fleet_export(): hash-checked export, never the fleet working tree).
+
+    No export and no fleet repository: None (the fleet tests skip). A wrong tree: pinned.py raises.
+    """
+    from examples.dsv2lite.pinned import fleet_export
+    try:
+        return fleet_export() / "src"
+    except FileNotFoundError:
+        return None
+
+
+FLEET_SRC = _pinned_fleet_src()
 N_REQ, LAYERS, CH = 4, 3, 8
 
 # 0c641ec (PR #25 head), 3 layers, PassOptions(inline_tiles=True, relay="on"), env = arms.build_env(arm):
@@ -306,7 +320,7 @@ def test_arm():
 
 
 # ---------------------------------------------------------------- levers with 8 chunks
-needs_fleet = pytest.mark.skipif(not (FLEET_SRC / "kernels/fleet_kernel.hip").exists(), reason="pinned fleet source not present")
+needs_fleet = pytest.mark.skipif(FLEET_SRC is None, reason="pinned fleet export not present")
 
 
 def _rows_of_pipelined(rpi, cnt, waves=4):
