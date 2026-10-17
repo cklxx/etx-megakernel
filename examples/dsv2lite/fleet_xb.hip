@@ -163,6 +163,9 @@ __device__ __forceinline__ void unpack8(const uint4& u, float* x8) {
 // Same software pipeline as gemv_rows_pipelined (two groups in flight, unconditional loads clamped to the last row,
 // masked FMAs) with kRPI rows per group. x: slot(s, j) at lane + 64 dd (fixed LDS offsets; chunks past K are read but
 // masked). ys: the B output pointers, in LDS, read by the storing lane.
+// kNoTerminal (lever gemv_no_terminal_all's loop, used by fleet_lm_head_xb only): the last group issues no dead
+// clamped group after it. false is the qkv tile's loop, unchanged.
+template <bool kNoTerminal = false>
 __device__ __forceinline__ void gemv_rows_xb(const __hip_bfloat16* __restrict__ w, int ld, fleet::Scratch& s,
                                              float* const* ys, int N, int K, int xcd, int n_xcds, int worker,
                                              int n_workers) {
@@ -223,16 +226,36 @@ __device__ __forceinline__ void gemv_rows_xb(const __hip_bfloat16* __restrict__ 
     }                                                                                       \
   }
   XB_ISSUE(bufA, k)
-  while (true) {
-    const int k2 = k + stride;
-    XB_ISSUE(bufB, k2)
-    XB_REDUCE(bufA, k)
-    if (k2 >= cnt) break;
-    const int k3 = k2 + stride;
-    XB_ISSUE(bufA, k3)
-    XB_REDUCE(bufB, k2)
-    if (k3 >= cnt) break;
-    k = k3;
+  if constexpr (kNoTerminal) {
+    while (k + 2 * stride < cnt) {
+      const int k2 = k + stride;
+      XB_ISSUE(bufB, k2)
+      XB_REDUCE(bufA, k)
+      const int k3 = k2 + stride;
+      XB_ISSUE(bufA, k3)
+      XB_REDUCE(bufB, k2)
+      k = k3;
+    }
+    if (k + stride < cnt) {
+      const int k2 = k + stride;
+      XB_ISSUE(bufB, k2)
+      XB_REDUCE(bufA, k)
+      XB_REDUCE(bufB, k2)
+    } else {
+      XB_REDUCE(bufA, k)
+    }
+  } else {
+    while (true) {
+      const int k2 = k + stride;
+      XB_ISSUE(bufB, k2)
+      XB_REDUCE(bufA, k)
+      if (k2 >= cnt) break;
+      const int k3 = k2 + stride;
+      XB_ISSUE(bufA, k3)
+      XB_REDUCE(bufB, k2)
+      if (k3 >= cnt) break;
+      k = k3;
+    }
   }
 #undef XB_ROW
 #undef XB_ISSUE
@@ -462,15 +485,19 @@ __device__ __forceinline__ void lm_head(const etx_ctx* c) {
   }
   __syncthreads();
   const bool coh = run_task_coh(fq->rt);
-  if ((int)threadIdx.x < d.hidden / 8) {
+  // the thread index through an empty asm, as in oproj(): with threadIdx.x the staging offsets were hoisted out of
+  // the task loop (local ROCm 7.2.4 compile: 251 + 6 VGPRs, 1 workgroup per CU; with the asm: 248 + 6, 2)
+  int t = (int)threadIdx.x;
+  asm volatile("" : "+v"(t));
+  if (t < d.hidden / 8) {
 #pragma unroll
     for (int j = 0; j < kB; ++j)
-      slot(s, j)[threadIdx.x] = ld_act16(reinterpret_cast<const uint4*>(tab[2 * kMaxB + j]) + threadIdx.x, coh);
+      slot(s, j)[t] = ld_act16(reinterpret_cast<const uint4*>(tab[2 * kMaxB + j]) + t, coh);
   }
   __syncthreads();
   // fleet: gemv_rows(w.lm_head, d.hidden, s.vec, act.logits, nullptr, EPI_BF16, 1.f, d.vocab, d.hidden, xcd,
   // kNumXCDs, worker, nw), here with 74 workers
-  gemv_rows_xb(wl, d.hidden, s, reinterpret_cast<float* const*>(tab), d.vocab, d.hidden, xcd, fleet::kNumXCDs, worker, nw);
+  gemv_rows_xb<true>(wl, d.hidden, s, reinterpret_cast<float* const*>(tab), d.vocab, d.hidden, xcd, fleet::kNumXCDs, worker, nw);
 }
 
 // ---------------------------------------------------------------- fleet_xb_lm_cand
