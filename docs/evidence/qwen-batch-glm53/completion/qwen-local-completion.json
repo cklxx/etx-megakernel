@@ -1,0 +1,95 @@
+{
+  "2": {
+    "status": "LOCAL-COMPILED",
+    "compiler": "ROCm 7.2.4 clang 22",
+    "flags": [
+      "-O3",
+      "-DETX_DSL_NT",
+      "-DETX_DSL_VECNORM"
+    ],
+    "tasks": 120724,
+    "types": 872,
+    "imported_per_position": 194,
+    "old_source_bytes": 1083325,
+    "source_bytes": 225955,
+    "unchanged_plan_fields": [
+      "types",
+      "events",
+      "descs",
+      "args",
+      "static_queues",
+      "task_in"
+    ],
+    "hashes": {
+      "plan.json": "5a6d71bfe4cdb291b662e2b06e1686552b4bb0c400aef42b1c5aa873958f0a79",
+      "megakernel_d0.hip": "e82d484c1bc20436c9c120caf21d8905a760f09082e73c2e67fcc5ead2409e8e",
+      "imports.bc": "9c5d4de99add973441c2f065affacf82cb1e1f44acf1beeecc51d8d66c2e3683",
+      "mk.s": "386a4c67934cf61052d77dda5d056aa3638bd482776a01cf1d3b8d1640799580",
+      "resource.log": "9a036790418dd5ce3c4542809c48ea1c4f34abbd72262f422d08e1f03f06ea6f",
+      "host_dev.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "gpu_correctness": "unmeasured"
+  },
+  "4": {
+    "status": "LOCAL-COMPILED",
+    "compiler": "ROCm 7.2.4 clang 22",
+    "flags": [
+      "-O3",
+      "-DETX_DSL_NT",
+      "-DETX_DSL_VECNORM"
+    ],
+    "tasks": 241448,
+    "types": 1744,
+    "imported_per_position": 388,
+    "old_source_bytes": 2161930,
+    "source_bytes": 440229,
+    "unchanged_plan_fields": [
+      "types",
+      "events",
+      "descs",
+      "args",
+      "static_queues",
+      "task_in"
+    ],
+    "hashes": {
+      "plan.json": "22753556550044489fa99c7bacc3d2c8f0b9df3826174414a5f75129f6c141e1",
+      "megakernel_d0.hip": "85aca535a6c8ea297b1aaf3ed361c7a7ca718335ba4dd9bacc521ae299b87739",
+      "imports.bc": "9c5d4de99add973441c2f065affacf82cb1e1f44acf1beeecc51d8d66c2e3683",
+      "mk.s": "eb2fa1eb5a40032b0d2422d1ae097c344fe220046c44c92c6dc3e312091014e3",
+      "resource.log": "c2431fbc1fe1a7a08ff6e73434f54db67b2190715fcb64ee179b53572382ffff",
+      "host_dev.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "gpu_correctness": "unmeasured"
+  },
+  "8": {
+    "status": "LOCAL-COMPILED",
+    "compiler": "ROCm 7.2.4 clang 22",
+    "flags": [
+      "-O3",
+      "-DETX_DSL_NT",
+      "-DETX_DSL_VECNORM"
+    ],
+    "tasks": 482896,
+    "types": 3488,
+    "imported_per_position": 776,
+    "old_source_bytes": 4323708,
+    "source_bytes": 873339,
+    "unchanged_plan_fields": [
+      "types",
+      "events",
+      "descs",
+      "args",
+      "static_queues",
+      "task_in"
+    ],
+    "hashes": {
+      "plan.json": "d94977447a43a19de51739b90b8b637d829890fe6cab848a7b8c61a64092f5a4",
+      "megakernel_d0.hip": "4ebe2f16780d8fd986dfbd9c8d5ee3b41605b93a0c7a3fa06641d6a5c241c13a",
+      "imports.bc": "9c5d4de99add973441c2f065affacf82cb1e1f44acf1beeecc51d8d66c2e3683",
+      "mk.s": "de5725649941b0c11bc1816533bb7b8929a3998ec8fc5c7bc8ae6bb657454fe4",
+      "resource.log": "1f730d478d041c411fe17a017c525312beafa415249d462182a9eb9fa899e2d4",
+      "host_dev.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "gpu_correctness": "unmeasured"
+  }
+}

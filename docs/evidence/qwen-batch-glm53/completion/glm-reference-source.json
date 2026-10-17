@@ -1,0 +1,10 @@
+{
+  "transformers_version": "5.19.0",
+  "files": {
+    "models/glm5_next/modeling_glm5_next.py": "a56b3f59f79c4430505bbc85557e0abdc35098561b831ab79cf14661aac1f6a5",
+    "models/glm5_next/configuration_glm5_next.py": "d1e8e803a97b1cb996cc53261265fac25ec5f17e1f2449e77e6e74402b2298a9",
+    "conversion_mapping.py": "59e4657cf685e436cbce5340bda1dfa26d33bcd0c0086098565cdc4dc603e603"
+  },
+  "purpose": "Independent local numerical reference and checkpoint name/shape conversion specification",
+  "weight_downloads": false
+}

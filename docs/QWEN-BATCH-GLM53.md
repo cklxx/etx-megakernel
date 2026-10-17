@@ -267,3 +267,19 @@ all-request coverage and exact 32/32 in both free-greedy modes/repetitions. Reco
 device/runtime conditions in its session record. Only after that passes should
 the two-GPU transport experiment proceed. No performance tuning or winner is
 part of this preparation.
+
+## Completion continuation, 2026-10-17
+
+The compiler memory failure is fixed in the emitter: large dispatches now share
+identical control flow and load their differing integer constants from per-type
+tables. Numerical tile bodies, event identities, descriptor/argument layout,
+standard O3, and the default NT/VECNORM macros are retained. An inverse-emission
+test reconstructs every original literal for 600 cases. This is a compiler size
+fix; it does not establish GPU correctness or performance.
+
+`bash examples/vllm_llm/batch_preflight.sh "$PWD/build/qwen-preflight"` is the
+complete reproducible local gate (serial 16-build matrix, exact ROCm B2/B4/B8,
+session dry run, tests). Its execution-package manifest enumerates all 20 required
+model/reference assets and hashes the runner/compiler sources. Bind it to staged
+assets with `batch_correctness.execution_package(Path(MODEL))` before hardware
+qualification. An unbound manifest explicitly records `UNBOUND`.

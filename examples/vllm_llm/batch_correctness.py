@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -71,7 +72,9 @@ def inputs(model, batch):
         rows = prefill.read_text().splitlines()
         am = list(map(int, rows[0].split()[1:]))
         margins = list(map(float, rows[1].split()[1:]))
-        if len(am) < CONTEXT + GEN - 1 or len(am) != len(margins):
+        if (len(am) < CONTEXT + GEN - 1 or len(am) != len(margins)
+                or any(t < 0 or t >= c['vocab_size'] for t in am)
+                or any(not math.isfinite(m) or m < 0 for m in margins)):
             raise ValueError('incomplete HF prefill reference')
         paths.extend([path, prefill])
     if len(set(prompts)) != batch:
@@ -82,6 +85,27 @@ def inputs(model, batch):
     paths.append(model / 'vl.bin')
     return dict(model='Qwen/Qwen3-30B-A3B', revision=revision, batch=batch,
                 context=CONTEXT, gen=GEN, files={str(p.relative_to(model)): cert.sha(p) for p in paths})
+
+
+def execution_package(model=None):
+    """Offline manifest, with optional complete binding to pre-staged assets."""
+    sources = ['examples/sessions/qwen_batch_correctness.py',
+               'examples/vllm_llm/batch_correctness.py', 'examples/vllm_llm/build.sh',
+               'examples/vllm_llm/host.hip', 'examples/vllm_llm/model.py',
+               'examples/vllm_llm/import_certificate.py', 'etx/codegen/kernel.py',
+               'examples/vllm_llm/batch_local.sh', 'examples/vllm_llm/batch_preflight.sh',
+               'examples/llm/configs/qwen3-30b-a3b.json']
+    required = ['hf/config.json', 'hf/REVISION', 'vl.bin', 'vl.manifest']
+    required += golden_names(8)
+    required += [name.replace('golden', 'prefill', 1) for name in golden_names(8)]
+    record = dict(schema=1, batches=list(BATCHES), context=CONTEXT, gen=GEN, repeat=REPEAT,
+                  required_assets=required, recipes={str(b): recipe(b) for b in BATCHES},
+                  sources={name: cert.sha(ROOT / name) for name in sources},
+                  asset_status='UNBOUND', gpu_correctness='unmeasured', performance='unmeasured')
+    if model is not None:
+        record['inputs'] = {str(b): inputs(model, b) for b in BATCHES}
+        record['asset_status'] = 'BOUND'
+    return record
 
 
 def host_args(model, build, batch):

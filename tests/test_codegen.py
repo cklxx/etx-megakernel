@@ -90,3 +90,49 @@ def test_arg_table_does_not_survive_its_plan():
     _arg_table(p)
     p.graph.tensor("z", (8,), role="activation", bytes_per_elem=2)
     assert _arg_table(p) == {"x": 0, "y": 1, "z": 2}
+
+
+def test_large_dispatch_preserves_every_integer_and_case():
+    """Invert the factoring transformation: each original type has identical C."""
+    import re
+    from etx.codegen.kernel import _compact_dispatch
+    original = ['  switch (t.type) {']
+    for i in range(600):
+        original += [f'    case {i}: {{ // request {i}',
+                     f'      ctx.cst[0] = {123*i}; ctx.cst[1] = 64;',
+                     f'#define ETX_TARGET(idx) etx_wait_SYSTEM(p.events + ETX_EVW({i+9} + (idx)), p.ctrl_abort)',
+                     '  ETX_TARGET(t.coord[0]);', '#undef ETX_TARGET',
+                     f'      sym = {i % 3};', '      break; }']
+    original += ['    default: break;', '  }']
+    transformed = list(original)
+    _compact_dispatch(transformed, 0, 'test', 600)
+    src = '\n'.join(transformed)
+    assert src.count('etx_wait_SYSTEM(') == 1
+    table = re.search(r'etx_test_data\[600\]\[(\d+)\] = \{(.*?)\};', src, re.S)
+    rows = re.findall(r'\{([^{}]*)\}', table[2])
+    for i in range(600):
+        assert f'case {i}:' in src
+        values = list(map(int, rows[i].split(',')))
+        body = re.search(r'    \{\n(.*?)      break;', src, re.S)[1]
+        reconstructed = re.sub(r'etx_test_data\[t.type\]\[(\d+)\]', lambda m: str(values[int(m[1])]), body)
+        assert f'ctx.cst[0] = {123*i}; ctx.cst[1] = 64;' in reconstructed
+        assert f'ETX_EVW({i+9} + (idx))' in reconstructed
+        assert f'sym = {i % 3};' in reconstructed
+    small = ['unchanged']
+    _compact_dispatch(small, 0, 'test', 10)
+    assert small == ['unchanged']
+
+
+def test_compact_dispatch_keeps_different_scopes_and_hooks_separate():
+    from etx.codegen.kernel import _compact_dispatch
+    lines = ['  switch (t.type) {']
+    for i, scope in enumerate(('DOMAIN', 'SYSTEM', 'DOMAIN')):
+        lines += [f'    case {i}: {{ // {scope}',
+                  f'      etx_wait_{scope}(p.events + {i}, p.ctrl_abort);',
+                  '      return true; }']
+    lines += ['    default: return true;', '  }']
+    _compact_dispatch(lines, 0, 'ready', 600)
+    src = '\n'.join(lines)
+    assert src.count('etx_wait_DOMAIN(') == src.count('etx_wait_SYSTEM(') == 1
+    assert 'case 0:\n    case 2:' in src
+    assert 'case 1:' in src

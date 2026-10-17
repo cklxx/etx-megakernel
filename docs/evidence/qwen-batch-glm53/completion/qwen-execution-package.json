@@ -1,0 +1,77 @@
+{
+  "schema": 1,
+  "batches": [
+    2,
+    4,
+    8
+  ],
+  "context": 1024,
+  "gen": 32,
+  "repeat": 2,
+  "required_assets": [
+    "hf/config.json",
+    "hf/REVISION",
+    "vl.bin",
+    "vl.manifest",
+    "golden_c1024.txt",
+    "golden_c1024_r97.txt",
+    "golden_c1024_r194.txt",
+    "golden_c1024_r291.txt",
+    "golden_c1024_r388.txt",
+    "golden_c1024_r485.txt",
+    "golden_c1024_r582.txt",
+    "golden_c1024_r679.txt",
+    "prefill_c1024.txt",
+    "prefill_c1024_r97.txt",
+    "prefill_c1024_r194.txt",
+    "prefill_c1024_r291.txt",
+    "prefill_c1024_r388.txt",
+    "prefill_c1024_r485.txt",
+    "prefill_c1024_r582.txt",
+    "prefill_c1024_r679.txt"
+  ],
+  "recipes": {
+    "2": {
+      "ETX_VL_REQUESTS": "2",
+      "ETX_VL_BATCH": "0",
+      "ETX_VL_NB": "1",
+      "ETX_VL_CHAIN": "0",
+      "ETX_VL_CHECK": "1",
+      "ETX_DEV_RESET": "0",
+      "ETX_VL_MAXLEN": "1072"
+    },
+    "4": {
+      "ETX_VL_REQUESTS": "4",
+      "ETX_VL_BATCH": "0",
+      "ETX_VL_NB": "1",
+      "ETX_VL_CHAIN": "0",
+      "ETX_VL_CHECK": "1",
+      "ETX_DEV_RESET": "0",
+      "ETX_VL_MAXLEN": "1072"
+    },
+    "8": {
+      "ETX_VL_REQUESTS": "8",
+      "ETX_VL_BATCH": "0",
+      "ETX_VL_NB": "1",
+      "ETX_VL_CHAIN": "0",
+      "ETX_VL_CHECK": "1",
+      "ETX_DEV_RESET": "0",
+      "ETX_VL_MAXLEN": "1072"
+    }
+  },
+  "sources": {
+    "examples/sessions/qwen_batch_correctness.py": "5707ae2d1a39b4055d13e81376bfed71efd1849df493e0257234b01dc36df05c",
+    "examples/vllm_llm/batch_correctness.py": "cecdb40c7f16d9dc325bb03e6965d166b0501380c75791757e5b8ef62a309ac2",
+    "examples/vllm_llm/build.sh": "13193d69a0671310e3b979415bbd65f913fbf7f54fbc8e31303ee43717282be2",
+    "examples/vllm_llm/host.hip": "7faba870473d9c3a1f0451b91ec0e79497a06cca59c4a6dd56ee7cf63957f15c",
+    "examples/vllm_llm/model.py": "9307607f6f309e1a0d7cb3c01e1d689b28f6092d2435fc17904bd3ae601530bf",
+    "examples/vllm_llm/import_certificate.py": "6fb791188ebe16fd17737ba78e5ce1f47a8a6d4da35d82e808b0d059d201bcc4",
+    "etx/codegen/kernel.py": "5b26b0fcf61cf11b833352f2db4e6518da3a344deedefabe269ca6b13105b316",
+    "examples/vllm_llm/batch_local.sh": "605f1d4c16ca1a29248a1c99d270db939a7ca3a24f3443d3fbeb022561491d46",
+    "examples/vllm_llm/batch_preflight.sh": "63cee4d96c1d68110714bf0363248afd0172d2f2376770fa44a486dcbbb80036",
+    "examples/llm/configs/qwen3-30b-a3b.json": "c214108014d8495d762a4009ff74f9548d7a9e215cda85f941147011f56ae7ba"
+  },
+  "asset_status": "UNBOUND",
+  "gpu_correctness": "unmeasured",
+  "performance": "unmeasured"
+}

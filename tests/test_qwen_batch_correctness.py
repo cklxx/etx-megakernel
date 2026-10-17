@@ -190,3 +190,14 @@ def test_qualify_runs_all_five_processes_and_records_identity(tmp_path, monkeypa
     assert receipt['status'] == 'PASS' and receipt['performance'] == 'unmeasured'
     assert receipt['imported_per_position'] == 1 and receipt['greedy_tokens_per_mode'] == 128
     assert len(list(out.glob('*.log'))) == 5
+
+
+def test_execution_package_has_full_asset_closure_and_sources():
+    package = bc.execution_package()
+    assert package['batches'] == [2, 4, 8]
+    assert len(package['required_assets']) == 20
+    assert len(set(package['required_assets'])) == 20
+    assert 'prefill_c1024_r679.txt' in package['required_assets']
+    assert all(len(v) == 64 for v in package['sources'].values())
+    assert package['asset_status'] == 'UNBOUND'
+    assert package['gpu_correctness'] == 'unmeasured'

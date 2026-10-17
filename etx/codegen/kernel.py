@@ -15,6 +15,7 @@ from . import manifest
 
 import json
 import os
+import re
 from typing import Any
 
 from ..ir.edgemap import EdgeMap
@@ -147,6 +148,53 @@ def _setup_body(plan: Plan, g: TaskGrid, symbols: list[str]) -> list[str]:
     return out
 
 
+def _compact_dispatch(lines: list[str], start: int, tag: str, ntypes: int) -> None:
+    """Factor equal control flow into one case body with per-type integer data.
+
+    Large replicated graphs otherwise hand LLVM thousands of copies of the same
+    wait/release code. This changes only the representation of integer literals;
+    descriptors, edge maps, arithmetic bodies and all build flags stay identical.
+    Small graphs retain the original source. Comments are ignored for grouping.
+    """
+    if ntypes < 512:
+        return
+    chunk = "\n".join(lines[start:])
+    pattern = re.compile(r"    case (\d+): \{[^\n]*\n(.*?)^      (break;|return true;) \}", re.M | re.S)
+    matches = list(pattern.finditer(chunk))
+    if not matches:
+        return
+    integer = re.compile(r"(?<![\w.])\d+(?![\w.])")
+    groups = {}
+    for match in matches:
+        body = re.sub(r"//[^\n]*", "", match[2])
+        values = integer.findall(body)
+        key = (integer.sub("@", body), match[3])
+        groups.setdefault(key, []).append((int(match[1]), body, values))
+    rows = [[] for _ in range(ntypes)]
+    bodies = []
+    maxcols = 0
+    for (_, ending), cases in groups.items():
+        varying = [i for i in range(len(cases[0][2])) if len({c[2][i] for c in cases}) > 1]
+        maxcols = max(maxcols, len(varying))
+        for tid, _, values in cases:
+            rows[tid] = [values[i] for i in varying]
+        col = {n: j for j, n in enumerate(varying)}
+        it = iter(range(len(cases[0][2])))
+        def replace(m):
+            i = next(it)
+            return f"etx_{tag}_data[t.type][{col[i]}]" if i in col else m[0]
+        body = integer.sub(replace, cases[0][1])
+        bodies.append("".join(f"    case {tid}:\n" for tid, _, _ in cases) + "    {\n" + body + f"      {ending} }}")
+    table = ""
+    if maxcols:
+        data = ["{" + ", ".join(row + ["0"] * (maxcols - len(row))) + "}" for row in rows]
+        table = f"#include <stdint.h>\nstatic __device__ const int32_t etx_{tag}_data[{ntypes}][{maxcols}] = {{" + ",\n".join(data) + "};\n"
+    # Tables have static storage; never allocate them per thread in scratch.
+    lines[start:] = [chunk[:matches[0].start()] + "\n".join(bodies) + chunk[matches[-1].end():]]
+    if table:
+        lines.insert(0, table)
+
+
 def emit_kernel(plan: Plan, device: int = 0) -> str:
     isolate_poller = os.environ.get("ETX_PREFETCH_ISOLATE_POLLER", "0") == "1"
     m = plan.machine
@@ -254,6 +302,7 @@ def emit_kernel(plan: Plan, device: int = 0) -> str:
         out.append("#endif")
         out.append("")
     # non-blocking readiness probe per task type (same edge maps as the wait code)
+    compact_start = len(out)
     out.append("static __device__ __forceinline__ bool etx_deps_ready(const etx_params& p, int32_t tid) {")
     out.append("  const etx_task t = p.descs[tid];")
     out.append("  switch (t.type) {")
@@ -274,6 +323,7 @@ def emit_kernel(plan: Plan, device: int = 0) -> str:
     out.append("  }")
     out.append("}")
     out.append("")
+    _compact_dispatch(out, compact_start, "ready", n_types)
     # Three phases, so every tile body has exactly ONE call site (two if it is also a Pass-3 prologue):
     # (1) per-type switch: immediates, waits, acquire, pick the body symbol; (2) one etx_call_body;
     # (3) per-type switch: releases and arrives. Emitting the body call inside each type's case made
@@ -305,6 +355,7 @@ def emit_kernel(plan: Plan, device: int = 0) -> str:
     if max_pro:
         out.append(f"  etx_ctx pctx[{max_pro}]; int psym[{max_pro}];")
         out.append(f"  for (int j = 0; j < {max_pro}; ++j) psym[j] = -1;")
+    compact_start = len(out)
     out.append("  switch (t.type) {   // phase 1: immediates, waits, acquire")
     for g in grids:
         mode = plan.modes.get(g.name, "static")
@@ -361,6 +412,7 @@ def emit_kernel(plan: Plan, device: int = 0) -> str:
         out.append("      break; }")
     out.append("    default: break;")
     out.append("  }")
+    _compact_dispatch(out, compact_start, "wait", n_types)
     out.append("  __syncthreads();")
     out.append("  if (tr && threadIdx.x == 0) tr[1] = (uint64_t)ETX_TIMER();")
     if bar2:
@@ -383,6 +435,7 @@ def emit_kernel(plan: Plan, device: int = 0) -> str:
     out.append("  __syncthreads();")
     out.append("  if (tr && threadIdx.x == 0) { tr[2] = (uint64_t)ETX_TIMER(); tr[3] = worker; }")
     out.append("  if (threadIdx.x != 0) return;")
+    compact_start = len(out)
     out.append("  switch (t.type) {   // phase 3: releases, arrives, pushes")
     for g in grids:
         mode = plan.modes.get(g.name, "static")
@@ -410,6 +463,7 @@ def emit_kernel(plan: Plan, device: int = 0) -> str:
     out.append("  }")
     out.append("}")
     out.append("")
+    _compact_dispatch(out, compact_start, "arrive", n_types)
     out.append("#ifndef ETX_MIN_WG_PER_CU   // the plan's residency (P1). NOTE: launch_bounds' second argument is MIN")
     out.append("// WAVES PER EU, not workgroups per CU, and for this persistent kernel (one 16-wave workgroup per CU by")
     out.append("// construction) it cannot raise occupancy at all -- it only caps VGPRs and forces spills. Round 34: =8 gave")
