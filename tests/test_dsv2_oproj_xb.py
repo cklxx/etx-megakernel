@@ -208,9 +208,10 @@ def test_arm_differs_from_x4xb_only_by_the_switch():
 
 
 # ---------------------------------------------------------------- the row split of gemv_rows_half_xb
-def _half_rows_written(N, worker, nw, waves=4, oh=4):
-    """Python mirror of gemv_rows_half_xb's row loop (= fleet's gemv_rows_pipelined_half<2 oh>): first / cnt, groups of
-    2 oh rows per wave, row k + 2 j + half on half-wave `half`, the two-buffer pipeline."""
+def _half_rows_written(N, worker, nw, waves=4, oh=4, issued=None):
+    """Python mirror of gemv_rows_half_xb's row loop (= fleet's gemv_rows_pipelined_half<2 oh> with the
+    gemv_no_terminal_all lever): first / cnt, groups of 2 oh rows per wave, row k + 2 j + half on half-wave `half`, the
+    two-buffer pipeline with the last group peeled. issued: if a list, gets (wave, k) for each group of loads."""
     first = worker
     if first >= N:
         return []
@@ -222,19 +223,29 @@ def _half_rows_written(N, worker, nw, waves=4, oh=4):
         if k >= cnt:
             continue
 
+        def issue(kk):
+            if issued is not None:
+                issued.append((wave, kk))
+
         def reduce(kk):
             for half in (0, 1):
                 out.extend(first + (kk + 2 * j + half) * nw for j in range(oh) if kk + 2 * j + half < cnt)
-        while True:
+        issue(k)
+        while k + 2 * stride < cnt:
             k2 = k + stride
+            issue(k2)
             reduce(k)
-            if k2 >= cnt:
-                break
             k3 = k2 + stride
+            issue(k3)
             reduce(k2)
-            if k3 >= cnt:
-                break
             k = k3
+        if k + stride < cnt:
+            k2 = k + stride
+            issue(k2)
+            reduce(k)
+            reduce(k2)
+        else:
+            reduce(k)
     return out
 
 
@@ -255,8 +266,50 @@ def test_mirror_matches_the_source_lines():
                  "reinterpret_cast<uint4*>(s.vec)[t] = ld_act16(reinterpret_cast<const uint4*>(tab[kMaxB + j]) + i, coh);",
                  "gemv_rows_half_xb(wo + (int64_t)xcd * kc, hv, s.vec, reinterpret_cast<float* const*>(tab), d.hidden, worker, nw, coh);",
                  "const bool coh = run_task_coh(fq->rt);",
-                 'extern "C" __device__ void fleet_oproj_xb(const etx_ctx* c) { etx_xb::oproj(c); }'):
+                 'extern "C" __device__ void fleet_oproj_xb(const etx_ctx* c) { etx_xb::oproj(c); }',
+                 "while (k + 2 * stride < cnt) {",
+                 "if (k + stride < cnt) {"):
         assert line in XB_SRC, line
+    # the unpatched loop (a dead group of loads at the end of each wave) is gone
+    xbo = XB_SRC[XB_SRC.index("void gemv_rows_half_xb("):XB_SRC.index("#undef XBO_ROW")]
+    assert "if (k2 >= cnt) break;" not in xbo and "if (k3 >= cnt) break;" not in xbo
+
+
+def test_no_wave_issues_a_group_it_does_not_reduce():
+    """gemv_no_terminal_all: every group of loads is a group of rows < cnt. At 74 workers each wave issues one group."""
+    hidden = 2048
+    for nw in (dsv.W, dsv.XB_W):
+        for w in range(nw):
+            cnt = (hidden - w + nw - 1) // nw
+            issued = []
+            _half_rows_written(hidden, w, nw, issued=issued)
+            assert issued and all(k < cnt for _, k in issued), (nw, w)
+            assert len(issued) == len(set(issued))
+            if nw == dsv.XB_W:
+                assert len(issued) == len({wave for wave, _ in issued})
+
+
+def test_trace_stamps_are_in_stamped_builds_only():
+    """The stamp after the staging barrier (and the start / end stamps) compile only with ETX_DS_PRO or
+    ETX_DSV2_STAMPS2, so the device code of an unstamped build does not change."""
+    body = XB_SRC[XB_SRC.index("__device__ __forceinline__ void oproj("):XB_SRC.index("}  // namespace etx_xb")]
+    stack, stamps = [], 0
+    for line in body.splitlines():
+        s = line.strip()
+        if s.startswith("#if"):
+            stack.append(s)
+        elif s.startswith("#endif"):
+            stack.pop()
+        elif "__builtin_amdgcn_s_memrealtime()" in s:
+            stamps += 1
+            assert "#if ETX_DS_PRO || ETX_DSV2_STAMPS2" in stack, s
+    assert stamps == 3 and stack == []
+    staging = body.index("reinterpret_cast<uint4*>(s.vec)[t] = ld_act16(")
+    barrier = body.index("__syncthreads();", staging)
+    assert barrier < body.index("s.stamp_stage = __builtin_amdgcn_s_memrealtime();") < body.index("gemv_rows_half_xb(")
+    assert "constexpr int kXboProKind = 31;" in XB_SRC
+    # 8 XCDs x 128 coordinates fit one kind's 1024 slots; 74 workers fit 128
+    assert 8 * 128 == 1024 and dsv.XB_W <= 128
 
 
 def test_row_split_writes_every_row_exactly_once_per_xcd():

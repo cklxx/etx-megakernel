@@ -339,12 +339,23 @@ __device__ __forceinline__ void gemv_rows_half_xb(const __hip_bfloat16* __restri
 #undef XBO_REDUCE
 }
 
+// pro_trace slot of a batched o_proj task in stamped builds: fleet kind slot kXboProKind (no fleet task kind uses it),
+// coordinate xcd * 128 + worker. PRO_SLOT's coord[0] * 64 + coord[1] does not fit 74 workers.
+constexpr int kXboProKind = 31;
+static_assert(kXboProKind > fleet::TASK_Q_ABSORB && kXboProKind < 32, "a pro_trace kind slot of its own");
+#define XBO_PRO_SLOT(L, xcd, worker) ((((int64_t)(L) + 1) * 32 + kXboProKind) * 1024 + (int64_t)(xcd) * 128 + (worker))
+
 // grid constants (layer, workers per XCD, first request). The first request is always 0 (graph.py), a grid constant
 // for the same reason as in qkv().
 __device__ __forceinline__ void oproj(const etx_ctx* c) {
   const int L = LAYER(c), xcd = (int)c->domain, worker = (int)c->coord[1], nw = (int)c->cst[1], r0 = (int)c->cst[2];
   fleet::Scratch& s = *reinterpret_cast<fleet::Scratch*>(c->lds);
   const FleetParams* fq = &etx_fleet_const[r0];
+#if ETX_DS_PRO || ETX_DSV2_STAMPS2
+  // stamped builds only (as pro_begin / pro_end; the host fills request 0's pro_trace with ETX_DS_PROLOGUE, the
+  // ETX_TRACE runs of a stamped build): body start in s.stamp, kept in LDS, not in a register
+  if (fq->pro_trace != nullptr && threadIdx.x == 0) s.stamp = __builtin_amdgcn_s_memrealtime();
+#endif
   const fleet::ModelDims& d = fq->d;
   const int hv = d.heads * d.v_head;                                  // 2048: W_o's row length
   const int kc = hv / fleet::kNumXCDs;                                // 256: this XCD's columns
@@ -372,7 +383,24 @@ __device__ __forceinline__ void oproj(const etx_ctx* c) {
     reinterpret_cast<uint4*>(s.vec)[t] = ld_act16(reinterpret_cast<const uint4*>(tab[kMaxB + j]) + i, coh);
   }
   __syncthreads();
+#if ETX_DS_PRO || ETX_DSV2_STAMPS2
+  // end of the staging: the trace splits the staging of the B o slices from the GEMV
+  if (fq->pro_trace != nullptr && threadIdx.x == 0) s.stamp_stage = __builtin_amdgcn_s_memrealtime();
+#endif
   gemv_rows_half_xb(wo + (int64_t)xcd * kc, hv, s.vec, reinterpret_cast<float* const*>(tab), d.hidden, worker, nw, coh);
+#if ETX_DS_PRO || ETX_DSV2_STAMPS2
+  // row {body start, end of staging, end of GEMV}, the layout of pro_end, in slot XBO_PRO_SLOT. Thread 0 is lane 0 of
+  // wave 0, which always runs the GEMV to its end (cnt >= 27 rows per worker), so it reaches this point.
+  if (fq->pro_trace != nullptr && threadIdx.x == 0) {
+#if ETX_DSV2_STAMPS2
+    uint64_t* r = fq->pro_trace + XBO_PRO_SLOT(L, xcd, worker) * 16;
+    for (int i = 3; i < 16; ++i) r[i] = 0;
+#else
+    uint64_t* r = fq->pro_trace + XBO_PRO_SLOT(L, xcd, worker) * 3;
+#endif
+    r[0] = s.stamp; r[1] = s.stamp_stage; r[2] = __builtin_amdgcn_s_memrealtime();
+  }
+#endif
 }
 
 }  // namespace etx_xb
