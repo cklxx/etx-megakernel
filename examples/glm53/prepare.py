@@ -1,7 +1,7 @@
-"""Offline, source-pinned GLM-5.3-Flash PP2 preparation; never runs a model.
+"""Offline pinned GLM architecture, ownership and implementation/asset status.
 
-`--require-model` exits 2 with explicit blockers, before importing a GPU library.
-The independent two-GPU boundary probe is not an implementation of GLM inference.
+The actual numerical model path is examples.glm53.model; this command never
+executes a GPU or downloads a checkpoint. --require-model validates --stage.
 """
 from __future__ import annotations
 import argparse
@@ -73,6 +73,11 @@ def budget(cfg, api, batch, context, gpu_gib):
     native_per_rank = expert_params // 2 + payload - expert_params
     bf16_per_rank_floor = params  # total BF16 bytes / two ranks
     state_bytes = batch * t['hc_mult'] * t['hidden_size'] * 2
+    from examples.glm53.stage import dimensions
+    dims=dimensions(t,min(context+32,t['max_position_embeddings']))
+    ranks=partition(t)
+    cache=[batch*sum(dims['STATE_KDA'] if t['layer_types'][i]=='linear_attention' else dims['STATE_MLA'] for i in rank['layers'])*4 for rank in ranks]
+    scratch=[batch*len(rank['layers'])*dims['SCRATCH']*4 for rank in ranks]
     return dict(kind='ESTIMATE, not measured allocation', checkpoint_payload_bytes=payload,
                 native_fp8_per_rank_ideal_floor=payload / 2,
                 native_fp8_per_rank_conservative_payload=native_per_rank,
@@ -82,11 +87,8 @@ def budget(cfg, api, batch, context, gpu_gib):
                 native_payload_reserve_bytes=int(gpu_gib * 2**30) - native_per_rank,
                 boundary_bytes_per_decode_step=state_bytes, token_return_bytes=4 * batch,
                 boundary_bytes_for_32_steps=32 * (state_bytes + 4 * batch),
-                context=context, batch=batch,
+                context=context, batch=batch,native_cache_bytes_per_rank=cache,native_scratch_bytes_per_rank=scratch,
                 unknown=['actual checkpoint tensor/shard allocation and FP8 conversion buffers',
-                         'KDA recurrent and convolution states per request',
-                         'sparse MLA latent cache, indexer/kpool cache and workspace',
-                         'upstream mHC boundary residual dtype/layout; BF16 transport is a proposal',
                          'mHC workspace, allocator/runtime/event buffers, vision weights if retained'],
                 memory_fit='UNESTABLISHED; payload reserve is not a runtime fit certificate')
 
@@ -94,7 +96,7 @@ def budget(cfg, api, batch, context, gpu_gib):
 def prepare(batch=1, context=1024, gpu_gib=192, evidence=EVIDENCE):
     cfg, api = metadata(evidence)
     t = cfg['text_config']
-    return dict(schema=1, status='BLOCKED', model=MODEL, revision=api['sha'],
+    return dict(schema=1, status='LOCAL-IMPLEMENTED', model=MODEL, revision=api['sha'],
                 config_sha256=sha(evidence / 'glm-config.json'), scope='text-only PP2 preparation, MTP disabled',
                 architecture=dict(wrapper=cfg['architectures'][0], hidden=t['hidden_size'],
                                   layers=t['num_hidden_layers'], kda=t['layer_types'].count('linear_attention'),
@@ -105,18 +107,18 @@ def prepare(batch=1, context=1024, gpu_gib=192, evidence=EVIDENCE):
                                final_norm_and_head=1, kv_and_recurrence='owner of the complete layer',
                                mtp='disabled; not needed for 32-token greedy oracle'),
                 communication=dict(strategy='PP2, complete-layer ownership, no expert all-to-all',
-                                   activation='proposed: rank 0 sends [B,hc_mult,H] BF16 residual to rank 1; upstream dtype/layout must be verified',
+                                   activation='rank 0 sends [B,hc_mult,H] BF16 residual streams to rank 1',
                                    feedback='rank 1 returns B int32 greedy token IDs to rank 0',
                                    ordering='SYSTEM release/acquire events; both ranks reset before launch',
                                    transport='peer access + fine-grained buffers and shared integer counters'),
                 budget=budget(cfg, api, batch, context, gpu_gib),
-                blockers=['ETX has no GLM KDA recurrence/conv state, sparse MLA/indexer/kpool or mHC kernels',
-                          'ETX has no GLM sigmoid/noaux_tc correction-bias router, scaling and clipped-SwiGLU compatibility path',
-                          'ETX Qwen BF16 packer/import ABI cannot load this FP8 multimodal checkpoint',
-                          'gfx942 native FP8/hybrid-kernel compatibility is unvalidated; official AMD recipe covers gfx950',
-                          'no staged GLM weights or same-checkpoint HF 32-token oracle in this task',
-                          'real per-rank memory and peer/atomic visibility remain unmeasured'],
-                next_gate='run exact Qwen B2/B4/B8 correctness first; then two-GPU transport probe, never full model until blockers resolved',
+                implementation=dict(graph='examples/glm53/model.py',tiles='examples/glm53/tiles.hip',
+                    numerics='examples/glm53/native.h',stager='examples/glm53/stage.py',
+                    runner='examples/glm53/run.py',reference='examples/glm53/reference.py',
+                    backend='complete-layer native correctness tiles; no performance claim'),
+                hardware_gates=['pre-staged exact checkpoint and independent HF reference',
+                                'real two-GPU allocation, peer visibility and full-checkpoint tokens/logits'],
+                next_gate='validate staged tensors; build and execute examples/sessions/glm53_model.py on an authorized existing host',
                 performance='unmeasured')
 
 
@@ -127,13 +129,24 @@ def main():
     ap.add_argument('--gpu-gib', type=float, default=192)
     ap.add_argument('--out', type=Path)
     ap.add_argument('--require-model', action='store_true')
+    ap.add_argument('--stage',type=Path)
     a = ap.parse_args()
     result = prepare(a.batch, a.context, a.gpu_gib)
+    code=0
+    if a.require_model:
+        if a.stage is None:
+            result.update(status='ASSETS-REQUIRED',error='--stage must name an already staged exact model');code=2
+        else:
+            from examples.glm53.stage import validate
+            try:
+                validate(a.stage);result['status']='STAGED-MODEL-VALIDATED'
+            except (ValueError,FileNotFoundError,KeyError) as exc:
+                result.update(status='ASSETS-REQUIRED',error=str(exc));code=2
     text = json.dumps(result, indent=2) + '\n'
     if a.out:
         a.out.write_text(text)
     print(text, end='')
-    return 2 if a.require_model else 0
+    return code
 
 
 if __name__ == '__main__':

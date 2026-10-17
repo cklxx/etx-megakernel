@@ -1,6 +1,6 @@
-"""Validate future same-checkpoint HF versus ETX PP2 greedy token records offline.
+"""Validate same-checkpoint HF versus the actual ETX PP2 greedy token records offline.
 
-Token agreement alone does not certify unimplemented GLM kernels or imports.
+Token agreement alone does not certify all full-checkpoint operator numerics.
 Record schema: model, revision, config_sha256, batch, mode='greedy',
 speculative=false, backend='hf'/'etx-pp2', requests=[{prompt_ids, generated_ids}].
 """
@@ -17,6 +17,8 @@ def compare(reference, candidate):
     for record, backend in ((reference, 'hf'), (candidate, 'etx-pp2')):
         if any(record.get(k) != v for k, v in identity.items()) or record.get('backend') != backend:
             raise ValueError('wrong model/revision/config, decode mode or backend')
+        if type(record.get('speculative')) is not bool or type(record.get('schema')) is not int:
+            raise ValueError('invalid schema or speculative flag type')
         b = record.get('batch')
         if type(b) is not int or b not in (1, 2, 4, 8) or len(record['requests']) != b:
             raise ValueError('incomplete batch')
@@ -39,7 +41,7 @@ def compare(reference, candidate):
         matched.append(sum(a == b for a, b in zip(ref['generated_ids'], got['generated_ids'])))
     return dict(schema=1, status='TOKENS-EQUAL' if all(n == 32 for n in matched) else 'FAILED',
                 matched_each=matched, required_each=32, model_certified=False,
-                missing_gates=['per-operator numerical/state correctness', 'same-build imported-launch checks',
+                missing_gates=['per-operator numerical/state correctness', 'same-build native model/source identity',
                                'real two-GPU full model execution'], performance='unmeasured')
 
 

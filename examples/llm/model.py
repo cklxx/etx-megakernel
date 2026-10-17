@@ -96,8 +96,8 @@ def load_dims(path: str | None = None) -> Dims:
     path = path or os.environ.get("ETX_LLM_CONFIG") or str(HERE / "configs" / "qwen3-8b.json")
     c = json.loads(Path(path).read_text())
     if c.get('model_type') in ('glm5_next', 'glm5_next_text') or (c.get('text_config') or {}).get('model_type') == 'glm5_next_text':
-        raise ValueError(f'{path}: GLM-5.3-Flash needs KDA, sparse MLA, mHC and FP8 support; '
-                         'use python -m examples.glm53.prepare for the explicit compatibility blocker')
+        raise ValueError(f'{path}: GLM-5.3-Flash needs its dedicated hybrid/FP8 model path; '
+                         'use examples/glm53/stage.py, build_model.sh and python -m examples.glm53.run')
     rope_kind(c, str(path))
     mt = c.get("model_type", "")
     if mt == "olmo2":

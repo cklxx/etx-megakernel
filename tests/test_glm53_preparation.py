@@ -22,7 +22,7 @@ def test_exact_identity_architecture_and_complete_ownership():
     assert p['ranks'][1]['layers'] == list(range(24, 45))
     assert [r['moe_layers'] for r in p['ranks']] == [21, 21]
     assert [r['kda_layers'] for r in p['ranks']] == [18, 16]
-    assert p['status'] == 'BLOCKED' and p['performance'] == 'unmeasured'
+    assert p['status'] == 'LOCAL-IMPLEMENTED' and p['performance'] == 'unmeasured'
 
 
 def test_memory_is_an_estimate_and_bf16_cannot_fit_two_192gib_cards():
@@ -64,7 +64,7 @@ def test_executable_blocker_is_offline_and_exits_nonzero(tmp_path):
     out = tmp_path / 'blocker.json'
     run = subprocess.run([sys.executable, '-m', 'examples.glm53.prepare', '--require-model', '--out', str(out)],
                          cwd=prepare.ROOT, capture_output=True, text=True)
-    assert run.returncode == 2 and json.loads(out.read_text())['status'] == 'BLOCKED'
+    assert run.returncode == 2 and json.loads(out.read_text())['status'] == 'ASSETS-REQUIRED'
 
 
 @pytest.mark.parametrize('batch', [1, 2, 4, 8])
