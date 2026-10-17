@@ -231,6 +231,7 @@ int main(int argc, char** argv) {
     prompts.push_back(pr); goldens.push_back(ga);
   }
   for (int r = 1; r < nreq; ++r) if (prompts[r].size() != prompts[0].size()) die("the requests' prompts differ in length");
+  if (gen <= 0 || repeat <= 0 || prompts[0].empty()) die("need a nonempty prompt, generation and repeat count");
   for (auto& gv : goldens) gv.resize(gen);
   const std::vector<int>& prompt = prompts[0];
   const std::vector<int>& golden = goldens[0];
@@ -541,7 +542,6 @@ int main(int argc, char** argv) {
 
   std::vector<std::vector<int32_t>> seqs(nreq);
   for (int r = 0; r < nreq; ++r) { seqs[r] = prompts[r]; seqs[r].insert(seqs[r].end(), goldens[r].begin(), goldens[r].end()); }
-  if (check_layers > 0 && nreq > 1) die("--check needs a one-request plan (build without ETX_VL_REQUESTS)");
   if (check_layers > 0) {
     ETX_VL_BIND(reqs[0])
 #ifndef ETX_VL_CHECK
@@ -551,7 +551,11 @@ int main(int argc, char** argv) {
     // on the same inputs (a snapshot of every buffer they can touch), compared byte for byte
     if (check_pos < 0 || check_pos >= steps) die("--check-pos must be >= 0 and < steps");
     printf("CHECK position %d partitions %d\n", check_pos, (check_pos + 1 + 255) / 256);
-    std::vector<std::pair<void*, size_t>> bufs = {{resid, n_resid * 2}, {hn, n_hn * 2}, {qkv, NQKV * 2}, {qn, NH * HD * 2}, {kn, NKV * HD * 2}, {attn_out, NH * HD * 2},
+    std::vector<std::pair<void*, size_t>> bufs;
+    std::vector<std::string> buffer_names;
+    for (int request = 0; request < nreq; ++request) {
+      ETX_VL_BIND(reqs[request])
+      std::vector<std::pair<void*, size_t>> rb = {{resid, n_resid * 2}, {hn, n_hn * 2}, {qkv, NQKV * 2}, {qn, NH * HD * 2}, {kn, NKV * HD * 2}, {attn_out, NH * HD * 2},
       {o, H * 2}, {gu, 4 * I}, {act, 2 * I}, {dn, H * 2}, {logits, (size_t)V * 2}, {exp_sums, (size_t)NH * parts * 4}, {max_logits, (size_t)NH * parts * 4},
       {tmp_out, (size_t)NH * parts * HD * 2}, {rlog, (size_t)std::max(E, 1) * 2}, {topk_w, n_tk * 4},
       {topk_ids, n_tk * 4}, {tei, n_tk * 4}, {mc1, (size_t)std::max(TOPK, 1) * 4 * MI},
@@ -559,24 +563,37 @@ int main(int argc, char** argv) {
       {resid2, n_resid2 * 2}, {dx, n_dx * 2}, {ox, n_ox * 2}, {actx, n_actx * 2}};
     const char* names[] = {"resid", "hn", "qkv", "qn", "kn", "attn_out", "o", "gu", "act", "dn", "logits", "exp_sums", "max_logits", "tmp_out",
                            "router_logits", "topk_weights", "topk_ids", "token_expert_indices", "moe_cache1", "moe_cache2", "moe_cache3", "resid2", "dx", "ox", "actx"};
-    const size_t NB = sizeof(names) / sizeof(names[0]);
-    for (int l = 0; l < std::min(L, check_layers); ++l) { bufs.push_back({kc[l], cache_elems * 2}); bufs.push_back({vc[l], cache_elems * 2}); }
+      for (size_t b = 0; b < rb.size(); ++b) buffer_names.push_back("r" + std::to_string(request) + ":" + names[b]);
+      bufs.insert(bufs.end(), rb.begin(), rb.end());
+      for (int l = 0; l < std::min(L, check_layers); ++l) {
+        bufs.push_back({kc[l], cache_elems * 2}); bufs.push_back({vc[l], cache_elems * 2});
+        buffer_names.push_back("r" + std::to_string(request) + ":kc" + std::to_string(l));
+        buffer_names.push_back("r" + std::to_string(request) + ":vc" + std::to_string(l));
+      }
+    }
     std::vector<void*> save(bufs.size()), ref(bufs.size());
     for (size_t b = 0; b < bufs.size(); ++b) { save[b] = dalloc<char>(bufs[b].second); ref[b] = dalloc<char>(bufs[b].second); }
-    std::vector<int32_t> tin(steps + 2, 0); for (size_t i = 0; i < seqs[0].size(); ++i) tin[i] = seqs[0][i];
-    ETX_CHECK(hipMemcpy(token_in, tin.data(), tin.size() * 4, hipMemcpyHostToDevice));
+    for (int r = 0; r < nreq; ++r) {
+      std::vector<int32_t> tin(steps + 2, 0);
+      for (size_t i = 0; i < seqs[r].size(); ++i) tin[i] = seqs[r][i];
+      ETX_CHECK(hipMemcpy(reqs[r].token_in, tin.data(), tin.size() * 4, hipMemcpyHostToDevice));
+    }
     for (int t = 0; t < check_pos; ++t) {
-      vp.tok = t; vp.pos = t; vp.write_next = 0;
-      vl_set_params(&vp, 1, hst.stream);
+      for (VlParams& v : vps) { v.tok = t; v.pos = t; v.write_next = 0; }
+      vl_set_params(vps.data(), nreq, hst.stream);
       if (!hst.run(60.0)) { printf("check prefix step %d: ETX step failed\n", t); return 2; }
       if (t % 64 == 0) { printf("CHECK prefix step %d/%d\n", t, check_pos); fflush(stdout); }
     }
-    vp.tok = check_pos; vp.pos = check_pos; vp.write_next = 0; vl_set_params(&vp, 1, hst.stream);
+    for (VlParams& v : vps) { v.tok = check_pos; v.pos = check_pos; v.write_next = 0; }
+    vl_set_params(vps.data(), nreq, hst.stream);
+    // Checker requires unchained plans: one prologue per request, one launch per instance, then argmaxes.
+    if ((int)(sizeof(etx_launch_count) / sizeof(etx_launch_count[0])) != (int)insts.size() + 2 * nreq)
+      die("--check needs an unchained plan (ETX_VL_CHAIN=0)");
     auto launch_imported = [&](int li) {
       int32_t first = etx_launch_first[li]; void* kargs[] = {&hst.p, &first};
       ETX_CHECK(hipLaunchKernel(hst.unfused_kernel, dim3(etx_launch_count[li]), dim3(ETX_THREADS), kargs, 0, hst.stream));
     };
-    launch_imported(0);                                              // prologue: embedding row, positions, lengths
+    for (int r = 0; r < nreq; ++r) launch_imported(r); // every request's prologue
     if (!wait_stream(hst.stream, 5.0)) die("prologue hung");
     int checked = 0, planned = 0, replicas = 0;
     for (const Inst& x : insts) {
@@ -613,7 +630,7 @@ int main(int argc, char** argv) {
           }
         }
 #endif
-        launch_imported(x.n + 1);
+        launch_imported(x.n + nreq);
         if (!wait_stream(hst.stream, 5.0)) die("DSL tile hung: " + x.exp);
 #ifdef ETX_BF16_CAPTURE
         capture.after();
@@ -677,7 +694,7 @@ int main(int argc, char** argv) {
         tri = mods[x.exp];
       }
       const int xtasks = x.tasks == 1 && x.rep > 1 ? x.rep : x.tasks;         // an x-form instance runs one task per XCD
-      if (etx_launch_count[x.n + 1] != xtasks) die("launch table does not follow the plan at instance " + std::to_string(x.n));
+      if (etx_launch_count[x.n + nreq] != xtasks) die("launch table does not follow the plan at instance " + std::to_string(x.n));
       for (size_t b = 0; b < bufs.size(); ++b) ETX_CHECK(hipMemcpyAsync(save[b], bufs[b].first, bufs[b].second, hipMemcpyDeviceToDevice, hst.stream));
       if (x.rep > 1 && !(x.tasks == 1 && x.copyoff < 0))
         die("unsupported replicated imported instance " + std::to_string(x.n) + " (" + x.exp + ")");
@@ -697,7 +714,7 @@ int main(int argc, char** argv) {
         ETX_CHECK(hipMemcpyAsync(bufs[b].first, save[b], bufs[b].second, hipMemcpyDeviceToDevice, hst.stream));
       }
       ETX_CHECK(hipEventRecord(e0, hst.stream));
-      launch_imported(x.n + 1);
+      launch_imported(x.n + nreq);
       ETX_CHECK(hipEventRecord(e1, hst.stream));
       if (!wait_stream(hst.stream, 5.0)) { printf("HANG imported %s L%d %s (%d tasks)\n", x.role.c_str(), x.layer, x.exp.c_str(), x.tasks); return 3; }
       const double us_i = elapsed_us();
@@ -710,7 +727,7 @@ int main(int argc, char** argv) {
         size_t n = 0, first = 0; for (size_t k = 0; k < A.size(); ++k) if (A[k] != B[k]) { if (!n) first = k; ++n; }
         if (n && first_byte < 0) first_byte = (long long)(compared_bytes + first);
         compared_bytes += A.size();
-        if (n) diff += std::string(" ") + (b < NB ? names[b] : (((b - NB) % 2) ? "vc" : "kc")) + ":" + std::to_string(n) + "B@" + std::to_string(first);
+        if (n) diff += std::string(" ") + buffer_names[b] + ":" + std::to_string(n) + "B@" + std::to_string(first);
       }
       printf("  %-10s L%-3d %-20s %s%s  original %6.1f us  imported %6.1f us\n", x.role.c_str(), x.layer, x.exp.c_str(),
              diff.empty() ? "identical" : "DIFFERS", diff.c_str(), us_o, us_i);
@@ -728,7 +745,7 @@ int main(int argc, char** argv) {
           if (fn) ETX_CHECK(hipLaunchKernel(fn, dim3(x.gx, x.gy, x.gz), dim3(d->block[0], d->block[1], d->block[2]), av.data(), 0, hst.stream));
           else ETX_CHECK(hipModuleLaunchKernel(tri, x.gx, x.gy, x.gz, d->block[0], d->block[1], d->block[2], tri_shared, hst.stream, av.data(), nullptr));
         };
-        for (int w = 0; w < 10; ++w) { original(); launch_imported(x.n + 1); }
+        for (int w = 0; w < 10; ++w) { original(); launch_imported(x.n + nreq); }
         if (!wait_stream(hst.stream, 5.0)) die("X5 warmup hung");
         for (int sample = 0; sample < 3; ++sample) {
           double values[2];
@@ -736,7 +753,7 @@ int main(int argc, char** argv) {
             const int who = (sample % 2) ? 1-order : order;
             ETX_CHECK(hipEventRecord(e0, hst.stream));
             for (int replay = 0; replay < 100; ++replay) {
-              if (who == 0) original(); else launch_imported(x.n + 1);
+              if (who == 0) original(); else launch_imported(x.n + nreq);
             }
             ETX_CHECK(hipEventRecord(e1, hst.stream));
             if (!wait_stream(hst.stream, 5.0)) die("X5 sample hung");
@@ -751,11 +768,12 @@ int main(int argc, char** argv) {
       if (!diff.empty()) ++bad;
     }
     {   // the ETX tiles with no vLLM counterpart (vLLM uses torch's embedding and argmax kernels)
-      const int last = (int)insts.size() + 1;
-      for (int li : {0, last}) {
+      std::vector<int> native;
+      for (int r = 0; r < nreq; ++r) { native.push_back(r); native.push_back(nreq + (int)insts.size() + r); }
+      for (int li : native) {
         ETX_CHECK(hipEventRecord(e0, hst.stream)); launch_imported(li); ETX_CHECK(hipEventRecord(e1, hst.stream));
         if (!wait_stream(hst.stream, 5.0)) die("native tile hung");
-        printf("  %-20s imported %6.1f us  (%d task(s))\n", li == 0 ? "prologue (ETX)" : "argmax (ETX)", elapsed_us(), etx_launch_count[li]);
+        printf("  %-20s imported %6.1f us  (%d task(s))\n", li < nreq ? "prologue (ETX)" : "argmax (ETX)", elapsed_us(), etx_launch_count[li]);
       }
     }
     printf("kernel time, summed over the checked launches (GPU events, one launch each):\n");
@@ -776,7 +794,7 @@ int main(int argc, char** argv) {
 #ifdef ETX_HOUR_PROFILE
   hst.hour_profile_init();
 #endif
-  int cov_hard = 0;
+  int cov_hard = 0, token_failures = 0;
   for (int run = 0; run < repeat; ++run) {
     for (int r = 0; r < nreq; ++r) {
       std::vector<int32_t> tin(steps + 2, 0);
@@ -879,6 +897,7 @@ int main(int argc, char** argv) {
              matched[r], gen, teacher ? " (teacher-forced argmax)" : "");
       if (first_div >= 0) printf("; first divergence at %d (ours %d, HF %d)", first_div, out[(int)prompt.size() - 1 + first_div], goldens[r][first_div]);
       printf("\n");
+      if (matched[r] != gen) ++token_failures;
 #ifdef ETX_INBODY_REPORT
       // Outside the timed step, with correctness for EVERY repetition.
       if (r == 0) {
@@ -1111,5 +1130,6 @@ int main(int argc, char** argv) {
   printf("RESULT model=%s requests=%d matched=%d gen=%d median_ms=%.3f wall_ms=%.3f tokens_per_s=%.0f matched_each=%s\n", dir.c_str(), nreq, mall, gen,
          med, wmed, med > 0 ? nreq * 1e3 / med : 0.0, ms.c_str());
   if (check_coverage && cov_hard) { printf("CHECK-COVERAGE FAILED: %d position(s) wrong beyond ties\n", cov_hard); return 5; }
+  if (token_failures) { printf("CHECK-TOKENS FAILED: %d request-run(s) differ\n", token_failures); return 6; }
   return 0;
 }

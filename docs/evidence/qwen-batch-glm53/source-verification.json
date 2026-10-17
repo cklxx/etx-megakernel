@@ -1,0 +1,41 @@
+{
+  "checked_date": "2026-10-17",
+  "sources": [
+    {
+      "url": "https://huggingface.co/zai-org/GLM-5.3-Flash/resolve/main/config.json",
+      "saved_file": "glm-config.json",
+      "sha256_now": "bb8f01c42cb92a52ca72e65afb4d5bd8d11aef083cd210e8de25dfb904f23e9f",
+      "matches_interrupted_evidence": true
+    },
+    {
+      "url": "https://huggingface.co/api/models/zai-org/GLM-5.3-Flash",
+      "saved_file": "glm-model-api.json",
+      "sha256_now": "adbb303c330e3cf116dfe558582e400f2b2aeaa021b4e046590f7d5a331852a3",
+      "matches_interrupted_evidence": false
+    },
+    {
+      "url": "https://raw.githubusercontent.com/vllm-project/recipes/main/models/zai-org/GLM-5.3-Flash.yaml",
+      "saved_file": "glm-recipe.yaml",
+      "sha256_now": "ffcd619ddd168d83e5517bc9fc00ca4b00e740f05cda8e6c0fc98149e672f92a",
+      "matches_interrupted_evidence": true
+    }
+  ],
+  "stable_api_fields": {
+    "id": "zai-org/GLM-5.3-Flash",
+    "sha": "46a050bec13002ad29ee795c16e61cf4fa3c4a9c",
+    "safetensors": {
+      "parameters": {
+        "BF16": 6926096640,
+        "F8_E4M3": 314396639232,
+        "F32": 295518
+      },
+      "total": 321323031390
+    }
+  },
+  "stable_api_fields_match": true,
+  "pinned_config": {
+    "url": "https://huggingface.co/zai-org/GLM-5.3-Flash/resolve/46a050bec13002ad29ee795c16e61cf4fa3c4a9c/config.json",
+    "sha256": "bb8f01c42cb92a52ca72e65afb4d5bd8d11aef083cd210e8de25dfb904f23e9f",
+    "matches_saved": true
+  }
+}

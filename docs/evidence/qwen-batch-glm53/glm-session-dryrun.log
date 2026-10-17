@@ -1,0 +1,3 @@
+Session hard stop: 300s from runner start (includes setup)
+  0 build_transport                  cpu      timeout   180s  reads: -  writes: boundary/run
+  1 transport                        cpu      timeout    90s  reads: boundary/run

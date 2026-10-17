@@ -1,0 +1,7 @@
+Session hard stop: 7200s from runner start (includes setup)
+  0 build_b2                         cpu      timeout  1500s  reads: -  writes: build_b2/run
+  1 qualify_b2                       GPU 0    timeout  4800s  reads: build_b2/run  writes: qualify_b2/correctness.json
+  2 build_b4                         cpu      timeout  1500s  reads: -  writes: build_b4/run
+  3 qualify_b4                       GPU 0    timeout  4800s  reads: build_b4/run, qualify_b2/correctness.json  writes: qualify_b4/correctness.json
+  4 build_b8                         cpu      timeout  1500s  reads: -  writes: build_b8/run
+  5 qualify_b8                       GPU 0    timeout  4800s  reads: build_b8/run, qualify_b4/correctness.json  writes: qualify_b8/correctness.json

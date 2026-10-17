@@ -1,0 +1,42 @@
+{
+  "schema": 1,
+  "recipe": {
+    "ETX_VL_REQUESTS": "8",
+    "ETX_VL_BATCH": "0",
+    "ETX_VL_NB": "1",
+    "ETX_VL_CHAIN": "0",
+    "ETX_VL_CHECK": "1",
+    "ETX_DEV_RESET": "0",
+    "ETX_VL_MAXLEN": "1072"
+  },
+  "performance": "unmeasured",
+  "host": [
+    "/staged/b8/run",
+    "/staged/qwen",
+    "/staged/b8/vl_plan.txt",
+    "--gen",
+    "32",
+    "--repeat",
+    "2",
+    "--golden",
+    "golden_c1024.txt",
+    "--golden1",
+    "golden_c1024_r97.txt",
+    "--golden2",
+    "golden_c1024_r194.txt",
+    "--golden3",
+    "golden_c1024_r291.txt",
+    "--golden4",
+    "golden_c1024_r388.txt",
+    "--golden5",
+    "golden_c1024_r485.txt",
+    "--golden6",
+    "golden_c1024_r582.txt",
+    "--golden7",
+    "golden_c1024_r679.txt"
+  ],
+  "positions": [
+    0,
+    1040
+  ]
+}

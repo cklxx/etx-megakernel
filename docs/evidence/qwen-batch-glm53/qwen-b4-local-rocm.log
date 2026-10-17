@@ -1,0 +1,15 @@
+== import (attn_mfma16_g8,attn_reduce,rms_norm_2d)
+attn_mfma16_g8         (256, 1, 1) slots=1 args=160B lds=8192B barriers=7
+attn_reduce            (128, 1, 1) slots=8 args=80B lds=2176B barriers=1
+rms_norm_2d            (256, 1, 1) slots=4 args=100B lds=320B barriers=2
+dsl ops attnprep,gemv,topk: /code/.wt/etx-qwen-batch-glm53-multigpu/build/qwen-batch-rocm/b4/dsl_tiles.hip; /code/.wt/etx-qwen-batch-glm53-multigpu/build/qwen-batch-rocm/b4/imp/imports.json updated
+== plan
+  tasks=241448 events=1744 eliminated=[]
+== device code (ROCm clang 22)
+bash: line 38:    26 Killed                  $RL/bin/clang++ -x hip --cuda-device-only --offload-arch=gfx942 -O3 -std=c++17 -nogpuinc --rocm-device-lib-path=$DL -isystem $R/inc -include __clang_hip_runtime_wrapper.h -D__HIP_PLATFORM_AMD__ -Ietx/runtime/include -I $OUT -I . $CFLAGS -Xclang -mlink-builtin-bitcode -Xclang $OUT/imports.bc -Rpass-analysis=kernel-resource-usage -S $OUT/megakernel_d0.hip -o $OUT/mk.s 2> $OUT/resource.log
+Traceback (most recent call last):
+  File "<stdin>", line 6, in <module>
+  File "/opt/homebrew/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/subprocess.py", line 577, in run
+    raise CalledProcessError(retcode, process.args,
+                             output=stdout, stderr=stderr)
+subprocess.CalledProcessError: Command '['bash', 'examples/vllm_llm/rocm_build_check.sh', 'qwen3-30b-a3b', 'default', '/Users/ckl/code/.wt/etx-qwen-batch-glm53-multigpu/build/qwen-batch-rocm/b4']' returned non-zero exit status 1.
