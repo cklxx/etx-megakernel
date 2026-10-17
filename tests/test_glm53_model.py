@@ -103,11 +103,14 @@ def test_clipped_swiglu_matches_hf_at_saturation_boundaries(tmp_path):
 def test_model_session_has_real_model_and_two_visible_devices():
     from etx.tools.gpu_jobs import load_session
     jobs,_=load_session(Path('examples/sessions/glm53_model.py'))
-    assert jobs[1].env['HIP_VISIBLE_DEVICES']=='0,1'
-    assert 'examples.glm53.run' in jobs[1].cmd and 'qualify' in jobs[1].cmd
-    assert jobs[1].reads==['model/run']
-    assert jobs[2].lane=='final' and 'tools/two_gpu_verify.py' in jobs[2].cmd
-    assert jobs[2].reads==['?qualification/qualification.json']
+    job={j.name:j for j in jobs}
+    assert [j.name for j in jobs]==['apt','etx_env','model_build','model_qualify','verify']
+    assert job['etx_env'].reads==['apt'] and job['model_build'].reads==['etx_env']
+    assert job['model_qualify'].env['HIP_VISIBLE_DEVICES']=='0,1'
+    assert 'examples.glm53.run' in job['model_qualify'].cmd and 'qualify' in job['model_qualify'].cmd
+    assert job['model_qualify'].reads==['model/run']
+    assert job['verify'].lane=='final' and 'tools/two_gpu_verify.py' in job['verify'].cmd
+    assert job['verify'].reads==['?qualification/qualification.json']
 
 
 def test_fixture_cannot_enter_hardware_qualification(native,tmp_path):

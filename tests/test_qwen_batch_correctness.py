@@ -78,7 +78,10 @@ def test_environment_is_fixed(monkeypatch):
 
 def test_session_is_gpu_free_to_load_and_orders_qualifications():
     jobs, _ = load_session(bc.ROOT / 'examples/sessions/qwen_batch_correctness.py')
-    assert len(jobs) == 7
+    assert len(jobs) == 9
+    # a staged ~/etx has no .venv: every build waits for the setup job that creates it
+    assert [j.name for j in jobs[:2]] == ['apt', 'etx_env'] and jobs[1].reads == ['apt']
+    assert all(j.reads == ['etx_env'] for j in jobs if j.name.startswith('build_b'))
     assert [j.gpu for j in jobs if j.lane == 'gpu'] == [0, 0, 0]
     assert 'qualify_b4/correctness.json' in next(j for j in jobs if j.name == 'qualify_b8').reads
     verify = next(j for j in jobs if j.name == 'verify')

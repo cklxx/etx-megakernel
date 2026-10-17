@@ -164,3 +164,26 @@ def test_require_seal_refuses_an_unsealed_record(tmp_path, capsys):
     root = record(tmp_path)
     assert run(root, '--qwen-only', '--require-seal') == 2
     assert 'VERIFY FAIL seal' in capsys.readouterr().out
+
+
+@pytest.mark.parametrize('session, flag', [('qwen_batch_correctness', '--qwen-only'),
+                                           ('glm53_model', '--glm-only')])
+def test_session_final_lane_command_runs_as_the_runner_runs_it(tmp_path, session, flag):
+    # The exact `final` cmd, under bash -c from the repository with the runner's interpreter
+    # first on PATH (etx/tools/gpu_jobs.py), against a complete and an empty record.
+    import os
+    import subprocess
+    import sys
+    from etx.tools.gpu_jobs import load_session
+    jobs, _ = load_session(ROOT / f'examples/sessions/{session}.py')
+    final, = [j for j in jobs if j.lane == 'final']
+    assert flag in final.cmd
+    env = dict(os.environ, PATH=str(Path(sys.executable).parent) + os.pathsep + os.environ.get('PATH', ''))
+    for root, code in ((record(tmp_path / 'good'), 0), (tmp_path / 'empty', 2)):
+        root.mkdir(parents=True, exist_ok=True)
+        done = subprocess.run(['bash', '-c', final.cmd], cwd=ROOT, env=dict(env, ETX_SESS_LOGDIR=str(root)),
+                              capture_output=True, text=True)
+        assert done.returncode == code, done.stdout + done.stderr
+        assert 'unrecognized arguments' not in done.stderr
+        out, = final.writes
+        assert json.loads((root / out).read_text())['status'] == ('OK' if code == 0 else 'FAIL')

@@ -1,7 +1,11 @@
 # Qwen B2/B4/B8 + GLM-5.3-Flash PP2 — two-GPU session runbook
 
-Correctness only. No download, no model fetch, no performance verdict. Both
-sessions run on one already-authorized `2x MI300X VM` with pre-staged assets.
+Correctness only. No model download, no performance verdict. Both sessions
+run on one already-authorized `2x MI300X VM` with pre-staged assets. A staged
+`~/etx` has no `.venv`, so each session starts with the `apt` and `etx_env`
+setup jobs of `examples/sessions/ds_interleave.py`: they create `~/etx/.venv`
+(system site packages) and install only `python3.12-venv`, PyYAML (and NumPy
+for GLM) when the box lacks them.
 
 Order: stage and preflight, Qwen B2/B4/B8 on GPU 0, then GLM PP2 on GPUs
 `0,1`, then fetch, verify, teardown. Each `start` creates a fresh logdir
@@ -29,11 +33,11 @@ prepared beforehand on an authorized box.
 ## 1. Preflight — one command, fails closed
 
 ```bash
-tools/session.sh preflight <ip>          # tree, ROCm, docker, dry run
+tools/session.sh preflight <ip>          # tree, ROCm, docker, dry run of both sessions
 
 ssh hotaisle@<ip>
 cd ~/etx
-.venv/bin/python tools/two_gpu_preflight.py \
+python3 tools/two_gpu_preflight.py \
   --qwen-model ~/llm/qwen3-30b-a3b \
   --glm-stage /staged/glm53 \
   --glm-reference /staged/glm53-reference.json \
@@ -58,13 +62,16 @@ pass to the GLM session.
 ## 2. Qwen B2/B4/B8 (GPU 0)
 
 ```bash
-ETX_QWEN_BATCH_MODEL=~/llm/qwen3-30b-a3b \
+ETX_QWEN_BATCH_MODEL=/home/hotaisle/llm/qwen3-30b-a3b \
   tools/session.sh start <ip> examples/sessions/qwen_batch_correctness.py 0
 ```
 
 `tools/session.sh start` forwards `ETX_QWEN_BATCH_MODEL` (among the GLM
-variables below) to the box. The session runs three CPU builds and three
-serialized GPU qualifications on GPU 0, then a `final` verification job.
+variables below) to the box. Give the box's absolute path: an unquoted `~` in
+this assignment expands on the laptop (`/Users/...`), not on the box. Unset, the
+session uses the box's own `~/llm/qwen3-30b-a3b`. The session runs the two
+setup jobs, three CPU builds and three serialized GPU qualifications on GPU 0,
+then a `final` verification job.
 
 Poll until the runner is gone and the record is sealed:
 
@@ -82,7 +89,7 @@ tools/session.sh fetch <ip> ~/etx-captures
 
 ## 3. GLM-5.3-Flash PP2 (GPUs 0,1)
 
-Both jobs are CPU-lane, so the runner does not mask either process to one GPU;
+Both model jobs are CPU-lane, so the runner does not mask either process to one GPU;
 the qualification job sets `HIP_VISIBLE_DEVICES=0,1` itself. `ETX_GLM_BATCH`
 must match the preflighted reference.
 
