@@ -279,8 +279,9 @@ static_assert(sizeof(fleet::Scratch::logits) >= 2 * kMaxB * sizeof(void*), "s.lo
 
 // fleet::gemv_rows(w, ld, x, y, nullptr, EPI_NONE, 1.f, N, kOprojK, 0, 1, worker, n_workers, coh) for kB vectors at
 // once, through fleet's half-wave path: rows first + k * n_workers, row k + 2 j + half of a group on half-wave `half`,
-// lane hl owns 16-byte chunk hl of the row (all 32 chunks valid at K = 256). xs: s.vec, slice j at j * kOprojK.
-// ys: the B output pointers, in LDS, read by the storing lane.
+// lane hl owns 16-byte chunk hl of the row (all 32 chunks valid at K = 256). xs: s.vec, slice b at b * kOprojK.
+// ys: the B output pointers, in LDS, read by the storing lane. One request at a time inside a group (sums, then
+// stores): only kOH accumulators are live, as in fleet's half-wave path.
 __device__ __forceinline__ void gemv_rows_half_xb(const __hip_bfloat16* __restrict__ w, int ld, const float* xs,
                                                   float* const* ys, int N, int worker, int n_workers, bool coh) {
   const int first = worker;
@@ -300,23 +301,18 @@ __device__ __forceinline__ void gemv_rows_half_xb(const __hip_bfloat16* __restri
   _Pragma("unroll") for (int j = 0; j < kOH; ++j)                                           \
     BUF[j] = fleet::load_weight(reinterpret_cast<const uint4*>(XBO_ROW(KK, j)) + hl);
 #define XBO_REDUCE(BUF, KK)                                                                 \
-  {                                                                                         \
-    float acc[kOH][kB];                                                                     \
-    _Pragma("unroll") for (int j = 0; j < kOH; ++j)                                         \
-      _Pragma("unroll") for (int b = 0; b < kB; ++b) acc[j][b] = 0.f;                       \
-    _Pragma("unroll") for (int b = 0; b < kB; ++b) {                                        \
-      const float* x8 = xs + b * kOprojK + hl * 8;                                          \
-      _Pragma("unroll") for (int j = 0; j < kOH; ++j) fleet::fma8(BUF[j], x8, acc[j][b]);   \
+  _Pragma("unroll") for (int b = 0; b < kB; ++b) {                                          \
+    float acc[kOH];                                                                         \
+    const float* x8 = xs + b * kOprojK + hl * 8;                                            \
+    _Pragma("unroll") for (int j = 0; j < kOH; ++j) {                                       \
+      acc[j] = 0.f;                                                                         \
+      fleet::fma8(BUF[j], x8, acc[j]);                                                      \
+      acc[j] = fleet::half_wave_sum(acc[j]);                                                \
     }                                                                                       \
-    _Pragma("unroll") for (int j = 0; j < kOH; ++j)                                         \
-      _Pragma("unroll") for (int b = 0; b < kB; ++b) acc[j][b] = fleet::half_wave_sum(acc[j][b]); \
     if (hl == 0) {                                                                          \
       _Pragma("unroll") for (int j = 0; j < kOH; ++j) {                                     \
         const int r = (KK) + 2 * j + half;                                                  \
-        if (r < cnt) {                                                                      \
-          const int n = first + r * n_workers;                                              \
-          _Pragma("unroll") for (int b = 0; b < kB; ++b) fleet::epi_st(ys[b] + n, acc[j][b], coh); \
-        }                                                                                   \
+        if (r < cnt) fleet::epi_st(ys[b] + first + r * n_workers, acc[j], coh);             \
       }                                                                                     \
     }                                                                                       \
   }
@@ -361,9 +357,13 @@ __device__ __forceinline__ void oproj(const etx_ctx* c) {
   const bool coh = run_task_coh(fq->rt);
   // the B o slices into s.vec: thread t loads 16-byte chunk t % 64 of request t / 64 (fleet's stage_vector, with the
   // build's activation loads)
-  if ((int)threadIdx.x < kB * kOprojK / 4) {
-    const int j = (int)threadIdx.x / (kOprojK / 4), i = (int)threadIdx.x % (kOprojK / 4);
-    reinterpret_cast<uint4*>(s.vec)[threadIdx.x] = ld_act16(reinterpret_cast<const uint4*>(tab[kMaxB + j]) + i, coh);
+  // the thread index through an empty asm, as in gemv_rows_xb: with threadIdx.x the staging offsets were hoisted out
+  // of the task loop (local ROCm 7.2.4 compile: 252 + 6 VGPRs, 1 workgroup per CU; with the asm: 248 + 6, 2)
+  int t = (int)threadIdx.x;
+  asm volatile("" : "+v"(t));
+  if (t < kB * kOprojK / 4) {
+    const int j = t / (kOprojK / 4), i = t % (kOprojK / 4);
+    reinterpret_cast<uint4*>(s.vec)[t] = ld_act16(reinterpret_cast<const uint4*>(tab[kMaxB + j]) + i, coh);
   }
   __syncthreads();
   gemv_rows_half_xb(wo + (int64_t)xcd * kc, hv, s.vec, reinterpret_cast<float* const*>(tab), d.hidden, worker, nw, coh);
