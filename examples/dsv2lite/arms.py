@@ -143,19 +143,36 @@ ARMS = {a.name: a for a in [
     # difference to x4xb is ETX_DSV2_OPROJ_XB=1, so a same-box A/B against x4xb measures that change. B = 4 only: B = 2
     # loses 40 us in the latency-bound case (/workspace/bound_batch_gemv.md), so x2 waits for this arm's GPU A/B.
     # Per-slot timing model per layer (graph.py xb_oproj_us; no measurement yet): x4xb runs 2 o_proj tasks per slot,
-    # 2 x 12.0 = 24.0 us; x4xbo runs 1 batched task, 0.5 us x 4 stage + 12.0 x 37 / 74 = 8.0 us. 27-layer protocol
-    # simulator (3 seeds, cv 0.05 / 0.1, COH=l1, COUPLE=none, 2026-10-18): kv_a shared (this arm) x4xb 7841.3 ->
-    # x4xbo 7349.5 us (-492 us); kv_a replicated 7826.2 -> 7334.2 us (-492 us, fix's bound reproduced). If the
-    # batched task stays at 14 us (latency-bound case), the gain is -310 us.
-    # Threshold, written before any GPU measurement: KEEP only if every token gate of x4xbo passes and the same-box A/B
-    # (tools/ab_same_box.py, 6 rounds in all 6 orders, A = x4xb, B = x4xbo) gives every round faster, sign-test
-    # p <= 0.05 and a median step gain >= 0.31 ms (the latency-bound case); otherwise DROP.
-    # Resources, local compiles of etx_megakernel_d0 (VGPR + AGPR, scratch B/lane, SGPR spill, VGPR spill, workgroups
-    # per CU), 2026-10-18:
-    #   ROCm 7.14:  x4xb 256 + 0, 80, 1719, 17, 2;  x4xbo 256 + 0, 80, 1750, 16, 2
-    #   ROCm 7.2.4: x4xb 248 + 6, 64, 1683, 13, 2;  x4xbo 248 + 6, 64, 1721, 14, 2 (no VGPR headroom, as x4xb)
-    # LDS 26668 B in all four. SGPR spill +31 / +38: the grid reuses the batched qkv grid's arguments, so the lowered
-    # dispatch code gets no new address table (the qkv tile's second table cost +420). Allowance: x4xb's 80.
+    # 2 x 12.0 = 24.0 us; x4xbo runs 1 batched task. The model sets 0.5 us x 4 stage + 12.0 x 37 / 74 = 8.0 us, but the
+    # task is latency-bound (one load round trip per wave in both grids, review_pr23.md section 3), so the expected
+    # batched task time is a RANGE: 8 to 13 us per slot. The model value 8.0 us is the low end of the range.
+    # Expected saving, 27-layer protocol simulator (3 seeds, cv 0.05 / 0.1, COH=l1, COUPLE=none, kv_a shared as in
+    # this arm, xb_oproj_us set to a constant, 2026-10-18), x4xb 7841.3 us:
+    #   batched task  8 us: x4xbo 7349.5 us, saving 492 us (sim), 0.52 ms (host)
+    #   batched task 13 us: x4xbo 7501.0 us, saving 340 us (sim), 0.36 ms (host)
+    # Host value = simulator value x 1.055 (the measured host / simulator ratio, /workspace/bound_next_1p85.md). So the
+    # expected host saving is 0.36 to 0.52 ms. At 14 us (fix's latency-bound case) the saving is 310 us (sim), 0.33 ms
+    # (host). kv_a replicated: 7826.2 -> 7334.2 us at 8 us (-492 us, fix's bound reproduced).
+    # Threshold, written before any GPU measurement (changed on 2026-10-18 after fix's review, still before any GPU
+    # run): KEEP only if every token gate of x4xbo passes AND tools/ab_same_box.py (A = x4xb, B = x4xbo, 6 rounds in
+    # all 6 orders, --identity-cmd) gives verdict WIN AND the median step saving is >= 0.15 ms; otherwise DROP.
+    #   WIN with 6 rounds means 6 of 6 rounds faster: the one-sided sign test gives p = 1/64 = 0.0156 <= 0.05 at 6/6
+    #   and p = 0.109 at 5/6, so one slower round gives DROP. WIN also needs median > max(--min-gain, max |A/A|).
+    #   ab_same_box gives the gain as a ratio (A / B - 1), not in ms. Compute the median saving in ms from ab.json
+    #   (median over the rounds of A - B), or pass --min-gain = 100 x 0.15 / T_A percent (about 2 at T_A = 7.5 ms).
+    #   0.15 ms is about 2 % of the step, below the expected range (0.36 to 0.52 ms), so noise in a real gain of
+    #   about 0.35 ms does not cause a DROP.
+    # Resources: ROCm 7.14 (the compiler of the GPU machine) is the GATE compiler. The occupancy gate (2 workgroups
+    # per CU) and the scratch allowance (80 B) apply to the 7.14 build only. The ROCm 7.2.4 numbers are recorded
+    # only; 7.2.4 has no VGPR headroom (248 + 6), so a later tile (lm_head) can go to 1 workgroup per CU on 7.2.4
+    # without a DROP. Local compiles of etx_megakernel_d0 (VGPR + AGPR, scratch B/lane, SGPR spill, VGPR spill,
+    # workgroups per CU), 2026-10-18:
+    #   ROCm 7.14 (gate):     x4xb 256 + 0, 80, 1719, 17, 2;  x4xbo 256 + 0, 80, 1753, 16, 2
+    #   ROCm 7.2.4 (record):  x4xb 248 + 6, 64, 1683, 13, 2;  x4xbo 248 + 6, 64, 1725, 14, 2
+    # x4xbo includes the peeled GEMV loop (gemv_no_terminal_all: no dead group of loads at the end of a wave; before
+    # the peel 1750 / 1721 SGPR spill). LDS 26668 B in all four. SGPR spill +34 / +42: the grid reuses the batched qkv
+    # grid's arguments, so the lowered dispatch code gets no new address table (the qkv tile's second table cost
+    # +420). Allowance: x4xb's 80.
     Arm("x4xbo", levers=ARMS_X[4].levers, flags=ARMS_X[4].flags, env=dict(ARMS_X[4].env, ETX_DSV2_QKV_XB="1",
                                                                             ETX_DSV2_OPROJ_XB="1"),
         scratch_allow=80),

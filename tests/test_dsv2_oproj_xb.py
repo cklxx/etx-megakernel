@@ -422,3 +422,29 @@ def test_duration_model_per_slot_oproj_time():
     the rows plus a 0.5 us stage per request."""
     assert 2 * dsv.DUR["oproj"] == pytest.approx(24.0)
     assert dsv.xb_oproj_us(4) == pytest.approx(8.0)
+
+
+def test_keep_rule_range_and_gate_compiler_are_written_in_arms_py():
+    """The rule was written before any GPU run: WIN (6/6 rounds, p <= 0.05) and median saving >= 0.15 ms, token gates
+    pass; the expected task time and saving are ranges; ROCm 7.14 is the gate compiler, 7.2.4 is recorded only."""
+    src = (ROOT / "examples/dsv2lite/arms.py").read_text()
+    block = src[src.index("# Per-slot timing model per layer (graph.py xb_oproj_us"):src.index('Arm("x4xbo", ')]
+    text = " ".join(line.strip().lstrip("#").strip() for line in block.splitlines())
+    for s in ("8 to 13 us per slot", "0.36 to 0.52 ms", "simulator value x 1.055",
+              "gives verdict WIN AND the median step saving is >= 0.15 ms; otherwise DROP",
+              "A = x4xb, B = x4xbo, 6 rounds", "--identity-cmd", "p = 1/64 = 0.0156",
+              "ROCm 7.14 (the compiler of the GPU machine) is the GATE compiler", "7.2.4 numbers are recorded only"):
+        assert s in text, s
+    assert ">= 0.31 ms" not in text
+
+
+def test_keep_rule_statistics_match_ab_same_box():
+    """6 rounds: 6/6 faster gives p = 1/64 <= 0.05 (WIN possible); 5/6 gives p = 7/64 > 0.05 (no WIN, so DROP)."""
+    import sys
+    sys.path.insert(0, str(ROOT / "tools"))
+    import ab_same_box as ab
+    assert ab.ALPHA == 0.05
+    assert ab.sign_test_p([0.03] * 6, positive=True) == pytest.approx(1 / 64)
+    assert ab.sign_test_p([0.03] * 5 + [-0.01], positive=True) == pytest.approx(7 / 64)
+    assert ab.verdict([0.03] * 6, [0.002], 0.01)[0] == "WIN"
+    assert ab.verdict([0.03] * 5 + [-0.01], [0.002], 0.01)[0] == "NO-DIFF"
