@@ -98,6 +98,45 @@ def test_subprocess_execution_and_deadline(tmp_path):
         bc.execute([sys.executable, '-c', 'import time; time.sleep(5)'], tmp_path / 'timeout.log', bc.clean_env(2), 0.1)
 
 
+def test_silent_active_compile_is_probed_and_keeps_its_hard_deadline(tmp_path, monkeypatch):
+    now = bc.time.time()
+    monkeypatch.setattr(bc.time, 'time', lambda: now + 1000)
+    def supervised(argv, **kw):
+        assert kw['deadline_s'] == 1200
+        kw['on_poll'](181)
+        kw['sink'].write('compile completed\n')
+        return 0
+    monkeypatch.setattr(bc.proc, 'run', supervised)
+    text = bc.execute(['synthetic-long-compile'], tmp_path / 'compile.log', bc.clean_env(2), 1200)
+    assert 'SILENCE-PROBE' in text and 'compile completed' in text
+
+
+def test_native_script_supervises_both_compiler_stages(tmp_path):
+    import os
+    import subprocess
+    import sys
+    toolchain = tmp_path / 'synthetic-compiler'
+    toolchain.mkdir()
+    # Only transport/orchestration is tested here; these are NOT GPU compilers.
+    for name in ('clang++', 'llc'):
+        p = toolchain / name
+        p.write_text(f'#!{sys.executable}\nimport pathlib, sys\n'
+                     'pathlib.Path(sys.argv[sys.argv.index("-o")+1]).write_text("synthetic compiler fixture\\n")\n')
+        p.chmod(0o755)
+    out = tmp_path / 'batch'
+    d = out / 'b2'
+    d.mkdir(parents=True)
+    (d / 'megakernel_d0.hip').write_text('#include "/code/fixture.h"\n')
+    (d / 'imports.bc').write_bytes(b'synthetic')
+    run = subprocess.run(['bash', 'examples/vllm_llm/batch_native.sh', str(out), '2'], cwd=bc.ROOT,
+                         env=dict(os.environ, ETX_LLVM=str(toolchain), ETX_QWEN_NATIVE_SECONDS='10'),
+                         capture_output=True, text=True, timeout=20)
+    assert run.returncode == 0, run.stdout + run.stderr
+    receipt = json.loads((d / 'native-check.json').read_text())
+    assert receipt['status'] == 'COMPILED' and receipt['gpu_correctness'] == 'unmeasured'
+    assert all((d / name).exists() for name in ('native-ir.log', 'native-isa.log'))
+
+
 def staged_model(tmp_path, batch=8):
     model = tmp_path / 'model'
     (model / 'hf').mkdir(parents=True)

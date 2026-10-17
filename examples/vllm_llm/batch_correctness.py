@@ -120,9 +120,12 @@ def execute(argv, path, env, seconds):
                 print(f'BATCH-PROGRESS elapsed_s={elapsed:.0f} bytes={path.stat().st_size} log={path}', flush=True)
                 last[0] = elapsed
             if elapsed > 180 and time.time() - path.stat().st_mtime > 180:
-                probe = subprocess.run(['ps', '-eo', 'pid,ppid,etime,stat,comm'], capture_output=True, text=True, timeout=5)
-                out.write('\nSILENCE-PROBE\n' + probe.stdout); out.flush()
-                raise ValueError(f'silent for 180s: {path}')
+                probe = subprocess.run(['ps', '-eo', 'pid,ppid,etime,pcpu,stat,comm'], capture_output=True, text=True, timeout=5)
+                out.write(f'\nSILENCE-PROBE exit={probe.returncode}\n' + probe.stdout + probe.stderr); out.flush()
+                # A long active compile may legitimately be quiet. Retain the
+                # probe and the hard step deadline, rather than misclassifying
+                # silence as a correctness failure.
+                print(f'BATCH-SILENCE-PROBE elapsed_s={elapsed:.0f} log={path}', flush=True)
         rc = proc.run(argv, sink=out, env=env, cwd=ROOT, deadline_s=seconds, poll_s=5, on_poll=poll)
     if rc:
         raise ValueError(f'exit {rc}; full log: {path}')
@@ -177,7 +180,7 @@ def main():
         inputs(a.model, a.batch)
         a.out.mkdir(parents=True, exist_ok=True)
         execute(['bash', 'examples/vllm_llm/build.sh', str(a.model)], a.out / 'build.log',
-                dict(clean_env(a.batch), ETX_OUT=str(a.build)), 1200)
+                dict(clean_env(a.batch), ETX_OUT=str(a.build)), 1800)
     else:
         qualify(a.model, a.build, a.out, a.batch)
         print(f'BATCH-CORRECTNESS PASS batch={a.batch} performance=unmeasured', flush=True)

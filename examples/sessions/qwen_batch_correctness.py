@@ -16,7 +16,7 @@ for b in (2, 4, 8):
     common = f'--batch {b} --model {shlex.quote(MODEL)} --build "{build}"'
     JOBS.append(dict(name=f'build_b{b}', lane='cpu',
                      cmd=f'{OP} build {common} --out "$ETX_SESS_LOGDIR/log_b{b}"',
-                     reads=[], writes=[f'build_b{b}/run'], timeout=1500, quiet_s=180))
+                     reads=[], writes=[f'build_b{b}/run'], timeout=2100, quiet_s=180))
     JOBS.append(dict(name=f'qualify_b{b}', lane='gpu', gpu=0,
                      cmd=f'{OP} qualify {common} --out "$ETX_SESS_LOGDIR/qualify_b{b}"',
                      reads=[f'build_b{b}/run'] + ([f'qualify_b{b//2}/correctness.json'] if b > 2 else []),

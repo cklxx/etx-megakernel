@@ -84,6 +84,14 @@ bash examples/vllm_llm/batch_local.sh "$PWD/build/qwen-batch-rocm"
 `batch_local.sh` requires the cached `etx-rocm22` image and local ROCm headers,
 device libraries and vLLM source. It runs the exact batch recipe through ROCm
 7.2.4's compiler. The 16-build matrix separately covers the existing configurations.
+If that container runs out of memory after emitting the plan/import bundle,
+`bash examples/vllm_llm/batch_native.sh "$PWD/build/qwen-batch-rocm" 2 4 8`
+checks those preserved plans with native LLVM. It remaps include paths only.
+Each native batch has a 1200-second diagnostic budget (override with
+`ETX_QWEN_NATIVE_SECONDS`), progress/probes, full logs and a completion receipt.
+Native LLVM is an additional syntax/ISA check, not a substitute for the ROCm
+compiler check or a predictor of its VGPR/spill allocation. Before any GPU
+provisioning, complete the ROCm checks on a local environment with enough memory.
 
 On an explicitly authorized, already prepared MI300X host, with vLLM source in
 `$VLLM` or `~/vllm`, run the committed single session:
@@ -95,7 +103,9 @@ ETX_QWEN_BATCH_MODEL="$MODEL" .venv/bin/python -m etx.tools.gpu_jobs \
 
 The session has a 7200-second cap; three CPU builds may overlap, qualifications
 are serialized B2 → B4 → B8. Every child has a deadline, full unfiltered log,
-30-second progress, and a process-state probe on 180-second silence. A failed
+30-second progress, and a process-state probe on 180-second silence. Quiet active
+compilers retain their 1800-second hard build deadline; silence alone is not a
+failure. A failed
 batch blocks later qualifications. No resource rental or setup is hidden in it.
 Estimate the GPU cost from the host's actual hourly rate before any authorized
 run; no allocation or GPU money was spent for this preparation.
@@ -221,3 +231,39 @@ Its record schema is in the module docstring. It refuses truncated or swapped
 requests and reports `model_certified: false`: token agreement cannot replace
 per-operator state/logit checks and same-build import certification. Tests use
 explicit synthetic records; no GLM model output was generated here.
+
+## Local validation and remaining gates, 2026-10-17
+
+- Clean-tree full suite at implementation commit `aaab31d`: **2253 passed,
+  18 skipped**. The final focused suite covers the later supervisor, native
+  wrapper and reference-preparation changes; see `focused-tests-final.log`.
+- Existing local matrix: **16/16** passed, including gfx942 code generation,
+  host syntax and the relevant UC checks. Full per-build logs are preserved.
+- Qwen B2/B4/B8 host syntax passed; compiled plans contain **194/388/776**
+  imported instances per position. **No new GPU instance check or token ran.**
+- Qwen B2 exact-default O3 device compile passed with ROCm 7.2.4/LLVM 22.
+  B4 exhausted the local VM (6.835 GiB RAM, 8 GiB swap); the O1 diagnostic also
+  exhausted it and was not adopted. B8 ROCm compilation is NOT-COMPLETE.
+- Native LLVM 23 produced B2 IR/ISA, which was independently assembled into an
+  object. That older wrapper invocation exited 2 after the helper was edited
+  while active; its log is retained. The current wrapper is syntax-checked and
+  tested with explicit synthetic compiler processes. B4 native IR is preserved;
+  B4 ISA and B8 native compilation were stopped as **NOT-COMPLETE**. Native
+  checks do not replace the outstanding ROCm preflight.
+- The GLM probe's two device kernels and host syntax passed both native LLVM 23
+  and ROCm 7.2.4 compiler checks. Its GPU transport, all GLM model inference and
+  every new performance result remain **unmeasured**.
+
+The initial full suite's fixture errors/clean-tree refusal and all compiler
+failures are retained. They consumed local CPU time only; GPU spending was $0.
+The standard kernel/optimization settings are unchanged. No local Docker memory
+or security configuration was changed, and no compiler/container remains active.
+
+The next prerequisite is completing ROCm B4/B8 device builds with enough local
+compiler memory, using the preserved plans/imports. Before any GPU provisioning,
+also stage and bind the exact checkpoint/references. The next GPU experiment is
+then the Qwen correctness session: every imported instance at positions 0/1040,
+all-request coverage and exact 32/32 in both free-greedy modes/repetitions. Record
+device/runtime conditions in its session record. Only after that passes should
+the two-GPU transport experiment proceed. No performance tuning or winner is
+part of this preparation.

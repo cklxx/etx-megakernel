@@ -1,0 +1,1 @@
+EXACT-DEVICE OK /code/.wt/etx-qwen-batch-glm53-multigpu/build/qwen-batch-rocm/b2 flags=-DETX_DSL_NT,-DETX_DSL_VECNORM

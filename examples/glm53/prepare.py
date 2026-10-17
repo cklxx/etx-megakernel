@@ -86,6 +86,7 @@ def budget(cfg, api, batch, context, gpu_gib):
                 unknown=['actual checkpoint tensor/shard allocation and FP8 conversion buffers',
                          'KDA recurrent and convolution states per request',
                          'sparse MLA latent cache, indexer/kpool cache and workspace',
+                         'upstream mHC boundary residual dtype/layout; BF16 transport is a proposal',
                          'mHC workspace, allocator/runtime/event buffers, vision weights if retained'],
                 memory_fit='UNESTABLISHED; payload reserve is not a runtime fit certificate')
 
@@ -104,7 +105,7 @@ def prepare(batch=1, context=1024, gpu_gib=192, evidence=EVIDENCE):
                                final_norm_and_head=1, kv_and_recurrence='owner of the complete layer',
                                mtp='disabled; not needed for 32-token greedy oracle'),
                 communication=dict(strategy='PP2, complete-layer ownership, no expert all-to-all',
-                                   activation='rank 0 sends [B,hc_mult,H] BF16 residual to rank 1',
+                                   activation='proposed: rank 0 sends [B,hc_mult,H] BF16 residual to rank 1; upstream dtype/layout must be verified',
                                    feedback='rank 1 returns B int32 greedy token IDs to rank 0',
                                    ordering='SYSTEM release/acquire events; both ranks reset before launch',
                                    transport='peer access + fine-grained buffers and shared integer counters'),

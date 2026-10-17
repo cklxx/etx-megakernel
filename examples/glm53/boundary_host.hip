@@ -25,7 +25,10 @@ int main(int argc, char** argv) {
     ETX_CHECK(hipDeviceCanAccessPeer(&access, rank, 1-rank));
     ETX_CHECK(hipDeviceGetP2PAttribute(&atomics, hipDevP2PAttrNativeAtomicSupported, rank, 1-rank));
     if (!access || !atomics) { fprintf(stderr, "BLOCKED: peer access and native peer integer atomics required\n"); return 2; }
-    ETX_CHECK(hipSetDevice(rank)); ETX_CHECK(hipDeviceEnablePeerAccess(1-rank, 0));
+    ETX_CHECK(hipSetDevice(rank));
+    const hipError_t peer = hipDeviceEnablePeerAccess(1-rank, 0);
+    if (peer == hipErrorPeerAccessAlreadyEnabled) (void)hipGetLastError();
+    else ETX_CHECK(peer);
   }
   const int batch = etx_shape[ETX_SYM_B], n = batch * 16384;
   if (batch != 1 && batch != 2 && batch != 4 && batch != 8) return 2;

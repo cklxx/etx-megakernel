@@ -1,0 +1,14 @@
+plan: graph=glm53_boundary_transport arch=gfx942 bindings={'B': 1}
+  devices=2 domains/device=8 workers/domain=76 (wg/CU=2)
+  tasks=130 events=3 eliminated=[]
+  send_state               static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=6.16)
+  receive_state            static   64 cross-device edges: pushes over P2P are prohibitive (ETC TP=4 dynamic 0.83x)
+  send_token               static   S_balance=0.00us <= 1.5x(C_cross=0.87+C_queue=1.53)
+  receive_token            static   1 cross-device edges: pushes over P2P are prohibitive (ETC TP=4 dynamic 0.83x)
+  event ready            scope=SYSTEM  mem=fine_grained numel=64 cross_domain=0 cross_device=64
+  event copied           scope=DEVICE  mem=device       numel=64 cross_domain=56 cross_device=0
+  event feedback         scope=SYSTEM  mem=fine_grained numel=1 cross_domain=0 cross_device=1
+  prefetch entries=0
+sources to link: ['examples/glm53/boundary_tiles.hip']
+wrote build/glm53-boundary/
+TRANSPORT-BUILD OK; GPU result unmeasured

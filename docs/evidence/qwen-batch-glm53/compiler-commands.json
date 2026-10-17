@@ -1,0 +1,161 @@
+{
+  "cwd": "/Users/ckl/code/.wt/etx-qwen-batch-glm53-multigpu",
+  "commands": [
+    {
+      "kind": "ROCm exact-default compile",
+      "argv": [
+        "bash",
+        "docs/evidence/qwen-batch-glm53/qwen-exact-compile.sh",
+        "2"
+      ],
+      "result": "exit 0"
+    },
+    {
+      "kind": "native IR",
+      "argv": [
+        "bash",
+        "etx/importer/hip_ir_local.sh",
+        "build/qwen-batch-rocm/b2/megakernel_native.hip",
+        "build/qwen-batch-rocm/b2/native.ll",
+        "-DETX_DSL_NT",
+        "-DETX_DSL_VECNORM",
+        "-Ietx/runtime/include",
+        "-I",
+        "build/qwen-batch-rocm/b2",
+        "-I",
+        ".",
+        "-Xclang",
+        "-mlink-builtin-bitcode",
+        "-Xclang",
+        "build/qwen-batch-rocm/b2/imports.bc"
+      ],
+      "env": {
+        "ETX_DEVLIBS": "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode"
+      },
+      "result": "compiler stage completed"
+    },
+    {
+      "kind": "native ISA",
+      "argv": [
+        "/opt/homebrew/opt/llvm/bin/llc",
+        "-mtriple=amdgcn-amd-amdhsa",
+        "-mcpu=gfx942",
+        "-O3",
+        "build/qwen-batch-rocm/b2/native.ll",
+        "-o",
+        "build/qwen-batch-rocm/b2/native.s"
+      ],
+      "result": "stage completed; older wrapper subsequently exited 2 due editing while active"
+    },
+    {
+      "kind": "ROCm exact-default compile",
+      "argv": [
+        "bash",
+        "docs/evidence/qwen-batch-glm53/qwen-exact-compile.sh",
+        "4"
+      ],
+      "result": "exit 137 OOM"
+    },
+    {
+      "kind": "native IR",
+      "argv": [
+        "bash",
+        "etx/importer/hip_ir_local.sh",
+        "build/qwen-batch-rocm/b4/megakernel_native.hip",
+        "build/qwen-batch-rocm/b4/native.ll",
+        "-DETX_DSL_NT",
+        "-DETX_DSL_VECNORM",
+        "-Ietx/runtime/include",
+        "-I",
+        "build/qwen-batch-rocm/b4",
+        "-I",
+        ".",
+        "-Xclang",
+        "-mlink-builtin-bitcode",
+        "-Xclang",
+        "build/qwen-batch-rocm/b4/imports.bc"
+      ],
+      "env": {
+        "ETX_DEVLIBS": "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode"
+      },
+      "result": "IR produced; overall native check incomplete"
+    },
+    {
+      "kind": "native ISA",
+      "argv": [
+        "/opt/homebrew/opt/llvm/bin/llc",
+        "-mtriple=amdgcn-amd-amdhsa",
+        "-mcpu=gfx942",
+        "-O3",
+        "build/qwen-batch-rocm/b4/native.ll",
+        "-o",
+        "build/qwen-batch-rocm/b4/native.s"
+      ],
+      "result": "exit 143; stopped"
+    },
+    {
+      "kind": "ROCm exact-default compile",
+      "argv": [
+        "bash",
+        "docs/evidence/qwen-batch-glm53/qwen-exact-compile.sh",
+        "8"
+      ],
+      "result": "exit 137 cancelled"
+    },
+    {
+      "kind": "native IR",
+      "argv": [
+        "bash",
+        "etx/importer/hip_ir_local.sh",
+        "build/qwen-batch-rocm/b8/megakernel_native.hip",
+        "build/qwen-batch-rocm/b8/native.ll",
+        "-DETX_DSL_NT",
+        "-DETX_DSL_VECNORM",
+        "-Ietx/runtime/include",
+        "-I",
+        "build/qwen-batch-rocm/b8",
+        "-I",
+        ".",
+        "-Xclang",
+        "-mlink-builtin-bitcode",
+        "-Xclang",
+        "build/qwen-batch-rocm/b8/imports.bc"
+      ],
+      "env": {
+        "ETX_DEVLIBS": "/Users/ckl/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode"
+      },
+      "result": "exit 143, stopped after >20 minutes"
+    },
+    {
+      "kind": "independent native B2 assembler",
+      "argv": [
+        "/opt/homebrew/opt/llvm/bin/llvm-mc",
+        "-triple=amdgcn-amd-amdhsa",
+        "-mcpu=gfx942",
+        "-filetype=obj",
+        "build/qwen-batch-rocm/b2/native.s",
+        "-o",
+        "build/qwen-batch-rocm/b2/native.o"
+      ],
+      "result": "exit 0"
+    }
+  ],
+  "versions": {
+    "native_llvm": {
+      "exit": 0,
+      "output": "Homebrew clang version 23.1.1\nTarget: arm64-apple-darwin24.6.0\nThread model: posix\nInstalledDir: /opt/homebrew/Cellar/llvm/23.1.1_1/bin\nConfiguration file: /opt/homebrew/Cellar/llvm/23.1.1_1/etc/clang/arm64-apple-darwin24.cfg\n"
+    },
+    "python": {
+      "exit": 0,
+      "output": "Python 3.13.5\n"
+    },
+    "cached_rocm_image": {
+      "exit": 0,
+      "output": "sha256:084a446de60ebf2192b2000d1da2fc784aea0f48a8b3e7cf672f0b60a26314af\n"
+    },
+    "vllm_source_commit": {
+      "exit": 0,
+      "output": "f46a9dfe2c5f57bebbd29556cbbb25eabd874226\n"
+    }
+  }
+}
