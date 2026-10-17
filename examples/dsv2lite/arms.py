@@ -245,7 +245,9 @@ ARMS = {a.name: a for a in [
     # Threshold, written before any GPU measurement: KEEP only if every token gate passes and the same-box A/B
     # (tools/ab_same_box.py, 6 rounds in all 6 orders, --identity-cmd, A = x4xbor, B = x4xbora) gives verdict WIN
     # (6/6 rounds faster, p <= 0.05, median gain > max |A/A control|) and a median step saving (A - B, ms, ab.json)
-    # >= 0.587 ms (pessimistic -556.3 us x 1.055 host scale); otherwise DROP.
+    # >= 0.30 ms; otherwise DROP. The floor is below the stress case (-448.3 us x 1.055 = 0.47 ms host) and leaves
+    # 0.17 ms for model error (fix's review of PR #27). A median of 0.30 .. 0.47 ms is KEEP, recorded as "KEEP, below
+    # the stress case"; then a timed (stamped) trace of the 8-chunk attention task comes before the next estimate.
     # Resources (etx_megakernel_d0: VGPR + AGPR, scratch B/lane, SGPR spill, VGPR spill, WG/CU), 0c641ec + this arm:
     #   ROCm 7.14 (gate):     x4xbor 256 + 0, 80, 1796, 17, 2;  x4xbora 256 + 0, 80, 1794, 17, 2
     #   ROCm 7.2.4 (record):  x4xbor 248 + 6, 64, 1756, 14, 2;  x4xbora 248 + 6, 64, 1754, 14, 2

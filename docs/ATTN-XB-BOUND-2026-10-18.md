@@ -60,8 +60,19 @@ Gain against x4xbl: -715 / -552 / -444 us.
 
 KEEP only if every token gate passes and `tools/ab_same_box.py` (6 rounds, all 6 orders, `--identity-cmd`,
 A = x4xbor, B = x4xbora = x4xbor + ETX_DSV2_ATTN_XB=1 + -DETX_DSV2_ATTN_XB=1) gives verdict WIN (6/6 rounds faster,
-p <= 0.05, median gain > max |A/A control|) and a median step saving (A - B, from ab.json) >= 0.587 ms
-(pessimistic -556.3 us x 1.055). Otherwise DROP.
+p <= 0.05, median gain > max |A/A control|) and a median step saving (A - B, from ab.json) >= 0.30 ms.
+Otherwise DROP.
+
+- The floor is below the full expected range. The stress case is -448.3 us x 1.055 = 0.47 ms host. The margin for
+  model error is 0.17 ms.
+- 0.30 ms is about 4.5 % of the step. It is also the 0.3 ms stop line of this document.
+- A host gain of 0.30 ms needs attention at about 29-30 us per task. That is about 3.5 x the modeled slope. A result
+  below 0.30 ms thus shows a model error, and DROP is then correct.
+- A median of 0.30 .. 0.47 ms is KEEP. Record it as "KEEP, below the stress case". Then make one timed (stamped)
+  trace of the 8-chunk attention task before the next estimate uses the timing model.
+- History: the first floor was 0.587 ms (pessimistic -556.3 us x 1.055). fix's review of PR #27 showed that this
+  floor is inside the expected range, so a real gain of 0.47-0.58 ms gave DROP. The floor changed to 0.30 ms before
+  any GPU run.
 
 ## Step 2 (built): ETX_DSV2_ATTN_XB=1, arm x4xbora
 
