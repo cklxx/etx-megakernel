@@ -231,8 +231,10 @@ def test_arms_differ_from_their_reference_only_by_the_switch():
 
 
 # ---------------------------------------------------------------- the row split of gemv_rows_xb
-def _rows_written(N, xcd, n_xcds, worker, nw, waves=4, rpi=1):
-    """Python mirror of gemv_rows_xb's row loop (fleet's xcd_rows, first / cnt, the two-buffer pipeline)."""
+def _rows_written(N, xcd, n_xcds, worker, nw, waves=4, rpi=1, issued=None, peeled=True):
+    """Python mirror of gemv_rows_xb's row loop (fleet's xcd_rows, first / cnt, the two-buffer pipeline with the last
+    group peeled, as lever gemv_no_terminal_all). issued: if a list, gets (wave, k) for each group of loads.
+    peeled=False: the unpatched loop of a4bb267 (one dead group of loads at the end of each wave), for the byte count."""
     per = (N + n_xcds - 1) // n_xcds
     begin, end = xcd * per, min(N, xcd * per + per)
     first = begin + worker
@@ -246,18 +248,42 @@ def _rows_written(N, xcd, n_xcds, worker, nw, waves=4, rpi=1):
         if k >= cnt:
             continue
 
+        def issue(kk):
+            if issued is not None:
+                issued.append((wave, kk))
+
         def reduce(kk):
             out.extend(first + (kk + r) * nw for r in range(rpi) if kk + r < cnt)
-        while True:
+        issue(k)
+        if not peeled:
+            while True:
+                k2 = k + stride
+                issue(k2)
+                reduce(k)
+                if k2 >= cnt:
+                    break
+                k3 = k2 + stride
+                issue(k3)
+                reduce(k2)
+                if k3 >= cnt:
+                    break
+                k = k3
+            continue
+        while k + 2 * stride < cnt:
             k2 = k + stride
+            issue(k2)
             reduce(k)
-            if k2 >= cnt:
-                break
             k3 = k2 + stride
+            issue(k3)
             reduce(k2)
-            if k3 >= cnt:
-                break
             k = k3
+        if k + stride < cnt:
+            k2 = k + stride
+            issue(k2)
+            reduce(k)
+            reduce(k2)
+        else:
+            reduce(k)
     return out
 
 
@@ -277,8 +303,55 @@ def test_mirror_matches_the_source_lines():
                  "const bool kvs = (c->cst[3] & kKvs) != 0;",
                  "const bool fold = (c->cst[2] & kFold) != 0;",
                  "tab[threadIdx.x] = p.act.q + q0;",
-                 "fleet::epi_st(ys[j] + n, fleet::bf16_round(1.f * fleet::bf16_round(acc[r][j])), false);"):
+                 "fleet::epi_st(ys[j] + n, fleet::bf16_round(1.f * fleet::bf16_round(acc[r][j])), false);",
+                 "while (k + 2 * stride < cnt) {",
+                 "if (k + stride < cnt) {"):
         assert line in XB_SRC, line
+    gemv = XB_SRC[XB_SRC.index("void gemv_rows_xb("):XB_SRC.index("#undef XB_ROW")]
+    assert "if (k2 >= cnt) break;" not in gemv and "if (k3 >= cnt) break;" not in gemv
+
+
+def _groups(kvs, peeled):
+    """(groups of loads issued, groups reduced) per layer: 8 XCDs x 74 workers, the q GEMV and the kv_a GEMV."""
+    heads, q_head_dim, kv_rows = 16, 192, 512 + 64
+    q_rows = heads // dsv.XCDS * q_head_dim
+    issued = reduced = 0
+    for xcd in range(dsv.XCDS):
+        for w in range(dsv.XB_W):
+            for args in ((q_rows, 0, 1), (kv_rows, xcd, dsv.XCDS) if kvs else (kv_rows, 0, 1)):
+                got = []
+                rows = _rows_written(*args, w, dsv.XB_W, issued=got, peeled=peeled)
+                issued += len(got)
+                reduced += len(rows)                      # kRPI = 1: one row per group
+    return issued, reduced
+
+
+@pytest.mark.parametrize("kvs", [False, True])
+def test_no_wave_loads_a_group_it_does_not_reduce(kvs):
+    """gemv_no_terminal_all: every group of loads is a group of rows < cnt, and each group is loaded once."""
+    heads, q_head_dim, kv_rows = 16, 192, 512 + 64
+    q_rows = heads // dsv.XCDS * q_head_dim
+    for xcd in range(dsv.XCDS):
+        for w in range(dsv.XB_W):
+            for N, x, n in ((q_rows, 0, 1), (kv_rows, xcd, dsv.XCDS) if kvs else (kv_rows, 0, 1)):
+                per = (N + n - 1) // n
+                first, end = x * per + w, min(N, x * per + per)
+                cnt = max(0, (end - first + dsv.XB_W - 1) // dsv.XB_W)
+                issued = []
+                _rows_written(N, x, n, w, dsv.XB_W, issued=issued)
+                assert all(k < cnt for _, k in issued) and len(issued) == len(set(issued)), (xcd, w)
+    issued, reduced = _groups(kvs, peeled=True)
+    assert issued == reduced
+
+
+@pytest.mark.parametrize("kvs, dead", [(False, 4736), (True, 2944)])
+def test_dead_groups_removed_per_layer(kvs, dead):
+    """The unpatched loop loaded one dead group (1 row x 4 KB at K = 2048) per active wave: 4736 groups (18.5 MiB
+    issued) per layer with kv_a replicated, 2944 (11.5 MiB) with kv_a shared. The row is clamped to cnt - 1, a row the
+    workgroup also loads, so the dead loads are mostly L2 hits, not HBM reads."""
+    old_issued, reduced = _groups(kvs, peeled=False)
+    assert old_issued - reduced == dead
+    assert _groups(kvs, peeled=True) == (reduced, reduced)
 
 
 @pytest.mark.parametrize("kvs", [False, True])
