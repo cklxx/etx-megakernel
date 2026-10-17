@@ -36,9 +36,6 @@ constexpr int kD = 4;                            // 16-byte chunks per lane per 
 constexpr int kRPI = 1;                          // rows per wave per group, two groups in flight: 32 VGPRs of weights
                                                  // (fleet's pipelined<2, 4> has 64; with B = 4 the megakernel needs them)
 constexpr size_t kVecBytes = (size_t)fleet::kMaxHidden * sizeof(__hip_bfloat16);   // 4096 B per request
-#ifndef XB_SEG
-#define XB_SEG 0
-#endif
 constexpr int kFold = 1, kKvs = 2;               // grid constant flags (graph.py XB_FOLD, XB_KVS)
 
 // LDS slot j's byte offset in fleet::Scratch
@@ -255,19 +252,10 @@ __device__ __forceinline__ void qkv(const etx_ctx* c) {
   }
   __syncthreads();
   float* const* out = reinterpret_cast<float* const*>(tab);
-#if XB_SEG
-#pragma nounroll
-  for (int seg = 0; seg < 2; ++seg) {
-    const bool kv = seg != 0;
-    gemv_rows_xb(wq + (int64_t)(kv ? kv0 : q0) * d.hidden, d.hidden, s, out + (kv ? kMaxB : 0), kv ? kv_rows : q_rows,
-                 d.hidden, kv && kvs ? xcd : 0, kv && kvs ? fleet::kNumXCDs : 1, worker, nw);
-  }
-#else
   gemv_rows_xb(wq + (int64_t)q0 * d.hidden, d.hidden, s, out, q_rows, d.hidden, 0, 1, worker, nw);
   // FLAG_KVA_SHARED: this XCD's 1/8 of the rows into one buffer; otherwise this XCD's own full copy
   gemv_rows_xb(wq + (int64_t)kv0 * d.hidden, d.hidden, s, out + kMaxB, kv_rows, d.hidden, kvs ? xcd : 0,
                kvs ? fleet::kNumXCDs : 1, worker, nw);
-#endif
 }
 
 }  // namespace etx_xb
