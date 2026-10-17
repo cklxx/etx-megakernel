@@ -1,186 +1,300 @@
 {
-  "base_commit": "e26cc872d109eefbd61d60482f010647ed18512f",
-  "builds": {
-    "alld4r0_after": {
-      "isa_sha256": "f26a7ff3bdf99aa5d0f7ae1c7a50450bb5bfb801b089a6b3217455f3fb396bf5",
-      "megakernel_d0_hip_sha256": "7835eaf60457373f610c663e4330a9aedd7c221200d75797a9cddd4c04c034df",
-      "path": "build/d4s-final-r0/gemv_no_terminal_all+norm_tree_all+argmax_tree+topk_rank+attn_prologue_live",
-      "plan_data_h_sha256": "5ec17310661ccb0847401cd0f175bb66f188e63a75d4b09d282123d165c13b98",
-      "plan_sha256": "3e648b7c7abd036d3f31cf9d14fdab01cad518ca1c2dae65a5cb575b5c1f1382",
-      "resources": {
-        "agpr": 90,
-        "lds": 26668,
-        "occupancy": 1,
-        "scratch": 0,
-        "sgpr": 108,
-        "vgpr": 256
-      }
+  "arm": "d4s",
+  "arm_build": {
+    "compiler": {
+      "clang_commit": "f58b06dce1f9c15707c5f808fd002e18c2accf7e",
+      "clang_version": "AMD clang version 22.0.0git (https://github.com/RadeonOpenCompute/llvm-project roc-7.2.4 26084 f58b06dce1f9c15707c5f808fd002e18c2accf7e)",
+      "compiler_path": "/workspace/rocm724deb/stage/opt/rocm-7.2.4/lib/llvm/bin/clang++",
+      "mode": "local",
+      "rocm_root": "/workspace/rocm724deb/stage/opt/rocm-7.2.4",
+      "toolchain": "7.2.4"
     },
-    "alld4r0_before": {
-      "isa_sha256": "f26a7ff3bdf99aa5d0f7ae1c7a50450bb5bfb801b089a6b3217455f3fb396bf5",
-      "megakernel_d0_hip_sha256": "7835eaf60457373f610c663e4330a9aedd7c221200d75797a9cddd4c04c034df",
-      "path": "build/d4s-before-r0/gemv_no_terminal_all+norm_tree_all+argmax_tree+topk_rank+attn_prologue_live",
-      "plan_data_h_sha256": "5ec17310661ccb0847401cd0f175bb66f188e63a75d4b09d282123d165c13b98",
-      "plan_sha256": "3e648b7c7abd036d3f31cf9d14fdab01cad518ca1c2dae65a5cb575b5c1f1382",
-      "resources": {
-        "agpr": 90,
-        "lds": 26668,
-        "occupancy": 1,
-        "scratch": 0,
-        "sgpr": 108,
-        "vgpr": 256
-      }
+    "isa_sha256": "2c4390925189a01f5b6974b2c0b0926a3245de20888d4c75c8997da723f2a479",
+    "kernel_sha256": "3b76dbc932e6d23f829967949605e10353f4dc519c6e0d4482d86adddae3e560",
+    "plan_sha256": "3e648b7c7abd036d3f31cf9d14fdab01cad518ca1c2dae65a5cb575b5c1f1382",
+    "resources": {
+      "agpr": 104,
+      "lds": 26672,
+      "occupancy": 1,
+      "scratch": 0,
+      "sgpr": 108,
+      "vgpr": 256
     },
-    "alld4s": {
-      "isa_sha256": "2c4390925189a01f5b6974b2c0b0926a3245de20888d4c75c8997da723f2a479",
-      "megakernel_d0_hip_sha256": "3b76dbc932e6d23f829967949605e10353f4dc519c6e0d4482d86adddae3e560",
-      "path": "build/d4s-final-slices/gemv_no_terminal_all+norm_tree_all+argmax_tree+topk_rank+attn_prologue_live",
-      "plan_data_h_sha256": "5ec17310661ccb0847401cd0f175bb66f188e63a75d4b09d282123d165c13b98",
-      "plan_sha256": "3e648b7c7abd036d3f31cf9d14fdab01cad518ca1c2dae65a5cb575b5c1f1382",
-      "resources": {
-        "agpr": 104,
-        "lds": 26672,
-        "occupancy": 1,
-        "scratch": 0,
-        "sgpr": 108,
-        "vgpr": 256
-      }
-    },
-    "d4s": {
-      "isa_sha256": "fc67219601226cce9b02793a8fc38e3dcfa5f74899b9a993779b54a97a648f83",
-      "megakernel_d0_hip_sha256": "3b76dbc932e6d23f829967949605e10353f4dc519c6e0d4482d86adddae3e560",
-      "path": "build/d4s-final-d4/default",
-      "plan_data_h_sha256": "5ec17310661ccb0847401cd0f175bb66f188e63a75d4b09d282123d165c13b98",
-      "plan_sha256": "3e648b7c7abd036d3f31cf9d14fdab01cad518ca1c2dae65a5cb575b5c1f1382",
-      "resources": {
-        "agpr": 65,
-        "lds": 26672,
-        "occupancy": 1,
-        "scratch": 0,
-        "sgpr": 108,
-        "vgpr": 256
-      }
-    },
-    "default": {
-      "isa_sha256": "a105cb16a414ee0f9f697c9de13205419d09674f5c69f6ee804cf36942377724",
-      "megakernel_d0_hip_sha256": "751293fad5f5c98ec6dbf9eeca3c73319b1d4ded4b6ca73996a65757c0ffae5d",
-      "path": "build/d4s-final-default/default",
-      "plan_data_h_sha256": "25c9363c704c8e87fbcbc9be06f8954a0c6ae9d9c3f65f8cff495c9a9f931256",
-      "plan_sha256": "09011c207b1e92febf29a2c2efc2d944ef9ad7ac8a0803633579c8444d821f8a",
-      "resources": {
-        "agpr": 48,
-        "lds": 26668,
-        "occupancy": 1,
-        "scratch": 0,
-        "sgpr": 108,
-        "vgpr": 256
-      }
-    },
-    "old_all_d4_32": {
-      "isa_sha256": "cfd97fd9949a9d3054997a7404a75a143882cb6b3befddb59a4702e3ea349721",
-      "megakernel_d0_hip_sha256": "3b76dbc932e6d23f829967949605e10353f4dc519c6e0d4482d86adddae3e560",
-      "path": "build/d4s-before-slices/gemv_no_terminal_all+norm_tree_all+argmax_tree+topk_rank+attn_prologue_live",
-      "plan_data_h_sha256": "5ec17310661ccb0847401cd0f175bb66f188e63a75d4b09d282123d165c13b98",
-      "plan_sha256": "3e648b7c7abd036d3f31cf9d14fdab01cad518ca1c2dae65a5cb575b5c1f1382",
-      "resources": {
-        "agpr": 89,
-        "lds": 26672,
-        "occupancy": 1,
-        "scratch": 0,
-        "sgpr": 108,
-        "vgpr": 256
-      }
+    "static": {
+      "asm_lines": 157847,
+      "inv_sc0": 10,
+      "inv_sc1": 357,
+      "nt_weight_loads": 222,
+      "sys_loads": 0,
+      "vmcnt0_waits": 3708,
+      "wbl2": 172
     }
   },
-  "compiler": "ROCm 7.2.4 AMD clang 22, gfx942, offline etx-rocm22 container",
+  "compiler": {
+    "clang_commit": "f58b06dce1f9c15707c5f808fd002e18c2accf7e",
+    "clang_version": "AMD clang version 22.0.0git (https://github.com/RadeonOpenCompute/llvm-project roc-7.2.4 26084 f58b06dce1f9c15707c5f808fd002e18c2accf7e)",
+    "compiler_path": "/workspace/rocm724deb/stage/opt/rocm-7.2.4/lib/llvm/bin/clang++",
+    "mode": "local",
+    "rocm_root": "/workspace/rocm724deb/stage/opt/rocm-7.2.4",
+    "toolchain": "7.2.4"
+  },
+  "cpu_gates": {
+    "files": [
+      "tests/test_dsv2_lever_gemv_no_terminal_all.py",
+      "tests/test_dsv2_lever_norm_tree_all.py",
+      "tests/test_dsv2_lever_argmax_tree.py",
+      "tests/test_dsv2_lever_topk_rank.py",
+      "tests/test_dsv2_lever_attn_prologue_live.py",
+      "tests/test_dsv2_stamps.py",
+      "tests/test_dsv2_d4.py"
+    ],
+    "summary": "82 passed in 9.15s"
+  },
+  "default": {
+    "compiler": {
+      "clang_commit": "f58b06dce1f9c15707c5f808fd002e18c2accf7e",
+      "clang_version": "AMD clang version 22.0.0git (https://github.com/RadeonOpenCompute/llvm-project roc-7.2.4 26084 f58b06dce1f9c15707c5f808fd002e18c2accf7e)",
+      "compiler_path": "/workspace/rocm724deb/stage/opt/rocm-7.2.4/lib/llvm/bin/clang++",
+      "mode": "local",
+      "rocm_root": "/workspace/rocm724deb/stage/opt/rocm-7.2.4",
+      "toolchain": "7.2.4"
+    },
+    "isa_sha256": "a105cb16a414ee0f9f697c9de13205419d09674f5c69f6ee804cf36942377724",
+    "kernel_sha256": "751293fad5f5c98ec6dbf9eeca3c73319b1d4ded4b6ca73996a65757c0ffae5d",
+    "plan_sha256": "09011c207b1e92febf29a2c2efc2d944ef9ad7ac8a0803633579c8444d821f8a",
+    "resources": {
+      "agpr": 48,
+      "lds": 26668,
+      "occupancy": 1,
+      "scratch": 0,
+      "sgpr": 108,
+      "vgpr": 256
+    },
+    "static": {
+      "asm_lines": 107990,
+      "inv_sc0": 6,
+      "inv_sc1": 279,
+      "nt_weight_loads": 252,
+      "sys_loads": 0,
+      "vmcnt0_waits": 2750,
+      "wbl2": 118
+    }
+  },
+  "default_isa_matches_baseline": true,
+  "delta_vs_default": {
+    "agpr": 56,
+    "lds": 4,
+    "occupancy": 0,
+    "scratch": 0,
+    "sgpr": 0,
+    "vgpr": 0
+  },
+  "etx_commit": "a4bb2674d927ba0fe2e93176f11356ee3e72f2b9",
+  "etx_dirty": true,
+  "flags": [
+    "-DETX_DSV2_D4=1"
+  ],
   "fleet_commit": "3fb67a6",
   "fleet_src_sha256": "28f5cbb4f39524df318883522341c48ca4162c18b71a3a6223c52eabb40ce4b3",
-  "gpu_gate": {
-    "every_gain_positive": true,
-    "layers": 27,
-    "median_min_us": 30,
-    "median_must_exceed_spread_times": 2,
-    "reference": "alld4r0",
-    "rounds": 5,
-    "tokens": 32
+  "plan_env": {
+    "ETX_DSV2_D4": "1",
+    "ETX_DSV2_D4_ROWS": "32"
   },
-  "image": "sha256:e8958ce54391229087b63d0e8636df58b14f160f1444246c8c6cb58f8b872a6b",
-  "isa_observations": {
-    "alld4s_down_expert_pointer_load_line": 108655,
-    "alld4s_down_intervening_wait_line": 108666,
-    "alld4s_down_weight_load_lines": [
-      108660,
-      108665,
-      108668
-    ],
-    "alld4s_metadata_barrier_line": 112478,
-    "alld4s_metadata_vector_load_lines": [
-      112465,
-      112471
-    ],
-    "down_weight_issue_batches": 2
-  },
-  "prior_trace_reproduction": {
-    "d4": {
-      "layers": "3..25 inclusive",
-      "median_layer_metrics_us": {
-        "down": {
-          "first_ready_us": 45.19999999999982,
-          "last_done_us": 65.56999999999994,
-          "mean_body_us": 17.514054054053968
-        },
-        "sdown": {
-          "first_ready_us": 39.02999999999997,
-          "last_done_us": 77.11000000000013,
-          "mean_body_us": 35.73351351351347
-        },
-        "shgu": {
-          "first_ready_us": 2.2200000000000273,
-          "last_done_us": 38.2199999999998,
-          "mean_body_us": 33.66000000000003
+  "prior_record": {
+    "base_commit": "e26cc872d109eefbd61d60482f010647ed18512f",
+    "builds": {
+      "alld4r0_after": {
+        "isa_sha256": "f26a7ff3bdf99aa5d0f7ae1c7a50450bb5bfb801b089a6b3217455f3fb396bf5",
+        "megakernel_d0_hip_sha256": "7835eaf60457373f610c663e4330a9aedd7c221200d75797a9cddd4c04c034df",
+        "path": "build/d4s-final-r0/gemv_no_terminal_all+norm_tree_all+argmax_tree+topk_rank+attn_prologue_live",
+        "plan_data_h_sha256": "5ec17310661ccb0847401cd0f175bb66f188e63a75d4b09d282123d165c13b98",
+        "plan_sha256": "3e648b7c7abd036d3f31cf9d14fdab01cad518ca1c2dae65a5cb575b5c1f1382",
+        "resources": {
+          "agpr": 90,
+          "lds": 26668,
+          "occupancy": 1,
+          "scratch": 0,
+          "sgpr": 108,
+          "vgpr": 256
         }
       },
-      "trace": "/Users/ckl/code/etx-cache/results_2026-10-13-d1d5/run2/trace_d4.trace.bin",
-      "trace_sha256": "7cf640ebcedfc967655f6e5598aaf07487b26873a88318d82b4fe295829b76ad"
+      "alld4r0_before": {
+        "isa_sha256": "f26a7ff3bdf99aa5d0f7ae1c7a50450bb5bfb801b089a6b3217455f3fb396bf5",
+        "megakernel_d0_hip_sha256": "7835eaf60457373f610c663e4330a9aedd7c221200d75797a9cddd4c04c034df",
+        "path": "build/d4s-before-r0/gemv_no_terminal_all+norm_tree_all+argmax_tree+topk_rank+attn_prologue_live",
+        "plan_data_h_sha256": "5ec17310661ccb0847401cd0f175bb66f188e63a75d4b09d282123d165c13b98",
+        "plan_sha256": "3e648b7c7abd036d3f31cf9d14fdab01cad518ca1c2dae65a5cb575b5c1f1382",
+        "resources": {
+          "agpr": 90,
+          "lds": 26668,
+          "occupancy": 1,
+          "scratch": 0,
+          "sgpr": 108,
+          "vgpr": 256
+        }
+      },
+      "alld4s": {
+        "isa_sha256": "2c4390925189a01f5b6974b2c0b0926a3245de20888d4c75c8997da723f2a479",
+        "megakernel_d0_hip_sha256": "3b76dbc932e6d23f829967949605e10353f4dc519c6e0d4482d86adddae3e560",
+        "path": "build/d4s-final-slices/gemv_no_terminal_all+norm_tree_all+argmax_tree+topk_rank+attn_prologue_live",
+        "plan_data_h_sha256": "5ec17310661ccb0847401cd0f175bb66f188e63a75d4b09d282123d165c13b98",
+        "plan_sha256": "3e648b7c7abd036d3f31cf9d14fdab01cad518ca1c2dae65a5cb575b5c1f1382",
+        "resources": {
+          "agpr": 104,
+          "lds": 26672,
+          "occupancy": 1,
+          "scratch": 0,
+          "sgpr": 108,
+          "vgpr": 256
+        }
+      },
+      "d4s": {
+        "isa_sha256": "fc67219601226cce9b02793a8fc38e3dcfa5f74899b9a993779b54a97a648f83",
+        "megakernel_d0_hip_sha256": "3b76dbc932e6d23f829967949605e10353f4dc519c6e0d4482d86adddae3e560",
+        "path": "build/d4s-final-d4/default",
+        "plan_data_h_sha256": "5ec17310661ccb0847401cd0f175bb66f188e63a75d4b09d282123d165c13b98",
+        "plan_sha256": "3e648b7c7abd036d3f31cf9d14fdab01cad518ca1c2dae65a5cb575b5c1f1382",
+        "resources": {
+          "agpr": 65,
+          "lds": 26672,
+          "occupancy": 1,
+          "scratch": 0,
+          "sgpr": 108,
+          "vgpr": 256
+        }
+      },
+      "default": {
+        "isa_sha256": "a105cb16a414ee0f9f697c9de13205419d09674f5c69f6ee804cf36942377724",
+        "megakernel_d0_hip_sha256": "751293fad5f5c98ec6dbf9eeca3c73319b1d4ded4b6ca73996a65757c0ffae5d",
+        "path": "build/d4s-final-default/default",
+        "plan_data_h_sha256": "25c9363c704c8e87fbcbc9be06f8954a0c6ae9d9c3f65f8cff495c9a9f931256",
+        "plan_sha256": "09011c207b1e92febf29a2c2efc2d944ef9ad7ac8a0803633579c8444d821f8a",
+        "resources": {
+          "agpr": 48,
+          "lds": 26668,
+          "occupancy": 1,
+          "scratch": 0,
+          "sgpr": 108,
+          "vgpr": 256
+        }
+      },
+      "old_all_d4_32": {
+        "isa_sha256": "cfd97fd9949a9d3054997a7404a75a143882cb6b3befddb59a4702e3ea349721",
+        "megakernel_d0_hip_sha256": "3b76dbc932e6d23f829967949605e10353f4dc519c6e0d4482d86adddae3e560",
+        "path": "build/d4s-before-slices/gemv_no_terminal_all+norm_tree_all+argmax_tree+topk_rank+attn_prologue_live",
+        "plan_data_h_sha256": "5ec17310661ccb0847401cd0f175bb66f188e63a75d4b09d282123d165c13b98",
+        "plan_sha256": "3e648b7c7abd036d3f31cf9d14fdab01cad518ca1c2dae65a5cb575b5c1f1382",
+        "resources": {
+          "agpr": 89,
+          "lds": 26672,
+          "occupancy": 1,
+          "scratch": 0,
+          "sgpr": 108,
+          "vgpr": 256
+        }
+      }
     },
-    "default": {
-      "layers": "3..25 inclusive",
-      "median_layer_metrics_us": {
-        "down": {
-          "first_ready_us": 50.850000000000136,
-          "last_done_us": 72.86999999999989,
-          "mean_body_us": 19.10554054054054
-        }
+    "compiler": "ROCm 7.2.4 AMD clang 22, gfx942, offline etx-rocm22 container",
+    "fleet_commit": "3fb67a6",
+    "fleet_src_sha256": "28f5cbb4f39524df318883522341c48ca4162c18b71a3a6223c52eabb40ce4b3",
+    "gpu_gate": {
+      "every_gain_positive": true,
+      "layers": 27,
+      "median_min_us": 30,
+      "median_must_exceed_spread_times": 2,
+      "reference": "alld4r0",
+      "rounds": 5,
+      "tokens": 32
+    },
+    "image": "sha256:e8958ce54391229087b63d0e8636df58b14f160f1444246c8c6cb58f8b872a6b",
+    "isa_observations": {
+      "alld4s_down_expert_pointer_load_line": 108655,
+      "alld4s_down_intervening_wait_line": 108666,
+      "alld4s_down_weight_load_lines": [
+        108660,
+        108665,
+        108668
+      ],
+      "alld4s_metadata_barrier_line": 112478,
+      "alld4s_metadata_vector_load_lines": [
+        112465,
+        112471
+      ],
+      "down_weight_issue_batches": 2
+    },
+    "prior_trace_reproduction": {
+      "d4": {
+        "layers": "3..25 inclusive",
+        "median_layer_metrics_us": {
+          "down": {
+            "first_ready_us": 45.19999999999982,
+            "last_done_us": 65.56999999999994,
+            "mean_body_us": 17.514054054053968
+          },
+          "sdown": {
+            "first_ready_us": 39.02999999999997,
+            "last_done_us": 77.11000000000013,
+            "mean_body_us": 35.73351351351347
+          },
+          "shgu": {
+            "first_ready_us": 2.2200000000000273,
+            "last_done_us": 38.2199999999998,
+            "mean_body_us": 33.66000000000003
+          }
+        },
+        "trace": "/Users/ckl/code/etx-cache/results_2026-10-13-d1d5/run2/trace_d4.trace.bin",
+        "trace_sha256": "7cf640ebcedfc967655f6e5598aaf07487b26873a88318d82b4fe295829b76ad"
       },
-      "trace": "/Users/ckl/code/etx-cache/results_2026-10-13-d1d5/run1/trace_default.trace.bin",
-      "trace_sha256": "db6799503df64d1c6e04da5ddab26b8b43f1bddf034abeff225750ff5cb13266"
-    }
+      "default": {
+        "layers": "3..25 inclusive",
+        "median_layer_metrics_us": {
+          "down": {
+            "first_ready_us": 50.850000000000136,
+            "last_done_us": 72.86999999999989,
+            "mean_body_us": 19.10554054054054
+          }
+        },
+        "trace": "/Users/ckl/code/etx-cache/results_2026-10-13-d1d5/run1/trace_default.trace.bin",
+        "trace_sha256": "db6799503df64d1c6e04da5ddab26b8b43f1bddf034abeff225750ff5cb13266"
+      }
+    },
+    "rows": 32,
+    "session_dry_run": {
+      "all_job_shells_bash_n_exit_code": 0,
+      "exit_code": 0,
+      "jobs": 7
+    },
+    "shim_sha256": "2a27470d8055f61dcffe81de7aba28643ede2e8336b0ddea4816a45566d57d2f",
+    "source_count": {
+      "new_sdown_added_barriers": 1,
+      "new_sdown_dependency_groups": 2,
+      "new_sdown_metadata_loads": 0,
+      "new_shgu_metadata_scalar_words": 6,
+      "old_sdown_dependency_groups": 9,
+      "old_sdown_metadata_scalar_lane_loads": 1536,
+      "old_sdown_slice_barriers": 6
+    },
+    "status": "CPU VERIFIED; GPU NOT RUN",
+    "tests": {
+      "command": ".venv/bin/python -m pytest -q tests/test_dsv2_*.py tests/test_coherence.py",
+      "exit_code": 0,
+      "summary": "133 passed in 35.53s"
+    },
+    "unknown": [
+      "GPU 32/32 tokens and 27/27 layers",
+      "shared gate_up/down task times and completion ordering",
+      "paired device and wall performance versus alld4r0"
+    ]
   },
-  "rows": 32,
-  "session_dry_run": {
-    "all_job_shells_bash_n_exit_code": 0,
-    "exit_code": 0,
-    "jobs": 7
+  "registered_arm": "alld4s",
+  "static_delta": {
+    "asm_lines": 49857,
+    "inv_sc0": 4,
+    "inv_sc1": 78,
+    "nt_weight_loads": -30,
+    "sys_loads": 0,
+    "vmcnt0_waits": 958,
+    "wbl2": 54
   },
-  "shim_sha256": "2a27470d8055f61dcffe81de7aba28643ede2e8336b0ddea4816a45566d57d2f",
-  "source_count": {
-    "new_sdown_added_barriers": 1,
-    "new_sdown_dependency_groups": 2,
-    "new_sdown_metadata_loads": 0,
-    "new_shgu_metadata_scalar_words": 6,
-    "old_sdown_dependency_groups": 9,
-    "old_sdown_metadata_scalar_lane_loads": 1536,
-    "old_sdown_slice_barriers": 6
-  },
-  "status": "CPU VERIFIED; GPU NOT RUN",
-  "tests": {
-    "command": ".venv/bin/python -m pytest -q tests/test_dsv2_*.py tests/test_coherence.py",
-    "exit_code": 0,
-    "summary": "133 passed in 35.53s"
-  },
-  "unknown": [
-    "GPU 32/32 tokens and 27/27 layers",
-    "shared gate_up/down task times and completion ordering",
-    "paired device and wall performance versus alld4r0"
-  ]
+  "verdict": "PASS"
 }
