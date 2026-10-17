@@ -176,6 +176,14 @@ ARMS = {a.name: a for a in [
     Arm("x4xbo", levers=ARMS_X[4].levers, flags=ARMS_X[4].flags, env=dict(ARMS_X[4].env, ETX_DSV2_QKV_XB="1",
                                                                             ETX_DSV2_OPROJ_XB="1"),
         scratch_allow=80),
+    # Stage B2, the token tail on top of o_proj (graph.py build_xb_lm, fleet_xb.hip fleet_xb_final_norm /
+    # fleet_lm_head_xb / fleet_xb_lm_cand): x4xbo plus, per token, a final-norm grid per request, ONE column-batched
+    # lm_head grid for the 4 requests (W_lm, 419 MB, read once per token, not 4 times) and a per-request candidate
+    # grid feeding fleet's argmax. The only difference to x4xbo is ETX_DSV2_LMHEAD_XB=1. B = 4 only.
+    # (RESULTS: x4xbl notes are filled in after the resource compiles.)
+    Arm("x4xbl", levers=ARMS_X[4].levers, flags=ARMS_X[4].flags, env=dict(ARMS_X[4].env, ETX_DSV2_QKV_XB="1",
+                                                                            ETX_DSV2_OPROJ_XB="1", ETX_DSV2_LMHEAD_XB="1"),
+        scratch_allow=80),
     # B = 8 is a diagnostic: with M1 alone the eight-request gate failed (request 5, 3/27 layers), so the three
     # recipes are built side by side and the gate says which one is correct at eight requests. x8p is the plain
     # replication recipe (the pre-section-10 arm), x8m adds M1, x8k adds K1.
