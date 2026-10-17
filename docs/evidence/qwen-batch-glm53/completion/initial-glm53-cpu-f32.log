@@ -1,0 +1,20 @@
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/Users/ckl/code/.wt/etx-qwen-batch-glm53-multigpu/examples/glm53/cpu_check.py", line 175, in <module>
+    if __name__=='__main__':main()
+                            ~~~~^^
+  File "/Users/ckl/code/.wt/etx-qwen-batch-glm53-multigpu/examples/glm53/cpu_check.py", line 173, in main
+    a=ap.parse_args();print(json.dumps(check(a.out.resolve(),a.batch,a.steps,a.bf16,a.fp8),indent=2))
+                                       ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/ckl/code/.wt/etx-qwen-batch-glm53-multigpu/examples/glm53/cpu_check.py", line 137, in check
+    spec,hf,head=fixture(out,bf16,fp8);candidate=CPUModel(out);candidate.reset(batch)
+                 ~~~~~~~^^^^^^^^^^^^^^
+  File "/Users/ckl/code/.wt/etx-qwen-batch-glm53-multigpu/examples/glm53/cpu_check.py", line 61, in fixture
+    r['weights'][f'l{i}']=stage.write_blob(out,f'l{i}',stage.shapes(t,i),get,stage.slot_names(t))
+                                                       ~~~~~~~~~~~~^^^^^
+  File "/Users/ckl/code/.wt/etx-qwen-batch-glm53-multigpu/examples/glm53/stage.py", line 71, in shapes
+    d=dimensions(t); h=d['H']; hc=d['HC']; n=d['QDIM']; ld=d['LD']; nh=d['NH']; ad=d['AD']
+  File "/Users/ckl/code/.wt/etx-qwen-batch-glm53-multigpu/examples/glm53/stage.py", line 54, in dimensions
+    raise ValueError('unsupported GLM numerical contract (NoPE, equal KV head dims, one group/shared expert, normalized routing, safe KDA, tail required)')
+ValueError: unsupported GLM numerical contract (NoPE, equal KV head dims, one group/shared expert, normalized routing, safe KDA, tail required)

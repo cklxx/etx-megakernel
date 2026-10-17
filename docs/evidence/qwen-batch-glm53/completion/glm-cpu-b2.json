@@ -1,0 +1,17 @@
+{
+  "schema": 1,
+  "status": "PASS",
+  "fixture": true,
+  "batch": 2,
+  "steps": 32,
+  "matched": 64,
+  "max_logit_abs": 3.5762786865234375e-07,
+  "max_kda_state_abs": 4.656612873077393e-10,
+  "bf16": false,
+  "fp8": false,
+  "implementation": "same C++ numerical body as ETX HIP tiles",
+  "reference": "independent Transformers GLM5Next text model",
+  "full_checkpoint": false,
+  "gpu_correctness": "unmeasured",
+  "performance": "unmeasured"
+}

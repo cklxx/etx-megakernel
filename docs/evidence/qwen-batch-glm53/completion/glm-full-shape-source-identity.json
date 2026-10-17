@@ -1,0 +1,35 @@
+{
+  "schema": 1,
+  "arch": "gfx942",
+  "flags": [
+    "-O3",
+    "-std=c++17"
+  ],
+  "sources": {
+    "examples/glm53/native.h": "404a9fa72c759dbf9b38d65d8f277b7532d53b7f1ba859a9d48c9cea8a028449",
+    "examples/glm53/tiles.hip": "7749a3ab2ca051541679ba9ea9f3847c27c48053c413976a46ffc946bf98aa4b",
+    "examples/glm53/model_host.hip": "aa4793495a6005f5c943ecb59cf5b23d6c23f77e7073aedcb2aeef74f1700ef7",
+    "examples/glm53/model.py": "e138dca7e17d4b039c1f377459ccb225656e6908f0a0a29afc7a1f679397339e",
+    "examples/glm53/model_build.py": "8b852d7a9b718b567312fa7623675541892ac517a931c88918165ec1fc90667b",
+    "examples/glm53/stage.py": "8737b056d7138ba356034bbe43d5a6d942003b5cad710ae2bbdbdef818d86bae",
+    "etx/runtime/include/etx/host.h": "e07fb97470f43281a3fcb426627ae7395775fcdfc3ec4fdda3fe7361b944c53b",
+    "etx/runtime/include/etx/tile_util.h": "85ec95e41fff47b33fb36e06e6536bd41af53bdd86dcd04c1004d0b7f0e63da0",
+    "etx/runtime/include/etx/primitives_nvptx.h": "d8f720916bae3ae9c6304149097af25417795be0d026cdecc6d7e8bd2f1b76c6",
+    "etx/runtime/include/etx/import.h": "79f237ad6e1c962e1c28bc7907b541d49ff1b206f9338523bbe602561fbdf3ca",
+    "etx/runtime/include/etx/abi.h": "e466cfe8557acb886073bad8e8db041a11c54fe5fcafd392fa50270679f91deb",
+    "etx/runtime/include/etx/primitives_amdgcn.h": "cb7703b330d6af98b411b9629311e2253ea007402486c164dadda601db1a514b",
+    "etx/runtime/include/etx/primitives.h": "beeee7dd773c6cf27051ef7251766504e401fff05f89b942abd9623a92e1a99e",
+    "etx/runtime/include/etx/inbody.h": "aa1b6f607bf6b0d3e2f515aa4983b7959e08c869dd6dc841a74ce5130b938950",
+    "etx/runtime/include/etx/selection.h": "a389ed938ce9bdb8b3336a5d88f1ce43dc8d5dd0cde8739e52d13d917e8d65ac"
+  },
+  "generated": {
+    "plan.json": "f14c0f409d68459053d47295882baaf48982024ec131a2eed747c64eb92ddf17",
+    "plan_data.h": "54d038800236a48d6ae5821fe58ec67c2a9bed5187152740a5fb9c9568403add",
+    "glm53_spec.h": "a2f49baef691e35e7cf41dfb9af27f7f7cdd6c6638faa25544c21f2a0e7c12ac",
+    "glm53_contract.h": "815e926a004e3a1cddd83878ba33841ec91f2032b048d2b16bd5e3ccdabe9d82",
+    "load.tsv": "29cb6fb847da53f5f430052bf3040b035677b7e19721cf4cbb1afc3a2e4e5fa6",
+    "build-spec.json": "493355b051c6937c430a2afdb799b7f4bd26ce5b7f0641a94fdc3487b22bd28d",
+    "megakernel_d0.hip": "a027013b9c7a6903dc516aa65c0df7f816c386fbd90356a97185ea7c3b345179",
+    "megakernel_d1.hip": "dc3e70390f6d7a48dfc9341c71659eb4fe7cb17b9a6d85b1c98022ff49aa59ed"
+  }
+}

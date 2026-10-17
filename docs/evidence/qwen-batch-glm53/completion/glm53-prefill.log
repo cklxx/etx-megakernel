@@ -1,0 +1,39 @@
+.F                                                                       [100%]
+=================================== FAILURES ===================================
+_____ test_hf_chunk_prefill_then_32_exact_native_greedy_tokens[True-True] ______
+
+tmp_path = PosixPath('/private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1406/test_hf_chunk_prefill_then_32_1')
+bf16 = True, fp8 = True
+
+    @pytest.mark.parametrize('bf16,fp8',[(False,False),(True,True)])
+    def test_hf_chunk_prefill_then_32_exact_native_greedy_tokens(tmp_path,bf16,fp8):
+>       result=cpu_check.check_prefill(tmp_path/'prefill',2,8,bf16,fp8)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_glm53_model.py:156: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+out = PosixPath('/private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1406/test_hf_chunk_prefill_then_32_1/prefill')
+batch = 2, context = 8, bf16 = True, fp8 = True
+
+    def check_prefill(out,batch=2,context=8,bf16=False,fp8=False):
+        """HF chunk prefill versus native sequential state, then exact free decode."""
+        import numpy as np
+        import torch
+        from transformers.cache_utils import DynamicCache
+        torch.set_num_threads(1)
+        spec,hf,head=fixture(out,bf16,fp8);candidate=CPUModel(out);candidate.reset(batch)
+        prompts=[[1+(i+3*r)%47 for i in range(context)] for r in range(batch)]
+        cache=DynamicCache(config=hf.config);errors=[];matched=0
+        with torch.inference_mode():
+            for pos in range(context):got,_=candidate([row[pos] for row in prompts])
+            ref=head(hf(input_ids=torch.tensor(prompts),past_key_values=cache,use_cache=True).last_hidden_state[:,-1]).float().numpy()
+            for step in range(32):
+>               if not np.array_equal(got.argmax(-1),ref.argmax(-1)):raise ValueError(f'chunk-prefill greedy mismatch step={step}')
+                                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E               ValueError: chunk-prefill greedy mismatch step=22
+
+examples/glm53/cpu_check.py:218: ValueError
+=========================== short test summary info ============================
+FAILED tests/test_glm53_model.py::test_hf_chunk_prefill_then_32_exact_native_greedy_tokens[True-True]
+1 failed, 1 passed, 17 deselected in 4.83s

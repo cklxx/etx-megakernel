@@ -1,0 +1,73 @@
+[transformers] `causal_conv1d_fn` is falling back to its reference PyTorch implementation because `causal_conv1d` is not installed. This is correct but much slower; install `causal_conv1d` for the optimized kernel.
+[transformers] `chunk_kda` is falling back to its reference PyTorch implementation because `flash-linear-attention` is not installed. This is correct but much slower; install `flash-linear-attention` for the optimized kernel.
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/Users/ckl/code/.wt/etx-qwen-batch-glm53-multigpu/examples/glm53/cpu_check.py", line 175, in <module>
+    if __name__=='__main__':main()
+                            ~~~~^^
+  File "/Users/ckl/code/.wt/etx-qwen-batch-glm53-multigpu/examples/glm53/cpu_check.py", line 173, in main
+    a=ap.parse_args();print(json.dumps(check(a.out.resolve(),a.batch,a.steps,a.bf16,a.fp8),indent=2))
+                                       ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/ckl/code/.wt/etx-qwen-batch-glm53-multigpu/examples/glm53/cpu_check.py", line 144, in check
+    ref=hf(input_ids=ids,past_key_values=cache,use_cache=True).last_hidden_state
+        ~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/ckl/code/etx/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1783, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/ckl/code/etx/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1794, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/Users/ckl/code/etx/.venv/lib/python3.13/site-packages/transformers/utils/generic.py", line 1081, in wrapper
+    output = func(self, *args, **kwargs)
+  File "/Users/ckl/code/etx/.venv/lib/python3.13/site-packages/transformers/utils/output_capturing.py", line 287, in wrapper
+    outputs = func(self, *args, **kwargs)
+  File "/Users/ckl/code/etx/.venv/lib/python3.13/site-packages/transformers/models/glm5_next/modeling_glm5_next.py", line 1498, in forward
+    hidden_states, topk_indices = decoder_layer(
+                                  ~~~~~~~~~~~~~^
+        hidden_states,
+        ^^^^^^^^^^^^^^
+    ...<7 lines>...
+        **kwargs,
+        ^^^^^^^^^
+    )
+    ^
+  File "/Users/ckl/code/etx/.venv/lib/python3.13/site-packages/transformers/modeling_layers.py", line 110, in __call__
+    return super().__call__(*args, **kwargs)
+           ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/ckl/code/etx/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1783, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/ckl/code/etx/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1889, in _call_impl
+    return inner()
+  File "/Users/ckl/code/etx/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1837, in inner
+    result = forward_call(*args, **kwargs)
+  File "/Users/ckl/code/etx/.venv/lib/python3.13/site-packages/transformers/models/glm5_next/modeling_glm5_next.py", line 1344, in forward
+    hidden_states = self.mlp(hidden_states)
+  File "/Users/ckl/code/etx/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1783, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/ckl/code/etx/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1794, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/Users/ckl/code/etx/.venv/lib/python3.13/site-packages/transformers/models/glm5_next/modeling_glm5_next.py", line 205, in forward
+    hidden_states = self.experts(hidden_states, topk_indices, topk_weights).view(*orig_shape)
+                    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/ckl/code/etx/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1783, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/Users/ckl/code/etx/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1794, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/Users/ckl/code/etx/.venv/lib/python3.13/site-packages/transformers/integrations/moe.py", line 590, in forward
+    return experts_forward(self, *args, **kwargs)
+  File "/Users/ckl/code/etx/.venv/lib/python3.13/site-packages/transformers/integrations/moe.py", line 475, in grouped_mm_experts_forward
+    proj_out = _grouped_linear(
+        proj_out, selected_weights, offsets, bias=selected_biases, is_transposed=self.is_transposed
+    )  # (S, hidden_dim)
+  File "/Users/ckl/code/etx/.venv/lib/python3.13/site-packages/transformers/integrations/moe.py", line 379, in _grouped_linear
+    out = _grouped_mm(input, weight.transpose(-2, -1), offs=offs)
+  File "/Users/ckl/code/etx/.venv/lib/python3.13/site-packages/transformers/integrations/moe.py", line 343, in _grouped_mm
+    return torch.nn.functional.grouped_mm(input.to(weight.dtype), weight, offs=offs)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/ckl/code/etx/.venv/lib/python3.13/site-packages/torch/nn/functional.py", line 7168, in grouped_mm
+    return torch._grouped_mm(mat_a, mat_b, offs=offs, bias=bias, out_dtype=out_dtype)
+           ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+RuntimeError: strides should be multiple of 16 bytes

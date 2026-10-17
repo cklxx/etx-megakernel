@@ -1,0 +1,103 @@
+.....................................................ss................. [  3%]
+.................................................................s...... [  6%]
+........................................................................ [  9%]
+...................................................................s..ss [ 12%]
+s....................................................................... [ 15%]
+........................................................................ [ 18%]
+........................................................................ [ 22%]
+........................................................................ [ 25%]
+........................................................................ [ 28%]
+........................................................................ [ 31%]
+........................................................................ [ 34%]
+........................................................................ [ 37%]
+.....................s......ss.......................................... [ 41%]
+................................................s....................... [ 44%]
+...............................................................s........ [ 47%]
+........................................................................ [ 50%]
+.................................................s...................... [ 53%]
+........................................................................ [ 56%]
+........................................................................ [ 60%]
+.................................................s..................ss.. [ 63%]
+.............................................s......................F... [ 66%]
+........................................................................ [ 69%]
+........................................................................ [ 72%]
+........................................................................ [ 75%]
+........................................................................ [ 79%]
+........................................................................ [ 82%]
+........................................................................ [ 85%]
+........................................................................ [ 88%]
+........................................................................ [ 91%]
+...............................................................s........ [ 94%]
+........................................................................ [ 98%]
+...........................................                              [100%]
+=================================== FAILURES ===================================
+_________ test_documented_push_stage_attach_start_with_local_transport _________
+
+tmp_path = PosixPath('/private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1399/test_documented_push_stage_att0')
+
+    def test_documented_push_stage_attach_start_with_local_transport(tmp_path):
+        """Execute the real shell archive/push/start path. Transport/probes only are local substitutes.
+    
+        SSH never contacts a host; rsync, product probes and key management are labelled
+        no-ops. The real preflight fails closed on synthetic inputs; compute cannot run.
+        """
+        import os
+        import time
+        home = tmp_path/'home'
+        (home/'code').mkdir(parents=True)
+        binpath = tmp_path/'bin'
+        binpath.mkdir()
+        c = inputs(home)
+        config = home/'config.json'
+        config.write_text(json.dumps(c))
+        def script(name, body):
+            p = binpath/name
+            p.write_text(body)
+            p.chmod(0o755)
+        script('ssh', f'''#!{sys.executable}
+    import subprocess, sys
+    args=sys.argv[1:]
+    while args and args[0]=='-o': args=args[2:]
+    assert args.pop(0)=='hotaisle@local-fixture'
+    raise SystemExit(subprocess.call(['bash','-c',' '.join(args)]))
+    ''')
+        for name in ('rsync','ssh-keygen'):
+            script(name, '#!/bin/sh\necho LOCAL-TRANSPORT-SUBSTITUTE '+name+'\n')
+        script('rocm-smi', '#!/bin/sh\necho "Card Series: CPU-SUBSTITUTE"\n')
+        script('nproc', '#!/bin/sh\necho 1\n')
+        script('setsid', '#!/bin/sh\nexec "$@"\n')
+        # The independent-venv archive test above verifies dependency staging itself.
+        (binpath/'python3').symlink_to(sys.executable)
+        env = dict(os.environ, HOME=str(home), PATH=str(binpath)+os.pathsep+os.environ['PATH'])
+        command = [sys.executable, '-u', '-m', 'tools.producer_start', 'local-fixture',
+                   '--venv', sys.prefix, '--config', str(config), '--allocation-deadline', str(time.time()+600)]
+        started = subprocess.run(command, cwd=ROOT, env=env, capture_output=True, text=True, timeout=120)
+        print('LOCAL PUSH/STAGE/ATTACH/START\n'+started.stdout+started.stderr)
+>       assert started.returncode == 0
+E       AssertionError: assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/Users/ckl/code/etx/.venv/bin/python', '-u', '-m', 'tools.producer_start', 'local-fixture', '-...ror(f\'staging/start failed exit={rc}; stop and fetch\')\nRuntimeError: staging/start failed exit=1; stop and fetch\n').returncode
+
+tests/test_producer_readiness.py:284: AssertionError
+----------------------------- Captured stdout call -----------------------------
+LOCAL PUSH/STAGE/ATTACH/START
+STAGE command bash /Users/ckl/code/.wt/etx-qwen-batch-glm53-multigpu/tools/session.sh push local-fixture timeout_s=300.0
+refusing: /Users/ckl/code/.wt/etx-qwen-batch-glm53-multigpu has uncommitted changes
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/Users/ckl/code/.wt/etx-qwen-batch-glm53-multigpu/tools/producer_start.py", line 60, in <module>
+    main()
+    ~~~~^^
+  File "/Users/ckl/code/.wt/etx-qwen-batch-glm53-multigpu/tools/producer_start.py", line 56, in main
+    launch(args.ip, args.venv, args.config, args.allocation_deadline)
+    ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/ckl/code/.wt/etx-qwen-batch-glm53-multigpu/tools/producer_start.py", line 34, in launch
+    run(['bash', ROOT/'tools/session.sh', 'push', ip], staging_deadline)
+    ~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/ckl/code/.wt/etx-qwen-batch-glm53-multigpu/tools/producer_start.py", line 33, in run
+    raise RuntimeError(f'staging/start failed exit={rc}; stop and fetch')
+RuntimeError: staging/start failed exit=1; stop and fetch
+
+=========================== short test summary info ============================
+FAILED tests/test_producer_readiness.py::test_documented_push_stage_attach_start_with_local_transport
+1 failed, 2256 passed, 18 skipped in 575.55s (0:09:35)

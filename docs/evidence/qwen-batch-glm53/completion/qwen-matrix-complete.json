@@ -1,0 +1,324 @@
+{
+  "schema": 1,
+  "status": "PASS",
+  "count": 16,
+  "configurations": {
+    "mixtral-8x7b_base": {
+      "configuration": {
+        "model": "mixtral-8x7b",
+        "model_config": "examples/llm/configs/mixtral-8x7b.json",
+        "overrides": {
+          "ETX_VL_IMPORTED": "1"
+        },
+        "variant": "base"
+      },
+      "hashes": {
+        "configuration.json": "88619d65058c5946041007c898cd2d57b27734b7efc3c29e7d13a9cb15ed1b1a",
+        "plan.json": "4038292057f16acfc388c6542084bb507341b9bf8f23872a99391f855ada4df4",
+        "mk.ll": "9a62dffdb9ecbd079c9bddc36077197e87fe4531b2386bf6c2e9ba29e0ed7c75",
+        "mk.s": "8af18f9162f85cc19c57868b67b2eef2199ebf9263a06205b3f54045ae70192d",
+        "matrix.log": "8d8499ad00aec7cb6406442f6ad1af45657805ac689e9112bb4b7164dbbbdbc6"
+      },
+      "status": "PASS"
+    },
+    "mixtral-8x7b_chain": {
+      "configuration": {
+        "model": "mixtral-8x7b",
+        "model_config": "examples/llm/configs/mixtral-8x7b.json",
+        "overrides": {
+          "ETX_VL_CHAIN": "1",
+          "ETX_VL_IMPORTED": "1"
+        },
+        "variant": "chain"
+      },
+      "hashes": {
+        "configuration.json": "40778161767969f2cfc9007760cb0363035606c5459d60e17f646e9d30f1d891",
+        "plan.json": "b2dc8d07ab34e08bc640052e3f60868e36919575fc1e6ae6f81b70213902e8ba",
+        "mk.ll": "737d4c2be39c99bc5d9870efceef64e60d740853c182536808da64d80cab0b26",
+        "mk.s": "f587c56d51cf7072cdb102a2703c943c6b330b5323096c256a1444073035032f",
+        "matrix.log": "8d8499ad00aec7cb6406442f6ad1af45657805ac689e9112bb4b7164dbbbdbc6"
+      },
+      "status": "PASS"
+    },
+    "qwen2.5-1.5b_base": {
+      "configuration": {
+        "model": "qwen2.5-1.5b",
+        "model_config": "examples/llm/configs/qwen2.5-1.5b.json",
+        "overrides": {
+          "ETX_VL_IMPORTED": "1"
+        },
+        "variant": "base"
+      },
+      "hashes": {
+        "configuration.json": "ede521ec70964b7675a6541e21d04e3ab90cf31b6974eede15058f6c712130d8",
+        "plan.json": "78c4b2b07eac9007c0e4d4acccb2352521ac8c270d8e5001011b91f8f69376e3",
+        "mk.ll": "326c5d4d8098cf93ee43a49346152ee8fe310215446d85bdaff660dadb1b0849",
+        "mk.s": "9acb4c70ff34e0e62434e685aca066c61e5b717479916977759e371d5d0fc11c",
+        "matrix.log": "f048a44d86661c529240b00b2ecc0baa10d918d829cd383c8a08047a896ac34e"
+      },
+      "status": "PASS"
+    },
+    "qwen2.5-1.5b_chain": {
+      "configuration": {
+        "model": "qwen2.5-1.5b",
+        "model_config": "examples/llm/configs/qwen2.5-1.5b.json",
+        "overrides": {
+          "ETX_VL_CHAIN": "1",
+          "ETX_VL_IMPORTED": "1"
+        },
+        "variant": "chain"
+      },
+      "hashes": {
+        "configuration.json": "e70606c249d4fcf57219579490d7e779f9e1a607c8f0f99f9a2471f368af4c5e",
+        "plan.json": "1b52a365ff0b0b359add7bbd5e8f96eb441e22d21afe1c13e5ee2a7565552e8a",
+        "mk.ll": "172f723d65890087b8d85416d241481d653f71af7190adf0b0a726431627b2a5",
+        "mk.s": "d3d6f21be232f1ce4c24c5cd24dcf0f9adf5ec789a36dda6bfa02fdd53c47720",
+        "matrix.log": "f048a44d86661c529240b00b2ecc0baa10d918d829cd383c8a08047a896ac34e"
+      },
+      "status": "PASS"
+    },
+    "qwen2.5-1.5b_uc": {
+      "configuration": {
+        "model": "qwen2.5-1.5b",
+        "model_config": "examples/llm/configs/qwen2.5-1.5b.json",
+        "overrides": {
+          "ETX_VL_CHAIN": "1",
+          "ETX_VL_IMPORTED": "1",
+          "ETX_VL_PIN": "1",
+          "ETX_VL_UC": "1",
+          "ETX_VL_XCD": "1"
+        },
+        "variant": "uc"
+      },
+      "hashes": {
+        "configuration.json": "3ce9568c62fe2371d75c5b187f195a9e3dc31a9adbae0787463884edc05944f5",
+        "plan.json": "7ba0d368ac4af941df45b3cc43a81754175c7ac1bdafb67a2dbd6b8315db0d75",
+        "mk.ll": "6d48cd3edc1b9036dbddad1ffb907560befd4dea64ac05d85f5971c17e4fc312",
+        "mk.s": "cf506b2557470413e2b9bdce74470d0d82867b90a3421b004afb4a1eb4efc3cf",
+        "matrix.log": "eea85e132e58387494697bb33521daa610841d827afe4db7b8a273c230662351"
+      },
+      "status": "PASS"
+    },
+    "qwen2.5-1.5b_uc_s1": {
+      "configuration": {
+        "model": "qwen2.5-1.5b",
+        "model_config": "examples/llm/configs/qwen2.5-1.5b.json",
+        "overrides": {
+          "ETX_VL_CHAIN": "1",
+          "ETX_VL_IMPORTED": "1",
+          "ETX_VL_PIN": "1",
+          "ETX_VL_UC": "1",
+          "ETX_VL_XCD": "1"
+        },
+        "variant": "uc_s1"
+      },
+      "hashes": {
+        "configuration.json": "817090d86f472dd83a679e3af26e435396d09ab687589fb6f2e1f4ffcccbfffd",
+        "plan.json": "1109ed4572e4ed7ba8c42e4915d69757245c21d3c42539014128e2e83bc8eab2",
+        "mk.ll": "a928406ed0531f2d484a13b4cd155150eaef672ece0c17f7f1fb184c473b7766",
+        "mk.s": "9890530eb3483d435f03d9a0221387311a5708b79e8fa58a848cdaf502629ebc",
+        "matrix.log": "320d8808dc118691f51222373c7e49bbfc9547b5c48be6593f434323b8d66934"
+      },
+      "status": "PASS"
+    },
+    "qwen2.5-1.5b_xcd": {
+      "configuration": {
+        "model": "qwen2.5-1.5b",
+        "model_config": "examples/llm/configs/qwen2.5-1.5b.json",
+        "overrides": {
+          "ETX_VL_CHAIN": "1",
+          "ETX_VL_IMPORTED": "1",
+          "ETX_VL_XCD": "1"
+        },
+        "variant": "xcd"
+      },
+      "hashes": {
+        "configuration.json": "53ccecf5264bc0e0f4159671ab818953efaff843e20d0c9561bea57c9ceea01e",
+        "plan.json": "9b3c010f22245e027779b0741fc447b984fb5642c9aeb3c7d6f422d675abdacb",
+        "mk.ll": "7830e612772c4800adbefb177ddc876336aea10d1d38b9ab4ae276757e67c572",
+        "mk.s": "9a58a6e6b0efc7d8322823f5453e31dbba5ec28a412824b0f70f366501aea3a5",
+        "matrix.log": "f048a44d86661c529240b00b2ecc0baa10d918d829cd383c8a08047a896ac34e"
+      },
+      "status": "PASS"
+    },
+    "qwen2.5-1.5b_xcd_s1": {
+      "configuration": {
+        "model": "qwen2.5-1.5b",
+        "model_config": "examples/llm/configs/qwen2.5-1.5b.json",
+        "overrides": {
+          "ETX_VL_CHAIN": "1",
+          "ETX_VL_IMPORTED": "1",
+          "ETX_VL_XCD": "1"
+        },
+        "variant": "xcd_s1"
+      },
+      "hashes": {
+        "configuration.json": "e951e621f069f7c25ec388f564c5d58d4077f9993223cc65be5914b710ecd35b",
+        "plan.json": "cfd398c674603a777e16c7465b26e303ae2c09b61b8425bccdceb99209dccda0",
+        "mk.ll": "8967dbb2e83edfab5b8cc95ef5d8de1439e43cac558c8d11a6dc6382343271dd",
+        "mk.s": "8f798e96ab8807b58e1019fd5e5abb7134e2205ed886edccb23009a609ca30d5",
+        "matrix.log": "c14350c7faa2bcdfca2b76a30f407f1ca021f2c61cd4f76c084c97245d85778a"
+      },
+      "status": "PASS"
+    },
+    "qwen3-30b-a3b_base": {
+      "configuration": {
+        "model": "qwen3-30b-a3b",
+        "model_config": "examples/llm/configs/qwen3-30b-a3b.json",
+        "overrides": {
+          "ETX_VL_IMPORTED": "1"
+        },
+        "variant": "base"
+      },
+      "hashes": {
+        "configuration.json": "172b763d89509c3c5d83a73d000e11201336316f122807423799c7073775fff9",
+        "plan.json": "7d06cba9f2c44408bd7b5f9cd4e8fe8a18ebbb67312be563cca1a49bbe29545b",
+        "mk.ll": "c4312671efa4122f7b6951f26b14113d17de14bd08e4be9cd97964f49b5ff3b1",
+        "mk.s": "07e693b0fdd981bd91dae3cc85eb38a2eb7f762ef46873b9a3ed4a88ddb2be63",
+        "matrix.log": "847c4c06cc1cdb357d6eb948373e3fdfe2aea8953e640094d7a9a6abd52cac40"
+      },
+      "status": "PASS"
+    },
+    "qwen3-30b-a3b_chain": {
+      "configuration": {
+        "model": "qwen3-30b-a3b",
+        "model_config": "examples/llm/configs/qwen3-30b-a3b.json",
+        "overrides": {
+          "ETX_VL_CHAIN": "1",
+          "ETX_VL_IMPORTED": "1"
+        },
+        "variant": "chain"
+      },
+      "hashes": {
+        "configuration.json": "c38d9f87107fa9e86a124477306f50a7a16278d18d54452ea10a7bb5d4be102a",
+        "plan.json": "f958a4b4a9775481a02210b91e590beb3c5aa475f844ec1357a2138618292d5d",
+        "mk.ll": "17b56ef44ca46a5f4494df441f75cd71fbcd496024427c84c265c5f3c28f5162",
+        "mk.s": "abe244047611cb0318978620434a5d3b97c0e6d5939d14fc7b30eb06409a0d78",
+        "matrix.log": "847c4c06cc1cdb357d6eb948373e3fdfe2aea8953e640094d7a9a6abd52cac40"
+      },
+      "status": "PASS"
+    },
+    "qwen3-8b_base": {
+      "configuration": {
+        "model": "qwen3-8b",
+        "model_config": "examples/llm/configs/qwen3-8b.json",
+        "overrides": {
+          "ETX_VL_IMPORTED": "1"
+        },
+        "variant": "base"
+      },
+      "hashes": {
+        "configuration.json": "c0324e45fd6ace3d9d5dce4a1b8b2051578dc0b15e143bc26464de238d375988",
+        "plan.json": "aac890aed9679626de06510ce0d2a3975441b2cb9ebe5cd2dcc9adb74beaac3c",
+        "mk.ll": "6dc486dd2e15b8bdb1b7f28d27a9decf116ebddaefd420aa32dbd7b4376988ee",
+        "mk.s": "b66723fb45b65aef4980f893e161af688b0883b771dac2229f6c983d73f3e795",
+        "matrix.log": "3407bb67b5944a420402b671b169f9c3bfd7f72c6ba8a53ef82759205056ae8c"
+      },
+      "status": "PASS"
+    },
+    "qwen3-8b_chain": {
+      "configuration": {
+        "model": "qwen3-8b",
+        "model_config": "examples/llm/configs/qwen3-8b.json",
+        "overrides": {
+          "ETX_VL_CHAIN": "1",
+          "ETX_VL_IMPORTED": "1"
+        },
+        "variant": "chain"
+      },
+      "hashes": {
+        "configuration.json": "b536d87db864258930ba8ac18364d76542e2670c96eacf7f021f2a120af208a4",
+        "plan.json": "e603d5a91dd537d7d3cf3a5b99455fe30343eea0939aa99e544ee5810f0ac994",
+        "mk.ll": "aced4b75acfbee0a2844bee16c062f762a4ed68725377a6467318a55e79c5989",
+        "mk.s": "77251721acfc3aa09e022e2fcf1671e3c0abf46c3eed6c307d7103c5e412a1fe",
+        "matrix.log": "3407bb67b5944a420402b671b169f9c3bfd7f72c6ba8a53ef82759205056ae8c"
+      },
+      "status": "PASS"
+    },
+    "qwen3-8b_uc": {
+      "configuration": {
+        "model": "qwen3-8b",
+        "model_config": "examples/llm/configs/qwen3-8b.json",
+        "overrides": {
+          "ETX_VL_CHAIN": "1",
+          "ETX_VL_IMPORTED": "1",
+          "ETX_VL_PIN": "1",
+          "ETX_VL_UC": "1",
+          "ETX_VL_XCD": "1"
+        },
+        "variant": "uc"
+      },
+      "hashes": {
+        "configuration.json": "7f5a35fa60468bc67a5c50aa3c5b96a5d9bd0f2ada1e5c6d3961fbdf270a41b0",
+        "plan.json": "65f2d7b1000ef79c0a4cb82f8bb79b198740ee465375f7e285b5b0857178dd7f",
+        "mk.ll": "ea73e89fb4e51105f0f269a53f8e4961295778217e61b4f95269b74a8c68eba6",
+        "mk.s": "3363d86b14433a7648fac06d5f8b5b10c8800004417029c33509fed41e9eecd5",
+        "matrix.log": "14fd226b8a2426e9f39d05e5525d3f0a8984c24ac8ceeccf665180da5758a912"
+      },
+      "status": "PASS"
+    },
+    "qwen3-8b_uc_s1": {
+      "configuration": {
+        "model": "qwen3-8b",
+        "model_config": "examples/llm/configs/qwen3-8b.json",
+        "overrides": {
+          "ETX_VL_CHAIN": "1",
+          "ETX_VL_IMPORTED": "1",
+          "ETX_VL_PIN": "1",
+          "ETX_VL_UC": "1",
+          "ETX_VL_XCD": "1"
+        },
+        "variant": "uc_s1"
+      },
+      "hashes": {
+        "configuration.json": "1b4b2bb76dc766352bb2e6767273e9ad3e0fe5952b5a23f7916ef10ef3ed8378",
+        "plan.json": "417fa049978dcb2ab9ccc72605a9fe9604235c78b8c29d3376a8be15e39a5e7c",
+        "mk.ll": "6dc99916b47771d86ea1e1dd2c25e096b1012e08a156ea8584911d16c474c0f0",
+        "mk.s": "2a8013f292caece276d4fd24d54a84cc93fe3386814458590ea994501afed930",
+        "matrix.log": "0067b1fa010a00e10adce3ed54924985058caca43325a1e16664a20045a1faf9"
+      },
+      "status": "PASS"
+    },
+    "qwen3-8b_xcd": {
+      "configuration": {
+        "model": "qwen3-8b",
+        "model_config": "examples/llm/configs/qwen3-8b.json",
+        "overrides": {
+          "ETX_VL_CHAIN": "1",
+          "ETX_VL_IMPORTED": "1",
+          "ETX_VL_XCD": "1"
+        },
+        "variant": "xcd"
+      },
+      "hashes": {
+        "configuration.json": "3bd6b84b27e60938bc874512a7c075b348c391d89af3fb1441a76902dc3cd7b6",
+        "plan.json": "e7648da540dd63f127163d1b95d6d94c31d63cff07138dcac3c30c06a18d2f3d",
+        "mk.ll": "eaabf751ab8189af885bece72834a2d431d4d8c84026b496dccdcaeaa5decdc3",
+        "mk.s": "40e5a593ea5e03481611bc776a46499792762e34539452d25582f037d8012f6d",
+        "matrix.log": "3407bb67b5944a420402b671b169f9c3bfd7f72c6ba8a53ef82759205056ae8c"
+      },
+      "status": "PASS"
+    },
+    "qwen3-8b_xcd_s1": {
+      "configuration": {
+        "model": "qwen3-8b",
+        "model_config": "examples/llm/configs/qwen3-8b.json",
+        "overrides": {
+          "ETX_VL_CHAIN": "1",
+          "ETX_VL_IMPORTED": "1",
+          "ETX_VL_XCD": "1"
+        },
+        "variant": "xcd_s1"
+      },
+      "hashes": {
+        "configuration.json": "7b0ec41b449ea790f5474b8454dfbe72fafb62df3d1348f3aaae00ae942dffc2",
+        "plan.json": "24dbbf8added3a9e9c59156bae8db1e5e4dc88f16a7570360de322f7367a0fd0",
+        "mk.ll": "57990e83898d271897cdd8de0d5e1a19e3b3f9073d044335b06fbbba27c31818",
+        "mk.s": "a29d95c06805252a8dc7ccfa4a443ec03c5065e65e99192ab1704b38766e3981",
+        "matrix.log": "e7c1f321da71f171247cfa8cdc6eeea1cebad1308e30e9028d82bfe3a2451b23"
+      },
+      "status": "PASS"
+    }
+  },
+  "gpu_correctness": "unmeasured"
+}
