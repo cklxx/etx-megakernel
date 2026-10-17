@@ -165,10 +165,11 @@ def _layer_tensor(g: Graph, L: int) -> None:
 
 # ETX_DSV2_ATTN_XB=1 (B = 4 only, with ETX_DSV2_OPROJ_XB=1; docs/ATTN-XB-BOUND-2026-10-18.md): attention blocking.
 # Request r's qabs (16, 2), attention (16, ATTN_XB_CHUNKS) and merge (16, ATTN_XB_CHUNKS) go on the 16 workers
-# off + (r // 2) * 16 .. of its slot, so the 2 requests of a slot run qabs .. merge in one wave (today: one after the
-# other on workers 0..15). The tiles are fleet_xb.hip's fleet_attention8* / fleet_merge_uv8 (n_split = 8, a compile-time
-# constant); the arm passes -DETX_DSV2_ATTN_XB=1. Durations (model, no measurement yet): attention 20.3 us (fix's
-# optimistic end; pessimistic 24.0), merge 7.6 us (pessimistic 9.0: 16 W_UV rows per task, 8 partials).
+# off + (r // 2) * 16 .. of its slot, so the 2 requests of a slot run qabs .. merge in one wave (x4xbor: one after
+# the other, each on workers 0..31 of the slot, map (h % 2) * 16 + c). The tiles are fleet_xb.hip's
+# fleet_attention8* / fleet_merge_uv8 (n_split = 8, a compile-time constant); the arm passes -DETX_DSV2_ATTN_XB=1.
+# Durations (model, no measurement yet): attention 20.3 us (fix's optimistic end; pessimistic 24.0), merge 7.6 us
+# (pessimistic 9.0: 16 W_UV rows per task, 8 partials).
 ATTN_XB_CHUNKS = 8
 ATTN_XB_DUR = {"attn": 20.3, "merge": 7.6}
 
