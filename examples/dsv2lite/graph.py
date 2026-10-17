@@ -52,6 +52,9 @@ D5_PREFETCH = {
     "fleet_lm_head": "fleet_d5_lm_head", "fleet_lm_head_fold": "fleet_d5_lm_head",
 }
 
+# fleet_xb_lm_cand reads act.logits with plain loads (fleet::lm_head_candidate) after an XCD-local event: it keeps the
+# acquire invalidate in every coherence mode (ETX_DSV2_LMHEAD_XB=1 only)
+COH_PLAIN_XBL = frozenset({"fleet_xb_lm_cand"})
 # fleet per-task durations in microseconds (STATUS.md, v0.14-v0.18 traces)
 DUR = {"qkv": 7.4 + 12.0, "qabs": 4.0, "attn": 16.7, "merge": 7.6, "oproj": 12.0, "router": 9.0,
        "gate_up": 33.0, "down": 30.0, "dense_gu": 45.0, "dense_dn": 45.0, "embed": 2.0, "lm_head": 140.0, "argmax": 5.0}
@@ -77,8 +80,9 @@ def _tile(symbol: str):
     source = D5_T if d5 else XB_T if _xb() else T
     # the fleet tile family implements "coherent_l1" through lever l1_loads, which examples/dsv2lite/build.sh adds when
     # the build-wide switch ETX_COHERENCE=l1 is set (etx/passes/plan.py); dense_down reads h inside gemv_rows: not capable
-    kw["coherence_caps"] = () if symbol in COH_PLAIN else ("coherent_l1",)
-    if mode and symbol not in COH_PLAIN:
+    plain = symbol in COH_PLAIN or symbol in COH_PLAIN_XBL
+    kw["coherence_caps"] = () if plain else ("coherent_l1",)
+    if mode and not plain:
         return hip_link(source, symbol, coherence=mode, **kw)
     return hip_link(source, symbol, **kw)
 
@@ -94,6 +98,13 @@ def _xbo() -> bool:
     v = os.environ.get("ETX_DSV2_OPROJ_XB", "0")
     if v not in ("0", "1"):
         raise ValueError(f"ETX_DSV2_OPROJ_XB={v!r}: 0 | 1")
+    return v == "1"
+
+
+def _xbl() -> bool:
+    v = os.environ.get("ETX_DSV2_LMHEAD_XB", "0")
+    if v not in ("0", "1"):
+        raise ValueError(f"ETX_DSV2_LMHEAD_XB={v!r}: 0 | 1")
     return v == "1"
 
 
@@ -364,14 +375,66 @@ def build_xb_oproj(g: Graph, qs: list, L: int) -> None:
                   duration_cv=0.05)
 
 
+# ETX_DSV2_LMHEAD_XB=1 (B = 4 only, on top of ETX_DSV2_OPROJ_XB=1): the token tail batched (build_xb_lm, fleet_xb.hip).
+# Duration model (no measurement yet), microseconds: the per-request final-norm task is fleet's lm_head prologue
+# (7.4 us, as XB_NORM_US); the batched task copies B x 4 KB into LDS and streams half the rows of an x<n> lm_head
+# task, but not faster than the HBM floor: 102400 x 2048 bf16 = 419.4 MB over 8 x 74 tasks at 5.2 TB/s = 80.7 us
+# (W_lm does not fit the 256 MB MALL). The candidate task is fleet's lm_head_candidate (346 logits from L2 + one
+# block tree) on the request's own 37 workers.
+XBL_REQUESTS = 4
+XBL_NORM_US = 7.4
+XBL_HBM_US = 102400 * 2048 * 2 / 5.2e6
+XBL_CAND_US = 2.0
+
+
+def xb_lm_us(requests: int) -> float:
+    return XB_STAGE_US * requests + max((DUR["lm_head"] - XBL_NORM_US) * W / XB_W, XBL_HBM_US)
+
+
+def build_xb_lm(g: Graph, qs: list, state: dict) -> None:
+    """ETX_DSV2_LMHEAD_XB=1: the token tail of every request as a per-request final-norm grid, ONE lm_head grid for
+    all requests, a per-request candidate grid, and the request's argmax (fleet's, unchanged).
+
+    Final-norm grid r{r}_lmn (8,): one task per XCD does fleet's lm_head prologue for request r (stage_residual with
+    the expert fold, dump of the last layer, final RMSNorm) and writes the bf16 normalized vector into its XCD's slice
+    of act.x_norm; it signals r{r}_E_lmn[x] (1 signal). Batched grid xb_lm (8 XCDs, 74): copies the B vectors of its
+    XCD into LDS and streams its rows of this XCD's 12800-row slice of W_lm once, B bf16 logits per row into each
+    request's act.logits (fleet's EPI_BF16, plain stores as fleet's lm_head). It signals every request's XCD-local
+    r{r}_E_lmx[x] (74 signals). Candidate grid r{r}_lmc (8, 37), on the request's slot: fleet's lm_head_candidate
+    over fleet's worker rows (first + k x 37), so act.argmax_val / argmax_idx get the same 296 candidates as today;
+    it signals the global r{r}_E_lm (296), which fleet's argmax waits for.
+
+    Deadlock freedom: every in-edge comes from a grid created before it; every static queue runs in creation order."""
+    for q in qs:
+        g.etensor(q.n("E_lmn"), (XCDS,), wait_count=1)
+        g.etensor(q.n("E_lmx"), (XCDS,), wait_count=XB_W)
+        g.etensor(q.n("E_lm"), (1,), wait_count=XCDS * W)
+        g.etensor(q.n("E_argmax"), (1,), wait_count=1)
+    for q in qs:
+        e, _, prev_moe = state[q.r]
+        g.call_device(q.n("lmn"), (XCDS,), _tile("fleet_xb_final_norm"), resource=_res(paired=True),
+                      args=[q.fleet, "layer_-1"], consts=(-1, q.r, XB_FOLD if prev_moe else 0), domain_map="x->x",
+                      worker_map=f"x->({xb_norm_worker(q.r)})", in_edges={e: "x->(0)"},
+                      out_edges={q.n("E_lmn"): "x->x"}, duration_us=XBL_NORM_US, duration_cv=0.05)
+    # consts: (layer, workers per XCD of this grid, first request = 0)
+    g.call_device("xb_lm", (XCDS, XB_W), _tile("fleet_lm_head_xb"), resource=_res(paired=True),
+                  args=[qs[0].fleet, "layer_-1"], consts=(-1, XB_W, 0), domain_map="xw->x",
+                  worker_map=f"xw->(w%{W}+(w/{W})*{CUS})", in_edges={q.n("E_lmn"): "xw->x" for q in qs},
+                  out_edges={q.n("E_lmx"): "xw->x" for q in qs}, duration_us=xb_lm_us(len(qs)), duration_cv=0.05)
+    for q in qs:
+        _chiplet(g, q, "lmc", "fleet_xb_lm_cand", -1, {q.n("E_lmx"): "xw->x"}, {q.n("E_lm"): "xw->(0)"}, XBL_CAND_US)
+    for q in qs:
+        g.call_device(q.n("argmax"), (1,), _tile("fleet_argmax"), resource=_res(paired=q.paired), args=[q.fleet, "layer_-1"],
+                      consts=(-1, q.r), in_edges={q.n("E_lm"): "i->i"}, out_edges={q.n("E_argmax"): "i->i"},
+                      duration_us=DUR["argmax"], worker_map=q.wmap("i->(OFF)"))
 ROUTER_SPREAD_W = 18       # router workers per request and XCD with ETX_DSV2_ROUTER_SPREAD=1: 2 x 18 <= 37 per slot
 
 
 def build_moe_router(g: Graph, q: _Req, L: int, e_oproj: str, spread: bool) -> None:
     """The router half of build_moe_tail (ETX_DSV2_ROUTER_FIRST / ETX_DSV2_ROUTER_SPREAD; the default path keeps
     build_moe_tail). spread: grid router_L (8 XCDs, ROUTER_SPREAD_W) on workers (r // 2) * W' .. of request r's slot
-    (r0 0..17, r2 18..35 of slot 0; r1, r3 the same in slot 1), tile fleet_norm_router_spread (fleet_xb.hip, lever
-    router_nw): the same fold, norm and router rows as fleet's 37-worker task, the rows split over W' workers. E_norm_L
+    (r0 0..17, r2 18..35 of slot 0; r1, r3 the same in slot 1), tile fleet_norm_router_spread (fleet_xb.hip,
+    no new lever): the same fold, norm and router rows as fleet's 37-worker task, the rows split over W' workers. E_norm_L
     keeps its shape (8,) and counts W' arrivals per XCD; gate_up still waits for it with "xw->x"."""
     n = q.n
     if not spread:
@@ -466,6 +529,14 @@ def build(layers: int = LAYERS, routing_cached: bool | None = None, requests: in
         if requests != XBO_REQUESTS:
             raise ValueError(f"ETX_DSV2_OPROJ_XB=1 needs {XBO_REQUESTS} requests, not {requests}: B = 2 waits for a GPU A/B "
                              "(/workspace/bound_batch_gemv.md: +40 us in the latency-bound case)")
+    # ETX_DSV2_LMHEAD_XB=1: the batched token tail (build_xb_lm); B = 4 only, on top of the batched o_proj
+    xbl = _xbl()
+    if xbl and not (xbo and requests == XBL_REQUESTS):
+        raise ValueError(f"ETX_DSV2_LMHEAD_XB=1 needs ETX_DSV2_OPROJ_XB=1 (so ETX_DSV2_QKV_XB=1) and {XBL_REQUESTS} "
+                         f"requests, not {requests}")
+    if xbl and {"norm_tree", "norm_gamma_early"} & set(os.environ.get("ETX_FLEET_PATCH", "").split()):
+        # fleet_xb_final_norm takes the lever's norm helper; these two levers leave fleet's final norm unpatched
+        raise ValueError("ETX_DSV2_LMHEAD_XB=1 with lever norm_tree / norm_gamma_early is not supported: use norm_tree_all")
     rfirst, rspread = _router_first(), _router_spread()
     if (rfirst or rspread) and not xbo:
         raise ValueError("ETX_DSV2_ROUTER_FIRST / ETX_DSV2_ROUTER_SPREAD need ETX_DSV2_OPROJ_XB=1 (B = 4): with one request "
@@ -545,7 +616,9 @@ def build(layers: int = LAYERS, routing_cached: bool | None = None, requests: in
                                     xb=xb)
                 prev_moe = True
             state[q.r] = (e, "xw->(0)", prev_moe)
-    for q in qs:
+    if xbl:
+        build_xb_lm(g, qs, state)
+    for q in (() if xbl else qs):
         n = q.n
         e, _, prev_moe = state[q.r]
         g.etensor(n("E_lm"), (1,), wait_count=XCDS * W)

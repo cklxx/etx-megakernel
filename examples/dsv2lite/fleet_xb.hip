@@ -31,6 +31,18 @@
 //                  The fp32 partials go to request j's act.oproj_partial[xcd] with fleet's coherent store (EPI_NONE);
 //                  the router prologue of each request folds them as today. No norm, no new LDS: the 2 x B pointers
 //                  live in s.logits.
+//
+// ETX_DSV2_LMHEAD_XB=1 (B = 4 only, stacked on ETX_DSV2_OPROJ_XB=1; graph.py build_xb_lm) adds the token tail:
+//   fleet_xb_final_norm  one task per request and XCD: fleet's TASK_LM_HEAD prologue (stage_residual with the expert
+//                  fold, dump of the last layer, the final RMSNorm the build's lever selected), then the normalized
+//                  vector as bf16 into this XCD's slice of the request's act.x_norm (exact, as in fleet_xb_norm).
+//                  x_norm is free: its last readers (the last layer's experts) finished before the request's last
+//                  E_down; its next writer (the next token's layer-0 norm grid) runs after this token's argmax.
+//   fleet_lm_head_xb the batched lm_head grid (8 XCDs x 74 workers): the B vectors into the qkv tile's LDS slots,
+//                  then gemv_rows_xb over this XCD's 12800 rows of W_lm (one weight stream for all B requests),
+//                  fleet's EPI_BF16 with plain stores (as fleet's lm_head) into request j's act.logits.
+//   fleet_xb_lm_cand fleet::lm_head_candidate unchanged, per request on fleet's 37 workers, after an XCD-local event:
+//                  the same 296 candidates in act.argmax_val / argmax_idx, so fleet's argmax task is unchanged.
 #include "examples/dsv2lite/fleet_shim.hip"
 #include <stddef.h>
 
@@ -151,6 +163,9 @@ __device__ __forceinline__ void unpack8(const uint4& u, float* x8) {
 // Same software pipeline as gemv_rows_pipelined (two groups in flight, unconditional loads clamped to the last row,
 // masked FMAs) with kRPI rows per group. x: slot(s, j) at lane + 64 dd (fixed LDS offsets; chunks past K are read but
 // masked). ys: the B output pointers, in LDS, read by the storing lane.
+// kNoTerminal (lever gemv_no_terminal_all's loop, used by fleet_lm_head_xb only): the last group issues no dead
+// clamped group after it. false is the qkv tile's loop, unchanged.
+template <bool kNoTerminal = false>
 __device__ __forceinline__ void gemv_rows_xb(const __hip_bfloat16* __restrict__ w, int ld, fleet::Scratch& s,
                                              float* const* ys, int N, int K, int xcd, int n_xcds, int worker,
                                              int n_workers) {
@@ -211,16 +226,36 @@ __device__ __forceinline__ void gemv_rows_xb(const __hip_bfloat16* __restrict__ 
     }                                                                                       \
   }
   XB_ISSUE(bufA, k)
-  while (true) {
-    const int k2 = k + stride;
-    XB_ISSUE(bufB, k2)
-    XB_REDUCE(bufA, k)
-    if (k2 >= cnt) break;
-    const int k3 = k2 + stride;
-    XB_ISSUE(bufA, k3)
-    XB_REDUCE(bufB, k2)
-    if (k3 >= cnt) break;
-    k = k3;
+  if constexpr (kNoTerminal) {
+    while (k + 2 * stride < cnt) {
+      const int k2 = k + stride;
+      XB_ISSUE(bufB, k2)
+      XB_REDUCE(bufA, k)
+      const int k3 = k2 + stride;
+      XB_ISSUE(bufA, k3)
+      XB_REDUCE(bufB, k2)
+      k = k3;
+    }
+    if (k + stride < cnt) {
+      const int k2 = k + stride;
+      XB_ISSUE(bufB, k2)
+      XB_REDUCE(bufA, k)
+      XB_REDUCE(bufB, k2)
+    } else {
+      XB_REDUCE(bufA, k)
+    }
+  } else {
+    while (true) {
+      const int k2 = k + stride;
+      XB_ISSUE(bufB, k2)
+      XB_REDUCE(bufA, k)
+      if (k2 >= cnt) break;
+      const int k3 = k2 + stride;
+      XB_ISSUE(bufA, k3)
+      XB_REDUCE(bufB, k2)
+      if (k3 >= cnt) break;
+      k = k3;
+    }
   }
 #undef XB_ROW
 #undef XB_ISSUE
@@ -403,28 +438,103 @@ __device__ __forceinline__ void oproj(const etx_ctx* c) {
 #endif
 }
 
+// ---------------------------------------------------------------- fleet_xb_final_norm
+// grid constants (layer = -1, request, flags: kFold); one task per XCD, worker index 0 for fleet's helpers, so XCD 0's
+// task dumps the last layer once, as fleet's (xcd 0, worker 0) lm_head task does. No residual publication (fleet's
+// lm_head passes dst = nullptr).
+__device__ __forceinline__ void final_norm(const etx_ctx* c) {
+  const int xcd = (int)c->domain;
+  const bool fold = (c->cst[2] & kFold) != 0;
+  const FleetParams* fp = FP(c);
+  const fleet::ModelDims& d = fp->d;
+  const fleet::Activations& act = fp->act;
+  fleet::Scratch& s = *reinterpret_cast<fleet::Scratch*>(c->lds);
+  fleet::TokenCtx tc;
+  tc.tok = fp->tok; tc.epoch = fp->epoch; tc.pos = fp->pos; tc.seq_len = fp->pos + 1;
+  tc.cos = act.cos + (int64_t)fp->pos * d.qk_rope; tc.sin = act.sin + (int64_t)fp->pos * d.qk_rope;
+  tc.dump = fp->dump != 0; tc.trace = false;
+  fleet::stage_residual(d, act.x[1], fold ? act.expert_out : nullptr, nullptr, s.vec, xcd, 0, run_task_coh(fp->rt));
+  fleet::dump_layer(d, act, d.layers - 1, s.vec, xcd, 0, tc);
+  // the lever's helper, as fleet's lm_head after norm_tree_all (graph.py refuses norm_tree / norm_gamma_early, which
+  // leave fleet's final norm unpatched)
+  input_norm(rank2{}, d, fp->w.final_norm, s.vec, s.smem);   // ends with __syncthreads
+  uint4* dst = reinterpret_cast<uint4*>(act.x_norm + (int64_t)xcd * d.hidden);
+  for (int i = (int)threadIdx.x; i < d.hidden / 8; i += fleet::kBlockThreads) {
+    union { __hip_bfloat16 h[8]; uint4 u; } p;
+#pragma unroll
+    for (int k = 0; k < 8; ++k) p.h[k] = __float2bfloat16(s.vec[i * 8 + k]);
+    dst[i] = p.u;
+  }
+}
+
+// ---------------------------------------------------------------- fleet_lm_head_xb
+// grid constants (layer = -1, workers per XCD, first request = 0)
+__device__ __forceinline__ void lm_head(const etx_ctx* c) {
+  const int xcd = (int)c->domain, worker = (int)c->coord[1], nw = (int)c->cst[1], r0 = (int)c->cst[2];
+  fleet::Scratch& s = *reinterpret_cast<fleet::Scratch*>(c->lds);
+  const FleetParams* fq = &etx_fleet_const[r0];
+  const fleet::ModelDims& d = fq->d;
+  const __hip_bfloat16* wl = fq->w.lm_head;
+  // per-request pointers into LDS (s.logits): [0, kMaxB) act.logits, [2 kMaxB, 3 kMaxB) this XCD's normalized vector
+  void** tab = reinterpret_cast<void**>(s.logits);
+  if (threadIdx.x < kB) {
+    const FleetParams& p = fq[threadIdx.x];
+    if (p.w.lm_head != wl || p.d.hidden != d.hidden || p.d.vocab != d.vocab) __builtin_trap();
+    tab[threadIdx.x] = p.act.logits;
+    tab[2 * kMaxB + threadIdx.x] = p.act.x_norm + (int64_t)xcd * d.hidden;
+  }
+  __syncthreads();
+  const bool coh = run_task_coh(fq->rt);
+  // the thread index through an empty asm, as in oproj(): with threadIdx.x the staging offsets were hoisted out of
+  // the task loop (local ROCm 7.2.4 compile: 251 + 6 VGPRs, 1 workgroup per CU; with the asm: 248 + 6, 2)
+  int t = (int)threadIdx.x;
+  asm volatile("" : "+v"(t));
+  if (t < d.hidden / 8) {
+#pragma unroll
+    for (int j = 0; j < kB; ++j)
+      slot(s, j)[t] = ld_act16(reinterpret_cast<const uint4*>(tab[2 * kMaxB + j]) + t, coh);
+  }
+  __syncthreads();
+  // fleet: gemv_rows(w.lm_head, d.hidden, s.vec, act.logits, nullptr, EPI_BF16, 1.f, d.vocab, d.hidden, xcd,
+  // kNumXCDs, worker, nw), here with 74 workers
+  gemv_rows_xb<true>(wl, d.hidden, s, reinterpret_cast<float* const*>(tab), d.vocab, d.hidden, xcd, fleet::kNumXCDs, worker, nw);
+}
+
+// ---------------------------------------------------------------- fleet_xb_lm_cand
+// grid constants (layer = -1, request); fleet's 37 workers of the request's slot
+__device__ __forceinline__ void lm_cand(const etx_ctx* c) {
+  const FleetParams* fp = FP(c);
+  fleet::Activations& act = *const_cast<fleet::Activations*>(&fp->act);
+  fleet::Scratch& s = *reinterpret_cast<fleet::Scratch*>(c->lds);
+  fleet::lm_head_candidate(fp->d, act, (int)c->domain, (int)c->coord[1], fleet::kWorkersPerXCD, s.smem, s.ids_blk,
+                           run_task_coh(fp->rt));
+}
+
 }  // namespace etx_xb
 
 extern "C" __device__ void fleet_xb_norm(const etx_ctx* c) { etx_xb::norm(c); }
 extern "C" __device__ void fleet_qkv_xb(const etx_ctx* c) { etx_xb::qkv(c); }
 extern "C" __device__ void fleet_oproj_xb(const etx_ctx* c) { etx_xb::oproj(c); }
+extern "C" __device__ void fleet_xb_final_norm(const etx_ctx* c) { etx_xb::final_norm(c); }
+extern "C" __device__ void fleet_lm_head_xb(const etx_ctx* c) { etx_xb::lm_head(c); }
+extern "C" __device__ void fleet_xb_lm_cand(const etx_ctx* c) { etx_xb::lm_cand(c); }
 #if defined(ETX_DSV2_ROUTER_SPREAD) && ETX_DSV2_ROUTER_SPREAD
-// ETX_DSV2_ROUTER_SPREAD=1 (graph.py build_router_spread; the arm passes -DETX_DSV2_ROUTER_SPREAD=1 and applies lever
-// router_nw last): fleet's TASK_NORM_ROUTER of one request on a (8 XCDs, nw) grid. Worker coord[1] in [0, nw) owns router
-// rows coord[1], coord[1] + nw, ... (fleet: coord[1] + 37 k). Each row's dot product is the same worker-local code, so
-// every logit is bitwise fleet's. nw is the grid's third constant (graph.py consts=(L, r, nw)). Same FleetParams, same
-// TaskDescriptor and prologue stamps as fleet_call: no new kernel argument and no new base address. Compiled only in that
-// build, so the x4xbo translation unit is unchanged.
-extern "C" __device__ void fleet_norm_router_spread(const etx_ctx* c) {
+// ETX_DSV2_ROUTER_SPREAD=1 (graph.py build_moe_router; the arm passes -DETX_DSV2_ROUTER_SPREAD=1): fleet's
+// TASK_NORM_ROUTER (MoE layers) of one request on a (8 XCDs, nw) grid. Worker coord[1] in [0, nw) owns router rows
+// coord[1], coord[1] + nw, ... (fleet: coord[1] + 37 k). The body is task_norm_router's, step by step, with the same
+// helpers (so the same lever edits): stage_residual_f32 (the fold of the 8 o_proj partials; coherent_loads / l1_loads
+// edit it in place), the post-attention norm by input_norm (the helper the norm levers put at fleet's MoE router call
+// site), worker 0's x_norm publication, and gemv_rows with n_workers = nw (gemv_no_terminal_all edits its paths in
+// place). gemv_rows picks its path by K only, and a row is one worker's code, so every logit is bitwise fleet's.
+// fleet's FLAG_TOPK_PUBLISH block is not used by ETX's router (flags 0). nw is the grid's third constant (graph.py
+// consts=(L, r, nw)). Same FleetParams and stamps as fleet_call: no new kernel argument, no new base address.
+// Compiled only in that build, so the x4xbo / x4xbl translation unit is unchanged.
+namespace etx_xb {
+__device__ __forceinline__ void norm_router_spread(const etx_ctx* c) {
   const FleetParams* fp = FP(c);
   const int32_t L = LAYER(c);
-  const int worker = c->coord[1];
-  fleet::TaskDescriptor t{};
-  t.kind = fleet::TASK_NORM_ROUTER; t.layer = (int16_t)L; t.xcd = (int16_t)c->domain; t.worker = (int16_t)worker;
-  t.wait_event = -1; t.signal_event = -1; t.signal_scope = 0; t.n_split = 1;
-  t.head = -1; t.kv_chunk = -1; t.expert_slot = -1;
-  t.wait_scope = 0; t.wait_count = 0; t.local_event = 0; t.flags = 0; t.signal_xcd_count = 0;
-  t.index = 0;
+  const int xcd = (int)c->domain, worker = c->coord[1], nw = (int)c->cst[2];
+  const auto& d = fp->d;
   fleet::TokenCtx tc;
   tc.tok = fp->tok; tc.epoch = fp->epoch; tc.pos = fp->pos; tc.seq_len = fp->pos + 1;
   tc.cos = fp->act.cos + (int64_t)fp->pos * fp->d.qk_rope;
@@ -433,10 +543,21 @@ extern "C" __device__ void fleet_norm_router_spread(const etx_ctx* c) {
   tc.trace = false;
   fleet::Activations& act = *const_cast<fleet::Activations*>(&fp->act);
   fleet::Scratch& s = *reinterpret_cast<fleet::Scratch*>(c->lds);
+  const bool coh = run_task_coh(fp->rt);
   uint64_t t0 = 0;
   pro_begin(fp, tc, s, t0);
-  fleet::task_norm_router_nw(fp->d, fp->w, act, s, L, (int)c->domain, worker, L >= fp->d.first_k_dense, tc,
-                             etx_xb::run_task_coh(fp->rt), t, fp->rt, (int)c->cst[2]);
+  fleet::stage_residual_f32(d, act.x[0], act.oproj_partial, act.x[1], s.vec, xcd, worker, coh);
+  FLEET_STAMP_STAGE();
+  input_norm(rank2{}, d, fp->w.layer_norm_post[L], s.vec, s.smem);
+  FLEET_STAMP();
+  if (worker == 0) {
+    float* x_norm = act.x_norm + (int64_t)xcd * d.hidden;
+    for (int i = threadIdx.x; i < d.hidden; i += blockDim.x) x_norm[i] = s.vec[i];
+  }
+  fleet::gemv_rows(fp->w.layer_router[L], d.hidden, s.vec, act.router_logits + (int64_t)xcd * d.n_routed, nullptr,
+                   fleet::EPI_NONE, 1.f, d.n_routed, d.hidden, 0, 1, worker, nw);
   pro_end(fp, s, PRO_SLOT(L, fleet::TASK_NORM_ROUTER, c), t0);
 }
+}  // namespace etx_xb
+extern "C" __device__ void fleet_norm_router_spread(const etx_ctx* c) { etx_xb::norm_router_spread(c); }
 #endif

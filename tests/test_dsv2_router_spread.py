@@ -1,13 +1,13 @@
 """Router order and router spread on top of the batched o_proj (B = 4, ETX_DSV2_OPROJ_XB=1):
 ETX_DSV2_ROUTER_FIRST=1 (graph.py: every request's router of a layer before any request's experts) and
-ETX_DSV2_ROUTER_SPREAD=1 (graph.py build_moe_router, fleet_xb.hip fleet_norm_router_spread, lever router_nw: each
+ETX_DSV2_ROUTER_SPREAD=1 (graph.py build_moe_router, fleet_xb.hip fleet_norm_router_spread: each
 request's norm + router on 18 workers of its slot). CPU only, no GPU:
 
   * default off: x4xbo's plan and kernel are byte-identical to 01d08f4 (hash pins), with the switches unset or "0";
   * on: grids, worker maps, event counts, no new argument tensor, creation order, queue order, routing handoff,
     no deadlock in the protocol simulator;
   * unsupported combinations are refused;
-  * the lever: one parameter and one argument changed, no new __shared__, the earlier levers' text kept;
+  * the tile runs task_norm_router's steps in fleet's order with the same helpers (so the same lever edits);
   * numbers: the router logits and the top-6 of every XCD with the rows split over 18 workers against 37 (a mirror of
     gemv_rows_pipelined<2, 4>'s per-row order), on random data with DeepSeek-V2-Lite's dimensions.
 """
@@ -80,7 +80,8 @@ def test_spread_tile_is_compiled_only_with_its_define():
 
 # ---------------------------------------------------------------- on
 MODES = {"first": dict(ETX_DSV2_ROUTER_FIRST="1"), "spread": dict(ETX_DSV2_ROUTER_SPREAD="1"),
-         "both": dict(ETX_DSV2_ROUTER_FIRST="1", ETX_DSV2_ROUTER_SPREAD="1")}
+         "both": dict(ETX_DSV2_ROUTER_FIRST="1", ETX_DSV2_ROUTER_SPREAD="1"),
+         "bothlm": dict(ETX_DSV2_ROUTER_FIRST="1", ETX_DSV2_ROUTER_SPREAD="1", ETX_DSV2_LMHEAD_XB="1")}
 
 
 @pytest.fixture(scope="module", params=[(m, k) for m in MODES for k in ("shared", "replicated")],
@@ -198,12 +199,11 @@ def test_switch_value_is_checked(monkeypatch, sw):
 
 def test_arms():
     from examples.dsv2lite.arms import ARMS
-    base, q, r = ARMS["x4xbo"], ARMS["x4xboq"], ARMS["x4xbor"]
+    base, q, r = ARMS["x4xbl"], ARMS["x4xboq"], ARMS["x4xbor"]
     assert q.env == dict(base.env, ETX_DSV2_ROUTER_FIRST="1") and q.levers == base.levers and q.flags == base.flags
     assert r.env == dict(base.env, ETX_DSV2_ROUTER_FIRST="1", ETX_DSV2_ROUTER_SPREAD="1")
-    assert r.levers == (*base.levers, "router_nw") and r.flags == (*base.flags, "-DETX_DSV2_ROUTER_SPREAD=1")
-    assert all("ETX_DSV2_ROUTER_SPREAD" not in a.env and "router_nw" not in a.levers
-               for n, a in ARMS.items() if n != "x4xbor")
+    assert r.levers == base.levers and r.flags == (*base.flags, "-DETX_DSV2_ROUTER_SPREAD=1")
+    assert {n for n, a in ARMS.items() if "ETX_DSV2_ROUTER_SPREAD" in a.env} == {"x4xbor"}
 
 
 def test_duration_model():
@@ -211,32 +211,27 @@ def test_duration_model():
     assert dsv.router_spread_us() == pytest.approx(dsv.DUR["router"] + dsv.ROUTER_GEMV_US)
 
 
-# ---------------------------------------------------------------- the lever
+# ---------------------------------------------------------------- the tile follows fleet's task_norm_router
 @pytest.mark.skipif(not (FLEET_SRC / "kernels/fleet_kernel.hip").exists(), reason="pinned fleet source not present")
-def test_lever_router_nw(tmp_path):
-    from examples.dsv2lite.arms import ARMS
-    from examples.dsv2lite.patch_fleet import _function, apply
-    src = tmp_path / "src"
-    shutil.copytree(FLEET_SRC, src)
-    for name in ARMS["x4xbo"].levers:
-        apply(src, name)
-    before = (src / "kernels/fleet_kernel.hip").read_text()
-    apply(src, "router_nw")
-    after = (src / "kernels/fleet_kernel.hip").read_text()
-    orig = _function(before, "__device__ void task_norm_router(")
-    assert _function(after, "__device__ void task_norm_router(") == orig      # the original stays byte for byte
-    copy = _function(after, "__device__ void task_norm_router_nw(")
-    assert after == before.replace(orig, orig + "\n\n// etx lever router_nw: task_norm_router with the router rows split "
-                                   "over nw workers\n" + copy)
-    assert "rms_norm_lds_tree_early(" in copy                               # the earlier levers' text is kept
-    assert "__shared__" not in copy and "FLAG_TOPK_PUBLISH" not in copy
-    assert copy.count("worker, nw);") == 1 and "kWorkersPerXCD" not in copy
-    head = orig[:orig.index("// The softmax + 6-pass top-k")]
-    stripped = copy.replace("void task_norm_router_nw(", "void task_norm_router(").replace(
-        "const RuntimeState& rt, int nw) {", "const RuntimeState& rt) {").replace("worker, nw);", "worker, kWorkersPerXCD);")
-    assert stripped.startswith(head.rstrip())
-    with pytest.raises(SystemExit, match="already applied"):
-        apply(src, "router_nw")
+def test_spread_tile_mirrors_task_norm_router():
+    from examples.dsv2lite.patch_fleet import _function
+    fleet = _function((FLEET_SRC / "kernels/fleet_kernel.hip").read_text(), "__device__ void task_norm_router(")
+    body = XB_SRC[XB_SRC.index("void norm_router_spread("):]
+    body = body[:body.index("\n}\n")]
+    # the same steps in the same order; only the row split's worker count differs
+    steps_fleet = ["stage_residual_f32(d, act.x[0], act.oproj_partial, act.x[1], s.vec, xcd, worker, coh);",
+                   "rms_norm_lds(d, w.layer_norm_post[layer], s.vec, s.smem);", "if (worker == 0) {",
+                   "1.f, d.n_routed, d.hidden, 0, 1, worker, kWorkersPerXCD);"]
+    steps_tile = ["fleet::stage_residual_f32(d, act.x[0], act.oproj_partial, act.x[1], s.vec, xcd, worker, coh);",
+                  "input_norm(rank2{}, d, fp->w.layer_norm_post[L], s.vec, s.smem);", "if (worker == 0) {",
+                  "1.f, d.n_routed, d.hidden, 0, 1, worker, nw);"]
+    pos = [fleet.index(x) for x in steps_fleet]
+    assert pos == sorted(pos)
+    pos = [body.index(x) for x in steps_tile]
+    assert pos == sorted(pos)
+    assert "__shared__" not in body and "args[" not in body and "run_task_coh(fp->rt)" in body
+    # the router uses no row-split o_proj in these arms (fleet's FLAG_OPROJ_ROW_SPLIT branch is the only other path)
+    assert "FLAG_OPROJ_ROW_SPLIT" not in XB_SRC[XB_SRC.index("void norm_router_spread("):]
 
 
 # ---------------------------------------------------------------- numbers

@@ -204,7 +204,9 @@ def test_arm_differs_from_x4xb_only_by_the_switch():
     assert build_env(b) == {**build_env(a), "ETX_DSV2_OPROJ_XB": "1"}
     assert "-DETX_DS_REQUESTS=4" in b.flags and b.rule is None and b.order == ()
     assert sess.required_wg_per_cu(b) == 2
-    assert all("ETX_DSV2_OPROJ_XB" not in ARMS[n].env for n in ARMS if not n.startswith("x4xbo"))
+    # only x4xbo and the arms stacked on it (x4xbl, tests/test_dsv2_lmhead_xb.py; x4xboq / x4xbor,
+    # tests/test_dsv2_router_spread.py) set the switch
+    assert {n for n in ARMS if "ETX_DSV2_OPROJ_XB" in ARMS[n].env} == {"x4xbo", "x4xbl", "x4xboq", "x4xbor"}
 
 
 # ---------------------------------------------------------------- the row split of gemv_rows_half_xb
