@@ -174,7 +174,8 @@ ARMS = {a.name: a for a in [
     # without a DROP. Local compiles of etx_megakernel_d0 (VGPR + AGPR, scratch B/lane, SGPR spill, VGPR spill,
     # workgroups per CU), 2026-10-18:
     #   ROCm 7.14 (gate):     x4xb 256 + 0, 80, 1719, 17, 2;  x4xbo 256 + 0, 80, 1753, 16, 2
-    #   ROCm 7.2.4 (record):  x4xb 248 + 6, 64, 1683, 13, 2;  x4xbo 248 + 6, 64, 1725, 14, 2
+    #   ROCm 7.2.4 (record):  x4xb 248 + 6, 64, 1683, 13, 2;  x4xbo 248 + 6, 64, 1724, 14, 2
+    # (after the merge of the peeled qkv GEMV loop, feat/ds-qkv-noterm: 7.14 unchanged; 7.2.4 x4xbo SGPR spill 1725 -> 1724)
     # x4xbo includes the peeled GEMV loop (gemv_no_terminal_all: no dead group of loads at the end of a wave; before
     # the peel 1750 / 1721 SGPR spill). LDS 26668 B in all four. SGPR spill +34 / +42: the grid reuses the batched qkv
     # grid's arguments, so the lowered dispatch code gets no new address table (the qkv tile's second table cost
