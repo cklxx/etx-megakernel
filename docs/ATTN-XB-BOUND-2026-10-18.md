@@ -45,6 +45,16 @@ attn 20.3 / 24.0 us at 8 chunks is fix's range (/workspace/bound_next_1p85.md). 
 - base reproduces x4xbor (6866.9 us = 7148.7 - 281.8).
 - Gain: optimistic -719.3 us, pessimistic -556.3 us, stress -448.3 us. All are above the 0.3 ms stop line.
 
+### In-body q_c wait (fix's review of PR #27)
+
+- The simulator does not model the in-body wait of attention on q_c (the qabs counter, fleet PUB_WAIT).
+- fix added this wait as an ETX in-edge (E_qkv -> qabs -> E_qabs -> attn). In a static queue the worker blocks in
+  both cases, so this is a valid deadlock model.
+- Result: no deadlock (27 layers, 3 seeds, kv_a shared and replicated).
+- Times: x4xbor 6962.1 us, x4xbora 6190.7 us (kv_a shared), thus -771 us. With kv_a replicated: 6175.1 us.
+- The gain without the wait is -719 us (optimistic). Thus the missing wait does not make the claimed gain too high.
+- Evidence: /workspace/pr27v (sim.py, sims.log), /workspace/review_pr27.md section 2.
+
 ## 27-layer protocol simulator, Step 1 (against x4xbl, 17996ae; record only)
 
 ```
@@ -83,3 +93,9 @@ Otherwise DROP.
   - ROCm 7.14 (gate): x4xbor 256 + 0, 80, 1796, 17, 2, 26668; x4xbora 256 + 0, 80, 1794, 17, 2, 26668.
   - ROCm 7.2.4 (record): x4xbor 248 + 6, 64, 1756, 14, 2, 26668; x4xbora 248 + 6, 64, 1754, 14, 2, 26668.
 - Equality: not bitwise to x4xbor. tests/test_dsv2_attn_xb.py states the fp32 tolerance against the 16-chunk path.
+- Tokens: the greedy-token test uses random weights. It cannot prove that the tokens do not change on real weights.
+  Only the GPU token gate on all 4 requests can prove it. fix's estimate: the smallest HF top-2 logit margin is 6.625
+  (request 0) and 6.0 (request 1). 1 bf16 step on 0.1 % of o is about 2e-4 relative, 20-100 x below the drift that
+  the gate already accepts. A token change is thus unlikely, but the GPU token gate stays mandatory.
+- Fleet source: all resource numbers come from the pinned fleet 3fb67a6 (~/code/etx-cache/fleet-3fb67a6, hash checked).
+  fix rebuilt x4xbora with it: ROCm 7.14 256 + 0, 80 B, SGPR spill 1794, 2 WG/CU.
