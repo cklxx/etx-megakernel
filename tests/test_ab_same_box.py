@@ -189,9 +189,9 @@ def test_full_run_sequence_with_warm_up(tmp_path, rounds):
 def _alive(pid):
     try:
         state = Path(f"/proc/{pid}/status").read_text()
-    except FileNotFoundError:
+    except (FileNotFoundError, ProcessLookupError):  # the process can exit during the read (ESRCH)
         return False
-    return "\nState:\tZ" not in state
+    return "\nState:\tZ" not in state and "\nState:\tX" not in state
 
 
 def test_background_child_is_killed_after_a_normal_run(tmp_path):
@@ -200,9 +200,11 @@ def test_background_child_is_killed_after_a_normal_run(tmp_path):
     assert rc == 0 and "step_ms=1" in text
     pid = int(pidf.read_text())
     deadline = time.monotonic() + 5
-    while _alive(pid) and time.monotonic() < deadline:
+    dead = False
+    while not dead and time.monotonic() < deadline:
+        dead = not _alive(pid)  # an exiting process can read as gone and then as present once; one gone is enough
         time.sleep(0.05)
-    assert not _alive(pid)
+    assert dead
 
 
 def test_wait_after_a_timeout_kill_is_bounded(tmp_path):
