@@ -732,9 +732,9 @@ int main(int argc, char** argv) {
       printf("  %-10s L%-3d %-20s %s%s  original %6.1f us  imported %6.1f us\n", x.role.c_str(), x.layer, x.exp.c_str(),
              diff.empty() ? "identical" : "DIFFERS", diff.c_str(), us_o, us_i);
       // Machine-readable evidence supplements (never replaces) the legacy line.
-      printf("CHECK-INSTANCE {\"id\":%d,\"layer\":%d,\"export\":\"%s\",\"replicas\":%d,"
+      printf("CHECK-INSTANCE {\"id\":%d,\"req\":%d,\"layer\":%d,\"export\":\"%s\",\"replicas\":%d,"
              "\"grid\":[%d,%d,%d],\"block\":[%d,%d,%d],\"position\":%d,\"bytes\":%zu,"
-             "\"result\":\"%s\",\"first_byte\":%lld}\n", x.n, x.layer, x.exp.c_str(), x.rep,
+             "\"result\":\"%s\",\"first_byte\":%lld}\n", x.n, x.req, x.layer, x.exp.c_str(), x.rep,
              x.gx, x.gy, x.gz, d->block[0], d->block[1], d->block[2], check_pos, compared_bytes,
              diff.empty() ? "identical" : "DIFFERS", first_byte);
       if (price_attention && (x.role == "attn" || x.role == "reduce")) {

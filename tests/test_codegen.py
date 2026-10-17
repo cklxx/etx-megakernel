@@ -1,4 +1,5 @@
 import json
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -121,6 +122,86 @@ def test_large_dispatch_preserves_every_integer_and_case():
     small = ['unchanged']
     _compact_dispatch(small, 0, 'test', 10)
     assert small == ['unchanged']
+
+
+def _without_comments(text):
+    return re.sub(r'//[^\n]*', '', text)
+
+
+def _normalise(text):
+    return '\n'.join(line.rstrip() for line in _without_comments(text).splitlines()).strip('\n')
+
+
+def _compact_tables(src):
+    tables = {}
+    for m in re.finditer(r'static __device__ const int32_t etx_(\w+)_data\[\d+\]\[(\d+)\] = \{(.*?)\};', src, re.S):
+        tables[m[1]] = [list(map(int, row.split(','))) for row in re.findall(r'\{([^{}]*)\}', m[3])]
+    return tables
+
+
+def _grouped_cases(segment, tag, tables):
+    cases = {}
+    for m in re.finditer(r'((?:    case \d+:\n)+)    \{\n(.*?)^      (break;|return true;) \}', segment, re.M | re.S):
+        body = _normalise(m[2])
+        for tid in map(int, re.findall(r'    case (\d+):\n', m[1])):
+            values = tables[tag][tid]
+            expanded = re.sub(rf'etx_{tag}_data\[t\.type\]\[(\d+)\]', lambda x: str(values[int(x[1])]), body)
+            assert tid not in cases, f'duplicate case {tid} in {tag}'
+            cases[tid] = (expanded, m[3])
+    return cases
+
+
+def _single_cases(segment):
+    return {int(m[1]): (_normalise(m[2]), m[3]) for m in re.finditer(
+        r'    case (\d+): \{[^\n]*\n(.*?)^      (break;|return true;) \}', segment, re.M | re.S)}
+
+
+ANCHORS = ['etx_deps_ready(const etx_params& p, int32_t tid) {',
+           'switch (t.type) {   // phase 1:', 'switch (t.type) {   // phase 3:']
+TAGS = ('ready', 'wait', 'arrive')
+
+
+def _dispatch_segments(src):
+    """The three dispatch switches only, not the plain body-dispatch switch."""
+    start = [src.index(a) for a in ANCHORS]
+    return [src[start[0]:start[1]], src[start[1]:start[2]],
+            src[start[2]:src.index('\n  switch (t.type) {\n', start[2])]]
+
+
+def test_compact_dispatch_reconstructs_a_real_replicated_plan(tmp_path, monkeypatch):
+    """A generated plan above the threshold: compact emission expands to the plain source.
+
+    This is not an inversion of hand-written lines. Both sources come from the
+    same compiled B8 Qwen plan; every ready/wait/arrive case body must agree.
+    """
+    import importlib
+    from test_vllm_moe import _graph
+    from etx.codegen import kernel as kernel_module
+    with monkeypatch.context() as mp:
+        mp.setenv('ETX_VL_REQUESTS', '8')
+        mp.setenv('ETX_VL_CHAIN', '0')
+        _, graph = _graph(tmp_path, mp, xcd=False, layers=4)
+        plan = compile_graph(graph, 'gfx942', {}, {})
+    # _graph reloads model.py under the test environment; reload it again after
+    # the environment is restored so later tests see the default module.
+    importlib.reload(importlib.import_module('examples.vllm_llm.model'))
+    assert len(plan.type_ids) >= 512
+    compact = emit_kernel(plan)
+    monkeypatch.setattr(kernel_module, '_compact_dispatch', lambda *args, **kwargs: None)
+    plain = emit_kernel(plan)
+    tables = _compact_tables(compact)
+    assert set(tables) == set(TAGS)
+    assert len(compact) * 2 < len(plain)
+    total = 0
+    for tag, segment, plain_segment in zip(TAGS, _dispatch_segments(compact), _dispatch_segments(plain)):
+        expected = _single_cases(plain_segment)
+        got = _grouped_cases(segment, tag, tables)
+        assert expected, f'no cases found for {tag}'
+        assert set(got) == set(expected), f'{tag} case set differs'
+        for tid, (body, ending) in expected.items():
+            assert got[tid] == (body, ending), f'{tag} case {tid} differs after expansion'
+        total += len(expected)
+    assert total >= len(plan.type_ids)
 
 
 def test_compact_dispatch_keeps_different_scopes_and_hooks_separate():

@@ -134,7 +134,24 @@ def test_exact_production_shape_has_45_layers_and_pp24_boundary():
     assert s['fixture'] and s['compile_only']
     assert len(p.tasks)==48*8 and p.events['e_l23'].scope==Scope.SYSTEM
     assert p.tensor_placement['l23_out']=='fine_grained'
-    assert s['dimensions']['H']==4096 and s['dimensions']['EXPERTS']==288
+    d=s['dimensions']
+    assert d['H']==4096 and d['EXPERTS']==288 and d['TOPK']==8
+    assert d['INDEX_TOPK']==2048 and d['POOL']==4
+    assert [(r['rank'],r['layers'][0],r['layers'][-1]) for r in s['ranks']]==[(0,0,23),(1,24,44)]
+    assert [r['moe_layers'] for r in s['ranks']]==[21,21]
+    assert [r['kda_layers'] for r in s['ranks']]==[18,16]
+    assert all(len(r['routed_experts'])==288 for r in s['ranks'])
+
+
+def test_production_schedule_numerics_cover_288_experts_topk8_and_45_layers(tmp_path):
+    """The same native body at production layer/expert/top-k schedule, small widths."""
+    pytest.importorskip('torch');pytest.importorskip('transformers')
+    result=cpu_check.check(tmp_path/'production',2,32,production_schedule=True)
+    assert result['status']=='PASS' and result['matched']==64
+    assert result['layers']==45 and result['experts']==288 and result['topk']==8
+    assert result['production_schedule'] and not result['full_checkpoint']
+    spec=json.loads((tmp_path/'production/stage.json').read_text())
+    assert [(r['rank'],r['layers'][0],r['layers'][-1]) for r in spec['ranks']]==[(0,0,23),(1,24,44)]
 
 
 def test_snapshot_reader_accepts_hf_symlink_shards_and_rejects_path_traversal(tmp_path):
@@ -155,6 +172,34 @@ def test_snapshot_reader_accepts_hf_symlink_shards_and_rejects_path_traversal(tm
 def test_hf_chunk_prefill_then_32_exact_native_greedy_tokens(tmp_path,bf16,fp8):
     result=cpu_check.check_prefill(tmp_path/'prefill',2,8,bf16,fp8)
     assert result['matched']==64 and result['status']=='PASS'
+
+
+def test_logit_comparison_reports_error_that_leaves_argmax_unchanged():
+    import numpy as np
+    from examples.glm53.run import compare_logits
+    expected=np.zeros((2,1,4),np.float32);got=expected.copy();got[0,0,0]=0.5
+    assert np.array_equal(got.argmax(-1),expected.argmax(-1))     # tokens match
+    report=compare_logits(expected,got)
+    assert report['logit_gate']=='REPORTED' and report['logit_max_abs']==0.5
+    assert report['logit_argmax_equal'] and not report['logit_bit_equal']
+    assert report['logit_max_abs_per_step']==[0.5,0.0]
+    # The same mismatch fails an explicit gate, even though the tokens match.
+    with pytest.raises(ValueError,match='exceeds'):
+        compare_logits(expected,got,0.25)
+    assert compare_logits(expected,got,0.5)['logit_gate']=='ENFORCED'
+
+
+def test_logit_comparison_is_exact_and_rejects_invalid_input():
+    import numpy as np
+    from examples.glm53.run import compare_logits
+    logits=np.arange(12,dtype=np.float32).reshape(1,3,4)
+    report=compare_logits(logits,logits.copy(),0.0)
+    assert report['logit_bit_equal'] and report['logit_max_abs']==0.0 and report['logit_gate']=='ENFORCED'
+    with pytest.raises(ValueError,match='shape'):
+        compare_logits(logits,logits[:,:2])
+    for atol in (-1.0,float('nan'),float('inf'),'0.1'):
+        with pytest.raises(ValueError,match='finite and non-negative'):
+            compare_logits(logits,logits.copy(),atol)
 
 
 def test_bf16_conv_output_rounds_before_silu(tmp_path):

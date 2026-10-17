@@ -134,6 +134,38 @@ def check_tokens(text, batch, *, coverage=False):
         raise ValueError('failed/truncated host output')
 
 
+def check_identity(text, batch, expected, position):
+    """Per-request byte-identity gate for replicated multi-request plans.
+
+    cert.check_output already proves every planned instance ran and compared
+    identical in plan order. This additionally proves each request owns the
+    same non-empty planned set, so a dropped or duplicated request cannot hide
+    behind a globally consistent instance list.
+    """
+    records = [json.loads(line[len('CHECK-INSTANCE '):]) for line in text.splitlines()
+               if line.startswith('CHECK-INSTANCE ')]
+    by_req = {r: [] for r in range(batch)}
+    for record in records:
+        req = record.get('req')
+        if type(req) is not int or req not in by_req:
+            raise ValueError('CHECK-INSTANCE lacks a valid request id')
+        by_req[req].append(record)
+    planned = {r: [e['id'] for e in expected if e['req'] == r] for r in range(batch)}
+    for r in range(batch):
+        if not planned[r]:
+            raise ValueError(f'request {r}: plan has no imported byte comparison')
+    if len({len(ids) for ids in planned.values()}) != 1:
+        raise ValueError('requests have unequal planned imported instance counts')
+    for r in range(batch):
+        if [rec['id'] for rec in by_req[r]] != planned[r]:
+            raise ValueError(f'request {r}: incomplete/duplicate/out-of-order byte comparisons at position {position}')
+        if any(rec.get('result') != 'identical' or rec.get('first_byte') != -1
+               or rec.get('position') != position or type(rec.get('bytes')) is not int or rec['bytes'] <= 0
+               for rec in by_req[r]):
+            raise ValueError(f'request {r}: imported bytes differ at position {position}')
+    return dict(position=position, requests=batch, instances_per_request=len(planned[0]))
+
+
 def execute(argv, path, env, seconds):
     """Full logs, deadline, regular progress and a silence probe; kill the entire tree."""
     last = [0.0]
@@ -168,10 +200,12 @@ def qualify(model, build, out, batch):
         expected = cert.expected_instances((build / 'vl_plan.txt').read_text(), json.loads((build / 'imp/imports.json').read_text()))
         env = clean_env(batch)
         args = host_args(model, build, batch)
+        identity_gate = {}
         for position in (0, 1040):
             raw = execute(args + ['--check', '48', '--check-pos', str(position)], out / f'check_p{position}.log', env, 900)
             tag = cert.digest(identity)
             cert.check_output(f'BUILD-IDENTITY phase=before sha256={tag}\n' + raw + f'\nBUILD-IDENTITY phase=after sha256={tag}\n', expected, position, identity)
+            identity_gate[position] = check_identity(raw, batch, expected, position)
         for mode, extra in [('coverage', ['--check-coverage']), ('fused', []), ('unfused', ['--unfused'])]:
             raw = execute(args + extra, out / f'{mode}.log', env, 900)
             check_tokens(raw, batch, coverage=mode == 'coverage')
@@ -179,6 +213,7 @@ def qualify(model, build, out, batch):
             raise ValueError('assets changed during qualification')
         receipt.update(status='PASS', inputs=before, build_identity=identity,
                        imported_per_position=len(expected), positions=[0, 1040],
+                       byte_identity_per_request={str(k): v for k, v in identity_gate.items()},
                        greedy_tokens_per_mode=batch * GEN * REPEAT, modes=['fused', 'unfused'],
                        coverage='HF margin >0.5 gate; exact 32/32 tail in every repetition')
     except Exception as exc:

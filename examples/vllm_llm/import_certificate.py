@@ -111,7 +111,10 @@ def expected_instances(plan, imports):
         all_ids.add(n)
         if r[1].startswith('dsl_'):
             continue
+        # The plan's trailing columns are rep stride copyoff req nb; old plans
+        # without them belong to request 0.
         rows.append(dict(id=n, export=r[1], layer=int(r[2]), replicas=int(r[12]),
+                         req=int(r[15]) if len(r) > 15 else 0,
                          grid=list(map(int, r[4:7])), block=imports[r[1]]['block']))
     if not rows:
         raise Refusal('zero planned imports')
@@ -137,6 +140,9 @@ def check_output(text, expected, position, identity):
     if [r['id'] for r in records] != [r['id'] for r in expected]:
         raise Refusal(f'position {position}: incomplete/duplicate/out-of-order instances {len(records)}/{len(expected)}')
     for r, want in zip(records, expected):
+        # Records written before host.hip published req belong to request 0.
+        if 'req' not in r and want.get('req') == 0:
+            want = {k: v for k, v in want.items() if k != 'req'}
         if any(r.get(k) != v for k, v in want.items()):
             raise Refusal(f'position {position}: instance metadata mismatch')
         if r.get('position') != position or type(r.get('bytes')) is not int or r['bytes'] <= 0:

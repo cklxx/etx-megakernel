@@ -28,11 +28,37 @@ def tiny_config():
       attention_dropout=0.,rms_norm_eps=1e-5,routed_scaling_factor=2.5,swiglu_limit=10.)
 
 
-def fixture(out, bf16=False, fp8=False, selection=False, fp32_conv=True):
+def production_schedule_config():
+    """The pinned 45-layer schedule at fixture arithmetic widths.
+
+    Layer types, layer order, expert count, top-k, INDEX_TOPK/POOL and the PP2
+    split are production values; hidden/intermediate/vocab stay small so the same
+    native body can run locally without the checkpoint. Shape-dependent code
+    (288-expert routing, topk=8, 45 layers, layer 23/24 boundary) is exercised.
+    """
+    from transformers.models.glm5_next.configuration_glm5_next import Glm5NextTextConfig
+    from examples.glm53.prepare import metadata
+    cfg,_=metadata();t=cfg['text_config']
+    layers=['indexed_attention' if x!='linear_attention' else x for x in t['layer_types']]
+    return Glm5NextTextConfig(vocab_size=48,hidden_size=8,intermediate_size=12,moe_intermediate_size=6,
+      num_hidden_layers=t['num_hidden_layers'],num_attention_heads=2,num_key_value_heads=2,
+      n_routed_experts=t['n_routed_experts'],num_experts_per_tok=t['num_experts_per_tok'],
+      n_shared_experts=1,q_lora_rank=4,kv_lora_rank=4,qk_nope_head_dim=4,qk_rope_head_dim=0,
+      v_head_dim=4,linear_head_dim=4,linear_num_heads=2,linear_conv_kernel_dim=4,
+      hc_mult=t['hc_mult'],hc_sinkhorn_iters=t['hc_sinkhorn_iters'],index_head_dim=4,index_n_heads=2,
+      index_topk=t['index_topk'],index_kpool=t['index_kpool'],index_kpool_always_select_tail=True,
+      pad_token_id=0,max_position_embeddings=max(t['index_topk'],128),layer_types=layers,
+      mlp_layer_types=list(t['mlp_layer_types']),indexer_types=['full']*len(layers),
+      attention_dropout=0.,rms_norm_eps=1e-5,routed_scaling_factor=t['routed_scaling_factor'],
+      swiglu_limit=t['swiglu_limit'])
+
+
+def fixture(out, bf16=False, fp8=False, selection=False, fp32_conv=True, production_schedule=False):
     import torch
     from transformers.models.glm5_next.modeling_glm5_next import Glm5NextTextModel
     torch.manual_seed(713)
-    cfg=tiny_config();cfg._attn_implementation='eager';cfg._experts_implementation='eager'
+    cfg=production_schedule_config() if production_schedule else tiny_config()
+    cfg._attn_implementation='eager';cfg._experts_implementation='eager'
     if selection:cfg.index_topk=2
     hf=Glm5NextTextModel(cfg).eval()
     if selection:
@@ -55,8 +81,13 @@ def fixture(out, bf16=False, fp8=False, selection=False, fp32_conv=True):
     out.mkdir(parents=True,exist_ok=False)
     t=cfg.to_dict();d=stage.dimensions(t,64,bf16)
     _,api=metadata()
+    if production_schedule:
+        from examples.glm53.prepare import partition
+        ranks=partition(t)
+    else:
+        ranks=[dict(rank=0,layers=[0,1]),dict(rank=1,layers=[2,3])]
     r=dict(schema=1,model=MODEL,revision=api['sha'],config_sha256=sha(EVIDENCE/'glm-config.json'),fixture=True,
-      config=t,dimensions=d,ranks=[dict(rank=0,layers=[0,1]),dict(rank=1,layers=[2,3])],weights={})
+      config=t,dimensions=d,ranks=ranks,weights={})
     def prepare_tensor(value):
         value=value.detach().cpu()
         if fp8 and value.ndim==2 and min(value.shape)>1:
@@ -161,14 +192,14 @@ class CPUModel:
         return np.stack(logits),layers
 
 
-def check(out,batch=2,steps=32,bf16=False,fp8=False):
+def check(out,batch=2,steps=32,bf16=False,fp8=False,production_schedule=False):
     import numpy as np
     import torch
     from transformers.cache_utils import DynamicCache
     torch.set_num_threads(1)
-    spec,hf,head=fixture(out,bf16,fp8);candidate=CPUModel(out);candidate.reset(batch)
+    spec,hf,head=fixture(out,bf16,fp8,production_schedule=production_schedule);candidate=CPUModel(out);candidate.reset(batch)
     cache=DynamicCache(config=hf.config);ids=torch.tensor([[3+r] for r in range(batch)])
-    errors=[];state_errors=[];matched=0
+    errors=[];state_errors=[];matched=0;layers=len(hf.config.layer_types)
     with torch.inference_mode():
         for pos in range(steps):
             captured=[];selected=[]
@@ -178,12 +209,12 @@ def check(out,batch=2,steps=32,bf16=False,fp8=False):
             for h in handles+ih:h.remove()
             target=head(ref)[:,0].float();got,layer_out=candidate(ids[:,0].tolist())
             diff=float(np.max(np.abs(got-target.numpy())));errors.append(diff)
-            for i in range(4):
+            for i in range(layers):
                 actual=np.stack([layer_out[r][i] for r in range(batch)])
                 if bf16:actual=torch.from_numpy(actual).view(torch.bfloat16).float().numpy()
                 expected=captured[i][:,0].numpy()
                 if not np.allclose(actual,expected,atol=0.012 if bf16 else 3e-5,rtol=0.025 if bf16 else 1e-4):
-                    
+
                     np.savez(out/'failure.npz',actual=actual,expected=expected,ids=ids.numpy(),scratch=candidate.last_scratch,selected=selected[-1],state=candidate.states[-1][-1]);raise ValueError(f'layer mismatch pos={pos} layer={i} max_abs={np.max(np.abs(actual-expected))}')
                 if hf.config.layer_types[i]=='linear_attention':
                     n=spec['dimensions']['QDIM']*3*spec['dimensions']['CONV']
@@ -195,8 +226,10 @@ def check(out,batch=2,steps=32,bf16=False,fp8=False):
             if not np.array_equal(actual,reference):raise ValueError(f'greedy mismatch pos={pos}: {actual} != {reference}')
             matched+=batch;ids=torch.tensor(actual[:,None])
             if pos%8==0:print(f'GLM-CPU step={pos} batch={batch} logit_max_abs={diff:.8g}',flush=True)
-    result=dict(schema=1,status='PASS',fixture=True,batch=batch,steps=steps,matched=matched,
+    result=dict(schema=1,status='PASS',fixture=True,batch=batch,steps=steps,matched=matched,layers=layers,
+                experts=spec['config']['n_routed_experts'],topk=spec['config']['num_experts_per_tok'],
                 max_logit_abs=max(errors),max_kda_state_abs=max(state_errors),bf16=bf16,fp8=fp8,
+                production_schedule=production_schedule,
                 implementation='same C++ numerical body as ETX HIP tiles',reference='independent Transformers GLM5Next text model',
                 full_checkpoint=False,gpu_correctness='unmeasured',performance='unmeasured')
     (out/'cpu-check.json').write_text(json.dumps(result,indent=2)+'\n');return result

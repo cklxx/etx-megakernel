@@ -162,6 +162,54 @@ def test_asset_fingerprint_includes_weights_and_every_reference(tmp_path):
         bc.inputs(model, 8)
 
 
+def instance_text(rows, position=0):
+    return '\n'.join('CHECK-INSTANCE ' + json.dumps(row) for row in rows)
+
+
+def instances(requirements, position=0, **override):
+    rows = [dict(id=i, export='attn_reduce', layer=0, replicas=1, req=req,
+                 grid=[1, 1, 1], block=[128, 1, 1], position=position, bytes=4,
+                 result='identical', first_byte=-1)
+            for i, req in enumerate(requirements)]
+    for row, changes in override.items():
+        rows[int(row)].update(changes)
+    return rows
+
+
+def planned(requirements):
+    return [dict(id=i, export='attn_reduce', layer=0, replicas=1, req=req,
+                 grid=[1, 1, 1], block=[128, 1, 1])
+            for i, req in enumerate(requirements)]
+
+
+@pytest.mark.parametrize('batch', bc.BATCHES)
+def test_byte_identity_gate_is_per_request(batch):
+    requirements = [r for r in range(batch) for _ in range(3)]
+    result = bc.check_identity(instance_text(instances(requirements, 1040), 1040), batch, planned(requirements), 1040)
+    assert result == dict(position=1040, requests=batch, instances_per_request=3)
+
+
+@pytest.mark.parametrize('mutate, match', [
+    (lambda rows: rows[:2], 'request 0: incomplete'),
+    (lambda rows: rows + [dict(rows[1], id=3)], 'request 1: incomplete'),
+    (lambda rows: [dict(rows[0], req=None)] + rows[1:], 'valid request id'),
+    (lambda rows: [dict(rows[0], result='differs')] + rows[1:], 'request 0: imported bytes differ'),
+    (lambda rows: [dict(rows[0], position=0)] + rows[1:], 'request 0: imported bytes differ'),
+])
+def test_byte_identity_gate_refuses_partial_or_wrong_request(mutate, match):
+    requirements = [0, 1, 0, 1, 0, 1]
+    rows = instances(requirements, position=1040)
+    with pytest.raises(ValueError, match=match):
+        bc.check_identity(instance_text(mutate(rows), 1040), 2, planned(requirements), 1040)
+
+
+def test_byte_identity_gate_requires_a_plan_entry_for_every_request():
+    with pytest.raises(ValueError, match='request 1: plan has no imported byte comparison'):
+        bc.check_identity(instance_text(instances([0, 0])), 2, planned([0, 0]), 0)
+    with pytest.raises(ValueError, match='unequal planned'):
+        bc.check_identity(instance_text(instances([0, 1, 0])), 2, planned([0, 1, 0]), 0)
+
+
 def test_qualify_runs_all_five_processes_and_records_identity(tmp_path, monkeypatch):
     import sys
     model = staged_model(tmp_path, 2)
@@ -169,15 +217,18 @@ def test_qualify_runs_all_five_processes_and_records_identity(tmp_path, monkeypa
     build.mkdir()
     # A real subprocess fixture exercises log capture and the certificate parser.
     # This is deliberately labelled synthetic; it proves no GPU property.
-    (build / 'vl_plan.txt').write_text('# synthetic\n0 attn_reduce 0 reduce 1 1 1 0 1 0 0 0 1 0 -1 0 1\n')
+    (build / 'vl_plan.txt').write_text('# synthetic\n'
+                                       '0 attn_reduce 0 reduce 1 1 1 0 1 0 0 0 1 0 -1 0 1\n'
+                                       '1 attn_reduce 0 reduce 1 1 1 0 1 0 0 0 1 0 -1 1 1\n')
     (build / 'imp').mkdir()
     (build / 'imp/imports.json').write_text(json.dumps({'attn_reduce': {'block': [128, 1, 1]}}))
     script = build / 'fixture.py'
     script.write_text('import json, sys\n'
                       'if "--check" in sys.argv:\n'
                       ' p = int(sys.argv[sys.argv.index("--check-pos")+1])\n'
-                      ' print("CHECK-INSTANCE " + json.dumps(dict(id=0, export="attn_reduce", layer=0, replicas=1, grid=[1,1,1], block=[128,1,1], position=p, bytes=4, result="identical", first_byte=-1)))\n'
-                      ' print(f"CHECK-IMPORTED checked=1 planned=1 replicas=1 position={p}")\n'
+                      ' for i in range(2):\n'
+                      '  print("CHECK-INSTANCE " + json.dumps(dict(id=i, export="attn_reduce", layer=0, replicas=1, req=i, grid=[1,1,1], block=[128,1,1], position=p, bytes=4, result="identical", first_byte=-1)))\n'
+                      ' print(f"CHECK-IMPORTED checked=2 planned=2 replicas=2 position={p}")\n'
                       ' print("CHECK OK: 0 launch(es) differ")\n'
                       'else:\n'
                       ' print(' + repr(output(2, True)) + ' if "--check-coverage" in sys.argv else ' + repr(output(2)) + ')\n')
@@ -188,7 +239,10 @@ def test_qualify_runs_all_five_processes_and_records_identity(tmp_path, monkeypa
     bc.qualify(model, build, out, 2)
     receipt = json.loads((out / 'correctness.json').read_text())
     assert receipt['status'] == 'PASS' and receipt['performance'] == 'unmeasured'
-    assert receipt['imported_per_position'] == 1 and receipt['greedy_tokens_per_mode'] == 128
+    assert receipt['imported_per_position'] == 2 and receipt['greedy_tokens_per_mode'] == 128
+    assert receipt['byte_identity_per_request'] == {
+        '0': dict(position=0, requests=2, instances_per_request=1),
+        '1040': dict(position=1040, requests=2, instances_per_request=1)}
     assert len(list(out.glob('*.log'))) == 5
 
 
