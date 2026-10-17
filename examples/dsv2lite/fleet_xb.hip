@@ -408,3 +408,35 @@ __device__ __forceinline__ void oproj(const etx_ctx* c) {
 extern "C" __device__ void fleet_xb_norm(const etx_ctx* c) { etx_xb::norm(c); }
 extern "C" __device__ void fleet_qkv_xb(const etx_ctx* c) { etx_xb::qkv(c); }
 extern "C" __device__ void fleet_oproj_xb(const etx_ctx* c) { etx_xb::oproj(c); }
+#if defined(ETX_DSV2_ROUTER_SPREAD) && ETX_DSV2_ROUTER_SPREAD
+// ETX_DSV2_ROUTER_SPREAD=1 (graph.py build_router_spread; the arm passes -DETX_DSV2_ROUTER_SPREAD=1 and applies lever
+// router_nw last): fleet's TASK_NORM_ROUTER of one request on a (8 XCDs, nw) grid. Worker coord[1] in [0, nw) owns router
+// rows coord[1], coord[1] + nw, ... (fleet: coord[1] + 37 k). Each row's dot product is the same worker-local code, so
+// every logit is bitwise fleet's. nw is the grid's third constant (graph.py consts=(L, r, nw)). Same FleetParams, same
+// TaskDescriptor and prologue stamps as fleet_call: no new kernel argument and no new base address. Compiled only in that
+// build, so the x4xbo translation unit is unchanged.
+extern "C" __device__ void fleet_norm_router_spread(const etx_ctx* c) {
+  const FleetParams* fp = FP(c);
+  const int32_t L = LAYER(c);
+  const int worker = c->coord[1];
+  fleet::TaskDescriptor t{};
+  t.kind = fleet::TASK_NORM_ROUTER; t.layer = (int16_t)L; t.xcd = (int16_t)c->domain; t.worker = (int16_t)worker;
+  t.wait_event = -1; t.signal_event = -1; t.signal_scope = 0; t.n_split = 1;
+  t.head = -1; t.kv_chunk = -1; t.expert_slot = -1;
+  t.wait_scope = 0; t.wait_count = 0; t.local_event = 0; t.flags = 0; t.signal_xcd_count = 0;
+  t.index = 0;
+  fleet::TokenCtx tc;
+  tc.tok = fp->tok; tc.epoch = fp->epoch; tc.pos = fp->pos; tc.seq_len = fp->pos + 1;
+  tc.cos = fp->act.cos + (int64_t)fp->pos * fp->d.qk_rope;
+  tc.sin = fp->act.sin + (int64_t)fp->pos * fp->d.qk_rope;
+  tc.dump = fp->dump != 0;
+  tc.trace = false;
+  fleet::Activations& act = *const_cast<fleet::Activations*>(&fp->act);
+  fleet::Scratch& s = *reinterpret_cast<fleet::Scratch*>(c->lds);
+  uint64_t t0 = 0;
+  pro_begin(fp, tc, s, t0);
+  fleet::task_norm_router_nw(fp->d, fp->w, act, s, L, (int)c->domain, worker, L >= fp->d.first_k_dense, tc,
+                             etx_xb::run_task_coh(fp->rt), t, fp->rt, (int)c->cst[2]);
+  pro_end(fp, s, PRO_SLOT(L, fleet::TASK_NORM_ROUTER, c), t0);
+}
+#endif

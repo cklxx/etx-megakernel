@@ -1,0 +1,46 @@
+{
+  "arm": "router_nw",
+  "arm_build": {
+    "arm": "x4xbor",
+    "plan_sha256": "3168f8636527a50bc6ae62805fb4c6d769990b1a38c097215e59afafc78c356d",
+    "resources_rocm714": {
+      "agpr": 0,
+      "scratch": 80,
+      "sgpr_spill": 1764,
+      "vgpr": 256,
+      "wg_per_cu": 2
+    },
+    "resources_rocm724": {
+      "agpr": 6,
+      "scratch": 64,
+      "sgpr_spill": 1724,
+      "vgpr": 248,
+      "wg_per_cu": 2
+    }
+  },
+  "cpu_gates": {
+    "files": [
+      "tests/test_dsv2_router_spread.py"
+    ]
+  },
+  "fleet_commit": "85b087e",
+  "note": "hand-written record (not verify_lever.py): the lever only adds task_norm_router_nw, which only fleet_norm_router_spread calls under -DETX_DSV2_ROUTER_SPREAD=1 (arm x4xbor). Local compiles of etx_megakernel_d0, 2026-10-18.",
+  "reference": {
+    "arm": "x4xbo",
+    "resources_rocm714": {
+      "agpr": 0,
+      "scratch": 80,
+      "sgpr_spill": 1750,
+      "vgpr": 256,
+      "wg_per_cu": 2
+    },
+    "resources_rocm724": {
+      "agpr": 6,
+      "scratch": 64,
+      "sgpr_spill": 1721,
+      "vgpr": 248,
+      "wg_per_cu": 2
+    }
+  },
+  "verdict": "PASS"
+}

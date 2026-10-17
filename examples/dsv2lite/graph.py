@@ -97,6 +97,25 @@ def _xbo() -> bool:
     return v == "1"
 
 
+def _switch(name: str) -> bool:
+    v = os.environ.get(name, "0")
+    if v not in ("0", "1"):
+        raise ValueError(f"{name}={v!r}: 0 | 1")
+    return v == "1"
+
+
+def _router_first() -> bool:
+    """ETX_DSV2_ROUTER_FIRST=1 (B = 4 with ETX_DSV2_OPROJ_XB=1): create every request's layer-L router before any
+    request's layer-L gate_up / down (today: r0 router, gate_up, down, then r1 ...). Plan order only, same tiles."""
+    return _switch("ETX_DSV2_ROUTER_FIRST")
+
+
+def _router_spread() -> bool:
+    """ETX_DSV2_ROUTER_SPREAD=1 (B = 4 with ETX_DSV2_OPROJ_XB=1): each request's MoE norm + router on ROUTER_SPREAD_W
+    workers of its slot (build_router_spread), so the two requests of a slot route at the same time."""
+    return _switch("ETX_DSV2_ROUTER_SPREAD")
+
+
 def _res(lds: int = SCRATCH_BYTES, paired: bool = False) -> Resource:
     # paired: two workgroups per CU (one per request) -> at most 256 registers per lane (measured cost 0.8%, design 15.12)
     return Resource(threads=256, vgpr=256, agpr=0 if paired else 72, lds_bytes=lds)
@@ -345,6 +364,50 @@ def build_xb_oproj(g: Graph, qs: list, L: int) -> None:
                   duration_cv=0.05)
 
 
+ROUTER_SPREAD_W = 18       # router workers per request and XCD with ETX_DSV2_ROUTER_SPREAD=1: 2 x 18 <= 37 per slot
+
+
+def build_moe_router(g: Graph, q: _Req, L: int, e_oproj: str, spread: bool) -> None:
+    """The router half of build_moe_tail (ETX_DSV2_ROUTER_FIRST / ETX_DSV2_ROUTER_SPREAD; the default path keeps
+    build_moe_tail). spread: grid router_L (8 XCDs, ROUTER_SPREAD_W) on workers (r // 2) * W' .. of request r's slot
+    (r0 0..17, r2 18..35 of slot 0; r1, r3 the same in slot 1), tile fleet_norm_router_spread (fleet_xb.hip, lever
+    router_nw): the same fold, norm and router rows as fleet's 37-worker task, the rows split over W' workers. E_norm_L
+    keeps its shape (8,) and counts W' arrivals per XCD; gate_up still waits for it with "xw->x"."""
+    n = q.n
+    if not spread:
+        g.etensor(n(f"E_norm_{L}"), (XCDS,), wait_count=W)
+        _chiplet(g, q, f"router_{L}", "fleet_norm_router", L, {e_oproj: "xw->(0)"}, {n(f"E_norm_{L}"): "xw->x"}, DUR["router"])
+        return
+    ww = ROUTER_SPREAD_W
+    g.etensor(n(f"E_norm_{L}"), (XCDS,), wait_count=ww)
+    # consts: (layer, request, router workers per XCD); the router's work per worker grows 37 / 18 (rows 2 -> 4), the
+    # fold + norm prologue (most of the 9 us) does not: router_spread_us
+    g.call_device(n(f"router_{L}"), (XCDS, ww), _tile("fleet_norm_router_spread"), resource=_res(paired=True),
+                  args=[q.fleet, f"layer_{L}"], consts=(L, q.r, ww), domain_map="xw->x",
+                  worker_map=f"xw->(w+{(q.r // 2) * ww + q.off})", in_edges={e_oproj: "xw->(0)"},
+                  out_edges={n(f"E_norm_{L}"): "xw->x"}, duration_us=router_spread_us(), duration_cv=0.05)
+
+
+ROUTER_GEMV_US = 1.0       # router row part of DUR["router"] at 37 workers (2 rows per worker); model only, 18 workers: +1 us
+
+
+def router_spread_us() -> float:
+    """Duration model of one spread router task: fold + norm unchanged, the row part x (rows 4 / 2)."""
+    return DUR["router"] + ROUTER_GEMV_US * (-(-64 // ROUTER_SPREAD_W) / -(-64 // W) - 1)
+
+
+def build_moe_experts(g: Graph, q: _Req, L: int, routing_cached: bool) -> str:
+    """The gate_up / down half of build_moe_tail (same tiles, same edges)."""
+    n = q.n
+    g.etensor(n(f"E_gu_{L}"), (XCDS,), wait_count=W)
+    g.etensor(n(f"E_down_{L}"), (1,), wait_count=XCDS * W)
+    _chiplet(g, q, f"gate_up_{L}", "fleet_expert_gate_up", L, {n(f"E_norm_{L}"): "xw->x"}, {n(f"E_gu_{L}"): "xw->x"},
+             DUR["gate_up"])
+    _chiplet(g, q, f"down_{L}", "fleet_expert_down_cached" if routing_cached else "fleet_expert_down", L,
+             {n(f"E_gu_{L}"): "xw->x"}, {n(f"E_down_{L}"): "xw->(0)"}, DUR["down"])
+    return n(f"E_down_{L}")
+
+
 def build(layers: int = LAYERS, routing_cached: bool | None = None, requests: int | None = None) -> Graph:
     # ETX_DSV2_ROUTING_CACHED=0: expert_down recomputes the top-k instead of reusing its worker's LDS
     # (needed for the unfused baseline, where LDS does not survive the kernel boundary)
@@ -403,6 +466,12 @@ def build(layers: int = LAYERS, routing_cached: bool | None = None, requests: in
         if requests != XBO_REQUESTS:
             raise ValueError(f"ETX_DSV2_OPROJ_XB=1 needs {XBO_REQUESTS} requests, not {requests}: B = 2 waits for a GPU A/B "
                              "(/workspace/bound_batch_gemv.md: +40 us in the latency-bound case)")
+    rfirst, rspread = _router_first(), _router_spread()
+    if (rfirst or rspread) and not xbo:
+        raise ValueError("ETX_DSV2_ROUTER_FIRST / ETX_DSV2_ROUTER_SPREAD need ETX_DSV2_OPROJ_XB=1 (B = 4): with one request "
+                         "per slot (B <= 2) neither changes a worker's queue")
+    if (rfirst or rspread) and os.environ.get("ETX_DSV2_KCHUNKS", "1") != "1":
+        raise ValueError("ETX_DSV2_ROUTER_FIRST / ETX_DSV2_ROUTER_SPREAD with ETX_DSV2_KCHUNKS is not supported")
     if xb:
         if not 2 <= requests <= XB_MAX_REQUESTS:
             raise ValueError(f"ETX_DSV2_QKV_XB=1 needs 2..{XB_MAX_REQUESTS} requests (fleet_xb.hip LDS slots), not {requests}")
@@ -435,6 +504,17 @@ def build(layers: int = LAYERS, routing_cached: bool | None = None, requests: in
                 e, m, prev_moe = state[q.r]
                 build_attention_block(g, q, L, e, m, fold=prev_moe, xb=True, xbo=True)
             build_xb_oproj(g, qs, L)
+            if (rfirst or rspread) and L >= FIRST_DENSE:
+                # ROUTER_FIRST: every router, then every request's gate_up .. down (queue: r, r + 2 routers, then
+                # experts). Without it: r's router, gate_up, down, then r + 2's (today's order, spread routers only).
+                if rfirst:
+                    for q in qs:
+                        build_moe_router(g, q, L, q.n(f"E_oproj_{L}"), rspread)
+                for q in qs:
+                    if not rfirst:
+                        build_moe_router(g, q, L, q.n(f"E_oproj_{L}"), rspread)
+                    state[q.r] = (build_moe_experts(g, q, L, routing_cached), "xw->(0)", True)
+                continue
             for q in qs:
                 e_oproj = q.n(f"E_oproj_{L}")
                 if L < FIRST_DENSE:

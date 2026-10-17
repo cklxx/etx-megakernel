@@ -176,6 +176,28 @@ ARMS = {a.name: a for a in [
     Arm("x4xbo", levers=ARMS_X[4].levers, flags=ARMS_X[4].flags, env=dict(ARMS_X[4].env, ETX_DSV2_QKV_XB="1",
                                                                             ETX_DSV2_OPROJ_XB="1"),
         scratch_allow=80),
+    # Router order and spread on top of x4xbo (graph.py build_moe_router; /workspace/bound_next_1p85.md items #7 and #4).
+    # x4xboq: ETX_DSV2_ROUTER_FIRST=1 only -- every request's router of a layer is created before any request's experts
+    # (a plan order change, same tiles). x4xbor: ROUTER_FIRST plus ETX_DSV2_ROUTER_SPREAD=1 -- each request's router
+    # on 18 workers of its slot (fleet_xb.hip fleet_norm_router_spread, lever router_nw, applied last), so the 4 routers
+    # of a layer run at the same time.
+    # 27-layer protocol simulator (3 seeds, cv 0.05 / 0.1, kv_a shared, 2026-10-18): x4xbo 7349.5 us; ROUTER_FIRST
+    # 7247.0 (-102.5); SPREAD alone 7379.5 (+30.0: a spread router waits behind the other request's experts); both
+    # (x4xbor) 7061.5 (-288.0; router row part +0 / +1 / +2 us: -316.5 / -288.0 / -259.5). kv_a replicated: 7334.2 ->
+    # 7045.3 (-288.9). B = 2: the switches are refused (one request per slot: no queue changes); x2xb 4202.2 unchanged.
+    # Threshold, written before any GPU measurement: KEEP x4xbor only if every token gate passes and the same-box A/B
+    # (tools/ab_same_box.py, 6 rounds, A = x4xbo, B = x4xbor) is a WIN with 6/6 rounds faster, p <= 0.05 and a median
+    # step gain >= 0.15 ms (about half of the simulated 0.30 ms host gain, x 1.055; --min-gain 1.9 %); otherwise DROP.
+    # Resources (etx_megakernel_d0: VGPR + AGPR, scratch B/lane, SGPR spill, WG/CU), gate compiler ROCm 7.14 (0c0345d):
+    #   x4xbo 256 + 0, 80, 1753, 2;  x4xboq 256 + 0, 80, 1757, 2;  x4xbor 256 + 0, 80, 1768, 2
+    # ROCm 7.2.4 (recorded only, on 01d08f4): x4xbo 248 + 6, 64, 1721, 2;  x4xboq 248 + 6, 64, 1725, 2;
+    #   x4xbor 248 + 6, 64, 1724, 2
+    # The spread grid uses the router's own arguments (fleetN, layer_L): no new kernel-argument base address.
+    Arm("x4xboq", levers=ARMS_X[4].levers, flags=ARMS_X[4].flags,
+        env=dict(ARMS_X[4].env, ETX_DSV2_QKV_XB="1", ETX_DSV2_OPROJ_XB="1", ETX_DSV2_ROUTER_FIRST="1"), scratch_allow=80),
+    Arm("x4xbor", levers=(*ARMS_X[4].levers, "router_nw"), flags=(*ARMS_X[4].flags, "-DETX_DSV2_ROUTER_SPREAD=1"),
+        env=dict(ARMS_X[4].env, ETX_DSV2_QKV_XB="1", ETX_DSV2_OPROJ_XB="1", ETX_DSV2_ROUTER_FIRST="1",
+                 ETX_DSV2_ROUTER_SPREAD="1"), scratch_allow=80),
     # B = 8 is a diagnostic: with M1 alone the eight-request gate failed (request 5, 3/27 layers), so the three
     # recipes are built side by side and the gate says which one is correct at eight requests. x8p is the plain
     # replication recipe (the pre-section-10 arm), x8m adds M1, x8k adds K1.
