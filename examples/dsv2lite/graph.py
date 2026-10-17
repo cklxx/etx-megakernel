@@ -238,35 +238,55 @@ def build_dense_layer(g: Graph, q: _Req, L: int, e_in: str, e_in_map: str, fold:
     return n(f"E_dense_{L}")
 
 
-XB_FOLD, XB_KVS = 1, 2    # fleet_xb.hip kFold, kKvs (grid constant 3)
+XB_FOLD, XB_KVS = 1, 2    # fleet_xb.hip kFold, kKvs (grid constant flags)
 XB_W = 2 * W              # the batched qkv grid takes both slots' 37 workers of every XCD (74 per XCD)
+# duration model (no measurement yet), microseconds: the norm task is fleet's qkv prologue (DUR["qkv"] = 7.4 prologue
+# + 12.0 GEMV); a batched qkv task copies B x 4 KB from L2 into LDS, then streams half the rows of an x<n> qkv task
+XB_NORM_US = 7.4
+XB_STAGE_US = 0.5
+
+
+def xb_norm_worker(r: int) -> int:
+    """Local worker of request r's norm task on every XCD: on its own slot (r mod 2), one CU per request pair."""
+    return r // 2 + (r % 2) * CUS
+
+
+def xb_qkv_us(requests: int) -> float:
+    return XB_STAGE_US * requests + (DUR["qkv"] - XB_NORM_US) * W / XB_W
 
 
 def build_xb_qkv(g: Graph, qs: list, L: int, ins: dict, fold: bool) -> None:
-    """ETX_DSV2_QKV_XB=1: ONE qkv grid for all requests of layer L, created before any request's layer-L grids.
+    """ETX_DSV2_QKV_XB=1: per request a norm grid, then ONE qkv grid for all requests of layer L, all created before any
+    request's layer-L grids.
 
-    Each task stages and norms every request's layer input (fleet's prologue, per request), keeps the normalized
-    vectors as bf16 in LDS, then streams its weight rows of the fused [3072 + 576, 2048] matrix once and forms all B dot
-    products per row (fleet_xb.hip). The grid is (8 XCDs, 74): workers w < 37 are slot 0's, w >= 37 slot 1's
-    (local worker w % 37 + (w / 37) * 38), so both workgroups of every CU work on it. It waits on every request's
-    layer input event and signals every request's own E_qkv_L, so everything after qkv is the unbatched graph.
+    Norm grid r{r}_xbn_L (8,): one task per XCD does fleet's qkv prologue for request r (stage_residual + fold +
+    residual publication, dump, input RMSNorm) and writes the bf16 normalized vector into its XCD's slice of the
+    request's act.x_norm; it signals r{r}_E_xbn_L[x] (XCD-local, 1 signal). Batched grid xb_qkv_L (8 XCDs, 74): copies
+    the B vectors of its XCD into LDS, streams its weight rows of the fused [3072 + 576, 2048] matrix once and forms all
+    B dot products per row (fleet_xb.hip). Workers w < 37 are slot 0's, w >= 37 slot 1's (local worker
+    w % 37 + (w / 37) * 38), so both workgroups of every CU work on it. It signals every request's own E_qkv_L, so
+    everything after qkv is the unbatched graph.
 
-    Deadlock freedom: the grid is created after every request's layer L-1 grids (its producers) and before every
-    request's layer-L grids (its consumers); every static queue runs in creation order, so the earliest unfinished task
-    always has its inputs."""
+    Deadlock freedom: the norm grids are created after their request's layer L-1 grids, the batched grid after every
+    norm grid and before every request's layer-L grids; every static queue runs in creation order, so the earliest
+    unfinished task always has its inputs."""
     _layer_tensor(g, L)
     kvs = os.environ.get("ETX_DSV2_KVA", "replicated") == "shared"
     for q in qs:
+        g.etensor(q.n(f"E_xbn_{L}"), (XCDS,), wait_count=1)
         g.etensor(q.n(f"E_qkv_{L}"), (1,) if kvs else (XCDS,), wait_count=XCDS * XB_W if kvs else XB_W)
-    # consts: (layer, workers per XCD of this grid, first request = 0, flags: 1 = fold the expert partials, 2 = shared
-    # kv_a); the body loops over the ETX_DS_REQUESTS requests itself. One symbol for every case: one copy of the body
-    # in the megakernel (fleet_xb.hip)
-    flags = (XB_FOLD if fold else 0) | (XB_KVS if kvs else 0)
+    for q in qs:
+        e, _ = ins[q.r]
+        g.call_device(q.n(f"xbn_{L}"), (XCDS,), _tile("fleet_xb_norm"), resource=_res(paired=True),
+                      args=[q.fleet, f"layer_{L}"], consts=(L, q.r, XB_FOLD if fold else 0), domain_map="x->x",
+                      worker_map=f"x->({xb_norm_worker(q.r)})", in_edges={e: "x->(0)"},
+                      out_edges={q.n(f"E_xbn_{L}"): "x->x"}, duration_us=XB_NORM_US, duration_cv=0.05)
+    # consts: (layer, workers per XCD of this grid, first request = 0, flags: 2 = shared kv_a)
     g.call_device(f"xb_qkv_{L}", (XCDS, XB_W), _tile("fleet_qkv_xb"), resource=_res(paired=True), args=[qs[0].fleet, f"layer_{L}"],
-                  consts=(L, XB_W, 0, flags), domain_map="xw->x", worker_map=f"xw->(w%{W}+(w/{W})*{CUS})", in_edges=ins,
+                  consts=(L, XB_W, 0, XB_KVS if kvs else 0), domain_map="xw->x", worker_map=f"xw->(w%{W}+(w/{W})*{CUS})",
+                  in_edges={q.n(f"E_xbn_{L}"): "xw->x" for q in qs},
                   out_edges={q.n(f"E_qkv_{L}"): "xw->(0)" if kvs else "xw->x" for q in qs},
-                  # model only (no measurement yet): B prologues of 7.4 us, then half the rows per worker
-                  duration_us=7.4 * len(qs) + DUR["qkv"] - 7.4, duration_cv=0.05)
+                  duration_us=xb_qkv_us(len(qs)), duration_cv=0.05)
 
 
 def build(layers: int = LAYERS, routing_cached: bool | None = None, requests: int | None = None) -> Graph:
@@ -343,7 +363,7 @@ def build(layers: int = LAYERS, routing_cached: bool | None = None, requests: in
     # static queue order, and each worker only runs its own request's tasks)
     for L in range(layers):
         if xb:
-            build_xb_qkv(g, qs, L, {state[q.r][0]: state[q.r][1] for q in qs}, fold=state[qs[0].r][2])
+            build_xb_qkv(g, qs, L, {q.r: state[q.r][:2] for q in qs}, fold=state[qs[0].r][2])
         for q in qs:
             e, m, prev_moe = state[q.r]
             extra = extra_gu = None

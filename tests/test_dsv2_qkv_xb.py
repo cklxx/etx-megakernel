@@ -2,8 +2,10 @@
 graph (ETX_DSV2_QKV_XB=1; graph.py build_xb_qkv, examples/dsv2lite/fleet_xb.hip). CPU only, no GPU:
 
   * default off: the plans and kernels of x1, x2 and x4 are byte-identical to origin/main b573664 (hash pins);
-  * on: one qkv grid per layer for all requests, every request's E_qkv gets exactly its wait_count of signals, the
-    static queues keep creation order and the protocol simulator finds no deadlock;
+  * on: per layer one norm grid per request (8 tasks) and one qkv grid for all requests, every request's E_xbn / E_qkv
+    gets exactly its wait_count of signals, the static queues keep creation order and the protocol simulator finds no
+    deadlock;
+  * the session refuses a paired build that fits fewer than 2 workgroups per CU (registers or LDS);
   * the tile's row split (a Python mirror of gemv_rows_xb, pinned to its source lines) writes every q / kv_a row of
     every request exactly once;
   * numbers: the batched math (bf16 copy of the normalized vector, fleet's per-lane fp32 order, bf16 output) against
@@ -89,12 +91,17 @@ def test_one_batched_qkv_grid_per_layer_reads_the_weight_once(xb_plan):
     assert [gr.name for gr in xb] == [f"xb_qkv_{L}" for L in range(3)]
     kvs = dsv.XB_KVS if kva == "shared" else 0
     assert {gr.body.symbol for gr in xb} == {"fleet_qkv_xb"}
-    # layer 0: input from embed; layer 1: after the dense layer (no expert partials); layer 2: after MoE (fold)
-    assert [gr.consts[3] for gr in xb] == [kvs, kvs, dsv.XB_FOLD | kvs]
+    by_name = {gr.name: gr for gr in g.grids}
     for L, gr in enumerate(xb):
         assert gr.body.source == dsv.XB_T and tuple(gr.grid) == (dsv.XCDS, dsv.XB_W)
-        assert tuple(gr.consts[:3]) == (L, dsv.XB_W, 0)
+        assert tuple(gr.consts) == (L, dsv.XB_W, 0, kvs)
         assert gr.args == ["fleet0", f"layer_{L}"]
+        # the per-request norm grids: one task per XCD, fleet's prologue with the request's own FleetParams;
+        # layer 0: input from embed; layer 1: after the dense layer (no expert partials); layer 2: after MoE (fold)
+        for r in range(n):
+            nm = by_name[f"r{r}_xbn_{L}"]
+            assert nm.body.symbol == "fleet_xb_norm" and tuple(nm.grid) == (dsv.XCDS,)
+            assert tuple(nm.consts) == (L, r, dsv.XB_FOLD if L == 2 else 0) and nm.args == [f"fleet{r}", f"layer_{L}"]
         # one grid per layer = one stream of the fused [3072 + 576, 2048] weight per layer (it was n)
         assert sum(1 for x in g.grids if x.body.symbol.startswith("fleet_qkv") and x.consts[0] == L) == 1
     assert all(gr.body.source == dsv.XB_T for gr in g.grids)       # one TU: fleet_xb.hip includes fleet_shim.hip
@@ -119,9 +126,21 @@ def test_every_request_qkv_event_gets_its_full_wait_count(xb_plan):
             # its consumers are exactly the request's own qabs and attention grids, as in the default graph
             consumers = {t.grid for t in plan.tasks if any(e[0] == ev for e in inst.task_in[(t.grid, t.coord)])}
             assert consumers == {f"r{r}_qabs_{L}", f"r{r}_attn_{L}"}
-        # it waits for every request's layer input
-        want = {f"r{r}_E_embed" if L == 0 else f"r{r}_E_dense_0" if L == 1 else f"r{r}_E_down_{L - 1}" for r in range(n)}
-        assert {e[0] for e in inst.task_in[(tasks[0].grid, tasks[0].coord)]} == want
+        # it waits for every request's normalized vector on its own XCD
+        for t in tasks:
+            assert {e[0] for e in inst.task_in[(t.grid, t.coord)]} == {f"r{r}_E_xbn_{L}" for r in range(n)}
+        for r in range(n):
+            # the norm event: one signal per XCD index, from that XCD's norm task
+            ev = f"r{r}_E_xbn_{L}"
+            assert g.events[ev].wait_count == 1
+            idxs = [k for k in inst.producers if k[0] == ev]
+            assert len(idxs) == dsv.XCDS
+            for k in idxs:
+                assert [plan.tasks[plan.task_index[p]].grid for p in inst.producers[k]] == [f"r{r}_xbn_{L}"]
+            # the norm grid waits for the request's layer input
+            want = f"r{r}_E_embed" if L == 0 else f"r{r}_E_dense_0" if L == 1 else f"r{r}_E_down_{L - 1}"
+            for t in (t for t in plan.tasks if t.grid == f"r{r}_xbn_{L}"):
+                assert {e[0] for e in inst.task_in[(t.grid, t.coord)]} == {want}
 
 
 def test_both_slots_work_on_it_and_queues_keep_creation_order(xb_plan):
@@ -135,6 +154,10 @@ def test_both_slots_work_on_it_and_queues_keep_creation_order(xb_plan):
         if t.grid.startswith("xb_qkv_"):
             w = t.coord[1]
             assert t.domain == t.coord[0] and local == w % dsv.W + (w // dsv.W) * dsv.CUS
+        elif "_xbn_" in t.grid:
+            r = int(t.grid.split("_", 1)[0][1:])
+            assert t.domain == t.coord[0] and local == dsv.xb_norm_worker(r)
+            assert (r % 2) * dsv.CUS <= local < (r % 2) * dsv.CUS + dsv.W
         else:
             r = int(t.grid.split("_", 1)[0][1:])
             assert (r % 2) * dsv.CUS <= local < (r % 2) * dsv.CUS + dsv.W
@@ -142,16 +165,19 @@ def test_both_slots_work_on_it_and_queues_keep_creation_order(xb_plan):
     for queue in plan.static_queues.values():
         idx = [order[tasks[i].grid] for i in queue]
         assert idx == sorted(idx)
-    # creation order: layer L's batched grid after every request's layer L-1 grids, before every layer-L grid
+    # creation order: layer L's norm grids after every request's layer L-1 grids, then the batched grid, then every
+    # other layer-L grid
     for L in range(3):
         x = order[f"xb_qkv_{L}"]
+        norms = [order[f"r{r}_xbn_{L}"] for r in range(n)]
+        assert max(norms) < x
         for name, i in order.items():
             if name.startswith("r") and name.rsplit("_", 1)[-1].lstrip("-").isdigit():
                 layer = int(name.rsplit("_", 1)[-1])
-                if layer == L:
+                if layer == L and "_xbn_" not in name:
                     assert i > x, name
                 elif 0 <= layer < L:
-                    assert i < x, name
+                    assert i < min(norms), name
 
 
 def test_protocol_simulation_has_no_deadlock_and_runs_every_task(xb_plan):
@@ -196,15 +222,14 @@ def test_arms_differ_from_their_reference_only_by_the_switch():
     from examples.dsv2lite.arms import ARMS, build_env
     for n in (2, 4):
         a, b = ARMS[f"x{n}"], ARMS[f"x{n}xb"]
-        assert (b.levers, b.flags) == (a.levers, a.flags)
-        assert b.scratch_allow == {2: 192, 4: 288}[n] >= a.scratch_allow   # local 7.14 spill x 2 (arms.py)
+        assert (b.levers, b.flags, b.scratch_allow) == (a.levers, a.flags, a.scratch_allow)
         assert build_env(b) == {**build_env(a), "ETX_DSV2_QKV_XB": "1"}
         assert f"-DETX_DS_REQUESTS={n}" in b.flags and b.rule is None and b.order == ()
     assert "ETX_DSV2_QKV_XB" not in ARMS["x4"].env
 
 
 # ---------------------------------------------------------------- the row split of gemv_rows_xb
-def _rows_written(N, xcd, n_xcds, worker, nw, waves=4, rpi=2):
+def _rows_written(N, xcd, n_xcds, worker, nw, waves=4, rpi=1):
     """Python mirror of gemv_rows_xb's row loop (fleet's xcd_rows, first / cnt, the two-buffer pipeline)."""
     per = (N + n_xcds - 1) // n_xcds
     begin, end = xcd * per, min(N, xcd * per + per)
@@ -241,14 +266,16 @@ def test_mirror_matches_the_source_lines():
                  "int k = kRPI * wave;",
                  "if ((KK) + r < cnt) {",
                  "const int n = first + ((KK) + r) * n_workers;",
-                 "constexpr int kRPI = 2;",
-                 "gemv_rows_xb(wq + (int64_t)q0 * d.hidden, d.hidden, s, out, q_rows, d.hidden, 0, 1, worker, nw);",
-                 "gemv_rows_xb(wq + (int64_t)kv0 * d.hidden, d.hidden, s, out + kMaxB, kv_rows, d.hidden, kvs ? xcd : 0,",
-                 "kvs ? fleet::kNumXCDs : 1, worker, nw);",
-                 "out[kMaxB + j] = fq[j].act.kv_a + (kvs ? 0 : (int64_t)xcd * kv_rows);",
+                 "constexpr int kRPI = 1;",
+                 "for (int seg = 0; seg < 2; ++seg) {",
+                 "const bool kv = seg != 0;",
+                 "gemv_rows_xb(wq + (int64_t)(kv ? kv0 : q0) * d.hidden, d.hidden, s, out + (kv ? kMaxB : 0), kv ? kv_rows : q_rows,",
+                 "d.hidden, kv && kvs ? xcd : 0, kv && kvs ? fleet::kNumXCDs : 1, worker, nw);",
+                 "tab[kMaxB + threadIdx.x] = p.act.kv_a + (kvs ? 0 : (int64_t)xcd * kv_rows);",
                  "constexpr int kFold = 1, kKvs = 2;",
-                 "const bool fold = (c->cst[3] & kFold) != 0, kvs = (c->cst[3] & kKvs) != 0;",
-                 "out[j] = fq[j].act.q + q0;",
+                 "const bool kvs = (c->cst[3] & kKvs) != 0;",
+                 "const bool fold = (c->cst[2] & kFold) != 0;",
+                 "tab[threadIdx.x] = p.act.q + q0;",
                  "fleet::epi_st(ys[j] + n, fleet::bf16_round(1.f * fleet::bf16_round(acc[r][j])), false);"):
         assert line in XB_SRC, line
 
@@ -340,6 +367,69 @@ def test_bf16_slot_layout_is_checked_at_compile_time():
     for text in ('static_assert(sizeof(fleet::Scratch::part) >= 2 * kVecBytes',
                  'sizeof(fleet::Scratch::row) + sizeof(fleet::Scratch::q_c) + sizeof(fleet::Scratch::q_pe) >= kVecBytes',
                  'static_assert(sizeof(fleet::Scratch::vec) >= kVecBytes',
+                 'static_assert(sizeof(fleet::Scratch::logits) >= 3 * kMaxB * sizeof(void*)',
                  'static_assert(kB >= 2 && kB <= kMaxB'):
         assert text in XB_SRC
     assert dsv.XB_MAX_REQUESTS == 4 and "constexpr int kMaxB = 4;" in XB_SRC
+
+
+def test_norm_tile_hands_over_the_exact_bf16_vector_through_x_norm():
+    """fleet_xb_norm writes this XCD's slice of act.x_norm (bf16, 16 bytes per thread) and the batched tile reads the
+    same slice into LDS with the build's activation loads; the bf16 copy is exact (test above)."""
+    for text in ("uint4* dst = reinterpret_cast<uint4*>(act.x_norm + (int64_t)xcd * d.hidden);",
+                 "tab[2 * kMaxB + threadIdx.x] = p.act.x_norm + (int64_t)xcd * d.hidden;",
+                 "slot(s, j)[threadIdx.x] = ld_act16(reinterpret_cast<const uint4*>(tab[2 * kMaxB + j]) + threadIdx.x, coh);",
+                 "fleet::stage_residual(d, src, parts, (L == 0) ? nullptr : act.x[0], s.vec, xcd, 0, run_task_coh(fp->rt));",
+                 "return fleet::ld_l1_u4(p);"):
+        assert text in XB_SRC, text
+
+
+# ---------------------------------------------------------------- the duration model
+def test_duration_model_per_slot_qkv_time():
+    """Per layer and slot: x4 runs two requests' qkv tasks (prologue 7.4 + GEMV 12.0 us each); x4xb runs one norm task
+    (only on the slot's norm workers) and one batched task with half the rows."""
+    x4 = 2 * dsv.DUR["qkv"]
+    xb4 = dsv.XB_NORM_US + dsv.xb_qkv_us(4)
+    xb2 = dsv.XB_NORM_US + dsv.xb_qkv_us(2)
+    assert x4 == pytest.approx(38.8) and dsv.DUR["qkv"] == pytest.approx(19.4)
+    assert dsv.xb_qkv_us(4) == pytest.approx(8.0) and xb4 == pytest.approx(15.4)
+    assert dsv.xb_qkv_us(2) == pytest.approx(7.0) and xb2 == pytest.approx(14.4)
+
+
+# ---------------------------------------------------------------- the occupancy gate
+@pytest.mark.parametrize("res,want", [
+    (dict(vgpr=248, agpr=6, lds=26668, occupancy=2), 2),    # x4 / x4xb, ROCm 7.2.4
+    (dict(vgpr=256, agpr=0, lds=26668, occupancy=2), 2),    # x4 / x4xb, ROCm 7.14
+    (dict(vgpr=250, agpr=6, lds=26668, occupancy=1), 1),    # an x4xb variant: 252 + 6 rounds to 264
+    (dict(vgpr=256, agpr=6, lds=26668, occupancy=1), 1),    # PR #20 head 9ee4d40, ROCm 7.2.4
+    (dict(vgpr=128, agpr=0, lds=40000, occupancy=4), 1),    # LDS-bound
+    (dict(vgpr=250, agpr=6, lds=26668, occupancy=2), 1),    # registers decide even if the record says 2
+])
+def test_wg_per_cu_from_registers_and_lds(res, want):
+    from examples.dsv2lite.build_resources import wg_per_cu
+    assert wg_per_cu(dict(res, sgpr=108, scratch=0)) == want
+
+
+def test_session_refuses_a_paired_arm_at_one_workgroup_per_cu(tmp_path):
+    from examples.dsv2lite import inplace_session as sess
+    from examples.dsv2lite.arms import ARMS
+    assert sess.required_wg_per_cu(ARMS["x4xb"]) == 2 and sess.required_wg_per_cu(ARMS["x2xb"]) == 2
+    assert sess.required_wg_per_cu(ARMS["x4"]) == 2 and sess.required_wg_per_cu(ARMS["default"]) == 1
+
+    def record(vgpr, agpr, occ):
+        return ("remark: Function Name: etx_megakernel_d0\n"
+                + "".join(f"remark:     {k}: {v}\n" for k, v in (
+                    ("VGPRs", vgpr), ("AGPRs", agpr), ("TotalSGPRs", 108), ("ScratchSize [bytes/lane]", 0),
+                    ("Occupancy [waves/SIMD]", occ), ("LDS Size [bytes/block]", 26668))))
+    s = object.__new__(sess.Session)
+    s.out = lambda arm, stamped=False: tmp_path / arm
+    s.fleet = tmp_path
+    for arm in ("x4xb", "default"):
+        (tmp_path / arm).mkdir()
+        (tmp_path / arm / "plan.json").write_text("{}")
+    s.run = lambda *a, **k: record(256, 6, 1)
+    with pytest.raises(RuntimeError, match="needs 2"):
+        sess.Session.build(s, "x4xb")
+    sess.Session.build(s, "default")                      # one workgroup per CU is a single-request arm's normal
+    s.run = lambda *a, **k: record(248, 6, 2)
+    sess.Session.build(s, "x4xb")

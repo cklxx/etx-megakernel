@@ -118,17 +118,19 @@ ARMS = {a.name: a for a in [
     # allowance rises from 0 to 64 with that measurement; x4's 64 and x8's 192 already covered it.
     *ARMS_X.values(),
     # Stage B2, qkv only (docs/BATCH-2026-10-14.md section 5; graph.py build_xb_qkv, fleet_xb.hip): the x2 / x4 arm plus
-    # ONE column-batched qkv grid per layer for all requests (each qkv weight row read once per layer, not once per
-    # request). The only difference to x<n> is ETX_DSV2_QKV_XB=1, so a same-box A/B against x<n> measures that change.
+    # per layer one norm grid per request (8 tasks: fleet's qkv prologue, bf16 vector out) and ONE column-batched qkv grid
+    # for all requests (each qkv weight row read once per layer, not once per request). The only difference to x<n> is
+    # ETX_DSV2_QKV_XB=1, so a same-box A/B against x<n> measures that change.
     # Threshold, written before any GPU measurement: KEEP only if every token gate of x<n>xb passes and the same-box A/B
     # (tools/ab_same_box.py, 6 rounds in all 6 orders, A = x<n>, B = x<n>xb) gives every round faster, sign-test
     # p <= 0.05 and a median step gain >= 0.28 ms (the low end of the CPU estimate for B = 4); otherwise DROP.
-    # Scratch: the local ROCm 7.14 compile (same compiler as the box) spills x2xb 96 and x4xb 144 B/lane (x2 32,
-    # x4 64), occupancy 2 kept; allowance twice that, as above. Local ROCm 7.2.4 gives x4xb 256 VGPR + 6 AGPR, i.e.
-    # occupancy 1 (the session does not check occupancy; read it from the BUILD line before trusting an A/B).
+    # Resources, local compiles of etx_megakernel_d0 (VGPR + AGPR, scratch B/lane, workgroups per CU):
+    #   ROCm 7.2.4 (the GPU box's compiler): x2 248 + 6, 16, 2;  x2xb 248 + 6, 16, 2;  x4 248 + 6, 64, 2;  x4xb 248 + 6, 64, 2
+    #   ROCm 7.14:                           x2 256 + 0, 32, 2;  x4 256 + 0, 64, 2;  x4xb 256 + 0, 80, 2 (16 B over x4)
+    # Allowance: x<n>'s own; the session also refuses fewer than 2 workgroups per CU (inplace_session.required_wg_per_cu).
     *(Arm(f"x{n}xb", levers=ARMS_X[n].levers, flags=ARMS_X[n].flags, env=dict(ARMS_X[n].env, ETX_DSV2_QKV_XB="1"),
-          scratch_allow=allow)
-      for n, allow in ((2, 192), (4, 288))),
+          scratch_allow=ARMS_X[n].scratch_allow)
+      for n in (2, 4)),
     # B = 8 is a diagnostic: with M1 alone the eight-request gate failed (request 5, 3/27 layers), so the three
     # recipes are built side by side and the gate says which one is correct at eight requests. x8p is the plain
     # replication recipe (the pre-section-10 arm), x8m adds M1, x8k adds K1.
