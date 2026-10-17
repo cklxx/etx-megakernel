@@ -30,16 +30,20 @@ ROOT = Path(__file__).resolve().parents[1]
 XB_SRC = (ROOT / dsv.XB_T).read_text()
 
 
-def _pinned_fleet_src() -> Path:
-    """src/ of the hash-checked pinned fleet export (pinned.fleet_export); a missing path when it cannot be made."""
+def _pinned_fleet_src():
+    """fleet's src at the pinned commit (pinned.fleet_export(): hash-checked export, never the fleet working tree).
+
+    No export and no fleet repository: None (the fleet tests skip). A wrong tree: pinned.py raises.
+    """
     from examples.dsv2lite.pinned import fleet_export
     try:
         return fleet_export() / "src"
-    except (FileNotFoundError, RuntimeError, OSError):
-        return Path("/nonexistent/pinned-fleet/src")
+    except FileNotFoundError:
+        return None
 
 
 FLEET_SRC = _pinned_fleet_src()
+needs_fleet = pytest.mark.skipif(FLEET_SRC is None, reason="pinned fleet export not present")
 N_REQ, LAYERS = 4, 3
 XBO = dict(ETX_DSV2_COH="l1", ETX_DSV2_COUPLE="none", ETX_DSV2_REQUESTS="4", ETX_DSV2_QKV_XB="1", ETX_DSV2_OPROJ_XB="1")
 # 01d08f4 (PR #23), 3 layers, PassOptions(inline_tiles=True, relay="on"): (plan.json sha256, megakernel sha256)
@@ -223,7 +227,7 @@ def test_duration_model():
 
 
 # ---------------------------------------------------------------- the tile follows fleet's task_norm_router
-@pytest.mark.skipif(not (FLEET_SRC / "kernels/fleet_kernel.hip").exists(), reason="pinned fleet source not present")
+@needs_fleet
 def test_spread_tile_mirrors_task_norm_router():
     from examples.dsv2lite.patch_fleet import _function
     fleet = _function((FLEET_SRC / "kernels/fleet_kernel.hip").read_text(), "__device__ void task_norm_router(")
@@ -305,11 +309,10 @@ def test_router_logits_and_topk_bitwise_with_18_workers():
         assert np.bincount(own18).max() == 4 and np.bincount(own37).max() == 2
 
 
+@needs_fleet
 def test_gemv_rows_selects_its_path_by_k_only():
     """The bitwise claim rests on gemv_rows choosing the GEMV path from K alone (not from cnt or n_workers)."""
     gemv = FLEET_SRC / "kernels/gemv.h"
-    if not gemv.exists():
-        pytest.skip("pinned fleet source not present")
     text = gemv.read_text()
     body = text[text.index("__device__ inline void gemv_rows("):]
     body = body[:body.index("\n}\n")]
