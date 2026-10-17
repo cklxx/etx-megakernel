@@ -142,7 +142,20 @@ ARMS = {a.name: a for a in [
     # column-batched o_proj grid per layer for the 4 requests (each W_o chunk read once per layer, not 4 times). The only
     # difference to x4xb is ETX_DSV2_OPROJ_XB=1, so a same-box A/B against x4xb measures that change. B = 4 only: B = 2
     # loses 40 us in the latency-bound case (/workspace/bound_batch_gemv.md), so x2 waits for this arm's GPU A/B.
-    # (RESULTS: see the x4xbo notes below this table.)
+    # Per-slot timing model per layer (graph.py xb_oproj_us; no measurement yet): x4xb runs 2 o_proj tasks per slot,
+    # 2 x 12.0 = 24.0 us; x4xbo runs 1 batched task, 0.5 us x 4 stage + 12.0 x 37 / 74 = 8.0 us. 27-layer protocol
+    # simulator (3 seeds, cv 0.05 / 0.1, COH=l1, COUPLE=none, 2026-10-18): kv_a shared (this arm) x4xb 7841.3 ->
+    # x4xbo 7349.5 us (-492 us); kv_a replicated 7826.2 -> 7334.2 us (-492 us, fix's bound reproduced). If the
+    # batched task stays at 14 us (latency-bound case), the gain is -310 us.
+    # Threshold, written before any GPU measurement: KEEP only if every token gate of x4xbo passes and the same-box A/B
+    # (tools/ab_same_box.py, 6 rounds in all 6 orders, A = x4xb, B = x4xbo) gives every round faster, sign-test
+    # p <= 0.05 and a median step gain >= 0.31 ms (the latency-bound case); otherwise DROP.
+    # Resources, local compiles of etx_megakernel_d0 (VGPR + AGPR, scratch B/lane, SGPR spill, VGPR spill, workgroups
+    # per CU), 2026-10-18:
+    #   ROCm 7.14:  x4xb 256 + 0, 80, 1719, 17, 2;  x4xbo 256 + 0, 80, 1750, 16, 2
+    #   ROCm 7.2.4: x4xb 248 + 6, 64, 1683, 13, 2;  x4xbo 248 + 6, 64, 1721, 14, 2 (no VGPR headroom, as x4xb)
+    # LDS 26668 B in all four. SGPR spill +31 / +38: the grid reuses the batched qkv grid's arguments, so the lowered
+    # dispatch code gets no new address table (the qkv tile's second table cost +420). Allowance: x4xb's 80.
     Arm("x4xbo", levers=ARMS_X[4].levers, flags=ARMS_X[4].flags, env=dict(ARMS_X[4].env, ETX_DSV2_QKV_XB="1",
                                                                             ETX_DSV2_OPROJ_XB="1"),
         scratch_allow=80),
