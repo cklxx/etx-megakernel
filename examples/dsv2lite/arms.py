@@ -202,6 +202,9 @@ ARMS = {a.name: a for a in [
     # per CU), 2026-10-18. ROCm 7.14 is the gate compiler; 7.2.4 is recorded only:
     #   ROCm 7.14:  x4xbo 256 + 0, 80, 1750, 16, 2;  x4xbl 256 + 0, 80, 1803, 16, 2
     #   ROCm 7.2.4: x4xbo 248 + 6, 64, 1721, 14, 2;  x4xbl 248 + 6, 64, 1787, 14, 2 (no VGPR headroom)
+    # After the merge of feat/ds-oproj-colbatch (peeled o_proj and qkv GEMV loops, one gemv_rows_xb loop), 2026-10-18:
+    #   ROCm 7.14 (gate):     x4xbo 256 + 0, 80, 1753, 16, 2;  x4xbl 256 + 0, 80, 1807, 16, 2
+    #   ROCm 7.2.4 (record):  x4xbo 248 + 6, 64, 1724, 14, 2;  x4xbl 248 + 6, 64, 1793, 14, 2
     # LDS 26668 B in all four. SGPR spill +53 / +66: the new grids use existing arguments (fleet<r>, layer_-1), so no
     # new address table. Allowance: x4xbo's 80.
     Arm("x4xbl", levers=ARMS_X[4].levers, flags=ARMS_X[4].flags, env=dict(ARMS_X[4].env, ETX_DSV2_QKV_XB="1",
