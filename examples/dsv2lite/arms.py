@@ -43,6 +43,13 @@ def d2(cand):
 _LEVER = dict(Q="gemv_no_terminal", Qall="gemv_no_terminal_all", N="norm_tree", Nall="norm_tree_all",
               argmax="argmax_tree", topk="topk_rank", prep="attn_prologue_live")
 SINGLE = (*_LEVER, "relaxed")                             # attribution: each lever alone, no rule
+# the x2 / x4 batch arms (also listed in ARMS below); their x<n>xb variants copy them
+ARMS_X = {n: Arm(f"x{n}", levers=(*LEVERS_ALL, "l1_loads", "merge_uv_waves"),
+                 flags=(f"-DETX_DS_REQUESTS={n}", "-DETX_SLOT_BY_CU") + (("-DETX_DSV2_KVA_SHARED=1",) if k1 else ()),
+                 env=dict(ETX_DSV2_COH="l1", ETX_DSV2_REQUESTS=str(n), ETX_DSV2_COUPLE="none",
+                          **({"ETX_DSV2_KVA": "shared"} if k1 else {})),
+                 scratch_allow=allow)
+          for n, allow, k1 in ((2, 64, True), (4, 64, True))}
 ARMS = {a.name: a for a in [
     Arm("default", stamped=True),
     Arm("fleet", builder="fleet"),                                         # fleet 3fb67a6's own build (inplace_session.Session.build)
@@ -109,12 +116,19 @@ ARMS = {a.name: a for a in [
     # compiler differs (docs/BATCH-2026-10-14.md, local build evidence). Section 10 gave the arms M1 and K1: on the
     # box (ROCm 7.14, one compile each, 2026-10-14) the new recipe spilled x2 32, x4 64 and x8 144 B/lane, so x2's
     # allowance rises from 0 to 64 with that measurement; x4's 64 and x8's 192 already covered it.
-    *(Arm(f"x{n}", levers=(*LEVERS_ALL, "l1_loads", "merge_uv_waves"),
-          flags=(f"-DETX_DS_REQUESTS={n}", "-DETX_SLOT_BY_CU") + (("-DETX_DSV2_KVA_SHARED=1",) if k1 else ()),
-          env=dict(ETX_DSV2_COH="l1", ETX_DSV2_REQUESTS=str(n), ETX_DSV2_COUPLE="none",
-                   **({"ETX_DSV2_KVA": "shared"} if k1 else {})),
+    *ARMS_X.values(),
+    # Stage B2, qkv only (docs/BATCH-2026-10-14.md section 5; graph.py build_xb_qkv, fleet_xb.hip): the x2 / x4 arm plus
+    # ONE column-batched qkv grid per layer for all requests (each qkv weight row read once per layer, not once per
+    # request). The only difference to x<n> is ETX_DSV2_QKV_XB=1, so a same-box A/B against x<n> measures that change.
+    # Threshold, written before any GPU measurement: KEEP only if every token gate of x<n>xb passes and the same-box A/B
+    # (tools/ab_same_box.py, 6 rounds in all 6 orders, A = x<n>, B = x<n>xb) gives every round faster, sign-test
+    # p <= 0.05 and a median step gain >= 0.28 ms (the low end of the CPU estimate for B = 4); otherwise DROP.
+    # Scratch: the local ROCm 7.14 compile (same compiler as the box) spills x2xb 96 and x4xb 144 B/lane (x2 32,
+    # x4 64), occupancy 2 kept; allowance twice that, as above. Local ROCm 7.2.4 gives x4xb 256 VGPR + 6 AGPR, i.e.
+    # occupancy 1 (the session does not check occupancy; read it from the BUILD line before trusting an A/B).
+    *(Arm(f"x{n}xb", levers=ARMS_X[n].levers, flags=ARMS_X[n].flags, env=dict(ARMS_X[n].env, ETX_DSV2_QKV_XB="1"),
           scratch_allow=allow)
-      for n, allow, k1 in ((2, 64, True), (4, 64, True))),
+      for n, allow in ((2, 192), (4, 288))),
     # B = 8 is a diagnostic: with M1 alone the eight-request gate failed (request 5, 3/27 layers), so the three
     # recipes are built side by side and the gate says which one is correct at eight requests. x8p is the plain
     # replication recipe (the pre-section-10 arm), x8m adds M1, x8k adds K1.

@@ -38,6 +38,10 @@ LAYERS, FIRST_DENSE = 27, 1
 SCRATCH_BYTES = 24576      # >= sizeof(fleet::Scratch) (23,408 B); checked by the host against fleet_scratch_bytes()
 T = "examples/dsv2lite/fleet_shim.hip"
 D5_T = "examples/dsv2lite/fleet_d5.hip"
+# ETX_DSV2_QKV_XB=1 (docs/BATCH-2026-10-14.md section 5, stage B2, qkv only): this source replaces fleet_shim.hip ONLY in
+# that graph; it includes fleet_shim.hip and adds the column-batched qkv tile. The default TU does not include it.
+XB_T = "examples/dsv2lite/fleet_xb.hip"
+XB_MAX_REQUESTS = 4        # fleet_xb.hip keeps one bf16 hidden vector per request in fleet::Scratch regions (4 slots)
 # D5 uses Pass 7's existing l2_warm hook, not fleet's retained-register prefetch loop.
 D5_PREFETCH = {
     "fleet_qkv_fused": "fleet_d5_qkv", "fleet_qkv_fused_fold": "fleet_d5_qkv",
@@ -70,13 +74,20 @@ def _tile(symbol: str):
     mode = COH_MODES.get(os.environ.get("ETX_DSV2_COH", "0"))
     d5 = os.environ.get("ETX_DSV2_D5", "0") == "1"
     kw = {"prefetch": D5_PREFETCH.get(symbol)} if d5 else {}
-    source = D5_T if d5 else T
+    source = D5_T if d5 else XB_T if _xb() else T
     # the fleet tile family implements "coherent_l1" through lever l1_loads, which examples/dsv2lite/build.sh adds when
     # the build-wide switch ETX_COHERENCE=l1 is set (etx/passes/plan.py); dense_down reads h inside gemv_rows: not capable
     kw["coherence_caps"] = () if symbol in COH_PLAIN else ("coherent_l1",)
     if mode and symbol not in COH_PLAIN:
         return hip_link(source, symbol, coherence=mode, **kw)
     return hip_link(source, symbol, **kw)
+
+
+def _xb() -> bool:
+    v = os.environ.get("ETX_DSV2_QKV_XB", "0")
+    if v not in ("0", "1"):
+        raise ValueError(f"ETX_DSV2_QKV_XB={v!r}: 0 | 1")
+    return v == "1"
 
 
 def _res(lds: int = SCRATCH_BYTES, paired: bool = False) -> Resource:
@@ -115,9 +126,11 @@ def _layer_tensor(g: Graph, L: int) -> None:
         g.tensor(f"layer_{L}", (1,), role="runtime", bytes_per_elem=4)
 
 
-def build_attention_block(g: Graph, q: _Req, L: int, e_in: str, e_in_map: str, fold: bool, extra_in: dict | None = None) -> str:
+def build_attention_block(g: Graph, q: _Req, L: int, e_in: str, e_in_map: str, fold: bool, extra_in: dict | None = None,
+                          xb: bool = False) -> str:
     """qkv -> (qabs, attention) -> merge -> o_proj; returns the global o_proj event name. extra_in: more in-edges of qkv
-    (the interleave's cross-request ordering)."""
+    (the interleave's cross-request ordering). xb: the layer's column-batched qkv grid (build_xb_qkv) was created
+    before this request's block and already created and signals E_qkv; this block adds everything after qkv."""
     _layer_tensor(g, L)
     n = q.n
     # K1 (docs/DSV2-D1-D5.md), ETX_DSV2_KVA=shared: kv_a is computed once, 1/8 per XCD (fleet's FLAG_KVA_SHARED), so the
@@ -125,14 +138,16 @@ def build_attention_block(g: Graph, q: _Req, L: int, e_in: str, e_in_map: str, f
     # Default `replicated`: every XCD computes its own full kv_a, the event stays XCD-local (today's graph).
     kvs = os.environ.get("ETX_DSV2_KVA", "replicated") == "shared"
     sfx = "_kvs" if kvs else ""
-    g.etensor(n(f"E_qkv_{L}"), (1,) if kvs else (XCDS,), wait_count=XCDS * W if kvs else W)
+    if not xb:
+        g.etensor(n(f"E_qkv_{L}"), (1,) if kvs else (XCDS,), wait_count=XCDS * W if kvs else W)
     g.etensor(n(f"E_qabs_{L}"), (HEADS,), wait_count=QABS)
     g.etensor(n(f"E_attn_{L}"), (HEADS,), wait_count=KV_CHUNKS)
     g.etensor(n(f"E_merge_{L}"), (XCDS,), wait_count=(HEADS // XCDS) * KV_CHUNKS)
     g.etensor(n(f"E_oproj_{L}"), (1,), wait_count=XCDS * W)
-    qkv_in = {e_in: e_in_map, **(extra_in or {})}
-    _chiplet(g, q, f"qkv_{L}", ("fleet_qkv_fused_fold" if fold else "fleet_qkv_fused") + sfx, L, qkv_in,
-             {n(f"E_qkv_{L}"): "xw->(0)" if kvs else "xw->x"}, DUR["qkv"])
+    if not xb:
+        qkv_in = {e_in: e_in_map, **(extra_in or {})}
+        _chiplet(g, q, f"qkv_{L}", ("fleet_qkv_fused_fold" if fold else "fleet_qkv_fused") + sfx, L, qkv_in,
+                 {n(f"E_qkv_{L}"): "xw->(0)" if kvs else "xw->x"}, DUR["qkv"])
     g.call_device(n(f"qabs_{L}"), (HEADS, QABS), _tile("fleet_q_absorb"), resource=_res(paired=q.paired), args=[q.fleet, f"layer_{L}"],
                   consts=(L, q.r), domain_map="hs->(h/2)", worker_map=q.wmap("hs->((h%2)*2+s+OFF)"),
                   in_edges={n(f"E_qkv_{L}"): "hs->(0)" if kvs else "hs->(h/2)"}, out_edges={n(f"E_qabs_{L}"): "hs->h"},
@@ -152,9 +167,9 @@ def build_attention_block(g: Graph, q: _Req, L: int, e_in: str, e_in_map: str, f
 
 
 def build_moe_layer(g: Graph, q: _Req, L: int, e_in: str, e_in_map: str, fold: bool, routing_cached: bool, extra_in=None,
-                    extra_gu=None) -> str:
+                    extra_gu=None, xb: bool = False) -> str:
     n = q.n
-    e_oproj = build_attention_block(g, q, L, e_in, e_in_map, fold, extra_in)
+    e_oproj = build_attention_block(g, q, L, e_in, e_in_map, fold, extra_in, xb=xb)
     kchunks = os.environ.get("ETX_DSV2_KCHUNKS", "1") == "4"
     g.etensor(n(f"E_norm_{L}"), (XCDS,), wait_count=W)
     if not kchunks:                     # event creation order is part of the plan: unchanged for the default path
@@ -211,9 +226,9 @@ def build_moe_layer_d4(g: Graph, q: _Req, L: int, e_in: str, e_in_map: str, fold
     return n(f"E_down_{L}")
 
 
-def build_dense_layer(g: Graph, q: _Req, L: int, e_in: str, e_in_map: str, fold: bool, extra_in=None) -> str:
+def build_dense_layer(g: Graph, q: _Req, L: int, e_in: str, e_in_map: str, fold: bool, extra_in=None, xb: bool = False) -> str:
     n = q.n
-    e_oproj = build_attention_block(g, q, L, e_in, e_in_map, fold, extra_in)
+    e_oproj = build_attention_block(g, q, L, e_in, e_in_map, fold, extra_in, xb=xb)
     g.etensor(n(f"E_norm_{L}"), (XCDS,), wait_count=W)
     g.etensor(n(f"E_dgu_{L}"), (1,), wait_count=XCDS * W)
     g.etensor(n(f"E_dense_{L}"), (1,), wait_count=XCDS * W)
@@ -221,6 +236,37 @@ def build_dense_layer(g: Graph, q: _Req, L: int, e_in: str, e_in_map: str, fold:
     _chiplet(g, q, f"dense_gu_{L}", "fleet_dense_gate_up", L, {n(f"E_norm_{L}"): "xw->x"}, {n(f"E_dgu_{L}"): "xw->(0)"}, DUR["dense_gu"])
     _chiplet(g, q, f"dense_dn_{L}", "fleet_dense_down", L, {n(f"E_dgu_{L}"): "xw->(0)"}, {n(f"E_dense_{L}"): "xw->(0)"}, DUR["dense_dn"])
     return n(f"E_dense_{L}")
+
+
+XB_FOLD, XB_KVS = 1, 2    # fleet_xb.hip kFold, kKvs (grid constant 3)
+XB_W = 2 * W              # the batched qkv grid takes both slots' 37 workers of every XCD (74 per XCD)
+
+
+def build_xb_qkv(g: Graph, qs: list, L: int, ins: dict, fold: bool) -> None:
+    """ETX_DSV2_QKV_XB=1: ONE qkv grid for all requests of layer L, created before any request's layer-L grids.
+
+    Each task stages and norms every request's layer input (fleet's prologue, per request), keeps the normalized
+    vectors as bf16 in LDS, then streams its weight rows of the fused [3072 + 576, 2048] matrix once and forms all B dot
+    products per row (fleet_xb.hip). The grid is (8 XCDs, 74): workers w < 37 are slot 0's, w >= 37 slot 1's
+    (local worker w % 37 + (w / 37) * 38), so both workgroups of every CU work on it. It waits on every request's
+    layer input event and signals every request's own E_qkv_L, so everything after qkv is the unbatched graph.
+
+    Deadlock freedom: the grid is created after every request's layer L-1 grids (its producers) and before every
+    request's layer-L grids (its consumers); every static queue runs in creation order, so the earliest unfinished task
+    always has its inputs."""
+    _layer_tensor(g, L)
+    kvs = os.environ.get("ETX_DSV2_KVA", "replicated") == "shared"
+    for q in qs:
+        g.etensor(q.n(f"E_qkv_{L}"), (1,) if kvs else (XCDS,), wait_count=XCDS * XB_W if kvs else XB_W)
+    # consts: (layer, workers per XCD of this grid, first request = 0, flags: 1 = fold the expert partials, 2 = shared
+    # kv_a); the body loops over the ETX_DS_REQUESTS requests itself. One symbol for every case: one copy of the body
+    # in the megakernel (fleet_xb.hip)
+    flags = (XB_FOLD if fold else 0) | (XB_KVS if kvs else 0)
+    g.call_device(f"xb_qkv_{L}", (XCDS, XB_W), _tile("fleet_qkv_xb"), resource=_res(paired=True), args=[qs[0].fleet, f"layer_{L}"],
+                  consts=(L, XB_W, 0, flags), domain_map="xw->x", worker_map=f"xw->(w%{W}+(w/{W})*{CUS})", in_edges=ins,
+                  out_edges={q.n(f"E_qkv_{L}"): "xw->(0)" if kvs else "xw->x" for q in qs},
+                  # model only (no measurement yet): B prologues of 7.4 us, then half the rows per worker
+                  duration_us=7.4 * len(qs) + DUR["qkv"] - 7.4, duration_cv=0.05)
 
 
 def build(layers: int = LAYERS, routing_cached: bool | None = None, requests: int | None = None) -> Graph:
@@ -271,6 +317,17 @@ def build(layers: int = LAYERS, routing_cached: bool | None = None, requests: in
         raise ValueError(f"ETX_DSV2_KVA={kva!r}: replicated | shared")
     if kva == "shared" and os.environ.get("ETX_DSV2_D5", "0") == "1":
         raise ValueError("ETX_DSV2_KVA=shared supports one request without ETX_DSV2_D5 only")
+    # ETX_DSV2_QKV_XB=1: one column-batched qkv grid per layer for all requests (build_xb_qkv, fleet_xb.hip)
+    xb = _xb()
+    if xb:
+        if not 2 <= requests <= XB_MAX_REQUESTS:
+            raise ValueError(f"ETX_DSV2_QKV_XB=1 needs 2..{XB_MAX_REQUESTS} requests (fleet_xb.hip LDS slots), not {requests}")
+        if couple != "none":
+            raise ValueError("ETX_DSV2_QKV_XB=1 needs ETX_DSV2_COUPLE=none: the coupling edges are qkv in-edges")
+        if os.environ.get("ETX_DSV2_D5", "0") == "1":
+            raise ValueError("ETX_DSV2_QKV_XB=1 with ETX_DSV2_D5 is not supported: no prefetch sibling for the batched qkv")
+        if os.environ.get("ETX_DSV2_ISOLATE", "") or os.environ.get("ETX_DSV2_SNAPSHOT", ""):
+            raise ValueError("ETX_DSV2_QKV_XB=1 with ETX_DSV2_ISOLATE / ETX_DSV2_SNAPSHOT is not supported: no per-request qkv grid")
     g = Graph("dsv2lite_decode" if requests == 1 else f"dsv2lite_decode_x{requests}")
     g.tensor("layer_-1", (1,), role="runtime", bytes_per_elem=4)
     qs = [_Req(r, requests) for r in range(requests)]
@@ -285,6 +342,8 @@ def build(layers: int = LAYERS, routing_cached: bool | None = None, requests: in
     # layers outer, requests inner: every cross-request producer is created before its consumer (program order is the
     # static queue order, and each worker only runs its own request's tasks)
     for L in range(layers):
+        if xb:
+            build_xb_qkv(g, qs, L, {state[q.r][0]: state[q.r][1] for q in qs}, fold=state[qs[0].r][2])
         for q in qs:
             e, m, prev_moe = state[q.r]
             extra = extra_gu = None
@@ -299,12 +358,13 @@ def build(layers: int = LAYERS, routing_cached: bool | None = None, requests: in
                 elif L > FIRST_DENSE:
                     extra_gu = {f"r1_E_down_{L - 1}": "xw->(0)"}       # r0's of L after r1's of L-1
             if L < FIRST_DENSE:
-                e = build_dense_layer(g, q, L, e, m, fold=prev_moe, extra_in=extra); prev_moe = False
+                e = build_dense_layer(g, q, L, e, m, fold=prev_moe, extra_in=extra, xb=xb); prev_moe = False
             elif d4_rows is not None:
                 e = build_moe_layer_d4(g, q, L, e, m, fold=prev_moe, rows=d4_rows)
                 prev_moe = True
             else:
-                e = build_moe_layer(g, q, L, e, m, fold=prev_moe, routing_cached=routing_cached, extra_in=extra, extra_gu=extra_gu)
+                e = build_moe_layer(g, q, L, e, m, fold=prev_moe, routing_cached=routing_cached, extra_in=extra, extra_gu=extra_gu,
+                                    xb=xb)
                 prev_moe = True
             state[q.r] = (e, "xw->(0)", prev_moe)
     for q in qs:
