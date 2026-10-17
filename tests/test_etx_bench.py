@@ -31,9 +31,9 @@ def test_decode_population_and_correctness(mutation):
 @pytest.mark.parametrize('failure', [None, 'missing_input', 'build', 'imports', 'tokens', 'source', 'identity', 'timeout'])
 def test_standalone_pipeline_fail_closed(tmp_path, monkeypatch, capsys, failure):
     monkeypatch.setattr(b, 'ROOT', tmp_path)
-    monkeypatch.setattr(b, 'prerequisites', lambda model: None)
+    monkeypatch.setattr(b, 'prerequisites', lambda model, batch=1: None)
     if failure == 'missing_input':
-        def missing(model): raise Refusal('missing input: golden_c1024.txt')
+        def missing(model, batch=1): raise Refusal('missing input: golden_c1024.txt')
         monkeypatch.setattr(b, 'prerequisites', missing)
     monkeypatch.setattr(b.subprocess, 'check_output', lambda *args, **kwargs: 'a'*40)
     seen = []
@@ -45,6 +45,7 @@ def test_standalone_pipeline_fail_closed(tmp_path, monkeypatch, capsys, failure)
     fixture = fixture_session(tmp_path/'fixture', count=3)
     identity = json.loads((fixture/'build_identity.json').read_text())
     identity['hipcc_flags'] = b.BASE_FLAGS
+    identity['overrides'] = dict(b.KEPT_ENV)
     (fixture/'build_identity.json').write_text(json.dumps(identity))
     # Restamp synthetic evidence after adding the flags; real checker/validator
     # still owns coverage and byte-identity decisions in this integration test.

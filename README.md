@@ -201,9 +201,19 @@ Prerequisites, in order:
 ```bash
 make bench                                      # default model directory
 make bench MODEL=/path/to/qwen3-30b-a3b           # override the model directory
+make bench BATCH=4                               # 4 concurrent requests (1, 2, 4 or 8)
 # Equivalent direct command:
 python3 -m examples.vllm_llm.bench /path/to/qwen3-30b-a3b
+python3 -m examples.vllm_llm.bench --batch 4 --json b4.json /path/to/qwen3-30b-a3b
 ```
+
+`--batch N` (N > 1) serves N requests by replication (`ETX_VL_REQUESTS=N`, no column batching). Request r
+reads `golden_c1024.txt` (r = 0) or `golden_c1024_r<97 r>.txt` and its `prefill_*` reference from the model
+directory (`examples/llm/prep.py --context 1024 --rotate <97 r> --golden-only`). Each batch has its own build and
+certificate: byte-identical imports at positions 0 and 1040 for every request, teacher-forced coverage of all 1055
+positions per request, and 32/32 HF greedy tokens per request. Only then does it print `TIMING batch=N ...
+median_decode_wall_ms=<one decode step, all requests> tokens_per_s=<N * 1000 / step>`. `--recipe plain` is the
+multi-request recipe that passed those gates on hardware on 2026-10-17 (`examples/vllm_llm/batch_correctness.py`).
 
 This builds the current kept configuration through `build.sh`:
 `ETX_TOPK_KEY32=1 ETX_VL_TOUCH=1 ETX_VL_CU=256 ETX_DEV_RESET=0 ETX_VL_CHECK=1
