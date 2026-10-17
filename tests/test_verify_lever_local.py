@@ -99,3 +99,42 @@ def test_local_script_refuses_an_unpinned_fleet_source(tmp_path):
                        env={"PATH": "/usr/bin:/bin", "ETX_ROCM_724": str(rocm), "ETX_PYTHON": sys.executable})
     assert r.returncode == 2 and "is not the pinned fleet 3fb67a6" in r.stderr
     assert not (tmp_path / "o/default").exists()
+
+
+def test_fleet_src_record_has_path_and_pinned_hash(tmp_path, monkeypatch):
+    monkeypatch.setattr(vl, "source_sha", lambda src: vl.FLEET_SRC_SHA256)
+    assert vl.fleet_src_record(tmp_path) == {"path": str(tmp_path), "commit": vl.FLEET_COMMIT, "src_sha256": vl.FLEET_SRC_SHA256}
+
+
+def test_fleet_src_record_refuses_another_fleet(tmp_path):
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src/kernel.hip").write_text("// not fleet 3fb67a6\n")
+    with pytest.raises(SystemExit, match="not the pinned fleet"):
+        vl.fleet_src_record(tmp_path)
+
+
+def test_build_writes_fleet_src_next_to_compiler_and_refuses_before_building(tmp_path, monkeypatch):
+    calls = []
+    monkeypatch.setattr(vl, "fleet_export", lambda: tmp_path)
+    monkeypatch.setattr(vl, "run", lambda cmd, env=None: calls.append(cmd))
+    (tmp_path / "src").mkdir()
+    with pytest.raises(SystemExit, match="not the pinned fleet"):
+        vl.build("default", tmp_path / "o", "7.2.4")
+    assert calls == []
+    monkeypatch.setattr(vl, "source_sha", lambda src: vl.FLEET_SRC_SHA256)
+    d = tmp_path / "o/default"
+    d.mkdir(parents=True)
+    (d / "compiler.json").write_text(json.dumps({"mode": "local"}))
+    for f in ("plan.json", "megakernel_d0.hip", "isa.bin", "mk.s", "resource.log"):
+        (d / f).write_text("")
+    monkeypatch.setattr(vl, "parse", lambda text: {})
+    monkeypatch.setattr(vl, "static_counts", lambda p: {})
+    rec = vl.build("default", tmp_path / "o", "7.2.4")
+    assert rec["fleet_src"]["src_sha256"] == vl.FLEET_SRC_SHA256 and rec["fleet_src"]["path"] == str(tmp_path)
+    assert calls[0][3] == str(tmp_path)
+
+
+def test_local_script_registered_stamps_option():
+    text = SCRIPT.read_text()
+    assert '--stamps' in text and 'ARM=${REGISTERED}_st' in text and 'PATCH_ARM="$PATCH_ARM+stamps"' in text
+    assert 'stamps) STAMPS=1; FLAGS=(-DETX_DSV2_STAMPS2)' in text

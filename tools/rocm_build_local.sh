@@ -3,7 +3,7 @@
 # compiler instead of the etx-rocm22 image + ~/code/rocm-headers. Logic taken from the local device build
 # (xbobuild.sh, 2026-10-18) and from rocm_build_check.sh's container script.
 # Usage: tools/rocm_build_local.sh TOOLCHAIN PINNED_FLEET_EXPORT ARM [OUT]
-#        tools/rocm_build_local.sh TOOLCHAIN PINNED_FLEET_EXPORT --arm REGISTERED_ARM [OUT]
+#        tools/rocm_build_local.sh TOOLCHAIN PINNED_FLEET_EXPORT --arm REGISTERED_ARM [--stamps] [OUT]
 #   TOOLCHAIN: 7.2.4 | 7.14 (roots: ETX_ROCM_724 / ETX_ROCM_714, defaults below)
 #   ARM (legacy form): default | stamps | <lever>[+<lever>...]
 # Writes OUT/<arm>/{compiler.txt,compiler.json,build_env.json,plan.json,megakernel_d0.hip,resource.log,mk.s,isa.bin,...}
@@ -14,7 +14,10 @@ TC=${1:?toolchain 7.2.4 or 7.14}; shift
 FLEET="$(cd "${1:?pinned fleet export}" && pwd)"; shift
 PY=${ETX_PYTHON:-$ROOT/.venv/bin/python}
 REGISTERED=""
+STAMPED=0
 if [ "${1:-}" = --arm ]; then REGISTERED=${2:?registered arm name required}; shift 2; ARM=$REGISTERED
+  # --stamps: the stamped build of the arm (patch_stamps after the arm's patches, -DETX_DSV2_STAMPS2), OUT/<arm>_st
+  if [ "${1:-}" = --stamps ]; then STAMPED=1; shift; ARM=${REGISTERED}_st; fi
 else ARM=${1:?arm}; shift; fi
 OUT=${1:-$ROOT/build/dsv2lite-local-$TC}
 mkdir -p "$OUT"; OUT="$(cd "$OUT" && pwd)"
@@ -39,6 +42,7 @@ if [ -n "$REGISTERED" ]; then
   while IFS= read -r name; do case "$name" in ETX_*|FLEET_*) unset "$name";; esac; done < <(compgen -e)
   eval "$(cd "$ROOT" && "$PY" -m examples.dsv2lite.arms shell "$REGISTERED")"
   PATCH_ARM=${ETX_FLEET_PATCH// /+}; PATCH_ARM=${PATCH_ARM:-default}
+  [ "$STAMPED" = 0 ] || PATCH_ARM="$PATCH_ARM+stamps"
 else
   LEVERS=$(cd "$ROOT" && "$PY" -c 'from examples.dsv2lite.patch_fleet import levers; print(" ".join(levers()))')
   if [ "$ARM" != default ]; then

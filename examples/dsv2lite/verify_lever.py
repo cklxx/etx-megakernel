@@ -29,7 +29,7 @@ import subprocess
 import sys
 
 from examples.dsv2lite.build_resources import parse
-from examples.dsv2lite.pinned import FLEET_COMMIT, FLEET_SRC_SHA256, fleet_export
+from examples.dsv2lite.pinned import FLEET_COMMIT, FLEET_SRC_SHA256, fleet_export, source_sha
 
 ROOT = Path(__file__).resolve().parents[2]
 # The default arm's record (its isa.bin hash equals effb06e's default build): every lever run checks against it.
@@ -89,6 +89,14 @@ def compiler_record(d: Path, compiler: str) -> dict:
             "rocm_root": "~/code/rocm-headers", "clang_version": first, "clang_commit": m.group(1) if m else None}
 
 
+def fleet_src_record(fleet: Path) -> dict:
+    """Path and pinned.py source hash of the fleet export a build uses; refuses (SystemExit) when it is not the pin."""
+    got = source_sha(Path(fleet) / "src")
+    if got != FLEET_SRC_SHA256:
+        raise SystemExit(f"fleet source {fleet}/src is not the pinned fleet {FLEET_COMMIT}: {got} != {FLEET_SRC_SHA256}")
+    return {"path": str(fleet), "commit": FLEET_COMMIT, "src_sha256": got}
+
+
 def build(arm: str, out: Path, compiler: str = "docker", registered: bool = False) -> dict:
     env = {k: v for k, v in os.environ.items() if k not in ("ETX_DSV2_COH", "ETX_DSV2_KCHUNKS", "ETX_CFLAGS", "ETX_DSV2_D5")}
     build_arm = arm if registered else ARM_LEVERS.get(arm, arm)
@@ -100,9 +108,11 @@ def build(arm: str, out: Path, compiler: str = "docker", registered: bool = Fals
             env.update(LEVER_ENV.get(lever, {}))
     if compiler != "docker":
         env["ETX_PYTHON"] = sys.executable
-    run(build_cmd(build_arm, out, compiler, registered), env=env)
+    fleet = fleet_export()
+    fleet_src = fleet_src_record(fleet)
+    run(build_cmd(build_arm, out, compiler, registered, fleet=fleet), env=env)
     d = out / build_arm
-    return dict(compiler=compiler_record(d, compiler), resources=parse((d / "resource.log").read_text()),
+    return dict(compiler=compiler_record(d, compiler), fleet_src=fleet_src, resources=parse((d / "resource.log").read_text()),
                 plan_sha256=hashlib.sha256((d / "plan.json").read_bytes()).hexdigest(),
                 kernel_sha256=hashlib.sha256((d / "megakernel_d0.hip").read_bytes()).hexdigest(),
                 isa_sha256=hashlib.sha256((d / "isa.bin").read_bytes()).hexdigest(),
@@ -150,6 +160,7 @@ def main(argv=None) -> int:
     record["cpu_gates"] = dict(files=tests, summary=summary)
     default = build("default", out_dir, a.compiler)
     record["compiler"] = default["compiler"]
+    record["fleet_src"] = default["fleet_src"]
     if BASELINE.exists():
         want = json.loads(BASELINE.read_text())["default"]["isa_sha256"]
         if a.compiler == "docker" and default["isa_sha256"] != want:
