@@ -40,7 +40,8 @@ def attn_block(g, q, L, e_in, e_in_map, fold, extra_in=None, xb=False, xbo=False
 if mode == "new":
     dsv.build_attention_block = attn_block
 os.environ.update(ETX_DSV2_COH="l1", ETX_DSV2_COUPLE="none", ETX_DSV2_KVA="shared", ETX_DSV2_REQUESTS="4",
-                  ETX_DSV2_QKV_XB="1", ETX_DSV2_OPROJ_XB="1", ETX_DSV2_LMHEAD_XB="1")
+                  ETX_DSV2_QKV_XB="1", ETX_DSV2_OPROJ_XB="1", ETX_DSV2_LMHEAD_XB="1",
+                  ETX_DSV2_ROUTER_FIRST="1", ETX_DSV2_ROUTER_SPREAD="1")
 plan = compile_graph(dsv.build(), "gfx942", {}, {}, PassOptions(inline_tiles=True, relay="on"))
 ms = []
 for seed in range(3):

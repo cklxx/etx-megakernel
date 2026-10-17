@@ -1,6 +1,7 @@
 # ETX_DSV2_ATTN_XB: bound and design (Step 1, no tile code)
 
-Date: 2026-10-18. Base: 17996ae (x4xbl). B = 4 only. Script: `tools/attn_xb_bound.py`.
+Date: 2026-10-18. Step 1 base: 17996ae (x4xbl). Step 1b base: 0c641ec (PR #25, x4xbor = x4xbl +
+ETX_DSV2_ROUTER_FIRST=1 + ETX_DSV2_ROUTER_SPREAD=1). B = 4 only. Script: `tools/attn_xb_bound.py` (Step 1b: x4xbor env).
 
 ## Design
 
@@ -30,9 +31,21 @@ Date: 2026-10-18. Base: 17996ae (x4xbl). B = 4 only. Script: `tools/attn_xb_boun
 attn 20.3 / 24.0 us at 8 chunks is fix's range (/workspace/bound_next_1p85.md). merge at 8 chunks reads 16 W_UV rows
 (not 8) and merges 8 partials (not 16): 7.6 us optimistic, 9.0 us pessimistic.
 
-## 27-layer protocol simulator
+## 27-layer protocol simulator, Step 1b (against x4xbor, the A of the KEEP rule)
 
-3 seeds, kv_a shared, COH=l1, COUPLE=none, QKV_XB + OPROJ_XB + LMHEAD_XB on.
+3 seeds, kv_a shared, COH=l1, COUPLE=none, QKV_XB + OPROJ_XB + LMHEAD_XB + ROUTER_FIRST + ROUTER_SPREAD on.
+
+```
+{"tag": "base", "attn_us": 16.7, "merge_us": 7.6, "qabs_us": 4.0, "tasks": 173496, "cv0": 6186.4, "seeds": [6862.7, 6871.1, 6867.1], "mean": 6866.9}
+{"tag": "opt", "attn_us": 20.3, "merge_us": 7.6, "qabs_us": 4.0, "tasks": 145848, "cv0": 5502.1, "seeds": [6145.8, 6145.9, 6151.1], "mean": 6147.6}
+{"tag": "pess", "attn_us": 24.0, "merge_us": 9.0, "qabs_us": 4.0, "tasks": 145848, "cv0": 5639.8, "seeds": [6310.1, 6307.9, 6313.9], "mean": 6310.6}
+{"tag": "pess2", "attn_us": 24.0, "merge_us": 11.0, "qabs_us": 6.0, "tasks": 145848, "cv0": 5747.8, "seeds": [6418.1, 6415.9, 6421.9], "mean": 6418.6}
+```
+
+- base reproduces x4xbor (6866.9 us = 7148.7 - 281.8).
+- Gain: optimistic -719.3 us, pessimistic -556.3 us, stress -448.3 us. All are above the 0.3 ms stop line.
+
+## 27-layer protocol simulator, Step 1 (against x4xbl, 17996ae; record only)
 
 ```
 {"tag": "base", "attn_us": 16.7, "merge_us": 7.6, "qabs_us": 4.0, "tasks": 189304, "cv0": 6411.1, "seeds": [7143.1, 7150.8, 7152.2], "mean": 7148.7}
@@ -41,11 +54,11 @@ attn 20.3 / 24.0 us at 8 chunks is fix's range (/workspace/bound_next_1p85.md). 
 {"tag": "pess2", "attn_us": 24.0, "merge_us": 11.0, "qabs_us": 6.0, "tasks": 161656, "cv0": 5972.5, "seeds": [6699.5, 6702.5, 6711.8], "mean": 6704.6}
 ```
 
-- base reproduces x4xbl (7148.7 us).
-- Gain: optimistic -715 us, pessimistic -552 us, stress -444 us. All are above the 0.3 ms stop line.
+Gain against x4xbl: -715 / -552 / -444 us.
 
 ## KEEP threshold (written before any GPU measurement)
 
-KEEP only if every token gate passes and `tools/ab_same_box.py` (6 rounds, all 6 orders, A = x4xbl, B = x4xbl +
-ETX_DSV2_ATTN_XB=1) gives verdict WIN (6/6) and a median step saving >= 0.58 ms (pessimistic -552 us x 1.055).
-Otherwise DROP.
+KEEP only if every token gate passes and `tools/ab_same_box.py` (6 rounds, all 6 orders, `--identity-cmd`,
+A = x4xbor, B = x4xbora = x4xbor + ETX_DSV2_ATTN_XB=1 + -DETX_DSV2_ATTN_XB=1) gives verdict WIN (6/6 rounds faster,
+p <= 0.05, median gain > max |A/A control|) and a median step saving (A - B, from ab.json) >= 0.587 ms
+(pessimistic -556.3 us x 1.055). Otherwise DROP.
