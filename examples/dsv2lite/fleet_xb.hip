@@ -317,16 +317,22 @@ __device__ __forceinline__ void gemv_rows_half_xb(const __hip_bfloat16* __restri
     }                                                                                       \
   }
   XBO_ISSUE(bufA, k)
-  while (true) {
+  while (k + 2 * stride < cnt) {
     const int k2 = k + stride;
     XBO_ISSUE(bufB, k2)
     XBO_REDUCE(bufA, k)
-    if (k2 >= cnt) break;
     const int k3 = k2 + stride;
     XBO_ISSUE(bufA, k3)
     XBO_REDUCE(bufB, k2)
-    if (k3 >= cnt) break;
     k = k3;
+  }
+  if (k + stride < cnt) {
+    const int k2 = k + stride;
+    XBO_ISSUE(bufB, k2)
+    XBO_REDUCE(bufA, k)
+    XBO_REDUCE(bufB, k2)
+  } else {
+    XBO_REDUCE(bufA, k)
   }
 #undef XBO_ROW
 #undef XBO_ISSUE
