@@ -73,7 +73,7 @@ def test_default_off_x4xbo_is_byte_identical_to_01d08f4(kva, switch):
 def test_spread_tile_is_compiled_only_with_its_define():
     i = XB_SRC.index('extern "C" __device__ void fleet_norm_router_spread(')
     head = XB_SRC[:i]
-    assert head.rstrip().endswith("// build, so the x4xbo translation unit is unchanged.")
+    assert "#if defined(ETX_DSV2_ROUTER_SPREAD)" in head and "namespace etx_xb {" in head[head.rindex("#if defined(ETX_DSV2_ROUTER_SPREAD)"):]
     assert "#if defined(ETX_DSV2_ROUTER_SPREAD) && ETX_DSV2_ROUTER_SPREAD" in head[head.rindex("#endif"):]
     assert XB_SRC.rstrip().endswith("#endif")
 

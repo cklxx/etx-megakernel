@@ -225,7 +225,7 @@ ARMS = {a.name: a for a in [
     # (tools/ab_same_box.py, 6 rounds, A = x4xbl, B = x4xbor) is a WIN with 6/6 rounds faster, p <= 0.05 and a median
     # step gain >= 0.15 ms (about half of the simulated 0.30 ms host gain, 281.8 us x 1.055); otherwise DROP.
     # Resources (etx_megakernel_d0: VGPR + AGPR, scratch B/lane, SGPR spill, WG/CU), gate compiler ROCm 7.14, merge
-    # with 17996ae: x4xbl 256 + 0, 80, 1798, 2;  x4xbor 256 + 0, 80, 1796, 2. The tile adds no lever and no LDS.
+    # with d9c9669: x4xbl 256 + 0, 80, 1807, 2;  x4xbor 256 + 0, 80, 1796, 2. The tile adds no lever and no LDS.
     # The spread grid uses the router's own arguments (fleetN, layer_L): no new kernel-argument base address.
     Arm("x4xboq", levers=ARMS_X[4].levers, flags=ARMS_X[4].flags,
         env=dict(ARMS_X[4].env, ETX_DSV2_QKV_XB="1", ETX_DSV2_OPROJ_XB="1", ETX_DSV2_LMHEAD_XB="1",
