@@ -263,3 +263,21 @@ def test_execution_package_has_full_asset_closure_and_sources():
     assert all(len(v) == 64 for v in package['sources'].values())
     assert package['asset_status'] == 'UNBOUND'
     assert package['gpu_correctness'] == 'unmeasured'
+
+
+def test_producer_asset_identity_passes_the_session_verifier_for_every_batch(tmp_path):
+    from tests.test_two_gpu_verify import qwen_receipt
+    from tools import two_gpu_verify as vf
+    model = staged_model(tmp_path)
+    record = tmp_path / 'record'
+    for batch in bc.BATCHES:
+        receipt = dict(qwen_receipt(batch), inputs=bc.inputs(model, batch))
+        assert len(receipt['inputs']['files']) == 4 + 2 * batch
+        (record / f'qualify_b{batch}').mkdir(parents=True)
+        (record / f'qualify_b{batch}/correctness.json').write_text(json.dumps(receipt))
+    assert set(vf.qwen(record)) == {'2', '4', '8'}
+    # B2 bound to the B8 reference set is not what B2 read: refused.
+    receipt = dict(qwen_receipt(2), inputs=dict(bc.inputs(model, 2), files=bc.inputs(model, 8)['files']))
+    (record / 'qualify_b2/correctness.json').write_text(json.dumps(receipt))
+    with pytest.raises(vf.Fail, match='incomplete staged-asset identity'):
+        vf.qwen(record)

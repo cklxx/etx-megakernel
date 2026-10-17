@@ -12,10 +12,17 @@ INVENTORY = {e['batch']: e['imported_instances']
              for e in json.loads((ROOT / 'docs/evidence/qwen-batch-glm53/qwen-plan-inventory.json').read_text())}
 
 
+def qwen_files(batch):
+    names = bc.golden_names(batch)
+    names += [n.replace('golden', 'prefill', 1) for n in names]
+    names += ['hf/config.json', 'hf/REVISION', 'vl.manifest', 'vl.bin']
+    return {name: f'{i:064x}' for i, name in enumerate(names)}
+
+
 def qwen_receipt(batch):
     return dict(status='PASS', performance='unmeasured', batch=batch, positions=[0, 1040],
                 inputs=dict(model='Qwen/Qwen3-30B-A3B', revision='a' * 40, batch=batch,
-                            context=1024, gen=32, files={f'f{i}': f'{i:064x}' for i in range(20)}),
+                            context=1024, gen=32, files=qwen_files(batch)),
                 build_identity=dict(check_enabled=True, overrides=bc.recipe(batch)),
                 imported_per_position=INVENTORY[batch],
                 byte_identity_per_request={

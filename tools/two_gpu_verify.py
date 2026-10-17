@@ -47,7 +47,7 @@ def receipt(path):
 
 
 def qwen(record):
-    from examples.vllm_llm.batch_correctness import BATCHES, CONTEXT, GEN, REPEAT, recipe
+    from examples.vllm_llm.batch_correctness import BATCHES, CONTEXT, GEN, REPEAT, golden_names, recipe
 
     counts = {e['batch']: e['imported_instances'] for e in json.loads(INVENTORY.read_text())}
     summary = {}
@@ -62,10 +62,14 @@ def qwen(record):
             raise Fail(f'{item}: batch {r.get("batch")!r}, expected {batch}')
         inputs = r.get('inputs') or {}
         files = inputs.get('files') or {}
+        # batch_correctness.inputs binds exactly the assets this batch reads: 4 + 2 per request.
+        names = golden_names(batch)
+        assets = {'hf/config.json', 'hf/REVISION', 'vl.manifest', 'vl.bin', *names,
+                  *(n.replace('golden', 'prefill', 1) for n in names)}
         if (inputs.get('model') != 'Qwen/Qwen3-30B-A3B' or inputs.get('batch') != batch
                 or inputs.get('context') != CONTEXT or inputs.get('gen') != GEN
                 or not re.fullmatch('[0-9a-f]{40}', str(inputs.get('revision')))
-                or len(files) != 20 or not all(HEX64.fullmatch(str(v)) for v in files.values())):
+                or set(files) != assets or not all(HEX64.fullmatch(str(v)) for v in files.values())):
             raise Fail(f'{item}: incomplete staged-asset identity')
         identity = r.get('build_identity') or {}
         overrides = identity.get('overrides') or {}
