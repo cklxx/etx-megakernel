@@ -9,6 +9,11 @@
       "rocm_root": "/workspace/rocm724deb/stage/opt/rocm-7.2.4",
       "toolchain": "7.2.4"
     },
+    "fleet_src": {
+      "commit": "3fb67a6",
+      "path": "/home/box/code/etx-cache/fleet-3fb67a6",
+      "src_sha256": "28f5cbb4f39524df318883522341c48ca4162c18b71a3a6223c52eabb40ce4b3"
+    },
     "isa_sha256": "fc67219601226cce9b02793a8fc38e3dcfa5f74899b9a993779b54a97a648f83",
     "kernel_sha256": "3b76dbc932e6d23f829967949605e10353f4dc519c6e0d4482d86adddae3e560",
     "plan_sha256": "3e648b7c7abd036d3f31cf9d14fdab01cad518ca1c2dae65a5cb575b5c1f1382",
@@ -43,7 +48,7 @@
       "tests/test_dsv2_stamps.py",
       "tests/test_dsv2_d4.py"
     ],
-    "summary": "65 passed in 1.22s"
+    "summary": "65 passed in 1.16s"
   },
   "default": {
     "compiler": {
@@ -53,6 +58,11 @@
       "mode": "local",
       "rocm_root": "/workspace/rocm724deb/stage/opt/rocm-7.2.4",
       "toolchain": "7.2.4"
+    },
+    "fleet_src": {
+      "commit": "3fb67a6",
+      "path": "/home/box/code/etx-cache/fleet-3fb67a6",
+      "src_sha256": "28f5cbb4f39524df318883522341c48ca4162c18b71a3a6223c52eabb40ce4b3"
     },
     "isa_sha256": "a105cb16a414ee0f9f697c9de13205419d09674f5c69f6ee804cf36942377724",
     "kernel_sha256": "751293fad5f5c98ec6dbf9eeca3c73319b1d4ded4b6ca73996a65757c0ffae5d",
@@ -84,12 +94,17 @@
     "sgpr": 0,
     "vgpr": 0
   },
-  "etx_commit": "a4bb2674d927ba0fe2e93176f11356ee3e72f2b9",
-  "etx_dirty": true,
+  "etx_commit": "76e1a90e491bc511fa2ea0bfdb03acb1e7ef883e",
+  "etx_dirty": false,
   "flags": [
     "-DETX_DSV2_D4=1"
   ],
   "fleet_commit": "3fb67a6",
+  "fleet_src": {
+    "commit": "3fb67a6",
+    "path": "/home/box/code/etx-cache/fleet-3fb67a6",
+    "src_sha256": "28f5cbb4f39524df318883522341c48ca4162c18b71a3a6223c52eabb40ce4b3"
+  },
   "fleet_src_sha256": "28f5cbb4f39524df318883522341c48ca4162c18b71a3a6223c52eabb40ce4b3",
   "plan_env": {
     "ETX_DSV2_D4": "1"
