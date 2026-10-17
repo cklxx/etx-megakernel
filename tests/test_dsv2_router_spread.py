@@ -28,7 +28,18 @@ from examples.dsv2lite import graph as dsv
 
 ROOT = Path(__file__).resolve().parents[1]
 XB_SRC = (ROOT / dsv.XB_T).read_text()
-FLEET_SRC = Path(os.environ.get("ETX_FLEET_SRC", "/workspace/fleet-mi300x/src"))
+
+
+def _pinned_fleet_src() -> Path:
+    """src/ of the hash-checked pinned fleet export (pinned.fleet_export); a missing path when it cannot be made."""
+    from examples.dsv2lite.pinned import fleet_export
+    try:
+        return fleet_export() / "src"
+    except (FileNotFoundError, RuntimeError, OSError):
+        return Path("/nonexistent/pinned-fleet/src")
+
+
+FLEET_SRC = _pinned_fleet_src()
 N_REQ, LAYERS = 4, 3
 XBO = dict(ETX_DSV2_COH="l1", ETX_DSV2_COUPLE="none", ETX_DSV2_REQUESTS="4", ETX_DSV2_QKV_XB="1", ETX_DSV2_OPROJ_XB="1")
 # 01d08f4 (PR #23), 3 layers, PassOptions(inline_tiles=True, relay="on"): (plan.json sha256, megakernel sha256)
