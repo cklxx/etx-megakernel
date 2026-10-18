@@ -65,7 +65,7 @@ def environment(build, batch=1, name='kept'):
     env = {k: v for k, v in os.environ.items()
            if (not k.startswith(('ETX_', 'DSL_ABLATE_', 'BF16_')) or k in tools)}
     overrides, flags = recipe(batch, name)
-    env.update(overrides, ETX_OUT=str(build), ETX_HIPCC_FLAGS=flags,
+    env.update(overrides, ETX_VL_CHECK='1', ETX_OUT=str(build), ETX_HIPCC_FLAGS=flags,
                ETX_VL_PROGRESS='1', PYTHONUNBUFFERED='1')
     return env
 
