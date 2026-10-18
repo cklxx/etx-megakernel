@@ -232,3 +232,52 @@ Sources: `docs/TWO-WEEK-RESULTS-2026-10-18.md`,
 `examples/gpu-live/results/2026-10-16-multibatch/result.md`,
 `examples/dsv2lite/batch_floor.py`, `docs/ETX_Technical_Design.md`; external
 citations inline above.
+
+## 5. Adversarial review
+
+Recomputed from measured bytes (dense 2.459 GB, experts 3.624 GB per request)
+and the measured stream rate 3.56 TB/s (`hw_bench lf`), not the plan's framing.
+The shared fatal assumption: the E1/E2 falsifiers need rocprof `FETCH_SIZE`, but
+no accepted traffic capture exists on this hardware (`result.md`: "no accepted
+hardware traffic counters … partial rocprof CSV remains rejected"), so "bytes
+did not fall N×" cannot fire; only the wall-clock 2% bar can.
+
+- **E1 (dense column-batch).** (a) Ceiling (N−1)×2.459 GB ÷ 3.56 TB/s = B4
+  −2.07, B8 −4.84 ms; the code path exists (`model.py:199-202`) but is
+  correctness-unqualified, so the realized gain is [U]. (b) rocprof falsifier
+  cannot fire; the wall-clock <2% bar can. (c) Not subsumed; it gates E2/E4.
+- **E2 (MoE union).** (a) Ceiling (N−union/K)×3.624 GB ÷ 3.56 = B4 −0.37, B8
+  −1.58 ms, but no shared-weight MoE tile exists and it needs a standalone
+  top-k, so the gain against the code as-is is 0. (b) rocprof falsifier cannot
+  fire. (c) Effectively subsumed by E1 (both are "share the weights"), and its
+  1.58 ms is small next to the 10.73 ms B8 gap.
+- **E3 (attn_reduce).** (a) The +2473 µs is a `--check` single-launch sum the
+  repo marks "not decode time", so −1.5/−2.0 ms is unbacked; [U]. (b) Falsifier
+  (per-launch median back to 6.2 µs) fires via `--check`. (c) Not subsumed, but
+  must measure the decode-step cost first.
+- **E4 (measure vs vLLM).** (a) 0 — validation, not an optimization. (b) The
+  correctness gate fires. (c) Moot unless E1 turns positive.
+- **E5 (B1 prefetch).** (a) Needs new code, and the premise is measured-negative:
+  forced overlap measured 314/341 tok/s vs 366 uncoupled (`docs/PLAN-v3.md:178`).
+  (b) sync_bench falsifier fires. (c) Not subsumed; it is the only path to the
+  2–3× B1 claim.
+- **E6 (slot map).** (a) Ceiling is the 0.366 ms queue gap — 1/9 of the 3.37 ms
+  target; `result.md` already concluded gap-only cleanup cannot reach it.
+  (b) Needs a fresh trace. (c) Dead — delete; no replacement (E1/E2 own the
+  body-reduction path).
+
+**Run first with one GPU-hour: E1.** Flip `ETX_VL_BATCH=1`, pair kept vs
+column-batched at B4/B8, read the wall clock: positive → shared weights are the
+cost and E2/E4 follow; negative → the weight re-read is not the cost and effort
+moves to E3. Either outcome changes the decision.
+
+**Delete: E6.** Its 0.366 ms ceiling is measured and irrelevant to the 3.37 ms
+target; the decision it would inform is already made.
+
+**The estimate the measurements contradict.** The measured marginal is 2.154
+ms/request (B4→B8, `docs/QWEN-BATCH-BASELINE-2026-10-18.md`), but E1+E2 remove
+only 6.42/7 = 0.917 ms/request of it (~43%). So after E1+E2 (and even adding
+E3's unbacked 2.0 ms), B8 lands near 12.5 → 10.5 ms, still 1.28× slower than
+vLLM's 8.17 ms. The plan's "shared-weight batching closes the B4/B8 gap"
+overstates the recoverable share: most of the marginal is per-request compute
+and attention, not the weight re-read.
