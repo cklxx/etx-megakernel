@@ -3,8 +3,8 @@
 Status: analysis scaffold plus pointers to the measured values. This file
 records which candidate mechanisms the Qwen B1/B2/B4/B8 record can decide,
 which it cannot, and the decision rule for each missing measurement. The clean
-run completed B1 and B2 only; kept B4/B8 and plain B8 remain [U]. Measured
-values are in `docs/QWEN-BATCH-BASELINE-2026-10-18.md`.
+run completed all four kept batches and both plain batches, and the vLLM control
+also ran. Measured values are in `docs/QWEN-BATCH-BASELINE-2026-10-18.md`.
 
 Labels: [M] measured and present in the record. [E] estimate. [U] absent from
 the record. A [U] cell has no number.
@@ -34,9 +34,9 @@ Two further mechanisms are partly present:
 - work replication [M] as the plan design and exact counts,
 - imported-kernel per-launch time [M] from `--check`, which is not decode time.
 
-The decode wall time and throughput are now [M] for kept B1/B2 and plain B4,
-and remain [U] for kept B4/B8 and plain B8. Section 6 lists the values and
-points to the results file.
+The decode wall time and throughput are now [M] for all four kept batches, both
+plain batches, and the vLLM control. Section 6 lists the values and points to
+the results file.
 
 ## 2. The records
 
@@ -46,8 +46,8 @@ Four records are in scope.
 |---|---|---|---|
 | `20261017T140801Z-988ffe` | Correctness of replicated requests, and per-launch GPU event times under `--check` | B2/B4/B8, `plain` recipe, one MI300X, ROCm 7.14.0, context 1024, 32 tokens | No decode wall time, no task trace, no counters |
 | Local compile reports (`docs/QWEN-BATCH-GLM53.md:21-26`) | Static task counts and compiler resource use | ROCm 7.2.4, standard B2/B4/B8 builds | No GPU execution |
-| Clean serial bench run (`/Users/ckl/.hermes/cache/scratch/bench-out9.log`) | Per-batch decode wall time and per-batch gates | B1/B2 complete, `kept` recipe, one runner with `flock` | B4/B8: the remote shell exited at B4, so no gate or timing line exists |
-| Plain B4 run (`/root/bench_plain_b4.json`) | Decode wall time and gates for the correctness-qualified recipe | B4, `plain` recipe, separate runner under the same lock | B8 was still running when this file was written |
+| Clean serial bench runs (`/Users/ckl/.hermes/cache/scratch/bench-out9.log`, `/root/bench_b*.json`) | Per-batch decode wall time and per-batch gates | B1/B2/B4/B8, `kept` recipe, one runner with `flock` | The first kept run exited at B4; a later clean serial run completed B4/B8 |
+| Plain runs (`/root/bench_plain_b4.json`, `/root/bench_plain_b8.json`) | Decode wall time and gates for the correctness-qualified recipe | B4/B8, `plain` recipe, separate runner under the same lock | — |
 
 The first record is committed evidence. The session directory itself is not in
 the repository. The summary is in
@@ -228,23 +228,24 @@ B8 step is much slower than twice the B4 step.
 The committed summary breaks out only `attn_reduce` at B8. The per-kernel table
 for the other batches is [U] in the repository.
 
-### 5.8 Decode wall time and throughput [M, partial]
+### 5.8 Decode wall time and throughput [M]
 
-The clean run completed kept B1 and B2; kept B4/B8 are absent. One later plain
-run completed B4. The host wall time of one decode step, with all requests
-advancing one token, is 4.087415 ms at kept B1, 5.701229 ms at kept B2 and
-11.929137 ms at plain B4. Throughput is 244.65, 350.80 and 335.31 tokens/s.
-The values and their gates are in `docs/QWEN-BATCH-BASELINE-2026-10-18.md`.
+All four kept batches and both plain batches completed. The host wall time of
+one decode step, with all requests advancing one token, is 4.087415 / 5.701229 /
+10.287806 / 18.903416 ms at kept B1/B2/B4/B8, and 11.929137 / 22.243487 ms at
+plain B4/B8. Throughput is 244.65 / 350.80 / 388.81 / 423.20 tokens/s (kept)
+and 335.31 / 359.66 tokens/s (plain). The vLLM control on the same box measures
+4.984999 / 5.821864 / 6.098564 / 8.174588 ms (200.6 / 343.5 / 655.9 / 978.6
+tokens/s). The values, gates and the ETX/vLLM comparison are in
+`docs/QWEN-BATCH-BASELINE-2026-10-18.md`.
 
-The same-recipe pair is B1 to B2: doubling the requests costs 1.394825x the
-step, so per-request cost falls 30.26%. The step does not grow linearly at B2.
-The cause is [U]; no trace separates overlap from a fixed part of the step.
-
-No B2-to-B4 scaling statement is made. The only B4 row is plain, a different
-build, and the kept B4 cell is [U].
-
-These runs are not a vLLM comparison. A comparison against vLLM needs paired
-runs on one box in one session. These rows are ETX baselines.
+The kept recipe now gives the full scaling curve. Doubling the requests costs
+1.3948x (B1→B2), 1.8045x (B2→B4) and 1.8375x (B4→B8) the step: per-request
+cost falls 30.26% at B2, then the marginal is a roughly constant ~2.2 ms per
+request. vLLM's step grows 1.1679x / 1.0475x / 1.3404x over the same doublings,
+so ETX leads at B1/B2 (1.22x / 1.02x throughput) and loses at B4/B8 (0.59x /
+0.43x). The mechanism — per-request graph replication versus shared-weight
+batching — and its arithmetic are in `docs/QWEN-BATCH-BASELINE-2026-10-18.md`.
 
 ## 6. Fill-in rule and measured values
 
@@ -264,18 +265,19 @@ The runner is `/Users/ckl/.hermes/cache/scratch/bench_runner.sh`. It holds
 |---|---:|---:|---:|---:|---:|---|---:|---:|
 | 1 | kept | 4.087415 | 244.65 | 4.087415 | 0.034415 | PASS 32/32 | 97 | [U] |
 | 2 | kept | 5.701229 | 350.80 | 2.8506145 | 0.073494 | PASS 64/64, coverage 2x1055, ties 0,0 | 194 | 120724 |
-| 4 | kept | [U] | [U] | [U] | [U] | [U] | 388 | 241448 |
-| 8 | kept | [U] | [U] | [U] | [U] | [U] | 776 | 482896 |
+| 4 | kept | 10.287806 | 388.81 | 2.5719515 | 0.169452 | PASS 128/128, coverage 4x1055, ties 0,0,1,1 | 388 | 241448 |
+| 8 | kept | 18.903416 | 423.20 | 2.362927 | 0.202527 | PASS 256/256, coverage 8x1055, ties 0,0,1,1,3,0,0,0 | 776 | 482896 |
 | 4 | plain | 11.929137 | 335.31 | 2.982284 | 0.308351 | PASS 128/128, coverage 4x1055, ties 0,0,1,1 | 388 | [U] |
-| 8 | plain | [U] | [U] | [U] | [U] | [U] | [U] | [U] |
+| 8 | plain | 22.243487 | 359.66 | 2.7804359 | 0.266128 | PASS 256/256, coverage 8x1055, ties 0,0,1,1,3,0,0,0 | 776 | [U] |
 
 The correctness column means the timed build in the same run as the timing.
 The earlier `20261017T140801Z-988ffe` pass is a different recipe and does not
 fill any kept cell. The plain B4 row fills only its own row.
 
 If a batch fails a gate, its cells stay [U] and the failure is recorded. A
-shorter run is not a number for a longer one. The kept B4/B8 cells are [U]
-because the run produced no result there, not because a gate failed.
+shorter run is not a number for a longer one. The kept B4/B8 cells were [U]
+because the first kept run's remote shell exited at B4; a later clean serial run
+completed them and they are now filled above.
 
 The plain-recipe task count is not in its result record [U].
 
@@ -314,15 +316,14 @@ The clean run's timing began after those processes were gone. The overlap was
 confined to the clean run's B1 build and check.
 
 The clean kept run completed B1 and B2 and stopped at B4: its remote shell
-exited before any B4 gate or timing line. The local wrapper was left waiting
-and was stopped by PID after the remote side was confirmed gone. A separate
-runner then took the same lock and completed plain B4; it is a different
-recipe and fills only the plain row.
+exited before any B4 gate or timing line. A later clean serial run then
+completed kept B4 and B8; a separate runner under the same lock completed
+plain B4 and B8. Each timed build certified itself in the run that timed it.
 
 No number in this file is compared across sessions. The timing values are from
-one clean serial run on one MI300X, plus the separate plain B4 run on the same
-GPU and commit. The static and per-launch values are from the records in
-section 2.
+clean serial runs on one MI300X, one runner at a time, plus the vLLM control on
+the same GPU and commit. The static and per-launch values are from the records
+in section 2.
 
 ## 9. Reproduce
 
@@ -347,7 +348,9 @@ The per-launch imported-against-original sums are in
 - The correctness record is the `plain` recipe. The clean kept run is `kept`;
   each completed row certified its own timed build.
 - The correctness record covers B2/B4/B8, not B1.
-- kept B4/B8 are absent from the clean run; plain B8 is in progress.
+- kept B4/B8 and plain B8 are now measured in a later clean serial run; the
+  vLLM control also ran. The values are in
+  `docs/QWEN-BATCH-BASELINE-2026-10-18.md`.
 - The per-launch timings are isolated launches, not decode time.
 - There is no task trace, no hardware counter and no profiler capture for the
   Qwen batch decode path.
