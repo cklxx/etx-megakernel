@@ -1,40 +1,9 @@
 # Known ENVIRONMENT failures of the full pytest suite on the shared dev box (no GPU, no ssh to localhost,
-# no clang++/rsync/TLC/`build`, Debian 13, g++ 14 installed). LOCAL RUNS ONLY.
+# no Java/TLC, no `build` module, no package index; Debian 13 with g++ 14, clang 19 and rsync installed). LOCAL RUNS ONLY.
 # Do NOT use this list in CI or to hide failures: CI must run the full suite and fail on every failure.
 # Checked: tools/check_known_failures.py REPORT (pytest --junitxml or -rA log); new failures exit 1, stale entries are listed.
-# Measured 2026-10-18 on a4bb267 and 193382f (same set). Format: <test id> <reason>
+# Measured 2026-10-18 on a4bb267 (after clang + rsync: 4 of the first 35 still fail). Format: <test id> <reason>
 tests/test_cpu_check.py::test_formal_missing_dependency_fails no java on the box: the check stops at "java unavailable" before the TLC_JAR message
-tests/test_operator_spec.py::test_host_accepts_captured_configuration[wvsplitk_y2] host clang++ not installed (tests call clang++ by name; g++ is not enough)
-tests/test_operator_spec.py::test_host_accepts_captured_configuration[fused_moe_up] host clang++ not installed (tests call clang++ by name; g++ is not enough)
-tests/test_operator_spec.py::test_host_accepts_captured_configuration[fused_moe_down] host clang++ not installed (tests call clang++ by name; g++ is not enough)
-tests/test_operator_spec.py::test_host_accepts_captured_configuration[fused_moe_up_e8] host clang++ not installed (tests call clang++ by name; g++ is not enough)
-tests/test_operator_spec.py::test_host_accepts_captured_configuration[fused_moe_down_e8] host clang++ not installed (tests call clang++ by name; g++ is not enough)
-tests/test_operator_spec.py::test_old_loader_accepts_but_new_loader_rejects[fused_moe_up_e8-896-BLOCK_SIZE_N/MOE_BN] host clang++ not installed (tests call clang++ by name; g++ is not enough)
-tests/test_operator_spec.py::test_old_loader_accepts_but_new_loader_rejects[wvsplitk_y2-256-CuCount] host clang++ not installed (tests call clang++ by name; g++ is not enough)
-tests/test_operator_spec.py::test_loader_checks_model_shape[fused_moe_up-shape0-192] host clang++ not installed (tests call clang++ by name; g++ is not enough)
-tests/test_operator_spec.py::test_loader_checks_model_shape[fused_moe_up_e8-shape1-3584] host clang++ not installed (tests call clang++ by name; g++ is not enough)
-tests/test_operator_spec.py::test_legal_block_range[rms_norm_2d-block0-changes0] host clang++ not installed (tests call clang++ by name; g++ is not enough)
-tests/test_operator_spec.py::test_legal_block_range[rms_norm_2d-block1-changes1] host clang++ not installed (tests call clang++ by name; g++ is not enough)
-tests/test_operator_spec.py::test_legal_block_range[rms_norm_3d-block2-changes2] host clang++ not installed (tests call clang++ by name; g++ is not enough)
-tests/test_operator_spec.py::test_legal_block_range[fused_add_rms_norm-block3-changes3] host clang++ not installed (tests call clang++ by name; g++ is not enough)
-tests/test_operator_spec.py::test_legal_block_range[silu_and_mul-block4-changes4] host clang++ not installed (tests call clang++ by name; g++ is not enough)
-tests/test_operator_spec.py::test_legal_block_range[rope_neox-block5-changes5] host clang++ not installed (tests call clang++ by name; g++ is not enough)
-tests/test_operator_spec.py::test_legal_block_range[reshape_and_cache-block6-changes6] host clang++ not installed (tests call clang++ by name; g++ is not enough)
-tests/test_operator_spec.py::test_legal_block_range[moe_sum_k8-block7-changes7] host clang++ not installed (tests call clang++ by name; g++ is not enough)
-tests/test_operator_spec.py::test_illegal_block_fails_in_python_and_host[rms_norm_2d-block0] host clang++ not installed (tests call clang++ by name; g++ is not enough)
-tests/test_operator_spec.py::test_illegal_block_fails_in_python_and_host[rms_norm_2d-block1] host clang++ not installed (tests call clang++ by name; g++ is not enough)
-tests/test_operator_spec.py::test_illegal_block_fails_in_python_and_host[silu_and_mul-block2] host clang++ not installed (tests call clang++ by name; g++ is not enough)
-tests/test_operator_spec.py::test_illegal_block_fails_in_python_and_host[reshape_and_cache-block3] host clang++ not installed (tests call clang++ by name; g++ is not enough)
-tests/test_operator_spec.py::test_illegal_block_fails_in_python_and_host[wvsplitk_y2-block4] host clang++ not installed (tests call clang++ by name; g++ is not enough)
-tests/test_operator_spec.py::test_illegal_block_fails_in_python_and_host[attn_reduce-block5] host clang++ not installed (tests call clang++ by name; g++ is not enough)
-tests/test_operator_spec.py::test_block_rule_change_reaches_python_and_host host clang++ not installed (tests call clang++ by name; g++ is not enough)
-tests/test_operator_spec.py::test_reduce_partition_limit[16384-True] host clang++ not installed (tests call clang++ by name; g++ is not enough)
-tests/test_operator_spec.py::test_reduce_partition_limit[16385-False] host clang++ not installed (tests call clang++ by name; g++ is not enough)
-tests/test_operator_spec.py::test_reduce_partition_limit[17000-False] host clang++ not installed (tests call clang++ by name; g++ is not enough)
 tests/test_packaging.py::test_wheel_contains_importer_shim_headers python package "build" not installed in the venv (no wheel build)
 tests/test_producer_readiness.py::test_fresh_archive_interpreter_preflight_and_failure_report fresh independent venv has no yaml/numpy (no package index access)
-tests/test_producer_readiness.py::test_documented_push_stage_attach_start_with_local_transport local transport session never seals (no ssh to localhost)
-tests/test_qwen_staging.py::test_stage_pack_on_a_packed_model_writes_the_pinned_golden_and_the_config run from a git worktree without .venv/bin/python (tree-relative venv)
-tests/test_session_sh.py::test_fetch_copies_one_sealed_record_into_its_own_directory no rsync / ssh localhost (session.sh fetch)
-tests/test_session_sh.py::test_incomplete_unsealed_and_absent_records_are_never_results no rsync / ssh localhost (session.sh fetch)
-tests/test_session_sh.py::test_failed_or_symlinked_refetch_never_yields_a_verifiable_old_capture no rsync / ssh localhost (session.sh fetch)
+tests/test_producer_readiness.py::test_documented_push_stage_attach_start_with_local_transport UNEXPLAINED, not shown to be environment: the local-transport runner writes report.log VERDICT NOT-COMPLETE but never writes SEAL within 30 s (ssh is a local fixture; investigate)
