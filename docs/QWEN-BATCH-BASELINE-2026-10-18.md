@@ -146,9 +146,10 @@ replication baseline's gates (byte-identical imports at positions 0 and 1040,
   with N activation columns when `ETX_VL_BATCH=1`) and `model.py:685` (request 0
   owns the shared group, the others skip), with the runtime in
   `examples/vllm_llm/host.hip:192-198,284-315` (`nb` + per-column strides). The
-  mechanism is already written; it is switched off by `bench.py:58`
-  (`ETX_VL_BATCH='0'`). The experiment is a recipe flip plus correctness gates,
-  not new kernels.
+  mechanism is already written. `bench.py` now exposes it as `--recipe batched`
+  (`bench.py:37,64,68-72`: `ETX_VL_BATCH='1'`, `ETX_VL_NB=batch`,
+  `ETX_VL_ROUTER_NARROW='0'`; batch 1 is refused). The experiment is a recipe
+  selection plus correctness gates, not new kernels.
 - **Expected delta [E]:** dense read falls from Nx to 1x, saving
   (N−1) x 2.459 GB / 3.56 TB/s → **B4 −2.07 ms** (10.29 → ~8.2),
   **B8 −4.84 ms** (18.90 → ~14.1). Tokens/s at B8 ~565 vs vLLM 979: closes 4.84
@@ -156,6 +157,36 @@ replication baseline's gates (byte-identical imports at positions 0 and 1040,
 - **Falsifies:** a rocprof capture with `FETCH_SIZE` shows the dense bytes per
   step did NOT fall ~Nx (the weights were already L2-resident, so the cost is
   compute, not bandwidth), OR the paired host step improves <2% in any pair.
+
+**Local status, 2026-10-18 (offline, no GPU):**
+
+| B | Replicated dense (GB) | Batched dense (GB) | Delta (GB) | Floor at 3.56 TB/s |
+|---|---:|---:|---:|---:|
+| 4 | 9.8377 | 2.4594 | 7.3783 | 2.073 ms |
+| 8 | 19.6755 | 2.4594 | 17.2160 | 4.836 ms |
+
+The replicated plan emits each dense role once per request (580 dense
+instances at B4, 1160 at B8); the batched plan emits each once for all requests
+(145 instances; every dense role is `nb=4` at B4 and `nb=8` at B8). Non-dense
+roles stay replicated at `nb=1`. Reproduce with
+`python -m examples.vllm_llm.dense_bytes --replicated vl_plan_bN_rep.txt --batched vl_plan_bN_bat.txt`.
+
+The focused batch/byte tests pass (61) and the full suite passes (2368 passed,
+24 skipped, 574.88 s).
+
+Compile gate: `desktop` (16-core x86_64, no GPU), image
+`docker.m.daocloud.io/rocm/dev-ubuntu-22.04:6.4.1`, `hipcc
+--offload-arch=gfx942`. The B8 batched plan's `megakernel_d0.hip` device
+codegen exits 0 (3,097,680-byte assembly); `host.hip` device codegen and host
+object compile both exit 0 (690,964-byte object). No link, no GPU, no timing;
+the ROCm version differs from the MI300X box, so this is a compile gate only.
+
+The E1 GPU wall-clock delta remains [U]. A positive result requires the batched
+B4/B8 run to pass the kept gates — byte-identical imports at positions 0 and
+1040, per-request coverage, 32/32 tokens per request — and to record
+`ETX_VL_BATCH=1` in the build identity; the new risk is a wrong column or
+stride, which `host.hip:198` refuses when the plan's `nb` exceeds `ETX_VL_NB`.
+E2 is a separate change and is not started here.
 
 ### E2 — Column-batch the MoE to the union of the batch's routed experts
 
