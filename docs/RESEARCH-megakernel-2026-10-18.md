@@ -1,6 +1,6 @@
 # Research: megakernel compilation — Event Tensor vs MPK vs Ada-MK
 
-Status: research, no measurements · Date: 2026-10-18 · Sources: arXiv 2604.13327 v2 (Event Tensor, full text + appendices), arXiv 2512.22219 v2 (MPK, full text), mirage-project/mirage `mpk` branch (commit ca58a02, 2026-10-16), arXiv 2605.11581 v1 (Ada-MK, abstract + §1–§4.2). **All performance numbers below are author self-measurements. No independent reproduction exists.** Each number carries its source section/table.
+Status: research, no measurements · Date: 2026-10-18 · Sources: arXiv 2604.13327 v2 (Event Tensor, full text + appendices), arXiv 2512.22219 v2 (MPK, full text; **v1 published 2025-12-22 — a 2025 paper**, correction 2026-10-18), mirage-project/mirage `mpk` branch (commit ca58a02, 2026-10-16), arXiv 2605.11581 v1 (Ada-MK, abstract + §1–§4.2). **All performance numbers below are author self-measurements. No independent reproduction exists.** Each number carries its source section/table.
 
 ## 0. One-line positioning
 
@@ -103,7 +103,7 @@ Baidu, arXiv 2605.11581 (2026-05-12). Opposite stance to the other two: **"under
 ## 8. Sources
 
 - Event Tensor: arXiv 2604.13327 v2, full text read (incl. appendices A–E); experiments §4 (8×B200), §4.1–§4.5, Appendix D. arXiv lists "accepted in MLSys 2026" (verified via arXiv API).
-- MPK: arXiv 2512.22219 v2, full text read (18 pages); experiments §6.1–§6.7, Appendix A; code mirage-project/mirage `mpk` branch (commit ca58a02, 2026-10-16): README, demo, CI, persistent_kernel.cuh read. Venue not annotated on arXiv (an "OSDI reviewed" claim could not be verified and was dropped).
+- MPK: arXiv 2512.22219 v2, full text read (18 pages); **v1 published 2025-12-22 — this is a 2025 paper, not 2026** (correction 2026-10-18). Experiments §6.1–§6.7, Appendix A; code mirage-project/mirage `mpk` branch (commit ca58a02, 2026-10-16): README, demo, CI, persistent_kernel.cuh read. Venue: not annotated on arXiv; second-hand OSDI'26 acceptance confirmation via a Mixture-of-Kittens citation ("Proc. 20th USENIX OSDI, pp. 1909–1926") — not yet verified against the OSDI program itself.
 - Ada-MK: arXiv 2605.11581 v1, abstract + §1–§4.2 read; §5–§6 not read in full (numbers per abstract/§1, marked partially verified).
 
 **Honesty note**: all three papers are author self-measurements with zero independent reproduction. All three end-to-end multiples carry some "peak packaging" (ET's weak baseline, MPK's small-model peak and undisclosed baseline versions, Ada-MK's claimed production deployment). The hardest numbers in each are in the ablation splits. Any multiple quoted without hardware + baseline + batch is marketing repetition.
