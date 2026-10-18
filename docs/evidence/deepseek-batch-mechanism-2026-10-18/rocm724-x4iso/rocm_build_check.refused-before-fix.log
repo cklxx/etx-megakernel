@@ -1,0 +1,4 @@
+== x4iso: offline ROCm 7.2.4 compile
+COH-CHECK REFUSED: the fleet tiles are patched with l1_loads but the plan keeps every acquire (ETX_DSV2_COH=l1 unset): not that arm
+FAILED: full logs in /tmp/x4iso-rocmcheck/x4iso
+rc=1

@@ -102,3 +102,23 @@ def test_build_refuses_an_l1_plan_without_l1_tiles(tmp_path, pinned_src, monkeyp
     shutil.copytree(pinned_src, d2src)
     pf.apply(d2src, "coherent_loads")
     assert coh_check.main([str(mk), str(d2src)]) == 2          # D2 tiles under a D2b plan: wrong arm, refused
+
+
+def test_compacted_large_plan_is_checked_from_plan_json(tmp_path, pinned_src, monkeypatch):
+    """x4 / x8 (>= 512 task types) compact their dispatch switches and lose the per-case coherence comments
+    (_compact_dispatch, 85900b2): the check reads plan.json's per-type coherence instead and still refuses mismatches."""
+    from etx.codegen import emit_kernel
+    from etx.codegen.kernel import emit_plan_json
+    from etx.passes import PassOptions, compile_graph
+    from examples.dsv2lite import graph
+    for k, v in dict(ETX_DSV2_COH="l1", ETX_DSV2_REQUESTS="4", ETX_DSV2_COUPLE="none", ETX_DSV2_KVA="shared").items():
+        monkeypatch.setenv(k, v)
+    plan = compile_graph(graph.build(), "gfx942", {}, {}, PassOptions(relay="on"))
+    assert len(plan.graph.grids) >= 512
+    mk = tmp_path / "megakernel_d0.hip"
+    mk.write_text(emit_kernel(plan))
+    assert "coherent-L1 tile" not in mk.read_text()               # the old evidence is gone at this size
+    (tmp_path / "plan.json").write_text(emit_plan_json(plan))
+    l1src = _copy(tmp_path, pinned_src, "l1_loads")
+    assert coh_check.main([str(mk), str(l1src)]) == 0
+    assert coh_check.main([str(mk), str(pinned_src)]) == 2        # l1 plan, unpatched tiles: still refused
