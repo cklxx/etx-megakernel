@@ -56,8 +56,9 @@ B2→B4 step growth (+4451 us) decomposes as: body +3625 us (81%), dependency ga
 replicates the whole graph with no cross-request weight amortization. `qabs`
 appears only at B≥2 and adds a 172 us serial dependency at B4.
 
-B8: no completed trace [U] — the session that was to produce it was running
-when the machines were destroyed.
+B8: no completed trace [U]. The batch session on 2026-10-18 measured B1 and B2
+(313 and 448 tok/s against vLLM 245 and 423, `breport.log`) and reported B4 and
+B8 as NOT COMPLETE; the machine then went read-only twice and was destroyed.
 
 Not in the record [U]: HBM/L2 traffic, hardware occupancy counters, dispatch
 counts, and a task-level ordered dependency chain.
