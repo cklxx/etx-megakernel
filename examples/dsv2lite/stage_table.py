@@ -194,7 +194,7 @@ def _write_atomic(path: Path, text: str) -> None:
     """Write a temporary file in the same directory, then os.replace it: a reader sees the old or the new file, never a part."""
     fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp")
     try:
-        with os.fdopen(fd, "w") as f:
+        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as f:
             f.write(text)
         os.chmod(tmp, 0o644)              # mkstemp makes 0600; keep the usual file mode
         os.replace(tmp, path)
