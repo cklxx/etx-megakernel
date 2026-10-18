@@ -58,8 +58,14 @@ def test_recipes():
         assert env['ETX_VL_CHECK'] == '1' and flags == b.BASE_FLAGS
         env, flags = b.recipe(batch, 'plain')
         assert env == bc.recipe(batch) and flags == b.REPORT_FLAGS
+        env, flags = b.recipe(batch, 'batched')
+        assert env['ETX_VL_REQUESTS'] == str(batch) and env['ETX_VL_BATCH'] == '1' and env['ETX_VL_NB'] == str(batch)
+        assert env['ETX_VL_ROUTER_NARROW'] == '0'                          # model.py refuses a batched folded router
+        assert flags == b.BASE_FLAGS
     with pytest.raises(Refusal):
         b.recipe(1, 'plain')
+    with pytest.raises(Refusal):
+        b.recipe(1, 'batched')
     with pytest.raises(Refusal):
         b.recipe(3)
 
