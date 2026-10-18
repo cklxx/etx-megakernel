@@ -328,9 +328,12 @@ with open({str(spool)!r}, 'a') as f:
         assert (record/'SEAL').exists()
         runner.wait(30)  # the runner exits after sealing (its exit code reflects the failed preflight)
     finally:
-        # Never leave a runner: it leads its own session, so kill the whole group if it is still alive.
-        if runner.poll() is None:
+        # Never leave a runner or anything it started: it leads its own session, so always kill the whole group
+        # (the group may already be gone).
+        try:
             os.killpg(runner.pid, signal.SIGKILL)
+        except (ProcessLookupError, PermissionError):
+            pass
         runner.wait()
         runner_out.close()
     import shutil
