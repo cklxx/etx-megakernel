@@ -86,7 +86,7 @@ def write_build(build, model):
                     hipcc_flags=os.environ.get('ETX_HIPCC_FLAGS', ''),
                     compiler=(build / 'compiler_version.txt').read_text().strip(),
                     overrides={k: v for k, v in os.environ.items()
-                               if k.startswith(('ETX_VL_', 'ETX_DSL_'))
+                               if k.startswith(('ETX_VL_', 'ETX_DSL_', 'ETX_TOPK_'))
                                or k in ('ETX_PREFETCH_ISOLATE_POLLER', 'ETX_DEV_RESET')},
                     files=fingerprint(build, model))
     (build / 'build_identity.json').write_text(json.dumps(identity, indent=2, sort_keys=True) + '\n')
