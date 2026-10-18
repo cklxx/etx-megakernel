@@ -8,7 +8,7 @@
 | 实验 | 为什么值得做 | 上机了吗 | 结果 |
 |---|---|---|---|
 | B2/B4/B8 正确性，真实权重真实卡 | 基线之前必须证明批量路径算得对，否则 tok/s 无意义 | 是 — 记录 `20261017T140801Z-988ffe`，单卡 MI300X | [M] **通过**。194/388/776 个导入实例，每请求 97 个，生成 128/256/512 token 全对；位置 0 和 1040 零差异；fused 与 unfused 都过 |
-| B1/B2/B4/B8 tokens/s，ETX 对 vLLM | 这就是基线：四档吞吐与每 token 毫秒，同机串行 | 否 — `bench.py --batch N` 已实现（每档独立构建与证书；本地 22 项测试通过；kept B2 配方 ROCm 7.2.4 本地编译通过：128 VGPR、9 个 VGPR spill、40 B/lane scratch、occupancy 4），未上机 | [U] **无数字**。B2/B4/B8 的 `performance` 全为 `unmeasured` |
+| B1/B2/B4/B8 tokens/s，ETX 对 vLLM | 这就是基线：四档吞吐与每 token 毫秒，同机串行 | 进行中 — `bench.py --batch N` 干净串行运行（`flock`，单 runner）；B1/B2 已过全部门，B4/B8 未完成。vLLM 对照未跑。每档独立构建与证书；本地 22 项测试通过；kept B2 配方 ROCm 7.2.4 本地编译通过：128 VGPR、9 个 VGPR spill、40 B/lane scratch、occupancy 4 | [U] **无数字**。B1/B2 的 `TIMING` 已在 `bench-out9.log`，等干净运行完成后再写入分析；B4/B8 未完成 |
 | 同轮顺带：导入版 vs 原始版单次 launch 汇总 | 看批量放大后哪些内核吃亏 | 是 — 同一记录（`--check` 下逐个 launch 的 GPU event 计时之和） | [M] 位置 0：原版→导入版 B2 2576.2→2307.0 µs（−10.5%），B4 4053.6→4771.1（+17.7%），B8 7092.9→9576.6（+35.0%）；位置 1040：−17.0% / +4.8% / +26.7%。B8 位置 0 的 +2483.7 µs 中 `attn_reduce` 占 +2473.3（2455.9→4929.2 µs，+101%），单次 launch 中位数 6.2→12.7 µs（位置 1040：6.2→13.1）。不是 tok/s |
 | 批量机制清单（occupancy / 依赖链 / 启动数 / HBM·L2 流量 / 串行化 / 工作复制） | 吞吐数字之外必须说明 B1→B8 为什么这样缩放，以及现有记录能证明什么 | 部分 — 离线读 2026-10-17 记录、本地编译报告；干净串行 bench 运行中 | [M]/[U] **已有**：工作复制（每位置实例 194/388/776，任务 120724/241448/482896，均精确 2×）、静态 launch 数（每请求 97 个导入实例）、编译器资源报告（128 VGPR、32 B/lane、7 spill；kept B2 为 40 B/lane、9 spill、occupancy 4）、导入版 vs 原版单次 launch 计时。**记录中没有**：运行时 occupancy 计数、任务级依赖链、decode step 的 launch/dispatch 计数与间隔、HBM/L2 流量、串行化间隙、B1/B2/B4/B8 的 step 与 tok/s（待干净运行）。见 `docs/QWEN-BATCH-MECHANISM-SCAFFOLD-2026-10-18.md` |
 
