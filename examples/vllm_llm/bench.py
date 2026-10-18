@@ -1,8 +1,11 @@
-"""Standalone kept ETX benchmark: python3 -m examples.vllm_llm.bench [--batch N] [--recipe kept|plain] [model-dir].
+"""Standalone kept ETX benchmark: python3 -m examples.vllm_llm.bench [--batch N] [--recipe kept|plain|batched] [model-dir].
 
---batch N (1, 2, 4 or 8) builds a plan that serves N concurrent requests by replication (ETX_VL_REQUESTS=N, no column
-batching). Request r reads golden_c1024[_r<97 r>].txt and its prefill reference from the model directory. Every
-decode step advances all N requests by one token, so tokens_per_s = N * 1000 / median_decode_wall_ms.
+--batch N (1, 2, 4 or 8) builds a plan that serves N concurrent requests. Request r reads
+golden_c1024[_r<97 r>].txt and its prefill reference from the model directory. Every decode step advances all N
+requests by one token, so tokens_per_s = N * 1000 / median_decode_wall_ms.
+--recipe kept (N > 1) serves them by replication (ETX_VL_REQUESTS=N, no column batching); --recipe batched (N > 1)
+is kept plus column-batched dense GEMVs (ETX_VL_BATCH=1): the dense weights (qkv, o_proj, router, lm_head) are read
+once for all requests, the attention block and the MoE stay replicated.
 --recipe plain (N > 1 only) is the recipe batch_correctness.py qualified on hardware, plus the host-only timing report.
 Each batch gets its own build and its own certificate; no gate or number is shared between batches.
 """
@@ -31,7 +34,7 @@ DEFAULT_MODEL = Path.home() / 'llm/qwen3-30b-a3b'
 
 
 BATCHES = (1, 2, 4, 8)
-RECIPES = ('kept', 'plain')
+RECIPES = ('kept', 'plain', 'batched')
 CONTEXT, GEN = 1024, 32
 # Host-only: per-step HOUR-WALL lines and the 5 s step watchdog; no device code changes.
 REPORT_FLAGS = '-DETX_INBODY_REPORT'
@@ -42,7 +45,13 @@ RUN_TIMEOUT = {1: 180, 2: 600, 4: 600, 8: 900}
 
 
 def recipe(batch, name='kept'):
-    """Build overrides for one batch. B1 kept is the unchanged kept build."""
+    """Build overrides for one batch. B1 kept is the unchanged kept build.
+
+    kept: replication (every request its own launches, no column batching).
+    batched: kept plus column-batched dense GEMVs (ETX_VL_BATCH=1); the dense
+      weights qkv, o_proj, router and lm_head are read once for all requests,
+      the attention block and the MoE stay replicated.
+    """
     if batch not in BATCHES:
         raise Refusal(f'batch must be one of {BATCHES}')
     if name not in RECIPES:
@@ -52,10 +61,18 @@ def recipe(batch, name='kept'):
             raise Refusal('the plain recipe is the multi-request correctness recipe; batch 1 uses kept')
         from examples.vllm_llm.batch_correctness import recipe as qualified
         return dict(qualified(batch)), REPORT_FLAGS
+    if name == 'batched' and batch == 1:
+        raise Refusal('the batched recipe needs batch > 1 (no columns to share at batch 1)')
     env = dict(KEPT_ENV)
     if batch > 1:
-        # Replication: every request its own launches; no column batching, no chaining.
-        env.update(ETX_VL_REQUESTS=str(batch), ETX_VL_BATCH='0', ETX_VL_NB='1', ETX_VL_CHAIN='0')
+        if name == 'batched':
+            # Column-batched dense GEMVs: the dense weights are read once for all requests.
+            # The router narrowing is a folded NB=1 router, so it is incompatible with batching (model.py).
+            env.update(ETX_VL_REQUESTS=str(batch), ETX_VL_BATCH='1', ETX_VL_NB=str(batch), ETX_VL_CHAIN='0',
+                       ETX_VL_ROUTER_NARROW='0')
+        else:
+            # Replication: every request its own launches; no column batching, no chaining.
+            env.update(ETX_VL_REQUESTS=str(batch), ETX_VL_BATCH='0', ETX_VL_NB='1', ETX_VL_CHAIN='0')
     return env, BASE_FLAGS
 
 
@@ -175,7 +192,8 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('model', nargs='?', type=Path, default=DEFAULT_MODEL)
     ap.add_argument('--batch', type=int, choices=BATCHES, default=1, help='concurrent requests (replicated)')
-    ap.add_argument('--recipe', choices=RECIPES, default='kept')
+    ap.add_argument('--recipe', choices=RECIPES, default='kept',
+                    help='kept: replication; batched: column-batched dense GEMVs (batch > 1); plain: correctness recipe')
     ap.add_argument('--json', type=Path, default=None, help='also write the result record here')
     args = ap.parse_args(argv)
     batch = args.batch
