@@ -1,17 +1,24 @@
 {
   "arm": "d4",
-  "d4": {
-    "isa_sha256": "9d1543e83d59f88add104a28c2e1f60aec97eb1e0473e3f20584c54ea6be6f4d",
-    "plan": {
-      "d4_bodies": [
-        "fleet_d4_routed_down",
-        "fleet_d4_routed_gate_up",
-        "fleet_d4_shared_down",
-        "fleet_d4_shared_gate_up"
-      ]
+  "arm_build": {
+    "compiler": {
+      "clang_commit": "f58b06dce1f9c15707c5f808fd002e18c2accf7e",
+      "clang_version": "AMD clang version 22.0.0git (https://github.com/RadeonOpenCompute/llvm-project roc-7.2.4 26084 f58b06dce1f9c15707c5f808fd002e18c2accf7e)",
+      "compiler_path": "/workspace/rocm724deb/stage/opt/rocm-7.2.4/lib/llvm/bin/clang++",
+      "mode": "local",
+      "rocm_root": "/workspace/rocm724deb/stage/opt/rocm-7.2.4",
+      "toolchain": "7.2.4"
     },
+    "fleet_src": {
+      "commit": "3fb67a6",
+      "path": "/home/box/code/etx-cache/fleet-3fb67a6",
+      "src_sha256": "28f5cbb4f39524df318883522341c48ca4162c18b71a3a6223c52eabb40ce4b3"
+    },
+    "isa_sha256": "fc67219601226cce9b02793a8fc38e3dcfa5f74899b9a993779b54a97a648f83",
+    "kernel_sha256": "3b76dbc932e6d23f829967949605e10353f4dc519c6e0d4482d86adddae3e560",
+    "plan_sha256": "3e648b7c7abd036d3f31cf9d14fdab01cad518ca1c2dae65a5cb575b5c1f1382",
     "resources": {
-      "agpr": 54,
+      "agpr": 65,
       "lds": 26672,
       "occupancy": 1,
       "scratch": 0,
@@ -19,17 +26,47 @@
       "vgpr": 256
     },
     "static": {
-      "asm_lines": 129429,
-      "inv_sc0": 8,
+      "asm_lines": 130133,
+      "inv_sc0": 10,
       "inv_sc1": 357,
-      "nt_weight_loads": 348,
+      "nt_weight_loads": 354,
       "sys_loads": 0,
-      "vmcnt0_waits": 3321,
+      "vmcnt0_waits": 3352,
       "wbl2": 172
     }
   },
+  "compiler": {
+    "clang_commit": "f58b06dce1f9c15707c5f808fd002e18c2accf7e",
+    "clang_version": "AMD clang version 22.0.0git (https://github.com/RadeonOpenCompute/llvm-project roc-7.2.4 26084 f58b06dce1f9c15707c5f808fd002e18c2accf7e)",
+    "compiler_path": "/workspace/rocm724deb/stage/opt/rocm-7.2.4/lib/llvm/bin/clang++",
+    "mode": "local",
+    "rocm_root": "/workspace/rocm724deb/stage/opt/rocm-7.2.4",
+    "toolchain": "7.2.4"
+  },
+  "cpu_gates": {
+    "files": [
+      "tests/test_dsv2_stamps.py",
+      "tests/test_dsv2_d4.py"
+    ],
+    "summary": "65 passed in 1.16s"
+  },
   "default": {
+    "compiler": {
+      "clang_commit": "f58b06dce1f9c15707c5f808fd002e18c2accf7e",
+      "clang_version": "AMD clang version 22.0.0git (https://github.com/RadeonOpenCompute/llvm-project roc-7.2.4 26084 f58b06dce1f9c15707c5f808fd002e18c2accf7e)",
+      "compiler_path": "/workspace/rocm724deb/stage/opt/rocm-7.2.4/lib/llvm/bin/clang++",
+      "mode": "local",
+      "rocm_root": "/workspace/rocm724deb/stage/opt/rocm-7.2.4",
+      "toolchain": "7.2.4"
+    },
+    "fleet_src": {
+      "commit": "3fb67a6",
+      "path": "/home/box/code/etx-cache/fleet-3fb67a6",
+      "src_sha256": "28f5cbb4f39524df318883522341c48ca4162c18b71a3a6223c52eabb40ce4b3"
+    },
     "isa_sha256": "a105cb16a414ee0f9f697c9de13205419d09674f5c69f6ee804cf36942377724",
+    "kernel_sha256": "751293fad5f5c98ec6dbf9eeca3c73319b1d4ded4b6ca73996a65757c0ffae5d",
+    "plan_sha256": "09011c207b1e92febf29a2c2efc2d944ef9ad7ac8a0803633579c8444d821f8a",
     "resources": {
       "agpr": 48,
       "lds": 26668,
@@ -48,6 +85,92 @@
       "wbl2": 118
     }
   },
-  "etx_commit": "65350473c0abb0244bced1ed8fa25f7d3ac816ab",
-  "how": "ETX_DSV2_D4=1 ETX_CFLAGS=-DETX_DSV2_D4=1 rocm_build_check.sh <fleet export> default (ROCm 7.2.4)"
+  "default_isa_matches_baseline": true,
+  "delta_vs_default": {
+    "agpr": 17,
+    "lds": 4,
+    "occupancy": 0,
+    "scratch": 0,
+    "sgpr": 0,
+    "vgpr": 0
+  },
+  "etx_commit": "76e1a90e491bc511fa2ea0bfdb03acb1e7ef883e",
+  "etx_dirty": false,
+  "flags": [
+    "-DETX_DSV2_D4=1"
+  ],
+  "fleet_commit": "3fb67a6",
+  "fleet_src": {
+    "commit": "3fb67a6",
+    "path": "/home/box/code/etx-cache/fleet-3fb67a6",
+    "src_sha256": "28f5cbb4f39524df318883522341c48ca4162c18b71a3a6223c52eabb40ce4b3"
+  },
+  "fleet_src_sha256": "28f5cbb4f39524df318883522341c48ca4162c18b71a3a6223c52eabb40ce4b3",
+  "plan_env": {
+    "ETX_DSV2_D4": "1"
+  },
+  "prior_record": {
+    "arm": "d4",
+    "d4": {
+      "isa_sha256": "9d1543e83d59f88add104a28c2e1f60aec97eb1e0473e3f20584c54ea6be6f4d",
+      "plan": {
+        "d4_bodies": [
+          "fleet_d4_routed_down",
+          "fleet_d4_routed_gate_up",
+          "fleet_d4_shared_down",
+          "fleet_d4_shared_gate_up"
+        ]
+      },
+      "resources": {
+        "agpr": 54,
+        "lds": 26672,
+        "occupancy": 1,
+        "scratch": 0,
+        "sgpr": 108,
+        "vgpr": 256
+      },
+      "static": {
+        "asm_lines": 129429,
+        "inv_sc0": 8,
+        "inv_sc1": 357,
+        "nt_weight_loads": 348,
+        "sys_loads": 0,
+        "vmcnt0_waits": 3321,
+        "wbl2": 172
+      }
+    },
+    "default": {
+      "isa_sha256": "a105cb16a414ee0f9f697c9de13205419d09674f5c69f6ee804cf36942377724",
+      "resources": {
+        "agpr": 48,
+        "lds": 26668,
+        "occupancy": 1,
+        "scratch": 0,
+        "sgpr": 108,
+        "vgpr": 256
+      },
+      "static": {
+        "asm_lines": 107990,
+        "inv_sc0": 6,
+        "inv_sc1": 279,
+        "nt_weight_loads": 252,
+        "sys_loads": 0,
+        "vmcnt0_waits": 2750,
+        "wbl2": 118
+      }
+    },
+    "etx_commit": "65350473c0abb0244bced1ed8fa25f7d3ac816ab",
+    "how": "ETX_DSV2_D4=1 ETX_CFLAGS=-DETX_DSV2_D4=1 rocm_build_check.sh <fleet export> default (ROCm 7.2.4)"
+  },
+  "registered_arm": "d4",
+  "static_delta": {
+    "asm_lines": 22143,
+    "inv_sc0": 4,
+    "inv_sc1": 78,
+    "nt_weight_loads": 102,
+    "sys_loads": 0,
+    "vmcnt0_waits": 602,
+    "wbl2": 54
+  },
+  "verdict": "PASS"
 }

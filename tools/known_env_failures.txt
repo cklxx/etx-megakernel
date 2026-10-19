@@ -1,0 +1,8 @@
+# Known ENVIRONMENT failures of the full pytest suite on the shared dev box (no GPU, no ssh to localhost,
+# no Java/TLC, no `build` module, no package index; Debian 13 with g++ 14, clang 19 and rsync installed). LOCAL RUNS ONLY.
+# Do NOT use this list in CI or to hide failures: CI must run the full suite and fail on every failure.
+# Checked: tools/check_known_failures.py REPORT (pytest --junitxml or -rA log); new failures exit 1, stale entries are listed.
+# Measured 2026-10-18 on a4bb267 (after clang + rsync: 3 of the first 35 still fail; the local-transport test was a test bug, fixed). Format: <test id> <reason>
+tests/test_cpu_check.py::test_formal_missing_dependency_fails no java on the box: the check stops at "java unavailable" before the TLC_JAR message
+tests/test_packaging.py::test_wheel_contains_importer_shim_headers python package "build" not installed in the venv (no wheel build)
+tests/test_producer_readiness.py::test_fresh_archive_interpreter_preflight_and_failure_report fresh independent venv has no yaml/numpy (no package index access)

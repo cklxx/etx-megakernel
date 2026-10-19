@@ -1,0 +1,140 @@
+"""verify_lever.py --compiler (docker | 7.2.4 | 7.14) and tools/rocm_build_local.sh: CPU only, no compiler needed."""
+from __future__ import annotations
+
+import json
+import subprocess
+from pathlib import Path
+
+import pytest
+
+from examples.dsv2lite import verify_lever as vl
+
+ROOT = Path(__file__).resolve().parents[1]
+SCRIPT = ROOT / "tools/rocm_build_local.sh"
+FLEET = Path("/nonexistent/fleet")
+
+
+def test_build_cmd_docker_is_unchanged():
+    assert vl.build_cmd("topk_rank", Path("/o"), "docker", fleet=FLEET) == [
+        "bash", "examples/dsv2lite/rocm_build_check.sh", str(FLEET), "topk_rank", "/o"]
+    assert vl.build_cmd("d4", Path("/o"), "docker", registered=True, fleet=FLEET)[3:5] == ["--arm", "d4"]
+
+
+@pytest.mark.parametrize("tc", ["7.2.4", "7.14"])
+def test_build_cmd_local(tc):
+    assert vl.build_cmd("topk_rank", Path("/o"), tc, fleet=FLEET) == ["bash", vl.LOCAL_SCRIPT, tc, str(FLEET), "topk_rank", "/o"]
+    assert vl.build_cmd("alld4s", Path("/o"), tc, registered=True, fleet=FLEET) == [
+        "bash", vl.LOCAL_SCRIPT, tc, str(FLEET), "--arm", "alld4s", "/o"]
+
+
+def test_unknown_compiler_is_refused():
+    with pytest.raises(ValueError, match="compiler"):
+        vl.build_cmd("default", Path("/o"), "7.0", fleet=FLEET)
+
+
+def test_compiler_record_local_and_docker(tmp_path):
+    d = tmp_path / "default"
+    d.mkdir()
+    local = {"mode": "local", "toolchain": "7.14", "compiler_path": "/x/clang++", "rocm_root": "/x",
+             "clang_version": "AMD clang version 23", "clang_commit": "a" * 40}
+    (d / "compiler.json").write_text(json.dumps(local))
+    assert vl.compiler_record(d, "7.14") == local
+    (d / "compiler.txt").write_text("AMD clang version 22.0.0git (https://github.com/RadeonOpenCompute/llvm-project "
+                                    "roc-7.2.4 26084 f58b06dce1f9c15707c5f808fd002e18c2accf7e)\nTarget: x\n")
+    (tmp_path / "image.txt").write_text("sha256:abc\n")
+    rec = vl.compiler_record(d, "docker")
+    assert rec["mode"] == "docker" and rec["toolchain"] == "7.2.4" and rec["image"] == "sha256:abc"
+    assert rec["clang_commit"] == "f58b06dce1f9c15707c5f808fd002e18c2accf7e"
+    assert set(rec) >= {"mode", "toolchain", "compiler_path", "clang_version", "clang_commit"}
+
+
+def test_local_script_syntax_and_refusals(tmp_path):
+    assert subprocess.run(["bash", "-n", str(SCRIPT)]).returncode == 0
+    fleet = tmp_path / "fleet"
+    (fleet / "src").mkdir(parents=True)
+    bad = subprocess.run(["bash", str(SCRIPT), "6.0", str(fleet), "default", str(tmp_path / "o")], capture_output=True, text=True)
+    assert bad.returncode == 2 and "unknown toolchain" in bad.stderr
+    missing = subprocess.run(["bash", str(SCRIPT), "7.2.4", str(fleet), "default", str(tmp_path / "o")], capture_output=True,
+                             text=True, env={"PATH": "/usr/bin:/bin", "ETX_ROCM_724": str(tmp_path / "none")})
+    assert missing.returncode == 2 and "incomplete" in missing.stderr
+    (fleet / ".git").mkdir()
+    co = subprocess.run(["bash", str(SCRIPT), "7.2.4", str(fleet), "default"], capture_output=True, text=True)
+    assert co.returncode == 2 and "checkout" in co.stderr
+
+
+def test_local_script_writes_the_compiler_record_fields():
+    text = SCRIPT.read_text()
+    for field in ('"mode": "local"', '"toolchain"', '"compiler_path"', '"clang_version"', '"clang_commit"', '"rocm_root"'):
+        assert field in text
+    assert "docker" not in text.split("set -euo pipefail", 1)[1]
+
+
+def test_cli_needs_exactly_one_arm(capsys):
+    with pytest.raises(SystemExit):
+        vl.main(["default", "--registered", "d4"])
+    with pytest.raises(SystemExit):
+        vl.main([])
+
+
+def test_committed_d4_records_have_the_report_fields():
+    for name in ("d4", "d4s"):
+        rec = json.loads((ROOT / f"examples/dsv2lite/results/levers/{name}.json").read_text())
+        assert {"resources", "static"} <= set(rec["arm_build"]) and "summary" in rec["cpu_gates"]
+        assert rec["compiler"]["mode"] in ("docker", "local") and rec["compiler"]["clang_commit"]
+        assert rec["verdict"] == "PASS" and "prior_record" in rec
+
+
+def test_local_script_refuses_an_unpinned_fleet_source(tmp_path):
+    """A fleet export whose src hash is not pinned.FLEET_SRC_SHA256 (e.g. a copy of another fleet commit) fails the build."""
+    import sys
+    rocm = tmp_path / "rocm"
+    for f in ["lib/llvm/bin/clang++", "lib/llvm/bin/llvm-mc", "lib/llvm/bin/llvm-objcopy", "amdgcn/bitcode/ockl.bc",
+              "include/hip/hip_runtime.h"]:
+        (rocm / f).parent.mkdir(parents=True, exist_ok=True)
+        (rocm / f).write_text("")
+    fleet = tmp_path / "fleet"
+    (fleet / "src").mkdir(parents=True)
+    (fleet / "src/kernel.hip").write_text("// not fleet 3fb67a6\n")
+    r = subprocess.run(["bash", str(SCRIPT), "7.2.4", str(fleet), "default", str(tmp_path / "o")], capture_output=True, text=True,
+                       env={"PATH": "/usr/bin:/bin", "ETX_ROCM_724": str(rocm), "ETX_PYTHON": sys.executable})
+    assert r.returncode == 2 and "is not the pinned fleet 3fb67a6" in r.stderr
+    assert not (tmp_path / "o/default").exists()
+
+
+def test_fleet_src_record_has_path_and_pinned_hash(tmp_path, monkeypatch):
+    monkeypatch.setattr(vl, "source_sha", lambda src: vl.FLEET_SRC_SHA256)
+    assert vl.fleet_src_record(tmp_path) == {"path": str(tmp_path), "commit": vl.FLEET_COMMIT, "src_sha256": vl.FLEET_SRC_SHA256}
+
+
+def test_fleet_src_record_refuses_another_fleet(tmp_path):
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src/kernel.hip").write_text("// not fleet 3fb67a6\n")
+    with pytest.raises(SystemExit, match="not the pinned fleet"):
+        vl.fleet_src_record(tmp_path)
+
+
+def test_build_writes_fleet_src_next_to_compiler_and_refuses_before_building(tmp_path, monkeypatch):
+    calls = []
+    monkeypatch.setattr(vl, "fleet_export", lambda: tmp_path)
+    monkeypatch.setattr(vl, "run", lambda cmd, env=None: calls.append(cmd))
+    (tmp_path / "src").mkdir()
+    with pytest.raises(SystemExit, match="not the pinned fleet"):
+        vl.build("default", tmp_path / "o", "7.2.4")
+    assert calls == []
+    monkeypatch.setattr(vl, "source_sha", lambda src: vl.FLEET_SRC_SHA256)
+    d = tmp_path / "o/default"
+    d.mkdir(parents=True)
+    (d / "compiler.json").write_text(json.dumps({"mode": "local"}))
+    for f in ("plan.json", "megakernel_d0.hip", "isa.bin", "mk.s", "resource.log"):
+        (d / f).write_text("")
+    monkeypatch.setattr(vl, "parse", lambda text: {})
+    monkeypatch.setattr(vl, "static_counts", lambda p: {})
+    rec = vl.build("default", tmp_path / "o", "7.2.4")
+    assert rec["fleet_src"]["src_sha256"] == vl.FLEET_SRC_SHA256 and rec["fleet_src"]["path"] == str(tmp_path)
+    assert calls[0][3] == str(tmp_path)
+
+
+def test_local_script_registered_stamps_option():
+    text = SCRIPT.read_text()
+    assert '--stamps' in text and 'ARM=${REGISTERED}_st' in text and 'PATCH_ARM="$PATCH_ARM+stamps"' in text
+    assert 'stamps) STAMPS=1; FLAGS=(-DETX_DSV2_STAMPS2)' in text
