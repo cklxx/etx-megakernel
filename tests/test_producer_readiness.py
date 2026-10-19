@@ -250,6 +250,7 @@ def test_documented_push_stage_attach_start_with_local_transport(tmp_path):
     no-ops. The real preflight fails closed on synthetic inputs; compute cannot run.
     """
     import os
+    import signal
     import time
     home = tmp_path/'home'
     (home/'code').mkdir(parents=True)
@@ -273,7 +274,23 @@ raise SystemExit(subprocess.call(['bash','-c',' '.join(args)]))
         script(name, '#!/bin/sh\necho LOCAL-TRANSPORT-SUBSTITUTE '+name+'\n')
     script('rocm-smi', '#!/bin/sh\necho "Card Series: CPU-SUBSTITUTE"\n')
     script('nproc', '#!/bin/sh\necho 1\n')
-    script('setsid', '#!/bin/sh\nexec "$@"\n')
+    # A remote runner outlives its ssh session. Locally, the start step's sweep (etx/session/proc.py: subreaper +
+    # descendant SIGKILL on Linux, process-group kill elsewhere) kills every process the step leaves behind, so a
+    # runner started under the step dies mid-session and never writes SEAL. The setsid substitute hands the command
+    # to this test, which starts it outside the step's process tree, as the remote host would.
+    # Limit: the real detach in tools/session.sh (`setsid nohup python3 -m etx.tools.gpu_jobs ... > "$STARTUP" 2>&1
+    # < /dev/null &`) is not exercised: the fake setsid only records the command, so a broken redirect or detach
+    # there is not caught here (only argv and the stdout target are checked below).
+    # Linux: the stdout target comes from /proc/self/fd/1; elsewhere it is None and the runner writes to
+    # tmp_path/runner.out (the STARTUP file then stays empty; nothing reads it).
+    # The spool is appended (one JSON line per call); exactly one call is expected.
+    spool = tmp_path/'setsid.jsonl'
+    script('setsid', f'''#!{sys.executable}
+import json, os, sys
+out = os.readlink('/proc/self/fd/1') if os.path.exists('/proc/self/fd/1') else None
+with open({str(spool)!r}, 'a') as f:
+    f.write(json.dumps(dict(argv=sys.argv[1:], cwd=os.getcwd(), env=dict(os.environ), stdout=out)) + chr(10))
+''')
     # The independent-venv archive test above verifies dependency staging itself.
     (binpath/'python3').symlink_to(sys.executable)
     env = dict(os.environ, HOME=str(home), PATH=str(binpath)+os.pathsep+os.environ['PATH'])
@@ -283,23 +300,41 @@ raise SystemExit(subprocess.call(['bash','-c',' '.join(args)]))
     print('LOCAL PUSH/STAGE/ATTACH/START\n'+started.stdout+started.stderr)
     assert started.returncode == 0
     assert (home/'etx/SOURCE_IDENTITY').is_file()
-    deadline = time.monotonic()+30
-    while time.monotonic() < deadline:
-        reports = list((home/'sess').glob('*/report.json'))
-        if reports:
-            break
-        time.sleep(.1)
-    assert len(reports) == 1
-    assert json.loads(reports[0].read_text())['status'] == 'NOT-COMPLETE'
-    record = reports[0].parent
-    print((record/'preflight.log').read_text())
-    assert 'FAIL phase=preflight' in (record/'preflight.log').read_text()
-    assert not (record/'build_baseline.log').exists()
-    assert not (record/'measure.log').exists()
-    assert 'VERDICT ' in (record/'report.log').read_text()
-    # The session may need one more tick to seal. Do not leave an active runner.
-    while time.monotonic() < deadline and not (record/'SEAL').exists():
-        time.sleep(.1)
-    assert (record/'SEAL').exists()
+    calls = [json.loads(line) for line in spool.read_text().splitlines()]
+    assert len(calls) == 1, calls
+    detached = calls[0]
+    assert detached['argv'][:4] == ['nohup', 'python3', '-m', 'etx.tools.gpu_jobs'], detached['argv']
+    runner_out = open(detached['stdout'] or tmp_path/'runner.out', 'a')
+    runner = subprocess.Popen(detached['argv'], cwd=detached['cwd'], env=detached['env'], stdout=runner_out,
+                              stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, start_new_session=True)
+    try:
+        deadline = time.monotonic()+30
+        while time.monotonic() < deadline:
+            reports = list((home/'sess').glob('*/report.json'))
+            if reports:
+                break
+            time.sleep(.1)
+        assert len(reports) == 1
+        assert json.loads(reports[0].read_text())['status'] == 'NOT-COMPLETE'
+        record = reports[0].parent
+        print((record/'preflight.log').read_text())
+        assert 'FAIL phase=preflight' in (record/'preflight.log').read_text()
+        assert not (record/'build_baseline.log').exists()
+        assert not (record/'measure.log').exists()
+        assert 'VERDICT ' in (record/'report.log').read_text()
+        # The session may need one more tick to seal.
+        while time.monotonic() < deadline and not (record/'SEAL').exists():
+            time.sleep(.1)
+        assert (record/'SEAL').exists()
+        runner.wait(30)  # the runner exits after sealing (its exit code reflects the failed preflight)
+    finally:
+        # Never leave a runner or anything it started: it leads its own session, so always kill the whole group
+        # (the group may already be gone).
+        try:
+            os.killpg(runner.pid, signal.SIGKILL)
+        except (ProcessLookupError, PermissionError):
+            pass
+        runner.wait()
+        runner_out.close()
     import shutil
     shutil.rmtree(home/'src')  # Runner is sealed; retain its logs under home/sess.
