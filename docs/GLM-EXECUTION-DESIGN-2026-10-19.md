@@ -168,14 +168,17 @@ rank 1), so this one slice exercises **both ranks and the seam**. A prefix of
 layers 0–3 would be ~9 GB and would stay on rank 0; it is a second choice only
 if the dense-MLP path must be covered.
 
-**The slice is a code change first.** The record calls it prepared, but no
-`--layers` option exists in `examples/glm53/stage.py` (CLI at `stage.py:217-219`)
-or in `reference.py` (CLI at `reference.py:74-77`), and `prepare.py` pins the
-full 45-layer config sha (`prepare.py:34-47`). Required: a `slice` gate
-identical in kind to `production`/`module` (`prepare.py:20`) whose derived
-config (4 layer types, same hidden/expert dims) and sliced index are pinned;
-stage and reference gain `--layers 22-25 --gate slice`, and `run.py` builds and
-qualifies with the same gate. Size **S** [E]; local tests only, no GPU.
+**The slice is a code change first — implemented 2026-10-19.** `prepare.py`
+gains a `slice` gate next to `production`/`module` over the same pinned release
+evidence, plus `parse_layers`, `check_slice` and `slice_config`; the derived
+four-layer config (same hidden/expert dims, four layer types) and the source
+window are recorded in `stage.json` and in the reference record, and
+`oracle.compare` refuses reference/candidate pairs whose windows differ.
+`stage.py:238-240` and `reference.py:168-171` take `--layers 22-25 --gate
+slice`, `run.py` builds and qualifies with the same gate, and both the stager
+and the reference **refuse any window that does not straddle the PP2 split at
+layers 23/24** (`prepare.py:check_slice`). Tests:
+`tests/test_glm53_slice.py`, CPU only.
 
 **Build and run commands** (all need the already-staged local snapshot; none
 fetches):
@@ -281,9 +284,12 @@ and one certificate per batch, never shared; it prints `BUILD-IDENTITY`,
 checked import positions (`bench.py:268-289`). Steps timed are 1024–1054, 31
 samples (`bench.py:182-187`).
 
-**What GLM lacks.** `examples/glm53/model_host.hip:75` records `start` but the
-step line prints no time (`model_host.hip:81`); `run.py` has no timing mode and
-no `bench_result.json`. There is no per-batch timer equivalent.
+**What GLM had.** `examples/glm53/model_host.hip:75` recorded `start` but the
+step line printed no time; `run.py` had no timing mode and no
+`bench_result.json`. Both are closed 2026-10-19: the step line now carries
+`ms=` (host wall of the two launches and both waits, before D2H), and
+`examples/glm53/bench.py` implements the contract below. No timing number for
+GLM has been produced yet [U]: the harness exists, the run does not.
 
 **Spec: `examples/glm53/bench.py`** (size S [E]), reusing the certificate
 contract:
@@ -304,8 +310,13 @@ contract:
 - **Refusal:** if any identity changes during the run, if the correctness
   receipt is not `TOKENS-EQUAL`, or if a step sample is non-finite or
   non-positive — the same fail-closed pattern as `bench.py:290-297`.
-- **Required code change:** one line-format extension in
-  `model_host.hip:81` to print the step's ms (XS), then the wrapper. No device
-  code and no timing in this document.
+- **Implemented:** `model_host.hip:75-83` (print at `:83`) prints the step's `ms=`, `run.py`
+  parses it (optional field, so old logs still qualify), and
+  `examples/glm53/bench.py` runs one qualification per invocation and refuses a
+  log without `ms=`, a missing/duplicated step, a non-finite sample, a changed
+  identity or a receipt that is not `TOKENS-EQUAL`. It takes `--stage`,
+  `--build`, `--reference`, `--out`, `--gate`; it writes `bench_result.json`
+  under `--out`. Tests: `tests/test_glm53_slice.py`. No device code and no
+  timing in this document.
 
 A timing number from any other source is not accepted by this design.

@@ -73,12 +73,14 @@ int main(int argc,char** argv){
     ETX_CHECK(hipSetDevice(0));ETX_CHECK(hipMemcpy(buffers[etx_host::arg_index("step")],step.data(),step.size()*4,hipMemcpyHostToDevice));
     for(auto& h:hosts)h.reset_step();for(auto& h:hosts){ETX_CHECK(hipSetDevice(h.device));ETX_CHECK(hipStreamSynchronize(h.stream));}
     auto start=std::chrono::steady_clock::now();for(auto& h:hosts)h.launch();for(auto& h:hosts)if(!h.wait(120.0,start))return 3;
+    // Timing definition: host wall from the launches to both waits, before any D2H copy.
+    double step_ms=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-start).count();
     ETX_CHECK(hipSetDevice(0));ETX_CHECK(hipMemcpy(returned.data(),buffers[etx_host::arg_index("returned")],batch*4,hipMemcpyDeviceToHost));
     if(pos>=context-1){int gen=pos-context+1;for(int r=0;r<batch;++r)generated[r*32+gen]=returned[r];
       ETX_CHECK(hipSetDevice(1));ETX_CHECK(hipMemcpy(head.data(),buffers[etx_host::arg_index("head_scratch")],head.size()*4,hipMemcpyDeviceToHost));
       for(int r=0;r<batch;++r)logits.write((const char*)(head.data()+r*(2*GLM_H+GLM_VOCAB)+2*GLM_H),GLM_VOCAB*4);
     }
-    printf("GLM-MODEL-STEP pos=%d batch=%d\n",pos,batch);
+    printf("GLM-MODEL-STEP pos=%d batch=%d ms=%.6f\n",pos,batch,step_ms);
   }
   logits.close();std::ofstream tokens(std::string(argv[4])+".tokens");
   for(int r=0;r<batch;++r){for(int k=0;k<32;++k)tokens<<generated[r*32+k]<<" ";tokens<<"\n";}

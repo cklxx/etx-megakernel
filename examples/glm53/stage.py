@@ -12,7 +12,8 @@ import math
 from pathlib import Path
 import struct
 
-from examples.glm53.prepare import gate_identity, metadata, partition, sha
+from examples.glm53.prepare import (gate_identity, metadata, partition, sha,
+                                    check_slice, parse_layers, slice_config)
 
 def file_sha(path):
     h=hashlib.sha256()
@@ -171,17 +172,27 @@ class Snapshot:
         return dict(index_sha256=self.index_sha256,shards=self.shard_hashes)
 
 
-def stage(src, out, maxlen=1072, gate='production'):
+def stage(src, out, maxlen=1072, gate='production', layers=None):
+    """Stage the release checkpoint, or (--gate slice --layers 22-25) one contiguous
+    window of it, re-indexed from layer 0. A slice must straddle the PP2 split."""
     evidence,model=gate_identity(gate);cfg,api=metadata(evidence)
+    if gate=='slice' and layers is None:raise ValueError('the slice gate requires --layers')
+    if gate!='slice' and layers is not None:raise ValueError('--layers is only valid with --gate slice')
+    # Refuse a window that misses the PP2 split before touching the checkpoint.
+    provenance=check_slice(cfg['text_config'],layers) if layers is not None else None
     if sha(src/'config.json')!=sha(evidence/'glm-config.json') or (src/'REVISION').read_text().strip()!=api['sha']:
         raise ValueError(f'snapshot is not the exact pinned GLM checkpoint/config ({gate} gate)')
+    t=slice_config(cfg['text_config'],layers) if provenance else cfg['text_config']
     out.mkdir(parents=True,exist_ok=False)
-    t=cfg['text_config']; d=dimensions(t,maxlen);ranks=partition(t);reader=Snapshot(src)
+    d=dimensions(t,maxlen);ranks=partition(t);reader=Snapshot(src)
     result=dict(schema=1,model=model,revision=api['sha'],config_sha256=sha(src/'config.json'),fixture=False,
                 config=t,dimensions=d,ranks=ranks,weights={},numerics='native FP8 -> BF16 per block; FP32 accumulators; no activation quantization')
-    for i in range(t['num_hidden_layers']):
-        result['weights'][f'l{i}']=write_blob(out,f'l{i}',shapes(t,i),lambda k,i=i:reader(f'model.layers.{i}.{k}'),slot_names(t))
-        print(f'STAGE layer={i} bytes={result["weights"][f"l{i}"]["blob_bytes"]}',flush=True)
+    if provenance is not None:
+        result['slice']=provenance
+        print(f'STAGE-SLICE layers={provenance["layers"]} split={provenance["split"]}',flush=True)
+    for j,src_layer in enumerate(provenance['layers'] if provenance else range(t['num_hidden_layers'])):
+        result['weights'][f'l{j}']=write_blob(out,f'l{j}',shapes(t,j),lambda k,j=j,src_layer=src_layer:reader(f'model.layers.{src_layer}.{k}'),slot_names(t))
+        print(f'STAGE layer={j} source_layer={src_layer} bytes={result["weights"][f"l{j}"]["blob_bytes"]}',flush=True)
     outer={'embedding':('model.embed_tokens.weight',(t['vocab_size'],t['hidden_size'])),
            'norm':('model.norm.weight',(t['hidden_size'],)), 'head':('lm_head.weight',(t['vocab_size'],t['hidden_size']))}
     for name,(key,shape) in outer.items():result['weights'][name]=write_blob(out,name,{key:shape},reader,[key])
@@ -199,7 +210,15 @@ def validate(out, allow_fixture=False, gate='production'):
     if r.get('schema')!=1 or r.get('model')!=model or r.get('revision')!=api['sha'] or r.get('config_sha256')!=sha(evidence/'glm-config.json'):raise ValueError(f'wrong staged model identity for the {gate} gate')
     if r.get('fixture') and not allow_fixture:raise ValueError('synthetic fixtures cannot qualify the production model')
     if not r.get('fixture') and r['dimensions']['BF16']!=1:raise ValueError('production activations must be BF16')
-    if not r.get('fixture') and r['config']!=cfg['text_config']:raise ValueError('changed production config')
+    if gate=='slice':
+        sl=r.get('slice')
+        if not isinstance(sl,dict):raise ValueError('the slice gate needs a --layers stage')
+        canonical=check_slice(cfg['text_config'],tuple(sl.get('layers') or ()))
+        if sl!=canonical:raise ValueError('changed slice provenance')
+        if r['config']!=slice_config(cfg['text_config'],tuple(sl['layers'])):raise ValueError('changed slice config')
+    elif r.get('slice') is not None:
+        raise ValueError(f'a sliced stage cannot qualify the {gate} gate')
+    elif not r.get('fixture') and r['config']!=cfg['text_config']:raise ValueError('changed production config')
     if r['dimensions']!=dimensions(r['config'],r['dimensions']['MAXLEN'],r['dimensions']['BF16']==1):raise ValueError('inconsistent compiled dimensions')
     n=r['config']['num_hidden_layers']
     if set(r['weights'])!={*(f'l{i}' for i in range(n)),'embedding','norm','head'}:raise ValueError('incomplete staged model')
@@ -216,8 +235,9 @@ def validate(out, allow_fixture=False, gate='production'):
 
 def main():
     ap=argparse.ArgumentParser(description=__doc__);ap.add_argument('--src',type=Path,required=True);ap.add_argument('--out',type=Path,required=True);ap.add_argument('--maxlen',type=int,default=1072)
-    ap.add_argument('--gate',choices=['production','module'],default='production')
-    a=ap.parse_args();stage(a.src,a.out,a.maxlen,a.gate)
+    ap.add_argument('--gate',choices=['production','module','slice'],default='production')
+    ap.add_argument('--layers',help='slice gate only: contiguous source layers that straddle the PP2 split, e.g. 22-25')
+    a=ap.parse_args();stage(a.src,a.out,a.maxlen,a.gate,parse_layers(a.layers) if a.layers else None)
 
 
 

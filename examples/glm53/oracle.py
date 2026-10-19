@@ -7,7 +7,7 @@ speculative=false, backend='hf'/'etx-pp2', requests=[{prompt_ids, generated_ids}
 import argparse
 import json
 from pathlib import Path
-from examples.glm53.prepare import gate_identity, metadata, sha
+from examples.glm53.prepare import gate_identity, metadata, sha, check_slice
 
 
 def compare(reference, candidate, gate='production'):
@@ -33,6 +33,18 @@ def compare(reference, candidate, gate='production'):
             prompts.append(tuple(p))
         if len(set(prompts)) != b:
             raise ValueError('duplicate request prompt')
+    slices = {}
+    for record, backend in ((reference, 'hf'), (candidate, 'etx-pp2')):
+        sl = record.get('slice')
+        if gate == 'slice':
+            if not isinstance(sl, dict):
+                raise ValueError(f'{backend} record carries no slice provenance')
+            sl = check_slice(cfg['text_config'], tuple(sl.get('layers') or ()))
+        elif sl is not None:
+            raise ValueError(f'{backend} record is sliced but the gate is {gate}')
+        slices[backend] = sl
+    if slices['hf'] != slices['etx-pp2']:
+        raise ValueError('reference and candidate slices differ')
     if reference['batch'] != candidate['batch']:
         raise ValueError('batch mismatch')
     matched = []
@@ -51,7 +63,7 @@ def main():
     ap.add_argument('--reference', type=Path, required=True)
     ap.add_argument('--candidate', type=Path, required=True)
     ap.add_argument('--out', type=Path, required=True)
-    ap.add_argument('--gate', choices=['production', 'module'], default='production')
+    ap.add_argument('--gate', choices=['production', 'module', 'slice'], default='production')
     a = ap.parse_args()
     try:
         result = compare(json.loads(a.reference.read_text()), json.loads(a.candidate.read_text()), a.gate)

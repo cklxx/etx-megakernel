@@ -66,11 +66,12 @@ def qualify(staged,build,ref_path,out,seconds=7200,logit_atol=None,gate='product
             env={k:v for k,v in os.environ.items() if not k.startswith(('ETX_','DSL_ABLATE_'))}
             raw=execute([str((build/'run').resolve()),str(staged.resolve()),str((build/'load.tsv').resolve()),str(prompt.resolve()),str(prefix.resolve())],out/f'run{repetition}.log',env,seconds)
             tag=f'GLM-MODEL-EXECUTED batch={batch} layers={before["config"]["num_hidden_layers"]} generated_each=32; reference comparison required'
-            steps=re.findall(r'^GLM-MODEL-STEP pos=(\d+) batch=(\d+)$',raw,re.M)
-            if raw.count(tag)!=1 or steps!=[(str(i),str(batch)) for i in range(len(p[0])+31)]:raise ValueError('incomplete/duplicate model execution steps')
+            steps=[(pos,gots,ms) for pos,gots,ms in re.findall(r'^GLM-MODEL-STEP pos=(\d+) batch=(\d+)(?: ms=(\S+))?$',raw,re.M)]
+            if raw.count(tag)!=1 or [(a,b) for a,b,_ in steps]!=[(str(i),str(batch)) for i in range(len(p[0])+31)]:raise ValueError('incomplete/duplicate model execution steps')
             rows=[list(map(int,line.split())) for line in prefix.with_suffix('.tokens').read_text().splitlines()]
             if len(rows)!=batch:raise ValueError('missing/duplicate token output rows')
-            candidate=dict(reference.identity(gate),backend='etx-pp2',batch=batch,
+            window=tuple(before['slice']['layers']) if before.get('slice') else None
+            candidate=dict(reference.identity(gate,window),backend='etx-pp2',batch=batch,
                            requests=[dict(prompt_ids=pr,generated_ids=ids) for pr,ids in zip(p,rows)])
             verdict=oracle.compare(ref,candidate,gate)
             if verdict['status']!='TOKENS-EQUAL':raise ValueError(f'exact greedy mismatch: {verdict}')
@@ -101,7 +102,7 @@ def qualify(staged,build,ref_path,out,seconds=7200,logit_atol=None,gate='product
 def main():
     ap=argparse.ArgumentParser(description=__doc__);ap.add_argument('operation',choices=['build','qualify']);ap.add_argument('--stage',type=Path,required=True);ap.add_argument('--build',type=Path,required=True);ap.add_argument('--reference',type=Path);ap.add_argument('--out',type=Path,required=True);ap.add_argument('--batch',type=int,choices=[1,2,4,8],default=1)
     ap.add_argument('--logit-atol',type=float,help='fail unless every full logit is within this absolute error of HF, even when all tokens match; default reports only')
-    ap.add_argument('--gate',choices=['production','module'],default='production',help='pinned identity the stage and reference must carry')
+    ap.add_argument('--gate',choices=['production','module','slice'],default='production',help='pinned identity the stage and reference must carry')
     a=ap.parse_args();stage.validate(a.stage,gate=a.gate)
     if a.operation=='build':
         a.out.mkdir(parents=True,exist_ok=False)

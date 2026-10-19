@@ -17,7 +17,11 @@ MODEL = 'zai-org/GLM-5.3-Flash'
 # examples/glm53/module_gate.py and pinned like the release (config, id, revision).
 MODULE_EVIDENCE = ROOT / 'docs/evidence/glm53-module-gate'
 MODULE_MODEL = 'etx-synthetic/GLM-5.3-Flash-module-gate'
-GATES = {'production': (EVIDENCE, MODEL), 'module': (MODULE_EVIDENCE, MODULE_MODEL)}
+# The slice gate: the exact release checkpoint, but staged and referenced for a
+# contiguous layer window that must straddle the PP2 split (docs/GLM-EXECUTION-
+# DESIGN-2026-10-19.md section 6). It shares the release evidence and pin.
+GATES = {'production': (EVIDENCE, MODEL), 'module': (MODULE_EVIDENCE, MODULE_MODEL),
+         'slice': (EVIDENCE, MODEL)}
 
 
 def gate_identity(gate='production'):
@@ -66,6 +70,69 @@ def partition(t):
                           kda_layers=sum(t['layer_types'][i] == 'linear_attention' for i in layers),
                           mla_layers=sum(t['layer_types'][i] == 'deepseek_sparse_attention' for i in layers)))
     return ranks
+
+
+def parse_layers(text):
+    """`22-25` or `22,23,24,25` -> a contiguous, ascending tuple of layer indices."""
+    raw = str(text).strip()
+    if not raw:
+        raise ValueError('empty layer slice')
+    if ',' in raw:
+        try:
+            layers = tuple(int(part) for part in raw.split(','))
+        except ValueError:
+            raise ValueError(f'layer slice {text!r} is not a comma-separated list of integers') from None
+    else:
+        lo, sep, hi = raw.partition('-')
+        if not sep:
+            raise ValueError(f'layer slice {text!r} must be a range like 22-25 or a list like 22,23,24,25')
+        try:
+            lo, hi = int(lo), int(hi)
+        except ValueError:
+            raise ValueError(f'layer slice {text!r} is not a range of integers') from None
+        layers = tuple(range(lo, hi + 1))
+    if len(layers) < 2:
+        raise ValueError('a layer slice needs at least two layers')
+    if list(layers) != list(range(layers[0], layers[-1] + 1)):
+        raise ValueError(f'layer slice {text!r} must be contiguous and ascending without repeats')
+    if layers[0] < 0:
+        raise ValueError('layer indices must be non-negative')
+    return layers
+
+
+def slice_split(t):
+    """First layer of PP2 rank 1; a gating slice must contain both sides of it."""
+    return partition(t)[1]['layers'][0]
+
+
+def check_slice(t, layers):
+    """Validate the slice provenance. Refuses any window that does not cross the PP2 split."""
+    layers = tuple(layers)
+    if len(layers) < 2 or list(layers) != list(range(layers[0], layers[-1] + 1)):
+        raise ValueError(f'layer slice {list(layers)} must be contiguous and ascending')
+    n = t['num_hidden_layers']
+    if layers[0] < 0 or layers[-1] >= n:
+        raise ValueError(f'layer slice {list(layers)} is outside 0..{n - 1}')
+    split = slice_split(t)
+    if not layers[0] < split <= layers[-1]:
+        raise ValueError(f'layer slice {list(layers)} must straddle the PP2 boundary at layers '
+                         f'{split - 1}/{split}; a window on one side cannot gate the pipeline')
+    return dict(source_num_hidden_layers=int(n), layers=[int(i) for i in layers], split=int(split))
+
+
+def slice_config(t, layers):
+    """The derived text config HF and the plan see: the selected layers re-indexed from 0."""
+    layers = tuple(layers)
+    if any(i < 0 or i >= t['num_hidden_layers'] for i in layers):
+        raise ValueError('layer slice outside the source model')
+    out = json.loads(json.dumps(t))
+    out['num_hidden_layers'] = len(layers)
+    for key in ('layer_types', 'mlp_layer_types', 'indexer_types'):
+        if key in out:
+            if len(out[key]) != t['num_hidden_layers']:
+                raise ValueError(f'{key} does not cover every source layer')
+            out[key] = [t[key][i] for i in layers]
+    return out
 
 
 def budget(cfg, api, batch, context, gpu_gib):
@@ -143,6 +210,7 @@ def main():
     ap.add_argument('--out', type=Path)
     ap.add_argument('--require-model', action='store_true')
     ap.add_argument('--stage',type=Path)
+    ap.add_argument('--gate',choices=['production','module','slice'],default='production')
     a = ap.parse_args()
     result = prepare(a.batch, a.context, a.gpu_gib)
     code=0
@@ -152,7 +220,7 @@ def main():
         else:
             from examples.glm53.stage import validate
             try:
-                validate(a.stage);result['status']='STAGED-MODEL-VALIDATED'
+                validate(a.stage,gate=a.gate);result['status']='STAGED-MODEL-VALIDATED'
             except (ValueError,FileNotFoundError,KeyError) as exc:
                 result.update(status='ASSETS-REQUIRED',error=str(exc));code=2
     text = json.dumps(result, indent=2) + '\n'
