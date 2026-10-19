@@ -27,28 +27,6 @@ def parse(text: str) -> dict[str, int]:
     return result
 
 
-# Per-CU budgets of the target (a SIMD's register file is 512 registers per lane, VGPRs and AGPRs from one pool; 64 KiB
-# of LDS per CU; four SIMDs per CU). A 256-thread workgroup puts one 64-lane wave on each SIMD.
-REGS_PER_SIMD_LANE, LDS_PER_CU, SIMDS_PER_CU, WAVE_LANES = 512, 65536, 4, 64
-
-
-def _align(x: int, a: int) -> int:
-    return (x + a - 1) // a * a
-
-
-def wg_per_cu(res: dict, threads: int = 256) -> int:
-    """Workgroups of `threads` that fit one CU, from the record's registers and LDS, never above the compiler's own
-    occupancy figure. Registers: AGPRs start at the VGPR count rounded to 4, the total is allocated in granules of 8
-    (248 + 6 AGPR -> 256: 2 per CU; 250 + 6 -> 264: 1 per CU)."""
-    waves_per_wg = -(-threads // WAVE_LANES)
-    waves_per_simd_per_wg = -(-waves_per_wg // SIMDS_PER_CU)
-    regs = _align(_align(res["vgpr"], 4) + res["agpr"], 8)
-    by_regs = REGS_PER_SIMD_LANE // max(regs, 1) // waves_per_simd_per_wg
-    by_lds = LDS_PER_CU // res["lds"] if res["lds"] else by_regs
-    by_compiler = res["occupancy"] // waves_per_simd_per_wg
-    return min(by_regs, by_lds, by_compiler)
-
-
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("out", type=Path)
