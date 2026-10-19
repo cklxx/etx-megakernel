@@ -164,6 +164,28 @@ replication marginal should fall from ~2.2 ms/request toward vLLM's ~0.5
 ms/request. Full deltas and code paths are in
 `docs/QWEN-BATCH-BASELINE-2026-10-18.md:5`.
 
+**E7 — hierarchical sentinel polling for the relay (independent).**
+
+Not sequenced with E1–E6 and a prerequisite for none of them. Replace the
+relay's atomic counter barrier with hierarchical sentinel polling: one
+producer-owned cache line per participant, one poller per XCD, one top level.
+
+- **Ceiling.** The measured whole-GPU counter barrier is **8.6 µs at 304
+  workgroups** (`docs/RESEARCH-sync-hardware.md:25`). DeepSeek B4's dependency
+  gap is measured at **963 µs**; at roughly **2 barriers per layer over 27
+  layers** that is about **464 µs**. The experiment ceiling is therefore
+  **under 1 ms against a 3.37 ms target**, which is why it stays independent
+  and does not preempt E1.
+- **First step is not code.** Count the barriers per decode step from a trace
+  and compute the ceiling from those counts. If the counted ceiling is below
+  **0.9 ms, do not write code.**
+- **Unverified input [U].** The external sentinel result (7.8 µs → 0.9 µs) is
+  not reproduced in this repo and is marked [U] until measured here (recorded
+  as "public, not reproduced" in
+  `docs/SYNC-TAXONOMY-AUDIT-2026-10-11.md:89`).
+- **Falsifier:** the counted ceiling is below 0.9 ms, or a paired step improves
+  <2%.
+
 **Week 2 — one MI300X box, correctness-first, then timing.**
 
 4. **E4: measure the shared-weight B4/B8 recipe against vLLM**, interleaved
