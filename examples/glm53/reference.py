@@ -14,6 +14,7 @@ import json
 from pathlib import Path
 from examples.glm53.prepare import (gate_identity,metadata,sha,check_slice,
                                     parse_layers,slice_config)
+from examples.glm53.stage import file_sha
 
 
 LAYER_PREFIXES=('model.layers.','model.language_model.layers.','language_model.model.layers.')
@@ -100,6 +101,19 @@ def write_slice_snapshot(src,dst,layers):
         {'metadata':{'total_size':total},'weight_map':weight_map},indent=2,sort_keys=True)+'\n')
 
 
+def snapshot_hashes(path):
+    """config.json, the index and every shard the index names: the files HF loads."""
+    index=json.loads((path/'model.safetensors.index.json').read_text())
+    names=['config.json','model.safetensors.index.json']+sorted(set(index['weight_map'].values()))
+    out={}
+    for name in names:
+        if Path(name).name!=name:raise ValueError(f'unsafe snapshot path {name!r}')
+        p=path/name
+        if not p.is_file():raise ValueError(f'missing derived snapshot file {name}')
+        out[name]=file_sha(p)
+    return out
+
+
 def run(src,prompt_path,out,offload,max_memory,gate='production',layers=None):
     import torch
     import transformers
@@ -121,12 +135,13 @@ def run(src,prompt_path,out,offload,max_memory,gate='production',layers=None):
         for items in groups.values():
             for _,_,old in items:snapshot.shard(old)
     p=prompts(prompt_path,gate);record=dict(identity(gate,window['layers'] if window else None),backend='hf',batch=len(p),requests=[])
-    load_src=src
+    load_src=src;derived_hashes=None
     if window is not None:
         load_src=out.parent/(out.name+'.slice')
         write_slice_snapshot(src,load_src,window['layers'])
-        record['slice_snapshot']=dict(path=str(load_src),index_sha256=sha(load_src/'model.safetensors.index.json'))
-        print(f'GLM-SLICE-SNAPSHOT {load_src} layers={window["layers"]}',flush=True)
+        # Hash everything HF is about to load (config, index, every shard); rechecked after the run.
+        derived_hashes=snapshot_hashes(load_src)
+        print(f'GLM-SLICE-SNAPSHOT {load_src} layers={window["layers"]} files={len(derived_hashes)}',flush=True)
     # The saved release config names DSA differently from the library cache ABI.
     config=AutoConfig.from_pretrained(load_src,local_files_only=True,trust_remote_code=False)
     config.text_config.layer_types=['indexed_attention' if x=='deepseek_sparse_attention' else x for x in config.text_config.layer_types]
@@ -156,10 +171,12 @@ def run(src,prompt_path,out,offload,max_memory,gate='production',layers=None):
             print(f'GLM-HF-STEP {step+1}/32 batch={len(p)}',flush=True)
     import numpy as np
     np.stack(logits).astype('<f4').tofile(out.with_suffix('.logits'))
-    source=snapshot.verified_inputs()
-    record.update(requests=[dict(prompt_ids=row,generated_ids=g) for row,g in zip(p,generated)],
-                  provenance=dict(transformers=transformers.__version__,quantization='FP8 block dequantize -> BF16',attention='eager',experts='eager',
-                                  config_source_sha256=sha(src/'config.json'),index_sha256=source['index_sha256'],source_shards=source['shards']))
+    source=snapshot.verified_inputs();provenance=dict(transformers=transformers.__version__,quantization='FP8 block dequantize -> BF16',attention='eager',experts='eager',
+                                  config_source_sha256=sha(src/'config.json'),index_sha256=source['index_sha256'],source_shards=source['shards'])
+    if window is not None:
+        if snapshot_hashes(load_src)!=derived_hashes:raise ValueError('derived slice snapshot changed during the reference run')
+        provenance['slice_snapshot']=dict(path=str(load_src),files=derived_hashes)
+    record.update(requests=[dict(prompt_ids=row,generated_ids=g) for row,g in zip(p,generated)],provenance=provenance)
     out.write_text(json.dumps(record,indent=2)+'\n');return record
 
 

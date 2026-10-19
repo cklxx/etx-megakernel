@@ -333,8 +333,10 @@ struct etx_host {
     else ETX_CHECK(hipLaunchKernel(kernel, dim3(ETX_N_LAUNCH), dim3(ETX_THREADS), kargs, 0, stream));   // residency checked by check_residency()
     if (record_events) ETX_CHECK(hipEventRecord(ev_stop, stream));
   }
-  // wait with watchdog; returns false on timeout / spin limit / incomplete
-  bool wait(double timeout_s, std::chrono::steady_clock::time_point t0) {
+  // Stream completion with watchdog, no completion checks and no device copies: returns true
+  // once the stream has retired. Callers that time a step must call this on every device first,
+  // take the timestamp, and only then call after_wait() (which does synchronous D2H copies).
+  bool wait_stream(double timeout_s, std::chrono::steady_clock::time_point t0) {
     ETX_CHECK(hipSetDevice(device));
     // ETX_SYNC=block: block in the driver instead of polling. hipStreamQuery costs microseconds on this driver, so the
     // poll loop's granularity became ~71 us of overshoot per step against a 5 ms kernel (measured 2026-10-01). The
@@ -342,7 +344,7 @@ struct etx_host {
     // for a hang the device cannot see, so the poll path stays the default.
     if (sync_block) {
       ETX_CHECK(hipStreamSynchronize(stream));
-      return after_wait();
+      return true;
     }
     while (hipStreamQuery(stream) == hipErrorNotReady) {
       double el = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
@@ -356,7 +358,11 @@ struct etx_host {
       std::this_thread::yield();   // a 50 us sleep overshot the 5 ms kernel by ~100 us/step (2026-10-01)
     }
     ETX_CHECK(hipStreamSynchronize(stream));
-    return after_wait();
+    return true;
+  }
+  // wait with watchdog; returns false on timeout / spin limit / incomplete
+  bool wait(double timeout_s, std::chrono::steady_clock::time_point t0) {
+    return wait_stream(timeout_s, t0) && after_wait();
   }
   // everything the host checks once the kernel has retired; shared by the polling and blocking waits
   bool after_wait() {

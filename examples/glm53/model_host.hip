@@ -72,9 +72,12 @@ int main(int argc,char** argv){
     for(int r=0;r<batch;++r){step[2*r]=pos;step[2*r+1]=pos<context?inputs[r*context+pos]:returned[r];}
     ETX_CHECK(hipSetDevice(0));ETX_CHECK(hipMemcpy(buffers[etx_host::arg_index("step")],step.data(),step.size()*4,hipMemcpyHostToDevice));
     for(auto& h:hosts)h.reset_step();for(auto& h:hosts){ETX_CHECK(hipSetDevice(h.device));ETX_CHECK(hipStreamSynchronize(h.stream));}
-    auto start=std::chrono::steady_clock::now();for(auto& h:hosts)h.launch();for(auto& h:hosts)if(!h.wait(120.0,start))return 3;
-    // Timing definition: host wall from the launches to both waits, before any D2H copy.
+    auto start=std::chrono::steady_clock::now();for(auto& h:hosts)h.launch();
+    // Both streams retire first; the timestamp is taken before any completion check, because
+    // after_wait() does synchronous 8-byte (and, under ETX_EXEC_COUNT, trace) D2H copies.
+    for(auto& h:hosts)if(!h.wait_stream(120.0,start))return 3;
     double step_ms=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-start).count();
+    for(auto& h:hosts){ETX_CHECK(hipSetDevice(h.device));if(!h.after_wait())return 3;}
     ETX_CHECK(hipSetDevice(0));ETX_CHECK(hipMemcpy(returned.data(),buffers[etx_host::arg_index("returned")],batch*4,hipMemcpyDeviceToHost));
     if(pos>=context-1){int gen=pos-context+1;for(int r=0;r<batch;++r)generated[r*32+gen]=returned[r];
       ETX_CHECK(hipSetDevice(1));ETX_CHECK(hipMemcpy(head.data(),buffers[etx_host::arg_index("head_scratch")],head.size()*4,hipMemcpyDeviceToHost));

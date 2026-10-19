@@ -4,8 +4,9 @@ This is the contract of section 9 of docs/GLM-EXECUTION-DESIGN-2026-10-19.md,
 mirroring examples/vllm_llm/bench.py: each batch B in {1,2,4,8} has its own
 build, its own correctness qualification and its own certificate; no gate or
 number is shared between batches. The timed quantity is the host wall between
-the two rank launches and both waits completing (examples/glm53/model_host.hip,
-before any D2H copy), one sample per position, positions 1024-1054.
+the two rank launches and both streams retiring (examples/glm53/model_host.hip
+calls wait_stream on every rank, then takes the timestamp, then runs after_wait,
+which does synchronous D2H copies), one sample per position, 1024-1054.
 
 Fail-closed: a missing ms= field, an identity change during the run, a
 correctness receipt that is not TOKENS-EQUAL, or a non-finite/non-positive
@@ -81,7 +82,7 @@ def certificate(staged, build, identity, batch, xs, receipt, source, gate='produ
                                 hidden=t['hidden_size'], context=CONTEXT, generated=GEN,
                                 precision='native FP8 weights, BF16 activations',
                                 maxlen=staged['dimensions']['MAXLEN']),
-                measured='host wall from both rank launches to both waits completing (before D2H), steps 1024-1054',
+                measured='host wall from both rank launches to both streams retiring, before any completion check or D2H copy, steps 1024-1054',
                 steps=LAST - FIRST + 1, **summarise(xs, batch),
                 tokens_matched=sum(receipt.get('matched_each') or []),
                 tokens_expected=GEN * batch,

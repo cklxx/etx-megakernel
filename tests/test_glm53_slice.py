@@ -247,3 +247,73 @@ def test_bench_summary_and_certificate_fields():
 
     with pytest.raises(bench.Refusal, match='batch must be one of'):
         bench.summarise(xs, 3)
+
+
+def test_step_timestamp_is_taken_before_completion_copies():
+    """The certificate's timed region ends when both streams retire, not after the D2H checks."""
+    host = (ROOT / 'examples/glm53/model_host.hip').read_text()
+    launch = host.index('for(auto& h:hosts)h.launch()')
+    streams = host.index('h.wait_stream(120.0,start)')
+    stamp = host.index('double step_ms=')
+    checks = host.index('h.after_wait()')
+    assert launch < streams < stamp < checks
+    assert 'h.wait(120.0,start)' not in host
+    assert host.count('h.wait_stream(120.0,start)') == 1 and 'for(auto& h:hosts)if(!h.wait_stream' in host
+    assert 'ETX_CHECK(hipSetDevice(h.device));if(!h.after_wait())' in host
+
+
+def test_wait_splits_stream_completion_from_device_copies():
+    """wait() = wait_stream() then after_wait(); the D2H copies live in the second half."""
+    text = (ROOT / 'etx/runtime/include/etx/host.h').read_text()
+    wait_at = text.index('bool wait(')
+    wait_body = text[wait_at:text.index('// everything the host checks', wait_at)]
+    assert 'return wait_stream(timeout_s, t0) && after_wait();' in wait_body
+    stream_at = text.index('bool wait_stream(')
+    stream_body = text[stream_at:wait_at]
+    assert 'hipMemcpyDeviceToHost' not in stream_body
+    after_at = text.index('bool after_wait()')
+    assert text.index('hipMemcpyDeviceToHost', after_at) > after_at
+
+
+def _hashed_snapshot(tmp_path):
+    torch = pytest.importorskip('torch')
+    from safetensors.torch import save_file
+    tmp_path.mkdir(parents=True, exist_ok=True)
+    save_file({'a': torch.zeros(1)}, tmp_path / 'model-00000.safetensors')
+    (tmp_path / 'config.json').write_text('{}\n')
+    (tmp_path / 'model.safetensors.index.json').write_text(
+        json.dumps({'weight_map': {'a': 'model-00000.safetensors'}}))
+    return tmp_path
+
+
+def test_snapshot_hashes_cover_config_index_and_every_shard(tmp_path):
+    snap = _hashed_snapshot(tmp_path)
+    hashes = reference.snapshot_hashes(snap)
+    assert set(hashes) == {'config.json', 'model.safetensors.index.json', 'model-00000.safetensors'}
+    # Changing any file HF loads is detectable.
+    (snap / 'model-00000.safetensors').write_bytes(b'tampered')
+    assert reference.snapshot_hashes(snap)['model-00000.safetensors'] != hashes['model-00000.safetensors']
+    snap = _hashed_snapshot(tmp_path / 'second')
+    hashes = reference.snapshot_hashes(snap)
+    (snap / 'config.json').write_text('{"changed": true}\n')
+    assert reference.snapshot_hashes(snap)['config.json'] != hashes['config.json']
+    snap = _hashed_snapshot(tmp_path / 'third')
+    hashes = reference.snapshot_hashes(snap)
+    (snap / 'model.safetensors.index.json').write_text(json.dumps({'weight_map': {}}))
+    assert reference.snapshot_hashes(snap)['model.safetensors.index.json'] != hashes['model.safetensors.index.json']
+
+
+def test_snapshot_hashes_refuse_a_missing_shard(tmp_path):
+    snap = _hashed_snapshot(tmp_path)
+    (snap / 'model-00000.safetensors').unlink()
+    with pytest.raises(ValueError, match='missing derived snapshot file'):
+        reference.snapshot_hashes(snap)
+
+
+def test_reference_hashes_the_derived_snapshot_before_hf_loads_it():
+    text = (ROOT / 'examples/glm53/reference.py').read_text()
+    hashed = text.index('derived_hashes=snapshot_hashes(load_src)')
+    load = text.index('from_pretrained(load_src')
+    recheck = text.index('if snapshot_hashes(load_src)!=derived_hashes')
+    provenance = text.index("provenance['slice_snapshot']")
+    assert hashed < load < recheck < provenance

@@ -177,8 +177,10 @@ window are recorded in `stage.json` and in the reference record, and
 `stage.py:238-240` and `reference.py:168-171` take `--layers 22-25 --gate
 slice`, `run.py` builds and qualifies with the same gate, and both the stager
 and the reference **refuse any window that does not straddle the PP2 split at
-layers 23/24** (`prepare.py:check_slice`). Tests:
-`tests/test_glm53_slice.py`, CPU only.
+layers 23/24** (`prepare.py:check_slice`). The reference hashes the derived
+snapshot's `config.json`, index and every shard before HF loads it, rechecks
+them after the run, and records them in its provenance
+(`reference.py:snapshot_hashes`). Tests: `tests/test_glm53_slice.py`, CPU only.
 
 **Build and run commands** (all need the already-staged local snapshot; none
 fetches):
@@ -287,7 +289,8 @@ samples (`bench.py:182-187`).
 **What GLM had.** `examples/glm53/model_host.hip:75` recorded `start` but the
 step line printed no time; `run.py` had no timing mode and no
 `bench_result.json`. Both are closed 2026-10-19: the step line now carries
-`ms=` (host wall of the two launches and both waits, before D2H), and
+`ms=` (host wall of the two launches until both streams retire, before the
+completion checks and their D2H copies), and
 `examples/glm53/bench.py` implements the contract below. No timing number for
 GLM has been produced yet [U]: the harness exists, the run does not.
 
@@ -299,10 +302,12 @@ contract:
 - **Identity:** stage and build validated before and after, source hashes
   (`model_build.source_identity`), reference hashes, and the exact build files
   (`run.py:46`), recorded in the certificate as in Qwen's `BUILD-IDENTITY`.
-- **Timing definition:** host wall from the two launches to both waits
-  completing (`model_host.hip:75`), excluding the returned-ID and logit D2H
-  copies; one sample per position, positions 1024–1054 (31 samples, matching
-  Qwen's 1024–1054 window).
+- **Timing definition:** host wall from the two launches to both streams
+  retiring (`model_host.hip:75-79`: `wait_stream` on every rank, then the
+  timestamp, then `after_wait`, whose 8-byte ctrl and optional trace D2H copies
+  are therefore excluded), also excluding the returned-ID and logit copies; one
+  sample per position, positions 1024–1054 (31 samples, matching Qwen's
+  1024–1054 window).
 - **Reported:** `median_decode_wall_ms`, `tokens_per_s = B*1000/median`,
   `ms_per_token = median/B`, `spread_ms`, every sample, conditions (two
   MI300X, context 1024, 32 greedy tokens, PP2, layer count), and the
