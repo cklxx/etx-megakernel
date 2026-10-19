@@ -273,16 +273,7 @@ raise SystemExit(subprocess.call(['bash','-c',' '.join(args)]))
         script(name, '#!/bin/sh\necho LOCAL-TRANSPORT-SUBSTITUTE '+name+'\n')
     script('rocm-smi', '#!/bin/sh\necho "Card Series: CPU-SUBSTITUTE"\n')
     script('nproc', '#!/bin/sh\necho 1\n')
-    # A remote runner outlives its ssh session. Locally, the start step's sweep (etx/session/proc.py: subreaper +
-    # descendant SIGKILL on Linux, process-group kill elsewhere) kills every process the step leaves behind, so a
-    # runner started under the step dies mid-session and never writes SEAL. The setsid substitute hands the command
-    # to this test, which starts it outside the step's process tree, as the remote host would.
-    spool = tmp_path/'setsid.json'
-    script('setsid', f'''#!{sys.executable}
-import json, os, sys
-out = os.readlink('/proc/self/fd/1') if os.path.exists('/proc/self/fd/1') else None
-json.dump(dict(argv=sys.argv[1:], cwd=os.getcwd(), env=dict(os.environ), stdout=out), open({str(spool)!r}, 'w'))
-''')
+    script('setsid', '#!/bin/sh\nexec "$@"\n')
     # The independent-venv archive test above verifies dependency staging itself.
     (binpath/'python3').symlink_to(sys.executable)
     env = dict(os.environ, HOME=str(home), PATH=str(binpath)+os.pathsep+os.environ['PATH'])
@@ -292,10 +283,6 @@ json.dump(dict(argv=sys.argv[1:], cwd=os.getcwd(), env=dict(os.environ), stdout=
     print('LOCAL PUSH/STAGE/ATTACH/START\n'+started.stdout+started.stderr)
     assert started.returncode == 0
     assert (home/'etx/SOURCE_IDENTITY').is_file()
-    detached = json.loads(spool.read_text())
-    runner_out = open(detached['stdout'] or tmp_path/'runner.out', 'a')
-    runner = subprocess.Popen(detached['argv'], cwd=detached['cwd'], env=detached['env'], stdout=runner_out,
-                              stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, start_new_session=True)
     deadline = time.monotonic()+30
     while time.monotonic() < deadline:
         reports = list((home/'sess').glob('*/report.json'))
@@ -314,7 +301,5 @@ json.dump(dict(argv=sys.argv[1:], cwd=os.getcwd(), env=dict(os.environ), stdout=
     while time.monotonic() < deadline and not (record/'SEAL').exists():
         time.sleep(.1)
     assert (record/'SEAL').exists()
-    runner.wait(30)  # the runner exits after sealing (its exit code reflects the failed preflight)
-    runner_out.close()
     import shutil
     shutil.rmtree(home/'src')  # Runner is sealed; retain its logs under home/sess.

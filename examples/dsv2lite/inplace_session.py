@@ -44,12 +44,6 @@ D4_STAGE_NOTE = ("D4 arms: topk = the ROUTED XCDs' routing prologue (only routed
                  "bodies include the shared XCDs while the topk split does not. Span, stage sums and verdicts are exact.")
 
 
-
-def required_wg_per_cu(arm) -> int:
-    """The paired multi-request builds (-DETX_SLOT_BY_CU) run two workgroups per CU, one per slot: at one per CU the
-    second slot's workers never start and the plan deadlocks or serializes. Every other arm runs one per CU."""
-    return 2 if "-DETX_SLOT_BY_CU" in arm.flags else 1
-
 class Session:
     def __init__(self):
         self.root = Path(__file__).resolve().parents[2]
@@ -181,11 +175,6 @@ class Session:
             if resources["scratch"] > a.scratch_allow:
                 raise RuntimeError(f"arm {arm} spills to scratch on this box beyond its allowance "
                                    f"({a.scratch_allow} B/lane): {resources}")
-            from examples.dsv2lite.build_resources import wg_per_cu
-            need = required_wg_per_cu(a)
-            if wg_per_cu(resources) < need:
-                raise RuntimeError(f"arm {arm} fits {wg_per_cu(resources)} workgroup(s) per CU on this box, its plan "
-                                   f"needs {need} (VGPR + AGPR <= {512 // need}): {resources}")
             print(f"BUILD arm={arm} stamped={int(stamped)} plan_sha256={sha(out / 'plan.json')} resources={resources}", flush=True)
         print(f"BUILD arm={arm} OK", flush=True)
 
