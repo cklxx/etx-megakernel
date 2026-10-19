@@ -20,10 +20,13 @@ def test_replay_reproduces_the_measured_trace(data):
     assert abs(r["error_us"]) < 0.01 and r["clamped_skew_us"] < 0.01, r
 
 
-def test_every_stage_has_a_lever_and_the_rows_partition_the_token(data):
+def test_every_stage_has_a_lever_and_the_rows_partition_the_token(data, tmp_path):
     from examples.dsv2lite import stage_table as st
-    assert st.main() == 0
-    out = json.loads(Path("examples/dsv2lite/results/stages/stage_table.json").read_text())
+    # Write to tmp_path, never to the committed files: other tests (inplace_session report) read them.
+    assert st.main(out=tmp_path) == 0
+    for name in ("stage_table.json", "stage_table.md"):     # the committed table regenerates byte for byte
+        assert (tmp_path / name).read_bytes() == (st.OUT / name).read_bytes(), name
+    out = json.loads((tmp_path / "stage_table.json").read_text())
     rows = {r["stage"]: r for r in out["rows"]}
     assert list(rows) == st.ORDER and len(rows) == 14
     assert abs(sum(r["current_us"] for r in rows.values()) - out["summary"]["traced_token_us"]) < 1e-6
