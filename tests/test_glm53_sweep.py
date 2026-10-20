@@ -192,4 +192,3 @@ def test_compile_rejects_actual_residency_below_exact_plan_requirement(tmp_path,
         sweep.compile_candidate(build,options.Options(),Path('/llvm'),Path('/headers'),libs,min_workgroups_per_cu=1)
     saved=json.loads((build/'compiler-resources.json').read_text())
     assert saved[0]['required_workgroups_per_cu']==2 and saved[0]['estimated_workgroups_per_cu_upper_bound']==1
-
