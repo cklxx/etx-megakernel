@@ -9,11 +9,13 @@ from pathlib import Path
 from etx.frontends import hip_link
 from etx.ir import Graph, Resource
 from examples.glm53.stage import validate
+from examples.glm53.options import Options, load as load_options
 
 TILES='examples/glm53/tiles.hip'
 
 
-def build_from(stage, batch=1):
+def build_from(stage, batch=1, options=None):
+    options = Options() if options is None else options
     if batch not in (1,2,4,8):raise ValueError('batch must be 1,2,4,8')
     d=stage['dimensions'];t=stage['config'];g=Graph('glm53_flash_pp2')
     g.symbols=['B'];a_bytes=2 if d['BF16'] else 4
@@ -24,7 +26,8 @@ def build_from(stage, batch=1):
         g.tensor(name+'_weights',(w['blob_bytes'],),role='weight',dtype='uint8',bytes_per_elem=1)
         g.tensor(name+'_meta',(w['meta_bytes'],),role='weight',dtype='uint8',bytes_per_elem=1)
     g.tensor('head_scratch',('B',2*d['H']+d['VOCAB']),role='scratch',dtype='float32',bytes_per_elem=4)
-    resource=Resource(threads=256,vgpr=64)
+    # Native static LDS staging is additional to scheduler LDS, not ctx.lds.
+    resource=Resource(threads=options.threads,vgpr=options.vgpr_budget)
     previous='embedded';event='e_embed'
     g.tensor(previous,('B',d['HC'],d['H']),bytes_per_elem=a_bytes)
     g.etensor(event,('B',),wait_count=1)
@@ -57,7 +60,7 @@ def build_from(stage, batch=1):
 
 def build():
     path=Path(os.environ['ETX_GLM_STAGE'])
-    return build_from(validate(path,allow_fixture=os.environ.get('ETX_GLM_FIXTURE')=='1',gate=os.environ.get('ETX_GLM_GATE','production')))
+    return build_from(validate(path,allow_fixture=os.environ.get('ETX_GLM_FIXTURE')=='1',gate=os.environ.get('ETX_GLM_GATE','production')), options=load_options(os.environ.get('ETX_GLM_OPTIONS')))
 
 def bindings(**overrides):
     b=dict(B=int(os.environ.get('ETX_GLM_BATCH','1')));b.update(overrides)

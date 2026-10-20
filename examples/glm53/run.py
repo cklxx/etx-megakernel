@@ -103,11 +103,16 @@ def main():
     ap=argparse.ArgumentParser(description=__doc__);ap.add_argument('operation',choices=['build','qualify']);ap.add_argument('--stage',type=Path,required=True);ap.add_argument('--build',type=Path,required=True);ap.add_argument('--reference',type=Path);ap.add_argument('--out',type=Path,required=True);ap.add_argument('--batch',type=int,choices=[1,2,4,8],default=1)
     ap.add_argument('--logit-atol',type=float,help='fail unless every full logit is within this absolute error of HF, even when all tokens match; default reports only')
     ap.add_argument('--gate',choices=['production','module','slice'],default='production',help='pinned identity the stage and reference must carry')
-    a=ap.parse_args();stage.validate(a.stage,gate=a.gate)
+    ap.add_argument('--options',type=Path,help='build operation only: explicit build-options JSON (never taken from ambient environment)')
+    a=ap.parse_args()
+    if a.operation!='build' and a.options is not None:ap.error('--options is only valid for build; qualify verifies the existing build identity')
+    stage.validate(a.stage,gate=a.gate)
     if a.operation=='build':
         a.out.mkdir(parents=True,exist_ok=False)
         env={k:v for k,v in os.environ.items() if not k.startswith(('ETX_','DSL_ABLATE_'))}
-        execute(['bash','examples/glm53/build_model.sh',str(a.stage.resolve()),str(a.build.resolve())],a.out/'build.log',dict(env,ETX_GLM_BATCH=str(a.batch),ETX_GLM_GATE=a.gate),1800)
+        command=['bash','examples/glm53/build_model.sh',str(a.stage.resolve()),str(a.build.resolve())]
+        if a.options is not None:command+=['--options',str(a.options.resolve())]
+        execute(command,a.out/'build.log',dict(env,ETX_GLM_BATCH=str(a.batch),ETX_GLM_GATE=a.gate),1800)
     else:
         if a.reference is None:ap.error('--reference is required for qualify')
         print(json.dumps(qualify(a.stage,a.build,a.reference,a.out,logit_atol=a.logit_atol,gate=a.gate)))

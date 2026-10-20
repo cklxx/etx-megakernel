@@ -260,6 +260,12 @@ def test_gfx942_matched_cache_ab_differs_only_in_cache_bits(sources):
                 assert 's_waitcnt vmcnt(0)' in control
 
 
+def test_hip_host_pass_accepts_explicit_cache_options(sources):
+    flags = [flag for flag in _gfx942_compiler() if flag != '--cuda-device-only']
+    _run([*flags, '--cuda-host-only', *_defines({'CACHE_AB': 1, 'ROUTED_SLC': 1, 'LDS_BYTES': 64}),
+          '-I', NATIVE, '-I', sources, '-fsyntax-only', sources/'device.hip'])
+
+
 def test_gfx942_nonzero_lds_and_tile_variant_compiles(sources):
     out = sources/'lds-tiles.s'
     _run([*_gfx942_compiler(), *_defines({'ROW_TILE': 3, 'K_TILE': 5, 'LDS_BYTES': 64}),
