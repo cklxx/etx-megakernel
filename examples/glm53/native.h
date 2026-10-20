@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <math.h>
 #include "glm53_spec.h"
+#include "native_options.h"
 #ifdef GLM53_CPU
 #define GLM_DEV inline
 #define GLM_SYNC() ((void)0)
@@ -45,20 +46,78 @@ GLM_DEV float glm_fp8(uint8_t x) {
   float v=e ? ldexpf(1.0f+m/8.0f,e-7) : ldexpf(m/8.0f,-6);
   return x&128 ? -v : v;
 }
-GLM_DEV float glm_w(const uint8_t* blob,const glm_weight& w,int r,int c=0) {
+// Only immutable weight payloads use these readers. Explicit SLC is opt-in;
+// ordinary/default loads (including all scales) retain compiler cache policy.
+// Wait for the inline-assembly result before C++ consumes it. No activation,
+// recurrent state, cross-XCD control or atomic ordering is changed here.
+template<bool Stream,bool Explicit=false> GLM_DEV uint32_t glm_payload_u8(const uint8_t* p) {
+#if defined(__gfx942__) && !defined(GLM53_CPU)
+  if(Stream){uint32_t v;asm volatile("global_load_ubyte %0, %1, off slc\n\ts_waitcnt vmcnt(0)" : "=v"(v) : "v"(p) : "memory");return v;}
+  if(Explicit){uint32_t v;asm volatile("global_load_ubyte %0, %1, off\n\ts_waitcnt vmcnt(0)" : "=v"(v) : "v"(p) : "memory");return v;}
+#endif
+  return *p;
+}
+template<bool Stream,bool Explicit=false> GLM_DEV uint32_t glm_payload_u16(const uint16_t* p) {
+#if defined(__gfx942__) && !defined(GLM53_CPU)
+  if(Stream){uint32_t v;asm volatile("global_load_ushort %0, %1, off slc\n\ts_waitcnt vmcnt(0)" : "=v"(v) : "v"(p) : "memory");return v;}
+  if(Explicit){uint32_t v;asm volatile("global_load_ushort %0, %1, off\n\ts_waitcnt vmcnt(0)" : "=v"(v) : "v"(p) : "memory");return v;}
+#endif
+  return *p;
+}
+template<bool Stream,bool Explicit=false> GLM_DEV float glm_payload_f32(const float* p) {
+#if defined(__gfx942__) && !defined(GLM53_CPU)
+  if(Stream){union{float f;uint32_t u;}v;asm volatile("global_load_dword %0, %1, off slc\n\ts_waitcnt vmcnt(0)" : "=v"(v.u) : "v"(p) : "memory");return v.f;}
+  if(Explicit){union{float f;uint32_t u;}v;asm volatile("global_load_dword %0, %1, off\n\ts_waitcnt vmcnt(0)" : "=v"(v.u) : "v"(p) : "memory");return v.f;}
+#endif
+  return *p;
+}
+template<bool Stream=false,bool Explicit=false> GLM_DEV float glm_w(const uint8_t* blob,const glm_weight& w,int r,int c=0) {
   uint64_t i=(uint64_t)r*w.cols+c;
-  if(w.kind==1) { union{float f;uint32_t u;}v;v.u=(uint32_t)((const uint16_t*)(blob+w.offset))[i]<<16;return v.f; }
-  if(w.kind==2) return ((const float*)(blob+w.offset))[i];
+  if(w.kind==1) { union{float f;uint32_t u;}v;v.u=glm_payload_u16<Stream,Explicit>((const uint16_t*)(blob+w.offset)+i)<<16;return v.f; }
+  if(w.kind==2) return glm_payload_f32<Stream,Explicit>((const float*)(blob+w.offset)+i);
   int scols=(w.cols+w.block-1)/w.block;
   float scale=((const float*)(blob+w.scale))[(r/w.block)*scols+c/w.block];
   // Trusted reference dequantizes FP8 blocks to BF16 before linear algebra.
-  return glm_bf(glm_fp8(blob[w.offset+i])*scale);
+  return glm_bf(glm_fp8(glm_payload_u8<Stream,Explicit>(blob+w.offset+i))*scale);
 }
-GLM_DEV void glm_mv(const uint8_t* b,const glm_weight& w,const float* x,float* y,bool rounded=true) {
+#if ETX_GLM_LDS_BYTES > 0 && !defined(GLM53_CPU)
+// One common allocation, not one per glm_mv<Stream,Explicit> specialization.
+static __shared__ float glm_input_slab[ETX_GLM_LDS_BYTES/sizeof(float)];
+#endif
+template<bool Stream=false,bool Explicit=false> GLM_DEV void glm_mv(const uint8_t* b,const glm_weight& w,const float* x,float* y,bool rounded=true) {
+#if ETX_GLM_LDS_BYTES > 0 && !defined(GLM53_CPU)
+  // Every call site is workgroup-uniform. All lanes participate, even when
+  // there are fewer output rows than lanes. Reused only after the final sync.
+  if(w.cols<=ETX_GLM_LDS_BYTES/(int)sizeof(float)){
+    for(int c=GLM_LANE;c<w.cols;c+=GLM_LANES)glm_input_slab[c]=x[c];
+    GLM_SYNC();x=glm_input_slab;
+  }
+#endif
+#if ETX_GLM_ROW_TILE == 1 && ETX_GLM_K_TILE == 0
   for(int r=GLM_LANE;r<w.rows;r+=GLM_LANES){float sum=0;
-    for(int c=0;c<w.cols;++c) sum += glm_w(b,w,r,c)*x[c];
+    for(int c=0;c<w.cols;++c) sum += glm_w<Stream,Explicit>(b,w,r,c)*x[c];
     y[r]=rounded?glm_bf(sum):sum;
-  } GLM_SYNC();
+  }
+#else
+  // A lane owns adjacent rows with independent accumulators. Chunking does
+  // not introduce K partial sums: each row still visits c in ascending order.
+  for(int base=GLM_LANE*ETX_GLM_ROW_TILE;base<w.rows;base+=GLM_LANES*ETX_GLM_ROW_TILE){
+    float sums[ETX_GLM_ROW_TILE]={};
+    for(int begin=0;begin<w.cols;){
+      int count=w.cols-begin;
+#if ETX_GLM_K_TILE > 0
+      if(count>ETX_GLM_K_TILE)count=ETX_GLM_K_TILE;
+#endif
+      int end=begin+count;
+      for(int c=begin;c<end;++c){float v=x[c];
+        for(int j=0;j<ETX_GLM_ROW_TILE;++j)if(base+j<w.rows)sums[j]+=glm_w<Stream,Explicit>(b,w,base+j,c)*v;
+      }
+      begin=end;
+    }
+    for(int j=0;j<ETX_GLM_ROW_TILE;++j)if(base+j<w.rows)y[base+j]=rounded?glm_bf(sums[j]):sums[j];
+  }
+#endif
+  GLM_SYNC();
 }
 GLM_DEV void glm_norm(const uint8_t* b,const glm_weight& w,const float* x,float* y,int n,float eps=GLM_EPS) {
   if(GLM_LANE==0){float ss=0;for(int i=0;i<n;++i)ss+=x[i]*x[i];
@@ -100,11 +159,11 @@ GLM_DEV void glm_mix(float* s,const float* y,const float* tmp) {
   } GLM_SYNC();
   for(int j=GLM_LANE;j<GLM_HC*GLM_H;j+=GLM_LANES)s[j]=out[j];GLM_SYNC();
 }
-GLM_DEV void glm_mlp(const uint8_t* b,const glm_weight* w,int g,int u,int d,const float* x,float* y,float* scratch) {
+template<bool Stream=false,bool Explicit=false> GLM_DEV void glm_mlp(const uint8_t* b,const glm_weight* w,int g,int u,int d,const float* x,float* y,float* scratch) {
   float* gate=scratch;float* up=scratch+GLM_INTERMAX;
-  glm_mv(b,w[g],x,gate);glm_mv(b,w[u],x,up);
+  glm_mv<Stream,Explicit>(b,w[g],x,gate);glm_mv<Stream,Explicit>(b,w[u],x,up);
   for(int j=GLM_LANE;j<w[g].rows;j+=GLM_LANES){float a=fminf(gate[j],GLM_CLIP),v=fmaxf(-GLM_CLIP,fminf(up[j],GLM_CLIP));gate[j]=glm_bf(glm_bf(a*glm_sig(a))*v);}GLM_SYNC();
-  glm_mv(b,w[d],gate,y);
+  glm_mv<Stream,Explicit>(b,w[d],gate,y);
 }
 GLM_DEV void glm_ffn(const uint8_t* b,const glm_weight* w,const float* x,float* y,float* a,bool moe) {
   if(!moe){glm_mlp(b,w,MG,MU,MD,x,y,a);return;}
@@ -122,9 +181,9 @@ GLM_DEV void glm_ffn(const uint8_t* b,const glm_weight* w,const float* x,float* 
     for(int i=0;i<GLM_TOPK;++i)for(int j=i+1;j<GLM_TOPK;++j)if(ids[j]<ids[i]){float t=ids[i];ids[i]=ids[j];ids[j]=t;t=probs[i];probs[i]=probs[j];probs[j]=t;}
     for(int j=0;j<GLM_H;++j)y[j]=0;
   }GLM_SYNC();
-  for(int k=0;k<GLM_TOPK;++k){int slot=EXPERTS+3*(int)ids[k];glm_mlp(b,w,slot,slot+1,slot+2,x,expert,a);
+  for(int k=0;k<GLM_TOPK;++k){int slot=EXPERTS+3*(int)ids[k];glm_mlp<(ETX_GLM_ROUTED_SLC!=0),(ETX_GLM_CACHE_AB!=0)>(b,w,slot,slot+1,slot+2,x,expert,a);
     for(int j=GLM_LANE;j<GLM_H;j+=GLM_LANES)y[j]=glm_bf(y[j]+glm_bf(expert[j]*probs[k]));GLM_SYNC();}
-  glm_mlp(b,w,SG,SU,SD,x,expert,a);
+  glm_mlp<(ETX_GLM_SHARED_SLC!=0),(ETX_GLM_CACHE_AB!=0)>(b,w,SG,SU,SD,x,expert,a);
   for(int j=GLM_LANE;j<GLM_H;j+=GLM_LANES)y[j]=glm_bf(y[j]+expert[j]);GLM_SYNC();
 }
 GLM_DEV void glm_kda(const uint8_t* b,const glm_weight* w,const float* x,float* y,float* state,float* t) {
