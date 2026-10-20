@@ -33,6 +33,29 @@ def digest(identity):
     return hashlib.sha256(json.dumps(identity, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
 
 
+def plan_requests(build: Path):
+    """The request count the plan header publishes (`total .. requests <n>`); plans without one serve one request.
+    A missing plan is left to the fingerprint, which refuses it."""
+    plan = build / 'vl_plan.txt'
+    if not plan.is_file():
+        return 1
+    for line in plan.read_text().splitlines():
+        if line.startswith('total '):
+            words = line.split()
+            if 'requests' in words:
+                n = int(words[words.index('requests') + 1])
+                if n < 1:
+                    raise Refusal('plan header publishes no request')
+                return n
+            return 1
+    return 1
+
+
+def request_goldens(requests):
+    """Request r's golden: the base prompt rotated by 97 r tokens (examples/llm/prep.py --rotate)."""
+    return ['golden_c1024.txt'] + [f'golden_c1024_r{97 * r}.txt' for r in range(1, requests)]
+
+
 def fingerprint(build: Path, model: Path):
     paths = {'executable': build / 'run', 'plan': build / 'vl_plan.txt',
              'imports': build / 'imports.bc', 'import_metadata': build / 'imp/imports.json',
@@ -41,6 +64,14 @@ def fingerprint(build: Path, model: Path):
              'compiler_output': build / 'hipcc.log'}
     if (build / 'hipcc_command.json').exists():
         paths['compiler_command'] = build / 'hipcc_command.json'
+    # A multi-request plan reads one golden and one HF prefill reference per request; one-request
+    # identities are unchanged.
+    requests = plan_requests(build)
+    if requests > 1:
+        for name in request_goldens(requests):
+            paths[f'request_golden/{name}'] = model / name
+            prefill = name.replace('golden', 'prefill', 1)
+            paths[f'request_prefill/{prefill}'] = model / prefill
     sources = sorted(build.glob('*.hip'))
     for required in ('megakernel_d0.hip', 'dsl_tiles.hip', 'imp_tiles.hip'):
         if build / required not in sources:
@@ -55,7 +86,7 @@ def write_build(build, model):
                     hipcc_flags=os.environ.get('ETX_HIPCC_FLAGS', ''),
                     compiler=(build / 'compiler_version.txt').read_text().strip(),
                     overrides={k: v for k, v in os.environ.items()
-                               if k.startswith(('ETX_VL_', 'ETX_DSL_'))
+                               if k.startswith(('ETX_VL_', 'ETX_DSL_', 'ETX_TOPK_'))
                                or k in ('ETX_PREFETCH_ISOLATE_POLLER', 'ETX_DEV_RESET')},
                     files=fingerprint(build, model))
     (build / 'build_identity.json').write_text(json.dumps(identity, indent=2, sort_keys=True) + '\n')
@@ -72,11 +103,17 @@ def verified_build(build, model):
 def capture(build, model, args):
     # The wrapper fixes executable, plan, model and golden; alternate golden or
     # truncated/teacher-forced timing must not inherit their fingerprints.
-    allowed = {'--check', '--check-pos', '--repeat', '--unfused', '--check-dsl', '--price-attention'}
+    allowed = {'--check', '--check-pos', '--repeat', '--unfused', '--check-dsl', '--price-attention', '--check-coverage'}
     for arg in args:
         if arg.startswith('-') and arg not in allowed:
             raise Refusal(f'unsupported certified host option {arg}')
     identity = verified_build(build, model)
+    # Multi-request plans: the wrapper, not the caller, names each request's fingerprinted golden.
+    requests = plan_requests(build)
+    if requests > 1:
+        args = list(args)
+        for r, name in enumerate(request_goldens(requests)):
+            args += ['--golden' + (str(r) if r else ''), name]
     tag = digest(identity)
     print(f'BUILD-IDENTITY phase=before sha256={tag}', flush=True)
     print('ETX_ENV ETX_UNFUSED_SYNC=' + os.environ.get('ETX_UNFUSED_SYNC', '')
@@ -111,7 +148,10 @@ def expected_instances(plan, imports):
         all_ids.add(n)
         if r[1].startswith('dsl_'):
             continue
+        # The plan's trailing columns are rep stride copyoff req nb; old plans
+        # without them belong to request 0.
         rows.append(dict(id=n, export=r[1], layer=int(r[2]), replicas=int(r[12]),
+                         req=int(r[15]) if len(r) > 15 else 0,
                          grid=list(map(int, r[4:7])), block=imports[r[1]]['block']))
     if not rows:
         raise Refusal('zero planned imports')
@@ -137,6 +177,9 @@ def check_output(text, expected, position, identity):
     if [r['id'] for r in records] != [r['id'] for r in expected]:
         raise Refusal(f'position {position}: incomplete/duplicate/out-of-order instances {len(records)}/{len(expected)}')
     for r, want in zip(records, expected):
+        # Records written before host.hip published req belong to request 0.
+        if 'req' not in r and want.get('req') == 0:
+            want = {k: v for k, v in want.items() if k != 'req'}
         if any(r.get(k) != v for k, v in want.items()):
             raise Refusal(f'position {position}: instance metadata mismatch')
         if r.get('position') != position or type(r.get('bytes')) is not int or r['bytes'] <= 0:
