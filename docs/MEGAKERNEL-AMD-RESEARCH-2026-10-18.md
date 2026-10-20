@@ -170,21 +170,65 @@ Not sequenced with E1–E6 and a prerequisite for none of them. Replace the
 relay's atomic counter barrier with hierarchical sentinel polling: one
 producer-owned cache line per participant, one poller per XCD, one top level.
 
-- **Ceiling.** The measured whole-GPU counter barrier is **8.6 µs at 304
-  workgroups** (`docs/RESEARCH-sync-hardware.md:25`). DeepSeek B4's dependency
-  gap is measured at **963 µs**; at roughly **2 barriers per layer over 27
-  layers** that is about **464 µs**. The experiment ceiling is therefore
-  **under 1 ms against a 3.37 ms target**, which is why it stays independent
-  and does not preempt E1.
-- **First step is not code.** Count the barriers per decode step from a trace
-  and compute the ceiling from those counts. If the counted ceiling is below
-  **0.9 ms, do not write code.**
+- **Barrier count from the trace: [U].** The session named for this step
+  (`~/etx-sessions/20261018T022516Z-a9dbdf`) holds the B4 build plan
+  (`b_x4/plan.json`, 219,784 tasks) and per-step records
+  (`b4_alld4r0l1kvsmw.raw.log`, `brounds.json`) but **no trace**: the x4 build
+  failed there (`build_x4.log:1`), no `ETX_TRACE_RAW` file exists under the
+  directory, and there is no trace report. The B4 trace report this repo does
+  hold (`examples/gpu-live/results/2026-10-16-multibatch/trace_report.json`,
+  three B4 traces of 219,784 tasks, spans 8.696/8.670/8.665 ms,
+  `:2463-2464`) carries `phase`, `tasks`, `body_us`, `cp_body_us`,
+  `cp_dep_gap_us`, `cp_queue_gap_us` and wait/skew fields only;
+  `grep -c barrier` returns 0 and no field counts event completions. **Neither
+  source records how many relay barriers a step executes, so no
+  trace-measured count is reported.**
+- **Plan-derived count: [E], exact for this build structure.** Count the event
+  instances of the session's own `b_x4/plan.json` whose producer and consumer
+  worker sets are equal and whose scope is `DEVICE` (the relay mirrors only
+  DEVICE-scope words, 336 = 4 requests × 84 at B4,
+  `b_x4/plan_data.h:18-19`): **220 whole-group barriers per B4 step**, 55 per
+  request (27 `E_oproj`, 26 `E_down`, plus one `E_dgu` and one `E_dense`). They form two
+  disjoint 296-worker groups (r0/r2 and r1/r3); each group executes **110**
+  on its own path, concurrently with the other. The plan also holds 3,424
+  `DOMAIN`-scope producer=consumer instances (16- and 37-worker subgroups
+  inside one domain) that never cross the relay; they are excluded. The B1
+  plan (`b_alld4r0l1kvsmw/plan.json`, 53,022 tasks) has **55** whole-group
+  barriers. The B4 plan's 14 per-family task counts equal the traced B4
+  build's [M trace report, E plan], so the structure counted is the one that
+  was timed.
+- **Ceiling [E].** `110 × 8.6 µs = 946 µs` per B4 step; `220 × 8.6 =
+  1,892 µs` would double-count the two groups that run concurrently. B1:
+  `55 × 8.6 = 473 µs`. The 8.6 µs is [M] (`docs/RESEARCH-sync-hardware.md:25`:
+  a whole-GPU counter barrier at 304 workgroups) — the barrier shape E7
+  replaces, waited out through the relay's mirror
+  (`etx/runtime/include/etx/primitives.h:97-123`).
+- **Cross-check [M].** The held B4 traces measure **944.70 / 955.08 / 963.12
+  µs** of critical-path dependency gap (sum of `cp_dep_gap_us` over the
+  per-phase rows of the three B4 traces; `trace_report.json`), within **2%**
+  of 946 µs — consistent with the relay's barrier being essentially the whole
+  dependency gap. B1's measured gaps are **378.71 / 379.34 / 385.22 µs**
+  against 473 µs predicted, so the product over-predicts by ~23% there; it is
+  an upper bound, not a reconstruction.
+- **Verdict of the pre-registered rule.** B4's 946 µs is **5% above** the
+  0.9 ms bar; B1's 473 µs is far below it. At B4 the experiment is at the
+  line, at B1 it is not justified. The next step is the counter below, not
+  code.
+- **Cheapest counter [E, not implemented].** Add `uint32_t
+  done[ETX_EVENT_WORDS]` (6,356 words = 25 KB at B4) with one relaxed
+  `atomicAdd` in the last-arriver zero-crossing branch of
+  `etx_arrive_flush_DEVICE_nf` (`etx/runtime/include/etx/primitives.h:72-79`),
+  then one 25 KB D2H copy after the run; intersect the counts with the plan
+  offline to recover the 220. Zero-atomic alternative: record the waited
+  event-word index in the existing 9×int64 per-task trace row
+  (`etx/runtime/include/etx/host.h:612`), but that counts waiters only and changes
+  the trace row format.
 - **Unverified input [U].** The external sentinel result (7.8 µs → 0.9 µs) is
   not reproduced in this repo and is marked [U] until measured here (recorded
   as "public, not reproduced" in
   `docs/SYNC-TAXONOMY-AUDIT-2026-10-11.md:89`).
-- **Falsifier:** the counted ceiling is below 0.9 ms, or a paired step improves
-  <2%.
+- **Falsifier:** a counted ceiling below 0.9 ms (B1 already is), or a paired
+  step improving <2%.
 
 **Week 2 — one MI300X box, correctness-first, then timing.**
 
