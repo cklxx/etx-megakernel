@@ -5,9 +5,17 @@ cd "$(dirname "$0")/../.."
 STAGE=${1:?validated staged model directory}
 OUT=${2:?new build directory}
 PY=${ETX_PYTHON:-.venv/bin/python}
+shift 2
+LOCAL=0
+if [ "${1:-}" = --local ]; then LOCAL=1; shift; fi
+# Never allow hidden compiler flags to change a recorded configuration.
+for name in HIPCC_COMPILE_FLAGS_APPEND HIPCC_LINK_FLAGS_APPEND CFLAGS CXXFLAGS CPPFLAGS CPATH CPLUS_INCLUDE_PATH C_INCLUDE_PATH CCC_OVERRIDE_OPTIONS; do
+  if [ -n "${!name:-}" ]; then printf 'Refusing unrecorded compiler environment %s\n' "$name" >&2; exit 2; fi
+done
+if [ -n "${ETX_GLM_OPTIONS:-}" ]; then set -- --options "$ETX_GLM_OPTIONS" "$@"; fi
 export ETX_GLM_STAGE="$STAGE"
-"$PY" -m examples.glm53.model_build --stage "$STAGE" --out "$OUT" --batch "${ETX_GLM_BATCH:-1}" --gate "${ETX_GLM_GATE:-production}" ${ETX_GLM_FIXTURE:+--allow-fixture}
-if [ "${3:-}" = --local ]; then
+"$PY" -m examples.glm53.model_build --stage "$STAGE" --out "$OUT" --batch "${ETX_GLM_BATCH:-1}" --gate "${ETX_GLM_GATE:-production}" ${ETX_GLM_FIXTURE:+--allow-fixture} "$@"
+if [ "$LOCAL" = 1 ]; then
   for d in 0 1; do
     bash etx/importer/hip_ir_local.sh "$OUT/megakernel_d$d.hip" "$OUT/mk$d.ll" -Ietx/runtime/include -I "$OUT" -I .
     "${ETX_LLVM:-/opt/homebrew/opt/llvm/bin}/llc" -mtriple=amdgcn-amd-amdhsa -mcpu=gfx942 -O3 "$OUT/mk$d.ll" -o "$OUT/mk$d.s"
@@ -15,16 +23,16 @@ if [ "${3:-}" = --local ]; then
   R=${ETX_ROCM_HEADERS:-$HOME/code/rocm-headers}
   "${ETX_LLVM:-/opt/homebrew/opt/llvm/bin}/clang++" -x hip --cuda-host-only -fsyntax-only -nogpuinc -nogpulib \
     --offload-arch=gfx942 -std=c++17 -isystem "$R/clang" -isystem "$R/inc" -include __clang_hip_runtime_wrapper.h \
-    -isystem etx/importer/shim/mac -D__HIP_PLATFORM_AMD__ -Ietx/runtime/include -I "$OUT" -I . examples/glm53/model_host.hip
+    -isystem etx/importer/shim/mac -D__HIP_PLATFORM_AMD__ -Ietx/runtime/include -I "$OUT" -I . -include glm53_options.h examples/glm53/model_host.hip
 else
-  hipcc -O3 -std=c++17 --offload-arch=gfx942 -Ietx/runtime/include -I "$OUT" -I . \
+  hipcc -O3 -std=c++17 --offload-arch=gfx942 -Ietx/runtime/include -I "$OUT" -I . -include glm53_options.h \
     "$OUT/megakernel_d0.hip" "$OUT/megakernel_d1.hip" examples/glm53/model_host.hip -pthread -o "$OUT/run"
 fi
 
-"$PY" - "$OUT" "${3:-}" <<'PYEND'
+"$PY" - "$OUT" "$LOCAL" <<'PYEND'
 from pathlib import Path
 import sys
 from examples.glm53.model_build import finalize
-finalize(Path(sys.argv[1]),local=sys.argv[2]=='--local')
+finalize(Path(sys.argv[1]),local=sys.argv[2]=='1')
 print('GLM-MODEL-BUILD OK; hardware correctness requires qualification',flush=True)
 PYEND
