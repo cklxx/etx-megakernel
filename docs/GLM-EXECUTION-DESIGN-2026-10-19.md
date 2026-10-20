@@ -182,89 +182,55 @@ snapshot's `config.json`, index and every shard before HF loads it, rechecks
 them after the run, and records them in its provenance
 (`reference.py:snapshot_hashes`). Tests: `tests/test_glm53_slice.py`, CPU only.
 
-**Box commands.** One ssh invocation runs the whole oracle: staging, HF
-reference, candidate build and run, comparison, certificate. No machine path is
-baked into the code or this document; `HOST`, `MODEL_ROOT` and `OUT_ROOT` are
-supplied at call time, and `REPO`, `GLM_BATCH`, `GLM_CONTEXT` and
-`GLM_MAX_MEMORY` have box-side defaults. Run the first block from any machine
-that can reach the two-GPU box; the heredoc executes on the box.
+**Box command.** One runner does the whole oracle: staging, HF reference,
+candidate build and run, comparison, certificate. `examples/glm53/run_all.py`
+takes every parameter as a flag or the environment variable named beside it;
+no machine path is baked into the code or this document.
 
 ```bash
-HOST=${HOST:?ssh target of the two-GPU box, e.g. user@gpu-box}
-MODEL_ROOT=${MODEL_ROOT:?pinned GLM-5.3 release directory on the box}
-OUT_ROOT=${OUT_ROOT:?new output directory on the box}
-GLM_BATCH=${GLM_BATCH:-4}      # 1/2/4/8; one build and one certificate per batch
-GLM_CONTEXT=${GLM_CONTEXT:-1024}
-
-ssh "$HOST" "MODEL_ROOT='$MODEL_ROOT' OUT_ROOT='$OUT_ROOT' REPO='${REPO:-}' \
-GLM_BATCH=$GLM_BATCH GLM_CONTEXT=$GLM_CONTEXT GLM_MAX_MEMORY='${GLM_MAX_MEMORY:-}' bash -s" <<'BOX'
-set -euo pipefail
-: "${REPO:=$HOME/etx}"          # checkout on the box
-cd "$REPO"
-[ -x .venv/bin/python ] || { echo "no .venv in $REPO" >&2; exit 2; }
-if [ -z "${GLM_MAX_MEMORY:-}" ]; then GLM_MAX_MEMORY='{"0":"80GiB","1":"80GiB","cpu":"32GiB"}'; fi
-if [ -e "$OUT_ROOT" ]; then echo "OUT_ROOT must be new: $OUT_ROOT" >&2; exit 2; fi
-mkdir -p "$OUT_ROOT"
-STAGE="$OUT_ROOT/stage"; REF="$OUT_ROOT/reference.json"; BUILD="$OUT_ROOT/build"
-QUALIFY="$OUT_ROOT/qualification"; CERT="$OUT_ROOT/certificate"
-
-# 0. prompts: 1/2/4/8 distinct equal-length rows (reference.py:31-36), deterministic seed
-.venv/bin/python - "$MODEL_ROOT" "$OUT_ROOT/prompts.json" "$GLM_BATCH" "$GLM_CONTEXT" <<'PY'
-import json, random, sys
-src, out, batch, context = sys.argv[1], sys.argv[2], int(sys.argv[3]), int(sys.argv[4])
-vocab = json.load(open(src + "/config.json"))["text_config"]["vocab_size"]
-rows = [random.Random(20261019 + r).sample(range(vocab), context) for r in range(batch)]
-assert len({tuple(r) for r in rows}) == batch
-json.dump(rows, open(out, "w"))
-print(f"PROMPTS {out} batch={batch} context={context} vocab={vocab}", flush=True)
-PY
-
-# 1. stage layers 22-25 as a derived, pinned identity (refuses a window not straddling 23/24)
-.venv/bin/python -u -m examples.glm53.stage --src "$MODEL_ROOT" --out "$STAGE" \
-  --maxlen 1072 --layers 22-25 --gate slice
-.venv/bin/python -m examples.glm53.prepare --require-model --stage "$STAGE" \
-  --gate slice --out "$OUT_ROOT/prepare.json"
-
-# 2. independent HF reference on the same four layers and prompts, 32 greedy steps;
-#    writes $REF, $REF's .logits and the derived snapshot $REF.slice/
-mkdir -p "$OUT_ROOT/offload"
-HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 .venv/bin/python -u -m examples.glm53.reference \
-  --src "$MODEL_ROOT" --prompts "$OUT_ROOT/prompts.json" --out "$REF" \
-  --offload "$OUT_ROOT/offload" --max-memory "$GLM_MAX_MEMORY" \
-  --layers 22-25 --gate slice
-
-# 3. build the ETX PP2 model for this batch, then the candidate run (two repetitions)
-.venv/bin/python -m examples.glm53.run build --stage "$STAGE" --build "$BUILD" \
-  --out "$OUT_ROOT/build-log" --batch "$GLM_BATCH" --gate slice
-.venv/bin/python -m examples.glm53.run qualify --stage "$STAGE" --build "$BUILD" \
-  --reference "$REF" --out "$QUALIFY" --batch "$GLM_BATCH" --gate slice
-
-# 4. offline comparison of each candidate record with the HF record
-for r in 0 1; do
-  .venv/bin/python -m examples.glm53.oracle --reference "$REF" \
-    --candidate "$QUALIFY/run$r.json" --out "$OUT_ROOT/oracle-run$r.json" --gate slice
-done
-
-# 5. timing certificate: reruns qualification under $CERT, then writes bench_result.json
-.venv/bin/python -m examples.glm53.bench --stage "$STAGE" --build "$BUILD" \
-  --reference "$REF" --out "$CERT" --gate slice
-BOX
+cd <checkout on the two-GPU box>
+.venv/bin/python -m examples.glm53.run_all \
+  --model-root <pinned GLM-5.3 release directory> \
+  --out <new output directory> \
+  [--layers 22-25] [--batch 4] [--gpus 2] \
+  [--max-memory '{"0":"80GiB","1":"80GiB","cpu":"32GiB"}'] \
+  [--dry-run]
+# env fallbacks: GLM_MODEL_ROOT, GLM_OUT_ROOT, GLM_LAYERS, GLM_BATCH, GLM_GPUS,
+#                GLM_MAX_MEMORY, GLM_PYTHON, GLM_HIPCC, GLM_SEED, GLM_SECONDS
 ```
 
-**What each path produces.** `$OUT_ROOT/prompts.json`; `$STAGE/stage.json` and
-`$OUT_ROOT/prepare.json` (staged identity validated); `$OUT_ROOT/reference.json`,
-`$OUT_ROOT/reference.logits`, `$OUT_ROOT/reference.json.slice/` (the derived
-snapshot HF loaded, with its hashes in provenance); `$QUALIFY/qualification.json`,
-`$QUALIFY/run0.json`, `$QUALIFY/run1.json` and their `.tokens`/`.logits`/logs;
-`$OUT_ROOT/oracle-run0.json` and `oracle-run1.json`; and the certificate
-`$CERT/bench_result.json` (with the qualification it re-ran under
-`$CERT/qualification`). Every stage is fail-closed: a mismatch exits non-zero
-and, where the tool defines one, still writes its receipt. `OUT_ROOT` must not
-already exist; the stage, reference, build, qualification and bench output
-directories refuse to overwrite (the oracle reports overwrite the named file,
-so name new paths). Paths must not contain single quotes or spaces (the ssh
-argument is single-quoted). To run directly on the box, export `MODEL_ROOT`,
-`OUT_ROOT` and `REPO` and execute the heredoc body unchanged.
+From another machine, run the same line over ssh:
+`ssh "$HOST" "cd <checkout> && .venv/bin/python -m examples.glm53.run_all ..."`.
+
+**Refusal before work.** Before creating anything the runner checks the pinned
+checkpoint (`config.json` hash, `REVISION`, the index and every shard it names),
+the layer window (contiguous, straddling the PP2 split at 23/24), that the
+output root is new, the step interpreter and the five modules (`numpy`, `torch`,
+`transformers`, `safetensors`, `accelerate`), `hipcc`, and exactly two visible
+GPUs. A missing input exits 2 before any work, with one `supply:` command per
+problem — the pinned `hf download`, the `pip install`, `tools/hotaisle_grab.sh
+2x`, the valid `--layers` example — and the output root is not created.
+`--dry-run` prints the ordered step commands and the same list, executes
+nothing, and exits 0 when ready or 3 when not. On the x86 test host (2026-10-20;
+no model, a CPU-only torch, no GPU, no `hipcc`): dry run exit 3 naming those
+four supplies, real run exit 2, output root absent [M].
+
+**What each path produces.** `$OUT/prompts.json`; `$OUT/stage/stage.json` and
+`$OUT/prepare.json` (staged identity validated); `$OUT/reference.json`,
+`$OUT/reference.logits`, `$OUT/reference.json.slice/` (the derived snapshot HF
+loaded, with its hashes in provenance); `$OUT/logs/*.log` and
+`$OUT/build-log/build.log`; `$OUT/qualification/qualification.json`,
+`run0.json`, `run1.json` and their `.tokens`/`.logits`; `$OUT/oracle-run0.json`
+and `oracle-run1.json`; and the certificate
+`$OUT/certificate/bench_result.json` (with the qualification it re-ran under
+`$OUT/certificate/qualification`). A successful run ends with
+`RESULT batch=<B> tokens=<32B>/<32B> median_decode_wall_ms=<ms>
+certificate=<path>`. Every stage is fail-closed: a mismatch exits non-zero and,
+where the tool defines one, still writes its receipt. `--out` must not already
+exist; the stage, reference, build, qualification and bench output directories
+refuse to overwrite (the oracle report overwrites the named file, so name new
+paths). The runner passes arguments without a shell, so paths may contain
+spaces.
 
 `prompts.json` follows the existing contract: 1/2/4/8 distinct equal-length
 arrays (`reference.py:31-36`), each `length + 32 <= max_position_embeddings`.
