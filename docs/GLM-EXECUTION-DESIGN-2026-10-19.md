@@ -182,89 +182,103 @@ snapshot's `config.json`, index and every shard before HF loads it, rechecks
 them after the run, and records them in its provenance
 (`reference.py:snapshot_hashes`). Tests: `tests/test_glm53_slice.py`, CPU only.
 
-**Box commands.** One ssh invocation runs the whole oracle: staging, HF
-reference, candidate build and run, comparison, certificate. No machine path is
-baked into the code or this document; `HOST`, `MODEL_ROOT` and `OUT_ROOT` are
-supplied at call time, and `REPO`, `GLM_BATCH`, `GLM_CONTEXT` and
-`GLM_MAX_MEMORY` have box-side defaults. Run the first block from any machine
-that can reach the two-GPU box; the heredoc executes on the box.
+**Box command.** One runner does the whole oracle: staging, HF reference,
+candidate build and run, comparison, certificate. `examples/glm53/run_all.py`
+takes every parameter as a flag or the environment variable named beside it;
+no machine path is baked into the code or this document.
 
 ```bash
-HOST=${HOST:?ssh target of the two-GPU box, e.g. user@gpu-box}
-MODEL_ROOT=${MODEL_ROOT:?pinned GLM-5.3 release directory on the box}
-OUT_ROOT=${OUT_ROOT:?new output directory on the box}
-GLM_BATCH=${GLM_BATCH:-4}      # 1/2/4/8; one build and one certificate per batch
-GLM_CONTEXT=${GLM_CONTEXT:-1024}
-
-ssh "$HOST" "MODEL_ROOT='$MODEL_ROOT' OUT_ROOT='$OUT_ROOT' REPO='${REPO:-}' \
-GLM_BATCH=$GLM_BATCH GLM_CONTEXT=$GLM_CONTEXT GLM_MAX_MEMORY='${GLM_MAX_MEMORY:-}' bash -s" <<'BOX'
-set -euo pipefail
-: "${REPO:=$HOME/etx}"          # checkout on the box
-cd "$REPO"
-[ -x .venv/bin/python ] || { echo "no .venv in $REPO" >&2; exit 2; }
-if [ -z "${GLM_MAX_MEMORY:-}" ]; then GLM_MAX_MEMORY='{"0":"80GiB","1":"80GiB","cpu":"32GiB"}'; fi
-if [ -e "$OUT_ROOT" ]; then echo "OUT_ROOT must be new: $OUT_ROOT" >&2; exit 2; fi
-mkdir -p "$OUT_ROOT"
-STAGE="$OUT_ROOT/stage"; REF="$OUT_ROOT/reference.json"; BUILD="$OUT_ROOT/build"
-QUALIFY="$OUT_ROOT/qualification"; CERT="$OUT_ROOT/certificate"
-
-# 0. prompts: 1/2/4/8 distinct equal-length rows (reference.py:31-36), deterministic seed
-.venv/bin/python - "$MODEL_ROOT" "$OUT_ROOT/prompts.json" "$GLM_BATCH" "$GLM_CONTEXT" <<'PY'
-import json, random, sys
-src, out, batch, context = sys.argv[1], sys.argv[2], int(sys.argv[3]), int(sys.argv[4])
-vocab = json.load(open(src + "/config.json"))["text_config"]["vocab_size"]
-rows = [random.Random(20261019 + r).sample(range(vocab), context) for r in range(batch)]
-assert len({tuple(r) for r in rows}) == batch
-json.dump(rows, open(out, "w"))
-print(f"PROMPTS {out} batch={batch} context={context} vocab={vocab}", flush=True)
-PY
-
-# 1. stage layers 22-25 as a derived, pinned identity (refuses a window not straddling 23/24)
-.venv/bin/python -u -m examples.glm53.stage --src "$MODEL_ROOT" --out "$STAGE" \
-  --maxlen 1072 --layers 22-25 --gate slice
-.venv/bin/python -m examples.glm53.prepare --require-model --stage "$STAGE" \
-  --gate slice --out "$OUT_ROOT/prepare.json"
-
-# 2. independent HF reference on the same four layers and prompts, 32 greedy steps;
-#    writes $REF, $REF's .logits and the derived snapshot $REF.slice/
-mkdir -p "$OUT_ROOT/offload"
-HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 .venv/bin/python -u -m examples.glm53.reference \
-  --src "$MODEL_ROOT" --prompts "$OUT_ROOT/prompts.json" --out "$REF" \
-  --offload "$OUT_ROOT/offload" --max-memory "$GLM_MAX_MEMORY" \
-  --layers 22-25 --gate slice
-
-# 3. build the ETX PP2 model for this batch, then the candidate run (two repetitions)
-.venv/bin/python -m examples.glm53.run build --stage "$STAGE" --build "$BUILD" \
-  --out "$OUT_ROOT/build-log" --batch "$GLM_BATCH" --gate slice
-.venv/bin/python -m examples.glm53.run qualify --stage "$STAGE" --build "$BUILD" \
-  --reference "$REF" --out "$QUALIFY" --batch "$GLM_BATCH" --gate slice
-
-# 4. offline comparison of each candidate record with the HF record
-for r in 0 1; do
-  .venv/bin/python -m examples.glm53.oracle --reference "$REF" \
-    --candidate "$QUALIFY/run$r.json" --out "$OUT_ROOT/oracle-run$r.json" --gate slice
-done
-
-# 5. timing certificate: reruns qualification under $CERT, then writes bench_result.json
-.venv/bin/python -m examples.glm53.bench --stage "$STAGE" --build "$BUILD" \
-  --reference "$REF" --out "$CERT" --gate slice
-BOX
+cd <checkout on the two-GPU box>
+.venv/bin/python -m examples.glm53.run_all \
+  --model-root <pinned GLM-5.3 release directory> \
+  --out <new output directory> \
+  [--layers 22-25] [--batch 4] [--gpus 2] \
+  [--max-memory '{"0":"80GiB","1":"80GiB","cpu":"32GiB"}'] \
+  [--bandwidth-tbps 4.3] \
+  [--dry-run]
+# env fallbacks: GLM_MODEL_ROOT, GLM_OUT_ROOT, GLM_LAYERS, GLM_BATCH, GLM_GPUS,
+#                GLM_MAX_MEMORY, GLM_PYTHON, GLM_HIPCC, GLM_SEED,
+#                GLM_BANDWIDTH_TBPS, GLM_SECONDS
 ```
 
-**What each path produces.** `$OUT_ROOT/prompts.json`; `$STAGE/stage.json` and
-`$OUT_ROOT/prepare.json` (staged identity validated); `$OUT_ROOT/reference.json`,
-`$OUT_ROOT/reference.logits`, `$OUT_ROOT/reference.json.slice/` (the derived
-snapshot HF loaded, with its hashes in provenance); `$QUALIFY/qualification.json`,
-`$QUALIFY/run0.json`, `$QUALIFY/run1.json` and their `.tokens`/`.logits`/logs;
-`$OUT_ROOT/oracle-run0.json` and `oracle-run1.json`; and the certificate
-`$CERT/bench_result.json` (with the qualification it re-ran under
-`$CERT/qualification`). Every stage is fail-closed: a mismatch exits non-zero
-and, where the tool defines one, still writes its receipt. `OUT_ROOT` must not
-already exist; the stage, reference, build, qualification and bench output
-directories refuse to overwrite (the oracle reports overwrite the named file,
-so name new paths). Paths must not contain single quotes or spaces (the ssh
-argument is single-quoted). To run directly on the box, export `MODEL_ROOT`,
-`OUT_ROOT` and `REPO` and execute the heredoc body unchanged.
+From another machine, run the same line over ssh:
+`ssh "$HOST" "cd <checkout> && .venv/bin/python -m examples.glm53.run_all ..."`.
+
+**Refusal before work.** Before creating anything the runner checks the pinned
+checkpoint (`config.json` hash, `REVISION`, the index and every shard it names),
+the layer window (contiguous, straddling the PP2 split at 23/24), that the
+output root is new, the step interpreter and the five modules (`numpy`, `torch`,
+`transformers`, `safetensors`, `accelerate`), `hipcc`, and exactly two visible
+GPUs. A missing input exits 2 before any work, with one `supply:` command per
+problem — the pinned `hf download`, the `pip install`, `tools/hotaisle_grab.sh
+2x`, the valid `--layers` example — and the output root is not created.
+`--dry-run` prints the ordered step commands and the same list, executes
+nothing, and exits 0 when ready or 3 when not. On the x86 test host (2026-10-20;
+no model, a CPU-only torch, no GPU, no `hipcc`): dry run exit 3 naming those
+four supplies, real run exit 2, output root absent [M].
+
+**Reporting rule — every GLM number from 2026-10-20 on.** A result is never
+just milliseconds and tokens/s; it is also a fraction of the bandwidth floor,
+because that is the number that says how much of the possible remains.
+
+- **Bytes actually read per token** are counted, not assumed: weights and their
+  descriptors are one shared read per step, amortised over the batch; the
+  embedding table is gathered, so one row per request is charged, not the
+  table; KV/KDA state is read once per request per token, with the compiled
+  MLA state scaled from `MAXLEN` to the certificate's context and assumed FP32
+  (4 bytes per element, as `prepare.budget` already does). Layer and state
+  sizes come from `stage.json` descriptors, so a slice change moves the budget
+  with it.
+- **The floor** is those bytes divided by the achievable rate:
+  `floor_ms_per_token = kernel_bytes_per_token / (bandwidth_TB/s × 10^12) ×
+  1000`, and **`fraction_of_floor = floor_ms_per_token / measured_ms_per_token`**
+  (`measured_over_floor` and `percent_of_floor` are written beside it). The
+  default rate is 4.3 TB/s (`--bandwidth-tbps`, `GLM_BANDWIDTH_TBPS`); pass the
+  rate this session actually measured when there is one. §1's floors use the
+  measured **3.56 TB/s** (`hw_bench lf`), so a session comparing against them
+  passes `--bandwidth-tbps 3.56` and says so.
+- **The GPU count is stated with every number.** This oracle is two MI300X in
+  PP2, batch from `--batch`; the certificate carries `gpus` at top level and
+  inside `bandwidth_floor`.
+- **The 1.72x weight-copy factor is its own budget line** —
+  `bandwidth_floor.weight_copy = {factor, weight_copy_bytes_per_token,
+  separate: true, note}`. It is never added to kernel bytes, never subtracted
+  from the floor, and never folded into a kernel-efficiency claim; a copy-heavy
+  result says so on its own line rather than hiding in an efficiency ratio.
+- **Mono does not exist:** GLM-5.3 mono on gfx942 does not exist as of
+  2026-10-20. Every certificate records that string as
+  `mono_gfx942_availability`, so no reader can mistake a PP2 slice number for a
+  single-GPU one.
+
+The runner applies the rule after `bench.py` writes a `PASS` certificate: it
+refuses a `FAIL` or wrong-batch certificate, adds the fields above, and prints
+`RESULT`, then the `BANDWIDTH` line (bytes per token, the separate 1.72x line,
+the mono note). `bench.py` itself is unchanged; the annotation is the runner's.
+
+**What each path produces.** `$OUT/prompts.json`; `$OUT/stage/stage.json` and
+`$OUT/prepare.json` (staged identity validated); `$OUT/reference.json`,
+`$OUT/reference.logits`, `$OUT/reference.json.slice/` (the derived snapshot HF
+loaded, with its hashes in provenance); `$OUT/logs/*.log` and
+`$OUT/build-log/build.log`; `$OUT/qualification/qualification.json`,
+`run0.json`, `run1.json` and their `.tokens`/`.logits`; `$OUT/oracle-run0.json`
+and `oracle-run1.json`; and the certificate
+`$OUT/certificate/bench_result.json` (with the qualification it re-ran under
+`$OUT/certificate/qualification`, and the annotation above: `gpus`,
+`mono_gfx942_availability`, and `bandwidth_floor` carrying the bytes actually
+read per token, the floor, `fraction_of_floor`, `measured_over_floor`,
+`percent_of_floor`, and the separate `weight_copy` line). A successful run ends
+with
+`RESULT batch=<B> tokens=<32B>/<32B> gpus=<G> median_decode_wall_ms=<ms>
+tokens_per_s=<n> measured_ms_per_token=<ms> floor_ms_per_token=<ms>
+fraction_of_floor=<x> certificate=<path>` and a `BANDWIDTH gpus=<G>
+kernel_bytes_per_token=<bytes> weight_copy_factor=1.72 (separate; not in the
+floor) mono_gfx942="does not exist as of 2026-10-20"` line. Every stage is
+fail-closed: a mismatch exits non-zero and,
+where the tool defines one, still writes its receipt. `--out` must not already
+exist; the stage, reference, build, qualification and bench output directories
+refuse to overwrite (the oracle report overwrites the named file, so name new
+paths). The runner passes arguments without a shell, so paths may contain
+spaces.
 
 `prompts.json` follows the existing contract: 1/2/4/8 distinct equal-length
 arrays (`reference.py:31-36`), each `length + 32 <= max_position_embeddings`.
@@ -376,7 +390,13 @@ contract:
 - **Reported:** `median_decode_wall_ms`, `tokens_per_s = B*1000/median`,
   `ms_per_token = median/B`, `spread_ms`, every sample, conditions (two
   MI300X, context 1024, 32 greedy tokens, PP2, layer count), and the
-  correctness receipt (32/32 per request, §8 metrics).
+  correctness receipt (32/32 per request, §8 metrics). The runner then
+  annotates the `PASS` certificate with the §6 reporting rule's fields —
+  `gpus`, `mono_gfx942_availability`, and `bandwidth_floor` (bytes actually
+  read per token, `floor_ms_per_token`, `fraction_of_floor`,
+  `measured_over_floor`, `percent_of_floor`, and the separate 1.72x
+  `weight_copy` line). `bench.py` is not modified; without that annotation a
+  certificate is incomplete and its millisecond figures are not reported.
 - **Refusal:** if any identity changes during the run, if the correctness
   receipt is not `TOKENS-EQUAL`, or if a step sample is non-finite or
   non-positive — the same fail-closed pattern as `bench.py:290-297`.
