@@ -1,0 +1,8 @@
+{
+  "model": "qwen3-8b",
+  "model_config": "examples/llm/configs/qwen3-8b.json",
+  "overrides": {
+    "ETX_VL_IMPORTED": "1"
+  },
+  "variant": "base"
+}

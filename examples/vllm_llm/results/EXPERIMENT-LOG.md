@@ -1,7 +1,7 @@
 # Qwen3-30B-A3B experiment log: four columns
 
 This log covers two recent measured experiments, four design-only proposals, and the CPU-only producer-router study.
-Updated from the captured results on 2026-10-15; no new GPU run was performed.
+Updated from the captured results on 2026-10-15; the 2026-10-17/18 section below records the batch benchmark, completed 2026-10-18.
 Earlier measured history is in [the gains ledger](../../../docs/GAINS-LEDGER.md) and
 [the baseline record](../../../docs/BASELINE-STATE-2026-10-12.md).
 Closed routes are in [OPTIMISATIONS](../../../docs/OPTIMISATIONS.md).
@@ -78,3 +78,11 @@ and native host object compilation.
 The source-bound receipt covers **324 source files** and **17 successful commands**.
 These are offline checks. Linux HIP executable linking, loading and GPU execution remain pending.
 See [the exact commands, skip reasons and compiler limits](2026-10-15-producer-prep/validation.md).
+
+## Multi-request correctness and the batch benchmark (2026-10-17/18)
+
+| Experiment | Why we think it is a good experiment | Run on GPU? | Result |
+|---|---|---|---|
+| B2/B4/B8 correctness, replicated requests (`examples/sessions/qwen_batch_correctness.py`, `plain` recipe) | A batch throughput number is meaningless until every request is shown to compute the same thing as B1: imported bytes per request, full coverage, HF greedy tokens | **Yes** — one MI300X, ROCm 7.14.0, session `20261017T140801Z-988ffe` (qualify 283 / 558 / 1572 s) | **PASS for all three.** Imported instances byte-identical at positions 0 and 1040: 194/388/776 (97 per request). Coverage 1055 positions per request with 0 wrong beyond ties (ties per request: B4 0,0,1,1; B8 0,0,1,1,3,0,0,0). 32/32 tokens per request in both repetitions of fused, unfused and coverage runs (128/256/512 per mode). The record seal verifies (147 files, 0 bad), but it is sealed INCOMPLETE: the in-session verifier wrongly required 20 asset files for every batch. With the fix (`f2d29d1`) the same receipts verify. No timing claim |
+| Imported vs original launch time under `--check` (same record) | Shows which imported kernel grows with replication before any throughput run | **Yes** — same record, GPU events per launch, one launch each | Summed over the checked launches, at position 0: B2 −10.5%, B4 +17.7%, B8 +35.0%; at 1040: −17.0% / +4.8% / +26.7%. At B8 position 0, `attn_reduce` accounts for +2473.3 of +2483.7 µs (2455.9 → 4929.2 µs), with a per-launch median of 6.2 → 12.7 µs. Isolated launches, not decode time |
+| `bench.py --batch 1/2/4/8`, `kept` and `plain` recipes, against vLLM batch mode | The owner's baseline: tokens/s and step wall time per batch, ETX and vLLM on one box in one session | **Yes** — one MI300X, ROCm 7.14.0, source commit `380ed02`, one runner at a time under `flock` on `/root/bench.lock`. All four kept batches and both plain batches completed clean serial runs, each with its own build and certificate; vLLM batch mode (`examples/llm/vllm_bench.py`, one engine, `--batches 1,2,4,8`, `VLLM_ROCM_USE_AITER=1`) ran on the same box, one process at a time. Kept B2 compiles locally with ROCm 7.2.4: 120,724 tasks, 128 VGPR, 9 VGPR spills, 40 B/lane scratch, occupancy 4 | **PASS on every batch.** Host step median ms / tokens/s (kept): B1 4.087415 / 244.65, B2 5.701229 / 350.80, B4 10.287806 / 388.81, B8 18.903416 / 423.20; plain B4 11.929137 / 335.31, B8 22.243487 / 359.66. vLLM whole-batch step median ms / tokens/s: B1 4.984999 / 200.6, B2 5.821864 / 343.5, B4 6.098564 / 655.9, B8 8.174588 / 978.6. ETX/vLLM tokens/s: 1.22 / 1.02 / 0.59 / 0.43. 32/32 tokens per request at every batch; imports checked 194/388/776/1552 (97 per request per position). Kept B1 to B2: step x1.3948, tokens/s x1.4339. See `docs/QWEN-BATCH-BASELINE-2026-10-18.md` |

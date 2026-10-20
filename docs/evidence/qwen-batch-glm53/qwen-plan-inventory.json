@@ -1,0 +1,23 @@
+[
+  {
+    "batch": 2,
+    "imported_instances": 194,
+    "launch_plan_sha256": "0a35dfe78daf5e092d4e5459ba5f3aed8f7459d81f0ade38f23cc6dca80e435e",
+    "imports_sha256": "04274de5527aac873fc0e523e07f772a37e7f576e806dbff8e06021ea3b88d9c",
+    "planned_not_gpu_checked": true
+  },
+  {
+    "batch": 4,
+    "imported_instances": 388,
+    "launch_plan_sha256": "5427f6656f5d523b3325f015c8a0a8b3316b325871d7f9d6825b52ad4e8c0e30",
+    "imports_sha256": "04274de5527aac873fc0e523e07f772a37e7f576e806dbff8e06021ea3b88d9c",
+    "planned_not_gpu_checked": true
+  },
+  {
+    "batch": 8,
+    "imported_instances": 776,
+    "launch_plan_sha256": "00d1ee926e546bc846609d6163ac5646a6f0192ad85220a83b7babaa48f4d574",
+    "imports_sha256": "04274de5527aac873fc0e523e07f772a37e7f576e806dbff8e06021ea3b88d9c",
+    "planned_not_gpu_checked": true
+  }
+]

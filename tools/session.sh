@@ -4,7 +4,7 @@
 #
 #   tools/session.sh stage  <ip>                     this repository's HEAD, as an archive, in a NEW box directory; ~/etx -> it
 #   tools/session.sh push   <ip>                     stage, then rsync fleet-mi300x, vLLM csrc, pytorch headers
-#   tools/session.sh preflight <ip>                check pushed tree, ROCm, dry run and Docker (no pull)
+#   tools/session.sh preflight <ip>                check pushed tree, ROCm, Qwen batch + GLM dry runs, Docker (no pull)
 #   tools/session.sh postmortem <ip> <dest>          fetch and report failed/skipped jobs and runner minutes
 #   tools/session.sh start  <ip> <session.py> [gpus] [machine]   start the runner (gpus default: all the VM has)
 #   tools/session.sh status <ip>                     runner alive?, last 25 lines of its log
@@ -64,7 +64,8 @@ if [ -z "$version" ]; then
     printf 'PREFLIGHT FAIL rocm-version: %s\n' "$version_cmd"
     failed=1
 fi
-check dry-run 'cd ~/etx && python3 -m examples.sessions.vlbest --dry-run'
+check dry-run 'cd ~/etx && python3 -m etx.tools.gpu_jobs examples/sessions/qwen_batch_correctness.py --gpus 0 --dry-run &&
+    python3 -m etx.tools.gpu_jobs examples/sessions/glm53_model.py --gpus 0,1 --dry-run'
 check container 'sudo docker info >/dev/null && echo DOCKER-OK'
 [ "$failed" = 0 ] || exit 1
 printf 'PREFLIGHT OK\nROCM-VERSION %s\n' "$version"
@@ -98,6 +99,13 @@ REMOTE
       REMOTE_BASH="ETX_QWEN_G6_CONFIG='$QWEN_CONFIG' $REMOTE_BASH"
       printf 'Passing Qwen config: ETX_QWEN_G6_CONFIG=%s\n' "$ETX_QWEN_G6_CONFIG"
     fi
+    # Session inputs that live on the box: the packed Qwen model, the GLM stage, its HF reference, batch and gate.
+    for name in ETX_QWEN_BATCH_MODEL ETX_GLM_STAGE ETX_GLM_REFERENCE ETX_GLM_BATCH ETX_GLM_GATE; do
+      [ "${!name+x}" = x ] || continue
+      value=$(printf '%s' "${!name}" | sed "s/'/'\\\\''/g")
+      REMOTE_BASH="$name='$value' $REMOTE_BASH"
+      printf 'Passing %s=%s\n' "$name" "${!name}"
+    done
     $SSH "$REMOTE_BASH" -s -- "$SESS" "${GPUS:-auto}" "$M" <<'REMOTE'
 SESS=$1; G=$2; M=$3; [ "$G" = auto ] && G=""
 cd ~/etx || exit 1
@@ -111,7 +119,9 @@ sleep 2; echo "runner started: machine $M, GPUs $G; startup log: $STARTUP"; head
 REMOTE
     ;;
   status)
-    $SSH 'pgrep -f etx.tools.gpu_jobs >/dev/null && echo RUNNING || echo "runner not running"; find ~/sess -name runner.log -print -exec tail -25 {} \;' ;;
+    # the runner's argv has the bare fields `-m etx.tools.gpu_jobs`; this shell's has them quoted (`pgrep -f`
+    # matches the ssh shell whose command line names the runner)
+    $SSH 'if ps -eo args= | awk '\''{for (i = 1; i < NF; i++) if ($i == "-m" && $(i + 1) == "etx.tools.gpu_jobs") n++} END {exit !n}'\''; then echo RUNNING; else echo "runner not running"; fi; find ~/sess -name runner.log -print -exec tail -25 {} \;' ;;
   fetch)
     DEST=${3:?dest}; ID=${4:-$($SSH 'ls -1t ~/sess 2>/dev/null | grep -v "^startup\." | head -1')}
     [ -n "$ID" ] || { echo "NO RECORD on the box (~/sess holds no session): nothing to fetch"; exit 4; }

@@ -1,0 +1,2 @@
+BATCH-NATIVE OK batch=2; GPU correctness remains unmeasured
+examples/vllm_llm/batch_native.sh: line 29: syntax error near unexpected token `)'

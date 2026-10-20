@@ -1,0 +1,146 @@
+[transformers] `causal_conv1d_fn` is falling back to its reference PyTorch implementation because `causal_conv1d` is not installed. This is correct but much slower; install `causal_conv1d` for the optimized kernel.
+[transformers] `chunk_kda` is falling back to its reference PyTorch implementation because `flash-linear-attention` is not installed. This is correct but much slower; install `flash-linear-attention` for the optimized kernel.
+GLM-CPU step=0 batch=1 logit_max_abs=1.4901161e-07
+[transformers] `causal_conv1d_update` is falling back to its reference PyTorch implementation because `causal_conv1d` is not installed. This is correct but much slower; install `causal_conv1d` for the optimized kernel.
+[transformers] `fused_recurrent_kda` is falling back to its reference PyTorch implementation because `flash-linear-attention` is not installed. This is correct but much slower; install `flash-linear-attention` for the optimized kernel.
+GLM-CPU step=8 batch=1 logit_max_abs=1.7881393e-07
+GLM-CPU step=16 batch=1 logit_max_abs=1.7881393e-07
+GLM-CPU step=24 batch=1 logit_max_abs=1.1920929e-07
+{
+  "schema": 1,
+  "status": "PASS",
+  "fixture": true,
+  "batch": 1,
+  "steps": 32,
+  "matched": 32,
+  "max_logit_abs": 3.5762786865234375e-07,
+  "max_kda_state_abs": 3.4924596548080444e-10,
+  "bf16": false,
+  "fp8": false,
+  "implementation": "same C++ numerical body as ETX HIP tiles",
+  "reference": "independent Transformers GLM5Next text model",
+  "full_checkpoint": false,
+  "gpu_correctness": "unmeasured",
+  "performance": "unmeasured"
+}
+[transformers] `causal_conv1d_fn` is falling back to its reference PyTorch implementation because `causal_conv1d` is not installed. This is correct but much slower; install `causal_conv1d` for the optimized kernel.
+[transformers] `chunk_kda` is falling back to its reference PyTorch implementation because `flash-linear-attention` is not installed. This is correct but much slower; install `flash-linear-attention` for the optimized kernel.
+GLM-CPU step=0 batch=2 logit_max_abs=1.1920929e-07
+[transformers] `causal_conv1d_update` is falling back to its reference PyTorch implementation because `causal_conv1d` is not installed. This is correct but much slower; install `causal_conv1d` for the optimized kernel.
+[transformers] `fused_recurrent_kda` is falling back to its reference PyTorch implementation because `flash-linear-attention` is not installed. This is correct but much slower; install `flash-linear-attention` for the optimized kernel.
+GLM-CPU step=8 batch=2 logit_max_abs=1.4901161e-07
+GLM-CPU step=16 batch=2 logit_max_abs=1.3411045e-07
+GLM-CPU step=24 batch=2 logit_max_abs=1.7881393e-07
+{
+  "schema": 1,
+  "status": "PASS",
+  "fixture": true,
+  "batch": 2,
+  "steps": 32,
+  "matched": 64,
+  "max_logit_abs": 3.5762786865234375e-07,
+  "max_kda_state_abs": 4.656612873077393e-10,
+  "bf16": false,
+  "fp8": false,
+  "implementation": "same C++ numerical body as ETX HIP tiles",
+  "reference": "independent Transformers GLM5Next text model",
+  "full_checkpoint": false,
+  "gpu_correctness": "unmeasured",
+  "performance": "unmeasured"
+}
+[transformers] `causal_conv1d_fn` is falling back to its reference PyTorch implementation because `causal_conv1d` is not installed. This is correct but much slower; install `causal_conv1d` for the optimized kernel.
+[transformers] `chunk_kda` is falling back to its reference PyTorch implementation because `flash-linear-attention` is not installed. This is correct but much slower; install `flash-linear-attention` for the optimized kernel.
+GLM-CPU step=0 batch=4 logit_max_abs=0
+[transformers] `causal_conv1d_update` is falling back to its reference PyTorch implementation because `causal_conv1d` is not installed. This is correct but much slower; install `causal_conv1d` for the optimized kernel.
+[transformers] `fused_recurrent_kda` is falling back to its reference PyTorch implementation because `flash-linear-attention` is not installed. This is correct but much slower; install `flash-linear-attention` for the optimized kernel.
+GLM-CPU step=8 batch=4 logit_max_abs=0.0078125
+GLM-CPU step=16 batch=4 logit_max_abs=0.0078125
+GLM-CPU step=24 batch=4 logit_max_abs=0.0078125
+{
+  "schema": 1,
+  "status": "PASS",
+  "fixture": true,
+  "batch": 4,
+  "steps": 32,
+  "matched": 128,
+  "max_logit_abs": 0.00830078125,
+  "max_kda_state_abs": 1.4126067981123924e-05,
+  "bf16": true,
+  "fp8": false,
+  "implementation": "same C++ numerical body as ETX HIP tiles",
+  "reference": "independent Transformers GLM5Next text model",
+  "full_checkpoint": false,
+  "gpu_correctness": "unmeasured",
+  "performance": "unmeasured"
+}
+[transformers] `causal_conv1d_fn` is falling back to its reference PyTorch implementation because `causal_conv1d` is not installed. This is correct but much slower; install `causal_conv1d` for the optimized kernel.
+[transformers] `chunk_kda` is falling back to its reference PyTorch implementation because `flash-linear-attention` is not installed. This is correct but much slower; install `flash-linear-attention` for the optimized kernel.
+GLM-CPU step=0 batch=8 logit_max_abs=0.00390625
+[transformers] `causal_conv1d_update` is falling back to its reference PyTorch implementation because `causal_conv1d` is not installed. This is correct but much slower; install `causal_conv1d` for the optimized kernel.
+[transformers] `fused_recurrent_kda` is falling back to its reference PyTorch implementation because `flash-linear-attention` is not installed. This is correct but much slower; install `flash-linear-attention` for the optimized kernel.
+GLM-CPU step=8 batch=8 logit_max_abs=0.0078125
+GLM-CPU step=16 batch=8 logit_max_abs=0.0078125
+GLM-CPU step=24 batch=8 logit_max_abs=0.0078125
+{
+  "schema": 1,
+  "status": "PASS",
+  "fixture": true,
+  "batch": 8,
+  "steps": 32,
+  "matched": 256,
+  "max_logit_abs": 0.01318359375,
+  "max_kda_state_abs": 9.080140443984419e-06,
+  "bf16": true,
+  "fp8": true,
+  "implementation": "same C++ numerical body as ETX HIP tiles",
+  "reference": "independent Transformers GLM5Next text model",
+  "full_checkpoint": false,
+  "gpu_correctness": "unmeasured",
+  "performance": "unmeasured"
+}
+FULL-SHAPE PLAN OK (no checkpoint weights; compiler check only)
+GLM-ROCM-DEVICE PASS rank=0
+GLM-ROCM-DEVICE PASS rank=1
+GLM-ROCM-HOST PASS
+Session hard stop: 18000s from runner start (includes setup)
+  0 model_build                      cpu      timeout  2100s  reads: -  writes: model/run
+  1 model_qualify                    cpu      timeout 15000s  reads: model/run  writes: qualification/qualification.json
+..................F.......................                               [100%]
+=================================== FAILURES ===================================
+_____ test_hf_chunk_prefill_then_32_exact_native_greedy_tokens[True-True] ______
+
+tmp_path = PosixPath('/private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1407/test_hf_chunk_prefill_then_32_1')
+bf16 = True, fp8 = True
+
+    @pytest.mark.parametrize('bf16,fp8',[(False,False),(True,True)])
+    def test_hf_chunk_prefill_then_32_exact_native_greedy_tokens(tmp_path,bf16,fp8):
+>       result=cpu_check.check_prefill(tmp_path/'prefill',2,8,bf16,fp8)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_glm53_model.py:156: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+out = PosixPath('/private/var/folders/tb/g6324rs52jz3skf78xwgk8gh0000gn/T/pytest-of-ckl/pytest-1407/test_hf_chunk_prefill_then_32_1/prefill')
+batch = 2, context = 8, bf16 = True, fp8 = True
+
+    def check_prefill(out,batch=2,context=8,bf16=False,fp8=False):
+        """HF chunk prefill versus native sequential state, then exact free decode."""
+        import numpy as np
+        import torch
+        from transformers.cache_utils import DynamicCache
+        torch.set_num_threads(1)
+        spec,hf,head=fixture(out,bf16,fp8);candidate=CPUModel(out);candidate.reset(batch)
+        prompts=[[1+(i+3*r)%47 for i in range(context)] for r in range(batch)]
+        cache=DynamicCache(config=hf.config);errors=[];matched=0
+        with torch.inference_mode():
+            for pos in range(context):got,_=candidate([row[pos] for row in prompts])
+            ref=head(hf(input_ids=torch.tensor(prompts),past_key_values=cache,use_cache=True).last_hidden_state[:,-1]).float().numpy()
+            for step in range(32):
+>               if not np.array_equal(got.argmax(-1),ref.argmax(-1)):raise ValueError(f'chunk-prefill greedy mismatch step={step}')
+                                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E               ValueError: chunk-prefill greedy mismatch step=22
+
+examples/glm53/cpu_check.py:218: ValueError
+=========================== short test summary info ============================
+FAILED tests/test_glm53_model.py::test_hf_chunk_prefill_then_32_exact_native_greedy_tokens[True-True]
+1 failed, 41 passed in 13.16s

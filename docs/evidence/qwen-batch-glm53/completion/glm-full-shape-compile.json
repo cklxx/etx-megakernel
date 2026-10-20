@@ -1,0 +1,37 @@
+{
+  "schema": 1,
+  "implementation_revision": "c906b3bf8013b66c29b0932d82384ba1d3c79fe9",
+  "fixture": true,
+  "compile_only": true,
+  "full_checkpoint": false,
+  "arch": "gfx942",
+  "batch": 8,
+  "layers": 45,
+  "tasks": 384,
+  "types": 48,
+  "devices": 2,
+  "tools": [
+    "native LLVM 23",
+    "ROCm 7.2.4 clang 22"
+  ],
+  "flags": [
+    "-O3",
+    "-std=c++17"
+  ],
+  "host_syntax": "PASS",
+  "host_device_pass": "PASS",
+  "hashes": {
+    "mk0.ll": "97a64a9d96efdacd441d71b14ebbab0abf6976e3d18f030a5c7f244cd10178fd",
+    "mk1.ll": "3461b59552ebf54796ddcc1ec4a17a8ae7d0369401e8bc6a9d36c3c6f8b5224d",
+    "mk0.s": "c7a2a13744a05b5d1466be099ca3227c86c97ae49f00917da7dc4cfe21dc5eea",
+    "mk1.s": "f7aef7673ea4ed8b67d5d8ce4f3386065a3c70c4c28c7a9e8df758f4d8d41a6a",
+    "rocm0.s": "ac882a4fe5b49bc40dc9b3e05b623b578a62f9c759d96ba3fb2fd6e0da8addfc",
+    "rocm1.s": "71035bba30be53118d6ec75642e0dedf9f6cf1b142875eceba53ba0aa9437f19",
+    "rocm-host.s": "35ab5db95259c60d00a8872b2217323b813db5efc4de19a27254cac8965d6cdc",
+    "plan.json": "f14c0f409d68459053d47295882baaf48982024ec131a2eed747c64eb92ddf17",
+    "megakernel_d0.hip": "a027013b9c7a6903dc516aa65c0df7f816c386fbd90356a97185ea7c3b345179",
+    "megakernel_d1.hip": "dc3e70390f6d7a48dfc9341c71659eb4fe7cb17b9a6d85b1c98022ff49aa59ed"
+  },
+  "gpu_correctness": "unmeasured",
+  "performance": "unmeasured"
+}

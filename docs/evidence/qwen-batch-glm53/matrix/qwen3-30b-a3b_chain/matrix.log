@@ -1,0 +1,14 @@
+wvsplitk_y2            (64, 16, 1) slots=1 args=80B lds=32768B barriers=1
+wvsplitk_y1            (64, 16, 1) slots=1 args=80B lds=32768B barriers=1
+attn_mfma16_g8         (256, 1, 1) slots=4 args=160B lds=32768B barriers=7
+attn_reduce            (128, 1, 1) slots=8 args=80B lds=2176B barriers=1
+rms_norm_2d            (256, 1, 1) slots=4 args=100B lds=320B barriers=2
+rms_norm_3d            (16, 1, 1) slots=16 args=100B lds=1280B barriers=2
+fused_add_rms_norm     (1024, 1, 1) slots=1 args=72B lds=80B barriers=2
+rope_neox              (512, 1, 1) slots=2 args=108B lds=0B barriers=0
+reshape_and_cache      (64, 1, 1) slots=16 args=96B lds=0B barriers=0
+silu_and_mul           (96, 1, 1) slots=1 args=48B lds=0B barriers=0
+topk_softmax_e128      (64, 4, 1) slots=4 args=104B lds=0B barriers=0
+moe_sum_k8             (256, 1, 1) slots=4 args=96B lds=0B barriers=0
+fused_moe_up           (256, 1, 1) slots=1 args=136B lds=20480B barriers=9
+fused_moe_down         (256, 1, 1) slots=1 args=144B lds=20480B barriers=9

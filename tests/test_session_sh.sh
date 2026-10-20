@@ -34,4 +34,34 @@ for cap in 1200 '' "quote'\$(false); literal"; do
   grep -F 'ETX_SESS_MAX_SECONDS=' "$COMMAND_LOG" >/dev/null
   grep -F 'Passing session cap: ETX_SESS_MAX_SECONDS=' "$TMP/output" >/dev/null
 done
+unset ETX_SESS_MAX_SECONDS
+# The two-GPU session inputs reach the box, quoted for spaces and apostrophes.
+ETX_QWEN_BATCH_MODEL="/models/qwen 3" ETX_GLM_STAGE="/staged/glm'53" \
+ETX_GLM_REFERENCE=/staged/glm53-reference.json ETX_GLM_BATCH=2 ETX_GLM_GATE=module \
+  bash "$SCRIPT" start offline session.py > "$TMP/output"
+[ "$(cat "$CAP_LOG")" = unset ]
+cat > "$TMP/expected" <<'EOF'
+ETX_GLM_GATE='module' ETX_GLM_BATCH='2' ETX_GLM_REFERENCE='/staged/glm53-reference.json' ETX_GLM_STAGE='/staged/glm'\''53' ETX_QWEN_BATCH_MODEL='/models/qwen 3' bash -s -- session.py auto A
+EOF
+cmp "$TMP/expected" "$COMMAND_LOG"
+grep -F 'Passing ETX_GLM_BATCH=2' "$TMP/output" >/dev/null
+# Preflight dry-runs the two sessions it packages, not vlbest.
+grep -F 'python3 -m etx.tools.gpu_jobs examples/sessions/qwen_batch_correctness.py --gpus 0 --dry-run' "$SCRIPT" >/dev/null
+grep -F 'python3 -m etx.tools.gpu_jobs examples/sessions/glm53_model.py --gpus 0,1 --dry-run' "$SCRIPT" >/dev/null
+! grep -F 'examples.sessions.vlbest --dry-run' "$SCRIPT" >/dev/null
+# status runs its remote command under `sh -c` like sshd: it must not count that shell (or awk)
+# as the runner, and must see a real `python3 -m etx.tools.gpu_jobs` process.
+mkdir -p "$TMP/home/sess" "$TMP/fake/etx/tools"
+: > "$TMP/fake/etx/__init__.py"; : > "$TMP/fake/etx/tools/__init__.py"
+printf 'import time\ntime.sleep(60)\n' > "$TMP/fake/etx/tools/gpu_jobs.py"
+HOME="$TMP/home" bash "$SCRIPT" status offline < /dev/null > /dev/null
+[ "$(head -1 "$CAP_LOG")" = 'runner not running' ]
+(cd "$TMP/fake" && exec python3 -m etx.tools.gpu_jobs) & RUNNER=$!
+trap 'kill "$RUNNER" 2>/dev/null || true; rm -rf "$TMP"' EXIT HUP INT TERM
+sleep 1
+HOME="$TMP/home" bash "$SCRIPT" status offline < /dev/null > /dev/null
+[ "$(head -1 "$CAP_LOG")" = RUNNING ]
+kill "$RUNNER"; wait "$RUNNER" 2>/dev/null || true
+HOME="$TMP/home" bash "$SCRIPT" status offline < /dev/null > /dev/null
+[ "$(head -1 "$CAP_LOG")" = 'runner not running' ]
 printf '%s\n' 'session.sh offline checks passed'

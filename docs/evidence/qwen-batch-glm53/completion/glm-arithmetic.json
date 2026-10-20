@@ -1,0 +1,7 @@
+{
+  "status": "PASS",
+  "finite_fp8_patterns": 254,
+  "nan_encodings_rejected_by_staging": 2,
+  "bf16_rounding_cases": 10000,
+  "gpu_correctness": "unmeasured"
+}

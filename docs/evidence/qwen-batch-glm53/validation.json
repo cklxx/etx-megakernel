@@ -1,0 +1,109 @@
+{
+  "schema": 1,
+  "implementation_commit": "aaab31d",
+  "gpu_launches_measured": 0,
+  "gpu_cost_usd": 0,
+  "performance": "unmeasured",
+  "checks": [
+    {
+      "command": ".venv/bin/python -m pytest -q (initial dirty checkout)",
+      "exit": 1,
+      "result": "2212 passed, 18 skipped, 9 C++ fixture errors and 1 clean-tree guard refusal; preserved pytest.log"
+    },
+    {
+      "command": ".venv/bin/python -m pytest -q tests/test_host_import_check.py tests/test_glm53_preparation.py tests/test_qwen_batch_correctness.py tests/test_import_certificate.py",
+      "exit": 0,
+      "result": "111 passed"
+    },
+    {
+      "command": ".venv/bin/python -m pytest -q tests/test_llm.py tests/test_select_models.py tests/test_decode_entry.py",
+      "exit": 0,
+      "result": "49 passed"
+    },
+    {
+      "command": "bash examples/vllm_llm/local_matrix.sh build/qwen-batch-matrix",
+      "exit": 0,
+      "result": "16/16 local gfx942 builds, host syntax and UC checks"
+    },
+    {
+      "command": "ETX_DEVLIBS=<local ROCm devlibs> bash examples/glm53/build_boundary.sh build/glm53-boundary --local",
+      "exit": 0,
+      "result": "two kernels LLVM IR + gfx942 assembly, host syntax"
+    },
+    {
+      "command": "bash examples/glm53/local_boundary_rocm.sh build/glm53-boundary-rocm",
+      "exit": 0,
+      "result": "two kernels ROCm 7.2.4 assembly, host syntax"
+    },
+    {
+      "command": ".venv/bin/python -m examples.glm53.prepare --require-model --out <record>",
+      "exit": 2,
+      "result": "expected explicit model blocker, no GPU library imported"
+    },
+    {
+      "command": "Qwen and GLM session dry runs",
+      "exit": 0,
+      "result": "6 Qwen jobs; 2 GLM transport jobs; no GPU operation"
+    },
+    {
+      "command": "bash -n for new shell scripts; Python compileall for new modules",
+      "exit": 0,
+      "result": "passed"
+    },
+    {
+      "command": ".venv/bin/python -m pytest -q (clean committed checkout; output in scratch)",
+      "exit": 0,
+      "result": "2253 passed, 18 skipped in 686.22s",
+      "code_commit": "aaab31d"
+    },
+    {
+      "command": "final focused suite: host/import/GLM/Qwen runner including current supervisor and native wrapper",
+      "exit": 0,
+      "result": "113 passed; synthetic orchestration fixtures are not GPU/model evidence"
+    },
+    {
+      "command": "exact standard O3 ROCm device check B2",
+      "exit": 0,
+      "result": "device assembly complete, -DETX_DSL_NT -DETX_DSL_VECNORM"
+    },
+    {
+      "command": "exact standard O3 ROCm device check B4",
+      "exit": 137,
+      "result": "OOM; NOT-COMPLETE"
+    },
+    {
+      "command": "ROCm B8 O3 check",
+      "exit": 137,
+      "result": "cancelled; NOT-COMPLETE"
+    },
+    {
+      "command": "B4 O1 compile-capacity diagnostic",
+      "exit": 137,
+      "result": "OOM; not adopted"
+    },
+    {
+      "command": "native LLVM 23 B2 compiler stages + independent llvm-mc assembly",
+      "exit": 0,
+      "result": "IR/ISA/object produced; enclosing older wrapper subsequently exited 2 after it was edited while active; whole wrapper NOT-COMPLETE"
+    },
+    {
+      "command": "native LLVM 23 B4/B8 diagnostic",
+      "exit": 143,
+      "result": "stopped; NOT-COMPLETE; B4 IR preserved, B8 optimizer sample preserved"
+    },
+    {
+      "command": "final GLM native/ROCm compile after peer-access error handling fix",
+      "exit": 0,
+      "result": "both device kernels and host syntax passed"
+    }
+  ],
+  "remaining": [],
+  "recorded_utc": "2026-10-17T02:30:51.206838+00:00",
+  "remaining_gates": [
+    "ROCm 7.2.4 B4/B8 device checks with sufficient local compiler memory before provisioning",
+    "pinned pre-staged Qwen checkpoint and HF goldens/prefills",
+    "same-build all-instance checks at positions 0/1040 plus per-request coverage and exact 32/32 free-greedy in fused/unfused modes, two repetitions",
+    "two-GPU transport correctness after Qwen passes",
+    "GLM operator/pack/import interfaces, confirmed boundary dtype/layout, actual memory fit and same-checkpoint numerical/HF oracle"
+  ]
+}

@@ -27,7 +27,7 @@ struct etx_imp_desc {};
 using hipFunction_t = void*;
 using hipModule_t = void*;
 struct { int stream; } hst;
-int launches = 0, lookups = 0;
+int launches = 0, lookups = 0, last_launch = -1;
 int topk_ids[64] = {17}, n_tk = 64, check_pos = 1040, NR = 8;
 float topk_w[64] = {0.5f};
 constexpr int H=2048,E=128;
@@ -39,7 +39,7 @@ const void* W(const std::string& name) {
 }
 constexpr int hipMemcpyDeviceToHost = 1;
 int hipMemcpy(void* dst, const void* src, size_t n, int) { memcpy(dst, src, n); return 0; }
-void launch_imported(int) { ++launches; }
+void launch_imported(int launch) { ++launches; last_launch = launch; }
 bool wait_stream(int, double) { return true; }
 void die(const std::string& s) { fprintf(stderr, "%s\n", s.c_str()); exit(1); }
 const etx_imp_desc* etx_imp_find(const char*) { return nullptr; }
@@ -49,6 +49,7 @@ int hipModuleLoad(hipModule_t*, const char*) { return 0; }
 int hipModuleGetFunction(hipFunction_t*, hipModule_t, const char*) { return 0; }
 #define ETX_CHECK(x) (void)(x)
 int main(int argc, char** argv) {
+  const int nreq = getenv("CHECK_TEST_REQUESTS") ? atoi(getenv("CHECK_TEST_REQUESTS")) : 1;
   int bad = getenv("CHECK_TEST_BAD") ? 1 : 0, not_imported = 0;
   std::string not_imported_names;
   struct Inst { std::string exp; int n; std::string role; int req; int layer; };
@@ -58,7 +59,7 @@ int main(int argc, char** argv) {
 ''' + dispatch + r'''
   }
 ''' + summary + r'''
-  printf("launches=%d lookups=%d\n", launches, lookups);
+  printf("launches=%d lookups=%d last_launch=%d\n", launches, lookups, last_launch);
 ''' + return_line + r'''
 }
 '''
@@ -79,6 +80,14 @@ def test_dsl_skips_comparison_but_executes(check_dispatch):
     assert "CHECK NOT-IMPORTED: 3 instance(s): dsl_gemv, dsl_topk, dsl_gemv\n" in run.stdout
     assert "CHECK OK: 0 launch(es) differ\n" in run.stdout
     assert "launches=3 lookups=0" in run.stdout
+
+
+@pytest.mark.parametrize('requests', [1, 2, 4, 8])
+def test_import_check_launch_offset_accounts_for_all_prologues(check_dispatch, requests):
+    run = subprocess.run([str(check_dispatch), 'dsl_gemv', 'dsl_topk'],
+                         env={**os.environ, 'CHECK_TEST_REQUESTS': str(requests)}, capture_output=True, text=True)
+    assert run.returncode == 0
+    assert f'launches=2 lookups=0 last_launch={requests+2}' in run.stdout
 
 
 @pytest.mark.parametrize("export", ["rms_norm_2d", "not_dsl_gemv", "dsl", "DSL_gemv"])

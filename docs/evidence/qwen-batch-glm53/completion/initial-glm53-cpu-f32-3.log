@@ -1,0 +1,18 @@
+[transformers] `causal_conv1d_fn` is falling back to its reference PyTorch implementation because `causal_conv1d` is not installed. This is correct but much slower; install `causal_conv1d` for the optimized kernel.
+[transformers] `chunk_kda` is falling back to its reference PyTorch implementation because `flash-linear-attention` is not installed. This is correct but much slower; install `flash-linear-attention` for the optimized kernel.
+GLM-CPU step=0 batch=2 logit_max_abs=1.1920929e-07
+[transformers] `causal_conv1d_update` is falling back to its reference PyTorch implementation because `causal_conv1d` is not installed. This is correct but much slower; install `causal_conv1d` for the optimized kernel.
+[transformers] `fused_recurrent_kda` is falling back to its reference PyTorch implementation because `flash-linear-attention` is not installed. This is correct but much slower; install `flash-linear-attention` for the optimized kernel.
+GLM-CPU step=8 batch=2 logit_max_abs=1.7881393e-07
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/Users/ckl/code/.wt/etx-qwen-batch-glm53-multigpu/examples/glm53/cpu_check.py", line 175, in <module>
+    if __name__=='__main__':main()
+                            ~~~~^^
+  File "/Users/ckl/code/.wt/etx-qwen-batch-glm53-multigpu/examples/glm53/cpu_check.py", line 173, in main
+    a=ap.parse_args();print(json.dumps(check(a.out.resolve(),a.batch,a.steps,a.bf16,a.fp8),indent=2))
+                                       ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/ckl/code/.wt/etx-qwen-batch-glm53-multigpu/examples/glm53/cpu_check.py", line 153, in check
+    raise ValueError(f'layer mismatch pos={pos} layer={i} max_abs={np.max(np.abs(actual-expected))}')
+ValueError: layer mismatch pos=15 layer=3 max_abs=0.0030232053250074387

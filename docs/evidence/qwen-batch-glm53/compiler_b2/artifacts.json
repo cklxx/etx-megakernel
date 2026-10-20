@@ -1,0 +1,34 @@
+{
+  "build/qwen-batch-rocm/b2/vl_plan.txt": {
+    "bytes": 56724,
+    "sha256": "0a35dfe78daf5e092d4e5459ba5f3aed8f7459d81f0ade38f23cc6dca80e435e"
+  },
+  "build/qwen-batch-rocm/b2/imp/imports.json": {
+    "bytes": 32314,
+    "sha256": "04274de5527aac873fc0e523e07f772a37e7f576e806dbff8e06021ea3b88d9c"
+  },
+  "build/qwen-batch-rocm/b2/imports.bc": {
+    "bytes": 69040,
+    "sha256": "9c5d4de99add973441c2f065affacf82cb1e1f44acf1beeecc51d8d66c2e3683"
+  },
+  "build/qwen-batch-rocm/b2/megakernel_d0.hip": {
+    "bytes": 1083325,
+    "sha256": "794b7c46603a69a0f8b38bf71c260f38b3a09dbc5e00c4e04d86480ebb2f6e1c"
+  },
+  "build/qwen-batch-rocm/b2/native.ll": {
+    "bytes": 87413455,
+    "sha256": "a9c38b847522ce2f4c4d268d76ed82ddde70cea7932fc71b116c605e64948d4a"
+  },
+  "build/qwen-batch-rocm/b2/native.s": {
+    "bytes": 14772535,
+    "sha256": "23f66fbb02c70ef8ee101c766d4ca94417c7fda6b9d5db41cffb1fad7240062a"
+  },
+  "build/qwen-batch-rocm/b2/native.o": {
+    "bytes": 1546640,
+    "sha256": "abab3223e122c4324ae7be5bbe7880176c9a2e3695ad94a3461c1659d0e54f9a"
+  },
+  "build/qwen-batch-rocm/b2/mk_exact.s": {
+    "bytes": 8842420,
+    "sha256": "5ce73e2a127e214d03fa4d08103eb6f4010af0b3a1f388ca8e01bc67819d9ba9"
+  }
+}

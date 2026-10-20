@@ -1,0 +1,16 @@
+[qwen3-8b base] rc=0   tasks=37915 events=472 eliminated=[] megakernel_d0 vgpr 123 spill 0 lds 41448; unfused_d0 vgpr 100 spill 0 lds 41416;   
+[qwen3-8b chain] rc=0   tasks=37771 events=364 eliminated=[] megakernel_d0 vgpr 121 spill 0 lds 41448; unfused_d0 vgpr 100 spill 0 lds 41416;   
+[qwen3-8b xcd] rc=0   tasks=38534 events=364 eliminated=[] megakernel_d0 vgpr 122 spill 0 lds 41448; unfused_d0 vgpr 100 spill 0 lds 41416;   
+[qwen3-8b xcd_s1] rc=0   tasks=40622 events=364 eliminated=[] megakernel_d0 vgpr 118 spill 0 lds 41336; unfused_d0 vgpr 104 spill 0 lds 41304;   
+[qwen3-8b uc] rc=0   tasks=38534 events=364 eliminated=[] megakernel_d0 vgpr 122 spill 0 lds 41448; unfused_d0 vgpr 100 spill 0 lds 41416;  UC plan ok: all 364 grids static, 108 KV-cache grids entirely on XCD 0 
+[qwen3-8b uc_s1] rc=0   tasks=40622 events=364 eliminated=[] megakernel_d0 vgpr 117 spill 0 lds 41336; unfused_d0 vgpr 104 spill 0 lds 41304;  UC plan ok: all 364 grids static, 108 KV-cache grids entirely on XCD 0 
+[qwen2.5-1.5b base] rc=0   tasks=29211 events=312 eliminated=[] megakernel_d0 vgpr 121 spill 0 lds 41448; unfused_d0 vgpr 104 spill 0 lds 41416;   
+[qwen2.5-1.5b chain] rc=0   tasks=29183 events=284 eliminated=[] megakernel_d0 vgpr 121 spill 0 lds 41448; unfused_d0 vgpr 104 spill 0 lds 41416;   
+[qwen2.5-1.5b xcd] rc=0   tasks=29778 events=284 eliminated=[] megakernel_d0 vgpr 121 spill 0 lds 41448; unfused_d0 vgpr 104 spill 0 lds 41416;   
+[qwen2.5-1.5b xcd_s1] rc=0   tasks=30254 events=284 eliminated=[] megakernel_d0 vgpr 123 spill 0 lds 41364; unfused_d0 vgpr 106 spill 0 lds 41332;   
+[qwen2.5-1.5b uc] rc=0   tasks=29778 events=284 eliminated=[] megakernel_d0 vgpr 121 spill 0 lds 41448; unfused_d0 vgpr 104 spill 0 lds 41416;  UC plan ok: all 284 grids static, 84 KV-cache grids entirely on XCD 0 
+[qwen2.5-1.5b uc_s1] rc=0   tasks=30254 events=284 eliminated=[] megakernel_d0 vgpr 123 spill 0 lds 41364; unfused_d0 vgpr 106 spill 0 lds 41332;  UC plan ok: all 284 grids static, 84 KV-cache grids entirely on XCD 0 
+[qwen3-30b-a3b base] rc=0   tasks=59875 events=772 eliminated=[] megakernel_d0 vgpr 125 spill 0 lds 41448; unfused_d0 vgpr 104 spill 0 lds 41416;   
+[qwen3-30b-a3b chain] rc=0   tasks=59683 events=628 eliminated=[] megakernel_d0 vgpr 125 spill 0 lds 41448; unfused_d0 vgpr 104 spill 0 lds 41416;   
+[mixtral-8x7b base] rc=0   tasks=156611 events=452 eliminated=[] megakernel_d0 vgpr 123 spill 0 lds 41384; unfused_d0 vgpr 100 spill 0 lds 41352;   
+[mixtral-8x7b chain] rc=0   tasks=156579 events=420 eliminated=[] megakernel_d0 vgpr 123 spill 0 lds 41384; unfused_d0 vgpr 100 spill 0 lds 41352;   

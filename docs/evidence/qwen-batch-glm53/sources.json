@@ -1,0 +1,17 @@
+[
+  {
+    "file": "glm-config.json",
+    "url": "https://huggingface.co/zai-org/GLM-5.3-Flash/resolve/main/config.json",
+    "sha256": "bb8f01c42cb92a52ca72e65afb4d5bd8d11aef083cd210e8de25dfb904f23e9f"
+  },
+  {
+    "file": "glm-model-api.json",
+    "url": "https://huggingface.co/api/models/zai-org/GLM-5.3-Flash",
+    "sha256": "ea086a39148df448a1bd81f7e5a7c6a6179b0a5ad2bf39e7f4a8bce0a39e5e2a"
+  },
+  {
+    "file": "glm-recipe.yaml",
+    "url": "https://raw.githubusercontent.com/vllm-project/recipes/main/models/zai-org/GLM-5.3-Flash.yaml",
+    "sha256": "ffcd619ddd168d83e5517bc9fc00ca4b00e740f05cda8e6c0fc98149e672f92a"
+  }
+]

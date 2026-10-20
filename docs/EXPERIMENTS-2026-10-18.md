@@ -1,0 +1,40 @@
+# 目标与结果, 2026-10-18 — 四列
+
+格式与 `examples/vllm_llm/results/EXPERIMENT-LOG.md`、`examples/dsv2lite/results/EXPERIMENT-LOG.md` 一致：
+四列 = 实验 / 为什么值得做 / 上机了吗 / 结果。标签：[M] 实测，[E] 估算，[U] 未做。
+
+## 目标 1 — Qwen 多 batch 基线
+
+| 实验 | 为什么值得做 | 上机了吗 | 结果 |
+|---|---|---|---|
+| B2/B4/B8 正确性，真实权重真实卡 | 基线之前必须证明批量路径算得对，否则 tok/s 无意义 | 是 — 记录 `20261017T140801Z-988ffe`，单卡 MI300X | [M] **通过**。194/388/776 个导入实例，每请求 97 个，生成 128/256/512 token 全对；位置 0 和 1040 零差异；fused 与 unfused 都过 |
+| B1/B2/B4/B8 tokens/s，ETX 对 vLLM | 这就是基线：四档吞吐与每 token 毫秒，同机串行 | 部分 — `bench.py --batch N` 干净串行运行（`flock`，单 runner）完成 B1/B2；B4 时远端 shell 退出，kept B4/B8 无结果。另一条 `plain` B4 运行完成；plain B8 进行中。vLLM 对照未跑。每档独立构建与证书；本地 22 项测试通过；kept B2 配方 ROCm 7.2.4 本地编译通过：128 VGPR、9 个 VGPR spill、40 B/lane scratch、occupancy 4 | [M]/[U] **kept**：B1 4.087415 ms / 244.65 tok/s（32/32，194/194）；B2 5.701229 ms / 350.80 tok/s（64/64，388/388，coverage 2×1055，ties 0,0）。B1→B2 请求数 ×2、step ×1.3948、tok/s ×1.4339，每请求成本 −30.26% [M]。**plain**：B4 11.929137 ms / 335.31 tok/s（128/128，776/776，coverage 4×1055，ties 0,0,1,1）。kept B4/B8 [U]；plain B8 进行中 [U]。见 `docs/QWEN-BATCH-BASELINE-2026-10-18.md` |
+| 同轮顺带：导入版 vs 原始版单次 launch 汇总 | 看批量放大后哪些内核吃亏 | 是 — 同一记录（`--check` 下逐个 launch 的 GPU event 计时之和） | [M] 位置 0：原版→导入版 B2 2576.2→2307.0 µs（−10.5%），B4 4053.6→4771.1（+17.7%），B8 7092.9→9576.6（+35.0%）；位置 1040：−17.0% / +4.8% / +26.7%。B8 位置 0 的 +2483.7 µs 中 `attn_reduce` 占 +2473.3（2455.9→4929.2 µs，+101%），单次 launch 中位数 6.2→12.7 µs（位置 1040：6.2→13.1）。不是 tok/s |
+| 批量机制清单（occupancy / 依赖链 / 启动数 / HBM·L2 流量 / 串行化 / 工作复制） | 吞吐数字之外必须说明 B1→B8 为什么这样缩放，以及现有记录能证明什么 | 部分 — 离线读 2026-10-17 记录、本地编译报告；干净串行 bench 已完成 kept B1/B2，另有 plain B4；kept B4/B8 与 plain B8 未完成 | [M]/[U] **已有**：工作复制（每位置实例 194/388/776，任务 120724/241448/482896，均精确 2×）、静态 launch 数（每请求 97 个导入实例）、编译器资源报告（128 VGPR、32 B/lane、7 spill；kept B2 为 40 B/lane、9 spill、occupancy 4）、导入版 vs 原版单次 launch 计时，以及 decode step 与 tok/s（kept B1/B2、plain B4；`docs/QWEN-BATCH-BASELINE-2026-10-18.md`）。**记录中没有**：运行时 occupancy 计数、任务级依赖链、decode step 的 launch/dispatch 计数与间隔、HBM/L2 流量、串行化间隙、kept B4/B8 与 plain B8 的 step/tok/s。见 `docs/QWEN-BATCH-MECHANISM-SCAFFOLD-2026-10-18.md` |
+
+## 目标 2 — DeepSeek 多 batch 归因
+
+| 实验 | 为什么值得做 | 上机了吗 | 结果 |
+|---|---|---|---|
+| B2→B4 trace 与任务数分解 | B4/B8 变慢必须落到机制，否则无法决定优化方向 | 部分 — 历史 trace | [M] 任务 109892→219784，trace 4.339→8.670 ms |
+| 机制归因（occupancy / 依赖链 / 启动数 / HBM·L2 流量 / 串行化） | 只有带计数的机制能指导改动 | 部分 — 离线读 2026-10-16 trace | [M]/[U] **分项计数已有**：任务数、body、依赖间隙、排队间隙、每阶段 `active_tasks`/`active_xcds`（`docs/DS-BATCH-MECHANISM-SCAFFOLD-2026-10-18.md`）。**记录中没有**：HBM/L2 流量、硬件 occupancy 计数、launch/dispatch 计数、任务级有序依赖链、反事实调度、共享权重实现、B8 |
+
+## 目标 3 — GLM 5.3 Flash 代码
+
+| 实验 | 为什么值得做 | 上机了吗 | 结果 |
+|---|---|---|---|
+| 模块门：合成 4 层 FP8，单卡两 rank | 最小代价验证双卡边界、内核、FP8 解码 | 否 — 模块门代码在 `160bed1`，但其 host 要求恰好 2 张卡（`model_host.hip:28`），单卡两 rank 未实现；单卡 `ETX_N_DEVICES=1` 草稿未提交（stash `28bdfde3`） | [U] **未跑** |
+| 4 层真权重（约 29 GB）+ HF 同层对照 | 用真权重验证 staging 与数值，不碰 305 GiB | 否 | [U] **未跑** |
+| 45 层全模型 PP2 | 最终目标 | 否 | [U] **阻塞**：305.71 GiB 载荷、163.96 GiB/rank，需双卡与完整权重 |
+| fixture 级正确性 | 代码正确性下限 | 本地 | [M] 480/480 token 全对（4 层、小维度） |
+
+## 其他未完项
+
+| 实验 | 为什么值得做 | 上机了吗 | 结果 |
+|---|---|---|---|
+| G06/G07/G08 三项单请求优化 | 解释为什么没有稳定收益 | 是 — 2026-10-16 | [M] G08 慢 1.1–1.7 µs（V 全排空排在 Q 之前，0/15 对为正）；G07 慢 60–321 ns（控制组本已重叠）；G06 −40~+120 ns（未产生新重叠）。门槛 625 ns，36 帧仅 1 帧噪声够小 |
+| G09/G10 | 两个 Qwen row 实验，接口已修 | 否 | [U] 未跑 |
+
+## 花费
+
+2026-10-17 单卡 4.22 h × 1.99 = $8.39 [E]；droplet `609988843` 已销毁（HTTP 204，账号内 0 台）。

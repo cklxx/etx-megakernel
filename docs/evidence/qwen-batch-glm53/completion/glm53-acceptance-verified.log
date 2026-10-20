@@ -1,0 +1,109 @@
+[transformers] `causal_conv1d_fn` is falling back to its reference PyTorch implementation because `causal_conv1d` is not installed. This is correct but much slower; install `causal_conv1d` for the optimized kernel.
+[transformers] `chunk_kda` is falling back to its reference PyTorch implementation because `flash-linear-attention` is not installed. This is correct but much slower; install `flash-linear-attention` for the optimized kernel.
+GLM-CPU step=0 batch=1 logit_max_abs=1.4901161e-07
+[transformers] `causal_conv1d_update` is falling back to its reference PyTorch implementation because `causal_conv1d` is not installed. This is correct but much slower; install `causal_conv1d` for the optimized kernel.
+[transformers] `fused_recurrent_kda` is falling back to its reference PyTorch implementation because `flash-linear-attention` is not installed. This is correct but much slower; install `flash-linear-attention` for the optimized kernel.
+GLM-CPU step=8 batch=1 logit_max_abs=1.7881393e-07
+GLM-CPU step=16 batch=1 logit_max_abs=1.7881393e-07
+GLM-CPU step=24 batch=1 logit_max_abs=1.1920929e-07
+{
+  "schema": 1,
+  "status": "PASS",
+  "fixture": true,
+  "batch": 1,
+  "steps": 32,
+  "matched": 32,
+  "max_logit_abs": 3.5762786865234375e-07,
+  "max_kda_state_abs": 3.4924596548080444e-10,
+  "bf16": false,
+  "fp8": false,
+  "implementation": "same C++ numerical body as ETX HIP tiles",
+  "reference": "independent Transformers GLM5Next text model",
+  "full_checkpoint": false,
+  "gpu_correctness": "unmeasured",
+  "performance": "unmeasured"
+}
+[transformers] `causal_conv1d_fn` is falling back to its reference PyTorch implementation because `causal_conv1d` is not installed. This is correct but much slower; install `causal_conv1d` for the optimized kernel.
+[transformers] `chunk_kda` is falling back to its reference PyTorch implementation because `flash-linear-attention` is not installed. This is correct but much slower; install `flash-linear-attention` for the optimized kernel.
+GLM-CPU step=0 batch=2 logit_max_abs=1.1920929e-07
+[transformers] `causal_conv1d_update` is falling back to its reference PyTorch implementation because `causal_conv1d` is not installed. This is correct but much slower; install `causal_conv1d` for the optimized kernel.
+[transformers] `fused_recurrent_kda` is falling back to its reference PyTorch implementation because `flash-linear-attention` is not installed. This is correct but much slower; install `flash-linear-attention` for the optimized kernel.
+GLM-CPU step=8 batch=2 logit_max_abs=1.4901161e-07
+GLM-CPU step=16 batch=2 logit_max_abs=1.3411045e-07
+GLM-CPU step=24 batch=2 logit_max_abs=1.7881393e-07
+{
+  "schema": 1,
+  "status": "PASS",
+  "fixture": true,
+  "batch": 2,
+  "steps": 32,
+  "matched": 64,
+  "max_logit_abs": 3.5762786865234375e-07,
+  "max_kda_state_abs": 4.656612873077393e-10,
+  "bf16": false,
+  "fp8": false,
+  "implementation": "same C++ numerical body as ETX HIP tiles",
+  "reference": "independent Transformers GLM5Next text model",
+  "full_checkpoint": false,
+  "gpu_correctness": "unmeasured",
+  "performance": "unmeasured"
+}
+[transformers] `causal_conv1d_fn` is falling back to its reference PyTorch implementation because `causal_conv1d` is not installed. This is correct but much slower; install `causal_conv1d` for the optimized kernel.
+[transformers] `chunk_kda` is falling back to its reference PyTorch implementation because `flash-linear-attention` is not installed. This is correct but much slower; install `flash-linear-attention` for the optimized kernel.
+GLM-CPU step=0 batch=4 logit_max_abs=0
+[transformers] `causal_conv1d_update` is falling back to its reference PyTorch implementation because `causal_conv1d` is not installed. This is correct but much slower; install `causal_conv1d` for the optimized kernel.
+[transformers] `fused_recurrent_kda` is falling back to its reference PyTorch implementation because `flash-linear-attention` is not installed. This is correct but much slower; install `flash-linear-attention` for the optimized kernel.
+GLM-CPU step=8 batch=4 logit_max_abs=0
+GLM-CPU step=16 batch=4 logit_max_abs=0
+GLM-CPU step=24 batch=4 logit_max_abs=0
+{
+  "schema": 1,
+  "status": "PASS",
+  "fixture": true,
+  "batch": 4,
+  "steps": 32,
+  "matched": 128,
+  "max_logit_abs": 0.0,
+  "max_kda_state_abs": 1.1641532182693481e-09,
+  "bf16": true,
+  "fp8": false,
+  "implementation": "same C++ numerical body as ETX HIP tiles",
+  "reference": "independent Transformers GLM5Next text model",
+  "full_checkpoint": false,
+  "gpu_correctness": "unmeasured",
+  "performance": "unmeasured"
+}
+[transformers] `causal_conv1d_fn` is falling back to its reference PyTorch implementation because `causal_conv1d` is not installed. This is correct but much slower; install `causal_conv1d` for the optimized kernel.
+[transformers] `chunk_kda` is falling back to its reference PyTorch implementation because `flash-linear-attention` is not installed. This is correct but much slower; install `flash-linear-attention` for the optimized kernel.
+GLM-CPU step=0 batch=8 logit_max_abs=0
+[transformers] `causal_conv1d_update` is falling back to its reference PyTorch implementation because `causal_conv1d` is not installed. This is correct but much slower; install `causal_conv1d` for the optimized kernel.
+[transformers] `fused_recurrent_kda` is falling back to its reference PyTorch implementation because `flash-linear-attention` is not installed. This is correct but much slower; install `flash-linear-attention` for the optimized kernel.
+GLM-CPU step=8 batch=8 logit_max_abs=0
+GLM-CPU step=16 batch=8 logit_max_abs=0
+GLM-CPU step=24 batch=8 logit_max_abs=0
+{
+  "schema": 1,
+  "status": "PASS",
+  "fixture": true,
+  "batch": 8,
+  "steps": 32,
+  "matched": 256,
+  "max_logit_abs": 0.0,
+  "max_kda_state_abs": 2.3283064365386963e-10,
+  "bf16": true,
+  "fp8": true,
+  "implementation": "same C++ numerical body as ETX HIP tiles",
+  "reference": "independent Transformers GLM5Next text model",
+  "full_checkpoint": false,
+  "gpu_correctness": "unmeasured",
+  "performance": "unmeasured"
+}
+FULL-SHAPE PLAN OK (no checkpoint weights; compiler check only)
+GLM-ROCM-DEVICE PASS rank=0
+GLM-ROCM-DEVICE PASS rank=1
+GLM-ROCM-HOST PASS
+Session hard stop: 18000s from runner start (includes setup)
+  0 model_build                      cpu      timeout  2100s  reads: -  writes: model/run
+  1 model_qualify                    cpu      timeout 15000s  reads: model/run  writes: qualification/qualification.json
+...........................................                              [100%]
+43 passed in 12.91s

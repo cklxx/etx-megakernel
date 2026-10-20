@@ -1,0 +1,13 @@
+{
+  "revision": "c906b3bf8013b66c29b0932d82384ba1d3c79fe9",
+  "commands": [
+    "bash examples/vllm_llm/batch_local.sh \"$PWD/build/qwen-batch-complete\"",
+    "serial local_matrix.sh for 16 variants, reproduced by committed batch_preflight.sh",
+    ".venv/bin/python -m etx.tools.gpu_jobs examples/sessions/qwen_batch_correctness.py --gpus 0 --logdir build/qwen-complete-dryrun --dry-run",
+    "bash examples/glm53/local_acceptance.sh \"$PWD/build/glm53-acceptance-verified\"",
+    ".venv/bin/python -m pytest -q > build/integrated-full-clean.log 2>&1"
+  ],
+  "gpu_resources_created": 0,
+  "large_weight_downloads": 0,
+  "gpu_spend_usd": 0
+}

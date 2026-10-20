@@ -1,0 +1,734 @@
+plan: graph=vl_qwen3-8b arch=gfx942 bindings={}
+  devices=1 domains/device=8 workers/domain=38 (wg/CU=1)
+  tasks=40622 events=364 eliminated=[]
+  prologue                 static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  in_norm_0_x              static   S_balance=0.00us <= 1.5x(C_cross=0.77+C_queue=1.20)
+  qkv_0                    static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  chain_q_norm_k_norm_rope_cache_0 static   S_balance=0.00us <= 1.5x(C_cross=1.73+C_queue=1.20)
+  attn_0                   static   S_balance=0.00us <= 1.5x(C_cross=0.90+C_queue=1.20)
+  reduce_0                 static   S_balance=0.00us <= 1.5x(C_cross=5.69+C_queue=1.20)
+  o_proj_0                 static   S_balance=0.00us <= 1.5x(C_cross=32.38+C_queue=1.20)
+  post_norm_0_x            static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  gate_up_0                static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  act_0_x                  static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  down_0                   static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  in_norm_1_x              static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  qkv_1                    static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  chain_q_norm_k_norm_rope_cache_1 static   S_balance=0.00us <= 1.5x(C_cross=1.73+C_queue=1.20)
+  attn_1                   static   S_balance=0.00us <= 1.5x(C_cross=0.90+C_queue=1.20)
+  reduce_1                 static   S_balance=0.00us <= 1.5x(C_cross=5.69+C_queue=1.20)
+  o_proj_1                 static   S_balance=0.00us <= 1.5x(C_cross=32.38+C_queue=1.20)
+  post_norm_1_x            static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  gate_up_1                static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  act_1_x                  static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  down_1                   static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  in_norm_2_x              static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  qkv_2                    static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  chain_q_norm_k_norm_rope_cache_2 static   S_balance=0.00us <= 1.5x(C_cross=1.73+C_queue=1.20)
+  attn_2                   static   S_balance=0.00us <= 1.5x(C_cross=0.90+C_queue=1.20)
+  reduce_2                 static   S_balance=0.00us <= 1.5x(C_cross=5.69+C_queue=1.20)
+  o_proj_2                 static   S_balance=0.00us <= 1.5x(C_cross=32.38+C_queue=1.20)
+  post_norm_2_x            static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  gate_up_2                static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  act_2_x                  static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  down_2                   static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  in_norm_3_x              static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  qkv_3                    static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  chain_q_norm_k_norm_rope_cache_3 static   S_balance=0.00us <= 1.5x(C_cross=1.73+C_queue=1.20)
+  attn_3                   static   S_balance=0.00us <= 1.5x(C_cross=0.90+C_queue=1.20)
+  reduce_3                 static   S_balance=0.00us <= 1.5x(C_cross=5.69+C_queue=1.20)
+  o_proj_3                 static   S_balance=0.00us <= 1.5x(C_cross=32.38+C_queue=1.20)
+  post_norm_3_x            static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  gate_up_3                static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  act_3_x                  static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  down_3                   static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  in_norm_4_x              static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  qkv_4                    static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  chain_q_norm_k_norm_rope_cache_4 static   S_balance=0.00us <= 1.5x(C_cross=1.73+C_queue=1.20)
+  attn_4                   static   S_balance=0.00us <= 1.5x(C_cross=0.90+C_queue=1.20)
+  reduce_4                 static   S_balance=0.00us <= 1.5x(C_cross=5.69+C_queue=1.20)
+  o_proj_4                 static   S_balance=0.00us <= 1.5x(C_cross=32.38+C_queue=1.20)
+  post_norm_4_x            static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  gate_up_4                static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  act_4_x                  static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  down_4                   static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  in_norm_5_x              static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  qkv_5                    static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  chain_q_norm_k_norm_rope_cache_5 static   S_balance=0.00us <= 1.5x(C_cross=1.73+C_queue=1.20)
+  attn_5                   static   S_balance=0.00us <= 1.5x(C_cross=0.90+C_queue=1.20)
+  reduce_5                 static   S_balance=0.00us <= 1.5x(C_cross=5.69+C_queue=1.20)
+  o_proj_5                 static   S_balance=0.00us <= 1.5x(C_cross=32.38+C_queue=1.20)
+  post_norm_5_x            static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  gate_up_5                static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  act_5_x                  static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  down_5                   static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  in_norm_6_x              static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  qkv_6                    static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  chain_q_norm_k_norm_rope_cache_6 static   S_balance=0.00us <= 1.5x(C_cross=1.73+C_queue=1.20)
+  attn_6                   static   S_balance=0.00us <= 1.5x(C_cross=0.90+C_queue=1.20)
+  reduce_6                 static   S_balance=0.00us <= 1.5x(C_cross=5.69+C_queue=1.20)
+  o_proj_6                 static   S_balance=0.00us <= 1.5x(C_cross=32.38+C_queue=1.20)
+  post_norm_6_x            static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  gate_up_6                static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  act_6_x                  static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  down_6                   static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  in_norm_7_x              static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  qkv_7                    static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  chain_q_norm_k_norm_rope_cache_7 static   S_balance=0.00us <= 1.5x(C_cross=1.73+C_queue=1.20)
+  attn_7                   static   S_balance=0.00us <= 1.5x(C_cross=0.90+C_queue=1.20)
+  reduce_7                 static   S_balance=0.00us <= 1.5x(C_cross=5.69+C_queue=1.20)
+  o_proj_7                 static   S_balance=0.00us <= 1.5x(C_cross=32.38+C_queue=1.20)
+  post_norm_7_x            static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  gate_up_7                static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  act_7_x                  static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  down_7                   static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  in_norm_8_x              static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  qkv_8                    static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  chain_q_norm_k_norm_rope_cache_8 static   S_balance=0.00us <= 1.5x(C_cross=1.73+C_queue=1.20)
+  attn_8                   static   S_balance=0.00us <= 1.5x(C_cross=0.90+C_queue=1.20)
+  reduce_8                 static   S_balance=0.00us <= 1.5x(C_cross=5.69+C_queue=1.20)
+  o_proj_8                 static   S_balance=0.00us <= 1.5x(C_cross=32.38+C_queue=1.20)
+  post_norm_8_x            static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  gate_up_8                static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  act_8_x                  static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  down_8                   static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  in_norm_9_x              static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  qkv_9                    static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  chain_q_norm_k_norm_rope_cache_9 static   S_balance=0.00us <= 1.5x(C_cross=1.73+C_queue=1.20)
+  attn_9                   static   S_balance=0.00us <= 1.5x(C_cross=0.90+C_queue=1.20)
+  reduce_9                 static   S_balance=0.00us <= 1.5x(C_cross=5.69+C_queue=1.20)
+  o_proj_9                 static   S_balance=0.00us <= 1.5x(C_cross=32.38+C_queue=1.20)
+  post_norm_9_x            static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  gate_up_9                static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  act_9_x                  static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  down_9                   static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  in_norm_10_x             static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  qkv_10                   static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  chain_q_norm_k_norm_rope_cache_10 static   S_balance=0.00us <= 1.5x(C_cross=1.73+C_queue=1.20)
+  attn_10                  static   S_balance=0.00us <= 1.5x(C_cross=0.90+C_queue=1.20)
+  reduce_10                static   S_balance=0.00us <= 1.5x(C_cross=5.69+C_queue=1.20)
+  o_proj_10                static   S_balance=0.00us <= 1.5x(C_cross=32.38+C_queue=1.20)
+  post_norm_10_x           static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  gate_up_10               static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  act_10_x                 static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  down_10                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  in_norm_11_x             static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  qkv_11                   static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  chain_q_norm_k_norm_rope_cache_11 static   S_balance=0.00us <= 1.5x(C_cross=1.73+C_queue=1.20)
+  attn_11                  static   S_balance=0.00us <= 1.5x(C_cross=0.90+C_queue=1.20)
+  reduce_11                static   S_balance=0.00us <= 1.5x(C_cross=5.69+C_queue=1.20)
+  o_proj_11                static   S_balance=0.00us <= 1.5x(C_cross=32.38+C_queue=1.20)
+  post_norm_11_x           static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  gate_up_11               static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  act_11_x                 static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  down_11                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  in_norm_12_x             static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  qkv_12                   static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  chain_q_norm_k_norm_rope_cache_12 static   S_balance=0.00us <= 1.5x(C_cross=1.73+C_queue=1.20)
+  attn_12                  static   S_balance=0.00us <= 1.5x(C_cross=0.90+C_queue=1.20)
+  reduce_12                static   S_balance=0.00us <= 1.5x(C_cross=5.69+C_queue=1.20)
+  o_proj_12                static   S_balance=0.00us <= 1.5x(C_cross=32.38+C_queue=1.20)
+  post_norm_12_x           static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  gate_up_12               static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  act_12_x                 static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  down_12                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  in_norm_13_x             static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  qkv_13                   static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  chain_q_norm_k_norm_rope_cache_13 static   S_balance=0.00us <= 1.5x(C_cross=1.73+C_queue=1.20)
+  attn_13                  static   S_balance=0.00us <= 1.5x(C_cross=0.90+C_queue=1.20)
+  reduce_13                static   S_balance=0.00us <= 1.5x(C_cross=5.69+C_queue=1.20)
+  o_proj_13                static   S_balance=0.00us <= 1.5x(C_cross=32.38+C_queue=1.20)
+  post_norm_13_x           static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  gate_up_13               static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  act_13_x                 static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  down_13                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  in_norm_14_x             static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  qkv_14                   static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  chain_q_norm_k_norm_rope_cache_14 static   S_balance=0.00us <= 1.5x(C_cross=1.73+C_queue=1.20)
+  attn_14                  static   S_balance=0.00us <= 1.5x(C_cross=0.90+C_queue=1.20)
+  reduce_14                static   S_balance=0.00us <= 1.5x(C_cross=5.69+C_queue=1.20)
+  o_proj_14                static   S_balance=0.00us <= 1.5x(C_cross=32.38+C_queue=1.20)
+  post_norm_14_x           static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  gate_up_14               static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  act_14_x                 static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  down_14                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  in_norm_15_x             static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  qkv_15                   static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  chain_q_norm_k_norm_rope_cache_15 static   S_balance=0.00us <= 1.5x(C_cross=1.73+C_queue=1.20)
+  attn_15                  static   S_balance=0.00us <= 1.5x(C_cross=0.90+C_queue=1.20)
+  reduce_15                static   S_balance=0.00us <= 1.5x(C_cross=5.69+C_queue=1.20)
+  o_proj_15                static   S_balance=0.00us <= 1.5x(C_cross=32.38+C_queue=1.20)
+  post_norm_15_x           static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  gate_up_15               static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  act_15_x                 static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  down_15                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  in_norm_16_x             static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  qkv_16                   static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  chain_q_norm_k_norm_rope_cache_16 static   S_balance=0.00us <= 1.5x(C_cross=1.73+C_queue=1.20)
+  attn_16                  static   S_balance=0.00us <= 1.5x(C_cross=0.90+C_queue=1.20)
+  reduce_16                static   S_balance=0.00us <= 1.5x(C_cross=5.69+C_queue=1.20)
+  o_proj_16                static   S_balance=0.00us <= 1.5x(C_cross=32.38+C_queue=1.20)
+  post_norm_16_x           static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  gate_up_16               static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  act_16_x                 static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  down_16                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  in_norm_17_x             static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  qkv_17                   static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  chain_q_norm_k_norm_rope_cache_17 static   S_balance=0.00us <= 1.5x(C_cross=1.73+C_queue=1.20)
+  attn_17                  static   S_balance=0.00us <= 1.5x(C_cross=0.90+C_queue=1.20)
+  reduce_17                static   S_balance=0.00us <= 1.5x(C_cross=5.69+C_queue=1.20)
+  o_proj_17                static   S_balance=0.00us <= 1.5x(C_cross=32.38+C_queue=1.20)
+  post_norm_17_x           static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  gate_up_17               static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  act_17_x                 static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  down_17                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  in_norm_18_x             static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  qkv_18                   static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  chain_q_norm_k_norm_rope_cache_18 static   S_balance=0.00us <= 1.5x(C_cross=1.73+C_queue=1.20)
+  attn_18                  static   S_balance=0.00us <= 1.5x(C_cross=0.90+C_queue=1.20)
+  reduce_18                static   S_balance=0.00us <= 1.5x(C_cross=5.69+C_queue=1.20)
+  o_proj_18                static   S_balance=0.00us <= 1.5x(C_cross=32.38+C_queue=1.20)
+  post_norm_18_x           static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  gate_up_18               static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  act_18_x                 static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  down_18                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  in_norm_19_x             static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  qkv_19                   static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  chain_q_norm_k_norm_rope_cache_19 static   S_balance=0.00us <= 1.5x(C_cross=1.73+C_queue=1.20)
+  attn_19                  static   S_balance=0.00us <= 1.5x(C_cross=0.90+C_queue=1.20)
+  reduce_19                static   S_balance=0.00us <= 1.5x(C_cross=5.69+C_queue=1.20)
+  o_proj_19                static   S_balance=0.00us <= 1.5x(C_cross=32.38+C_queue=1.20)
+  post_norm_19_x           static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  gate_up_19               static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  act_19_x                 static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  down_19                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  in_norm_20_x             static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  qkv_20                   static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  chain_q_norm_k_norm_rope_cache_20 static   S_balance=0.00us <= 1.5x(C_cross=1.73+C_queue=1.20)
+  attn_20                  static   S_balance=0.00us <= 1.5x(C_cross=0.90+C_queue=1.20)
+  reduce_20                static   S_balance=0.00us <= 1.5x(C_cross=5.69+C_queue=1.20)
+  o_proj_20                static   S_balance=0.00us <= 1.5x(C_cross=32.38+C_queue=1.20)
+  post_norm_20_x           static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  gate_up_20               static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  act_20_x                 static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  down_20                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  in_norm_21_x             static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  qkv_21                   static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  chain_q_norm_k_norm_rope_cache_21 static   S_balance=0.00us <= 1.5x(C_cross=1.73+C_queue=1.20)
+  attn_21                  static   S_balance=0.00us <= 1.5x(C_cross=0.90+C_queue=1.20)
+  reduce_21                static   S_balance=0.00us <= 1.5x(C_cross=5.69+C_queue=1.20)
+  o_proj_21                static   S_balance=0.00us <= 1.5x(C_cross=32.38+C_queue=1.20)
+  post_norm_21_x           static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  gate_up_21               static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  act_21_x                 static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  down_21                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  in_norm_22_x             static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  qkv_22                   static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  chain_q_norm_k_norm_rope_cache_22 static   S_balance=0.00us <= 1.5x(C_cross=1.73+C_queue=1.20)
+  attn_22                  static   S_balance=0.00us <= 1.5x(C_cross=0.90+C_queue=1.20)
+  reduce_22                static   S_balance=0.00us <= 1.5x(C_cross=5.69+C_queue=1.20)
+  o_proj_22                static   S_balance=0.00us <= 1.5x(C_cross=32.38+C_queue=1.20)
+  post_norm_22_x           static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  gate_up_22               static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  act_22_x                 static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  down_22                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  in_norm_23_x             static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  qkv_23                   static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  chain_q_norm_k_norm_rope_cache_23 static   S_balance=0.00us <= 1.5x(C_cross=1.73+C_queue=1.20)
+  attn_23                  static   S_balance=0.00us <= 1.5x(C_cross=0.90+C_queue=1.20)
+  reduce_23                static   S_balance=0.00us <= 1.5x(C_cross=5.69+C_queue=1.20)
+  o_proj_23                static   S_balance=0.00us <= 1.5x(C_cross=32.38+C_queue=1.20)
+  post_norm_23_x           static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  gate_up_23               static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  act_23_x                 static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  down_23                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  in_norm_24_x             static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  qkv_24                   static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  chain_q_norm_k_norm_rope_cache_24 static   S_balance=0.00us <= 1.5x(C_cross=1.73+C_queue=1.20)
+  attn_24                  static   S_balance=0.00us <= 1.5x(C_cross=0.90+C_queue=1.20)
+  reduce_24                static   S_balance=0.00us <= 1.5x(C_cross=5.69+C_queue=1.20)
+  o_proj_24                static   S_balance=0.00us <= 1.5x(C_cross=32.38+C_queue=1.20)
+  post_norm_24_x           static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  gate_up_24               static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  act_24_x                 static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  down_24                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  in_norm_25_x             static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  qkv_25                   static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  chain_q_norm_k_norm_rope_cache_25 static   S_balance=0.00us <= 1.5x(C_cross=1.73+C_queue=1.20)
+  attn_25                  static   S_balance=0.00us <= 1.5x(C_cross=0.90+C_queue=1.20)
+  reduce_25                static   S_balance=0.00us <= 1.5x(C_cross=5.69+C_queue=1.20)
+  o_proj_25                static   S_balance=0.00us <= 1.5x(C_cross=32.38+C_queue=1.20)
+  post_norm_25_x           static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  gate_up_25               static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  act_25_x                 static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  down_25                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  in_norm_26_x             static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  qkv_26                   static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  chain_q_norm_k_norm_rope_cache_26 static   S_balance=0.00us <= 1.5x(C_cross=1.73+C_queue=1.20)
+  attn_26                  static   S_balance=0.00us <= 1.5x(C_cross=0.90+C_queue=1.20)
+  reduce_26                static   S_balance=0.00us <= 1.5x(C_cross=5.69+C_queue=1.20)
+  o_proj_26                static   S_balance=0.00us <= 1.5x(C_cross=32.38+C_queue=1.20)
+  post_norm_26_x           static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  gate_up_26               static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  act_26_x                 static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  down_26                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  in_norm_27_x             static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  qkv_27                   static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  chain_q_norm_k_norm_rope_cache_27 static   S_balance=0.00us <= 1.5x(C_cross=1.73+C_queue=1.20)
+  attn_27                  static   S_balance=0.00us <= 1.5x(C_cross=0.90+C_queue=1.20)
+  reduce_27                static   S_balance=0.00us <= 1.5x(C_cross=5.69+C_queue=1.20)
+  o_proj_27                static   S_balance=0.00us <= 1.5x(C_cross=32.38+C_queue=1.20)
+  post_norm_27_x           static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  gate_up_27               static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  act_27_x                 static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  down_27                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  in_norm_28_x             static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  qkv_28                   static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  chain_q_norm_k_norm_rope_cache_28 static   S_balance=0.00us <= 1.5x(C_cross=1.73+C_queue=1.20)
+  attn_28                  static   S_balance=0.00us <= 1.5x(C_cross=0.90+C_queue=1.20)
+  reduce_28                static   S_balance=0.00us <= 1.5x(C_cross=5.69+C_queue=1.20)
+  o_proj_28                static   S_balance=0.00us <= 1.5x(C_cross=32.38+C_queue=1.20)
+  post_norm_28_x           static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  gate_up_28               static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  act_28_x                 static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  down_28                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  in_norm_29_x             static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  qkv_29                   static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  chain_q_norm_k_norm_rope_cache_29 static   S_balance=0.00us <= 1.5x(C_cross=1.73+C_queue=1.20)
+  attn_29                  static   S_balance=0.00us <= 1.5x(C_cross=0.90+C_queue=1.20)
+  reduce_29                static   S_balance=0.00us <= 1.5x(C_cross=5.69+C_queue=1.20)
+  o_proj_29                static   S_balance=0.00us <= 1.5x(C_cross=32.38+C_queue=1.20)
+  post_norm_29_x           static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  gate_up_29               static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  act_29_x                 static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  down_29                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  in_norm_30_x             static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  qkv_30                   static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  chain_q_norm_k_norm_rope_cache_30 static   S_balance=0.00us <= 1.5x(C_cross=1.73+C_queue=1.20)
+  attn_30                  static   S_balance=0.00us <= 1.5x(C_cross=0.90+C_queue=1.20)
+  reduce_30                static   S_balance=0.00us <= 1.5x(C_cross=5.69+C_queue=1.20)
+  o_proj_30                static   S_balance=0.00us <= 1.5x(C_cross=32.38+C_queue=1.20)
+  post_norm_30_x           static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  gate_up_30               static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  act_30_x                 static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  down_30                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  in_norm_31_x             static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  qkv_31                   static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  chain_q_norm_k_norm_rope_cache_31 static   S_balance=0.00us <= 1.5x(C_cross=1.73+C_queue=1.20)
+  attn_31                  static   S_balance=0.00us <= 1.5x(C_cross=0.90+C_queue=1.20)
+  reduce_31                static   S_balance=0.00us <= 1.5x(C_cross=5.69+C_queue=1.20)
+  o_proj_31                static   S_balance=0.00us <= 1.5x(C_cross=32.38+C_queue=1.20)
+  post_norm_31_x           static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  gate_up_31               static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  act_31_x                 static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  down_31                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  in_norm_32_x             static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  qkv_32                   static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  chain_q_norm_k_norm_rope_cache_32 static   S_balance=0.00us <= 1.5x(C_cross=1.73+C_queue=1.20)
+  attn_32                  static   S_balance=0.00us <= 1.5x(C_cross=0.90+C_queue=1.20)
+  reduce_32                static   S_balance=0.00us <= 1.5x(C_cross=5.69+C_queue=1.20)
+  o_proj_32                static   S_balance=0.00us <= 1.5x(C_cross=32.38+C_queue=1.20)
+  post_norm_32_x           static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  gate_up_32               static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  act_32_x                 static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  down_32                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  in_norm_33_x             static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  qkv_33                   static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  chain_q_norm_k_norm_rope_cache_33 static   S_balance=0.00us <= 1.5x(C_cross=1.73+C_queue=1.20)
+  attn_33                  static   S_balance=0.00us <= 1.5x(C_cross=0.90+C_queue=1.20)
+  reduce_33                static   S_balance=0.00us <= 1.5x(C_cross=5.69+C_queue=1.20)
+  o_proj_33                static   S_balance=0.00us <= 1.5x(C_cross=32.38+C_queue=1.20)
+  post_norm_33_x           static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  gate_up_33               static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  act_33_x                 static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  down_33                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  in_norm_34_x             static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  qkv_34                   static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  chain_q_norm_k_norm_rope_cache_34 static   S_balance=0.00us <= 1.5x(C_cross=1.73+C_queue=1.20)
+  attn_34                  static   S_balance=0.00us <= 1.5x(C_cross=0.90+C_queue=1.20)
+  reduce_34                static   S_balance=0.00us <= 1.5x(C_cross=5.69+C_queue=1.20)
+  o_proj_34                static   S_balance=0.00us <= 1.5x(C_cross=32.38+C_queue=1.20)
+  post_norm_34_x           static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  gate_up_34               static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  act_34_x                 static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  down_34                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  in_norm_35_x             static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  qkv_35                   static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  chain_q_norm_k_norm_rope_cache_35 static   S_balance=0.00us <= 1.5x(C_cross=1.73+C_queue=1.20)
+  attn_35                  static   S_balance=0.00us <= 1.5x(C_cross=0.90+C_queue=1.20)
+  reduce_35                static   S_balance=0.00us <= 1.5x(C_cross=5.69+C_queue=1.20)
+  o_proj_35                static   S_balance=0.00us <= 1.5x(C_cross=32.38+C_queue=1.20)
+  post_norm_35_x           static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  gate_up_35               static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  act_35_x                 static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  down_35                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  final_norm_x             static   S_balance=0.00us <= 1.5x(C_cross=8.65+C_queue=1.20)
+  lm_head                  static   S_balance=0.00us <= 1.5x(C_cross=0.00+C_queue=3.51)
+  argmax                   static   S_balance=0.00us <= 1.5x(C_cross=1.73+C_queue=1.20)
+  event E_pro            scope=DEVICE  mem=device       numel=1 cross_domain=7 cross_device=0
+  event E_0              scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_1              scope=DEVICE  mem=device       numel=1 cross_domain=224 cross_device=0
+  event E_2              scope=DEVICE  mem=device       numel=1 cross_domain=35 cross_device=0
+  event E_3              scope=DEVICE  mem=device       numel=1 cross_domain=1120 cross_device=0
+  event E_4              scope=DEVICE  mem=device       numel=1 cross_domain=7168 cross_device=0
+  event E_5              scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_6              scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_7              scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_8              scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_9              scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_10             scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_11             scope=DEVICE  mem=device       numel=1 cross_domain=224 cross_device=0
+  event E_12             scope=DEVICE  mem=device       numel=1 cross_domain=35 cross_device=0
+  event E_13             scope=DEVICE  mem=device       numel=1 cross_domain=1120 cross_device=0
+  event E_14             scope=DEVICE  mem=device       numel=1 cross_domain=7168 cross_device=0
+  event E_15             scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_16             scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_17             scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_18             scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_19             scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_20             scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_21             scope=DEVICE  mem=device       numel=1 cross_domain=224 cross_device=0
+  event E_22             scope=DEVICE  mem=device       numel=1 cross_domain=35 cross_device=0
+  event E_23             scope=DEVICE  mem=device       numel=1 cross_domain=1120 cross_device=0
+  event E_24             scope=DEVICE  mem=device       numel=1 cross_domain=7168 cross_device=0
+  event E_25             scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_26             scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_27             scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_28             scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_29             scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_30             scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_31             scope=DEVICE  mem=device       numel=1 cross_domain=224 cross_device=0
+  event E_32             scope=DEVICE  mem=device       numel=1 cross_domain=35 cross_device=0
+  event E_33             scope=DEVICE  mem=device       numel=1 cross_domain=1120 cross_device=0
+  event E_34             scope=DEVICE  mem=device       numel=1 cross_domain=7168 cross_device=0
+  event E_35             scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_36             scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_37             scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_38             scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_39             scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_40             scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_41             scope=DEVICE  mem=device       numel=1 cross_domain=224 cross_device=0
+  event E_42             scope=DEVICE  mem=device       numel=1 cross_domain=35 cross_device=0
+  event E_43             scope=DEVICE  mem=device       numel=1 cross_domain=1120 cross_device=0
+  event E_44             scope=DEVICE  mem=device       numel=1 cross_domain=7168 cross_device=0
+  event E_45             scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_46             scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_47             scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_48             scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_49             scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_50             scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_51             scope=DEVICE  mem=device       numel=1 cross_domain=224 cross_device=0
+  event E_52             scope=DEVICE  mem=device       numel=1 cross_domain=35 cross_device=0
+  event E_53             scope=DEVICE  mem=device       numel=1 cross_domain=1120 cross_device=0
+  event E_54             scope=DEVICE  mem=device       numel=1 cross_domain=7168 cross_device=0
+  event E_55             scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_56             scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_57             scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_58             scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_59             scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_60             scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_61             scope=DEVICE  mem=device       numel=1 cross_domain=224 cross_device=0
+  event E_62             scope=DEVICE  mem=device       numel=1 cross_domain=35 cross_device=0
+  event E_63             scope=DEVICE  mem=device       numel=1 cross_domain=1120 cross_device=0
+  event E_64             scope=DEVICE  mem=device       numel=1 cross_domain=7168 cross_device=0
+  event E_65             scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_66             scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_67             scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_68             scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_69             scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_70             scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_71             scope=DEVICE  mem=device       numel=1 cross_domain=224 cross_device=0
+  event E_72             scope=DEVICE  mem=device       numel=1 cross_domain=35 cross_device=0
+  event E_73             scope=DEVICE  mem=device       numel=1 cross_domain=1120 cross_device=0
+  event E_74             scope=DEVICE  mem=device       numel=1 cross_domain=7168 cross_device=0
+  event E_75             scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_76             scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_77             scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_78             scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_79             scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_80             scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_81             scope=DEVICE  mem=device       numel=1 cross_domain=224 cross_device=0
+  event E_82             scope=DEVICE  mem=device       numel=1 cross_domain=35 cross_device=0
+  event E_83             scope=DEVICE  mem=device       numel=1 cross_domain=1120 cross_device=0
+  event E_84             scope=DEVICE  mem=device       numel=1 cross_domain=7168 cross_device=0
+  event E_85             scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_86             scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_87             scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_88             scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_89             scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_90             scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_91             scope=DEVICE  mem=device       numel=1 cross_domain=224 cross_device=0
+  event E_92             scope=DEVICE  mem=device       numel=1 cross_domain=35 cross_device=0
+  event E_93             scope=DEVICE  mem=device       numel=1 cross_domain=1120 cross_device=0
+  event E_94             scope=DEVICE  mem=device       numel=1 cross_domain=7168 cross_device=0
+  event E_95             scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_96             scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_97             scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_98             scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_99             scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_100            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_101            scope=DEVICE  mem=device       numel=1 cross_domain=224 cross_device=0
+  event E_102            scope=DEVICE  mem=device       numel=1 cross_domain=35 cross_device=0
+  event E_103            scope=DEVICE  mem=device       numel=1 cross_domain=1120 cross_device=0
+  event E_104            scope=DEVICE  mem=device       numel=1 cross_domain=7168 cross_device=0
+  event E_105            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_106            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_107            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_108            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_109            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_110            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_111            scope=DEVICE  mem=device       numel=1 cross_domain=224 cross_device=0
+  event E_112            scope=DEVICE  mem=device       numel=1 cross_domain=35 cross_device=0
+  event E_113            scope=DEVICE  mem=device       numel=1 cross_domain=1120 cross_device=0
+  event E_114            scope=DEVICE  mem=device       numel=1 cross_domain=7168 cross_device=0
+  event E_115            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_116            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_117            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_118            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_119            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_120            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_121            scope=DEVICE  mem=device       numel=1 cross_domain=224 cross_device=0
+  event E_122            scope=DEVICE  mem=device       numel=1 cross_domain=35 cross_device=0
+  event E_123            scope=DEVICE  mem=device       numel=1 cross_domain=1120 cross_device=0
+  event E_124            scope=DEVICE  mem=device       numel=1 cross_domain=7168 cross_device=0
+  event E_125            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_126            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_127            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_128            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_129            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_130            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_131            scope=DEVICE  mem=device       numel=1 cross_domain=224 cross_device=0
+  event E_132            scope=DEVICE  mem=device       numel=1 cross_domain=35 cross_device=0
+  event E_133            scope=DEVICE  mem=device       numel=1 cross_domain=1120 cross_device=0
+  event E_134            scope=DEVICE  mem=device       numel=1 cross_domain=7168 cross_device=0
+  event E_135            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_136            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_137            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_138            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_139            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_140            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_141            scope=DEVICE  mem=device       numel=1 cross_domain=224 cross_device=0
+  event E_142            scope=DEVICE  mem=device       numel=1 cross_domain=35 cross_device=0
+  event E_143            scope=DEVICE  mem=device       numel=1 cross_domain=1120 cross_device=0
+  event E_144            scope=DEVICE  mem=device       numel=1 cross_domain=7168 cross_device=0
+  event E_145            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_146            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_147            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_148            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_149            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_150            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_151            scope=DEVICE  mem=device       numel=1 cross_domain=224 cross_device=0
+  event E_152            scope=DEVICE  mem=device       numel=1 cross_domain=35 cross_device=0
+  event E_153            scope=DEVICE  mem=device       numel=1 cross_domain=1120 cross_device=0
+  event E_154            scope=DEVICE  mem=device       numel=1 cross_domain=7168 cross_device=0
+  event E_155            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_156            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_157            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_158            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_159            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_160            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_161            scope=DEVICE  mem=device       numel=1 cross_domain=224 cross_device=0
+  event E_162            scope=DEVICE  mem=device       numel=1 cross_domain=35 cross_device=0
+  event E_163            scope=DEVICE  mem=device       numel=1 cross_domain=1120 cross_device=0
+  event E_164            scope=DEVICE  mem=device       numel=1 cross_domain=7168 cross_device=0
+  event E_165            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_166            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_167            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_168            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_169            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_170            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_171            scope=DEVICE  mem=device       numel=1 cross_domain=224 cross_device=0
+  event E_172            scope=DEVICE  mem=device       numel=1 cross_domain=35 cross_device=0
+  event E_173            scope=DEVICE  mem=device       numel=1 cross_domain=1120 cross_device=0
+  event E_174            scope=DEVICE  mem=device       numel=1 cross_domain=7168 cross_device=0
+  event E_175            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_176            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_177            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_178            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_179            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_180            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_181            scope=DEVICE  mem=device       numel=1 cross_domain=224 cross_device=0
+  event E_182            scope=DEVICE  mem=device       numel=1 cross_domain=35 cross_device=0
+  event E_183            scope=DEVICE  mem=device       numel=1 cross_domain=1120 cross_device=0
+  event E_184            scope=DEVICE  mem=device       numel=1 cross_domain=7168 cross_device=0
+  event E_185            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_186            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_187            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_188            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_189            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_190            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_191            scope=DEVICE  mem=device       numel=1 cross_domain=224 cross_device=0
+  event E_192            scope=DEVICE  mem=device       numel=1 cross_domain=35 cross_device=0
+  event E_193            scope=DEVICE  mem=device       numel=1 cross_domain=1120 cross_device=0
+  event E_194            scope=DEVICE  mem=device       numel=1 cross_domain=7168 cross_device=0
+  event E_195            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_196            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_197            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_198            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_199            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_200            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_201            scope=DEVICE  mem=device       numel=1 cross_domain=224 cross_device=0
+  event E_202            scope=DEVICE  mem=device       numel=1 cross_domain=35 cross_device=0
+  event E_203            scope=DEVICE  mem=device       numel=1 cross_domain=1120 cross_device=0
+  event E_204            scope=DEVICE  mem=device       numel=1 cross_domain=7168 cross_device=0
+  event E_205            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_206            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_207            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_208            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_209            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_210            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_211            scope=DEVICE  mem=device       numel=1 cross_domain=224 cross_device=0
+  event E_212            scope=DEVICE  mem=device       numel=1 cross_domain=35 cross_device=0
+  event E_213            scope=DEVICE  mem=device       numel=1 cross_domain=1120 cross_device=0
+  event E_214            scope=DEVICE  mem=device       numel=1 cross_domain=7168 cross_device=0
+  event E_215            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_216            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_217            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_218            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_219            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_220            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_221            scope=DEVICE  mem=device       numel=1 cross_domain=224 cross_device=0
+  event E_222            scope=DEVICE  mem=device       numel=1 cross_domain=35 cross_device=0
+  event E_223            scope=DEVICE  mem=device       numel=1 cross_domain=1120 cross_device=0
+  event E_224            scope=DEVICE  mem=device       numel=1 cross_domain=7168 cross_device=0
+  event E_225            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_226            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_227            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_228            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_229            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_230            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_231            scope=DEVICE  mem=device       numel=1 cross_domain=224 cross_device=0
+  event E_232            scope=DEVICE  mem=device       numel=1 cross_domain=35 cross_device=0
+  event E_233            scope=DEVICE  mem=device       numel=1 cross_domain=1120 cross_device=0
+  event E_234            scope=DEVICE  mem=device       numel=1 cross_domain=7168 cross_device=0
+  event E_235            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_236            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_237            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_238            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_239            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_240            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_241            scope=DEVICE  mem=device       numel=1 cross_domain=224 cross_device=0
+  event E_242            scope=DEVICE  mem=device       numel=1 cross_domain=35 cross_device=0
+  event E_243            scope=DEVICE  mem=device       numel=1 cross_domain=1120 cross_device=0
+  event E_244            scope=DEVICE  mem=device       numel=1 cross_domain=7168 cross_device=0
+  event E_245            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_246            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_247            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_248            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_249            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_250            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_251            scope=DEVICE  mem=device       numel=1 cross_domain=224 cross_device=0
+  event E_252            scope=DEVICE  mem=device       numel=1 cross_domain=35 cross_device=0
+  event E_253            scope=DEVICE  mem=device       numel=1 cross_domain=1120 cross_device=0
+  event E_254            scope=DEVICE  mem=device       numel=1 cross_domain=7168 cross_device=0
+  event E_255            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_256            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_257            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_258            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_259            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_260            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_261            scope=DEVICE  mem=device       numel=1 cross_domain=224 cross_device=0
+  event E_262            scope=DEVICE  mem=device       numel=1 cross_domain=35 cross_device=0
+  event E_263            scope=DEVICE  mem=device       numel=1 cross_domain=1120 cross_device=0
+  event E_264            scope=DEVICE  mem=device       numel=1 cross_domain=7168 cross_device=0
+  event E_265            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_266            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_267            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_268            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_269            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_270            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_271            scope=DEVICE  mem=device       numel=1 cross_domain=224 cross_device=0
+  event E_272            scope=DEVICE  mem=device       numel=1 cross_domain=35 cross_device=0
+  event E_273            scope=DEVICE  mem=device       numel=1 cross_domain=1120 cross_device=0
+  event E_274            scope=DEVICE  mem=device       numel=1 cross_domain=7168 cross_device=0
+  event E_275            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_276            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_277            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_278            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_279            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_280            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_281            scope=DEVICE  mem=device       numel=1 cross_domain=224 cross_device=0
+  event E_282            scope=DEVICE  mem=device       numel=1 cross_domain=35 cross_device=0
+  event E_283            scope=DEVICE  mem=device       numel=1 cross_domain=1120 cross_device=0
+  event E_284            scope=DEVICE  mem=device       numel=1 cross_domain=7168 cross_device=0
+  event E_285            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_286            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_287            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_288            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_289            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_290            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_291            scope=DEVICE  mem=device       numel=1 cross_domain=224 cross_device=0
+  event E_292            scope=DEVICE  mem=device       numel=1 cross_domain=35 cross_device=0
+  event E_293            scope=DEVICE  mem=device       numel=1 cross_domain=1120 cross_device=0
+  event E_294            scope=DEVICE  mem=device       numel=1 cross_domain=7168 cross_device=0
+  event E_295            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_296            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_297            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_298            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_299            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_300            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_301            scope=DEVICE  mem=device       numel=1 cross_domain=224 cross_device=0
+  event E_302            scope=DEVICE  mem=device       numel=1 cross_domain=35 cross_device=0
+  event E_303            scope=DEVICE  mem=device       numel=1 cross_domain=1120 cross_device=0
+  event E_304            scope=DEVICE  mem=device       numel=1 cross_domain=7168 cross_device=0
+  event E_305            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_306            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_307            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_308            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_309            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_310            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_311            scope=DEVICE  mem=device       numel=1 cross_domain=224 cross_device=0
+  event E_312            scope=DEVICE  mem=device       numel=1 cross_domain=35 cross_device=0
+  event E_313            scope=DEVICE  mem=device       numel=1 cross_domain=1120 cross_device=0
+  event E_314            scope=DEVICE  mem=device       numel=1 cross_domain=7168 cross_device=0
+  event E_315            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_316            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_317            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_318            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_319            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_320            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_321            scope=DEVICE  mem=device       numel=1 cross_domain=224 cross_device=0
+  event E_322            scope=DEVICE  mem=device       numel=1 cross_domain=35 cross_device=0
+  event E_323            scope=DEVICE  mem=device       numel=1 cross_domain=1120 cross_device=0
+  event E_324            scope=DEVICE  mem=device       numel=1 cross_domain=7168 cross_device=0
+  event E_325            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_326            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_327            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_328            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_329            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_330            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_331            scope=DEVICE  mem=device       numel=1 cross_domain=224 cross_device=0
+  event E_332            scope=DEVICE  mem=device       numel=1 cross_domain=35 cross_device=0
+  event E_333            scope=DEVICE  mem=device       numel=1 cross_domain=1120 cross_device=0
+  event E_334            scope=DEVICE  mem=device       numel=1 cross_domain=7168 cross_device=0
+  event E_335            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_336            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_337            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_338            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_339            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_340            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_341            scope=DEVICE  mem=device       numel=1 cross_domain=224 cross_device=0
+  event E_342            scope=DEVICE  mem=device       numel=1 cross_domain=35 cross_device=0
+  event E_343            scope=DEVICE  mem=device       numel=1 cross_domain=1120 cross_device=0
+  event E_344            scope=DEVICE  mem=device       numel=1 cross_domain=7168 cross_device=0
+  event E_345            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_346            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_347            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_348            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_349            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_350            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_351            scope=DEVICE  mem=device       numel=1 cross_domain=224 cross_device=0
+  event E_352            scope=DEVICE  mem=device       numel=1 cross_domain=35 cross_device=0
+  event E_353            scope=DEVICE  mem=device       numel=1 cross_domain=1120 cross_device=0
+  event E_354            scope=DEVICE  mem=device       numel=1 cross_domain=7168 cross_device=0
+  event E_355            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_356            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_357            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_358            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_359            scope=DEVICE  mem=device       numel=1 cross_domain=1792 cross_device=0
+  event E_360            scope=DOMAIN  mem=device       numel=8 cross_domain=0 cross_device=0
+  event E_361            scope=DEVICE  mem=device       numel=1 cross_domain=224 cross_device=0
+  event E_argmax         scope=DOMAIN  mem=device       numel=1 cross_domain=0 cross_device=0
+  prefetch entries=0
+sources to link: ['/Users/ckl/code/.wt/etx-qwen-batch-glm53-multigpu/examples/vllm_llm/vl_tiles.hip', 'build/qwen-batch-matrix/qwen3-8b_xcd_s1/imp_tiles.hip', 'build/qwen-batch-matrix/qwen3-8b_xcd_s1/chain_tiles.hip']
+wrote build/qwen-batch-matrix/qwen3-8b_xcd_s1/
