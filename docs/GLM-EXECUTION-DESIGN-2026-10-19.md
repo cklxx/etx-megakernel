@@ -1,14 +1,19 @@
 # GLM execution design and its gates, 2026-10-19
 
-Offline analysis; no GPU was used. This file consolidates the former
-`GLM-LAYER-BANDWIDTH-CACHE-AUTOCONF-2026-10-19.md` into sections 4–5 and adds
-the four gates (6–9) that make any further optimisation judgeable. Labels:
+Offline analysis and opt-in experiment tooling; no GPU was used. This file
+consolidates the former `GLM-LAYER-BANDWIDTH-CACHE-AUTOCONF-2026-10-19.md`
+into sections 4–5 and adds the four gates (6–9) that make any further
+optimisation judgeable. The cache policy, six-token LDS slab and resource
+selection below are proposals, not established properties of the native tiles.
+Labels:
 [M] measured, [E] arithmetic from stated inputs, [F] gfx942 fork fact,
 [U] absent from the record.
 
-**Blocked until §6 exists: §5 (tile auto-optimisation).** Work order: §6 oracle
-first; §7's probe may run any time because it needs no weights; §9 measures only
-what §6 has certified; §5 runs last, against §8's fixed bar.
+**Measured selection is blocked until §6 passes on the same build.** Offline
+candidate enumeration, compilation and compiler-resource filtering need no
+weights and are allowed before that gate. Work order: §6 oracle first for any
+performance claim; §7's synthetic seam probe may run without weights; §9
+accepts only what §6 has certified; §5 selects a winner last against §8's bar.
 
 ## 1. Kernel selection
 
@@ -26,10 +31,17 @@ imports no vLLM kernels; a build requires exactly `megakernel_d0.hip` and
 Selection is therefore by bytes, not by name. One expert is
 3 × 2048 × 4096 × 1 B = **25.17 MB** FP8 (scales add 6.1 KB, 0.024%, ignored).
 A batch-1 layer is 8 routed experts (201.3 MB) + shared expert (25.2 MB) +
-router (1.18 MB) = **227.7 MB**; 45 layers is **10.25 GB per step** → a
-**2.88 ms floor** at the measured 3.56 TB/s [E]. At B8 the same layer is
+router (1.18 MB) = **227.7 MB**. Multiplying by 45 gives an **all-MoE-equivalent
+10.25 GB / 2.88 ms** at the measured 3.56 TB/s [E], not an exact whole-model
+byte ledger: the release has 42 sparse and three dense layers, and this
+calculation omits attention, mHC, embedding/head and cache traffic. At B8 the
+same sparse layer is
 1,611 MB replicated, or 1,462 MB as the routed union (58.1 experts), only 9.2%
 saved because 288 experts spread the routing wider than Qwen's 128 [E].
+The native row-per-lane, serial-K implementation exposes only B productive
+layer workgroups. The measured chip-wide bandwidth is therefore a ceiling,
+not demonstrated bandwidth for this implementation; one must measure native
+tile throughput before choosing a decomposition against that ceiling.
 
 The bandwidth basis: `hw_bench lf` measured **3.56 TB/s at 192 × 64 KB in
 flight, 3.93 TB/s maximum** (`examples/vllm_llm/batch_pp.py:10`) [M] — 67.2%
@@ -73,8 +85,10 @@ wait on the boundary carried over SYSTEM events and fine-grained peer memory
 The boundary is crossed **once per decode step** (`prepare.py:88,101` sets
 `boundary_bytes_per_decode_step` to exactly one `[B,4,4096]` transfer).
 
-- Rank 1 can do no layer work before the boundary; its 21 layers run after
-  rank 0's 24 [E]. No per-layer timing exists, so the bubble's size is [U].
+- Rank 1 cannot process a **given row** before rank 0 publishes that row's
+  layer-23 output. Dependencies are `i->i`, not a whole-batch fence, so different
+  rows can progress on opposite ranks at B > 1. No per-layer timing exists;
+  the actual overlap and bubble sizes are [U].
 - No cross-step overlap: both ranks reset before either launches
   (`model_host.hip:73-74`), so step t+1 cannot start on rank 0 while rank 1
   runs step t.
@@ -88,30 +102,54 @@ The boundary is crossed **once per decode step** (`prepare.py:88,101` sets
 B8 layer's routed stream is 1,611 MB against **4 MB of L2 per XCD (32 MB for 8
 XCDs)** (`docs/RESEARCH-sync-hardware.md:13,62`) and a **256 MB MALL**
 (`docs/RESEARCH-sync-hardware.md:98`) — 50× L2 and 6.3× MALL. Nothing holds the
-routed stream; it is HBM-bound by construction. The shared expert and router
+routed stream across a complete layer; weights must be streamed from HBM.
+This capacity argument does not establish that the current few-workgroup
+implementation saturates HBM. The shared expert and router
 (26.4 MB per layer) are the only reused part: they fit MALL at 10.3% of it.
 
-**Which loads carry which bits.** In this repo's ISA `sc0` = GLC (L1-level
+**Proposed cache bits, not the default implementation.** In this repo's ISA `sc0` = GLC (L1-level
 coherence; `etx/tools/isa_hops.py:112`,
 `etx/runtime/include/etx/primitives_amdgcn.h:27-35`) and `sc1` = SLC
 (system/L2 level; `etx/tools/isa_hops.py:116`, `etx/ops/coh.py:2,27`).
-Recommended policy [E, gated by §6 and measured by §9]:
+Recommended policy **proposal** [E, gated by §6 and measured by §9]. The
+baseline uses ordinary weight loads; the opt-in switches below exist only to
+make an isolated A/B possible, not to establish that this policy wins:
 
 | Data | Bits | Why |
 |---|---|---|
 | Routed-expert stream, read once per step | `slc` (SLC, bypass L2) | cannot be reused in-step; allocating it evicts the shared expert and router |
 | Shared expert, router, dense projections | plain cached, no `glc`/`slc` | reused within the step and across steps; the only MALL-resident candidates |
-| Cross-XCD activations and payloads | keep `sc1` agent-scope loads and `sc0 sc1` system-scope atomics (`etx/ops/coh.py:27-35`) | already measured; changing them reopens a correctness surface |
+| Cross-XCD activations and payloads | retain generated acquire/release and SYSTEM publication; do not change payload loads in a cache A/B | native tiles do not blanket-apply `sc1`; changing ordering is a separate correctness surface |
 | Weight pre-warming | none | L2 warming measured **−3%** (`docs/RESEARCH-sync-hardware.md:89`) |
 
-**LDS residency at 64 KB per CU.** Staging bf16 activations of K = 4096 costs
-4096 × 2 B = 8 KB per token: **6 tokens = 48 KB (75%), leaving 16 KB for
-double-buffering; 8 tokens = 64 KB (100%), no headroom.** That is the gfx942
-port's 6-token pass width (0.75 × 64 KB ÷ 8 KB = 6) [F]. Weights are never
-LDS-resident — one expert is 25.17 MB against 64 KB — so every weight byte
-streams through the CU and LDS holds only the activation slab. B8 means two
-passes (6 + 2), or FP8 activation staging (8 × 4096 × 1 B = 32 KB, 50%),
-numerically unproven [U].
+**Native A/B switches (all opt-in).** `ETX_GLM_ROUTED_SLC=1` changes only
+routed-expert gate/up/down weight-payload reads; `ETX_GLM_SHARED_SLC=1`
+changes only the shared expert's gate/up/down weight-payload reads. Both default to 0 (ordinary cached loads). For an isolated cache-bit A/B,
+set `ETX_GLM_CACHE_AB=1` in **both** arms: expert payloads then use matching
+explicit load/wait sequences, with only the SLC bit differing. This control is
+also default-off; comparing compiler ordinary loads against explicit SLC
+loads alone would confound cache policy with instruction scheduling. Router,
+dense projections, attention, embedding/head, FP32 scale tables, activations,
+state and control/event loads remain on their original paths. The two
+switches are independent: test `(routed, shared) = (0,0), (1,0), (0,1), (1,1)` with all other options and
+inputs fixed. CPU equality and an ISA cache-bit check establish implementation,
+not GPU numerical correctness or a speed improvement.
+
+**Proposed six-token LDS slab, not an implemented GLM batch tile.** With
+64 KB per CU, staging bf16 activations of K = 4096 would cost 4096 × 2 B =
+8 KB per token: **6 tokens = 48 KB (75%), leaving 16 KB; 8 tokens = 64 KB
+(100%), no headroom.** This is capacity arithmetic [E], not an established
+pass width or a double-buffered implementation. Two 48 KB buffers would not
+fit. The native path currently assigns one workgroup per request/layer and
+keeps its scratch in global FP32 memory (`model.py:41-47`). It does **not**
+execute B8 as 6 + 2 passes. FP8 activation staging (8 × 4096 × 1 B = 32 KB)
+is also only a proposal and is numerically unproven [U].
+
+The opt-in input-staging experiment described below is different: it stages
+one GEMV's FP32 input vector, not six requests' bf16 activations. Its actual
+LDS footprint includes ETX's own shared storage and must be read from the
+compiler report, not inferred from the requested slab capacity. Neither
+staging experiment makes the 25.17 MB expert weights LDS-resident.
 
 ## 5. Tile auto-optimisation
 
@@ -122,35 +160,77 @@ numerically unproven [U].
 XCD simulator and the measured phase model (`autoconf.py:57-69`). No GPU. It is
 Qwen-specific: none of the five switches exists in the GLM path.
 
-**What is missing.** The search space none of it touches:
+**Native knobs, not a selected tile.** `examples/glm53/options.py` records one
+immutable JSON configuration per build. Defaults preserve the original native
+path; alternate settings are experiments, never automatic tuned defaults.
 
-- **BM/BN** — tile constants in `etx/ops/gemv.py` and the GLM tiles, not build
-  switches;
-- **waves per SIMD** — occupancy fixed by the workgroup shape;
-- **VGPR budget** — the compiler report (VGPRs, spills, scratch) never returns
-  to the search;
-- **LDS footprint** — the 6-token/64 KB constraint in §4 is not modelled, so
-  the simulator will rank tiles that do not fit gfx942's LDS;
-- no per-config measurement: the ranking is simulated, and the measured
-  reference (`autoconf.py:75`) is a single point.
+| JSON field | Default | Actual effect / limit |
+|---|---:|---|
+| `threads` | 256 | workgroup threads, 64/128/256; does not split a layer into additional workgroups |
+| `vgpr_budget` | 64 | planner estimate only; never substitute it for compiler VGPR usage |
+| `waves_per_simd_max` | 0 | 0 leaves LLVM unchanged; nonzero requests `amdgpu_waves_per_eu(1,max)`, not measured occupancy |
+| `row_tile` | 1 | adjacent output rows per lane with independent accumulators; not tensor-core BM/BN |
+| `k_tile` | 0 | 0 retains the full K loop; positive values chunk consecutive K without partial-sum reduction |
+| `lds_bytes` | 0 | opt-in FP32 input slab; inputs too large for it use direct reads; not a six-token slab |
+| `cache_ab` | 0 | matched explicit expert-load control for the cache A/B in §4 |
+| `routed_slc`, `shared_slc` | 0, 0 | independently change routed/shared expert payload cache bits, §4 |
 
-**Closing the loop within the box budget.** One session script, prepared
-offline:
+Row/K traversal retains each row's ascending-K accumulation order. Nevertheless
+all nondefault variants must pass the same weighted oracle before a timing is
+accepted; CPU equality cannot establish GPU numerics or coherence.
 
-1. enumerate the space locally (BM × BN × waves × LDS budget), free;
-2. compile every candidate for gfx942 with the local matrix
-   (`examples/vllm_llm/local_matrix.sh`), dropping any over the VGPR / spill /
-   LDS limits from the compiler report, free;
-3. measure survivors on one MI300X in one script: pinned, under `flock`, five
-   interleaved rounds, B8 fixed at 8 rows, one microbench per candidate;
-4. feed the measured µs back into `pmodel`'s constants and re-rank.
+**Compiler-only enumeration, no weights or GPU.** The default sweep uses the
+release dimensions with placeholder weight descriptors marked compile-only;
+its output cannot execute a model. For example, compile eight configurations:
+
+```bash
+export ETX_DEVLIBS="$HOME/code/rocm-headers/devlibs/opt/rocm-7.2.4/lib/llvm/lib/clang/22/lib/amdgcn/bitcode"
+# Refuse ambient compiler flags/include paths rather than silently changing a candidate.
+env -u CPPFLAGS -u CPLUS_INCLUDE_PATH -u C_INCLUDE_PATH \
+  .venv/bin/python -u -m examples.glm53.sweep --out "$NEW_SWEEP_DIR" \
+  --threads 128,256 --row-tile 1,2 --lds-bytes 0,256 --batches 1 \
+  --max-candidates 8 --devlibs "$ETX_DEVLIBS" --host-syntax
+```
+
+Each candidate has its own options, generated code, identities and full
+compiler logs for both ranks. The summary distinguishes compiled survivors,
+resource rejections and compiler failures; `survivors.json` is a list to
+measure later, **not a ranking or a winner**. Missing resource evidence is not
+an implicit pass. The total compiler LDS includes runtime storage as well as
+the requested slab. Resource filtering checks the persistent plan's required
+residency; a legal workgroup size alone is insufficient. Local LLVM output is
+not a substitute for the target box compiler or GPU residency checks.
+
+For a runnable later candidate, use an already staged model (`--stage`, with
+the appropriate `--gate`) rather than compile-only placeholders. Build and
+qualify the candidate explicitly, retaining the same options:
+
+```bash
+.venv/bin/python -m examples.glm53.run build --stage "$STAGE" --build "$NEW_BUILD" \
+  --out "$NEW_BUILD_LOG" --batch "$BATCH" --gate slice --options "$OPTIONS_JSON"
+# Qualification/bench use this existing build; options are in its hashed identity.
+.venv/bin/python -m examples.glm53.run qualify --stage "$STAGE" --build "$NEW_BUILD" \
+  --reference "$REFERENCE" --out "$NEW_QUALIFICATION" --gate slice
+```
+
+`build-options.json` and `glm53_options.h` are included in the build identity;
+changing either or a native implementation source refuses that build. A
+request for flags is not a measurement of what the compiler generated.
+
+**Measured selection loop, still proposed.** After the same-build oracle:
+measure compiled survivors in one bounded session, fixed batch and input,
+pinned under `flock`, five interleaved rounds; retain raw step samples and feed
+measured µs back into the model. Cache comparisons use `cache_ab=1` in both
+arms, with only `routed_slc` or `shared_slc` varied. No measured selection, GPU
+execution or speed improvement is claimed here.
 
 Budget [E]: 36 survivors × 2 min = 72 min plus 20 min setup ≈ 1.5 h ≈ **$3 at
 $1.99/h**, paid once in the same session as another measurement.
 
-**Blocked:** this section cannot start until §6 exists. Every GLM per-layer
-number above is arithmetic on stated dimensions; tuning against it would tune
-to an unrun model.
+**Measured selection blocked:** the oracle implementation exists, but no
+real-weight slice has passed it. Compiler-only enumeration below does not
+execute or rank candidates by runtime. Neither an estimated phase model nor a
+successful compile establishes a winning GLM configuration.
 
 ## 6. Real-weight correctness oracle
 
@@ -159,6 +239,15 @@ to an unrun model.
 (`docs/TWO-WEEK-RESULTS-2026-10-18.md:68-72`); the only plan on record is a
 4-layer slice, ~29 GB, ~30 min of GPU, not run (`...:73`). This section fixes
 that build and makes it the gate every later change must pass.
+
+**Independent acceptance blocker, not waived by the new tooling:** the
+existing `run.compare_logits` reports absolute logit error and only optionally
+enforces an absolute tolerance. It does not yet enforce §8's cosine and
+relative-error thresholds, and the existing `bench.py` accepts token equality.
+Until those numerical checks are implemented and the same-build weighted
+slice passes, neither a compiler survivor nor a `BENCH PASS` line establishes
+the numerical certificate specified here. The old model session also still
+needs slice/bench integration; the standalone seam session does not fix that.
 
 **Slice.** Four *sparse* layers, indices 22–25: ~29.0 GB of FP8 expert payload
 (4 × 7.25 GB) plus embedding [E], matching the recorded ~29 GB. Their types are
@@ -300,22 +389,66 @@ and has simulator-static numbers only: `send_state` static queue estimate
 **6.16 µs** in `docs/evidence/qwen-batch-glm53/glm-boundary-local-final.log:4`
 — a simulator estimate, not a measurement. It must not be used as one.
 
-**Step cost.** Per the design instruction, step boundary cost =
-**24 × per-hand-off latency** [U]. Note once: 24 is the number of rank-0 layers,
-while the implemented schedule crosses the boundary **once per decode step**
-(`prepare.py:101`); the ×24 applies to a per-layer hand-off schedule, and 1× to
-today's schedule. The probe measures the per-hand-off latency either way, so
-both numbers become computable from it.
+**Step cost is not 24 hand-offs.** The implemented schedule has one activation
+publication per row per decode step, plus one returned token per row. Rank 0
+having 24 layers does not multiply this seam latency by 24. A hypothetical
+per-layer hand-off design would need its own benchmark and overlap model;
+neither its critical path nor its latency can be inferred from today's seam.
 
-**The probe that measures it.** Already implemented as a two-launch ping-pong
-with no weights: `send_state` (0→1, B×16384 uint16), `receive_state`, then
-`send_token` (1→0), with events in between (`examples/glm53/boundary.py:10-30`);
-it compiles for both devices (`local_boundary_rocm.sh`) but has no timing
-driver. Required addition (XS–S): run 1,000 iterations per B ∈ {1,2,4,8}, five
-rounds, host wall around each send/receive pair plus device `s_clock`
-timestamps, report median and spread of the per-iteration latency and its
-split (copy vs wait). Success: a measured median replaces this [U], and §3's
-bubble and §9's step time use it; no code beyond the driver.
+**Old transport probe, not a seam timing oracle.** `boundary.py` sends the
+payload in B×64 chunks and waits on a whole-batch copied event before token
+feedback. `boundary_host.hip` checks bits and explicitly reports performance
+unmeasured. This remains a useful standalone transport-correctness test, but
+its graph is not production's B complete-row tasks with `i->i` dependencies.
+Adding a stopwatch to that old graph would not establish §3's seam cost.
+
+**Production-shaped synthetic seam probe (opt-in, no weights).**
+`examples/glm53/seam.py` builds three B-row grids: rank 0 fills each entire
+`[4,4096]` BF16 mailbox, rank 1 reads that row and publishes its int token,
+then rank 0 consumes that token. All tasks use 256 threads and per-row
+`i->i` SYSTEM dependencies, with fine-grained peer payloads, matching the
+production handoff topology rather than the old chunked transport probe.
+The values are deterministic BF16 bit patterns, not GLM activations or an
+inference accuracy test.
+
+The control arm touches only each row's two endpoint words with the same
+events and feedback. Every row and token is checked, including preservation
+of poison values at untouched control positions. Five rounds reverse arm
+order, with 20 warmup and 1,000 measured iterations per arm by default for
+B ∈ {1,2,4,8}. Separate uninstrumented and trace processes prevent trace
+instrumentation from being mistaken for the primary wall measurement.
+
+Host wall covers both launches through both stream retirements, before
+completion checks or D2H. HIP event spans are local to each rank. Trace
+intervals use only same-GPU clock differences: runtime taken→ready includes
+setup/wait/acquire/barrier; ready→done includes body/store-drain/barrier.
+**Never subtract GPU 0 and GPU 1 timestamps.** Payload-minus-control is an
+incremental synthetic fill/read/control-work estimate, not pure peer-link
+latency, an isolated memcpy, or a whole-model seam prediction. A per-row
+roundtrip is not the whole-batch wall divided by B.
+
+Local validation (no weights, no GPU; output directory must be new):
+
+```bash
+ETX_GLM_BATCH=4 bash examples/glm53/build_seam.sh "$NEW_SEAM_BUILD" --local
+.venv/bin/python -m pytest -q tests/test_glm53_seam.py
+```
+
+Later, on an authorized two-GPU box, use the bounded job file
+`examples/sessions/glm53_seam.py` through `tools/session.sh`; it builds all
+batches and retains the full logs, watchdog diagnostics and offline summary.
+An explicit standalone equivalent, after GPU-linking B1/2/4/8 under
+`$SEAM_BUILD_ROOT/b1` etc., is:
+
+```bash
+.venv/bin/python -u -m examples.glm53.seam run --build-root "$SEAM_BUILD_ROOT" \
+  --logdir "$NEW_SEAM_LOGDIR" --batches 1 2 4 8 --iterations 1000 --rounds 5
+# Offline only; refuses incomplete/duplicate/invalid samples.
+.venv/bin/python -m examples.glm53.seam summary "$NEW_SEAM_LOGDIR"/*.log
+```
+
+Both the native probe and the outer runner have deadlines and progress
+output. No GPU measurement is included in this change; latency remains [U].
 
 ## 8. Numerics tolerance (fixed before optimising)
 
