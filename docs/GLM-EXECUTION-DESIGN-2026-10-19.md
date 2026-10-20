@@ -194,9 +194,11 @@ cd <checkout on the two-GPU box>
   --out <new output directory> \
   [--layers 22-25] [--batch 4] [--gpus 2] \
   [--max-memory '{"0":"80GiB","1":"80GiB","cpu":"32GiB"}'] \
+  [--bandwidth-tbps 4.3] \
   [--dry-run]
 # env fallbacks: GLM_MODEL_ROOT, GLM_OUT_ROOT, GLM_LAYERS, GLM_BATCH, GLM_GPUS,
-#                GLM_MAX_MEMORY, GLM_PYTHON, GLM_HIPCC, GLM_SEED, GLM_SECONDS
+#                GLM_MAX_MEMORY, GLM_PYTHON, GLM_HIPCC, GLM_SEED,
+#                GLM_BANDWIDTH_TBPS, GLM_SECONDS
 ```
 
 From another machine, run the same line over ssh:
@@ -215,6 +217,44 @@ nothing, and exits 0 when ready or 3 when not. On the x86 test host (2026-10-20;
 no model, a CPU-only torch, no GPU, no `hipcc`): dry run exit 3 naming those
 four supplies, real run exit 2, output root absent [M].
 
+**Reporting rule — every GLM number from 2026-10-20 on.** A result is never
+just milliseconds and tokens/s; it is also a fraction of the bandwidth floor,
+because that is the number that says how much of the possible remains.
+
+- **Bytes actually read per token** are counted, not assumed: weights and their
+  descriptors are one shared read per step, amortised over the batch; the
+  embedding table is gathered, so one row per request is charged, not the
+  table; KV/KDA state is read once per request per token, with the compiled
+  MLA state scaled from `MAXLEN` to the certificate's context and assumed FP32
+  (4 bytes per element, as `prepare.budget` already does). Layer and state
+  sizes come from `stage.json` descriptors, so a slice change moves the budget
+  with it.
+- **The floor** is those bytes divided by the achievable rate:
+  `floor_ms_per_token = kernel_bytes_per_token / (bandwidth_TB/s × 10^12) ×
+  1000`, and **`fraction_of_floor = floor_ms_per_token / measured_ms_per_token`**
+  (`measured_over_floor` and `percent_of_floor` are written beside it). The
+  default rate is 4.3 TB/s (`--bandwidth-tbps`, `GLM_BANDWIDTH_TBPS`); pass the
+  rate this session actually measured when there is one. §1's floors use the
+  measured **3.56 TB/s** (`hw_bench lf`), so a session comparing against them
+  passes `--bandwidth-tbps 3.56` and says so.
+- **The GPU count is stated with every number.** This oracle is two MI300X in
+  PP2, batch from `--batch`; the certificate carries `gpus` at top level and
+  inside `bandwidth_floor`.
+- **The 1.72x weight-copy factor is its own budget line** —
+  `bandwidth_floor.weight_copy = {factor, weight_copy_bytes_per_token,
+  separate: true, note}`. It is never added to kernel bytes, never subtracted
+  from the floor, and never folded into a kernel-efficiency claim; a copy-heavy
+  result says so on its own line rather than hiding in an efficiency ratio.
+- **Mono does not exist:** GLM-5.3 mono on gfx942 does not exist as of
+  2026-10-20. Every certificate records that string as
+  `mono_gfx942_availability`, so no reader can mistake a PP2 slice number for a
+  single-GPU one.
+
+The runner applies the rule after `bench.py` writes a `PASS` certificate: it
+refuses a `FAIL` or wrong-batch certificate, adds the fields above, and prints
+`RESULT`, then the `BANDWIDTH` line (bytes per token, the separate 1.72x line,
+the mono note). `bench.py` itself is unchanged; the annotation is the runner's.
+
 **What each path produces.** `$OUT/prompts.json`; `$OUT/stage/stage.json` and
 `$OUT/prepare.json` (staged identity validated); `$OUT/reference.json`,
 `$OUT/reference.logits`, `$OUT/reference.json.slice/` (the derived snapshot HF
@@ -223,9 +263,17 @@ loaded, with its hashes in provenance); `$OUT/logs/*.log` and
 `run0.json`, `run1.json` and their `.tokens`/`.logits`; `$OUT/oracle-run0.json`
 and `oracle-run1.json`; and the certificate
 `$OUT/certificate/bench_result.json` (with the qualification it re-ran under
-`$OUT/certificate/qualification`). A successful run ends with
-`RESULT batch=<B> tokens=<32B>/<32B> median_decode_wall_ms=<ms>
-certificate=<path>`. Every stage is fail-closed: a mismatch exits non-zero and,
+`$OUT/certificate/qualification`, and the annotation above: `gpus`,
+`mono_gfx942_availability`, and `bandwidth_floor` carrying the bytes actually
+read per token, the floor, `fraction_of_floor`, `measured_over_floor`,
+`percent_of_floor`, and the separate `weight_copy` line). A successful run ends
+with
+`RESULT batch=<B> tokens=<32B>/<32B> gpus=<G> median_decode_wall_ms=<ms>
+tokens_per_s=<n> measured_ms_per_token=<ms> floor_ms_per_token=<ms>
+fraction_of_floor=<x> certificate=<path>` and a `BANDWIDTH gpus=<G>
+kernel_bytes_per_token=<bytes> weight_copy_factor=1.72 (separate; not in the
+floor) mono_gfx942="does not exist as of 2026-10-20"` line. Every stage is
+fail-closed: a mismatch exits non-zero and,
 where the tool defines one, still writes its receipt. `--out` must not already
 exist; the stage, reference, build, qualification and bench output directories
 refuse to overwrite (the oracle report overwrites the named file, so name new
@@ -342,7 +390,13 @@ contract:
 - **Reported:** `median_decode_wall_ms`, `tokens_per_s = B*1000/median`,
   `ms_per_token = median/B`, `spread_ms`, every sample, conditions (two
   MI300X, context 1024, 32 greedy tokens, PP2, layer count), and the
-  correctness receipt (32/32 per request, §8 metrics).
+  correctness receipt (32/32 per request, §8 metrics). The runner then
+  annotates the `PASS` certificate with the §6 reporting rule's fields —
+  `gpus`, `mono_gfx942_availability`, and `bandwidth_floor` (bytes actually
+  read per token, `floor_ms_per_token`, `fraction_of_floor`,
+  `measured_over_floor`, `percent_of_floor`, and the separate 1.72x
+  `weight_copy` line). `bench.py` is not modified; without that annotation a
+  certificate is incomplete and its millisecond figures are not reported.
 - **Refusal:** if any identity changes during the run, if the correctness
   receipt is not `TOKENS-EQUAL`, or if a step sample is non-finite or
   non-positive — the same fail-closed pattern as `bench.py:290-297`.

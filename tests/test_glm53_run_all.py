@@ -10,8 +10,14 @@ from pathlib import Path
 import subprocess
 import sys
 
+import pytest
+
 ROOT = Path(__file__).resolve().parents[1]
 EVIDENCE = ROOT / 'docs/evidence/qwen-batch-glm53'
+sys.path.insert(0, str(ROOT))
+
+from examples.glm53.run_all import (MONO_GFX942, WEIGHT_COPY_FACTOR, Failure,
+                                    annotate, reading_budget)
 
 
 def run(*flags, env=None):
@@ -165,3 +171,83 @@ def test_an_unsupported_batch_is_a_parser_error(tmp_path):
     r = run('--dry-run', '--model-root', tmp_path / 'model', '--out', tmp_path / 'out', '--batch', '3')
     assert r.returncode == 2
     assert 'invalid choice' in r.stderr
+
+
+def staged_model():
+    """The stage.json fields the budget reads, at hand-checkable size."""
+    return dict(
+        dimensions=dict(MAXLEN=1072, STATE_KDA=100, STATE_MLA=10720),
+        config=dict(layer_types=['linear_attention', 'deepseek_sparse_attention']),
+        weights=dict(
+            embedding=dict(blob_bytes=10 * 8 * 4, meta_bytes=32,
+                           tensors={'model.embed_tokens.weight': {'shape': [10, 8]}}),
+            l0=dict(blob_bytes=1000, meta_bytes=64, tensors={}),
+            norm=dict(blob_bytes=16, meta_bytes=32, tensors={}),
+            head=dict(blob_bytes=800, meta_bytes=32, tensors={})))
+
+
+def test_the_floor_uses_bytes_read_and_keeps_the_copy_factor_separate():
+    budget = reading_budget(staged_model(), batch=4, tbps=4.3)
+    # 1944 bytes of layer/norm/head weights and descriptors, shared per step,
+    # plus the embedding descriptors and one 32-byte row per request:
+    # (1944 + 32 + 4 * 32) / 4 = 526 per token.
+    assert budget['weights_read_per_token_bytes'] == 526
+    # 4 bytes per state element: KDA 100 + MLA 10720 scaled 1024/1072.
+    assert budget['state_read_per_token_bytes'] == 41360
+    assert budget['kernel_bytes_per_token'] == 41886
+    assert budget['floor_ms_per_token'] == pytest.approx(41886 / 4.3e12 * 1000)
+    assert budget['weight_copy']['factor'] == WEIGHT_COPY_FACTOR == 1.72
+    assert budget['weight_copy']['separate'] is True
+    assert 'never folded' in budget['weight_copy']['note']
+    assert budget['weight_copy']['weight_copy_bytes_per_token'] == round(1.72 * 526)
+    assert budget['mono_gfx942'] == MONO_GFX942
+
+
+def test_the_weight_read_is_amortised_over_the_batch_and_state_is_not():
+    one = reading_budget(staged_model(), batch=1, tbps=4.3)
+    four = reading_budget(staged_model(), batch=4, tbps=4.3)
+    assert one['weights_read_per_token_bytes'] == 1944 + 32 + 32
+    assert four['weights_read_per_token_bytes'] == 526
+    assert one['state_read_per_token_bytes'] == four['state_read_per_token_bytes']
+    assert one['floor_ms_per_token'] > four['floor_ms_per_token']
+
+
+def test_the_certificate_carries_gpus_the_fraction_and_the_mono_note(tmp_path):
+    path = tmp_path / 'bench_result.json'
+    path.write_text(json.dumps(dict(schema=1, status='PASS', batch=4, median_decode_wall_ms=1.0,
+                                    tokens_per_s=4000.0, ms_per_token=0.25)))
+    annotate(path, staged_model(), batch=4, gpus=2, tbps=4.3)
+    saved = json.loads(path.read_text())
+    floor = saved['bandwidth_floor']
+    assert saved['gpus'] == 2
+    assert saved['mono_gfx942_availability'] == MONO_GFX942
+    assert floor['gpus'] == 2
+    assert floor['measured_ms_per_token'] == 0.25
+    assert floor['fraction_of_floor'] == pytest.approx(floor['floor_ms_per_token'] / 0.25)
+    assert floor['percent_of_floor'] == pytest.approx(100 * floor['fraction_of_floor'])
+    assert floor['measured_over_floor'] == pytest.approx(0.25 / floor['floor_ms_per_token'])
+
+
+def test_annotate_refuses_a_failed_or_mismatched_certificate(tmp_path):
+    path = tmp_path / 'bench_result.json'
+    path.write_text(json.dumps(dict(status='FAIL', batch=4)))
+    with pytest.raises(Failure):
+        annotate(path, staged_model(), batch=4, gpus=2, tbps=4.3)
+    path.write_text(json.dumps(dict(status='PASS', batch=2, ms_per_token=0.25)))
+    with pytest.raises(Failure):
+        annotate(path, staged_model(), batch=4, gpus=2, tbps=4.3)
+
+
+def test_a_nonpositive_bandwidth_is_refused(tmp_path):
+    r = run('--dry-run', '--model-root', tmp_path / 'model', '--out', tmp_path / 'out',
+            '--bandwidth-tbps', '0', '--hipcc', '/bin/true')
+    assert r.returncode == 3
+    assert 'not a positive rate' in r.stdout
+    assert '--bandwidth-tbps 4.3' in r.stdout
+
+
+def test_annotate_refuses_a_stage_without_the_budget_fields(tmp_path):
+    path = tmp_path / 'bench_result.json'
+    path.write_text(json.dumps(dict(status='PASS', batch=4, ms_per_token=0.25)))
+    with pytest.raises(Failure):
+        annotate(path, dict(config=dict(layer_types=[])), batch=4, gpus=2, tbps=4.3)

@@ -11,12 +11,20 @@ that supplies each missing input. `--dry-run` runs nothing, prints the exact
 step commands and the same refusal list, and exits 0 when the run is ready or 3
 when it is not.
 
+Every result is also reported as a fraction of the bandwidth floor: bytes
+actually read per token divided by the achievable rate (default 4.3 TB/s,
+`--bandwidth-tbps`; section 1 of the design pins its floors to the 3.56 TB/s
+`hw_bench lf` measured). The certificate records the GPU count, the separate
+1.72x weight-copy line (never folded into kernel efficiency or the floor), and
+that GLM-5.3 mono on gfx942 does not exist as of 2026-10-20.
+
 usage: python -m examples.glm53.run_all --model-root <pinned release dir> \
            --out <new output root> [--layers 22-25] [--batch 4] [--gpus 2]
 """
 from __future__ import annotations
 import argparse
 import json
+import math
 import os
 import random
 import shlex
@@ -40,6 +48,9 @@ GENERATED = 32
 SEED = 20261019
 DEFAULT_LAYERS = '22-25'
 DEFAULT_MAX_MEMORY = '{"0":"80GiB","1":"80GiB","cpu":"32GiB"}'
+DEFAULT_BANDWIDTH_TBPS = 4.3   # achievable rate on MI300X; override with the measured rate
+WEIGHT_COPY_FACTOR = 1.72      # separate budget line; never folded into kernel efficiency
+MONO_GFX942 = 'GLM-5.3 mono on gfx942 does not exist as of 2026-10-20'
 MODULES = ('numpy', 'torch', 'transformers', 'safetensors', 'accelerate')
 # The dependency/GPU probe runs in the interpreter the steps will use, so a
 # broken environment is found here rather than an hour into the run.
@@ -90,6 +101,11 @@ def parse_args(argv=None):
                     help='ROCm compiler for the tile and host build (env GLM_HIPCC)')
     ap.add_argument('--seed', type=int, default=env_default('GLM_SEED', str(SEED)),
                     help='deterministic prompt seed (env GLM_SEED)')
+    ap.add_argument('--bandwidth-tbps', type=float,
+                    default=env_default('GLM_BANDWIDTH_TBPS', str(DEFAULT_BANDWIDTH_TBPS)),
+                    help='achievable bandwidth in TB/s for the floor (default 4.3, the MI300X '
+                         'figure in the standing rule; pass 3.56 for the hw_bench lf measurement '
+                         'or the rate measured in this session) (env GLM_BANDWIDTH_TBPS)')
     ap.add_argument('--seconds', type=int, default=env_default('GLM_SECONDS'),
                     help='override every step timeout (env GLM_SECONDS)')
     ap.add_argument('--dry-run', action='store_true', help='print the plan and the refusal list; run nothing')
@@ -197,6 +213,10 @@ def preflight(args):
         problem(f'--max-memory is not usable: {exc}',
                 '--max-memory ' + shlex.quote(DEFAULT_MAX_MEMORY))
 
+    if not math.isfinite(args.bandwidth_tbps) or args.bandwidth_tbps <= 0:
+        problem(f'--bandwidth-tbps {args.bandwidth_tbps} is not a positive rate',
+                '--bandwidth-tbps 4.3 (about 4.3 TB/s achievable on MI300X; or the measured rate)')
+
     python = executable(args.python)
     if python is None:
         problem(f'interpreter {args.python} not found',
@@ -291,7 +311,8 @@ def print_plan(args, steps):
     out = Path(args.out).expanduser() if args.out else '<out>'
     model = Path(args.model_root).expanduser() if args.model_root else '<model-root>'
     print(f'PLAN model={model} out={out} layers={args.layers} batch={args.batch} gpus={args.gpus} '
-          f'context={CONTEXT} maxlen={MAXLEN} generated={GENERATED}', flush=True)
+          f'bandwidth_tb_s={args.bandwidth_tbps:g} context={CONTEXT} maxlen={MAXLEN} '
+          f'generated={GENERATED}', flush=True)
     for index, step in enumerate(steps):
         if step['argv'] is None:
             print(f'PLAN {index} {step["name"]}: {step["note"]}', flush=True)
@@ -376,6 +397,83 @@ def prompts(path, batch, seed, vocab):
     print(f'PROMPTS {path} batch={batch} context={CONTEXT} vocab={vocab} seed={seed}', flush=True)
 
 
+def embedding_row_bytes(group):
+    """Bytes of one embedding row: the table is gathered per request, not read whole per step."""
+    tensors = list(group.get('tensors', {}).values())
+    if len(tensors) != 1 or len(tensors[0].get('shape') or []) != 2:
+        return group['blob_bytes']
+    rows, cols = tensors[0]['shape']
+    size, remainder = divmod(group['blob_bytes'], rows * cols)
+    return cols * size if remainder == 0 and size in (1, 2, 4) else group['blob_bytes']
+
+
+def reading_budget(staged, batch, tbps):
+    """Bytes actually read per token and the bandwidth floor they imply.
+
+    Weights (and their descriptors) are one shared read per step, amortised over
+    the batch; the embedding table is gathered per request, so one row per
+    request is charged; KV/KDA state is read once per request per token, with
+    the compiled MLA state scaled from MAXLEN to the certificate's context.
+    The 1.72x weight-copy factor is reported beside the budget, never inside
+    the kernel bytes or the floor.
+    """
+    dimensions = staged['dimensions']
+    scale = CONTEXT / dimensions['MAXLEN']
+    state = sum(4 * (dimensions['STATE_KDA'] if kind == 'linear_attention'
+                     else dimensions['STATE_MLA'] * scale)
+                for kind in staged['config']['layer_types'])
+    step = 0
+    for name, group in staged['weights'].items():
+        blob = batch * embedding_row_bytes(group) if name == 'embedding' else group['blob_bytes']
+        step += blob + group.get('meta_bytes', 0)
+    weights = step / batch
+    kernel = weights + state
+    floor_ms = kernel / (tbps * 1e12) * 1000
+    return dict(
+        basis='bytes actually read per token: weights shared per step, one embedding row and '
+              'one state read per request',
+        batch=batch, context=CONTEXT,
+        achievable_bandwidth_tb_s=tbps,
+        weights_read_per_token_bytes=round(weights),
+        state_read_per_token_bytes=round(state),
+        kernel_bytes_per_token=round(kernel),
+        floor_ms_per_token=floor_ms,
+        floor_ms_per_step=floor_ms * batch,
+        weight_copy=dict(factor=WEIGHT_COPY_FACTOR,
+                         weight_copy_bytes_per_token=round(WEIGHT_COPY_FACTOR * weights),
+                         separate=True,
+                         note='separate budget line; never folded into kernel efficiency or the floor'),
+        mono_gfx942=MONO_GFX942,
+    )
+
+
+def annotate(path, staged, batch, gpus, tbps):
+    """Add the standing reporting fields to the PASS certificate in place."""
+    result = json.loads(path.read_text())
+    if result.get('status') != 'PASS':
+        raise Failure(f'certificate is {result.get("status")!r}, not PASS')
+    if result.get('batch') != batch:
+        raise Failure(f'certificate batch {result.get("batch")} differs from --batch {batch}')
+    measured = result.get('ms_per_token')
+    if not isinstance(measured, (int, float)) or not math.isfinite(measured) or measured <= 0:
+        raise Failure(f'certificate carries no usable ms_per_token: {measured!r}')
+    try:
+        floor = reading_budget(staged, batch, tbps)
+    except KeyError as exc:
+        raise Failure(f'stage.json lacks {exc} needed for the bandwidth floor; '
+                      'the certificate is not annotated and its ms is not reported')
+    floor.update(gpus=gpus, measured_ms_per_token=measured,
+                 measured_ms_per_step=result.get('median_decode_wall_ms'),
+                 fraction_of_floor=floor['floor_ms_per_token'] / measured,
+                 percent_of_floor=100 * floor['floor_ms_per_token'] / measured,
+                 measured_over_floor=measured / floor['floor_ms_per_token'])
+    result['gpus'] = gpus
+    result['mono_gfx942_availability'] = MONO_GFX942
+    result['bandwidth_floor'] = floor
+    path.write_text(json.dumps(result, indent=2) + '\n')
+    return result
+
+
 def run(args, ready, steps):
     out = ready['out']
     out.mkdir(parents=True, exist_ok=False)
@@ -388,11 +486,21 @@ def run(args, ready, steps):
             continue
         execute(step['argv'], step['log'], step['seconds'], env)
     certificate = out / 'certificate' / 'bench_result.json'
-    result = json.loads(certificate.read_text())
+    staged = json.loads((out / 'stage' / 'stage.json').read_text())
+    result = annotate(certificate, staged, args.batch, args.gpus, args.bandwidth_tbps)
+    budget = result['bandwidth_floor']
     median = result.get('median_decode_wall_ms')
-    shown = f'{median:.6f}' if isinstance(median, float) else median
+    tokens_s = result.get('tokens_per_s')
+    shown_median = f'{median:.6f}' if isinstance(median, float) else median
+    shown_tokens = f'{tokens_s:.2f}' if isinstance(tokens_s, float) else tokens_s
     print(f'RESULT batch={args.batch} tokens={result.get("tokens_matched")}/{result.get("tokens_expected")} '
-          f'median_decode_wall_ms={shown} certificate={certificate}', flush=True)
+          f'gpus={args.gpus} median_decode_wall_ms={shown_median} tokens_per_s={shown_tokens} '
+          f'measured_ms_per_token={budget["measured_ms_per_token"]:.6f} '
+          f'floor_ms_per_token={budget["floor_ms_per_token"]:.6f} '
+          f'fraction_of_floor={budget["fraction_of_floor"]:.4f} certificate={certificate}', flush=True)
+    print(f'BANDWIDTH gpus={args.gpus} kernel_bytes_per_token={budget["kernel_bytes_per_token"]} '
+          f'weight_copy_factor={WEIGHT_COPY_FACTOR} (separate; not in the floor) '
+          f'mono_gfx942="does not exist as of 2026-10-20"', flush=True)
 
 
 def main(argv=None):
