@@ -13,6 +13,8 @@ import sys
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
+# Preflight only checks existence; these tests never execute the supplied compiler.
+HIPCC_STUB = sys.executable
 EVIDENCE = ROOT / 'docs/evidence/qwen-batch-glm53'
 sys.path.insert(0, str(ROOT))
 
@@ -54,7 +56,7 @@ def fake_python(tmp_path, missing=(), gpus=2):
 def test_missing_model_is_refused_and_the_download_command_is_named(tmp_path):
     out = tmp_path / 'out'
     model = tmp_path / 'model'
-    r = run('--dry-run', '--model-root', model, '--out', out, '--hipcc', '/bin/true')
+    r = run('--dry-run', '--model-root', model, '--out', out, '--hipcc', HIPCC_STUB)
     assert r.returncode == 3, r.stdout + r.stderr
     assert 'REFUSED before any work' in r.stdout
     assert f'hf download zai-org/GLM-5.3-Flash --revision ' in r.stdout
@@ -65,7 +67,7 @@ def test_missing_model_is_refused_and_the_download_command_is_named(tmp_path):
 
 def test_the_plan_lists_every_step_in_order(tmp_path):
     out = tmp_path / 'out'
-    r = run('--dry-run', '--model-root', tmp_path / 'model', '--out', out, '--hipcc', '/bin/true')
+    r = run('--dry-run', '--model-root', tmp_path / 'model', '--out', out, '--hipcc', HIPCC_STUB)
     names = [line.split()[2].rstrip(':') for line in r.stdout.splitlines()
              if line.startswith('PLAN ') and line.split()[1].isdigit()]
     assert names == ['prompts', 'stage', 'prepare', 'reference', 'build', 'qualify',
@@ -83,7 +85,7 @@ def test_the_plan_lists_every_step_in_order(tmp_path):
 def test_an_existing_output_root_is_refused(tmp_path):
     out = tmp_path / 'out'
     out.mkdir()
-    r = run('--dry-run', '--model-root', tmp_path / 'model', '--out', out, '--hipcc', '/bin/true')
+    r = run('--dry-run', '--model-root', tmp_path / 'model', '--out', out, '--hipcc', HIPCC_STUB)
     assert r.returncode == 3
     assert 'already exists' in r.stdout
     assert f'--out {out}-<label>' in r.stdout
@@ -91,7 +93,7 @@ def test_an_existing_output_root_is_refused(tmp_path):
 
 def test_a_window_that_does_not_straddle_the_pp2_split_is_refused(tmp_path):
     r = run('--dry-run', '--model-root', tmp_path / 'model', '--out', tmp_path / 'out',
-            '--layers', '0-3', '--hipcc', '/bin/true')
+            '--layers', '0-3', '--hipcc', HIPCC_STUB)
     assert r.returncode == 3
     assert 'straddle' in r.stdout
     assert '--layers 22-25' in r.stdout
@@ -99,7 +101,7 @@ def test_a_window_that_does_not_straddle_the_pp2_split_is_refused(tmp_path):
 
 def test_a_gpu_count_other_than_two_is_refused(tmp_path):
     r = run('--dry-run', '--model-root', tmp_path / 'model', '--out', tmp_path / 'out',
-            '--gpus', '1', '--hipcc', '/bin/true')
+            '--gpus', '1', '--hipcc', HIPCC_STUB)
     assert r.returncode == 3
     assert 'requires exactly two GPUs' in r.stdout
     assert '--gpus 2 (provision with tools/hotaisle_grab.sh 2x)' in r.stdout
@@ -107,7 +109,7 @@ def test_a_gpu_count_other_than_two_is_refused(tmp_path):
 
 def test_environment_variables_fill_every_parameter(tmp_path):
     model, out = tmp_path / 'model', tmp_path / 'out'
-    r = run('--dry-run', '--hipcc', '/bin/true', env=dict(
+    r = run('--dry-run', '--hipcc', HIPCC_STUB, env=dict(
         GLM_MODEL_ROOT=model, GLM_OUT_ROOT=out, GLM_LAYERS='23-26', GLM_BATCH='2',
         GLM_GPUS='2', GLM_MAX_MEMORY='{"0":"1GiB"}'))
     assert f'PLAN model={model} out={out} layers=23-26 batch=2 gpus=2' in r.stdout
@@ -118,7 +120,7 @@ def test_environment_variables_fill_every_parameter(tmp_path):
 
 def test_a_real_run_refuses_without_creating_the_output_root(tmp_path):
     out = tmp_path / 'out'
-    r = run('--model-root', tmp_path / 'model', '--out', out, '--hipcc', '/bin/true')
+    r = run('--model-root', tmp_path / 'model', '--out', out, '--hipcc', HIPCC_STUB)
     assert r.returncode == 2
     assert 'no work was done; the output root was not created' in r.stdout
     assert not out.exists()
@@ -128,7 +130,7 @@ def test_missing_modules_name_one_install_command(tmp_path):
     python = fake_python(tmp_path, missing=('torch', 'accelerate'), gpus=2)
     out = tmp_path / 'out'
     r = run('--dry-run', '--model-root', tmp_path / 'model', '--out', out,
-            '--python', python, '--hipcc', '/bin/true')
+            '--python', python, '--hipcc', HIPCC_STUB)
     assert r.returncode == 3
     assert f'{python} cannot import torch, accelerate' in r.stdout
     assert f"{python} -m pip install -e '.[reference]' accelerate" in r.stdout
@@ -139,7 +141,7 @@ def test_a_ready_environment_plans_without_running(tmp_path):
     model = pinned(tmp_path)
     out = tmp_path / 'out'
     r = run('--dry-run', '--model-root', model, '--out', out,
-            '--python', fake_python(tmp_path, gpus=2), '--hipcc', '/bin/true')
+            '--python', fake_python(tmp_path, gpus=2), '--hipcc', HIPCC_STUB)
     assert r.returncode == 0, r.stdout + r.stderr
     assert 'DRY-RUN READY' in r.stdout
     assert 'REFUSED' not in r.stdout
@@ -150,18 +152,18 @@ def test_a_wrong_revision_or_missing_shard_is_refused(tmp_path):
     model = pinned(tmp_path)
     python, out = fake_python(tmp_path, gpus=2), tmp_path / 'out'
     (model / 'REVISION').write_text('0' * 40 + '\n')
-    r = run('--dry-run', '--model-root', model, '--out', out, '--python', python, '--hipcc', '/bin/true')
+    r = run('--dry-run', '--model-root', model, '--out', out, '--python', python, '--hipcc', HIPCC_STUB)
     assert r.returncode == 3 and 'different revision' in r.stdout
     api = json.loads((EVIDENCE / 'glm-model-api.json').read_text())
     (model / 'REVISION').write_text(api['sha'] + '\n')
     (model / 'model-00001.safetensors').unlink()
-    r = run('--dry-run', '--model-root', model, '--out', out, '--python', python, '--hipcc', '/bin/true')
+    r = run('--dry-run', '--model-root', model, '--out', out, '--python', python, '--hipcc', HIPCC_STUB)
     assert r.returncode == 3 and '1 checkpoint shard(s) are missing' in r.stdout
 
 
 def test_an_unusable_max_memory_names_the_default(tmp_path):
     r = run('--dry-run', '--model-root', tmp_path / 'model', '--out', tmp_path / 'out',
-            '--max-memory', 'not-json', '--hipcc', '/bin/true')
+            '--max-memory', 'not-json', '--hipcc', HIPCC_STUB)
     assert r.returncode == 3
     assert '--max-memory is not usable' in r.stdout
     assert '{"0":"80GiB","1":"80GiB","cpu":"32GiB"}' in r.stdout
@@ -240,7 +242,7 @@ def test_annotate_refuses_a_failed_or_mismatched_certificate(tmp_path):
 
 def test_a_nonpositive_bandwidth_is_refused(tmp_path):
     r = run('--dry-run', '--model-root', tmp_path / 'model', '--out', tmp_path / 'out',
-            '--bandwidth-tbps', '0', '--hipcc', '/bin/true')
+            '--bandwidth-tbps', '0', '--hipcc', HIPCC_STUB)
     assert r.returncode == 3
     assert 'not a positive rate' in r.stdout
     assert '--bandwidth-tbps 4.3' in r.stdout
