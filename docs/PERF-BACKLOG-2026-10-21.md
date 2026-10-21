@@ -86,7 +86,7 @@ Before provisioning, these must pass with numbers:
 
 **#3 Weights shared across requests (Q).**
 - Mac: `examples/vllm_llm/dense_bytes.py` (`f3c7ed6`) prints dense bytes per step for `kept` and `batched`. Test: `tests/test_dense_bytes.py` asserts `kept / batched = N ± 1%` for N = 2, 4, 8 → `3 passed`.
-- GPU (S1): rocprof `FETCH_SIZE` per step, B4. The measured ratio `kept / batched` of dense-weight bytes must be within 10% of the Mac prediction. The falsifier named in `docs/MEGAKERNEL-AMD-RESEARCH-2026-10-18.md:26`.
+- GPU (S1): rocprof `FETCH_SIZE` per step, B4. The measured ratio `kept / batched` of dense-weight bytes must be within 10% of the Mac prediction. The falsifier named in `docs/MEGAKERNEL-AMD-RESEARCH-2026-10-18.md:153`.
 - Done: the S1 log shows the ratio within 10%.
 
 **#1 Per-request replication of dense nodes (Q).**
