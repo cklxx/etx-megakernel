@@ -3,6 +3,15 @@
 Status: offline decomposition DONE from retained traces; the on-box session is PREPARED, NOT RUN
 (`examples/sessions/ds_batch_mechanism.py`). No GPU was used for this document.
 
+Publication clarification (2026-10-21): the decomposition is an accounting identity,
+not a causal isolation experiment. Residency-cap and saturation explanations below
+are hypotheses pending P1–P3. N is the configured worker-slot count and u is a
+trace-derived busy fraction, neither a hardware occupancy counter. Estimated bytes
+are not measured HBM/L2 traffic. Keep the missing-counter caveats in
+`DS-BATCH-MECHANISM-SCAFFOLD-2026-10-18.md`; unchanged task bodies do not rule out
+HBM saturation or prove spare bandwidth. The compiler receipts are historical,
+not a fresh build or GPU qualification of the merged revision.
+
 ## 1. The question, corrected once
 
 The question was why B4 and B8 are slower per token than B2. Per generated token, B4 is **not** slower:
@@ -61,7 +70,7 @@ tasks, then body, then slots, then busy fraction. The four terms add up to the m
 The five columns map onto the requested counters as follows:
 
 - **launch count:** one megakernel dispatch per step at every B. Grids and tasks are device queue entries, not launches.
-- **occupancy:** N and u.
+- **occupancy proxies (not hardware occupancy):** configured N and trace-derived u.
 - **dependency chain:** the critical-path split.
 - **HBM/L2 traffic:** the byte estimate per span. No counter has been accepted yet; see section 4.
 - **serialization:** requests per slot, tasks per slot and the queue gaps.
@@ -88,27 +97,28 @@ a slot. Its queue-gap finding (qkv, attn) is the critical-path trace of that slo
 - Result: 3.094 -> 2.170 ms per generated token.
 - Caveat: B1 is a different recipe (D4, 72 AGPR, one workgroup per CU), so this step is not a clean single-variable comparison.
 
-**B2 -> B4: the residency cap, then queue serialization of replicated work.** The arithmetic chain:
+**B2 -> B4 hypothesis: residency cap and queue serialization of replicated work.** The accounting chain (causality awaits P1–P3):
 1. The x arms compile to 256 VGPR per lane at 2 waves per SIMD (`b_x4/resources.json`: vgpr 256, occupancy 2).
    That allows two 256-thread workgroups per CU, so N = 592 is already full at B2 (`plan.wg_per_cu = 2` for x2, x4 and x8).
 2. `graph._Req` pins request r to slot r mod 2. At B4, each slot runs two requests' queues back to back: 185.6 -> 371.3
    tasks per slot.
 3. The span equals the slot's serial body sum divided by u: 3.267 ms of body per slot at B2 and 6.507 ms at B4.
    With u unchanged (0.753 -> 0.751), that gives 4.339 -> 8.670 ms.
-4. Body per task is unchanged (x0.996). Each task still runs beside the same one other workgroup on its CU, so the
-   memory demand per unit time is unchanged. The estimated delivered rate is 2.274 -> 2.277 TB/s, about 53% of 4.3 TB/s
-   and 65% of the 3.51 TB/s measured hw_bench stream (`results/2026-09-27d/hw_stream.log:18`).
-   HBM saturation would stretch the bodies; it does not appear in the B2 -> B4 step.
+4. Body per task is unchanged (x0.996). The estimated delivered rate is 2.274 -> 2.277 TB/s,
+   about 53% of 4.3 TB/s and 65% of the older 3.51 TB/s hw_bench stream
+   (`results/2026-09-27d/hw_stream.log:18`). These are model-based byte rates and a cross-session
+   reference, not hardware traffic counters. Unchanged bodies cannot distinguish a residency
+   limit from an already-saturated memory/issue path; P2 and P3 must decide.
 5. Signature of the serialization on the critical path: queue gaps rise from 0.067 to 0.366 ms. qkv's mean dependency
    gap rises from about 2.6 us at B2 to 140-156 us at B4: a request's next layer starts about 145 us after its
    producer finished, behind the other request's tasks on its slot (`trace_report.json`, r0-r3 qkv rows).
 6. The host excess grows from 0.235 to 0.341 ms (+0.106 ms, 2.4% of the span change; instrumented runs).
 
-Why replicated work grows the step and does not just add parallel work: each ETX request's GEMV tiles re-read every
-weight they use (9.87 -> 19.74 GB estimated per step). The extra requests get no extra slots, so the step grows in
-proportion to the requests per slot. The B4 slowdown is the product of (a) no work shared across requests and
-(b) a slot count that is already reached at B2. Neither factor alone produces it. vLLM's column-batched GEMMs share
-weight reads across the B columns, so its step grows only x1.30.
+The proposed explanation is that replicated reads (9.87 -> 19.74 GB estimated per step)
+and fixed configured slots make extra requests add serial work rather than parallel capacity.
+The accounting fits that explanation, but does not establish which resource is limiting or
+how much physical traffic cache reuse removes. Likewise, vLLM's x1.30 step growth is a measured
+comparison, not proof that weight sharing alone caused the difference.
 
 Candidate, untested: u stays at 0.75 instead of rising when two requests share a slot. The static queues run in
 creation order (layers outer, requests inner), so request r+2 cannot fill request r's dependency bubbles. Stalls at
