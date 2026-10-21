@@ -34,6 +34,7 @@ FEATURES: dict[str, tuple[str, str, int]] = {
     "bar2": ("ETX_EMIT_BAR2", "value", 0),          # two-barrier static loop (kernel.py)
     "dev_reset": ("ETX_EMIT_DEV_RESET", "value", 0),  # the kernel resets its own per-step state (host.h)
     "fold_topk": ("ETX_EMIT_FOLD_TOPK", "value", 0),  # the top-k folded into the expert tasks (host.hip)
+    "last_router": ("ETX_EMIT_LAST_ROUTER", "value", 0), # G01 plan/host argument binding; default off
     "coh": ("ETX_DSL_COH", "flag", 0),              # the DSL tiles' coherent activation access (etx/ops/coh.py)
     "coh_l1": ("ETX_DSL_COH_L1", "flag", 0),        # ...with AGENT-scope loads (coherence mode "l1", p4 sets it)
     "nb": ("ETX_VL_NB", "value", 1),                # activation columns the tiles were emitted for (host.hip)

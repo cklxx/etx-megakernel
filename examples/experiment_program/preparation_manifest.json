@@ -1,0 +1,835 @@
+{
+  "schema": "etx.all13.preparation.v1",
+  "state": "AWAITING_INDEPENDENT_REVIEW",
+  "revision_binding": "The Git commit containing this file freezes this manifest. External readiness.json records its exact combined SHA.",
+  "base": "b573664faa4e7988dff353bc03aca4ce8561a729",
+  "research_authority": {
+    "path": "/Users/ckl/code/.wt/etx-experiment-preparation-20261016/examples/experiment_program/specs.json",
+    "sha256": "30196f6aefb8750f7759aa0e2a7a87de0240afc3f73759434e597133b9a02758"
+  },
+  "evidence_root": "/Users/ckl/.hermes/cache/scratch/etx-experiment-preparation",
+  "record_count": 13,
+  "session_order": [
+    "G01",
+    "G02",
+    "G03",
+    "G04",
+    "G05",
+    "G06",
+    "G07",
+    "G08",
+    "G09",
+    "G10",
+    "G13",
+    "G12",
+    "G11"
+  ],
+  "toolchain": {
+    "path": "/Users/ckl/.hermes/cache/scratch/etx-experiment-preparation/toolchain.json",
+    "sha256": "c6877a2b34e106c2af3c51f6eca4bc6618fc2694e06d6429f29b6c42104f5744"
+  },
+  "local_matrix_toolchain": {
+    "path": "/Users/ckl/.hermes/cache/scratch/etx-experiment-preparation/local-matrix-toolchain.json",
+    "sha256": "8c2e27878092479baec2209af08d09da6da6f3c1b046b77c07c5fd21dfeeccb8"
+  },
+  "post_commit_acceptance": "publication-completion-receipt.md and publication-completion/ final source-bound receipts. Only changed G11 acceptance rerun; no all-ready/GPU claim.",
+  "local_acceptance": {
+    "previous_acceptance_revision": "94a29c0f3e51e271ea884eb216de5b90c4a7b25b",
+    "matrix": {
+      "path": "/Users/ckl/.hermes/cache/scratch/etx-experiment-preparation/storage-relief/matrix-combined/manifest.json",
+      "sha256": "6231109d2a9fd944a9ddb687f56422d941d77205c4a880a2ebbc90e1deac2a26"
+    },
+    "matrix_cells_required": 16,
+    "matrix_cells_passed": 16,
+    "matrix_rebuilt_this_repair": false,
+    "baseline_red": {
+      "path": "/Users/ckl/.hermes/cache/scratch/etx-experiment-preparation/review-repair/baseline-red.log",
+      "sha256": "e9b4990eee133b1e2244243cf953778d7b3b4da33a86c55e97d5ffa612384cbe"
+    },
+    "precommit_tests": {
+      "path": "/Users/ckl/.hermes/cache/scratch/etx-experiment-preparation/review-repair/precommit.log",
+      "sha256": "aa631f0012cd287c343ab51d955f0f8a5e42eb3f26c6ce9f6158f30c87fd98e4"
+    },
+    "final_committed_acceptance": "review-repair/final-acceptance-{command,result}.json/.log/.exit",
+    "final_native_audit": "review-repair/final-native-audit.json",
+    "final_staging": "review-repair/staging/staging-status.json"
+  },
+  "global_gates": [
+    "All12 original software findings independently CLOSED at e8d10ec. Integrated canonical G11 local preparation is implemented and awaiting scoped independent acceptance.",
+    "G11 permits same-invocation publication issue/forced-retirement bounds in the accepted current subgraph. Actual control/probe/empty native descriptors are matched with instruction bytes preserved; raw VGPR88/92/92, SGPRspills24/48/46, scratch0 are retained evidence. Local preparation admission is not native diagnostic qualification.",
+    "K03 original rejected whole-model capacity/spill/topology paths remain CLOSED; G08 phase1 diagnostic remains unqualified.",
+    "K04 DeepSeek same-kernel graph UNAVAILABLE_LDS_LIFETIME; no DeepSeek fusion claim.",
+    "GPU correctness/placement, <=500ns diagnostic perturbation, 97/97 original checks,32/32greedy and all timing remain unmeasured."
+  ],
+  "safety": {
+    "gpu_executed": false,
+    "cloud_used": false,
+    "ssh_used": false,
+    "purchases": false,
+    "published": false,
+    "primary_merged": false,
+    "protected_evidence_deleted": false
+  },
+  "records": [
+    {
+      "record": "G01",
+      "title": "Exact last-router selector and eight-XCD publication",
+      "kind": "optimization",
+      "dependencies": [],
+      "implementation": "COMPILED_MATCHED_DIAGNOSTICS_PLACEMENT_AND_QUIESCENT_ROLLOVER_PROGRAM",
+      "candidate": "All256 router tasks with election after128 useful owners and eight physical readers",
+      "control": "Original kept router/KEY32 arithmetic; all writing waves drain",
+      "code": [
+        "examples/experiment_program/router",
+        "etx/ops/last_router.py",
+        "examples/experiment_program/router/model_contract.py"
+      ],
+      "default_enabled": false,
+      "local_safe_command": [
+        "/Users/ckl/code/etx/.venv/bin/python",
+        "-m",
+        "examples.experiment_program",
+        "dry-run",
+        "--config",
+        "SESSION.json",
+        "--out",
+        "NEW_REVIEW_OUTPUT",
+        "--record",
+        "G01"
+      ],
+      "future_native_command": "Concrete argument array emitted for this record by stage.py in the sealed session configuration; explicit future device authorization required",
+      "remaining_gates": "96 original retained input cases; GPU checks/32-token model/import checks and pairs unmeasured",
+      "gpu_correctness": "UNMEASURED",
+      "gpu_timing": "UNMEASURED",
+      "native_identity": {
+        "path": "/Users/ckl/code/.wt/etx-experiment-preparation-20261016/build/review-repair-router-ready/identity.json",
+        "sha256": "c7ce3d87a5532530c4225c3f7cd6fbb40af374324065b3c95c072e239662236a"
+      },
+      "complete_model": {
+        "path": "/Users/ckl/code/.wt/etx-experiment-preparation-20261016/build/review-repair-guards-frozen/G01-models/models.json",
+        "sha256": "7118666f0d14095f649eec388425643e18025831cd6506c2eac3d6542af9e43c"
+      },
+      "complete_model_static_admitted": true,
+      "complete_model_executable": true,
+      "review_findings": [
+        "F06",
+        "F12"
+      ],
+      "review_disposition": "ORIGINAL_SOFTWARE_FINDINGS_INDEPENDENTLY_CLOSED; NATIVE_GATES_UNCHANGED",
+      "previous_native_identity": {
+        "path": "/Users/ckl/code/.wt/etx-experiment-preparation-20261016/build/experiment_program/router-final01/identity.json",
+        "sha256": "e8680dc9278a755f84c549af204bb21395edcf6a57285fc466b0e3cdb2be9ac3"
+      },
+      "previous_complete_model": {
+        "path": "/Users/ckl/code/.wt/etx-experiment-preparation-20261016/build/experiment_model/g12-qwen-durable-final2/G01-attested/models.json",
+        "sha256": "d3c05f9569b04af5e2736060d9312fce86534048707f7e0fa8ba4e0d1fb0b51d"
+      }
+    },
+    {
+      "record": "G02",
+      "title": "Shared-column tile service and request-readiness frontier",
+      "kind": "optimization",
+      "dependencies": [],
+      "implementation": "MICRO_COMPILED_MODEL_CLOSED_RESOURCE",
+      "candidate": "Native weight stream shared across independently ordered columns on accepted75-worker ETX queues",
+      "control": "Identical original Fleet per-column reduction/rounding and XCD6/7 roles",
+      "code": [
+        "examples/experiment_program/columns"
+      ],
+      "default_enabled": false,
+      "local_safe_command": [
+        "/Users/ckl/code/etx/.venv/bin/python",
+        "-m",
+        "examples.experiment_program",
+        "dry-run",
+        "--config",
+        "SESSION.json",
+        "--out",
+        "NEW_REVIEW_OUTPUT",
+        "--record",
+        "G02"
+      ],
+      "future_native_command": "Concrete argument array emitted for this record by stage.py in the sealed session configuration; explicit future device authorization required",
+      "remaining_gates": "Native post-prologue operands/outputs and placement probes missing; B2/B4 full model capacity1<2",
+      "gpu_correctness": "UNMEASURED",
+      "gpu_timing": "UNMEASURED",
+      "native_identity": {
+        "path": "/Users/ckl/code/etx-experiment-columns-build/identity.json",
+        "sha256": "113900526a562a50945f4cabcf404cc804035a1e4a74b3d97a667f5373467e38"
+      },
+      "scope_evidence": [
+        {
+          "path": "/Users/ckl/.hermes/cache/scratch/etx-experiment-preparation/columns/status.json",
+          "sha256": "10c3984f334f66d23840fe66448a8cc0e5ad98e61b3c2851ec54982eceaef844"
+        },
+        {
+          "path": "/Users/ckl/.hermes/cache/scratch/etx-experiment-preparation/columns/durable-model-resources.json",
+          "sha256": "e2f3b9589f6f21aaa8a9ab5d1434dcc1ca15806d0f2dce09fdbe928853962c53"
+        }
+      ],
+      "review_findings": [
+        "F04",
+        "F05",
+        "F11"
+      ],
+      "review_disposition": "ORIGINAL_SOFTWARE_FINDINGS_INDEPENDENTLY_CLOSED; NATIVE_GATES_UNCHANGED",
+      "previous_native_identity": {
+        "path": "/Users/ckl/code/etx-experiment-columns-build/identity.json",
+        "sha256": "113900526a562a50945f4cabcf404cc804035a1e4a74b3d97a667f5373467e38"
+      }
+    },
+    {
+      "record": "G03",
+      "title": "Dense NB2: separate tile service from the added request join",
+      "kind": "diagnostic",
+      "dependencies": [
+        "G02"
+      ],
+      "implementation": "DIAGNOSTIC_COMPILED_CAPTURE_GATED",
+      "candidate": "Historical b5eaa67 NB1/NB2 exact arithmetic in common resident ETX graph; independent readiness producers",
+      "control": "Source-bound retained QKV11 mapping, matched LDS, simultaneous/captured-ready arms",
+      "code": [
+        "examples/experiment_program/columns"
+      ],
+      "default_enabled": false,
+      "local_safe_command": [
+        "/Users/ckl/code/etx/.venv/bin/python",
+        "-m",
+        "examples.experiment_program",
+        "dry-run",
+        "--config",
+        "SESSION.json",
+        "--out",
+        "NEW_REVIEW_OUTPUT",
+        "--record",
+        "G03"
+      ],
+      "future_native_command": "Concrete argument array emitted for this record by stage.py in the sealed session configuration; explicit future device authorization required",
+      "remaining_gates": "Requires G02 QKV admission and new native captures; historical full run attribution UNKNOWN",
+      "gpu_correctness": "UNMEASURED",
+      "gpu_timing": "UNMEASURED",
+      "native_identity": {
+        "path": "/Users/ckl/code/etx-experiment-columns-build/identity.json",
+        "sha256": "113900526a562a50945f4cabcf404cc804035a1e4a74b3d97a667f5373467e38"
+      },
+      "scope_evidence": [
+        {
+          "path": "/Users/ckl/.hermes/cache/scratch/etx-experiment-preparation/columns/status.json",
+          "sha256": "10c3984f334f66d23840fe66448a8cc0e5ad98e61b3c2851ec54982eceaef844"
+        },
+        {
+          "path": "/Users/ckl/.hermes/cache/scratch/etx-experiment-preparation/columns/durable-model-resources.json",
+          "sha256": "e2f3b9589f6f21aaa8a9ab5d1434dcc1ca15806d0f2dce09fdbe928853962c53"
+        }
+      ],
+      "review_findings": [
+        "F03",
+        "F11"
+      ],
+      "review_disposition": "ORIGINAL_SOFTWARE_FINDINGS_INDEPENDENTLY_CLOSED; NATIVE_GATES_UNCHANGED",
+      "previous_native_identity": {
+        "path": "/Users/ckl/code/etx-experiment-columns-build/identity.json",
+        "sha256": "113900526a562a50945f4cabcf404cc804035a1e4a74b3d97a667f5373467e38"
+      }
+    },
+    {
+      "record": "G04",
+      "title": "Native expert-identity and effective-batch observation",
+      "kind": "diagnostic",
+      "dependencies": [],
+      "implementation": "COMPLETE_JSON_DEPENDENCY_AND_GENUINE_LINKED_CAPTURE_HOSTS",
+      "candidate": "Actual B2/B4 selector-consumer native capture and exhaustive population parser",
+      "control": "Unmodified consumed IDs/mix/slot order; capture-only, no optimization verdict",
+      "code": [
+        "examples/experiment_program/routing",
+        "examples/dsv2lite/fleet_shim.hip",
+        "examples/dsv2lite/host.hip"
+      ],
+      "default_enabled": false,
+      "local_safe_command": [
+        "/Users/ckl/code/etx/.venv/bin/python",
+        "-m",
+        "examples.experiment_program",
+        "dry-run",
+        "--config",
+        "SESSION.json",
+        "--out",
+        "NEW_REVIEW_OUTPUT",
+        "--record",
+        "G04"
+      ],
+      "future_native_command": "Concrete argument array emitted for this record by stage.py in the sealed session configuration; explicit future device authorization required",
+      "remaining_gates": "Genuine B2/B4 ordinary capture hosts linked. Future complete 32-token native capture and input configuration remain required; no GPU capture observed.",
+      "gpu_correctness": "UNMEASURED",
+      "gpu_timing": "UNMEASURED",
+      "scope_evidence": [
+        {
+          "path": "/Users/ckl/.hermes/cache/scratch/etx-experiment-preparation/routing/native-resource-final02.json",
+          "sha256": "17dcae16027a455f7315f70e9afcfebaddd19c372892b0c99048c8e481e5e0ae"
+        }
+      ],
+      "review_findings": [
+        "F02"
+      ],
+      "review_disposition": "ORIGINAL_SOFTWARE_FINDINGS_INDEPENDENTLY_CLOSED; NATIVE_GATES_UNCHANGED",
+      "capture_builds": {
+        "2": {
+          "path": "/Users/ckl/code/.wt/etx-experiment-preparation-20261016/build/review-repair-linked/G04-B2/build-identity.json",
+          "sha256": "bea1d8433333c8df18b9f5dfafc530b23cb011e5a7abc0d5ddd1ea7e79300464"
+        },
+        "4": {
+          "path": "/Users/ckl/code/.wt/etx-experiment-preparation-20261016/build/review-repair-linked/G04-B4/build-identity.json",
+          "sha256": "90fc92a1eef30673e6d735684e8f169c7bf2cca158fc19d14a778df728fdb53a"
+        }
+      }
+    },
+    {
+      "record": "G05",
+      "title": "Stable expert-identity grouping with separate column outputs",
+      "kind": "optimization",
+      "dependencies": [
+        "G04"
+      ],
+      "implementation": "MICRO_COMPILED_MODEL_CLOSED_RESOURCE_AND_TOPOLOGY",
+      "candidate": "Stable first-encounter expert grouping, exact singleton helper, generation publication and timed metadata transfer",
+      "control": "Original ungrouped Fleet helpers and per-request endpoints",
+      "code": [
+        "examples/experiment_program/columns"
+      ],
+      "default_enabled": false,
+      "local_safe_command": [
+        "/Users/ckl/code/etx/.venv/bin/python",
+        "-m",
+        "examples.experiment_program",
+        "dry-run",
+        "--config",
+        "SESSION.json",
+        "--out",
+        "NEW_REVIEW_OUTPUT",
+        "--record",
+        "G05"
+      ],
+      "future_native_command": "Concrete argument array emitted for this record by stage.py in the sealed session configuration; explicit future device authorization required",
+      "remaining_gates": "Requires complete G04 capture and native operands; B2 capacity fails; B4 spills plus unregistered37-worker topology",
+      "gpu_correctness": "UNMEASURED",
+      "gpu_timing": "UNMEASURED",
+      "native_identity": {
+        "path": "/Users/ckl/code/etx-experiment-columns-build/identity.json",
+        "sha256": "113900526a562a50945f4cabcf404cc804035a1e4a74b3d97a667f5373467e38"
+      },
+      "scope_evidence": [
+        {
+          "path": "/Users/ckl/.hermes/cache/scratch/etx-experiment-preparation/columns/status.json",
+          "sha256": "10c3984f334f66d23840fe66448a8cc0e5ad98e61b3c2851ec54982eceaef844"
+        },
+        {
+          "path": "/Users/ckl/.hermes/cache/scratch/etx-experiment-preparation/columns/durable-model-resources.json",
+          "sha256": "e2f3b9589f6f21aaa8a9ab5d1434dcc1ca15806d0f2dce09fdbe928853962c53"
+        }
+      ],
+      "review_findings": [
+        "F02",
+        "F11"
+      ],
+      "review_disposition": "ORIGINAL_SOFTWARE_FINDINGS_INDEPENDENTLY_CLOSED; NATIVE_GATES_UNCHANGED",
+      "previous_native_identity": {
+        "path": "/Users/ckl/code/etx-experiment-columns-build/identity.json",
+        "sha256": "113900526a562a50945f4cabcf404cc804035a1e4a74b3d97a667f5373467e38"
+      }
+    },
+    {
+      "record": "G06",
+      "title": "Remaining prep-read issue exposure after compiler overlap",
+      "kind": "optimization",
+      "dependencies": [],
+      "implementation": "TARGET_MICRO_AND_COMPLETE_MODEL_COMPILED",
+      "candidate": "Registered independent instruction issue order over current emitted kept DSL",
+      "control": "Exact original DSL math, ABI, reduction and rounding",
+      "code": [
+        "examples/experiment_program/issue_order"
+      ],
+      "default_enabled": false,
+      "local_safe_command": [
+        "/Users/ckl/code/etx/.venv/bin/python",
+        "-m",
+        "examples.experiment_program",
+        "dry-run",
+        "--config",
+        "SESSION.json",
+        "--out",
+        "NEW_REVIEW_OUTPUT",
+        "--record",
+        "G06"
+      ],
+      "future_native_command": "Concrete argument array emitted for this record by stage.py in the sealed session configuration; explicit future device authorization required",
+      "remaining_gates": "Native layer/correctness/625ns gate and full model gates unmeasured",
+      "gpu_correctness": "UNMEASURED",
+      "gpu_timing": "UNMEASURED",
+      "native_identity": {
+        "path": "/Users/ckl/code/.wt/etx-experiment-preparation-20261016/build/review-repair-guards-frozen/G06-micro/identity.json",
+        "sha256": "a78a97aa871416a5ccc2c6b3de450a6d25ec40880a4516cf2c50a354b29e9dcf"
+      },
+      "scope_evidence": [
+        {
+          "path": "/Users/ckl/.hermes/cache/scratch/etx-experiment-preparation/issue_order/status.json",
+          "sha256": "27752c72f3d0f41ff74b179bf90987322cb4f3b9865b21b66c924242c0aaebda"
+        }
+      ],
+      "complete_model": {
+        "path": "/Users/ckl/code/.wt/etx-experiment-preparation-20261016/build/review-repair-guards-frozen/G06-models/models.json",
+        "sha256": "b15c1a043325d099f73d84f12b7f63e7e902a3914e2f4e692bf7643f2be88d88"
+      },
+      "complete_model_static_admitted": true,
+      "complete_model_executable": true,
+      "review_findings": [
+        "F11"
+      ],
+      "review_disposition": "ORIGINAL_SOFTWARE_FINDINGS_INDEPENDENTLY_CLOSED; NATIVE_GATES_UNCHANGED",
+      "previous_native_identity": {
+        "path": "/Users/ckl/code/.wt/etx-experiment-preparation-20261016/build/experiment_issue_order/G06_sealed4/identity.json",
+        "sha256": "2327a6f05ffe55d6dc317cf692ce119b77fecfe372ce6e15b4d1c3214e420aa9"
+      },
+      "previous_complete_model": {
+        "path": "/Users/ckl/code/.wt/etx-experiment-preparation-20261016/build/experiment_model/g12-qwen-durable-final2/G06/models.json",
+        "sha256": "80d44b30c691b49f01a26d38434aac31c41b01d446285b7c057e080360ed0af1"
+      }
+    },
+    {
+      "record": "G07",
+      "title": "Attention statistics-wave read issue overlap",
+      "kind": "optimization",
+      "dependencies": [],
+      "implementation": "TARGET_MICRO_AND_COMPLETE_MODEL_COMPILED",
+      "candidate": "Registered native MFMA issue order with unchanged imported ABI and arithmetic",
+      "control": "Original imported LLVM/HIP function and exact adjacent boundary inputs",
+      "code": [
+        "examples/experiment_program/issue_order"
+      ],
+      "default_enabled": false,
+      "local_safe_command": [
+        "/Users/ckl/code/etx/.venv/bin/python",
+        "-m",
+        "examples.experiment_program",
+        "dry-run",
+        "--config",
+        "SESSION.json",
+        "--out",
+        "NEW_REVIEW_OUTPUT",
+        "--record",
+        "G07"
+      ],
+      "future_native_command": "Concrete argument array emitted for this record by stage.py in the sealed session configuration; explicit future device authorization required",
+      "remaining_gates": "Sparse instrumentation requires matched allocations and <=500ns perturbation; GPU unknown",
+      "gpu_correctness": "UNMEASURED",
+      "gpu_timing": "UNMEASURED",
+      "native_identity": {
+        "path": "/Users/ckl/code/.wt/etx-experiment-preparation-20261016/build/review-repair-guards-frozen/G07-micro/identity.json",
+        "sha256": "126381bee65114ff05d8408482c81fe307f15a2f9fcac81562bbe64cf40c60a2"
+      },
+      "scope_evidence": [
+        {
+          "path": "/Users/ckl/.hermes/cache/scratch/etx-experiment-preparation/issue_order/status.json",
+          "sha256": "27752c72f3d0f41ff74b179bf90987322cb4f3b9865b21b66c924242c0aaebda"
+        }
+      ],
+      "complete_model": {
+        "path": "/Users/ckl/code/.wt/etx-experiment-preparation-20261016/build/review-repair-guards-frozen/G07-models/models.json",
+        "sha256": "8be896976aac67aecd3a289237fa375b2514f559562f17205e77897517c32de3"
+      },
+      "complete_model_static_admitted": true,
+      "complete_model_executable": true,
+      "review_findings": [
+        "F11"
+      ],
+      "review_disposition": "ORIGINAL_SOFTWARE_FINDINGS_INDEPENDENTLY_CLOSED; NATIVE_GATES_UNCHANGED",
+      "previous_native_identity": {
+        "path": "/Users/ckl/code/.wt/etx-experiment-preparation-20261016/build/experiment_issue_order/G07_sealed4/identity.json",
+        "sha256": "a5022bcc7b223a30aa8012441d7b0cc393a9b79e4191ac6f7ce838699f94ea8d"
+      },
+      "previous_complete_model": {
+        "path": "/Users/ckl/code/.wt/etx-experiment-preparation-20261016/build/experiment_model/g12-qwen-durable-final2/G07/models.json",
+        "sha256": "1205dfb124ba0cb71ce9ffb9528f22468b0a63df6bd3dc479c1873b4f670d956"
+      }
+    },
+    {
+      "record": "G08",
+      "title": "Attention V-read issue overlap without changing the attention algorithm",
+      "kind": "optimization",
+      "dependencies": [],
+      "implementation": "TARGET_MICRO_COMPILED_COMPLETE_MODEL_CLOSED_RESOURCE",
+      "candidate": "Registered attention stage issue order, source-mapped instruction liveness and phase probes",
+      "control": "Original attention implementation, imported ABI and exact boundary population",
+      "code": [
+        "examples/experiment_program/issue_order"
+      ],
+      "default_enabled": false,
+      "local_safe_command": [
+        "/Users/ckl/code/etx/.venv/bin/python",
+        "-m",
+        "examples.experiment_program",
+        "dry-run",
+        "--config",
+        "SESSION.json",
+        "--out",
+        "NEW_REVIEW_OUTPUT",
+        "--record",
+        "G08"
+      ],
+      "future_native_command": "Concrete argument array emitted for this record by stage.py in the sealed session configuration; explicit future device authorization required",
+      "remaining_gates": "Phase1 diagnostic UNQUALIFIED because actual original control spills144B/lane; no attribution waiver",
+      "gpu_correctness": "UNMEASURED",
+      "gpu_timing": "UNMEASURED",
+      "native_identity": {
+        "path": "/Users/ckl/code/.wt/etx-experiment-preparation-20261016/build/review-repair-guards-frozen/G08-micro/identity.json",
+        "sha256": "c00c55a5875728fc1876c3fd12aa11d56ae7f3dc50dee3fb03d0406e270047f4"
+      },
+      "scope_evidence": [
+        {
+          "path": "/Users/ckl/.hermes/cache/scratch/etx-experiment-preparation/issue_order/status.json",
+          "sha256": "27752c72f3d0f41ff74b179bf90987322cb4f3b9865b21b66c924242c0aaebda"
+        }
+      ],
+      "complete_model": {
+        "path": "/Users/ckl/code/.wt/etx-experiment-preparation-20261016/build/experiment_model/g12-qwen-durable-final2/G08/models.json",
+        "sha256": "94ddee6c2b899d3561baa64594099ca9cc95e3ce343de6413811028c10c1b988"
+      },
+      "complete_model_static_admitted": false,
+      "complete_model_executable": false,
+      "review_findings": [
+        "F11"
+      ],
+      "review_disposition": "ORIGINAL_SOFTWARE_FINDINGS_INDEPENDENTLY_CLOSED; NATIVE_GATES_UNCHANGED",
+      "previous_native_identity": {
+        "path": "/Users/ckl/code/.wt/etx-experiment-preparation-20261016/build/experiment_issue_order/G08_sealed4/identity.json",
+        "sha256": "8f798d083f7ac6d23b0db34ba0a7070809439a53e62106073d075f2089ac1499"
+      }
+    },
+    {
+      "record": "G09",
+      "title": "Exact activation-segment reuse within existing row owners",
+      "kind": "optimization",
+      "dependencies": [],
+      "implementation": "BOTH_POSITION_RAW_PROGRAM_AND_SOURCE_BOUND_CAPTURE",
+      "candidate": "Register-retained activation segments with original row order and output-only poison",
+      "control": "Original current-kept activation arithmetic and complete original checker",
+      "code": [
+        "examples/experiment_program/row_ops"
+      ],
+      "default_enabled": false,
+      "local_safe_command": [
+        "/Users/ckl/code/etx/.venv/bin/python",
+        "-m",
+        "examples.experiment_program",
+        "dry-run",
+        "--config",
+        "SESSION.json",
+        "--out",
+        "NEW_REVIEW_OUTPUT",
+        "--record",
+        "G09"
+      ],
+      "future_native_command": "Concrete argument array emitted for this record by stage.py in the sealed session configuration; explicit future device authorization required",
+      "remaining_gates": "Native correctness/timing and model/graph/system validation unmeasured",
+      "gpu_correctness": "UNMEASURED",
+      "gpu_timing": "UNMEASURED",
+      "native_identity": {
+        "path": "/Users/ckl/code/.wt/etx-experiment-preparation-20261016/build/review-repair-row-native-matched/identity.json",
+        "sha256": "3f72f55b47d04e4be51e0c4af44a104fcecdff2e9f0c05bf50f08d57834cc820"
+      },
+      "complete_model": {
+        "path": "/Users/ckl/code/.wt/etx-experiment-preparation-20261016/build/experiment_model/g12-qwen-durable-final2/G09/models.json",
+        "sha256": "0506d07226cb40bd619302ceb2d132fcb2e22a215ba2412fd010df77b4ba2301"
+      },
+      "complete_model_static_admitted": false,
+      "complete_model_executable": false,
+      "review_findings": [
+        "F01",
+        "F08",
+        "F10",
+        "F11",
+        "F12"
+      ],
+      "review_disposition": "ORIGINAL_SOFTWARE_FINDINGS_INDEPENDENTLY_CLOSED; NATIVE_GATES_UNCHANGED",
+      "previous_native_identity": {
+        "path": "/Users/ckl/code/.wt/etx-experiment-preparation-20261016/build/experiment_program/row_ops/identity.json",
+        "sha256": "9e4e35605329a7087871b0d9229faf82d3e77cd621ada7bb1eeb8e21ab669c03"
+      },
+      "row_program": "examples/experiment_program/row_ops/program.py",
+      "diagnostic_identity": {
+        "path": "/Users/ckl/code/.wt/etx-experiment-preparation-20261016/build/review-repair-row-diagnostics-ready/identity.json",
+        "sha256": "9620fd1910c5d13b92eb1789ad89058d48ca1ff79d4e6857560aa7ff2f512a4c"
+      },
+      "original_capture_checker": {
+        "path": "/Users/ckl/code/.wt/etx-experiment-preparation-20261016/build/review-repair-models-complete/row-original-checker/build-identity.json",
+        "sha256": "1a135287f1b5e2039809360ee77ff15ba09ed5a20dbddd5740664e2ac60bd354"
+      }
+    },
+    {
+      "record": "G10",
+      "title": "Existing whole-row ownership: remove partial scratch, retain numerical order",
+      "kind": "optimization",
+      "dependencies": [],
+      "implementation": "BOTH_POSITION_RAW_PROGRAM_AND_SOURCE_BOUND_CAPTURE",
+      "candidate": "Remove registered original-row scratch while preserving exact arithmetic; down conditional on admitted up",
+      "control": "Original current-kept up/down helpers; original slot ordering; all writable outputs rechecked",
+      "code": [
+        "examples/experiment_program/row_ops"
+      ],
+      "default_enabled": false,
+      "local_safe_command": [
+        "/Users/ckl/code/etx/.venv/bin/python",
+        "-m",
+        "examples.experiment_program",
+        "dry-run",
+        "--config",
+        "SESSION.json",
+        "--out",
+        "NEW_REVIEW_OUTPUT",
+        "--record",
+        "G10"
+      ],
+      "future_native_command": "Concrete argument array emitted for this record by stage.py in the sealed session configuration; explicit future device authorization required",
+      "remaining_gates": "Down requires exact raw admitted up; native correctness/timing unknown",
+      "gpu_correctness": "UNMEASURED",
+      "gpu_timing": "UNMEASURED",
+      "native_identity": {
+        "path": "/Users/ckl/code/.wt/etx-experiment-preparation-20261016/build/review-repair-row-native-matched/identity.json",
+        "sha256": "3f72f55b47d04e4be51e0c4af44a104fcecdff2e9f0c05bf50f08d57834cc820"
+      },
+      "complete_model": {
+        "path": "/Users/ckl/code/.wt/etx-experiment-preparation-20261016/build/experiment_model/g12-qwen-durable-final2/G10/models.json",
+        "sha256": "013f8b9ea54f034573157786fd09dd063d8de563b93b439675648d8c2fffeabe"
+      },
+      "complete_model_static_admitted": false,
+      "complete_model_executable": false,
+      "conditional_down_complete_model": {
+        "path": "/Users/ckl/code/.wt/etx-experiment-preparation-20261016/build/experiment_model/g12-qwen-durable-final2/G10-g10_down/models.json",
+        "sha256": "deab2294a5496e10d5e49f1ab65031082b0c09c38f0479e89e40376a0916b34d"
+      },
+      "review_findings": [
+        "F01",
+        "F07",
+        "F08",
+        "F10",
+        "F11",
+        "F12"
+      ],
+      "review_disposition": "ORIGINAL_SOFTWARE_FINDINGS_INDEPENDENTLY_CLOSED; NATIVE_GATES_UNCHANGED",
+      "previous_native_identity": {
+        "path": "/Users/ckl/code/.wt/etx-experiment-preparation-20261016/build/experiment_program/row_ops/identity.json",
+        "sha256": "9e4e35605329a7087871b0d9229faf82d3e77cd621ada7bb1eeb8e21ab669c03"
+      },
+      "row_program": "examples/experiment_program/row_ops/program.py",
+      "diagnostic_identity": {
+        "path": "/Users/ckl/code/.wt/etx-experiment-preparation-20261016/build/review-repair-row-diagnostics-ready/identity.json",
+        "sha256": "9620fd1910c5d13b92eb1789ad89058d48ca1ff79d4e6857560aa7ff2f512a4c"
+      },
+      "original_capture_checker": {
+        "path": "/Users/ckl/code/.wt/etx-experiment-preparation-20261016/build/review-repair-models-complete/row-original-checker/build-identity.json",
+        "sha256": "1a135287f1b5e2039809360ee77ff15ba09ed5a20dbddd5740664e2ac60bd354"
+      }
+    },
+    {
+      "record": "G11",
+      "title": "Current publication-to-consumer fold exposure before global row sharing",
+      "kind": "diagnostic",
+      "dependencies": [
+        "G12"
+      ],
+      "implementation": "INTEGRATED_CURRENT_DOWN_QKV_SUBGRAPH_PREPARED_AWAITING_REVIEW",
+      "candidate": "Same-invocation original publication issue/forced-retirement bounds through consumer read/fold/norm/output, all512 tasks/all16waves",
+      "control": "Diagnostic-disabled timed control, empty/probe matched actual hardware allocation; separate native coverage/warmups",
+      "code": [
+        "examples/experiment_program/publication_subgraph.py",
+        "examples/experiment_program/publication_build.py",
+        "examples/experiment_program/publication_capture.py",
+        "examples/experiment_program/publication_host.cpp",
+        "examples/experiment_program/publication_run.py"
+      ],
+      "default_enabled": false,
+      "local_safe_command": [
+        "/Users/ckl/code/etx/.venv/bin/python",
+        "-m",
+        "examples.experiment_program",
+        "dry-run",
+        "--config",
+        "SESSION.json",
+        "--out",
+        "NEW_REVIEW_OUTPUT",
+        "--record",
+        "G11"
+      ],
+      "future_native_command": "Concrete argument array emitted for this record by stage.py in the sealed session configuration; explicit future device authorization required",
+      "remaining_gates": "Independent scoped acceptance pending. Original native captures at all6 cases, actual active matching G12 trace/fold decision, complete native exactness/coverage/placement and measured<=0.5us perturbation remain unmeasured; no GPU readiness or exposure-to-speedup claim.",
+      "gpu_correctness": "UNMEASURED",
+      "gpu_timing": "UNMEASURED",
+      "native_identity": {
+        "path": "/Users/ckl/code/.wt/etx-experiment-preparation-20261016/build/publication-completion-final/identity-final.json",
+        "sha256": "75591e2367daf1351163d20e12c4bef29ad4dc1262b0d7d39759b80289c922ce"
+      },
+      "review_findings": [
+        "F01",
+        "F08",
+        "K02"
+      ],
+      "review_disposition": "ORIGINAL_SOFTWARE_FINDINGS_INDEPENDENTLY_CLOSED; NATIVE_GATES_UNCHANGED",
+      "previous_native_identity": {
+        "path": "/Users/ckl/code/.wt/etx-experiment-preparation-20261016/build/experiment_program/row_ops/identity.json",
+        "sha256": "9e4e35605329a7087871b0d9229faf82d3e77cd621ada7bb1eeb8e21ab669c03"
+      },
+      "row_program": "examples/experiment_program/publication_run.py",
+      "publication_admission": {
+        "path": "/Users/ckl/.hermes/cache/scratch/etx-experiment-preparation/publication-completion/admission.json",
+        "sha256": "811a54612e09f2c2cde85e81ac67e38afeadfffa5a31a5ceafaf13c8a41e4e63"
+      },
+      "rejected_whole_model_publication": {
+        "path": "/Users/ckl/.hermes/cache/scratch/etx-experiment-preparation/review-repair/K02-admission.json",
+        "sha256": "0732c5a2025c73310b34daafa69c24892e01b10e1350a7048f3646579e13d22c"
+      }
+    },
+    {
+      "record": "G12",
+      "title": "Winner-only end-to-end and dual-baseline validation",
+      "kind": "validation",
+      "dependencies": [],
+      "implementation": "ELIGIBLE_MODEL_HOSTS_GENUINELY_LINKED_RAW_WINNER_AND_GPU_GATED",
+      "candidate": "Precompiled registered same-session winner dispatch into original checker,32-token model,host-wall pairs,graph and strongest legal system gates",
+      "control": "Same kernels replayed as HIP graph plus strongest tested legal system; no invented winner/certificate",
+      "code": [
+        "examples/experiment_program/validation.py",
+        "examples/experiment_program/validation_prepare.py",
+        "examples/experiment_program/validation_run.py",
+        "examples/experiment_program/validation_dispatch.py",
+        "examples/experiment_program/validation_trace.py"
+      ],
+      "default_enabled": false,
+      "local_safe_command": [
+        "/Users/ckl/code/etx/.venv/bin/python",
+        "-m",
+        "examples.experiment_program",
+        "dry-run",
+        "--config",
+        "SESSION.json",
+        "--out",
+        "NEW_REVIEW_OUTPUT",
+        "--record",
+        "G12"
+      ],
+      "future_native_command": "Concrete argument array emitted for this record by stage.py in the sealed session configuration; explicit future device authorization required",
+      "remaining_gates": "Actual same-session raw micro winner required; preserved K03 resource closures and K04 graph limitation; full GPU97/97/32greedy/pairs unobserved. Ordinary eligible hosts now linked genuinely.",
+      "gpu_correctness": "UNMEASURED",
+      "gpu_timing": "UNMEASURED",
+      "scope_evidence": [
+        {
+          "path": "/Users/ckl/.hermes/cache/scratch/etx-experiment-preparation/validation/qwen-durable-final2-status.json",
+          "sha256": "8ba7c9bc0b23b3633752f02d5c0f909aa54dda05ec7f1534cc2b35ba52c28ed5"
+        },
+        {
+          "path": "/Users/ckl/.hermes/cache/scratch/etx-experiment-preparation/row_ops/validation/durable-attestation-final2.json",
+          "sha256": "6fceec2d9e9cdc47c5ff938e16c7ab381ddaf3c6cb49fcba8c7c7c1347b7add3"
+        },
+        {
+          "path": "/Users/ckl/.hermes/cache/scratch/etx-experiment-preparation/row_ops/validation/durable-preparations-final2.json",
+          "sha256": "849f222f172aceb7495a3db358ce4c30692e72401de52063f0251b5cee614d94"
+        }
+      ],
+      "review_findings": [
+        "F06",
+        "F08",
+        "K01"
+      ],
+      "review_disposition": "ORIGINAL_SOFTWARE_FINDINGS_INDEPENDENTLY_CLOSED; NATIVE_GATES_UNCHANGED",
+      "eligible_linked_models": {
+        "G01": {
+          "path": "/Users/ckl/code/.wt/etx-experiment-preparation-20261016/build/review-repair-guards-frozen/G01-models/models.json",
+          "sha256": "7118666f0d14095f649eec388425643e18025831cd6506c2eac3d6542af9e43c"
+        },
+        "G06": {
+          "path": "/Users/ckl/code/.wt/etx-experiment-preparation-20261016/build/review-repair-guards-frozen/G06-models/models.json",
+          "sha256": "b15c1a043325d099f73d84f12b7f63e7e902a3914e2f4e692bf7643f2be88d88"
+        },
+        "G07": {
+          "path": "/Users/ckl/code/.wt/etx-experiment-preparation-20261016/build/review-repair-guards-frozen/G07-models/models.json",
+          "sha256": "8be896976aac67aecd3a289237fa375b2514f559562f17205e77897517c32de3"
+        }
+      }
+    },
+    {
+      "record": "G13",
+      "title": "Unshared expert work: restore independent successor readiness",
+      "kind": "diagnostic",
+      "dependencies": [
+        "G02"
+      ],
+      "implementation": "RAW_RECOMPUTED_THREE_LEGAL_SCHEDULING_STATES_IN_TWO_MATCHED_PAIRED_GROUPS",
+      "candidate": "898-task exact ff9ef92 unshared expert graph with independent request ready producers and two legal queue orders",
+      "control": "Same up/down bodies; combined vs per-request completion; blocking order statically rejected",
+      "code": [
+        "examples/experiment_program/columns"
+      ],
+      "default_enabled": false,
+      "local_safe_command": [
+        "/Users/ckl/code/etx/.venv/bin/python",
+        "-m",
+        "examples.experiment_program",
+        "dry-run",
+        "--config",
+        "SESSION.json",
+        "--out",
+        "NEW_REVIEW_OUTPUT",
+        "--record",
+        "G13"
+      ],
+      "future_native_command": "Concrete argument array emitted for this record by stage.py in the sealed session configuration; explicit future device authorization required",
+      "remaining_gates": "G02 QKV admission, active coalescing decision and new native captures required; historical run attribution UNKNOWN",
+      "gpu_correctness": "UNMEASURED",
+      "gpu_timing": "UNMEASURED",
+      "native_identity": {
+        "path": "/Users/ckl/code/etx-experiment-columns-build/identity.json",
+        "sha256": "113900526a562a50945f4cabcf404cc804035a1e4a74b3d97a667f5373467e38"
+      },
+      "scope_evidence": [
+        {
+          "path": "/Users/ckl/.hermes/cache/scratch/etx-experiment-preparation/columns/status.json",
+          "sha256": "10c3984f334f66d23840fe66448a8cc0e5ad98e61b3c2851ec54982eceaef844"
+        },
+        {
+          "path": "/Users/ckl/.hermes/cache/scratch/etx-experiment-preparation/columns/durable-model-resources.json",
+          "sha256": "e2f3b9589f6f21aaa8a9ab5d1434dcc1ca15806d0f2dce09fdbe928853962c53"
+        }
+      ],
+      "review_findings": [
+        "F09",
+        "F11"
+      ],
+      "review_disposition": "ORIGINAL_SOFTWARE_FINDINGS_INDEPENDENTLY_CLOSED; NATIVE_GATES_UNCHANGED",
+      "previous_native_identity": {
+        "path": "/Users/ckl/code/etx-experiment-columns-build/identity.json",
+        "sha256": "113900526a562a50945f4cabcf404cc804035a1e4a74b3d97a667f5373467e38"
+      },
+      "diagnostic_formula": "Simultaneous completion-only deficit:C_both-up-I_both-up; full-restoration gains:C_repeated-both-up-I_request. Each uses its own paired control. Actual native queues/body distributions and endpoints retained; no historical or traffic attribution."
+    }
+  ],
+  "review_repair": {
+    "reviewed_revision": "94a29c0f3e51e271ea884eb216de5b90c4a7b25b",
+    "software_milestone": "088caad",
+    "independent_rereview": "ALL12_CLOSED_AT_e8d10ec; final-closure-review.md retracts exact-point and mandatory whole-model conditions",
+    "receipt": "/Users/ckl/.hermes/cache/scratch/etx-experiment-preparation/review-repair-receipt.md",
+    "findings": "/Users/ckl/.hermes/cache/scratch/etx-experiment-preparation/review-repair-findings.json",
+    "previous_manifest_revision": "94a29c0f3e51e271ea884eb216de5b90c4a7b25b",
+    "native_source_reuse": "General16-cell matrix unchanged; no matrix cell rebuilt. Python-only issue/model guard reuse is explicit and binds unchanged compiled bytes.",
+    "K01": "Genuine official runtime/dependency closure and ordinary links completed for eligible branches; original77 receipts retained.",
+    "K02": {
+      "path": "/Users/ckl/.hermes/cache/scratch/etx-experiment-preparation/review-repair/K02-admission.json",
+      "sha256": "0732c5a2025c73310b34daafa69c24892e01b10e1350a7048f3646579e13d22c"
+    },
+    "current_G11_admission": {
+      "path": "/Users/ckl/.hermes/cache/scratch/etx-experiment-preparation/publication-completion/admission.json",
+      "sha256": "811a54612e09f2c2cde85e81ac67e38afeadfffa5a31a5ceafaf13c8a41e4e63"
+    },
+    "previous_G11_admission": {
+      "path": "/Users/ckl/.hermes/cache/scratch/etx-experiment-preparation/publication-gap/subgraph-admission.json",
+      "sha256": "c5da5cada26babb16600997fd6aeac4f3776a94cd3f7e9af352c80c4e63656b7"
+    }
+  }
+}

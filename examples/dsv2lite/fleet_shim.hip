@@ -17,6 +17,9 @@
 //                   when ETX placed both on the same worker back to back (fleet_expert_down_cached)
 #include "etx/abi.h"
 #include "kernels/fleet_kernel.hip"
+#if defined(ETX_PROGRAM_ROUTE_CAPTURE) && ETX_PROGRAM_ROUTE_CAPTURE
+#include "examples/experiment_program/routing/capture.h"
+#endif
 
 struct FleetParams {
   fleet::RuntimeState rt;
@@ -122,6 +125,23 @@ static __device__ __forceinline__ void fleet_call(const etx_ctx* c, uint16_t kin
   uint64_t t0 = 0;
   pro_begin(fp, tc, s, t0);
   fleet::run_task(t, fp->rt, fp->d, fp->w, act, kv, s, tc, (int)c->domain, worker);
+#if defined(ETX_PROGRAM_ROUTE_CAPTURE) && ETX_PROGRAM_ROUTE_CAPTURE
+  // The actual native per-task selector's LDS arrays remain live here. Capture
+  // all six slots on all eight XCDs, not HF picks or a recomputed selector.
+  // worker0 is one original gate/up task per (request,layer,XCD,step).
+  if (fp->pro_trace && kind == fleet::TASK_EXPERT_GATE_UP && worker == 0 &&
+      L >= 1 && L < 27 && fp->tok >= 0 && fp->tok < 32) {
+    G04Record* rec=reinterpret_cast<G04Record*>(fp->pro_trace)+
+       ((size_t)fp->tok*26+(L-1))*8+c->domain;
+    if (threadIdx.x < 6) {
+      const int slot=threadIdx.x;
+      rec->ids[slot]=(flags & fleet::FLAG_TOPK_READ) ? act.topk_ids[c->domain*fleet::kMaxTopK+slot] : s.ids[slot];
+      rec->mix[slot]=(flags & fleet::FLAG_TOPK_READ) ? act.topk_w[c->domain*fleet::kMaxTopK+slot] : s.ws[slot];
+    }
+    ETX_RELEASE_DOMAIN(); __syncthreads(); // all writing waves before seen
+    if(threadIdx.x==0){rec->epoch=fp->epoch;atomicAdd(&rec->seen,1u);}
+  }
+#endif
   pro_end(fp, s, PRO_SLOT(L, kind, c), t0);
 }
 

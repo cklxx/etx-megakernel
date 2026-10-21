@@ -15,6 +15,9 @@
 #undef main
 #include "plan_data.h"
 #include "etx/host.h"
+#if defined(ETX_PROGRAM_ROUTE_CAPTURE) && ETX_PROGRAM_ROUTE_CAPTURE
+#include "examples/experiment_program/routing/capture.h"
+#endif
 
 using namespace fleet;
 
@@ -190,6 +193,14 @@ int main(int argc, char** argv) {
   return ds_snapshot_run(hst, reqs[0].fp, reqs[0].d_fp, reqs[0].first_token, tokens, repeat, unfused);
 #endif
 
+#if defined(ETX_PROGRAM_ROUTE_CAPTURE) && ETX_PROGRAM_ROUTE_CAPTURE
+  const char* g04_dir=getenv("ETX_PROGRAM_ROUTE_DIR");
+  if(!g04_dir || (R!=2 && R!=4) || tokens!=32 || repeat!=2 || context!=1024 || teacher || unfused ||
+     d.layers!=27 || d.first_k_dense!=1 || d.top_k!=6 || d.n_routed!=64 || pro_path)
+    die("G04 requires B2/B4 C1024,32 greedy tokens,repeat2,27 layers/top6of64 and exclusive route output directory");
+  std::vector<uint64_t*> g04_buffers(R);
+  for(int r=0;r<R;++r){HIP_CHECK(hipMalloc((void**)&g04_buffers[r],G04_BYTES));HIP_CHECK(hipMemset(g04_buffers[r],0,G04_BYTES));}
+#endif
   double wall_total = 0; std::vector<double> step_ms;
   for (int run = 0; run < repeat; ++run) {
     const bool last = run == repeat - 1;
@@ -205,6 +216,9 @@ int main(int argc, char** argv) {
       for (int r = 0; r < R; ++r) {
         FleetParams& fp = reqs[r].fp;
         fp.tok = t; fp.epoch = (uint32_t)(run * tokens + t + 1); fp.pos = context + t; fp.dump = (last && t == 0) ? 1 : 0;
+#if defined(ETX_PROGRAM_ROUTE_CAPTURE) && ETX_PROGRAM_ROUTE_CAPTURE
+        fp.pro_trace=last?g04_buffers[r]:nullptr; // warmup never overwrites captured greedy population
+#endif
         HIP_CHECK(hipMemcpy(reqs[r].d_fp, &fp, sizeof(fp), hipMemcpyHostToDevice));
         fleet_set_params(&fp, hst.stream, r);
       }
@@ -305,5 +319,19 @@ int main(int argc, char** argv) {
     for (int r = 0; r < R; ++r) j << (r ? ", " : "") << reqs[r].layers_ok;
     j << "]}\n";
   }
+#if defined(ETX_PROGRAM_ROUTE_CAPTURE) && ETX_PROGRAM_ROUTE_CAPTURE
+  for(int r=0;r<R;++r){
+    const Req& q=reqs[r];
+    if(q.matched!=32 || q.compared!=32 || q.warm_matched!=32 || q.warm_compared!=32 || q.layers_ok!=27)
+      die("G04 refuses export: every request needs warmup/greedy32 and hidden27 gates");
+  }
+  for(int r=0;r<R;++r){
+    std::vector<unsigned char> raw(G04_BYTES);HIP_CHECK(hipMemcpy(raw.data(),g04_buffers[r],raw.size(),hipMemcpyDeviceToHost));
+    std::ofstream out(std::string(g04_dir)+"/routes_r"+std::to_string(r)+".bin",std::ios::binary);
+    out.write((const char*)raw.data(),raw.size());out.close();if(!out)die("G04 output export failed");
+    HIP_CHECK(hipFree(g04_buffers[r]));
+  }
+  std::printf("G04 CAPTURE COMPLETE requests=%d steps=32 routed_layers=26 replicas=8 slots=6 dense_layer=0\n",R);
+#endif
   return all_ok ? 0 : 3;
 }

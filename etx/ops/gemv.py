@@ -992,6 +992,14 @@ def emit_tiles(lds_floats: int = 8192, machine=None) -> str:
             out.append(f'extern "C" __device__ __attribute__((always_inline)) void etx_touch_x_{e}(const etx_ctx* c) {{ dsl_touch_plain(etx_imp_argblock(c->args, c->cst[0] + c->coord[0] * c->cst[1]), c->coord[0] * c->cst[2] + c->coord[1]); }}')
         out.append("")
     source = "\n".join(out) + "\n"
+    from etx.ops import last_router
+    if last_router.enabled():
+        if not DSL_ROUTER or DSL_NB != 1 or DSL_EXT:
+            raise ValueError('G01 needs unchanged narrow Qwen NB1 router')
+        # Retain original bodies and hooks; replace only the two router entries.
+        for name in ('etx_tile_dsl_gemv_router_fold','etx_tile_x_dsl_gemv_router_fold'):
+            source=source.replace('void '+name+'(', 'void '+name+'_original_unused(')
+        source+=last_router.emit()
     from etx.ops import local_fold
     if local_fold.enabled():
         source += local_fold.emit(STREAM, BODIES["plain"])

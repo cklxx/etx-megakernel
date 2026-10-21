@@ -1,0 +1,434 @@
+{
+  "schema_version": 1,
+  "execution_authorized": false,
+  "count": 13,
+  "new_mechanism_count": 0,
+  "common_micro_rule": "Stop on any correctness/liveness failure, incomplete pair, unqualified instrumentation or resource rejection. Optimization admission: all five savings positive, median >2*range and >=2% of the same completion-window control. Qwen per-layer candidates also need >=0.625 us/layer net before a model arm (30 us/48); a local pass permits validation, not extrapolated model savings. No full-model arm on a miss.",
+  "experiments": [
+    {
+      "id": "G01",
+      "title": "Exact last-router selector and eight-XCD publication",
+      "priority": 1,
+      "kind": "optimization",
+      "inventory_ids": [
+        "last-router-selector"
+      ],
+      "decision_changed": "Pursue or close P5 before any full-model implementation.",
+      "model_batch_context_precision": "Qwen3-30B-A3B, B1, context1024; replay actual router inputs at decode positions0/1040; bf16 H2048/E128/K8.",
+      "baseline_revision_and_source": "Qwen kept recipe at b573664faa4e7988dff353bc03aca4ce8561a729: examples/vllm_llm/kept_build.py; WSUM/SCALAR/GU1/RBATCH, KEY32, narrow router, norm hoist, TOUCH. Reference observation 4.051 ms wall/3.917 device in 2026-10-14 pairs_kept_l1.json, not a fresh fusion/system certificate. Freeze source/plan/imports/executable/compiler/input hashes anew; do not substitute checkout HEAD.",
+      "implementation_status": "Design/local logical model only; no GPU prototype, complete driver or production arm.",
+      "changed_mechanism": "Keep all256 router tasks, original norm/dot/logit rounding and KEY32. Elect after128 useful owners; winner reads rounded logits, selects once and publishes all three payloads to eight slabs before releasing normal completion.",
+      "additional_costs": "128 election RMWs/layer, all-writing-wave drain, winner acquire, counter/epoch lifecycle, selector/fanout tail, possible new live ranges/spills. Still768 output payload bytes/layer and512KiB router weights. No P1 grid shrink.",
+      "old_failure_evidence": "Fleet last-router publication slowed a parallel-consumer selector (STATUS:29/78); Qwen producer scoring changed136/256 mix bytes (Oct15). P5 differs from both. Prior Oct16 replica probe96/96 exact sets is a necessary condition only.",
+      "competing_falsifiable_predictions": [
+        "Removing existing serial selector dispatch/duplicate evaluations exceeds new protocol tail and all-eight-reader completion becomes faster.",
+        "Visibility/election/fanout costs dominate; early local winner completion does not reduce globally-readable completion, or current-resource spills erase the gain."
+      ],
+      "smallest_decisive_intervention": "Only router -> selector -> eight exact readers. Existing256-router/eight-selector path vs exact elected finalizer, same outputs/topology/resources admitted. Vary winner XCD and completion permutation without changing arithmetic; include repeated epoch/reset stress.",
+      "correctness_endpoints": "Byte-compare affected original/candidate outputs from identical retained model inputs at positions 0 and 1040; include ties, cancellation, signed zero, epoch rollover/reset and all producing waves as applicable. Do not replace GPU exp/reductions with CPU approximations. Any model arm must also pass CHECK-DSL, all 97/97 applicable imported instances against the unchanged original on that exact build, and 32/32 HF greedy tokens. Require exact logits, normalized input, residual, IDs, fp32 mix and indices in every replica; owner0 norm publication cannot be skipped.",
+      "timed_interval": "Counter initialization/epoch advance and first admitted router readiness through successful visible read of final routing bytes AND canonical norm by all8 consumers. Instrument publication separately, outside decisive pairs.",
+      "required_raw_evidence": "Seal source/plan/generated code/native code object/compiler/math flags/resources/input and output hashes. Keep every paired sample, order, warmup count, selected tasks/waves, clocks/power readings and full unfiltered stdout/stderr. Use one resident-input process for subgraphs. Five complete AB/BA interleaved pairs with a fixed declared warmup and sample population; randomize pair ordinal in a predeclared seed, keep all ordinals. No first-pair selection or post-hoc trimming. Attribute with separate sparse probes; decisive pairs uninstrumented. Record device completion and host wall separately. If counters are used, require complete valid candidate/control populations; a crashed profiler produces no counter claim. Per-owner stores/drain/election/acquire/fanout/reader stamps and real XCD/worker IDs; exact replica output captures and reset-stress counts. Old74us gap is not a current timing budget.",
+      "decision_stop_rule": "Stop on any correctness/liveness failure, incomplete pair, unqualified instrumentation or resource rejection. Optimization admission: all five savings positive, median >2*range and >=2% of the same completion-window control. Qwen per-layer candidates also need >=0.625 us/layer net before a model arm (30 us/48); a local pass permits validation, not extrapolated model savings. No full-model arm on a miss. Specifically median saving >=0.625us/layer net. A miss closes P5; a pass only unlocks G12.",
+      "risk_and_cost_rationale": "Highest Qwen priority because local byte-replica premise passed and only a bounded protocol is missing. No predicted net gain: old conditional account ranges -2.8..16.88us with visibility, before other costs.",
+      "preparation_before_gpu_authorization": "Implement isolated election/driver only after separate implementation authorization; prove producer counts, all-wave drain, norm lifetime, reader acquire and quiescence with negative tests. Compile once with actual deployment compiler and inspect whole-kernel resources locally. Existing probes are not a runnable candidate.",
+      "dependencies": [],
+      "gpu_required": true,
+      "runnable_now": false,
+      "execution_authorized": false
+    },
+    {
+      "id": "G02",
+      "title": "Shared-column tile service and request-readiness frontier",
+      "priority": 1,
+      "kind": "optimization",
+      "inventory_ids": [
+        "shared-weight-batch",
+        "interleave-requests"
+      ],
+      "decision_changed": "Whether to invest in shared columns for request-independent work, and which readiness regime is viable.",
+      "model_batch_context_precision": "DeepSeek-Coder-V2-Lite-Base bf16 decode, B2 thenB4, context1024. First exact frozen QKV role, then one shared-expert gate_up/down role only if QKV passes. Shapes taken from frozen native arguments; no inferred Qwen dimensions.",
+      "baseline_revision_and_source": "DeepSeek accepted frozen source/executable 554133d744b4591c9cf87c68b6817df781137c9b, continuation archive abee09fcda357bb982cfba4d85bb387a6da97ec2385d3d4574f1f7cd4282d5da. B2/B4 replicated K1/M1/l1 recipe; B1 also has D4. Reuse sealed goldens and exact request prefixes; compare equal B, never B1 D4 against B4 as a causal control.",
+      "implementation_status": "DeepSeek column-batched tiles were cancelled before implementation. New tile/driver not built. Existing replicated traces and goldens reused.",
+      "changed_mechanism": "Load a request-independent weight vector once and update two/four separate ordered column accumulators; preserve each output dot DAG/rounding. Preserve request-specific completions where output values are actually final. Keep routed experts and attention unshared.",
+      "additional_costs": "B accumulators/activation staging, per-column LDS/reductions, more live state or scratch, layout and output scatter, retained/reread weights for late inputs, possible smaller streaming width and output publication tail.",
+      "old_failure_evidence": "Historical Qwen dense NB2 lost0.293ms; later whole-layer variant did not share MoE weights and lost overlap. DeepSeek B4/B2 span1.9981x/work1.9821x does not identify HBM saturation.",
+      "competing_falsifiable_predictions": [
+        "Real external-read reduction with adequate tile service reduces final both/all-output completion when inputs are ready together.",
+        "Weight requests drop but external bytes scarcely change because the replicated control already reuses cache; no equivalent benefit.",
+        "Bytes drop but shared workgroup issue/LDS/reduction or delayed-column readiness dominates; tile still loses or benefits only simultaneous arrivals."
+      ],
+      "smallest_decisive_intervention": "Same frozen inputs/weights/worker budget: B independent native tile grids vs one shared-column grid. Use simultaneous readiness and one replay of the archived B2/B4 arrival pattern; timestamp individual outputs and final completion. Do not fuse whole layers. Stage shared-expert window only after QKV passes; do not assume identical service behavior.",
+      "correctness_endpoints": "Exact per-column bf16 outputs and required intermediate rounding/reduction order against the frozen tile control on identical native inputs. Preserve request/slot/expert identity and mixing weights; canonical shared buffers must have proven lifetimes. Any model arm must pass every request: 32/32 warmup and greedy tokens plus 27/27 hidden-state boundaries using sealed producer-bound goldens. A token-only pass cannot waive hidden-state failure.",
+      "timed_interval": "First required input readiness through visibility of all requested outputs, including staging, joins, output tails and publication. Also report per-request first-ready-to-output latency, never divide total step byB for latency.",
+      "required_raw_evidence": "Seal source/plan/generated code/native code object/compiler/math flags/resources/input and output hashes. Keep every paired sample, order, warmup count, selected tasks/waves, clocks/power readings and full unfiltered stdout/stderr. Use one resident-input process for subgraphs. Five complete AB/BA interleaved pairs with a fixed declared warmup and sample population; randomize pair ordinal in a predeclared seed, keep all ordinals. No first-pair selection or post-hoc trimming. Attribute with separate sparse probes; decisive pairs uninstrumented. Record device completion and host wall separately. If counters are used, require complete valid candidate/control populations; a crashed profiler produces no counter claim. Valid external-read bytes plus L2/MALL/cache policy and dynamic scratch traffic if available; source-request byte counts separately. Per-column consumed-segment/output-ready stamps, native allocation and actual worker placement. If counters unavailable, service verdict may exist but traffic cause stays unknown.",
+      "decision_stop_rule": "Stop on any correctness/liveness failure, incomplete pair, unqualified instrumentation or resource rejection. Optimization admission: all five savings positive, median >2*range and >=2% of the same completion-window control. Qwen per-layer candidates also need >=0.625 us/layer net before a model arm (30 us/48); a local pass permits validation, not extrapolated model savings. No full-model arm on a miss. Each tested role/regime decides independently. A B2 pass does not approve B4. Do not unlock full model if benefit disappears under retained arrival pattern; close that implementation, retaining the narrower simultaneous-ready fact. G12 must judge the actual B4 system target.",
+      "risk_and_cost_rationale": "Highest DeepSeek priority: request-independent dense/shared weights offer fullB columns, unlike sparse routed union. QKV addresses a measured0.92628ms B4 CP-body family only under the archived fixed-body account; that is no wall saving and cannot fill3.37236ms alone.",
+      "preparation_before_gpu_authorization": "A reviewed exact shared-column prototype and resident-input driver are required; not implemented here. Recover frozen argument shapes/identity, validate per-column reduction/rounding, local resource/lifetime/queue proofs and one target-compiler build. No MFMA substitution without a separately passed numerical contract.",
+      "dependencies": [],
+      "gpu_required": true,
+      "runnable_now": false,
+      "execution_authorized": false
+    },
+    {
+      "id": "G03",
+      "title": "Dense NB2: separate tile service from the added request join",
+      "priority": 3,
+      "kind": "diagnostic",
+      "inventory_ids": [
+        "shared-weight-batch",
+        "queue-reorder"
+      ],
+      "decision_changed": "Whether an asynchronous/readiness-preserving DSL column variant is justified, or its service skeleton must change.",
+      "model_batch_context_precision": "Qwen3-30B-A3B historical B2 decode qkv5120x2048,256tasks of20rows; bf16; actual captured vectors, context1024 provenance. Isolated subgraph only.",
+      "baseline_revision_and_source": "Historical dense source b5eaa67 and round14 b14_b2/b14_r2 objects/resources in etx-shared-weight-causality; source-bindings.json, native-resources.json, plan-analysis.json. This is not the newer kept baseline.",
+      "implementation_status": "Historical sources/objects retained; isolated matched-resource replay and staged diagnostics NOT built. Original raw per-run0.293ms timing identity remains incomplete.",
+      "changed_mechanism": "Intervene only on activation readiness: simultaneous vs fixed second-request stagger, paired with original NB2 and two NB1 grids. Preserve equal two-output endpoint; do not compare one NB1 task with a two-output task.",
+      "additional_costs": "Matched-resource padding if needed can alter compiler schedules; require actual allocations/ISA not assumed equality. Sparse stage timers can perturb dependency latency; no causal prices from unqualified probes.",
+      "old_failure_evidence": "Prior report: NB2 halves requested weight bytes, retains equal two-request MAC/LDS work, original resource counts do not show lower residency; full original regression remains unattributed.",
+      "competing_falsifiable_predictions": [
+        "NB2 loss shrinks at simultaneous readiness and returns with stagger: request join is material.",
+        "NB2 still loses with both ready and fewer external bytes: tile issue/consume/reduce cost is material.",
+        "External bytes do not decline in proportion to requests: cache reuse invalidates the presumed streaming saving. These causes may coexist."
+      ],
+      "smallest_decisive_intervention": "One qkv subgraph, one common matched worker/resource budget,2x2 readiness-by-layout control; exactly one captured nonzero stagger. No original full-model timing rerun or broad profiling suite.",
+      "correctness_endpoints": "Byte-compare affected original/candidate outputs from identical retained model inputs at positions 0 and 1040; include ties, cancellation, signed zero, epoch rollover/reset and all producing waves as applicable. Do not replace GPU exp/reductions with CPU approximations. Any model arm must also pass CHECK-DSL, all 97/97 applicable imported instances against the unchanged original on that exact build, and 32/32 HF greedy tokens. Exact two-column qkv outputs to unchanged historical control before timing; no current model certificate is inferred.",
+      "timed_interval": "First of the two input-ready markers to both visible qkv outputs; separately show arrival-normalized service and each request completion. Include join/reset costs.",
+      "required_raw_evidence": "Seal source/plan/generated code/native code object/compiler/math flags/resources/input and output hashes. Keep every paired sample, order, warmup count, selected tasks/waves, clocks/power readings and full unfiltered stdout/stderr. Use one resident-input process for subgraphs. Five complete AB/BA interleaved pairs with a fixed declared warmup and sample population; randomize pair ordinal in a predeclared seed, keep all ordinals. No first-pair selection or post-hoc trimming. Attribute with separate sparse probes; decisive pairs uninstrumented. Record device completion and host wall separately. If counters are used, require complete valid candidate/control populations; a crashed profiler produces no counter claim. Stage/consume/reduction stamps and complete traffic pairs with cache/scratch semantics. Preserve historical executable/source flags and distinguish new isolated observations from the missing original-run evidence.",
+      "decision_stop_rule": "Only run if a portable DSL column implementation is an active choice after G02 or independently requested. A cause explains most of the NEW isolated deficit only if its intervention recovers >half that deficit in every pair and beyond2*range. Otherwise report partial/mixed/unknown; never extrapolate to the historical0.293ms.",
+      "risk_and_cost_rationale": "Conditional low priority: explains a rejected implementation, not DeepSeek Fleet tile service. Skip entirely if G02 closes the implementation direction or no DSL decision depends on it.",
+      "preparation_before_gpu_authorization": "Build isolated historical replay/resource control and prove exact source/objects/inputs; not a runnable supplied microbenchmark. Missing original hashes/logs remain unrecoverable by new execution.",
+      "dependencies": [
+        "G02"
+      ],
+      "gpu_required": true,
+      "runnable_now": false,
+      "execution_authorized": false
+    },
+    {
+      "id": "G04",
+      "title": "Native expert-identity and effective-batch observation",
+      "priority": 2,
+      "kind": "diagnostic",
+      "inventory_ids": [
+        "expert-union",
+        "interleave-requests"
+      ],
+      "decision_changed": "Whether actual expert multiplicity supports routed grouping at all, distinct from request-independent sharing.",
+      "model_batch_context_precision": "DeepSeek-Coder-V2-Lite-Base bf16, B2/B4,context1024, exact retained32-token per-request timed prefixes. Routed layers only; dense first layer separately labeled.",
+      "baseline_revision_and_source": "DeepSeek accepted frozen source/executable 554133d744b4591c9cf87c68b6817df781137c9b, continuation archive abee09fcda357bb982cfba4d85bb387a6da97ec2385d3d4574f1f7cd4282d5da. B2/B4 replicated K1/M1/l1 recipe; B1 also has D4. Reuse sealed goldens and exact request prefixes; compare equal B, never B1 D4 against B4 as a causal control.",
+      "implementation_status": "Native timed-prefix multi-request route equality/union capture absent in reviewed continuation export. HF union summaries exist and must not be recaptured.",
+      "changed_mechanism": "Observe native selected expert IDs, slot order and weights for every request/layer/step without changing the routing decision. Compute per-expert column count and duplicate-weight potential locally after capture.",
+      "additional_costs": "Separate diagnostic capture adds storage/transfer and may perturb execution. No timing from capture; no fresh HF/model download or broad new prompt suite.",
+      "old_failure_evidence": "HF means6/11.496394/20.631010 unique experts atB1/B2/B4 are not sealed native pick equality. GlobalB4 is only about1.1633 pooled columns/expert under that estimate.",
+      "competing_falsifiable_predictions": [
+        "Native picks agree with bound reference and meaningful duplicate groups exist, supporting a small grouped-tile test.",
+        "Native picks/weights or prefix provenance differ, invalidating the previous reuse model; or duplicates are too sparse to amortize pack/scatter/dispatch."
+      ],
+      "smallest_decisive_intervention": "One diagnostic pass of existing acceptedB2/B4 prefixes, copy exact native routing outputs at a safe quiescent boundary; compare to existing producer-bound reference. No timing rerun and no synthetic uniform routing presented as real.",
+      "correctness_endpoints": "Every B2/B4 request must pass the existing accepted 32/32 warmup and greedy-token gates plus all 27/27 hidden-state boundaries against sealed producer-bound goldens. A token-only pass cannot waive hidden-state failure. Preserve exact request/slot/expert identity and mixing-weight bytes without changing routing; compare to the existing bound reference only within its certified identity and endpoints. Include full per-request gate records and exact request/layer/step/slot indexing; native IDs/mix are captured, never recomputed with CPU exp for a byte certificate.",
+      "timed_interval": "Not a performance experiment: the observation window is the existing 32-token decode prefix. No timed candidate/control interval is required. Any operational elapsed/capture-overhead record is provenance only; no timing, throughput, latency or speedup claim is permitted.",
+      "required_raw_evidence": "Seal source/plan/generated code/native code object/compiler/math flags/resources, executable, weights, input/prefix, output and sealed producer-bound golden hashes; bind the capture driver and route-buffer layout/lifetime to that identity. Keep full unfiltered stdout/stderr and accepted per-request correctness records. Preserve exact native expert IDs, slot order and mixing-weight bytes at the safe quiescent capture boundary; never reconstruct them with CPU arithmetic. Record capture ownership and a coverage manifest for every declared B2/B4 request, routed layer, all 32 decode steps and selected slot, with expected/observed counts and zero missing or duplicate indices; label the dense first layer separately. Retain raw payload hashes, indexing and the local derivation code/parameters for reproducible union, multiplicity and effective-batch histograms. This observation requires no AB/BA pairs, timing sample population, warmup timing count, clocks/power survey or paired performance counters. Operational timestamps, elapsed invocation or capture overhead, if retained, are provenance only and support no timing or performance claim. The completeness manifest must reconcile raw payloads with every declared request/layer/step/slot and the accepted per-request gate records; no partial-prefix or selected-layer capture may stand in for complete coverage.",
+      "decision_stop_rule": "Any provenance/correctness failure, missing payload or incomplete/duplicate capture coverage stops; no multiplicity verdict from a partial capture. Before G05 implementation, use measured multiplicity and proposed pack/scatter work to write a role-specific budget; if even its stated optimistic fixed-service scenario misses the target, defer grouping. Do not use that scenario as an algorithm-wide impossibility proof.",
+      "risk_and_cost_rationale": "Cheap native observation can eliminate expensive grouped-kernel work. No GPU route capture for Qwen is needed for P5: its actual logits/replicas already exist.",
+      "preparation_before_gpu_authorization": "Local route-output buffer/lifetime audit and safe diagnostic-only capture driver required, no production grouped tile. Verify existing sealed native payloads are still absent before authorization; do not regenerate if found.",
+      "dependencies": [],
+      "gpu_required": true,
+      "runnable_now": false,
+      "execution_authorized": false
+    },
+    {
+      "id": "G05",
+      "title": "Stable expert-identity grouping with separate column outputs",
+      "priority": 4,
+      "kind": "optimization",
+      "inventory_ids": [
+        "expert-union"
+      ],
+      "decision_changed": "Whether routed grouping earns implementation beyond the higher-reuse dense/shared-column path.",
+      "model_batch_context_precision": "DeepSeek-Coder-V2-Lite-Base bf16,B4,context1024; start one real duplicated expert group from G04 at its observed multiplicity, then matched routed-up/down subgraph. No syntheticB4-per-expert assumption.",
+      "baseline_revision_and_source": "DeepSeek accepted frozen source/executable 554133d744b4591c9cf87c68b6817df781137c9b, continuation archive abee09fcda357bb982cfba4d85bb387a6da97ec2385d3d4574f1f7cd4282d5da. B2/B4 replicated K1/M1/l1 recipe; B1 also has D4. Reuse sealed goldens and exact request prefixes; compare equal B, never B1 D4 against B4 as a causal control.",
+      "implementation_status": "Expert union/grouped GEMV is design only and not built. Admit only after G04 and a locally reviewed exact candidate.",
+      "changed_mechanism": "Stable group by expert ID, gather its ready activation columns, stream that expert weight once, scatter outputs to original request/slot positions. Preserve per-request mixing and ordered expert fold; unique experts use unchanged single-column path.",
+      "additional_costs": "Grouping metadata, gather/scatter, additional column state/LDS, per-group publication, late-input buffering, small irregular tails, worker imbalance and lost independent readiness. No shared arithmetic between distinct activation vectors.",
+      "old_failure_evidence": "Old whole-layer Qwen MoE did not group identities or share expert columns. DeepSeek routed/shared-XCD and K-chunk variants lost due different placement/streaming/readiness costs; they are not grouped-weight tests.",
+      "competing_falsifiable_predictions": [
+        "A real duplicate group saves external reads/service enough to pay packing/scatter and earlier requests still finish promptly.",
+        "Small effective batches, cache hits in replicated control, pack/scatter or straggler coupling erase any weight-request benefit."
+      ],
+      "smallest_decisive_intervention": "Original per-request expert tasks vs grouped tasks on identical real G04 IDs/inputs; full gather-through-scatter interval; same XCD/worker budget. Include original-ready vs simultaneous-ready replay using the same group once, not a routing sweep.",
+      "correctness_endpoints": "Exact per-column bf16 outputs and required intermediate rounding/reduction order against the frozen tile control on identical native inputs. Preserve request/slot/expert identity and mixing weights; canonical shared buffers must have proven lifetimes. Any model arm must pass every request: 32/32 warmup and greedy tokens plus 27/27 hidden-state boundaries using sealed producer-bound goldens. A token-only pass cannot waive hidden-state failure. Byte-check each original slot before folding, exact IDs/mix and original per-request expert accumulation order; grouping order cannot become fp32 reduction order.",
+      "timed_interval": "Native picks ready through all corresponding slot outputs visible, including metadata construction, gather, streaming, scatter and completion publication. Report each request latency as well as final group completion.",
+      "required_raw_evidence": "Seal source/plan/generated code/native code object/compiler/math flags/resources/input and output hashes. Keep every paired sample, order, warmup count, selected tasks/waves, clocks/power readings and full unfiltered stdout/stderr. Use one resident-input process for subgraphs. Five complete AB/BA interleaved pairs with a fixed declared warmup and sample population; randomize pair ordinal in a predeclared seed, keep all ordinals. No first-pair selection or post-hoc trimming. Attribute with separate sparse probes; decisive pairs uninstrumented. Record device completion and host wall separately. If counters are used, require complete valid candidate/control populations; a crashed profiler produces no counter claim. Group multiplicities and actual input-arrival stamps, original/grouped external-read bytes if available, scatter/publication intervals and raw per-slot output bytes.",
+      "decision_stop_rule": "Stop on any correctness/liveness failure, incomplete pair, unqualified instrumentation or resource rejection. Optimization admission: all five savings positive, median >2*range and >=2% of the same completion-window control. Qwen per-layer candidates also need >=0.625 us/layer net before a model arm (30 us/48); a local pass permits validation, not extrapolated model savings. No full-model arm on a miss. Reject if singleton fallback regresses the representative real mix or any early request is held without declared tradeoff. Only a repeatable net real-mix benefit permits G12; never multiply a duplicated-group microgain by all expert work.",
+      "risk_and_cost_rationale": "Conditional low priority because HF-only B4 estimate offers14.04% routed weight-request reuse, not75%. No duration, speedup or universal throughput advantage is predicted.",
+      "preparation_before_gpu_authorization": "Implement stable metadata/gather/scatter and exact per-column dot path with singleton fallback, local arithmetic/lifetime/placement tests and one target-compiler resource check. Not built in this research.",
+      "dependencies": [
+        "G04"
+      ],
+      "gpu_required": true,
+      "runnable_now": false,
+      "execution_authorized": false
+    },
+    {
+      "id": "G06",
+      "title": "Remaining prep-read issue exposure after compiler overlap",
+      "priority": 3,
+      "kind": "optimization",
+      "inventory_ids": [
+        "prep-issue"
+      ],
+      "decision_changed": "Whether the residual prep dependency chain warrants a model arm after removing already-existing compiler overlap.",
+      "model_batch_context_precision": "Qwen3-30B-A3B bf16 B1,context1024; actual prep inputs/cache mappings at positions0/1040; H2048,head128 and fixed admitted cache layout.",
+      "baseline_revision_and_source": "Qwen kept recipe at b573664faa4e7988dff353bc03aca4ce8561a729: examples/vllm_llm/kept_build.py; WSUM/SCALAR/GU1/RBATCH, KEY32, narrow router, norm hoist, TOUCH. Reference observation 4.051 ms wall/3.917 device in 2026-10-14 pairs_kept_l1.json, not a fresh fusion/system certificate. Freeze source/plan/imports/executable/compiler/input hashes anew; do not substitute checkout HEAD.",
+      "implementation_status": "Expanded early-position/slot prototype is not built. Older PREP_EARLY lost. Retained LLVM22 vector wrapper already issues cos/sin,position andK slot before rsqrt; prep function text equals later kept preparation source.",
+      "changed_mechanism": "Move only still-delayed immutable position/slot address chain earlier relative to q/k input loads and wave sum, retaining all RMS/RoPE/cache-write math. Do not claim to newly overlap cos/sin with rsqrt; it already occurs in inspected wrapper.",
+      "additional_costs": "Additional live pointers/position/slot values and speculative guard work can spill or extend issue contention; must preserve out-of-range/negative-slot behavior and stores exactly once.",
+      "old_failure_evidence": "Source-only DAG assumed two serial loaded trips and priced75.84us; archived ISA contradicts that full serialization. It cannot be a current price or a forecast.",
+      "competing_falsifiable_predictions": [
+        "Earlier remaining position/slot response removes a still-exposed critical k-wave wait and final all-wave prep completion improves.",
+        "Compiler already hoists enough, another wave controls completion or cache-hit latency is hidden; changed source adds live state with no net saving."
+      ],
+      "smallest_decisive_intervention": "Original prep vs one early-position/slot body only, exact same outputs/joins. Current candidate preparation must show genuinely different final native issue order; if it does not, cancel before GPU. Measure only actual delayed wave and final task completion, not summed wave intervals.",
+      "correctness_endpoints": "Byte-compare affected original/candidate outputs from identical retained model inputs at positions 0 and 1040; include ties, cancellation, signed zero, epoch rollover/reset and all producing waves as applicable. Do not replace GPU exp/reductions with CPU approximations. Any model arm must also pass CHECK-DSL, all 97/97 applicable imported instances against the unchanged original on that exact build, and 32/32 HF greedy tokens. Exact q/k in-place outputs, new KV rows and unchanged neighboring rows/slot map; prep executes once per owner.",
+      "timed_interval": "Input-ready through all q/k/K/V stores drained and task completion visible, with separate sparse per-wave load/pre-publication landmarks.",
+      "required_raw_evidence": "Seal source/plan/generated code/native code object/compiler/math flags/resources/input and output hashes. Keep every paired sample, order, warmup count, selected tasks/waves, clocks/power readings and full unfiltered stdout/stderr. Use one resident-input process for subgraphs. Five complete AB/BA interleaved pairs with a fixed declared warmup and sample population; randomize pair ordinal in a predeclared seed, keep all ordinals. No first-pair selection or post-hoc trimming. Attribute with separate sparse probes; decisive pairs uninstrumented. Record device completion and host wall separately. If counters are used, require complete valid candidate/control populations; a crashed profiler produces no counter claim. Current final native ISA/source-line mapping, exact cache bytes and critical wave identities. Historical wrapper scheduling is supporting evidence, not current timed-megakernel identity.",
+      "decision_stop_rule": "Stop on any correctness/liveness failure, incomplete pair, unqualified instrumentation or resource rejection. Optimization admission: all five savings positive, median >2*range and >=2% of the same completion-window control. Qwen per-layer candidates also need >=0.625 us/layer net before a model arm (30 us/48); a local pass permits validation, not extrapolated model savings. No full-model arm on a miss. Cancel locally if no remaining issue-order difference or resource admission fails. Miss closes this expanded implementation; no repeated unchanged PREP_EARLY trial.",
+      "risk_and_cost_rationale": "Below P5/shared columns because local ISA already removes part of the nominal opportunity; no new net estimate. Does not overlap credit with retained vec-prep.",
+      "preparation_before_gpu_authorization": "Implement one isolated changed issue-order body only after authorization; map current compiler ISA and math island before GPU. This is preparation for an unbuilt candidate, not a paid source/ISA investigation.",
+      "dependencies": [],
+      "gpu_required": true,
+      "runnable_now": false,
+      "execution_authorized": false
+    },
+    {
+      "id": "G07",
+      "title": "Attention statistics-wave read issue overlap",
+      "priority": 2,
+      "kind": "optimization",
+      "inventory_ids": [
+        "reduce-issue"
+      ],
+      "decision_changed": "Whether independent statistics loads are a useful operator improvement rather than already-hidden requests.",
+      "model_batch_context_precision": "Qwen3-30B-A3B bf16 B1; replay admitted reduce at positions0/1023/1024/1040, context near1024 partition boundary, unchangedPART256 and original partition order.",
+      "baseline_revision_and_source": "Qwen kept recipe at b573664faa4e7988dff353bc03aca4ce8561a729: examples/vllm_llm/kept_build.py; WSUM/SCALAR/GU1/RBATCH, KEY32, narrow router, norm hoist, TOUCH. Reference observation 4.051 ms wall/3.917 device in 2026-10-14 pairs_kept_l1.json, not a fresh fusion/system certificate. Freeze source/plan/imports/executable/compiler/input hashes anew; do not substitute checkout HEAD.",
+      "implementation_status": "Reordered reduce candidate not built. Retained imported source was inspected locally: nonzero waves already skip statistics and can issue tmp_out; stats wave is the target.",
+      "changed_mechanism": "After original seq_len/valid-partition calculation, issue independent max_logits,exp_sums and stats-wave tmp_out loads earlier; keep fmax, exp, both reductions, ordered partition FMA/division and shared joins unchanged.",
+      "additional_costs": "More live statistics/partial vectors, register/scratch pressure, issue competition, active/inactive partition guards; no barrier/slot-round deletion.",
+      "old_failure_evidence": "Nominal66.24us model assumed loaded0.69us responses and unlimited issue capacity, not current cached response/exposure. C6 failed and changes a different protocol; do not rerun it.",
+      "competing_falsifiable_predictions": [
+        "Critical stats-wave join readiness improves without altered arithmetic and net reduce completion clears the bar.",
+        "Current compiler already overlaps, metadata is cache-hot or another wave/slot controls the join; extra live tmps spill or produce no saving."
+      ],
+      "smallest_decisive_intervention": "One original vs one load-reordered reduce body, same retained inputs and all imported slots/barrier rounds. Validate all four existing boundary captures; no process-per-layer single-sample sum.",
+      "correctness_endpoints": "Byte-compare affected original/candidate outputs from identical retained model inputs at positions 0 and 1040; include ties, cancellation, signed zero, epoch rollover/reset and all producing waves as applicable. Do not replace GPU exp/reductions with CPU approximations. Any model arm must also pass CHECK-DSL, all 97/97 applicable imported instances against the unchanged original on that exact build, and 32/32 HF greedy tokens. Exact every reduced output element versus unchanged original vendor launch for every admitted partition count/slot, not just generated tokens.",
+      "timed_interval": "All partition inputs ready through visible reduced output and final slot rounds; reset/init charged. Stats-wave before/after-shared-join probes only in separate attribution runs.",
+      "required_raw_evidence": "Seal source/plan/generated code/native code object/compiler/math flags/resources/input and output hashes. Keep every paired sample, order, warmup count, selected tasks/waves, clocks/power readings and full unfiltered stdout/stderr. Use one resident-input process for subgraphs. Five complete AB/BA interleaved pairs with a fixed declared warmup and sample population; randomize pair ordinal in a predeclared seed, keep all ordinals. No first-pair selection or post-hoc trimming. Attribute with separate sparse probes; decisive pairs uninstrumented. Record device completion and host wall separately. If counters are used, require complete valid candidate/control populations; a crashed profiler produces no counter claim. Current final ISA mapping, stats-wave issue/ready/join stamps, all-slot completion, native spills and complete candidate/original byte captures at every boundary.",
+      "decision_stop_rule": "Stop on any correctness/liveness failure, incomplete pair, unqualified instrumentation or resource rejection. Optimization admission: all five savings positive, median >2*range and >=2% of the same completion-window control. Qwen per-layer candidates also need >=0.625 us/layer net before a model arm (30 us/48); a local pass permits validation, not extrapolated model savings. No full-model arm on a miss. Require >=0.625us/layer equivalent net at the actual target context and no correctness miss at any adjacent boundary. Cancel pre-GPU if final ISA/math inspection finds no actual reorder or illegal speculative address.",
+      "risk_and_cost_rationale": "Source supports independent addresses but not exposed latency. Cheaper bounded operator than a complete attention rewrite; all claimed recovery stays within the same attention/reduce path, never added to C6.",
+      "preparation_before_gpu_authorization": "Prepare one exact imported-body reorder and resident-input driver; retain unchanged original as certificate reference. Local math/CFG/ISA/resource and legal-address checks before GPU; not implemented here.",
+      "dependencies": [],
+      "gpu_required": true,
+      "runnable_now": false,
+      "execution_authorized": false
+    },
+    {
+      "id": "G08",
+      "title": "Attention V-read issue overlap without changing the attention algorithm",
+      "priority": 3,
+      "kind": "optimization",
+      "inventory_ids": [
+        "attn-issue"
+      ],
+      "decision_changed": "Whether V issue is an exposed cost in the admitted attention regime.",
+      "model_batch_context_precision": "Qwen3-30B-A3B bf16 B1,context around1024; admitted heads/GQA/cache layout and positions0/1023/1024/1040. No prefill or long-context performance claim.",
+      "baseline_revision_and_source": "Qwen kept recipe at b573664faa4e7988dff353bc03aca4ce8561a729: examples/vllm_llm/kept_build.py; WSUM/SCALAR/GU1/RBATCH, KEY32, narrow router, norm hoist, TOUCH. Reference observation 4.051 ms wall/3.917 device in 2026-10-14 pairs_kept_l1.json, not a fresh fusion/system certificate. Freeze source/plan/imports/executable/compiler/input hashes anew; do not substitute checkout HEAD.",
+      "implementation_status": "Independent-read candidate not built. Retained source confirms V metadata/payload do not depend on Q LDS normalization/staging or QK math; final current-kernel dynamic exposure remains unknown.",
+      "changed_mechanism": "Issue eligible V block-table reads and then V payload earlier alongside original Q staging/K reads. Keep original QK/PV MFMA instruction/arithmetic order, softmax, masks, partition outputs and every LDS lifetime join.",
+      "additional_costs": "Vlocal lifetime, live address/register pressure, possible spills, more concurrent read requests and contention with K/Q. Direct-to-LDS/gfx950 features are not assumed.",
+      "old_failure_evidence": "Native whole attention absent, vendor unified replacement11.42vs10.65us/layer lost; C6 closed on mixed pairs. None tested this independent-read placement.",
+      "competing_falsifiable_predictions": [
+        "An exposed V address/payload chain shortens final attention completion with unchanged math.",
+        "The compiler already overlaps or longer V lifetime harms issue/register/cache behavior; performance remains within spread or worsens."
+      ],
+      "smallest_decisive_intervention": "Original vs single early-V-issue operator, identical arguments/cache warmup/slot protocol; positions already captured suffice. No unrelated context sweep or native-family implementation.",
+      "correctness_endpoints": "Byte-compare affected original/candidate outputs from identical retained model inputs at positions 0 and 1040; include ties, cancellation, signed zero, epoch rollover/reset and all producing waves as applicable. Do not replace GPU exp/reductions with CPU approximations. Any model arm must also pass CHECK-DSL, all 97/97 applicable imported instances against the unchanged original on that exact build, and 32/32 HF greedy tokens. Byte-compare original partial logits,exp sums and output partitions before reduce, then final reduce outputs with the unchanged original. Preserve current-row write visibility.",
+      "timed_interval": "Q/K/V inputs ready through all original attention partition outputs visible and imported slot rounds complete. Do not omit barriers or price only a chosen V-load interval.",
+      "required_raw_evidence": "Seal source/plan/generated code/native code object/compiler/math flags/resources/input and output hashes. Keep every paired sample, order, warmup count, selected tasks/waves, clocks/power readings and full unfiltered stdout/stderr. Use one resident-input process for subgraphs. Five complete AB/BA interleaved pairs with a fixed declared warmup and sample population; randomize pair ordinal in a predeclared seed, keep all ordinals. No first-pair selection or post-hoc trimming. Attribute with separate sparse probes; decisive pairs uninstrumented. Record device completion and host wall separately. If counters are used, require complete valid candidate/control populations; a crashed profiler produces no counter claim. Final native ISA proof of moved requests, exact operator intermediates, dynamic spill/traffic evidence where supported, last-wave/last-partition readiness stamps and uninstrumented pairs.",
+      "decision_stop_rule": "Stop on any correctness/liveness failure, incomplete pair, unqualified instrumentation or resource rejection. Optimization admission: all five savings positive, median >2*range and >=2% of the same completion-window control. Qwen per-layer candidates also need >=0.625 us/layer net before a model arm (30 us/48); a local pass permits validation, not extrapolated model savings. No full-model arm on a miss. Cancel locally if instructions already issue early or resource/numerical admission fails. Miss closes this implementation; no adoption based on partial-body speed alone.",
+      "risk_and_cost_rationale": "Bounded alternative to a new native family. No66.24us forecast, no additive gain with G07; any combined benefit is measured only in G12.",
+      "preparation_before_gpu_authorization": "One exact source reorder with local address/alias, math-island, compiler/resource admission and replay driver; not built. Keep original imports as comparison authority.",
+      "dependencies": [],
+      "gpu_required": true,
+      "runnable_now": false,
+      "execution_authorized": false
+    },
+    {
+      "id": "G09",
+      "title": "Exact activation-segment reuse within existing row owners",
+      "priority": 3,
+      "kind": "optimization",
+      "inventory_ids": [
+        "segment-reuse"
+      ],
+      "decision_changed": "Whether reducing repeated local operand reads is worth the live-register cost.",
+      "model_batch_context_precision": "Qwen3-30B-A3B bf16 B1,context1024, kept GU1 up task:32gate+32up rows,K2048,16waves,EPL8. Down is not automatically included.",
+      "baseline_revision_and_source": "Qwen kept recipe at b573664faa4e7988dff353bc03aca4ce8561a729: examples/vllm_llm/kept_build.py; WSUM/SCALAR/GU1/RBATCH, KEY32, narrow router, norm hoist, TOUCH. Reference observation 4.051 ms wall/3.917 device in 2026-10-14 pairs_kept_l1.json, not a fresh fusion/system certificate. Freeze source/plan/imports/executable/compiler/input hashes anew; do not substitute checkout HEAD.",
+      "implementation_status": "Design only; no segment-reuse tile exists. New local enumeration confirms each wave owns4whole rows and repeats its activation segment addresses.",
+      "changed_mechanism": "Retain exact fp32 activation segment values across that wave\u2019s four rows and reuse them while preserving every dot operand, sum order and bf16 conversion. Original mapping/reductions/publication unchanged.",
+      "additional_costs": "Retaining whole K means32fp32 payload values/lane versus8for one segment:24additional values before current pipeline overlap/allocator effects. More lifetime/index/unpack work or scratch may cost more than removed LDS requests.",
+      "old_failure_evidence": "Original X model0.03447ms is marginal and not measured. XOR modeled below bar; register caps and generic row-wave variants do not test exact segment retention.",
+      "competing_falsifiable_predictions": [
+        "Repeated LDS read issue/dependencies are exposed and retention shortens final up task without losing useful residency/streaming.",
+        "Reads are broadcast/banked/hidden, or longer live state spills and stalls; requested-LDS reduction produces no net completion benefit."
+      ],
+      "smallest_decisive_intervention": "One existing-row-owner up task family vs same arithmetic with retained segments, same real inputs and full streaming-worker contention; do not add XOR/remap/barrier deletion. Verify native resource effects first locally.",
+      "correctness_endpoints": "Byte-compare affected original/candidate outputs from identical retained model inputs at positions 0 and 1040; include ties, cancellation, signed zero, epoch rollover/reset and all producing waves as applicable. Do not replace GPU exp/reductions with CPU approximations. Any model arm must also pass CHECK-DSL, all 97/97 applicable imported instances against the unchanged original on that exact build, and 32/32 HF greedy tokens. Exact separately-rounded gate/up,SiLU product and final up bytes; xs is fp32 and cannot be silently repacked to bf16.",
+      "timed_interval": "Original activation staging through all up output stores drained/visible, including reduction and live-register drain effects. Test one real representative up window, not a solitary wave\u2019s LDS loop.",
+      "required_raw_evidence": "Seal source/plan/generated code/native code object/compiler/math flags/resources/input and output hashes. Keep every paired sample, order, warmup count, selected tasks/waves, clocks/power readings and full unfiltered stdout/stderr. Use one resident-input process for subgraphs. Five complete AB/BA interleaved pairs with a fixed declared warmup and sample population; randomize pair ordinal in a predeclared seed, keep all ordinals. No first-pair selection or post-hoc trimming. Attribute with separate sparse probes; decisive pairs uninstrumented. Record device completion and host wall separately. If counters are used, require complete valid candidate/control populations; a crashed profiler produces no counter claim. Static and dynamic LDS reads separately; local geometry predicts524288 ->131072requested fp32 operand bytes/task, not physical transactions. Native resources/scratch and critical wave/service stamps required.",
+      "decision_stop_rule": "Stop on any correctness/liveness failure, incomplete pair, unqualified instrumentation or resource rejection. Optimization admission: all five savings positive, median >2*range and >=2% of the same completion-window control. Qwen per-layer candidates also need >=0.625 us/layer net before a model arm (30 us/48); a local pass permits validation, not extrapolated model savings. No full-model arm on a miss. Stop locally on spills/static-capacity loss unless a reviewed cost budget explicitly admits it; no automatic register cap. Micro pass unlocks G12 only; if final model misses30us, close as model optimization.",
+      "risk_and_cost_rationale": "Real reusable addresses supply a concrete mechanism, but near-bar nominal benefit and large live state lower priority. No addition of XOR/layout saving or assumed occupancy benefit.",
+      "preparation_before_gpu_authorization": "Implement exact register-retained segment path under fixed shape guard and generic fallback; local address/operand sequence checks and actual target-compiler resource inspection. Not implemented in this research.",
+      "dependencies": [],
+      "gpu_required": true,
+      "runnable_now": false,
+      "execution_authorized": false
+    },
+    {
+      "id": "G10",
+      "title": "Existing whole-row ownership: remove partial scratch, retain numerical order",
+      "priority": 3,
+      "kind": "optimization",
+      "inventory_ids": [
+        "row-wave",
+        "merge-accumulators"
+      ],
+      "decision_changed": "Whether a source-proven redundant structure is also an exposed machine cost.",
+      "model_batch_context_precision": "Qwen3-30B-A3B bf16 B1,context1024; upK2048/64combinedrows/EPL8 and separately downK768/64rows/EPL4,16waves. Positions0/1040.",
+      "baseline_revision_and_source": "Qwen kept recipe at b573664faa4e7988dff353bc03aca4ce8561a729: examples/vllm_llm/kept_build.py; WSUM/SCALAR/GU1/RBATCH, KEY32, narrow router, norm hoist, TOUCH. Reference observation 4.051 ms wall/3.917 device in 2026-10-14 pairs_kept_l1.json, not a fresh fusion/system certificate. Freeze source/plan/imports/executable/compiler/input hashes anew; do not substitute checkout HEAD.",
+      "implementation_status": "An isolated up-only clone exists at b573664 examples/vllm_llm/bf16_300/source.py, not GPU validated; driver/complete landmarks/full-model integration absent. Guarded down clone not built.",
+      "changed_mechanism": "Keep the actual current mapping (four whole rows/wave), retain WSUM, initial+0 and original ordered virtual-zero additions, emit each row epilogue from its owner; remove only partial clear/gather structure. Keep up gate/up join, SiLU, arena reuse and all-wave publication.",
+      "additional_costs": "Multiwave down output stores may increase coherent issue pressure; compiler/live-range/resource changes, guards and fallbacks. Separate probes can change allocation and require perturbation qualification.",
+      "old_failure_evidence": "Rejected row-wave remap increased static barriers168->170/LDS1101->1119; G10 does not remap rows. Old no-VMEM/no-reduction wrong-output residuals do not price a removable interval. Nominal gross0.015..0.023ms is service modeling, not an upper bound.",
+      "competing_falsifiable_predictions": [
+        "Existing single-owner partial scratch hides an exposed join/gather or late-wave tail; exact deletion improves final output completion.",
+        "Most scratch/join work is hidden/required overlap; redistributed stores or scheduling offsets deletion and net gain stays below bar or negative."
+      ],
+      "smallest_decisive_intervention": "Start existing guarded up-only clone vs unmodified emitter output, exact same shape/input/worker window; extend down only if up is correct and above admission. Keep one changed mechanism and no new wave-row remap.",
+      "correctness_endpoints": "Byte-compare affected original/candidate outputs from identical retained model inputs at positions 0 and 1040; include ties, cancellation, signed zero, epoch rollover/reset and all producing waves as applicable. Do not replace GPU exp/reductions with CPU approximations. Any model arm must also pass CHECK-DSL, all 97/97 applicable imported instances against the unchanged original on that exact build, and 32/32 HF greedy tokens. Byte-check each row including signed-zero/cancellation fixtures and actual intermediates; owner-lane WSUM only. Do not sum independent rows or change w2 order. Guard gate/up discontinuity and no cross-row segments.",
+      "timed_interval": "Activation staging through final output drained/visible; independent uninstrumented completion pairs. Sparse setup/clear/pipeline/flush/join/gather/SiLU/publication landmarks cover every executed interval without summing overlaps.",
+      "required_raw_evidence": "Seal source/plan/generated code/native code object/compiler/math flags/resources/input and output hashes. Keep every paired sample, order, warmup count, selected tasks/waves, clocks/power readings and full unfiltered stdout/stderr. Use one resident-input process for subgraphs. Five complete AB/BA interleaved pairs with a fixed declared warmup and sample population; randomize pair ordinal in a predeclared seed, keep all ordinals. No first-pair selection or post-hoc trimming. Attribute with separate sparse probes; decisive pairs uninstrumented. Record device completion and host wall separately. If counters are used, require complete valid candidate/control populations; a crashed profiler produces no counter claim. Actual last-task/last-wave proof, same resource allocations for attribution builds, body perturbation<=0.5us and matched empty control; otherwise stamps are unqualified. Keep full raw row outputs and all native resources.",
+      "decision_stop_rule": "Stop on any correctness/liveness failure, incomplete pair, unqualified instrumentation or resource rejection. Optimization admission: all five savings positive, median >2*range and >=2% of the same completion-window control. Qwen per-layer candidates also need >=0.625 us/layer net before a model arm (30 us/48); a local pass permits validation, not extrapolated model savings. No full-model arm on a miss. No0.324ms or0.482ms target promised. If below0.625us/layer/30us-step admission, do not build a model arm; preserve measured small result. Reject unqualified probes as causal evidence even if decisive untraced A/B remains valid.",
+      "risk_and_cost_rationale": "Different implementation of an old principle, supported by source ownership proof, not a newly invented mechanism. Smallest prepared clone offers a bounded test; no large removable-pool claim.",
+      "preparation_before_gpu_authorization": "Complete isolated resident-input byte-check/timing driver and missing landmarks locally, reconcile probe resource mismatches before attribution. Existing bf16_300 build interface alone cannot execute this experiment; no invented command provided.",
+      "dependencies": [],
+      "gpu_required": true,
+      "runnable_now": false,
+      "execution_authorized": false
+    },
+    {
+      "id": "G11",
+      "title": "Current consumer-fold exposure before global row sharing",
+      "priority": 4,
+      "kind": "diagnostic",
+      "inventory_ids": [
+        "consumer-expert-fold",
+        "xcd-fold",
+        "row-partition-fold"
+      ],
+      "decision_changed": "Whether any globally shared fold implementation deserves design after current exposure is measured.",
+      "model_batch_context_precision": "Qwen3-30B-A3B bf16 B1,context1024, kept expert-down -> next-qkv folded norm chain; representative early/middle/late layers at0/1040.",
+      "baseline_revision_and_source": "Qwen kept recipe at b573664faa4e7988dff353bc03aca4ce8561a729: examples/vllm_llm/kept_build.py; WSUM/SCALAR/GU1/RBATCH, KEY32, narrow router, norm hoist, TOUCH. Reference observation 4.051 ms wall/3.917 device in 2026-10-14 pairs_kept_l1.json, not a fresh fusion/system certificate. Freeze source/plan/imports/executable/compiler/input hashes anew; do not substitute checkout HEAD.",
+      "implementation_status": "LOCAL_FOLD port implemented but unmeasured; parallel row-partition down alternative design only. Qualified current fold stamps not available.",
+      "changed_mechanism": "Observe exact residual/slot load,ordered fold,norm and publication intervals on current critical consumers. No new shared producer or changed algebra in this diagnostic.",
+      "additional_costs": "Sparse instrumentation can alter allocation or critical wave; full last-task/wave coverage and a matched empty/control are necessary. It is not a candidate saving.",
+      "old_failure_evidence": "Fleet single writer serialized~4us vs~1us parallel consumer fold; Qwen synthetic row-owner candidate lost in both persistent and graph execution. Old qkv fold allowance0.073ms is not a present removable budget.",
+      "competing_falsifiable_predictions": [
+        "An exclusive fold interval remains sufficiently exposed to motivate an exact parallel-row producer after paying a new global/all-expert join.",
+        "Critical time is dominated by publication/input readiness/required norm or the fold is hidden; sharing cannot be justified from repeated bytes."
+      ],
+      "smallest_decisive_intervention": "One accepted current subgraph instrumented sparsely against its uninstrumented control; retain actual task/worker edges. Capture enough waves to identify the final consumer, not task0 by convenience. No producer candidate, queue sweep or unchanged expert-row-owner retry.",
+      "correctness_endpoints": "Byte-compare affected original/candidate outputs from identical retained model inputs at positions 0 and 1040; include ties, cancellation, signed zero, epoch rollover/reset and all producing waves as applicable. Do not replace GPU exp/reductions with CPU approximations. Any model arm must also pass CHECK-DSL, all 97/97 applicable imported instances against the unchanged original on that exact build, and 32/32 HF greedy tokens. Instrumented control must keep all exact intermediates and baseline outputs; probes cannot consume another consumer\u2019s norm scratch.",
+      "timed_interval": "Final predecessor publication through consumer norm-ready and output-complete, with disjoint marked fold/read/norm intervals. Boundaries report issue vs retirement separately; forced drains are labeled diagnostics.",
+      "required_raw_evidence": "Seal source/plan/generated code/native code object/compiler/math flags/resources/input and output hashes and full unfiltered stdout/stderr. Retain the accepted current-subgraph identity, exact outputs and the complete declared task/wave/consumer coverage. Declare the sparse-probe observation population and matched instrumented/empty/uninstrumented qualification controls, including any actual warmup and all samples without trimming; keep allocation equality, probe placement and perturbation results. Instrumented landmarks are the exposure evidence; use the uninstrumented control to qualify perturbation, not to claim candidate speedup. No new optimization candidate, five-pair performance trial or paired traffic-counter population is required. Reject incomplete coverage, changed outputs, resource mismatch or perturbation above 0.5us as unqualified; do not infer removable work or model savings from the observed interval. Raw per-wave/task landmarks, actual dependency edges/queue predecessors, allocation equality and <=0.5us perturbation. Any complete interval is an exposure observation, not all legally removable work.",
+      "decision_stop_rule": "Run only opportunistically when G12 already needs a matching current trace and a fold implementation decision is active. If qualified exclusive fold is <0.625us/layer, defer sharing. If larger, still require a new complete producer/global-publication budget before implementation; diagnostic alone never authorizes a GPU optimization trial.",
+      "risk_and_cost_rationale": "Low priority, piggyback only; avoids building a whole producer system on an old residual. Distinct from attributing the already-rejected row-owner candidate.",
+      "preparation_before_gpu_authorization": "Finish shape-specific safe sparse probes and local resource matching; no full-model instrumented build until qualified. Not runnable as delivered.",
+      "dependencies": [
+        "G12"
+      ],
+      "gpu_required": true,
+      "runnable_now": false,
+      "execution_authorized": false
+    },
+    {
+      "id": "G12",
+      "title": "Winner-only end-to-end and dual-baseline validation",
+      "priority": 5,
+      "kind": "validation",
+      "inventory_ids": [
+        "fusion",
+        "shared-weight-batch",
+        "last-router-selector",
+        "reduce-issue",
+        "attn-issue",
+        "segment-reuse"
+      ],
+      "decision_changed": "Whether the admitted mechanism is a model improvement, whether fusion is established, and whether it leads the strongest tested legal system.",
+      "model_batch_context_precision": "Only an admitted winning branch: Qwen3-30B-A3B bf16B1/C1024/32greedy tokens, or DeepSeek-Coder-V2-Lite-Base bf16B2/B4/C1024/32perrequest. Other models/contexts/prefill excluded.",
+      "baseline_revision_and_source": "Qwen kept recipe at b573664faa4e7988dff353bc03aca4ce8561a729: examples/vllm_llm/kept_build.py; WSUM/SCALAR/GU1/RBATCH, KEY32, narrow router, norm hoist, TOUCH. Reference observation 4.051 ms wall/3.917 device in 2026-10-14 pairs_kept_l1.json, not a fresh fusion/system certificate. Freeze source/plan/imports/executable/compiler/input hashes anew; do not substitute checkout HEAD. DeepSeek alternative: DeepSeek accepted frozen source/executable 554133d744b4591c9cf87c68b6817df781137c9b, continuation archive abee09fcda357bb982cfba4d85bb387a6da97ec2385d3d4574f1f7cd4282d5da. B2/B4 replicated K1/M1/l1 recipe; B1 also has D4. Reuse sealed goldens and exact request prefixes; compare equal B, never B1 D4 against B4 as a causal control.",
+      "implementation_status": "No new full-model candidate built. Existing paired harnesses/certification interfaces exist, but integration and identity-specific comparison for each winning candidate do not.",
+      "changed_mechanism": "Integrate only the single admitted mechanism into the frozen kept recipe; compare it against that unchanged kept control, its own exact same-kernel graph where legal, and strongest lever-proven legal vLLM reference selected at that batch in this same session.",
+      "additional_costs": "Integration can alter whole-kernel allocation, critical path, cache contention and host overhead. Baseline selection/certificates cost real work. Combined winners require their own measured arm; individual gains never add.",
+      "old_failure_evidence": "Qwen old trace4.30354ms does not price kept4.051ms. DeepSeek graph is unavailable because of LDS lifetime; cannot certify fusion there. Historical vLLM default/AITER strongest means strongest among tested, not exhaustive.",
+      "competing_falsifiable_predictions": [
+        "Operator/protocol advantage survives model dependency/host effects and passes fresh correct paired wall gates.",
+        "Model overlap, changed resources, host excess or fastest legal system removes the local advantage; reject even a faster isolated body."
+      ],
+      "smallest_decisive_intervention": "One winning candidate vs current kept with five complete interleaved wall pairs. Then candidate same-kernel graph fusion pairs if semantically available; strongest tested legal vLLM at sameB/input/context. No unrelated broad variant/model suite.",
+      "correctness_endpoints": "Byte-compare affected original/candidate outputs from identical retained model inputs at positions 0 and 1040; include ties, cancellation, signed zero, epoch rollover/reset and all producing waves as applicable. Do not replace GPU exp/reductions with CPU approximations. Any model arm must also pass CHECK-DSL, all 97/97 applicable imported instances against the unchanged original on that exact build, and 32/32 HF greedy tokens. DeepSeek alternative: Exact per-column bf16 outputs and required intermediate rounding/reduction order against the frozen tile control on identical native inputs. Preserve request/slot/expert identity and mixing weights; canonical shared buffers must have proven lifetimes. Any model arm must pass every request: 32/32 warmup and greedy tokens plus 27/27 hidden-state boundaries using sealed producer-bound goldens. A token-only pass cannot waive hidden-state failure. Retain exact per-invocation gate records, including selected vLLM full AND short calls for its estimator.",
+      "timed_interval": "Qwen registered host wall full decode-step bracket plus separate device span. DeepSeek direct host registered step and worst-request token intervals; vLLM registered full-minus-short estimator with all gates. Throughput=B/step, never step/B as request latency.",
+      "required_raw_evidence": "Seal source/plan/generated code/native code object/compiler/math flags/resources/input and output hashes. Keep every paired sample, order, warmup count, selected tasks/waves, clocks/power readings and full unfiltered stdout/stderr. Use one resident-input process for subgraphs. Five complete AB/BA interleaved pairs with a fixed declared warmup and sample population; randomize pair ordinal in a predeclared seed, keep all ordinals. No first-pair selection or post-hoc trimming. Attribute with separate sparse probes; decisive pairs uninstrumented. Record device completion and host wall separately. If counters are used, require complete valid candidate/control populations; a crashed profiler produces no counter claim. All wall/device samples, per-request token timestamps, correctness certificates, vLLM actual lever counters/applied configuration, matched trace only if needed and full source/build/input seals. No trace stage subtraction from a different build/session.",
+      "decision_stop_rule": "Qwen optimization KEEP: every wall saving positive,median>=0.030ms and>2*range. Fusion ESTABLISHED only via existing pairs.py wall rule (>2% and>2*spread,all pairs positive) and same-build imported checks. System/batch result uses registered five-pair throughput/latency rules independently; DeepSeek B4 pursuit target remains step<=0.9*same-session strongest legal vLLM. If graph unavailable, report UNAVAILABLE and no fusion claim. Any correctness/incomplete invocation means no performance verdict.",
+      "risk_and_cost_rationale": "Expensive gate reserved for real micro winners, not all proposed candidates. No elapsed paid duration/speedup promised; staged model/image/compiler availability and implementation determine future budget. No authorization or execution in this research.",
+      "preparation_before_gpu_authorization": "Winner integration after separate authorization; all locally runnable tests, single-target compile/resource/lifetime checks, manifest/queue/certificate checks and session dry-run completed before any paid session. Repair DeepSeek graph semantics locally before ever scheduling its comparison; otherwise explicitly omit it. One prepared bounded session, no silent steps.",
+      "dependencies": [],
+      "gpu_required": true,
+      "runnable_now": false,
+      "execution_authorized": false
+    },
+    {
+      "id": "G13",
+      "title": "Unshared expert work: restore independent successor readiness",
+      "priority": 3,
+      "kind": "diagnostic",
+      "inventory_ids": [
+        "shared-weight-batch",
+        "queue-reorder"
+      ],
+      "decision_changed": "Whether unshared expert work may be safely coalesced behind combined readiness, or independent request release must be retained.",
+      "model_batch_context_precision": "Qwen3-30B-A3B historical bf16B2,context1024; one captured expert-up/down layer,192up+256down tasks per request,8XCDs/38workers each. No expert-weight sharing claimed.",
+      "baseline_revision_and_source": "Historical whole-layer source ff9ef92 and round33 b_r33_bat2/b_r33_rep2 traces in etx-shared-weight-causality. Use retained actual inputs/IDs where available; newly recovered inputs must be labeled and cannot recreate historical identity.",
+      "implementation_status": "Whole-layer variants and printed traces retained; one common-executable dependency/order intervention driver NOT built. Raw task stamps for the historical pair were not retained.",
+      "changed_mechanism": "Keep both requests\u2019 original single-column expert bodies, weight requests and placement; split combined completion into request-specific release and restore the original legal per-request successor order. Where both remain legal, hold completion or order fixed in a small orthogonal control.",
+      "additional_costs": "Additional event initialization/publication and queue entries, possible contention from overlapped up/down, epochs and reset. Earlier release is not useful if successor workers are unavailable; no free overlapping worker groups assumed.",
+      "old_failure_evidence": "Layer11 replicated envelope overlaps r0down with r1up by15.8us, combined has none. Combined up envelope itself is shorter40.5vs42.8us; summed work decreases while span grows. These facts do not assign all later0.58ms or original0.293ms to joins.",
+      "competing_falsifiable_predictions": [
+        "Request-specific events plus reachable successor order restore earlier down readiness and reduce both-requests-complete span at equal arithmetic/weight requests.",
+        "Earlier release does not reduce final completion because streaming contention or fixed worker/queue capacity consumes the overlap; the dominant repairable-scheduling explanation is refuted in this subgraph."
+      ],
+      "smallest_decisive_intervention": "Single layer,common executable/resource budget,combined vs independent completion/order with identical bodies. Simultaneous-ready and one archived~10us request stagger. Admit orthogonal order/completion controls only after local reachability simulation excludes producer-blocking deadlocks; no global queue search.",
+      "correctness_endpoints": "Byte-compare affected original/candidate outputs from identical retained model inputs at positions 0 and 1040; include ties, cancellation, signed zero, epoch rollover/reset and all producing waves as applicable. Do not replace GPU exp/reductions with CPU approximations. Any model arm must also pass CHECK-DSL, all 97/97 applicable imported instances against the unchanged original on that exact build, and 32/32 HF greedy tokens. Exact each request\u2019s up/down and final outputs at original slot/ID; every original task must execute once and every producing wave must drain.",
+      "timed_interval": "First up readiness through both requests\u2019 final down outputs globally readable,charging every new event/reset and publication. Report per-request downstream-ready markers and final endpoint together.",
+      "required_raw_evidence": "Seal source/plan/generated code/native code object/compiler/math flags/resources/input and output hashes. Keep every paired sample, order, warmup count, selected tasks/waves, clocks/power readings and full unfiltered stdout/stderr. Use one resident-input process for subgraphs. Five complete AB/BA interleaved pairs with a fixed declared warmup and sample population; randomize pair ordinal in a predeclared seed, keep all ordinals. No first-pair selection or post-hoc trimming. Attribute with separate sparse probes; decisive pairs uninstrumented. Record device completion and host wall separately. If counters are used, require complete valid candidate/control populations; a crashed profiler produces no counter claim. Complete per-task taken/ready/done/worker/XCD stamps and actual event producer counts, queue predecessor edges, each body-duration distribution and exact output bytes. Phase-envelope overlap alone is not a causal price.",
+      "decision_stop_rule": "Optional only if a coalesced multi-request scheduling framework remains a live implementation choice. Call scheduling dominant for the NEW isolated deficit only if restoration recovers >half that simultaneously measured deficit,all pairs positive and median>2*range. A miss closes this repair for this subgraph; no claim about all batching. Large body-duration changes require contention attribution.",
+      "risk_and_cost_rationale": "Separates the strongest source-supported old failure mechanism from new shared-column math. It is not needed to establish that old whole-layer code lacked expert union, which is already proved locally. Skip if no implementation decision depends on coalescing.",
+      "preparation_before_gpu_authorization": "Build resident-input/common-resource subgraph driver, exact event-count/epoch/visibility checks and local queue reachability proofs. Not implemented; no executable command invented. Do not reload a full model for every pair.",
+      "dependencies": [
+        "G02"
+      ],
+      "gpu_required": true,
+      "runnable_now": false,
+      "execution_authorized": false
+    }
+  ]
+}

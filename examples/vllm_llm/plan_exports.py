@@ -63,6 +63,8 @@ def build_settings(d, names, phases):
             elif p["role"] == "reduce":
                 slots[p["export"]] = p["grid"][0] // prep["grid"][0]
     ops = set()
+    if os.environ.get('ETX_VL_LAST_ROUTER','0')=='1':
+        ops.add('topk') # helper body used inside elected router; no standalone selector grid
     for name, kind in names.items():
         if kind != "dsl":
             continue

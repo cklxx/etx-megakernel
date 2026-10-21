@@ -1,0 +1,5 @@
+{
+  "dsl_moe_up": {"argument_offset": 56, "multiplier": 2},
+  "dsl_moe_down": {"argument_offset": null, "multiplier": 0},
+  "dsl_gemv_fold": {"argument_offset": 52, "multiplier": 1}
+}

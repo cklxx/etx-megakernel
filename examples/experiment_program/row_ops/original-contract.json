@@ -1,0 +1,13 @@
+{
+  "dsl_tiles.hip": "d52611b1d231df26918472325458bd0fc1cc8595ff8b2ea821a97ce4e32cfbab",
+  "plan.json": "1c806a001cffded7e4a9182802894b7b733212568304ecb8af34ebaf7cc64bf5",
+  "imports.bc": "9c5d4de99add973441c2f065affacf82cb1e1f44acf1beeecc51d8d66c2e3683",
+  "authority": "frozen unchanged kept Qwen control from reviewed94a29c0; no candidate-produced reference",
+  "native_identity_sha256": "1a35b30b71c2ec50d50c5fb00d3916a6a1d2ad6a2864a49b9fbcb7469d7f0598",
+  "model.hsaco": "80446907b5763449e963c5b5095b105b4da104f3ab7c40cc585e351b25f92fe6",
+  "compiler_files": {
+    "/Users/ckl/code/rocm-headers/rocm-llvm/opt/rocm-7.2.4/lib/llvm/bin/clang++": "beaae27cf876812ec1d32f8731317ba837175536a847590f5e51c409c2831b48",
+    "/Users/ckl/code/rocm-headers/rocm-llvm/opt/rocm-7.2.4/lib/llvm/bin/lld": "3a4db0f90a45844be78a068b47f886b7ba6000a75a88876d9999cb0bb46fb5f3",
+    "/Users/ckl/code/rocm-headers/rocm-llvm/opt/rocm-7.2.4/lib/llvm/bin/llc": "eef2ea9381eb509222b7d7334b8fc24dd0c10ffd40bdf5896159cc8d06d6d88e"
+  }
+}
