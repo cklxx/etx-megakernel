@@ -1,0 +1,10 @@
+{
+  "schema": "etx.columns.program.v1",
+  "record": "G02",
+  "build": "/session/columns-build",
+  "capture_root": "/session/native-columns",
+  "dependencies": [],
+  "warmup": 3,
+  "seed": 20261016,
+  "timeout": 120
+}

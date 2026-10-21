@@ -16,6 +16,9 @@
 #define ETX_VL_MOE_RPT 32
 #endif
 #include "etx/host.h"
+#ifndef ETX_EMIT_LAST_ROUTER
+#define ETX_EMIT_LAST_ROUTER 0 // legacy frozen headers can only select the unchanged path
+#endif
 #include "etx/selection.h"   // the planner's variant per phase, published by plan_data.h
 #include "imports.h"
 
@@ -454,8 +457,9 @@ int main(int argc, char** argv) {
       else die("dsl_gemv_fold: role " + r);
       if (mode == 4 && lnb == nullptr) die("dsl_gemv_fold: LayerNorm (mode 4) needs the norm bias tensor for " + r);
       (void)gbias; (void)lnb;
-      a.ptr(w).ptr(xout).ptr(out).ptr(nullptr).ptr(nullptr).i64(0).i32(xM).i32(x.K).i32(rpt).i32(0)
-       .ptr(rows).ptr(rin).ptr(rout).ptr(ln).i32(R).f32(eps).i32(mode).i32(0).ptr(nullptr)
+      const bool g01_router=ETX_EMIT_LAST_ROUTER && r=="router";
+      a.ptr(w).ptr(xout).ptr(out).ptr(g01_router ? topk_ids : nullptr).ptr(g01_router ? topk_w : nullptr).i64(0).i32(xM).i32(x.K).i32(rpt).i32(0)
+       .ptr(rows).ptr(rin).ptr(rout).ptr(ln).i32(R).f32(eps).i32(mode).i32(0).ptr(g01_router ? tei : nullptr)
        .i32(x.nb).i32((int)sx).i32((int)sout).i32((int)srows).i32((int)srin).i32((int)srout)
 #if ETX_EMIT_DSL_EXT
        .ptr(gbias).ptr(lnb)
@@ -527,6 +531,22 @@ int main(int argc, char** argv) {
     ETX_CHECK(hipFree(hst.args[ia])); hst.args[ia] = etx_host::upload(ab.data(), ab.size());
   }
   hst.setup();
+  // G01 adds one real reset grid before every router while the textual argument
+  // plan keeps only original argument-bearing launches. Map isolated checking
+  // launches explicitly; a normal step executes these grids through the graph.
+  auto physical_launch = [&](int virtual_li, bool reset_router=false) {
+    int shift=0;
+#if ETX_EMIT_LAST_ROUTER
+    for(const Inst& x:insts)if(x.role=="router" && x.n+nreq<=virtual_li){
+      if(reset_router && x.n+nreq==virtual_li){
+        int32_t first=etx_launch_first[virtual_li+shift];void* args[]={&hst.p,&first};
+        ETX_CHECK(hipLaunchKernel(hst.unfused_kernel,dim3(etx_launch_count[virtual_li+shift]),dim3(ETX_THREADS),args,0,hst.stream));
+      }
+      ++shift;
+    }
+#endif
+    return virtual_li+shift;
+  };
   printf("etx: %d tasks, %d event words, %d workers (%d domains x %d), %zu grid instances, %zu B of argument blocks\n",
          ETX_N_TASKS, ETX_EVENT_WORDS, ETX_N_WORKERS, ETX_N_DOMAINS, ETX_WORKERS_PER_DOMAIN, insts.size(), total);
   if (vl_params_bytes() != (int)sizeof(VlParams)) die("VlParams layout differs between host and device");
@@ -587,9 +607,10 @@ int main(int argc, char** argv) {
     for (VlParams& v : vps) { v.tok = check_pos; v.pos = check_pos; v.write_next = 0; }
     vl_set_params(vps.data(), nreq, hst.stream);
     // Checker requires unchained plans: one prologue per request, one launch per instance, then argmaxes.
-    if ((int)(sizeof(etx_launch_count) / sizeof(etx_launch_count[0])) != (int)insts.size() + 2 * nreq)
+    if ((int)(sizeof(etx_launch_count) / sizeof(etx_launch_count[0])) != physical_launch((int)insts.size() + 2 * nreq))
       die("--check needs an unchained plan (ETX_VL_CHAIN=0)");
     auto launch_imported = [&](int li) {
+      li=physical_launch(li,true);
       int32_t first = etx_launch_first[li]; void* kargs[] = {&hst.p, &first};
       ETX_CHECK(hipLaunchKernel(hst.unfused_kernel, dim3(etx_launch_count[li]), dim3(ETX_THREADS), kargs, 0, hst.stream));
     };
@@ -694,7 +715,7 @@ int main(int argc, char** argv) {
         tri = mods[x.exp];
       }
       const int xtasks = x.tasks == 1 && x.rep > 1 ? x.rep : x.tasks;         // an x-form instance runs one task per XCD
-      if (etx_launch_count[x.n + nreq] != xtasks) die("launch table does not follow the plan at instance " + std::to_string(x.n));
+      if (etx_launch_count[physical_launch(x.n + nreq)] != xtasks) die("launch table does not follow the plan at instance " + std::to_string(x.n));
       for (size_t b = 0; b < bufs.size(); ++b) ETX_CHECK(hipMemcpyAsync(save[b], bufs[b].first, bufs[b].second, hipMemcpyDeviceToDevice, hst.stream));
       if (x.rep > 1 && !(x.tasks == 1 && x.copyoff < 0))
         die("unsupported replicated imported instance " + std::to_string(x.n) + " (" + x.exp + ")");
@@ -773,7 +794,7 @@ int main(int argc, char** argv) {
       for (int li : native) {
         ETX_CHECK(hipEventRecord(e0, hst.stream)); launch_imported(li); ETX_CHECK(hipEventRecord(e1, hst.stream));
         if (!wait_stream(hst.stream, 5.0)) die("native tile hung");
-        printf("  %-20s imported %6.1f us  (%d task(s))\n", li < nreq ? "prologue (ETX)" : "argmax (ETX)", elapsed_us(), etx_launch_count[li]);
+        printf("  %-20s imported %6.1f us  (%d task(s))\n", li < nreq ? "prologue (ETX)" : "argmax (ETX)", elapsed_us(), etx_launch_count[physical_launch(li)]);
       }
     }
     printf("kernel time, summed over the checked launches (GPU events, one launch each):\n");
@@ -992,6 +1013,9 @@ int main(int argc, char** argv) {
                                   (std::string(role) == "o_proj" && x.exp == "dsl_gemv_producer")) ? x.exp : is_fold(role) ? std::string(exp) + "_fold" : std::string(exp);
         if (x.exp != want) die(std::string("--check-dsl: ") + role + " is " + x.exp + ", not " + want);
         const int li = launch_of(x);
+#if ETX_EMIT_LAST_ROUTER
+        if(x.role=="router")(void)physical_launch(x.n+nreq,true); // fresh raw counter for isolated CHECK-DSL replay
+#endif
         if (etx_launch_count[li] != inst_tasks(x)) die(std::string("--check-dsl: launch ") + std::to_string(li) + " of " + role + " has " +
             std::to_string(etx_launch_count[li]) + " tasks, the plan says " + std::to_string(inst_tasks(x)));
         int32_t first = etx_launch_first[li]; void* kargs[] = {&hst.p, &first};

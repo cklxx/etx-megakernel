@@ -377,7 +377,7 @@ def instances(d) -> list[dict]:
             # stream if the few slots were pinned. The top-k then keeps ONE copy (rep = 1): the unpinned expert
             # tasks all read copy 0, which is the host's rr = 0 block (host.hip addresses copies as rr * TOPK).
             noaff = XCD and d.TOPK % NX != 0
-            if not PS and (not FOLD or not FOLD_TOPK):
+            if not PS and (not FOLD or not FOLD_TOPK) and os.environ.get('ETX_VL_LAST_ROUTER','0')!='1':
                 add("dsl_topk" if (DSL or DSL_TOPK) else f"topk_softmax_e{d.E}", L, "topk", (1, 1, 1),
                     override=DSL or IMPORTED or "ETX_VL_DSL_TOPK" in os.environ, noaff=noaff)
             if DSL_GEMV:                                      # 32 gate + 32 up rows (256 KB) per task; 64 down rows (96 KB)
@@ -457,6 +457,14 @@ def build() -> Graph:
     # reads independently: build.sh gated the tile's define on ETX_VL_FOLD_TOPK while the plan derived the opposite,
     # and the expert tiles recomputed a top-k the plan had already given its own phase -- 0.63 ms, measured round 30.
     g.codegen["fold_topk"] = fold_topk(d)
+    LAST_ROUTER=os.environ.get('ETX_VL_LAST_ROUTER','0')=='1'
+    g.codegen['last_router']=LAST_ROUTER
+    if LAST_ROUTER:
+        if not (d.H==2048 and d.E==128 and d.TOPK==8 and REQUESTS==1 and CU==256 and NX==8 and
+                DSL_GEMV and DSL_FOLD and not fold_topk(d) and not BATCH and
+                os.environ.get('ETX_VL_ROUTER_NARROW','0')=='1' and not os.environ.get('ETX_VL_PRODUCER','0')=='1'):
+            raise SystemExit('G01 model integration requires exact kept QwenB1/CU256/narrow/fold/no producer recipe')
+        g.tensor('g01_state',(48,32),bytes_per_elem=4,role='runtime')
     # MoE K beyond the tiles' 4096-float staged window (Mixtral moe_down: 14336): the chunked path is compiled in
     # only when a shape needs it -- it measured +0.12 ms on Qwen as a resident runtime branch (round 43).
     g.codegen["dsl_bigk"] = bool(DSL_GEMV and d.moe and max(d.H, d.MI) > 4096)
@@ -567,6 +575,12 @@ def build() -> Graph:
                     prev[rr] = e; prev_x[rr] = x
             else:
                 prev[r] = e; prev_x[r] = x
+        if LAST_ROUTER and len(grp)==1 and grp[0]['role']=='router':
+            i=grp[0];init=f'g01_reset_{i["layer"]}';done=init+'_done'
+            g.etensor(done,(1,),wait_count=1)
+            g.call_device(init,(1,),hip_link(src_of(i),'etx_tile_g01_reset'),resource=res,args=['g01_state'],
+                          consts=(i['layer'],),in_edges=ins_of('i->(0)'),out_edges={done:'i->(0)'},domain_map='i->(0)',duration_us=1.0)
+            prev[r]=done;prev_x[r]=False
         if len(grp) == 1 and grp[0]["rep"] > 1 and grp[0]["role"] in REP_ROLES:
             i = grp[0]
             g.etensor(ev, (NX,), wait_count=1)
@@ -588,6 +602,7 @@ def build() -> Graph:
                 raise SystemExit(f"{i['export']}: {i['tasks']} tasks do not split over {NX} XCDs as {i['role']} needs")
             nxt = groups[n + 1][0] if n + 1 < len(groups) else None
             local_next = nxt is not None and len(groups[n + 1]) == 1 and nxt["role"] in XAFF_ROLES and nxt["rep"] > 1
+            if LAST_ROUTER and i['role']=='router':local_next=False # all256 completions include winner fanout before any expert
             if local_next:        # the next launch's part on this XCD waits for this XCD's part only
                 g.etensor(ev, (NX,), wait_count=per)
                 out = {ev: "xw->x"}; this_x = True
@@ -597,8 +612,8 @@ def build() -> Graph:
             name = P + (f"{i['role']}_{i['layer']}" if i["layer"] >= 0 else i["role"])
             dur = max(2.0, i["M"] * i["K"] * 2 / 4.0e12 * 1e6) if i["export"].startswith("wvsplitk") else 3.0
             g.call_device(name, (NX, per), hip_link(src_of(i), f"etx_tile_x_{i['export']}", pre_wait=f"etx_pre_x_{i['export']}", touch=touch_of(i, True), coherence=coh_of(i), coherence_caps=caps_of(i), arg_bytes=i.get("arg_bytes", 0)),
-                          resource=res, args=["impargs"],
-                          consts=(i["offset"], i["stride"], per), in_edges=ins_of("xw->x" if prev_x[r] else "xw->(0)"), out_edges=out,
+                          resource=res, args=["impargs","g01_state"] if LAST_ROUTER and i['role']=='router' else ["impargs"],
+                          consts=(i["offset"], i["stride"], per, i['layer']) if LAST_ROUTER and i['role']=='router' else (i["offset"],i["stride"],per), in_edges=ins_of("xw->x" if prev_x[r] else "xw->(0)"), out_edges=out,
                           domain_map="xw->x", duration_us=dur)
             prev_x[r] = this_x
         elif len(grp) == 1 and DSL_ATTNHEAD and grp[0]["role"] in ("prep", "attn", "reduce"):
@@ -632,8 +647,8 @@ def build() -> Graph:
             name = P + (f"{i['role']}_{i['layer']}" if i["layer"] >= 0 else i["role"])
             pin = {"domain_map": "i->(0)"} if i["role"] in PIN_ROLES else {}
             g.call_device(name, (i["tasks"],), hip_link(src_of(i), f"etx_tile_{i['export']}", pre_wait=f"etx_pre_{i['export']}", touch=touch_of(i, False), coherence=coh_of(i), coherence_caps=caps_of(i), arg_bytes=i.get("arg_bytes", 0)),
-                          resource=res, args=["impargs"],
-                          consts=(i["offset"],), in_edges=ins_of("i->(0)"), out_edges={ev: "i->(0)"}, **pin,
+                          resource=res, args=["impargs","g01_state"] if LAST_ROUTER and i['role']=='router' else ["impargs"],
+                          consts=(i["offset"],0,0,i['layer']) if LAST_ROUTER and i['role']=='router' else (i["offset"],), in_edges=ins_of("i->(0)"), out_edges={ev: "i->(0)"}, **pin,
                           duration_us=2.0 if not i["export"].startswith("wvsplitk") else max(2.0, i["M"] * i["K"] * 2 / 4.0e12 * 1e6))
         else:
             sig = "__".join(x["export"] for x in grp)
