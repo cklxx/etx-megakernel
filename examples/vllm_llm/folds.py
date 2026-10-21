@@ -10,7 +10,7 @@ themselves says which way it goes -- only their shapes do. This module makes the
              + hotspot_us(consumer tasks, shared bytes)    contention: many tasks reading one small buffer uncached
              + rounds x serial_us                          latency: dependent work on wave 0 while the others wait
 
-CONSTANTS AND WHERE THEY COME FROM (docs/BUDGET-2026-10-01.md unless noted):
+CONSTANTS AND WHERE THEY COME FROM (docs/qwen/BUDGET-2026-10-01.md unless noted):
   PHASE_FLOOR_US 2.64   a full-device phase costs this before any bytes, at the tiles' 1024-thread width (round 21;
                         the 3.0 us figure in the budget's text is the 256-thread measurement)
   HANDOFF_US     1.00   one event edge, 9 per layer x 1.00 = 0.433 ms/token

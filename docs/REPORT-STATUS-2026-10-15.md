@@ -23,13 +23,13 @@ corresponding exported prompt/token windows. Colliding windows at requests 0/4 l
 
 Every gain is relative to its named reference in the same session. Absolute times from different sessions are never
 combined into a performance verdict. These lever and application studies do not replace the separate Qwen fusion claim
-against the **same kernels in a HIP graph**; see [the fusion evidence](VLBEST2-2026-10-10.md). No new same-kernel HIP-graph
+against the **same kernels in a HIP graph**; see [the fusion evidence](qwen/VLBEST2-2026-10-10.md). No new same-kernel HIP-graph
 comparison was performed in this task.
 
 ## Single-request experiments: completed and still open
 
 The original [experiment log](../examples/dsv2lite/results/EXPERIMENT-LOG.md) and
-[D1–D5 decision register](DSV2-D1-D5.md) preserve the session-specific rules and records.
+[D1–D5 decision register](deepseek/DSV2-D1-D5.md) preserve the session-specific rules and records.
 
 - **Initial tile studies, October 13:** terminal-load removal Q / Qall measured -3 / -3 us alone; top-k rank +66 us;
   norm-tree-all +37 us (spread 7); norm-tree +30 us, attribution only; attention prologue +27 us; argmax tree +2 us
@@ -124,7 +124,7 @@ It supplies neither a five-pair verdict nor a conversion between machines.
 
 ## Design-only work and unfinished questions
 
-[Four Qwen proposals](PROPOSALS-2026-10-14.md) remain unbuilt and unmeasured: router remapping (P1), epoch/static-only
+[Four Qwen proposals](qwen/PROPOSALS-2026-10-14.md) remain unbuilt and unmeasured: router remapping (P1), epoch/static-only
 reset (P3), producer-side row-partitioned combine (P4), and last-arriver top-k (P5). Pre-shuffled weights (P2) are
 already implemented; their row-ownership remainder is the noisy study above. P1/P3 lack a demonstrated ceiling above
 the bar, P4 needs exposed combine-time evidence, and P5 needs its deciding synchronization microbenchmark. No proposal
@@ -189,7 +189,7 @@ harness only; they are never substituted for GPU measurements.
 
 ## Preparation update, no new GPU evidence
 
-The [two-gap preparation](DEEPSEEK-PREP-TWO-GAPS-2026-10-15.md) implements the missing recipe-matched B1 control,
+The [two-gap preparation](deepseek/DEEPSEEK-PREP-TWO-GAPS-2026-10-15.md) implements the missing recipe-matched B1 control,
 producer-bound reference refusal/regeneration path, and a correctness-only x8 queue. It also prepares the separate
 B1/B2/B4 attribution and corrected-baseline queue. The prior closure's missing-implementation statements below are
 historical; the linked acceptance record gives current local checks and remaining native/device gates.
@@ -201,7 +201,7 @@ host-wall verdict requires the new session. Older wall descriptions in this hist
 
 ## Minimal next paid experiment, not authorized or executed here
 
-The [actionable experiment plan](NEXT-GPU-2026-10-15.md) specifies the controls, exact acceptance thresholds,
+The [actionable experiment plan](deepseek/NEXT-GPU-2026-10-15.md) specifies the controls, exact acceptance thresholds,
 decision branches, local readiness blockers and a 30-minute target / 60-minute hard cap (estimated $1–$2 at the
 historical $1.99/GPU-hour rate, subject to an actual quote). The matching B1 control and correctness-only session are now implemented and locally validated; SOL_CLOSE records
 final full-suite acceptance and the independent review status in the linked preparation evidence. CC found no blocking

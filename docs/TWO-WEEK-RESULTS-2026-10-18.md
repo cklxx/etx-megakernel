@@ -22,7 +22,7 @@ imported instances byte-identical (97 per request per position), source commit
 `380ed02`, one runner at a time under `flock`. vLLM is one engine,
 `VLLM_ROCM_USE_AITER=1`, v0.27.1, three samples per batch.
 
-Mechanism (arithmetic in `docs/QWEN-BATCH-BASELINE-2026-10-18.md`): ETX serves N
+Mechanism (arithmetic in `docs/qwen/QWEN-BATCH-BASELINE-2026-10-18.md`): ETX serves N
 requests by replication — 97 imported instances per request, tasks 120,724 /
 241,448 / 482,896 at B2/B4/B8 (exact 2.000x per doubling) — and re-reads each
 request's dense weights (2.459 GB) and K=8 experts (3.624 GB), so its marginal
@@ -80,7 +80,7 @@ No task trace, hardware counter or profiler capture exists for the Qwen batch
 decode path; the DeepSeek B8 trace and every GLM real-weight run are [U]. The
 three Qwen experiments in section 1 are estimates, not measurements.
 
-Sources: `docs/QWEN-BATCH-BASELINE-2026-10-18.md`,
-`docs/DS-BATCH-ATTRIBUTION-2026-10-18.md`, `docs/EXPERIMENTS-2026-10-18.md`,
+Sources: `docs/qwen/QWEN-BATCH-BASELINE-2026-10-18.md`,
+`docs/deepseek/DS-BATCH-ATTRIBUTION-2026-10-18.md`, `docs/EXPERIMENTS-2026-10-18.md`,
 `examples/vllm_llm/results/EXPERIMENT-LOG.md`; raw records `bench_b*.json`,
 `bench_plain_b*.json`, `/root/vllm-bench.log`, `trace_report.json`.

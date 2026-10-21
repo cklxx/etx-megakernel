@@ -8,7 +8,7 @@ really share (the input of the batch2 estimate). Runs on one 2x MI300X VM in abo
          fleet) and the routing-overlap run
   cpu    environment, the DeepSeek download, the six builds, the analysis
 
-Decisions (written before the session, docs/PLAN-v3.md section 8):
+Decisions (written before the session, docs/qwen/PLAN-v3.md section 8):
   * cap256 within 3% of the relaxed build -> the interleave keeps fleet's tiles; slower -> rework the GEMV first
   * measured 2-sequence expert union: fed to whatif.py; interleave is built if it still beats batch2 there
   * qkv prologue (ETX vs fleet) explains the +3.7 us/task -> fix it in the shim; otherwise look at the stream part

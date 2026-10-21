@@ -1,4 +1,4 @@
-"""G6 (docs/INVENTORY-SYSTEM-2026-10-13.md 4.1): `coherent_l1` as ONE build-wide compiler mode (ETX_COHERENCE=l1 /
+"""G6 (docs/core/INVENTORY-SYSTEM-2026-10-13.md 4.1): `coherent_l1` as ONE build-wide compiler mode (ETX_COHERENCE=l1 /
 PassOptions.coherence), taken by every tile whose FAMILY declares it, for any model. Default byte-identical; the DSL
 family's accessors switch to agent-scope loads through the feature manifest; fleet's through its lever; a plan in l1
 with tiles that do not implement it is refused."""

@@ -12,7 +12,7 @@ Budget [planning cap]: 120 GPU minutes (MAX_SESSION_SECONDS), $5.98 at $2.99/h (
 10 + 15 + 2 + 70 = 97 invocations x ~8 s (results_2026-09-27b runner: 7-8 s per 32-token invocation) = ~13 min,
 plus builds' tail: ~45-60 min total.
 
-Inputs are prepared ON THE BOX by the prep_* jobs (the ds_gap.py recipes): docs/DATA.md:59-64 says the fleet reference
+Inputs are prepared ON THE BOX by the prep_* jobs (the ds_gap.py recipes): docs/core/DATA.md:59-64 says the fleet reference
 outputs (~70 MB, ~2 GPU minutes) and the packed weights (31 GB, ~1 min download + ~1 min pack) were never kept. Both
 come from the PINNED fleet export (ETX_DSV2_FLEET, default ~/fleet-3fb67a6, src hash verified by `source`) and
 deepseek-ai/DeepSeek-Coder-V2-Lite-Base, into ETX_DSV2_DATA (default ~/dsv2-data); `preflight` compares every file

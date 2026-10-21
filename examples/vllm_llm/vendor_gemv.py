@@ -112,7 +112,7 @@ def worker(a):
         roctx.roctxRangePop.restype = ctypes.c_int
     metadata = {}
     # Scrub reads/writes twice the MALL capacity before each pass, outside ranges.
-    # Capacity source: docs/RESEARCH-sync-hardware.md:98; router copies alone are too small.
+    # Capacity source: docs/core/RESEARCH-sync-hardware.md:98; router copies alone are too small.
     scrub = torch.zeros(2 * 256 * 1024 * 1024, dtype=torch.uint8, device='cuda')
     for shape, (n, k, calls) in SHAPES.items():
         count = 1 if shape == 'lm_head' else a.copies

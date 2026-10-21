@@ -41,7 +41,7 @@ int main(int argc, char** argv) {
   std::string weights_path = "build/weights.bin", cache_path = "build/fleet_cache.bin";
   std::string golden_path = "build/golden_tokens.txt", hidden_path = "build/golden_hidden.bin", json_path;
   std::string r1_dir = "build_r1";     // request 1's cache, golden tokens and hidden states (reference_rotated.py)
-  std::vector<std::string> req_dirs;   // --req-dir, once per request 1..R-1 in order (docs/BATCH-2026-10-14.md section 4)
+  std::vector<std::string> req_dirs;   // --req-dir, once per request 1..R-1 in order (docs/deepseek/BATCH-2026-10-14.md section 4)
   int tokens = 32, context = 1024, first_token = -1, repeat = 1; bool unfused = false;
   bool teacher = false;
   for (int i = 1; i < argc; ++i) {
@@ -137,7 +137,7 @@ int main(int argc, char** argv) {
     q.golden = load_tokens(gp);
     for (int o = 0; o < r; ++o)   // prompt distinctness is checked by examples/dsv2lite/batch_goldens.py before the run;
                                   // two rotations may still share their short greedy output, which only weakens the
-                                  // mix-up check for that pair (docs/BATCH-2026-10-14.md 4a), so print and continue
+                                  // mix-up check for that pair (docs/deepseek/BATCH-2026-10-14.md 4a), so print and continue
       if (q.golden.size() > (size_t)tokens && reqs[o].golden.size() > (size_t)tokens && std::equal(q.golden.begin() + 1, q.golden.begin() + tokens + 1, reqs[o].golden.begin() + 1))
         std::printf("BATCHCOLLISION requests %d and %d: identical %d checked greedy tokens [1:tokens+1]; prompts are distinct, "
                     "the request mix-up check is unavailable for this pair\n",
@@ -295,7 +295,7 @@ int main(int argc, char** argv) {
   if (R > 1)
     std::printf("\nRESULT requests=%d step median %.3f ms -> %.1f tokens/s (%d tokens per step); tokens %d/%d match\n",
                 R, step_med, R * 1000.0 / step_med, R, matched, compared);
-  // docs/BATCH-2026-10-14.md section 1: throughput from the host's step time, per-request latency from each request's own
+  // docs/deepseek/BATCH-2026-10-14.md section 1: throughput from the host's step time, per-request latency from each request's own
   // device timestamps (token_time: s_memrealtime, 10 ns ticks), the median time from one token's end to the next's.
   // Exact decimals (ms with 6 places = integer ns) for etx/session/batch.py.
   for (int r = 0; r < R; ++r) {

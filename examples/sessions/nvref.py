@@ -1,4 +1,4 @@
-"""One MI300X reference session; docs/SPEC-nv-reference-2026-10-08.md.
+"""One MI300X reference session; docs/qwen/SPEC-nv-reference-2026-10-08.md.
 
 Host wall, batch 1, context 1024; five interleaved rounds. No NVIDIA claim.
 Estimate: 35 minutes / $1.74, ceiling 60 minutes / $3.00. Operator must delete

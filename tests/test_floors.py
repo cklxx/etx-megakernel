@@ -1,4 +1,4 @@
-"""CPU arithmetic for the hardware floors of docs/FLOORS-2026-10-08.md; no hardware claims."""
+"""CPU arithmetic for the hardware floors of docs/qwen/FLOORS-2026-10-08.md; no hardware claims."""
 from dataclasses import replace
 import os
 from pathlib import Path
@@ -39,7 +39,7 @@ def test_isa_counts_are_exact_integers_with_the_documented_prices():
 
 def test_prices_come_from_the_cited_lines():
     (lo, hi), where = fl.rtt_range_us()
-    assert (lo, hi) == RTTS and where == 'docs/TILES-2026-10-07.md:32'
+    assert (lo, hi) == RTTS and where == 'docs/qwen/TILES-2026-10-07.md:32'
     assert fl.cached_hop_us()[0] == pytest.approx(0.1043)
     assert fl.handoff_us_per_layer()[0] == 9.02
     assert fl.measured_span_us()[0] == 5081.5
@@ -106,7 +106,7 @@ def test_grid_covers_both_bandwidths_and_rtts_and_the_median_sensitivity():
 
 
 def test_isa_hop_table_matches_the_matching_build():
-    """Recount the ISA hops. Needs the matching .s and its inline map (see docs/FLOORS-2026-10-08.md)."""
+    """Recount the ISA hops. Needs the matching .s and its inline map (see docs/qwen/FLOORS-2026-10-08.md)."""
     s, m = os.environ.get('ETX_ISA_S'), os.environ.get('ETX_ISA_MAP')
     if not (s and m and Path(s).is_file() and Path(m).is_file()):
         message = 'ISA recount needs ETX_ISA_S and ETX_ISA_MAP'
@@ -150,7 +150,7 @@ STEP_ROWS = {'Measured device span': 'measured_span_us', 'Serial floor': 'serial
 @pytest.mark.parametrize('path, heading, cases', [
     (fl.DOC, '## Results', [(4.3, 0.50), (4.3, 0.69), (3.5, 0.50), (3.5, 0.69)]),
     (fl.DOC, '### Sensitivity at the one-workgroup median', [(4.3, 0.28), (3.5, 0.28)]),
-    ('docs/PLAN-generic-decoder-2026-10-08.md', '#### Estimate for Qwen3-30B-A3B', [(4.3, 0.50), (4.3, 0.69), (3.5, 0.50), (3.5, 0.69)]),
+    ('docs/core/PLAN-generic-decoder-2026-10-08.md', '#### Estimate for Qwen3-30B-A3B', [(4.3, 0.50), (4.3, 0.69), (3.5, 0.50), (3.5, 0.69)]),
 ])
 def test_report_step_tables_are_the_tool_output(path, heading, cases):
     rows = _doc_rows(path, heading, 'Value, ms')
@@ -171,7 +171,7 @@ def test_report_phase_tables_are_the_tool_output():
         for cell, value in ((chain, a['chain_us']), (f50, a['phase_floor_us']), (f69, b['phase_floor_us']),
                             (stream, a['stream_us']), (body, a['crit_body_us'])):
             assert _close(cell, value, 2), (p, cell, value)
-    plan = _doc_rows('docs/PLAN-generic-decoder-2026-10-08.md', '#### Estimate for Qwen3-30B-A3B', 'Phase')
+    plan = _doc_rows('docs/core/PLAN-generic-decoder-2026-10-08.md', '#### Estimate for Qwen3-30B-A3B', 'Phase')
     assert set(plan) == set(fl.PHASES)
     for p, (floor, tag, _) in plan.items():
         f50, f69 = floor.split(' / ')
@@ -199,7 +199,7 @@ def test_report_split_is_the_tool_output():
     for name, value in want.items():
         assert _close(rows[name][0], value, 0), (name, value)
     want['Body excess of topk, router, prep, attn and reduce'] = want.pop('Body excess of prep, attn, reduce, router and topk')
-    plan = _doc_rows('docs/PLAN-generic-decoder-2026-10-08.md', '## 3. Priority', 'Part of the gain without prefetch')
+    plan = _doc_rows('docs/core/PLAN-generic-decoder-2026-10-08.md', '## 3. Priority', 'Part of the gain without prefetch')
     assert set(plan) == set(want) - {'Total'}
     for name, (cell,) in plan.items():
         assert _close(cell, want[name] / 1000, 2), (name, want[name])

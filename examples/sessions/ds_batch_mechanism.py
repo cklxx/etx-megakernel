@@ -1,4 +1,4 @@
-"""PREPARED, NOT RUN: why DeepSeek B4/B8 do not scale past B2 (docs/DEEPSEEK-BATCH-MECHANISM-2026-10-18.md).
+"""PREPARED, NOT RUN: why DeepSeek B4/B8 do not scale past B2 (docs/deepseek/DEEPSEEK-BATCH-MECHANISM-2026-10-18.md).
 
 One MI300X, GPU 0. No vLLM, no new kernel, no pairs: this session tests the mechanism, it does not re-time ETX against
 vLLM (the 2026-10-15 rounds already did). Order on the GPU lane: references, the x2/x4 gates, the isolation

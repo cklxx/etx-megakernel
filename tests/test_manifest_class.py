@@ -59,12 +59,12 @@ def test_every_macro_the_tiles_test_is_either_published_or_tile_local():
     tile_local = {"ETX_DSL_NT", "ETX_DSL_VECNORM", "ETX_DSL_UNIFORM", "ETX_DSL_PREP_EARLY", "ETX_IMPORT_LDS",
                   "ETX_DSL_COH_HELPERS", "DSL_G", "DSL_U32X4_DEFINED", "DSL_SPLIT_TAIL",
                   "ETX_DSL_U4",   # load depth: only the tile's own instantiation changes (round 34)
-                  # tile code only, same argument layout and output bits (docs/TILES-2026-10-07.md)
+                  # tile code only, same argument layout and output bits (docs/qwen/TILES-2026-10-07.md)
                   "ETX_DSL_WSUM", "ETX_DSL_SCALAR", "ETX_DSL_GU1", "ETX_DSL_RBATCH",
                   "ETX_DSL_NORM_HOIST",  # cached weight scheduling only; no host/ABI counterpart
                   # Alternate GEMV row ownership / constant segment count: same tile arguments and layout.
                   "ETX_DSL_ROW_WAVE", "ETX_DSL_ROW_WAVE_FIXED_SPR",
-                  # top-k selection on a 32-bit key: tile code only, same arguments and outputs (docs/TOPK-KEY32-2026-10-08.md)
+                  # top-k selection on a 32-bit key: tile code only, same arguments and outputs (docs/core/TOPK-KEY32-2026-10-08.md)
                   "ETX_TOPK_KEY32"}
     published = {m for m, _, _ in manifest.FEATURES.values()}
     # These are runtime protocol switches, NOT tile-local features. local_fold only tests them to

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Every measured per-role number the kernel model is checked against, in one JSON (docs/MODEL-vllm-kernels.md):
+"""Every measured per-role number the kernel model is checked against, in one JSON (docs/qwen/MODEL-vllm-kernels.md):
 
   vllm       vLLM's launch of the kernel (rocprofv3, HIP graph: the duration is all the launch costs), untraced-scaled
   etx_unf    ETX's unfused launch of the imported kernel (rocprofv3, 8 steps of the prompt, layers 2..L-2)

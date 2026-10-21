@@ -1,4 +1,4 @@
-"""Experiments as data (docs/SESSION-ARCH-2026-10-13.md, component D).
+"""Experiments as data (docs/core/SESSION-ARCH-2026-10-13.md, component D).
 
 Invariant: an arm name is one build and one rule everywhere. A model family keeps ONE registry module (e.g.
 examples/dsv2lite/arms.py) of Arm records; the build, the local build check, the session's jobs, the verdicts and the

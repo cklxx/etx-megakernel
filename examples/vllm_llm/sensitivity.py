@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build 3's simulated step under the parameters the microbenchmarks left uncertain (docs/MODEL-vllm-kernels.md
+"""Build 3's simulated step under the parameters the microbenchmarks left uncertain (docs/qwen/MODEL-vllm-kernels.md
 section 17), so a measurement that misses the prediction points at a parameter rather than at "the model":
 
   python3 -m examples.vllm_llm.sensitivity [--bench results_2026-09-28b] [--requests 1,2]

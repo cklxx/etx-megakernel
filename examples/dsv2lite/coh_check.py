@@ -1,4 +1,4 @@
-"""Refuse a D2 build whose plan and tiles disagree (docs/DSV2-D1-D5.md, D2).
+"""Refuse a D2 build whose plan and tiles disagree (docs/deepseek/DSV2-D1-D5.md, D2).
 
   python -m examples.dsv2lite.coh_check <megakernel_d0.hip> <fleet src dir the build compiles>
 

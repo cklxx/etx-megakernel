@@ -1,11 +1,11 @@
-"""The Qwen3-30B-A3B arms: ONE table (etx/session/experiment.py, component D of docs/SESSION-ARCH-2026-10-13.md).
+"""The Qwen3-30B-A3B arms: ONE table (etx/session/experiment.py, component D of docs/core/SESSION-ARCH-2026-10-13.md).
 
 The generic-path counterpart of examples/dsv2lite/arms.py. The G6 session (examples/sessions/qwen_g6.py), the local
 device build check and every re-derivation (`python -m etx.session.experiment verify <dir> examples.vllm_llm.arms`)
 read this table; nothing else names an arm's build or rule.
 
 `kept` is the kept recipe (kept_build.py: KEPT_ENV + BASE_FLAGS). `kept_l1` is the same build with the compiler's
-coherence mode switched to `l1` (ETX_COHERENCE, docs/INVENTORY-SYSTEM-2026-10-13.md section 4.1): one compiler switch,
+coherence mode switched to `l1` (ETX_COHERENCE, docs/core/INVENTORY-SYSTEM-2026-10-13.md section 4.1): one compiler switch,
 no per-model change. Its rule is G6's, copied verbatim from section 4.1, where it was written before any Qwen code.
 
   python -m examples.vllm_llm.arms shell <arm>     the arm's build as shell assignments
@@ -23,7 +23,7 @@ from etx.session.experiment import Arm, Rule, ns
 from examples.vllm_llm.kept_build import BASE_FLAGS, KEPT_ENV
 
 CONDITION = "one MI300X, Qwen3-30B-A3B, bf16, batch 1, context 1024, 32 tokens, device time"
-G6_TEXT = ("G6 (docs/INVENTORY-SYSTEM-2026-10-13.md 4.1): KEEP if every pair is faster than kept, median >= 30 us and "
+G6_TEXT = ("G6 (docs/core/INVENTORY-SYSTEM-2026-10-13.md 4.1): KEEP if every pair is faster than kept, median >= 30 us and "
            "median > 2 x spread; otherwise NO-GO")
 
 ARMS = {a.name: a for a in [

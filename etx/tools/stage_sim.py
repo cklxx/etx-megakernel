@@ -20,7 +20,7 @@ Assumptions (each is unmeasured for this lever):
 * A gain on o_proj's critical body shortens the step one for one (o_proj is serial).
 * The staged bytes would otherwise stream inside the body. The round11 build breaks this: its touch hook
   (ETX_VL_TOUCH=1) already loads 61,440 of the 65,536 B slice into L2 during the wait, so the result is an
-  upper bound (docs/STAGE-oproj-2026-10-07.md, "Review, 2026-10-08").
+  upper bound (docs/qwen/STAGE-oproj-2026-10-07.md, "Review, 2026-10-08").
 """
 from __future__ import annotations
 
@@ -31,7 +31,7 @@ import math
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-LAT = 'docs/LATENCY-2026-10-07.md'
+LAT = 'docs/qwen/LATENCY-2026-10-07.md'
 
 
 def source(path: str, text: str) -> str:
@@ -82,12 +82,12 @@ def constants() -> dict[str, Constant]:
     add('empty_task_us', .506, 'measured', LAT, 'The 6,144 empty tasks average 0.506 us.',
         'Body of a task with no rows (arrive, acquire, exit): fixed per-task cost proxy')
     add('lds_total_bytes', 65536, 'derived', 'etx/machine/arch/gfx942.yaml', 'lds_kb: 64', 'LDS per CU')
-    add('lds_used_bytes', 29736, 'measured', 'docs/VALIDATION-baremetal-2026-10-01.md', 'LDS is 29736, not 41448',
+    add('lds_used_bytes', 29736, 'measured', 'docs/qwen/VALIDATION-baremetal-2026-10-01.md', 'LDS is 29736, not 41448',
         'Group segment of the dsl control build (CU=256, import prune), VF and bare metal; 41448 is the all-imported build')
     add('threads', 1024, 'derived', 'examples/vllm_llm/model.py', 'THREADS = 1024', 'Megakernel workgroup size')
     add('lds_dma_bytes_per_lane', 4, 'derived', 'etx/machine/arch/gfx942.yaml', 'async_copy_to_lds: dword_only',
         'buffer_load ... lds moves 32 bit per lane and needs no VGPR destination')
-    add('vgpr_per_wave', 128, 'measured', 'docs/BUDGET-2026-10-01.md', 'VGPR: 512/SIMD ÷ 128/wave = 4',
+    add('vgpr_per_wave', 128, 'measured', 'docs/qwen/BUDGET-2026-10-01.md', 'VGPR: 512/SIMD ÷ 128/wave = 4',
         'Megakernel VGPRs per wave (15 spills already)')
     add('regs_per_lane', 512, 'derived', 'etx/machine/arch/gfx942.yaml', 'regs_per_lane: 512', 'Register file entries per SIMD lane')
     add('simds_per_cu', 4, 'derived', 'etx/machine/arch/gfx942.yaml', 'simds_per_cu: 4', 'SIMDs per CU')
@@ -95,9 +95,9 @@ def constants() -> dict[str, Constant]:
     add('wg_rate_kb_us', 8.9, 'measured', 'examples/vllm_llm/model.py', '8.9 KB/us at 296',
         'hw_bench stream per-workgroup rate at 296 workgroups (gate_up shape, 2026-10-01)')
     add('ref_ms', 4.823, 'measured', 'README.md', '**ETX megakernel** | **4.823**', 'Shipped ETX ms/token (wall), 2026-10-02')
-    add('spread_ms', .028, 'measured', 'docs/TILES-2026-10-07.md', 'same-binary spread of five fused runs is 0.028',
+    add('spread_ms', .028, 'measured', 'docs/qwen/TILES-2026-10-07.md', 'same-binary spread of five fused runs is 0.028',
         'Same-binary spread of five fused runs')
-    add('keep_ms', .030, 'derived', 'docs/TILES-2026-10-07.md', 'The mean gain is at or below -0.030 ms.',
+    add('keep_ms', .030, 'derived', 'docs/qwen/TILES-2026-10-07.md', 'The mean gain is at or below -0.030 ms.',
         'Repository KEEP threshold for a flag A/B, ms per token')
     # Public peak values, not repository measurements.
     add('lds_bytes_per_clk', 128, 'assumed', 'etx/tools/stage_sim.py', '* LDS read rate and engine clock',
@@ -185,7 +185,7 @@ def report() -> dict:
                 prior=[
                     'fleet-mi300x docs/STATUS.md:30 (85b087e): prefetch of the next task\'s rows across the event wait into VGPRs, 8 x 16 B per thread, measured 4% slower (3.812 vs 3.673 ms) from register pressure. The vgpr path here reproduces that blocker.',
                     'fleet-mi300x docs/STATUS.md:72: idle-worker prefetch into the Infinity Cache, no gain. This lever targets LDS, not a cache level.',
-                    'docs/TILES-2026-10-07.md: L2 prefetch is a measured loss on this path; not repeated here.',
+                    'docs/qwen/TILES-2026-10-07.md: L2 prefetch is a measured loss on this path; not repeated here.',
                 ])
 
 

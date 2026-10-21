@@ -200,7 +200,7 @@ int main(int argc, char** argv) {
       // the extra requests silently read column 0 -- refuse instead (ETX_VL_BATCH sets both from ETX_VL_REQUESTS)
       if (x.nb > ETX_VL_NB) die("plan instance nb=" + std::to_string(x.nb) + " but the tiles were built with ETX_VL_NB=" + std::to_string(ETX_VL_NB));
       // the variant of this phase comes from the manifest (plan_data.h), never from a re-derivation here: the plan
-      // file and the manifest must name the same export (docs/PLAN-generic-decoder-2026-10-08.md section 6.3)
+      // file and the manifest must name the same export (docs/core/PLAN-generic-decoder-2026-10-08.md section 6.3)
       if (const char* error = etx_sel_check(x.role.c_str(), x.layer, x.exp.c_str()))
         die("plan instance " + std::to_string(x.n) + " (" + x.role + ", layer " + std::to_string(x.layer) + ", " + x.exp + "): " + error);
       insts.push_back(x);

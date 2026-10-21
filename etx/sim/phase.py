@@ -1,6 +1,6 @@
 """The measured phase cost of MI300X, from hw_bench stream (results_2026-09-30/hw_stream.log).
 
-This replaces the per-task tax the old model fitted (docs/MODEL-vllm-kernels.md section 19). Two facts decide a
+This replaces the per-task tax the old model fitted (docs/qwen/MODEL-vllm-kernels.md section 19). Two facts decide a
 phase, both measured with no events and no ETX, just N workgroups each reading B bytes:
 
   1. a floor. 296 workgroups reading 896 B each still take 3.2 us, so any full-device phase costs about 3 us

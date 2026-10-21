@@ -24,7 +24,7 @@ def _graph(tmp_path, monkeypatch, xcd: bool, layers: int = 3, qknr: str = "0", a
         imports["attn_mfma16_g8"]["slots"] = 1                        # ETX_VL_SLOTS=attn_mfma16_g8=1
     imp.write_text(json.dumps(imports))
     # These cases exercise the IMPORTED kernels, which stopped being the default on 2026-10-01 when the DSL tiles
-    # became universal rules (docs/OPTIMISATIONS.md); ETX_VL_IMPORTED=1 is the escape that restores that build.
+    # became universal rules (docs/core/OPTIMISATIONS.md); ETX_VL_IMPORTED=1 is the escape that restores that build.
     monkeypatch.setenv("ETX_VL_IMPORTED", "1")
     monkeypatch.setenv("ETX_VL_DSL_ATTN", "head" if attn_head else "0")
     monkeypatch.setenv("ETX_VL_IMPORTS", str(imp))

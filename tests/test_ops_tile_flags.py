@@ -1,4 +1,4 @@
-"""The flag-gated DSL tile changes of docs/TILES-2026-10-07.md (ETX_DSL_RBATCH, ETX_DSL_SCALAR, ETX_DSL_WSUM,
+"""The flag-gated DSL tile changes of docs/qwen/TILES-2026-10-07.md (ETX_DSL_RBATCH, ETX_DSL_SCALAR, ETX_DSL_WSUM,
 ETX_DSL_GU1). Each is meant to leave every output bit unchanged; these tests pin the arguments for that claim that can
 be checked off the GPU: the lane-0 reduction tree, the gate/up single-pass condition, and that a build without the
 flags compiles the original text."""

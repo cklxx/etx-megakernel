@@ -3,7 +3,7 @@
 One MI300X, GPU 0; planned 60-90 minutes, hard runner cap 7200 seconds including prep.
 No provider operation, tariff assumption or spend approval is part of this job. DigitalOcean
 availability, actual price and native/runtime gates must be checked before a separately authorized run.
-See docs/DEEPSEEK-B4-PREP-2026-10-15.md for acceptance and the exact pre-registered branches.
+See docs/deepseek/DEEPSEEK-B4-PREP-2026-10-15.md for acceptance and the exact pre-registered branches.
 """
 import copy
 import importlib.util

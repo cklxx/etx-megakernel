@@ -1,4 +1,4 @@
-"""Historical batch study; current harness fixes await GPU revalidation: the batch 2 / 4 / 8 study on DeepSeek-V2-Lite (docs/BATCH-2026-10-14.md, rules committed before
+"""Historical batch study; current harness fixes await GPU revalidation: the batch 2 / 4 / 8 study on DeepSeek-V2-Lite (docs/deepseek/BATCH-2026-10-14.md, rules committed before
 the code in 0fc38c9). One MI300X, GPU 0. No provisioning without the owner's approval.
 
 ETX at B = 1 (the kept arm alld4r0l1kvsmw, section 9), 2, 4, 8 (arms x2, x4, x8) against the strongest legal vLLM configuration at the
@@ -11,7 +11,7 @@ order: the 7 rotated references (prep_goldens), one gated invocation per x arm, 
 the vLLM selection round, rounds 1-5,
 the measured expert union (routing), the report.
 Budget [E]: ~40-60 min, about $2 at $1.99/h, plus ~1 GPU minute for boxcontrol (build excluded);
-runner cap 5400 s (docs/BATCH-2026-10-14.md section 6).
+runner cap 5400 s (docs/deepseek/BATCH-2026-10-14.md section 6).
 Run: examples/dsv2lite/reproduce.sh stage <ip> && examples/dsv2lite/reproduce.sh box-setup <ip> &&
      ETX_SESS_USER=root ETX_SESS_MAX_SECONDS=5400 tools/session.sh start <ip> examples/sessions/ds_batch.py
 """

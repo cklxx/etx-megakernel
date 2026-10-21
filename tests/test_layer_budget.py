@@ -179,7 +179,7 @@ def test_metric_limits(capsys):
     assert "Do not use either sum alone for the 8.3 us rental gate" in text
     assert "dependency_gap_us" in text
     assert "metric_limits" in result
-    doc = (Path(__file__).resolve().parents[1] / "docs/DESIGN-acquire-2026-10-05.md").read_text()
+    doc = (Path(__file__).resolve().parents[1] / "docs/qwen/DESIGN-acquire-2026-10-05.md").read_text()
     for sentence in result["metric_limits"].split(". "):
         assert sentence in doc
 

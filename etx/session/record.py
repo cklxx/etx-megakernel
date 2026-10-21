@@ -1,4 +1,4 @@
-"""The session record (docs/SESSION-ARCH-2026-10-13.md, component B).
+"""The session record (docs/core/SESSION-ARCH-2026-10-13.md, component B).
 
 Invariant: a result is a SEALED record whose every byte was written by this session's processes after they were
 reaped. The runner creates the record directory itself (never an existing one), owns every file in it, and seals it

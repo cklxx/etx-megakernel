@@ -3,7 +3,7 @@ stager/validator/reference/qualification with gate='module', and the median-logi
 
 Tests that need the production HF reference (FineGrainedFP8 dequantize) need
 `accelerate`; they skip without it (run them in the module-gate venv, see
-docs/QWEN-BATCH-GLM53-RUNBOOK.md#module-gate).
+docs/glm/QWEN-BATCH-GLM53-RUNBOOK.md#module-gate).
 """
 import copy
 import json
@@ -177,7 +177,7 @@ def test_verify_applies_the_median_rule_and_keeps_gates_apart(tmp_path):
 
 
 def test_rule_is_registered_between_the_measured_correct_and_buggy_bodies():
-    # CPU runs of the native body against this reference (docs/QWEN-BATCH-GLM53-RUNBOOK.md#module-gate)
+    # CPU runs of the native body against this reference (docs/glm/QWEN-BATCH-GLM53-RUNBOOK.md#module-gate)
     correct, smallest_bug = 0.453, 5.02
     assert correct * 3 < mg.MEDIAN_LOGIT_BOUND < smallest_bug / 3
 

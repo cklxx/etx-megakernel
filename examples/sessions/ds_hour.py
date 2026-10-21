@@ -1,4 +1,4 @@
-"""The next paid hour (plan: docs/DSV2-D1-D5.md, "The next paid hour"; every rule fixed in that file before its code).
+"""The next paid hour (plan: docs/deepseek/DSV2-D1-D5.md, "The next paid hour"; every rule fixed in that file before its code).
 
 GPU order (one pairs invocation 5.9 s, one traced token 7-8 s, from the 2026-10-13 runner records):
   pairs_l1         D2b rerun, 3-way default / relaxed / l1, D2's rule           15 inv, ~88 s

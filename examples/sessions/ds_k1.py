@@ -1,4 +1,4 @@
-"""The K1 hour (docs/DSV2-D1-D5.md, "K1": rules written before the code, commit 2ec2d29). Kept arm alld4r0l1 against:
+"""The K1 hour (docs/deepseek/DSV2-D1-D5.md, "K1": rules written before the code, commit 2ec2d29). Kept arm alld4r0l1 against:
 
 GPU order (one pairs invocation 5.9 s, one traced token 7-8 s, from the 2026-10-13 runner records):
   pairs_alld4r0l1kvs   K1: kv_a computed once (1/8 per XCD) behind a global qkv event; KEEP or DROP   10 inv, ~59 s

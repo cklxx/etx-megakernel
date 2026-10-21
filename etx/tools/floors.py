@@ -19,7 +19,7 @@ overlap floor = max(step bytes/BW, 48 x (sum over phases of ISA chain + handoffs
 The overlap floor assumes that every byte streams under earlier phases, with unlimited capacity.
 The handoff term is the measured 9 edges per layer. It is a measurement of the edge, not of a body.
 
-Inputs: docs/FLOORS-2026-10-08.md holds the round11 phase table, recomputed from the raw trace,
+Inputs: docs/qwen/FLOORS-2026-10-08.md holds the round11 phase table, recomputed from the raw trace,
 and the ISA hop table with the MATCH .s lines. `round11_from_trace` recomputes the phase table.
 `python -m etx.tools.isa_phases` recomputes the ISA hop table.
 """
@@ -33,11 +33,11 @@ import re
 import statistics
 
 ROOT = Path(__file__).resolve().parents[2]
-DOC = 'docs/FLOORS-2026-10-08.md'
-BUDGET = 'docs/BUDGET-2026-10-01.md'
-TILES = 'docs/TILES-2026-10-07.md'
-VALID = 'docs/VALIDATION-baremetal-2026-10-01.md'
-BW_DOC = 'docs/BANDWIDTH-2026-10-07.md'
+DOC = 'docs/qwen/FLOORS-2026-10-08.md'
+BUDGET = 'docs/qwen/BUDGET-2026-10-01.md'
+TILES = 'docs/qwen/TILES-2026-10-07.md'
+VALID = 'docs/qwen/VALIDATION-baremetal-2026-10-01.md'
+BW_DOC = 'docs/qwen/BANDWIDTH-2026-10-07.md'
 PHASES = ('qkv', 'prep', 'attn', 'reduce', 'o_proj', 'router', 'topk', 'moe_up', 'moe_down')
 TAIL = ('prologue', 'in_norm', 'lm_head', 'argmax')
 ISA_TAIL = ('prologue', 'in_norm', 'argmax')            # tail phases with an ISA hop row
@@ -117,7 +117,7 @@ def probes_us() -> dict[str, tuple[float | None, str]]:
 
 # Static evidence of the hop chains: (revision, path, line, text). The ETX lines are in this repository at the
 # round11 commit. The vLLM lines are in a vLLM v0.27.1 checkout. tests/test_floors.py checks each line where the
-# revision is present. See docs/FLOORS-2026-10-08.md for the chains.
+# revision is present. See docs/qwen/FLOORS-2026-10-08.md for the chains.
 TILE_REV = 'ae1529c'
 VLLM_REV = '6e448d0ea9bf3d88d898b65449ca6dc2aec170ac'
 TILE_EVIDENCE = (

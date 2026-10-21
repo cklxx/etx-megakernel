@@ -1,4 +1,4 @@
-"""Batch studies: total throughput and per-request latency, each decided on its own (docs/BATCH-2026-10-14.md).
+"""Batch studies: total throughput and per-request latency, each decided on its own (docs/deepseek/BATCH-2026-10-14.md).
 
 Model-agnostic. A study has, per batch size B, one ETX arm and the strongest legal vLLM configuration on the same box.
 Round 0 selects the vLLM baseline per B; rounds 1-5 give one (ETX, vLLM) pair per B each. Every timing is decimal

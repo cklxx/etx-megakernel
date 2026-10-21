@@ -1,7 +1,7 @@
 """Qwen B2/B4/B8 functional qualification, without a performance verdict.
 
 All GPU commands use pre-staged local assets. No download or provisioning.
-See docs/QWEN-BATCH-GLM53.md for reference preparation and session commands.
+See docs/glm/QWEN-BATCH-GLM53.md for reference preparation and session commands.
 """
 from __future__ import annotations
 

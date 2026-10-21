@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Batching against layer pipelining across XCDs on the build-3 structure, analytic (docs/MODEL-vllm-kernels.md
+"""Batching against layer pipelining across XCDs on the build-3 structure, analytic (docs/qwen/MODEL-vllm-kernels.md
 section 17): what a batch of B tokens costs on the whole GPU (dense weights once, the union of B tokens' experts,
 the per-launch tax as in the simulator) against a pipeline of S stages of 8/S XCDs each, micro-batches of m tokens,
 S x m requests in flight, each stage streaming its 48/S layers at the stage's own bandwidth.

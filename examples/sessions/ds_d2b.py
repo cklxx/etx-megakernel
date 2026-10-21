@@ -1,4 +1,4 @@
-"""D2b session (thresholds: docs/DSV2-D1-D5.md, "D2b"): l1 (three-way default / relaxed / l1, D2's rule) and
+"""D2b session (thresholds: docs/deepseek/DSV2-D1-D5.md, "D2b"): l1 (three-way default / relaxed / l1, D2's rule) and
 alld4r0l1 (three-way default / alld4r0 / alld4r0l1, KEEP vs alld4r0). The full prep chain of ds_inplace.py runs first
 (idempotent on a box that already has the inputs), so this file works on a fresh droplet.
 Run: examples/dsv2lite/reproduce.sh stage <ip> && examples/dsv2lite/reproduce.sh box-setup <ip> &&

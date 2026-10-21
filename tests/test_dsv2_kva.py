@@ -1,4 +1,4 @@
-"""K1 (docs/DSV2-D1-D5.md): ETX_DSV2_KVA=shared computes kv_a once (1/8 per XCD) behind a global qkv event.
+"""K1 (docs/deepseek/DSV2-D1-D5.md): ETX_DSV2_KVA=shared computes kv_a once (1/8 per XCD) behind a global qkv event.
 Default byte-identical; shared: the event, the edges, the symbols, the compiled scope; refusals; the registry arms."""
 import hashlib
 import os
@@ -86,7 +86,7 @@ def test_unsupported_combinations_are_refused(monkeypatch, env, match):
 
 @pytest.mark.parametrize("requests", [2, 4, 8])
 def test_shared_kva_builds_for_more_than_one_request(monkeypatch, requests):
-    # section 10 of docs/BATCH-2026-10-14.md: the batch arms carry K1, so the one-request scope guard is gone; the
+    # section 10 of docs/deepseek/BATCH-2026-10-14.md: the batch arms carry K1, so the one-request scope guard is gone; the
     # qkv event stays device-scope, i.e. every attention task waits for all of that request's qkv tasks
     for k, v in {"ETX_DSV2_KVA": "shared", "ETX_DSV2_REQUESTS": str(requests),
                  "ETX_DSV2_COUPLE": "none"}.items():

@@ -1,4 +1,4 @@
-// Hardware primitives of the DeepSeek decode model (docs/MODEL-dsv2.md, parameters H2, H5-H11, H13, pairs E1-E4). Every
+// Hardware primitives of the DeepSeek decode model (docs/deepseek/MODEL-dsv2.md, parameters H2, H5-H11, H13, pairs E1-E4). Every
 // mode prints RESULT lines; times from s_memrealtime (100 MHz, one clock for the whole GPU) unless noted.
 //
 //   hw_bench stream    phase replica: A workgroups (spread evenly over the 8 XCDs) each stream B bytes of weights,
@@ -19,7 +19,7 @@
 //   hw_bench pair      two workgroups per CU: a foreground body X timed beside a background body Y on the same CU, for
 //                      X, Y in {stream, chain (fold-like: 64 KB shared read + LDS reduce + 2 barriers + a 2 KB norm), alu,
 //                      lds, idle}. Reports X's time with Y / X's time alone.
-// Added 2026-09-28 for the vLLM-kernel model (docs/MODEL-vllm-kernels.md: every parameter the simulator used to fit):
+// Added 2026-09-28 for the vLLM-kernel model (docs/qwen/MODEL-vllm-kernels.md: every parameter the simulator used to fit):
 //   hw_bench lat       dependent round trip (pointer chase, one wave, 2000 hops over distinct 128 B lines in random order),
 //                      vector (global_load) and scalar (s_load) loads, the line in L1 / K$, L2, MALL or HBM, optionally a
 //                      buffer_inv sc0 / sc1 before every hop (the state after an ETX acquire), with the other 303 CUs idle
@@ -41,7 +41,7 @@
 //                      j, j+24, j+48, ...): same experts, bytes, load depth and code but the row address. Cold reads (an
 //                      expert recurs only after >= 350 MB, beyond the 256 MB MALL), a position-dependent fill, and a per-pass
 //                      sum checksum against the host's expected value; 5 launch pairs, order reversed on odd pairs. Decides
-//                      Q2 (docs/INVENTORY-SYSTEM-2026-10-13.md 4.2); rule in examples/vllm_llm/results/QWEN-READINESS-2026-10-14.md section 4.
+//                      Q2 (docs/core/INVENTORY-SYSTEM-2026-10-13.md 4.2); rule in examples/vllm_llm/results/QWEN-READINESS-2026-10-14.md section 4.
 //   hw_bench streamw   the stream shapes at 256 AND 1024 threads per workgroup: the achievable rate in the
 //                      megakernel's own 16-wave regime, which `stream` (256 threads) does not measure.
 //   hw_bench launch    the kernel boundary with work: 200 kernels in one HIP graph, each reads the previous kernel's output

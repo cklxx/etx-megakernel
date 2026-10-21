@@ -193,7 +193,7 @@ extern "C" __device__ void fleet_attention(const etx_ctx* c) {
   pro_end(fp, s, PRO_SLOT(L, fleet::TASK_ATTENTION, c), t0);
 }
 #if defined(ETX_DSV2_KVA_SHARED) && ETX_DSV2_KVA_SHARED
-// K1 (docs/DSV2-D1-D5.md, ETX_DSV2_KVA=shared; the arm passes -DETX_DSV2_KVA_SHARED=1): fleet's FLAG_KVA_SHARED -- each XCD
+// K1 (docs/deepseek/DSV2-D1-D5.md, ETX_DSV2_KVA=shared; the arm passes -DETX_DSV2_KVA_SHARED=1): fleet's FLAG_KVA_SHARED -- each XCD
 // computes 1/8 of the 576 kv_a rows into ONE buffer instead of its own full copy, graph.py makes the qkv event global and
 // attention reads that buffer. Compiled only in that build: the default translation unit stays byte-identical (with the
 // entry points always present, the unchanged default ISA moved in 78 lines on ROCm 7.2.4). A plan that names these
@@ -243,7 +243,7 @@ extern "C" __device__ void fleet_lm_head_fold(const etx_ctx* c) { fleet_call(c, 
 extern "C" __device__ void fleet_argmax(const etx_ctx* c) { fleet_call(c, fleet::TASK_ARGMAX, 0, -1, -1, 1, -1, 0); }
 
 #if defined(ETX_DSV2_KCHUNKS) && ETX_DSV2_KCHUNKS
-// D3 (docs/DSV2-D1-D5.md): gate_up -> down handed over in 4 K-chunks of 352 rows of h. gate_up signals chunk c on the
+// D3 (docs/deepseek/DSV2-D1-D5.md): gate_up -> down handed over in 4 K-chunks of 352 rows of h. gate_up signals chunk c on the
 // XCD's counter KCH_EVENT(L) + c from every wave as its rows land (fleet's CHUNK_SIGNAL); down -- whose ETX edge is the
 // routing, not gate_up -- waits chunk 0 here and chunks 1..3 inside fleet's body (CHUNK_WAIT), each followed by
 // buffer_inv sc1 (lever kchunk352). A worker's gate_up precedes its down in its queue, so the waits cannot deadlock.
@@ -291,7 +291,7 @@ extern "C" __device__ void fleet_expert_down_k(const etx_ctx* c) {
 #endif
 
 #if defined(ETX_DSV2_D4) && ETX_DSV2_D4
-// D4 (docs/DSV2-D1-D5.md; placement and its build-time check: examples/dsv2lite/d4_placement.py, graph.py
+// D4 (docs/deepseek/DSV2-D1-D5.md; placement and its build-time check: examples/dsv2lite/d4_placement.py, graph.py
 // build_moe_layer_d4). Grid constants (L, request, rows, spx). Routed grid coordinate k = routing slot k = XCD k;
 // shared grid coordinate x = shared half x on XCD top_k + x, which also runs rows [0, rows) of slots [x*spx, x*spx+spx).
 // A slice's h lives in its slot's h buffer (rows [0, rows) by the shared XCD, [rows, inter) by the routed XCD; rows is a

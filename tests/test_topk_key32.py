@@ -1,5 +1,5 @@
 """ETX_TOPK_KEY32: the key mapping, the DPP wave max model, and the selection against the old path (CPU only).
-See docs/TOPK-KEY32-2026-10-08.md and etx/ops/topk_key32.py."""
+See docs/core/TOPK-KEY32-2026-10-08.md and etx/ops/topk_key32.py."""
 from __future__ import annotations
 
 import os

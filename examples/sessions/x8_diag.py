@@ -10,7 +10,7 @@ eight requests and the candidate list is:
   x8   x8p + M1 + K1 (section 10's recipe, the one the first failure came from)
 
 Only the build and gate jobs run here; the winner's timing is measured by the batch study's own rounds afterwards
-(docs/BATCH-2026-10-14.md section 10 says no timing is reported from an arm whose gate failed).
+(docs/deepseek/BATCH-2026-10-14.md section 10 says no timing is reported from an arm whose gate failed).
 
 Run: examples/dsv2lite/reproduce.sh stage <ip> && ETX_SESS_USER=root ETX_SESS_MAX_SECONDS=2700 \
      tools/session.sh start <ip> examples/sessions/x8_diag.py

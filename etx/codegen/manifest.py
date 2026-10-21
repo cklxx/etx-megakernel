@@ -74,7 +74,7 @@ def guard_block(codegen: dict) -> list[str]:
     return out
 
 
-# ---- variant selection (docs/PLAN-generic-decoder-2026-10-08.md sections 6.2, 6.3; docs/SEC7-interface-fix.md)
+# ---- variant selection (docs/core/PLAN-generic-decoder-2026-10-08.md sections 6.2, 6.3; docs/core/SEC7-interface-fix.md)
 #
 # The planner selects one variant (one export) for each phase. `Graph.codegen[SELECTION]` carries that choice, and
 # `selection_block()` publishes it in plan_data.h. The host reads it there and nowhere else: it compares every plan

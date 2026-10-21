@@ -132,7 +132,7 @@ def graph_eligibility(plan: dict) -> dict:
     return dict(status='UNAVAILABLE', reason=reason, unsafe_types=found,
                 evidence=['examples/dsv2lite/fleet_shim.hip: FLAG_ROUTING_CACHED',
                           'etx/codegen/kernel.py: _emit_unfused allocates per-launch LDS',
-                          'docs/ETX_Technical_Design.md section 15.7: retained wrong-layer unfused result'])
+                          'docs/core/ETX_Technical_Design.md section 15.7: retained wrong-layer unfused result'])
 
 
 class AttributionSession(BatchSession):

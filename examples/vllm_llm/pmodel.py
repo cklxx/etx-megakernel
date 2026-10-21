@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The phase cost model of a compiled plan (docs/MODEL-vllm-kernels.md section 19), replacing the per-task /
+"""The phase cost model of a compiled plan (docs/qwen/MODEL-vllm-kernels.md section 19), replacing the per-task /
 per-event model of section 10.
 
 The old model charged a tax per task and counted events, so folding operations and cutting events predicted large
@@ -36,7 +36,7 @@ from etx.sim.xcd import Cost, Hw, simulate
 
 PROFILES = ("2026-09-30", "2026-10-08")
 STREAM_ROLES = {"qkv", "o_proj", "router", "moe_up", "moe_down", "lm_head"}
-# Round11 critical bodies, from another build (docs/FLOORS-2026-10-08.md).
+# Round11 critical bodies, from another build (docs/qwen/FLOORS-2026-10-08.md).
 NARROW_BODY_US = {"prep": 6.04, "reduce": 5.58, "topk": 8.35, "prologue": 11.3,
                   "in_norm": 5.6, "argmax": 10.1}
 # Pre-session host excess: results_tiles/ab{1,2,3}_all_x.log; VLLM-LADDER-2026-10-01.md.
@@ -49,7 +49,7 @@ FUSED_US = 1.8          # fitted: what the megakernel costs on top of that, over
                         # kernel with 388 task types, 128 VGPRs and 10 spills is not free to dispatch into.
 ROOT = Path(__file__).resolve().parents[2]
 
-# ETX_VL_COH (docs/MODEL-vllm-kernels.md section 20): DSL tiles read activations coherently and their acquire no
+# ETX_VL_COH (docs/qwen/MODEL-vllm-kernels.md section 20): DSL tiles read activations coherently and their acquire no
 # longer invalidates the XCD's L2. What that removes from the fitted per-phase constants cannot be derived from
 # first principles -- the fit bundles acquire, argument path, release and wave start -- so the model carries it as
 # a RANGE, not a point: the measured pieces bound the inv + write-back share of (etx_us + fused_us) at roughly
@@ -174,7 +174,7 @@ def wall_ms(plan: str | Path, cfg: dict, fused: bool, profile: str) -> float:
 
 
 def predict_coh(plan_path: str | Path, cfg: dict, mapping: str = "contig") -> dict:
-    """The build-4 (ETX_VL_COH) prediction as a range (docs/MODEL-vllm-kernels.md section 20): the overhead share
+    """The build-4 (ETX_VL_COH) prediction as a range (docs/qwen/MODEL-vllm-kernels.md section 20): the overhead share
     alone at its low and high estimates, then with the touch landing."""
     out = {"base": step_us(plan_path, cfg, mapping)}
     out["coh_lo"] = step_us(plan_path, cfg, mapping, coh_save_us=COH_SAVE_LO)

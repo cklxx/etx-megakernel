@@ -1,4 +1,4 @@
-"""Lever merge_uv_waves (M1, docs/DSV2-D1-D5.md): merge's W_UV rows over all four waves, bit-identical by construction."""
+"""Lever merge_uv_waves (M1, docs/deepseek/DSV2-D1-D5.md): merge's W_UV rows over all four waves, bit-identical by construction."""
 import shutil
 
 import pytest

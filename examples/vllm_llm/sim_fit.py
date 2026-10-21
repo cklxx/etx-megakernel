@@ -1,5 +1,5 @@
 """Fit the XCD simulator's two spread parameters (wake-up, stream-rate cv) to the measured ramps and tails of the MoE
-xcd trace (docs/MODEL-vllm-kernels.md section 2). python3 examples/vllm_llm/sim_fit.py"""
+xcd trace (docs/qwen/MODEL-vllm-kernels.md section 2). python3 examples/vllm_llm/sim_fit.py"""
 import json, re, sys
 from collections import defaultdict
 from statistics import median

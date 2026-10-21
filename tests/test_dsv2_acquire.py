@@ -1,5 +1,5 @@
 """D1: every DeepSeek session builds with the safe sc1 acquire; the relaxed sc0 acquire appears only in an arm that is
-named for it (examples/dsv2lite/acquire.py, docs/DSV2-D1-D5.md)."""
+named for it (examples/dsv2lite/acquire.py, docs/deepseek/DSV2-D1-D5.md)."""
 from pathlib import Path
 
 import pytest

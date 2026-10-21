@@ -1,4 +1,4 @@
-"""The same decoder as examples/llm/model.py, built as one slice per XCD (design: docs/PLAN-fusion-win.md, section 2).
+"""The same decoder as examples/llm/model.py, built as one slice per XCD (design: docs/qwen/PLAN-fusion-win.md, section 2).
 
 Every layer is cut into X = 8 slices pinned to the XCDs with `domain_map`, the way fleet-mi300x's
 Chiplet tasks are.  Inside a slice only XCD-local events are used; the slices meet at two device-wide

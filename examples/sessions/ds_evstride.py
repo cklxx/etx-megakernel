@@ -1,5 +1,5 @@
 """A/B of ETX_EV_STRIDE (event counters one cache line each) on DeepSeek-V2-Lite, one and two requests, alternated on GPU 0;
-a traced one-request run with the stride on GPU 1 for the ledger. Prediction (docs/MODEL-dsv2.md H6, 2026-09-27): about
+a traced one-request run with the stride on GPU 1 for the ledger. Prediction (docs/deepseek/MODEL-dsv2.md H6, 2026-09-27): about
 5 XCD-local hand-offs per MoE layer lose ~2.3 us each to the shared line, so up to ~11 us per layer, ~0.3 ms per token.
 Assumes the environment, references and weights of ds_model.py are in place (same VM)."""
 from examples.dsv2lite.acquire import ACQUIRE, RELAXED   # D1: safe sc1 unless an arm names RELAXED

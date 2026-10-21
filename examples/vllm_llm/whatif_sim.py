@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""What each lever is worth on the MoE step, from the XCD simulation (docs/MODEL-vllm-kernels.md section 8):
+"""What each lever is worth on the MoE step, from the XCD simulation (docs/qwen/MODEL-vllm-kernels.md section 8):
 
   levers    one request: the argument path per imported kernel, hardware barriers, cheaper hand-offs
   interleave  two requests in one megakernel, one workgroup per CU: the second request's tasks fill the CUs the first

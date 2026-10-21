@@ -1,5 +1,5 @@
-"""Item 6 of docs/PLAN-generic-decoder-2026-10-08.md section 7: the planner's selection goes into the feature
-manifest, and the host reads it from there (docs/SEC7-interface-fix.md section 6).
+"""Item 6 of docs/core/PLAN-generic-decoder-2026-10-08.md section 7: the planner's selection goes into the feature
+manifest, and the host reads it from there (docs/core/SEC7-interface-fix.md section 6).
 
 The selection is published in plan_data.h only (etx/codegen/manifest.py selection_block). The host reads it through
 etx/runtime/include/etx/selection.h, which these tests compile and run with the CPU compiler. The megakernel source
@@ -22,7 +22,7 @@ from etx.passes import compile_graph
 ROOT = Path(__file__).resolve().parents[1]
 INC = ROOT / "etx/runtime/include"
 BUDGET = {"threads": 1024, "vgpr": 128, "lds": 65536}
-# The MATCH configuration of the round11 build b_r8base (docs/PLAN-generic-decoder-2026-10-08.md section 2.2).
+# The MATCH configuration of the round11 build b_r8base (docs/core/PLAN-generic-decoder-2026-10-08.md section 2.2).
 MATCH_ENV = {"ETX_VL_XCD": "1", "ETX_VL_CHAIN": "1", "ETX_VL_DSL_GEMV": "1", "ETX_VL_DSL_TOPK": "1",
              "ETX_VL_DSL_ATTN": "head", "ETX_VL_DSL_FOLD": "1", "ETX_VL_TOUCH": "1", "ETX_VL_COH": "1",
              "ETX_VL_CU": "256", "ETX_VL_FOLD_TOPK": "0"}

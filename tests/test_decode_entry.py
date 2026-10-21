@@ -1,4 +1,4 @@
-"""Item 8 of docs/PLAN-generic-decoder-2026-10-08.md section 7: one entry point for the three GQA models
+"""Item 8 of docs/core/PLAN-generic-decoder-2026-10-08.md section 7: one entry point for the three GQA models
 (examples/vllm_llm/decode.py). CPU only: the tests check the selection and the commands, and run no step."""
 import ast
 import json

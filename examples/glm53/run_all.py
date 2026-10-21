@@ -1,6 +1,6 @@
 """One command for the GLM real-weight oracle: slice, HF reference, PP2 candidate, certificate.
 
-This is section 6 of docs/GLM-EXECUTION-DESIGN-2026-10-19.md as one entry point
+This is section 6 of docs/glm/GLM-EXECUTION-DESIGN-2026-10-19.md as one entry point
 instead of a shell heredoc. Every parameter is a flag or the environment
 variable named beside it; nothing about a particular machine is baked in.
 

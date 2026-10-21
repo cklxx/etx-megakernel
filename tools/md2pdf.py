@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Render a Markdown deliverable to PDF: markdown -> HTML (document stylesheet) -> headless Chrome.
 
-    .venv/bin/python tools/md2pdf.py docs/ETX_Technical_Design.md docs/ETX_Technical_Design.pdf
+    .venv/bin/python tools/md2pdf.py docs/core/ETX_Technical_Design.md docs/core/ETX_Technical_Design.pdf
 """
 from __future__ import annotations
 

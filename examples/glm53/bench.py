@@ -1,6 +1,6 @@
 """Per-batch GLM PP2 timing certificate: one build, one qualification, one number.
 
-This is the contract of section 9 of docs/GLM-EXECUTION-DESIGN-2026-10-19.md,
+This is the contract of section 9 of docs/glm/GLM-EXECUTION-DESIGN-2026-10-19.md,
 mirroring examples/vllm_llm/bench.py: each batch B in {1,2,4,8} has its own
 build, its own correctness qualification and its own certificate; no gate or
 number is shared between batches. The timed quantity is the host wall between

@@ -14,7 +14,7 @@ import subprocess
 
 BAR_US = 7.69
 BASELINE_US = 10.645
-# Feasibility: docs/X5-FEASIBILITY-and-SIM-2026-10-12.md.
+# Feasibility: docs/qwen/X5-FEASIBILITY-and-SIM-2026-10-12.md.
 # [U] BUILDABLE is an engineering verdict, not a staged/certified survivor.
 CANDIDATES = [
     ('ROCM_ATTN_G8', 'READY control', 'PART=256, block=16, HD=128, GQA=8, MFMA16; existing importer', 10.645),

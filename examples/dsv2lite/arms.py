@@ -1,8 +1,8 @@
-"""The DeepSeek port's arms: ONE table (etx/session/experiment.py, component D of docs/SESSION-ARCH-2026-10-13.md).
+"""The DeepSeek port's arms: ONE table (etx/session/experiment.py, component D of docs/core/SESSION-ARCH-2026-10-13.md).
 
 The session's builds and pairs (inplace_session.py), its job graph (examples/sessions/ds_*.py), the local device build
 (rocm_build_check.sh --arm <name>) and every re-derivation read this table; nothing else names an arm's levers,
-flags, plan switches, invocation order, references or rule. Rules are copied verbatim from docs/DSV2-D1-D5.md, where
+flags, plan switches, invocation order, references or rule. Rules are copied verbatim from docs/deepseek/DSV2-D1-D5.md, where
 each was committed before its measurement (commits named in the text).
 
   python -m examples.dsv2lite.arms shell <arm>     the arm's build as shell assignments (rocm_build_check.sh)
@@ -23,7 +23,7 @@ LEVERS_ALL = ("gemv_no_terminal_all", "norm_tree_all", "argmax_tree", "topk_rank
 BASE_ENV = dict(ETX_DSV2_COH="0", ETX_DSV2_D4="0", ETX_DSV2_KCHUNKS="1", ETX_DSV2_D5="0")   # plan switches, all off
 D4 = ("-DETX_DSV2_D4=1",)
 D4R0 = dict(ETX_DSV2_D4="1", ETX_DSV2_D4_ROWS="0")
-BATCHES = (1, 2, 4, 8)                       # docs/BATCH-2026-10-14.md: the ETX arm of batch B is BATCH_ARMS[B]
+BATCHES = (1, 2, 4, 8)                       # docs/deepseek/BATCH-2026-10-14.md: the ETX arm of batch B is BATCH_ARMS[B]
 BATCH_ARMS = {1: "alld4r0l1kvsmw", 2: "x2", 4: "x4", 8: "x8"}   # B = 1: the kept arm (section 9 amendment, ebb8cc3)
 X8_CANDIDATES = ("x8p", "x8m", "x8k", "x8")   # the batch-8 recipe diagnostic (section 10); gates accept these
 BATCH_CONDITION = "one MI300X, bf16, batch B in (1, 2, 4, 8), context 1024, 32 greedy tokens per request, repeat 2"
@@ -75,7 +75,7 @@ ARMS = {a.name: a for a in [
         rule=Rule("device_ms", "all", 30, text="DROP if |median gain| <= spread or any pair is slower than all; KEEP only if every pair faster than "
                   "all, median >= 30 us and > 2 x spread; otherwise DROP (D5 rule commit 84eaa1b)",
                   labels=("KEEP", "DROP"))),
-    # K1 and the two ablations on the kept arm (docs/DSV2-D1-D5.md, "K1", rules written before the code, 2ec2d29)
+    # K1 and the two ablations on the kept arm (docs/deepseek/DSV2-D1-D5.md, "K1", rules written before the code, 2ec2d29)
     Arm("alld4r0l1kvs", levers=(*LEVERS_ALL, "l1_loads"), flags=(*D4, "-DETX_DSV2_KVA_SHARED=1"),
         env=dict(D4R0, ETX_DSV2_COH="l1", ETX_DSV2_KVA="shared"),
         order=("alld4r0l1", "alld4r0l1kvs"), references=("alld4r0l1",), stamped=True,
@@ -86,12 +86,12 @@ ARMS = {a.name: a for a in [
           rule=Rule("device_ms", "alld4r0l1", 0, text=f"REMOVE {lever} from the kept recipe if every pair faster than "
                     "alld4r0l1 and median > 2 x spread; otherwise it stays (rule commit 2ec2d29)", labels=("REMOVE", "STAYS")))
       for name, lever in (("alld4r0l1noQ", "gemv_no_terminal_all"), ("alld4r0l1noA", "argmax_tree"))),
-    # M1 on the kept arm (docs/DSV2-D1-D5.md, "M1", rule written before the code, 3d27ff8)
+    # M1 on the kept arm (docs/deepseek/DSV2-D1-D5.md, "M1", rule written before the code, 3d27ff8)
     Arm("alld4r0l1mw", levers=(*LEVERS_ALL, "l1_loads", "merge_uv_waves"), flags=D4, env=dict(D4R0, ETX_DSV2_COH="l1"),
         order=("alld4r0l1", "alld4r0l1mw"), references=("alld4r0l1",),
         rule=Rule("device_ms", "alld4r0l1", 30, text="M1: KEEP if every pair faster than alld4r0l1, median >= 30 us, "
                   "> 2 x spread; otherwise DROP (rule commit 3d27ff8)", labels=("KEEP", "DROP"))),
-    # KM: K1 and M1 together, against M1 alone (docs/DSV2-D1-D5.md, "KM", rule written before the code, bf92fd4)
+    # KM: K1 and M1 together, against M1 alone (docs/deepseek/DSV2-D1-D5.md, "KM", rule written before the code, bf92fd4)
     Arm("alld4r0l1kvsmw", levers=(*LEVERS_ALL, "l1_loads", "merge_uv_waves"), flags=(*D4, "-DETX_DSV2_KVA_SHARED=1"),
         env=dict(D4R0, ETX_DSV2_COH="l1", ETX_DSV2_KVA="shared"),
         order=("alld4r0l1", "alld4r0l1mw", "alld4r0l1kvsmw"), references=("alld4r0l1", "alld4r0l1mw"),
@@ -101,12 +101,12 @@ ARMS = {a.name: a for a in [
     Arm("x1km", levers=(*LEVERS_ALL, "l1_loads", "merge_uv_waves"),
         flags=("-DETX_DS_REQUESTS=1", "-DETX_SLOT_BY_CU", "-DETX_DSV2_KVA_SHARED=1"),
         env=dict(ETX_DSV2_COH="l1", ETX_DSV2_REQUESTS="1", ETX_DSV2_COUPLE="none", ETX_DSV2_KVA="shared")),
-    # batch 2 / 4 / 8 (docs/BATCH-2026-10-14.md, rules written before the code, 0fc38c9): the kept recipe without D4
+    # batch 2 / 4 / 8 (docs/deepseek/BATCH-2026-10-14.md, rules written before the code, 0fc38c9): the kept recipe without D4
     # (D4 refuses multiple requests), two workgroups per CU paired by CU, request r on slot r mod 2, no coupling.
     # Measured by examples/dsv2lite/batch_session.py against vLLM at the same B, not by `pairs`: no Rule here.
     # Scratch: x2 0; x4 32 and x8 96 B/lane on the local ROCm 7.2.4 compile (7 / 21 VGPRs holding SGPR spills; the
     # spills grow with the task types, i.e. with the requests). Allowance: twice the local figure, since the box's
-    # compiler differs (docs/BATCH-2026-10-14.md, local build evidence). Section 10 gave the arms M1 and K1: on the
+    # compiler differs (docs/deepseek/BATCH-2026-10-14.md, local build evidence). Section 10 gave the arms M1 and K1: on the
     # box (ROCm 7.14, one compile each, 2026-10-14) the new recipe spilled x2 32, x4 64 and x8 144 B/lane, so x2's
     # allowance rises from 0 to 64 with that measurement; x4's 64 and x8's 192 already covered it.
     *(Arm(f"x{n}", levers=(*LEVERS_ALL, "l1_loads", "merge_uv_waves"),
@@ -115,7 +115,7 @@ ARMS = {a.name: a for a in [
                    **({"ETX_DSV2_KVA": "shared"} if k1 else {})),
           scratch_allow=allow)
       for n, allow, k1 in ((2, 64, True), (4, 64, True))),
-    # The B4 mechanism microbenchmark (docs/DEEPSEEK-BATCH-MECHANISM-2026-10-18.md): x4's recipe plus in-situ copies of
+    # The B4 mechanism microbenchmark (docs/deepseek/DEEPSEEK-BATCH-MECHANISM-2026-10-18.md): x4's recipe plus in-situ copies of
     # gate_up/qkv/attn of layer 5, each alone, beside the CU's other slot (r1) and queued on the same slot (r2).
     # Never timed as a step; the copies run after the token, so the per-request gates still decide the invocation.
     Arm("x4iso", levers=(*LEVERS_ALL, "l1_loads", "merge_uv_waves"),

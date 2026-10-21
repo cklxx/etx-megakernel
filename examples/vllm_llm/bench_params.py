@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The kernel model's parameters from the microbenchmarks alone (docs/MODEL-vllm-kernels.md section 10), next to the
+"""The kernel model's parameters from the microbenchmarks alone (docs/qwen/MODEL-vllm-kernels.md section 10), next to the
 fitted ones, and the XCD simulation run with each set.
 
   python3 -m examples.vllm_llm.bench_params LOGDIR [--plan results_2026-09-28/plan_b_moe_xcd.json]

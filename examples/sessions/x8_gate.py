@@ -2,7 +2,7 @@
 
 The 2026-10-14 combined run passed the B = 2 and B = 4 gates and failed B = 8 with
 `error: requests 0 and 4 have the same golden tokens: one prompt twice` - the host's own duplicate check, which the
-docs/BATCH-2026-10-14.md 4a amendment had not reached yet. The host now prints `BATCHCOLLISION requests 0 and 4` and
+docs/deepseek/BATCH-2026-10-14.md 4a amendment had not reached yet. The host now prints `BATCHCOLLISION requests 0 and 4` and
 continues; the x8 arm has to be rebuilt because that string lives in the host binary, and its gate re-run.
 
 Only three jobs do work here: `build_x8` (the arm binary), `prep_goldens` (the reference set already exists in the data

@@ -11,7 +11,7 @@ Run inside the rocm/vllm container; VLLM_ROCM_USE_AITER=1 selects AITER kernels 
 the same prompt rotated by 97*i tokens, so every sequence has the same length but different content (a MoE routes them
 to different experts, as real concurrent requests would). The reported step time is per decode step of the whole batch.
 
---goldens G0 G1 ... --batches 1,2,4,8 (docs/BATCH-2026-10-14.md): sequence r's prompt and golden ids come from its own
+--goldens G0 G1 ... --batches 1,2,4,8 (docs/deepseek/BATCH-2026-10-14.md): sequence r's prompt and golden ids come from its own
 file Gr, and ONE engine measures every listed batch size in turn (sequences 0..B-1). Every sequence is checked on the
 warm-up and on every sample; nothing is filtered or stops the run. Per sequence and phase one `VLLMSEQ` line, per batch
 size one `VLLMB` line with the per-sample decode cost of the whole batch (etx/session/batch.py reads both).

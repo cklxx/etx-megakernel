@@ -1,4 +1,4 @@
-"""D4 (docs/DSV2-D1-D5.md): shared experts during routing, routed slices on the shared XCDs, and the build-time placement
+"""D4 (docs/deepseek/DSV2-D1-D5.md): shared experts during routing, routed slices on the shared XCDs, and the build-time placement
 check. The negative tests prove the refusal fires: in the rule, in the realised graph, inside graph.build() and through
 the real `etx compile` command line."""
 from __future__ import annotations

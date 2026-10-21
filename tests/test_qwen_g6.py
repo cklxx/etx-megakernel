@@ -1,4 +1,4 @@
-"""G6 on Qwen (docs/INVENTORY-SYSTEM-2026-10-13.md 4.1): the registry arm, its pre-registered rule at the boundaries,
+"""G6 on Qwen (docs/core/INVENTORY-SYSTEM-2026-10-13.md 4.1): the registry arm, its pre-registered rule at the boundaries,
 the timed-invocation gate, the session's job graph, and a stored verdict re-derived from the raw logs."""
 import json
 from pathlib import Path

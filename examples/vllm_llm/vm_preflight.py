@@ -20,7 +20,7 @@ from examples.vllm_llm.qwen300_config import IMAGE
 
 ROOT = Path(__file__).resolve().parents[2]
 KFD = Path('/dev/kfd')
-VLLM_TAG = 'v0.27.1'  # docs/DATA.md: pinned runtime's release tag
+VLLM_TAG = 'v0.27.1'  # docs/core/DATA.md: pinned runtime's release tag
 GOLDEN_SHA256 = 'bab2f1fbe12f70179711ec40a215c74710845b73169b1cc6a3a6ca50e0a19484'
 GATES = ('pytest', 'gfx942', 'dry_run', 'shell', 'local_matrix_16', 'rocm_build_check')
 

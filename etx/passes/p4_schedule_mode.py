@@ -128,7 +128,7 @@ def run(plan: Plan) -> None:
                 ep.scope = need
                 plan.graph.events[ev].scope = need
                 plan.say(f"P4: event {ev}: scope raised to {need.name} because {g.name} is globally scheduled")
-    # Coherence of each event's endpoints (docs/RESULTS-2026-09-30.md: the acquire's whole-L2 invalidate is why the
+    # Coherence of each event's endpoints (docs/qwen/RESULTS-2026-09-30.md: the acquire's whole-L2 invalidate is why the
     # megakernel's phases start cold). A "coherent" tile accesses its activations past the XCD caches, so it needs no
     # acquire invalidate; but a coherent consumer also bypasses a plain producer's L2, so such a producer must write
     # back (wbl2) on release even inside one XCD. The emitter reads these two bits per event. A "coherent_loads" tile is

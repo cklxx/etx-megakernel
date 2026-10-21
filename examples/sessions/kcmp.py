@@ -1,14 +1,14 @@
 """Per-kernel micro-session, only after nvref report and fetch.
 
 Operator prerequisites: nvref report finished and fetched; retain its logs in sess.
-Budget and VM-life limits: docs/KCMP-THRESHOLDS.md,
+Budget and VM-life limits: docs/qwen/KCMP-THRESHOLDS.md,
 section 5: estimated five GPU minutes, ten VM minutes, $0.50; skip if
 nvref ends after 45 minutes, and retain the operator's 55-minute VM hard stop.
 This job file does not provision or extend the VM deadline. Historical traces on
 VF hardware are not a matched baseline; the requested fixed job list excludes kc_vllm.
 
 All numeric threshold statements below are verbatim from
-docs/KCMP-THRESHOLDS.md (section 4).
+docs/qwen/KCMP-THRESHOLDS.md (section 4).
 
 Define the gain g = (ETX standalone median − best vendor standalone median), per layer; a positive g means the vendor kernel is faster.
 

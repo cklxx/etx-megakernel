@@ -1,4 +1,4 @@
-"""KM: K1 and M1 together (docs/DSV2-D1-D5.md, "KM": rule written before the code, commit bf92fd4).
+"""KM: K1 and M1 together (docs/deepseek/DSV2-D1-D5.md, "KM": rule written before the code, commit bf92fd4).
 
 GPU order: pairs_alld4r0l1kvsmw, five rounds of alld4r0l1, alld4r0l1mw, alld4r0l1kvsmw (15 invocations, ~90 s at
 5.9 s each [E from M]). Decided against alld4r0l1mw; the gain vs alld4r0l1 is attribution only. The prep chain of

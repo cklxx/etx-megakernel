@@ -9,7 +9,7 @@ output-buffer coverage, cache visibility correctness or measured GPU performance
 
 For the complete CPU acceptance target (numerical gates, captured operator specs,
 regression tests, code generation and optional formal/device compilation), see
-[G0 CPU readiness](../docs/CPU-READINESS.md).
+[G0 CPU readiness](../docs/core/CPU-READINESS.md).
 
 ## Run and recompute
 

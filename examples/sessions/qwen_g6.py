@@ -1,5 +1,5 @@
 """G6 on Qwen3-30B-A3B: the compiler's `coherent_l1` mode (ETX_COHERENCE=l1) against the kept build, under G6's rule
-(docs/INVENTORY-SYSTEM-2026-10-13.md section 4.1, written before the code). DeepSeek's half was measured in the
+(docs/core/INVENTORY-SYSTEM-2026-10-13.md section 4.1, written before the code). DeepSeek's half was measured in the
 2026-10-13 paid hour (examples/dsv2lite/results/2026-10-13-hour, pairs_l1: +330 us vs default, spread 13 us).
 
 Order: preflight, both builds and the hw_bench build (CPU, in parallel) -> moerows, the Q2 decision microbenchmark
@@ -20,8 +20,8 @@ SUMMARY = [r"^(PREFLIGHT|BUILD|CERTIFIED|VERDICT|PAIRS) "]
 # The box's Qwen inputs (examples/vllm_llm/stage_qwen.py writes it). session.sh start forwards a laptop override;
 # every job carries the selected path explicitly.
 CONFIG = os.environ.get("ETX_QWEN_G6_CONFIG", os.path.expanduser("~/qwen-g6.json"))
-# staging, pinned BEFORE anything is fetched: the HF revision every Qwen session recorded (docs/NVREF-2026-10-09.md:26,
-# docs/NVREF2-2026-10-09.md:59), the vLLM runtime's release tag (vm_preflight.VLLM_TAG), the repo's golden (its sha256 is
+# staging, pinned BEFORE anything is fetched: the HF revision every Qwen session recorded (docs/qwen/NVREF-2026-10-09.md:26,
+# docs/qwen/NVREF2-2026-10-09.md:59), the vLLM runtime's release tag (vm_preflight.VLLM_TAG), the repo's golden (its sha256 is
 # vm_preflight.GOLDEN_SHA256). Paths are the box's: what vm_preflight checks by default.
 HF_REPO = "Qwen/Qwen3-30B-A3B"
 HF_REVISION = "ad44e777bcd18fa416d9da3bd8f70d33ebb85d39"

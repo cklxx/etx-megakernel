@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Simulate the fused ETX step of a vLLM-kernel plan on MI300X's XCDs with the kernel model's costs, and put it next to
-the measured trace (docs/MODEL-vllm-kernels.md):
+the measured trace (docs/qwen/MODEL-vllm-kernels.md):
 
   task cost   the kernel model's ETX-task terms (examples/vllm_llm/kmodel.py): front = the argument path after the
               acquire, chain = scalar + vector round trips + barriers + reductions + issue, stream = bytes per task at

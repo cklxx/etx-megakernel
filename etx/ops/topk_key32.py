@@ -9,7 +9,7 @@ a DPP wave max per round (row_shr 1, 2, 4, 8, row_bcast:15 with row_mask 0xa, ro
 lane 63), m from the round-0 key, the weights from the winner lane's p.
 
 numpy's float32 exp is not the device expf. Both functions use the same exp, so a comparison of the two checks the
-selection and the order of the arithmetic, not the last bit of expf. See docs/TOPK-KEY32-2026-10-08.md.
+selection and the order of the arithmetic, not the last bit of expf. See docs/core/TOPK-KEY32-2026-10-08.md.
 """
 from __future__ import annotations
 

@@ -3,7 +3,7 @@
 alld4s is all levers + D4 with 32-row slices; alld4r0 is the measured best arm with zero slice rows.
 KEEP against alld4r0, device basis: every pair faster, median >= 30 us and > 2 x full-range spread.
 Every invocation requires 32/32 HF-greedy tokens, 27/27 layers, and a 32/32 warm-up. Both device and wall
-results are retained. The threshold was fixed before the implementation in docs/DSV2-D1-D5.md.
+results are retained. The threshold was fixed before the implementation in docs/deepseek/DSV2-D1-D5.md.
 
 Inputs and the pinned fleet export are reused from the box, verified before any timed invocation. No provisioning
 or downloads. Thirty minutes is a hard session cap; builds run on CPU in parallel, then all 15 invocations use GPU 0.

@@ -1,4 +1,4 @@
-"""Tile primitives (docs/PLAN-generic-decoder-2026-10-08.md section 6.4).
+"""Tile primitives (docs/core/PLAN-generic-decoder-2026-10-08.md section 6.4).
 
 A tile generator calls a primitive by name. The C definition of the primitive comes from the machine model
 (`primitives:` in etx/machine/arch/<arch>.yaml). This module does not test an architecture name.

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Where the time of a fused (or unfused) ETX step with vLLM's kernels goes, role by role, next to vLLM's own launch of
-the same kernel (docs/MODEL-moe.md: h = hand-off, p = what the imported form adds per task).
+the same kernel (docs/qwen/MODEL-moe.md: h = hand-off, p = what the imported form adds per task).
 
   ledger   ETX_TRACE of a fused run: for each launch B after launch A in plan order,
              handoff = B first ready - A last done      (the event: release, arrive, poll, acquire)

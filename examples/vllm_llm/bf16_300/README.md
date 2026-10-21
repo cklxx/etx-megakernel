@@ -1,7 +1,7 @@
 # BF16 300 tok/s: CPU probe preparation
 
 This implements preparation for step 2 of section 7 of
-`docs/PLAN-300TOKS-2026-10-11.md`. It is **not a model implementation,
+`docs/qwen/PLAN-300TOKS-2026-10-11.md`. It is **not a model implementation,
 performance result or correctness certificate**. No GPU, provisioning or network
 spend was used. The vendor-MoE-swap route remains CLOSED at the supplied
 30.72 us/layer; reduced precision is excluded.
@@ -223,7 +223,7 @@ The unstamped original has no fabricated timestamps. Replay covers one expert's
 MoE up/down task group, including mode-zero `_fold` aliases; it does not implement
 the standalone fusion prototype, dispatcher probes or full-model token checking.
 
-See [the record/CPU evidence/session contract](../../../docs/INBODY-INSTRUMENT-2026-10-11.md)
+See [the record/CPU evidence/session contract](../../../docs/qwen/INBODY-INSTRUMENT-2026-10-11.md)
 and `examples/sessions/inbody.py` for the single 900-second gpu_jobs attempt.
 GPU perturbation, full-model correctness and exclusive removable-work credit
 remain unmeasured. The enabled allocations differ; no historical certificate

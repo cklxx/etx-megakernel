@@ -1,4 +1,4 @@
-"""GPU session: calibrate the operation-level model of the DeepSeek-V2-Lite decode (docs/MODEL-dsv2.md).
+"""GPU session: calibrate the operation-level model of the DeepSeek-V2-Lite decode (docs/deepseek/MODEL-dsv2.md).
 
 GPU 0: the hardware primitives (bench/hw/hw_bench.hip: stream, shared, handoff, wg + clock, pair), then the in-situ
        phase benchmarks with the real tiles (ETX_DSV2_ISOLATE): every phase of layer 5 alone (one request), and the
@@ -6,7 +6,7 @@ GPU 0: the hardware primitives (bench/hw/hw_bench.hip: stream, shared, handoff, 
        latency beside latency).
 GPU 1: request 0's reference + weights, request 1's reference, then hardware counters of whole tokens (one counter set per
        job, so an unsupported counter only loses its own job).
-Each result feeds one row of docs/MODEL-dsv2.md section 5; the alternatives to check when a prediction misses are in
+Each result feeds one row of docs/deepseek/MODEL-dsv2.md section 5; the alternatives to check when a prediction misses are in
 section 3 of the same file.
 
   python3 -m etx.tools.gpu_jobs examples/sessions/ds_model.py --gpus 0,1 --logdir ~/sess

@@ -24,7 +24,7 @@ The runner stops at 8400s, 600s below the 150-minute machine life.
 KEY32 acceptance is reused, never a new timing tranche:
 results_qwen300_2026-10-11/job2_run4.log:138,144 records 0.231ms paired
 saving (spread 0.016ms) and 4.180ms host wall = 239.23 tok/s, with checks
-at :47,60 and 32/32 in all timed logs (docs/KEY32-MEASURED-2026-10-11.md).
+at :47,60 and 32/32 in all timed logs (docs/qwen/KEY32-MEASURED-2026-10-11.md).
 This scheduling-only change leaves the KEY32 build recipe/identity unchanged.
 A new candidate/diagnostic/combination identity still buys fresh correctness
 inside its existing tranche before timing; it never adds KEY32 off/on pairs.
@@ -48,7 +48,7 @@ from examples.vllm_llm.qwen300_config import IMAGE, QWEN300_HOUR_MAX_SESSION_SEC
 
 ROOT = Path(__file__).resolve().parents[2]
 MANIFEST = Path(__file__).with_name('qwen300_hour_arms.json')
-# Registration: main 9f91f3a, docs/PLAN-300TOKS-2026-10-11.md:297,304,310,318,320.
+# Registration: main 9f91f3a, docs/qwen/PLAN-300TOKS-2026-10-11.md:297,304,310,318,320.
 MAX_SESSION_SECONDS = QWEN300_HOUR_MAX_SESSION_SECONDS
 ENVIRONMENT_GUARD_SECONDS = 240
 TRANCHE_SECONDS = dict(A=900, B=1320, C=4020, D=1910)
@@ -303,24 +303,24 @@ REGISTERED = {
     'D.system': '5 adjacent pinned pairs; LEAD all deltas <0, median <=-0.050 ms',
 }
 THRESHOLD_SOURCES = {
-    'GUARD': 'docs/LEVERS-MORE-2026-10-12.md:section 1; PLAN-300-CERTAIN-2026-10-12.md F0',
-    'A1.busy': 'docs/qwen300-hour-2026-10-11.md:39',
-    'A1.free': 'docs/qwen300-hour-2026-10-11.md:40',
-    'A1.floor': 'docs/X7-SCHEDULE-WHATIF-2026-10-11.md:164',
-    'A.loads': 'docs/VERIFY-PLAN-2026-10-12.md; MASTER-TABLE-2026-10-11.md QK6/OP3/M.J',
-    'A2.route': 'docs/qwen300-hour-2026-10-11.md:42',
-    'A3.host': 'docs/MASTER-TABLE-2026-10-11.md:60',
-    'RESET.keep': 'docs/VERIFY-PLAN-2026-10-12.md; KEEP from PLAN-300TOKS-2026-10-11.md:322',
-    'A4.reset': 'docs/PLAN-generic-decoder-2026-10-08.md:154',
-    'A.stop': 'docs/PLAN-300TOKS-2026-10-11.md:301-302 (main 9f91f3a)',
-    'X5': 'docs/PLAN-300TOKS-2026-10-11.md:307; REVIEW-POOL-ANALYSIS-2026-10-11.md:123',
-    'B.stop': 'docs/PLAN-300TOKS-2026-10-11.md:306-308 (main 9f91f3a)',
-    'B.keep': 'docs/PLAN-300TOKS-2026-10-11.md:314,322 (main 9f91f3a)',
-    'C.fusion': 'docs/PLAN-300TOKS-2026-10-11.md:315,331 (main 9f91f3a)',
-    'C.body': 'docs/PLAN-300TOKS-2026-10-11.md:314,322 (main 9f91f3a)',
-    'C.NO_TOUCH': 'docs/PLAN-300TOKS-2026-10-11.md:310,314; docs/XCD-PREFETCH-2026-10-11.md:76,125',
-    'C.ISOLATE_POLLER': 'docs/VERIFY-GAPS-2026-10-11.md:141-193; examples/vllm_llm/prefetch_isolation_cpu.py',
-    'D.target': 'docs/PLAN-300TOKS-2026-10-11.md:318 (main 9f91f3a)',
+    'GUARD': 'docs/qwen/LEVERS-MORE-2026-10-12.md:section 1; PLAN-300-CERTAIN-2026-10-12.md F0',
+    'A1.busy': 'docs/qwen/qwen300-hour-2026-10-11.md:39',
+    'A1.free': 'docs/qwen/qwen300-hour-2026-10-11.md:40',
+    'A1.floor': 'docs/qwen/X7-SCHEDULE-WHATIF-2026-10-11.md:164',
+    'A.loads': 'docs/qwen/VERIFY-PLAN-2026-10-12.md; MASTER-TABLE-2026-10-11.md QK6/OP3/M.J',
+    'A2.route': 'docs/qwen/qwen300-hour-2026-10-11.md:42',
+    'A3.host': 'docs/qwen/MASTER-TABLE-2026-10-11.md:60',
+    'RESET.keep': 'docs/qwen/VERIFY-PLAN-2026-10-12.md; KEEP from PLAN-300TOKS-2026-10-11.md:322',
+    'A4.reset': 'docs/core/PLAN-generic-decoder-2026-10-08.md:154',
+    'A.stop': 'docs/qwen/PLAN-300TOKS-2026-10-11.md:301-302 (main 9f91f3a)',
+    'X5': 'docs/qwen/PLAN-300TOKS-2026-10-11.md:307; REVIEW-POOL-ANALYSIS-2026-10-11.md:123',
+    'B.stop': 'docs/qwen/PLAN-300TOKS-2026-10-11.md:306-308 (main 9f91f3a)',
+    'B.keep': 'docs/qwen/PLAN-300TOKS-2026-10-11.md:314,322 (main 9f91f3a)',
+    'C.fusion': 'docs/qwen/PLAN-300TOKS-2026-10-11.md:315,331 (main 9f91f3a)',
+    'C.body': 'docs/qwen/PLAN-300TOKS-2026-10-11.md:314,322 (main 9f91f3a)',
+    'C.NO_TOUCH': 'docs/qwen/PLAN-300TOKS-2026-10-11.md:310,314; docs/qwen/XCD-PREFETCH-2026-10-11.md:76,125',
+    'C.ISOLATE_POLLER': 'docs/qwen/VERIFY-GAPS-2026-10-11.md:141-193; examples/vllm_llm/prefetch_isolation_cpu.py',
+    'D.target': 'docs/qwen/PLAN-300TOKS-2026-10-11.md:318 (main 9f91f3a)',
     'D.fusion': 'examples/vllm_llm/pairs.py:33-34,138-143',
     'D.system': 'examples/vllm_llm/nvref_report.py:115-125',
 }
@@ -439,7 +439,7 @@ def gap_atom_prices(report):
     Observation keeps the conservative upper idle price, 0.951 us.
     Arrive/setup use the owner's preflight fix 6 pricing decision: 0.30/0.15 us
     from the 1.00 us floor decomposition in
-    docs/PREFLIGHT-QWEN300-HOUR-2026-10-11.md:20,55 (pre 0.05, arrive 0.30,
+    docs/qwen/PREFLIGHT-QWEN300-HOUR-2026-10-11.md:20,55 (pre 0.05, arrive 0.30,
     observation 0.50, setup 0.15). These are pricing estimates, not new measured
     idle latencies; the observation price remains gfx942.yaml:69-72's 0.951 us.
     """

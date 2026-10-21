@@ -1,4 +1,4 @@
-"""GPU session: two DeepSeek-V2-Lite requests interleaved in one ETX megakernel (docs/PLAN-v3.md 4.4 / section 8).
+"""GPU session: two DeepSeek-V2-Lite requests interleaved in one ETX megakernel (docs/qwen/PLAN-v3.md 4.4 / section 8).
 
 Builds (cpu lane, parallel):
   x1          one request, fleet's tiles, sc0 domain acquire: today's ETX figure (3.73-3.75 ms)

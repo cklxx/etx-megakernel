@@ -16,7 +16,7 @@ On the box (examples/sessions/ds_batch_mechanism.py), one fresh gated invocation
   iso <arm>         the in-situ phase microbenchmark (graph._isolate) on the x4 recipe: a phase alone, beside the
                     other slot of its CU (r0 with r1), and queued behind the same slot (r0 with r2)
   counters <arm>    rocprofv3 --pmc, one counter group per fresh invocation, 64 megakernel dispatches each
-  report            pre-registered predictions (docs/DEEPSEEK-BATCH-MECHANISM-2026-10-18.md) against the measurements
+  report            pre-registered predictions (docs/deepseek/DEEPSEEK-BATCH-MECHANISM-2026-10-18.md) against the measurements
 Instrumented spans and counter runs never supply a performance verdict.
 """
 from __future__ import annotations
@@ -126,7 +126,7 @@ def offline(traces: Path = TRACES, stats: dict | None = None) -> dict:
         out["batches"][str(b)] = batch_terms(run, stats[b]["slots"], step_bytes(b)["replicated"])
     x = out["batches"]
     out["steps"] = {"1->2": steps(x["1"], x["2"]), "2->4": steps(x["2"], x["4"])}
-    # B8 is not traced (its gate failed: docs/BATCH-2026-10-14.md section 13a). Projection from the plan only [E]:
+    # B8 is not traced (its gate failed: docs/deepseek/BATCH-2026-10-14.md section 13a). Projection from the plan only [E]:
     # same slots, per-task body and busy fraction as B4, tasks from the lowered plan.
     b4, p8 = x["4"], stats[8]
     span8 = p8["tasks"] * b4["body_per_task_us"] / (p8["slots"] * b4["busy"])
@@ -137,7 +137,7 @@ def offline(traces: Path = TRACES, stats: dict | None = None) -> dict:
 
 
 def render(o: dict) -> str:
-    """The tables of docs/DEEPSEEK-BATCH-MECHANISM-2026-10-18.md section 2, from offline()."""
+    """The tables of docs/deepseek/DEEPSEEK-BATCH-MECHANISM-2026-10-18.md section 2, from offline()."""
     x, p = o["batches"], o["plans"]
     lines = ["| quantity | B1 | B2 | B4 | B8 (plan) |", "|---|---:|---:|---:|---:|"]
     def row(name, f, b8="—"):
@@ -366,7 +366,7 @@ def _session_class():
 
 # ---------------------------------------------------------------- pre-registered evaluation
 def evaluate(logs: Path) -> dict:
-    """Apply the predictions of docs/DEEPSEEK-BATCH-MECHANISM-2026-10-18.md section 4; a missing input is INCOMPLETE."""
+    """Apply the predictions of docs/deepseek/DEEPSEEK-BATCH-MECHANISM-2026-10-18.md section 4; a missing input is INCOMPLETE."""
     def load(name):
         p = logs / name
         return json.loads(p.read_text()) if p.is_file() else None

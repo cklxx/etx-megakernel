@@ -1,4 +1,4 @@
-// Synchronisation microbenchmarks for MI300X (docs/RESEARCH-sync-hardware.md section 3). One question:
+// Synchronisation microbenchmarks for MI300X (docs/core/RESEARCH-sync-hardware.md section 3). One question:
 // can a synchronisation inside a persistent kernel be cheaper than a kernel boundary, and with which memory type?
 //
 //   sync_bench pingpong   payload hand-off between two workgroups on DIFFERENT XCDs (and a same-XCD pair):

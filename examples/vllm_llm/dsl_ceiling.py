@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""What the fused small-op structure (ETX_VL_DSL, docs/MODEL-vllm-kernels.md section 12) is worth, simulated before any
+"""What the fused small-op structure (ETX_VL_DSL, docs/qwen/MODEL-vllm-kernels.md section 12) is worth, simulated before any
 of it is built: the xcd + fused-q/k-norm plan of today against the DSL plan, same kernel-model parameters from the
 microbenchmarks (results_2026-09-28b), hand-offs from the trace.
 

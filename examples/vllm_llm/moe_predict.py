@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Qwen3-30B-A3B decode with vLLM's kernels fused by ETX: the per-token time predicted from vLLM's own kernel trace and
-the two ETX costs that decide it (docs/MODEL-moe.md).
+the two ETX costs that decide it (docs/qwen/MODEL-moe.md).
 
   python3 examples/vllm_llm/moe_predict.py results_2026-09-27/vlnext/moe/layer.json [--h 1.2 --p 0.5]
 

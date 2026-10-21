@@ -98,7 +98,7 @@ lowering:
 notes:
   - "Plain and sc0 loads hit the stale per-CU L1 and never observe an arrive (measured); poll via buffer_inv sc0 + load or agent atomic load."
   - "Workgroup k landed on XCD (k+6) mod 8 on the 2026-09-22 VM: round-robin with an offset, so discovery via HW_ID is mandatory."
-# Tile primitives (docs/PLAN-generic-decoder-2026-10-08.md section 6.4). Each entry is the C definition that
+# Tile primitives (docs/core/PLAN-generic-decoder-2026-10-08.md section 6.4). Each entry is the C definition that
 # etx/ops/prims.py emits for this machine. The tile generators call the primitive by name only.
 # wave_sum is the text of etx_wave_sum in etx/runtime/include/etx/tile_util.h (a test keeps the two equal).
 # wave_sum0 is the ETX_DSL_WSUM reduction of etx/ops/gemv.py.

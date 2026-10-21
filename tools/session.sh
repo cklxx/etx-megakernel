@@ -138,7 +138,7 @@ REMOTE
     ls "$DEST/$ID" | head -50
     python3 "$ROOT/etx/session/record.py" verify "$DEST/$ID"; rc=$?      # 0 complete, 3 incomplete, 2 not verified
     [ "$rc" != 2 ] || { echo "FETCH NOT VERIFIED: keep the box"; exit 2; }
-    # keep the fleet reference outputs (goldens, KV caches) for the next VM: no reference re-run (docs/DATA.md)
+    # keep the fleet reference outputs (goldens, KV caches) for the next VM: no reference re-run (docs/core/DATA.md)
     $SSH 'test -d ~/fleet-mi300x/build' 2>/dev/null || exit "$rc"
     mkdir -p ~/code/etx-cache/fleet_ref/build ~/code/etx-cache/fleet_ref/build_r1
     capture_rc=0

@@ -1,4 +1,4 @@
-"""The ETX_VL_COH prediction of the phase model (docs/MODEL-vllm-kernels.md section 20): the coh variant lowers a
+"""The ETX_VL_COH prediction of the phase model (docs/qwen/MODEL-vllm-kernels.md section 20): the coh variant lowers a
 fused build within the pre-registered range, leaves the non-coh path byte-identical, and does not apply unfused."""
 from pathlib import Path
 

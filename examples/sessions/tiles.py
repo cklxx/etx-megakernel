@@ -1,5 +1,5 @@
 """GPU session: four flag-gated DSL tile changes, each alone and together, against the shipped control build
-(docs/TILES-2026-10-07.md). Qwen3-30B-A3B, batch 1, context 1024, one MI300X. Every flag claims bit-identical output:
+(docs/qwen/TILES-2026-10-07.md). Qwen3-30B-A3B, batch 1, context 1024, one MI300X. Every flag claims bit-identical output:
 
   -DETX_DSL_WSUM     the flush's wave sum: 2 LDS-pipe steps + 4 DPP steps instead of 6 ds_bpermute round trips
   -DETX_DSL_SCALAR   argument block through scalar loads: the stream loop's row / segment control on the SALU

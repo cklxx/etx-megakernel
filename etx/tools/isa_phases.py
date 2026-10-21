@@ -9,7 +9,7 @@ function. Steps:
 2. `phases`: for each phase, take the blocks that the tile body owns (`isa_hops.owned_region`), and run
    `isa_hops.analyse` at each round trip. Imported vLLM kernels with slot copies get pins on the slot register.
 
-See docs/FLOORS-2026-10-08.md, section "ISA hop table", for the commands and the results.
+See docs/qwen/FLOORS-2026-10-08.md, section "ISA hop table", for the commands and the results.
 """
 from __future__ import annotations
 

@@ -55,7 +55,7 @@ DUR = {"qkv": 7.4 + 12.0, "qabs": 4.0, "attn": 16.7, "merge": 7.6, "oproj": 12.0
 
 CUS = 38                   # CUs per XCD: the interleaved build pins request r to worker slots r * CUS + w (ETX_SLOT_BY_CU pairs them per CU)
 
-# D2 (docs/DSV2-D1-D5.md): ETX_DSV2_COH=1 marks fleet's tiles "coherent_loads" (no acquire invalidate; their releases
+# D2 (docs/deepseek/DSV2-D1-D5.md): ETX_DSV2_COH=1 marks fleet's tiles "coherent_loads" (no acquire invalidate; their releases
 # write the L2 back). Correct ONLY with the coherent_loads lever patched into the tiles (examples/dsv2lite/levers/
 # coherent_loads.py); examples/dsv2lite/coh_check.py refuses a build that has one without the other. dense_down reads the
 # dense h from global inside gemv_rows, which the lever does not cover: it stays plain and keeps its acquire.
@@ -90,7 +90,7 @@ class _Req:
         self.r, self.paired = r, requests > 1
         self.p = f"r{r}_" if self.paired else ""
         self.fleet = f"fleet{r}" if self.paired else "fleet"
-        # two workgroups per CU is the residency limit of the paired build (docs/BATCH-2026-10-14.md section 3): request
+        # two workgroups per CU is the residency limit of the paired build (docs/deepseek/BATCH-2026-10-14.md section 3): request
         # r takes slot r mod 2, so with 4 or 8 requests a slot's requests take turns in its queue in creation order
         self.off = (r % 2) * CUS
 
@@ -120,7 +120,7 @@ def build_attention_block(g: Graph, q: _Req, L: int, e_in: str, e_in_map: str, f
     (the interleave's cross-request ordering)."""
     _layer_tensor(g, L)
     n = q.n
-    # K1 (docs/DSV2-D1-D5.md), ETX_DSV2_KVA=shared: kv_a is computed once, 1/8 per XCD (fleet's FLAG_KVA_SHARED), so the
+    # K1 (docs/deepseek/DSV2-D1-D5.md), ETX_DSV2_KVA=shared: kv_a is computed once, 1/8 per XCD (fleet's FLAG_KVA_SHARED), so the
     # qkv event is global -- every attention/q_absorb task waits for all 296 qkv tasks and reads the one kv_a buffer.
     # Default `replicated`: every XCD computes its own full kv_a, the event stays XCD-local (today's graph).
     kvs = os.environ.get("ETX_DSV2_KVA", "replicated") == "shared"
@@ -162,7 +162,7 @@ def build_moe_layer(g: Graph, q: _Req, L: int, e_in: str, e_in_map: str, fold: b
     g.etensor(n(f"E_down_{L}"), (1,), wait_count=XCDS * W)
     _chiplet(g, q, f"router_{L}", "fleet_norm_router", L, {e_oproj: "xw->(0)"}, {n(f"E_norm_{L}"): "xw->x"}, DUR["router"])
     if kchunks:
-        # D3 (docs/DSV2-D1-D5.md): no E_gu -- down waits for the routing like gate_up, then for each of the 4 K-chunks
+        # D3 (docs/deepseek/DSV2-D1-D5.md): no E_gu -- down waits for the routing like gate_up, then for each of the 4 K-chunks
         # of h inside its body (fleet_shim.hip ETX_DSV2_KCHUNKS); the worker's own gate_up precedes it in its queue
         _chiplet(g, q, f"gate_up_{L}", "fleet_expert_gate_up_k", L, {n(f"E_norm_{L}"): "xw->x"}, {}, DUR["gate_up"])
         _chiplet(g, q, f"down_{L}", "fleet_expert_down_k", L, {n(f"E_norm_{L}"): "xw->x"}, {n(f"E_down_{L}"): "xw->(0)"},
@@ -176,7 +176,7 @@ def build_moe_layer(g: Graph, q: _Req, L: int, e_in: str, e_in_map: str, fold: b
 
 
 def build_moe_layer_d4(g: Graph, q: _Req, L: int, e_in: str, e_in_map: str, fold: bool, rows: int) -> str:
-    """D4 (docs/DSV2-D1-D5.md, examples/dsv2lite/d4_placement.py): routed XCDs 0..5 route and run rows [rows, 1408) of
+    """D4 (docs/deepseek/DSV2-D1-D5.md, examples/dsv2lite/d4_placement.py): routed XCDs 0..5 route and run rows [rows, 1408) of
     their slot; shared XCDs 6, 7 run no router -- their gate_up folds and norms by itself and waits on o_proj only --
     then, after an in-body wait for the routed XCDs' published routing, rows [0, rows) of three slots each, and one down
     for the shared half and those slices. Every slice's gate_up and down on one XCD (checked below, refused otherwise)."""
@@ -226,7 +226,7 @@ def build_dense_layer(g: Graph, q: _Req, L: int, e_in: str, e_in_map: str, fold:
 def build(layers: int = LAYERS, routing_cached: bool | None = None, requests: int | None = None) -> Graph:
     # ETX_DSV2_ROUTING_CACHED=0: expert_down recomputes the top-k instead of reusing its worker's LDS
     # (needed for the unfused baseline, where LDS does not survive the kernel boundary)
-    # ETX_DSV2_REQUESTS=2: two requests interleaved (docs/PLAN-v3.md 4.4): one workgroup per request per CU, request 1's
+    # ETX_DSV2_REQUESTS=2: two requests interleaved (docs/qwen/PLAN-v3.md 4.4): one workgroup per request per CU, request 1's
     # layer L starts when request 0's router of layer L is done and request 0's layer L+1 when request 1's router of
     # layer L is done, so one request's latency-bound phases run beside the other's expert stream
     if routing_cached is None:
@@ -364,7 +364,7 @@ def _all_map(grid) -> str:
 
 
 def _isolate(g: Graph, spec: str, reps: int, qs: list) -> None:
-    """In-situ microbenchmark (docs/MODEL-dsv2.md section 4): after the whole token (so every activation the tiles read
+    """In-situ microbenchmark (docs/deepseek/MODEL-dsv2.md section 4): after the whole token (so every activation the tiles read
     is real), run the phases in `spec` again. spec = blocks separated by ';', run one after the other; a block = groups
     separated by ',', started together; a group = "<request>:<phase>[+<phase>...]" (phases named as in this graph without
     the request prefix, run in order). Each block is repeated `reps` times, every repetition after the previous one has

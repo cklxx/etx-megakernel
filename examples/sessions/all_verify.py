@@ -3,7 +3,7 @@
 kailun asked for one verification run instead of separate rentals. Nothing is redefined here: the two session files'
 own jobs are composed, exactly as examples/sessions/joint_ds_qwen.py composes two of them.
 
-Contents (docs/EXPERIMENTS-2026-10-14.md, docs/BATCH-2026-10-14.md):
+Contents (docs/EXPERIMENTS-2026-10-14.md, docs/deepseek/BATCH-2026-10-14.md):
 - DeepSeek batch (examples/sessions/ds_batch.py): B = 1 (the kept arm alld4r0l1kvsmw, BATCH-2026-10-14.md section 9),
   2, 4, 8 (arms x2, x4, x8) against the strongest legal vLLM configuration at the same B, total throughput and
   per-request latency decided separately, per-request goldens.
@@ -16,7 +16,7 @@ Not in this run, with the reason:
   (examples/dsv2lite/results/2026-10-14-k1 and 2026-10-14-km). AGENTS.md section 2.5: no GPU run regenerates data that
   exists. The kept arm alld4r0l1kvsmw still runs five times here, as the batch study's B = 1 arm.
 - The runtime-bundle epoch/static-only-reset form (P3) and the row-partitioned expert-combine (P4) have no testable arm
-  until a local diagnostic and a stamp exist (docs/PROPOSALS-2026-10-14.md); queueing them would spend GPU minutes on
+  until a local diagnostic and a stamp exist (docs/qwen/PROPOSALS-2026-10-14.md); queueing them would spend GPU minutes on
   nothing.
 
 Isolation, from the artifact graph rather than from comments: the two models share no job name and no file (Qwen's are

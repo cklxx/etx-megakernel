@@ -26,7 +26,7 @@ static __device__ __forceinline__ float etx_wave_max(float v) {
 }
 #ifdef ETX_TOPK_KEY32
 // ---- ETX_TOPK_KEY32 (default off): the softmax top-k selects on one 32-bit key per expert.
-// See docs/TOPK-KEY32-2026-10-08.md. One wave of 64 lanes holds 2 logits per lane, so E <= 128
+// See docs/core/TOPK-KEY32-2026-10-08.md. One wave of 64 lanes holds 2 logits per lane, so E <= 128
 // (host.hip already refuses E > 128 for dsl_topk and for the folds).
 //   key = bit 23 (valid) | order16(logit) << 7 | (127 - e);  key 0 = taken, or e >= E.
 // order16 maps the bf16 logit to an unsigned value with the same order: 0x8000 +- magnitude (offset binary).
@@ -77,7 +77,7 @@ static __device__ __forceinline__ unsigned etx_wave_max_u32(unsigned v) {
 // weight before renorm, and the function returns sel (wave-uniform); the caller divides by sel (the old code's way).
 // The two forms give the same ids and weight bits. Both callers use the lane-t form now. The kPerRound form stays as
 // the tested alternative: the form only steers the register allocation of the whole kernel (128 VGPRs, the limit),
-// and which form spills less depends on the tree and the compiler (docs/TOPK-KEY32-2026-10-08.md, section 7.4).
+// and which form spills less depends on the tree and the compiler (docs/core/TOPK-KEY32-2026-10-08.md, section 7.4).
 template <bool kPerRound, class Put>
 static __device__ __forceinline__ float etx_topk_key32_impl(const float (&l)[2], int E, int K, bool renorm, int lane, Put put) {
   unsigned key[2]; bool ok[2];

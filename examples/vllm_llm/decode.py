@@ -1,6 +1,6 @@
 """python -m examples.vllm_llm.decode <model> [--hf DIR] [--work DIR] [--machine gfx942] [--only STEPS] [--dry-run]
 
-One entry point for the GQA models (docs/PLAN-generic-decoder-2026-10-08.md section 7, item 8). <model> is a known
+One entry point for the GQA models (docs/core/PLAN-generic-decoder-2026-10-08.md section 7, item 8). <model> is a known
 name (qwen3-8b, qwen3-30b-a3b, mixtral-8x7b) or the path of a Hugging Face config.json. Every model goes through the
 same code: the config, then the GQA check, then the variant selection (etx.select), then three steps:
 

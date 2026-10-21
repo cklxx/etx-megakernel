@@ -1,5 +1,5 @@
 // Overlap microbenchmarks for MI300X: can idle memory bandwidth be filled without slowing the latency-bound chain?
-// (docs/PLAN-v3.md section 4.4, the DeepSeek-V2-Lite schedule work). Two questions, each one number:
+// (docs/qwen/PLAN-v3.md section 4.4, the DeepSeek-V2-Lite schedule work). Two questions, each one number:
 //
 //   overlap_bench stream   read rate of S MB (304 x 256 threads, 8 x 16 B in flight per lane), three passes:
 //                          cold (after a 1 GiB flush), warm (the same workgroup reads the same bytes again: L2 + MALL),

@@ -1,8 +1,8 @@
-"""Variant declarations (docs/PLAN-generic-decoder-2026-10-08.md section 6.1, section 7 item 1).
+"""Variant declarations (docs/core/PLAN-generic-decoder-2026-10-08.md section 6.1, section 7 item 1).
 
 Each tile variant declares, as data, which phase it can run, on which machines, for which shapes, and what it costs
 in VGPRs, LDS and workgroup width. The `shape` predicate holds the rule that examples/vllm_llm/host.hip states today
-as a `die()`; the line is cited beside each rule. The interface contract is docs/SEC7-interface-fix.md.
+as a `die()`; the line is cited beside each rule. The interface contract is docs/core/SEC7-interface-fix.md.
 
 This module does not read the environment. It imports no tile generator (etx.ops.gemv reads ETX_* at import time),
 so the resource numbers below are the generators' constants for the default build, cross-checked by
@@ -59,7 +59,7 @@ class Variant:
             raise ValueError(f"{self.export}: kind must be 'dsl', 'imported' or 'generic', not {self.kind!r}")
 
     def legal(self, machine: str, shape: Shape, budget: Budget) -> bool:
-        """Rule 1 of docs/SEC7-interface-fix.md section 5."""
+        """Rule 1 of docs/core/SEC7-interface-fix.md section 5."""
         r = self.resources
         return (machine in self.backend and bool(self.shape(shape)) and r.vgpr <= budget.vgpr
                 and r.lds <= budget.lds and r.threads in (0, budget.threads))

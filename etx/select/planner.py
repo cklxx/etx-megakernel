@@ -1,4 +1,4 @@
-"""The joint selection of docs/PLAN-generic-decoder-2026-10-08.md section 6.2 (section 7 item 2).
+"""The joint selection of docs/core/PLAN-generic-decoder-2026-10-08.md section 6.2 (section 7 item 2).
 
 The megakernel uses one VGPR count, one LDS size and one workgroup width for all tiles: each is the maximum over the
 selected tiles. The constraint is a maximum, so the planner solves it exactly by enumeration:
@@ -6,7 +6,7 @@ selected tiles. The constraint is a maximum, so the planner solves it exactly by
   2. at each level, give each phase its legal variant with the smallest cost;
   3. add the phase costs of the level;
   4. keep the level with the smallest total (ties: the earlier level).
-The planner does not read the environment. Contract: docs/SEC7-interface-fix.md, docs/SEC7-interface-grok.md.
+The planner does not read the environment. Contract: docs/core/SEC7-interface-fix.md, docs/core/SEC7-interface-grok.md.
 """
 from __future__ import annotations
 
@@ -34,7 +34,7 @@ class Plan:
     reasons: Mapping[str, str] = field(default_factory=dict)   # phase key -> why this variant
 
     def manifest(self) -> dict:
-        """The value that item 6 puts into Graph.codegen["selection"] (docs/SEC7-interface-fix.md section 6)."""
+        """The value that item 6 puts into Graph.codegen["selection"] (docs/core/SEC7-interface-fix.md section 6)."""
         b = self.budget
         return {"budget": {"threads": b.threads, "vgpr": b.vgpr, "lds": b.lds},
                 "phases": {k: (v.export, v.kind) for k, v in sorted(self.phases.items())}}   # sorted, as selection_of

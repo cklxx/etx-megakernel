@@ -13,7 +13,7 @@ import shlex
 gate=os.environ.get('ETX_GLM_GATE','production')
 if gate not in ('production','module'):raise ValueError('invalid GLM gate')
 # Caps: the release is sized for hours; the 4-layer module gate builds and runs in minutes
-# (estimate, docs/QWEN-BATCH-GLM53-RUNBOOK.md#module-gate), so it gets caps with a margin, not hours.
+# (estimate, docs/glm/QWEN-BATCH-GLM53-RUNBOOK.md#module-gate), so it gets caps with a margin, not hours.
 CAPS=dict(production=dict(session=18000,build=2100,qualify=15000),module=dict(session=2700,build=1200,qualify=1800))[gate]
 MAX_SESSION_SECONDS=CAPS['session']
 stage=shlex.quote(os.environ.get('ETX_GLM_STAGE','/staged/glm53'))

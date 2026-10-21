@@ -11,7 +11,7 @@
 #   (2) its whole-GPU barrier is faster than today's cached + device-fence barrier.
 # Budget: about 3 h of a 1x MI300X ($9); VL_MOE=0 skips the MoE capture (about 30 min), VL_DS=0 the DeepSeek step
 # (about 40 min).
-# Decisions this session feeds (written down before it, docs/PLAN-v3.md 4.4): the DeepSeek re-layout is built only if
+# Decisions this session feeds (written down before it, docs/qwen/PLAN-v3.md 4.4): the DeepSeek re-layout is built only if
 # examples/dsv2lite/whatif.py, fed the overlap log, estimates >= 5% per token; two-request interleaving only if the fold
 # slows by less than the batch2 break-even it prints AND it beats vLLM at batch 2 in tokens/s.
 set -uo pipefail

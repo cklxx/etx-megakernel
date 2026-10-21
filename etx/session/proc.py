@@ -1,4 +1,4 @@
-"""The one process supervisor of a session (docs/SESSION-ARCH-2026-10-13.md, component A).
+"""The one process supervisor of a session (docs/core/SESSION-ARCH-2026-10-13.md, component A).
 
 Invariant: when a step (a runner job, or an invocation inside one) ends -- normally, at its deadline, or stopped --
 no process it started is alive. Process groups cannot hold that (GNU `timeout` leaves them, compilers fork during a

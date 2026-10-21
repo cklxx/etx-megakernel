@@ -1,5 +1,5 @@
-"""Item 3 of docs/PLAN-generic-decoder-2026-10-08.md section 7: the selection for Qwen3-8B, Qwen3-30B-A3B and
-Mixtral-8x7B, from the model config only, on the real REGISTRY (docs/SEC7-interface-fix.md).
+"""Item 3 of docs/core/PLAN-generic-decoder-2026-10-08.md section 7: the selection for Qwen3-8B, Qwen3-30B-A3B and
+Mixtral-8x7B, from the model config only, on the real REGISTRY (docs/core/SEC7-interface-fix.md).
 
 The tests do not name the phase keys of the registry. They find a phase by its shape. They check each selected
 variant against the host.hip rules of today, written here a second time (HOST_RULES). Thus a shape predicate in the

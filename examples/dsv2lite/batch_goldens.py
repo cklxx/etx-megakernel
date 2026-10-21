@@ -1,4 +1,4 @@
-"""Check the per-request references of the batch study and export them for vLLM (docs/BATCH-2026-10-14.md section 4).
+"""Check the per-request references of the batch study and export them for vLLM (docs/deepseek/BATCH-2026-10-14.md section 4).
 
 Request 0 is the pinned set in DATA (golden.npz and friends, checked by preflight); request r >= 1 is DATA/r<r>/, written
 by reference_rotated.py --rotate 97r. Refused unless, for every r:
@@ -33,7 +33,7 @@ def rotate(ids: list[int], r: int) -> list[int]:
 def check(prompts: list[list[int]], gens: list[list[int]], token_files: list[list[int]], *,
           bindings=None, hashes=None) -> list[str]:
     """Every refusal reason; empty when the set is usable. Two requests may share their 32-token greedy output
-    (a repetitive prompt does it): that is reported as a collision, not refused. See docs/BATCH-2026-10-14.md 4a."""
+    (a repetitive prompt does it): that is reported as a collision, not refused. See docs/deepseek/BATCH-2026-10-14.md 4a."""
     bad = []
     for r, (p, g, t) in enumerate(zip(prompts, gens, token_files)):
         if bindings is not None and (bindings[r] is None or

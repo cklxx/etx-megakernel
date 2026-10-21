@@ -14,7 +14,7 @@ Runs pair up in order: (1, 2), (3, 4), ... Each pair must hold one run of each a
 
 Verdict (docs/NEXT-2026-10-03.md candidate 1): ESTABLISHED only if every pair's gain is positive, the median gain is
 above 2%, and the median gain exceeds twice the spread. The exit code follows --basis (wall by default, as in
-docs/DESIGN-acquire-2026-10-05.md section 4): 0 established, 1 not established, 2 refused. The device basis is
+docs/qwen/DESIGN-acquire-2026-10-05.md section 4): 0 established, 1 not established, 2 refused. The device basis is
 reported next to it. `VLLM ...` control lines are summarised, not paired.
 
 Refused: an odd number of runs, a pair that is not one run of each arm, fewer or more pairs than --pairs, a RESULT

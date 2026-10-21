@@ -1,4 +1,4 @@
-// Host side of the variant selection (docs/PLAN-generic-decoder-2026-10-08.md section 6.3).
+// Host side of the variant selection (docs/core/PLAN-generic-decoder-2026-10-08.md section 6.3).
 // Include plan_data.h before this file. plan_data.h publishes the planner's selection: etx_sel_phase,
 // etx_sel_export and etx_sel_kind (etx/codegen/manifest.py selection_block). The host reads the selection here
 // only. It does not derive it again from the environment, from a compile define or from the model shapes.

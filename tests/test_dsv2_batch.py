@@ -1,4 +1,4 @@
-"""Batch 2 / 4 / 8 on DeepSeek-V2-Lite (docs/BATCH-2026-10-14.md): the multi-request graph's queues, the per-request
+"""Batch 2 / 4 / 8 on DeepSeek-V2-Lite (docs/deepseek/BATCH-2026-10-14.md): the multi-request graph's queues, the per-request
 gates and rules (etx/session/batch.py), the vLLM batch mode's lines, the golden checks and the session's job graph."""
 from __future__ import annotations
 
@@ -98,7 +98,7 @@ def test_more_than_two_requests_refuse_what_names_two_or_one(monkeypatch, env, m
 
 
 def test_shared_kva_is_allowed_on_a_batched_graph(monkeypatch):
-    # docs/BATCH-2026-10-14.md section 10: the batch arms carry K1, so a shared kv_a must build for 4 requests
+    # docs/deepseek/BATCH-2026-10-14.md section 10: the batch arms carry K1, so a shared kv_a must build for 4 requests
     from examples.dsv2lite import graph
     for k, v in dict(ETX_DSV2_COUPLE="none", ETX_DSV2_KVA="shared").items():
         monkeypatch.setenv(k, v)
@@ -306,7 +306,7 @@ def test_goldens_refuse_a_wrong_rotation_a_duplicate_and_a_token_file_mismatch()
     assert any("rotated" in x for x in check([p0, p0, *prompts[2:]], gens, gens))
     assert any("same prompt" in x for x in check([p0, p0, *prompts[2:]], gens, gens))
     assert any("differs" in x for x in check(prompts, gens, [gens[0], [9] * 33, *gens[2:]]))
-    # an identical 32-token greedy output is reported as a collision, never refused (docs/BATCH-2026-10-14.md 4a)
+    # an identical 32-token greedy output is reported as a collision, never refused (docs/deepseek/BATCH-2026-10-14.md 4a)
     dup = [gens[0], gens[0], *gens[2:]]
     assert check(prompts, dup, dup) == []
     assert collisions(dup) == [[0, 1]]
@@ -323,7 +323,7 @@ def test_the_host_prints_exactly_the_fields_the_rule_reads():
     src = (ROOT / "examples/dsv2lite/host.hip").read_text()
     assert 'BATCHREQ r=%d tokens=%d/%d layers=%d warmup=%d/%d interval_median_ms=%llu.%05llu device_median_ms=%.6f' in src
     assert 'BATCH requests=%d tokens=%d step_median_ms=%.6f' in src
-    # an identical short greedy output is a printed collision, not a refusal (docs/BATCH-2026-10-14.md 4a); prompt
+    # an identical short greedy output is a printed collision, not a refusal (docs/deepseek/BATCH-2026-10-14.md 4a); prompt
     # distinctness is enforced by examples/dsv2lite/batch_goldens.py before the host ever runs
     assert "BATCHCOLLISION requests %d and %d" in src and '--req-dir' in src
 

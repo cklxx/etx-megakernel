@@ -1,4 +1,4 @@
-"""D4 expert placement (docs/DSV2-D1-D5.md): the shared XCDs start without routing, routed slices go to them, and each
+"""D4 expert placement (docs/deepseek/DSV2-D1-D5.md): the shared XCDs start without routing, routed slices go to them, and each
 slice's gate_up and down stay on one XCD. The build refuses any placement that breaks this.
 
 Units of one MoE layer: routing slots 0..5 (one routed expert each, `inter` = 1408 rows of h) and the two shared halves
@@ -26,7 +26,7 @@ TOP_K = 6             # routing slots = routed XCDs 0..5
 SHARED = 2            # shared halves = shared XCDs 6, 7
 SPX = TOP_K // SHARED  # routed slots whose slice one shared XCD runs
 ALIGN = 32
-ROWS = 32             # default slice rows per routed expert (estimate in docs/DSV2-D1-D5.md, D4)
+ROWS = 32             # default slice rows per routed expert (estimate in docs/deepseek/DSV2-D1-D5.md, D4)
 
 
 class PlacementError(ValueError):

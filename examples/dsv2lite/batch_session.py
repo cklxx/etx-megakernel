@@ -1,4 +1,4 @@
-"""The batch 2 / 4 / 8 study on DeepSeek-V2-Lite (docs/BATCH-2026-10-14.md; rules committed before this code, 0fc38c9).
+"""The batch 2 / 4 / 8 study on DeepSeek-V2-Lite (docs/deepseek/BATCH-2026-10-14.md; rules committed before this code, 0fc38c9).
 
 Operations, each run by one job of examples/sessions/ds_batch.py; every invocation is a fresh process with its full log
 kept (inplace_session.Session.run: deadline, progress, probes):
@@ -179,7 +179,7 @@ class BatchSession(Session):
             kept_step = batch.median_text(kept["etx_step_ms"]) if kept.get("status") == "COMPLETE" else None
             rec["next"] = (batch.build_decision(rec, kept_step, extra) if kept_step else
                            dict(next="the kept batch-1 arm is NOT COMPLETE: no projection"))
-        write_json(self.logs / "batch_report.json", dict(condition="docs/BATCH-2026-10-14.md", union=union,
+        write_json(self.logs / "batch_report.json", dict(condition="docs/deepseek/BATCH-2026-10-14.md", union=union,
                                                           batches={str(b): r for b, r in res.items()}))
         for b, rec in res.items():
             if rec["status"] != "COMPLETE":

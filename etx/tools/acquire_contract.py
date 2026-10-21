@@ -1,6 +1,6 @@
 """Memory contract check for one imported producer/consumer pair: attn_reduce -> wvsplitk_y2 (o_proj).
 
-docs/CONTRACT-acquire-2026-10-05.md states the contract. This tool checks that a build still matches it:
+docs/core/CONTRACT-acquire-2026-10-05.md states the contract. This tool checks that a build still matches it:
 
   python -m etx.tools.acquire_contract --build <build dir> --cflags "<device -D flags of that build>"
 
@@ -768,7 +768,7 @@ def main(argv=None) -> int:
     if errors:
         print(f"FAIL: {len(errors)} contract violations. Keep the acquire; do not build the transformed pair.")
         return 1
-    print(f"PASS: {PRODUCER} -> {CONSUMER} matches docs/CONTRACT-acquire-2026-10-05.md")
+    print(f"PASS: {PRODUCER} -> {CONSUMER} matches docs/core/CONTRACT-acquire-2026-10-05.md")
     summary(report, sys.stdout)
     return 0
 

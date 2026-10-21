@@ -1,4 +1,4 @@
-"""GPU session: the software phase boundary rebuilt, measured (docs/MODEL-vllm-kernels.md section 20).
+"""GPU session: the software phase boundary rebuilt, measured (docs/qwen/MODEL-vllm-kernels.md section 20).
 Microbenchmarks FIRST -- they are the diagnosis whatever the builds do: hw_bench restart (what one buffer_inv sc1
 costs a warm phase, the megakernel's per-phase cold start), cohload (inv + plain loads against coherent sc0 sc1
 loads for a staged activation), stream (the fixed width sweep: gate_up at 8/16/37/74/96/148/192 workgroups decides

@@ -1,7 +1,7 @@
 """Lever coherent_loads (D2): fleet's tiles read every payload another task wrote with system-scope coherent loads, so
 the megakernel can drop the per-task acquire `buffer_inv sc1` while every producer keeps its L2 write-back.
 
-Qwen's cache fix (ETX_VL_COH, etx/ops/coh.py) ported to fleet's tiles. Memory model (gfx942, docs/DSV2-D1-D5.md D2):
+Qwen's cache fix (ETX_VL_COH, etx/ops/coh.py) ported to fleet's tiles. Memory model (gfx942, docs/deepseek/DSV2-D1-D5.md D2):
   producer  plain stores (or fleet's agent-scope st_coh), then the megakernel's release writes the XCD's L2 back
             (ETX_RELEASE_DEVICE / the DEVICE last-arriver flush; graph.py marks the tiles "coherent_loads", which the
             compiler treats as a PLAIN producer: fleet measured the write-back necessary, fleet_runtime.h:247-255);

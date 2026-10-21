@@ -8,7 +8,7 @@
       "flags": {
         "ETX_VL_ROUTER_NARROW": "1"
       },
-      "source": "docs/ISA-FIXES-2026-10-11.md:31",
+      "source": "docs/qwen/ISA-FIXES-2026-10-11.md:31",
       "overlap": "router-body",
       "enabled": true
     },
@@ -19,7 +19,7 @@
       "defines": [
         "ETX_DSL_NORM_HOIST"
       ],
-      "source": "docs/ISA-FIXES-2026-10-11.md:135",
+      "source": "docs/qwen/ISA-FIXES-2026-10-11.md:135",
       "overlap": "router-body",
       "enabled": true
     }
@@ -47,7 +47,7 @@
         "median_gt_spread_multiplier": 2,
         "additional": null
       },
-      "source": "docs/PLAN-300TOKS-2026-10-11.md:310,314; docs/XCD-PREFETCH-2026-10-11.md:71-76,125; etx/codegen/kernel.py:297"
+      "source": "docs/qwen/PLAN-300TOKS-2026-10-11.md:310,314; docs/qwen/XCD-PREFETCH-2026-10-11.md:71-76,125; etx/codegen/kernel.py:297"
     },
     {
       "id": "ISOLATE_POLLER",
@@ -67,7 +67,7 @@
         "median_gt_spread_multiplier": 2,
         "round_trip_median_us_lt": 2.0
       },
-      "source": "docs/VERIFY-GAPS-2026-10-11.md:141-193; examples/vllm_llm/prefetch_isolation_cpu.py"
+      "source": "docs/qwen/VERIFY-GAPS-2026-10-11.md:141-193; examples/vllm_llm/prefetch_isolation_cpu.py"
     },
     {
       "id": "C6",
@@ -77,7 +77,7 @@
       "budget_s": 1200,
       "estimated_required_s": 1085,
       "prerequisites": "Contract/hook only today; requires a sealed committed full-model adapter, prototype_certificate, prototype_commit, expected_vgpr and expected_lds_bytes before qualification",
-      "source": "docs/ISA-FIXES-2026-10-11.md:246"
+      "source": "docs/qwen/ISA-FIXES-2026-10-11.md:246"
     }
   ]
 }

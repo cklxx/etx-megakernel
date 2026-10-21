@@ -1,7 +1,7 @@
-"""One MI300X reference session; docs/SPEC-nv-reference-2026-10-08.md.
+"""One MI300X reference session; docs/qwen/SPEC-nv-reference-2026-10-08.md.
 
 Host wall, batch 1, context 1024; five interleaved rounds. No NVIDIA claim.
-Estimate: about 51 minutes / $2.54 (nvref actual: docs/NVREF-2026-10-09.md section 5).
+Estimate: about 51 minutes / $2.54 (nvref actual: docs/qwen/NVREF-2026-10-09.md section 5).
 Ceiling 60 minutes / $3.00. Operator must delete
 at 55 minutes of VM life, dropping nice-to-have jobs first (spec section 9).
 """

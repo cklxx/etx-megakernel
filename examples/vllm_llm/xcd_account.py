@@ -33,8 +33,8 @@ from etx.tools import timeline as tl
 CLASSES = ("start", "between", "dep", "handoff", "bytes", "machinery", "none")
 TAXON = {"start": "d", "between": "d", "dep": "b", "handoff": "b", "bytes": "a", "machinery": "c", "none": "e"}
 
-# Exposed load round trips per task from the round11 ISA (docs/FLOORS-2026-10-08.md:127-140), priced as in
-# docs/FLOORS-2026-10-08.md:84-88: coherent 0.50 us; plain 0.104 us when warm, 0.50 us after an acquire;
+# Exposed load round trips per task from the round11 ISA (docs/qwen/FLOORS-2026-10-08.md:127-140), priced as in
+# docs/qwen/FLOORS-2026-10-08.md:84-88: coherent 0.50 us; plain 0.104 us when warm, 0.50 us after an acquire;
 # scalar 0.104 us. Store drains and scratch reloads are machinery, not bytes. Streaming phases count only the
 # hops before their first weight load ("pre"); the rest of their chain overlaps the stream.
 # stem: (coherent, plain, scalar, acquired, streaming)

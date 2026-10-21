@@ -1,4 +1,4 @@
-"""Items 4 and 5 of docs/PLAN-generic-decoder-2026-10-08.md section 7, against docs/SEC7-interface-fix.md.
+"""Items 4 and 5 of docs/core/PLAN-generic-decoder-2026-10-08.md section 7, against docs/core/SEC7-interface-fix.md.
 
 Item 4: a shape outside every DSL variant selects the imported kernel, and the planner does not stop.
 Item 5: a variant above the budget does not change the selection of the other phases.

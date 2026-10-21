@@ -1,6 +1,6 @@
 """The streaming batch-1 GEMV as an ETX op: a generator that emits the tile source and the argument-block layout,
 in the same form as the adapter's imported tiles (etx.importer.adapter), so model.py, the plan and the host treat it
-like any other export (docs/MODEL-vllm-kernels.md section 13).
+like any other export (docs/qwen/MODEL-vllm-kernels.md section 13).
 
 Why generated and not imported: vLLM's streaming kernels (wvSplitK, Triton fused_moe) keep 16-36 KB in flight per
 CU and pay a gap per trip; the lf microbenchmark (bench/hw/hw_bench.hip) reaches 3.6-3.9 TB/s with 64 KB in flight.
@@ -50,7 +50,7 @@ import os as _os
 #      (256 FMA/clk/CU) and 0.61 us of LDS (128 B/clk/CU), 6.3% of the 10.8 us regression, 0.70% for the FMAs alone.
 #      So a matrix instruction cannot pay: it attacks the 0.70%, and at NB=2 it idles 14 of 16 output columns
 #      (v_mfma_f32_16x16x16_bf16) or 2 of 4 (v_mfma_f32_4x4x4_16b_bf16, which is what vLLM's own wvSplitK already
-#      uses -- and dsl_gemv_rows beats it 6.29 vs 6.75 us on the identical 5120x2048 shape, docs/PHASES-2026-10-01.md).
+#      uses -- and dsl_gemv_rows beats it 6.29 vs 6.75 us on the identical 5120x2048 shape, docs/qwen/PHASES-2026-10-01.md).
 #      Register pressure is not it either: batched spills 20 against replicated 21, LDS 50216 vs 29736, both leaving
 #      one workgroup per CU. The dense PHASES in fact win -- qkv spans 20.9 us batched against 25.9 for the replicated
 #      pair; it is cause 2 below that loses the step. Dense bodies over a layer: 37.88 us batched vs 40.78 replicated.
@@ -78,7 +78,7 @@ DSL_NB = max(1, int(_os.environ.get("ETX_VL_NB", "1")))
 # asserts the imports.json layout and the plan's codegen flag agree, so the env and the manifest cannot drift apart.
 DSL_EXT = _os.environ.get("ETX_VL_DSL_EXT", "0") == "1"
 ARG_BYTES, GRID_OFF = (176, 144) if DSL_EXT else (160, 144)
-# the "_fold" forms carry a prologue (docs/MODEL-vllm-kernels.md section 16): norm fold (mode 1): x = rms_norm(bf16(bf16(sum
+# the "_fold" forms carry a prologue (docs/qwen/MODEL-vllm-kernels.md section 16): norm fold (mode 1): x = rms_norm(bf16(bf16(sum
 # of R rows) + resid_in)) with weight ln (vLLM's moe_sum + fused_add_rms_norm numerics: the sum rounded, the add rounded
 # per element, the variance over the rounded values, out = bf16(z * rsqrt * w)); task 0 stores the new residual to
 # resid_out. top-k fold (mode 2): every expert task recomputes the softmax top-k from the logits (deterministic) and
@@ -717,7 +717,7 @@ static __device__ __forceinline__ void dsl_topk_lds(const __hip_bfloat16* logits
     for (int k = 0; k < 2; ++k) { const int e = lane + k * ETX_WAVE_SIZE; p[k] = e < E ? dsl_a_ldbf(logits + e) : -INFINITY; taken[k] = e >= E; m = fmaxf(m, p[k]); }
 #ifdef ETX_TOPK_KEY32                                    // one 32-bit key per expert, DPP wave max (etx/tile_util.h)
     // lane t stores result t (the dsl_run_dsl_topk form). etx_topk_key32_lds (lane 0 stores each round) gives the same
-    // bits, but on this tree it adds 11 spilled VGPRs to the fold build (docs/TOPK-KEY32-2026-10-08.md, section 7.4).
+    // bits, but on this tree it adds 11 spilled VGPRs to the fold build (docs/core/TOPK-KEY32-2026-10-08.md, section 7.4).
     etx_topk_key32(p, E, K, renorm != 0, lane, [&](int t, int bi, float v) { ids[t] = bi; wts[t] = v; });
 #else
     m = etx_wave_max(m);

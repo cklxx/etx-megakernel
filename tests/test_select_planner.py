@@ -12,7 +12,7 @@ MOE_MODELS = ("qwen3-30b-a3b", "mixtral-8x7b", "qwen3-8b")   # qwen3-8b: model.p
 
 
 def _keyed(rows):
-    """fix's phase-key rule (docs/SEC7-interface-fix.md section 1): <role>@0 only when layer 0 differs."""
+    """fix's phase-key rule (docs/core/SEC7-interface-fix.md section 1): <role>@0 only when layer 0 differs."""
     by_role: dict[str, dict[int, str]] = {}
     for role, layer, export in rows:
         by_role.setdefault(role, {})[layer] = export

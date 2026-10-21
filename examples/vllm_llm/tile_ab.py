@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verdicts for the tile-flag session (examples/sessions/tiles.py, docs/TILES-2026-10-07.md section 6).
+"""Verdicts for the tile-flag session (examples/sessions/tiles.py, docs/qwen/TILES-2026-10-07.md section 6).
 
   python -m examples.vllm_llm.tile_ab ~/sess
 

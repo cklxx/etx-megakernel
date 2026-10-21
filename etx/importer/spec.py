@@ -119,7 +119,7 @@ SOURCES = [
                f"vllm::packed_silu_kernel<typename vllm::PackedTypeConverter<{CB}>::Type>, true, true, false, false>", (1024, 1, 1),
                note="dense: 1 row, block 1024; MoE (fused_experts): 8 rows of 768, block 768/8 = 96: set per model"),
     ]),
-    # Qwen3-30B-A3B MoE at batch 1 (fused_moe/fused_moe.py, TritonExperts; docs/RESEARCH-moe-import.md): router
+    # Qwen3-30B-A3B MoE at batch 1 (fused_moe/fused_moe.py, TritonExperts; docs/qwen/RESEARCH-moe-import.md): router
     # (wvsplitk_y1), top-k, two Triton fused_moe_kernel launches (etx.importer.triton_import), silu, moe_sum
     Source("csrc/libtorch_stable/moe/topk_softmax_kernels.cu", kernels=[
         # topkGatingLauncherHelper: BYTES_PER_LDG = min(16, 2 * 128) = 16, VPT = 128 / (64 / (256 / 16)) ... = 8,

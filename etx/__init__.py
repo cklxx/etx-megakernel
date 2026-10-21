@@ -1,6 +1,6 @@
 """ETX: a DSL-agnostic, chiplet-aware compiler for dynamic GPU megakernels.
 
-Layers (see docs/ARCHITECTURE.md):
+Layers (see docs/core/ARCHITECTURE.md):
   etx.frontends  L1  tile contract (TileOp) and frontend adapters
   etx.ir         L2  Event Tensor IR, edge maps, verification
   etx.machine    L3  machine model (exec-domain tree, visibility, capability, cost) from YAML

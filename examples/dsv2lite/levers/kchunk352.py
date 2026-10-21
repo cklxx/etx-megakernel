@@ -1,6 +1,6 @@
 """Lever kchunk352 (D3): fleet's gate_up -> down hand-off in four K-chunks of 352 rows of h instead of one piece.
 
-Two edits to the pinned source (docs/DSV2-D1-D5.md, D3):
+Two edits to the pinned source (docs/deepseek/DSV2-D1-D5.md, D3):
   fleet_types.h     kExpertKChunk 2048 -> 352 (1408 rows of h = 4 chunks; a multiple of 8, the 16-byte weight loads,
                     and of 32, so no h cache line straddles two chunks)
   fleet_kernel.hip  after each in-body chunk wait of the expert down, `buffer_inv sc1` -- fleet's XCD-local acquire is

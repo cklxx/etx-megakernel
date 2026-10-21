@@ -69,7 +69,7 @@ def constants() -> dict[str, Constant]:
     def add(name, value, status, path, needle, note):
         out[name] = Constant(value, source(path, needle), status, note)
 
-    model = 'docs/MODEL-vllm-kernels.md'
+    model = 'docs/qwen/MODEL-vllm-kernels.md'
     kernel = 'bench/sync/fresh_handoff.h'
     for name, value, needle in (
         ('l1_idle_us', .103, '| vector round trip L1 /'),
@@ -82,7 +82,7 @@ def constants() -> dict[str, Constant]:
         ('launch_us', 1.61, '| kernel boundary, empty / + first load | 1.5'),
     ):
         add(name, value, 'measured', model, needle, 'MI300X 2026-09-28b; different microbenchmark, not fresh-handoff validation')
-    add('bypass_proxy_us', .55, 'assumed', 'docs/VALIDATION-baremetal-2026-10-01.md',
+    add('bypass_proxy_us', .55, 'assumed', 'docs/qwen/VALIDATION-baremetal-2026-10-01.md',
         '| activation read: coherent', 'Whole activation read measured 0.55 us on bare metal; single-dword transfer is unknown')
     add('fence_us', .181, 'measured', 'etx/machine/arch/gfx942.yaml',
         't_fence_ns: 181', 'Isolated buffer_wbl2 sc1 plus completion wait, ns / 1000')

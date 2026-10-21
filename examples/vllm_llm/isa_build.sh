@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Assembly of every kernel of one build, both forms, with ROCm 7.2.4's clang (the VM's compiler), for the kernel model
-# (examples/vllm_llm/isa_inventory.py, docs/MODEL-vllm-kernels.md):
+# (examples/vllm_llm/isa_inventory.py, docs/qwen/MODEL-vllm-kernels.md):
 #   orig_<source>.s   vLLM's HIP kernels as vLLM compiles them (the sliced source with the launched specialisations)
 #   imp_wrap.s        each imported kernel alone in a 1024-thread workgroup, exactly as a megakernel task runs it
 #                     (etx_imp_<e>(args, block, tid, slot) behind the adapter's slot split; own register allocation)

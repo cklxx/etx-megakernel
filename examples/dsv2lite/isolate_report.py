@@ -1,4 +1,4 @@
-"""Report of an ETX_DSV2_ISOLATE run (docs/MODEL-dsv2.md section 4): per isolated phase, over its repetitions (median),
+"""Report of an ETX_DSV2_ISOLATE run (docs/deepseek/MODEL-dsv2.md section 4): per isolated phase, over its repetitions (median),
 the span (first task ready -> last done), mean task body, ramp (median ready - first ready), tail, and the achieved
 bandwidth of the phase's weight bytes over the span.
 

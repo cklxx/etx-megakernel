@@ -1,7 +1,7 @@
 """The DSL ops' activation accessors. With -DETX_DSL_COH (the ETX_VL_COH=1 builds) they are device-coherent
 (relaxed system-scope atomics: sc0 sc1, past the XCD's L1 and L2), so the megakernel emits no acquire
 `buffer_inv sc1` for these tiles and the weights (and the touch hook's lines) survive the phase boundary in L2
-(docs/RESULTS-2026-09-30.md: the whole-L2 invalidate per task is why every phase streamed from cold caches).
+(docs/qwen/RESULTS-2026-09-30.md: the whole-L2 invalidate per task is why every phase streamed from cold caches).
 Without the flag they reduce to the plain accesses the acquire-based builds always used, so a build without
 ETX_VL_COH is unchanged. Weights are never accessed through these: they are read-only for the whole run and
 must stay cached.

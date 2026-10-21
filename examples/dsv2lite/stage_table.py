@@ -45,7 +45,7 @@ def measured_inputs() -> dict:
     """Every pricing constant, read from the file that measured it."""
     d = data_sets() / "results_2026-09-27d"
     wg = (d / "hw_wg.log").read_text()
-    model = (ROOT / "docs/MODEL-dsv2.md").read_text()
+    model = (ROOT / "docs/deepseek/MODEL-dsv2.md").read_text()
     status = (fleet_export() / "docs/STATUS.md").read_text()
     m = {
         "barrier_us": float(re.search(r"__syncthreads\s+([\d.]+) ns", wg)[1]) / 1000,
@@ -58,10 +58,10 @@ def measured_inputs() -> dict:
     }
     m["sources"] = {"barrier_us": "results_2026-09-27d/hw_wg.log, __syncthreads",
                     "lds_probe_us": "results_2026-09-27d/hw_wg.log, LDS 8 KB write+read (2 barriers)",
-                    "bperm_us": "docs/MODEL-dsv2.md:157, fleet's routing stamp",
-                    "routing_us": "docs/MODEL-dsv2.md:157, fleet's routing stamp",
-                    "routing_bperms": "docs/MODEL-dsv2.md:157",
-                    "gamma_rt_us": "docs/MODEL-dsv2.md:157",
+                    "bperm_us": "docs/deepseek/MODEL-dsv2.md:157, fleet's routing stamp",
+                    "routing_us": "docs/deepseek/MODEL-dsv2.md:157, fleet's routing stamp",
+                    "routing_bperms": "docs/deepseek/MODEL-dsv2.md:157",
+                    "gamma_rt_us": "docs/deepseek/MODEL-dsv2.md:157",
                     "rate_bytes_per_us": "fleet docs/STATUS.md:42 @3fb67a6, measured streamed rate"}
     return m
 

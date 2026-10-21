@@ -2,7 +2,7 @@
 
 The first run (session 20261014T112629Z-d09618) failed two input jobs and skipped everything downstream:
 - prep_goldens failed because the prep job refused the reference set: requests 0 and 4 produced the same 32 greedy
-  tokens. That is now a recorded collision instead of a refusal (docs/BATCH-2026-10-14.md 4a). Nothing else about the
+  tokens. That is now a recorded collision instead of a refusal (docs/deepseek/BATCH-2026-10-14.md 4a). Nothing else about the
   Golden construction changed: request r is still fleet's prompt rotated by 97 r tokens.
 - qwen_preflight failed because /root/rocm-headers/inc was empty on the box (hip/hip_runtime.h missing). 467 files
   including hip/hip_runtime.h were pushed from the laptop's ~/code/rocm-headers/inc before this run.

@@ -1,4 +1,4 @@
-"""What-if estimates for re-laying out the DeepSeek-V2-Lite MoE layer (the ETX schedule work, docs/PLAN-v3.md 4.4).
+"""What-if estimates for re-laying out the DeepSeek-V2-Lite MoE layer (the ETX schedule work, docs/qwen/PLAN-v3.md 4.4).
 
 Starts from fleet's measured layer-5 timeline (129.3 us: five latency-bound phases, 74 us, then the expert stream,
 59 us) and asks what each layout would give, with every unmeasured input either read from the overlap / sync

@@ -1,4 +1,4 @@
-"""Byte floors of one DeepSeek-V2-Lite decode step at batch B (docs/BATCH-2026-10-14.md section 2).
+"""Byte floors of one DeepSeek-V2-Lite decode step at batch B (docs/deepseek/BATCH-2026-10-14.md section 2).
 
 Two ways to serve B requests in one step:
   replicated  each request reads every weight itself (ETX today: ETX_DSV2_REQUESTS=B): B x the batch-1 bytes.

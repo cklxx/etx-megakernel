@@ -25,7 +25,7 @@ __shared__ uint32_t etx_imp_bar_count[ETX_IMPORT_SLOTS], etx_imp_bar_gen[ETX_IMP
 
 #ifdef ETX_IMP_SW_BARRIER
 // The software slot barrier (the imported kernel's __syncthreads over its own slot's waves): LDS counter + generation
-// word, polling. Kept for A/B; measured 0.2-0.26 us per barrier against 77 ns for s_barrier (docs/MODEL-vllm-kernels.md).
+// word, polling. Kept for A/B; measured 0.2-0.26 us per barrier against 77 ns for s_barrier (docs/qwen/MODEL-vllm-kernels.md).
 extern "C" __device__ __attribute__((always_inline)) void etx_imp_slot_barrier(int slot, int nwaves) {
   __builtin_amdgcn_fence(__ATOMIC_RELEASE, "workgroup");
   if (__builtin_amdgcn_mbcnt_hi(~0u, __builtin_amdgcn_mbcnt_lo(~0u, 0u)) == 0) {   // lane 0 of the wave

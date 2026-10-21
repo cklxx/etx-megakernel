@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Validate a cost model against every ETX build of Qwen3-30B-A3B we have measured on one MI300X
-(docs/MODEL-vllm-kernels.md section 19). One run each, the numbers as they were reported.
+(docs/qwen/MODEL-vllm-kernels.md section 19). One run each, the numbers as they were reported.
 
   python3 -m examples.vllm_llm.validate [--etx-us 6.6] [--mapping contig] [--fit]
 

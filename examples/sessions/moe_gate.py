@@ -1,4 +1,4 @@
-"""GPU session: the dense gate, then Qwen3-30B-A3B with vLLM's kernels fused (docs/MODEL-moe.md sections 3-4).
+"""GPU session: the dense gate, then Qwen3-30B-A3B with vLLM's kernels fused (docs/qwen/MODEL-moe.md sections 3-4).
 
 Question: is ETX's hand-off (h) plus what the imported form adds per task (p) now small enough that fusing vLLM's own
 kernels beats vLLM (MoE break-even: 12 h + 15 p < 32.4 us per layer), and does the MoE build do it?
@@ -17,7 +17,7 @@ GPU 1 (correctness and traces):
       code object) or no MoE number counts; per-kernel original vs imported time (p per kernel, P2-P4)
   G2  ETX_TRACE of 1.5B xcd_s1 and MoE xcd (stride 32): per hand-off, last producer end -> first consumer start (h, H2-H4)
   G3  rocprofv3 kernel trace of the 1.5B and MoE unfused builds: per launch, against vLLM's trace of the same kernel (p)
-Nothing measured before is re-run (docs/DATA.md): vLLM's numbers and kernel traces, the hardware microbenchmarks.
+Nothing measured before is re-run (docs/core/DATA.md): vLLM's numbers and kernel traces, the hardware microbenchmarks.
 
   tools/session.sh push <ip>; tools/session.sh start <ip> examples/sessions/moe_gate.py
 """

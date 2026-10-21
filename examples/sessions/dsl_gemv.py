@@ -1,4 +1,4 @@
-"""GPU session: the DSL builds, one run each (docs/MODEL-vllm-kernels.md sections 13, 16). Build 3 (the best by the
+"""GPU session: the DSL builds, one run each (docs/qwen/MODEL-vllm-kernels.md sections 13, 16). Build 3 (the best by the
 configuration search): xcd + the DSL streaming GEMVs (etx.ops.gemv, silu fused into gate_up) + the attention block by
 kv head (etx.ops.attnprep on XCD h, vLLM's attention and reduce on XCD h) + the folds (in_norm / post_norm / final_norm
 into the qkv / router / lm_head prologues, the top-k into the expert tasks; no moe_sum). Build 2 (no folds) as the
@@ -85,7 +85,7 @@ job(name="build_bench", lane="cpu", reads="apt", timeout=900,
 job(name="hw_lfx", gpu=0, reads=["build_bench"], timeout=300,
     cmd="stdbuf -oL $HOME/sess/hw_bench lfx", summary=[r"^RESULT"])
 # and the hand-off with the data as the signal (hw_bench sdat: coherent stores / plain + wbl2 polled by coherent loads,
-# evx's device shapes): the number that decides whether the sentinel hand-off (docs/SURVEY-2026-09-29.md section 2) is
+# evx's device shapes): the number that decides whether the sentinel hand-off (docs/core/SURVEY-2026-09-29.md section 2) is
 # worth building against the measured evx / trace hand-offs
 job(name="hw_sdat", gpu=0, reads=["build_bench"], timeout=300,
     cmd="stdbuf -oL $HOME/sess/hw_bench sdat", summary=[r"^RESULT"])

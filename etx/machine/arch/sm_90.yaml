@@ -57,7 +57,7 @@ lowering:
   timer: 'clock64()'
   domain_id: '0'
   launch: cudaLaunchCooperativeKernel
-# Tile primitives (docs/PLAN-generic-decoder-2026-10-08.md section 6.4). Each entry is the C definition that
+# Tile primitives (docs/core/PLAN-generic-decoder-2026-10-08.md section 6.4). Each entry is the C definition that
 # etx/ops/prims.py emits for this machine. The tile generators call the primitive by name only.
 # No device ran these lowerings. No CUDA compiler checked them on this machine.
 primitives:

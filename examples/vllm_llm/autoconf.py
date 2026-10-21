@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The compiler's configuration search (docs/MODEL-vllm-kernels.md section 15): enumerate the build switches of
+"""The compiler's configuration search (docs/qwen/MODEL-vllm-kernels.md section 15): enumerate the build switches of
 examples/vllm_llm/model.py, compile each plan, cost every task from the tile it links (kmodel.kern_for_symbol) and
 simulate the step on the XCD simulator with the measured phase model (examples/vllm_llm/pmodel.py); print
 the ranking. What used to be hand-set

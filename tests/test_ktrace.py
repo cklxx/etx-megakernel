@@ -117,7 +117,7 @@ def test_vendor_cpu_dry_run():
 def test_thresholds_are_verbatim_and_reported(tmp_path, capsys):
     from examples.sessions import kcmp
     from examples.vllm_llm import kcmp_report
-    text = (ROOT / 'docs/KCMP-THRESHOLDS.md').read_text()
+    text = (ROOT / 'docs/qwen/KCMP-THRESHOLDS.md').read_text()
     thresholds = text.split('## 4. Thresholds, written before the run\n\n')[1].split('\n## 5.')[0]
     assert thresholds in kcmp.__doc__
     kcmp_report.main([str(tmp_path), '--historical-root', str(tmp_path)])

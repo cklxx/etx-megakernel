@@ -27,14 +27,14 @@ lifetime. No complete DeepSeek fusion certification is claimed.
 
 ## Other queue outcomes
 
-- [Expert row merge](results/2026-10-15/expert/): synthetic screen, all five pairs slower; median
+- [Expert row merge](results/2026-10-15/expert): synthetic screen, all five pairs slower; median
   gain −6.675003052 µs, spread 1.264495850 µs. STOP-NO-BENEFIT; no model speedup.
-- [Qwen producer/router scoring](results/2026-10-15/producer/): actual-model mixed-weight output mismatch
+- [Qwen producer/router scoring](results/2026-10-15/producer): actual-model mixed-weight output mismatch
   at position 0, `L0_mix.bin`. Qualification refused; later full-model gates and timing were not reached.
-- [DeepSeek x8](results/2026-10-15/x8/): all six strict diagnostics fail hidden boundaries, including
+- [DeepSeek x8](results/2026-10-15/x8): all six strict diagnostics fail hidden boundaries, including
   matching single-request controls. Concurrency is not necessary for the failure; its underlying cause is
   unproven. Exit 0 records successful diagnostic collection, not semantic correctness.
-- [Attention C6](results/2026-10-15/c6/): required correctness checks passed, but all four checked positions
+- [Attention C6](results/2026-10-15/c6): required correctness checks passed, but all four checked positions
   had mixed timing signs and large spreads. The registered local target closed; no stable model/host gain.
 - [B4 profiler failure](results/2026-10-15/b4/attribution.json): the first traffic invocation exited −11
   during HSA profiler finalization. Partial CSV is rejected traffic evidence. No unchanged profiler retry.

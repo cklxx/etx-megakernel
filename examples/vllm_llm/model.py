@@ -73,7 +73,7 @@ def _on(name: str, universal: bool = True) -> bool:
     return universal and not IMPORTED
 
 
-# UNIVERSAL (see docs/OPTIMISATIONS.md): on for every model, `=0` only to reproduce a measurement.
+# UNIVERSAL (see docs/core/OPTIMISATIONS.md): on for every model, `=0` only to reproduce a measurement.
 CU = int(os.environ.get("ETX_VL_CU", "256"))    # MI300X has 304 compute units
 BS = OPERATORS["attn_mfma4_g4"].constants["BS"]                       # KV block size (vLLM default on ROCm)
 PART = OPERATORS["attn_mfma4_g4"].constants["PART"]                    # paged attention partition size (fixed in paged_attention_custom_launcher).
@@ -97,7 +97,7 @@ CHAIN = _on("ETX_VL_CHAIN", universal=True)
 # 256-thread block, in place on qkv; replaces rms_norm_3d x2 + rotary_embedding
 # ETX_VL_QKNR=grid: the fused launch as its own grid (its blocks on several CUs), not chained with the cache write
 QKNR = os.environ.get("ETX_VL_QKNR", "0") in ("1", "grid")
-# ETX_VL_DSL=1 (simulation only, docs/MODEL-vllm-kernels.md section 12): the latency-bound small ops as ETX tile ops with
+# ETX_VL_DSL=1 (simulation only, docs/qwen/MODEL-vllm-kernels.md section 12): the latency-bound small ops as ETX tile ops with
 # their chains fused: q/k norm + rope + cache write + attention in one task per (partition, kv head); top-k as one tile;
 # moe_sum folded into the next layer's in_norm. The streaming ops (GEMVs, fused_moe) stay vLLM's.
 DSL = os.environ.get("ETX_VL_DSL", "0") in ("1", "2")
@@ -139,10 +139,10 @@ DSL_FOLD = _FOLD_ENV == "1" if _FOLD_ENV is not None else not IMPORTED
 # a model with few experts or few expert tasks could flip it, so the comparison is made from the shapes.
 _FOLD_TOPK_ENV = os.environ.get("ETX_VL_FOLD_TOPK")
 # ETX_VL_TOUCH=1: the dense DSL GEMVs get the megakernel's touch hook (etx.ops.gemv dsl_touch_plain): while wave 0 waits
-# for the task's event, the other waves pull the task's first weight trip into L2 (docs/MODEL-vllm-kernels.md section 18)
+# for the task's event, the other waves pull the task's first weight trip into L2 (docs/qwen/MODEL-vllm-kernels.md section 18)
 TOUCH = _on("ETX_VL_TOUCH")
 # ETX_VL_COH=1: the DSL tiles access their activations device-coherently (etx.ops.coh, built with -DETX_DSL_COH), so
-# the megakernel emits no acquire buffer_inv for them and the caches survive the phase boundary (docs/RESULTS-2026-09-30.md)
+# the megakernel emits no acquire buffer_inv for them and the caches survive the phase boundary (docs/qwen/RESULTS-2026-09-30.md)
 COH = _on("ETX_VL_COH") and not IMPORTED   # imported tiles cannot have it
 # ETX_VL_ATTN_WIDE=1: the attention partitions spread over all NX XCDs instead of sitting on the kv head's own
 # one. With NKV = 4 and 8 XCDs the head-affine block leaves XCDs 4-7 idle; the price is that prep -> attn ->
@@ -194,7 +194,7 @@ XAFF_ROLES = {"moe_up", "moe_act", "moe_down"}
 # ETX_VL_REQUESTS=2: two requests in one megakernel, one workgroup per CU. Their launches alternate in the graph (request
 # 0's launch n, request 1's launch n, ...), so every worker's static queue interleaves them and a CU request 0 leaves
 # idle (its 1-8-task launches, the attention block) runs request 1's tasks. Buffers, KV caches and argument blocks are
-# per request; weights are shared. (docs/MODEL-vllm-kernels.md section 8)
+# per request; weights are shared. (docs/qwen/MODEL-vllm-kernels.md section 8)
 REQUESTS = int(os.environ.get("ETX_VL_REQUESTS", "1"))
 # ETX_VL_BATCH=1: the dense GEMVs are emitted ONCE for all requests, their tile reading REQUESTS activation columns per
 # weight read (etx/ops/gemv.py, DSL_NB). The attention block and the MoE stay replicated, so a batched dense node waits
@@ -373,7 +373,7 @@ def instances(d) -> list[dict]:
             # split a slot across XCDs and the per-XCD moe_up -> moe_down edge would wait the wrong producers, so
             # those shapes run the MoE block UNPINNED instead: default placement spreads its tasks over all NX XCDs
             # (full stream width) at the price of device-scope edges in and out (~1.2 us/layer,
-            # docs/BUDGET-2026-10-01.md) -- against idling (NX - TOPK) / NX of the machine for the ~50 us expert
+            # docs/qwen/BUDGET-2026-10-01.md) -- against idling (NX - TOPK) / NX of the machine for the ~50 us expert
             # stream if the few slots were pinned. The top-k then keeps ONE copy (rep = 1): the unpinned expert
             # tasks all read copy 0, which is the host's rr = 0 block (host.hip addresses copies as rr * TOPK).
             noaff = XCD and d.TOPK % NX != 0
@@ -487,7 +487,7 @@ def build() -> Graph:
     g.codegen["nb"] = REQUESTS if BATCH else 1
     g.codegen["requests"] = REQUESTS
     g.codegen["uc"] = os.environ.get("ETX_VL_UC", "0") == "1"
-    # The variant of each phase, published through the manifest (plan_data.h; docs/SEC7-interface-fix.md). The host
+    # The variant of each phase, published through the manifest (plan_data.h; docs/core/SEC7-interface-fix.md). The host
     # compares every plan instance with it and derives nothing itself. Until the planner of section 6.2 lands, the
     # selection is the one instances() made above, so the published value equals today's choice by construction.
     g.codegen[manifest.SELECTION] = manifest.selection_of(((i["role"], i["layer"], i["export"]) for i in base),

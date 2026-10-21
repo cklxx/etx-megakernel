@@ -6,7 +6,7 @@
 #include <stddef.h>
 
 // Words between consecutive event counters in p.events. 1 packs them (the 8 coordinates of an XCD-local event share one
-// cache line and every hand-off contends on it: 3.3 us vs 1.0 us padded, bench/hw/hw_bench.hip handoff, docs/MODEL-dsv2.md
+// cache line and every hand-off contends on it: 3.3 us vs 1.0 us padded, bench/hw/hw_bench.hip handoff, docs/deepseek/MODEL-dsv2.md
 // H6); 32 gives every counter its own 128 B line. Device code addresses a counter as p.events + ETX_EVW(word).
 #ifndef ETX_EV_STRIDE
 #define ETX_EV_STRIDE 1

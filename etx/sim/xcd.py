@@ -10,7 +10,7 @@ the same time share the memory system, so what one XCD does changes what another
 
 Since 2026-09-30 the fixed part is dominated by `floor_us` and `etx_us`, measured per phase rather than derived from
 an instruction count: hw_bench stream shows 296 workgroups cost about 3 us even when they read 896 B each, and the
-measured builds put ETX's own share on top of that (docs/MODEL-vllm-kernels.md section 19). The earlier model
+measured builds put ETX's own share on top of that (docs/qwen/MODEL-vllm-kernels.md section 19). The earlier model
 charged a per-task tax of about 2 us and counted events, and predicted gains from folding that the hardware did not
 pay: build 2 5.934 ms -> build 3 5.895 ms, against a predicted 0.9 ms.
 
@@ -20,7 +20,7 @@ full of streams is bandwidth-bound, a few streams are latency-bound, and an XCD 
 
 Streams are split by where their bytes come from. Weights (6.1 GB per token) never fit in any cache and stream from
 HBM; the KV cache (104 MB) fits in the 256 MB Infinity Cache (MALL) and streams from there at MALL rate
-(docs/BUDGET-2026-10-01.md: attn 2.16 MB/layer in 6.28 us = 344 GB/s per task, MALL-resident). Cost.mall_bytes marks
+(docs/qwen/BUDGET-2026-10-01.md: attn 2.16 MB/layer in 6.28 us = 344 GB/s per task, MALL-resident). Cost.mall_bytes marks
 the MALL part of a task's stream_bytes; HBM and MALL are separate bandwidth pools that share nothing, so an XCD
 streaming KV does not take HBM bandwidth from an XCD streaming weights. Before this split the model charged every
 byte against HBM, which over-predicted contention whenever attention overlapped GEMMs.
@@ -54,7 +54,7 @@ class Cost:
     stream_bytes: float = 0.0    # bytes this task streams (weights from HBM, KV from MALL; see mall_bytes)
     mall_bytes: float = 0.0      # of stream_bytes, this many are served from the Infinity Cache (MALL) and never
                                  # touch HBM: the KV cache (104 MB) fits in MALL (256 MB) and streams at MALL rate,
-                                 # so it contends with other MALL streams only (docs/BUDGET-2026-10-01.md: attn
+                                 # so it contends with other MALL streams only (docs/qwen/BUDGET-2026-10-01.md: attn
                                  # 2.16 MB/layer in 6.28 us = 344 GB/s per task, MALL-resident). Clamped to
                                  # stream_bytes by simulate; 0.0 keeps the old all-HBM behaviour.
     cu_rate: float = 30e3        # bytes/us one CU of this task can pull alone, when inflight is 0 (a fixed cap); the
@@ -91,7 +91,7 @@ class Hw:
     seed: int = 0
     # Infinity Cache (MALL): the on-package cache the KV cache streams from. A separate bandwidth pool from HBM.
     mall_bw_max: float = 2.0e6   # bytes/us aggregate MALL bandwidth. FIT, not measured: 344 GB/s per attn task
-                                 # (docs/BUDGET-2026-10-01.md) x ~6 concurrent KV-streaming tasks, conservative.
+                                 # (docs/qwen/BUDGET-2026-10-01.md) x ~6 concurrent KV-streaming tasks, conservative.
                                  # Refit with an hw_bench MALL stream sweep (cf. etx.sim.phase.SPAN_US) before
                                  # trusting contention predictions between many concurrent attention tasks.
     mall_lat_us: float = 0.15    # MALL idle round trip, below HBM's (on-package, no HBM PHY)

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Operation-level cost model of vLLM's decode kernels on MI300X, in vLLM's form and in ETX's two forms
-(docs/MODEL-vllm-kernels.md).
+(docs/qwen/MODEL-vllm-kernels.md).
 
 Every kernel at batch 1 is a chain of dependent steps, so one block's time is a sum over its critical path:
 
@@ -47,7 +47,7 @@ class Kern:
     bytes_block: float = 0  # bytes one streaming block reads (weights, KV)
     mall_block: float = 0   # of bytes_block, this many come from the Infinity Cache (MALL), not HBM:
                             # the KV cache (104 MB) fits in MALL (256 MB); attn streams at MALL rate
-                            # (docs/BUDGET-2026-10-01.md: 2.16 MB/layer in 6.28 us = 344 GB/s)
+                            # (docs/qwen/BUDGET-2026-10-01.md: 2.16 MB/layer in 6.28 us = 344 GB/s)
     inflight: float = 0     # bytes one active CU keeps in flight while streaming
     active: int = 1         # CUs (blocks) that stream
     gap: float = 0          # exposed work per trip not overlapped with memory (fused_moe tile: 0.33 us)

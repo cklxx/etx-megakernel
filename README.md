@@ -9,12 +9,12 @@ One IR targets MI300X's 8 XCDs, MI250X's two GCDs, MI355X, H100, and B200.
 The compiler reads a machine model instead of a branch on an architecture name.
 
 Repository: https://github.com/cklxx/etx-megakernel (private). Design page (the spec): https://etc-dynamic-megakernel-arch.q1293822641.workers.dev
-(source in `docs/site/index.html`). Code map: `docs/ARCHITECTURE.md`.
+(source in `docs/site/index.html`). Code map: `docs/core/ARCHITECTURE.md`.
 
-Proposed scope, evidence limits, and staged acceptance gates: [project roadmap](docs/ROADMAP.md)
+Proposed scope, evidence limits, and staged acceptance gates: [project roadmap](docs/core/ROADMAP.md)
 (updated 2026-10-03).
 
-CPU acceptance target and one-command checks: [G0 readiness](docs/CPU-READINESS.md).
+CPU acceptance target and one-command checks: [G0 readiness](docs/core/CPU-READINESS.md).
 
 Latest measured GPU outcomes (2026-10-15 UTC), including the corrected DeepSeek B4 loss,
 Qwen correctness blockers and multibatch task traces: [results index](examples/gpu-live/README.md).
@@ -47,7 +47,7 @@ See design section 15.9.
 **Qwen3-30B-A3B bf16, batch 1, prompt 1024, 32 greedy tokens**, GPU 0.
 **-0.449 ms** is the paired wall delta against vLLM default; spread **0.036 ms**.
 **LEAD** comes from re-rendering the runner's own directory, not its erroneous NOT-COMPLETE report job
-(`results_nvref2_2026-10-09/report.log`; [reconciliation](docs/NVREF2-2026-10-09.md)).
+(`results_nvref2_2026-10-09/report.log`; [reconciliation](docs/qwen/NVREF2-2026-10-09.md)).
 
 | | ms/token wall | Basis / source |
 |---|---|---|
@@ -56,14 +56,14 @@ See design section 15.9.
 | vLLM + AITER | 4.982 | Median of three one-sample jobs; same report |
 
 **3.51% / +0.162 ms** wall fusion against the same kernels in a HIP graph passes again (same report).
-**3.50%** is the independent `pairs.py` RESULT-median wall gain; both bases pass ([commands and sources](docs/NVREF2-2026-10-09.md#measurements-m)).
+**3.50%** is the independent `pairs.py` RESULT-median wall gain; both bases pass ([commands and sources](docs/qwen/NVREF2-2026-10-09.md#measurements-m)).
 **32/32 tokens** and `CHECK-DSL OK` passed; import identity still covers only **5 of 97 instances**, in chk1.
 **MISSED:** §12 predicted ≤0.020 ms vLLM round spread; the report measured **0.032 ms**.
 **INSUFFICIENT** remains the first session's system verdict (`results_nvref_2026-10-09/report.log`).
 **One LEAD on a VF** covers only default/AITER vLLM configurations, not its strongest possible configuration.
-**No absolute milliseconds are compared across sessions.** See the [gains table](docs/GAINS-TABLE.md).
+**No absolute milliseconds are compared across sessions.** See the [gains table](docs/qwen/GAINS-TABLE.md).
 
-The comparison rows for `**ETX megakernel** | **4.823**` and 4.998 unfused are withdrawn for having no raw logs (`docs/DOC-AUDIT-2026-10-03.md:149`).
+The comparison rows for `**ETX megakernel** | **4.823**` and 4.998 unfused are withdrawn for having no raw logs (`docs/core/DOC-AUDIT-2026-10-03.md:149`).
 
 **Historical: the recorded round23 comparison shows a 1.2% fusion benefit for the same DSL tiles: 4.937 versus 4.998 ms/token.**
 The previous claim of a 4.2% loss refers to the day before.
@@ -72,7 +72,7 @@ The system improved 17.5% against itself, with confirmation on a second machine.
 That machine used bare metal and ROCm 7.2.4.
 Its fusion margin was +0.224 against −0.235 on 2026-09-30.
 These DSL results do not establish the all-imported claim.
-The all-imported comparison still loses in [docs/WHY-DSL-TILES-2026-10-01.md](docs/WHY-DSL-TILES-2026-10-01.md).
+The all-imported comparison still loses in [docs/qwen/WHY-DSL-TILES-2026-10-01.md](docs/qwen/WHY-DSL-TILES-2026-10-01.md).
 
 The acquire fix saved −0.317 ms. Each task previously used `buffer_inv sc1`, which invalidated the whole L2 and made each phase start cold.
 Removal of an earlier fold saved −0.231. That fold made 448 expert tasks per layer each repeat a 128-logit softmax.
@@ -87,7 +87,7 @@ The budget explains the remaining time.
 Handoff is at the event protocol's floor. Workgroup start delay is below the hardware dispatcher's own jitter.
 Fused host work is 0.133 ms (`results_nvref_2026-10-09/report.log:18`). The instruction cache hit rate is 99.90%.
 
-Host excess X is 0.094 ms (`results_nvref_2026-10-09/report.log:18`), above the 0.050 ms host screen in `docs/SPEC-nv-reference-2026-10-08.md` §11 (threshold also recorded in `results_nvref_2026-10-09/report.log:16`). The host profile points to async enqueue as a recoverable lever (`results_nvref_2026-10-09/hostprof.log:2117-2120`), but the strict async/resident decision needs a matching-step device mean. **Our own hand-written tiles account for 1.29 ms of the step.**
+Host excess X is 0.094 ms (`results_nvref_2026-10-09/report.log:18`), above the 0.050 ms host screen in `docs/qwen/SPEC-nv-reference-2026-10-08.md` §11 (threshold also recorded in `results_nvref_2026-10-09/report.log:16`). The host profile points to async enqueue as a recoverable lever (`results_nvref_2026-10-09/hostprof.log:2117-2120`), but the strict async/resident decision needs a matching-step device mean. **Our own hand-written tiles account for 1.29 ms of the step.**
 Tile quality was never ETX's claim. Generality on 2026-10-02: Mixtral-8x7B runs 32/32 through the same compiler with zero compiler changes.
 Its shape is top-2 of 8, G=4, K=14336.
 Every failure came from host-side shape glue. Shape keys now make unknown shapes fail with an explicit import error.
@@ -96,8 +96,8 @@ The DSL path reaches 10.365 ms/token against vLLM's 8.686. The floor is ~7.3-8.5
 Qwen-tuned task-width constants explain the remaining gap. See [docs/GENERALITY-2026-10-02.md](docs/GENERALITY-2026-10-02.md).
 The config rejects out-of-class architectures by name, such as Qwen3.6's hybrid linear attention.
 
-Full report: [docs/ETX-report-2026-10-01.pdf](docs/ETX-report-2026-10-01.pdf), per-phase budget in
-[docs/BUDGET-2026-10-01.md](docs/BUDGET-2026-10-01.md), measured data index in [docs/DATA.md](docs/DATA.md).
+Full report: [docs/qwen/ETX-report-2026-10-01.pdf](docs/qwen/ETX-report-2026-10-01.pdf), per-phase budget in
+[docs/qwen/BUDGET-2026-10-01.md](docs/qwen/BUDGET-2026-10-01.md), measured data index in [docs/core/DATA.md](docs/core/DATA.md).
 
 ## Earlier: the real model runs (2026-09-23)
 
@@ -262,7 +262,7 @@ It reports the deadlock check, makespan, and busy / wait / scheduling budget.
 * Cross-device: system-scope flag one-way 10.6 µs, peer store 285 GB/s; whole-GPU
   counter barrier 8.6 µs at 304 workgroups.
 * Five runtime defects were found only on hardware and are now rules with tests
-  (see `docs/ETX_Technical_Design.md`, Appendix C).
+  (see `docs/core/ETX_Technical_Design.md`, Appendix C).
 
 ```bash
 python -m etx compile examples/splitk_sum.py --arch gfx942 --out build/splitk_sum

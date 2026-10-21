@@ -1,4 +1,4 @@
-"""Lever merge_uv_waves (M1, docs/DSV2-D1-D5.md): merge's W_UV GEMV spreads its 8 rows over all four waves.
+"""Lever merge_uv_waves (M1, docs/deepseek/DSV2-D1-D5.md): merge's W_UV GEMV spreads its 8 rows over all four waves.
 
 fleet's merge_and_uv (kernels/attention.h @3fb67a6) applies the task's slice of W_UV with
 `gemv_rows(..., n_rows, kv_lora, ...)`. K = kv_lora = 512 selects `gemv_rows_pipelined<8, 1>`: 8 rows per wave per

@@ -19,7 +19,7 @@ ETX imports it. It is written as input to the ETX performance model. Every claim
 | **[ISA]** | CDNA3 ISA guide (`scratchpad/cdna3_isa.txt`). Table 28: `V_MFMA_F32_16X16X16_BF16` = 16 cycles. §S_SLEEP: `s_sleep 1` sleeps 0-64 clk. |
 
 Clock: 1.98 GHz (**[hw]**), so 1 us is about 1980 clk. Unloaded latencies are L2 100-108 ns and HBM 333-350 ns
-(docs/MODEL-dsv2.md:26). Achievable HBM bandwidth is about 4.3 TB/s (CLAUDE.md:13).
+(docs/deepseek/MODEL-dsv2.md:26). Achievable HBM bandwidth is about 4.3 TB/s (CLAUDE.md:13).
 
 ## 1. Launch shape at batch 1
 

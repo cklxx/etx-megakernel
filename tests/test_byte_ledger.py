@@ -40,7 +40,7 @@ def test_qwen_moe_weights_match_the_dsl_prep_formula():
     active = d.L * (attn + mlp) + d.V * d.H * 2
     small = sum(row["norms"] for row in r["layers"]) + sum(v for k, v in r["globals"].items() if k != "lm_head")
     assert r["weights"] - small == active
-    assert round(active / 1e9, 2) == 6.08             # docs/MODEL-vllm-kernels.md:481
+    assert round(active / 1e9, 2) == 6.08             # docs/qwen/MODEL-vllm-kernels.md:481
 
 
 def test_phimoe_session_floor():

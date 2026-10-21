@@ -1,5 +1,5 @@
 """GPU session: the two fixes the kernel model ranks first, each alone and together, and two interleaved requests
-(docs/MODEL-vllm-kernels.md sections 6-8). One variant per switch, everything else equal:
+(docs/qwen/MODEL-vllm-kernels.md sections 6-8). One variant per switch, everything else equal:
 
   -DETX_IMP_SW_BARRIER    imported barriers as the old software slot barrier (default now: hardware s_barrier in rounds)
   -DETX_IMP_VECTOR_ARGS   imported kernels' parameters through the old vector path (default now: wave-uniform, scalar)
@@ -15,7 +15,7 @@ Pre-registered (xcd schedule, ms per token; the simulation x 1.135, its bias aga
 Correctness first: the base build's --check (every launch of layers 0-1 byte-identical, the new barrier protocol in the
 imported kernels) and every timed run 32/32 (both requests for the two-request build), or the number does not count.
 Microbenchmarks first, on GPU 0 while the models download (bench/hw/hw_bench.hip lat / lf / launch / evx,
-bench/hw/imp_bench.hip in both protocols); their predictions are in docs/MODEL-vllm-kernels.md section 10.
+bench/hw/imp_bench.hip in both protocols); their predictions are in docs/qwen/MODEL-vllm-kernels.md section 10.
 Also: instruction-cache counters per launch during --check (vLLM's original next to the imported form: the hypothesis for
 the unexplained unfused excess), and one ETX_TRACE of the new xcd build (its front and bodies against the model).
 
@@ -59,7 +59,7 @@ for n, hf in MODELS.items():
         summary=[r"wrote .*vl.bin"])
 
 # ---------------------------------------------------------------- microbenchmarks first (GPU 0, while the models download)
-# every parameter the XCD simulation used to fit or estimate (docs/MODEL-vllm-kernels.md section 10), measured directly:
+# every parameter the XCD simulation used to fit or estimate (docs/qwen/MODEL-vllm-kernels.md section 10), measured directly:
 # dependent round trips by cache level and after ETX's invalidates (t_v, t_s, the argument path), bytes in flight -> rate
 # (the bandwidth), the kernel boundary with dependent loads (F), ETX's own event protocol in the plan's shapes (hand-offs),
 # and the imported barrier protocols from etx/import.h itself (t_swbar, the round barrier)
@@ -90,7 +90,7 @@ BUILDS = {   # name -> (model, env, hipcc flags)
     "moe_xcd_new": ("qwen3-30b-a3b", XCD, ""),
     "moe_xcds1_new": ("qwen3-30b-a3b", f"{XCD} {S1}", ""),
     "moe_xcd2_new": ("qwen3-30b-a3b", f"{XCD} ETX_VL_REQUESTS=2", ""),
-    # vLLM's fused_qk_norm_rope in place of rms_norm_3d x2 + rotary (docs/MODEL-vllm-kernels.md section 11)
+    # vLLM's fused_qk_norm_rope in place of rms_norm_3d x2 + rotary (docs/qwen/MODEL-vllm-kernels.md section 11)
     "moe_base_qknr": ("qwen3-30b-a3b", "ETX_VL_CHECK=1 ETX_VL_QKNR=1", ""),
     "moe_xcd_qknr_new": ("qwen3-30b-a3b", f"{XCD} ETX_VL_QKNR=grid", ""),
     "moe_xcd_qknrc_new": ("qwen3-30b-a3b", f"{XCD} ETX_VL_QKNR=1", ""),

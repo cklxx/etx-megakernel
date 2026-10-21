@@ -2,7 +2,7 @@
 
 fleet's select_experts_from (fleet_kernel.hip @3fb67a6) runs, on wave 0, a 6-step max, a 6-step sum and six 6-step
 butterfly argmax passes with two shuffles each: 84 dependent bpermutes, 4.7 us per gate_up workgroup (fleet's own
-stamp, docs/MODEL-dsv2.md:157). This lever keeps the max / exp / sum / normalise code byte for byte, then gives every lane
+stamp, docs/deepseek/MODEL-dsv2.md:157). This lever keeps the max / exp / sum / normalise code byte for byte, then gives every lane
 its rank under fleet's exact order (other beats self if larger, or equal with a lower lane index) from 64 independent
 readlanes, and the lane of rank k < top_k writes slot k with its own p: the same ids and weights in the same slots.
 

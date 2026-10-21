@@ -1,4 +1,4 @@
-"""STUB of etx.select: the interface of docs/SEC7-interface-fix.md sections 3 to 5, and nothing more.
+"""STUB of etx.select: the interface of docs/core/SEC7-interface-fix.md sections 3 to 5, and nothing more.
 
 Items 1 and 2 (Grok, branch grok/sec7-variants-planner) own the real code. The item 4 and item 5 tests load the
 real package when it exists (`load()`) and this stub only when it does not. Delete this file when etx.select lands.
