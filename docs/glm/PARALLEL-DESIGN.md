@@ -8,7 +8,7 @@ This is a design, not GPU qualification. It supersedes the cost-first ordering a
 
 Measured historical inputs must retain their conditions:
 
-- The recorded **8.61 us** counter barrier is an **intra-GPU** whole-grid barrier with **304** resident workgroups; **608** workgroups cost **17.30 us**. It is not a remote collective startup (`docs/core/ETX_Technical_Design.md:1261`; `bench/calib/phase_switch.hip:13-23,45-61`).
+- The recorded **8.61 us** counter barrier is an **intra-GPU** whole-grid barrier with **304** resident workgroups; **608** workgroups cost **17.30 us**. It is not a remote collective startup (`docs/core/ETX_Technical_Design.md:1287-1291`; `bench/calib/phase_switch.hip:13-23,45-61`).
 - The recorded **10.6 us** one-way remote flag observation was on **two MI300X** GPUs, not MI325X (`docs/core/ETX_Technical_Design.md:1287-1294`; `bench/calib/p2p_atomic.hip:10-19`). It is not an all-reduce measurement.
 - The recorded peer-store rate printed as **285 GB/s** actually uses **GiB/s** arithmetic: the source allocates **256 MiB**, divides MiB by seconds and by **1024**, and times **workgroup 0**, not completion of all workgroups (`bench/calib/p2p_atomic.hip:22-26,45-50`). Conversion gives **306.02 GB/s [E]**. Use **285 GiB/s** only as a *historical timing proxy*, not a validated completed-transfer or collective rate. Original calibration stdout has not been located [U].
 - Actual MI325X topology, completed-transfer rate, collective startup/tails and GLM stage times are **[U]**. Therefore the latency tables are sensitivity calculations, not predictions.
