@@ -151,3 +151,52 @@ For TP [E], `T = C_shardable/t + C_replicated + C_imbalance + T_collectives`; mo
 TP needs sharded tensor descriptors, head/state ownership, deterministic reductions and in-kernel collectives. EP needs expert placement, bounded variable routing buffers, dispatch/combine, shared-expert ownership and skew instrumentation. PP extension needs arbitrary stage ownership, explicit residual layout, token feedback and cross-request scheduling. DP needs request admission/cache isolation and end-to-end wall-time accounting. SP needs a compatible TP/context layout and numerical tests, not a new launcher per operation.
 
 **Reject any scheme that forces per-op host dispatch.** Communication must be a dependency-aware operation inside the resident megakernel or a proven persistent communication service with bounded progress. A per-op HIP/RCCL launch chain may be a comparison baseline, but it is not the ETX execution design.
+
+## GLM configuration and reproducible capacity basis
+
+The following configuration-derived numbers are all **[E]**, not GPU measurements. The pinned source is `zai-org/GLM-5.3-Flash`, revision `46a050bec13002ad29ee795c16e61cf4fa3c4a9c` (`docs/evidence/qwen-batch-glm53/glm-model-api.json:1`). This is the release checkpoint, not the synthetic module gate. Source locators are repo-root-relative.
+
+| Configuration [E] | Value [E] | Source |
+| --- | --- | --- |
+| Hidden width / mHC streams | 4096 / 4; mHC enabled | `docs/evidence/qwen-batch-glm53/glm-config.json:14-26,182` |
+| Layers / FFN split | 45; 3 dense followed by 42 MoE | `docs/evidence/qwen-batch-glm53/glm-config.json:184-240` |
+| Dense / expert intermediate | 12288 / 2048 | `docs/evidence/qwen-batch-glm53/glm-config.json:77,232` |
+| Routed / selected / shared experts | 288 / 8 / 1 | `docs/evidence/qwen-batch-glm53/glm-config.json:235-239` |
+| Routing | FP32 router, sigmoid, normalized selected weights, scale 2.5, one group | `docs/evidence/qwen-batch-glm53/glm-config.json:233-256` |
+| KDA attention | 34 layers, 64 heads × 128 dimensions; convolution width 4 | `docs/evidence/qwen-batch-glm53/glm-config.json:126-166` |
+| MLA attention | 11 layers at zero-based 3,7,11,15,19,23,27,31,35,39,43 | `docs/evidence/qwen-batch-glm53/glm-config.json:167-179` |
+| MLA projections | 64 heads, Q LoRA 1536, KV LoRA 512, QK/V dimensions 256; RoPE dimension 0 | `docs/evidence/qwen-batch-glm53/glm-config.json:78,238-258` |
+| Sparse indexer | 32 heads × 128, pooling 4, top-k 2048, tail always selected | `docs/evidence/qwen-batch-glm53/glm-config.json:21-26` |
+| Vocabulary / embedding tying | 154880 / untied | `docs/evidence/qwen-batch-glm53/glm-config.json:254-259` |
+| Model maximum positions | 1048576; not a native allocation guarantee | `docs/evidence/qwen-batch-glm53/glm-config.json:181` |
+| Native default allocation length | 1072; runtime runner uses the same value | `examples/glm53/stage.py:41`; `examples/glm53/run_all.py:46` |
+
+### What the requested weight total includes
+
+The saved API tensor inventory (`docs/evidence/qwen-batch-glm53/glm-model-api.json:1`) gives [E]:
+
+| Precision | Parameters [E] | Bytes [E] |
+| --- | ---: | ---: |
+| FP8 E4M3 | 314396639232 | 314396639232 |
+| BF16 | 6926096640 | 13852193280 |
+| FP32 | 295518 | 1182072 |
+| Total | 321323031390 | 328250014584 |
+
+Total is **305.70665 GiB [E]**, rounded to the requested **305.71 GiB [E]**. Calling all of it FP8 would be inaccurate. This inventory is not the exact staged text-only HBM footprint: native staging excludes vision/MTP, writes aligned matrix data plus explicit FP32 block scales and descriptors, and stages outer embedding/norm/head tensors (`examples/glm53/stage.py:1-5,97-123,193-200`). Only a validated stage manifest plus actual allocator telemetry can certify per-rank residency [U]. Do not equate download size, active bytes per token and resident allocation.
+
+Routed matrices alone [E]: `42 layers × 288 experts × 3 matrices × 4096 × 2048 × 1 byte = 283.5 GiB`. Each expert has **25165824 matrix bytes [E]**, plus **6144 scale bytes [E]** for FP32 scales on `128×128` blocks. The rounded residual `22.21 GiB [E]` used above is an accounting bucket, not a proof that all excluded metadata and scale bytes are covered. Replace it with exact staged ownership before deployment. Shapes and scale ABI: `examples/glm53/stage.py:84-89,109-119,264-266`.
+
+The runner's **1.72 [E]** weight-copy factor is a separate analytical traffic-budget line (`examples/glm53/run_all.py:52,415-438`). It is **not** a measured HBM residency multiplier and must not silently inflate or certify the capacity table.
+
+### Native state is not compressed MLA latent cache
+
+From `examples/glm53/stage.py:41-63`, the state element counts are [E]:
+
+- `STATE_KDA = 3 × (64×128) × 4 + 64×128×128 = 1146880` FP32 values per KDA layer/request, or **4587520 bytes**.
+- `STATE_MLA = maxlen × (2×64×256 + 2×128)` FP32 values per MLA layer/request, or **132096 × maxlen bytes**.
+- Full native state `K(L) = [34×4587520 + 11×132096×L] / 2^30 GiB/request`.
+- At `L=1072`, B1/B2/B4/B8 occupy **1.595963 / 3.191925 / 6.383850 / 12.767700 GiB [E]** before sharding. KDA state is recurrent and does not scale with context length; MLA state does. The tables do not substitute a shorter context's cache.
+
+KV LoRA rank **512 [E]** does not mean the native cache has only that many values per token: it stores expanded K/V plus indexer state. A compressed-cache or context-parallel implementation requires a new numerical/memory contract and measurement [U]. Likewise a TP degree does not automatically shard all cache or scratch arrays. mHC residual ownership, recurrent KDA state, MLA indexer state and logits must be explicit in a rank layout before using the ideal divided-cache rows.
+
+Current whole-layer partitioning is `examples/glm53/prepare.py:59-72`; staged validation insists on exactly two ranks with unique complete layer coverage (`examples/glm53/stage.py:224-226`). Actual staged bytes, layer balance, free-memory reserve and workspace must be checked per rank; passing the ideal arithmetic is not an allocation acceptance test.
