@@ -1,0 +1,384 @@
+{
+ "source": "examples/gpu-live/results/2026-10-16-multibatch/trace_report.json",
+ "scope": "instrumented final-token traces (ETX_TRACE), median-span run per B; bytes are shape estimates",
+ "plans": {
+  "1": {
+   "arm": "alld4r0l1kvsmw",
+   "grids": 271,
+   "tasks": 53022,
+   "wg_per_cu": 1,
+   "slots": 296,
+   "tasks_per_slot_mean": 179.1283783783784,
+   "tasks_per_slot_max": 186,
+   "requests_per_slot": 1,
+   "dispatches_per_step": 1
+  },
+  "2": {
+   "arm": "x2",
+   "grids": 438,
+   "tasks": 109892,
+   "wg_per_cu": 2,
+   "slots": 592,
+   "tasks_per_slot_mean": 185.6283783783784,
+   "tasks_per_slot_max": 219,
+   "requests_per_slot": 1,
+   "dispatches_per_step": 1
+  },
+  "4": {
+   "arm": "x4",
+   "grids": 876,
+   "tasks": 219784,
+   "wg_per_cu": 2,
+   "slots": 592,
+   "tasks_per_slot_mean": 371.2567567567568,
+   "tasks_per_slot_max": 438,
+   "requests_per_slot": 2,
+   "dispatches_per_step": 1
+  },
+  "8": {
+   "arm": "x8",
+   "grids": 1752,
+   "tasks": 439568,
+   "wg_per_cu": 2,
+   "slots": 592,
+   "tasks_per_slot_mean": 742.5135135135135,
+   "tasks_per_slot_max": 876,
+   "requests_per_slot": 4,
+   "dispatches_per_step": 1
+  }
+ },
+ "batches": {
+  "1": {
+   "batch": 1,
+   "arm": "alld4r0l1kvsmw",
+   "round": 1,
+   "tasks": 53022,
+   "slots": 296,
+   "span_us": 3094.4300000000003,
+   "body_work_us": 737261.24,
+   "wait_work_us": 108213.04000000002,
+   "body_per_task_us": 13.904817622873525,
+   "busy": 0.8049131608834041,
+   "cp_body_us": 2715.7199999999993,
+   "cp_dep_gap_us": 378.7100000000008,
+   "cp_queue_gap_us": 0.0,
+   "host_step_ms": 3.254209,
+   "host_minus_span_us": 159.77899999999954,
+   "bytes_est": 4934471680,
+   "rate_est_tbs": 1.5946302485433501,
+   "families": {
+    "gate_up": {
+     "tasks": 5772,
+     "body_per_task_us": 28.792217602217598,
+     "cp_body_us": 786.2400000000007
+    },
+    "attn": {
+     "tasks": 6912,
+     "body_per_task_us": 15.062887731481485,
+     "cp_body_us": 423.1599999999999
+    },
+    "down": {
+     "tasks": 5772,
+     "body_per_task_us": 15.378960498960499,
+     "cp_body_us": 416.31999999999965
+    },
+    "qkv": {
+     "tasks": 7992,
+     "body_per_task_us": 13.024544544544538,
+     "cp_body_us": 363.4399999999996
+    },
+    "router": {
+     "tasks": 5772,
+     "body_per_task_us": 8.143568953568955,
+     "cp_body_us": 225.519999999999
+    },
+    "oproj": {
+     "tasks": 7992,
+     "body_per_task_us": 6.53690690690691,
+     "cp_body_us": 180.08000000000087
+    },
+    "merge": {
+     "tasks": 6912,
+     "body_per_task_us": 4.729207175925929,
+     "cp_body_us": 133.11999999999986
+    },
+    "lm_head": {
+     "tasks": 296,
+     "body_per_task_us": 121.8801351351351,
+     "cp_body_us": 125.55999999999995
+    },
+    "dense_gu": {
+     "tasks": 296,
+     "body_per_task_us": 26.650945945945967,
+     "cp_body_us": 27.439999999999998
+    },
+    "dense_dn": {
+     "tasks": 296,
+     "body_per_task_us": 21.120000000000015,
+     "cp_body_us": 22.28
+    },
+    "norm": {
+     "tasks": 296,
+     "body_per_task_us": 5.404324324324325,
+     "cp_body_us": 5.520000000000003
+    },
+    "embed": {
+     "tasks": 1,
+     "body_per_task_us": 4.5600000000000005,
+     "cp_body_us": 4.5600000000000005
+    },
+    "argmax": {
+     "tasks": 1,
+     "body_per_task_us": 2.480000000000018,
+     "cp_body_us": 2.480000000000018
+    },
+    "qabs": {
+     "tasks": 864,
+     "body_per_task_us": 3.673379629629634,
+     "cp_body_us": 0.0
+    },
+    "shgu": {
+     "tasks": 1924,
+     "body_per_task_us": 28.724740124740126,
+     "cp_body_us": 0.0
+    },
+    "sdown": {
+     "tasks": 1924,
+     "body_per_task_us": 16.57941787941788,
+     "cp_body_us": 0.0
+    }
+   }
+  },
+  "2": {
+   "batch": 2,
+   "arm": "x2",
+   "round": 3,
+   "tasks": 109892,
+   "slots": 592,
+   "span_us": 4339.2,
+   "body_work_us": 1933957.1600000001,
+   "wait_work_us": 370187.1199999998,
+   "body_per_task_us": 17.59870745823172,
+   "busy": 0.7528621697610222,
+   "cp_body_us": 3739.799999999998,
+   "cp_dep_gap_us": 532.2400000000022,
+   "cp_queue_gap_us": 67.15999999999974,
+   "host_step_ms": 4.573789,
+   "host_minus_span_us": 234.58899999999994,
+   "bytes_est": 9868943360,
+   "rate_est_tbs": 2.274369321533923,
+   "families": {
+    "gate_up": {
+     "tasks": 15392,
+     "body_per_task_us": 36.631408523908526,
+     "cp_body_us": 1040.7999999999997
+    },
+    "down": {
+     "tasks": 15392,
+     "body_per_task_us": 22.317206340956343,
+     "cp_body_us": 595.5199999999986
+    },
+    "qkv": {
+     "tasks": 15984,
+     "body_per_task_us": 16.66941191191192,
+     "cp_body_us": 495.23999999999927
+    },
+    "attn": {
+     "tasks": 13824,
+     "body_per_task_us": 18.501678240740738,
+     "cp_body_us": 472.63999999999976
+    },
+    "router": {
+     "tasks": 15392,
+     "body_per_task_us": 10.245621101871103,
+     "cp_body_us": 325.6800000000012
+    },
+    "oproj": {
+     "tasks": 15984,
+     "body_per_task_us": 8.678065565565564,
+     "cp_body_us": 265.3999999999992
+    },
+    "merge": {
+     "tasks": 13824,
+     "body_per_task_us": 6.191284722222223,
+     "cp_body_us": 215.8800000000003
+    },
+    "qabs": {
+     "tasks": 1728,
+     "body_per_task_us": 4.363009259259259,
+     "cp_body_us": 129.68000000000015
+    },
+    "lm_head": {
+     "tasks": 592,
+     "body_per_task_us": 124.76932432432436,
+     "cp_body_us": 117.88000000000011
+    },
+    "dense_gu": {
+     "tasks": 592,
+     "body_per_task_us": 36.67594594594594,
+     "cp_body_us": 36.87999999999998
+    },
+    "dense_dn": {
+     "tasks": 592,
+     "body_per_task_us": 26.207770270270263,
+     "cp_body_us": 26.399999999999977
+    },
+    "norm": {
+     "tasks": 592,
+     "body_per_task_us": 6.360202702702702,
+     "cp_body_us": 9.64
+    },
+    "embed": {
+     "tasks": 2,
+     "body_per_task_us": 4.8,
+     "cp_body_us": 5.68
+    },
+    "argmax": {
+     "tasks": 2,
+     "body_per_task_us": 2.5799999999999272,
+     "cp_body_us": 2.4799999999995634
+    }
+   }
+  },
+  "4": {
+   "batch": 4,
+   "arm": "x4",
+   "round": 2,
+   "tasks": 219784,
+   "slots": 592,
+   "span_us": 8670.16,
+   "body_work_us": 3852422.84,
+   "wait_work_us": 682565.3599999998,
+   "body_per_task_us": 17.52822243657409,
+   "busy": 0.7505595068042012,
+   "cp_body_us": 7340.839999999999,
+   "cp_dep_gap_us": 963.120000000007,
+   "cp_queue_gap_us": 366.1999999999934,
+   "host_step_ms": 9.011131,
+   "host_minus_span_us": 340.97100000000137,
+   "bytes_est": 19737886720,
+   "rate_est_tbs": 2.276530850641741,
+   "families": {
+    "gate_up": {
+     "tasks": 30784,
+     "body_per_task_us": 35.76554183991684,
+     "cp_body_us": 2031.9199999999987
+    },
+    "down": {
+     "tasks": 30784,
+     "body_per_task_us": 21.745025987525988,
+     "cp_body_us": 1196.2800000000034
+    },
+    "attn": {
+     "tasks": 27648,
+     "body_per_task_us": 19.258514178240745,
+     "cp_body_us": 952.7599999999991
+    },
+    "qkv": {
+     "tasks": 31968,
+     "body_per_task_us": 16.439429429429435,
+     "cp_body_us": 915.2799999999991
+    },
+    "router": {
+     "tasks": 30784,
+     "body_per_task_us": 10.166893191268183,
+     "cp_body_us": 626.3999999999976
+    },
+    "oproj": {
+     "tasks": 31968,
+     "body_per_task_us": 8.848981481481477,
+     "cp_body_us": 510.8799999999978
+    },
+    "merge": {
+     "tasks": 27648,
+     "body_per_task_us": 6.412087673611109,
+     "cp_body_us": 439.95999999999935
+    },
+    "qabs": {
+     "tasks": 3456,
+     "body_per_task_us": 4.649444444444437,
+     "cp_body_us": 274.5200000000019
+    },
+    "lm_head": {
+     "tasks": 1184,
+     "body_per_task_us": 129.58854729729725,
+     "cp_body_us": 226.08000000000175
+    },
+    "dense_gu": {
+     "tasks": 1184,
+     "body_per_task_us": 34.85675675675676,
+     "cp_body_us": 76.19999999999996
+    },
+    "dense_dn": {
+     "tasks": 1184,
+     "body_per_task_us": 26.16746621621622,
+     "cp_body_us": 51.48000000000002
+    },
+    "norm": {
+     "tasks": 1184,
+     "body_per_task_us": 7.678716216216218,
+     "cp_body_us": 23.599999999999994
+    },
+    "embed": {
+     "tasks": 4,
+     "body_per_task_us": 5.07,
+     "cp_body_us": 10.200000000000001
+    },
+    "argmax": {
+     "tasks": 4,
+     "body_per_task_us": 3.3200000000001637,
+     "cp_body_us": 5.280000000000655
+    }
+   }
+  }
+ },
+ "steps": {
+  "1->2": {
+   "tasks": {
+    "ratio": 2.072573648674135,
+    "us": 3319.004075666704
+   },
+   "body_per_task": {
+    "ratio": 1.265655396247824,
+    "us": 1703.7633706805354
+   },
+   "slots": {
+    "ratio": 0.5,
+    "us": -4058.59872317362
+   },
+   "busy": {
+    "ratio": 1.0691374772342517,
+    "us": 280.60127682637903
+   },
+   "check_us": -9.094947017729282e-13,
+   "total_us": 1244.7699999999995
+  },
+  "2->4": {
+   "tasks": {
+    "ratio": 2.0,
+    "us": 4339.2
+   },
+   "body_per_task": {
+    "ratio": 0.9959948750881327,
+    "us": -34.758076035150225
+   },
+   "slots": {
+    "ratio": 1.0,
+    "us": 0.0
+   },
+   "busy": {
+    "ratio": 1.0030679285732125,
+    "us": 26.518076035148624
+   },
+   "check_us": -1.8189894035458565e-12,
+   "total_us": 4330.96
+  }
+ },
+ "projection_b8": {
+  "kind": "ESTIMATE: B4 body/task and busy fraction, B8 plan task count",
+  "span_us": 17340.32,
+  "per_token_us": 2167.54,
+  "request_interval_us": 17340.32,
+  "note": "excludes x8's 144 B/lane scratch (x4: 64) and the unresolved B8 hidden-state failure"
+ }
+}

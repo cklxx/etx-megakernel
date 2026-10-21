@@ -1,0 +1,6 @@
+== x4iso: offline ROCm 7.2.4 compile
+771c41b4947d256e641229935c9a29aa7d7f30b64aa6e6cb080c92919029fbc3  /out/x4iso/plan.json
+x4iso: device and host passes OK
+arm | VGPR | AGPR | SGPR | scratch B/lane | LDS B | waves/SIMD | delta vs default (same order)
+x4iso | 248 | 6 | 104 | 0 | 26668 | 2 | None
+rc=0

@@ -1,0 +1,13 @@
+{
+  "ETX_CFLAGS": "-Rpass-analysis=kernel-resource-usage -DETX_DS_REQUESTS=4 -DETX_SLOT_BY_CU -DETX_DSV2_KVA_SHARED=1",
+  "ETX_DSV2_COH": "l1",
+  "ETX_DSV2_COUPLE": "none",
+  "ETX_DSV2_D4": "0",
+  "ETX_DSV2_D5": "0",
+  "ETX_DSV2_ISOLATE": "0:gate_up_5;0:gate_up_5,1:gate_up_5;0:gate_up_5,2:gate_up_5;0:qkv_5;0:qkv_5,1:qkv_5;0:qkv_5,2:qkv_5;0:attn_5;0:attn_5,1:attn_5;0:attn_5,2:attn_5",
+  "ETX_DSV2_ISOLATE_REPS": "8",
+  "ETX_DSV2_KCHUNKS": "1",
+  "ETX_DSV2_KVA": "shared",
+  "ETX_DSV2_REQUESTS": "4",
+  "ETX_FLEET_PATCH": "gemv_no_terminal_all norm_tree_all argmax_tree topk_rank attn_prologue_live l1_loads merge_uv_waves"
+}

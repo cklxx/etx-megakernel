@@ -115,6 +115,15 @@ ARMS = {a.name: a for a in [
                    **({"ETX_DSV2_KVA": "shared"} if k1 else {})),
           scratch_allow=allow)
       for n, allow, k1 in ((2, 64, True), (4, 64, True))),
+    # The B4 mechanism microbenchmark (docs/DEEPSEEK-BATCH-MECHANISM-2026-10-18.md): x4's recipe plus in-situ copies of
+    # gate_up/qkv/attn of layer 5, each alone, beside the CU's other slot (r1) and queued on the same slot (r2).
+    # Never timed as a step; the copies run after the token, so the per-request gates still decide the invocation.
+    Arm("x4iso", levers=(*LEVERS_ALL, "l1_loads", "merge_uv_waves"),
+        flags=("-DETX_DS_REQUESTS=4", "-DETX_SLOT_BY_CU", "-DETX_DSV2_KVA_SHARED=1"),
+        env=dict(ETX_DSV2_COH="l1", ETX_DSV2_REQUESTS="4", ETX_DSV2_COUPLE="none", ETX_DSV2_KVA="shared",
+                 ETX_DSV2_ISOLATE=";".join(f"0:{p};0:{p},1:{p};0:{p},2:{p}" for p in ("gate_up_5", "qkv_5", "attn_5")),
+                 ETX_DSV2_ISOLATE_REPS="8"),
+        scratch_allow=64),
     # B = 8 is a diagnostic: with M1 alone the eight-request gate failed (request 5, 3/27 layers), so the three
     # recipes are built side by side and the gate says which one is correct at eight requests. x8p is the plain
     # replication recipe (the pre-section-10 arm), x8m adds M1, x8k adds K1.
