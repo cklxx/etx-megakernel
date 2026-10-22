@@ -64,8 +64,8 @@ class Options:
             raise ValueError('up_pairs must be 1..256 (gate/up pairs per phase tile)')
         if self.parallel not in (0, 1, 2) or (self.parallel and not self.phased):
             raise ValueError('parallel must be 0 (PP), 1 (FFN TP), or 2 (EP); TP/EP need phased=1')
-        if self.attention_tp not in (0,1) or (self.attention_tp and self.parallel != 1):
-            raise ValueError('attention_tp must be 0 or 1; head TP needs parallel=1')
+        if self.attention_tp not in (0,1) or (self.attention_tp and not self.parallel):
+            raise ValueError('attention_tp must be 0 or 1; head TP needs parallel=1 or 2')
         if self.devices not in (2, 4, 8) or (self.devices != 2 and not self.phased):
             raise ValueError('devices must be 2, 4 or 8 (4 and 8 need the phased graph)')
 

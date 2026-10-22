@@ -10,14 +10,14 @@ from pathlib import Path
 from examples.glm53.prepare import gate_identity, metadata, sha, check_slice
 
 
-CANDIDATE_BACKENDS=('etx-pp2', 'etx-pp4', 'etx-pp8', 'etx-ffn-tp', 'etx-ep', 'etx-tp')
+CANDIDATE_BACKENDS=('etx-pp2', 'etx-pp4', 'etx-pp8', 'etx-ffn-tp', 'etx-ep', 'etx-tp', 'etx-head-tp-ep')
 
 
 def build_backend(options):
     mode=options.get('parallel',0)
     if options.get('attention_tp',0):
-        if mode != 1:raise ValueError('attention TP needs FFN TP')
-        return 'etx-tp'
+        if mode not in (1,2):raise ValueError('attention TP needs FFN TP or EP')
+        return 'etx-tp' if mode==1 else 'etx-head-tp-ep'
     return 'etx-ffn-tp' if mode==1 else 'etx-ep' if mode==2 else f'etx-pp{options.get("devices",2)}'
 
 
