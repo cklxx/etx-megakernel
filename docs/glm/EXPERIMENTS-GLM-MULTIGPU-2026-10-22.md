@@ -101,3 +101,27 @@ It is never quoted as a baseline.
 `run_all.py:279-306` hardcodes `--gate slice` in every step.
 `run_all.py:283` hardcodes `--gpu-gib 192`; MI325X needs 256.
 `model_host.hip:19` exits unless the card count is 2.
+
+## 6. Full-model batch 1, measured 2026-10-22
+
+Per-task trace from ETX_TRACE=1 on the 45-layer build, batch 1, two cards.
+
+| item | value |
+|---|---|
+| total step span | 51 111 760 us |
+| embedding task body | 66.6 us |
+| layer task body, first | 914 768 us |
+| layer task body, typical | 900 000 to 1 190 000 us |
+| layers | 45, one task per layer, tasks=48 |
+| wait between layers | under 1 us; tasks run back to back |
+
+The layers are serial, one task each, and only one rank runs at a time, so the
+other card is idle for the whole body of each layer.
+
+Bytes: the layer task streams 7.5 GB, the full dense and expert set of the layer,
+at 6.8 GB/s. A batch-1 token needs only 9 of 288 experts, about 0.53 GB per layer
+and 25 GB per token, so 14 times the necessary bytes are streamed.
+
+So the 51 s has two independent factors, both measured: 14 times the bytes because
+every expert is read, and 1/600 of the bandwidth because one 256-thread workgroup
+owns a layer.
