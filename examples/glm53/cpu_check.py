@@ -133,6 +133,33 @@ extern "C" void run_embed(const void* b,const void* w,int id,void* out){
  auto m=(const glm_weight*)w;auto y=(glm_act*)out;
  for(int j=0;j<GLM_HC*GLM_H;++j)y[j]=glm_put(glm_w((const uint8_t*)b,m[0],id,j%GLM_H));
 }
+#include "examples/glm53/phases.h"
+// A NaN-filled scratch area (no C++ library: the checker's compiler may lack one).
+struct nanbuf { float* p; explicit nanbuf(int n):p(new float[n]){for(int i=0;i<n;++i)p[i]=NAN;} ~nanbuf(){delete[] p;} float* data(){return p;} float& operator[](int i){return p[i];} };
+extern "C" int glm_lds_floats(){return GLM_LDS_FLOATS;}
+extern "C" void glm_strides(int* s){int v[8]={GLM_S_HC,GLM_S_P1,GLM_S_P2,GLM_S_ATT,GLM_S_MID,GLM_S_RT,GLM_S_ACT,GLM_S_SEL};for(int i=0;i<8;++i)s[i]=v[i];}
+// The phase grids of one layer in graph order, every tile of every grid (T: hc p1 p2 att o hcf rt up down).
+// Scratch starts as NaN each layer, so a phase reading anything its producers did not write poisons the output.
+extern "C" void run_layer_phased(const void* bp,const void* wp,const void* x,void* y,void* state,int pos,int lin,int moe,const int* T){
+ auto b=(const uint8_t*)bp;auto w=(const glm_weight*)wp;auto in=(const glm_act*)x;auto out=(glm_act*)y;auto st=(float*)state;
+ nanbuf lds(GLM_LDS_FLOATS),hca(GLM_S_HC),p1(GLM_S_P1),p2(GLM_S_P2),att(GLM_S_ATT),mid(GLM_S_MID),hcf(GLM_S_HC),rt(GLM_S_RT),act(GLM_S_ACT),sel(GLM_S_SEL);
+ float* L=lds.data();
+ for(int t=0;t<T[0];++t)glm_ph_hc(b,w,A_FN,[&](int j){return glm_get(in[j]);},hca.data(),t,T[0],L);
+ for(int t=0;t<T[1];++t)glm_ph_p1(b,w,in,hca.data(),p1.data(),lin,t,T[1],L);
+ if(lin){for(int t=0;t<T[3];++t)glm_ph_kda(b,w,p1.data(),st,att.data(),t,T[3],L);}
+ else{for(int t=0;t<T[2];++t)glm_ph_p2(b,w,p1.data(),p2.data(),st,pos,t,T[2],L);
+      for(int t=0;t<T[3];++t)glm_ph_mla(b,w,p1.data(),p2.data(),st,att.data(),pos,t,T[3],L);}
+ for(int t=0;t<T[4];++t)glm_ph_o(b,w,in,hca.data(),att.data(),mid.data(),t,T[4],L);
+ for(int t=0;t<T[5];++t)glm_ph_hc(b,w,F_FN,[&](int j){return mid[j];},hcf.data(),t,T[5],L);
+ for(int t=0;t<T[6];++t)glm_ph_rt(b,w,mid.data(),hcf.data(),rt.data(),moe,t,T[6],L);
+ for(int t=0;t<T[7];++t)glm_ph_up(b,w,rt.data(),act.data(),sel.data(),moe,t,T[7],L);
+ for(int t=0;t<T[8];++t)glm_ph_down(b,w,act.data(),sel.data(),mid.data(),hcf.data(),out,moe,t,T[8],L);
+}
+extern "C" int run_head_phased(const void* in,const void* nb,const void* nw,const void* hb,const void* hw,void* tmp,int T){
+ nanbuf lds(GLM_LDS_FLOATS);int token=-1;
+ for(int t=0;t<T;++t)glm_ph_head((const glm_act*)in,(const uint8_t*)nb,(const glm_weight*)nw,(const uint8_t*)hb,(const glm_weight*)hw,(float*)tmp,t,T,lds.data());
+ glm_ph_argmax((const float*)tmp+2*GLM_H,&token,lds.data());return token;
+}
 extern "C" void run_head(const void* in,const void* nb,const void* nw,const void* hb,const void* hw,void* tmp){
  const glm_act* a=(const glm_act*)in;float* x=(float*)tmp;float* y=x+GLM_H;float* logits=y+GLM_H;
  for(int j=0;j<GLM_H;++j){float s=0;for(int k=0;k<GLM_HC;++k)s+=glm_get(a[k*GLM_H+j]);x[j]=glm_bf(s/GLM_HC);}
@@ -146,9 +173,12 @@ extern "C" void run_head(const void* in,const void* nb,const void* nw,const void
 
 
 class CPUModel:
-    def __init__(self,out,gate='production',work=None,root=None):
+    """phased: run the phase grids of examples/glm53/phases.h, every tile, with `tiles` tiles per
+    multi-tile grid (None: the counts of the GPU plan), instead of the one-workgroup glm_layer."""
+    def __init__(self,out,gate='production',work=None,root=None,phased=False,tiles=None):
         import numpy as np
         self.np=np;self.spec=stage.validate(out,allow_fixture=True,gate=gate);self.d=self.spec['dimensions']
+        self.phased=phased;self.tiles=tiles
         self.lib=ctypes.CDLL(str(compile_cpu(out,work,root)))
         ptr=ctypes.c_void_p;integer=ctypes.c_int
         self.lib.run_layer.argtypes=[ptr]*6+[integer]*3
@@ -156,6 +186,8 @@ class CPUModel:
         self.lib.run_mla.argtypes=[ptr]*6+[integer]
         self.lib.run_mlp.argtypes=[ptr]*5
         self.lib.run_head.argtypes=[ptr]*6
+        self.lib.run_layer_phased.argtypes=[ptr]*5+[integer]*3+[ptr];self.lib.run_layer_phased.restype=None
+        self.lib.run_head_phased.argtypes=[ptr]*6+[integer];self.lib.run_head_phased.restype=integer
         self.weights={k:(np.fromfile(out/v['blob'],dtype=np.uint8),np.fromfile(out/v['meta'],dtype=np.uint8)) for k,v in self.spec['weights'].items()}
         for name in ('run_layer','run_embed','run_head','run_mla','run_mlp'):getattr(self.lib,name).restype=None
         self.reset()
@@ -182,23 +214,37 @@ class CPUModel:
             backing=np.full(d['SCRATCH']+16,np.float32(123456.25));tmp=backing[:-16];tmp.fill(0);outputs=[]
             for i,kind in enumerate(self.spec['config']['layer_types']):
                 blob,meta=self.weights[f'l{i}'];y=np.zeros_like(x)
-                self.lib.run_layer(addr(blob),addr(meta),addr(x),addr(y),addr(self.states[r][i]),addr(tmp),self.position,int(kind=='linear_attention'),int(self.spec['config']['mlp_layer_types'][i]=='sparse'))
+                linear,moe=kind=='linear_attention',self.spec['config']['mlp_layer_types'][i]=='sparse'
+                if self.phased:
+                    from examples.glm53 import model
+                    n=model.phase_tiles(d,self.spec['config'],linear,moe)
+                    counts=[n['hc'],n['p1'],n.get('p2',1),n['att'],n['o'],n['hcf'],n['rt'],n['up'],n['down']]
+                    if self.tiles is not None:counts=[c if k in (0,3,5) else self.tiles for k,c in enumerate(counts)]
+                    T=(ctypes.c_int*9)(*counts)
+                    self.lib.run_layer_phased(addr(blob),addr(meta),addr(x),addr(y),addr(self.states[r][i]),self.position,int(linear),int(moe),T)
+                else:
+                    self.lib.run_layer(addr(blob),addr(meta),addr(x),addr(y),addr(self.states[r][i]),addr(tmp),self.position,int(linear),int(moe))
                 if not np.all(backing[-16:]==np.float32(123456.25)) or any(not np.all(s[-16:]==np.float32(123456.25)) for s in self.state_guards):raise ValueError('native workspace/state overrun')
                 x=y;outputs.append(x.copy())
             nb,nw=self.weights['norm'];hb,hw=self.weights['head'];final=np.zeros(2*d['H']+d['VOCAB'],dtype=np.float32)
-            self.lib.run_head(addr(x),addr(nb),addr(nw),addr(hb),addr(hw),addr(final))
+            if self.phased:
+                from examples.glm53 import model
+                token=self.lib.run_head_phased(addr(x),addr(nb),addr(nw),addr(hb),addr(hw),addr(final),self.tiles or model.tiles(d['VOCAB'],256))
+                if token!=int(np.argmax(final[2*d['H']:])):raise ValueError('phased argmax differs from the logits argmax')
+            else:
+                self.lib.run_head(addr(x),addr(nb),addr(nw),addr(hb),addr(hw),addr(final))
             logits.append(final[2*d['H']:]);layers.append(outputs)
         self.last_scratch=tmp.copy()
         self.position+=1
         return np.stack(logits),layers
 
 
-def check(out,batch=2,steps=32,bf16=False,fp8=False,production_schedule=False):
+def check(out,batch=2,steps=32,bf16=False,fp8=False,production_schedule=False,phased=False,tiles=None):
     import numpy as np
     import torch
     from transformers.cache_utils import DynamicCache
     torch.set_num_threads(1)
-    spec,hf,head=fixture(out,bf16,fp8,production_schedule=production_schedule);candidate=CPUModel(out);candidate.reset(batch)
+    spec,hf,head=fixture(out,bf16,fp8,production_schedule=production_schedule);candidate=CPUModel(out,phased=phased,tiles=tiles);candidate.reset(batch)
     cache=DynamicCache(config=hf.config);ids=torch.tensor([[3+r] for r in range(batch)])
     errors=[];state_errors=[];matched=0;layers=len(hf.config.layer_types)
     with torch.inference_mode():
@@ -230,7 +276,7 @@ def check(out,batch=2,steps=32,bf16=False,fp8=False,production_schedule=False):
     result=dict(schema=1,status='PASS',fixture=True,batch=batch,steps=steps,matched=matched,layers=layers,
                 experts=spec['config']['n_routed_experts'],topk=spec['config']['num_experts_per_tok'],
                 max_logit_abs=max(errors),max_kda_state_abs=max(state_errors),bf16=bf16,fp8=fp8,
-                production_schedule=production_schedule,
+                production_schedule=production_schedule,phased=phased,tiles=tiles,
                 implementation='same C++ numerical body as ETX HIP tiles',reference='independent Transformers GLM5Next text model',
                 full_checkpoint=False,gpu_correctness='unmeasured',performance='unmeasured')
     (out/'cpu-check.json').write_text(json.dumps(result,indent=2)+'\n');return result

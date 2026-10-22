@@ -7,6 +7,7 @@ import struct
 import pytest
 
 from examples.glm53 import stage,model,model_build,cpu_check
+from examples.glm53.options import Options
 from etx.passes import compile_graph,verify_plan
 from etx.ir import Scope
 
@@ -22,7 +23,7 @@ def native(tmp_path_factory):
 @pytest.mark.parametrize('batch',[1,2,4,8])
 def test_actual_model_plan_has_all_layers_rank_ownership_and_system_boundary(native,batch):
     _,s,_,_=native
-    g=model.build_from(s,batch);p=compile_graph(g,'gfx942',{'B':batch},{})
+    g=model.build_from(s,batch,Options(phased=0));p=compile_graph(g,'gfx942',{'B':batch},{})
     assert not verify_plan(p) and p.n_devices==2
     assert len(p.tasks)==7*batch
     assert [g.device for g in g.grids if g.name.startswith('l')]==[0,0,1,1]
@@ -135,7 +136,7 @@ def test_build_identity_refuses_source_drift_and_local_binary(native,tmp_path):
 
 
 def test_exact_production_shape_has_45_layers_and_pp24_boundary():
-    s=model_build.production_compile_spec();p=compile_graph(model.build_from(s,8),'gfx942',{'B':8},{})
+    s=model_build.production_compile_spec();p=compile_graph(model.build_from(s,8,Options(phased=0)),'gfx942',{'B':8},{})
     assert s['fixture'] and s['compile_only']
     assert len(p.tasks)==48*8 and p.events['e_l23'].scope==Scope.SYSTEM
     assert p.tensor_placement['l23_out']=='fine_grained'

@@ -6,7 +6,8 @@
 | --- | --- | --- |
 | DSL GEMV, MoE, top-k and attention prologue | [`etx/ops/`](../../../../etx/ops/), selected by [`examples/vllm_llm/model.py`](../../../../examples/vllm_llm/model.py) | ETX-native tiles |
 | vLLM HIP specializations | [`etx/importer/vllm_kernels.py`](../../../../etx/importer/vllm_kernels.py), [`etx/importer/spec.py`](../../../../etx/importer/spec.py) | Compiled IR import and generated adapters |
-| vLLM Triton captures | [`examples/vllm_llm/triton/`](../../../../examples/vllm_llm/triton/), [`etx/importer/specs/`](../../../../etx/importer/specs/) | Shape-specific IR and metadata import; not arbitrary-shape binaries |
+| vLLM Triton MoE gate/up | [`moe-up/vllm-triton-bf16/`](moe-up/vllm-triton-bf16/README.md) | Library-owned captured IR, metadata and reference code object; original path is a compatibility symlink |
+| Remaining vLLM Triton captures | [`examples/vllm_llm/triton/`](../../../../examples/vllm_llm/triton/), [`etx/importer/specs/`](../../../../etx/importer/specs/) | Shape-specific IR and metadata import; not arbitrary-shape binaries |
 
 Build and host integration remain in [`examples/vllm_llm/`](../../../../examples/vllm_llm/). The operator contract is documented in [`OPERATOR-SPEC.md`](../../../../docs/core/OPERATOR-SPEC.md).
 

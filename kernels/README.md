@@ -17,7 +17,7 @@ Use architecture identifiers from `etx/machine/arch/` (for example `gfx942` or `
 - [gfx942 / MI300X / Qwen3-30B-A3B](gfx942/mi300x/qwen3-30b-a3b/README.md): existing DSL/import hybrid and imported-kernel sources, with qualified session evidence.
 - [gfx942 / MI325X / GLM-5.3-Flash](gfx942/mi325x/glm-5.3-flash/README.md): native implementation and diagnostic execution; no qualified fastest kernel established.
 
-These entries point to the existing source of truth. They are an initial inventory, not a complete catalogue of supported models or machines.
+The first library-owned implementation is the [Qwen MoE gate/up Triton capture](gfx942/mi300x/qwen3-30b-a3b/moe-up/vllm-triton-bf16/README.md), including IR, metadata and the original executable code object. Its former location is a compatibility symlink. Other entries point to their existing source of truth. This is an initial inventory, not a complete catalogue of supported models or machines.
 
 ## What to record
 

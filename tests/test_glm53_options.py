@@ -103,6 +103,8 @@ def test_generated_configuration_header_waves_and_build_identity(tmp_path):
     assert identity['options'] == config.to_dict() and identity['options_sha256'] == config.digest()
     assert 'examples/glm53/native_options.h' in identity['sources']
     assert 'examples/glm53/options.py' in identity['sources']
+    assert 'examples/glm53/phases.h' in identity['sources']
+    assert all(f'etx/codegen/{name}' in identity['sources'] for name in ('kernel.py','lowering.py','plan_header.py'))
     assert identity['generated']['glm53_options.h'] and identity['generated']['build-options.json']
     source = (out/'megakernel_d0.hip').read_text()
     assert '#define ETX_THREADS 64' in source
@@ -115,12 +117,13 @@ def test_generated_configuration_header_waves_and_build_identity(tmp_path):
     with pytest.raises(ValueError):model_build.verified_build(out)
 
 
-def test_identity_detects_generated_and_native_options_drift(tmp_path, monkeypatch):
+@pytest.mark.parametrize('source', ['native_options.h', 'phases.h', 'kernel.py'])
+def test_identity_detects_generated_and_native_options_drift(tmp_path, monkeypatch, source):
     out = tmp_path/'build';model_build.generate(model_build.production_compile_spec(),out)
     (out/'run').write_text('not executed');model_build.finalize(out)
     old_sha = model_build.stage.file_sha
     def changed(path):
-        return 'drift' if Path(path).name == 'native_options.h' else old_sha(path)
+        return 'drift' if Path(path).name == source else old_sha(path)
     monkeypatch.setattr(model_build.stage,'file_sha',changed)
     with pytest.raises(ValueError,match='identity'):model_build.verified_build(out)
 
@@ -129,6 +132,8 @@ def test_run_build_passes_explicit_options_after_cleaning_environment(tmp_path,m
     stage = tmp_path/'stage';build = tmp_path/'build';out = tmp_path/'result';cfg = tmp_path/'options.json'
     cfg.write_text(json.dumps(options.Options(row_tile=2).to_dict()))
     monkeypatch.setenv('ETX_GLM_OPTIONS','/bad/ambient.json')
+    monkeypatch.setenv('GLM_SHARED_EVENTS','1')
+    monkeypatch.setenv('GLMDBG_DUMP_LAYERS','/bad/dump')
     monkeypatch.setattr(run.stage,'validate',lambda *a,**k: {})
     calls=[]
     monkeypatch.setattr(run,'execute',lambda *a: calls.append(a))
@@ -138,6 +143,7 @@ def test_run_build_passes_explicit_options_after_cleaning_environment(tmp_path,m
     command,log,env,timeout=calls[0]
     assert command[-2:] == ['--options',str(cfg.resolve())]
     assert 'ETX_GLM_OPTIONS' not in env and env['ETX_GLM_BATCH']=='4'
+    assert 'GLM_SHARED_EVENTS' not in env and 'GLMDBG_DUMP_LAYERS' not in env
 
 
 def test_qualify_cannot_supply_options_to_override_existing_identity(tmp_path,monkeypatch):
