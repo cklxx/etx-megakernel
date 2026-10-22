@@ -290,6 +290,7 @@ etx/runtime    L5  ABI header, device primitives (arrive/wait/pop/push) built on
 etx/frontends  L1  tile contract (hip_link / cuda_link / triton_fn / builtin), adapters
 etx/sim            protocol simulator (deadlock, makespan, critical-path budget)
 examples/          splitk_sum (paper fig. 3), moe_layer (both dynamisms), gemm_rs (2 devices)
+kernels/           kernel library: architecture / machine / model, source pointers and evidence
 bench/calib/       phase-0 microbenchmarks that fill the cost tables
 tests/             includes test_no_arch_branches.py enforcing "hardware is data"
 docs/              ARCHITECTURE.md (code map), DESIGN-v0.1.md, site/ (published page)
