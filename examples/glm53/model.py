@@ -160,7 +160,7 @@ def build_phased(stage,batch,options,layout=None):
         nstate=d['STATE_KDA'] if linear else d['STATE_MLA']
         if nstate>2**31-1:raise ValueError('state exceeds the native int32 per-request stride ABI')
         L=f'l{i}';prefix=L if layout is None else L+'_common'
-        W,M=prefix+'_weights',prefix+'_meta';n=phase_tiles(d,t,linear,moe,options.up_pairs);cst=(0,int(linear),int(moe),nstate)
+        W,M=prefix+'_weights',prefix+'_meta';n=phase_tiles(d,t,linear,moe,options.effective_up_pairs);cst=(0,int(linear),int(moe),nstate)
         for name,size in [('hca',st['hc']),('p1',st['p1']),('att',st['att']),('mid',st['mid']),('hcf',st['hc']),
                           ('rt',st['rt']),('act',st['act']),('sel',st['sel'])]+([] if linear else [('p2',st['p2'])]):
             g.tensor(f'{L}_{name}',('B',size),role='scratch',dtype='float32',bytes_per_elem=4)

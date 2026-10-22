@@ -7,6 +7,9 @@
 #ifndef ETX_GLM_ATTENTION_TP
 #define ETX_GLM_ATTENTION_TP 0
 #endif
+#ifndef ETX_GLM_UP_TAIL_BALANCE
+#define ETX_GLM_UP_TAIL_BALANCE 0
+#endif
 #ifndef ETX_GLM_UP_PAIRS
 #define ETX_GLM_UP_PAIRS 36
 #endif

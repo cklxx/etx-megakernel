@@ -27,7 +27,7 @@ def add_ffn(g, grid, layer, dimensions, config, options, counts, weights, meta, 
              [x('rt'),x('sel')],[packet])
         mi=config['moe_intermediate_size'] if moe else config['intermediate_size']
         local_mi=mi//world if tp else mi
-        up=tiles((d['TOPK']+1 if moe else 1)*local_mi,options.up_pairs,cap=608)
+        up=tiles((d['TOPK']+1 if moe else 1)*local_mi,options.effective_up_pairs,cap=608)
         cst=(0,int(moe),rank,world)
         grid(prefix+'_up',rank,'glm53_parallel_up',up,[W,M,packet,act],
              [W,M,packet],[act],cst)

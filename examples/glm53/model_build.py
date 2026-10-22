@@ -26,8 +26,8 @@ def generate(spec,out,batch=1,options=None):
     (out/'glm53_spec.h').write_text(stage.header(spec['dimensions']))
     (out/'plan.json').write_text(emit_plan_json(plan))
     (out/'build-resources.json').write_text(json.dumps(dict(batch=batch,devices=plan.n_devices,
-        parallel=options.parallel,attention_tp=options.attention_tp,
-        effective_up_pairs=options.up_pairs,
+        parallel=options.parallel,attention_tp=options.attention_tp,up_tail_balance=options.up_tail_balance,
+        effective_up_pairs=options.effective_up_pairs,
         attention_state_capacity='full global stride per private rank' if options.attention_tp else 'pipeline owner only',
         required_workgroups_per_cu=plan.wg_per_cu,
         workers_per_domain=plan.workers_per_domain,planner_vgpr_budget_estimate=options.vgpr_budget,

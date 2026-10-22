@@ -6,7 +6,8 @@ the staged PP2 split; 4/8 = contiguous layer blocks). parallel=1 shards FFN
 intermediate dimensions across devices; parallel=2 distributes routed experts.
 Both require phased=1. attention_tp=1 adds head-sharded KDA/MLA, local attention
 weights and output reduction to either FFN mode; 0 preserves serial attention.
-up_pairs controls phase-grid granularity (36 measured). the measured default is unchanged.
+up_pairs controls phase-grid granularity (36 measured). up_tail_balance=1 selects
+32 pairs per up tile without changing other phase caps or the measured default.
 phased=0 is the original one-workgroup-per-layer
 graph, whose numerics the remaining knobs tune and whose defaults preserve the
 pre-sweep execution settings.
@@ -39,6 +40,7 @@ class Options:
     up_pairs: int = 36
     parallel: int = 0                 # 0: PP; 1: FFN TP; 2: routed-expert EP
     attention_tp: int = 0             # head-sharded attention with parallel=1/2
+    up_tail_balance: int = 0          # 32 pairs/up tile; measured default stays 36
 
     def __post_init__(self):
         for f in fields(self):
@@ -66,8 +68,16 @@ class Options:
             raise ValueError('parallel must be 0 (PP), 1 (FFN TP), or 2 (EP); TP/EP need phased=1')
         if self.attention_tp not in (0,1) or (self.attention_tp and not self.parallel):
             raise ValueError('attention_tp must be 0 or 1; head TP needs parallel=1 or 2')
+        if self.up_tail_balance not in (0,1) or (self.up_tail_balance and not self.phased):
+            raise ValueError('up_tail_balance must be 0 or 1 and needs phased=1')
+        if self.up_tail_balance and self.up_pairs != 36:
+            raise ValueError('up_tail_balance selects 32 pairs; do not also override up_pairs')
         if self.devices not in (2, 4, 8) or (self.devices != 2 and not self.phased):
             raise ValueError('devices must be 2, 4 or 8 (4 and 8 need the phased graph)')
+
+    @property
+    def effective_up_pairs(self):
+        return 32 if self.up_tail_balance else self.up_pairs
 
     def to_dict(self):
         return asdict(self)
@@ -76,8 +86,8 @@ class Options:
         return hashlib.sha256(json.dumps(self.to_dict(), sort_keys=True, separators=(',', ':')).encode()).hexdigest()
 
     def header(self):
-        names = ('cache_ab', 'routed_slc', 'shared_slc', 'row_tile', 'k_tile', 'lds_bytes', 'parallel', 'attention_tp')
-        return '#pragma once\n' + ''.join(f'#define ETX_GLM_{n.upper()} {getattr(self, n)}\n' for n in names) + f'#define ETX_GLM_UP_PAIRS {self.up_pairs}\n'
+        names = ('cache_ab', 'routed_slc', 'shared_slc', 'row_tile', 'k_tile', 'lds_bytes', 'parallel', 'attention_tp', 'up_tail_balance')
+        return '#pragma once\n' + ''.join(f'#define ETX_GLM_{n.upper()} {getattr(self, n)}\n' for n in names) + f'#define ETX_GLM_UP_PAIRS {self.effective_up_pairs}\n'
 
     def compiler_flags(self):
         # The generated entrypoint carries the waves attribute. All numerical
