@@ -99,6 +99,59 @@ and `etx-head-tp-ep` for `parallel=2, attention_tp=1`. Future logs must preserve
 host's `GLM-VARIANT` line (devices/parallel/attention_tp/up_tail_balance/up_pairs)
 and the generated identity; the label alone is not a correctness certificate.
 
+## Batch axis: 120 explicit cases, 30 compute options
+
+Every arm is crossed with **B = 1, 2, 4, 8**: 30 compute configurations × 4
+bindings = **120 cases**. The emitter reuses the same 30 option files. Batch is a
+compile binding `{"B": B}`, **not** an `Options` field and not part of its digest.
+Each case has a unique name, e.g. `full-tp8-up-balanced-b4`, and a planning hash
+of the canonical `{options_sha256,batch}` object. **This is not a build
+certificate**: native source/compiler/plan identity remains a separate gate.
+Only **`pp2-b1`** is flagged as the measured-default case; sharing PP2's compute
+options does not make B2/B4/B8 measured defaults.
+
+- PP has an independent-request axis above B1 that may permit pipeline overlap;
+  this is potential, not proof that the scheduler overlaps microbatches. Trace
+  actual stage/request concurrency and feedback boundaries. A request's next
+  token must wait for its own sample.
+- Phase grids gain request coordinates and total work/state scale with B. These
+  per-request GEMVs do **not** automatically become a GEMM or share weight reads.
+  Establish per-phase scaling and traffic before claiming batching efficiency.
+- Per-workgroup LDS depends on phase dimensions, not B. More requests can increase
+  concurrent workgroups, but do not divide or multiply one workgroup's LDS slab.
+  Runtime scratch/state do scale with B. Head TP still allocates the full global
+  state stride **on every attention rank, for every request**, not `state/N`.
+- Check request isolation: distinct inputs/tokens, disjoint scratch and KDA/MLA
+  state, correct per-request event coordinates, and no cross-request feedback.
+  Preserve all logits as **`(32, B, VOCAB)`**, not only argmax tokens or request 0;
+  compare numerical/state output with predeclared tolerances and require **HF
+  greedy 32/32 for each request**. Neither HF generation nor qualification is
+  launched by the emitter.
+- Compare each case to baselines at the **same batch, world and decode positions**.
+  Report wall latency for one batch decode step and aggregate output tok/s
+  (`B / step_seconds`, or `32*B / full_32_step_seconds`). Do **not** report
+  `latency/B` as request latency: that is reciprocal aggregate throughput, not an
+  observed request/token response time. Report actual per-request latency too
+  when PP completion times differ.
+
+The manifest's outstanding acceptance list includes all of these batch gates.
+No B2/B4/B8 numerical, resource, fit, overlap or speed result is established.
+
+CPU-only generation of the extended matrix completed with this command:
+
+```sh
+python3 -m examples.glm53.parallel_variants --out results/o55-parallel-batches-20261022
+```
+
+```text
+GLM-VARIANTS options=30 cases=120 launches=0 status=uncompiled-untested out=results/o55-parallel-batches-20261022
+```
+
+The 30 reused option files and the 120-case manifest are retained in that new
+directory. This is options/manifest generation only: **no tests, native code
+generation/compilation or GPU execution**. The older lead-generated directory
+above remains untouched; its 30-arm manifest predates this batch extension.
+
 ## Gates before any performance claim
 
 1. **Local/source gates, later:** execute the authored option, graph, layout and

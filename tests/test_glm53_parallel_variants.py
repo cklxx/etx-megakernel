@@ -49,13 +49,55 @@ def test_generation_is_only_options_and_manifest_with_canonical_hashes(tmp_path)
         assert hashlib.sha256(canonical).hexdigest() == entry['options_sha256']
         assert value == entry['options']
         assert entry['status'] == 'uncompiled-untested'
-        assert entry['batch'] == 1 and entry['bindings'] == {'B':1}
+        assert 'batch' not in entry['options'] and 'batch' not in entry
         assert entry['checks_still_required'] == list(parallel_variants.REQUIRED_CHECKS)
         assert '32/32' in ' '.join(entry['checks_still_required'])
         if entry['mode'] == 'ep':
             assert 'EP preservation' in entry['numerical_contract']
         if entry['mode'] in ('ffn-tp','full-tp','head-tp-ep'):
             assert 'TP numerical qualification' in entry['numerical_contract']
+
+
+def test_batch_axis_reuses_options_but_has_unique_planning_case_identity():
+    entries = parallel_variants.variants()
+    cases = parallel_variants.cases(entries)
+    by_name = {entry['name']:entry for entry in entries}
+    assert len(cases) == len({c['name'] for c in cases}) == 120
+    assert len({c['case_sha256'] for c in cases}) == 120
+    assert len({c['options_file'] for c in cases}) == 30
+    assert len({c['options_sha256'] for c in cases}) == 30
+    assert {c['name'] for c in cases} == {f'{e["name"]}-b{b}' for e in entries for b in (1,2,4,8)}
+    assert [c['name'] for c in cases if c['measured_default_case']] == ['pp2-b1']
+    for case in cases:
+        entry = by_name[case['variant']]
+        batch = case['batch']
+        assert case['bindings'] == {'B':batch}
+        assert case['options_file'] == entry['options_file']
+        assert case['options_sha256'] == entry['options_sha256']
+        assert case['degree'] == entry['degree'] and case['mode'] == entry['mode']
+        value = dict(options_sha256=entry['options_sha256'], batch=batch)
+        expected = hashlib.sha256(json.dumps(value, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
+        assert case['case_sha256'] == expected
+        assert case['status'] == 'uncompiled-untested'
+        assert case['checks_still_required'] == list(parallel_variants.REQUIRED_CHECKS)
+        assert 'batch' not in entry['options']
+
+
+@pytest.mark.parametrize('batch', [0,3,16,True,False,1.0,'2',None])
+def test_planning_identity_rejects_unsupported_or_noninteger_batch(batch):
+    with pytest.raises(ValueError, match='batch'):
+        parallel_variants.case_digest(Options().digest(), batch)
+
+
+def test_generated_manifest_preserves_batch_acceptance_contract(tmp_path):
+    manifest = parallel_variants.generate(tmp_path/'batch-options')
+    assert manifest['schema'] == 2 and manifest['batches'] == [1,2,4,8]
+    assert len(manifest['variants']) == 30 and len(manifest['cases']) == 120
+    assert 'NOT a build certificate' in manifest['case_hash_basis']
+    assert manifest['correctness'] == dict(logits_shape=[32,'B','VOCAB'], preserve_all_logits=True,
+                                           hf_greedy_tokens_required_each=32, request_isolation_required=True)
+    assert 'per-WG LDS unchanged' in manifest['batch_capacity']
+    assert manifest['launches_performed'] == 0
 
 
 @pytest.mark.parametrize('existing', ['directory', 'file', 'symlink'])
