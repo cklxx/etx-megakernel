@@ -44,4 +44,4 @@ def test_review_command_blocks_are_complete_shell():
         assert f'[C{number}](#c{number})' in text
         assert '...' not in block and '…' not in block
         subprocess.run(['sh', '-n'], input=block, text=True, check=True)
-    assert (ROOT / 'docs/glm/PARALLEL-ANALYSIS.md').is_file()
+    assert (ROOT / 'docs/glm/PARALLEL-CAPACITY-2026-10-22.md').is_file()
