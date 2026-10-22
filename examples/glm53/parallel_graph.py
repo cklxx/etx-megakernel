@@ -3,6 +3,9 @@
 Every rank has local weight shards and private activation/output tensors. Explicit
 packet copies and SYSTEM event edges carry the input/selection and returned dots;
 no worker streams a peer's expert weights. This is not full attention TP.
+For eight independent uniformly assigned routed experts on eight ranks, the
+expected busy-rank count is 8*(1-(7/8)**8), about 5.2, not eight. Real routing
+can be skewed; measure the per-request ownership histogram and shared-root tail.
 """
 from examples.glm53.model import tiles
 
@@ -23,7 +26,7 @@ def add_ffn(g, grid, layer, dimensions, config, options, counts, weights, meta, 
         grid(prefix+'_dispatch',rank,'glm53_parallel_dispatch',1,[x('rt'),x('sel'),packet],
              [x('rt'),x('sel')],[packet])
         mi=config['moe_intermediate_size'] if moe else config['intermediate_size']
-        local_mi=mi//world
+        local_mi=mi//world if tp else mi
         up=tiles((d['TOPK']+1 if moe else 1)*local_mi,options.up_pairs,cap=608)
         cst=(0,int(moe),rank,world)
         grid(prefix+'_up',rank,'glm53_parallel_up',up,[W,M,packet,act],

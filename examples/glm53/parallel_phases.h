@@ -19,6 +19,10 @@
 GLM_DEV int glm_parallel_slot(const float* sel,bool moe,int k){
   return !moe?MG:k<GLM_TOPK?EXPERTS+3*(int)sel[k]:SG;
 }
+GLM_DEV int glm_parallel_owner(const float* sel,bool moe,int k,int world,int shared_owner){
+  return moe&&k<GLM_TOPK?(int)sel[k]%world:shared_owner;
+}
+
 // Exactly one workgroup per request, on the token owner. Reuse the original
 // tie breaking, probability normalization and ascending-expert-ID permutation.
 GLM_DEV void glm_ph_parallel_route(const uint8_t* b,const glm_weight* w,const float* rt,float* sel,bool moe,float* lds){
@@ -45,6 +49,7 @@ GLM_DEV void glm_ph_parallel_up(const uint8_t* b,const glm_weight* w,const float
   const int ne=moe?GLM_TOPK+1:1;
   int slots[GLM_TOPK+1],ends[GLM_TOPK+2],count=0;ends[0]=0;
   for(int k=0;k<ne;++k){
+    if(!tensor_parallel&&glm_parallel_owner(sel,moe,k,world,shared_owner)!=rank)continue;
     const int gs=glm_parallel_slot(sel,moe,k);
     slots[count]=k;ends[count+1]=ends[count]+w[gs].rows;++count;
   }
@@ -86,12 +91,12 @@ GLM_DEV void glm_ph_parallel_down(const uint8_t* b,const glm_weight* w,const flo
   const int lo=(int)((int64_t)GLM_H*t/T),hi=(int)((int64_t)GLM_H*(t+1)/T);
   const int ne=moe?GLM_TOPK+1:1;
   for(int k=0;k<GLM_TOPK+1;++k){
-    const bool owned=k<ne;
+    const bool owned=k<ne&&(tensor_parallel||glm_parallel_owner(sel,moe,k,world,shared_owner)==rank);
     float* dst=expert_out+(uint64_t)k*GLM_H;
     if(!owned){for(int j=lo+GLM_LANE;j<hi;j+=GLM_LANES)dst[j]=0;continue;}
     const int ds=glm_parallel_slot(sel,moe,k)+2;
     glm_rows<GLM_KFP8>(b,w[ds],act+(uint64_t)k*GLM_INTERMAX,lo,hi,
-      [&](int j,float v){dst[j]=v;});
+      [&](int j,float v){dst[j]=tensor_parallel?v:glm_bf(v);});
   }
 }
 
@@ -108,6 +113,7 @@ GLM_DEV void glm_ph_parallel_combine(const uint8_t* b,const glm_weight* w,const 
   for(int j=lo+GLM_LANE;j<hi;j+=GLM_LANES){
     auto expert=[&](int k){
       const uint64_t off=(uint64_t)k*GLM_H+j;
+      if(!tensor_parallel)return rank_outputs[glm_parallel_owner(sel,moe,k,world,shared_owner)][off];
       float v=rank_outputs[0][off];for(int r=1;r<world;++r)v+=rank_outputs[r][off];
       return glm_bf(v);
     };

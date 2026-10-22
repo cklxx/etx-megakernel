@@ -182,7 +182,7 @@ def build_phased(stage,batch,options,layout=None):
             grid(x('o'),dev,'glm53_o',n['o'],[W,M,previous,x('hca'),x('att'),x('mid')],[W,M,previous,x('hca'),x('att')],[x('mid')])
         grid(x('hcf'),dev,'glm53_hcf',n['hcf'],[W,M,x('mid'),x('hcf')],[W,M,x('mid')],[x('hcf')])
         grid(x('rt'),dev,'glm53_rt',n['rt'],[W,M,x('mid'),x('hcf'),x('rt')],[W,M,x('mid'),x('hcf')],[x('rt')],cst)
-        if layout is not None:
+        if layout is not None and (options.parallel==1 or moe):
             from examples.glm53.parallel_graph import add_ffn
             add_ffn(g,grid,L,d,t,options,n,W,M,moe)
         else:

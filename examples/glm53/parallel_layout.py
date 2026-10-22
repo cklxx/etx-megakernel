@@ -172,8 +172,8 @@ def derive(spec, mode, devices, attention_tp=False):
     """
     if type(attention_tp) is not bool:
         raise ValueError('attention_tp must be bool')
-    if mode != 'tp':
-        raise ValueError('mode must be tp')
+    if mode not in ('tp', 'ep'):
+        raise ValueError('mode must be tp or ep')
     if type(devices) is not int or devices not in (2, 4, 8):
         raise ValueError('devices must be 2, 4 or 8')
     t = spec['config']; slots = stage.slot_names(t)
@@ -245,11 +245,14 @@ def derive(spec, mode, devices, attention_tp=False):
             if is_attention:
                 axis = attention_axes.get(key)
                 owners = attention_names
-            elif axis is None:
+            elif axis is None or (mode == 'ep' and key in _DENSE):
                 owners = [names[0]]
-            else:
+            elif mode == 'tp':
                 owners = names[1:]
-            shard = axis is not None
+            else:
+                rank = int(key.split('.')[2]) % devices if key.startswith('mlp.experts.') else 0
+                owners = [names[1+rank]]
+            shard = axis is not None and (is_attention or mode == 'tp')
             multipart = is_attention and key == stage.SLOTS[11]
             # KDA convolution rows are [all Q, all K, all V], not one
             # contiguous attention-head interval across the entire descriptor.
