@@ -45,7 +45,7 @@ Four records are in scope.
 | Record | What it contains | Conditions | Not in it |
 |---|---|---|---|
 | `20261017T140801Z-988ffe` | Correctness of replicated requests, and per-launch GPU event times under `--check` | B2/B4/B8, `plain` recipe, one MI300X, ROCm 7.14.0, context 1024, 32 tokens | No decode wall time, no task trace, no counters |
-| Local compile reports (`docs/glm/QWEN-BATCH-GLM53.md:21-26`) | Static task counts and compiler resource use | ROCm 7.2.4, standard B2/B4/B8 builds | No GPU execution |
+| Local compile reports (`docs/qwen/QWEN-BATCH-GLM53.md:21-26`) | Static task counts and compiler resource use | ROCm 7.2.4, standard B2/B4/B8 builds | No GPU execution |
 | Clean serial bench runs (`/Users/ckl/.hermes/cache/scratch/bench-out9.log`, `/root/bench_b*.json`) | Per-batch decode wall time and per-batch gates | B1/B2/B4/B8, `kept` recipe, one runner with `flock` | The first kept run exited at B4; a later clean serial run completed B4/B8 |
 | Plain runs (`/root/bench_plain_b4.json`, `/root/bench_plain_b8.json`) | Decode wall time and gates for the correctness-qualified recipe | B4/B8, `plain` recipe, separate runner under the same lock | — |
 
@@ -73,7 +73,7 @@ These are measured counts or compiler reports. They are not performance numbers.
 
 The instance count is exactly 97 times the request count. The task count is
 exactly 2.000 times the previous batch's count. Both facts are [M] from
-`docs/glm/QWEN-BATCH-GLM53.md:22-24` and `EXPERIMENT-LOG.md:86`.
+`docs/qwen/QWEN-BATCH-GLM53.md:22-24` and `EXPERIMENT-LOG.md:86`.
 
 B1 is not in the multi-request record. It is the kept single-request build.
 The clean run checked 97 imported instances at each of positions 0 and 1040,
@@ -90,7 +90,7 @@ Compiler reports, kept separate because they describe different builds:
 | Kept B2 | 128 | 40 | 9 | 4 |
 | Kept B1/B4/B8 | [U] | [U] | [U] | [U] |
 
-The standard rows are from `docs/glm/QWEN-BATCH-GLM53.md:23-26`. The kept B2 row is
+The standard rows are from `docs/qwen/QWEN-BATCH-GLM53.md:23-26`. The kept B2 row is
 from `docs/EXPERIMENTS-2026-10-18.md:11`. The two builds are not the same. All
 values are compiler reports, not measured GPU residency or timing.
 

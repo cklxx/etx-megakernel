@@ -22,9 +22,9 @@ The GLM numerical path is entirely native. `examples/glm53/tiles.hip` and
 decoded to BF16 during GEMV, RMSNorm, clipped SwiGLU, top-k routing, the
 four-stream mHC collapse and Sinkhorn mixing, KDA (convolution, forget gates,
 L2-normalised recurrence), and NoPE MLA with the indexer and kpool
-(`docs/glm/QWEN-BATCH-GLM53.md:87-99`). These are correctness-first complete-layer
+(`docs/qwen/QWEN-BATCH-GLM53.md:87-99`). These are correctness-first complete-layer
 tiles, one workgroup per request/layer, with no speed claim
-(`docs/glm/QWEN-BATCH-GLM53.md:100-104`). Unlike the Qwen path, the GLM path
+(`docs/qwen/QWEN-BATCH-GLM53.md:100-104`). Unlike the Qwen path, the GLM path
 imports no vLLM kernels; a build requires exactly `megakernel_d0.hip` and
 `megakernel_d1.hip` (`examples/glm53/run.py:46`).
 
@@ -76,12 +76,12 @@ Consequences:
 Static partition: whole layers, split at the median sparse layer
 (`examples/glm53/prepare.py:55-67`); rank 0 owns layers 0–23, rank 1 owns
 24–44, with 21 MoE layers each, no all-to-all and no tensor sharding
-(`docs/glm/QWEN-BATCH-GLM53.md:107-108`). Embedding is on rank 0; norm/head on
+(`docs/qwen/QWEN-BATCH-GLM53.md:107-108`). Embedding is on rank 0; norm/head on
 rank 1.
 
 Per step the host resets both ranks, launches both kernels, and rank 1's layers
 wait on the boundary carried over SYSTEM events and fine-grained peer memory
-(`docs/glm/QWEN-BATCH-GLM53.md:109-111`; `examples/glm53/model_host.hip:73-75`).
+(`docs/qwen/QWEN-BATCH-GLM53.md:109-111`; `examples/glm53/model_host.hip:73-75`).
 The boundary is crossed **once per decode step** (`prepare.py:88,101` sets
 `boundary_bytes_per_decode_step` to exactly one `[B,4,4096]` transfer).
 
@@ -389,13 +389,13 @@ receipt, not the token count alone (`run.py:93-94`).
 
 **Gate rule.** No timing number, tile change or schedule change is accepted
 until this oracle passes on the same build identity. The full 45-layer,
-2-GPU qualification (`docs/glm/QWEN-BATCH-GLM53.md:190-214`) stays the end-to-end
+2-GPU qualification (`docs/qwen/QWEN-BATCH-GLM53.md:190-214`) stays the end-to-end
 gate; this slice is its affordable predecessor, not a replacement.
 
 ## 7. PP2 boundary cost
 
 **What crosses.** `[B,4,4096]` BF16 = **32,768 B per request per step** plus
-B int32 token IDs (`docs/glm/QWEN-BATCH-GLM53.md:109-111`;
+B int32 token IDs (`docs/qwen/QWEN-BATCH-GLM53.md:109-111`;
 `examples/glm53/prepare.py:88,101-102`; B8 = 262,144 B + 32 B).
 
 **Per-hand-off latency: [U].** No timing exists. The boundary probe compiles
@@ -467,7 +467,7 @@ output. No GPU measurement is included in this change; latency remains [U].
 ## 8. Numerics tolerance (fixed before optimising)
 
 Mixed FP8/bf16 fusion changes summation order: GLM decodes FP8 to BF16 during
-GEMV with FP32 accumulators (`docs/glm/QWEN-BATCH-GLM53.md:89-91`), so a fused
+GEMV with FP32 accumulators (`docs/qwen/QWEN-BATCH-GLM53.md:89-91`), so a fused
 path cannot reproduce operator-by-operator bit patterns. The bar is therefore
 at the output, fixed now:
 

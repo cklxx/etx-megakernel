@@ -31,7 +31,7 @@ written there under `ETX_SESS_LOGDIR`.
 
 Nothing in this runbook downloads weights or runs the HF reference. The
 reference is the offloaded BF16 job from
-[docs/glm/QWEN-BATCH-GLM53.md](QWEN-BATCH-GLM53.md#staging-and-two-gpu-execution),
+[docs/qwen/QWEN-BATCH-GLM53.md](QWEN-BATCH-GLM53.md#staging-and-two-gpu-execution),
 prepared beforehand on an authorized box.
 
 ## 1. Preflight — one command, fails closed
