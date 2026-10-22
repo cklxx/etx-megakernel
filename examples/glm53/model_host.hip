@@ -84,6 +84,10 @@ int main(int argc,char** argv){
       for(int r=0;r<batch;++r)logits.write((const char*)(head.data()+r*(2*GLM_H+GLM_VOCAB)+2*GLM_H),GLM_VOCAB*4);
     }
     printf("GLM-MODEL-STEP pos=%d batch=%d ms=%.6f\n",pos,batch,step_ms);
+    if(getenv("ETX_TRACE") && pos==1){for(size_t h=0;h<hosts.size();++h){
+      ETX_CHECK(hipSetDevice(hosts[h].device));
+      fprintf(stderr,"GLM-PHASES rank=%zu\n",h);
+      hosts[h].report_phases(nullptr,ETX_N_TYPES,10.0,stderr);}}
     // Opt-in debug: every layer output after the step, outside the timed span (GLMDBG_DUMP_LAYERS=<file>).
     if(const char* dump=getenv("GLMDBG_DUMP_LAYERS")){static std::ofstream df(dump,std::ios::binary);
       for(int i=0;i<ETX_N_TYPES-3;++i){std::string nm="l"+std::to_string(i)+"_out";int a=etx_host::arg_index(nm.c_str());

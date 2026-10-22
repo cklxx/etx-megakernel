@@ -115,8 +115,9 @@ Per-task trace from ETX_TRACE=1 on the 45-layer build, batch 1, two cards.
 | layers | 45, one task per layer, tasks=48 |
 | wait between layers | under 1 us; tasks run back to back |
 
-The layers are serial, one task each, and only one rank runs at a time, so the
-other card is idle for the whole body of each layer.
+The layers are serial, one task each, and only one rank runs at a time. Rank 1's
+first task waits 26 345 766 us of the 51 111 740 us span, so that card is idle for
+51 percent of the step.
 
 Bytes: the layer task streams 7.5 GB, the full dense and expert set of the layer,
 at 6.8 GB/s. A batch-1 token needs only 9 of 288 experts, about 0.53 GB per layer
