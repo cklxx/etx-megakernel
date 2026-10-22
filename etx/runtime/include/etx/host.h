@@ -565,14 +565,19 @@ struct etx_host {
     dump_trace();
     std::vector<int32_t> ev;
     snapshot_events(ev);
-    int shown = 0;
+    int shown = 0, foreign = 0;
     for (int e = 0; e < ETX_N_EVENTS; ++e) {
+#if defined(ETX_HAS_EVENT_DEVICE)
+      // Split buffers: another rank's DEVICE-local event is an untouched initial copy here, not outstanding work.
+      if (sys_events && sys_events != d_events && etx_ev_device[e] >= 0 && etx_ev_device[e] != device) { ++foreign; continue; }
+#endif
       int n = 1; for (int d = 0; d < 4; ++d) if (etx_ev_shape[e][d] > 0) n *= etx_ev_shape[e][d];
       for (int i = 0; i < n; ++i) if (ev[etx_ev_offset[e] + i] != 0 && shown++ < 32)
         fprintf(stderr, "  event %d[%d] = %d (initial %d)\n", e, i, ev[etx_ev_offset[e] + i], etx_ev_counts[etx_ev_offset[e] + i]);
     }
     if (shown > 32) fprintf(stderr, "  ... %d non-zero events\n", shown);
     if (shown == 0) fprintf(stderr, "  all events reached zero\n");
+    if (foreign) fprintf(stderr, "  %d events local to other devices not shown (dump those devices)\n", foreign);
 #if defined(ETX_PRODUCER_LEDGER) && ETX_PRODUCER_LEDGER
     if (const char* path = getenv("ETX_WATCHDOG_RAW")) {
       write_inbody(path);

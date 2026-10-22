@@ -107,6 +107,15 @@ def emit_plan_header(plan: Plan, device: int = 0) -> str:
     out.append(_arr("etx_ev_offset", [e.offset for e in evs]))
     out.append("#define ETX_HAS_EVENT_SCOPE 1")
     out.append(_arr("etx_ev_system", [int(e.scope == Scope.SYSTEM) for e in evs]))
+    # The one device whose tasks produce and consume a non-SYSTEM event, else -1. With split
+    # event buffers the other devices hold only an untouched initial copy of its counters.
+    touched: dict[str, set[int]] = {}
+    for table in (plan.inst.producers, plan.inst.consumers):
+        for (event, _), tids in table.items():
+            touched.setdefault(event, set()).update(plan.task(tid).device for tid in tids)
+    owners = [-1 if e.scope == Scope.SYSTEM or len(touched.get(e.name, ())) != 1 else next(iter(touched[e.name])) for e in evs]
+    out.append("#define ETX_HAS_EVENT_DEVICE 1")
+    out.append(_arr("etx_ev_device", owners))
     shapes = []
     for e in evs:
         s = list(e.shape) + [0] * (4 - len(e.shape))
