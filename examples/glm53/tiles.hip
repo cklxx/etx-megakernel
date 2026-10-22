@@ -108,3 +108,39 @@ extern "C" __device__ __attribute__((noinline)) void glm53_parallel_combine(cons
                           GLM_PR(3,const float*,GLM_S_MID),GLM_PR(4,const float*,GLM_S_HC),
                           GLM_PR(5,glm_act*,GLM_HC*GLM_H),c->cst[1],ETX_GLM_PARALLEL==1,c->cst[2],0,GLM_PT);
 }
+
+// Head-sharded attention: cst = (tiles, linear, rank, world). All request
+// strides stay global; only local head intervals and compact local weights run.
+#include "examples/glm53/attention_phases.h"
+extern "C" __device__ __attribute__((noinline)) void glm53_attention_input(const etx_ctx* c) {
+  glm_ph_attention_input(GLM_PB(0),GLM_PW(1),GLM_PR(2,const glm_act*,GLM_HC*GLM_H),
+                         GLM_PR(3,const float*,GLM_S_HC),GLM_PR(4,float*,GLM_H),(float*)c->lds);
+}
+extern "C" __device__ __attribute__((noinline)) void glm53_attention_dispatch(const etx_ctx* c) {
+  const float* in=GLM_PR(0,const float*,GLM_H);float* out=GLM_PR(1,float*,GLM_H);
+  for(int j=GLM_LANE;j<GLM_H;j+=GLM_LANES)out[j]=in[j];
+}
+extern "C" __device__ __attribute__((noinline)) void glm53_attention_p1(const etx_ctx* c) {
+  glm_ph_attention_p1(GLM_PB(0),GLM_PW(1),GLM_PR(2,const float*,GLM_H),GLM_PR(3,float*,GLM_S_P1),
+                      c->cst[1],c->cst[2],c->cst[3],GLM_PT);
+}
+extern "C" __device__ __attribute__((noinline)) void glm53_attention_p2(const etx_ctx* c) {
+  glm_ph_attention_p2(GLM_PB(1),GLM_PW(2),GLM_PR(3,const float*,GLM_S_P1),GLM_PR(4,float*,GLM_S_P2),
+                      GLM_PR(5,float*,GLM_STATE_MLA),glm53_step_load((const int*)c->args[0]+2*c->coord[0]),
+                      c->cst[2],c->cst[3],GLM_PT);
+}
+extern "C" __device__ __attribute__((noinline)) void glm53_attention_heads(const etx_ctx* c) {
+  glm_ph_attention_heads(GLM_PB(1),GLM_PW(2),GLM_PR(3,const float*,GLM_S_P1),
+                         GLM_PR(4,const float*,c->cst[1]?GLM_S_P1:GLM_S_P2),
+                         GLM_PR(5,float*,c->cst[1]?GLM_STATE_KDA:GLM_STATE_MLA),GLM_PR(6,float*,GLM_S_ATT),
+                         glm53_step_load((const int*)c->args[0]+2*c->coord[0]),c->cst[1],c->cst[2],c->cst[3],GLM_PT);
+}
+extern "C" __device__ __attribute__((noinline)) void glm53_attention_o(const etx_ctx* c) {
+  glm_ph_attention_o(GLM_PB(0),GLM_PW(1),GLM_PR(2,const float*,GLM_S_ATT),GLM_PR(3,float*,GLM_H),
+                     c->cst[1],c->cst[2],c->cst[3],GLM_PT);
+}
+extern "C" __device__ __attribute__((noinline)) void glm53_attention_combine(const etx_ctx* c) {
+  const float* partials[8];for(int rank=0;rank<c->cst[1];++rank)partials[rank]=GLM_PR(5+rank,const float*,GLM_H);
+  glm_ph_attention_combine(GLM_PB(0),GLM_PW(1),GLM_PR(2,const glm_act*,GLM_HC*GLM_H),
+                           GLM_PR(3,const float*,GLM_S_HC),partials,GLM_PR(4,float*,GLM_S_MID),c->cst[1],GLM_PT);
+}

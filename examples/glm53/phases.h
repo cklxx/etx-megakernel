@@ -365,7 +365,7 @@ GLM_DEV void glm_ph_p2(const uint8_t* b,const glm_weight* w,const float* p1,floa
   }
 }
 // MLA attention for the heads of tile t (glm_mla after the projections).
-GLM_DEV void glm_ph_mla(const uint8_t* b,const glm_weight* w,const float* p1,const float* p2,const float* state,float* att,int pos,int t,int T,float* lds){
+GLM_DEV void glm_ph_mla(const uint8_t* b,const glm_weight* w,const float* p1,const float* p2,const float* state,float* att,int pos,int t,int T,float* lds,int head_begin=0,int head_end=GLM_NH){
   float* a=lds+GLM_LDS_HEAD;float* chosen=a+GLM_MAXLEN;float* score=chosen+GLM_MAXLEN;float* pool=score+GLM_MAXLEN;
   const int stride=2*GLM_NH*GLM_AD+2*GLM_ID;
   const int np=(pos+1)/GLM_POOL,take=np<GLM_INDEX_TOPK/GLM_POOL?np:GLM_INDEX_TOPK/GLM_POOL;
@@ -398,7 +398,7 @@ GLM_DEV void glm_ph_mla(const uint8_t* b,const glm_weight* w,const float* p1,con
     // thread owns 4 value dims for one of G key groups; the G partial sums are added in group order.
     float* qs=lds+GLM_LDS_HEAD+GLM_R4(3*GLM_MAXLEN+GLM_ID);float* part=qs+GLM_R4(GLM_AD);
     constexpr int DQ=GLM_AD/4,G=GLM_VT/DQ;
-    for(int h=t*GLM_NH/T;h<(t+1)*GLM_NH/T;++h){
+    for(int h=head_begin+t*(head_end-head_begin)/T;h<head_begin+(t+1)*(head_end-head_begin)/T;++h){
       for(int d=threadIdx.x;d<GLM_AD;d+=GLM_VT)qs[d]=p2[h*GLM_AD+d];
       GLM_SYNC();
       float m=-INFINITY;
@@ -428,7 +428,7 @@ GLM_DEV void glm_ph_mla(const uint8_t* b,const glm_weight* w,const float* p1,con
     return;
   }
 #endif
-  for(int h=t*GLM_NH/T;h<(t+1)*GLM_NH/T;++h){
+  for(int h=head_begin+t*(head_end-head_begin)/T;h<head_begin+(t+1)*(head_end-head_begin)/T;++h){
     const float* q=p2+h*GLM_AD;
     // One group of lanes per key position; scores rounded like eager BF16 matmul.
     glm_each(0,pos+1,S,[&](int j,int sl){
@@ -450,26 +450,30 @@ GLM_DEV void glm_ph_mla(const uint8_t* b,const glm_weight* w,const float* p1,con
   }
 }
 // KDA heads of tile t: short conv, forget gate, delta-rule recurrence, gated output norm.
-GLM_DEV void glm_ph_kda(const uint8_t* b,const glm_weight* w,const float* p1,float* state,float* att,int t,int T,float* lds){
+GLM_DEV void glm_ph_kda(const uint8_t* b,const glm_weight* w,const float* p1,float* state,float* att,int t,int T,float* lds,int head_begin=0,int head_end=GLM_LH,bool sharded=false){
   const int L=GLM_R4(GLM_LD);
   float* q=lds+GLM_LDS_HEAD;float* k=q+L;float* v=k+L;float* g=v+L;float* gate=g+L;float* o=gate+L;float* fs=o+L;float* gs=fs+L;
   const float* small_f=p1+3*GLM_QDIM;const float* braw=small_f+GLM_LD;const float* small_g=braw+GLM_LH;
   float* conv=state;float* rec=conv+3*GLM_QDIM*GLM_CONV;
   for(int i=GLM_LANE;i<GLM_LD;i+=GLM_LANES){fs[i]=small_f[i];gs[i]=small_g[i];}
   GLM_SYNC();
-  for(int h=t*GLM_LH/T;h<(t+1)*GLM_LH/T;++h){const int off=h*GLM_LD;
+  // Bounds partition heads, never the full-global activation/state addressing.
+  // sharded selects compact local weight rows; false also permits bounded full weights.
+  for(int h=head_begin+t*(head_end-head_begin)/T;h<head_begin+(t+1)*(head_end-head_begin)/T;++h){const int off=h*GLM_LD;
+    const int localoff=sharded?off-head_begin*GLM_LD:off;
     for(int i=GLM_LANE;i<3*GLM_LD;i+=GLM_LANES){const int part=i/GLM_LD,n=i%GLM_LD,j=part*GLM_QDIM+off+n;
       float* hist=conv+(uint64_t)j*GLM_CONV;for(int z=0;z<GLM_CONV-1;++z)hist[z]=hist[z+1];hist[GLM_CONV-1]=p1[j];
-      float sum=0;for(int z=0;z<GLM_CONV;++z)sum+=hist[z]*glm_w(b,w[CONV],j,z);
+      const int row=sharded?part*((head_end-head_begin)*GLM_LD)+(j%GLM_QDIM-head_begin*GLM_LD):j;
+      float sum=0;for(int z=0;z<GLM_CONV;++z)sum+=hist[z]*glm_w(b,w[CONV],row,z);
       // conv1d returns its weight dtype before SiLU (FP32 in production).
       if(w[CONV].kind==1)sum=glm_bf(sum);
       (part==0?q:part==1?k:v)[n]=glm_bf(sum*glm_sig(sum));
     }
-    glm_rows<GLM_KBF16>(b,w[FB],fs,off,off+GLM_LD,[&](int r,float y){g[r-off]=glm_bf(y);});
-    glm_rows<GLM_KBF16>(b,w[GB],gs,off,off+GLM_LD,[&](int r,float y){gate[r-off]=glm_bf(y);});
+    glm_rows<GLM_KBF16>(b,w[FB],fs,localoff,localoff+GLM_LD,[&](int r,float y){g[r-localoff]=glm_bf(y);});
+    glm_rows<GLM_KBF16>(b,w[GB],gs,localoff,localoff+GLM_LD,[&](int r,float y){gate[r-localoff]=glm_bf(y);});
     GLM_SYNC();
     for(int i=GLM_LANE;i<GLM_LD;i+=GLM_LANES){const int j=off+i;
-      g[i]=expf(GLM_LOWER*glm_sig(expf(glm_w(b,w[ALOG],j/GLM_LD))*(g[i]+glm_w(b,w[DT],j))));}
+      g[i]=expf(GLM_LOWER*glm_sig(expf(glm_w(b,w[ALOG],sharded?h-head_begin:j/GLM_LD))*(g[i]+glm_w(b,w[DT],sharded?localoff+i:j))));}
     const float beta=glm_bf(glm_sig(braw[h]));
     float pq=GLM_LANE==0?1e-6f:0.0f,pk=pq;
     for(int i=GLM_LANE;i<GLM_LD;i+=GLM_LANES){pq+=q[i]*q[i];pk+=k[i]*k[i];}

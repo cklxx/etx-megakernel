@@ -3,7 +3,8 @@
 phased=1 (default) splits every layer into phase grids over all CUs
 (examples/glm53/phases.h). parallel=0 uses PP: devices counts stages (2 =
 the staged PP2 split; 4/8 = contiguous layer blocks). parallel=1 shards FFN
-intermediate dimensions across devices, with serial attention and phased=1.
+intermediate dimensions across devices with phased=1. attention_tp=1 adds head-sharded KDA/MLA, local attention
+weights and output reduction to either FFN mode; 0 preserves serial attention.
 up_pairs controls phase-grid granularity (36 measured). the measured default is unchanged.
 phased=0 is the original one-workgroup-per-layer
 graph, whose numerics the remaining knobs tune and whose defaults preserve the
@@ -36,6 +37,7 @@ class Options:
     devices: int = 2
     up_pairs: int = 36
     parallel: int = 0                 # 0: PP; 1: FFN TP
+    attention_tp: int = 0             # head-sharded attention with parallel=1/2
 
     def __post_init__(self):
         for f in fields(self):
@@ -61,6 +63,8 @@ class Options:
             raise ValueError('up_pairs must be 1..256 (gate/up pairs per phase tile)')
         if self.parallel not in (0, 1) or (self.parallel and not self.phased):
             raise ValueError('parallel must be 0 (PP), 1 (FFN TP); TP needs phased=1')
+        if self.attention_tp not in (0,1) or (self.attention_tp and self.parallel != 1):
+            raise ValueError('attention_tp must be 0 or 1; head TP needs parallel=1')
         if self.devices not in (2, 4, 8) or (self.devices != 2 and not self.phased):
             raise ValueError('devices must be 2, 4 or 8 (4 and 8 need the phased graph)')
 
@@ -71,7 +75,7 @@ class Options:
         return hashlib.sha256(json.dumps(self.to_dict(), sort_keys=True, separators=(',', ':')).encode()).hexdigest()
 
     def header(self):
-        names = ('cache_ab', 'routed_slc', 'shared_slc', 'row_tile', 'k_tile', 'lds_bytes', 'parallel')
+        names = ('cache_ab', 'routed_slc', 'shared_slc', 'row_tile', 'k_tile', 'lds_bytes', 'parallel', 'attention_tp')
         return '#pragma once\n' + ''.join(f'#define ETX_GLM_{n.upper()} {getattr(self, n)}\n' for n in names) + f'#define ETX_GLM_UP_PAIRS {self.up_pairs}\n'
 
     def compiler_flags(self):

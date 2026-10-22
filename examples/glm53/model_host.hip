@@ -28,7 +28,7 @@ int main(int argc,char** argv){
   if(argc!=5){fprintf(stderr,"usage: run STAGE LOAD_TSV PROMPTS OUTPUT_PREFIX\n");return 2;}
   int count=0;ETX_CHECK(hipGetDeviceCount(&count));if(count!=NDEV){fprintf(stderr,"exactly %d GPUs required (HIP_VISIBLE_DEVICES), %d visible\n",NDEV,count);return 2;}
   int batch=etx_shape[ETX_SYM_B];
-  printf("GLM-VARIANT devices=%d parallel=%d up_pairs=%d\n",NDEV,ETX_GLM_PARALLEL,ETX_GLM_UP_PAIRS);
+  printf("GLM-VARIANT devices=%d parallel=%d attention_tp=%d up_pairs=%d\n",NDEV,ETX_GLM_PARALLEL,ETX_GLM_ATTENTION_TP,ETX_GLM_UP_PAIRS);
   std::vector<int> owner(ETX_N_ARGS);std::vector<size_t> needed(NDEV,0);std::vector<void*> buffers(ETX_N_ARGS,nullptr);
   for(int a=0;a<ETX_N_ARGS;++a)owner[a]=glm_arg_owner[a]>=0?glm_arg_owner[a]:std::max(0,etx_arg_writer_device[a]);
   const std::string load_path=argv[2];const auto slash=load_path.find_last_of('/');

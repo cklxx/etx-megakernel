@@ -105,7 +105,59 @@ def _ffn_axis(key):
     return None
 
 
-def derive(spec, mode, devices):
+def _attention_contract(t, layer, source, tensors, devices):
+    """Validate the complete native attention ABI and return its slicing axes."""
+    schedule = t.get('layer_types')
+    if (not isinstance(schedule, list) or len(schedule) != t['num_hidden_layers']
+            or any(kind not in ('linear_attention', 'deepseek_sparse_attention', 'full_attention') for kind in schedule)):
+        raise ValueError('invalid attention layer schedule')
+    h = _int(t['hidden_size'], 'hidden size', 1, _I32)
+    hc = _int(t.get('hc_mult'), 'attention hc_mult', 1, _I32)
+    shapes = dict(zip(stage.SLOTS[:8], [(hc*(hc+2), hc*h), (hc*(hc+2),), (3,),
+                                      (hc*(hc+2), hc*h), (hc*(hc+2),), (3,), (h,), (h,)]))
+    axes = {}
+    if schedule[layer] == 'linear_attention':
+        la = t.get('linear_attn_config', {})
+        heads = _int(la.get('num_heads', t.get('linear_num_heads', 64)), 'KDA heads', 1, _I32)
+        dim = _int(la.get('head_dim', t.get('linear_head_dim', 128)), 'KDA head dimension', 1, _I32)
+        conv = _int(la.get('short_conv_kernel_size', t.get('linear_conv_kernel_dim', 4)), 'KDA convolution width', 1, _I32)
+        qd = heads*dim
+        values = [(qd,h), (qd,h), (qd,h), (3*qd,1,conv), (dim,h), (qd,dim),
+                  (qd,), (heads,), (heads,h), (dim,h), (qd,dim), (dim,), (h,qd)]
+        shapes.update(zip(stage.SLOTS[8:21], values))
+        axes = {stage.SLOTS[i]: 0 for i in (8, 9, 10, 11, 13, 14, 15, 16, 18)}
+        axes[stage.SLOTS[20]] = 1
+        kind = 'kda'
+    else:
+        heads = _int(t.get('num_attention_heads'), 'MLA heads', 1, _I32)
+        dim = _int(t.get('qk_nope_head_dim'), 'MLA head dimension', 1, _I32)
+        qr = _int(t.get('q_lora_rank'), 'MLA Q rank', 1, _I32)
+        kvr = _int(t.get('kv_lora_rank'), 'MLA KV rank', 1, _I32)
+        ih = _int(t.get('index_n_heads'), 'indexer heads', 1, _I32)
+        ident = _int(t.get('index_head_dim'), 'indexer head dimension', 1, _I32)
+        pool = _int(t.get('index_kpool'), 'indexer pool', 1, _I32)
+        values = [(qr,h), (qr,), (heads*dim,qr), (kvr,h), (kvr,),
+                  (heads*2*dim,kvr), (ih*ident,qr), (ident,h), (ident,), (ident,),
+                  (ih,h), (ident,h), (pool,ident)]
+        shapes.update(zip(stage.SLOTS[21:34], values))
+        shapes[stage.SLOTS[20]] = (h, heads*dim)
+        axes = {stage.SLOTS[23]: 0, stage.SLOTS[26]: 0, stage.SLOTS[20]: 1}
+        kind = 'mla'
+    if heads % devices:
+        raise ValueError(f'attention head count must divide evenly by devices: l{layer}')
+    actual = {key for key in tensors if key in stage.SLOTS[:34]}
+    if actual != set(shapes):
+        raise ValueError(f'incomplete or unexpected attention slots: l{layer}')
+    for key, shape in shapes.items():
+        if tuple(source['tensors'][key]['shape']) != shape:
+            raise ValueError(f'invalid attention descriptor dimensions: l{layer}/{key}')
+    summary = dict(kind=kind, heads=heads, head_dim=dim,
+                   ranks=[dict(rank=r, start=r*(heads//devices), end=(r+1)*(heads//devices))
+                          for r in range(devices)])
+    return axes, summary
+
+
+def derive(spec, mode, devices, attention_tp=False):
     """Return a JSON-serializable layout; do not read files or mutate ``spec``.
 
     ``weights[name]`` contains rank, logical blob/meta basenames, byte counts,
@@ -118,6 +170,8 @@ def derive(spec, mode, devices):
     Attention helpers retain global-index activation/state buffers, but read the
     compact local descriptors (CONV packs Q, K and V in three local row groups).
     """
+    if type(attention_tp) is not bool:
+        raise ValueError('attention_tp must be bool')
     if mode != 'tp':
         raise ValueError('mode must be tp')
     if type(devices) is not int or devices not in (2, 4, 8):
@@ -132,10 +186,12 @@ def derive(spec, mode, devices):
     if set(spec['weights']) != expected_weights:
         raise ValueError('incomplete source weights')
     digest = hashlib.sha256(json.dumps(spec, sort_keys=True, separators=(',', ':'), allow_nan=False).encode()).hexdigest()
-    layout = dict(schema=1, mode=mode, devices=devices, source_spec_sha256=digest,
+    layout = dict(schema=1, mode=mode, devices=devices, attention_tp=attention_tp, source_spec_sha256=digest,
                   source={k: spec[k] for k in ('schema', 'model', 'revision', 'config_sha256', 'fixture', 'slice') if k in spec},
                   slot_names=slots, weights={}, ranges=[], graph_tensors={},
                   rank_memory=[dict(rank=r, blob_bytes=0, meta_bytes=0, outer_bytes=0, total_bytes=0) for r in range(devices)])
+    if attention_tp:
+        layout['attention_head_ranges'] = {}
 
     def add_range(name, source, src, dest, rows, srcstride, width, dststride):
         # Collapse contiguous row copies (notably TP gate/up and row scales).
@@ -152,6 +208,10 @@ def derive(spec, mode, devices):
     for layer in range(n):
         layer_name = f'l{layer}'; source = spec['weights'][layer_name]
         tensors = _validated(source, slots)
+        attention_axes = {}
+        if attention_tp:
+            attention_axes, summary = _attention_contract(t, layer, source, tensors, devices)
+            layout['attention_head_ranges'][layer_name] = summary
         dense = t['mlp_layer_types'][layer] == 'dense'
         required = _DENSE if dense else _SHARED | set(slots[42:]) | set(stage.SLOTS[37:39])
         present_ffn = {key for key in tensors if _ffn_axis(key) is not None or key in stage.SLOTS[37:39]}
@@ -170,7 +230,7 @@ def derive(spec, mode, devices):
             elif key == stage.SLOTS[38] and tensors[key][:2] != (experts, 1):
                 raise ValueError('invalid router bias descriptor dimensions')
         names = [layer_name+'_common'] + [f'{layer_name}_r{rank}' for rank in range(devices)]
-        attention_names = []
+        attention_names = [f'{layer_name}_a{rank}' for rank in range(devices)] if attention_tp else []
         for name in names + attention_names:
             rank = 0 if name == names[0] else int(name.rsplit('_', 1)[1][1:])
             layout['weights'][name] = dict(rank=rank, blob=name+'.bin', meta=name+'.meta',
@@ -181,21 +241,29 @@ def derive(spec, mode, devices):
                 continue
             rows, cols, kind, itemsize, off, scale = tensors[key]
             axis = _ffn_axis(key)
-            if axis is None:
+            is_attention = attention_tp and key in stage.SLOTS[8:34]
+            if is_attention:
+                axis = attention_axes.get(key)
+                owners = attention_names
+            elif axis is None:
                 owners = [names[0]]
             else:
                 owners = names[1:]
             shard = axis is not None
-            extent = (cols if axis == 1 else rows) if shard else 0
+            multipart = is_attention and key == stage.SLOTS[11]
+            # KDA convolution rows are [all Q, all K, all V], not one
+            # contiguous attention-head interval across the entire descriptor.
+            extent = (cols if axis == 1 else rows//3 if multipart else rows) if shard else 0
             if shard and (extent % devices or (kind == 3 and (extent // devices) % 128)):
-                raise ValueError(f'FFN shard boundary must divide evenly and be FP8 block128 aligned: {layer_name}/{key}')
+                family = 'attention' if is_attention else 'FFN'
+                raise ValueError(f'{family} shard boundary must divide evenly and be FP8 block128 aligned: {layer_name}/{key}')
             for name in owners:
                 w = layout['weights'][name]; rank = w['rank']
                 start = rank * (extent // devices) if shard else 0
                 nr = rows // devices if shard and axis == 0 else rows
                 nc = cols // devices if shard and axis == 1 else cols
                 dst = _align(w['blob_bytes'], 128)
-                row_ranges = [(start if shard and axis == 0 else 0, nr)]
+                row_ranges = [(group*extent+start, extent//devices) for group in range(3)] if multipart else [(start if shard and axis == 0 else 0, nr)]
                 destrow = 0
                 for srcrow, count in row_ranges:
                     src = off + (srcrow*cols + (start if shard and axis == 1 else 0))*itemsize
@@ -222,6 +290,8 @@ def derive(spec, mode, devices):
                 w['tensors'][key] = dict(slot=slot, shape=local_shape, dtype=source['tensors'][key]['dtype'],
                                          offset=dst, scale_offset=ds, source_start=start,
                                          shard_axis=axis if shard else None)
+                if multipart:
+                    w['tensors'][key]['source_ranges'] = [dict(start=a, rows=b) for a, b in row_ranges]
         for name in names + attention_names:
             w = layout['weights'][name]
             w['blob_bytes'] = max(1, w['blob_bytes'])  # empty EP ranks still have valid arguments

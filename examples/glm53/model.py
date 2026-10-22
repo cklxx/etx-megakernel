@@ -24,9 +24,10 @@ def build_from(stage, batch=1, options=None, layout=None):
     if options.parallel:
         if layout is None:
             from examples.glm53.parallel_layout import derive
-            layout=derive(stage,'tp' if options.parallel==1 else 'ep',options.devices)
+            layout=derive(stage,'tp' if options.parallel==1 else 'ep',options.devices,attention_tp=bool(options.attention_tp))
         expected_mode='tp' if options.parallel==1 else 'ep'
-        if (layout['mode']!=expected_mode or layout['devices']!=options.devices):
+        if (layout['mode']!=expected_mode or layout['devices']!=options.devices
+                or bool(layout.get('attention_tp',False))!=bool(options.attention_tp)):
             raise ValueError('parallel layout differs from requested build options')
         return build_phased(stage,batch,options,layout)
     if options.phased:return build_phased(stage,batch,options)
@@ -118,7 +119,8 @@ def owners(stage,devices=2):
 
 def build_phased(stage,batch,options,layout=None):
     d=stage['dimensions'];t=stage['config']
-    name=f'glm53_phased_pp{options.devices}' if layout is None else f'glm53_{layout["mode"]}{options.devices}_serial_attention'
+    attention='head_tp' if options.attention_tp else 'serial_attention'
+    name=f'glm53_phased_pp{options.devices}' if layout is None else f'glm53_{layout["mode"]}{options.devices}_{attention}'
     g=Graph(name)
     g.symbols=['B'];a_bytes=2 if d['BF16'] else 4;st=strides(d)
     g.tensor('step',('B',2),dtype='int32',bytes_per_elem=4)
@@ -162,18 +164,22 @@ def build_phased(stage,batch,options,layout=None):
         for name,size in [('hca',st['hc']),('p1',st['p1']),('att',st['att']),('mid',st['mid']),('hcf',st['hc']),
                           ('rt',st['rt']),('act',st['act']),('sel',st['sel'])]+([] if linear else [('p2',st['p2'])]):
             g.tensor(f'{L}_{name}',('B',size),role='scratch',dtype='float32',bytes_per_elem=4)
-        g.tensor(L+'_state',('B',nstate),role='runtime',dtype='float32',bytes_per_elem=4)
+        if not options.attention_tp:g.tensor(L+'_state',('B',nstate),role='runtime',dtype='float32',bytes_per_elem=4)
         g.tensor(L+'_out',('B',d['HC'],d['H']),bytes_per_elem=a_bytes)
         x=lambda name:f'{L}_{name}'
         grid(x('hc'),dev,'glm53_hc',n['hc'],[W,M,previous,x('hca')],[W,M,previous],[x('hca')])
-        grid(x('p1'),dev,'glm53_p1',n['p1'],[W,M,previous,x('hca'),x('p1')],[W,M,previous,x('hca')],[x('p1')],cst)
-        if linear:
-            grid(x('kda'),dev,'glm53_kda',n['att'],[W,M,x('p1'),x('state'),x('att')],[W,M,x('p1'),x('state')],[x('state'),x('att')],cst)
+        if options.attention_tp:
+            from examples.glm53.attention_graph import add_attention
+            add_attention(g,grid,L,d,t,options,n,W,M,previous,linear,nstate)
         else:
-            grid(x('p2'),dev,'glm53_p2',n['p2'],['step',W,M,x('p1'),x('p2'),x('state')],['step',W,M,x('p1'),x('state')],[x('p2'),x('state')],cst)
-            grid(x('mla'),dev,'glm53_mla',n['att'],['step',W,M,x('p1'),x('p2'),x('state'),x('att')],
-                 ['step',W,M,x('p1'),x('p2'),x('state')],[x('att')],cst)
-        grid(x('o'),dev,'glm53_o',n['o'],[W,M,previous,x('hca'),x('att'),x('mid')],[W,M,previous,x('hca'),x('att')],[x('mid')])
+            grid(x('p1'),dev,'glm53_p1',n['p1'],[W,M,previous,x('hca'),x('p1')],[W,M,previous,x('hca')],[x('p1')],cst)
+            if linear:
+                grid(x('kda'),dev,'glm53_kda',n['att'],[W,M,x('p1'),x('state'),x('att')],[W,M,x('p1'),x('state')],[x('state'),x('att')],cst)
+            else:
+                grid(x('p2'),dev,'glm53_p2',n['p2'],['step',W,M,x('p1'),x('p2'),x('state')],['step',W,M,x('p1'),x('state')],[x('p2'),x('state')],cst)
+                grid(x('mla'),dev,'glm53_mla',n['att'],['step',W,M,x('p1'),x('p2'),x('state'),x('att')],
+                     ['step',W,M,x('p1'),x('p2'),x('state')],[x('att')],cst)
+            grid(x('o'),dev,'glm53_o',n['o'],[W,M,previous,x('hca'),x('att'),x('mid')],[W,M,previous,x('hca'),x('att')],[x('mid')])
         grid(x('hcf'),dev,'glm53_hcf',n['hcf'],[W,M,x('mid'),x('hcf')],[W,M,x('mid')],[x('hcf')])
         grid(x('rt'),dev,'glm53_rt',n['rt'],[W,M,x('mid'),x('hcf'),x('rt')],[W,M,x('mid'),x('hcf')],[x('rt')],cst)
         if layout is not None:

@@ -18,7 +18,7 @@ def generate(spec,out,batch=1,options=None):
     layout=None
     if options.parallel:
         from examples.glm53.parallel_layout import derive,write_layout
-        layout=derive(spec,'tp' if options.parallel==1 else 'ep',options.devices)
+        layout=derive(spec,'tp' if options.parallel==1 else 'ep',options.devices,attention_tp=bool(options.attention_tp))
         write_layout(layout,out)
     plan=compile_graph(model.build_from(spec,batch,options,layout),'gfx942',{'B':batch},{},CompileOptions(inline_tiles=True))
     errors=verify_plan(plan)
@@ -26,8 +26,9 @@ def generate(spec,out,batch=1,options=None):
     (out/'glm53_spec.h').write_text(stage.header(spec['dimensions']))
     (out/'plan.json').write_text(emit_plan_json(plan))
     (out/'build-resources.json').write_text(json.dumps(dict(batch=batch,devices=plan.n_devices,
-        parallel=options.parallel,
+        parallel=options.parallel,attention_tp=options.attention_tp,
         effective_up_pairs=options.up_pairs,
+        attention_state_capacity='full global stride per private rank' if options.attention_tp else 'pipeline owner only',
         required_workgroups_per_cu=plan.wg_per_cu,
         workers_per_domain=plan.workers_per_domain,planner_vgpr_budget_estimate=options.vgpr_budget,
         phased_planner_vgpr_estimate=128 if options.phased else None,
@@ -91,7 +92,7 @@ def production_compile_spec(maxlen=1072):
 
 def source_identity(out):
     root=Path(__file__).resolve().parents[2]
-    sources=[root/'examples/glm53'/name for name in ('native.h','native_options.h','phases.h','parallel_phases.h','parallel_graph.py','parallel_layout.py','options.py','tiles.hip','model_host.hip','model.py','model_build.py','build_model.sh','stage.py')]
+    sources=[root/'examples/glm53'/name for name in ('native.h','native_options.h','phases.h','attention_phases.h','attention_graph.py','parallel_phases.h','parallel_graph.py','parallel_layout.py','options.py','tiles.hip','model_host.hip','model.py','model_build.py','build_model.sh','stage.py')]
     sources+=list((root/'etx/runtime/include').rglob('*.h'))
     sources += [root/'etx/codegen'/name for name in ('kernel.py','lowering.py','plan_header.py')]
     generated=['plan.json','plan_data.h','etx_lowering.h','glm53_spec.h','glm53_contract.h','glm53_kernels.h','load.tsv','build-spec.json','build-options.json','build-resources.json','glm53_options.h']+sorted(p.name for p in out.glob('megakernel_d*.hip'))
