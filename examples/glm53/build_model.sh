@@ -31,6 +31,9 @@ else
   ls "$OUT"/megakernel_d*.hip | xargs -P 8 -I{} sh -c 'hipcc -O3 -std=c++17 --offload-arch=gfx942 -Ietx/runtime/include -I "$1" -I . -include glm53_options.h -c "$2" -o "${2%.hip}.o"' _ "$OUT" {}
   hipcc -O3 -std=c++17 --offload-arch=gfx942 -Ietx/runtime/include -I "$OUT" -I . -include glm53_options.h \
     "$OUT"/megakernel_d*.o examples/glm53/model_host.hip -pthread -o "$OUT/run"
+  # Refuse a binary whose kernels cannot all be co-resident (e.g. ROCm 6.4.1: 1 wave/SIMD for a
+  # 2-workgroup/CU plan) here, from its code objects, instead of at the device launch.
+  "$PY" -m examples.glm53.residency "$OUT" --cus "${ETX_GLM_CUS:-304}" --llvm "${ETX_ROCM_LLVM:-/opt/rocm/llvm/bin}"
 fi
 
 "$PY" - "$OUT" "$LOCAL" <<'PYEND'
