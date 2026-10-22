@@ -117,8 +117,12 @@ def compile_candidate(build, config, llvm, headers, devlibs, timeout=180, host_s
         raise ValueError('ETX_DEVLIBS must contain ocml.bc and ockl.bc; no -nogpulib qualification')
     contract = json.loads((build/'build-resources.json').read_text())
     min_workgroups_per_cu = max(min_workgroups_per_cu, contract['required_workgroups_per_cu'])
+    devices = contract['devices']
+    generated = sorted(p.name for p in build.glob('megakernel_d*.hip'))
+    if type(devices) is not int or devices not in (2, 4, 8) or generated != sorted(f'megakernel_d{d}.hip' for d in range(devices)):
+        raise ValueError(f'build-resources.json devices={devices!r} does not match the generated kernels {generated}')
     reports = []
-    for rank in (0, 1):
+    for rank in range(devices):
         ir = build/f'mk{rank}.ll'; assembly = build/f'mk{rank}.s'
         run_command(['bash', ROOT/'etx/importer/hip_ir_local.sh', build/f'megakernel_d{rank}.hip', ir,
                      '-I'+str(ROOT/'etx/runtime/include'), '-I'+str(build), '-I'+str(ROOT)],

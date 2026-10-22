@@ -183,7 +183,8 @@ def test_compile_rejects_actual_residency_below_exact_plan_requirement(tmp_path,
     for name in sweep.UNRECORDED_ENV:monkeypatch.delenv(name,raising=False)
     build=tmp_path/'build';build.mkdir();libs=tmp_path/'libs';libs.mkdir()
     for name in ('ocml.bc','ockl.bc'):(libs/name).write_bytes(b'not used')
-    (build/'build-resources.json').write_text(json.dumps(dict(required_workgroups_per_cu=2)))
+    (build/'build-resources.json').write_text(json.dumps(dict(required_workgroups_per_cu=2,devices=2)))
+    for rank in (0,1):(build/f'megakernel_d{rank}.hip').write_text('// not compiled\n')
     def fake(command,*a,**kw):
         if str(command[0]).endswith('llc'):
             (build/'mk0.s').write_text(assembly(occupancy=1))
@@ -192,3 +193,44 @@ def test_compile_rejects_actual_residency_below_exact_plan_requirement(tmp_path,
         sweep.compile_candidate(build,options.Options(),Path('/llvm'),Path('/headers'),libs,min_workgroups_per_cu=1)
     saved=json.loads((build/'compiler-resources.json').read_text())
     assert saved[0]['required_workgroups_per_cu']==2 and saved[0]['estimated_workgroups_per_cu_upper_bound']==1
+
+
+def eight_rank_build(tmp_path,monkeypatch,failing_rank=None):
+    for name in sweep.UNRECORDED_ENV:monkeypatch.delenv(name,raising=False)
+    build=tmp_path/'build';build.mkdir();libs=tmp_path/'libs';libs.mkdir()
+    for name in ('ocml.bc','ockl.bc'):(libs/name).write_bytes(b'not used')
+    (build/'build-resources.json').write_text(json.dumps(dict(required_workgroups_per_cu=1,devices=8)))
+    for rank in range(8):(build/f'megakernel_d{rank}.hip').write_text('// not compiled\n')
+    compiled=[]
+    def fake(command,*a,**kw):
+        if str(command[0]).endswith('llc'):
+            rank=int(Path(command[-1]).stem.removeprefix('mk'));compiled.append(rank)
+            if rank==failing_rank:raise RuntimeError(f'compiler exit 1 rank {rank}')
+            Path(command[-1]).write_text(assembly(kernel=f'etx_megakernel_d{rank}'))
+    monkeypatch.setattr(sweep,'run_command',fake)
+    monkeypatch.setattr(sweep.model_build,'finalize',lambda *a,**kw:None)
+    return build,libs,compiled
+
+
+def test_compile_visits_and_reports_every_generated_rank(tmp_path,monkeypatch):
+    build,libs,compiled=eight_rank_build(tmp_path,monkeypatch)
+    reports=sweep.compile_candidate(build,options.Options(devices=8,parallel=1),Path('/llvm'),Path('/headers'),libs)
+    assert compiled==list(range(8)) and [r['rank'] for r in reports]==list(range(8))
+    assert [r['rank'] for r in json.loads((build/'compiler-resources.json').read_text())]==list(range(8))
+
+
+def test_compile_failure_on_last_rank_rejects_the_build(tmp_path,monkeypatch):
+    build,libs,compiled=eight_rank_build(tmp_path,monkeypatch,failing_rank=7)
+    with pytest.raises(RuntimeError,match='rank 7'):
+        sweep.compile_candidate(build,options.Options(devices=8,parallel=1),Path('/llvm'),Path('/headers'),libs)
+    assert compiled==list(range(8))
+
+
+@pytest.mark.parametrize('devices,kernels',[(8,2),(2,8),(3,3),(None,2)])
+def test_compile_refuses_rank_count_that_disagrees_with_generated_kernels(tmp_path,monkeypatch,devices,kernels):
+    build,libs,compiled=eight_rank_build(tmp_path,monkeypatch)
+    (build/'build-resources.json').write_text(json.dumps(dict(required_workgroups_per_cu=1,devices=devices)))
+    for rank in range(kernels,8):(build/f'megakernel_d{rank}.hip').unlink()
+    with pytest.raises(ValueError,match='does not match the generated kernels'):
+        sweep.compile_candidate(build,options.Options(),Path('/llvm'),Path('/headers'),libs)
+    assert compiled==[]
