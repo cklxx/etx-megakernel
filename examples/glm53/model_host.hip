@@ -84,6 +84,11 @@ int main(int argc,char** argv){
       for(int r=0;r<batch;++r)logits.write((const char*)(head.data()+r*(2*GLM_H+GLM_VOCAB)+2*GLM_H),GLM_VOCAB*4);
     }
     printf("GLM-MODEL-STEP pos=%d batch=%d ms=%.6f\n",pos,batch,step_ms);
+    // Opt-in debug: every layer output after the step, outside the timed span (GLMDBG_DUMP_LAYERS=<file>).
+    if(const char* dump=getenv("GLMDBG_DUMP_LAYERS")){static std::ofstream df(dump,std::ios::binary);
+      for(int i=0;i<ETX_N_TYPES-3;++i){std::string nm="l"+std::to_string(i)+"_out";int a=etx_host::arg_index(nm.c_str());
+        std::vector<char> tmp(etx_arg_bytes[a]);ETX_CHECK(hipMemcpy(tmp.data(),buffers[a],tmp.size(),hipMemcpyDeviceToHost));df.write(tmp.data(),tmp.size());}
+      df.flush();}
   }
   logits.close();std::ofstream tokens(std::string(argv[4])+".tokens");
   for(int r=0;r<batch;++r){for(int k=0;k<32;++k)tokens<<generated[r*32+k]<<" ";tokens<<"\n";}
