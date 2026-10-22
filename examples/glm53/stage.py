@@ -124,7 +124,8 @@ def write_blob(out, name, expected, tensors, slots):
 
 
 class Snapshot:
-    def __init__(self, src):
+    def __init__(self, src, trust=False):
+        self.trust=trust
         self.src=src
         self.index_sha256=file_sha(src/'model.safetensors.index.json')
         self.index=json.loads((src/'model.safetensors.index.json').read_text())['weight_map']
@@ -166,13 +167,14 @@ class Snapshot:
             self.shard_hashes[name]=file_sha(path)
         return path
     def verified_inputs(self):
-        if file_sha(self.src/'model.safetensors.index.json')!=self.index_sha256:raise ValueError('checkpoint index changed during staging')
-        for name,digest in self.shard_hashes.items():
-            if file_sha(self.src/name)!=digest:raise ValueError(f'checkpoint shard changed during staging: {name}')
+        if not self.trust and file_sha(self.src/'model.safetensors.index.json')!=self.index_sha256:raise ValueError('checkpoint index changed during staging')
+        if not self.trust:
+            for name,digest in self.shard_hashes.items():
+                if file_sha(self.src/name)!=digest:raise ValueError(f'checkpoint shard changed during staging: {name}')
         return dict(index_sha256=self.index_sha256,shards=self.shard_hashes)
 
 
-def stage(src, out, maxlen=1072, gate='production', layers=None):
+def stage(src, out, maxlen=1072, gate='production', layers=None, trust=False):
     """Stage the release checkpoint, or (--gate slice --layers 22-25) one contiguous
     window of it, re-indexed from layer 0. A slice must straddle the PP2 split."""
     evidence,model=gate_identity(gate);cfg,api=metadata(evidence)
@@ -184,7 +186,7 @@ def stage(src, out, maxlen=1072, gate='production', layers=None):
         raise ValueError(f'snapshot is not the exact pinned GLM checkpoint/config ({gate} gate)')
     t=slice_config(cfg['text_config'],layers) if provenance else cfg['text_config']
     out.mkdir(parents=True,exist_ok=False)
-    d=dimensions(t,maxlen);ranks=partition(t);reader=Snapshot(src)
+    d=dimensions(t,maxlen);ranks=partition(t);reader=Snapshot(src,trust=trust)
     result=dict(schema=1,model=model,revision=api['sha'],config_sha256=sha(src/'config.json'),fixture=False,
                 config=t,dimensions=d,ranks=ranks,weights={},numerics='native FP8 -> BF16 per block; FP32 accumulators; no activation quantization')
     if provenance is not None:
@@ -236,8 +238,9 @@ def validate(out, allow_fixture=False, gate='production'):
 def main():
     ap=argparse.ArgumentParser(description=__doc__);ap.add_argument('--src',type=Path,required=True);ap.add_argument('--out',type=Path,required=True);ap.add_argument('--maxlen',type=int,default=1072)
     ap.add_argument('--gate',choices=['production','module','slice'],default='production')
+    ap.add_argument('--trust-verified',action='store_true',help='reuse the hashes taken during staging instead of hashing every shard a second time')
     ap.add_argument('--layers',help='slice gate only: contiguous source layers that straddle the PP2 split, e.g. 22-25')
-    a=ap.parse_args();stage(a.src,a.out,a.maxlen,a.gate,parse_layers(a.layers) if a.layers else None)
+    a=ap.parse_args();stage(a.src,a.out,a.maxlen,a.gate,parse_layers(a.layers) if a.layers else None,trust=a.trust_verified)
 
 
 
