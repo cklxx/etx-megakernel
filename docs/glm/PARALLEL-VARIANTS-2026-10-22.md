@@ -3,7 +3,7 @@
 ## Status and scope
 
 **CPU options/manifest generation completed; variants remain uncompiled,
-untested and unmeasured.** The lead ran only the options generator; all regression
+untested and unmeasured.** Only the options generator ran (twice, into two fresh directories, launches=0); all regression
 tests, native compilation and GPU execution remain unrun. No GPU, SSH,
 provisioning or stopped-box access occurred. Options files are not build,
 capacity, numerical or speed certificates. The surrounding production integration
@@ -182,6 +182,15 @@ above remains untouched; its 30-arm manifest predates this batch extension.
    traffic/overlap. A new world/GPU session is not an absolute-ms comparison to an
    old one. For a fusion claim retain the repository's five-pair positive-gain,
    median >2% and >2× spread rule; this is not a promise of parallel speedup.
+
+## Future measurement order and decision bars
+
+The [separate measurement plan](PARALLEL-MEASUREMENT-PLAN-2026-10-22.md) specifies
+per-variant/per-batch unknowns, correctness/capacity first, deciding microbenchmarks
+second, then bounded five-interleaved-pair timing for survivors. It requires full
+`(32,B,VOCAB)` logits and HF32/32 per request, actual PP overlap and TP/EP rank
+skew, both mandatory baseline families, and predeclared keep/drop thresholds.
+Incomplete work yields no result; a kept variant never changes defaults silently.
 
 No GPU session or new expenditure is authorized by this runbook. The stopped
 GPU box must remain untouched. Future execution needs the owner's separate
