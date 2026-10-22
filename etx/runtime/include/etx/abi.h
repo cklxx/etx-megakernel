@@ -72,6 +72,7 @@ struct etx_params {
   void* const*     type_args;          // per task type: max_args pointers in the grid's own argument order
   int32_t          max_args;
   etx_event*       events;
+  etx_event*       sys_events;         // SYSTEM-scope words, shared by every device (= events when one buffer serves all)
   const int32_t*   ev_offset;
   const int32_t  (*ev_shape)[4];
   const etx_task*  descs;

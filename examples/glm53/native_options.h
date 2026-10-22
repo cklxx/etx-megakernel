@@ -1,6 +1,12 @@
 // Compile-time native experiments. Defaults retain the original arithmetic and
 // ordinary loads. These switches never change activation/state cache policy.
 #pragma once
+#ifndef ETX_GLM_PARALLEL
+#define ETX_GLM_PARALLEL 0
+#endif
+#ifndef ETX_GLM_UP_PAIRS
+#define ETX_GLM_UP_PAIRS 36
+#endif
 #ifndef ETX_GLM_ROUTED_SLC
 #define ETX_GLM_ROUTED_SLC 0
 #endif

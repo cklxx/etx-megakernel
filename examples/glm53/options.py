@@ -1,4 +1,13 @@
-"""Explicit GLM build knobs. Defaults preserve the pre-sweep execution settings.
+"""Explicit GLM build knobs.
+
+phased=1 (default) splits every layer into phase grids over all CUs
+(examples/glm53/phases.h). parallel=0 uses PP: devices counts stages (2 =
+the staged PP2 split; 4/8 = contiguous layer blocks). parallel=1 shards FFN
+intermediate dimensions across devices, with serial attention and phased=1.
+up_pairs controls phase-grid granularity (36 measured). the measured default is unchanged.
+phased=0 is the original one-workgroup-per-layer
+graph, whose numerics the remaining knobs tune and whose defaults preserve the
+pre-sweep execution settings.
 
 vgpr_budget is a planner estimate, NOT a compiler register limit or measurement.
 waves_per_simd_max requests the LLVM amdgpu_waves_per_eu(1, max) bound;
@@ -23,6 +32,10 @@ class Options:
     row_tile: int = 1
     k_tile: int = 0
     lds_bytes: int = 0
+    phased: int = 1
+    devices: int = 2
+    up_pairs: int = 36
+    parallel: int = 0                 # 0: PP; 1: FFN TP
 
     def __post_init__(self):
         for f in fields(self):
@@ -42,6 +55,14 @@ class Options:
             raise ValueError('k_tile must be 0..2147483647')
         if not 0 <= self.lds_bytes <= 65536 or self.lds_bytes % 4:
             raise ValueError('lds_bytes must be a multiple of 4 in 0..65536')
+        if self.phased not in (0, 1):
+            raise ValueError('phased must be 0 or 1')
+        if not 1 <= self.up_pairs <= 256:
+            raise ValueError('up_pairs must be 1..256 (gate/up pairs per phase tile)')
+        if self.parallel not in (0, 1) or (self.parallel and not self.phased):
+            raise ValueError('parallel must be 0 (PP), 1 (FFN TP); TP needs phased=1')
+        if self.devices not in (2, 4, 8) or (self.devices != 2 and not self.phased):
+            raise ValueError('devices must be 2, 4 or 8 (4 and 8 need the phased graph)')
 
     def to_dict(self):
         return asdict(self)
@@ -50,8 +71,8 @@ class Options:
         return hashlib.sha256(json.dumps(self.to_dict(), sort_keys=True, separators=(',', ':')).encode()).hexdigest()
 
     def header(self):
-        names = ('cache_ab', 'routed_slc', 'shared_slc', 'row_tile', 'k_tile', 'lds_bytes')
-        return '#pragma once\n' + ''.join(f'#define ETX_GLM_{n.upper()} {getattr(self, n)}\n' for n in names)
+        names = ('cache_ab', 'routed_slc', 'shared_slc', 'row_tile', 'k_tile', 'lds_bytes', 'parallel')
+        return '#pragma once\n' + ''.join(f'#define ETX_GLM_{n.upper()} {getattr(self, n)}\n' for n in names) + f'#define ETX_GLM_UP_PAIRS {self.up_pairs}\n'
 
     def compiler_flags(self):
         # The generated entrypoint carries the waves attribute. All numerical

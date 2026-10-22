@@ -1,4 +1,4 @@
-"""Strict real two-GPU GLM model qualification, using pre-staged assets only."""
+"""Strict real multi-GPU GLM qualification of PP / FFN TP / EP staged builds."""
 import argparse
 import json
 import math
@@ -43,11 +43,15 @@ def qualify(staged,build,ref_path,out,seconds=7200,logit_atol=None,gate='product
         spec=json.loads((build/'build-spec.json').read_text())
         if before!=spec:raise ValueError('build/staged model identity differs')
         identity=model_build.verified_build(build)
-        required=['run','build-spec.json','plan.json','plan_data.h','glm53_spec.h','glm53_contract.h','load.tsv','megakernel_d0.hip','megakernel_d1.hip']
+        mode=identity['options'].get('parallel',0);devices=identity['options'].get('devices',2)
+        backend=oracle.build_backend(identity['options'])
+        required=['run','build-spec.json','plan.json','plan_data.h','glm53_spec.h','glm53_contract.h','load.tsv']
+        required += [f'megakernel_d{d}.hip' for d in range(devices)]
+        if mode:required += ['parallel-layout.json','ranges.tsv']+sorted(p.name for p in build.glob('l*_*.meta'))
         build_hash={name:stage.file_sha(build/name) for name in required}
         ref=json.loads(ref_path.read_text());p=[r['prompt_ids'] for r in ref['requests']]
         # Reuse the strict record validator, before starting any GPU work.
-        probe=dict(ref,backend='etx-pp2');oracle.compare(ref,probe,gate)
+        probe=dict(ref,backend=backend);oracle.compare(ref,probe,gate,candidate_backend=backend)
         plan=json.loads((build/'plan.json').read_text());batch=len(p)
         if plan['shape']!=[batch] or len({len(x) for x in p})!=1 or len(p[0])+32>before['dimensions']['MAXLEN']:raise ValueError('reference differs from compiled batch/context')
         if ref.get('provenance',{}).get('index_sha256')!=before['snapshot_inputs']['index_sha256']:raise ValueError('reference checkpoint index differs from staged inputs')
@@ -63,7 +67,7 @@ def qualify(staged,build,ref_path,out,seconds=7200,logit_atol=None,gate='product
         # mismatch in either run is fatal; do not let a later repetition mask it.
         for repetition in range(2):
             prefix=out/f'run{repetition}'
-            env={k:v for k,v in os.environ.items() if not k.startswith(('ETX_','DSL_ABLATE_'))}
+            env={k:v for k,v in os.environ.items() if not k.startswith(('ETX_','DSL_ABLATE_','GLM_','GLMDBG_'))}
             raw=execute([str((build/'run').resolve()),str(staged.resolve()),str((build/'load.tsv').resolve()),str(prompt.resolve()),str(prefix.resolve())],out/f'run{repetition}.log',env,seconds)
             tag=f'GLM-MODEL-EXECUTED batch={batch} layers={before["config"]["num_hidden_layers"]} generated_each=32; reference comparison required'
             steps=[(pos,gots,ms) for pos,gots,ms in re.findall(r'^GLM-MODEL-STEP pos=(\d+) batch=(\d+)(?: ms=(\S+))?$',raw,re.M)]
@@ -71,9 +75,9 @@ def qualify(staged,build,ref_path,out,seconds=7200,logit_atol=None,gate='product
             rows=[list(map(int,line.split())) for line in prefix.with_suffix('.tokens').read_text().splitlines()]
             if len(rows)!=batch:raise ValueError('missing/duplicate token output rows')
             window=tuple(before['slice']['layers']) if before.get('slice') else None
-            candidate=dict(reference.identity(gate,window),backend='etx-pp2',batch=batch,
+            candidate=dict(reference.identity(gate,window),backend=backend,batch=batch,
                            requests=[dict(prompt_ids=pr,generated_ids=ids) for pr,ids in zip(p,rows)])
-            verdict=oracle.compare(ref,candidate,gate)
+            verdict=oracle.compare(ref,candidate,gate,candidate_backend=backend)
             if verdict['status']!='TOKENS-EQUAL':raise ValueError(f'exact greedy mismatch: {verdict}')
             lf=prefix.with_suffix('.logits')
             if lf.stat().st_size!=hf_logits.stat().st_size:raise ValueError('truncated model logits')
@@ -84,7 +88,7 @@ def qualify(staged,build,ref_path,out,seconds=7200,logit_atol=None,gate='product
             # argmax matches; --logit-atol turns the reported error into a gate.
             # No universal full-checkpoint numerical certificate is invented.
             verdict.update(compare_logits(expected,got,logit_atol),
-                           repetition=repetition,checkpoint_execution='real two-GPU ETX model',model_certified=False)
+                           repetition=repetition,checkpoint_execution=f'real {devices}-GPU ETX model ({backend})',model_certified=False)
             print(f'GLM-LOGIT-GATE {verdict["logit_gate"]} repetition={repetition} max_abs={verdict["logit_max_abs"]:.9g} atol={logit_atol}',flush=True)
             verdicts.append(verdict);prefix.with_suffix('.json').write_text(json.dumps(candidate,indent=2)+'\n')
         if model_build.verified_build(build)!=identity or stage.validate(staged,gate=gate)!=before or {name:stage.file_sha(build/name) for name in required}!=build_hash or {p:stage.file_sha(Path(p)) for p in ref_hash}!=ref_hash:raise ValueError('assets/build/reference changed during qualification')
@@ -109,7 +113,7 @@ def main():
     stage.validate(a.stage,gate=a.gate)
     if a.operation=='build':
         a.out.mkdir(parents=True,exist_ok=False)
-        env={k:v for k,v in os.environ.items() if not k.startswith(('ETX_','DSL_ABLATE_'))}
+        env={k:v for k,v in os.environ.items() if not k.startswith(('ETX_','DSL_ABLATE_','GLM_','GLMDBG_'))}
         command=['bash','examples/glm53/build_model.sh',str(a.stage.resolve()),str(a.build.resolve())]
         if a.options is not None:command+=['--options',str(a.options.resolve())]
         execute(command,a.out/'build.log',dict(env,ETX_GLM_BATCH=str(a.batch),ETX_GLM_GATE=a.gate),1800)

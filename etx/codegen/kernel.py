@@ -89,11 +89,16 @@ def _wait_code(plan: Plan, g: TaskGrid) -> str:
         if _relayed(plan, ep):
             lines.append(f"#define ETX_TARGET(idx) etx_lok &= etx_wait_DEVICE_mirror(p, {ep.offset} + (idx), domain)")
         else:
-            lines.append(f"#define ETX_TARGET(idx) etx_wait_{sc}(p.events + ETX_EVW({ep.offset} + (idx)), p.ctrl_abort)")
+            lines.append(f"#define ETX_TARGET(idx) etx_wait_{sc}({_ev_base(ep)} + ETX_EVW({ep.offset} + (idx)), p.ctrl_abort)")
         lines.append(m.to_c(coord_vars, f"p.ev_shape[{list(plan.events).index(ev)}]", "ETX_TARGET",
                             _runtime_ptrs(plan, g), width, _symbols(plan)).rstrip())
         lines.append("#undef ETX_TARGET")
     return "\n".join(lines)
+
+
+def _ev_base(ep) -> str:
+    """Keep intra-device waits local; SYSTEM words use the optional shared buffer."""
+    return "(p.sys_events ? p.sys_events : p.events)" if ep.scope == Scope.SYSTEM else "p.events"
 
 
 def _arrive_code(plan: Plan, g: TaskGrid, mode: str) -> str:
@@ -114,7 +119,7 @@ def _arrive_code(plan: Plan, g: TaskGrid, mode: str) -> str:
         elif ep.scope == Scope.DEVICE:
             arrive = f"etx_arrive_flush_DEVICE{nf}(p, {ep.offset} + (idx), domain)"
         else:
-            arrive = f"etx_arrive_{sc}(p.events + ETX_EVW({ep.offset} + (idx)))"
+            arrive = f"etx_arrive_{sc}({_ev_base(ep)} + ETX_EVW({ep.offset} + (idx)))"
         if not has_dynamic_consumers:       # the producer's own mode is irrelevant: a static producer must still push dynamic consumers
             lines.append(f"#define ETX_TARGET(idx) (void){arrive}")
         else:
@@ -314,7 +319,7 @@ def emit_kernel(plan: Plan, device: int = 0) -> str:
         for ev, m in g.in_edges.items():
             ep = plan.events[ev]
             width = _gather_width(plan, m.gather_tensor) if m.kind == "gather" else ""
-            out.append(f"#define ETX_TARGET(idx) if (ETX_POLL_{ep.scope.name}(p.events + ETX_EVW({ep.offset} + (idx))) > 0) return false")
+            out.append(f"#define ETX_TARGET(idx) if (ETX_POLL_{ep.scope.name}({_ev_base(ep)} + ETX_EVW({ep.offset} + (idx))) > 0) return false")
             out.append(m.to_c(coord_vars, f"p.ev_shape[{list(plan.events).index(ev)}]", "ETX_TARGET",
                               _runtime_ptrs(plan, g), width, _symbols(plan)).rstrip())
             out.append("#undef ETX_TARGET")
@@ -445,7 +450,7 @@ def emit_kernel(plan: Plan, device: int = 0) -> str:
                 ep = plan.events[ev_name]
                 expr = _runtime_count_c(plan, e.runtime_count)
                 body.append(f"        for (int i = 0; i < p.ev_shape[{list(plan.events).index(ev_name)}][0]; ++i) "
-                            f"p.events[ETX_EVW({ep.offset} + i)] = {expr};   // runtime init of {ev_name}")
+                            f"{_ev_base(ep)}[ETX_EVW({ep.offset} + i)] = {expr};   // runtime init of {ev_name}")
         for ev in g.out_edges:
             ep = plan.events[ev]
             if ep.scope != Scope.DEVICE:                       # DEVICE-scope arrives carry their own (last-arriver) release

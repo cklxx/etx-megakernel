@@ -1,8 +1,8 @@
-"""Validate same-checkpoint HF versus the actual ETX PP2 greedy token records offline.
+"""Validate same-checkpoint HF versus actual ETX multi-GPU greedy records offline.
 
 Token agreement alone does not certify all full-checkpoint operator numerics.
 Record schema: model, revision, config_sha256, batch, mode='greedy',
-speculative=false, backend='hf'/'etx-pp2', requests=[{prompt_ids, generated_ids}].
+speculative=false, backend='hf'/an explicit ETX backend, requests=[{prompt_ids, generated_ids}].
 """
 import argparse
 import json
@@ -10,12 +10,22 @@ from pathlib import Path
 from examples.glm53.prepare import gate_identity, metadata, sha, check_slice
 
 
-def compare(reference, candidate, gate='production'):
+CANDIDATE_BACKENDS=('etx-pp2', 'etx-pp4', 'etx-pp8', 'etx-ffn-tp')
+
+
+def build_backend(options):
+    mode=options.get('parallel',0)
+    return 'etx-ffn-tp' if mode==1 else f'etx-pp{options.get("devices",2)}'
+
+
+def compare(reference, candidate, gate='production', candidate_backend='etx-pp2'):
+    if candidate_backend not in CANDIDATE_BACKENDS:
+        raise ValueError('unsupported ETX candidate backend')
     evidence, model = gate_identity(gate)
     cfg, api = metadata(evidence)
     identity = dict(schema=1, model=model, revision=api['sha'],
                     config_sha256=sha(evidence / 'glm-config.json'), mode='greedy', speculative=False)
-    for record, backend in ((reference, 'hf'), (candidate, 'etx-pp2')):
+    for record, backend in ((reference, 'hf'), (candidate, candidate_backend)):
         if any(record.get(k) != v for k, v in identity.items()) or record.get('backend') != backend:
             raise ValueError('wrong model/revision/config, decode mode or backend')
         if type(record.get('speculative')) is not bool or type(record.get('schema')) is not int:
@@ -34,7 +44,7 @@ def compare(reference, candidate, gate='production'):
         if len(set(prompts)) != b:
             raise ValueError('duplicate request prompt')
     slices = {}
-    for record, backend in ((reference, 'hf'), (candidate, 'etx-pp2')):
+    for record, backend in ((reference, 'hf'), (candidate, candidate_backend)):
         sl = record.get('slice')
         if gate == 'slice':
             if not isinstance(sl, dict):
@@ -43,7 +53,7 @@ def compare(reference, candidate, gate='production'):
         elif sl is not None:
             raise ValueError(f'{backend} record is sliced but the gate is {gate}')
         slices[backend] = sl
-    if slices['hf'] != slices['etx-pp2']:
+    if slices['hf'] != slices[candidate_backend]:
         raise ValueError('reference and candidate slices differ')
     if reference['batch'] != candidate['batch']:
         raise ValueError('batch mismatch')
@@ -55,7 +65,7 @@ def compare(reference, candidate, gate='production'):
     return dict(schema=1, status='TOKENS-EQUAL' if all(n == 32 for n in matched) else 'FAILED',
                 matched_each=matched, required_each=32, model_certified=False,
                 missing_gates=['per-operator numerical/state correctness', 'same-build native model/source identity',
-                               'real two-GPU full model execution'], performance='unmeasured')
+                               'real multi-GPU full model execution'], performance='unmeasured')
 
 
 def main():
@@ -64,9 +74,10 @@ def main():
     ap.add_argument('--candidate', type=Path, required=True)
     ap.add_argument('--out', type=Path, required=True)
     ap.add_argument('--gate', choices=['production', 'module', 'slice'], default='production')
+    ap.add_argument('--candidate-backend', choices=CANDIDATE_BACKENDS, default='etx-pp2')
     a = ap.parse_args()
     try:
-        result = compare(json.loads(a.reference.read_text()), json.loads(a.candidate.read_text()), a.gate)
+        result = compare(json.loads(a.reference.read_text()), json.loads(a.candidate.read_text()), a.gate, a.candidate_backend)
     except (ValueError, KeyError, TypeError) as exc:
         result = dict(schema=1, status='FAILED', error=str(exc), model_certified=False)
     a.out.write_text(json.dumps(result, indent=2) + '\n')

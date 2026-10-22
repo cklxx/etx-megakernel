@@ -44,6 +44,9 @@ struct etx_host {
   int32_t *d_lq_slots = nullptr, *d_lq_head = nullptr, *d_lq_tail = nullptr, *d_gq_slots = nullptr;
   etx_queue* d_local_queues = nullptr;
   bool owns_events = true;
+  // Optional separate SYSTEM-scope buffer (multi-device): every device's p.sys_events points at it; owns_sys resets it.
+  int32_t* sys_events = nullptr;
+  bool owns_sys = false;
   hipStream_t stream = nullptr;
   double last_ms = 0.0;
 
@@ -103,6 +106,7 @@ struct etx_host {
     else d_events = alloc_events(device);
     ETX_CHECK(hipSetDevice(device));
     p.events = d_events;
+    p.sys_events = sys_events ? (etx_event*)sys_events : p.events;
     p.push_index = upload(etx_push_index, sizeof(etx_push_index) / sizeof(int32_t));
     p.push_offsets = upload(etx_push_offsets, sizeof(etx_push_offsets) / sizeof(int32_t));
     p.push_lists = upload(etx_push_lists, sizeof(etx_push_lists) / sizeof(int32_t));
@@ -200,7 +204,8 @@ struct etx_host {
     // The emitter's decision, not an independent one: ETX_EMIT_DEV_RESET comes from plan_data.h, which the same
     // compile produced from the same plan, so the host cannot believe in a tail the kernel does not carry. The env
     // var only turns OFF what was emitted; it can never turn on what was not.
-    dev_reset = ETX_EMIT_DEV_RESET && !(getenv("ETX_DEV_RESET") && !strcmp(getenv("ETX_DEV_RESET"), "0"));
+    // A device tail cannot reset shared SYSTEM words while peer consumers may still run.
+    dev_reset = ETX_EMIT_DEV_RESET && !sys_events && !(getenv("ETX_DEV_RESET") && !strcmp(getenv("ETX_DEV_RESET"), "0"));
     build_reset_ops();
   }
   bool cooperative = true;
@@ -282,6 +287,13 @@ struct etx_host {
       else {                                             // counters at word * ETX_EV_STRIDE (one cache line each)
         if (ev_strided.empty()) { ev_strided.assign((size_t)ETX_EVENT_WORDS * ETX_EV_STRIDE, 0); for (int i = 0; i < ETX_EVENT_WORDS; ++i) ev_strided[(size_t)ETX_EVW(i)] = etx_ev_counts[i]; }
         ETX_CHECK(hipMemcpyAsync(d_events, ev_strided.data(), ev_strided.size() * sizeof(int32_t), hipMemcpyHostToDevice, stream));
+      }
+    }
+    if (owns_sys && sys_events) {                        // same counts layout as the device buffers
+      if (ETX_EV_STRIDE == 1) ETX_CHECK(hipMemcpyAsync(sys_events, etx_ev_counts, ETX_EVENT_WORDS * sizeof(int32_t), hipMemcpyHostToDevice, stream));
+      else {
+        if (ev_strided.empty()) { ev_strided.assign((size_t)ETX_EVENT_WORDS * ETX_EV_STRIDE, 0); for (int i = 0; i < ETX_EVENT_WORDS; ++i) ev_strided[(size_t)ETX_EVW(i)] = etx_ev_counts[i]; }
+        ETX_CHECK(hipMemcpyAsync(sys_events, ev_strided.data(), ev_strided.size() * sizeof(int32_t), hipMemcpyHostToDevice, stream));
       }
     }
     ETX_CHECK(hipMemsetAsync(d_slots, 0, (ETX_N_DOMAINS * 2 + ETX_N_DOMAINS * 256) * sizeof(int32_t), stream));
@@ -530,12 +542,29 @@ struct etx_host {
     ++hp.n;
     return ok;
   }
+  void snapshot_events(std::vector<int32_t>& logical) {
+    ETX_CHECK(hipSetDevice(device));
+    std::vector<int32_t> local((size_t)ETX_EVENT_WORDS * ETX_EV_STRIDE), shared;
+    ETX_CHECK(hipMemcpy(local.data(), d_events, local.size() * sizeof(int32_t), hipMemcpyDeviceToHost));
+    logical.resize(ETX_EVENT_WORDS);
+    for (int i = 0; i < ETX_EVENT_WORDS; ++i) logical[i] = local[(size_t)ETX_EVW(i)];
+    if (sys_events && sys_events != d_events) {
+#if defined(ETX_HAS_EVENT_SCOPE)
+      shared.resize(local.size());
+      ETX_CHECK(hipMemcpy(shared.data(), sys_events, shared.size() * sizeof(int32_t), hipMemcpyDeviceToHost));
+      for (int e = 0; e < ETX_N_EVENTS; ++e) if (etx_ev_system[e]) {
+        int n = 1; for (int d = 0; d < 4; ++d) if (etx_ev_shape[e][d] > 0) n *= etx_ev_shape[e][d];
+        for (int i = 0; i < n; ++i) { int w = etx_ev_offset[e] + i; logical[w] = shared[(size_t)ETX_EVW(w)]; }
+      }
+#else
+      fprintf(stderr, "SYSTEM event snapshot unavailable: regenerate plan_data.h\n");
+#endif
+    }
+  }
   void dump_events() {
     dump_trace();
-    ETX_CHECK(hipSetDevice(device));
-    std::vector<int32_t> evs((size_t)ETX_EVENT_WORDS * ETX_EV_STRIDE), ev(ETX_EVENT_WORDS);
-    ETX_CHECK(hipMemcpy(evs.data(), d_events, evs.size() * sizeof(int32_t), hipMemcpyDeviceToHost));
-    for (int i = 0; i < ETX_EVENT_WORDS; ++i) ev[i] = evs[(size_t)ETX_EVW(i)];
+    std::vector<int32_t> ev;
+    snapshot_events(ev);
     int shown = 0;
     for (int e = 0; e < ETX_N_EVENTS; ++e) {
       int n = 1; for (int d = 0; d < 4; ++d) if (etx_ev_shape[e][d] > 0) n *= etx_ev_shape[e][d];
@@ -588,9 +617,8 @@ struct etx_host {
     write_words(etx_arrival_offsets, (size_t)ETX_N_TASKS + 1);
     write_words(etx_arrival_words, ETX_ARRIVAL_SLOTS);
     write(d_arrival_stamps, (size_t)ETX_ARRIVAL_SLOTS * 2);
-    std::vector<int32_t> counters((size_t)ETX_EVENT_WORDS * ETX_EV_STRIDE), logical(ETX_EVENT_WORDS);
-    ETX_CHECK(hipMemcpy(counters.data(), d_events, counters.size() * sizeof(int32_t), hipMemcpyDeviceToHost));
-    for (int i = 0; i < ETX_EVENT_WORDS; ++i) logical[i] = counters[(size_t)ETX_EVW(i)];
+    std::vector<int32_t> logical;
+    snapshot_events(logical);
     write_words(logical.data(), logical.size());
     std::vector<int32_t> sub((size_t)ETX_N_DOMAINS * ETX_EVENT_WORDS);
     ETX_CHECK(hipMemcpy(sub.data(), d_ev_sub, sub.size() * sizeof(int32_t), hipMemcpyDeviceToHost));

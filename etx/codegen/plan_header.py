@@ -98,13 +98,15 @@ def emit_plan_header(plan: Plan, device: int = 0) -> str:
     out.append(_arr("etx_static_queue", sq, dims="ETX_STATIC_LEN"))
     out.append(_arr("etx_static_begin", begin, dims="ETX_N_DEVICES * ETX_N_WORKERS"))
     out.append(_arr("etx_static_end", end, dims="ETX_N_DEVICES * ETX_N_WORKERS"))
-    # events (one shared buffer)
+    # Event layout is common to the device-local and optional shared SYSTEM buffers.
     evs = list(plan.events.values())
     out.append(f"#define ETX_N_EVENTS {len(evs)}")
     total_words = sum(e.numel for e in evs)
     out.append(f"#define ETX_EVENT_WORDS {max(1, total_words)}")
     out.append(f"#define ETX_EVENTS_FINE_GRAINED {int(any(e.memory == 'fine_grained' or e.scope == Scope.SYSTEM for e in evs))}")
     out.append(_arr("etx_ev_offset", [e.offset for e in evs]))
+    out.append("#define ETX_HAS_EVENT_SCOPE 1")
+    out.append(_arr("etx_ev_system", [int(e.scope == Scope.SYSTEM) for e in evs]))
     shapes = []
     for e in evs:
         s = list(e.shape) + [0] * (4 - len(e.shape))
