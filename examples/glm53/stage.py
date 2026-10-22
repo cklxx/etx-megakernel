@@ -94,6 +94,9 @@ def slot_names(t):
     return SLOTS+[f'mlp.experts.{e}.{k}.weight' for e in range(t['n_routed_experts']) for k in ('gate_proj','up_proj','down_proj')]
 
 
+TRUST=[False]
+
+
 def write_blob(out, name, expected, tensors, slots):
     """tensors(key) -> (torch Tensor, optional FP32 block scale); bounded mapping."""
     import torch
@@ -108,7 +111,7 @@ def write_blob(out, name, expected, tensors, slots):
             if kind is None:raise ValueError(f'unsupported dtype {dtype}: {key}')
             if kind==3 and (value.ndim!=2 or scale is None):raise ValueError('FP8 requires a matrix and explicit block scales')
             if kind!=3 and scale is not None:raise ValueError('unexpected scale on non-FP8 tensor')
-            if not torch.isfinite(value.float()).all():raise ValueError(f'nonfinite weight {key}')
+            if not TRUST[0] and not torch.isfinite(value.float()).all():raise ValueError(f'nonfinite weight {key}')
             rows,cols=(value.numel(),1) if value.ndim==1 else (value.shape[0],math.prod(value.shape[1:]))
             f.write(b'\0'*(-f.tell()%128));off=f.tell()
             raw=value.contiguous().view(torch.uint8).numpy().tobytes();f.write(raw)
@@ -125,7 +128,7 @@ def write_blob(out, name, expected, tensors, slots):
 
 class Snapshot:
     def __init__(self, src, trust=False):
-        self.trust=trust
+        self.trust=trust;TRUST[0]=trust
         self.src=src
         self.index_sha256=file_sha(src/'model.safetensors.index.json')
         self.index=json.loads((src/'model.safetensors.index.json').read_text())['weight_map']

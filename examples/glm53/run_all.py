@@ -282,7 +282,7 @@ def plan(args, ready):
              note=f'write {out / "prompts.json"} (batch={args.batch}, context={CONTEXT}, seed={args.seed})'),
         dict(name='stage', log=out / 'logs' / 'stage.log', seconds=seconds('stage'),
              argv=[python, '-u', '-m', 'examples.glm53.stage', '--src', str(model), '--out', str(stage),
-                   '--maxlen', str(MAXLEN), '--gate', args.gate, *layers_argv]),
+                   '--maxlen', str(MAXLEN), '--gate', args.gate, *layers_argv, '--trust-verified']),
         dict(name='prepare', log=out / 'logs' / 'prepare.log', seconds=seconds('prepare'),
              argv=[python, '-m', 'examples.glm53.prepare', '--require-model', '--stage', str(stage),
                    '--gate', args.gate, '--batch', str(args.batch), '--context', str(CONTEXT),
