@@ -115,6 +115,37 @@ def test_oracle_rejects_wrong_identity_and_incomplete_requests(mutation):
         oracle.compare(token_record(), candidate)
 
 
+@pytest.mark.parametrize('backend', ['etx-pp2','etx-pp4','etx-pp8','etx-ffn-tp','etx-ep','etx-tp','etx-head-tp-ep'])
+@pytest.mark.parametrize('batch', [1,2,4,8])
+def test_oracle_requires_explicit_parallel_backend(backend,batch):
+    r,c=token_record(batch=batch),token_record(backend,batch=batch)
+    verdict=oracle.compare(r,c,candidate_backend=backend)
+    assert verdict['status']=='TOKENS-EQUAL' and not verdict['model_certified']
+    assert verdict['matched_each']==[32]*batch
+    if backend!='etx-pp2':
+        with pytest.raises(ValueError,match='backend'):oracle.compare(r,c)
+    with pytest.raises(ValueError,match='unsupported'):oracle.compare(r,c,candidate_backend='etx-unknown')
+
+
+@pytest.mark.parametrize('backend', ['etx-ffn-tp','etx-ep','etx-tp','etx-head-tp-ep'])
+@pytest.mark.parametrize('batch', [2,4,8])
+def test_parallel_oracle_checks_every_request_not_only_request_zero(backend,batch):
+    reference=token_record(batch=batch)
+    candidate=token_record(backend,batch=batch)
+    candidate['requests'][-1]['generated_ids'][-1]=77
+    verdict=oracle.compare(reference,candidate,candidate_backend=backend)
+    assert verdict['status']=='FAILED'
+    assert verdict['matched_each']==[32]*(batch-1)+[31]
+
+
+def test_backend_label_distinguishes_head_tp_from_ffn_only():
+    assert oracle.build_backend(dict(parallel=1,attention_tp=0))=='etx-ffn-tp'
+    assert oracle.build_backend(dict(parallel=1,attention_tp=1))=='etx-tp'
+    assert oracle.build_backend(dict(parallel=2,attention_tp=0))=='etx-ep'
+    assert oracle.build_backend(dict(parallel=2,attention_tp=1))=='etx-head-tp-ep'
+    with pytest.raises(ValueError):oracle.build_backend(dict(parallel=0,attention_tp=1))
+
+
 def test_transport_session_preserves_two_visible_devices():
     jobs, limit = load_session(prepare.ROOT / 'examples/sessions/glm53_boundary.py')
     assert limit == 300 and len(jobs) == 2
