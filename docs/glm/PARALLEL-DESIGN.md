@@ -12,7 +12,7 @@
 | 2 Configuration | [C2](#c2) | Pinned revision, layer counts, tensor dimensions and mixed-precision checkpoint bytes | 8 assertions; 328250014584 bytes [E] | Stop; reconcile the pinned configuration | 0 |
 | 3 Analysis | [C3](#c3) | Opens the preserved comparison, capacity, critical-path and evolution reference for cc-o55 review | U (unverified): review acceptance has not been recorded | Record rejected claim and source line; do not substitute a GPU result | 0 |
 | 4 Local contracts | [C4](#c4) | GLM contracts and ownership checks; not GPU qualification | 232 passed; 17 skipped in the recorded local run | Stop on failures; report skips without treating them as passes | 0 |
-| 5 S0 PP2 | U (unverified): no qualified MI325X execution command is recorded here | Release-checkpoint slice and full-model PP2 correctness; rank memory fit and host-wall timing | U (unverified): 32/32 tokens per request at B1/2/4/8 is the target [E] | Stop GPU qualification; retain logs and the PP2 baseline | U (unverified): no measured runtime |
+| 5 S0 PP2 | U (unverified): no qualified MI325X execution command is recorded here | Full-model PP2 correctness; rank memory fit and host-wall timing | U (unverified): 32/32 tokens per request at B1/2/4/8 is the target [E] | Stop GPU qualification; retain logs and the PP2 baseline | U (unverified): no measured runtime |
 | 6 S1 Rank parallelism | U (unverified): tile decomposition is not implemented | Same-numerics compute scaling within a rank; exact weight, state and workspace ownership | U (unverified): paired compute and memory measurements are missing | Retain whole-layer tiles; reject peak-bandwidth division as evidence | U (unverified): no measured runtime |
 | 7 S2 Collective gate | U (unverified): production-shaped collective benchmark is missing | Completed-transfer all-reduce and sparse all-to-all progress under concurrent compute on four GPUs | U (unverified): latency, bandwidth, skew and tail measurements are missing | Block S4; do not substitute the historical two-GPU seam | U (unverified): no measured runtime |
 | 8 S3 Pipeline capacity | U (unverified): arbitrary PP rank support is not implemented | PP2/4/8 layer ownership, memory fit, token feedback and independent-request overlap | U (unverified): numerical and pipeline-bubble measurements are missing | Retain PP2; reject same-request next-token overlap | U (unverified): no measured runtime |
@@ -27,7 +27,7 @@
 | C1 and C4 | Existing `.venv/bin/python` with pytest; stop on a missing interpreter |
 | C2 and C3 | `python3` available; C3 reads `docs/glm/PARALLEL-ANALYSIS.md`, the preserved reference, not this checklist |
 | Evidence | [E] means estimate; U (unverified) means missing evidence; target counts are not observed passes |
-| Terminology | slice means the contiguous release-checkpoint layer subset; PP means pipeline parallelism; TP means tensor parallelism; EP means expert parallelism; SP means sequence parallelism; DP means data parallelism |
+| Terminology | PP means pipeline parallelism; TP means tensor parallelism; EP means expert parallelism; SP means sequence parallelism; DP means data parallelism |
 | Recorded skips | 6 tests require accelerate; 11 tests require local gfx942 clang, ROCm headers and device libraries |
 | Recorded baseline failures | Two focused DeepSeek kernel-hash tests fail identically before and after the ownership move; expected hashes remain unchanged |
 | S0 | Exactly two visible GPUs; pinned release checkpoint; reference comparison; explicit GPU authorization and budget |

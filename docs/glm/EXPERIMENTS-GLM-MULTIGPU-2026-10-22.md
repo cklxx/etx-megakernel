@@ -52,7 +52,7 @@ with a dirty L2 costs 2.9x more than a clean one.
 |---|---|---|---|---|---|
 | E0 | fabric baseline: one-way flag latency between two cards, idle and under load | `/root/runs/calib/p2p_sync` | one-way under 2 us idle, under 4 us loaded | 3 | built today |
 | E1 | barrier cost inside a persistent kernel, 304 workgroups | `/root/runs/calib/sync_bench barrier` | median under 10 us, matches the 8.6 us in `docs/core/RESEARCH-sync-hardware.md` | 3 | built today |
-| E2 | PP2 step time, slice window, batch 1 to 8 | `python -m examples.glm53.bench --stage ... --build ... --reference ... --seconds 300` | median step time per batch, gate state recorded | 6 | running |
+| E2 | PP2 step time, batch 1 to 8 | `python -m examples.glm53.bench --stage ... --build ... --reference ... --seconds 300` | median step time per batch, gate state recorded | 6 | running |
 | E3 | PP2 step time, full 45 layers | needs the full gate implemented in `prepare.py`, `stage.py`, `bench.py` | step time and tok/s at B1 and B8 | 25 | MISSING |
 | E4 | PP4 handoff cost | needs the 4-card path in `model_host.hip` and `run_all.py` | added latency per extra handoff | 20 | MISSING |
 | E5 | TP2 all-reduce cost | needs a TP path | 90 all-reduces under 0.5 ms total | 30 | MISSING |
@@ -74,8 +74,8 @@ So the choice order is PP2, then PP4, then TP, then EP.
 TP is only justified when the weights no longer fit, and then the 0.99 ms is the
 price to pay per step.
 
-The measured bottleneck is elsewhere: a 4-layer slice takes 5.9 s per step, and the
-cause is single-workgroup weight streaming, not the fabric.
+The measured bottleneck is elsewhere: the per-layer single-workgroup weight
+streaming dominates, not the fabric.
 
 ## 5. How the baseline is defined
 
@@ -91,14 +91,14 @@ It is never quoted as a baseline.
 ## 5. Order for the next hour
 
 1. E0, E1: fabric numbers, 6 minutes total, already built.
-2. E2: PP2 slice step time for batch 1, 2, 4, 8, 6 minutes per batch.
+2. E2: PP2 step time for batch 1, 2, 4, 8, 6 minutes per batch.
 3. Report: the fabric numbers, the per-batch step times with gate state, and the
    written cost of E3 to E6 with their code gaps.
 
 ## 6. Known gaps that block a full-model baseline
 
-`prepare.py:24` knows two gates only, `production` and `slice`; there is no `full`.
-`run_all.py:279-306` hardcodes `--gate slice` in every step.
+`prepare.py` knows the `production` qualification gate only; a full model run is
+still the missing gate. `run_all.py` passes no full-model gate in its steps.
 `run_all.py:283` hardcodes `--gpu-gib 192`; MI325X needs 256.
 `model_host.hip:19` exits unless the card count is 2.
 

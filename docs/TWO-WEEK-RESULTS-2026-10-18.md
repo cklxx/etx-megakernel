@@ -70,7 +70,6 @@ counts, and a task-level ordered dependency chain.
 - Fixture correctness: **480/480** exact greedy tokens on a synthetic 4-layer,
   small-dimension checkpoint [M]. This is the correctness floor only.
 - Real weights: never ran [U].
-- 4-layer slice, ~29 GB, `--layers 4`, ~30 min of GPU: prepared, not run [U].
 - Full 45 layers: 305.71 GiB payload, 163.96 GiB/rank, needs 2 GPUs; the single
   box could not stage it (610 GB peak against 501 GB free) [U].
 

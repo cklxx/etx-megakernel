@@ -207,10 +207,10 @@ qualify the candidate explicitly, retaining the same options:
 
 ```bash
 .venv/bin/python -m examples.glm53.run build --stage "$STAGE" --build "$NEW_BUILD" \
-  --out "$NEW_BUILD_LOG" --batch "$BATCH" --gate slice --options "$OPTIONS_JSON"
+  --out "$NEW_BUILD_LOG" --batch "$BATCH" --gate production --options "$OPTIONS_JSON"
 # Qualification/bench use this existing build; options are in its hashed identity.
 .venv/bin/python -m examples.glm53.run qualify --stage "$STAGE" --build "$NEW_BUILD" \
-  --reference "$REFERENCE" --out "$NEW_QUALIFICATION" --gate slice
+  --reference "$REFERENCE" --out "$NEW_QUALIFICATION" --gate production
 ```
 
 `build-options.json` and `glm53_options.h` are included in the build identity;
@@ -228,7 +228,7 @@ Budget [E]: 36 survivors × 2 min = 72 min plus 20 min setup ≈ 1.5 h ≈ **$3 
 $1.99/h**, paid once in the same session as another measurement.
 
 **Measured selection blocked:** the oracle implementation exists, but no
-real-weight slice has passed it. Compiler-only enumeration below does not
+real-weight full-model run has passed it. Compiler-only enumeration below does not
 execute or rank candidates by runtime. Neither an estimated phase model nor a
 successful compile establishes a winning GLM configuration.
 
@@ -237,39 +237,22 @@ successful compile establishes a winning GLM configuration.
 **Status.** Fixture correctness is 480/480 exact greedy tokens on a synthetic
 4-layer, small-dimension checkpoint [M]. Real weights have **never run** [U]
 (`docs/TWO-WEEK-RESULTS-2026-10-18.md:68-72`); the only plan on record is a
-4-layer slice, ~29 GB, ~30 min of GPU, not run (`...:73`). This section fixes
+full-model run, not executed (`...:73`). This section fixes
 that build and makes it the gate every later change must pass.
 
 **Independent acceptance blocker, not waived by the new tooling:** the
 existing `run.compare_logits` reports absolute logit error and only optionally
 enforces an absolute tolerance. It does not yet enforce §8's cosine and
 relative-error thresholds, and the existing `bench.py` accepts token equality.
-Until those numerical checks are implemented and the same-build weighted
-slice passes, neither a compiler survivor nor a `BENCH PASS` line establishes
+Until those numerical checks are implemented and the same-build full-model run passes, neither a compiler survivor nor a `BENCH PASS` line establishes
 the numerical certificate specified here. The old model session also still
-needs slice/bench integration; the standalone seam session does not fix that.
+needs bench integration; the standalone seam session does not fix that.
 
-**Slice.** Four *sparse* layers, indices 22–25: ~29.0 GB of FP8 expert payload
-(4 × 7.25 GB) plus embedding [E], matching the recorded ~29 GB. Their types are
-K, M, K, K (KDA, sparse MLA, KDA, KDA), so both attention kinds appear; the
-layer-23/24 split reproduces the real PP2 boundary (22–23 on rank 0, 24–25 on
-rank 1), so this one slice exercises **both ranks and the seam**. A prefix of
-layers 0–3 would be ~9 GB and would stay on rank 0; it is a second choice only
-if the dense-MLP path must be covered.
-
-**The slice is a code change first — implemented 2026-10-19.** `prepare.py`
-gains a `slice` gate next to `production`/`module` over the same pinned release
-evidence, plus `parse_layers`, `check_slice` and `slice_config`; the derived
-four-layer config (same hidden/expert dims, four layer types) and the source
-window are recorded in `stage.json` and in the reference record, and
-`oracle.compare` refuses reference/candidate pairs whose windows differ.
-`stage.py:238-240` and `reference.py:168-171` take `--layers 22-25 --gate
-slice`, `run.py` builds and qualifies with the same gate, and both the stager
-and the reference **refuse any window that does not straddle the PP2 split at
-layers 23/24** (`prepare.py:check_slice`). The reference hashes the derived
-snapshot's `config.json`, index and every shard before HF loads it, rechecks
-them after the run, and records them in its provenance
-(`reference.py:snapshot_hashes`). Tests: `tests/test_glm53_slice.py`, CPU only.
+**Full-model gate.** The qualification target is the complete 45-layer release
+checkpoint on the MI325X pair: full model, both attention kinds, both ranks, and
+the layer-23/24 PP2 boundary all exercised in one run. No partial-layer run is
+accepted as its substitute, and no number from a partial run is quoted as
+evidence.
 
 **Box command.** One runner does the whole oracle: staging, HF reference,
 candidate build and run, comparison, certificate. `examples/glm53/run_all.py`
@@ -316,7 +299,7 @@ because that is the number that says how much of the possible remains.
   table; KV/KDA state is read once per request per token, with the compiled
   MLA state scaled from `MAXLEN` to the certificate's context and assumed FP32
   (4 bytes per element, as `prepare.budget` already does). Layer and state
-  sizes come from `stage.json` descriptors, so a slice change moves the budget
+  sizes come from `stage.json` descriptors, so a layer-count change moves the budget
   with it.
 - **The floor** is those bytes divided by the achievable rate:
   `floor_ms_per_token = kernel_bytes_per_token / (bandwidth_TB/s × 10^12) ×
@@ -336,7 +319,7 @@ because that is the number that says how much of the possible remains.
   result says so on its own line rather than hiding in an efficiency ratio.
 - **Mono does not exist:** GLM-5.3 mono on gfx942 does not exist as of
   2026-10-20. Every certificate records that string as
-  `mono_gfx942_availability`, so no reader can mistake a PP2 slice number for a
+  `mono_gfx942_availability`, so no reader can mistake a two-rank number for a
   single-GPU one.
 
 The runner applies the rule after `bench.py` writes a `PASS` certificate: it
@@ -346,8 +329,7 @@ the mono note). `bench.py` itself is unchanged; the annotation is the runner's.
 
 **What each path produces.** `$OUT/prompts.json`; `$OUT/stage/stage.json` and
 `$OUT/prepare.json` (staged identity validated); `$OUT/reference.json`,
-`$OUT/reference.logits`, `$OUT/reference.json.slice/` (the derived snapshot HF
-loaded, with its hashes in provenance); `$OUT/logs/*.log` and
+`$OUT/reference.logits`, `$OUT/reference.json` (the staged identity HF loaded, with its hashes in provenance); `$OUT/logs/*.log` and
 `$OUT/build-log/build.log`; `$OUT/qualification/qualification.json`,
 `run0.json`, `run1.json` and their `.tokens`/`.logits`; `$OUT/oracle-run0.json`
 and `oracle-run1.json`; and the certificate
@@ -390,7 +372,7 @@ receipt, not the token count alone (`run.py:93-94`).
 **Gate rule.** No timing number, tile change or schedule change is accepted
 until this oracle passes on the same build identity. The full 45-layer,
 2-GPU qualification (`docs/qwen/QWEN-BATCH-GLM53.md:190-214`) stays the end-to-end
-gate; this slice is its affordable predecessor, not a replacement.
+gate; no partial-layer run replaces it.
 
 ## 7. PP2 boundary cost
 
@@ -480,7 +462,7 @@ at the output, fixed now:
    `docs/deepseek/NEXT-GPU-2026-10-15.md:75`), applied per generated position.
 3. **Per-layer cosine ≥ 0.9999** when a layer-level oracle exists — the Qwen
    numpy reference's per-layer precedent (`docs/qwen/PLAN-moe-en.md:83`) —
-   reported from the slice's per-layer comparisons, not required at every
+   reported from the per-layer comparisons, not required at every
    optimisation step.
 
 All three apply simultaneously, in both repetitions. Token equality alone is
@@ -539,7 +521,7 @@ contract:
   log without `ms=`, a missing/duplicated step, a non-finite sample, a changed
   identity or a receipt that is not `TOKENS-EQUAL`. It takes `--stage`,
   `--build`, `--reference`, `--out`, `--gate`; it writes `bench_result.json`
-  under `--out`. Tests: `tests/test_glm53_slice.py`. No device code and no
+  under `--out`. Tests: the GLM contract tests. No device code and no
   timing in this document.
 
 A timing number from any other source is not accepted by this design.
