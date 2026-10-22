@@ -552,3 +552,36 @@ def test_attention_tp_flag_requires_bool(value):
     spec, _ = make_spec()
     with pytest.raises(ValueError, match='attention_tp'):
         parallel_layout.derive(spec, 'tp', 2, attention_tp=value)
+
+
+@pytest.fixture(scope='module')
+def compile_only_spec():
+    from examples.glm53 import model_build
+    return model_build.production_compile_spec()
+
+
+@pytest.mark.parametrize('mode', ['tp', 'ep'])
+@pytest.mark.parametrize('devices', [2, 4, 8])
+@pytest.mark.parametrize('attention', [False, True])
+def test_weights_free_production_spec_derives_every_parallel_layout(compile_only_spec, mode, devices, attention):
+    # The no-stage preflight path: descriptors exist without payload files.
+    spec = compile_only_spec
+    assert all(w['tensors'] for w in spec['weights'].values())
+    result = parallel_layout.derive(spec, mode, devices, attention_tp=attention)
+    assert result['ranges'] and len(result['rank_memory']) == devices
+    assert all(r['blob_bytes'] > 0 for r in result['rank_memory'])
+    assert ('attention_head_ranges' in result) == attention
+
+
+def test_compile_only_descriptors_follow_stage_alignment_and_release_dtypes(compile_only_spec):
+    from examples.glm53.module_gate import storage
+    t = compile_only_spec['config']
+    for i in range(t['num_hidden_layers']):
+        w = compile_only_spec['weights'][f'l{i}']
+        assert set(w['tensors']) == set(stage.shapes(t, i))
+        assert w['meta_bytes'] == 32 * len(stage.slot_names(t))
+        for key, tensor in w['tensors'].items():
+            assert tensor['offset'] % 128 == 0 and tensor['scale_offset'] % 4 == 0
+            want = {'F8_E4M3': 'torch.float8_e4m3fn', 'BF16': 'torch.bfloat16', 'F32': 'torch.float32'}
+            assert tensor['dtype'] == want[storage(t['layer_types'][i], key, tuple(tensor['shape']))]
+            assert (tensor['scale_offset'] > 0) == (tensor['dtype'] == 'torch.float8_e4m3fn')

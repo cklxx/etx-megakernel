@@ -1,6 +1,7 @@
 """Generate GLM PP / FFN TP / EP plans and their exact weight-load contracts."""
 import argparse
 import json
+import math
 from pathlib import Path
 from etx.codegen import emit_kernel,emit_lowering_header,emit_plan_json
 from etx.codegen.plan_header import emit_plan_header
@@ -79,13 +80,35 @@ def main():
 
 
 
+_STORAGE={'F8_E4M3':('torch.float8_e4m3fn',1),'BF16':('torch.bfloat16',2),'F32':('torch.float32',4)}
+
+
+def compile_descriptors(name,shapes,slots,kinds):
+    """Tensor records laid out exactly as stage.write_blob would (128 B payload alignment,
+    4 B-aligned FP32 128x128 block scales after FP8 matrices), without any payload."""
+    end=0;tensors={}
+    for key in slots:
+        if key not in shapes:continue
+        shape=shapes[key];dtype,size=_STORAGE[kinds(key,shape)]
+        rows,cols=(math.prod(shape),1) if len(shape)==1 else (shape[0],math.prod(shape[1:]))
+        off=end+(-end%128);end=off+rows*cols*size;scale=0
+        if dtype=='torch.float8_e4m3fn':
+            scale=end+(-end%4);end=scale+4*((rows+127)//128)*((cols+127)//128)
+        tensors[key]=dict(shape=list(shape),dtype=dtype,offset=off,scale_offset=scale)
+    return dict(blob_bytes=end,meta_bytes=32*len(slots),blob=name+'.bin',meta=name+'.meta',tensors=tensors)
+
+
 def production_compile_spec(maxlen=1072):
-    """Full pinned shape, without weight files. Code generation only, never runnable."""
+    """Full pinned shape and descriptors, without weight files. Code generation only, never runnable.
+    Dtypes follow the release storage rule (module_gate.storage); TP/EP layouts derive from these."""
     from examples.glm53.prepare import metadata,partition,MODEL,EVIDENCE,sha
-    cfg,api=metadata();t=cfg['text_config'];weights={}
+    from examples.glm53.module_gate import storage
+    cfg,api=metadata();t=cfg['text_config'];weights={};slots=stage.slot_names(t)
     for i in range(t['num_hidden_layers']):
-        weights[f'l{i}']=dict(blob_bytes=1,meta_bytes=32*len(stage.slot_names(t)),blob=f'l{i}.bin',meta=f'l{i}.meta')
-    for name in ('embedding','norm','head'):weights[name]=dict(blob_bytes=1,meta_bytes=32,blob=name+'.bin',meta=name+'.meta')
+        weights[f'l{i}']=compile_descriptors(f'l{i}',stage.shapes(t,i),slots,lambda key,shape,i=i:storage(t['layer_types'][i],key,shape))
+    h,vocab=t['hidden_size'],t['vocab_size']
+    for name,key,shape in (('embedding','model.embed_tokens.weight',(vocab,h)),('norm','model.norm.weight',(h,)),('head','lm_head.weight',(vocab,h))):
+        weights[name]=compile_descriptors(name,{key:shape},[key],lambda key,shape:'BF16')
     return dict(schema=1,model=MODEL,revision=api['sha'],config_sha256=sha(EVIDENCE/'glm-config.json'),
                 fixture=True,compile_only=True,config=t,dimensions=stage.dimensions(t,maxlen),ranks=partition(t),weights=weights)
 
