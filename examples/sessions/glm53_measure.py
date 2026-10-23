@@ -1,56 +1,63 @@
-"""GLM-5.3 launchable build and T10 measurement on one 2x MI300X/MI325X VM (world 2, batch 1).
+"""GLM-5.3 Phase 1 (/tmp/o55-lead/O55-GOAL.md): single stream, batch 1, one replica on 8x MI325X.
 
-Order (docs/glm/PARALLEL-MEASUREMENT-PLAN-2026-10-22.md): environment and capacity checks, the
-pinned checkpoint, staging, prompts and the HF reference (host Python with torch), then the PP2
-reference build and its certificate, then each candidate arm, then five interleaved,
-counterbalanced reference/candidate bench pairs per arm, judged by examples.glm53.pairs with the
-frozen keep/drop rule.
+Arms, in order: EP8 (parallel=2), headTP+EP8 (parallel=2, attention_tp=1), TP8 (parallel=1), all
+devices=8. Pipeline parallelism is not built or run at batch 1.
 
-Every build, qualification and bench runs inside the ROCm 7.2.4 image (examples/glm53/rocm724.sh),
-so the compiler that keeps 2 waves/SIMD and the HIP runtime the binary links (libamdhip64.so.7) are
-the same whatever ROCm the host has; build_model.sh refuses a non-resident binary
-(examples.glm53.residency). This path was rehearsed without a GPU on the module-gate stage: build,
-link, GLM-RESIDENCY PASS 608/608, GPU-LINKED identity, and bench up to hipGetDeviceCount.
-Every timed run is serial (each bench reads the previous one); nothing overlaps a timed run.
+Order: environment and capacity checks, the pinned checkpoint, staging, prompts and the HF reference
+(host Python with torch), then per arm: build (refused unless GLM-RESIDENCY PASS) and its certificate
+run, which is the full-model HF greedy 32/32 gate with all 32 logits. No timing from an arm is quoted
+unless its certificate shows CORRECTNESS 32/32.
+
+Paired T10 timing (examples.glm53.pairs) runs only when GLM_REFERENCE names the comparator arm: the
+goal does not name a batch-1 comparator, so none is assumed. Without it the session ends after the
+certificates.
+
+Every build, qualification and bench runs inside the ROCm 7.2.4 image (examples/glm53/rocm724.sh);
+the same three arms compiled, linked and passed residency 608/608 on the desktop with that toolchain.
+Every timed run is serial; nothing overlaps a timed run.
 
 Environment:
   GLM_MODEL_ROOT   checkpoint directory (downloaded here if absent; ~305 GiB)
-  GLM_ARMS         comma list of candidate arms (default ffn-tp2,ep2,pp2-up-balanced)
-  GLM_MAX_MEMORY   HF reference device map (default 170 GiB per MI300X GPU + 400 GiB CPU)
-  GLM_PAIRS        interleaved pairs per arm (default 5)
-  GLM_GPU_GIB      per-GPU capacity for the plan check (default 192, MI300X; 256 on MI325X)
+  GLM_ARMS         comma list, run in this order (default ep8,head-tp-ep8,tp8)
+  GLM_REFERENCE    comparator arm for T10 pairs (default unset: certificates only)
+  GLM_MAX_MEMORY   HF reference device map (default 230 GiB on each of 8 GPUs + 400 GiB CPU)
+  GLM_PAIRS        interleaved pairs per candidate arm (default 5)
+  GLM_GPU_GIB      per-GPU capacity for the plan check (default 256, MI325X)
   ETX_ROCM_BASE    base image for rocm724.sh (default rocm/dev-ubuntu-22.04:7.2.4)
 
-Estimated GPU-VM time (not measured): image 0.2 h, download 1 h, stage 1-2 h, HF reference 2-6 h,
-PP2 build and certificate 0.5 h, three arm builds 0.5 h, 3 x 10 benches at about 5 min each 2.5 h:
-8-13 h. MAX_SESSION_SECONDS caps the whole session at 14 h. Delete the VM when the runner ends.
+Estimated GPU-VM time (not measured): image 0.2 h, download 1 h, stage 1-2 h, HF reference 1-4 h,
+three builds 0.5 h, three certificates 0.5 h; with GLM_REFERENCE, 2 x 10 benches at about 5 min
+each 1.7 h: 4-10 h. MAX_SESSION_SECONDS caps the session at 12 h. Delete the VM when the runner ends.
 """
 import json
 import os
 import shlex
 
-ARMS = {  # name -> Options fields (world 2, B1); the PP2 reference uses the measured default.
-    'ffn-tp2': dict(devices=2, parallel=1),
-    'ep2': dict(devices=2, parallel=2),
-    'pp2-up-balanced': dict(devices=2, up_tail_balance=1),
+ARMS = {  # name -> Options fields (one 8-card replica, B1)
+    'ep8': dict(devices=8, parallel=2),
+    'head-tp-ep8': dict(devices=8, parallel=2, attention_tp=1),
+    'tp8': dict(devices=8, parallel=1),
 }
-arms = [a for a in os.environ.get('GLM_ARMS', 'ffn-tp2,ep2,pp2-up-balanced').split(',') if a]
-unknown = [a for a in arms if a not in ARMS]
+arms = [a for a in os.environ.get('GLM_ARMS', 'ep8,head-tp-ep8,tp8').split(',') if a]
+reference_arm = os.environ.get('GLM_REFERENCE', '')
+unknown = [a for a in arms + ([reference_arm] if reference_arm else []) if a not in ARMS]
 if unknown:
     raise ValueError(f'unknown GLM arms {unknown}; known: {sorted(ARMS)}')
+if reference_arm and reference_arm not in arms:
+    raise ValueError(f'GLM_REFERENCE {reference_arm} must be one of GLM_ARMS {arms}')
 PAIRS = int(os.environ.get('GLM_PAIRS', '5'))
 if PAIRS < 1:
     raise ValueError('GLM_PAIRS must be positive')
-MAX_SESSION_SECONDS = 14 * 3600
-gpu_gib = float(os.environ.get('GLM_GPU_GIB', '192'))
+MAX_SESSION_SECONDS = 12 * 3600
+gpu_gib = float(os.environ.get('GLM_GPU_GIB', '256'))
 model = shlex.quote(os.environ.get('GLM_MODEL_ROOT', os.path.expanduser('~/glm53-model')))
-memory = shlex.quote(os.environ.get('GLM_MAX_MEMORY', '{"0":"170GiB","1":"170GiB","cpu":"400GiB"}'))
+memory = shlex.quote(os.environ.get('GLM_MAX_MEMORY', json.dumps({**{str(i): '230GiB' for i in range(8)}, 'cpu': '400GiB'})))
 PY = '.venv/bin/python -u'
 LOG = '"$ETX_SESS_LOGDIR"'
 STAGE = f'{LOG}/stage'
 PROMPTS = f'{LOG}/prompts.json'
 REFERENCE = f'{LOG}/reference.json'
-TWO = {'HIP_VISIBLE_DEVICES': '0,1'}
+EIGHT = {'HIP_VISIBLE_DEVICES': '0,1,2,3,4,5,6,7'}
 IMAGE = f'bash examples/glm53/rocm724.sh {LOG} --'          # build/run inside the ROCm 7.2.4 image
 
 
@@ -71,10 +78,10 @@ JOBS = [
     dict(name='image', lane='cpu', reads='apt', timeout=1800, quiet_s=600,
          cmd=f"mkdir -p {LOG} && {IMAGE} hipcc --version | tee {LOG}/image-hipcc.txt && grep -q 'roc-7.2.4' {LOG}/image-hipcc.txt",
          writes=['image-hipcc.txt'], summary=[r'clang version']),
-    dict(name='preflight', lane='cpu', reads=['etx_env', 'image'], timeout=300, env=TWO,
+    dict(name='preflight', lane='cpu', reads=['etx_env', 'image'], timeout=300, env=EIGHT,
          cmd="rocm-smi --showproductname --showmeminfo vram | grep -E 'Card series|VRAM Total'; nproc; free -g | head -2; "
              "df -h \"$HOME\" | tail -1; "
-             ".venv/bin/python -c 'import torch; n=torch.cuda.device_count(); assert n==2, n; "
+             ".venv/bin/python -c 'import torch; n=torch.cuda.device_count(); assert n==8, n; "
              "[print(torch.cuda.get_device_properties(i).name, torch.cuda.get_device_properties(i).multi_processor_count) for i in range(n)]' && "
              "test $(df --output=avail -BG \"$HOME\" | tail -1 | tr -dc 0-9) -ge 750 || { echo 'NEED >=750 GiB free disk'; exit 1; }",
          summary=[r'MI3', r'NEED']),
@@ -92,45 +99,50 @@ JOBS = [
              f"from examples.glm53.prepare import metadata; "
              f"run_all.prompts(Path(sys.argv[1]), 1, run_all.SEED, metadata()[0][\"text_config\"][\"vocab_size\"])' {PROMPTS}",
          writes=['prompts.json']),
-    dict(name='reference', lane='cpu', reads='prompts', timeout=6 * 3600, quiet_s=900, env=TWO,
+    dict(name='reference', lane='cpu', reads='prompts', timeout=6 * 3600, quiet_s=900, env=EIGHT,
          cmd=f"mkdir -p {LOG}/offload && {PY} -m examples.glm53.reference --src {model} --prompts {PROMPTS} "
              f"--out {REFERENCE} --offload {LOG}/offload --max-memory {memory} --gate production",
          writes=['reference.json']),
-    # PP2 reference build (measured default options) and its own certificate: the launchable build.
-    dict(name='pp2_build', lane='cpu', reads=['stage', 'image'], timeout=2400, quiet_s=300, env={'ETX_GLM_BATCH': '1'},
-         cmd=f"{IMAGE} bash examples/glm53/build_model.sh {STAGE} {LOG}/pp2/build",
-         writes=['pp2/build/run', 'pp2/build/residency.json'], summary=[r'GLM-RESIDENCY (PASS|FAIL)']),
-    dict(name='pp2_certificate', lane='cpu', reads=['pp2_build', 'reference'], timeout=2 * 3600, quiet_s=600, env=TWO,
-         cmd=bench('pp2/certificate', f'{LOG}/pp2/build'),
-         writes=['pp2/certificate/bench_result.json'], summary=[r'^BENCH', r'^DEVICES', r'^CORRECTNESS', r'^TIMING']),
 ]
 
-previous = 'pp2_certificate'
+# Builds run in goal order; each certificate (the 32/32 gate) waits for its build and the previous
+# certificate, whatever that certificate's result, so one failing arm does not hide the next.
+previous = 'reference'
 for arm in arms:
-    options = json.dumps(dict(ARMS[arm]))
+    options = json.dumps(ARMS[arm])
     build = f'{LOG}/{arm}/build'
-    # Each arm needs the PP2 certificate; it only waits for the previous arm, whatever that arm's result.
-    reads = ['pp2_certificate'] + ([f'?{previous}'] if previous != 'pp2_certificate' else [])
     JOBS.append(dict(
-        name=f'{arm}_build', lane='cpu', reads=reads, timeout=2400, quiet_s=300, env={'ETX_GLM_BATCH': '1'},
+        name=f'{arm}_build', lane='cpu', reads=['stage', 'image'], timeout=2400, quiet_s=300, env={'ETX_GLM_BATCH': '1'},
         cmd=f"mkdir -p {LOG}/{arm} && {PY} -c 'import json,sys; from examples.glm53.options import Options; "
             f"print(json.dumps(Options(**json.loads(sys.argv[1])).to_dict()))' {shlex.quote(options)} > {LOG}/{arm}/options.json && "
             f"{IMAGE} bash examples/glm53/build_model.sh {STAGE} {build} --options {LOG}/{arm}/options.json",
         writes=[f'{arm}/build/run', f'{arm}/build/residency.json'], summary=[r'GLM-RESIDENCY (PASS|FAIL)']))
-    previous = f'{arm}_build'
-    certificates = []
-    for i in range(PAIRS):
-        order = ('ref', 'cand') if i % 2 == 0 else ('cand', 'ref')    # counterbalance the order across pairs
-        for side in order:
-            name = f'{arm}_p{i}_{side}'
-            JOBS.append(dict(
-                name=name, lane='cpu', reads=previous, timeout=2 * 3600, quiet_s=600, env=TWO,
-                cmd=bench(f'{arm}/{name}', f'{LOG}/pp2/build' if side == 'ref' else build),
-                writes=[f'{arm}/{name}/bench_result.json'], summary=[r'^BENCH', r'^DEVICES', r'^CORRECTNESS']))
-            certificates.append(f'{arm}/{name}/bench_result.json')
-            previous = name
     JOBS.append(dict(
-        name=f'{arm}_pairs', lane='final', reads=[f'?{c}' for c in certificates], timeout=300,
-        cmd=f"{PY} -m examples.glm53.pairs --pairs {PAIRS} --out {LOG}/{arm}/pairs.json "
-            + ' '.join(f'{LOG}/{c}' for c in certificates),
-        writes=[f'{arm}/pairs.json'], summary=[r'^GLM-PAIR']))
+        name=f'{arm}_certificate', lane='cpu', reads=[f'{arm}_build', 'reference'] + ([f'?{previous}'] if previous != 'reference' else []),
+        timeout=2 * 3600, quiet_s=600, env=EIGHT, cmd=bench(f'{arm}/certificate', build),
+        writes=[f'{arm}/certificate/bench_result.json'], summary=[r'^BENCH', r'^DEVICES', r'^CORRECTNESS', r'^TIMING']))
+    previous = f'{arm}_certificate'
+
+# T10 pairs against the named comparator; a pair job needs both certificates (both arms 32/32).
+if reference_arm:
+    for arm in [a for a in arms if a != reference_arm]:
+        certificates = []
+        first = True
+        for i in range(PAIRS):
+            order = ('ref', 'cand') if i % 2 == 0 else ('cand', 'ref')    # counterbalance the order across pairs
+            for side in order:
+                name = f'{arm}_p{i}_{side}'
+                # The first bench needs both 32/32 certificates; every bench runs after the previous one.
+                reads = [f'{reference_arm}_certificate', f'{arm}_certificate', f'?{previous}'] if first else [previous]
+                first = False
+                JOBS.append(dict(
+                    name=name, lane='cpu', reads=reads, timeout=2 * 3600, quiet_s=600, env=EIGHT,
+                    cmd=bench(f'{arm}/{name}', f'{LOG}/{reference_arm}/build' if side == 'ref' else f'{LOG}/{arm}/build'),
+                    writes=[f'{arm}/{name}/bench_result.json'], summary=[r'^BENCH', r'^DEVICES', r'^CORRECTNESS']))
+                certificates.append(f'{arm}/{name}/bench_result.json')
+                previous = name
+        JOBS.append(dict(
+            name=f'{arm}_pairs', lane='final', reads=[f'?{c}' for c in certificates], timeout=300,
+            cmd=f"{PY} -m examples.glm53.pairs --pairs {PAIRS} --out {LOG}/{arm}/pairs.json "
+                + ' '.join(f'{LOG}/{c}' for c in certificates),
+            writes=[f'{arm}/pairs.json'], summary=[r'^GLM-PAIR']))
