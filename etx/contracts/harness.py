@@ -12,7 +12,8 @@ PACKAGES = {'qwen-expert-merge': 'etx.models.vllm_llm.expert_merge',
             'glm53-boundary': 'etx.models.glm53',
             'glm53-model-build': 'etx.models.glm53',
             'glm53-run-all': 'etx.models.glm53',
-            'qwen-vllm': 'etx.models.vllm_llm'}
+            'qwen-vllm': 'etx.models.vllm_llm',
+            'deepseek-tools': 'etx.models.dsv2lite'}
 
 
 def run_harness_command(request):

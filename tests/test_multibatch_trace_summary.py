@@ -1,6 +1,6 @@
 import pytest
 
-from examples.dsv2lite.multibatch_trace_summary import stats, summarize
+from etx.models.dsv2lite.multibatch_trace_summary import stats, summarize
 
 
 def test_median_is_not_midrange():
