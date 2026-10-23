@@ -1,0 +1,12 @@
+[
+  {
+    "file": "glm-config.json",
+    "url": "generated: python -m examples.glm53.module_gate evidence --write",
+    "sha256": "4c7f044f6b53e54808e49a9c8386ca3896272dd212c896dec965087b4cca43ce"
+  },
+  {
+    "file": "glm-model-api.json",
+    "url": "generated: python -m examples.glm53.module_gate evidence --write",
+    "sha256": "c6cb5737c5626b9c46f71adf1b3e162d699598b8a194ea75473c852dae370fcc"
+  }
+]

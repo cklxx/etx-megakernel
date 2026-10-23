@@ -156,7 +156,7 @@ def run(src,prompt_path,out,offload,max_memory,gate='production',layers=None):
     # A tensor HF could not map is silently random-initialized: refuse instead. The
     # module-gate checkpoint carries no vision tower (text-only gate), so only there
     # may the vision weights be missing.
-    missing=[k for k in info['missing_keys'] if not (gate=='module' and k.startswith('model.visual.'))]
+    missing=[k for k in info['missing_keys'] if not (gate in ('module','module8') and k.startswith('model.visual.'))]
     bad=dict(missing=missing,unexpected=list(info['unexpected_keys']),mismatched=list(info['mismatched_keys']),errors=list(info['error_msgs']))
     if any(bad.values()):raise ValueError(f'HF did not load the checkpoint exactly: {bad}')
     device=model.get_input_embeddings().weight.device

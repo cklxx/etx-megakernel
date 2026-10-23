@@ -26,7 +26,7 @@ from pathlib import Path
 import zlib
 
 from examples.glm53 import stage
-from examples.glm53.prepare import EVIDENCE, MODEL, MODULE_EVIDENCE, MODULE_MODEL, metadata, partition, sha
+from examples.glm53.prepare import EVIDENCE, MODEL, MODULE_EVIDENCE, MODULE_MODEL, gate_identity, metadata, partition, sha
 
 SEED = 20261017
 BATCH = 2
@@ -40,6 +40,12 @@ TEXT = dict(hidden_size=512, num_hidden_layers=4, intermediate_size=1024, moe_in
             q_lora_rank=384, kv_lora_rank=256, index_n_heads=4, index_topk=64, vocab_size=4096,
             first_k_dense_replace=1, pad_token_id=4095, eos_token_id=[4095])
 LINEAR = dict(num_heads=4)
+# Gate variants: size overrides on TEXT/LINEAR, each pinned under its own gate identity.
+# module8: KDA and MLA heads 8 (one 256-row MLA head or 128-row KDA head per rank) and MoE
+# width 1024 (128 rows per rank), so the 8-rank TP, EP and head-TP layouts all derive.
+VARIANTS = {'module': dict(text={}, linear={}),
+            'module8': dict(text=dict(num_attention_heads=8, num_key_value_heads=8, moe_intermediate_size=1024),
+                            linear=dict(num_heads=8))}
 # Random MoE weights put routing on near-ties (2nd vs 3rd expert within 1e-3 in ~1% of
 # decisions), which BF16-level differences flip; a random head puts greedy on near-ties
 # too. The head therefore carries a permuted copy of the embedding (next token ~ pi(current))
@@ -87,14 +93,16 @@ def storage(layer_type, key, shape):
     return 'F8_E4M3'
 
 
-def module_config():
+def module_config(variant='module'):
     """The release config.json with only sizes changed; every numerical constant is kept."""
     cfg, _ = metadata()
     m = copy.deepcopy(cfg)
     t = m['text_config']
     t.update(TEXT, layer_types=list(LAYER_TYPES), mlp_layer_types=list(MLP_TYPES),
              indexer_types=['full'] * len(LAYER_TYPES))
-    t['linear_attn_config'].update(LINEAR, kda_layers=[i for i, k in enumerate(LAYER_TYPES) if k == 'linear_attention'],
+    t.update(VARIANTS[variant]['text'])
+    t['linear_attn_config'].update(LINEAR, **VARIANTS[variant]['linear'])
+    t['linear_attn_config'].update(kda_layers=[i for i, k in enumerate(LAYER_TYPES) if k == 'linear_attention'],
                                    full_attn_layers=[i for i, k in enumerate(LAYER_TYPES) if k != 'linear_attention'])
     m['vision_config'].update(VISION, out_hidden_size=t['hidden_size'])
     m['quantization_config']['modules_to_not_convert'] = skip_list(cfg, t)
@@ -231,10 +239,11 @@ def weights_digest(ts):
     return h.hexdigest()
 
 
-def evidence(write=False):
+def evidence(write=False, variant='module'):
     """The pinned module-gate identity: config.json, model API record (id, revision,
     inventory), sources. --write regenerates them; tests require the committed copy to match."""
-    cfg = module_config()
+    evidence_dir, model_id = gate_identity(variant)
+    cfg = module_config(variant)
     config_text = json.dumps(cfg, indent=2) + '\n'
     ts = tensors(cfg)
     inventory = {}
@@ -244,7 +253,7 @@ def evidence(write=False):
     digest = weights_digest(ts)
     config_sha = hashlib.sha256(config_text.encode()).hexdigest()
     _, release = metadata()
-    api = dict(id=MODULE_MODEL, sha=hashlib.sha1(f'{config_sha}\0{digest}'.encode()).hexdigest(),
+    api = dict(id=model_id, sha=hashlib.sha1(f'{config_sha}\0{digest}'.encode()).hexdigest(),
                kind='synthetic module-gate checkpoint; not a released model',
                generator='python -m examples.glm53.module_gate', seed=SEED, weights_sha256=digest,
                derived_from=dict(model=MODEL, revision=release['sha'], config_sha256=sha(EVIDENCE / 'glm-config.json')),
@@ -255,25 +264,26 @@ def evidence(write=False):
                     sha256=hashlib.sha256(text.encode()).hexdigest()) for f, text in files.items()]
     files['sources.json'] = json.dumps(sources, indent=2) + '\n'
     if write:
-        MODULE_EVIDENCE.mkdir(parents=True, exist_ok=True)
+        evidence_dir.mkdir(parents=True, exist_ok=True)
         for f, text in files.items():
-            (MODULE_EVIDENCE / f).write_text(text)
+            (evidence_dir / f).write_text(text)
     return files, ts
 
 
-def checkpoint(out):
+def checkpoint(out, variant='module'):
     """Write the synthetic snapshot (config.json, REVISION, safetensors + index) into a new directory."""
     from safetensors.torch import save_file
-    cfg, api = metadata(MODULE_EVIDENCE)
-    files, ts = evidence()
+    evidence_dir, _ = gate_identity(variant)
+    cfg, api = metadata(evidence_dir)
+    files, ts = evidence(variant=variant)
     for f, text in files.items():
-        if (MODULE_EVIDENCE / f).read_text() != text:
+        if (evidence_dir / f).read_text() != text:
             raise ValueError(f'generated {f} differs from the pinned module-gate evidence; '
                              'the generator changed (rerun `evidence --write` deliberately)')
     if weights_digest(ts) != api['weights_sha256']:
         raise ValueError('synthetic weights differ from the pinned module-gate revision')
     out.mkdir(parents=True, exist_ok=False)
-    (out / 'config.json').write_text((MODULE_EVIDENCE / 'glm-config.json').read_text())
+    (out / 'config.json').write_text((evidence_dir / 'glm-config.json').read_text())
     (out / 'REVISION').write_text(api['sha'] + '\n')
     shard = 'model.safetensors'
     save_file(ts, str(out / shard), metadata=dict(format='pt'))
@@ -292,7 +302,7 @@ def prompts():
     return [[int(x) for x in r] for r in rows]
 
 
-def predict(staged, ref_path, out, root=None):
+def predict(staged, ref_path, out, root=None, gate='module'):
     """The native body on CPU through the launcher's decode loop, judged like `qualify`.
     `root` swaps the source tree the body is compiled from (mutation tests)."""
     import tempfile
@@ -301,7 +311,7 @@ def predict(staged, ref_path, out, root=None):
     from examples.glm53.run import compare_logits
     ref = json.loads(ref_path.read_text())
     p = [r['prompt_ids'] for r in ref['requests']]
-    model = cpu_check.CPUModel(staged, gate='module', work=Path(tempfile.mkdtemp(prefix='glm53-cpu-')), root=root)
+    model = cpu_check.CPUModel(staged, gate=gate, work=Path(tempfile.mkdtemp(prefix='glm53-cpu-')), root=root)
     model.reset(len(p))
     context = len(p[0])
     returned = [0] * len(p)
@@ -314,9 +324,9 @@ def predict(staged, ref_path, out, root=None):
             logits.append(got.astype('<f4'))
             for r, token in enumerate(returned):
                 generated[r].append(token)
-    candidate = dict(reference.identity('module'), backend='etx-pp2', batch=len(p),
+    candidate = dict(reference.identity(gate), backend='etx-pp2', batch=len(p),
                      requests=[dict(prompt_ids=row, generated_ids=g) for row, g in zip(p, generated)])
-    verdict = oracle.compare(ref, candidate, 'module')
+    verdict = oracle.compare(ref, candidate, gate)
     expected = np.fromfile(ref_path.with_suffix('.logits'), dtype='<f4').reshape(32, len(p), -1)
     got = np.stack(logits)
     if verdict['status'] == 'TOKENS-EQUAL':
@@ -339,16 +349,16 @@ def margin(logits):
     return dict(hf_min_top2_margin=float(gap.min()), hf_median_top2_margin=float(np.median(gap)))
 
 
-def prepare(out):
+def prepare(out, variant='module'):
     """Everything the GPU session needs, made and checked offline. The CPU prediction is the
     go/no-go: if the native body does not pass the module rules on CPU, do not book a GPU."""
     from examples.glm53 import reference
     out.mkdir(parents=True, exist_ok=False)
-    checkpoint(out / 'checkpoint')
-    stage.stage(out / 'checkpoint', out / 'stage', gate='module')
+    checkpoint(out / 'checkpoint', variant)
+    stage.stage(out / 'checkpoint', out / 'stage', gate=variant)
     (out / 'prompts.json').write_text(json.dumps(prompts()) + '\n')
-    reference.run(out / 'checkpoint', out / 'prompts.json', out / 'reference.json', None, None, gate='module')
-    verdict = predict(out / 'stage', out / 'reference.json', out / 'cpu-prediction.json')
+    reference.run(out / 'checkpoint', out / 'prompts.json', out / 'reference.json', None, None, gate=variant)
+    verdict = predict(out / 'stage', out / 'reference.json', out / 'cpu-prediction.json', gate=variant)
     if verdict['status'] != 'TOKENS-EQUAL':
         raise SystemExit(f'MODULE-GATE CPU PREDICTION FAILED: {json.dumps(verdict)}')
     print(f'MODULE-GATE CPU PREDICTION OK: 32/32 x {len(verdict["matched_each"])}, median logit error '
@@ -363,12 +373,14 @@ def main():
     e.add_argument('--write', action='store_true')
     q = sub.add_parser('prepare')
     q.add_argument('--out', type=Path, required=True)
+    for p in (e, q):
+        p.add_argument('--variant', choices=sorted(VARIANTS), default='module')
     a = ap.parse_args()
     if a.op == 'evidence':
-        files, _ = evidence(a.write)
+        files, _ = evidence(a.write, a.variant)
         print(files['glm-model-api.json'], end='')
     else:
-        print(json.dumps(prepare(a.out.resolve()), indent=2))
+        print(json.dumps(prepare(a.out.resolve(), a.variant), indent=2))
 
 
 if __name__ == '__main__':

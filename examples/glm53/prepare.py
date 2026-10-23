@@ -17,10 +17,15 @@ MODEL = 'zai-org/GLM-5.3-Flash'
 # examples/glm53/module_gate.py and pinned like the release (config, id, revision).
 MODULE_EVIDENCE = ROOT / 'docs/evidence/glm53-module-gate'
 MODULE_MODEL = 'etx-synthetic/GLM-5.3-Flash-module-gate'
+# The same generator with every attention head count and FFN width divisible eight ways on FP8
+# 128-blocks, so the 8-rank TP, EP and head-TP layouts derive (module_gate.VARIANTS).
+MODULE8_EVIDENCE = ROOT / 'docs/glm/evidence/module8-gate'
+MODULE8_MODEL = 'etx-synthetic/GLM-5.3-Flash-module8-gate'
 # The slice gate: the exact release checkpoint, but staged and referenced for a
 # contiguous layer window that must straddle the PP2 split (docs/GLM-EXECUTION-
 # DESIGN-2026-10-19.md section 6). It shares the release evidence and pin.
 GATES = {'production': (EVIDENCE, MODEL), 'module': (MODULE_EVIDENCE, MODULE_MODEL),
+         'module8': (MODULE8_EVIDENCE, MODULE8_MODEL),
          'slice': (EVIDENCE, MODEL)}
 
 
