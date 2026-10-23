@@ -190,3 +190,4 @@ def test_all_fixed_payloads_stream_once(module8, k):
                 elif name.endswith('index_kpool_compress_ape') and pos == 0:
                     payload = 0
                 assert sink.payload[group, name] == payload, (pos, group, name)
+                assert sink.scales[group, name] == tensor_bytes(rec)[1], (pos, group, name)

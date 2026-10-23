@@ -169,7 +169,7 @@ def build_from(stage, k, batch=1, options=None):
                 args.extend([rt, act, sel])
                 reads.extend([rt, sel])
                 writes.append(act)
-            n = model.tiles(stage['config']['moe_intermediate_size'], options.effective_up_pairs)
+            n = 1  # one owner per expert also shares each FP8 scale block
             total = n * (stage['dimensions']['EXPERTS'] + 1)
             emit(layer + '_expert_up', hip_link(SOURCE, 'glm53_verify_expert_up'),
                  src.device, total, args, reads, writes, (total, n, count, 0))
@@ -181,11 +181,10 @@ def build_from(stage, k, batch=1, options=None):
                 args.extend([act, sel, partial])
                 reads.extend([act, sel])
                 writes.append(partial)
-            # Partition the existing down task budget over experts; each lane
-            # loops over its output-row range in the read-once primitive.
+            # One owner per expert streams its scale row and matrix once.
             mix_tiles = base.grid(layer + '_down').grid[1]
             experts = stage['dimensions']['EXPERTS'] + 1
-            n = max(1, (mix_tiles + experts - 1) // experts)
+            n = 1
             total = n * experts
             emit(layer + '_expert_down', hip_link(SOURCE, 'glm53_verify_expert_down'),
                  src.device, total, args, reads, writes, (total, n, count, 0))
@@ -253,6 +252,16 @@ def instrumented_shim(work):
             return target.name
         emitted.add(relative)
         text = native if relative.endswith('/native.h') else (graph_cpu.ROOT / relative).read_text()
+        if relative == SOURCE:
+            text = text.replace(
+                '  return ((const float*)(blob+w.scale))[i];',
+                '  if(glm_observe)glm_record({(uintptr_t)blob,w.offset,w.scale+4*i,4,1});\n'
+                '  return ((const float*)(blob+w.scale))[i];')
+            text = text.replace(
+                '  return glm_bf(glm_fp8(blob[w.offset+i])*scale);',
+                '  if(glm_observe)glm_record({(uintptr_t)blob,w.offset,w.offset+i,1,0});\n'
+                '  return glm_bf(glm_fp8(blob[w.offset+i])*scale);')
+
 
         def include(match):
             dependency = match[1]
