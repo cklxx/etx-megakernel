@@ -17,17 +17,18 @@ from .plan import Plan
 def _wg_per_cu(plan: Plan, vgpr: int, agpr: int, lds_bytes: int, threads: int) -> int:
     m = plan.machine
     res = m.resources
-    regs = vgpr + agpr
-    if regs <= 0:
-        regs = 1
+    regs = max(1, vgpr + agpr)
+    granule = res.get("reg_granule", 1)
+    regs = math.ceil(regs / granule) * granule
     waves_per_wg = max(1, math.ceil(threads / m.wave_size))
-    # registers: each SIMD has regs_per_lane * max_waves worth of register file per lane-slot
-    waves_per_simd_by_regs = max(1, int(res["regs_per_lane"] // regs)) if regs > res["regs_per_lane"] // res["max_waves_per_simd"] else res["max_waves_per_simd"]
+    # regs_per_lane is register-file capacity per SIMD lane slot, not the
+    # architectural per-thread limit. Round each warp's allocation first.
+    waves_per_simd_by_regs = min(res["max_waves_per_simd"], res["regs_per_lane"] // regs)
     waves_per_cu = waves_per_simd_by_regs * res["simds_per_cu"]
-    by_regs = max(1, waves_per_cu // waves_per_wg)
-    # the persistent kernel itself keeps a few shared words (domain, worker, task id); reserve 256 B
-    by_lds = max(1, int(res["lds_kb"] * 1024 // (lds_bytes + 256))) if lds_bytes else res["max_wg_per_cu"]
-    return max(1, min(res["max_wg_per_cu"], by_regs, by_lds))
+    by_regs = waves_per_cu // waves_per_wg
+    reserved = res.get("lds_reserved_per_wg_bytes", 256)
+    by_lds = int(res["lds_kb"] * 1024 // (lds_bytes + reserved)) if lds_bytes + reserved else res["max_wg_per_cu"]
+    return min(res["max_wg_per_cu"], by_regs, by_lds)
 
 
 def run(plan: Plan) -> None:
@@ -38,9 +39,12 @@ def run(plan: Plan) -> None:
         r = g.resource
         if r.lds_bytes + r.prefetch_bytes > m.resources["lds_kb"] * 1024:
             raise ValueError(f"{g.name}: LDS need {r.lds_bytes + r.prefetch_bytes} B exceeds {m.resources['lds_kb']} KB on {m.name}")
-        if r.vgpr + r.agpr > m.resources["regs_per_lane"]:
-            raise ValueError(f"{g.name}: {r.vgpr}+{r.agpr} registers exceed {m.resources['regs_per_lane']} on {m.name}")
+        reg_max = m.resources.get("regs_per_thread_max", m.resources["regs_per_lane"])
+        if r.vgpr + r.agpr > reg_max:
+            raise ValueError(f"{g.name}: {r.vgpr}+{r.agpr} registers exceed {reg_max} on {m.name}")
         wg = _wg_per_cu(plan, r.vgpr, r.agpr, r.lds_bytes + r.prefetch_bytes, r.threads)
+        if wg == 0:
+            raise ValueError(f"{g.name}: resource demand cannot fit one workgroup on {m.name}")
         per_grid_wg[g.name] = wg
         key = f"rc{wg}"
         classes.setdefault(key, []).append(g.name)
