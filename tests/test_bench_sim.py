@@ -5,7 +5,7 @@ import json
 
 import pytest
 
-from etx.tools import bench_sim as bench
+from etx.tools.validation import bench_sim as bench
 from etx.sim import simulate
 
 CASE = {"name": "small", "workload": "splitk", "size": 2, "duration_cv": 0.1}

@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from etx.tools import stage_sim
+from etx.tools.costs import stage_sim
 from etx.tools.stage_sim import Constant, check_constants, constants, report, simulate
 
 

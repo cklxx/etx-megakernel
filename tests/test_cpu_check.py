@@ -142,7 +142,7 @@ def test_archive_rejects_symlink_alias(tmp_path):
 
 
 def test_dependency_failure_preserves_failed_manifest(tmp_path, monkeypatch):
-    from etx.tools import cpu_check
+    from etx.tools.validation import cpu_check
     def fail():
         raise ValueError('archive member checksum mismatch')
     monkeypatch.setattr(cpu_check, 'dependencies', fail)
