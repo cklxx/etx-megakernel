@@ -13,7 +13,8 @@ HARNESSES = {'qwen-expert-merge': ('runner', 'prepare', 'capture', 'inputs', 'cp
              'glm53-boundary': ('boundary_build',),
              'glm53-model-build': ('model_build',),
              'glm53-run-all': ('run_all',),
-             'qwen-vllm': ('vllm_build', 'decode'),
+             'qwen-vllm': ('vllm_build', 'decode', 'dense_bytes', 'router_study_guards', 'verify_gaps_cpu', 'polling_isa_cpu',
+                           'watchdog_cpu'),
              'deepseek-tools': ('multibatch_trace_summary', 'compare_fleet')}
 
 
