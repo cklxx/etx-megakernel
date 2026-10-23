@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "kind": "retained-git-source-fixture",
+  "revision": "b573664faa4e7988dff353bc03aca4ce8561a729",
+  "path": "examples/vllm_llm/host.hip",
+  "sha256": "28570234c305ab6608fe0e24126d3022beeab259cd0b232c39fe6ad1afb802d8",
+  "git_blob": "60edf727489000dabb015ccdf6db321a4ba4d7a0"
+}
