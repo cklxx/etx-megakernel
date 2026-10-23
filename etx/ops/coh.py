@@ -94,3 +94,9 @@ static __device__ __forceinline__ long long dsl_a_ldll_u(const long long* p) { r
 #endif
 #endif
 '''
+
+
+def emit_tiles(machine="gfx942") -> str:
+    """Emit accessors using the machine's payload-coherence contract."""
+    from etx.ops import prims
+    return prims.emit_source(HELPERS, machine)

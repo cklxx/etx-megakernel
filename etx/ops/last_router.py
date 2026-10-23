@@ -9,8 +9,9 @@ import os
 def enabled():return os.environ.get('ETX_VL_LAST_ROUTER','0')=='1'
 
 
-def emit():
-    return r'''
+def emit(machine="gfx942"):
+    """Emit a fragment for the enclosing translation unit's explicit machine."""
+    source = r'''
 // Same existing KEY32 implementation; forward declaration for emitter order.
 static __device__ __attribute__((always_inline)) void dsl_run_dsl_topk(const unsigned char* a);
 extern "C" __device__ __attribute__((always_inline)) void etx_tile_g01_reset(const etx_ctx* c) {
@@ -55,3 +56,14 @@ extern "C" __device__ __attribute__((always_inline)) void etx_tile_dsl_gemv_rout
   g01_model_router(c,etx_imp_argblock(c->args,c->cst[0]),c->coord[0]);
 }
 '''
+
+    from etx.ops import prims
+    if "source_prelude" in prims.machine_or_default(machine).primitives:
+        source = "#include <cuda/atomic>\n" + source
+        source = source.replace(
+            "__hip_atomic_store((int*)c->args[0]+32*c->cst[0],128,__ATOMIC_RELAXED,__HIP_MEMORY_SCOPE_SYSTEM)",
+            "cuda::atomic_ref<int, cuda::thread_scope_system>(*((int*)c->args[0]+32*c->cst[0])).store(128, cuda::memory_order_relaxed)")
+        source = source.replace(
+            "__hip_atomic_fetch_sub((int*)c->args[1]+32*c->cst[3],1,__ATOMIC_ACQ_REL,__HIP_MEMORY_SCOPE_SYSTEM)",
+            "cuda::atomic_ref<int, cuda::thread_scope_system>(*((int*)c->args[1]+32*c->cst[3])).fetch_sub(1, cuda::memory_order_acq_rel)")
+    return source
