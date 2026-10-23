@@ -1,5 +1,6 @@
 """CPU-only acceptance for WP-S4a; source contracts require the pinned local reference."""
 import ast
+import json
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -16,7 +17,7 @@ REF = Path('/data/refs/vllm-v0.30.0/glm5next/nvidia')
 @pytest.fixture(scope='module')
 def fixture():
     config = gate.module_config('module8')
-    tensors = gate.tensors(config)
+    tensors = gate.tensors(config, mtp=True)
     return config, tensors, MTPReference(config, dequantize(tensors))
 
 
@@ -221,3 +222,38 @@ def test_input_order_residual_and_single_head_norm(fixture):
     np.testing.assert_allclose(hidden, expected, rtol=2e-6, atol=2e-6)
     np.testing.assert_array_equal(logits[:, :h], hidden)
     np.testing.assert_array_equal(logits[:, h:], 0)
+
+
+def test_default_checkpoint_retains_pinned_identity(tmp_path, fixture):
+    from safetensors.torch import load_file
+
+    config, with_mtp, _ = fixture
+    evidence_dir, _ = gate.gate_identity('module8')
+    pinned = {p.name: p.read_bytes() for p in evidence_dir.iterdir() if p.is_file()}
+    expected = json.loads(pinned['glm-model-api.json'])
+    files, default = gate.evidence(variant='module8')
+    for name, text in files.items():
+        assert text.encode() == pinned[name]
+    assert gate.weights_digest(default) == expected['weights_sha256']
+    prefix = f"model.language_model.layers.{config['text_config']['num_hidden_layers']}."
+    assert not any(n.startswith(prefix) for n in default)
+    main = {n: v for n, v in with_mtp.items() if not n.startswith(prefix)}
+    assert gate.weights_digest(main) == expected['weights_sha256']
+
+    base_path = tmp_path / 'base'
+    assert gate.checkpoint(base_path, variant='module8') == expected
+    assert gate.weights_digest(load_file(base_path / 'model.safetensors')) == expected['weights_sha256']
+    assert (base_path / 'REVISION').read_text() == expected['sha'] + '\n'
+    assert (base_path / 'config.json').read_bytes() == pinned['glm-config.json']
+
+    mtp_path = tmp_path / 'mtp'
+    identity = gate.checkpoint(mtp_path, variant='module8', mtp=True)
+    assert identity['weights_sha256'] == gate.weights_digest(with_mtp)
+    assert identity['sha'] != expected['sha']
+    assert identity['safetensors']['total'] == sum(v.numel() for v in with_mtp.values())
+    assert (mtp_path / 'REVISION').read_text() == identity['sha'] + '\n'
+    assert (mtp_path / 'config.json').read_bytes() == pinned['glm-config.json']
+    assert gate.weights_digest(load_file(mtp_path / 'model.safetensors')) == identity['weights_sha256']
+    assert {p.name: p.read_bytes() for p in evidence_dir.iterdir() if p.is_file()} == pinned
+    with pytest.raises(ValueError, match='module8'):
+        gate.checkpoint(tmp_path / 'unsupported', mtp=True)

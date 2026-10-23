@@ -234,8 +234,11 @@ def fp8_blocks(name, w):
     return torch.from_numpy(q).to(torch.float8_e4m3fn), torch.from_numpy(scale)
 
 
-def tensors(cfg):
-    """{native name: torch tensor} for the whole synthetic text checkpoint, in a fixed order."""
+def tensors(cfg, *, mtp=False):
+    """Synthetic text tensors in fixed order; the draft layer is explicitly opt-in.
+
+    The default inventory and bytes retain the pinned module-gate identity.
+    """
     import torch
     t = cfg['text_config']
     out = {}
@@ -251,7 +254,7 @@ def tensors(cfg):
                 out[name] = torch.from_numpy(w).to(torch.float32 if kind == 'F32' else torch.bfloat16)
     for name, shape in outer_tensors(t):
         out[name] = torch.from_numpy(values(name, None, shape)).to(torch.bfloat16)
-    if t['num_attention_heads'] == VARIANTS['module8']['text']['num_attention_heads'] and t['moe_intermediate_size'] == 1024:
+    if mtp:
         for name, key, _, shape in mtp_tensors(t):
             kind = storage('deepseek_sparse_attention', key, shape)
             # Fusion and shared-head weights are unquantized (mtp.py:47-49,68).
@@ -307,8 +310,14 @@ def evidence(write=False, variant='module'):
     return files, ts
 
 
-def checkpoint(out, variant='module'):
-    """Write the synthetic snapshot (config.json, REVISION, safetensors + index) into a new directory."""
+def checkpoint(out, variant='module', *, mtp=False):
+    """Write a snapshot; ``mtp=True`` explicitly adds the module8 draft layer.
+
+    Validate the pinned base first. The opt-in snapshot has its own returned
+    identity and content revision; pinned evidence is never rewritten.
+    """
+    if mtp and variant != 'module8':
+        raise ValueError('MTP checkpoint requires variant=module8')
     from safetensors.torch import save_file
     evidence_dir, _ = gate_identity(variant)
     cfg, api = metadata(evidence_dir)
@@ -319,6 +328,20 @@ def checkpoint(out, variant='module'):
                              'the generator changed (rerun `evidence --write` deliberately)')
     if weights_digest(ts) != api['weights_sha256']:
         raise ValueError('synthetic weights differ from the pinned module-gate revision')
+    if mtp:
+        ts = tensors(cfg, mtp=True)
+        api = copy.deepcopy(api)
+        api['id'] += '-mtp'
+        api['kind'] = 'synthetic module8 MTP fixture; not a pinned module-gate checkpoint'
+        api['weights_sha256'] = weights_digest(ts)
+        api['sha'] = hashlib.sha1(
+            f"{sha(evidence_dir / 'glm-config.json')}\0{api['weights_sha256']}".encode()).hexdigest()
+        inventory = {}
+        for v in ts.values():
+            kind = {'torch.float8_e4m3fn': 'F8_E4M3', 'torch.bfloat16': 'BF16',
+                    'torch.float32': 'F32'}[str(v.dtype)]
+            inventory[kind] = inventory.get(kind, 0) + v.numel()
+        api['safetensors'] = dict(parameters=inventory, total=sum(inventory.values()))
     out.mkdir(parents=True, exist_ok=False)
     (out / 'config.json').write_text((evidence_dir / 'glm-config.json').read_text())
     (out / 'REVISION').write_text(api['sha'] + '\n')
