@@ -109,13 +109,7 @@ def test_kept_recipe_clears_inherited_experiments(monkeypatch, tmp_path):
     assert env['ETX_HIPCC_FLAGS'] == b.BASE_FLAGS
 
 
-def test_cpu_box_is_a_clear_failure(monkeypatch, capsys):
-    exists = Path.exists
-    monkeypatch.setattr(Path, 'exists', lambda p: False if str(p) == '/dev/kfd' else exists(p))
-    assert b.main([]) == 1
-    out = capsys.readouterr().out
-    assert 'BENCH FAIL no AMD GPU available' in out
-    assert 'Traceback' not in out and 'TIMING ' not in out
+# The CPU-box refusal is the command in tests/e2e/test_api_qwen_bench.py.
 
 
 def test_command_retains_failed_output_and_bounds_wait(tmp_path):

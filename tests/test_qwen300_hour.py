@@ -298,14 +298,8 @@ def test_manifest_can_drop_b_without_harness_rewrite(tmp_path, monkeypatch):
     assert s.rows['B.keep']['status'] == 'NO-KEEP'
 
 
-def test_missing_staging_still_prints_all_registered_rows(tmp_path, monkeypatch, capsys):
-    monkeypatch.setenv('ETX_QWEN300_CONFIG', str(tmp_path/'missing.json'))
-    monkeypatch.setenv('ETX_SESS_LOGDIR', str(tmp_path/'out'))
-    assert h.main(['--run']) == 2
-    report = json.loads((tmp_path/'out/report.json').read_text())
-    assert set(h.REGISTERED) <= report['thresholds'].keys()
-    assert all(r['value'] is None for r in report['thresholds'].values())
-    assert 'REGISTERED THRESHOLDS' in capsys.readouterr().out
+# The --run command reporting every registered threshold without staging is executed in
+# tests/e2e/test_api_qwen300_hour.py.
 
 
 @pytest.mark.parametrize('bad_warmup', [False, True])
@@ -377,23 +371,7 @@ def test_c_positive_body_keep_cannot_bypass_net_fusion_bar(tmp_path, monkeypatch
     assert s.rows['C.fusion']['value']['proto']['native_resources']['lds_bytes'] == 29736
 
 
-def test_analysis_cli_emits_small_decision_view_under_its_deadline(tmp_path):
-    from etx.tools.inbody import MAGIC
-    plan, raw = trace()
-    p = tmp_path/'plan.json'; p.write_text(json.dumps(plan))
-    words = [MAGIC, 1, 3, 1, 1, 10]
-    for k in ('legacy', 'poll', 'events', 'waves'): words += [v for row in raw[k] for v in row]
-    r = tmp_path/'raw.bin'; r.write_bytes(struct.pack('<'+'Q'*len(words), *words))
-    out = tmp_path/'edges.json'
-    assert h.main(['--analyze', str(p), str(r), str(out)]) == 0
-    full = json.loads(out.read_text()); small = json.loads(out.with_suffix('.summary.json').read_text())
-    assert full['inbody']['raw'] == raw
-    assert small['critical_pools'] == full['critical_pools']
-    assert 'raw' not in small['inbody']
-    assert small['inbody']['phases'] == full['inbody']['phases']
-    assert small['stamp_perturbation'] == full['stamp_perturbation']
-    assert small['stamp_perturbation']['status'] == 'NOT-COMPLETE'
-    assert small['gap_atoms']['G_ms'] is None
+# The --analyze command is executed in tests/e2e/test_api_qwen300_hour.py.
 
 
 @pytest.mark.parametrize('change,status,message', [(.5, 'NOT-COMPLETE', 'NOT-COMPLETE: original/OFF spread not established'),
@@ -743,17 +721,7 @@ def test_140_minute_cap_and_22_minute_b_deadline(tmp_path, monkeypatch):
     assert limited.end-limited.start == 990
 
 
-@pytest.mark.parametrize('seconds,accepted', [
-    ('8400', True), ('6601', True), ('3600', True), ('8401', False),
-    ('0', False), ('-1', False), ('nan', False), ('inf', False), ('invalid', False),
-])
-def test_cap_environment_validation(seconds, accepted):
-    env = dict(os.environ, ETX_SESS_MAX_SECONDS=seconds)
-    result = subprocess.run([sys.executable, '-m', 'examples.sessions.qwen300_hour', '--dry-run'],
-                            env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=15)
-    assert (result.returncode == 0) is accepted
-    if accepted: assert f'Session hard stop: {seconds}s' in result.stdout
-    else: assert 'cap must be positive and <=8400 seconds' in result.stdout
+# The --dry-run cap validation is executed in tests/e2e/test_api_qwen300_hour.py.
 
 
 def test_full_hour_cap_reaches_pinned_image_preflight(tmp_path):
@@ -958,24 +926,7 @@ def test_enabled_c6_without_staged_prototype_remains_incomplete(tmp_path):
     assert 'C6' not in s.certified
 
 
-def test_generated_template_carries_all_session_and_guard_keys(tmp_path):
-    import ast
-    from examples.vllm_llm import environment_guard as g
-    keys=set()
-    for module in (h,g):
-        tree=ast.parse(Path(module.__file__).read_text())
-        for node in ast.walk(tree):
-            if isinstance(node,ast.Subscript) and isinstance(node.slice,ast.Constant):
-                base=node.value
-                if ((module is h and isinstance(base,ast.Name) and base.id=='c') or
-                    (isinstance(base,ast.Attribute) and base.attr=='c')):
-                    keys.add(node.slice.value)
-    path=tmp_path/'template.json'
-    assert h.main(['--template',str(path)])==0
-    config=json.loads(path.read_text())
-    assert keys <= config.keys()
-    assert config['environment_guard']['trees']=={}
-    assert config['weight_sha256']=={}
+# The --template command is executed in tests/e2e/test_api_qwen300_hour.py.
 
 
 @pytest.mark.parametrize('arm', ['C6', 'reset'])

@@ -70,10 +70,7 @@ def test_round11_spec_and_ranked_total(tmp_path, capsys):
     assert rules["^topk_0_x$"] == 352
     assert rules["^reduce_0$"] == 12608
     assert rules["^argmax$"] == 303888
-    path = tmp_path / "bytes.json"
-    assert bw_spec.main([str(PLAN), "--config", str(CONFIG), "--context", "1055",
-                         "--argmax-write-next", "1", "--output", str(path)]) == 0
-    assert json.loads(path.read_text()) == rules
+    # The bw_spec/timeline commands over these files are checked in tests/e2e/test_api_bandwidth_phases.py.
     rows = tl.read_raw(RAW)
     assert len(rows) == len(plan["descs"]) == 60362
     assert all(row[0] == d["type"] and list(row[1:5]) == (d["coord"] + [0] * 4)[:4]
@@ -112,10 +109,6 @@ def test_round11_spec_and_ranked_total(tmp_path, capsys):
             if p["phase"] in {"router", "prep", "topk", "reduce", "attn", "o_proj"}] == [
         ("prep", 192, 3.68), ("attn", 960, 3.60), ("reduce", 192, 3.45),
         ("o_proj", 12288, 7.58), ("router", 12288, 4.30), ("topk", 384, 7.59)]
-    assert tl.main([str(PLAN), str(RAW), "--latency-report"]) == 0
-    assert tl.main([str(PLAN), str(RAW), "--bytes", str(path), "--bandwidth-report"]) == 0
-    output = capsys.readouterr().out
-    assert "qkv" in output and "TOTAL known 6.1904 GB; device span 5081.5 us" in output
 
 
 def payload_fixture():

@@ -119,30 +119,7 @@ def test_silent_active_compile_is_probed_and_keeps_its_hard_deadline(tmp_path, m
     assert 'SILENCE-PROBE' in text and 'compile completed' in text
 
 
-def test_native_script_supervises_both_compiler_stages(tmp_path):
-    import os
-    import subprocess
-    import sys
-    toolchain = tmp_path / 'synthetic-compiler'
-    toolchain.mkdir()
-    # Only transport/orchestration is tested here; these are NOT GPU compilers.
-    for name in ('clang++', 'llc'):
-        p = toolchain / name
-        p.write_text(f'#!{sys.executable}\nimport pathlib, sys\n'
-                     'pathlib.Path(sys.argv[sys.argv.index("-o")+1]).write_text("synthetic compiler fixture\\n")\n')
-        p.chmod(0o755)
-    out = tmp_path / 'batch'
-    d = out / 'b2'
-    d.mkdir(parents=True)
-    (d / 'megakernel_d0.hip').write_text('#include "/code/fixture.h"\n')
-    (d / 'imports.bc').write_bytes(b'synthetic')
-    run = subprocess.run(['bash', 'examples/vllm_llm/batch_native.sh', str(out), '2'], cwd=bc.ROOT,
-                         env=dict(os.environ, ETX_LLVM=str(toolchain), ETX_QWEN_NATIVE_SECONDS='10'),
-                         capture_output=True, text=True, timeout=20)
-    assert run.returncode == 0, run.stdout + run.stderr
-    receipt = json.loads((d / 'native-check.json').read_text())
-    assert receipt['status'] == 'COMPILED' and receipt['gpu_correctness'] == 'unmeasured'
-    assert all((d / name).exists() for name in ('native-ir.log', 'native-isa.log'))
+# examples/vllm_llm/batch_native.sh is executed in tests/e2e/test_api_qwen_batch_native.py.
 
 
 from etx.testing import qwen_staged_model as staged_model  # noqa: E402  (shared with E2E preflight tests)

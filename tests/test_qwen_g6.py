@@ -106,11 +106,7 @@ def test_pairs_writes_a_verdict_that_re_derives_from_the_raw_logs(tmp_path, monk
     assert sorted(p.name for p in tmp_path.glob("*.raw.log"))[:2] == ["kept_l1_r0_kept.raw.log", "kept_l1_r0_kept_l1.raw.log"]
 
 
-def test_pairs_refuses_an_uncertified_build(tmp_path, monkeypatch):
-    monkeypatch.setenv("ETX_SESS_LOGDIR", str(tmp_path))
-    (tmp_path / "certificate_kept").mkdir()
-    with pytest.raises(ValueError, match="kept_l1 has no certificate"):
-        g6.pairs("kept_l1")
+# The uncertified-build refusal is the `pairs` command in tests/e2e/test_api_qwen_g6.py.
 
 
 def test_preflight_refuses_a_non_bf16_checkpoint(tmp_path, monkeypatch):
@@ -127,16 +123,4 @@ def test_preflight_refuses_a_non_bf16_checkpoint(tmp_path, monkeypatch):
         g6.preflight()
 
 
-def test_preflight_refuses_a_box_without_the_build_inputs_before_anything_runs(tmp_path, monkeypatch, capsys):
-    cfg = tmp_path / "c.json"
-    cfg.write_text(json.dumps(dict(model=str(tmp_path / "absent"), hf=str(tmp_path / "absent/hf"), golden_sha256="0" * 64)))
-    monkeypatch.setenv("ETX_QWEN_G6_CONFIG", str(cfg))
-    monkeypatch.setenv("ETX_SESS_LOGDIR", str(tmp_path))
-    monkeypatch.setenv("VLLM", str(tmp_path / "no-vllm"))
-    with pytest.raises(ValueError, match="box inputs missing"):
-        g6.preflight()
-    out = capsys.readouterr().out
-    assert "FAIL packed_model" in out and "missing=vl.bin,vl.manifest,hf/config.json,golden_c1024.txt" in out
-    assert "FAIL vllm_source" in out and "git clone --depth 1 --branch v0.27.1" in out
-    assert not (tmp_path / "inputs.json").exists()
-    assert [l.split()[1].rstrip(":") for l in out.splitlines() if l.startswith(("PASS", "FAIL"))] == list(g6.BUILD_INPUTS)
+# The missing-inputs refusal is the `preflight` command in tests/e2e/test_api_qwen_g6.py.

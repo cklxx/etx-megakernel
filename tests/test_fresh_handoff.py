@@ -120,21 +120,7 @@ def test_handoff_threshold_covers_every_mode(tmp_path, monkeypatch):
         probe.validate_case(tmp_path, case)
 
 
-def test_missing_runs_fail_closed(tmp_path):
-    (tmp_path / 'manifest.json').write_text(json.dumps({'plan': probe.matrix()}))
-    report = probe.analyze(tmp_path)
-    assert report['mechanism_gate'] == 'not_passed'
-    assert len(report['cases']) == 144
-    assert all(c['state'] == 'fail' for c in report['cases'])
-    assert report['paired'] == []
-
-
-def test_edited_matrix_cannot_pass(tmp_path):
-    plan = probe.matrix()
-    plan['cases'] = []
-    (tmp_path / 'manifest.json').write_text(json.dumps({'plan': plan}))
-    with pytest.raises(ValueError, match='frozen'):
-        probe.analyze(tmp_path)
+# Unrun and edited matrices are analyzed by the command in tests/e2e/test_api_fresh_handoff.py.
 
 
 @pytest.mark.parametrize('damage', ['none', 'checksum', 'exit', 'missing_inventory'])

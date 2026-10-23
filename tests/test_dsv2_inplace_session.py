@@ -387,18 +387,6 @@ def test_rule_uses_declared_basis_strictness_and_exact_nanoseconds():
         ns(3.0)
 
 
-def test_preflight_refuses_inputs_that_are_not_the_measured_ones(tmp_path, monkeypatch):
-    """review 07, R09: a consistent but different input set (even with its own SHA256SUMS) must not pass preflight."""
-    import hashlib
-    data = tmp_path / "data"
-    data.mkdir()
-    for k, v in (("ETX_SESS_LOGDIR", tmp_path / "s"), ("ETX_DSV2_FLEET", tmp_path / "f"), ("ETX_DSV2_DATA", data)):
-        monkeypatch.setenv(k, str(v))
-    contents = {"weights.bin": b"w" * 64, "weights.bin.manifest": b"m", "fleet_cache.bin": b"c",
-                "golden_tokens.txt": " ".join(["1"] * 33).encode(), "golden_hidden.bin": b"\0" * (27 * 2048 * 4)}
-    for name, body in contents.items():
-        (data / name).write_bytes(body)
-    (data / "SHA256SUMS").write_text("".join(f"{hashlib.sha256(b).hexdigest()}  {n}\n" for n, b in contents.items()))
-    with pytest.raises(RuntimeError, match="is not the measured one"):
-        ins.Session().preflight()
+def test_pinned_inputs_are_the_data_files():
+    # The preflight refusing unmeasured inputs is the command in tests/e2e/test_api_dsv2_inplace_preflight.py.
     assert set(ins.PINNED_INPUTS) == set(ins.DATA_FILES)

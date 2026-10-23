@@ -1,7 +1,6 @@
 """Authored-only regression cases for the options emitter; never GPU qualification."""
 import hashlib
 import json
-import sys
 
 import pytest
 
@@ -120,11 +119,4 @@ def test_existing_output_is_never_reused_or_overwritten(tmp_path, existing):
     if existing != 'file':assert sorted(p.name for p in out.iterdir()) == ['keep']
 
 
-def test_cli_requires_an_explicit_new_output_directory(tmp_path, monkeypatch, capsys):
-    monkeypatch.setattr(sys, 'argv', ['parallel_variants'])
-    with pytest.raises(SystemExit):parallel_variants.main()
-    assert not list(tmp_path.iterdir())
-    monkeypatch.setattr(sys, 'argv', ['parallel_variants', '--out', str(tmp_path)])
-    with pytest.raises(SystemExit):parallel_variants.main()
-    assert 'output already exists' in capsys.readouterr().err
-    assert not list(tmp_path.iterdir())
+# The generator command (manifest, refusals) is executed in tests/e2e/test_api_glm53_parallel_variants.py.

@@ -119,8 +119,7 @@ def test_successful_command_and_cli(tmp_path):
     # Real process, CLI argument parsing and module resolution. No HIP required.
     runner=s.Runner(tmp_path,tmp_path,99999999999); runner.attempt=tmp_path
     assert 'usage:' in runner.command('help',[sys.executable,'-m','examples.vllm_llm.attention_early_merge.build','--help'])
-    for module in ('offline','build_model','session','simulate'):
-        subprocess.run([sys.executable,'-m','examples.vllm_llm.attention_early_merge.'+module,'--help'],check=True,capture_output=True)
+    # Each command's --help is checked through the external API in tests/e2e/test_api_attention_early_merge.py.
 
 
 def test_job_graph_and_generated_shell():

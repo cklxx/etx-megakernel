@@ -147,10 +147,7 @@ def test_run_build_passes_explicit_options_after_cleaning_environment(tmp_path,m
     assert 'GLM_SHARED_EVENTS' not in env and 'GLMDBG_DUMP_LAYERS' not in env
 
 
-def test_qualify_cannot_supply_options_to_override_existing_identity(tmp_path,monkeypatch):
-    monkeypatch.setattr(sys,'argv',['run','qualify','--stage',str(tmp_path),'--build',str(tmp_path),
-                                   '--out',str(tmp_path),'--options',str(tmp_path/'options.json')])
-    with pytest.raises(SystemExit):run.main()
+# The qualify refusal is the command in tests/e2e/test_api_glm53_run.py.
 
 
 def test_inject_refuses_missing_entrypoint():

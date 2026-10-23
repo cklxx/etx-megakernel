@@ -27,14 +27,10 @@ def test_effective_budget_print(monkeypatch, override, cap):
     jobs, limit = load_session(SESSION)
     assert limit == cap
     assert next(j.cmd for j in jobs if j.name == 'budget') == f"printf '%s\\n' '{budget}'"
-    proc = subprocess.run([sys.executable, '-m', 'examples.sessions.vlbest', '--dry-run'],
-                          capture_output=True, text=True)
-    assert proc.returncode == 0, proc.stdout + proc.stderr
-    assert proc.stdout.splitlines()[:2] == [
-        budget, f'Session hard stop: {cap}s from runner start (includes setup)']
+    # The --dry-run command printing this budget is checked in tests/e2e/test_api_vlbest_budget.py.
 
 
-def test_budget_and_graph(capsys):
+def test_budget_and_graph():
     jobs, limit = load_session(SESSION)
     graph = {j.name: j for j in jobs}
     assert s.VM_LIFE_SECONDS == 9000
@@ -42,12 +38,7 @@ def test_budget_and_graph(capsys):
     assert limit == 8400 == s.VM_LIFE_SECONDS - s.SETUP_ALLOWANCE_SECONDS
     assert s.BUDGET == 'BUDGET vm-life=150m runner-cap=140m'
     assert graph['budget'].cmd == "printf '%s\\n' 'BUDGET vm-life=150m runner-cap=140m'"
-    assert s.main(['--dry-run']) == 0
-    out = capsys.readouterr().out
-    assert s.BUDGET in out
-    rows = [line for line in out.splitlines() if '  reads: ' in line]
-    assert len(rows) == len(jobs)
-    assert all(j.name in rows[i] for i, j in enumerate(jobs))
+    # The --dry-run listing of every job in order is checked in tests/e2e/test_api_vlbest_budget.py.
     seen = set()
     for j in jobs:
         assert set(j.deps() + j.deps(True)) <= seen, j.name

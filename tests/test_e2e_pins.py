@@ -28,3 +28,24 @@ def test_decode_known_models_match_the_entry():
     source = (ROOT / 'tests/e2e/test_api_decode_entry.py').read_text()
     known = next(n.value for n in ast.walk(ast.parse(source)) if isinstance(n, ast.Assign) and getattr(n.targets[0], 'id', '') == 'KNOWN')
     assert tuple(ast.literal_eval(known)) == tuple(decode.KNOWN)
+
+
+def test_inbody_magic_matches_the_trace_reader():
+    from etx.tools.inbody import MAGIC
+    assert int(pinned('tests/e2e/test_api_qwen300_hour.py', 'MAGIC'), 16) == MAGIC
+
+
+def test_g6_build_inputs_match_the_session():
+    import ast
+    from examples.vllm_llm.g6_session import BUILD_INPUTS
+    source = (ROOT / 'tests/e2e/test_api_qwen_g6.py').read_text()
+    pinned = next(n.value for n in ast.walk(ast.parse(source)) if isinstance(n, ast.Assign) and getattr(n.targets[0], 'id', '') == 'BUILD_INPUTS')
+    assert tuple(ast.literal_eval(pinned)) == BUILD_INPUTS
+
+
+def test_qwen300_registered_count_matches_the_session():
+    import ast
+    from examples.sessions.qwen300_hour import REGISTERED
+    source = (ROOT / 'tests/e2e/test_api_qwen300_hour.py').read_text()
+    pinned = next(n.value for n in ast.walk(ast.parse(source)) if isinstance(n, ast.Assign) and getattr(n.targets[0], 'id', '') == 'REGISTERED_COUNT')
+    assert ast.literal_eval(pinned) == len(REGISTERED)

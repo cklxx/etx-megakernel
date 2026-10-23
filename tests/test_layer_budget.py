@@ -1,69 +1,10 @@
 """Check the raw trace against the host summary and test layer differences."""
-import json
-import os
 from pathlib import Path
-import re
-import subprocess
-import sys
 
 import pytest
 
 from etx.tools import layer_budget as lb
 from etx.tools import timeline as tl
-
-
-def require_round11(candidates):
-    for base in candidates:
-        directory = base / "results_2026-10-01/round11"
-        if all((directory / name).is_file() for name in
-               ("trace_r11_decode.bin", "trace_r11_decode.log")) and list(directory.glob("*.json")):
-            return directory
-    message = ("Round11 acceptance gate did not run: data set is missing. "
-               "Set ETX_DATA_ROOT to its parent directory.")
-    # Local acceptance and GPU runs set ETX_REQUIRE_DATA=1 so a lost archive cannot pass silently.
-    if os.environ.get("ETX_REQUIRE_DATA") == "1":
-        pytest.fail(message)
-    pytest.skip(message)
-
-
-@pytest.fixture(scope="module")
-def round11():
-    root = Path(__file__).resolve().parents[1]
-    candidates = ([Path(os.environ["ETX_DATA_ROOT"])] if "ETX_DATA_ROOT" in os.environ
-                  else [root])
-    directory = require_round11(candidates)
-    rows = tl.read_raw(directory / "trace_r11_decode.bin")
-    # Match task count and grid-instance count, then check every task in analyze.
-    grid_count = len({r[0] for r in rows})
-    matches = []
-    for path in directory.glob("*.json"):
-        plan = tl.load_plan(path)
-        if (len(plan.get("descs", [])) == len(rows)
-                and sum(len(k["grids"]) for k in plan.get("kernel_instances", [])) == grid_count):
-            matches.append(path)
-    assert len(matches) == 1
-    assert len(rows) == 60362
-    assert grid_count == 436  # The log header says 434, but its phase table has 436 rows.
-    return directory, matches[0]
-
-
-def test_round11_host_correspondence(round11, capsys, tmp_path):
-    directory, plan = round11
-    output = tmp_path / "budget.json"
-    assert lb.main([str(plan), str(directory / "trace_r11_decode.bin"), "--json", str(output)]) == 0
-    actual = capsys.readouterr().out
-    expected = (directory / "trace_r11_decode.log").read_text()
-    pattern = r"^  \S+\s+\d+\s+\d+\.\d{2}\s+\d+\.\d{2}\s+\d+\.\d\s+\d+\.\d\s+\d+\.\d$"
-    expected_rows = re.findall(pattern, expected, re.M)
-    actual_rows = re.findall(pattern, actual, re.M)
-    assert len(expected_rows) == 436
-    assert actual_rows == expected_rows
-    for text in (expected, actual):
-        assert re.search(r"phase trace \(us\): total span (\d+\.\d)", text)[1] == "5081.5"
-    result = json.loads(output.read_text())["A"]
-    assert result["critical_span"] == pytest.approx(result["span"], abs=0.001)
-    assert result["layers"]["2"]["gap"] == pytest.approx(9.95)
-    assert result["layers"]["2"]["dependency_gap"] == pytest.approx(9.95)
 
 
 def small_trace(offset=0):
@@ -105,23 +46,6 @@ def test_reject_wrong_plan():
         lb.analyze(plan, rows)
 
 
-def test_compare_command(tmp_path, capsys):
-    from array import array
-
-    plan, rows = small_trace()
-    plan_path = tmp_path / "plan.json"
-    raw_path = tmp_path / "trace.bin"
-    output = tmp_path / "comparison.json"
-    plan_path.write_text(json.dumps(plan))
-    raw_path.write_bytes(array("q", [v for row in rows for v in row]).tobytes())
-    assert lb.main([str(plan_path), str(raw_path), "--compare", str(plan_path), str(raw_path),
-                    "--json", str(output)]) == 0
-    text = capsys.readouterr().out
-    assert "A minus B" in text
-    assert "0 0.00 0.00 0.00 0.00" in text
-    assert all(p["excess"] == 0 for p in json.loads(output.read_text())["difference"])
-
-
 def test_timeline_preserves_tick_differences():
     a = tl.build_trace(*small_trace())
     b = tl.build_trace(*small_trace(10**15))
@@ -146,28 +70,7 @@ def test_reject_incomplete_trace(field):
         lb.analyze(plan, rows)
 
 
-def run_round11_gate(tmp_path, require):
-    env = {k: v for k, v in os.environ.items() if k != "ETX_REQUIRE_DATA"}
-    env["ETX_DATA_ROOT"] = str(tmp_path)
-    if require:
-        env["ETX_REQUIRE_DATA"] = "1"
-    return subprocess.run(
-        [sys.executable, "-m", "pytest", "-q", "-rs", f"{__file__}::test_round11_host_correspondence"],
-        env=env, capture_output=True, text=True)
-
-
-def test_missing_round11_is_failure_when_data_required(tmp_path):
-    run = run_round11_gate(tmp_path, require=True)
-    assert run.returncode != 0
-    assert "acceptance gate did not run: data set is missing" in run.stdout
-    assert "1 skipped" not in run.stdout
-
-
-def test_missing_round11_is_skip_by_default(tmp_path):
-    run = run_round11_gate(tmp_path, require=False)
-    assert run.returncode == 0
-    assert "acceptance gate did not run: data set is missing" in run.stdout
-    assert "1 skipped" in run.stdout
+# The layer_budget command on the round-11 pair, --compare and the data gate are in tests/e2e/test_api_layer_budget.py.
 
 
 def test_metric_limits(capsys):

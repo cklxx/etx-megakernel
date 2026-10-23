@@ -1,7 +1,5 @@
 from copy import deepcopy
 import json
-import subprocess
-import sys
 
 import pytest
 
@@ -60,11 +58,7 @@ def test_existing_qwen_loader_refuses_nested_and_flat_glm(tmp_path):
             load_dims(str(path))
 
 
-def test_executable_blocker_is_offline_and_exits_nonzero(tmp_path):
-    out = tmp_path / 'blocker.json'
-    run = subprocess.run([sys.executable, '-m', 'examples.glm53.prepare', '--require-model', '--out', str(out)],
-                         cwd=prepare.ROOT, capture_output=True, text=True)
-    assert run.returncode == 2 and json.loads(out.read_text())['status'] == 'ASSETS-REQUIRED'
+# The prepare --require-model command is executed in tests/e2e/test_api_glm53_prepare.py.
 
 
 @pytest.mark.parametrize('batch', [1, 2, 4, 8])

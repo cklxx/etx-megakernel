@@ -1,5 +1,4 @@
 """Local acceptance for the session graph and fail-closed evidence consumers."""
-import json
 import subprocess
 from pathlib import Path
 
@@ -7,8 +6,6 @@ import pytest
 
 from etx.experiments.jobs import load_jobs, load_session
 from examples.sessions import nvchk
-from etx.testing.certificates import certificate_envelope as envelope, certified_import_session as fixture_session
-from tests.test_nvref_report import etx
 
 
 
@@ -103,30 +100,4 @@ printf 'CHECK OK\\n'
         assert not (tmp_path / 'check_p1040.txt').exists()
 
 
-@pytest.mark.parametrize('failure', [None, 'missing', 'status', 'identity', 'wrong_arm', 'gpu'])
-def test_triplet_report_requires_complete_same_build(tmp_path, capsys, failure):
-    fixture_session(tmp_path)
-    identity = json.loads((tmp_path / 'build_identity.json').read_text())
-    statuses = []
-    for rnd in range(1, 4):
-        for arm in ('poll', 'block', 'graph'):
-            name = f'{arm}_r{rnd}'
-            mode = 'graph' if arm == 'graph' else 'fused'
-            wall = {'poll': 4.5, 'block': 4.4, 'graph': 4.7}[arm]
-            text = f'# job {name} gpu=0\n' + envelope(identity, etx(wall, arm=mode))
-            (tmp_path / f'{name}.log').write_text(text)
-            statuses.append(dict(name=name, status='ok'))
-    p = tmp_path / 'block_r2.log'
-    if failure == 'missing':
-        p.unlink()
-    elif failure == 'status':
-        statuses[4]['status'] = 'timeout'
-    elif failure == 'identity':
-        p.write_text(p.read_text().replace('phase=after', 'phase=wrong'))
-    elif failure == 'wrong_arm':
-        p.write_text(p.read_text().replace('mode: ETX megakernel', 'mode: unfused'))
-    elif failure == 'gpu':
-        p.write_text(p.read_text().replace('gpu=0', 'gpu=1'))
-    (tmp_path / 'status.json').write_text(json.dumps(statuses))
-    assert nvchk.report_sync(tmp_path) == (2 if failure else 0)
-    assert ('SYNC NOT-COMPLETE' if failure else 'SYNC supported=True') in capsys.readouterr().out
+# The --report-sync command over the same-build triplet is checked in tests/e2e/test_api_nvchk.py.

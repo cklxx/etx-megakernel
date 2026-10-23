@@ -112,15 +112,7 @@ def test_historical_stream_is_exact_source_bound(tmp_path):
     with pytest.raises(ProtocolError,match='source hash'):
         extract_stream(source,'b5eaa67')
 
-def test_cli_all_flags_off_no_native_inputs(capsys):
-    from examples.experiment_program.columns.__main__ import main
-    for record in ('G02','G03','G05','G13'):
-        assert main(['--record',record,'--dry-run'])==0
-        report=json.loads(capsys.readouterr().out)
-        assert report['enabled'] is False
-        assert report['status']=='BLOCKED_NATIVE_CAPTURE'
-    assert main(['--record','G02','--execute'])==2
-    assert json.loads(capsys.readouterr().out)['enabled'] is False
+# The --dry-run/--execute command is checked in tests/e2e/test_api_experiment_columns.py.
 
 def test_native_capture_patcher_refuses_changed_anchors():
     from examples.experiment_program.columns.patch_capture import patch_kernel,patch_host,patch_shim
