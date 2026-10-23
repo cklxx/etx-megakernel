@@ -185,10 +185,12 @@ class ObservedBytes:
     physical HBM transactions. Storage is O(tensors), also for production.
     """
 
-    def __init__(self, spec):
+    def __init__(self, spec, *, on_read=None):
         _validate_schema(spec)
+        self.on_read = on_read
         self.spec = spec
-        self.payload = Counter()
+        self.payload = Counter({(g, t): 0 for g, b in spec['weights'].items()
+                                for t in b['tensors']})
         self.scales = Counter()
 
     def read(self, group, tensor, *, elements=1, scales=0):
@@ -201,6 +203,23 @@ class ObservedBytes:
         key = group, tensor
         self.payload[key] += elements * ITEM_BYTES[record['dtype']]
         self.scales[key] += scales * 4
+
+    def read_range(self, group, tensor, *, start, size, step, scale=False, repeats=1):
+        """Consume a compressed, instrumented byte-range event for one step."""
+        for name, value in [('start', start), ('size', size), ('step', step),
+                            ('repeats', repeats)]:
+            _integer(value, name, 1 if name in ('size', 'repeats') else 0)
+        rec = self.spec['weights'][group]['tensors'][tensor]
+        payload, scales = tensor_bytes(rec)
+        base = rec['scale_offset'] if scale else rec['offset']
+        extent = scales if scale else payload
+        if start < base or start + size > base + extent:
+            raise ValueError('observed byte range outside tensor')
+        counter = self.scales if scale else self.payload
+        counter[group, tensor] += size * repeats
+        if self.on_read is not None:
+            self.on_read(dict(group=group, tensor=tensor, start=start, size=size,
+                              step=step, scale=scale, repeats=repeats))
 
     def snapshot(self):
         return {key: self.payload[key] + self.scales[key]
@@ -282,15 +301,41 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--fc2a', action='store_true', required=True)
     parser.parse_args(argv)
-    # The wired graph currently has no full-graph instrumented read provider.
-    # In particular, IR reads cannot be substituted for observed reader events.
-    # Report both descriptor gates, and refuse to certify from ideal arithmetic.
-    reasons = []
-    for name in ('module8', 'production'):
-        spec = gate_spec(name)
-        report = fc2a(spec, {}, experts={})
-        reasons.extend(f'{name} {reason}' for reason in report['reasons'])
-    print('FC-2a FAIL ' + '; '.join(reasons))
+    import tempfile
+    from pathlib import Path
+    from examples.glm53 import module_gate, stage
+    from examples.glm53.verify_graph import VerifyGraphCPU, observed_step
+    # Production CPU execution is not feasible here. A measured module8
+    # counterexample is sufficient to fail the universal FC-2a condition;
+    # a module8 pass alone must never certify production.
+    observations, experts = {}, {}
+    with tempfile.TemporaryDirectory(prefix='fc2a-') as directory:
+        root = Path(directory)
+        module_gate.checkpoint(root / 'checkpoint', variant='module8')
+        stage.stage(root / 'checkpoint', root / 'stage', maxlen=160, gate='module8')
+        spec = stage.validate(root / 'stage', allow_fixture=True, gate='module8')
+        for k in (0, 1, 3, 5):
+            print(f'FC-2a observing module8 k={k}', flush=True)
+            cpu = VerifyGraphCPU(root / 'stage', k, 1, 'module8', root / f'k{k}',
+                                 observe=True)
+            sink = ObservedBytes(spec)
+            observed_step(cpu, spec, 0, [[1]] * (k+1), sink)
+            observations[k] = sink.snapshot()
+            experts[k] = {}
+            for i, kind in enumerate(spec['config']['mlp_layer_types']):
+                if kind == 'sparse':
+                    layer = f'l{i}'
+                    experts[k][layer] = []
+                    for p in range(k+1):
+                        name = layer+'_sel' if k == 0 else f'p{p}_{layer}_sel'
+                        selected = cpu.buffers[name].view(cpu.np.float32)
+                        experts[k][layer].append(
+                            selected[:spec['config']['num_experts_per_tok']].astype(int).tolist())
+        report = fc2a(spec, observations, experts=experts)
+    if report['passed']:
+        print('FC-2a FAIL production CPU reader coverage unmeasured')
+    else:
+        print('FC-2a FAIL ' + '; '.join('module8 ' + r for r in report['reasons']))
     return 1
 
 

@@ -178,6 +178,117 @@ def build_from(stage, k, batch=1, options=None):
     return graph
 
 
+
+def instrumented_shim(work):
+    """Instrument the scalar CPU reader, without modifying shared tile sources.
+
+    Each event identifies a blob, descriptor offset, byte range and repetition
+    count. Identical ranges are compressed in C++; the caller labels the step.
+    Scales remain separate events, including every repeated scale lookup.
+    """
+    native = (graph_cpu.ROOT / 'examples/glm53/native.h').read_text()
+    anchor = '  uint64_t i=(uint64_t)r*w.cols+c;'
+    if native.count(anchor) != 1:
+        raise RuntimeError('CPU weight reader instrumentation anchor changed')
+    native = native.replace('#include "native_options.h"',
+                            '#include "examples/glm53/native_options.h"')
+    native = native.replace(anchor, anchor + r"""
+  if(glm_observe){
+    int size=w.kind==1?2:w.kind==2?4:1;
+    glm_record({(uintptr_t)blob,w.offset,w.offset+i*size,(uint64_t)size,0});
+    if(w.kind==3)glm_record({(uintptr_t)blob,w.offset,
+      w.scale+4*((r/w.block)*((w.cols+w.block-1)/w.block)+c/w.block),4,1});
+  }
+""")
+    import re
+    emitted = set()
+
+    def mirror(relative):
+        target = Path(work) / ('observed_' + Path(relative).name)
+        if relative in emitted:
+            return target.name
+        emitted.add(relative)
+        text = native if relative.endswith('/native.h') else (graph_cpu.ROOT / relative).read_text()
+
+        def include(match):
+            dependency = match[1]
+            if dependency.startswith('examples/glm53/'):
+                return '#include "' + mirror(dependency) + '"'
+            return match[0]
+
+        target.write_text(re.sub(r'#include "([^"]+)"', include, text))
+        return target.name
+
+    entry = mirror(SOURCE)
+    prefix = r"""
+#include <map>
+#include <array>
+#include <stdint.h>
+static bool glm_observe=false;
+using ReadKey=std::array<uint64_t,5>;
+static std::map<ReadKey,uint64_t> glm_reads;
+static ReadKey pending[2];
+static uint64_t multiplicity[2]={0,0};
+static void glm_flush(int stream){
+  if(multiplicity[stream])glm_reads[pending[stream]]+=multiplicity[stream];
+  multiplicity[stream]=0;
+}
+static void glm_record(ReadKey key){
+  int stream=key[4];auto &last=pending[stream];auto &count=multiplicity[stream];
+  if(count && last==key){++count;return;}
+  if(count==1 && last[0]==key[0] && last[1]==key[1]
+     && last[2]+last[3]==key[2]){last[3]+=key[3];return;}
+  glm_flush(stream);last=key;count=1;
+}
+extern "C" void glm_reads_begin(){glm_reads.clear();multiplicity[0]=multiplicity[1]=0;glm_observe=true;}
+extern "C" void glm_reads_end(){glm_flush(0);glm_flush(1);glm_observe=false;}
+extern "C" uint64_t glm_reads_size(){return glm_reads.size();}
+extern "C" uint64_t glm_reads_copy(uint64_t* out){
+  uint64_t n=0;
+  for(auto &entry:glm_reads){
+    const auto &k=entry.first;
+    uint64_t* prev=n?out+6*(n-1):nullptr;
+    if(prev && prev[0]==k[0] && prev[1]==k[1] && prev[4]==k[4]
+       && prev[5]==entry.second && prev[2]+prev[3]==k[2])prev[3]+=k[3];
+    else {uint64_t* dst=out+6*n++;for(auto v:k)*dst++=v;*dst=entry.second;}
+  }
+  return n;
+}
+"""
+    return prefix + graph_cpu.SHIM.replace(
+        '#include "examples/glm53/tiles.hip"', f'#include "{entry}"')
+
+
+def observed_step(cpu, spec, pos, tokens, sink):
+    """Execute decode or verify and deliver actual reader ranges to a sink.
+
+    Works with a decode GraphCPU compiled using instrumented_shim as well.
+    Events carry the invocation's starting position, rather than claiming a
+    single position for reads shared across the verify block.
+    """
+    lib = cpu.lib
+    lib.glm_reads_size.restype = ctypes.c_uint64
+    lib.glm_reads_copy.argtypes = [ctypes.POINTER(ctypes.c_uint64)]
+    lib.glm_reads_begin()
+    try:
+        result = cpu.step(pos, tokens)
+    finally:
+        lib.glm_reads_end()
+    n = lib.glm_reads_size()
+    events = (ctypes.c_uint64 * (6*n))()
+    lib.glm_reads_copy.restype = ctypes.c_uint64
+    used = lib.glm_reads_copy(events)
+    lookup = {(cpu.buffers[group+'_weights'].ctypes.data, rec['offset']): (group, key)
+              for group, blob in spec['weights'].items()
+              for key, rec in blob['tensors'].items()}
+    for i in range(0, 6*used, 6):
+        blob, descriptor, start, size, scale, repeats = events[i:i+6]
+        group, tensor = lookup[blob, descriptor]
+        sink.read_range(group, tensor, start=start, size=size, step=pos,
+                        scale=bool(scale), repeats=repeats)
+    return result
+
+
 class VerifyGraphCPU:
     """Run the verify graph's actual C++ tiles using graph_cpu's CPU shim.
 
@@ -185,20 +296,23 @@ class VerifyGraphCPU:
     in position-major order. Buffers (including shared caches) persist across
     calls. The input block is validated before any state is changed.
     """
-    def __init__(self, stage_dir, k, batch, gate, work, options=None, poison=False):
+    def __init__(self, stage_dir, k, batch, gate, work, options=None, poison=False, observe=False):
         import numpy as np
         from examples.glm53 import stage
-        self.np, self.batch, self.count = np, batch, _positions(k)
+        self.np, self.batch, self.count = np, batch, (1 if observe and k == 0 else _positions(k))
         options = Options() if options is None else options
         stage_dir, work = Path(stage_dir), Path(work)
         spec = stage.validate(stage_dir, allow_fixture=True, gate=gate)
         self.d = spec['dimensions']
-        self.graph = build_from(spec, k, batch, options)
+        self.graph = (model.build_from(spec, batch, options) if observe and k == 0
+                      else build_from(spec, k, batch, options))
         work.mkdir(parents=True, exist_ok=True)
         (work / 'glm53_options.h').write_text(options.header())
         # Compile a separate TU, leaving graph_cpu and the decode tiles intact.
         shim = graph_cpu.SHIM.replace('#include "examples/glm53/tiles.hip"',
                                       f'#include "{SOURCE}"')
+        if observe:
+            shim = instrumented_shim(work)
         (work / 'verify_cpu.cpp').write_text(shim)
         lib = work / 'verify_cpu.so'
         subprocess.run(['c++', '-std=c++17', '-O2', '-ffp-contract=off', '-shared', '-fPIC',
@@ -228,7 +342,7 @@ class VerifyGraphCPU:
             args = (ctypes.c_void_p * len(g.args))(*[self.buffers[a].ctypes.data for a in g.args])
             cst = (ctypes.c_int * 4)(*(tuple(g.consts) + (0, 0, 0, 0))[:4])
             fn = ctypes.cast(getattr(self.lib, g.body.symbol), ctypes.c_void_p)
-            self.program.append((g.name, fn, g.grid[1], args, cst))
+            self.program.append((g.name, fn, g.grid[1] if len(g.grid) > 1 else 1, args, cst))
 
     def step(self, pos, tokens):
         np = self.np
@@ -240,14 +354,14 @@ class VerifyGraphCPU:
                 or pos + self.count > self.d['MAXLEN']):
             raise ValueError('position block exceeds cache capacity')
         for p in range(self.count):
-            step = self.buffers[f'p{p}_step'].view(np.int32).reshape(self.batch, 2)
+            step = self.buffers['step' if self.count == 1 else f'p{p}_step'].view(np.int32).reshape(self.batch, 2)
             step[:, 0], step[:, 1] = pos + p, tokens[p]
         for _, fn, tiles, args, cst in self.program:
             self.lib.glm_run_grid(fn, self.batch, tiles, args, cst,
                                  self.lds.ctypes.data, self.lds_floats)
         returned, logits = [], []
         for p in range(self.count):
-            returned.append(self.buffers[f'p{p}_returned'].view(np.int32).copy())
-            head = self.buffers[f'p{p}_head_scratch'].view(np.float32)
+            returned.append(self.buffers['returned' if self.count == 1 else f'p{p}_returned'].view(np.int32).copy())
+            head = self.buffers['head_scratch' if self.count == 1 else f'p{p}_head_scratch'].view(np.float32)
             logits.append(head.reshape(self.batch, -1)[:, 2*self.d['H']:].copy())
         return np.stack(returned), np.stack(logits)
