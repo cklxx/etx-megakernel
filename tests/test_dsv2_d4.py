@@ -143,7 +143,7 @@ def test_d4_verdict_and_trace_criterion(monkeypatch):
     assert decision("d4", [40, 35, 42, 38, 41])["passed"]
     assert not decision("d4", [40, 35, -1, 38, 41])["passed"]          # one pair slower
     assert not decision("d4", [28, 29, 31, 27, "29.5"])["passed"]          # median below 30 us
-    from examples.dsv2lite import ledger as ld
+    from etx.models.dsv2lite import ledger as ld
     T = ld.T
     fake = [T(0, 5, "router", 10.0, 19.0, None, None), T(0, 5, "router", 10.0, 20.0, None, None),
             T(0, 5, "shgu", 10.5, 40.0, None, None), T(0, 6, "router", 90.0, 99.0, None, None),

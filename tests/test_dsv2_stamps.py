@@ -7,7 +7,9 @@ from pathlib import Path
 
 import pytest
 
-from examples.dsv2lite import ledger, patch_fleet, patch_stamps
+from examples.dsv2lite import patch_fleet, patch_stamps
+
+from etx.models.dsv2lite import ledger
 
 
 def test_legacy_prologue_remains_readable(tmp_path):

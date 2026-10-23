@@ -1,47 +1,10 @@
-"""Read ROCm resource remarks for ETX's persistent kernel (not fleet's unused kernel)."""
-from __future__ import annotations
-
-import argparse
-import json
-import re
+"""python -m examples.dsv2lite.build_resources: translator for etx/models/dsv2lite/build_resources.py."""
 from pathlib import Path
+import sys
 
-FIELDS = {
-    "vgpr": "VGPRs", "agpr": "AGPRs", "sgpr": "TotalSGPRs",
-    "scratch": "ScratchSize [bytes/lane]", "lds": "LDS Size [bytes/block]",
-    "occupancy": "Occupancy [waves/SIMD]",
-}
-
-
-def parse(text: str) -> dict[str, int]:
-    parts = re.split(r"remark: Function Name: ", text)
-    matches = [p for p in parts[1:] if p.split()[0] == "etx_megakernel_d0"]
-    if len(matches) != 1:
-        raise ValueError("expected exactly one etx_megakernel_d0 resource record")
-    result = {}
-    for key, label in FIELDS.items():
-        values = re.findall(r"remark:\s+" + re.escape(label) + r": (\d+)", matches[0])
-        if len(values) != 1:
-            raise ValueError(f"missing/duplicate {label}")
-        result[key] = int(values[0])
-    return result
-
-
-def main(argv=None):
-    p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("out", type=Path)
-    args = p.parse_args(argv)
-    rows = {}
-    # Every arm directory rocm_build_check.sh wrote (default first, so deltas read against it).
-    for path in sorted(args.out.glob("*/resource.log"), key=lambda p: (p.parent.name != "default", p.parent.name)):
-        rows[path.parent.name] = parse(path.read_text())
-    base = rows.get("default")
-    print("arm | VGPR | AGPR | SGPR | scratch B/lane | LDS B | waves/SIMD | delta vs default (same order)")
-    for arm, row in rows.items():
-        delta = [row[k] - base[k] for k in FIELDS] if base else None
-        print(arm + " | " + " | ".join(str(row[k]) for k in FIELDS) + " | " + str(delta))
-    (args.out / "resources.json").write_text(json.dumps(rows, indent=2) + "\n")
+from etx.external import HarnessCommandRequest, run_harness_command
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(run_harness_command(HarnessCommandRequest(
+        "deepseek-tools", "build_resources", tuple(sys.argv[1:]), str(Path(__file__).resolve().parents[2]))))

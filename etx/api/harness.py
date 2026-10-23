@@ -15,7 +15,7 @@ HARNESSES = {'qwen-expert-merge': ('runner', 'prepare', 'capture', 'inputs', 'cp
              'glm53-run-all': ('run_all',),
              'qwen-vllm': ('vllm_build', 'decode', 'dense_bytes', 'router_study_guards', 'verify_gaps_cpu', 'polling_isa_cpu',
                            'watchdog_cpu', 'kmodel', 'xcd_run', 'whatif_sim', 'bench_params', 'dsl_ceiling', 'autoconf', 'sensitivity', 'pmodel', 'validate', 'measured', 'compare', 'plan_imports', 'xcd_account', 'folds', 'byte_ledger', 'bw_spec'),
-             'deepseek-tools': ('multibatch_trace_summary', 'compare_fleet')}
+             'deepseek-tools': ('multibatch_trace_summary', 'compare_fleet', 'batch_floor', 'batch_mechanism', 'batch_session', 'build_resources', 'isolate_report', 'ledger', 'multibatch_trace', 'phase_table300', 'pregpu_report', 'replay', 'stage_table', 'verify_lever', 'followup_2026_10_13', 'whatif', 'reference_prepare', 'x8_correctness', 'batch_attribution', 'batch_goldens')}
 
 
 @dataclass(frozen=True)

@@ -264,7 +264,7 @@ def test_build_decision_follows_section_5():
 
 # ---------------------------------------------------------------- goldens, floors, host lines
 def test_goldens_refuse_a_wrong_rotation_a_duplicate_and_a_token_file_mismatch():
-    from examples.dsv2lite.batch_goldens import check, collisions, rotate
+    from etx.models.dsv2lite.batch_goldens import check, collisions, rotate
     p0 = list(range(1024))
     prompts = [rotate(p0, r) for r in range(8)]
     gens = [[r] * 33 for r in range(8)]
@@ -280,7 +280,7 @@ def test_goldens_refuse_a_wrong_rotation_a_duplicate_and_a_token_file_mismatch()
 
 
 def test_floors_match_the_design_table():
-    from examples.dsv2lite.batch_floor import floors
+    from etx.models.dsv2lite.batch_floor import floors
     f = floors()
     assert [f[b]["replicated_floor_ms"] for b in BATCHES] == [1.148, 2.295, 4.59, 9.18]
     assert [f[b]["batched_floor_ms"] for b in BATCHES] == [1.148, 1.724, 2.721, 4.221]
@@ -361,7 +361,7 @@ def test_boxcontrol_job_declares_both_builds_and_preserves_its_recipe_difference
 
 def test_boxcontrol_prints_exact_host_medians_and_signed_recipe_difference(tmp_path, monkeypatch, capsys):
     import re
-    from examples.dsv2lite import batch_session as bs
+    from etx.models.dsv2lite import batch_session as bs
     for k in ("ETX_SESS_LOGDIR", "ETX_DSV2_FLEET", "ETX_DSV2_DATA"):
         monkeypatch.setenv(k, str(tmp_path))
     # Follow the registry's current shipped arm, rather than baking today's recipe into the mode.
@@ -413,7 +413,7 @@ def test_boxcontrol_prints_exact_host_medians_and_signed_recipe_difference(tmp_p
 
 @pytest.mark.parametrize("missing", [BATCH_ARMS[1], "alld4r0l1"])
 def test_boxcontrol_refuses_a_missing_arm_without_partial_numbers(tmp_path, monkeypatch, capsys, missing):
-    from examples.dsv2lite import batch_session as bs
+    from etx.models.dsv2lite import batch_session as bs
     for k in ("ETX_SESS_LOGDIR", "ETX_DSV2_FLEET", "ETX_DSV2_DATA"):
         monkeypatch.setenv(k, str(tmp_path))
     s = bs.BatchSession()
@@ -432,7 +432,7 @@ def test_boxcontrol_refuses_a_missing_arm_without_partial_numbers(tmp_path, monk
 
 @pytest.mark.parametrize("damage", [dict(tokens="31/32"), dict(layers=26), dict(warm="31/32")])
 def test_boxcontrol_refuses_failed_correctness_gates(tmp_path, monkeypatch, capsys, damage):
-    from examples.dsv2lite import batch_session as bs
+    from etx.models.dsv2lite import batch_session as bs
     for k in ("ETX_SESS_LOGDIR", "ETX_DSV2_FLEET", "ETX_DSV2_DATA"):
         monkeypatch.setenv(k, str(tmp_path))
     s = bs.BatchSession()
@@ -445,7 +445,7 @@ def test_boxcontrol_refuses_failed_correctness_gates(tmp_path, monkeypatch, caps
 
 def test_boxcontrol_cli_runs_without_an_arm(monkeypatch):
     from types import SimpleNamespace
-    from examples.dsv2lite import batch_session as bs
+    from etx.models.dsv2lite import batch_session as bs
     calls = []
     monkeypatch.setattr(bs, "BatchSession", lambda: SimpleNamespace(boxcontrol=lambda: calls.append("boxcontrol")))
     bs.main(["boxcontrol"])
@@ -453,7 +453,7 @@ def test_boxcontrol_cli_runs_without_an_arm(monkeypatch):
 
 
 def test_rounds_alternate_and_skip_an_arm_whose_gate_failed(tmp_path, monkeypatch):
-    from examples.dsv2lite import batch_session as bs
+    from etx.models.dsv2lite import batch_session as bs
     for k, v in dict(ETX_SESS_LOGDIR=str(tmp_path), ETX_DSV2_FLEET=str(tmp_path), ETX_DSV2_DATA=str(tmp_path)).items():
         monkeypatch.setenv(k, v)
     s = bs.BatchSession()
@@ -479,7 +479,7 @@ def test_gate_runs_the_arm_it_names(tmp_path, monkeypatch):
     written four times under four names and the run appeared to say that the plain arm fails exactly like the lever
     arms. This test is the local check that each gate invocation points at b_<arm>/run.
     """
-    from examples.dsv2lite import batch_session as bs
+    from etx.models.dsv2lite import batch_session as bs
     for k, v in dict(ETX_SESS_LOGDIR=str(tmp_path), ETX_DSV2_FLEET=str(tmp_path), ETX_DSV2_DATA=str(tmp_path)).items():
         monkeypatch.setenv(k, v)
     s = bs.BatchSession()
@@ -625,7 +625,7 @@ def test_verifier_checks_the_promised_batch_report(tmp_path):
 
 
 def test_baseline_refuses_a_model_other_than_the_prepared_model(tmp_path, monkeypatch):
-    from examples.dsv2lite import batch_session as bs
+    from etx.models.dsv2lite import batch_session as bs
     for k in ("ETX_SESS_LOGDIR", "ETX_DSV2_FLEET", "ETX_DSV2_DATA"):
         monkeypatch.setenv(k, str(tmp_path))
     other = tmp_path / "different-model"
@@ -652,7 +652,7 @@ def test_standalone_diagnostic_prepares_its_goldens():
 
 @pytest.mark.parametrize("changed", [0, 32])
 def test_collision_warning_covers_either_checked_token_window(changed):
-    from examples.dsv2lite.batch_goldens import collisions
+    from etx.models.dsv2lite.batch_goldens import collisions
     goldens = [list(range(33)), list(range(33))]
     goldens[1][changed] = 999
     assert collisions(goldens) == [[0, 1]]
@@ -698,7 +698,7 @@ def test_vllm_cli_rejects_options_for_the_other_mode(monkeypatch, capsys, args):
 
 @pytest.mark.parametrize("operation", ["rounds", "vsel", "report", "boxcontrol"])
 def test_batch_cli_rejects_an_ignored_arm(monkeypatch, capsys, operation):
-    from examples.dsv2lite import batch_session as bs
+    from etx.models.dsv2lite import batch_session as bs
     monkeypatch.setattr(bs, "BatchSession", lambda: pytest.fail("ignored arm reached session construction"))
     with pytest.raises(SystemExit) as exc:
         bs.main([operation, "x8p"])
@@ -706,7 +706,7 @@ def test_batch_cli_rejects_an_ignored_arm(monkeypatch, capsys, operation):
 
 
 def test_bulk_floor_excludes_router_weights_in_the_dense_layer():
-    from examples.dsv2lite.batch_floor import step_bytes
+    from etx.models.dsv2lite.batch_floor import step_bytes
     # Independently count the pinned model: 27 attention projections, 26 MoE routers,
     # one dense MLP, 26*(6 routed + 2 shared) experts, embedding and vocabulary projection.
     weights = (27 * (2048 * 16 * 192 + 2048 * 576 + 2 * 512 * 16 * 128 + 16 * 128 * 2048)

@@ -1,7 +1,7 @@
 """examples/dsv2lite/whatif.py: the base layout reproduces fleet's layer, and the parser reads overlap_bench's lines."""
 import pytest
 
-from examples.dsv2lite import whatif as w
+from etx.models.dsv2lite import whatif as w
 
 
 def test_base_and_bounds():

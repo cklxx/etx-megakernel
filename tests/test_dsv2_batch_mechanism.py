@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from etx.tools.timeline import Task, Trace
-from examples.dsv2lite import batch_mechanism as m
+from etx.models.dsv2lite import batch_mechanism as m
 
 ROOT = Path(__file__).resolve().parents[1]
 # what plan_stats lowers for the four arms (examples/dsv2lite/batch_mechanism.py, ~100 s locally); the offline test

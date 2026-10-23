@@ -80,7 +80,7 @@ def configuration(c,*,admission=True,dormant=False):
         require(goldens[0].resolve()==(model/'golden_c1024.txt').resolve(),'Qwen ETX/system golden mismatch')
     else:
         reqs=c['requests'];require(len(reqs)==c['batch'],'exact DeepSeek request directories required')
-        from examples.dsv2lite.batch_goldens import binding,read_binding,check
+        from etx.models.dsv2lite.batch_goldens import binding,read_binding,check
         # The producer validation binds distinct prompts and native references.
         prompts=[];gens=[];tokens=[];hashes={};bindings=[]
         import numpy as np

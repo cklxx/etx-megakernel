@@ -27,7 +27,7 @@ _full.JOBS = [dict(d) for d in _full.JOBS if d["name"] in
               ("apt", "etx_env", "prep_env", "source", "prep_dl", "prep_ref", "prep_pack", "preflight")]
 job, PREP_PY, MODEL = _full.job, _full.PREP_PY, _full.MODEL
 from examples.dsv2lite.arms import BATCH_ARMS  # noqa: E402
-from examples.dsv2lite.batch_session import BOXCONTROL_PREVIOUS_ARM  # noqa: E402
+from etx.models.dsv2lite.batch_session import BOXCONTROL_PREVIOUS_ARM  # noqa: E402
 IMAGE = "vllm/vllm-openai-rocm@sha256:bb44b39aea26798cce43030a98bf48efd0322ca7147367db86e38b96bd80f0e7"
 REQUESTS = 8
 GOLDENS = "$ETX_DSV2_DATA/goldens.json"

@@ -190,7 +190,7 @@ class Session:
             flags = shlex.split(env["ETX_CFLAGS"])
             text = self.run(f"compile_{arm}{'_stamps' if stamped else ''}",
                             ["bash", "examples/dsv2lite/build.sh", self.fleet, *flags], env=env, timeout=900)
-            parse = declaration(self.root, "dsv2lite.build_resources").parse
+            from .build_resources import parse
             resources = parse(text)
             write_json(out / "resources.json", resources)
             if resources["scratch"] > a.scratch_allow:
@@ -232,7 +232,7 @@ class Session:
                    ETX_DS_PROLOGUE=str(self.logs / f"{name}.stamps.bin"))
         text = self.run(name, [self.out(arm, stamped=True) / "run", *self.args()], env=env)
         self.d.full_result(text)
-        st = declaration(self.root, "dsv2lite.stage_table")
+        from . import stage_table as st
         us, n, span = st.measured(self.out(arm, stamped=True) / "plan.json", self.logs / f"{name}.trace.bin",
                                   self.logs / f"{name}.stamps.bin")
         rec = dict(arm=arm, span_us=span, stages_us=us, instances=n)
@@ -253,7 +253,7 @@ class Session:
               f"median lead {r['median_lead_us']:.1f} us, min {r['min_lead_us']:.1f} us", flush=True)
 
     def report(self):
-        st = declaration(self.root, "dsv2lite.stage_table")
+        from . import stage_table as st
         out = {f.stem.removeprefix("pairs_"): json.loads(f.read_text()) for f in sorted(self.logs.glob("pairs_*.json"))}
         if "all" not in out:
             raise RuntimeError("the deciding arm `all` is NOT COMPLETE")

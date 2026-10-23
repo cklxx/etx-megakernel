@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from examples.dsv2lite import batch_attribution as a
-from examples.dsv2lite.batch_session import BatchSession
+from etx.models.dsv2lite import batch_attribution as a
+from etx.models.dsv2lite.batch_session import BatchSession
 from examples.dsv2lite.routing_overlap import validate_prefix
 
 ROOT = Path(__file__).resolve().parents[1]

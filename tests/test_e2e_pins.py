@@ -52,14 +52,14 @@ def test_qwen300_registered_count_matches_the_session():
 
 
 def test_stage_table_location_matches_the_tool():
-    from examples.dsv2lite.stage_table import OUT
+    from etx.models.dsv2lite.stage_table import OUT
     source = (ROOT / 'tests/e2e/test_api_dsv2_stage_table.py').read_text()
     assert "COMMITTED = ROOT / '" + str(OUT.relative_to(ROOT)) + "'" in source
 
 
 def test_golden_files_and_rotation_match_the_tool():
     import ast
-    from examples.dsv2lite.batch_goldens import FILES, ROTATE
+    from etx.models.dsv2lite.batch_goldens import FILES, ROTATE
     tree = ast.parse((ROOT / 'tests/e2e/test_api_dsv2_goldens.py').read_text())
     values = {n.targets[0].id: ast.literal_eval(n.value) for n in tree.body
               if isinstance(n, ast.Assign) and getattr(n.targets[0], 'id', '') in ('FILES', 'ROTATE')}
@@ -68,7 +68,7 @@ def test_golden_files_and_rotation_match_the_tool():
 
 def test_attribution_batches_match_the_session():
     import ast
-    from examples.dsv2lite.batch_attribution import BATCHES
+    from etx.models.dsv2lite.batch_attribution import BATCHES
     tree = ast.parse((ROOT / 'tests/e2e/test_api_dsv2_attribution_final.py').read_text())
     pinned = next(n.value for n in tree.body if isinstance(n, ast.Assign) and getattr(n.targets[0], 'id', '') == 'BATCHES')
     assert tuple(ast.literal_eval(pinned)) == tuple(BATCHES)

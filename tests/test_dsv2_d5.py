@@ -292,7 +292,7 @@ def test_exact_cpp_planner_and_wrapper_addresses_are_only_owned_weights(tmp_path
 
 
 def test_verify_default_strips_d5_and_arm_sets_it(monkeypatch, tmp_path):
-    from examples.dsv2lite import verify_lever as verify
+    from etx.models.dsv2lite import verify_lever as verify
     calls = []
 
     def fake_run(cmd, **kwargs):

@@ -2,7 +2,7 @@ import copy
 
 import pytest
 
-from examples.dsv2lite.multibatch_trace import aggregate, validate_rows
+from etx.models.dsv2lite.multibatch_trace import aggregate, validate_rows
 
 
 def fixture():

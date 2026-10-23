@@ -51,9 +51,9 @@ def main() -> None:
     print(f"loaded in {time.time() - t0:.0f}s", flush=True)
     bound = None
     if a.reference_data:
-        from examples.dsv2lite.reference_prepare import verify, recipe
+        from etx.models.dsv2lite.reference_prepare import verify, recipe
         from examples.dsv2lite.pinned import fleet_export
-        from examples.dsv2lite.batch_goldens import read_binding, sha
+        from etx.models.dsv2lite.batch_goldens import read_binding, sha
         from examples.llm.vllm_bench import read_golden
         bound = []
         expected_recipe = recipe(fleet_export(Path(a.fleet)), Path(a.model), 0)

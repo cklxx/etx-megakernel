@@ -229,8 +229,8 @@ def _followup(fu: Path):
 
 
 def _stages(arm, f, plan, trace, stamps):
-    from examples.dsv2lite import stage_table as st
-    from examples.dsv2lite.phase_table300 import pinned_parser
+    from etx.models.dsv2lite import stage_table as st
+    from etx.models.dsv2lite.phase_table300 import pinned_parser
     pinned_parser()
     us, n, span = st.measured(plan, trace, stamps)
     want = json.loads(f.read_text())

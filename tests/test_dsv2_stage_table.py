@@ -15,13 +15,13 @@ def data():
 
 
 def test_replay_reproduces_the_measured_trace(data):
-    from examples.dsv2lite.replay import check, default_replay
+    from etx.models.dsv2lite.replay import check, default_replay
     r = check(default_replay())
     assert abs(r["error_us"]) < 0.01 and r["clamped_skew_us"] < 0.01, r
 
 
 def test_stage_order_is_the_committed_table_order(data):
     # The --out command regenerating the committed table byte for byte is in tests/e2e/test_api_dsv2_stage_table.py.
-    from examples.dsv2lite import stage_table as st
+    from etx.models.dsv2lite import stage_table as st
     rows = json.loads((st.OUT / "stage_table.json").read_text())["rows"]
     assert [r["stage"] for r in rows] == st.ORDER and len(st.ORDER) == 14

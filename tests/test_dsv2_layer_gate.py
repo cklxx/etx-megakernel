@@ -189,7 +189,7 @@ def test_layers_cli_refuses_missing_reference_multi_request_and_ignored_referenc
 
 @pytest.mark.parametrize("switch", [None, "0", "1"])
 def test_batch_gate_passes_only_opted_in_metrics_through_clean_env(tmp_path, monkeypatch, switch):
-    from examples.dsv2lite import batch_session as bs
+    from etx.models.dsv2lite import batch_session as bs
     for name in ("ETX_SESS_LOGDIR", "ETX_DSV2_DATA", "ETX_DSV2_FLEET"):
         monkeypatch.setenv(name, str(tmp_path))
     if switch is None:
