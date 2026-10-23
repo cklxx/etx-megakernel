@@ -28,14 +28,15 @@ def _positions(k):
     return k + 1
 
 
-def build_from(stage, k, batch=1, options=None):
+def build_from(stage, k, batch=1, options=None, *, _single_row=False):
     """Build one verify step. Weights and runtime state are shared across positions.
 
-    Blocks support 2 through 6 positions (k=1 through 5).
+    Blocks support 2 through 6 positions (k=1 through 5). The private
+    single-row mode supplies the observed k=0 baseline with identical tiles.
     This first verify path supports phased pipeline placement; TP/EP layouts
     need their own multi-position dispatch and are explicitly refused.
     """
-    count = _positions(k)
+    count = 1 if _single_row and k == 0 else _positions(k)
     if count > 6:
         raise ValueError('verify read-once MoE supports at most 6 positions (k <= 5)')
     options = Options() if options is None else options
@@ -46,6 +47,8 @@ def build_from(stage, k, batch=1, options=None):
     graph.symbols = list(base.symbols)
 
     def local(name, p):
+        if count == 1:
+            return name
         if name not in base.tensors:
             return f'p{p}_{name}'
         t = base.tensors[name]
@@ -155,7 +158,7 @@ def build_from(stage, k, batch=1, options=None):
                 [layer+'_mid'], [layer+'_hcf', layer+'_rt', layer+'_fwork'], int(moe))
         if moe:
             for p in range(count):
-                graph.tensor(f'p{p}_{layer}_partial',
+                graph.tensor(local(layer+'_partial', p),
                              ('B', (stage['dimensions']['TOPK'] + 1) * stage['dimensions']['H']),
                              role='scratch', dtype='float32', bytes_per_elem=4)
             src = base.grid(layer + '_up')
@@ -316,6 +319,7 @@ def observed_step(cpu, spec, pos, tokens, sink):
     """Execute decode or verify and deliver actual reader ranges to a sink.
 
     Works with a decode GraphCPU compiled using instrumented_shim as well.
+    VerifyGraphCPU(observe=True, k=0) uses the same verify tiles with one row.
     Events carry the invocation's starting position, rather than claiming a
     single position for reads shared across the verify block.
     """
@@ -357,8 +361,10 @@ class VerifyGraphCPU:
         stage_dir, work = Path(stage_dir), Path(work)
         spec = stage.validate(stage_dir, allow_fixture=True, gate=gate)
         self.d = spec['dimensions']
-        self.graph = (model.build_from(spec, batch, options) if observe and k == 0
-                      else build_from(spec, k, batch, options))
+        # Observe the same kernels with one row at k=0. Using decode's old
+        # tiled norm/prologue rereads would penalize true read-once verify
+        # phases with negative fixed violations. No FC-2a threshold is relaxed.
+        self.graph = build_from(spec, k, batch, options, _single_row=observe and k == 0)
         work.mkdir(parents=True, exist_ok=True)
         (work / 'glm53_options.h').write_text(options.header())
         # Compile a separate TU, leaving graph_cpu and the decode tiles intact.

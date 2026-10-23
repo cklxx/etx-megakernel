@@ -166,7 +166,7 @@ def test_head_streams_weights_once_for_all_positions(module8, k):
         assert not any(g.name == f'p{p}_head' for g in cpu.graph.grids)
 
 
-@pytest.mark.parametrize('k', [1, 3, 5])
+@pytest.mark.parametrize('k', [0, 1, 3, 5])
 def test_all_fixed_payloads_stream_once(module8, k):
     from examples.glm53.verify_graph import observed_step
     from examples.spec.ledger import ObservedBytes, tensor_bytes
@@ -191,3 +191,19 @@ def test_all_fixed_payloads_stream_once(module8, k):
                     payload = 0
                 assert sink.payload[group, name] == payload, (pos, group, name)
                 assert sink.scales[group, name] == tensor_bytes(rec)[1], (pos, group, name)
+
+
+def test_single_row_observation_matches_decode(module8, sequential):
+    cpu = VerifyGraphCPU(module8 / 'stage', 0, 2, 'module8',
+                         module8 / 'single-row-observed', observe=True, poison=True)
+    # This is an execution baseline, not an allowance for missing reads.
+    _reset_state(sequential)
+    for pos in range(82):
+        tokens = np.array([pos % cpu.d['VOCAB'], (pos + 1) % cpu.d['VOCAB']])
+        got_ids, got_logits = cpu.step(pos, tokens[None, :])
+        ids, logits = sequential.step(pos, tokens)
+        np.testing.assert_array_equal(got_ids[0], ids)
+        np.testing.assert_array_equal(got_logits[0], logits)
+    for name, tensor in sequential.graph.tensors.items():
+        if tensor.role == 'runtime':
+            np.testing.assert_array_equal(cpu.buffers[name], sequential.buffers[name])

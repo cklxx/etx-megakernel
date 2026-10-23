@@ -235,8 +235,9 @@ def test_fc2a_command_fails_closed(capsys):
     output = capsys.readouterr().out
     assert 'FC-2a FAIL module8 ' in output
     assert 'missing observed' not in output
-    assert 'fixed observed=' in output
-    assert 'baseline=' in output
+    # Strict baseline coverage still fails for the unused position-zero APE.
+    assert 'fixed observed=' not in output
+    assert 'missing positive observed baseline' in output
     for k in (0, 1, 3, 5):
         assert f'observing module8 k={k}' in output
 

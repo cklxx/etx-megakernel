@@ -361,6 +361,7 @@ template<int P, bool Down> GLM_DEV void glm_verify_expert(const etx_ctx* c) {
 }
 template<bool Down> GLM_DEV void glm_verify_experts(const etx_ctx* c) {
   switch(c->cst[2]){
+    case 1:glm_verify_expert<1,Down>(c);break;
     case 2:glm_verify_expert<2,Down>(c);break;
     case 3:glm_verify_expert<3,Down>(c);break;
     case 4:glm_verify_expert<4,Down>(c);break;
@@ -424,6 +425,7 @@ template<int P> GLM_DEV void glm_verify_head(const etx_ctx* c) {
 }
 extern "C" __device__ void glm53_verify_head(const etx_ctx* c) {
   switch(c->cst[2]){
+    case 1:glm_verify_head<1>(c);break;
     case 2:glm_verify_head<2>(c);break;
     case 3:glm_verify_head<3>(c);break;
     case 4:glm_verify_head<4>(c);break;
