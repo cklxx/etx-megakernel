@@ -78,19 +78,20 @@ def test_verify_byte_ledger(spec, k, pattern):
 
 
 @pytest.mark.parametrize('k', [0, 1, 3, 5])
-def test_actual_graph_does_not_prove_read_reuse(spec, k):
+def test_actual_graph_has_one_head_weight_pass(spec, k):
     from examples.glm53 import model, verify_graph
     graph = model.build_from(spec) if k == 0 else verify_graph.build_from(spec, k)
-    # Full head matrix is consumed by a separate head call per position.
-    heads = [g for g in graph.grids if g.body.symbol == 'glm53_lm']
-    assert len(heads) == k+1
+    # Verify now streams each head row through all positions in one call.
+    symbol = 'glm53_lm' if k == 0 else 'glm53_verify_head'
+    heads = [g for g in graph.grids if g.body.symbol == symbol]
+    assert len(heads) == 1
     assert all('head_weights' in g.reads for g in heads)
     report = graph_ledger(graph)
     weight_storage = sum(t.nbytes({'B': 1}) for t in graph.tensors.values() if t.role == 'weight')
     assert report['storage_bytes']['weight'] == weight_storage
     head_reads = [r for r in report['rows'] if r['tensor'] == 'head_weights']
-    assert len(head_reads) == k+1
-    assert sum(r['bytes'] for r in head_reads) == (k+1)*spec['weights']['head']['blob_bytes']
+    assert len(head_reads) == 1
+    assert sum(r['bytes'] for r in head_reads) == spec['weights']['head']['blob_bytes']
     # No copy of recurrent state or weight storage per draft position.
     baseline = graph_ledger(model.build_from(spec))
     assert report['storage_bytes']['weight'] == baseline['storage_bytes']['weight']
