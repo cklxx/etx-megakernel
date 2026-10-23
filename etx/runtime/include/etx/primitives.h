@@ -45,7 +45,7 @@ static __device__ __forceinline__ int32_t etx_arrive_flush_DEVICE_s(const etx_pa
   const int32_t old = atomicAdd(p.ev_sub + (size_t)domain * p.event_words + idx, 1);
   if (old + 1 != share) return 1;
   ETX_RELEASE_DEVICE();
-  return __hip_atomic_fetch_sub(p.events + ETX_EVW(idx), share, __ATOMIC_RELAXED, __HIP_MEMORY_SCOPE_AGENT) - share;
+  return etx_atomic_sub_device(p.events + ETX_EVW(idx), share) - share;
 }
 
 static __device__ __forceinline__ int32_t etx_arrive_flush_DEVICE(const etx_params& p, int32_t idx, uint32_t domain) {
@@ -55,7 +55,7 @@ static __device__ __forceinline__ int32_t etx_arrive_flush_DEVICE(const etx_para
   const int32_t old = atomicAdd(p.ev_sub + (size_t)domain * p.event_words + idx, 1);
   if (old + 1 != share) return 1;
   ETX_RELEASE_DEVICE();                                              // one write-back covers every earlier arrival's stores
-  return __hip_atomic_fetch_sub(p.events + ETX_EVW(idx), share, __ATOMIC_RELAXED, __HIP_MEMORY_SCOPE_AGENT) - share;
+  return etx_atomic_sub_device(p.events + ETX_EVW(idx), share) - share;
 }
 
 // _nf ("no flush"): the event's producers all store their payload with device-coherent accesses (sc0 sc1), so the
@@ -66,7 +66,7 @@ static __device__ __forceinline__ int32_t etx_arrive_flush_DEVICE_s_nf(const etx
   ETX_RELEASE_DOMAIN();
   const int32_t old = atomicAdd(p.ev_sub + (size_t)domain * p.event_words + idx, 1);
   if (old + 1 != share) return 1;
-  return __hip_atomic_fetch_sub(p.events + ETX_EVW(idx), share, __ATOMIC_RELAXED, __HIP_MEMORY_SCOPE_AGENT) - share;
+  return etx_atomic_sub_device(p.events + ETX_EVW(idx), share) - share;
 }
 
 static __device__ __forceinline__ int32_t etx_arrive_flush_DEVICE_nf(const etx_params& p, int32_t idx, uint32_t domain) {
@@ -75,7 +75,7 @@ static __device__ __forceinline__ int32_t etx_arrive_flush_DEVICE_nf(const etx_p
   ETX_RELEASE_DOMAIN();
   const int32_t old = atomicAdd(p.ev_sub + (size_t)domain * p.event_words + idx, 1);
   if (old + 1 != share) return 1;
-  return __hip_atomic_fetch_sub(p.events + ETX_EVW(idx), share, __ATOMIC_RELAXED, __HIP_MEMORY_SCOPE_AGENT) - share;
+  return etx_atomic_sub_device(p.events + ETX_EVW(idx), share) - share;
 }
 
 // Relay (P5, fleet's per-XCD scheduler mirror generalised). One workgroup per domain

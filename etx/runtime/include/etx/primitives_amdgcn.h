@@ -46,3 +46,8 @@ static __device__ __forceinline__ int32_t etx_amdgcn_load_agent(const int32_t* p
 static __device__ __forceinline__ void etx_store_relaxed_device(int32_t* p, int32_t v) {
   __hip_atomic_store(p, v, __ATOMIC_RELAXED, __HIP_MEMORY_SCOPE_AGENT);
 }
+
+// Relaxed device-scope counter decrement; returns the value before subtraction.
+static __device__ __forceinline__ int32_t etx_atomic_sub_device(int32_t* p, int32_t n) {
+  return __hip_atomic_fetch_sub(p, n, __ATOMIC_RELAXED, __HIP_MEMORY_SCOPE_AGENT);
+}
