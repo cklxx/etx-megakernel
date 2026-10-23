@@ -1,26 +1,26 @@
 # CUDA calibration bench ports (WP-19)
 
-Status: **compiled, never run**. This means the five benchmarks have been
+Status: **compiled, never run**. This means the six benchmarks have been
 compiled, and only their CPU `--help` paths have been executed. No GPU
 correctness, timing, residency, or forward-progress claim is made.
 
 These are syntax-level ports of `bench/sync/sync_bench.hip`,
-`bench/hw/hw_bench.hip`, and the three corresponding `bench/calib/*.hip`
+`bench/hw/hw_bench.hip`, and the four corresponding `bench/calib/*.hip`
 sources. No generated AMD lowering header or HIP runtime is required.
 
 ## Build and CPU acceptance
 
 ```bash
 # CUDA is an optional command prefix supplied by the caller (empty locally).
-CUDA= bash bench/calib/cuda/build.sh
-for name in sync_bench hw_bench atomic_pingpong queue_contention step_overhead; do
+$CUDA bash bench/calib/cuda/build.sh
+for name in sync_bench hw_bench atomic_pingpong queue_contention step_overhead p2p_sync; do
   build/calib_cuda/"$name" --help
 done
 ```
 
-The build script compiles all five binaries and never executes them. Set `NVCC`
-(or `CUDA_HOME`), `CUDA_ARCH` (default `sm_80`), and `OUT` to override the compiler,
-architecture, and output directory. Default compiler: `/opt/cuda/bin/nvcc`.
+The build script compiles all six binaries and never executes them. Set `NVCC`,
+`CUDA_ARCH` (default `sm_90`), and `OUT` to override the compiler,
+architecture, and output directory. Default compiler: `nvcc` on `PATH`.
 Default output: `build/calib_cuda/`. CUDA 13.4 was used for local acceptance.
 `--help` and `-h` return before any CUDA runtime call or GPU discovery.
 
@@ -64,3 +64,17 @@ The non-`--help` paths require future GPU qualification under a deadline.
 In particular, fixed launch sizes and polling protocols have not been checked
 for residency or forward progress. The port does not establish equivalent
 cache protocols, correctness, performance, or an ETX fusion result.
+
+`p2p_sync` ports the consumer-device-memory case of `bench/calib/p2p_sync.hip`.
+It retains the condition/location/payload/dev0/dev1 columns and us units. Each
+initiator is measured separately, with request, reply and optional 4 KB payload
+on its consumer; one-way is estimated as half the local-clock round trip, not
+a timestamp difference across GPUs. CUDA system-scope atomic references use
+release stores and acquire loads, with payload validation before acknowledgement.
+Both peer directions must support access and native atomics. Host-pinned and
+non-consumer flag placements from HIP are omitted. Peer capability alone does
+not establish NVLink transport; confirm topology before interpreting GPU results.
+The loaded case streams initialized 1 GB buffers on both devices for five
+seconds; signalling polls also have a five-second total deadline and fail
+without timing rows on timeout or payload mismatch. Load overlap and residency
+still need GPU qualification. Status: **compiled, never run**.
