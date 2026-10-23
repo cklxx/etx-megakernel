@@ -10,7 +10,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from etx.importer.ir_import import (
+from etx.ir.llvm import (
     ImportError_, ImportInfo, Param, _functions, _lds_globals,
     _matching_paren, _param_type, _size_align, _split_top,
 )
