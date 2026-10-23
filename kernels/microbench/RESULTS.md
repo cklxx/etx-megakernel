@@ -78,3 +78,69 @@ topk_row p50_us=57.344 min_us=56.320 max_us=59.296 rows=1 n=151936 k=16 grid=(1)
 spec_round p50_us=13.312 min_us=12.288 max_us=18.432 seqs=32 block_len=7 rows=64 dstride=8 grid=(32)x4+(1) block=64x5 effective_GBps=N/A check=OK
 markov_rows p50_us=55.296 min_us=55.232 max_us=58.240 rows=32 n=151936 hidden=4096 stride=7 grid=(32)+(32,64)+(32) block=256+1024+64 effective_GBps=185.935 check=OK
 ```
+
+## Remaining sm_89 drivers
+
+Target card: **NVIDIA GeForce RTX 4070 Ti SUPER, 16 GB**, **sm_89**;
+compiler: `/opt/cuda/bin/nvcc`, **CUDA 13.4.92**, `-O3 -std=c++17 -arch=sm_89`.
+All twelve drivers compile with this compiler. `BENCH_COMPILE_ONLY=1 bash
+kernels/microbench/run_bench.sh` compiles serially without executing GPU code.
+This compile-only check does not establish runtime correctness or timings.
+
+The eight added drivers use the same output-check, 20-warm-up, 200-sample CUDA
+event protocol as the first round. Each file's row measures its complete launch
+sequence. New timing numbers await authorization to run GPU benchmarks; none
+have been estimated or copied from another worktree.
+
+| Driver / timed launch sequence | p50 (µs) | min (µs) | max (µs) | Grid | Block | Effective GB/s |
+|---|---:|---:|---:|---|---|---:|
+| copy_rows: strided copy → last row → own rows | pending | pending | pending | (32)+(1)+(4) | 256×3 | pending |
+| dflash_conv: grouped convolution | pending | pending | pending | (20) | 256 | N/A |
+| dflash_select: 7-step candidate walk | pending | pending | pending | (4) | 256 | N/A |
+| gdn_advance: mask row zero → shift conv history | pending | pending | pending | (32)+(4,1) | 256×2 | N/A |
+| line_copy: gather → scatter | pending | pending | pending | (16,4)×2 | 256×2 | pending |
+| peer_barrier: single-rank self-peer barrier | pending | pending | pending | (1) | 32 | N/A |
+| peer_collective: single-rank local allgather copy | pending | pending | pending | (16) | 256 | pending |
+| weight_prep: weight+1 → cast → RoPE → four fills → iota | pending | pending | pending | (17)×2+(32)+(17)×5 | 256×2+64+256×5 | N/A |
+
+### Shapes, checks and interpretation
+
+- **copy_rows:** 32 bf16 rows, width 4,096, input/output strides 4,112/4,104;
+  four own rows start at row 30, testing clamping to the last row. Checks every
+  output and untouched stride padding. Logical traffic is 606,480 bytes per
+  sequence (row reads/writes plus four plan-index reads).
+- **dflash_conv:** 16 tokens, 5,120 channels, 320 groups, side 1. Nonzero
+  coefficients and delta check both taps and the reset at token 8 against the
+  original input. The timed operation updates the same buffer repeatedly;
+  initialization/restoration is outside timing. No bandwidth rate is assigned.
+- **dflash_select:** four sequences of seven steps, rank 256, 16 candidates,
+  eight rows per sequence; 16,384 dynamic shared-memory bytes. Alternating
+  predecessor signs force choices 15,0,15,0,15,0,15, exercising dependence on
+  the previously selected candidate. All token IDs are checked.
+- **gdn_advance:** four sequences of eight rows, 257 bf16 columns, 4,096-byte
+  history tokens, eight tokens per line. Acceptance counts 1–4 cover no shift,
+  overlapping shifts by one/two tokens, and a null line. Checks all masked
+  outputs and the entire state against a snapshot-based host reference. Timed
+  shifts repeatedly mutate the same state; restoration is outside timing.
+- **line_copy:** four sequences, indices 0,3,1,2, 65,536 bytes per sequence,
+  offset 16, line stride 65,568. Separate source and destination state buffers
+  check null-line handling, permutation, data and untouched guards. Logical
+  traffic is 786,464 bytes (three active gathers and scatters plus index reads).
+- **peer_barrier:** one rank pointing to its own flag, timeout 1 ms. Checks
+  flags, epoch and error before timing and the final epoch/error afterward.
+  This does not exercise missing-peer timeout or inter-device communication.
+- **peer_collective:** one rank, 16 rows of 8,192 bytes, 16 CTAs, timeout 1 ms.
+  Checks all output words, errors and epoch advancement. Logical local-copy
+  traffic is 262,144 bytes. With no remote rank, send/receive loops are skipped;
+  this is not a fabric-bandwidth or multi-rank protocol measurement.
+- **weight_prep:** 4,099 elements (including a partial final block); RoPE is
+  32×64 with base 10,000 and separate cosine/sine buffers. Checks weight+1,
+  cast, all four fill types, stride-two iota including untouched padding, and
+  RoPE against double-precision host trigonometry (absolute tolerance 0.004
+  for bf16 output). All eight entry points are timed together.
+
+### Blocked on sm_90 (Hopper ISA)
+
+No drivers are added for `attn_prep`, `gdn_decode`, `gemma_rms_norm`,
+`peer_allreduce`, `sigmoid_mul`, or `silu_mul`. These kernels require Hopper ISA
+and are blocked on `sm_90`; the sm_89 card cannot run them.
