@@ -1,0 +1,317 @@
+{
+ "sigmoid_mul": {
+  "kind": "cubin",
+  "sm": "sm_103a",
+  "license": "kern (LICENSE)",
+  "upstream": "tools/kernels-src/sigmoid_mul.cu",
+  "toolchain": "nvcc Build cuda_13.0.r13.0/compiler.36424714_0, -arch=sm_103a"
+ },
+ "dflash_select": {
+  "kind": "cubin",
+  "sm": "sm_103a",
+  "license": "kern (LICENSE)",
+  "upstream": "tools/kernels-src/dflash_select.cu",
+  "toolchain": "nvcc Build cuda_13.0.r13.0/compiler.36424714_0, -arch=sm_103a"
+ },
+ "k3_land": {
+  "kind": "cubin",
+  "sm": "sm_103a",
+  "license": "kern (LICENSE)",
+  "upstream": "tools/kernels-src/k3_land.cu",
+  "toolchain": "nvcc Build cuda_13.0.r13.0/compiler.36424714_0, -arch=sm_103a"
+ },
+ "gemma_rms_norm": {
+  "kind": "cubin",
+  "sm": "sm_103a",
+  "license": "kern (LICENSE)",
+  "upstream": "tools/kernels-src/gemma_rms_norm.cu",
+  "toolchain": "nvcc Build cuda_13.0.r13.0/compiler.36424714_0, -arch=sm_103a"
+ },
+ "k3_kda_core": {
+  "kind": "cubin",
+  "sm": "sm_103a",
+  "license": "kern (LICENSE)",
+  "upstream": "tools/kernels-src/k3_kda_core.cu",
+  "toolchain": "nvcc Build cuda_13.0.r13.0/compiler.36424714_0, -arch=sm_103a"
+ },
+ "peer_barrier": {
+  "kind": "cubin",
+  "sm": "sm_103a",
+  "license": "kern (LICENSE)",
+  "upstream": "tools/kernels-src/peer_barrier.cu",
+  "toolchain": "nvcc Build cuda_13.0.r13.0/compiler.36424714_0, -arch=sm_103a"
+ },
+ "trtllm_bmm_mxe4m3_mxe2m1_mxe4m3": {
+  "kind": "cubin",
+  "sm": "sm100f",
+  "license": "Apache-2.0",
+  "upstream": "flashinfer-cubin 0.6.18, cubins/8ec29a98612c3670f9f28825d1ed19f09496073b/batched_gemm-fa419f4-31ee4e5, TLLM_GEN_EXPORT_VERSION 7.0.4.0.4.0",
+  "toolchain": ""
+ },
+ "k3_kv_append": {
+  "kind": "cubin",
+  "sm": "sm_103a",
+  "license": "kern (LICENSE)",
+  "upstream": "tools/kernels-src/k3_kv_append.cu",
+  "toolchain": "nvcc Build cuda_13.0.r13.0/compiler.36424714_0, -arch=sm_103a"
+ },
+ "k3_conv_silu": {
+  "kind": "cubin",
+  "sm": "sm_103a",
+  "license": "kern (LICENSE)",
+  "upstream": "tools/kernels-src/k3_conv_silu.cu",
+  "toolchain": "nvcc Build cuda_13.0.r13.0/compiler.36424714_0, -arch=sm_103a"
+ },
+ "k3_kda_out_gate": {
+  "kind": "cubin",
+  "sm": "sm_103a",
+  "license": "kern (LICENSE)",
+  "upstream": "tools/kernels-src/k3_kda_out_gate.cu",
+  "toolchain": "nvcc Build cuda_13.0.r13.0/compiler.36424714_0, -arch=sm_103a"
+ },
+ "k3_mla_absorb": {
+  "kind": "cubin",
+  "sm": "sm_103a",
+  "license": "kern (LICENSE)",
+  "upstream": "tools/kernels-src/k3_mla_absorb.cu",
+  "toolchain": "nvcc Build cuda_13.0.r13.0/compiler.36424714_0, -arch=sm_103a"
+ },
+ "topk_row": {
+  "kind": "cubin",
+  "sm": "sm_103a",
+  "license": "kern (LICENSE)",
+  "upstream": "tools/kernels-src/topk_row.cu",
+  "toolchain": "nvcc Build cuda_13.0.r13.0/compiler.36424714_0, -arch=sm_103a"
+ },
+ "mla_decode_h96_p64": {
+  "kind": "cubin",
+  "sm": "sm_103a",
+  "license": "BSD-3-Clause",
+  "upstream": "FlashInfer flashinfer/cute_dsl/attention/monolithic/mla_decode_fp16.py (NVIDIA, CuTe DSL), compiled once for K3: heads 96, 1 q token, latent 512 + rope 64 bf16, page 64, variable split KV with the 256",
+  "toolchain": "nvidia-cutlass-dsl 4.6.0, CUDA 13, FlashInfer 0.6.x, sm_103a"
+ },
+ "line_copy": {
+  "kind": "cubin",
+  "sm": "sm_103a",
+  "license": "kern (LICENSE)",
+  "upstream": "tools/kernels-src/line_copy.cu",
+  "toolchain": "nvcc Build cuda_13.0.r13.0/compiler.36424714_0, -arch=sm_103a"
+ },
+ "peer_allreduce": {
+  "kind": "cubin",
+  "sm": "sm_103a",
+  "license": "kern (LICENSE)",
+  "upstream": "tools/kernels-src/peer_allreduce.cu",
+  "toolchain": "nvcc Build cuda_13.0.r13.0/compiler.36424714_0, -arch=sm_103a"
+ },
+ "k3_mega_moe": {
+  "kind": "cubin",
+  "sm": "sm_103a",
+  "license": "MIT",
+  "upstream": "DeepGEMM sm100 fp8 x fp4 MegaMoE (impls/sm100_fp8_fp4_mega_moe.cuh, upstream sha256 e74a82f9c931ddf7, pegainfer's vendored copy with the K3 situ activation), kern's peer-table SymBuffer fork at tools/",
+  "toolchain": "nvcc 13.0 (kernel-lab), sm_103a, DeepGEMM + CUTLASS headers from pegainfer's vendored DeepGEMM"
+ },
+ "attn_prep": {
+  "kind": "cubin",
+  "sm": "sm_103a",
+  "license": "kern (LICENSE)",
+  "upstream": "tools/kernels-src/attn_prep.cu",
+  "toolchain": "nvcc Build cuda_13.0.r13.0/compiler.36424714_0, -arch=sm_103a"
+ },
+ "trtllm_bmm_bf16_mxe2m1_mxe4m3": {
+  "kind": "cubin",
+  "sm": "sm100f",
+  "license": "Apache-2.0",
+  "upstream": "flashinfer-cubin 0.6.18, cubins/8ec29a98612c3670f9f28825d1ed19f09496073b/batched_gemm-fa419f4-31ee4e5, TLLM_GEN_EXPORT_VERSION 7.0.4.0.4.0",
+  "toolchain": ""
+ },
+ "gdn_decode": {
+  "kind": "cubin",
+  "sm": "sm_103a",
+  "license": "kern (LICENSE)",
+  "upstream": "tools/kernels-src/gdn_decode.cu",
+  "toolchain": "nvcc Build cuda_13.0.r13.0/compiler.36424714_0, -arch=sm_103a"
+ },
+ "k3_mla_vup_gate": {
+  "kind": "cubin",
+  "sm": "sm_103a",
+  "license": "kern (LICENSE)",
+  "upstream": "tools/kernels-src/k3_mla_vup_gate.cu",
+  "toolchain": "nvcc Build cuda_13.0.r13.0/compiler.36424714_0, -arch=sm_103a"
+ },
+ "k3_mla_v2": {
+  "kind": "cubin",
+  "sm": "sm_103a",
+  "license": "kern (LICENSE)",
+  "upstream": "tools/kernels-src/k3_mla_v2.cu",
+  "toolchain": "nvcc Build cuda_13.0.r13.0/compiler.36424714_0, -arch=sm_103a"
+ },
+ "argmax": {
+  "kind": "cubin",
+  "sm": "sm_103a",
+  "license": "kern (LICENSE)",
+  "upstream": "tools/kernels-src/argmax.cu",
+  "toolchain": "nvcc Build cuda_13.0.r13.0/compiler.36424714_0, -arch=sm_103a"
+ },
+ "k3_weight_prep": {
+  "kind": "cubin",
+  "sm": "sm_103a",
+  "license": "kern (LICENSE)",
+  "upstream": "tools/kernels-src/k3_weight_prep.cu",
+  "toolchain": "nvcc Build cuda_13.0.r13.0/compiler.36424714_0, -arch=sm_103a"
+ },
+ "trtllm_fmha_ctx_h192_v128": {
+  "kind": "cubin",
+  "sm": "sm103a",
+  "license": "Apache-2.0",
+  "upstream": "flashinfer-cubin 0.6.18, bundle 2d6a5a029eefcc388ec0ceb87efb55d8bcce5c3c, fmha/trtllm-gen/fmhaSm103aKernel_QkvBfloat16OBfloat16HQk192HV128SeparateQkvCausalVarSeqQ256Kv128PersistentContext.cubin (the w",
+  "toolchain": "trtllm-gen (NVIDIA), prebuilt"
+ },
+ "k3_span_state": {
+  "kind": "cubin",
+  "sm": "sm_103a",
+  "license": "kern (LICENSE)",
+  "upstream": "tools/kernels-src/k3_span_state.cu",
+  "toolchain": "nvcc Build cuda_13.0.r13.0/compiler.36424714_0, -arch=sm_103a"
+ },
+ "peer_collective": {
+  "kind": "cubin",
+  "sm": "sm_103a",
+  "license": "kern (LICENSE)",
+  "upstream": "tools/kernels-src/peer_collective.cu",
+  "toolchain": "nvcc Build cuda_13.0.r13.0/compiler.36424714_0, -arch=sm_103a"
+ },
+ "k3_residual": {
+  "kind": "cubin",
+  "sm": "sm_103a",
+  "license": "kern (LICENSE)",
+  "upstream": "tools/kernels-src/k3_residual.cu",
+  "toolchain": "nvcc Build cuda_13.0.r13.0/compiler.36424714_0, -arch=sm_103a"
+ },
+ "markov_rows": {
+  "kind": "cubin",
+  "sm": "sm_103a",
+  "license": "kern (LICENSE)",
+  "upstream": "tools/kernels-src/markov_rows.cu",
+  "toolchain": "nvcc Build cuda_13.0.r13.0/compiler.36424714_0, -arch=sm_103a"
+ },
+ "k3_mega_stage": {
+  "kind": "cubin",
+  "sm": "sm_103a",
+  "license": "kern (LICENSE)",
+  "upstream": "tools/kernels-src/k3_mega_stage.cu",
+  "toolchain": "nvcc Build cuda_13.0.r13.0/compiler.36424714_0, -arch=sm_103a"
+ },
+ "spec_round": {
+  "kind": "cubin",
+  "sm": "sm_103a",
+  "license": "kern (LICENSE)",
+  "upstream": "tools/kernels-src/spec_round.cu",
+  "toolchain": "nvcc Build cuda_13.0.r13.0/compiler.36424714_0, -arch=sm_103a"
+ },
+ "gdn_advance": {
+  "kind": "cubin",
+  "sm": "sm_103a",
+  "license": "kern (LICENSE)",
+  "upstream": "tools/kernels-src/gdn_advance.cu",
+  "toolchain": "nvcc Build cuda_13.0.r13.0/compiler.36424714_0, -arch=sm_103a"
+ },
+ "toy": {
+  "kind": "cubin",
+  "sm": "sm_103a",
+  "license": "kern (LICENSE)",
+  "upstream": "tools/kernels-src/toy.cu",
+  "toolchain": "nvcc Build cuda_13.0.r13.0/compiler.36424714_0, -arch=sm_103a"
+ },
+ "k3_moe_prefill": {
+  "kind": "cubin",
+  "sm": "sm_103a",
+  "license": "kern (LICENSE)",
+  "upstream": "tools/kernels-src/k3_moe_prefill.cu",
+  "toolchain": "nvcc Build cuda_13.0.r13.0/compiler.36424714_0, -arch=sm_103a"
+ },
+ "weight_prep": {
+  "kind": "cubin",
+  "sm": "sm_103a",
+  "license": "kern (LICENSE)",
+  "upstream": "tools/kernels-src/weight_prep.cu",
+  "toolchain": "nvcc Build cuda_13.0.r13.0/compiler.36424714_0, -arch=sm_103a"
+ },
+ "embedding": {
+  "kind": "cubin",
+  "sm": "sm_103a",
+  "license": "kern (LICENSE)",
+  "upstream": "tools/kernels-src/embedding.cu",
+  "toolchain": "nvcc Build cuda_13.0.r13.0/compiler.36424714_0, -arch=sm_103a"
+ },
+ "k3_router_argmax": {
+  "kind": "cubin",
+  "sm": "sm_103a",
+  "license": "kern (LICENSE)",
+  "upstream": "tools/kernels-src/k3_router_argmax.cu",
+  "toolchain": "nvcc Build cuda_13.0.r13.0/compiler.36424714_0, -arch=sm_103a"
+ },
+ "k3_mla_split_plan": {
+  "kind": "cubin",
+  "sm": "sm_103a",
+  "license": "kern (LICENSE)",
+  "upstream": "tools/kernels-src/k3_mla_split_plan.cu",
+  "toolchain": "nvcc Build cuda_13.0.r13.0/compiler.36424714_0, -arch=sm_103a"
+ },
+ "dflash_conv": {
+  "kind": "cubin",
+  "sm": "sm_103a",
+  "license": "kern (LICENSE)",
+  "upstream": "tools/kernels-src/dflash_conv.cu",
+  "toolchain": "nvcc Build cuda_13.0.r13.0/compiler.36424714_0, -arch=sm_103a"
+ },
+ "flash_kda_d128": {
+  "kind": "cubin",
+  "sm": "sm_103a",
+  "license": "MIT",
+  "upstream": "MoonshotAI FlashKDA 7afb9f4, vendored and trimmed at tools/flash-kda/ (PROVENANCE.md): the one instance <D=128, has_state_in, has_state_out, output_state, varlen=false>, prepare (grid (tiles, H), 256 ",
+  "toolchain": "CUDA 13.1 nvcc, CUTLASS 4.x headers (FlashInfer 0.6 3rdparty/cutlass), sm_103a"
+ },
+ "copy_rows": {
+  "kind": "cubin",
+  "sm": "sm_103a",
+  "license": "kern (LICENSE)",
+  "upstream": "tools/kernels-src/copy_rows.cu",
+  "toolchain": "nvcc Build cuda_13.0.r13.0/compiler.36424714_0, -arch=sm_103a"
+ },
+ "k3_mla_prep": {
+  "kind": "cubin",
+  "sm": "sm_103a",
+  "license": "kern (LICENSE)",
+  "upstream": "tools/kernels-src/k3_mla_prep.cu",
+  "toolchain": "nvcc Build cuda_13.0.r13.0/compiler.36424714_0, -arch=sm_103a"
+ },
+ "silu_mul": {
+  "kind": "cubin",
+  "sm": "sm_103a",
+  "license": "kern (LICENSE)",
+  "upstream": "tools/kernels-src/silu_mul.cu",
+  "toolchain": "nvcc Build cuda_13.0.r13.0/compiler.36424714_0, -arch=sm_103a"
+ },
+ "k3_span_gather": {
+  "kind": "cubin",
+  "sm": "sm_103a",
+  "license": "kern (LICENSE)",
+  "upstream": "tools/kernels-src/k3_span_gather.cu",
+  "toolchain": "nvcc Build cuda_13.0.r13.0/compiler.36424714_0, -arch=sm_103a"
+ },
+ "k3_mla_paged_attn": {
+  "kind": "cubin",
+  "sm": "sm_103a",
+  "license": "kern (LICENSE)",
+  "upstream": "tools/kernels-src/k3_mla_paged_attn.cu",
+  "toolchain": "nvcc Build cuda_13.0.r13.0/compiler.36424714_0, -arch=sm_103a"
+ },
+ "k3_prefill": {
+  "kind": "cubin",
+  "sm": "sm_103a",
+  "license": "kern (LICENSE)",
+  "upstream": "tools/kernels-src/k3_prefill.cu",
+  "toolchain": "nvcc Build cuda_13.0.r13.0/compiler.36424714_0, -arch=sm_103a"
+ }
+}
