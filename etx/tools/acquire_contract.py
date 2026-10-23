@@ -128,7 +128,12 @@ static __device__ __forceinline__ int32_t etx_arrive_flush_DEVICE_s(const etx_pa
   const int32_t old = atomicAdd(p.ev_sub + (size_t)domain * p.event_words + idx, 1);
   if (old + 1 != share) return 1;
   ETX_RELEASE_DEVICE();
-  return __hip_atomic_fetch_sub(p.events + ETX_EVW(idx), share, __ATOMIC_RELAXED, __HIP_MEMORY_SCOPE_AGENT) - share;
+  return etx_atomic_sub_device(p.events + ETX_EVW(idx), share) - share;
+}
+"""
+ATOMIC_SUB_DEVICE = r"""
+static __device__ __forceinline__ int32_t etx_atomic_sub_device(int32_t* p, int32_t n) {
+  return __hip_atomic_fetch_sub(p, n, __ATOMIC_RELAXED, __HIP_MEMORY_SCOPE_AGENT);
 }
 """
 WAIT_SCOPE = r"""
@@ -679,6 +684,13 @@ def function_text(text: str, start: str) -> str | None:
     return None if end < 0 else text[k:end + 2]
 
 
+def check_atomic_sub_device(amdgcn: str, errors) -> None:
+    got = function_text(amdgcn, "static __device__ __forceinline__ int32_t etx_atomic_sub_device(")
+    if got is None or compact(got) != compact(ATOMIC_SUB_DEVICE):
+        errors.append("runtime: etx_atomic_sub_device differs from the contract's text "
+                      "(requires relaxed agent-scope fetch-sub)")
+
+
 def check_runtime(primitives: str, imp: str, imp_tiles: str, errors) -> None:
     strip = lambda s: re.sub(r"//[^\n]*", "", s)
     got = function_text(primitives, "static __device__ __forceinline__ int32_t etx_arrive_flush_DEVICE_s(")
@@ -729,6 +741,8 @@ def run(build: Path | None, ir: Path | None, cflags: str | None, runtime: Path) 
     check_plan(plan, pairs, errors)
     report["pairs"] = pairs
     check_lowering(files["etx_lowering.h"], errors)
+    vendor = runtime / "primitives_amdgcn.h"
+    check_atomic_sub_device(vendor.read_text() if vendor.is_file() else "", errors)
     check_runtime((runtime / "primitives.h").read_text(), (runtime / "import.h").read_text(),
                   files["imp_tiles.hip"], errors)
     return errors, report

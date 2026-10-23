@@ -89,3 +89,31 @@ __global__ void etx_primitive_probe(int32_t* p) {
     result = _run([*flags, '-DETX_SLOT_BY_CU=1'])
     assert result.returncode != 0
     assert 'ETX_SLOT_BY_CU is supported only on AMD' in result.stderr
+
+
+@pytest.mark.parametrize("old,new", [
+    ("__ATOMIC_RELAXED", "__ATOMIC_ACQUIRE"),
+    ("__HIP_MEMORY_SCOPE_AGENT", "__HIP_MEMORY_SCOPE_WORKGROUP"),
+    ("__hip_atomic_fetch_sub", "__hip_atomic_fetch_add"),
+    ("return __hip_atomic_fetch_sub", "return n + __hip_atomic_fetch_sub"),
+])
+def test_acquire_contract_pins_amd_counter_semantics(old, new):
+    from etx.tools import acquire_contract as ac
+
+    source = (HEADERS / 'primitives_amdgcn.h').read_text()
+    errors = []
+    ac.check_atomic_sub_device(source, errors)
+    assert errors == []
+    # Change only the counter helper; other vendor atomics are independent.
+    helper = ac.function_text(source, 'static __device__ __forceinline__ int32_t etx_atomic_sub_device(')
+    assert old in helper
+    ac.check_atomic_sub_device(source.replace(helper, helper.replace(old, new)), errors)
+    assert len(errors) == 1 and 'etx_atomic_sub_device differs' in errors[0]
+
+
+def test_acquire_contract_rejects_missing_amd_counter():
+    from etx.tools import acquire_contract as ac
+
+    errors = []
+    ac.check_atomic_sub_device('', errors)
+    assert len(errors) == 1 and 'etx_atomic_sub_device differs' in errors[0]
