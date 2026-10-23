@@ -9,6 +9,16 @@ ROOT = Path(__file__).resolve().parents[1]
 ALLOWED = Path("etx/bench/vllm_baseline.py")
 
 
+def test_legacy_benchmark_import_shares_main_globals(monkeypatch):
+    from examples.llm import vllm_bench
+    from etx.bench import vllm_baseline
+
+    assert vllm_bench is vllm_baseline
+    sentinel = object()
+    monkeypatch.setattr(vllm_bench, "read_golden", sentinel)
+    assert vllm_bench.main.__globals__["read_golden"] is sentinel
+
+
 def vllm_imports(source):
     """Find direct vLLM imports, including aliases and nested imports."""
     for node in ast.walk(ast.parse(source)):

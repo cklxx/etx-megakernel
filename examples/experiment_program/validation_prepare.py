@@ -285,7 +285,7 @@ def activate(preparation,winner,out):
 
 def benchmark_source(out):
     """Private batch benchmark with the existing registered lever echo contract."""
-    old=(ROOT/'examples/llm/vllm_bench.py').read_text()
+    old=(ROOT/'etx/bench/vllm_baseline.py').read_text()
     start=old.index('        print(encode_config({"cudagraph_mode":')
     end=old.index('    print(f"VLLM-BATCH-MODE',start)
     new='''        print(encode_config({"async_scheduling":config.scheduler_config.async_scheduling,
