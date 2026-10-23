@@ -43,3 +43,20 @@ baseline can run at all, so a GPU session does not discover it on paid time.
 4. **Offline check before booking:** pull the chosen image or wheel and confirm it imports and
    registers `Glm5NextForConditionalGeneration` with ROCm (no GPU needed for the import guard); this
    decides item 1 at no GPU cost.
+
+## Offline check run on the desktop (no GPU, `--network=none`), 2026-10-23
+
+Image `vllm/vllm-openai-rocm:v0.30.0` (digest `sha256:2e7da1ad1c66836802072588adea75f9f4991da5f9545b4318e91d422c22ce6a`),
+checked with a script that imports vLLM, reads `ModelRegistry`, resolves the class and inspects the
+ROCm sparse-MLA backend; logs `desktop:/data/etx-run/o55-compile/vllm-arch-v0300.log` and
+`vllm-pkg-v0300.log`.
+
+- `vllm.__version__` 0.30.0; `Glm5NextForConditionalGeneration` is registered and imports
+  (`vllm.models.glm5next.nvidia.model`).
+- The package ships a ROCm path (`glm5next/amd/ops`: kpool compress, KDA fused recurrent) and its
+  platform guard refuses only XPU, not ROCm; this release does not carry the SM90-only guard of the
+  branch in vllm#53943.
+- `ROCMAiterMLASparseImpl.record_logical_topk_ready` is **absent**, matching vllm#59027/#58575: this
+  image is expected to crash at engine start on gfx942 unless the no-op workaround is applied, which
+  is then a modified baseline and must be recorded as such. Not tested on a GPU.
+- Not checked: vLLM main / v0.30.1rc0 images (contain #57252), and any decode correctness or speed.
