@@ -285,6 +285,9 @@ def allowed_arms(root=ROOT):
 
 def run(operation, arm=None, *, stamped=False, reference_dir=None, logs=None, fleet=None, data=None, root=None):
     session = Session(logs, fleet, data, root)
+    # The harness tools this session loads (stage_table, ledger, ...) read declarations from the same repository.
+    from . import paths
+    paths.configure(session.root)
     if operation in allowed_arms(session.root):
         extra = [stamped] if operation == "build" else [reference_dir] if operation == "layers" else []
         getattr(session, operation)(arm, *extra)
