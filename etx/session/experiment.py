@@ -168,7 +168,7 @@ def verify(d: Path, registry, session: Path | None = None) -> tuple[int, list[st
     rc, lines = record.verify(d) if (d / "SEAL").exists() else record.verify_legacy(d, registry.archives(d))
     bad, incomplete = rc == 2, rc == 3
     if session is not None:
-        from etx.tools.gpu_jobs import load_session
+        from etx.experiments.jobs import load_session
         jobs, _ = load_session(session)
         expected = [w for j in jobs for w in j.writes if w.startswith(("pairs_", "stages_", "batch_report"))]
         missing = [w for w in expected if not (d / w).is_file()]

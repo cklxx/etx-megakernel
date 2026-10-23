@@ -1,0 +1,33 @@
+"""Caller-facing API. CLI adapters and E2E tests use this facade, not internals."""
+from etx.api import (
+    Configuration, Inspection, KernelSpec, PlanRequest, PlannedWorkload, SCHEMA_VERSION, WorkloadSpec,
+    SimulationResult, ProcessRequest, ProcessResult, execute, read_process_result,
+    inspect, kernel, model, plan, simulate, SourceArtifact, emit, save_sources, load_sources,
+    DeviceCheck, check_device_sources, check_codegen, BuildArtifact, build, load_build, source_snapshot, verify_source_snapshot,
+    ArtifactRunRequest, ArtifactRun, run_artifact, read_artifact_run,
+    CompilerRequest, compiler_command, run_protocol_experiment, report_protocol_experiment,
+    run_protocol_study, run_cpu_acceptance, cpu_acceptance_fixtures,
+    JobSpec, JobSession, JobSessionRequest, JobOutcome, JobSessionResult,
+    load_job_session, run_jobs, verify_job_record,
+    SealedPreparationRequest, SealedSessionRequest, prepare_sealed_session, run_sealed_session,
+    SessionTransportRequest, run_session_transport, BuildRefused, ModelBuildRequest, build_model,
+    ExperimentSessionRequest, run_experiment_session, experiment_session_arms,
+    NativeProbeRequest, run_native_probe, AssetPreparationRequest, prepare_model_assets,
+    HarnessCommandRequest, run_harness_command,
+)
+
+__all__ = ['Configuration', 'Inspection', 'KernelSpec', 'PlanRequest', 'PlannedWorkload',
+           'SCHEMA_VERSION', 'SimulationResult', 'WorkloadSpec', 'inspect', 'kernel', 'model', 'plan',
+           'simulate', 'ProcessRequest', 'ProcessResult', 'execute', 'read_process_result',
+           'SourceArtifact', 'emit', 'save_sources', 'load_sources', 'DeviceCheck', 'check_device_sources',
+           'check_codegen', 'BuildArtifact', 'build', 'load_build',
+           'ArtifactRunRequest', 'ArtifactRun', 'run_artifact', 'read_artifact_run',
+           'source_snapshot', 'verify_source_snapshot', 'CompilerRequest', 'compiler_command',
+           'run_protocol_experiment', 'report_protocol_experiment', 'run_protocol_study',
+           'run_cpu_acceptance', 'cpu_acceptance_fixtures', 'JobSpec', 'JobSession', 'JobSessionRequest',
+           'JobOutcome', 'JobSessionResult', 'load_job_session', 'run_jobs', 'verify_job_record',
+           'SealedPreparationRequest', 'SealedSessionRequest', 'prepare_sealed_session', 'run_sealed_session',
+           'SessionTransportRequest', 'run_session_transport', 'BuildRefused', 'ModelBuildRequest', 'build_model',
+           'ExperimentSessionRequest', 'run_experiment_session', 'experiment_session_arms',
+           'NativeProbeRequest', 'run_native_probe', 'AssetPreparationRequest', 'prepare_model_assets',
+           'HarnessCommandRequest', 'run_harness_command']

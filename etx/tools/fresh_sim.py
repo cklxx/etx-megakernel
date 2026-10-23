@@ -28,7 +28,7 @@ import json
 import math
 from pathlib import Path
 
-from etx.tools.fresh_handoff import matrix
+from etx.experiments.fresh_handoff import matrix
 
 ROOT = Path(__file__).resolve().parents[2]
 

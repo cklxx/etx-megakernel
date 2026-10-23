@@ -10,6 +10,8 @@ SEAL does not cover, or an unsealed record, is not a result.
                                                   2 a byte, a file or the MANIFEST differs
   python -m etx.session.record local-only <dir>   the globs a fetch leaves on the box (one per line)
 """
+# Driver laptops run this file with the system python3 (3.9 on macOS); keep annotations lazy.
+from __future__ import annotations
 import fnmatch
 import hashlib
 import json
@@ -47,15 +49,17 @@ def files(d: Path) -> list[str]:
     return sorted(str(p.relative_to(d)) for p in d.rglob("*") if not p.is_dir() and str(p.relative_to(d)) not in OWN)
 
 
-def seal(d: Path, *, jobs: dict, plan: str, local_only=LOCAL_ONLY) -> dict:
+def seal(d: Path, *, jobs: dict, plan: str, local_only=LOCAL_ONLY, failure: str | None = None) -> dict:
     """Write MANIFEST and SEAL. The caller guarantees that nothing writes into d any more."""
     manifest = "".join(f"{sha256(d / name)}  {name}\n" for name in files(d))
     (d / "MANIFEST").write_text(manifest)
     identity = Path("SOURCE_IDENTITY")
     s = dict(session=d.name, sealed=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), jobs=jobs,
-             complete=bool(jobs) and all(v == "ok" for v in jobs.values()), plan_sha256=plan,
+             complete=failure is None and bool(jobs) and all(v == "ok" for v in jobs.values()), plan_sha256=plan,
              source=identity.read_text() if identity.is_file() else None, local_only=list(local_only),
              manifest_sha256=hashlib.sha256(manifest.encode()).hexdigest())
+    if failure is not None:
+        s['failure'] = failure
     (d / "SEAL").write_text(json.dumps(s, indent=1, sort_keys=True) + "\n")
     return s
 
@@ -84,8 +88,10 @@ def verify(d: Path) -> tuple[int, list[str]]:
         bad += 1
         lines.append(f"NOT IN THE SEALED MANIFEST {name}")
     done = [k for k, v in s["jobs"].items() if v != "ok"]
+    completion = (f"INCOMPLETE: runner failure: {s['failure']}" if s.get('failure') is not None else
+                  f"INCOMPLETE: not ok: {done}" if done else "complete")
     lines.append(f"{'FAILED' if bad else 'VERIFIED'}: session {s['session']}, {len(listed) - left} files match, {bad} bad,"
-                 f" {left} left on the box by design; " + (f"INCOMPLETE: not ok: {done}" if done else "complete"))
+                 f" {left} left on the box by design; " + completion)
     return (2 if bad else 3 if not s["complete"] else 0), lines
 
 
