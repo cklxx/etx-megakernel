@@ -151,6 +151,32 @@ def native_tensors(t, i):
     return out
 
 
+def mtp_tensors(t):
+    """Native checkpoint inventory for the single module8 MTP layer.
+
+    Source paths below are relative to /data/refs/vllm-v0.30.0/glm5next/nvidia/.
+    """
+    i = t['num_hidden_layers']  # mtp.py:117-128
+    prefix = f'model.language_model.layers.{i}.'
+    h, v = t['hidden_size'], t['vocab_size']
+    # mtp.py:47-49,68-70; SharedHead owns norm and head, not the global lm_head.
+    out = [(prefix + key, key, None, shape) for key, shape in (
+        ('enorm.weight', (h,)), ('hnorm.weight', (h,)),
+        ('eh_proj.weight', (h, 2*h)), ('shared_head.norm.weight', (h,)),
+        ('shared_head.head.weight', (v, h)))]
+    # mtp.py:71-82,256-280: decoder checkpoint names have no mtp_block prefix.
+    # model.py:302-331 forces MLA; :335-346 defaults to last base MLP kind;
+    # :379-401 excludes all HC parameters for MTP.
+    decoder = copy.deepcopy(t)
+    decoder['num_hidden_layers'] += 1
+    decoder['layer_types'].append('deepseek_sparse_attention')
+    decoder['mlp_layer_types'].append(t['mlp_layer_types'][-1])
+    for entry in native_tensors(decoder, i):
+        if not entry[1].startswith(('attn_hc.', 'ffn_hc.')):
+            out.append(entry)  # attention.py:245-281,446-497; model.py:116-132,366-377
+    return out
+
+
 def outer_tensors(t):
     h, v = t['hidden_size'], t['vocab_size']
     return [('model.language_model.embed_tokens.weight', (v, h)), ('model.language_model.norm.weight', (h,)),
@@ -208,8 +234,11 @@ def fp8_blocks(name, w):
     return torch.from_numpy(q).to(torch.float8_e4m3fn), torch.from_numpy(scale)
 
 
-def tensors(cfg):
-    """{native name: torch tensor} for the whole synthetic text checkpoint, in a fixed order."""
+def tensors(cfg, *, mtp=False):
+    """Synthetic text tensors in fixed order; the draft layer is explicitly opt-in.
+
+    The default inventory and bytes retain the pinned module-gate identity.
+    """
     import torch
     t = cfg['text_config']
     out = {}
@@ -225,6 +254,17 @@ def tensors(cfg):
                 out[name] = torch.from_numpy(w).to(torch.float32 if kind == 'F32' else torch.bfloat16)
     for name, shape in outer_tensors(t):
         out[name] = torch.from_numpy(values(name, None, shape)).to(torch.bfloat16)
+    if mtp:
+        for name, key, _, shape in mtp_tensors(t):
+            kind = storage('deepseek_sparse_attention', key, shape)
+            # Fusion and shared-head weights are unquantized (mtp.py:47-49,68).
+            if key.startswith(('enorm.', 'hnorm.', 'eh_proj.', 'shared_head.')):
+                kind = 'BF16'
+            w = values(name, key, shape)
+            if kind == 'F8_E4M3':
+                out[name], out[name.removesuffix('.weight') + '.weight_scale_inv'] = fp8_blocks(name, w)
+            else:
+                out[name] = torch.from_numpy(w).to(torch.float32 if kind == 'F32' else torch.bfloat16)
     return out
 
 
@@ -270,8 +310,14 @@ def evidence(write=False, variant='module'):
     return files, ts
 
 
-def checkpoint(out, variant='module'):
-    """Write the synthetic snapshot (config.json, REVISION, safetensors + index) into a new directory."""
+def checkpoint(out, variant='module', *, mtp=False):
+    """Write a snapshot; ``mtp=True`` explicitly adds the module8 draft layer.
+
+    Validate the pinned base first. The opt-in snapshot has its own returned
+    identity and content revision; pinned evidence is never rewritten.
+    """
+    if mtp and variant != 'module8':
+        raise ValueError('MTP checkpoint requires variant=module8')
     from safetensors.torch import save_file
     evidence_dir, _ = gate_identity(variant)
     cfg, api = metadata(evidence_dir)
@@ -282,6 +328,20 @@ def checkpoint(out, variant='module'):
                              'the generator changed (rerun `evidence --write` deliberately)')
     if weights_digest(ts) != api['weights_sha256']:
         raise ValueError('synthetic weights differ from the pinned module-gate revision')
+    if mtp:
+        ts = tensors(cfg, mtp=True)
+        api = copy.deepcopy(api)
+        api['id'] += '-mtp'
+        api['kind'] = 'synthetic module8 MTP fixture; not a pinned module-gate checkpoint'
+        api['weights_sha256'] = weights_digest(ts)
+        api['sha'] = hashlib.sha1(
+            f"{sha(evidence_dir / 'glm-config.json')}\0{api['weights_sha256']}".encode()).hexdigest()
+        inventory = {}
+        for v in ts.values():
+            kind = {'torch.float8_e4m3fn': 'F8_E4M3', 'torch.bfloat16': 'BF16',
+                    'torch.float32': 'F32'}[str(v.dtype)]
+            inventory[kind] = inventory.get(kind, 0) + v.numel()
+        api['safetensors'] = dict(parameters=inventory, total=sum(inventory.values()))
     out.mkdir(parents=True, exist_ok=False)
     (out / 'config.json').write_text((evidence_dir / 'glm-config.json').read_text())
     (out / 'REVISION').write_text(api['sha'] + '\n')
