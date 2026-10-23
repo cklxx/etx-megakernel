@@ -164,3 +164,29 @@ def test_head_streams_weights_once_for_all_positions(module8, k):
     for p in range(k + 1):
         assert f'p{p}_head_scratch' in head.writes
         assert not any(g.name == f'p{p}_head' for g in cpu.graph.grids)
+
+
+@pytest.mark.parametrize('k', [1, 3, 5])
+def test_all_fixed_payloads_stream_once(module8, k):
+    from examples.glm53.verify_graph import observed_step
+    from examples.spec.ledger import ObservedBytes, tensor_bytes
+
+    spec = stage.validate(module8 / 'stage', allow_fixture=True, gate='module8')
+    cpu = VerifyGraphCPU(module8 / 'stage', k, 1, 'module8',
+                         module8 / f'fixed-observed-k{k}', observe=True, poison=True)
+    # Position 80 exceeds the complete-pool budget even for k=1.
+    # Repeat token IDs deliberately: embedding reads the distinct row once.
+    for pos in (0, 80):
+        _reset_state(cpu)
+        sink = ObservedBytes(spec)
+        observed_step(cpu, spec, pos, [[1]] * (k + 1), sink)
+        for group, blob in spec['weights'].items():
+            for name, rec in blob['tensors'].items():
+                if name.startswith('mlp.experts.'):
+                    continue
+                payload, _ = tensor_bytes(rec)
+                if group == 'embedding':
+                    payload //= spec['dimensions']['VOCAB']
+                elif name.endswith('index_kpool_compress_ape') and pos == 0:
+                    payload = 0
+                assert sink.payload[group, name] == payload, (pos, group, name)

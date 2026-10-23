@@ -131,19 +131,18 @@ def build_from(stage, k, batch=1, options=None):
                  [local(layer+'_scanwork', p) for p in range(count)],
                  (1, 1, count, src.consts[3]))
         else:
-            # A single writer owns the KV cache. The current IR requires one
-            # writer grid per tensor, so serialize DSA positions within a
-            # request; requests still execute independently.
+            # Projection results remain private until the scan publishes each
+            # row. No future KV entries become visible to earlier attention.
             src = base.grid(layer + '_mla')
-            args = [layer + '_weights', layer + '_meta', layer + '_state']
-            reads, writes = args.copy(), [layer + '_state']
+            args = [layer+'_weights', layer+'_meta', layer+'_state', layer+'_vcommon']
+            reads, writes = args[:3], [layer+'_state', layer+'_vcommon']
             for p in range(count):
-                step, p1, p2, att = [local(n, p) for n in
-                    ('step', layer + '_p1', layer + '_p2', layer + '_att')]
-                args.extend([step, p1, p2, att])
-                reads.extend([step, p1])
-                writes.extend([p2, att])
-            emit(layer + '_dsa_scan', hip_link(SOURCE, 'glm53_verify_dsa_scan'),
+                names = [local(n, p) for n in ('step', layer+'_p1', layer+'_p2',
+                                              layer+'_att', layer+'_scanwork')]
+                args.extend(names)
+                reads.extend([names[0], names[1]])
+                writes.extend(names[2:])
+            emit(layer+'_dsa_scan', hip_link(SOURCE, 'glm53_verify_dsa_scan'),
                  src.device, 1, args, reads, writes, (1, 0, count, src.consts[3]))
         batched(layer+'_output', 'glm53_verify_output', src.device,
                 [layer+'_weights', layer+'_meta'],

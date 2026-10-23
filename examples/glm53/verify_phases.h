@@ -198,21 +198,105 @@ extern "C" __device__ void glm53_verify_kda_scan(const etx_ctx* c){
   }
 }
 
-// One workgroup owns a request's DSA cache throughout the block. Complete
-// each position's KV publication and index top-k before advancing the scan.
-// args: weights, meta, state, (step, p1, p2, att) for each position.
-extern "C" __device__ void glm53_verify_dsa_scan(const etx_ctx* c) {
+GLM_DEV void glm_verify_mla(const float* p1,const float* p2,const float* state,float* att,int pos,const float* ape,float* lds){
+  float* a=lds+GLM_LDS_HEAD;float* chosen=a+GLM_MAXLEN;float* score=chosen+GLM_MAXLEN;float* pool=score+GLM_MAXLEN;
+  const int stride=2*GLM_NH*GLM_AD+2*GLM_ID;
+  const int np=(pos+1)/GLM_POOL,take=np<GLM_INDEX_TOPK/GLM_POOL?np:GLM_INDEX_TOPK/GLM_POOL;
+  if(take==np){
+    // Every complete pool fits the budget and the tail is always kept: all positions are chosen.
+    for(int j=GLM_LANE;j<=pos;j+=GLM_LANES)chosen[j]=1;
+  } else if(GLM_LANE==0){
+    const float* iq=p2+GLM_NH*GLM_AD;const float* iw=p1+GLM_QR+GLM_KVR+2*GLM_ID;
+    for(int p=0;p<np;++p){
+      for(int d=0;d<GLM_ID;++d){float mx=-INFINITY,den=0,num=0;
+        for(int z=0;z<GLM_POOL;++z)mx=fmaxf(mx,state[(uint64_t)(p*GLM_POOL+z)*stride+2*GLM_NH*GLM_AD+GLM_ID+d]+ape[z*GLM_ID+d]);
+        for(int z=0;z<GLM_POOL;++z)den+=expf(state[(uint64_t)(p*GLM_POOL+z)*stride+2*GLM_NH*GLM_AD+GLM_ID+d]+ape[z*GLM_ID+d]-mx);
+        for(int z=0;z<GLM_POOL;++z){float prob=glm_bf(expf(state[(uint64_t)(p*GLM_POOL+z)*stride+2*GLM_NH*GLM_AD+GLM_ID+d]+ape[z*GLM_ID+d]-mx)/den);num+=glm_bf(prob*state[(uint64_t)(p*GLM_POOL+z)*stride+2*GLM_NH*GLM_AD+d]);}pool[d]=glm_bf(num);
+      }
+      float sum=0;for(int h=0;h<GLM_IH;++h){float dot=0;for(int d=0;d<GLM_ID;++d)dot+=iq[h*GLM_ID+d]*pool[d];sum+=iw[h]/sqrtf((float)GLM_IH)*fmaxf(0,dot/sqrtf((float)GLM_ID));}score[p]=sum;
+    }
+    for(int j=0;j<=pos;++j)chosen[j]=0;
+    for(int z=0;z<take;++z){int best=-1;float mx=-INFINITY;for(int p=0;p<np;++p)if(score[p]>mx){mx=score[p];best=p;}score[best]=-INFINITY;for(int j=0;j<GLM_POOL;++j)chosen[best*GLM_POOL+j]=1;}
+    for(int j=np*GLM_POOL;j<=pos;++j)chosen[j]=1;
+  }
+  GLM_SYNC();
+#ifdef GLM53_CPU
+  const int S=1;
+#else
+  int S=GLM_WAVE;while(S>1&&S>GLM_AD)S>>=1;
+#endif
+  for(int h=0;h<GLM_NH;++h){
+    const float* q=p2+h*GLM_AD;
+    // One group of lanes per key position; scores rounded like eager BF16 matmul.
+    glm_each(0,pos+1,S,[&](int j,int sl){
+      const float* k=state+(uint64_t)j*stride+h*2*GLM_AD;float dot=0;
+      for(int d=sl;d<GLM_AD;d+=S)dot+=q[d]*k[d];
+      dot=glm_xsum(dot,S);
+      if(sl==0)a[j]=chosen[j]?glm_bf(glm_bf(dot)/sqrtf((float)GLM_AD)):-INFINITY;
+    });
+    GLM_SYNC();
+    float m=-INFINITY;for(int j=GLM_LANE;j<=pos;j+=GLM_LANES)m=fmaxf(m,a[j]);
+    const float mx=glm_bmax(m,lds);
+    float part=0;for(int j=GLM_LANE;j<=pos;j+=GLM_LANES){a[j]=expf(a[j]-mx);part+=a[j];}
+    const float den=glm_bsum(part,lds);
+    for(int j=GLM_LANE;j<=pos;j+=GLM_LANES)a[j]=glm_bf(a[j]/den);
+    GLM_SYNC();
+    for(int d=GLM_LANE;d<GLM_AD;d+=GLM_LANES){float sum=0;
+      for(int j=0;j<=pos;++j)sum+=a[j]*state[(uint64_t)j*stride+h*2*GLM_AD+GLM_AD+d];att[h*GLM_AD+d]=glm_bf(sum);}
+    GLM_SYNC();
+  }
+}
+// Fixed DSA transforms run over all rows before any cache publication. KV
+// rows remain private scratch until their own causal scan iteration.
+template<int P> GLM_DEV void glm_verify_dsa(const etx_ctx* c){
+  const uint8_t* b=GLM_PB(0);const glm_weight* w=GLM_PW(1);
   float* state=GLM_PR(2,float*,(uint64_t)c->cst[3]);
-  float* lds=(float*)c->lds;
-  for(int p=0;p<c->cst[2];++p){
-    const int pos=glm53_step_load((const int*)c->args[3+4*p]+2*c->coord[0]);
-    const float* p1=GLM_PR(4+4*p,const float*,GLM_S_P1);
-    float* p2=GLM_PR(5+4*p,float*,GLM_S_P2);
-    float* att=GLM_PR(6+4*p,float*,GLM_S_ATT);
-    glm_ph_p2(GLM_PB(0),GLM_PW(1),p1,p2,state,pos,0,1,lds);
-    GLM_SYNC();
-    glm_ph_mla(GLM_PB(0),GLM_PW(1),p1,p2,state,att,pos,0,1,lds);
-    GLM_SYNC();
+  float* common=GLM_PR(3,float*,GLM_VCOMMON);float* red=(float*)c->lds;
+  const float* p1[P];float *p2[P],*att[P],*work[P],*qr[P],*kv[P];int pos[P];
+  constexpr int stride=2*GLM_NH*GLM_AD+2*GLM_ID;
+  for(int p=0;p<P;++p){
+    pos[p]=glm53_step_load((const int*)c->args[4+5*p]+2*c->coord[0]);
+    p1[p]=GLM_PR(5+5*p,const float*,GLM_S_P1);p2[p]=GLM_PR(6+5*p,float*,GLM_S_P2);
+    att[p]=GLM_PR(7+5*p,float*,GLM_S_ATT);work[p]=GLM_PR(8+5*p,float*,GLM_VWORK);
+    qr[p]=work[p]+GLM_VNR;kv[p]=qr[p]+GLM_QR;}
+  const float* x[P];for(int p=0;p<P;++p)x[p]=p1[p];
+  glm_verify_norm<P>(b,w[QAN],x,qr,GLM_QR,red);
+  for(int p=0;p<P;++p)x[p]=p1[p]+GLM_QR;
+  glm_verify_norm<P>(b,w[KVAN],x,kv,GLM_KVR,red);
+  for(int p=0;p<P;++p)x[p]=qr[p];
+  glm_verify_rows<P>(b,w[QB],x,0,w[QB].rows,[&](int p,int r,float v){p2[p][r]=glm_bf(v);});
+  glm_verify_rows<P>(b,w[IQ],x,0,w[IQ].rows,[&](int p,int r,float v){p2[p][GLM_NH*GLM_AD+r]=glm_bf(v);});
+  for(int p=0;p<P;++p)x[p]=kv[p];
+  glm_verify_rows<P>(b,w[KVB],x,0,w[KVB].rows,[&](int p,int r,float v){work[p][GLM_VKV+r]=glm_bf(v);});
+  float mean[P],inv[P];
+  for(int p=0;p<P;++p){const float* ik=p1[p]+GLM_QR+GLM_KVR;float part=0;
+    for(int i=GLM_LANE;i<GLM_ID;i+=GLM_LANES)part+=ik[i];mean[p]=glm_bsum(part,red)/GLM_ID;
+    part=0;for(int i=GLM_LANE;i<GLM_ID;i+=GLM_LANES)part+=(ik[i]-mean[p])*(ik[i]-mean[p]);
+    inv[p]=1/sqrtf(glm_bsum(part,red)/GLM_ID+1e-6f);}
+  for(int i=GLM_LANE;i<GLM_ID;i+=GLM_LANES){const float n=glm_w(b,w[IKN],i),bias=glm_w(b,w[IKB],i);
+    for(int p=0;p<P;++p){const float* ik=p1[p]+GLM_QR+GLM_KVR;
+      work[p][GLM_VKV+2*GLM_NH*GLM_AD+i]=glm_bf((ik[i]-mean[p])*inv[p]*n+bias);
+      work[p][GLM_VKV+2*GLM_NH*GLM_AD+GLM_ID+i]=ik[GLM_ID+i];}}
+  // Pool parameters are needed only in the pruned-pool branch. They are small
+  // invariant coefficients, unlike the projection matrices streamed above.
+  bool pool=false;for(int p=0;p<P;++p)pool=pool||(pos[p]+1)/GLM_POOL>GLM_INDEX_TOPK/GLM_POOL;
+  float* ape=common+GLM_LD+GLM_LH+GLM_QDIM;
+  if(pool)for(int j=GLM_LANE;j<GLM_POOL*GLM_ID;j+=GLM_LANES)ape[j]=glm_w(b,w[IAPE],j/GLM_ID,j%GLM_ID);
+  GLM_SYNC();
+  for(int p=0;p<P;++p){
+    float* st=state+(uint64_t)pos[p]*stride;
+    for(int j=GLM_LANE;j<stride;j+=GLM_LANES)st[j]=work[p][GLM_VKV+j];
+    GLM_SYNC();glm_verify_mla(p1[p],p2[p],state,att[p],pos[p],ape,red);GLM_SYNC();
+  }
+}
+extern "C" __device__ void glm53_verify_dsa_scan(const etx_ctx* c){
+  switch(c->cst[2]){
+    case 1:glm_verify_dsa<1>(c);break;
+    case 2:glm_verify_dsa<2>(c);break;
+    case 3:glm_verify_dsa<3>(c);break;
+    case 4:glm_verify_dsa<4>(c);break;
+    case 5:glm_verify_dsa<5>(c);break;
+    case 6:glm_verify_dsa<6>(c);break;
   }
 }
 
