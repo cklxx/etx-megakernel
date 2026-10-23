@@ -49,3 +49,18 @@ def test_qwen300_registered_count_matches_the_session():
     source = (ROOT / 'tests/e2e/test_api_qwen300_hour.py').read_text()
     pinned = next(n.value for n in ast.walk(ast.parse(source)) if isinstance(n, ast.Assign) and getattr(n.targets[0], 'id', '') == 'REGISTERED_COUNT')
     assert ast.literal_eval(pinned) == len(REGISTERED)
+
+
+def test_stage_table_location_matches_the_tool():
+    from examples.dsv2lite.stage_table import OUT
+    source = (ROOT / 'tests/e2e/test_api_dsv2_stage_table.py').read_text()
+    assert "COMMITTED = ROOT / '" + str(OUT.relative_to(ROOT)) + "'" in source
+
+
+def test_golden_files_and_rotation_match_the_tool():
+    import ast
+    from examples.dsv2lite.batch_goldens import FILES, ROTATE
+    tree = ast.parse((ROOT / 'tests/e2e/test_api_dsv2_goldens.py').read_text())
+    values = {n.targets[0].id: ast.literal_eval(n.value) for n in tree.body
+              if isinstance(n, ast.Assign) and getattr(n.targets[0], 'id', '') in ('FILES', 'ROTATE')}
+    assert values == dict(FILES=tuple(FILES), ROTATE=ROTATE)

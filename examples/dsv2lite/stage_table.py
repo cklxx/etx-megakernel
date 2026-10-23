@@ -298,4 +298,7 @@ def main(out: Path | None = None) -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    import argparse
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0] if __doc__ else None)
+    parser.add_argument("--out", type=Path, help="write stage_table.{json,md} here instead of the committed files")
+    raise SystemExit(main(out=parser.parse_args().out))

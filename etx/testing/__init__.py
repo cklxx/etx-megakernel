@@ -12,6 +12,7 @@ from .packaging import installed_package_probe
 from .families import census as scaffold_census
 from .models import model_isolation_probe, synthetic_llm_checkpoint
 from .commands import run_command
+from .arrays import write_npz
 from .qualification import qualification_record, qwen_staged_model
 from .certificates import certified_import_session, certificate_envelope, timing_log
 from .glm import glm_cpu_stage, glm_reference_record
@@ -37,7 +38,7 @@ __all__ = ['check_external_sources', 'check_api_layers', 'check_migrated_entry_p
            'sealed_cleanup_interrupt_probe',
            'sealed_resume_probe', 'sealed_dependency_probe', 'sealed_cli_list_probe',
            'sealed_historical_replay_probe', 'sealed_provenance_probe', 'sealed_original_host', 'sealed_contract_probe',
-           'installed_package_probe', 'scaffold_census', 'model_isolation_probe', 'synthetic_llm_checkpoint', 'run_command', 'qualification_record', 'qwen_staged_model', 'certified_import_session', 'certificate_envelope', 'timing_log', 'glm_cpu_stage', 'glm_reference_record', 'packed_manifest_text', 'simulated_trace_files', 'gemm_provider_conformance', 'dsv2lite_conformance',
+           'installed_package_probe', 'scaffold_census', 'model_isolation_probe', 'synthetic_llm_checkpoint', 'run_command', 'write_npz', 'qualification_record', 'qwen_staged_model', 'certified_import_session', 'certificate_envelope', 'timing_log', 'glm_cpu_stage', 'glm_reference_record', 'packed_manifest_text', 'simulated_trace_files', 'gemm_provider_conformance', 'dsv2lite_conformance',
            'plan_export_instances']
 
 

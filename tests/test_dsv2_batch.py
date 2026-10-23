@@ -540,44 +540,7 @@ def test_report_does_not_project_from_legacy_subset_means(tmp_path, monkeypatch)
     assert "PENDING" in report["batches"]["4"]["next"]["next"]
 
 
-@pytest.mark.parametrize("damage", ["mixed", "missing", "prompt"])
-def test_golden_certificate_binds_prompt_and_execution_bytes(tmp_path, damage):
-    import hashlib
-    import numpy as np
-    from examples.dsv2lite import batch_goldens as bg
-    for r in range(2):
-        d = bg.request_dir(tmp_path, r)
-        d.mkdir(exist_ok=True)
-        prompt = bg.rotate(list(range(128)), r)
-        np.savez(d / "golden.npz", prompt_ids=prompt, token_ids=[7] * 33)
-        (d / "golden_tokens.txt").write_text(" ".join(["7"] * 33))
-        for name in ("fleet_cache.bin", "golden_hidden.bin"):
-            (d / name).write_bytes(f"{name}: request {r}".encode())
-        cert = dict(prompt_ids=prompt, sha256={f: hashlib.sha256((d / f).read_bytes()).hexdigest() for f in bg.FILES})
-        (d / "golden.binding.json").write_text(json.dumps(cert))
-    if damage == "mixed":
-        for name in ("fleet_cache.bin", "golden_hidden.bin"):
-            (tmp_path / "r1" / name).write_bytes((tmp_path / name).read_bytes())
-    elif damage == "missing":
-        (tmp_path / "r1/golden.binding.json").unlink()
-    else:
-        cert["prompt_ids"] = list(range(128))
-        (tmp_path / "r1/golden.binding.json").write_text(json.dumps(cert))
-    with pytest.raises(SystemExit, match="request 1:.*binding"):
-        bg.main([str(tmp_path), "--requests", "2"])
-
-
-def test_fresh_golden_binding_verifies_and_exports(tmp_path):
-    import numpy as np
-    from examples.dsv2lite import batch_goldens as bg
-    np.savez(tmp_path / "golden.npz", prompt_ids=list(range(128)), token_ids=[7] * 33)
-    (tmp_path / "golden_tokens.txt").write_text(" ".join(["7"] * 33))
-    for name in ("fleet_cache.bin", "golden_hidden.bin"):
-        (tmp_path / name).write_bytes(b"fresh reference")
-    bg.main([str(tmp_path), "--certify"])
-    bg.main([str(tmp_path), "--verify-binding"])
-    bg.main([str(tmp_path), "--requests", "1"])
-    assert (tmp_path / "vllm/golden_r0.txt").read_text().startswith("prompt 0 1 2")
+# The batch_goldens certify/verify/export commands are executed in tests/e2e/test_api_dsv2_goldens.py.
 
 
 @pytest.mark.parametrize("bad_short", range(6))

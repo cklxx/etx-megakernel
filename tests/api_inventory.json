@@ -8,11 +8,9 @@
     "test_byte_ledger.py",
     "test_cpu_check.py",
     "test_decode_entry.py",
-    "test_deepseek_open_prep.py",
     "test_dsv2_batch.py",
     "test_dsv2_batch_attribution.py",
     "test_dsv2_d5.py",
-    "test_dsv2_stage_table.py",
     "test_dsv2_stamps.py",
     "test_dsv2lite.py",
     "test_experiment_issue_order.py",
@@ -29,7 +27,6 @@
     "test_glm53_run_all.py",
     "test_glm53_seam.py",
     "test_glm53_slice.py",
-    "test_glm53_sweep.py",
     "test_gpu_jobs.py",
     "test_import_certificate.py",
     "test_importer.py",
@@ -211,12 +208,9 @@
       "reason": "Entry/shape/selection units; dry-run CLI cases moved to tests/e2e/test_api_decode_entry.py."
     },
     "test_deepseek_open_prep.py": {
-      "classification": "mixed",
-      "owners": [
-        "API-18",
-        "API-24"
-      ],
-      "reason": "Recipe/parser units plus reference regeneration, durable receipts and diagnostics orchestration."
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Recipe/diagnostic/classification units, reference verify() probes (certified in process as setup), patched diagnostics orchestration and a shell-syntax probe; the finalize command is in tests/e2e/test_api_dsv2_x8_finalize.py."
     },
     "test_documentation_ownership.py": {
       "classification": "conformance",
@@ -348,12 +342,9 @@
       "reason": "Capture/replay graph structure and mutation refusals; no runtime capture execution."
     },
     "test_dsv2_stage_table.py": {
-      "classification": "mixed",
-      "owners": [
-        "API-18",
-        "API-24"
-      ],
-      "reason": "Replay consistency plus complete stage-table artifact generation/comparison."
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Replay identity and stage-order probes on the archived data; the stage_table --out command is in tests/e2e/test_api_dsv2_stage_table.py."
     },
     "test_dsv2_stamps.py": {
       "classification": "conformance",
@@ -610,12 +601,9 @@
       "reason": "Window/identity/sample units plus snapshot staging, reference preparation and generation."
     },
     "test_glm53_sweep.py": {
-      "classification": "mixed",
-      "owners": [
-        "API-15",
-        "API-24"
-      ],
-      "reason": "Resource units plus all-rank build sweep, identities, failures and CLI summaries."
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Resource/report parsers, the bounded run_command helper and compile environment refusal in process; sweep and CLI cases patch compile_candidate/sweep; no unpatched command."
     },
     "test_gpu_jobs.py": {
       "classification": "conformance",

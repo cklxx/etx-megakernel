@@ -136,11 +136,7 @@ def test_queue_dependency_and_correctness_only():
     assert not any('rounds' in j.cmd or 'vllm' in j.cmd for j in jobs)
 
 
-def test_final_lane_reports_missing_dependencies(tmp_path):
-    s=SimpleNamespace(logs=tmp_path)
-    x8.finalize(s)
-    out=json.loads((tmp_path/'x8_summary.json').read_text())
-    assert out['status']=='INCOMPLETE' and out['references_ready']['status']=='MISSING'
+# The final lane with missing dependencies is the `finalize` command in tests/e2e/test_api_dsv2_x8_finalize.py.
 
 
 def test_full_diagnostics_continue_after_hidden_failure(tmp_path, monkeypatch):
