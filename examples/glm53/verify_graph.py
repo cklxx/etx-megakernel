@@ -172,7 +172,20 @@ def build_from(stage, k, batch=1, options=None):
                 copy(layer + '_up', p)
             for p in range(count):
                 copy(layer + '_down', p)
-    for phase in ('head', 'argmax', 'feedback'):
+    # Normalize all rows before streaming each LM-head weight through every
+    # position accumulator. Head scratch holds the normalized input between
+    # the preparation and projection boundaries.
+    src = base.grid('head')
+    args = ['norm_weights', 'norm_meta', 'head_weights', 'head_meta']
+    reads, writes = args.copy(), []
+    for p in range(count):
+        inp, out = local(src.args[0], p), local('head_scratch', p)
+        args.extend([inp, out])
+        reads.append(inp)
+        writes.append(out)
+    emit('head_rows', hip_link(SOURCE, 'glm53_verify_head'), src.device,
+         1, args, reads, writes, (1, 0, count, 0))
+    for phase in ('argmax', 'feedback'):
         for p in range(count):
             copy(phase, p)
     return graph

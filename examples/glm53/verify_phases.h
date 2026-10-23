@@ -83,3 +83,46 @@ extern "C" __device__ void glm53_verify_expert_mix(const etx_ctx* c) {
       out[k*GLM_H+j]=glm_put(glm_mix1(hc,[&](int i){return mid[i];},y,k,j));
   }
 }
+
+// One streamed head row serves every verify position. Normalized activations
+// live in their existing head scratch, so LDS capacity does not grow with P.
+// Each output dot retains the decode scalar column order and BF16 boundaries.
+// args: norm blob/meta, head blob/meta, (input, head scratch) for each row.
+template<int P> GLM_DEV void glm_verify_head(const etx_ctx* c) {
+  const glm_act* in[P]; float* hs[P]; float inv[P];
+  float* red=(float*)c->lds;
+  for(int p=0;p<P;++p){
+    in[p]=GLM_PR(4+2*p,const glm_act*,GLM_HC*GLM_H);
+    hs[p]=GLM_PR(5+2*p,float*,2*GLM_H+GLM_VOCAB);
+    float part=0;
+    for(int j=GLM_LANE;j<GLM_H;j+=GLM_LANES){
+      float sum=0;
+      for(int k=0;k<GLM_HC;++k)sum+=glm_get(in[p][k*GLM_H+j]);
+      const float x=glm_bf(sum/GLM_HC);hs[p][j]=x;part+=x*x;
+    }
+    inv[p]=1.0f/sqrtf(glm_bsum(part,red)/GLM_H+GLM_EPS);
+  }
+  for(int j=GLM_LANE;j<GLM_H;j+=GLM_LANES){
+    const float w=glm_w(GLM_PB(0),GLM_PW(1)[0],j);
+    for(int p=0;p<P;++p)hs[p][GLM_H+j]=glm_bf(glm_bf(hs[p][j]*inv[p])*w);
+  }
+  GLM_SYNC();
+  const glm_weight& w=GLM_PW(3)[0];
+  for(int r=GLM_LANE;r<w.rows;r+=GLM_LANES){
+    float acc[P]={};
+    for(int j=0;j<w.cols;++j){
+      const float v=glm_w(GLM_PB(2),w,r,j);
+      for(int p=0;p<P;++p)acc[p]+=v*hs[p][GLM_H+j];
+    }
+    for(int p=0;p<P;++p)hs[p][2*GLM_H+r]=glm_bf(acc[p]);
+  }
+}
+extern "C" __device__ void glm53_verify_head(const etx_ctx* c) {
+  switch(c->cst[2]){
+    case 2:glm_verify_head<2>(c);break;
+    case 3:glm_verify_head<3>(c);break;
+    case 4:glm_verify_head<4>(c);break;
+    case 5:glm_verify_head<5>(c);break;
+    case 6:glm_verify_head<6>(c);break;
+  }
+}

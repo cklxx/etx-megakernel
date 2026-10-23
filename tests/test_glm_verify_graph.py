@@ -142,3 +142,25 @@ def test_read_once_moe_boundaries(module8, k):
 def test_read_once_position_limit():
     with pytest.raises(ValueError, match='at most 6 positions'):
         build_from({}, 6)
+
+
+@pytest.mark.parametrize('k', [1, 3, 5])
+def test_head_streams_weights_once_for_all_positions(module8, k):
+    from examples.glm53.verify_graph import observed_step
+    from examples.spec.ledger import ObservedBytes, tensor_bytes
+
+    spec = stage.validate(module8 / 'stage', allow_fixture=True, gate='module8')
+    cpu = VerifyGraphCPU(module8 / 'stage', k, 1, 'module8',
+                         module8 / f'head-observed-k{k}', observe=True, poison=True)
+    sink = ObservedBytes(spec)
+    observed_step(cpu, spec, 0, [[1]] * (k + 1), sink)
+    counts = sink.snapshot()
+    for group in ('norm', 'head'):
+        for name, rec in spec['weights'][group]['tensors'].items():
+            assert counts[group, name] == sum(tensor_bytes(rec))
+    head = cpu.graph.grid('head_rows')
+    assert head.body.symbol == 'glm53_verify_head'
+    assert head.consts[2] == k + 1
+    for p in range(k + 1):
+        assert f'p{p}_head_scratch' in head.writes
+        assert not any(g.name == f'p{p}_head' for g in cpu.graph.grids)
