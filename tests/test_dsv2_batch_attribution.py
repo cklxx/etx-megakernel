@@ -268,13 +268,7 @@ def bare_session(tmp_path):
     return s
 
 
-def test_final_is_structured_when_all_dependencies_failed(tmp_path):
-    s = bare_session(tmp_path)
-    s.final()
-    result = json.loads((tmp_path/'b4_result.json').read_text())
-    assert result['status'] == 'INCOMPLETE'
-    assert all('error' in result[k] for k in ('performance','attribution','routing'))
-
+# The final lane is the `final` command in tests/e2e/test_api_dsv2_attribution_final.py.
 
 def test_wrong_binary_or_failed_gate_stops_performance(tmp_path, monkeypatch):
     s = bare_session(tmp_path)
@@ -425,17 +419,7 @@ def test_refused_graph_baselines_do_not_block_corrected_vllm_attribution_rounds(
     assert all(x['status'] == 'UNAVAILABLE' for x in result['same_kernel_graph'].values())
 
 
-def test_full_claim_stays_incomplete_when_attribution_and_vllm_complete(tmp_path):
-    s = bare_session(tmp_path)
-    (tmp_path/'attribution.json').write_text('{"status":"COMPLETE"}')
-    (tmp_path/'routing.json').write_text('{"status":"COMPLETE","bound_prefix":true}')
-    (tmp_path/'batch_report.json').write_text(json.dumps(dict(batches={str(b):dict(status='COMPLETE') for b in a.BATCHES})))
-    (tmp_path/'brounds.json').write_text(json.dumps(dict(same_kernel_graph={str(b):dict(status='UNAVAILABLE') for b in a.BATCHES})))
-    s.final()
-    value = json.loads((tmp_path/'b4_result.json').read_text())
-    assert value['status'] == 'INCOMPLETE' and value['performance_claim_status'].startswith('INCOMPLETE')
-    assert value['corrected_vllm_status'] == value['attribution_status'] == 'COMPLETE'
-
+# The final lane is the `final` command in tests/e2e/test_api_dsv2_attribution_final.py.
 
 def test_profiled_vllm_command_is_inside_pinned_container_and_single_batch(tmp_path, monkeypatch):
     s = bare_session(tmp_path)

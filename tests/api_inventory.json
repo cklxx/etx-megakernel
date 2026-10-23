@@ -9,8 +9,6 @@
     "test_cpu_check.py",
     "test_decode_entry.py",
     "test_dsv2_batch.py",
-    "test_dsv2_batch_attribution.py",
-    "test_dsv2_d5.py",
     "test_dsv2_stamps.py",
     "test_dsv2lite.py",
     "test_experiment_issue_order.py",
@@ -19,7 +17,6 @@
     "test_experiment_session.py",
     "test_experiment_session_integration.py",
     "test_experiment_validation.py",
-    "test_expert_merge.py",
     "test_glm53_model.py",
     "test_glm53_module_gate.py",
     "test_glm53_pairs.py",
@@ -236,12 +233,9 @@
       "reason": "Layout/rule units plus batch gates, goldens, report verification and pair orchestration."
     },
     "test_dsv2_batch_attribution.py": {
-      "classification": "mixed",
-      "owners": [
-        "API-18",
-        "API-24"
-      ],
-      "reason": "Counter/trace units plus arm execution, gating, stop behavior and final report."
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Counter/trace/range units, an extracted host-clock C++ probe, the session declaration, and arm/gate/stop cases with identity/process seams patched; the final lane is the command in tests/e2e/test_api_dsv2_attribution_final.py."
     },
     "test_dsv2_batch_mechanism.py": {
       "classification": "conformance",
@@ -254,12 +248,9 @@
       "reason": "Placement/numerical probes and pairs/report cases with patched recorders; the `etx compile` refusal is in tests/e2e/test_api_dsv2_d4.py."
     },
     "test_dsv2_d5.py": {
-      "classification": "mixed",
-      "owners": [
-        "API-18",
-        "API-24"
-      ],
-      "reason": "Prefetch/ISA/address probes plus private verify.build orchestration with fake outputs."
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Prefetch/ISA/address probes: plan and kernel identity, hook placement and load counts from in-process compile_graph/emission, an extracted host C++ address proof; verify.build orchestration cases patch its runner; no command invoked."
     },
     "test_dsv2_inplace_session.py": {
       "classification": "conformance",
@@ -463,12 +454,9 @@
       "reason": "Verdict/population units plus preparation, transcript admission and conditional workflows."
     },
     "test_expert_merge.py": {
-      "classification": "mixed",
-      "owners": [
-        "API-21",
-        "API-24"
-      ],
-      "reason": "Math/protocol units plus generate/build/capture/certify/time/session workflows."
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Math/protocol/screen units, the bounded command helper, capture emit/seal probes and the session job graph; generate/verify/inputs are commands in tests/e2e/test_api_expert_merge.py; build/capture/certify/time cases patch their seams."
     },
     "test_feature_manifest.py": {
       "classification": "conformance",

@@ -26,34 +26,7 @@ def test_source_keeps_producers_and_exact_statistics():
         source.once('new source','old source','replacement')
 
 
-def test_generated_graph_and_identity(tmp_path,monkeypatch):
-    # The caller's model switches must not label a different executable.
-    monkeypatch.setenv('ETX_VL_NB','2')
-    monkeypatch.setenv('ETX_VL_DSL_EXT','1')
-    for arm in ('control','candidate'):
-        out=tmp_path/arm
-        identity=prepare.generate(out,arm,diagnostic=True,head=arm=='candidate')
-        assert prepare.verify(out)==identity
-        p=json.loads((out/'plan.json').read_text())
-        assert len(p['descs'])==192+256+256
-        assert sum(len(e['counts']) for e in p['events'])==9
-        assert sorted(t['type'] for t in p['descs']).count(0)==192
-        assert [(e['scope'],e['counts']) for e in p['events']]==[('DOMAIN',[24]*8),('DEVICE',[256])]
-        for t in p['descs']:
-            if t['type'] in (0,1): assert t['domain']==t['coord'][0]
-        assert 'ETX_IMPORT_LDS 21120' in (out/'tiles.hip').read_text()
-        assert 'full_model_default' in identity and identity['full_model_default']=='OFF'
-        with pytest.raises(ValueError,match='build exists'):
-            prepare.generate(out,arm)
-        changed=dict(identity); changed['head']=not changed['head']
-        (out/'identity.json').write_text(json.dumps(changed))
-        with pytest.raises(ValueError,match='manifest identity'):
-            prepare.verify(out)
-        (out/'identity.json').write_text(json.dumps(identity))
-        (out/'tiles.hip').write_text('stale')
-        with pytest.raises(ValueError,match='generated identity'):
-            prepare.verify(out)
-
+# generate/verify for both arms are the prepare commands in tests/e2e/test_api_expert_merge.py.
 
 @pytest.mark.parametrize('head',[False,True])
 def test_control_diagnostic_joins_cross_wave_readers(tmp_path,head):
@@ -231,12 +204,9 @@ def test_registered_screen(gains,passed):
     with pytest.raises(ValueError): runner.verdict(gains[:4],'synthetic')
 
 
-def test_input_pack_hash_and_precision(tmp_path):
-    out=tmp_path/'pack'; inputs.synthetic(out)
-    assert inputs.validate(out)['kind']=='synthetic'
-    assert inputs.bf16([1.00390625]).tolist()==[0x3f80]  # ties to even
-    (out/'x.bin').write_bytes(b'\0'*4096)
-    with pytest.raises(ValueError,match='hash mismatch'): inputs.validate(out)
+def test_bf16_rounding_ties_to_even():
+    # Synthetic pack creation and hash validation are the inputs commands in tests/e2e/test_api_expert_merge.py.
+    assert inputs.bf16([1.00390625]).tolist()==[0x3f80]
 
 
 def test_capture_entrypoint_and_failed_receipt(tmp_path):

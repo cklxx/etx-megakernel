@@ -64,3 +64,11 @@ def test_golden_files_and_rotation_match_the_tool():
     values = {n.targets[0].id: ast.literal_eval(n.value) for n in tree.body
               if isinstance(n, ast.Assign) and getattr(n.targets[0], 'id', '') in ('FILES', 'ROTATE')}
     assert values == dict(FILES=tuple(FILES), ROTATE=ROTATE)
+
+
+def test_attribution_batches_match_the_session():
+    import ast
+    from examples.dsv2lite.batch_attribution import BATCHES
+    tree = ast.parse((ROOT / 'tests/e2e/test_api_dsv2_attribution_final.py').read_text())
+    pinned = next(n.value for n in tree.body if isinstance(n, ast.Assign) and getattr(n.targets[0], 'id', '') == 'BATCHES')
+    assert tuple(ast.literal_eval(pinned)) == tuple(BATCHES)
