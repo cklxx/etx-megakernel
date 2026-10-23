@@ -98,3 +98,15 @@ def test_unknown_command(capsys):
         cli.main(['does.not.exist'])
     assert error.value.code == 2
     assert 'invalid choice' in capsys.readouterr().err
+
+
+def test_documented_inventory_matches_registry():
+    from collections import Counter
+    text = (commands.ROOT / 'COMMANDS.md').read_text()
+    assert f'Total commands: **{len(commands.COMMANDS)}**.' in text
+    rows = [line for line in text.splitlines() if line.startswith('| `')]
+    assert len(rows) == len(commands.COMMANDS)
+    assert {row.split('`')[1] for row in rows} == set(commands.REGISTRY)
+    for family, count in Counter(c.family for c in commands.COMMANDS).items():
+        assert f'| {family} | {count} |' in text
+        assert f'## {family} ({count})' in text
