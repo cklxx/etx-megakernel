@@ -175,3 +175,124 @@ class ReadLedger:
         return dict(read_once=bool(self.expected) and not (missing or unexpected or repeated),
                     missing=missing, unexpected=unexpected, repeated=repeated,
                     element_reads=sum(self.counts.values()))
+
+
+class ObservedBytes:
+    """Sink for instrumented logical weight reads, including repeated scales.
+
+    Call ``read`` at the reader boundary, never from graph declarations or
+    descriptor allocation. Counts describe bytes requested by the reader, not
+    physical HBM transactions. Storage is O(tensors), also for production.
+    """
+
+    def __init__(self, spec):
+        _validate_schema(spec)
+        self.spec = spec
+        self.payload = Counter()
+        self.scales = Counter()
+
+    def read(self, group, tensor, *, elements=1, scales=0):
+        """Record payload elements and FP32 scale loads actually performed."""
+        _integer(elements, 'elements')
+        _integer(scales, 'scales')
+        record = self.spec['weights'][group]['tensors'][tensor]
+        if scales and record['dtype'] != 'torch.float8_e4m3fn':
+            raise ValueError('scale reads require an FP8 descriptor')
+        key = group, tensor
+        self.payload[key] += elements * ITEM_BYTES[record['dtype']]
+        self.scales[key] += scales * 4
+
+    def snapshot(self):
+        return {key: self.payload[key] + self.scales[key]
+                for key in self.payload.keys() | self.scales.keys()}
+
+
+def fc2a(spec, observations, *, experts):
+    """Qualify instrumented per-step byte snapshots for k=0,1,3,5.
+
+    ``observations[k]`` maps (group, tensor) to observed bytes. Missing or
+    extra tensors fail closed; analytical ledgers are not observations.
+    Routed expectations include FP8 scales once per block. Fixed tensors
+    are compared individually to their observed decode baseline (0.1%).
+    """
+    _validate_schema(spec)
+    ks = (0, 1, 3, 5)
+    reasons = []
+    expected_keys = {(g, t) for g, b in spec['weights'].items() for t in b['tensors']}
+    for k in ks:
+        if k not in observations:
+            reasons.append(f'k={k}: missing observed instrumented reads')
+            continue
+        observed = observations[k]
+        routes = _routes(spec, k, experts[k])
+        if set(observed) != expected_keys:
+            reasons.append(f'k={k}: incomplete observed tensor coverage '
+                           f'(missing={len(expected_keys-set(observed))}, '
+                           f'unexpected={len(set(observed)-expected_keys)})')
+        for key, n in observed.items():
+            _integer(n, 'observed bytes')
+            if key not in expected_keys:
+                continue
+            group, tensor = key
+            match = EXPERT.match(tensor)
+            if match:
+                union = set().union(*routes[group])
+                target = (sum(tensor_bytes(spec['weights'][group]['tensors'][tensor]))
+                          if int(match[1]) in union else 0)
+                if n != target:
+                    reasons.append(f'k={k} {group}/{tensor}: routed observed={n} '
+                                   f'expected={target} excess={n-target} bytes')
+            else:
+                target = observations.get(0, {}).get(key)
+                if target is None or target <= 0:
+                    reasons.append(f'k={k} {group}/{tensor}: missing positive observed baseline')
+                elif abs(n-target)*1000 > target:
+                    reasons.append(f'k={k} {group}/{tensor}: fixed observed={n} '
+                                   f'baseline={target} excess={n-target} bytes')
+    return dict(passed=not reasons, basis='observed logical reader bytes; not HBM traffic',
+                reasons=reasons)
+
+
+def gate_spec(name):
+    """Build gate descriptors without materializing any checkpoint weights."""
+    from examples.glm53 import model_build, module_gate, stage
+    from examples.glm53.prepare import partition
+    if name == 'production':
+        return model_build.production_compile_spec()
+    if name != 'module8':
+        raise ValueError('unknown gate')
+    t = module_gate.module_config('module8')['text_config']
+    slots = stage.slot_names(t)
+    weights = {}
+    for i, kind in enumerate(t['layer_types']):
+        weights[f'l{i}'] = model_build.compile_descriptors(
+            f'l{i}', stage.shapes(t, i), slots,
+            lambda key, shape, kind=kind: module_gate.storage(kind, key, shape))
+    for name, shape in [('embedding', (t['vocab_size'], t['hidden_size'])),
+                        ('norm', (t['hidden_size'],)),
+                        ('head', (t['vocab_size'], t['hidden_size']))]:
+        weights[name] = model_build.compile_descriptors(
+            name, {name: shape}, [name], lambda key, shape: 'BF16')
+    return dict(config=t, dimensions=stage.dimensions(t, 160),
+                ranks=partition(t), weights=weights)
+
+
+def main(argv=None):
+    import argparse
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--fc2a', action='store_true', required=True)
+    parser.parse_args(argv)
+    # The wired graph currently has no full-graph instrumented read provider.
+    # In particular, IR reads cannot be substituted for observed reader events.
+    # Report both descriptor gates, and refuse to certify from ideal arithmetic.
+    reasons = []
+    for name in ('module8', 'production'):
+        spec = gate_spec(name)
+        report = fc2a(spec, {}, experts={})
+        reasons.extend(f'{name} {reason}' for reason in report['reasons'])
+    print('FC-2a FAIL ' + '; '.join(reasons))
+    return 1
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())
