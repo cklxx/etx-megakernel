@@ -4,7 +4,7 @@ import pytest
 import torch
 
 from examples.glm53 import module_gate
-from examples.glm53.mtp_graph import MTPGraphCPU, MTPUnavailable, prerequisites, require_prerequisites
+from examples.glm53.mtp_graph import MTPGraphCPU, ETXMTPGraphCPU, MTPUnavailable, prerequisites, require_prerequisites
 from examples.spec.mtp_reference import MTPReference, dequantize
 
 
@@ -13,7 +13,7 @@ def fixture():
     previous_threads = torch.get_num_threads()
     torch.set_num_threads(1)
     config = module_gate.module_config('module8')
-    tensors = module_gate.tensors(config)
+    tensors = module_gate.tensors(config, mtp=True)
     yield config, tensors, MTPGraphCPU(config, tensors), MTPReference(config, dequantize(tensors))
     torch.set_num_threads(previous_threads)
 
@@ -105,3 +105,64 @@ def test_chain_recycles_normalized_state_and_appends_greedy_token(fixture):
     np.testing.assert_allclose(logits[1, -1], second[-1].numpy(), atol=3e-5, rtol=3e-5)
     np.testing.assert_allclose(recycled[-1], last_hidden[-1].numpy(), atol=3e-5, rtol=3e-5)
     assert tokens[1, -1] == second[-1].argmax().item()
+
+
+@pytest.fixture(scope='module')
+def etx_draft(fixture):
+    config, tensors, _, _ = fixture
+    return ETXMTPGraphCPU(config, tensors)
+
+
+def test_etx_graph_plans_both_targets_and_has_real_bodies(etx_draft):
+    from etx.passes import verify_plan
+    from pathlib import Path
+    assert set(etx_draft.plans) == {'gfx942', 'sm_90'}
+    for plan in etx_draft.plans.values():
+        assert verify_plan(plan) == []
+    graph = etx_draft.graph
+    assert len(graph.grids) >= 20
+    assert all(Path(grid.body.source).is_file() for grid in graph.grids)
+    assert graph.grid('attention').reads == ['control', 'q', 'kv', 'rows']
+    assert graph.grid('argmax').writes == ['tokens']
+
+
+def test_etx_graph_32_positions_k5_equal_reference(fixture, etx_draft):
+    config, _, _, reference = fixture
+    ids, hidden = inputs(config)
+    before = etx_draft.index_selections
+    actual = etx_draft.chain(ids, hidden, 5)
+    expected = reference.chain(ids, hidden, 5)
+    np.testing.assert_array_equal(actual[0], expected[0])
+    np.testing.assert_array_equal(actual[0], actual[1].argmax(-1))
+    np.testing.assert_allclose(actual[1], expected[1], atol=3e-5, rtol=3e-5)
+    np.testing.assert_allclose(actual[2], expected[2], atol=3e-5, rtol=3e-5)
+    assert np.isfinite(actual[1]).all()
+    assert etx_draft.index_selections - before == 32
+
+
+def test_etx_preflight_default_refuses_missing_opt_in():
+    config = module_gate.module_config('module8')
+    assert prerequisites(config)['status'] == 'BLOCKED'
+    with pytest.raises(MTPUnavailable, match='missing MTP tensors'):
+        ETXMTPGraphCPU(config, module_gate.tensors(config))
+
+
+def test_etx_causal_prefix_and_index_reuse(fixture, etx_draft):
+    config, _, _, _ = fixture
+    ids, previous = inputs(config, 4)
+    full, hidden = etx_draft.forward(ids, previous)
+    short, _ = etx_draft.forward(ids[:2], previous[:2])
+    np.testing.assert_allclose(short, full[:2], atol=3e-5, rtol=3e-5)
+    etx_draft.forward(ids, previous)
+    rows = etx_draft.buffers['rows'][:4].copy()
+    token = full[-1].argmax()
+    a, _ = etx_draft.forward(np.append(ids, token), np.concatenate((previous, hidden[-1:])), reuse_index=True)
+    np.testing.assert_array_equal(etx_draft.buffers['rows'][:4], rows)
+    b, _ = etx_draft.forward(np.append(ids, token), np.concatenate((previous, hidden[-1:])))
+    np.testing.assert_array_equal(a, b)
+    with pytest.raises(ValueError, match='preceding prefix'):
+        etx_draft.forward(ids, previous, reuse_index=True)
+    with pytest.raises(ValueError, match='positive'):
+        etx_draft.chain(ids, previous, 0)
+    with pytest.raises(ValueError, match='capacity'):
+        etx_draft.chain(ids, previous, 34)

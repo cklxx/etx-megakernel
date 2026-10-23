@@ -1,4 +1,4 @@
-"""Offline module8 MTP draft execution, independently implemented with CPU Torch.
+"""Offline module8 MTP draft: ETX graph plus the retained CPU Torch reference.
 
 This is the draft dataflow's CPU implementation, not GPU qualification. Storage
 FP8 is dequantized to float32; activation/cache quantization is not simulated.
@@ -165,6 +165,234 @@ class MTPGraphCPU:
         return (torch.stack(tokens, 1).numpy(), torch.stack(logits, 1).numpy(),
                 torch.stack(recycled).numpy())
 
+
+
+def build_graph(config, capacity=36, source=None):
+    """Build the module8 all-visible MTP prefix as explicit ETX operations.
+
+    This gate covers 32 seeds plus four appended drafts. Sparse prefixes beyond
+    index_topk are deliberately refused. Each operation is one scalar-lane tile;
+    this is a correctness graph, with no device performance qualification.
+    ``source`` selects the generated tile file location (never a repo file by
+    default). The same bodies are compiled for the CPU executor below.
+    """
+    import tempfile
+    from pathlib import Path
+    from etx.ir import Graph, Resource
+    from etx.frontends import hip_link
+
+    c = config.get('text_config', config)
+    if c['qk_rope_head_dim'] or c['mlp_layer_types'][-1] != 'dense':
+        raise ValueError('only module8 NoPE/dense MTP is supported')
+    if not isinstance(capacity, int) or isinstance(capacity, bool) or not 1 <= capacity <= c['index_topk']:
+        raise ValueError('capacity must fit the all-visible index_topk prefix')
+    source = Path(source) if source is not None else Path(tempfile.mkdtemp(prefix='etx-mtp-')) / 'tiles.h'
+    g = Graph('glm53_mtp_dense_prefix')
+    h, heads, dim = c['hidden_size'], c['num_attention_heads'], c['qk_nope_head_dim']
+    prefix = f"model.language_model.layers.{c['num_hidden_layers']}."
+    weight_names = {}
+    for full, _, _, shape in module_gate.mtp_tensors(c):
+        name = 'w' + str(len(weight_names))
+        weight_names[full] = name
+        g.tensor(name, shape, dtype='float32', bytes_per_elem=4, role='weight')
+    weight_names['model.language_model.embed_tokens.weight'] = 'embedding_weight'
+    g.tensor('embedding_weight', (c['vocab_size'], h), dtype='float32', bytes_per_elem=4, role='weight')
+    g.tensor('control', (2,), dtype='int32', bytes_per_elem=4, role='runtime')  # length, reuse index
+    g.tensor('ids', (capacity,), dtype='int32', bytes_per_elem=4, role='runtime')
+    g.tensor('previous', (capacity, h), dtype='float32', bytes_per_elem=4, role='runtime')
+    g.tensor('rows', (capacity, capacity), dtype='int32', bytes_per_elem=4, role='runtime')
+    bodies, last = [], None
+
+    def tensor(name, width):
+        g.tensor(name, (capacity, width), dtype='float32', bytes_per_elem=4)
+        return name
+
+    def emit(name, inputs, output, code, integer=(), preserve=False):
+        nonlocal last
+        args = ['control'] + inputs + [output]
+        decls = ['const int n=((const int*)ctx->args[0])[0];']
+        for i, arg in enumerate(args[1:], 1):
+            typ = 'int' if arg in integer else 'float'
+            decls.append(f'{typ}* {arg}=({typ}*)ctx->args[{i}];')
+        symbol = 'mtp_' + name
+        bodies.append('extern "C" __device__ void ' + symbol + '(const etx_ctx* ctx){\n'
+                      '#ifndef MTP_CPU\nif(threadIdx.x != 0) return;\n#endif\n'
+                      + '\n'.join(decls) + '\n' + code + '\n}')
+        event = 'done_' + name
+        g.etensor(event, (1,))
+        g.call_device(name, (1,), hip_link(str(source), symbol), resource=Resource(threads=64, vgpr=32),
+                      args=args, reads=['control'] + inputs + ([output] if preserve else []), writes=[output],
+                      in_edges={last: 'i->i'} if last else {}, out_edges={event: 'i->i'})
+        last = event
+
+    def weight(key):
+        return weight_names[prefix + key]
+
+    def norm(x, key, width, name):
+        w, out = weight(key + '.weight'), tensor(name, width)
+        emit(name, [x, w], out,
+             f'for(int t=0;t<n;++t){{float s=0;for(int j=0;j<{width};++j)s+={x}[t*{width}+j]*{x}[t*{width}+j];'
+             f'float r=1.0f/sqrtf(s/{width}+{c["rms_norm_eps"]}f);'
+             f'for(int j=0;j<{width};++j){out}[t*{width}+j]={x}[t*{width}+j]*r*{w}[j];}}')
+        return out
+
+    def linear(x, key, name):
+        w = weight(key + '.weight')
+        rows, cols = g.tensors[w].shape
+        out = tensor(name, rows)
+        emit(name, [x, w], out,
+             f'for(int t=0;t<n;++t)for(int r=0;r<{rows};++r){{float s=0;'
+             f'for(int j=0;j<{cols};++j)s+={x}[t*{cols}+j]*{w}[r*{cols}+j];{out}[t*{rows}+r]=s;}}')
+        return out
+
+    def add(a, b, name):
+        out = tensor(name, h)
+        emit(name, [a, b], out, f'for(int j=0;j<n*{h};++j){out}[j]={a}[j]+{b}[j];')
+        return out
+
+    e = tensor('embedding', h)
+    emit('embedding', ['ids', 'embedding_weight'], e,
+         f'for(int t=0;t<n;++t)for(int j=0;j<{h};++j)embedding[t*{h}+j]=t?embedding_weight[ids[t]*{h}+j]:0;', integer=('ids',))
+    en, hn = norm(e, 'enorm', h, 'en'), norm('previous', 'hnorm', h, 'hn')
+    joined = tensor('joined', 2*h)
+    emit('join', [en, hn], joined,
+         f'for(int t=0;t<n;++t)for(int j=0;j<{h};++j){{joined[t*{2*h}+j]=en[t*{h}+j];joined[t*{2*h}+{h}+j]=hn[t*{h}+j];}}')
+    x = linear(joined, 'eh_proj', 'projected')
+    a = norm(x, 'input_layernorm', h, 'attn_input')
+    ql = norm(linear(a, 'self_attn.q_a_proj', 'qa'), 'self_attn.q_a_layernorm', c['q_lora_rank'], 'ql')
+    q = linear(ql, 'self_attn.q_b_proj', 'q')
+    kvl = norm(linear(a, 'self_attn.kv_a_proj_with_mqa', 'kva'), 'self_attn.kv_a_layernorm', c['kv_lora_rank'], 'kvl')
+    kv = linear(kvl, 'self_attn.kv_b_proj', 'kv')
+    # Dense topk selection has no ranking. On shared iterations preserve all
+    # previous rows and publish only the appended causal row.
+    emit('index', [], 'rows',
+         f'int begin=((const int*)ctx->args[0])[1]?n-1:0;'
+         f'for(int t=begin;t<n;++t)for(int s=0;s<{capacity};++s)rows[t*{capacity}+s]=(s<=t);', integer=('rows',), preserve=True)
+    out = tensor('attended', heads*dim)
+    emit('attention', [q, kv, 'rows'], out,
+         f'for(int t=0;t<n;++t)for(int hd=0;hd<{heads};++hd){{float scores[{capacity}],mx=-INFINITY,z=0;'
+         f'for(int s=0;s<=t;++s){{float v=0;for(int j=0;j<{dim};++j)v+=q[(t*{heads}+hd)*{dim}+j]*kv[(s*{heads}+hd)*{2*dim}+j];'
+         f'scores[s]=rows[t*{capacity}+s]?v/{dim**0.5}f:-INFINITY;mx=fmaxf(mx,scores[s]);}}'
+         f'for(int s=0;s<=t;++s){{scores[s]=expf(scores[s]-mx);z+=scores[s];}}'
+         f'for(int j=0;j<{dim};++j){{float v=0;for(int s=0;s<=t;++s)v+=scores[s]/z*kv[(s*{heads}+hd)*{2*dim}+{dim}+j];'
+         f'attended[(t*{heads}+hd)*{dim}+j]=v;}}}}', integer=('rows',))
+    residual = add(x, linear(out, 'self_attn.o_proj', 'attn_out'), 'residual')
+    f = norm(residual, 'post_attention_layernorm', h, 'ffn_input')
+    gate, up = linear(f, 'mlp.gate_proj', 'gate'), linear(f, 'mlp.up_proj', 'up')
+    width = g.tensors[gate].shape[1]
+    act = tensor('activation', width)
+    limit = c.get('swiglu_limit')
+    clamp = '' if limit is None else f'a=fminf(a,{float(limit)}f);b=fmaxf(-{float(limit)}f,fminf(b,{float(limit)}f));'
+    emit('swiglu', [gate, up], act,
+         f'for(int j=0;j<n*{width};++j){{float a=gate[j],b=up[j];{clamp}activation[j]=a/(1+expf(-a))*b;}}')
+    hidden = norm(add(residual, linear(act, 'mlp.down_proj', 'ffn_out'), 'final_residual'), 'shared_head.norm', h, 'hidden')
+    logits = linear(hidden, 'shared_head.head', 'logits')
+    g.tensor('tokens', (capacity,), dtype='int32', bytes_per_elem=4)
+    emit('argmax', [logits], 'tokens',
+         f'for(int t=0;t<n;++t){{int best=0;for(int j=1;j<{c["vocab_size"]};++j)if(logits[t*{c["vocab_size"]}+j]>logits[t*{c["vocab_size"]}+best])best=j;tokens[t]=best;}}', integer=('tokens',))
+    source.parent.mkdir(parents=True, exist_ok=True)
+    source.write_text('#include <math.h>\n#include "etx/abi.h"\n' + '\n'.join(bodies))
+    # Metadata is solely for binding checkpoint names to declared graph tensors.
+    g.mtp_weights = weight_names
+    return g
+
+
+class ETXMTPGraphCPU:
+    """Execute the graph's generated C++ tile bodies, with poisoned scratch.
+
+    Planning is exercised on both targets; CPU execution uses topological grid
+    order and does not validate GPU synchronization or device compilation.
+    """
+    def __init__(self, config, tensors, capacity=36):
+        import ctypes
+        import tempfile
+        import subprocess
+        from pathlib import Path
+        import numpy as np
+        from etx.passes import compile_graph, verify_plan
+
+        require_prerequisites(config, tensors)
+        self.c = config.get('text_config', config)
+        self.capacity = capacity
+        self._work = tempfile.TemporaryDirectory(prefix='etx-mtp-cpu-')
+        work = Path(self._work.name)
+        self.graph = build_graph(config, capacity, work / 'tiles.h')
+        self.plans = {arch: compile_graph(self.graph, arch, {}, {}) for arch in ('gfx942', 'sm_90')}
+        assert all(not verify_plan(p) for p in self.plans.values())
+        self.buffers = {}
+        for name, t in self.graph.tensors.items():
+            self.buffers[name] = np.full(t.shape, -1 if t.dtype == 'int32' else np.nan,
+                                       dtype=np.int32 if t.dtype == 'int32' else np.float32)
+        # Dequantization is storage conversion only, shared with the retained
+        # Torch path; no Torch arithmetic executes the graph.
+        weights = MTPGraphCPU(config, tensors).w
+        for name, target in self.graph.mtp_weights.items():
+            self.buffers[target][...] = weights[name].numpy()
+        root = Path(__file__).resolve().parents[2]
+        wrappers = []
+        for i, grid in enumerate(self.graph.grids):
+            wrappers.append(f'extern "C" void run_{i}(void** args){{etx_ctx c={{}};c.args=args;{grid.body.symbol}(&c);}}')
+        src = work / 'cpu.cpp'
+        src.write_text('#define MTP_CPU 1\n#define __device__\n#include "tiles.h"\n' + '\n'.join(wrappers))
+        lib = work / 'cpu.so'
+        subprocess.run(['c++', '-O3', '-ffp-contract=off', '-std=c++17', '-shared', '-fPIC',
+                        '-I', str(root / 'etx/runtime/include'), str(src), '-o', str(lib)],
+                       check=True, timeout=120, capture_output=True)
+        self.lib = ctypes.CDLL(str(lib))
+        self.calls = []
+        for i, grid in enumerate(self.graph.grids):
+            fn = getattr(self.lib, f'run_{i}')
+            fn.argtypes = [ctypes.POINTER(ctypes.c_void_p)]
+            args = (ctypes.c_void_p * len(grid.args))(*(self.buffers[n].ctypes.data for n in grid.args))
+            self.calls.append((fn, args))
+        self.index_selections = 0
+        self._shared_length = None
+
+    def forward(self, ids, previous, *, reuse_index=False):
+        import numpy as np
+        ids, previous = np.asarray(ids), np.asarray(previous, dtype=np.float32)
+        n = len(ids) if ids.ndim == 1 else 0
+        if (not n or ids.dtype.kind not in 'iu' or previous.shape != (n, self.c['hidden_size'])
+                or np.any(ids < 0) or np.any(ids >= self.c['vocab_size'])):
+            raise ValueError('expected nonempty integer token IDs and [time, hidden] states')
+        if n > self.capacity:
+            raise ValueError('prefix exceeds graph capacity / all-visible index_topk')
+        if reuse_index and self._shared_length != n-1:
+            raise ValueError('shared index requires the immediately preceding prefix')
+        for name, t in self.graph.tensors.items():
+            if t.role == 'activation':
+                self.buffers[name].fill(-1 if t.dtype == 'int32' else np.nan)
+        self.buffers['control'][:] = n, int(reuse_index)
+        self.buffers['ids'][:n] = ids
+        self.buffers['previous'][:n] = previous
+        for fn, args in self.calls:
+            fn(args)
+        self.index_selections += int(not reuse_index)
+        self._shared_length = n
+        return self.buffers['logits'][:n].copy(), self.buffers['hidden'][:n].copy()
+
+    def chain(self, ids, previous, depth):
+        import numpy as np
+        if isinstance(depth, bool) or not isinstance(depth, int) or depth < 1:
+            raise ValueError('depth must be positive')
+        ids, previous = np.asarray(ids), np.asarray(previous, dtype=np.float32)
+        if ids.ndim != 1 or not len(ids) or len(ids)+depth-1 > self.capacity:
+            raise ValueError('nonempty prefix plus drafts must fit graph capacity')
+        tokens, logits, recycled = [], [], []
+        for t in range(len(ids)):
+            branch, states = ids[:t+1].copy(), previous[:t+1].copy()
+            bt, bl = [], []
+            for d in range(depth):
+                out, hidden = self.forward(branch, states, reuse_index=bool(d and self.c.get('index_share_for_mtp_iteration', False)))
+                token = int(self.buffers['tokens'][len(branch)-1])
+                bt.append(token)
+                bl.append(out[-1])
+                branch = np.append(branch, token)
+                states = np.concatenate((states, hidden[-1:]))
+            tokens.append(bt)
+            logits.append(bl)
+            recycled.append(hidden[-1])
+        return np.asarray(tokens).T, np.swapaxes(np.asarray(logits), 0, 1), np.stack(recycled)
 
 def main():
     config = module_gate.module_config('module8')
