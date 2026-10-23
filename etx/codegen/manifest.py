@@ -159,3 +159,39 @@ def selection_block(selection: dict | None) -> list[str]:
     out.append(f"static const int32_t etx_sel_kind[{dims}] = {{{kinds}}};   // 0 dsl, 1 imported")
     out.append("")
     return out
+
+
+# ---- I/O roles: model-free startup loader (etx/runtime/host/loader.h)
+# A separate JSON manifest carries {"io_roles": {argument: {bytes, owner,
+# role, memory}}}. Argument names/indices must exactly match plan.json's args;
+# owner is a rank in [0, devices). Roles: weight/activation/runtime/scratch.
+# Memory: device/system. SYSTEM includes device-polled events and control words;
+# on CUDA it is owner-device memory plus peer access, NOT managed memory.
+# Pass events/control storage as explicit arguments to include it in ownership.
+#
+# The weight map JSON is {"ranges": [{arg, rank, file, src, dst, rows,
+# stride, width}]}. All offsets/strides/widths are bytes. Destination rows are
+# compact; source rows may be strided. Whole files use rows=1, src=dst=0,
+# stride=width=argument bytes. Each weight must be covered exactly once, with
+# no gaps/overlaps. file is a basename relative to the weight-map directory;
+# files can be shared by ranges/ranks. Non-weights start zeroed.
+def io_roles_manifest(args: dict[str, int], devices: int, roles: dict) -> dict:
+    """Validate explicit loader metadata; never infer a role from a name."""
+    if type(devices) is not int or devices <= 0:
+        raise ValueError("devices must be positive")
+    if set(args) != set(roles) or sorted(args.values()) != list(range(len(args))):
+        raise ValueError("I/O roles must match contiguous plan arguments")
+    result = {}
+    for name, entry in roles.items():
+        if set(entry) != {"bytes", "owner", "role", "memory"}:
+            raise ValueError(f"{name}: invalid I/O fields")
+        if type(entry["bytes"]) is not int or not 0 < entry["bytes"] < 2**64:
+            raise ValueError(f"{name}: invalid byte size")
+        if type(entry["owner"]) is not int or not 0 <= entry["owner"] < devices:
+            raise ValueError(f"{name}: invalid owner")
+        if entry["role"] not in ("weight", "activation", "runtime", "scratch"):
+            raise ValueError(f"{name}: invalid role")
+        if entry["memory"] not in ("device", "system"):
+            raise ValueError(f"{name}: invalid memory")
+        result[name] = dict(entry)
+    return {"io_roles": result}
