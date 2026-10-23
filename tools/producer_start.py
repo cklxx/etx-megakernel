@@ -31,7 +31,9 @@ def launch(ip, venv, config, allocation_deadline):
         rc = proc.run(list(map(str, argv)), sink=sys.stdout, deadline_s=seconds, poll_s=1, env=env, cwd=ROOT)
         if rc:
             raise RuntimeError(f'staging/start failed exit={rc}; stop and fetch')
-    run(['bash', ROOT/'tools/session.sh', 'push', ip], staging_deadline)
+    # The session transport through its external translator, under this interpreter.
+    transport = [sys.executable, '-m', 'etx.tools.session', '--root', ROOT]
+    run([*transport, 'push', ip], staging_deadline)
     user = os.environ.get('ETX_SESS_USER', 'hotaisle')
     remote = 'cd ~/etx && python3 -B -m examples.vllm_llm.producer_stage '+shlex.quote(venv)
     run(['ssh', '-o', 'ConnectTimeout=10', '-o', 'StrictHostKeyChecking=accept-new',
@@ -41,7 +43,7 @@ def launch(ip, venv, config, allocation_deadline):
     cap = min(3300, int(allocation_deadline-time.time()-15))
     if cap <= 300:
         raise ValueError('no compute budget after evidence reserve; stop and fetch')
-    run(['bash', ROOT/'tools/session.sh', 'start', ip, 'examples/sessions/qwen_producer.py', '0', 'A'],
+    run([*transport, 'start', ip, 'examples/sessions/qwen_producer.py', '0', 'A'],
         min(time.time()+15, allocation_deadline),
         dict(os.environ, ETX_QWEN_G6_CONFIG=config, ETX_SESS_MAX_SECONDS=str(cap)))
 
