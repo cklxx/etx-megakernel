@@ -11,12 +11,8 @@
     "test_dsv2_batch.py",
     "test_dsv2_stamps.py",
     "test_dsv2lite.py",
-    "test_experiment_issue_order.py",
-    "test_experiment_review_repair.py",
-    "test_experiment_row_ops.py",
     "test_experiment_session.py",
     "test_experiment_session_integration.py",
-    "test_experiment_validation.py",
     "test_glm53_model.py",
     "test_glm53_module_gate.py",
     "test_glm53_pairs.py",
@@ -392,12 +388,9 @@
       "reason": "Ownership/epoch/graph units, local preparation and run_program with an injected case_main; the command is in tests/e2e/test_api_experiment_columns.py."
     },
     "test_experiment_issue_order.py": {
-      "classification": "mixed",
-      "owners": [
-        "API-23",
-        "API-24"
-      ],
-      "reason": "Source/resource units plus overlays, artifact archives and matrix continuation workflows."
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Source/reorder/replay/probe validators and IR/matrix archive functions in process (matrix archive fixture patches ROOT); no command invoked."
     },
     "test_experiment_native_resources.py": {
       "classification": "conformance",
@@ -410,12 +403,9 @@
       "reason": "Pair arithmetic, election protocol, capture indices and sealed-path validation."
     },
     "test_experiment_review_repair.py": {
-      "classification": "mixed",
-      "owners": [
-        "API-23",
-        "API-24"
-      ],
-      "reason": "ABI/schema units plus populated programs, preflight, telemetry and staged dependencies."
+      "classification": "conformance",
+      "owners": [],
+      "reason": "ABI/schema/telemetry units, pack/export validators, and program/row CLI/preflight cases with run_program child stubs or patched build/config/admission/run_logged seams; no unpatched command."
     },
     "test_experiment_router.py": {
       "classification": "conformance",
@@ -428,12 +418,9 @@
       "reason": "Binary record decoding and malformed capture rejection."
     },
     "test_experiment_row_ops.py": {
-      "classification": "mixed",
-      "owners": [
-        "API-23",
-        "API-24"
-      ],
-      "reason": "Numerical/address/alias units plus raw-export readmission and winner artifact preparation."
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Numerical/address/alias units and raw-export readmission/winner-source validators in process; the native host-capture case patches its process seam; no unpatched command."
     },
     "test_experiment_session.py": {
       "classification": "conformance",
@@ -446,12 +433,9 @@
       "reason": "Bounded process, resume, dependency and provenance seams through etx.testing; preflight/run/resume/export operational cases moved to external-only tests/e2e/test_api_sealed.py."
     },
     "test_experiment_validation.py": {
-      "classification": "mixed",
-      "owners": [
-        "API-23",
-        "API-24"
-      ],
-      "reason": "Verdict/population units plus preparation, transcript admission and conditional workflows."
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Verdict/population/schedule validators and staging/command-resolution functions in process; no command invoked; staged-session cases patch their native seams."
     },
     "test_expert_merge.py": {
       "classification": "conformance",
