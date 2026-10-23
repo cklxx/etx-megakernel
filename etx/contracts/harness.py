@@ -30,6 +30,9 @@ def run_harness_command(request):
         code = module.main()
     except SystemExit as exit:
         code = exit.code
+        if code is not None and not isinstance(code, int):
+            # As the interpreter does for an uncaught SystemExit: the message goes to stderr, the status is 1.
+            print(code, file=sys.stderr, flush=True)
         return code if isinstance(code, int) else (0 if code is None else 1)
     finally:
         sys.argv = saved
