@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from etx.tools import timeline as tl
-from examples.vllm_llm import bw_spec
+from etx.models.vllm_llm import bw_spec
 
 ROOT = Path(__file__).resolve().parents[1]
 ROUND11 = Path(os.environ.get("ETX_DATA_ROOT", ROOT)) / "results_2026-10-01/round11"

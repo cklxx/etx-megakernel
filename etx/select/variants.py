@@ -121,7 +121,7 @@ def default_structure(d) -> Structure:
     fold_norms = bool(d.moe) or bool(getattr(d, "ln_norm", False))
     fold_topk = False
     if d.moe and fold_norms and not getattr(d, "sparsemixer", False):
-        from examples.vllm_llm import folds          # pure shape model, reads no environment
+        from etx.models.vllm_llm import folds          # pure shape model, reads no environment
         fold_topk = bool(folds.decide(d, CU, NX).get("topk", False))
     attn_head = bool(d.qk_norm) and d.G + 2 <= THREADS // 64      # model.py _attn_head
     return Structure(fold_norms=fold_norms, fold_topk=fold_topk, attn_head=attn_head)
@@ -190,7 +190,7 @@ def phase_shapes(model_cfg, structure: Structure | None = None) -> dict[str, dic
 # PLAN 6.1: "an estimate of body time for a given occupancy, a function of bytes and waves". Until a GPU measures the
 # per-variant rates, every variant of a phase gets the SAME estimate: the phase floor plus its weight bytes at the
 # copy ceiling. Equal costs make the selection fall to the tie rule (dsl first, then declaration order).
-PHASE_FLOOR_US = 2.64          # examples/vllm_llm/folds.py
+PHASE_FLOOR_US = 2.64          # etx/models/vllm_llm/folds.py
 COPY_B_PER_US = 4.3e6          # 4.3 TB/s, the MI300X ceiling the PLAN's utilisation figures use
 
 

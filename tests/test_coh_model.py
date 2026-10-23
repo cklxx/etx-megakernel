@@ -5,7 +5,7 @@ from pathlib import Path
 import json
 import pytest
 
-from examples.vllm_llm import pmodel
+from etx.models.vllm_llm import pmodel
 
 ROOT = Path(__file__).resolve().parents[1]
 PLAN = ROOT / "results_2026-09-30/plan_moe_dsl3.json"

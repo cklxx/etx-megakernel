@@ -8,7 +8,7 @@ import pytest
 
 from etx.sim import phase
 from etx.tools.floors import round11_from_trace
-from examples.vllm_llm import pmodel
+from etx.models.vllm_llm import pmodel
 
 ROOT = Path(__file__).resolve().parents[1]
 CFG = json.loads((ROOT / "examples/llm/configs/qwen3-30b-a3b.json").read_text())

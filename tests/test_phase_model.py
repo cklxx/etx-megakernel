@@ -41,7 +41,7 @@ def test_aggregate_bandwidth_grows_with_bytes_per_workgroup():
 
 
 def _step(plan_name, mapping="contig", fused=True):
-    from examples.vllm_llm import pmodel
+    from etx.models.vllm_llm import pmodel
     plan = json.loads((ROOT / "results_2026-09-30" / plan_name).read_text())
     hw = pmodel.hw() if fused else pmodel.hw(handoff_domain=1.61, handoff_device=1.61)
     _, st = simulate(plan, pmodel.cost_fn(plan, CFG, mapping, fused=fused), hw)
@@ -63,7 +63,7 @@ def test_folding_narrow_phases_away_is_worth_almost_nothing():
 
 def test_a_phase_is_charged_for_its_width_not_for_existing():
     """The same bytes over fewer tasks costs less, because the fixed cost follows the width."""
-    from examples.vllm_llm import pmodel
+    from etx.models.vllm_llm import pmodel
     rows = {r: (now, at_now, best, at_best) for r, _, now, at_now, best, at_best, _ in pmodel.width_sweep(CFG)}
     now, at_now, best, at_best = rows["router"]
     assert now == 304 and best < 64 and at_best < at_now / 4      # 0.5 MB does not want 304 tasks
@@ -75,7 +75,7 @@ def test_a_phase_is_charged_for_its_width_not_for_existing():
 def test_the_megakernel_costs_more_per_phase_than_separate_launches():
     """Measured: build 3 is 5.895 ms fused and 5.660 unfused although an unfused launch also pays a kernel
     boundary. The model carries that as a positive constant rather than assuming fusion is free."""
-    from examples.vllm_llm import pmodel
+    from etx.models.vllm_llm import pmodel
     assert pmodel.FUSED_US > 0
 
 

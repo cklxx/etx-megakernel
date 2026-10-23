@@ -1,4 +1,4 @@
-"""examples.vllm_llm.folds: the fold decision is derived from the model's shapes and reproduces what was measured.
+"""etx.models.vllm_llm.folds: the fold decision is derived from the model's shapes and reproduces what was measured.
 
 A fold deletes a one-block producer phase and pays for it with rematerialised work in every consumer task. Both
 outcomes were measured on Qwen3-30B-A3B on 2026-10-01: the input-norm fold wins (3.75 us/layer against 5.9 for the
@@ -8,7 +8,7 @@ the cost model stops reproducing those, it has drifted from the measurements and
 from pathlib import Path
 
 from examples.llm.model import load_dims
-from examples.vllm_llm import folds
+from etx.models.vllm_llm import folds
 
 ROOT = Path(__file__).resolve().parents[1]
 CFG = ROOT / "examples/llm/configs"

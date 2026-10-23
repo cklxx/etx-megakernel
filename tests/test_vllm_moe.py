@@ -141,8 +141,8 @@ def test_qknr_replaces_qk_norm_and_rope(tmp_path, monkeypatch):
     """ETX_VL_QKNR: vLLM's fused_qk_norm_rope (grid ceil((32 + 4) / 8) = 5, block 256) in place of rms_norm_3d x2 +
     rotary; =1 chains it with the cache write (one task), =grid keeps it a grid of its own (its blocks on 2 CUs)."""
     from etx.codegen.kernel import emit_plan_json
-    from examples.vllm_llm import kmodel as km
-    from examples.vllm_llm.xcd_run import cost_fn
+    from etx.models.vllm_llm import kmodel as km
+    from etx.models.vllm_llm.xcd_run import cost_fn
     vm, g = _graph(tmp_path, monkeypatch, xcd=False, qknr="1")
     rows = [ln.split() for ln in (tmp_path / "vl_plan.txt").read_text().splitlines()[2:]]
     layer1 = [(r[1], r[3], int(r[4]), int(r[8])) for r in rows if r[2] == "1"]

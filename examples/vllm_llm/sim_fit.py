@@ -6,8 +6,8 @@ from statistics import median
 sys.path.insert(0, ".")
 from etx.sim.xcd import Hw, simulate
 from etx.tools import timeline as tl
-from examples.vllm_llm import kmodel as km
-from examples.vllm_llm.xcd_run import cost_fn
+from etx.models.vllm_llm import kmodel as km
+from etx.models.vllm_llm.xcd_run import cost_fn
 
 plan = json.load(open("results_2026-09-28/plan_moe_xcd.json"))
 p = km.fit(json.load(open("results_2026-09-28/measured.json")))

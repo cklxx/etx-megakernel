@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from examples.vllm_llm import byte_ledger as bl
+from etx.models.vllm_llm import byte_ledger as bl
 from examples.llm.model import load_dims
 
 ROOT = Path(__file__).resolve().parents[1]

@@ -5,7 +5,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from examples.vllm_llm.bench_params import derive, parse
+from etx.models.vllm_llm.bench_params import derive, parse
 
 ROOT = Path(__file__).resolve().parents[1]
 

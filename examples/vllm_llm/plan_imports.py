@@ -1,12 +1,10 @@
-"""Compatibility entry point; both build scripts use plan_exports directly."""
+"""python -m examples.vllm_llm.plan_imports: translator for etx/models/vllm_llm/plan_imports.py."""
+from pathlib import Path
 import sys
-from examples.vllm_llm.plan_exports import exports
 
-
-def planned_imports(config: str) -> list[str]:
-    _, names, _ = exports(config)
-    return sorted(n for n, kind in names.items() if kind == "imported")
+from etx.external import HarnessCommandRequest, run_harness_command
 
 
 if __name__ == "__main__":
-    print(",".join(planned_imports(sys.argv[1])))
+    raise SystemExit(run_harness_command(HarnessCommandRequest(
+        "qwen-vllm", "plan_imports", tuple(sys.argv[1:]), str(Path(__file__).resolve().parents[2]))))

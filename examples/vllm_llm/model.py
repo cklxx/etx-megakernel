@@ -51,7 +51,7 @@ import os
 MOE_UP_RPT = int(os.environ.get("ETX_VL_MOE_RPT", "32"))
 
 from etx.importer.spec import launch_for, validate_wvsplitk, grid_for, OPERATORS
-from examples.vllm_llm import folds  # noqa: E402
+from etx.models.vllm_llm import folds  # noqa: E402
 from etx.codegen import manifest  # noqa: E402
 from etx import select as etx_select  # noqa: E402
 
@@ -125,7 +125,7 @@ DSL_ATTNHEAD = _ATTN_ENV == "head"      # module-level view; instances() re-deri
 # sums the 8 expert rows + residual and norms them itself, every router task norms o + residual, every moe_up task
 # recomputes the top-k from the logits (deterministic), the next layer reads the expert rows: no in_norm (L > 0),
 # post_norm, topk or moe_sum launches (the design's rematerialisation: redundant parallel work for a serial event)
-# DERIVED by default (examples/vllm_llm/folds.py): a fold deletes a one-block producer phase and pays for it with
+# DERIVED by default (etx/models/vllm_llm/folds.py): a fold deletes a one-block producer phase and pays for it with
 # rematerialised work in every consumer task, so whether it wins depends on the model's shapes, not on the phase.
 # `ETX_VL_DSL_FOLD=1/0` still forces it either way for an A/B; unset means "ask the cost model".
 # A fold is a DSL-tile capability (the folded prologue lives in dsl_gemv_fold), so the all-imported build has none.

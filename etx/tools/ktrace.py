@@ -14,7 +14,7 @@ from collections import defaultdict
 from pathlib import Path
 from statistics import median
 
-from examples.vllm_llm.compare import read_vl_plan
+from etx.models.vllm_llm.compare import read_vl_plan
 from examples.vllm_llm.vllm_profile import bursts
 from etx.tools.floors import PHASES
 

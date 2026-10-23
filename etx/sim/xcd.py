@@ -27,7 +27,7 @@ byte against HBM, which over-predicted contention whenever attention overlapped 
 
 The output has the layout of ETX_TRACE_RAW (type, coord x4, taken, ready, done, worker; 10 ns ticks), so the same tools
 read a simulated and a measured schedule: etx.tools.timeline (per-XCD occupancy, critical path, HTML) and
-examples/vllm_llm/compare.py ledger.
+etx/models/vllm_llm/compare.py ledger.
 
   from etx.sim.xcd import Cost, Hw, simulate
   rows = simulate(plan_json, cost_of_type, Hw.mi300x())

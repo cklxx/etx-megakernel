@@ -1,4 +1,4 @@
-"""examples.vllm_llm.xcd_account on a simulated DeepSeek-V2-Lite schedule: every worker's classes must cover the
+"""etx.models.vllm_llm.xcd_account on a simulated DeepSeek-V2-Lite schedule: every worker's classes must cover the
 span exactly once, and the critical-path account must telescope to the span."""
 import json
 from array import array
@@ -10,7 +10,7 @@ from etx.sim import simulate
 from etx.tools import timeline as tl
 from examples.dsv2lite import bytes as dsb
 from examples.dsv2lite import graph as dsv
-from examples.vllm_llm import xcd_account as xa
+from etx.models.vllm_llm import xcd_account as xa
 
 
 @pytest.fixture(scope="module")

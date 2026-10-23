@@ -198,7 +198,7 @@ def schedule(model,batch,systems,selected,seed,*,fold_decision_active=False,trac
 def replay(config,out,*,write=True):
     """Consume only this session's completed native logs and original certificates."""
     from etx.session.batch import etx_result,vllm_results,ns
-    from examples.vllm_llm import import_certificate as cert,pairs
+    from examples.vllm_llm import import_certificate as cert, pairs
     if 'conditional_candidates' in config:
         from .validation_dispatch import replay as conditional_replay
         return conditional_replay(config,out)
