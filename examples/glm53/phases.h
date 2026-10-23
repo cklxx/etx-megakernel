@@ -315,7 +315,7 @@ template<class S> GLM_DEV void glm_collapse_norm(const uint8_t* b,const glm_weig
 #ifndef GLM53_CPU
   constexpr int N=GLM_H/(8*GLM_VT);
   if(N>0&&GLM_H%(8*GLM_VT)==0&&glm_vec_src(s)){
-    float v[N][GLM_HC][8];
+    float v[N>0?N:1][GLM_HC][8];   // N==0 (small H): branch never taken; HIP forbids a zero-length array
     for(int k=0;k<N;++k)for(int c=0;c<GLM_HC;++c)glm_load8(s,c*GLM_H+(k*GLM_VT+(int)threadIdx.x)*8,v[k][c]);
     for(int k=0;k<N;++k)for(int i=0;i<8;++i){float sum=0;for(int c=0;c<GLM_HC;++c)sum+=pre[c]*v[k][c][i];x[(k*GLM_VT+threadIdx.x)*8+i]=glm_bf(sum);}
     GLM_SYNC();glm_pnorm(b,nw,x,x,GLM_H,red);return;
