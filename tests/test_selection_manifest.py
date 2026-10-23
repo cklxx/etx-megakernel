@@ -113,6 +113,15 @@ def _run(exe, plan_txt, env=None):
     return subprocess.run([str(exe), str(plan_txt)], capture_output=True, text=True, env=env)
 
 
+def test_frozen_import_table_matches_the_operators(tmp_path):
+    from etx.ops import attnprep as _prep, gemv as _gemv, topk as _topk
+    from tests.test_moe_mapping import IMPORTS
+    imp = {e: {"slots": s or 8, "arg_bytes": a} for e, (s, a) in IMPORTS.items()}
+    for mod in (_gemv, _topk, _prep):
+        imp.update(json.loads(json.dumps(mod.import_entries())))
+    assert json.loads((ROOT / "tests/e2e/data/selection_imports.json").read_text()) == imp
+
+
 def test_selection_of_splits_layer_zero_only_when_it_differs():
     rows = [("in_norm", 0, "rms_norm_2d"), ("qkv", 0, "dsl_gemv"), ("qkv", 1, "dsl_gemv_fold"), ("qkv", 2, "dsl_gemv_fold"),
             ("attn", 0, "attn_mfma16_g8"), ("attn", 1, "attn_mfma16_g8"), ("lm_head", -1, "dsl_gemv_fold")]
@@ -161,23 +170,13 @@ def test_megakernel_source_is_byte_identical_with_the_selection(tmp_path, monkey
     assert "etx_sel_" not in with_sel_kernel and "ETX_SEL_" not in with_sel_kernel
 
 
-def test_host_reads_the_selection_from_the_manifest(tmp_path, monkeypatch):
+def test_host_refuses_a_manifest_that_disagrees_with_the_plan(tmp_path, monkeypatch):
     """etx/selection.h, compiled for the CPU, accepts the plan that the manifest describes and refuses a plan row
     or a manifest that disagrees. The environment of the run does not matter: the host derives nothing."""
     g, plan = _build(tmp_path, monkeypatch)
     plan_txt = tmp_path / "vl_plan.txt"
-    exe, r = _driver(tmp_path, emit_plan_header(plan))
-    assert r.returncode == 0, r.stderr
-    ok = _run(exe, plan_txt)
-    assert ok.returncode == 0 and ok.stdout.strip() == "ok 12", ok.stdout
-    # the switches that select the variants today, set the other way at run time: no effect on the host
-    flipped = _run(exe, plan_txt, env={"ETX_VL_DSL_TOPK": "0", "ETX_VL_DSL_GEMV": "0", "ETX_VL_IMPORTED": "1", "PATH": "/usr/bin:/bin"})
-    assert flipped.returncode == 0, flipped.stdout
-    # a plan row that runs another export than the manifest names
-    bad = tmp_path / "bad_plan.txt"
-    bad.write_text(re.sub(r"^(\d+) dsl_topk ", r"\1 topk_softmax_e128 ", plan_txt.read_text(), count=1, flags=re.M))
-    r = _run(exe, bad)
-    assert r.returncode == 1 and "differs from the selection" in r.stdout and "topk_softmax_e128" in r.stdout, r.stdout
+    # Accepting the plan, ignoring run-time switches and refusing a disagreeing plan row are checked through
+    # `etx compile` in tests/e2e/test_api_selection_manifest.py; here the manifest itself is edited.
     # a manifest that selects another variant for one phase than the plan file runs
     sel = plan.graph.codegen[manifest.SELECTION]   # compile_graph copies the graph: the plan holds the manifest input
     sel["phases"]["topk"] = ("topk_softmax_e128", "imported")

@@ -10,6 +10,13 @@ def glm_cpu_stage(out):
     return Path(out)
 
 
+def glm_module_checkpoint(out):
+    """Write the module-gate checkpoint (the release's dtype rules at module sizes) at `out` (needs torch)."""
+    from examples.glm53 import module_gate
+    module_gate.checkpoint(Path(out))
+    return Path(out)
+
+
 def glm_reference_record(tmp_path, staged, batch=2, **changes):
     """A synthetic HF reference record (+ zero logits file) matching the pinned release's identity."""
     from examples.glm53 import reference as reference_module

@@ -110,17 +110,13 @@ def staged(tmp_path_factory):
     return d
 
 
-def test_production_stager_and_validator_keep_the_gates_apart(staged, capsys):
+def test_production_stager_and_validator_keep_the_gates_apart(staged):
     r = stage.validate(staged / 'stage', gate='module')
     assert r['model'] == MODULE_MODEL and r['fixture'] is False
     assert [x['layers'] for x in r['ranks']] == [[0, 1], [2, 3]]
     with pytest.raises(ValueError, match='production gate'):
         stage.validate(staged / 'stage')
-    with pytest.raises(ValueError, match='production gate'):
-        stage.stage(staged / 'checkpoint', staged / 'as-release')
-    assert pf.main(['--glm-stage', str(staged / 'stage'), '--glm-gate', 'module', '--hash']) == 0
-    assert pf.main(['--glm-stage', str(staged / 'stage')]) == 2
-    assert 'pinned GLM-5.3-Flash checkpoint' in capsys.readouterr().out
+    # The release stager's refusal and the preflight commands are in tests/e2e/test_api_glm53_module_gate.py.
 
 
 def test_unknown_gate_is_refused(staged):
@@ -193,15 +189,7 @@ def prepared(tmp_path_factory):
     return d, verdict
 
 
-def test_hf_loads_the_checkpoint_exactly_and_the_cpu_body_passes(prepared):
-    d, verdict = prepared
-    ref = json.loads((d / 'reference.json').read_text())
-    assert ref['model'] == MODULE_MODEL and ref['batch'] == mg.BATCH
-    assert ref['provenance']['quantization'] == 'FP8 block dequantize -> BF16'
-    assert verdict['status'] == 'TOKENS-EQUAL' and verdict['matched_each'] == [32] * mg.BATCH
-    assert verdict['module_rule']['ok'] and verdict['logit_argmax_equal']
-    assert all(len(set(r['generated_ids'])) > 16 for r in ref['requests'])   # not a degenerate repeat
-    assert not any(p.name.startswith('cpu') for p in (d / 'stage').iterdir())  # the pushed stage stays clean
+# The prepare command (HF load, CPU body, module rule) is in tests/e2e/test_api_glm53_module_gate.py.
 
 
 MUTATIONS = {

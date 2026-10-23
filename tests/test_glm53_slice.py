@@ -67,22 +67,7 @@ def test_slice_config_is_a_copy_not_an_alias():
     assert t['layer_types'][22] == 'linear_attention'
 
 
-def test_staging_refuses_before_touching_the_checkpoint(tmp_path):
-    with pytest.raises(ValueError, match='slice gate requires --layers'):
-        stage.stage(tmp_path / 'missing', tmp_path / 'out', gate='slice')
-    with pytest.raises(ValueError, match='only valid with --gate slice'):
-        stage.stage(tmp_path / 'missing', tmp_path / 'out', gate='production', layers=LAYERS)
-    with pytest.raises(ValueError, match='straddle the PP2 boundary'):
-        stage.stage(tmp_path / 'missing', tmp_path / 'out', gate='slice', layers=(22, 23))
-
-
-def test_reference_refuses_before_touching_the_checkpoint(tmp_path):
-    pytest.importorskip('torch')
-    pytest.importorskip('transformers')
-    with pytest.raises(ValueError, match='slice gate requires --layers'):
-        reference.run(tmp_path / 'missing', tmp_path / 'p.json', tmp_path / 'out', tmp_path / 'off', None, 'slice')
-    with pytest.raises(ValueError, match='straddle the PP2 boundary'):
-        reference.run(tmp_path / 'missing', tmp_path / 'p.json', tmp_path / 'out', tmp_path / 'off', None, 'slice', (24, 25))
+# The stage and reference refusals are the commands in tests/e2e/test_api_glm53_slice_refusals.py.
 
 
 def test_identity_carries_the_window_and_only_for_the_slice_gate():

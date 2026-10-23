@@ -80,3 +80,21 @@ def test_batch_session_batches_match_the_arms():
     tree = ast.parse((ROOT / 'tests/e2e/test_api_dsv2_batch_report.py').read_text())
     pinned = next(n.value for n in tree.body if isinstance(n, ast.Assign) and getattr(n.targets[0], 'id', '') == 'BATCHES')
     assert tuple(ast.literal_eval(pinned)) == tuple(BATCHES)
+
+
+def test_glm_module_gate_identity_matches_the_harness():
+    import ast
+    from examples.glm53 import module_gate
+    from examples.glm53.prepare import MODULE_MODEL
+    tree = ast.parse((ROOT / 'tests/e2e/test_api_glm53_module_gate.py').read_text())
+    values = {n.targets[0].id: ast.literal_eval(n.value) for n in tree.body
+              if isinstance(n, ast.Assign) and getattr(n.targets[0], 'id', '') in ('MODULE_MODEL', 'MODULE_BATCH')}
+    assert values == dict(MODULE_MODEL=MODULE_MODEL, MODULE_BATCH=module_gate.BATCH)
+
+
+def test_selection_match_environment_matches_the_conformance_build():
+    import ast
+    from tests.test_selection_manifest import MATCH_ENV
+    tree = ast.parse((ROOT / 'tests/e2e/test_api_selection_manifest.py').read_text())
+    pinned = next(n.value for n in tree.body if isinstance(n, ast.Assign) and getattr(n.targets[0], 'id', '') == 'MATCH_ENV')
+    assert ast.literal_eval(pinned) == MATCH_ENV

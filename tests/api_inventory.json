@@ -12,13 +12,8 @@
     "test_dsv2lite.py",
     "test_experiment_session.py",
     "test_experiment_session_integration.py",
-    "test_glm53_model.py",
-    "test_glm53_module_gate.py",
     "test_glm53_pairs.py",
-    "test_glm53_phased.py",
-    "test_glm53_run_all.py",
     "test_glm53_seam.py",
-    "test_glm53_slice.py",
     "test_gpu_jobs.py",
     "test_import_certificate.py",
     "test_importer.py",
@@ -30,7 +25,6 @@
     "test_qwen_staging.py",
     "test_ref_numpy.py",
     "test_select_planner.py",
-    "test_selection_manifest.py",
     "test_session_sh.py",
     "test_session_sh.sh",
     "test_timeline.py",
@@ -478,22 +472,14 @@
       "reason": "Checklist formatting and documentation shell syntax."
     },
     "test_glm53_model.py": {
-      "classification": "mixed",
-      "owners": [
-        "API-14",
-        "API-15",
-        "API-24"
-      ],
-      "reason": "Planner/staging/numerical probes plus the in-process HF chunk-prefill 32-token check (cpu_check.check_prefill has no command; examples/glm53 is owned by the GLM session); the 32-token fixture check is the cpu_check command in tests/e2e/test_api_glm53_cpu_check.py."
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Planner/staging probes and in-process CPUModel-vs-HF numerical checks, including the HF chunk-prefill 32-token check (cpu_check.check_prefill, not a command entry point); the 32-token fixture command is in tests/e2e/test_api_glm53_cpu_check.py."
     },
     "test_glm53_module_gate.py": {
-      "classification": "mixed",
-      "owners": [
-        "API-14",
-        "API-15",
-        "API-24"
-      ],
-      "reason": "Dtype/config units plus staging, CPU execution and production qualification-to-verification E2E."
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Evidence/dtype units, stager validation, native-source mutation probes, and run.qualify + two_gpu_verify over a build whose native binary is substituted by a CPU stand-in launcher (fails at 82dc20e); staging, preflight and prepare commands are in tests/e2e/test_api_glm53_module_gate.py."
     },
     "test_glm53_native_options.py": {
       "classification": "conformance",
@@ -526,12 +512,9 @@
       "reason": "Matrix/identity units and in-process generate() probes; the generator command is in tests/e2e/test_api_glm53_parallel_variants.py."
     },
     "test_glm53_phased.py": {
-      "classification": "mixed",
-      "owners": [
-        "API-15",
-        "API-24"
-      ],
-      "reason": "Plan/header probes plus full recurrent CPU generation and independent HF checks."
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Plan/header probes and in-process full recurrent CPU generation checked against independent HF modules; no command or command entry point is called (CPU numerical conformance of the GLM tiles)."
     },
     "test_glm53_preparation.py": {
       "classification": "conformance",
@@ -544,12 +527,9 @@
       "reason": "Resource parser/residency arithmetic and source-only build gate ordering."
     },
     "test_glm53_run_all.py": {
-      "classification": "mixed",
-      "owners": [
-        "API-15",
-        "API-24"
-      ],
-      "reason": "Floor/certificate units plus subprocess pipeline planning, prerequisites and execution refusal."
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Floor/budget/certificate probes in process; every run_all command case is in tests/e2e/test_api_glm53_run_all.py (four of them fail at 82dc20e, unchanged)."
     },
     "test_glm53_seam.py": {
       "classification": "conformance",
@@ -559,13 +539,9 @@
       "reason": "Graph/oracle/parser units and the patched argument-defaults probe; summary/run command cases moved to tests/e2e/test_api_glm53_seam.py."
     },
     "test_glm53_slice.py": {
-      "classification": "mixed",
-      "owners": [
-        "API-14",
-        "API-15",
-        "API-24"
-      ],
-      "reason": "Window/identity/sample units plus snapshot staging, reference preparation and generation."
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Window/identity/snapshot/sample probes in process; the stage and reference refusals are commands in tests/e2e/test_api_glm53_slice_refusals.py."
     },
     "test_glm53_sweep.py": {
       "classification": "conformance",
@@ -606,7 +582,7 @@
         "API-11",
         "API-24"
       ],
-      "reason": "IR/ABI units plus real slice-to-IR-to-import-to-link-to-gfx942 build workflow."
+      "reason": "IR/ABI units plus the real slice -> hip_ir_local.sh -> import -> link -> gfx942 pipeline run unpatched (skipped without a vLLM tree); no public importer API exists to run it through yet."
     },
     "test_inbody.py": {
       "classification": "conformance",
@@ -847,14 +823,9 @@
       "reason": "Planner legality units plus fresh-interpreter probes of the private model/planner (python -c on internal modules for import isolation); no supported command is exercised."
     },
     "test_selection_manifest.py": {
-      "classification": "mixed",
-      "owners": [
-        "API-05",
-        "API-11",
-        "API-17",
-        "API-24"
-      ],
-      "reason": "Selection units plus four unpatched in-process model-to-header-to-compiled cases (ETX_* set, compile_graph/emit/driver compile) without a command-level equivalent yet."
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Selection/header units and probes that edit the plan manifest in process (pop/replace the selection) with a CPU-compiled selection.h driver; the unedited plan-to-host check runs through `etx compile` in tests/e2e/test_api_selection_manifest.py."
     },
     "test_session_proc.py": {
       "classification": "conformance",

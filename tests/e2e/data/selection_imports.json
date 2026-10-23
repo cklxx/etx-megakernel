@@ -1,0 +1,1442 @@
+{
+ "attn_mfma16_g8": {
+  "arg_bytes": 160,
+  "slots": 1
+ },
+ "attn_mfma4_g4": {
+  "arg_bytes": 160,
+  "slots": 1
+ },
+ "attn_reduce": {
+  "arg_bytes": 120,
+  "slots": 8
+ },
+ "dsl_attnprep": {
+  "arg_bytes": 112,
+  "barriers": 0,
+  "block": [
+   1024,
+   1,
+   1
+  ],
+  "dsl": "attnprep",
+  "export": "etx_tile_dsl_attnprep",
+  "grid_offset": 96,
+  "kernel": "dsl_attnprep",
+  "lds_bytes": 0,
+  "lds_bytes_per_slot": 0,
+  "params": [
+   {
+    "align": 8,
+    "name": "%0",
+    "offset": 0,
+    "size": 8,
+    "ty": "ptr addrspace(1)"
+   },
+   {
+    "align": 8,
+    "name": "%1",
+    "offset": 8,
+    "size": 8,
+    "ty": "ptr addrspace(1)"
+   },
+   {
+    "align": 8,
+    "name": "%2",
+    "offset": 16,
+    "size": 8,
+    "ty": "ptr addrspace(1)"
+   },
+   {
+    "align": 8,
+    "name": "%3",
+    "offset": 24,
+    "size": 8,
+    "ty": "ptr addrspace(1)"
+   },
+   {
+    "align": 8,
+    "name": "%4",
+    "offset": 32,
+    "size": 8,
+    "ty": "ptr addrspace(1)"
+   },
+   {
+    "align": 8,
+    "name": "%5",
+    "offset": 40,
+    "size": 8,
+    "ty": "ptr addrspace(1)"
+   },
+   {
+    "align": 8,
+    "name": "%6",
+    "offset": 48,
+    "size": 8,
+    "ty": "ptr addrspace(1)"
+   },
+   {
+    "align": 8,
+    "name": "%7",
+    "offset": 56,
+    "size": 8,
+    "ty": "ptr addrspace(1)"
+   },
+   {
+    "align": 4,
+    "name": "%8",
+    "offset": 64,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 4,
+    "name": "%9",
+    "offset": 68,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 4,
+    "name": "%10",
+    "offset": 72,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 4,
+    "name": "%11",
+    "offset": 76,
+    "size": 4,
+    "ty": "float"
+   },
+   {
+    "align": 4,
+    "name": "%12",
+    "offset": 80,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 4,
+    "name": "%13",
+    "offset": 84,
+    "size": 4,
+    "ty": "i32"
+   }
+  ],
+  "slot_barrier": false,
+  "slot_threads": 1024,
+  "slots": 1,
+  "spec": "ETX DSL attention prep (q/k norm + rope + cache write of one kv head)",
+  "threads": 1024
+ },
+ "dsl_gemv": {
+  "arg_bytes": 160,
+  "barriers": 0,
+  "block": [
+   1024,
+   1,
+   1
+  ],
+  "dsl": "plain",
+  "export": "etx_tile_dsl_gemv",
+  "grid_offset": 144,
+  "kernel": "dsl_gemv",
+  "lds_bytes": 21120,
+  "lds_bytes_per_slot": 21120,
+  "params": [
+   {
+    "align": 8,
+    "name": "%0",
+    "offset": 0,
+    "size": 8,
+    "ty": "ptr addrspace(1)"
+   },
+   {
+    "align": 8,
+    "name": "%1",
+    "offset": 8,
+    "size": 8,
+    "ty": "ptr addrspace(1)"
+   },
+   {
+    "align": 8,
+    "name": "%2",
+    "offset": 16,
+    "size": 8,
+    "ty": "ptr addrspace(1)"
+   },
+   {
+    "align": 8,
+    "name": "%3",
+    "offset": 24,
+    "size": 8,
+    "ty": "ptr addrspace(1)"
+   },
+   {
+    "align": 8,
+    "name": "%4",
+    "offset": 32,
+    "size": 8,
+    "ty": "ptr addrspace(1)"
+   },
+   {
+    "align": 8,
+    "name": "%5",
+    "offset": 40,
+    "size": 8,
+    "ty": "i64"
+   },
+   {
+    "align": 4,
+    "name": "%6",
+    "offset": 48,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 4,
+    "name": "%7",
+    "offset": 52,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 4,
+    "name": "%8",
+    "offset": 56,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 4,
+    "name": "%9",
+    "offset": 60,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 8,
+    "name": "%10",
+    "offset": 64,
+    "size": 8,
+    "ty": "ptr addrspace(1)"
+   },
+   {
+    "align": 8,
+    "name": "%11",
+    "offset": 72,
+    "size": 8,
+    "ty": "ptr addrspace(1)"
+   },
+   {
+    "align": 8,
+    "name": "%12",
+    "offset": 80,
+    "size": 8,
+    "ty": "ptr addrspace(1)"
+   },
+   {
+    "align": 8,
+    "name": "%13",
+    "offset": 88,
+    "size": 8,
+    "ty": "ptr addrspace(1)"
+   },
+   {
+    "align": 4,
+    "name": "%14",
+    "offset": 96,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 4,
+    "name": "%15",
+    "offset": 100,
+    "size": 4,
+    "ty": "float"
+   },
+   {
+    "align": 4,
+    "name": "%16",
+    "offset": 104,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 4,
+    "name": "%17",
+    "offset": 108,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 8,
+    "name": "%18",
+    "offset": 112,
+    "size": 8,
+    "ty": "ptr addrspace(1)"
+   },
+   {
+    "align": 4,
+    "name": "%19",
+    "offset": 120,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 4,
+    "name": "%20",
+    "offset": 124,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 4,
+    "name": "%21",
+    "offset": 128,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 4,
+    "name": "%22",
+    "offset": 132,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 4,
+    "name": "%23",
+    "offset": 136,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 4,
+    "name": "%24",
+    "offset": 140,
+    "size": 4,
+    "ty": "i32"
+   }
+  ],
+  "slot_barrier": false,
+  "slot_threads": 1024,
+  "slots": 1,
+  "spec": "ETX DSL GEMV (plain)",
+  "threads": 1024
+ },
+ "dsl_gemv_fold": {
+  "arg_bytes": 160,
+  "barriers": 0,
+  "block": [
+   1024,
+   1,
+   1
+  ],
+  "dsl": "plain",
+  "export": "etx_tile_dsl_gemv_fold",
+  "grid_offset": 144,
+  "kernel": "dsl_gemv_fold",
+  "lds_bytes": 21120,
+  "lds_bytes_per_slot": 21120,
+  "params": [
+   {
+    "align": 8,
+    "name": "%0",
+    "offset": 0,
+    "size": 8,
+    "ty": "ptr addrspace(1)"
+   },
+   {
+    "align": 8,
+    "name": "%1",
+    "offset": 8,
+    "size": 8,
+    "ty": "ptr addrspace(1)"
+   },
+   {
+    "align": 8,
+    "name": "%2",
+    "offset": 16,
+    "size": 8,
+    "ty": "ptr addrspace(1)"
+   },
+   {
+    "align": 8,
+    "name": "%3",
+    "offset": 24,
+    "size": 8,
+    "ty": "ptr addrspace(1)"
+   },
+   {
+    "align": 8,
+    "name": "%4",
+    "offset": 32,
+    "size": 8,
+    "ty": "ptr addrspace(1)"
+   },
+   {
+    "align": 8,
+    "name": "%5",
+    "offset": 40,
+    "size": 8,
+    "ty": "i64"
+   },
+   {
+    "align": 4,
+    "name": "%6",
+    "offset": 48,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 4,
+    "name": "%7",
+    "offset": 52,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 4,
+    "name": "%8",
+    "offset": 56,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 4,
+    "name": "%9",
+    "offset": 60,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 8,
+    "name": "%10",
+    "offset": 64,
+    "size": 8,
+    "ty": "ptr addrspace(1)"
+   },
+   {
+    "align": 8,
+    "name": "%11",
+    "offset": 72,
+    "size": 8,
+    "ty": "ptr addrspace(1)"
+   },
+   {
+    "align": 8,
+    "name": "%12",
+    "offset": 80,
+    "size": 8,
+    "ty": "ptr addrspace(1)"
+   },
+   {
+    "align": 8,
+    "name": "%13",
+    "offset": 88,
+    "size": 8,
+    "ty": "ptr addrspace(1)"
+   },
+   {
+    "align": 4,
+    "name": "%14",
+    "offset": 96,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 4,
+    "name": "%15",
+    "offset": 100,
+    "size": 4,
+    "ty": "float"
+   },
+   {
+    "align": 4,
+    "name": "%16",
+    "offset": 104,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 4,
+    "name": "%17",
+    "offset": 108,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 8,
+    "name": "%18",
+    "offset": 112,
+    "size": 8,
+    "ty": "ptr addrspace(1)"
+   },
+   {
+    "align": 4,
+    "name": "%19",
+    "offset": 120,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 4,
+    "name": "%20",
+    "offset": 124,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 4,
+    "name": "%21",
+    "offset": 128,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 4,
+    "name": "%22",
+    "offset": 132,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 4,
+    "name": "%23",
+    "offset": 136,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 4,
+    "name": "%24",
+    "offset": 140,
+    "size": 4,
+    "ty": "i32"
+   }
+  ],
+  "slot_barrier": false,
+  "slot_threads": 1024,
+  "slots": 1,
+  "spec": "ETX DSL GEMV (plain)",
+  "threads": 1024
+ },
+ "dsl_moe_down": {
+  "arg_bytes": 160,
+  "barriers": 0,
+  "block": [
+   1024,
+   1,
+   1
+  ],
+  "dsl": "scale",
+  "export": "etx_tile_dsl_moe_down",
+  "grid_offset": 144,
+  "kernel": "dsl_moe_down",
+  "lds_bytes": 21120,
+  "lds_bytes_per_slot": 21120,
+  "params": [
+   {
+    "align": 8,
+    "name": "%0",
+    "offset": 0,
+    "size": 8,
+    "ty": "ptr addrspace(1)"
+   },
+   {
+    "align": 8,
+    "name": "%1",
+    "offset": 8,
+    "size": 8,
+    "ty": "ptr addrspace(1)"
+   },
+   {
+    "align": 8,
+    "name": "%2",
+    "offset": 16,
+    "size": 8,
+    "ty": "ptr addrspace(1)"
+   },
+   {
+    "align": 8,
+    "name": "%3",
+    "offset": 24,
+    "size": 8,
+    "ty": "ptr addrspace(1)"
+   },
+   {
+    "align": 8,
+    "name": "%4",
+    "offset": 32,
+    "size": 8,
+    "ty": "ptr addrspace(1)"
+   },
+   {
+    "align": 8,
+    "name": "%5",
+    "offset": 40,
+    "size": 8,
+    "ty": "i64"
+   },
+   {
+    "align": 4,
+    "name": "%6",
+    "offset": 48,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 4,
+    "name": "%7",
+    "offset": 52,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 4,
+    "name": "%8",
+    "offset": 56,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 4,
+    "name": "%9",
+    "offset": 60,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 8,
+    "name": "%10",
+    "offset": 64,
+    "size": 8,
+    "ty": "ptr addrspace(1)"
+   },
+   {
+    "align": 8,
+    "name": "%11",
+    "offset": 72,
+    "size": 8,
+    "ty": "ptr addrspace(1)"
+   },
+   {
+    "align": 8,
+    "name": "%12",
+    "offset": 80,
+    "size": 8,
+    "ty": "ptr addrspace(1)"
+   },
+   {
+    "align": 8,
+    "name": "%13",
+    "offset": 88,
+    "size": 8,
+    "ty": "ptr addrspace(1)"
+   },
+   {
+    "align": 4,
+    "name": "%14",
+    "offset": 96,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 4,
+    "name": "%15",
+    "offset": 100,
+    "size": 4,
+    "ty": "float"
+   },
+   {
+    "align": 4,
+    "name": "%16",
+    "offset": 104,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 4,
+    "name": "%17",
+    "offset": 108,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 8,
+    "name": "%18",
+    "offset": 112,
+    "size": 8,
+    "ty": "ptr addrspace(1)"
+   },
+   {
+    "align": 4,
+    "name": "%19",
+    "offset": 120,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 4,
+    "name": "%20",
+    "offset": 124,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 4,
+    "name": "%21",
+    "offset": 128,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 4,
+    "name": "%22",
+    "offset": 132,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 4,
+    "name": "%23",
+    "offset": 136,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 4,
+    "name": "%24",
+    "offset": 140,
+    "size": 4,
+    "ty": "i32"
+   }
+  ],
+  "slot_barrier": false,
+  "slot_threads": 1024,
+  "slots": 1,
+  "spec": "ETX DSL GEMV (scale)",
+  "threads": 1024
+ },
+ "dsl_moe_down_fold": {
+  "arg_bytes": 160,
+  "barriers": 0,
+  "block": [
+   1024,
+   1,
+   1
+  ],
+  "dsl": "scale",
+  "export": "etx_tile_dsl_moe_down_fold",
+  "grid_offset": 144,
+  "kernel": "dsl_moe_down_fold",
+  "lds_bytes": 21120,
+  "lds_bytes_per_slot": 21120,
+  "params": [
+   {
+    "align": 8,
+    "name": "%0",
+    "offset": 0,
+    "size": 8,
+    "ty": "ptr addrspace(1)"
+   },
+   {
+    "align": 8,
+    "name": "%1",
+    "offset": 8,
+    "size": 8,
+    "ty": "ptr addrspace(1)"
+   },
+   {
+    "align": 8,
+    "name": "%2",
+    "offset": 16,
+    "size": 8,
+    "ty": "ptr addrspace(1)"
+   },
+   {
+    "align": 8,
+    "name": "%3",
+    "offset": 24,
+    "size": 8,
+    "ty": "ptr addrspace(1)"
+   },
+   {
+    "align": 8,
+    "name": "%4",
+    "offset": 32,
+    "size": 8,
+    "ty": "ptr addrspace(1)"
+   },
+   {
+    "align": 8,
+    "name": "%5",
+    "offset": 40,
+    "size": 8,
+    "ty": "i64"
+   },
+   {
+    "align": 4,
+    "name": "%6",
+    "offset": 48,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 4,
+    "name": "%7",
+    "offset": 52,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 4,
+    "name": "%8",
+    "offset": 56,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 4,
+    "name": "%9",
+    "offset": 60,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 8,
+    "name": "%10",
+    "offset": 64,
+    "size": 8,
+    "ty": "ptr addrspace(1)"
+   },
+   {
+    "align": 8,
+    "name": "%11",
+    "offset": 72,
+    "size": 8,
+    "ty": "ptr addrspace(1)"
+   },
+   {
+    "align": 8,
+    "name": "%12",
+    "offset": 80,
+    "size": 8,
+    "ty": "ptr addrspace(1)"
+   },
+   {
+    "align": 8,
+    "name": "%13",
+    "offset": 88,
+    "size": 8,
+    "ty": "ptr addrspace(1)"
+   },
+   {
+    "align": 4,
+    "name": "%14",
+    "offset": 96,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 4,
+    "name": "%15",
+    "offset": 100,
+    "size": 4,
+    "ty": "float"
+   },
+   {
+    "align": 4,
+    "name": "%16",
+    "offset": 104,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 4,
+    "name": "%17",
+    "offset": 108,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 8,
+    "name": "%18",
+    "offset": 112,
+    "size": 8,
+    "ty": "ptr addrspace(1)"
+   },
+   {
+    "align": 4,
+    "name": "%19",
+    "offset": 120,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 4,
+    "name": "%20",
+    "offset": 124,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 4,
+    "name": "%21",
+    "offset": 128,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 4,
+    "name": "%22",
+    "offset": 132,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 4,
+    "name": "%23",
+    "offset": 136,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 4,
+    "name": "%24",
+    "offset": 140,
+    "size": 4,
+    "ty": "i32"
+   }
+  ],
+  "slot_barrier": false,
+  "slot_threads": 1024,
+  "slots": 1,
+  "spec": "ETX DSL GEMV (scale)",
+  "threads": 1024
+ },
+ "dsl_moe_up": {
+  "arg_bytes": 160,
+  "barriers": 0,
+  "block": [
+   1024,
+   1,
+   1
+  ],
+  "dsl": "silu_mul",
+  "export": "etx_tile_dsl_moe_up",
+  "grid_offset": 144,
+  "kernel": "dsl_moe_up",
+  "lds_bytes": 21120,
+  "lds_bytes_per_slot": 21120,
+  "params": [
+   {
+    "align": 8,
+    "name": "%0",
+    "offset": 0,
+    "size": 8,
+    "ty": "ptr addrspace(1)"
+   },
+   {
+    "align": 8,
+    "name": "%1",
+    "offset": 8,
+    "size": 8,
+    "ty": "ptr addrspace(1)"
+   },
+   {
+    "align": 8,
+    "name": "%2",
+    "offset": 16,
+    "size": 8,
+    "ty": "ptr addrspace(1)"
+   },
+   {
+    "align": 8,
+    "name": "%3",
+    "offset": 24,
+    "size": 8,
+    "ty": "ptr addrspace(1)"
+   },
+   {
+    "align": 8,
+    "name": "%4",
+    "offset": 32,
+    "size": 8,
+    "ty": "ptr addrspace(1)"
+   },
+   {
+    "align": 8,
+    "name": "%5",
+    "offset": 40,
+    "size": 8,
+    "ty": "i64"
+   },
+   {
+    "align": 4,
+    "name": "%6",
+    "offset": 48,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 4,
+    "name": "%7",
+    "offset": 52,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 4,
+    "name": "%8",
+    "offset": 56,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 4,
+    "name": "%9",
+    "offset": 60,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 8,
+    "name": "%10",
+    "offset": 64,
+    "size": 8,
+    "ty": "ptr addrspace(1)"
+   },
+   {
+    "align": 8,
+    "name": "%11",
+    "offset": 72,
+    "size": 8,
+    "ty": "ptr addrspace(1)"
+   },
+   {
+    "align": 8,
+    "name": "%12",
+    "offset": 80,
+    "size": 8,
+    "ty": "ptr addrspace(1)"
+   },
+   {
+    "align": 8,
+    "name": "%13",
+    "offset": 88,
+    "size": 8,
+    "ty": "ptr addrspace(1)"
+   },
+   {
+    "align": 4,
+    "name": "%14",
+    "offset": 96,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 4,
+    "name": "%15",
+    "offset": 100,
+    "size": 4,
+    "ty": "float"
+   },
+   {
+    "align": 4,
+    "name": "%16",
+    "offset": 104,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 4,
+    "name": "%17",
+    "offset": 108,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 8,
+    "name": "%18",
+    "offset": 112,
+    "size": 8,
+    "ty": "ptr addrspace(1)"
+   },
+   {
+    "align": 4,
+    "name": "%19",
+    "offset": 120,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 4,
+    "name": "%20",
+    "offset": 124,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 4,
+    "name": "%21",
+    "offset": 128,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 4,
+    "name": "%22",
+    "offset": 132,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 4,
+    "name": "%23",
+    "offset": 136,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 4,
+    "name": "%24",
+    "offset": 140,
+    "size": 4,
+    "ty": "i32"
+   }
+  ],
+  "slot_barrier": false,
+  "slot_threads": 1024,
+  "slots": 1,
+  "spec": "ETX DSL GEMV (silu_mul)",
+  "threads": 1024
+ },
+ "dsl_moe_up_fold": {
+  "arg_bytes": 160,
+  "barriers": 0,
+  "block": [
+   1024,
+   1,
+   1
+  ],
+  "dsl": "silu_mul",
+  "export": "etx_tile_dsl_moe_up_fold",
+  "grid_offset": 144,
+  "kernel": "dsl_moe_up_fold",
+  "lds_bytes": 21120,
+  "lds_bytes_per_slot": 21120,
+  "params": [
+   {
+    "align": 8,
+    "name": "%0",
+    "offset": 0,
+    "size": 8,
+    "ty": "ptr addrspace(1)"
+   },
+   {
+    "align": 8,
+    "name": "%1",
+    "offset": 8,
+    "size": 8,
+    "ty": "ptr addrspace(1)"
+   },
+   {
+    "align": 8,
+    "name": "%2",
+    "offset": 16,
+    "size": 8,
+    "ty": "ptr addrspace(1)"
+   },
+   {
+    "align": 8,
+    "name": "%3",
+    "offset": 24,
+    "size": 8,
+    "ty": "ptr addrspace(1)"
+   },
+   {
+    "align": 8,
+    "name": "%4",
+    "offset": 32,
+    "size": 8,
+    "ty": "ptr addrspace(1)"
+   },
+   {
+    "align": 8,
+    "name": "%5",
+    "offset": 40,
+    "size": 8,
+    "ty": "i64"
+   },
+   {
+    "align": 4,
+    "name": "%6",
+    "offset": 48,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 4,
+    "name": "%7",
+    "offset": 52,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 4,
+    "name": "%8",
+    "offset": 56,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 4,
+    "name": "%9",
+    "offset": 60,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 8,
+    "name": "%10",
+    "offset": 64,
+    "size": 8,
+    "ty": "ptr addrspace(1)"
+   },
+   {
+    "align": 8,
+    "name": "%11",
+    "offset": 72,
+    "size": 8,
+    "ty": "ptr addrspace(1)"
+   },
+   {
+    "align": 8,
+    "name": "%12",
+    "offset": 80,
+    "size": 8,
+    "ty": "ptr addrspace(1)"
+   },
+   {
+    "align": 8,
+    "name": "%13",
+    "offset": 88,
+    "size": 8,
+    "ty": "ptr addrspace(1)"
+   },
+   {
+    "align": 4,
+    "name": "%14",
+    "offset": 96,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 4,
+    "name": "%15",
+    "offset": 100,
+    "size": 4,
+    "ty": "float"
+   },
+   {
+    "align": 4,
+    "name": "%16",
+    "offset": 104,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 4,
+    "name": "%17",
+    "offset": 108,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 8,
+    "name": "%18",
+    "offset": 112,
+    "size": 8,
+    "ty": "ptr addrspace(1)"
+   },
+   {
+    "align": 4,
+    "name": "%19",
+    "offset": 120,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 4,
+    "name": "%20",
+    "offset": 124,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 4,
+    "name": "%21",
+    "offset": 128,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 4,
+    "name": "%22",
+    "offset": 132,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 4,
+    "name": "%23",
+    "offset": 136,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 4,
+    "name": "%24",
+    "offset": 140,
+    "size": 4,
+    "ty": "i32"
+   }
+  ],
+  "slot_barrier": false,
+  "slot_threads": 1024,
+  "slots": 1,
+  "spec": "ETX DSL GEMV (silu_mul)",
+  "threads": 1024
+ },
+ "dsl_topk": {
+  "arg_bytes": 64,
+  "barriers": 0,
+  "block": [
+   1024,
+   1,
+   1
+  ],
+  "dsl": "topk",
+  "export": "etx_tile_dsl_topk",
+  "grid_offset": 48,
+  "kernel": "dsl_topk",
+  "lds_bytes": 0,
+  "lds_bytes_per_slot": 0,
+  "params": [
+   {
+    "align": 8,
+    "name": "%0",
+    "offset": 0,
+    "size": 8,
+    "ty": "ptr addrspace(1)"
+   },
+   {
+    "align": 8,
+    "name": "%1",
+    "offset": 8,
+    "size": 8,
+    "ty": "ptr addrspace(1)"
+   },
+   {
+    "align": 8,
+    "name": "%2",
+    "offset": 16,
+    "size": 8,
+    "ty": "ptr addrspace(1)"
+   },
+   {
+    "align": 8,
+    "name": "%3",
+    "offset": 24,
+    "size": 8,
+    "ty": "ptr addrspace(1)"
+   },
+   {
+    "align": 4,
+    "name": "%4",
+    "offset": 32,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 4,
+    "name": "%5",
+    "offset": 36,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 4,
+    "name": "%6",
+    "offset": 40,
+    "size": 4,
+    "ty": "i32"
+   },
+   {
+    "align": 4,
+    "name": "%7",
+    "offset": 44,
+    "size": 4,
+    "ty": "i32"
+   }
+  ],
+  "slot_barrier": false,
+  "slot_threads": 1024,
+  "slots": 1,
+  "spec": "ETX DSL softmax top-k",
+  "threads": 1024
+ },
+ "fused_add_rms_norm": {
+  "arg_bytes": 64,
+  "slots": 4
+ },
+ "fused_moe_down": {
+  "arg_bytes": 160,
+  "slots": 1
+ },
+ "fused_moe_up": {
+  "arg_bytes": 160,
+  "slots": 1
+ },
+ "moe_sum_k8": {
+  "arg_bytes": 64,
+  "slots": 4
+ },
+ "reshape_and_cache": {
+  "arg_bytes": 96,
+  "slots": 4
+ },
+ "rms_norm_2d": {
+  "arg_bytes": 64,
+  "slots": 4
+ },
+ "rms_norm_3d": {
+  "arg_bytes": 64,
+  "slots": 4
+ },
+ "rope_neox": {
+  "arg_bytes": 96,
+  "slots": 4
+ },
+ "silu_and_mul": {
+  "arg_bytes": 48,
+  "slots": 4
+ },
+ "topk_softmax_e128": {
+  "arg_bytes": 104,
+  "slots": 4
+ },
+ "wvsplitk_y1": {
+  "arg_bytes": 96,
+  "slots": 2
+ },
+ "wvsplitk_y2": {
+  "arg_bytes": 96,
+  "slots": 2
+ }
+}
