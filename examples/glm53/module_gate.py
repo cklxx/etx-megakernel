@@ -151,6 +151,32 @@ def native_tensors(t, i):
     return out
 
 
+def mtp_tensors(t):
+    """Native checkpoint inventory for the single module8 MTP layer.
+
+    Source paths below are relative to /data/refs/vllm-v0.30.0/glm5next/nvidia/.
+    """
+    i = t['num_hidden_layers']  # mtp.py:117-128
+    prefix = f'model.language_model.layers.{i}.'
+    h, v = t['hidden_size'], t['vocab_size']
+    # mtp.py:47-49,68-70; SharedHead owns norm and head, not the global lm_head.
+    out = [(prefix + key, key, None, shape) for key, shape in (
+        ('enorm.weight', (h,)), ('hnorm.weight', (h,)),
+        ('eh_proj.weight', (h, 2*h)), ('shared_head.norm.weight', (h,)),
+        ('shared_head.head.weight', (v, h)))]
+    # mtp.py:71-82,256-280: decoder checkpoint names have no mtp_block prefix.
+    # model.py:302-331 forces MLA; :335-346 defaults to last base MLP kind;
+    # :379-401 excludes all HC parameters for MTP.
+    decoder = copy.deepcopy(t)
+    decoder['num_hidden_layers'] += 1
+    decoder['layer_types'].append('deepseek_sparse_attention')
+    decoder['mlp_layer_types'].append(t['mlp_layer_types'][-1])
+    for entry in native_tensors(decoder, i):
+        if not entry[1].startswith(('attn_hc.', 'ffn_hc.')):
+            out.append(entry)  # attention.py:245-281,446-497; model.py:116-132,366-377
+    return out
+
+
 def outer_tensors(t):
     h, v = t['hidden_size'], t['vocab_size']
     return [('model.language_model.embed_tokens.weight', (v, h)), ('model.language_model.norm.weight', (h,)),
@@ -225,6 +251,17 @@ def tensors(cfg):
                 out[name] = torch.from_numpy(w).to(torch.float32 if kind == 'F32' else torch.bfloat16)
     for name, shape in outer_tensors(t):
         out[name] = torch.from_numpy(values(name, None, shape)).to(torch.bfloat16)
+    if t['num_attention_heads'] == VARIANTS['module8']['text']['num_attention_heads'] and t['moe_intermediate_size'] == 1024:
+        for name, key, _, shape in mtp_tensors(t):
+            kind = storage('deepseek_sparse_attention', key, shape)
+            # Fusion and shared-head weights are unquantized (mtp.py:47-49,68).
+            if key.startswith(('enorm.', 'hnorm.', 'eh_proj.', 'shared_head.')):
+                kind = 'BF16'
+            w = values(name, key, shape)
+            if kind == 'F8_E4M3':
+                out[name], out[name.removesuffix('.weight') + '.weight_scale_inv'] = fp8_blocks(name, w)
+            else:
+                out[name] = torch.from_numpy(w).to(torch.float32 if kind == 'F32' else torch.bfloat16)
     return out
 
 
