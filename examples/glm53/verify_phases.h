@@ -164,10 +164,16 @@ template<int P> GLM_DEV void glm_verify_ffn_input(const etx_ctx* c){
 // args: weights, meta, state, invariant scratch, (p1, att, work) per row.
 // The convolution and recurrence still advance in position order. Only their
 // fixed coefficients and f/g projections are shared across the row block.
-template<int P> GLM_DEV void glm_verify_kda(const etx_ctx* c){
+template<int P,bool Checkpoint=false> GLM_DEV void glm_verify_kda(const etx_ctx* c){
   const uint8_t* b=GLM_PB(0);const glm_weight* w=GLM_PW(1);
   float* state=GLM_PR(2,float*,(uint64_t)c->cst[3]);
   float* common=GLM_PR(3,float*,GLM_VCOMMON);float* red=(float*)c->lds;
+  float* saved=nullptr;
+  if constexpr(Checkpoint){
+    saved=GLM_PR(4+3*P,float*,(uint64_t)(P+1)*c->cst[3]);
+    for(int j=GLM_LANE;j<c->cst[3];j+=GLM_LANES)saved[j]=state[j];
+    GLM_SYNC();
+  }
   const float* p1[P];float *att[P],*work[P];
   for(int p=0;p<P;++p){p1[p]=GLM_PR(4+3*p,const float*,GLM_S_P1);
     att[p]=GLM_PR(5+3*p,float*,GLM_S_ATT);work[p]=GLM_PR(6+3*p,float*,GLM_VWORK);}
@@ -187,10 +193,13 @@ template<int P> GLM_DEV void glm_verify_kda(const etx_ctx* c){
       for(int z=0;z<GLM_CONV-1;++z)hist[z]=hist[z+1];hist[GLM_CONV-1]=p1[p][j];
       float sum=0;for(int z=0;z<GLM_CONV;++z)sum+=hist[z]*weight[z];
       if(w[CONV].kind==1)sum=glm_bf(sum);
-      work[p][GLM_VA+j]=glm_bf(sum*glm_sig(sum));}}
+      work[p][GLM_VA+j]=glm_bf(sum*glm_sig(sum));
+      if constexpr(Checkpoint)for(int z=0;z<GLM_CONV;++z)
+        saved[(uint64_t)(p+1)*c->cst[3]+(uint64_t)j*GLM_CONV+z]=hist[z];
+    }}
   GLM_SYNC();
   float* rec=state+3*GLM_QDIM*GLM_CONV;
-  for(int p=0;p<P;++p)for(int h=0;h<GLM_LH;++h){const int off=h*GLM_LD;
+  for(int p=0;p<P;++p){for(int h=0;h<GLM_LH;++h){const int off=h*GLM_LD;
     float* q=work[p]+GLM_VA+off;float* k=q+GLM_QDIM;const float* v=k+GLM_QDIM;
     const float* g=work[p]+GLM_VG+off;const float* gate=work[p]+GLM_VB+off;
     const float beta=glm_bf(glm_sig(p1[p][3*GLM_QDIM+GLM_LD+h]));
@@ -210,7 +219,13 @@ template<int P> GLM_DEV void glm_verify_kda(const etx_ctx* c){
     const float inv=1/sqrtf(glm_bsum(part,red)/GLM_LD+GLM_EPS);
     for(int j=GLM_LANE;j<GLM_LD;j+=GLM_LANES)att[p][off+j]=glm_bf(o[j]*inv*common[j]*glm_sig(gate[j]));
     GLM_SYNC();
+  }    if constexpr(Checkpoint){
+      for(int j=3*GLM_QDIM*GLM_CONV+GLM_LANE;j<c->cst[3];j+=GLM_LANES)
+        saved[(uint64_t)(p+1)*c->cst[3]+j]=state[j];
+      GLM_SYNC();
+    }
   }
+
 }
 extern "C" __device__ void glm53_verify_kda_scan(const etx_ctx* c){
   switch(c->cst[2]){
@@ -273,10 +288,16 @@ GLM_DEV void glm_verify_mla(const float* p1,const float* p2,const float* state,f
 }
 // Fixed DSA transforms run over all rows before any cache publication. KV
 // rows remain private scratch until their own causal scan iteration.
-template<int P> GLM_DEV void glm_verify_dsa(const etx_ctx* c){
+template<int P,bool Checkpoint=false> GLM_DEV void glm_verify_dsa(const etx_ctx* c){
   const uint8_t* b=GLM_PB(0);const glm_weight* w=GLM_PW(1);
   float* state=GLM_PR(2,float*,(uint64_t)c->cst[3]);
   float* common=GLM_PR(3,float*,GLM_VCOMMON);float* red=(float*)c->lds;
+  float* saved=nullptr;
+  if constexpr(Checkpoint){
+    saved=GLM_PR(4+5*P,float*,(uint64_t)(P+1)*c->cst[3]);
+    for(int j=GLM_LANE;j<c->cst[3];j+=GLM_LANES)saved[j]=state[j];
+    GLM_SYNC();
+  }
   const float* p1[P];float *p2[P],*att[P],*work[P],*qr[P],*kv[P];int pos[P];
   constexpr int stride=2*GLM_NH*GLM_AD+2*GLM_ID;
   for(int p=0;p<P;++p){
@@ -312,6 +333,10 @@ template<int P> GLM_DEV void glm_verify_dsa(const etx_ctx* c){
     float* st=state+(uint64_t)pos[p]*stride;
     for(int j=GLM_LANE;j<stride;j+=GLM_LANES)st[j]=work[p][GLM_VKV+j];
     GLM_SYNC();glm_verify_mla(p1[p],p2[p],state,att[p],pos[p],ape,red);GLM_SYNC();
+    if constexpr(Checkpoint){
+      for(int j=GLM_LANE;j<c->cst[3];j+=GLM_LANES)saved[(uint64_t)(p+1)*c->cst[3]+j]=state[j];
+      GLM_SYNC();
+    }
   }
 }
 extern "C" __device__ void glm53_verify_dsa_scan(const etx_ctx* c){
@@ -558,3 +583,31 @@ extern "C" __device__ void glm53_verify_dense_down(const etx_ctx* c){
     case 6:glm_verify_dense_down<6>(c);break;
   }
 }
+
+// verify_state.py appends its checkpoint tensor to each scan's argument list.
+// Export its existing symbols with this graph's ABI, including the extra
+// invariant/activation scratch. The old bodies in verify_state.h are renamed
+// below so including that package still resolves the checkpoint entrypoints
+// to these adapters without modifying its source or bypassing GPU dispatch.
+extern "C" __device__ void glm53_checkpoint_kda(const etx_ctx* c){
+  switch(c->cst[2]){
+    case 1:glm_verify_kda<1,true>(c);break;
+    case 2:glm_verify_kda<2,true>(c);break;
+    case 3:glm_verify_kda<3,true>(c);break;
+    case 4:glm_verify_kda<4,true>(c);break;
+    case 5:glm_verify_kda<5,true>(c);break;
+    case 6:glm_verify_kda<6,true>(c);break;
+  }
+}
+extern "C" __device__ void glm53_checkpoint_dsa(const etx_ctx* c){
+  switch(c->cst[2]){
+    case 1:glm_verify_dsa<1,true>(c);break;
+    case 2:glm_verify_dsa<2,true>(c);break;
+    case 3:glm_verify_dsa<3,true>(c);break;
+    case 4:glm_verify_dsa<4,true>(c);break;
+    case 5:glm_verify_dsa<5,true>(c);break;
+    case 6:glm_verify_dsa<6,true>(c);break;
+  }
+}
+#define glm53_checkpoint_kda glm53_checkpoint_kda_legacy_abi
+#define glm53_checkpoint_dsa glm53_checkpoint_dsa_legacy_abi
