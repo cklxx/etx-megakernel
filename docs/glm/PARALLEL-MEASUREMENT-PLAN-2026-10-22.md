@@ -6,6 +6,25 @@ produced 30 compute options and 120 batch-bound cases, not runnable builds or
 performance certificates. See [the variant runbook](PARALLEL-VARIANTS-2026-10-22.md).
 Do not contact the stopped box, run HF, provision or launch this plan now.
 
+## Scope and comparator (governing goal, 2026-10-23)
+
+The owner's goal file fixes the order. Where anything below disagrees, this section wins.
+
+- **Phase 1, single stream: batch 1, one replica on all 8 cards.** Three arms, in this order:
+  `ep8-b1` (`parallel=2`), `head-tp-ep8-b1` (`parallel=2, attention_tp=1`), `ffn-tp8-b1`
+  (`parallel=1`), all `devices=8`. Each arm must pass full-model HF greedy 32/32, with all 32 logits
+  kept, before any timing number from it is quoted.
+- **Batch-1 comparator.** Phase 1 arms are paired against each other. The recorded legacy PP2
+  **29.455 ms/token** (MI325X, B1, from a build whose sources differ from HEAD) is quoted only as a
+  **reference**: never a target, never a design candidate, never a pair partner. PP2, PP4 and PP8 are not
+  built, timed or paired at batch 1.
+- **Phase 2, multi-batch**, may be generated and compiled offline. It is neither measured nor reported
+  before Phase 1 has a verdict. The vLLM baseline at B1/2/4/8 is measured first. PP returns only at
+  B2 (`pp8-b2`), as a request-overlap candidate. Batch per replica is 1, 2 or 4; B8 cases in the
+  manifest are outside the measured design space.
+- **No GPU is authorized.** Until the owner approves provisioning and a budget, every arm stops at
+  native compile, link, residency and the weights-free HF check.
+
 ## Case identity and comparison contract
 
 Use `results/o55-parallel-batches-20261022/manifest.json`: worlds 2/4/8, batches
@@ -28,9 +47,9 @@ Every surviving case has **two mandatory baseline families**:
    same world/batch/context and measurement basis. Search/configuration proof and
    version belong in the record; an untested configuration is not the strongest.
 
-Also compare every compute variant with freshly measured **same-world,
-same-batch PP**, balanced against its unbalanced parent, and head TP against its
-serial-attention parent. EP/full TP are not compared with an old-session absolute
+At batch 1, compare the Phase 1 arms with each other only. Quote the legacy PP2
+29.455 ms/token as a reference only; no PP arm is measured or paired at batch 1.
+Balanced arms are compared against their unbalanced parent. No arm is compared on an old-session absolute
 latency. A missing mandatory comparator means the corresponding claim is
 **NOT-COMPLETE**, not a win.
 
@@ -86,7 +105,7 @@ Zero tolerated malformed shards, cross-request aliases, failed checks or incompl
 
 ### 2. Measure the deciding unknown, not the whole matrix first
 
-For each world/batch selected for a future session, take its qualified PP/kernel
+For each world/batch selected for a future session, take its qualified arm's kernel
 trace and count bytes, achievable bandwidth floor and gaps. Measure achievable
 bandwidth on the session's MI325X; do not reuse the MI300X 4.3 TB/s figure. Separate root work,
 local compute, dispatch, return/reduction and wait/skew. Gaps bound fusion's
@@ -99,7 +118,7 @@ not simply `serial_time/world` arithmetic.
 
 | Arm | Deciding measurement, at each selected B/world |
 |---|---|
-| PP reference | Actual request/stage overlap and feedback serialization; root/head idle and critical path. B>1 only creates overlap opportunity. |
+| PP (Phase 2, B2 only) | Actual request/stage overlap and feedback serialization; root/head idle and critical path. Not measured at B1. |
 | Balance-only | Up duration/tail occupancy for 512→576 unsharded sparse tiles and local equivalents; confirm every non-up phase/head cap unchanged. |
 | FFN TP | Local gate/up/down scaling plus ordered FP32 partial return/reduction versus serial FFN; dense/sparse and root bottlenecks separately. |
 | EP | Expert placement, selected bytes, per-rank expert counts and straggler time including root shared/dense work; measure routing distribution rather than assume uniform utilization. |
@@ -118,9 +137,10 @@ retain the failed microbenchmark and reason, without paying for full timing.
 
 ### 3. Bounded full-model paired timing for surviving cases
 
-Do not blindly schedule 120 full runs. Prioritize a correctness-qualified PP
-reference per selected world/B, then the deciding microbenchmarks, then survivors
-and their independently balanced controls within the authorized budget. Mark
+Do not blindly schedule 120 full runs. Run Phase 1 first: the
+three batch-1 arms in order, each correctness-qualified, then the deciding
+microbenchmarks, then arm-against-arm pairs within the authorized budget. Phase 2
+cases follow only after Phase 1 has a verdict. Mark
 unselected cases **NOT-RUN**; a promising B/world does not qualify the others.
 
 For each surviving case/comparator pair, collect **five interleaved A/B pairs in
@@ -162,9 +182,9 @@ gain and `s = max(gain_i)-min(gain_i)` in percentage points.
 | Microbenchmark no-go | Nonpositive modeled savings after measured communication/root/skew: stop the speed campaign for that case. No full-run prediction from ideal division alone. |
 | KEEP as a measured speed improvement against a named comparator | All five `gain_i > 0`, `m > 2%`, **and** `m > 2*s`, with all correctness gates passed. |
 | Inconclusive | Correct complete pairs exist but the keep bar fails: report NO-ESTABLISHED-GAIN, not a win. Any nonpositive pair fails the keep rule. |
-| Default change | Never automatic. Even a KEEP leaves measured PP2/default options unchanged pending owner approval. |
+| Default change | Never automatic. Even a KEEP leaves the measured default options unchanged pending owner approval. |
 | Fusion claim | Independently pass the same five-pair rule against same-kernel replay; a win over PP or a real system does not isolate fusion. |
-| Real-system lead | Independently pass against the strongest tested legal same-world/B system; name untested configurations and exclusions. |
+| Real-system lead | Independently pass against the strongest tested legal same-world/B system; name untested configurations and exclusions. Phase 2 measures the vLLM baseline first; no throughput multiple is claimed before it exists. |
 | Claimed 2× | Require a separately stated, measured **≥2.0× host-wall speedup** against the named same-world/B comparator with all gates; EP/FFN-only arithmetic is not such a claim. |
 
 Retain negative/inconclusive measurements, correctness failures, exclusions and

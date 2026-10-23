@@ -20,7 +20,7 @@ For each `N` in **2, 4, 8**, the emitter defines these ten independent arms:
 
 | Options file | Mode | `parallel` | `attention_tp` | `up_tail_balance` |
 |---|---|---:|---:|---:|
-| `ppN.json` | PP reference at world N | 0 | 0 | 0 |
+| `ppN.json` | PP at world N (not timed at batch 1) | 0 | 0 | 0 |
 | `ppN-up-balanced.json` | PP, up-tail balance only | 0 | 0 | 1 |
 | `ffn-tpN.json` | FFN intermediate TP, serial attention | 1 | 0 | 0 |
 | `ffn-tpN-up-balanced.json` | FFN TP plus up-tail balance | 1 | 0 | 1 |
@@ -174,9 +174,11 @@ above remains untouched; its 30-arm manifest predates this batch extension.
    go/no-go bar before spending GPU time. Measure reduction/publication/traffic
    and actual overlap in a bounded microbenchmark before a full decode campaign.
 5. **Timing:** pair host-wall measurements at fixed GPU type, world, batch,
-   context/decode positions, compiler and correctness-qualified options. Compare
-   each arm with same-world PP, balanced versus unbalanced at the same compute
-   mode, same-kernel unfused replay, and the strongest legal real-system reference.
+   context/decode positions, compiler and correctness-qualified options. At batch 1
+   compare the 8-card arms (EP8, head-TP+EP8, TP8) with each other; the legacy PP2
+   29.455 ms/token is a reference only, and no PP arm is timed at batch 1. Also
+   compare balanced versus unbalanced at the same compute mode, same-kernel unfused
+   replay, and the strongest legal real-system reference.
    Keep device span secondary and label its basis. Use interleaved repeats; report
    every pair, median, spread, correctness, root critical path and observed fabric
    traffic/overlap. A new world/GPU session is not an absolute-ms comparison to an
