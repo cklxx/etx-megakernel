@@ -216,6 +216,6 @@ extern "C" __device__ __attribute__((always_inline)) void etx_pre_dsl_attnprep(c
 '''
 
 
-def emit_tiles() -> str:
-    from etx.ops import coh
-    return coh.HELPERS + TILE
+def emit_tiles(machine="gfx942") -> str:
+    from etx.ops import coh, prims
+    return prims.emit_source(coh.HELPERS + TILE, machine)

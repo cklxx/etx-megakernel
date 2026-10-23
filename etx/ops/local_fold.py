@@ -35,12 +35,14 @@ def _once(source: str, old: str, new: str) -> str:
     return source.replace(old, new, 1)
 
 
-def emit(stream: str, plain: str) -> str:
+def emit(stream: str, plain: str, machine="gfx942") -> str:
     """Reuse the actual ordered fold and norm text, not a second arithmetic implementation.
 
     Both vector and scalar paths are retained. The stage replacement preserves
     which lane owns each square and its accumulation order. A source edit that
     moves a boundary fails emission instead of silently using an old fold.
+    Pass the enclosing translation unit's machine; source lowering is applied
+    once by its owner after concatenating this fragment.
     """
     start = stream.index("template <int FixedK = 0, int FixedR = -1>")
     end = stream.index("static __device__ __forceinline__ void dsl_stage_norm(", start)
@@ -121,7 +123,7 @@ extern "C" __device__ __attribute__((always_inline)) void etx_tile_dsl_local_fol
   if (threadIdx.x == 0) ETX_ACQUIRE_DOMAIN();
   __syncthreads();
 ''' + body + "\n}\n"
-    return '''
+    source = '''
 // ETX_DSL_LOCAL_FOLD: emitted only when requested at Python planning/emission.
 #if !defined(ETX_DSL_LOCAL_FOLD) || !ETX_DSL_LOCAL_FOLD
 #error "local-fold graph/source requires -DETX_DSL_LOCAL_FOLD in the device compiler"
@@ -137,6 +139,17 @@ extern "C" __device__ __attribute__((always_inline)) void etx_tile_dsl_local_fol
 #endif
 typedef float dsl_local_f4 __attribute__((ext_vector_type(4)));
 ''' + norm + assembly + consumer
+    from etx.ops import prims
+    m = prims.machine_or_default(machine)
+    if "source_prelude" in m.primitives:
+        source = source.replace("__builtin_trap()", 'asm volatile("trap;")')
+        # CUDA has native structs rather than Clang's indexable vector type.
+        source = source.replace(
+            "typedef float dsl_local_f4 __attribute__((ext_vector_type(4)));",
+            "struct alignas(16) dsl_local_f4 { float v[4]; "
+            "__device__ float& operator[](int i) { return v[i]; } "
+            "__device__ const float& operator[](int i) const { return v[i]; } };")
+    return source
 
 
 def apply(graph, dims) -> None:
