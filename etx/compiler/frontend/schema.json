@@ -1,0 +1,241 @@
+{
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "[^/\\\\]+"
+    },
+    "config": {
+      "type": "string",
+      "minLength": 1
+    },
+    "arch": {
+      "type": "object",
+      "properties": {
+        "attention": {
+          "type": "string",
+          "minLength": 1,
+          "enum": [
+            "gqa",
+            "mla",
+            "kda"
+          ]
+        },
+        "rope": {
+          "type": "string",
+          "minLength": 1,
+          "enum": [
+            "neox",
+            "llama",
+            "longrope",
+            "none"
+          ]
+        },
+        "norm": {
+          "type": "string",
+          "minLength": 1,
+          "enum": [
+            "rmsnorm",
+            "layernorm"
+          ]
+        },
+        "ffn": {
+          "type": "string",
+          "minLength": 1,
+          "enum": [
+            "dense",
+            "moe"
+          ]
+        },
+        "layer_pattern": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "enum": [
+              "dense",
+              "moe"
+            ]
+          }
+        },
+        "tie_embeddings": {
+          "type": "boolean"
+        },
+        "experts": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "topk": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "shared": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "norm_topk": {
+          "type": "boolean"
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "weights": {
+      "type": "object",
+      "properties": {
+        "format": {
+          "type": "string",
+          "minLength": 1,
+          "enum": [
+            "safetensors"
+          ]
+        },
+        "map": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "etx_name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "hf_glob": {
+                "type": "string",
+                "minLength": 1
+              },
+              "concat_axis": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "dtype": {
+                "type": "string",
+                "minLength": 1,
+                "enum": [
+                  "float32",
+                  "float16",
+                  "bfloat16",
+                  "fp32",
+                  "fp16",
+                  "bf16"
+                ]
+              }
+            },
+            "required": [
+              "etx_name",
+              "hf_glob",
+              "concat_axis",
+              "dtype"
+            ],
+            "additionalProperties": false
+          },
+          "minItems": 1
+        }
+      },
+      "required": [
+        "format",
+        "map"
+      ],
+      "additionalProperties": false
+    },
+    "kernels": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "minLength": 1,
+        "pattern": "(dsl|[^@:\\s]+@[^@:\\s]+:[^@:\\s]+)"
+      }
+    },
+    "bindings": {
+      "type": "object",
+      "properties": {
+        "ctx_max": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "batch_sizes": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "ctx_max"
+      ],
+      "additionalProperties": false
+    },
+    "parallel": {
+      "type": "object",
+      "properties": {
+        "devices": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "mode": {
+          "type": "string",
+          "minLength": 1,
+          "enum": [
+            "none",
+            "tp",
+            "ep",
+            "ep_tp",
+            "tp_ep"
+          ]
+        }
+      },
+      "required": [
+        "devices",
+        "mode"
+      ],
+      "additionalProperties": false
+    },
+    "correctness": {
+      "type": "object",
+      "properties": {
+        "golden": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tolerance": {
+          "type": "object",
+          "properties": {
+            "cos": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "rel": {
+              "type": "number",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "cos",
+            "rel"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "golden"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "name",
+    "config",
+    "weights",
+    "kernels",
+    "bindings",
+    "parallel",
+    "correctness"
+  ],
+  "additionalProperties": false,
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Model input contract. Architecture and SHA256 are resolved from HF config; supplied architecture must agree except attention. PhiMoE uses LayerNorm. Paths are relative to model.json. Defaults: batch_sizes=[1,2,4,8], tolerance={cos:0.999,rel:0.02}. Semantic config agreement and unique ETX weight names are checked in Python."
+}
