@@ -232,7 +232,28 @@ def test_fc2a_command_fails_closed(capsys):
     from examples.spec.ledger import main
     assert main(['--fc2a']) == 1
     output = capsys.readouterr().out
-    assert output.startswith('FC-2a FAIL ')
-    for gate in ('module8', 'production'):
-        for k in (0, 1, 3, 5):
-            assert f'{gate} k={k}: missing observed instrumented reads' in output
+    assert 'FC-2a FAIL module8 ' in output
+    assert 'missing observed' not in output
+    assert 'fixed observed=' in output
+    assert 'baseline=' in output
+    for k in (0, 1, 3, 5):
+        assert f'observing module8 k={k}' in output
+
+
+def test_observed_ranges_are_validated_and_count_repeated_scales(spec):
+    from examples.spec.ledger import ObservedBytes
+    events = []
+    sink = ObservedBytes(spec, on_read=events.append)
+    group, tensor, rec = next((g, t, r) for g, b in spec['weights'].items()
+                              for t, r in b['tensors'].items()
+                              if r['dtype'] == 'torch.float8_e4m3fn')
+    sink.read_range(group, tensor, start=rec['offset'], size=1, step=0, repeats=3)
+    sink.read_range(group, tensor, start=rec['scale_offset'], size=4, step=0,
+                    scale=True, repeats=3)
+    assert sink.snapshot()[group, tensor] == 15
+    assert [(e["step"], e["start"], e["size"], e["repeats"]) for e in events] == [
+        (0, rec["offset"], 1, 3), (0, rec["scale_offset"], 4, 3)]
+    with pytest.raises(ValueError, match='outside tensor'):
+        sink.read_range(group, tensor, start=rec['offset']-1, size=1, step=0)
+    with pytest.raises(ValueError, match='repeats'):
+        sink.read_range(group, tensor, start=rec['offset'], size=1, step=0, repeats=0)
