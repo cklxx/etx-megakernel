@@ -12,7 +12,8 @@ import subprocess
 
 from etx.codegen import emit_kernel, emit_lowering_header, emit_plan_json
 from etx.passes import compile_graph, PassOptions
-from etx.tools.cli import _load_example
+from etx.passes.plan import environment_options
+from etx.contracts.compiler import _load_example
 from .verify_gaps_cpu import FLAGS, ROOT
 
 
@@ -44,7 +45,7 @@ def run(out, retained, native=False):
         if arm == 'NO_TOUCH_stamps': os.environ['ETX_INBODY_EMIT'] = '1'
         mod = _load_example(str(ROOT/'examples/vllm_llm/model.py'))
         bindings = mod.bindings()
-        plan = compile_graph(mod.build(), 'gfx942', bindings, mod.runtime(bindings), PassOptions(inline_tiles=True))
+        plan = compile_graph(mod.build(), 'gfx942', bindings, mod.runtime(bindings), PassOptions(inline_tiles=True, **environment_options(os.environ)))
         plans[arm] = emit_plan_json(plan)
         work = out/arm; work.mkdir(exist_ok=True)
         sources[arm] = emit_kernel(plan)

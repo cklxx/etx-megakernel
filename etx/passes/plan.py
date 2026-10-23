@@ -6,7 +6,6 @@ between steps, and those are what the host uploads.
 """
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -26,14 +25,37 @@ class PassOptions:
     inline_tiles: bool = False             # emit #include of the tile sources into the kernel TU (single-TU build, bodies inlinable)
     # coherence mode of the whole build, the SAME switch for every model: "declared" (default: each tile keeps the
     # coherence its graph declared) | "l1" (every tile whose family declares the capability becomes "coherent_l1":
-    # agent-scope payload loads, no acquire invalidate, no added write-back). Default from ETX_COHERENCE so every
-    # build script inherits it unchanged (docs/core/INVENTORY-SYSTEM-2026-10-13.md, G6).
-    coherence: str = field(default_factory=lambda: os.environ.get("ETX_COHERENCE", "declared"))
+    # agent-scope payload loads, no acquire invalidate, no added write-back). Build scripts set it through
+    # ETX_COHERENCE, translated by environment_options at the entry point (docs/core/INVENTORY-SYSTEM-2026-10-13.md, G6).
+    coherence: str = "declared"
     relay: str = "off"                     # per-domain relay of DEVICE-scope counters: off (default) | auto | on.
                                            # Off by default: measured neutral on MI300X, and its hierarchical acquire
                                            # (relay invalidates L2 once, consumers drop only L1) was shown UNSAFE on
                                            # 2026-09-24 (Qwen2.5-1.5B: nondeterministic tokens; deterministic with it off)
+    prefetch_isolate_poller: bool = False  # ETX_PREFETCH_ISOLATE_POLLER=1: poller waves skip prefetch work
+    inbody_emit: bool = False              # ETX_INBODY_EMIT=1: an independent in-body diagnostic translation unit
 
+
+
+def environment_options(environ) -> dict[str, Any]:
+    """The PassOptions the legacy build environment selects: ETX_COHERENCE, ETX_PREFETCH_ISOLATE_POLLER, ETX_INBODY_EMIT.
+
+    Passes and codegen never read the process environment; entry points that historically inherited these
+    variables (the `etx compile` command, in-process harness builds) pass their environment here explicitly.
+    """
+    return dict(coherence=environ.get("ETX_COHERENCE", "declared"),
+                prefetch_isolate_poller=environ.get("ETX_PREFETCH_ISOLATE_POLLER", "0") == "1",
+                inbody_emit=environ.get("ETX_INBODY_EMIT") == "1")
+
+
+def recorded_options(options: PassOptions) -> dict[str, Any]:
+    """PassOptions as records store them: the emission-only switches appear only when on, so records written
+    before they became options stay byte-identical."""
+    record = {f: getattr(options, f) for f in options.__dataclass_fields__}
+    for switch in ("prefetch_isolate_poller", "inbody_emit"):
+        if not record[switch]:
+            del record[switch]
+    return record
 
 @dataclass
 class TaskInst:

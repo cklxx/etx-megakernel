@@ -14,7 +14,6 @@ from __future__ import annotations
 from . import manifest
 
 import json
-import os
 import re
 from typing import Any
 
@@ -201,7 +200,7 @@ def _compact_dispatch(lines: list[str], start: int, tag: str, ntypes: int) -> No
 
 
 def emit_kernel(plan: Plan, device: int = 0) -> str:
-    isolate_poller = os.environ.get("ETX_PREFETCH_ISOLATE_POLLER", "0") == "1"
+    isolate_poller = plan.options.prefetch_isolate_poller
     m = plan.machine
     is_hip = m.vendor == "amd"
     grids = [g for g in plan.graph.grids if g.device == device]
@@ -576,7 +575,7 @@ def emit_kernel(plan: Plan, device: int = 0) -> str:
         out.append("}")
         out.append("")
         out.extend(_emit_unfused(plan, device, grids, symbols, max_pro))
-        return _diagnostic_source("\n".join(out))
+        return _diagnostic_source("\n".join(out), plan.options.inbody_emit)
     out.append("  int32_t ticket_local = -1, ticket_global = -1;   // ticket-ring reservations, see etx_try_pop")
     out.append("  uint32_t spins = 0;")
     out.append("  for (;;) {")
@@ -606,14 +605,13 @@ def emit_kernel(plan: Plan, device: int = 0) -> str:
     out.append("}")
     out.append("")
     out.extend(_emit_unfused(plan, device, grids, symbols, max_pro))
-    return _diagnostic_source("\n".join(out))
+    return _diagnostic_source("\n".join(out), plan.options.inbody_emit)
 
 
-def _diagnostic_source(source):
+def _diagnostic_source(source, inbody_emit):
     # An independent diagnostic TU. Ordinary emission remains byte-for-byte
     # unchanged; host and device must both compile with ETX_INBODY=1.
-    import os
-    if os.environ.get("ETX_INBODY_EMIT") == "1":
+    if inbody_emit:
         from .inbody import instrument
         source = instrument(source)
     return source

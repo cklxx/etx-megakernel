@@ -12,7 +12,7 @@ from pathlib import Path
 import re
 import sys
 
-from etx.external import BuildRefused, ModelBuildRequest, PlanRequest, build_model, model
+from etx.external import BuildRefused, ModelBuildRequest, PlanRequest, build_model, environment_options, model
 
 
 # Variables this translator consumes itself; they never reach the declaration.
@@ -38,8 +38,12 @@ def request(recipe, argument, extra, environ, root):
     environment.update({key: text for key, text in environ.items()
                         if prefixes and key.startswith(prefixes) and key not in CONTROL})
     options = dict(recipe['options'])
-    if 'ETX_COHERENCE' in environ:
-        options['coherence'] = environ['ETX_COHERENCE']
+    # The build environment's planner/emission switches, as the legacy shells' compiler inherited them.
+    switches = environment_options(environ)
+    for key, variable in (('coherence', 'ETX_COHERENCE'), ('prefetch_isolate_poller', 'ETX_PREFETCH_ISOLATE_POLLER'),
+                          ('inbody_emit', 'ETX_INBODY_EMIT')):
+        if variable in environ:
+            options[key] = switches[key]
     workload = model(Path(recipe['declaration']).parent.name, config=dict(
         declaration=str(declaration), declaration_sha256=hashlib.sha256(declaration.read_bytes()).hexdigest(),
         environment=environment))

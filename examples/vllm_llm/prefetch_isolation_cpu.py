@@ -1,5 +1,6 @@
 """Full-plan OFF .text identity and ON polling-path ISA; CPU only."""
 import argparse
+from dataclasses import replace
 import json
 import os
 from pathlib import Path
@@ -7,7 +8,7 @@ import subprocess
 import types
 
 from etx.codegen import emit_kernel, emit_lowering_header
-from etx.tools.cli import _load_example
+from etx.contracts.compiler import _load_example
 from etx.passes import compile_graph, PassOptions
 from etx.tools.verify_gaps import digest, report
 from .verify_gaps_cpu import ROOT, FLAGS
@@ -25,8 +26,8 @@ def run(out, retained, dry_run=False):
     baseline=types.ModuleType('etx.codegen.baseline');baseline.__package__='etx.codegen'
     exec(compile(subprocess.check_output(['git','show','9f91f3a:etx/codegen/kernel.py'],cwd=ROOT,text=True),'<baseline>','exec'),baseline.__dict__)
     original=baseline.emit_kernel(plan)
-    os.environ['ETX_PREFETCH_ISOLATE_POLLER']='0';off=emit_kernel(plan)
-    os.environ['ETX_PREFETCH_ISOLATE_POLLER']='1';on=emit_kernel(plan)
+    os.environ['ETX_PREFETCH_ISOLATE_POLLER']='0';plan.options=replace(plan.options,prefetch_isolate_poller=False);off=emit_kernel(plan)
+    os.environ['ETX_PREFETCH_ISOLATE_POLLER']='1';plan.options=replace(plan.options,prefetch_isolate_poller=True);on=emit_kernel(plan)
     if off!=original:raise ValueError('OFF emitter differs from starting commit')
     sources={'original':original,'off':off,'on':on}
     (out/'etx_lowering.h').write_text(emit_lowering_header(plan.machine))

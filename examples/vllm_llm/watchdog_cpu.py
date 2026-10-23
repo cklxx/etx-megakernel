@@ -4,6 +4,7 @@ CPU only. Local LLVM gfx942 device compilation uses ETX_DEVLIBS. Host syntax
 uses the installed offline ROCm image. The synthetic event is NOT a GPU hang.
 """
 import argparse
+from dataclasses import replace
 import json
 import os
 from pathlib import Path
@@ -14,8 +15,8 @@ from etx.ops import gemv
 from etx.codegen import emit_kernel,emit_lowering_header,emit_plan_json
 from etx.codegen.plan_header import emit_plan_header
 from etx.tools import inbody,watchdog
-from .bf16_300 import dispatcher
-from .bf16_300.build import current_source,preamble
+from etx.models.vllm_llm.bf16_300 import dispatcher
+from etx.models.vllm_llm.bf16_300.build import current_source,preamble
 from .verify_gaps_cpu import ROOT,FLAGS
 
 
@@ -42,6 +43,7 @@ def run(out,dry_run=False):
     tile=out/'tiles.hip';tile.write_text(preamble(gemv.LDS_BYTES)+current_source())
     plan=dispatcher.graph(tile)
     os.environ['ETX_INBODY_EMIT']='1'
+    plan.options=replace(plan.options,inbody_emit=True)
     (out/'kernel.hip').write_text(emit_kernel(plan))
     (out/'etx_lowering.h').write_text(emit_lowering_header(plan.machine))
     (out/'plan_data.h').write_text(emit_plan_header(plan))

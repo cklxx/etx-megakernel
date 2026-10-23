@@ -8,11 +8,12 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
 
 from etx.external import (CompilerRequest, compiler_command, PlanRequest, WorkloadSpec,
                           plan, emit, save_sources, load_sources, build, load_build,
-                          ArtifactRunRequest, run_artifact, read_artifact_run)
+                          ArtifactRunRequest, run_artifact, read_artifact_run, environment_options)
 
 
 def _request(args):
@@ -26,7 +27,9 @@ def _request(args):
                                prefetch=not args.no_prefetch,
                                split_resource_classes=args.split_classes,
                                force_mode=args.force_mode,
-                               inline_tiles=args.inline_tiles, relay=args.relay),
+                               inline_tiles=args.inline_tiles, relay=args.relay,
+                               # The command line is where the build environment's switches enter.
+                               **environment_options(os.environ).to_dict()),
                            simulate=getattr(args, 'sim', False), seed=getattr(args, 'seed', 0))
 
 

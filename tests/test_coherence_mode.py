@@ -15,7 +15,9 @@ from etx.frontends import hip_link
 from etx.ir import Graph, Resource
 from etx.ops import coh
 from etx.passes import compile_graph
-from etx.passes.plan import PassOptions
+import os
+
+from etx.passes.plan import PassOptions, environment_options
 
 RES = Resource(threads=256, lds_bytes=0, vgpr=64)
 
@@ -44,16 +46,27 @@ def test_default_mode_changes_nothing(monkeypatch):
     assert "coherent-L1" not in capable and "ETX_DSL_COH_L1" not in capable
 
 
+def env_options(**kw):
+    """The options the `etx compile` command and harness builds derive from the process environment."""
+    return PassOptions(**environment_options(os.environ), **kw)
+
+
+def test_planner_never_reads_the_environment(monkeypatch):
+    monkeypatch.setenv("ETX_COHERENCE", "l1")
+    assert PassOptions().coherence == "declared"
+    assert [gr.body.coherence for gr in compile_graph(_graph(), "gfx942", {}, {}).graph.grids] == ["imported"] * 3
+
+
 def test_l1_switches_exactly_the_declaring_tiles(monkeypatch):
     monkeypatch.setenv("ETX_COHERENCE", "l1")
     g = _graph()
-    plan = compile_graph(g, "gfx942", {}, {})
+    plan = compile_graph(g, "gfx942", {}, {}, env_options())
     assert [gr.body.coherence for gr in plan.graph.grids] == ["imported", "coherent_l1", "imported"]
     assert [gr.body.coherence for gr in g.grids] == ["imported"] * 3          # the caller's graph is not mutated
     src = emit_kernel(plan)
     assert "coherent-L1 tile: no acquire invalidate" in src
     assert "#define ETX_DSL_COH_L1 1" in src                                     # the manifest publishes the mode
-    inline = emit_kernel(compile_graph(_graph(), "gfx942", {}, {}, PassOptions(inline_tiles=True)))
+    inline = emit_kernel(compile_graph(_graph(), "gfx942", {}, {}, env_options(inline_tiles=True)))
     assert "#if defined(ETX_DSL_COH_HELPERS) && !defined(ETX_DSL_COH_L1_IMPL)" in inline   # stale DSL source refused
     assert "write it back" not in src                     # a coherent-L1 consumer adds no write-back
     assert re.search(r"etx_arrive_flush_DEVICE(_s)?\(", src) and "_nf(" not in src   # plain-store family: flush kept
@@ -63,7 +76,7 @@ def test_l1_switches_exactly_the_declaring_tiles(monkeypatch):
 def test_write_through_family_keeps_flush_free_arrives(monkeypatch):
     """The DSL family's stores are system scope: as a coherent-L1 producer it keeps the no-flush arrive."""
     monkeypatch.setenv("ETX_COHERENCE", "l1")
-    plan = compile_graph(_graph(caps_b=("coherent_l1", "coherent_stores")), "gfx942", {}, {})
+    plan = compile_graph(_graph(caps_b=("coherent_l1", "coherent_stores")), "gfx942", {}, {}, env_options())
     assert plan.events["E2"].producers_coherent
     assert re.search(r"etx_arrive_flush_DEVICE(_s)?_nf\(", emit_kernel(plan))
 
@@ -71,7 +84,7 @@ def test_write_through_family_keeps_flush_free_arrives(monkeypatch):
 def test_unknown_mode_is_refused(monkeypatch):
     monkeypatch.setenv("ETX_COHERENCE", "l2")
     with pytest.raises(ValueError, match="coherence='l2'"):
-        compile_graph(_graph(), "gfx942", {}, {})
+        compile_graph(_graph(), "gfx942", {}, {}, env_options())
 
 
 def test_manifest_flag_only_when_on():
@@ -96,10 +109,10 @@ def test_deepseek_build_wide_switch_equals_its_own_switch(monkeypatch):
     for k in ("ETX_COHERENCE", "ETX_DSV2_COH"):
         monkeypatch.delenv(k, raising=False)
     monkeypatch.setenv("ETX_DSV2_COH", "l1")
-    g1 = compile_graph(graph.build(), "gfx942", {}, {}).graph
+    g1 = compile_graph(graph.build(), "gfx942", {}, {}, env_options()).graph
     monkeypatch.delenv("ETX_DSV2_COH")
     monkeypatch.setenv("ETX_COHERENCE", "l1")
-    g2 = compile_graph(graph.build(), "gfx942", {}, {}).graph
+    g2 = compile_graph(graph.build(), "gfx942", {}, {}, env_options()).graph
     assert [(x.name, x.body.coherence) for x in g1.grids] == [(x.name, x.body.coherence) for x in g2.grids]
     assert {x.name for x in g2.grids if x.body.coherence != "coherent_l1"} == {"dense_dn_0"}
 
@@ -108,7 +121,7 @@ def test_deepseek_l1_plan_without_fleet_accessors_is_refused(tmp_path, pinned_sr
     from examples.dsv2lite import coh_check, graph
     monkeypatch.setenv("ETX_COHERENCE", "l1")
     mk = tmp_path / "mk.hip"
-    mk.write_text(emit_kernel(compile_graph(graph.build(), "gfx942", {}, {})))
+    mk.write_text(emit_kernel(compile_graph(graph.build(), "gfx942", {}, {}, env_options())))
     assert coh_check.main([str(mk), str(pinned_src)]) == 2
 
 

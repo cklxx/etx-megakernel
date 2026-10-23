@@ -14,6 +14,7 @@ import statistics
 import subprocess
 
 from etx.passes import PassOptions, compile_graph
+from etx.passes.plan import recorded_options
 from etx.sim import simulate
 
 MODES = ("static", "dynamic", "hybrid")
@@ -95,7 +96,7 @@ def contract(plan):
             "workers_per_device": plan.workers_per_device(), "n_devices": plan.n_devices,
             "bindings": plan.bindings, "runtime": plan.runtime, "decisions": plan.log,
             "tensors": {name: asdict(t) for name, t in plan.graph.tensors.items()},
-            "options": asdict(plan.options)}
+            "options": recorded_options(plan.options)}
 
 
 def check_sample(spec, result):

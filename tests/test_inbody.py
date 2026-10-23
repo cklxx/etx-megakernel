@@ -8,7 +8,10 @@ import subprocess
 
 import pytest
 
+from dataclasses import replace
+
 from etx.codegen import emit_kernel
+from etx.passes.plan import environment_options
 from etx.codegen.inbody import instrument
 from etx.tools import inbody
 from etx.models.vllm_llm.bf16_300 import dispatcher, launch, launch_source, pack
@@ -141,9 +144,10 @@ def test_default_emission_unchanged(monkeypatch):
     p=dispatcher.graph('/tmp/inbody_tiles.hip')
     monkeypatch.delenv('ETX_INBODY_EMIT',raising=False)
     original=emit_kernel(p)
-    monkeypatch.setenv('ETX_INBODY_EMIT','0')
-    assert emit_kernel(p)==original
+    # Emission follows the plan's options; the process environment is not read.
     monkeypatch.setenv('ETX_INBODY_EMIT','1')
+    assert emit_kernel(p)==original
+    p.options=replace(p.options,**environment_options({'ETX_INBODY_EMIT':'1'}))
     diagnostic=emit_kernel(p)
     assert diagnostic==instrument(original)
     assert '#define ETX_TARGET(idx) (void)ETX_INBODY_ARRIVE(p, 0 + (idx), tid,' in diagnostic

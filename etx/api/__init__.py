@@ -23,7 +23,7 @@ __all__ = ['Configuration', 'Inspection', 'KernelSpec', 'PlanRequest', 'PlannedW
            'SourceArtifact', 'emit', 'save_sources', 'load_sources', 'DeviceCheck', 'check_device_sources',
            'check_codegen', 'BuildArtifact', 'build', 'load_build',
            'ArtifactRunRequest', 'ArtifactRun', 'run_artifact', 'read_artifact_run',
-           'source_snapshot', 'verify_source_snapshot', 'CompilerRequest', 'compiler_command',
+           'source_snapshot', 'verify_source_snapshot', 'CompilerRequest', 'compiler_command', 'environment_options',
            'run_protocol_experiment', 'report_protocol_experiment', 'run_protocol_study',
            'run_cpu_acceptance', 'cpu_acceptance_fixtures', 'JobSpec', 'JobSession', 'JobSessionRequest',
            'JobOutcome', 'JobSessionResult', 'load_job_session', 'run_jobs', 'verify_job_record',
@@ -131,6 +131,15 @@ def report_protocol_experiment(output) -> int:
 def compiler_command(request: CompilerRequest) -> int:
     from etx.contracts.compiler import compiler_command as command
     return command(request)
+
+
+def environment_options(environ) -> Configuration:
+    """Planner options selected by a build environment's ETX_COHERENCE, ETX_PREFETCH_ISOLATE_POLLER, ETX_INBODY_EMIT.
+
+    The compiler never reads the process environment; commands pass their environment through this.
+    """
+    from etx.contracts.planning import environment_options as options
+    return Configuration(options(environ))
 
 
 def source_snapshot(root, *, paths) -> Configuration:

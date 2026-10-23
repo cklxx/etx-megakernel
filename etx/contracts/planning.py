@@ -7,6 +7,7 @@ from etx.codegen import emit_plan_json
 from etx.ir.types import Graph, Resource, TileBody
 from etx.machine.model import list_archs, load_machine
 from etx.passes import PassOptions, compile_graph
+from etx.passes.plan import recorded_options
 
 
 def _graph(workload):
@@ -91,5 +92,11 @@ def recompile(planned):
 def snapshot(request, compiled):
     # JSON conversion normalizes enum/integer dictionary keys in compiler data.
     machine = json.loads(json.dumps(asdict(compiled.machine)))
-    return PlannedWorkload(request, machine, asdict(compiled.options),
+    return PlannedWorkload(request, machine, recorded_options(compiled.options),
                            json.loads(emit_plan_json(compiled)), tuple(compiled.log))
+
+
+def environment_options(environ):
+    """Adapter onto the planner's environment translation (etx.passes.plan.environment_options)."""
+    from etx.passes.plan import environment_options as options
+    return options(environ)

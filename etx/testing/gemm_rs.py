@@ -11,9 +11,14 @@ from etx.api.types import Configuration
 
 
 def _encoded(value):
+    from etx.passes.plan import PassOptions, recorded_options
+
     def normal(item):
-        if dataclasses.is_dataclass(item):
-            return normal(dataclasses.asdict(item))
+        if isinstance(item, PassOptions):
+            # Options as records store them: default-off emission switches are absent, as before they existed.
+            return normal(recorded_options(item))
+        if dataclasses.is_dataclass(item) and not isinstance(item, type):
+            return {field.name: normal(getattr(item, field.name)) for field in dataclasses.fields(item)}
         if isinstance(item, dict):
             return {str(key): normal(value) for key, value in item.items()}
         if isinstance(item, (tuple, list)):
