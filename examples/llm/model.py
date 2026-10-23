@@ -31,7 +31,6 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
-from etx.frontends import hip_link
 from etx.ir import Graph, Resource
 
 T = "examples/llm/tiles.hip"
@@ -218,59 +217,10 @@ def _us(nbytes: float, tasks: int) -> float:
 
 
 def build() -> Graph:
-    d = load_dims()
-    p = partition(d)
-    ctx, chunk = _ctx_chunk()
-    NC = ctx // chunk
-    res = resource(d)
-    g = Graph(f"llm_{d.name}")
-    g.tensor("llm", (1,), role="weight", bytes_per_elem=8)          # placeholder: the tiles read __constant__ params
+    """Resolve this example's settings and build through the generic decoder frontend."""
+    from etx.compiler.frontend.decoder import DecoderConfig, build as build_decoder
 
-    def grid(name, shape, sym, L, ins, outs, dur):
-        return g.call_device(name, shape, hip_link(T, sym), resource=res, args=["llm"], consts=(L,),
-                             in_edges=ins, out_edges=outs, duration_us=dur, duration_cv=0.05)
-
-    def ntask(rows, rpt):
-        return math.ceil(rows / rpt)
-
-    g.etensor("E_embed", (1,), wait_count=1)
-    grid("embed", (1,), "llm_embed", -1, {}, {"E_embed": "i->i"}, 1.0)
-    e_in = "E_embed"
-    for L in range(d.L):
-        n_qkv, n_o = ntask(d.NQKV, p["qkv"]), ntask(d.H, p["o"])
-        g.etensor(f"E_qkv_{L}", (1,), wait_count=n_qkv)
-        g.etensor(f"E_post_{L}", (d.NKV,), wait_count=d.G + 2)
-        g.etensor(f"E_attn_{L}", (d.NKV,), wait_count=NC)
-        g.etensor(f"E_merge_{L}", (1,), wait_count=d.NH)
-        g.etensor(f"E_o_{L}", (1,), wait_count=n_o)
-        grid(f"qkv_{L}", (n_qkv,), "llm_qkv", L, {e_in: "i->(0)"}, {f"E_qkv_{L}": "i->(0)"}, _us(d.NQKV * d.H * 2, n_qkv))
-        grid(f"post_q_{L}", (d.NH,), "llm_post_q", L, {f"E_qkv_{L}": "i->(0)"}, {f"E_post_{L}": f"i->(i/{d.G})"}, 1.0)
-        grid(f"post_kv_{L}", (d.NKV, 2), "llm_post_kv", L, {f"E_qkv_{L}": "ij->(0)"}, {f"E_post_{L}": "ij->i"}, 1.0)
-        grid(f"attn_{L}", (d.NKV, NC), "llm_attn", L, {f"E_post_{L}": "hc->h"}, {f"E_attn_{L}": "hc->h"}, 3.0)
-        grid(f"merge_{L}", (d.NH,), "llm_merge", L, {f"E_attn_{L}": f"i->(i/{d.G})"}, {f"E_merge_{L}": "i->(0)"}, 1.0)
-        grid(f"oproj_{L}", (n_o,), "llm_oproj", L, {f"E_merge_{L}": "i->(0)"}, {f"E_o_{L}": "i->(0)"}, _us(d.H * d.NH * d.HD * 2, n_o))
-        g.etensor(f"E_down_{L}", (1,), wait_count=ntask(d.H, p["edn" if d.moe else "dn"]))
-        if d.moe:
-            n_r, n_egu, n_edn = ntask(d.E, p["r"]), ntask(d.MI, p["egu"]), ntask(d.H, p["edn"])
-            g.etensor(f"E_r_{L}", (1,), wait_count=n_r)
-            g.etensor(f"E_egu_{L}", (1,), wait_count=d.TOPK * n_egu)
-            grid(f"router_{L}", (n_r,), "llm_router", L, {f"E_o_{L}": "i->(0)"}, {f"E_r_{L}": "i->(0)"}, _us(d.E * d.H * 2, n_r))
-            grid(f"egu_{L}", (d.TOPK, n_egu), "llm_egu", L, {f"E_r_{L}": "sb->(0)"}, {f"E_egu_{L}": "sb->(0)"},
-                 _us(d.TOPK * 2 * d.MI * d.H * 2, d.TOPK * n_egu))
-            grid(f"edn_{L}", (n_edn,), "llm_edn", L, {f"E_egu_{L}": "i->(0)"}, {f"E_down_{L}": "i->(0)"},
-                 _us(d.TOPK * d.H * d.MI * 2, n_edn))
-        else:
-            n_gu, n_dn = ntask(d.INTER, p["gu"]), ntask(d.H, p["dn"])
-            g.etensor(f"E_gu_{L}", (1,), wait_count=n_gu)
-            grid(f"gateup_{L}", (n_gu,), "llm_gateup", L, {f"E_o_{L}": "i->(0)"}, {f"E_gu_{L}": "i->(0)"}, _us(2 * d.INTER * d.H * 2, n_gu))
-            grid(f"down_{L}", (n_dn,), "llm_down", L, {f"E_gu_{L}": "i->(0)"}, {f"E_down_{L}": "i->(0)"}, _us(d.H * d.INTER * 2, n_dn))
-        e_in = f"E_down_{L}"
-    n_lm = ntask(d.V, p["lm"])
-    g.etensor("E_lm", (1,), wait_count=n_lm)
-    g.etensor("E_argmax", (1,), wait_count=1)
-    grid("lmhead", (n_lm,), "llm_lmhead", -1, {e_in: "i->(0)"}, {"E_lm": "i->(0)"}, _us(d.V * d.H * 2, n_lm))
-    grid("argmax", (1,), "llm_argmax", -1, {"E_lm": "i->i"}, {"E_argmax": "i->i"}, 2.0)
-    return g
+    return build_decoder(DecoderConfig.from_example("llm"))
 
 
 def bindings(**overrides) -> dict:
