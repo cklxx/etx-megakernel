@@ -152,3 +152,87 @@ def test_missing_descriptors_refuse(spec):
 
 def test_empty_audit_does_not_establish_read_once():
     assert not ReadLedger(set()).report()['read_once']
+
+
+def qualification_fixture(spec, pattern='same'):
+    """Synthetic reader totals test the verdict logic, never certify a graph."""
+    from examples.spec.ledger import ObservedBytes
+    observed, ids = {}, {}
+    for k in (0, 1, 3, 5):
+        ids[k] = routes(spec, k, pattern)
+        sink = ObservedBytes(spec)
+        for group, blob in spec['weights'].items():
+            for tensor, record in blob['tensors'].items():
+                payload, scales = tensor_bytes(record)
+                selected = True
+                if tensor.startswith('mlp.experts.'):
+                    selected = int(tensor.split('.')[2]) in set().union(*map(set, ids[k][group]))
+                sink.read(group, tensor,
+                          elements=math.prod(record['shape']) if selected else 0,
+                          scales=scales//4 if selected else 0)
+        observed[k] = sink.snapshot()
+    return observed, ids
+
+
+@pytest.mark.parametrize('pattern', ['same', 'rotate'])
+def test_fc2a_verdict_and_per_position_expert_failure(spec, pattern):
+    from examples.spec.ledger import fc2a
+    observed, ids = qualification_fixture(spec, pattern)
+    assert fc2a(spec, observed, experts=ids)['passed']
+    key = next(key for key, n in observed[5].items()
+               if key[1].startswith('mlp.experts.') and n)
+    extra = observed[5][key]
+    observed[5][key] += extra
+    report = fc2a(spec, observed, experts=ids)
+    assert not report['passed']
+    assert any(f'excess={extra} bytes' in reason and 'routed' in reason
+               for reason in report['reasons'])
+
+
+def test_fc2a_fixed_tolerance_and_missing_coverage(spec):
+    from examples.spec.ledger import fc2a
+    observed, ids = qualification_fixture(spec)
+    key = next(key for key in observed[0] if key[0] == 'head')
+    baseline = observed[0][key]
+    observed[3][key] += baseline//1000
+    assert fc2a(spec, observed, experts=ids)['passed']
+    observed[3][key] += 1
+    assert not fc2a(spec, observed, experts=ids)['passed']
+    del observed[3][key]
+    assert any('coverage' in r for r in fc2a(spec, observed, experts=ids)['reasons'])
+    del observed[1]
+    assert any('k=1: missing observed' in r
+               for r in fc2a(spec, observed, experts=ids)['reasons'])
+
+
+def test_fc2a_never_certifies_without_instrumentation(spec):
+    from examples.spec.ledger import fc2a
+    report = fc2a(spec, {}, experts={})
+    assert not report['passed']
+    assert len(report['reasons']) == 4
+    assert all('missing observed instrumented reads' in r for r in report['reasons'])
+
+
+def test_observed_reader_validates_events(spec):
+    from examples.spec.ledger import ObservedBytes
+    sink = ObservedBytes(spec)
+    key = next(key for key in qualification_fixture(spec)[0][0] if key[0] == 'head')
+    sink.read(*key, elements=3)
+    sink.read(*key, elements=2)
+    assert sink.snapshot()[key] == 10
+    with pytest.raises(ValueError, match='scale reads'):
+        sink.read(*key, scales=1)
+    with pytest.raises(ValueError, match='elements'):
+        sink.read(*key, elements=-1)
+    with pytest.raises(KeyError):
+        sink.read('head', 'missing')
+
+
+def test_fc2a_command_fails_closed(capsys):
+    from examples.spec.ledger import main
+    assert main(['--fc2a']) == 1
+    output = capsys.readouterr().out
+    assert output.startswith('FC-2a FAIL ')
+    for gate in ('module8', 'production'):
+        for k in (0, 1, 3, 5):
+            assert f'{gate} k={k}: missing observed instrumented reads' in output
