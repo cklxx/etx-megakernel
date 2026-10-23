@@ -136,14 +136,65 @@ template<int P> GLM_DEV void glm_verify_ffn_input(const etx_ctx* c){
     glm_verify_rows<P>(b,w[ROUTER],cx,0,w[ROUTER].rows,[&](int p,int r,float v){rt[p][r]=v;});}
 }
 
-// One head scans all positions in causal order, including its convolution and
-// recurrent state. args: weights, meta, state, (p1, att) for each position.
-extern "C" __device__ void glm53_verify_kda_scan(const etx_ctx* c) {
+// args: weights, meta, state, invariant scratch, (p1, att, work) per row.
+// The convolution and recurrence still advance in position order. Only their
+// fixed coefficients and f/g projections are shared across the row block.
+template<int P> GLM_DEV void glm_verify_kda(const etx_ctx* c){
+  const uint8_t* b=GLM_PB(0);const glm_weight* w=GLM_PW(1);
   float* state=GLM_PR(2,float*,(uint64_t)c->cst[3]);
-  for(int p=0;p<c->cst[2];++p){
-    const float* in=GLM_PR(3+2*p,const float*,GLM_S_P1);
-    float* out=GLM_PR(4+2*p,float*,GLM_S_ATT);
-    glm_ph_kda(GLM_PB(0),GLM_PW(1),in,state,out,GLM_PT);
+  float* common=GLM_PR(3,float*,GLM_VCOMMON);float* red=(float*)c->lds;
+  const float* p1[P];float *att[P],*work[P];
+  for(int p=0;p<P;++p){p1[p]=GLM_PR(4+3*p,const float*,GLM_S_P1);
+    att[p]=GLM_PR(5+3*p,float*,GLM_S_ATT);work[p]=GLM_PR(6+3*p,float*,GLM_VWORK);}
+  const float *fs[P],*gs[P];
+  for(int p=0;p<P;++p){fs[p]=p1[p]+3*GLM_QDIM;gs[p]=fs[p]+GLM_LD+GLM_LH;}
+  glm_verify_rows<P>(b,w[FB],fs,0,w[FB].rows,[&](int p,int r,float v){work[p][GLM_VG+r]=glm_bf(v);});
+  glm_verify_rows<P>(b,w[GB],gs,0,w[GB].rows,[&](int p,int r,float v){work[p][GLM_VB+r]=glm_bf(v);});
+  for(int j=GLM_LANE;j<GLM_LD;j+=GLM_LANES)common[j]=glm_w(b,w[ONORM],j);
+  for(int h=GLM_LANE;h<GLM_LH;h+=GLM_LANES)common[GLM_LD+h]=glm_w(b,w[ALOG],h);
+  GLM_SYNC();
+  for(int j=GLM_LANE;j<GLM_QDIM;j+=GLM_LANES){const float dt=glm_w(b,w[DT],j);
+    for(int p=0;p<P;++p)work[p][GLM_VG+j]=expf(GLM_LOWER*glm_sig(expf(common[GLM_LD+j/GLM_LD])*(work[p][GLM_VG+j]+dt)));}
+  for(int j=GLM_LANE;j<3*GLM_QDIM;j+=GLM_LANES){
+    float weight[GLM_CONV];for(int z=0;z<GLM_CONV;++z)weight[z]=glm_w(b,w[CONV],j,z);
+    float* hist=state+(uint64_t)j*GLM_CONV;
+    for(int p=0;p<P;++p){
+      for(int z=0;z<GLM_CONV-1;++z)hist[z]=hist[z+1];hist[GLM_CONV-1]=p1[p][j];
+      float sum=0;for(int z=0;z<GLM_CONV;++z)sum+=hist[z]*weight[z];
+      if(w[CONV].kind==1)sum=glm_bf(sum);
+      work[p][GLM_VA+j]=glm_bf(sum*glm_sig(sum));}}
+  GLM_SYNC();
+  float* rec=state+3*GLM_QDIM*GLM_CONV;
+  for(int p=0;p<P;++p)for(int h=0;h<GLM_LH;++h){const int off=h*GLM_LD;
+    float* q=work[p]+GLM_VA+off;float* k=q+GLM_QDIM;const float* v=k+GLM_QDIM;
+    const float* g=work[p]+GLM_VG+off;const float* gate=work[p]+GLM_VB+off;
+    const float beta=glm_bf(glm_sig(p1[p][3*GLM_QDIM+GLM_LD+h]));
+    float pq=GLM_LANE==0?1e-6f:0.0f,pk=pq;
+    for(int i=GLM_LANE;i<GLM_LD;i+=GLM_LANES){pq+=q[i]*q[i];pk+=k[i]*k[i];}
+    const float nq=sqrtf(glm_bsum(pq,red))*sqrtf((float)GLM_LD),nk=sqrtf(glm_bsum(pk,red));
+    for(int i=GLM_LANE;i<GLM_LD;i+=GLM_LANES){q[i]/=nq;k[i]/=nk;}
+    GLM_SYNC();float* s=rec+(uint64_t)h*GLM_LD*GLM_LD;
+    float* o=red+GLM_LDS_HEAD;
+    for(int d=GLM_LANE;d<GLM_LD;d+=GLM_LANES){float mem=0;
+      for(int i=0;i<GLM_LD;++i){s[i*GLM_LD+d]*=g[i];mem+=s[i*GLM_LD+d]*k[i];}
+      const float delta=(v[d]-mem)*beta;float sum=0;
+      for(int i=0;i<GLM_LD;++i){s[i*GLM_LD+d]+=k[i]*delta;sum+=s[i*GLM_LD+d]*q[i];}
+      o[d]=glm_bf(sum);}
+    GLM_SYNC();float part=0;
+    for(int j=GLM_LANE;j<GLM_LD;j+=GLM_LANES)part+=o[j]*o[j];
+    const float inv=1/sqrtf(glm_bsum(part,red)/GLM_LD+GLM_EPS);
+    for(int j=GLM_LANE;j<GLM_LD;j+=GLM_LANES)att[p][off+j]=glm_bf(o[j]*inv*common[j]*glm_sig(gate[j]));
+    GLM_SYNC();
+  }
+}
+extern "C" __device__ void glm53_verify_kda_scan(const etx_ctx* c){
+  switch(c->cst[2]){
+    case 1:glm_verify_kda<1>(c);break;
+    case 2:glm_verify_kda<2>(c);break;
+    case 3:glm_verify_kda<3>(c);break;
+    case 4:glm_verify_kda<4>(c);break;
+    case 5:glm_verify_kda<5>(c);break;
+    case 6:glm_verify_kda<6>(c);break;
   }
 }
 

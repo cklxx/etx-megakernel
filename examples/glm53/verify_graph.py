@@ -119,16 +119,17 @@ def build_from(stage, k, batch=1, options=None):
                      dtype='float32', bytes_per_elem=4)
         if linear:
             src = base.grid(layer + '_kda')
-            args = [layer + '_weights', layer + '_meta', layer + '_state']
+            args = [layer + '_weights', layer + '_meta', layer + '_state', layer+'_vcommon']
             inputs, outputs = [], []
             for p in range(count):
                 inputs.append(local(layer + '_p1', p))
                 outputs.append(local(layer + '_att', p))
-                args.extend([inputs[-1], outputs[-1]])
+                args.extend([inputs[-1], outputs[-1], local(layer+'_scanwork', p)])
             emit(layer + '_kda_scan', hip_link(SOURCE, 'glm53_verify_kda_scan'),
-                 src.device, src.grid[1], args, args[:3] + inputs,
-                 [layer + '_state'] + outputs,
-                 (src.grid[1], 1, count, src.consts[3]))
+                 src.device, 1, args, args[:3] + inputs,
+                 [layer + '_state', layer+'_vcommon'] + outputs +
+                 [local(layer+'_scanwork', p) for p in range(count)],
+                 (1, 1, count, src.consts[3]))
         else:
             # A single writer owns the KV cache. The current IR requires one
             # writer grid per tensor, so serialize DSA positions within a
