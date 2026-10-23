@@ -3,7 +3,13 @@
 // Host-updated per-step controls cross both GPUs and may be read by CUs with
 // only DOMAIN predecessors. SYSTEM atomic loads must bypass stale XCD caches.
 static __device__ __forceinline__ int glm53_step_load(const int* p) {
+#if defined(__CUDACC__) && !defined(__HIP__)
+  int v;
+  asm volatile("ld.acquire.sys.global.s32 %0, [%1];" : "=r"(v) : "l"(p) : "memory");
+  return v;
+#else
   return __hip_atomic_load(p,__ATOMIC_ACQUIRE,__HIP_MEMORY_SCOPE_SYSTEM);
+#endif
 }
 extern "C" __device__ __attribute__((always_inline)) void glm53_embed(const etx_ctx* c) {
   int r=c->coord[0];const int* step=(const int*)c->args[0];const uint8_t* b=(const uint8_t*)c->args[1];

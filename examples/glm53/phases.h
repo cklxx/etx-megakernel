@@ -38,21 +38,33 @@
   GLM_MAX(GLM_R4(GLM_QR)+GLM_R4(GLM_KVR),GLM_MAX(GLM_R4(3*GLM_MAXLEN+GLM_ID)+5*GLM_R4(GLM_AD),10*GLM_R4(GLM_LD)))))
 static_assert(GLM_HCN<=32,"mHC coefficients exceed the reserved shared words");
 
+// CUDA warps have 32 lanes; HIP gfx942 waves retain their original 64.
+#if defined(__CUDACC__) && !defined(__HIP__)
+#define GLM_WAVE 32
+// A tail iteration may contain only some row groups of the warp. Each active
+// group is complete; do not require inactive groups to enter the shuffle.
+#define GLM_SHFL_XOR(v,o) __shfl_xor_sync(__activemask(),v,o,GLM_WAVE)
+#define GLM_SHFL(v,l) __shfl_sync(__activemask(),v,l,GLM_WAVE)
+#else
+#define GLM_WAVE 64
+#define GLM_SHFL_XOR(v,o) __shfl_xor(v,o,64)
+#define GLM_SHFL(v,l) __shfl(v,l,64)
+#endif
 #ifdef GLM53_CPU
 #define GLM_WLANE 0
 #define GLM_WID 0
 #define GLM_NW 1
 #else
-#define GLM_WLANE ((int)(threadIdx.x&63))
-#define GLM_WID ((int)(threadIdx.x>>6))
-#define GLM_NW ((int)(blockDim.x>>6))
+#define GLM_WLANE ((int)(threadIdx.x&(GLM_WAVE-1)))
+#define GLM_WID ((int)(threadIdx.x/GLM_WAVE))
+#define GLM_NW ((int)(blockDim.x/GLM_WAVE))
 #endif
 
 // ---- reductions. Callers pass per-thread partials of a GLM_LANE-strided loop; on
 // the CPU the single partial already is the sequential sum.
 GLM_DEV float glm_xsum(float v,int width) {
 #ifndef GLM53_CPU
-  for(int o=width>>1;o>0;o>>=1)v+=__shfl_xor(v,o,64);
+  for(int o=width>>1;o>0;o>>=1)v+=GLM_SHFL_XOR(v,o);
 #endif
   return v;
 }
@@ -60,7 +72,7 @@ GLM_DEV float glm_bsum(float v,float* red) {
 #ifdef GLM53_CPU
   return v;
 #else
-  v=glm_xsum(v,64);__syncthreads();if(GLM_WLANE==0)red[GLM_WID]=v;__syncthreads();
+  v=glm_xsum(v,GLM_WAVE);__syncthreads();if(GLM_WLANE==0)red[GLM_WID]=v;__syncthreads();
   float s=0;for(int i=0;i<GLM_NW;++i)s+=red[i];return s;
 #endif
 }
@@ -68,7 +80,7 @@ GLM_DEV float glm_bmax(float v,float* red) {
 #ifdef GLM53_CPU
   return v;
 #else
-  for(int o=32;o>0;o>>=1)v=fmaxf(v,__shfl_xor(v,o,64));
+  for(int o=GLM_WAVE/2;o>0;o>>=1)v=fmaxf(v,GLM_SHFL_XOR(v,o));
   __syncthreads();if(GLM_WLANE==0)red[GLM_WID]=v;__syncthreads();
   float m=red[0];for(int i=1;i<GLM_NW;++i)m=fmaxf(m,red[i]);return m;
 #endif
@@ -78,7 +90,7 @@ GLM_DEV int glm_bargmax(float v,int i,float* red) {
 #ifdef GLM53_CPU
   (void)v;(void)red;return i;
 #else
-  for(int o=32;o>0;o>>=1){float ov=__shfl_xor(v,o,64);int oi=__shfl_xor(i,o,64);if(ov>v||(ov==v&&oi<i)){v=ov;i=oi;}}
+  for(int o=GLM_WAVE/2;o>0;o>>=1){float ov=GLM_SHFL_XOR(v,o);int oi=GLM_SHFL_XOR(i,o);if(ov>v||(ov==v&&oi<i)){v=ov;i=oi;}}
   int* ri=(int*)(red+8);__syncthreads();if(GLM_WLANE==0){red[GLM_WID]=v;ri[GLM_WID]=i;}__syncthreads();
   v=red[0];i=ri[0];for(int k=1;k<GLM_NW;++k)if(red[k]>v||(red[k]==v&&ri[k]<i)){v=red[k];i=ri[k];}
   return i;
@@ -126,7 +138,7 @@ template<int KM=GLM_KALL> GLM_DEV int glm_group(const glm_weight& w){
   (void)w;return 1;
 #else
   if(!glm_vec(w)||!(KM&(w.kind==3?GLM_KFP8:w.kind==1?GLM_KBF16:GLM_KF32)))return 1;
-  const uint64_t rb=(uint64_t)w.cols*glm_esize(w);int s=64;while(s>1&&(uint64_t)s*16>rb)s>>=1;return s;
+  const uint64_t rb=(uint64_t)w.cols*glm_esize(w);int s=GLM_WAVE;while(s>1&&(uint64_t)s*16>rb)s>>=1;return s;
 #endif
 }
 #ifndef GLM53_CPU
@@ -191,7 +203,7 @@ template<class F> GLM_DEV void glm_each(int u0,int u1,int S,F f){
 #ifdef GLM53_CPU
   (void)S;for(int u=u0;u<u1;++u)f(u,0);
 #else
-  const int per=64/S,slots=GLM_NW*per,slot=GLM_WID*per+GLM_WLANE/S,sl=GLM_WLANE%S;
+  const int per=GLM_WAVE/S,slots=GLM_NW*per,slot=GLM_WID*per+GLM_WLANE/S,sl=GLM_WLANE%S;
   for(int u=u0+slot;u<u1;u+=slots)f(u,sl);
 #endif
 }
@@ -255,18 +267,18 @@ GLM_DEV void glm_hc_coeffs(const uint8_t* b,const glm_weight* w,int base,const f
   for(int r=GLM_LANE;r<GLM_HCN;r+=GLM_LANES)zs[r]=raw[r]*glm_w(b,w[base+2],r<GLM_HC?0:r<2*GLM_HC?1:2)+glm_w(b,w[base+1],r);
   GLM_SYNC();
 #ifndef GLM53_CPU
-  if(GLM_HC*GLM_HC<=64){
+  if(GLM_HC*GLM_HC<=GLM_WAVE){
     // One lane per comb entry of wave 0 (a single lane spent ~25 us on the dependent divisions).
     // Each lane reads its row/column through shuffles and sums them in the sequential order.
-    if(threadIdx.x<64){
+    if(threadIdx.x<GLM_WAVE){
       const int l=threadIdx.x,r=l/GLM_HC%GLM_HC,c=l%GLM_HC;const bool on=l<GLM_HC*GLM_HC;
       const float z=on?zs[2*GLM_HC+l]:0.0f;
-      float mx=-INFINITY;for(int cc=0;cc<GLM_HC;++cc)mx=fmaxf(mx,__shfl(z,r*GLM_HC+cc,64));
-      const float e=expf(z-mx);float den=0;for(int cc=0;cc<GLM_HC;++cc)den+=__shfl(e,r*GLM_HC+cc,64);
+      float mx=-INFINITY;for(int cc=0;cc<GLM_HC;++cc)mx=fmaxf(mx,GLM_SHFL(z,r*GLM_HC+cc));
+      const float e=expf(z-mx);float den=0;for(int cc=0;cc<GLM_HC;++cc)den+=GLM_SHFL(e,r*GLM_HC+cc);
       float m=e/den+GLM_HCEPS;
       for(int it=0;it<GLM_SINK;++it){
-        if(it){den=GLM_HCEPS;for(int cc=0;cc<GLM_HC;++cc)den+=__shfl(m,r*GLM_HC+cc,64);m/=den;}
-        den=GLM_HCEPS;for(int rr=0;rr<GLM_HC;++rr)den+=__shfl(m,rr*GLM_HC+c,64);m/=den;
+        if(it){den=GLM_HCEPS;for(int cc=0;cc<GLM_HC;++cc)den+=GLM_SHFL(m,r*GLM_HC+cc);m/=den;}
+        den=GLM_HCEPS;for(int rr=0;rr<GLM_HC;++rr)den+=GLM_SHFL(m,rr*GLM_HC+c);m/=den;
       }
       if(on)hc[GLM_HC+l]=m;
       if(l<GLM_HC){hc[GLM_HC+GLM_HC*GLM_HC+l]=glm_sig(zs[l])+GLM_HCEPS;hc[l]=2*glm_sig(zs[GLM_HC+l]);}
@@ -390,7 +402,7 @@ GLM_DEV void glm_ph_mla(const uint8_t* b,const glm_weight* w,const float* p1,con
 #ifdef GLM53_CPU
   const int S=1;
 #else
-  int S=64;while(S>1&&S>GLM_AD)S>>=1;
+  int S=GLM_WAVE;while(S>1&&S>GLM_AD)S>>=1;
 #endif
 #ifndef GLM53_CPU
   if(GLM_AD==4*64&&blockDim.x==GLM_VT){
