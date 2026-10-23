@@ -32,7 +32,7 @@ import shutil
 from examples.vllm_llm import import_certificate as cert
 from examples.vllm_llm.pairs import Refusal
 
-from etx.tools.gpu_jobs import session_limit
+from etx.experiments.jobs import session_limit
 from examples.sessions import nvchk
 from examples.vllm_llm import vlbest_report as report
 

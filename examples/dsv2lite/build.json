@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "comment": "Build recipe for the fleet-mi300x port; etx.tools.model_build reads it (examples/dsv2lite/build.sh).",
+  "argument": "fleet",
+  "provider": "dsv2lite",
+  "declaration": "examples/dsv2lite/graph.py",
+  "forward_prefixes": [
+    "ETX_"
+  ],
+  "variant_environment": {
+    "patches": "ETX_FLEET_PATCH",
+    "isolate": "ETX_DSV2_ISOLATE",
+    "coherence": "ETX_COHERENCE",
+    "inline": "ETX_INLINE_TILES",
+    "relay": "ETX_RELAY_PLAN",
+    "rdc": "ETX_RDC",
+    "d5": "ETX_DSV2_D5"
+  },
+  "options": {},
+  "output": "build/dsv2lite",
+  "output_override": "ETX_OUT",
+  "host": "examples/dsv2lite/host.hip",
+  "summary": "tasks=|workers/domain",
+  "summary_verbose": "ETX_BUILD_VERBOSE",
+  "link_output": "all",
+  "built_message": "built {out}/run  (run it from {fleet} so build/weights.bin, fleet_cache.bin, golden_tokens.txt resolve)"
+}

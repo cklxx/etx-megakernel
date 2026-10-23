@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "comment": "Build recipe for one prepared model; etx.tools.model_build reads it (examples/llm/build.sh).",
+  "argument": "packed",
+  "declaration": "examples/llm/model.py",
+  "declaration_override": "ETX_LLM_GRAPH",
+  "environment": {
+    "ETX_LLM_CONFIG": "{packed}/config.json"
+  },
+  "forward_environment": [
+    "ETX_LLM_CTX",
+    "ETX_LLM_CHUNK",
+    "ETX_LLM_LAYERS",
+    "ETX_LLM_WG",
+    "ETX_LLM_THREADS",
+    "ETX_LLM_PREFETCH"
+  ],
+  "options": {
+    "inline_tiles": true
+  },
+  "output": "build/llm/{name}",
+  "output_override": "ETX_OUT",
+  "flags": [
+    "-O3",
+    "-std=c++17",
+    "--offload-arch=gfx942"
+  ],
+  "includes": [
+    "etx/runtime/include",
+    "{out}",
+    "."
+  ],
+  "resource_usage": true,
+  "host": "examples/llm/host.hip",
+  "summary": "tasks=|workers/domain",
+  "link_output": "resource-usage",
+  "failure_message": "build failed: no {out}/run",
+  "failure_exit": 1,
+  "built_message": "built {out}/run"
+}

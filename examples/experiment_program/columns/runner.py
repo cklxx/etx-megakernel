@@ -172,8 +172,7 @@ def verify_dependency(path,*,needed=()):
         return verify_dependency(p,needed=needed)
     if r.get('record')=='G04':
         require(r.get('complete') is True,'G04 capture is incomplete')
-        from examples.experiment_program.routing import decode_records
-        from examples.experiment_program.routing.__main__ import gates,ROLES
+        from etx.experiments.sealed_routing import decode_records,gates,ROLES
         from examples.experiment_program.protocol import verify_files
         require(set(r.get('roles',{}))==ROLES,'G04 complete source/input roles absent')
         for files in r['roles'].values():verify_files(files)

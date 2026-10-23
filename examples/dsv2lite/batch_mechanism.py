@@ -279,7 +279,7 @@ def counter_values(path: Path, names: tuple[str, ...]) -> dict:
 # ---------------------------------------------------------------- the session
 def _session_class():
     from examples.dsv2lite.batch_session import BatchSession
-    from examples.dsv2lite.inplace_session import write_json
+    from etx.models.dsv2lite.session import write_json
     from examples.dsv2lite.reference_prepare import verify
     from etx.session import batch
 

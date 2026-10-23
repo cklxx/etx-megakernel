@@ -13,7 +13,7 @@ import subprocess
 import sys
 
 from .protocol import require,sha
-from .session import MODULES,SPECS
+from etx.experiments.sealed import MODULES,SPECS
 ROOT=Path(__file__).resolve().parents[2]
 HISTORICAL=ROOT/'examples/dsv2lite/results/2026-10-14-batch-20261014T183414Z/20261014T183414Z-68d6f6/qwen/pairs_kept_l1.json'
 

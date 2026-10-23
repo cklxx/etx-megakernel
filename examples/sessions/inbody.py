@@ -21,7 +21,7 @@ import time
 from etx.session import proc
 
 from etx.tools import inbody as reader
-from examples.vllm_llm.bf16_300.pack import sha
+from etx.models.vllm_llm.bf16_300.pack import sha
 
 MAX_SESSION_SECONDS = 900
 JOBS = [dict(name='inbody_attribution',gpu=0,machine='A',timeout=900,quiet_s=180,

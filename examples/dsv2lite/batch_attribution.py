@@ -13,7 +13,7 @@ from etx.session import batch
 from examples.dsv2lite.arms import BATCH_ARMS
 from examples.dsv2lite.batch_goldens import sha
 from examples.dsv2lite.batch_session import BatchSession
-from examples.dsv2lite.inplace_session import write_json
+from etx.models.dsv2lite.session import write_json
 from examples.dsv2lite.reference_prepare import verify
 
 BATCHES = (1, 2, 4)

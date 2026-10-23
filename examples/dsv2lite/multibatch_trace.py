@@ -17,7 +17,7 @@ from etx.session.batch import etx_result
 from etx.session.record import sha256
 from etx.tools.timeline import build_trace, latency_report, load_plan, read_raw
 from examples.dsv2lite.batch_session import BatchSession
-from examples.dsv2lite.inplace_session import write_json, PINNED_INPUTS
+from etx.models.dsv2lite.session import write_json, PINNED_INPUTS
 from examples.dsv2lite.reference_prepare import verify
 
 ARMS = {1: "alld4r0l1kvsmw", 2: "x2", 4: "x4"}

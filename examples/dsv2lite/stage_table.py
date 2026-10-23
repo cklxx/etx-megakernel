@@ -56,12 +56,13 @@ def measured_inputs() -> dict:
         "gamma_rt_us": float(re.search(r"gamma round trip \(~([\d.]+) us\)", model)[1]),
         "rate_bytes_per_us": float(re.search(r"Streamed read bandwidth, best depth \| ([\d.]+) TB/s", status)[1]) * 1e6,
     }
+    # Keep historical citation labels stable; the document is read at its canonical path above.
     m["sources"] = {"barrier_us": "results_2026-09-27d/hw_wg.log, __syncthreads",
                     "lds_probe_us": "results_2026-09-27d/hw_wg.log, LDS 8 KB write+read (2 barriers)",
-                    "bperm_us": "docs/deepseek/MODEL-dsv2.md:157, fleet's routing stamp",
-                    "routing_us": "docs/deepseek/MODEL-dsv2.md:157, fleet's routing stamp",
-                    "routing_bperms": "docs/deepseek/MODEL-dsv2.md:157",
-                    "gamma_rt_us": "docs/deepseek/MODEL-dsv2.md:157",
+                    "bperm_us": "docs/MODEL-dsv2.md:157, fleet's routing stamp",
+                    "routing_us": "docs/MODEL-dsv2.md:157, fleet's routing stamp",
+                    "routing_bperms": "docs/MODEL-dsv2.md:157",
+                    "gamma_rt_us": "docs/MODEL-dsv2.md:157",
                     "rate_bytes_per_us": "fleet docs/STATUS.md:42 @3fb67a6, measured streamed rate"}
     return m
 

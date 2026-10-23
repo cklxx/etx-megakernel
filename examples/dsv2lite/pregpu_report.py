@@ -8,7 +8,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from etx.tools.gpu_jobs import load_session
+from etx.experiments.jobs import load_session
 from examples.dsv2lite import arms
 from examples.dsv2lite.pinned import FLEET_COMMIT, FLEET_SRC_SHA256
 

@@ -25,7 +25,7 @@ Use --dry-run locally. Fetch the session directory into the tree before deleting
 import os
 
 from examples.dsv2lite.arms import ARMS, SINGLE
-from examples.dsv2lite.inplace_session import DATA_FILES
+from etx.models.dsv2lite.session import DATA_FILES
 
 MAX_SESSION_SECONDS = 7200
 JOBS = []

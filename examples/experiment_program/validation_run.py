@@ -204,7 +204,7 @@ def telemetry(hardware):
 
 def run(c,out):
     from .validation import schedule,system_population,replay
-    from .session import run_logged
+    from etx.experiments.sealed import run_logged
     from examples.vllm_llm import import_certificate as cert
     from etx.session.batch import ns
     from .validation_trace import options,reserve,create

@@ -46,7 +46,7 @@ def preflight(c):
 
 def select(c,root):
     from .validation import require_admission
-    from .session import bind_output
+    from etx.experiments.sealed import bind_output
     root=resolve_path(root);bound=bind_output(c,root);state=json.loads((root/'session.json').read_text())
     require(state['source_revision']==c['source_revision'],'micro session source revision differs')
     rejected=[]

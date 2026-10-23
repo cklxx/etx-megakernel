@@ -25,4 +25,6 @@ include = ["etx*"]
 [tool.setuptools.package-data]
 etx = ["ops/*.h", "machine/arch/*.yaml", "runtime/include/etx/*.h", "importer/specs/*.json",
        "importer/*.sh", "importer/shim/**/*.h", "importer/shim/**/*.cuh",
-       "importer/shim_nofp8/**/*.h", "importer/shim_nofp8/**/*.cuh"]
+       "importer/shim_nofp8/**/*.h", "importer/shim_nofp8/**/*.cuh",
+       "testing/data/sealed/*.hip", "testing/data/sealed/*.json", "experiments/specs.json",
+       "operators/tiles/*.hip", "operators/hosts/*.hip", "session/*.sh", "models/vllm_llm/*.sh"]

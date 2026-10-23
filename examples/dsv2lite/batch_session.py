@@ -20,7 +20,7 @@ from pathlib import Path
 from etx.session import batch
 from etx.session.experiment import ns
 from examples.dsv2lite.arms import BATCH_ARMS, BATCHES, X8_CANDIDATES
-from examples.dsv2lite.inplace_session import Session, write_json
+from etx.models.dsv2lite.session import Session, write_json
 
 IMAGE = "vllm/vllm-openai-rocm@sha256:bb44b39aea26798cce43030a98bf48efd0322ca7147367db86e38b96bd80f0e7"
 CONFIGS = {"default": "0", "aiter": "1"}            # VLLM_ROCM_USE_AITER, in tie-break order

@@ -96,7 +96,7 @@ def local_sources():
     files=source_hashes()
     files.update({str(p.relative_to(ROOT)):cert.sha(p) for p in (ROOT/'tests').rglob('*.py')})
     for name in ('examples/sessions/qwen_producer.py','examples/sessions/qwen300.py',
-                 'tools/producer_start.py','tools/session.sh','pyproject.toml'):
+                 'tools/producer_start.py','tools/session.sh','etx/session/transport.sh','pyproject.toml'):
         files[name]=cert.sha(ROOT/name)
     return files
 

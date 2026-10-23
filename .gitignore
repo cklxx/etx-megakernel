@@ -1,5 +1,7 @@
 .venv/
 build/
+!etx/build/
+!etx/build/*.py
 __pycache__/
 *.pyc
 .pytest_cache/
@@ -9,3 +11,5 @@ results_*/
 .claude/
 
 .venv
+.DS_Store
+**/.DS_Store

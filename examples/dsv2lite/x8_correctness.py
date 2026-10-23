@@ -8,7 +8,7 @@ import re
 from etx.session.batch import etx_result
 from examples.dsv2lite.arms import ARMS, build_env
 from examples.dsv2lite.batch_goldens import sha, binding
-from examples.dsv2lite.inplace_session import Session, write_json
+from etx.models.dsv2lite.session import Session, write_json
 from examples.dsv2lite.reference_prepare import verify
 
 KEPT = "alld4r0l1kvsmw"

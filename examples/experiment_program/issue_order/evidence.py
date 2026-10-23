@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 import re
 import statistics
-from examples.vllm_llm.attention_early_merge.evidence import frame, sha
+from etx.models.vllm_llm.attention_early_merge.evidence import frame, sha
 
 from examples.experiment_program.protocol import resolve_path
 

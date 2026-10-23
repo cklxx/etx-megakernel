@@ -171,7 +171,7 @@ def main():
     from transformers import AutoTokenizer
     tok = AutoTokenizer.from_pretrained(src)
     if a.context:
-        from examples.llm.prep import context_prompt_ids
+        from etx.models.llm.prep import context_prompt_ids
         ids = context_prompt_ids(tok, a.context)
     else:
         ids = tok(a.prompt).input_ids

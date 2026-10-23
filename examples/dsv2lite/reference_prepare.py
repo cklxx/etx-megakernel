@@ -10,7 +10,7 @@ import sys
 
 from examples.dsv2lite.batch_goldens import FILES, binding, read_binding, request_dir, sha, main as goldens
 from examples.dsv2lite.pinned import FLEET_SRC_SHA256, fleet_export, source_sha
-from examples.dsv2lite.inplace_session import Session, write_json, PINNED_INPUTS
+from etx.models.dsv2lite.session import Session, write_json, PINNED_INPUTS
 
 RECEIPT = "golden.producer.json"
 
