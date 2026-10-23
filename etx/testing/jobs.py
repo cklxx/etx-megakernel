@@ -26,29 +26,31 @@ def job_transport_interrupt_probe(directory, *, kill_parent=False):
 import sys
 from etx.external import JobSpec, JobSession, JobSessionRequest, run_jobs
 root = sys.argv[1]
-job = JobSpec('sleeper', 'echo ready > "$READY"; sleep 1; echo escaped > "$LATE"; sleep 20',
-              lane='cpu', env={'READY': root+'/ready', 'LATE': root+'/late'}, timeout=25)
-run_jobs(JobSessionRequest(JobSession((job,), max_seconds=27), logdir=root+'/records', gpus=(), poll_s=.01))
+job = JobSpec('sleeper', 'echo ready > "$READY"; sleep 5; echo escaped > "$LATE"; sleep 60',
+              lane='cpu', env={'READY': root+'/ready', 'LATE': root+'/late'}, timeout=90)
+run_jobs(JobSessionRequest(JobSession((job,), max_seconds=95), logdir=root+'/records', gpus=(), poll_s=.01))
 '''
     with (directory / 'caller.log').open('w') as log:
         child = subprocess.Popen([sys.executable, '-c', code, str(directory)],
                                  cwd=Path(__file__).resolve().parents[2], stdout=log, stderr=subprocess.STDOUT,
                                  stdin=subprocess.DEVNULL, start_new_session=True)
         try:
-            deadline = time.monotonic() + 5
+            deadline = time.monotonic() + 30
             while not (directory / 'ready').is_file():
                 if child.poll() is not None or time.monotonic() >= deadline:
                     raise RuntimeError('scheduler interrupt probe did not become ready')
                 time.sleep(.01)
             child.send_signal(signal.SIGKILL if kill_parent else signal.SIGINT)
-            code = child.wait(timeout=10)
-            deadline = time.monotonic() + 5
+            # Cleanup may take the scheduler's whole sweep budget (etx.session.proc.SWEEP_S, 30 s) plus its
+            # shim wait on a loaded host; the late marker fires 5 s after ready if the child escaped.
+            code = child.wait(timeout=45)
+            deadline = time.monotonic() + 45
             records = list((directory / 'records').iterdir())
             while not all((path / 'SEAL').is_file() for path in records):
                 if time.monotonic() >= deadline:
                     raise RuntimeError('interrupted scheduler did not seal after cleanup')
                 time.sleep(.01)
-            time.sleep(1.1)
+            time.sleep(5.5)
             return Configuration({'caller_returncode': code, 'late_child_output': (directory / 'late').exists(),
                                   'seals': [json.loads((path / 'SEAL').read_text()) for path in records]})
         finally:
