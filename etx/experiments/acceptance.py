@@ -203,9 +203,10 @@ def run(out, *, formal=False, require_external=False, rocm_image=None, rocm_root
     for example in ("splitk_sum", "moe_layer", "gemm_rs"):
         steps.append(command_step(f"codegen-{example}", [sys.executable, "-m", "etx", "compile",
             ROOT / f"examples/{example}.py", "--arch", "gfx942", "--out", out / "codegen" / example], out))
+    # The full tree took 1977 s on the 16-core desktop (2026-10-23); 3600 s is that plus margin.
     steps.append(command_step("pytest", [sys.executable, "-m", "pytest", "-q", "-ra", "-o", "addopts=",
         "-p", "etx.tools.pytest_acceptance", f"--acceptance-inventory={out / 'test-inventory.json'}",
-        f"--junitxml={out / 'pytest.xml'}", ROOT / "tests"], out, timeout=1800, env=pytest_environment()))
+        f"--junitxml={out / 'pytest.xml'}", ROOT / "tests"], out, timeout=3600, env=pytest_environment()))
     inventory = out / "test-inventory.json"
     complete = inventory.exists() and json.loads(inventory.read_text()).get("complete") is True
     steps.append({"step": "test-completeness", "returncode": int(not complete)})

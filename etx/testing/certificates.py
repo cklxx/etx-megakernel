@@ -23,6 +23,9 @@ def etx(ms, arm="fused", matched=32, count=31):
             + f"RESULT model=/m requests=1 matched={matched} gen=32 median_ms={ms - .15:.3f} wall_ms={ms:.3f} matched_each={matched}")
 
 
+timing_log = etx  # public name: one ETX decode-step log with a RESULT line
+
+
 def certificate_envelope(identity, body):
     tag = _cert().digest(identity)
     return f'BUILD-IDENTITY phase=before sha256={tag}\n{body}\nBUILD-IDENTITY phase=after sha256={tag}\n'

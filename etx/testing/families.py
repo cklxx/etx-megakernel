@@ -125,8 +125,11 @@ def inline_compilers(root=ROOT):
     """Session declarations and example shells that still invoke a compiler directly, not through the API."""
     root = Path(root)
     paths = sorted((root / 'examples/sessions').glob('*.py')) + sorted((root / 'examples').rglob('*.sh'))
+    def code(path):
+        # Comment lines name compilers (usage text, provenance) without invoking one.
+        return '\n'.join(line for line in path.read_text().splitlines() if not line.lstrip().startswith('#'))
     return [str(path.relative_to(root)) for path in paths
-            if any(word in path.read_text() for word in ('hipcc', 'clang++', 'llvm-link'))]
+            if any(word in code(path) for word in ('hipcc', 'clang++', 'llvm-link'))]
 
 
 def main():
