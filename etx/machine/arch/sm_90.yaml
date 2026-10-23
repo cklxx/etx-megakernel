@@ -88,3 +88,176 @@ primitives:
       v += __shfl_xor_sync(0xffffffffu, v, 1);
       return v;
     }
+  wave_max: |
+    static_assert(ETX_WAVE_SIZE == 32, "etx_wave_max requires warp32");
+    static __device__ __forceinline__ float etx_wave_max(float v) {
+      for (int off = 16; off; off >>= 1) v = fmaxf(v, __shfl_xor_sync(0xffffffffu, v, off));
+      return v;
+    }
+  wave_max_u32: |
+    static_assert(ETX_WAVE_SIZE == 32, "etx_wave_max_u32 requires warp32");
+    static __device__ __forceinline__ unsigned etx_wave_max_u32(unsigned v) {
+      return __reduce_max_sync(0xffffffffu, v);
+    }
+  source_prelude: |
+    #ifndef ETX_DSL_CUDA_SUPPORT
+    #define ETX_DSL_CUDA_SUPPORT
+    #include <cuda_runtime.h>
+    #include <cuda_bf16.h>
+    #include "etx/abi.h"
+    #include "etx/import_nvptx.h"
+    #ifndef ETX_WAVE_SIZE
+    #define ETX_WAVE_SIZE 32
+    #endif
+    static_assert(ETX_WAVE_SIZE == 32, "CUDA DSL requires warp32");
+    struct alignas(16) dsl_u32x4 {
+      unsigned x, y, z, w;
+      __device__ unsigned& operator[](int i) { return i == 0 ? x : i == 1 ? y : i == 2 ? z : w; }
+      __device__ const unsigned& operator[](int i) const { return i == 0 ? x : i == 1 ? y : i == 2 ? z : w; }
+    };
+    struct alignas(8) dsl_u32x2 {
+      unsigned x, y;
+      __device__ unsigned& operator[](int i) { return i == 0 ? x : y; }
+      __device__ const unsigned& operator[](int i) const { return i == 0 ? x : y; }
+    };
+    #define DSL_U32X4_DEFINED
+    #define DSL_G
+    static __device__ __forceinline__ int etx_lane() { return threadIdx.x % 32; }
+    static __device__ __forceinline__ int etx_wave() { return threadIdx.x / 32; }
+    static __device__ __forceinline__ int etx_nwaves() { return blockDim.x / 32; }
+    template<class T> static __device__ __forceinline__ T etx_shuffle(T v, int lane, int width) {
+      return __shfl_sync(0xffffffffu, v, lane, width);
+    }
+    template<class T> static __device__ __forceinline__ T etx_shuffle_xor(T v, int lane, int width) {
+      return __shfl_xor_sync(0xffffffffu, v, lane, width);
+    }
+    static __device__ __forceinline__ const unsigned char* etx_imp_argblock(const void* const* args, int off) {
+      return (const unsigned char*)args[0] + off;
+    }
+    static __device__ __forceinline__ void etx_imp_touch(const unsigned char* a, int bytes) {
+      unsigned acc = *(const unsigned*)(a + bytes - 4);
+      for (int o = 0; o < bytes; o += 64) acc ^= *(const unsigned*)(a + o);
+      asm volatile("" :: "r"(acc) : "memory");
+    }
+    #endif
+  block_sum: |
+    static __device__ __forceinline__ float etx_block_sum(float v, float* red) {
+      v = etx_wave_sum(v);
+      if (etx_lane() == 0) red[etx_wave()] = v;
+      __syncthreads();
+      float t = 0.f;
+      for (int w = 0; w < etx_nwaves(); ++w) t += red[w];
+      __syncthreads();
+      return t;
+    }
+  block_max: |
+    static __device__ __forceinline__ float etx_block_max(float v, float* red) {
+      v = etx_wave_max(v);
+      if (etx_lane() == 0) red[etx_wave()] = v;
+      __syncthreads();
+      float t = red[0];
+      for (int w = 1; w < etx_nwaves(); ++w) t = fmaxf(t, red[w]);
+      __syncthreads();
+      return t;
+    }
+  coherence: |
+    #ifndef ETX_DSL_COH_HELPERS
+    #define ETX_DSL_COH_HELPERS
+    #define ETX_DSL_COH_L1_IMPL 1
+    // Relaxed payload accesses. CUDA global volatile loads/stores bypass L1;
+    // the scheduler's release/acquire supplies inter-task ordering.
+    static __device__ __forceinline__ float dsl_a_ldbf(const __nv_bfloat16* p) {
+      unsigned short u = *(const volatile unsigned short*)p;
+      return __bfloat162float(__ushort_as_bfloat16(u));
+    }
+    static __device__ __forceinline__ void dsl_a_stbf(__nv_bfloat16* p, __nv_bfloat16 v) {
+      *(volatile unsigned short*)p = __bfloat16_as_ushort(v);
+    }
+    static __device__ __forceinline__ int dsl_a_ldi(const int* p) { return *(const volatile int*)p; }
+    static __device__ __forceinline__ void dsl_a_sti(int* p, int v) { *(volatile int*)p = v; }
+    static __device__ __forceinline__ float dsl_a_ldf(const float* p) { return *(const volatile float*)p; }
+    static __device__ __forceinline__ void dsl_a_stf(float* p, float v) { *(volatile float*)p = v; }
+    static __device__ __forceinline__ long long dsl_a_ldll(const long long* p) { return *(const volatile long long*)p; }
+    static __device__ __forceinline__ unsigned long long dsl_a_ld64(const unsigned long long* p) { return *(const volatile unsigned long long*)p; }
+    static __device__ __forceinline__ void dsl_a_st64(unsigned long long* p, unsigned long long v) { *(volatile unsigned long long*)p = v; }
+    static __device__ __forceinline__ dsl_u32x4 dsl_a_ld128(const __nv_bfloat16* p) {
+      const unsigned long long lo = dsl_a_ld64((const unsigned long long*)p);
+      const unsigned long long hi = dsl_a_ld64((const unsigned long long*)p + 1);
+      dsl_u32x4 v; v[0] = (unsigned)(lo & 0xffffffffull); v[1] = (unsigned)(lo >> 32);
+      v[2] = (unsigned)(hi & 0xffffffffull); v[3] = (unsigned)(hi >> 32); return v;
+    }
+    static __device__ __forceinline__ void dsl_a_st128(__nv_bfloat16* p, dsl_u32x4 v) {
+      dsl_a_st64((unsigned long long*)p, ((unsigned long long)v[1] << 32) | v[0]);
+      dsl_a_st64((unsigned long long*)p + 1, ((unsigned long long)v[3] << 32) | v[2]);
+    }
+
+    static __device__ __forceinline__ long long dsl_a_ldll_u(const long long* p) {
+    #ifdef ETX_DSL_UNIFORM
+      long long v = etx_lane() == 0 ? dsl_a_ldll(p) : 0;
+      return __shfl_sync(0xffffffffu, v, 0);
+    #else
+      return dsl_a_ldll(p);
+    #endif
+    }
+    #endif
+  topk_key32: |
+    #ifdef ETX_TOPK_KEY32
+    static __device__ __forceinline__ unsigned etx_key32_order(float x) {
+      const unsigned mag = (__float_as_uint(x) >> 16) & 0x7fffu;          // a bf16 value converted to float: low 16 bits 0
+      const unsigned u = x < 0.f ? 0x8000u - mag : 0x8000u + mag;          // -0 is not < 0: it maps with +0
+      return x != x ? 0u : u;                                              // explicit NaN test, not the bit mapping
+    }
+    static __device__ __forceinline__ unsigned etx_key32(float x, int e) {
+      return 0x800000u | (etx_key32_order(x) << 7) | (unsigned)(127 - e);
+    }
+    // the logit of a key (order16 inverse); NaN for order 0. -0 comes back as +0, which gives the same expf(x - m).
+    static __device__ __forceinline__ float etx_key32_logit(unsigned key) {
+      const unsigned u = (key >> 7) & 0xffffu;
+      if (u == 0u) return __uint_as_float(0x7fc00000u);
+      return __uint_as_float((u >= 0x8000u ? u - 0x8000u : 0x8000u | (0x8000u - u)) << 16);
+    }
+    static __device__ __forceinline__ int etx_key32_expert(unsigned key) { return key ? 127 - (int)(key & 127u) : 0; }
+    static __device__ __forceinline__ unsigned etx_umax(unsigned a, unsigned b) { return a > b ? a : b; }
+    // Four logits per lane cover all 128 experts on warp32. All lanes participate.
+    // Ties select the lowest expert index. The scheduler supplies payload ordering.
+    template <bool kPerRound, class Put>
+    static __device__ __forceinline__ float etx_topk_key32_impl(const float (&l)[4], int E, int K, bool renorm, int lane, Put put) {
+      unsigned key[4]; bool ok[4];
+    #pragma unroll
+      for (int k = 0; k < 4; ++k) { const int e = lane + k * ETX_WAVE_SIZE; ok[k] = e < E; key[k] = ok[k] ? etx_key32(l[k], e) : 0u; }
+      unsigned km = etx_wave_max_u32(etx_umax(etx_umax(key[0], key[1]), etx_umax(key[2], key[3])));
+    #pragma unroll
+      for (int k = 0; k < 4; ++k) if (key[k] == km) key[k] = 0u;           // the winner lane clears its key
+      const float m = etx_key32_logit(km);
+      float p[4], s = 0.f;
+    #pragma unroll
+      for (int k = 0; k < 4; ++k) { p[k] = ok[k] ? expf(l[k] - m) : 0.f; s += p[k]; }
+      s = etx_wave_sum(s);
+      const float inv = 1.f / s;
+    #pragma unroll
+      for (int k = 0; k < 4; ++k) p[k] = ok[k] ? p[k] * inv : 0.f;
+      float sel = 0.f, myw = 0.f; int myid = 0;                            // kPerRound = false: lane t keeps round t
+      for (int t = 0; t < K; ++t) {
+        if (t > 0) {
+          km = etx_wave_max_u32(etx_umax(etx_umax(key[0], key[1]), etx_umax(key[2], key[3])));
+    #pragma unroll
+          for (int k = 0; k < 4; ++k) if (key[k] == km) key[k] = 0u;
+        }
+        const int bi = etx_key32_expert(km);
+        const float bv = __shfl_sync(0xffffffffu, p[bi / ETX_WAVE_SIZE], bi % ETX_WAVE_SIZE);
+        if constexpr (kPerRound) { if (lane == 0) put(t, bi, bv); }
+        else if (lane == t) { myid = bi; myw = bv; }
+        sel += bv;
+      }
+      if constexpr (!kPerRound) { if (lane < K) put(lane, myid, renorm ? myw / sel : myw); }
+      return sel;
+    }
+    template <class Put>
+    static __device__ __forceinline__ void etx_topk_key32(const float (&l)[4], int E, int K, bool renorm, int lane, Put put) {
+      etx_topk_key32_impl<false>(l, E, K, renorm, lane, put);
+    }
+    template <class Put>
+    static __device__ __forceinline__ float etx_topk_key32_lds(const float (&l)[4], int E, int K, int lane, Put put) {
+      return etx_topk_key32_impl<true>(l, E, K, false, lane, put);
+    }
+    #endif
