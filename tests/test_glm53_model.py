@@ -34,12 +34,7 @@ def test_actual_model_plan_has_all_layers_rank_ownership_and_system_boundary(nat
     assert all(g.body.source=='examples/glm53/tiles.hip' for g in g.grids)
 
 
-@pytest.mark.parametrize('batch,bf16,fp8',[(1,False,False),(2,False,False),(4,True,False),(8,True,True)])
-def test_same_hip_body_full_hybrid_model_32_exact_tokens_and_states(tmp_path,batch,bf16,fp8):
-    pytest.importorskip('torch');pytest.importorskip('transformers')
-    result=cpu_check.check(tmp_path/'fixture',batch,32,bf16,fp8)
-    assert result['matched']==batch*32 and result['status']=='PASS'
-    assert result['fixture'] and not result['full_checkpoint']
+# The 32-exact-token CPU fixture check is the cpu_check command in tests/e2e/test_api_glm53_cpu_check.py.
 
 
 def test_staging_rejects_fixtures_and_changed_blob(native,tmp_path):

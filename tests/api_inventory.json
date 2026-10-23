@@ -505,7 +505,7 @@
         "API-15",
         "API-24"
       ],
-      "reason": "Planner/numerical probes plus full CPU/HF generation, staging and qualification."
+      "reason": "Planner/staging/numerical probes plus the in-process HF chunk-prefill 32-token check (cpu_check.check_prefill has no command; examples/glm53 is owned by the GLM session); the 32-token fixture check is the cpu_check command in tests/e2e/test_api_glm53_cpu_check.py."
     },
     "test_glm53_module_gate.py": {
       "classification": "mixed",
