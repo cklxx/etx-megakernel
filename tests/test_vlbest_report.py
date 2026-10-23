@@ -222,32 +222,42 @@ def test_spread_bound_does_not_change_verdict():
     assert r.paired(deltas) == 'LEAD'
 
 
-def test_report_spread_diagnostic_roundtrip(tmp_path, capsys):
-    from etx.testing.certificates import certified_import_session as fixture_session
-    from tests.test_nvref_report import write
-    fixture_session(tmp_path)
-    search = dict(tested=['S0'], winners={}, excluded={})
-    (tmp_path / 'final.json').write_text(json.dumps(dict(final=r.config('S0'), search=search)))
-    write(tmp_path, 'docker_pull', 'IMAGE ' + r.IMAGE, 'None')
-    write(tmp_path, 'golden_sha', '/synthetic/golden_c1024.txt: OK', 'None')
-    write(tmp_path, 'record', 'GPU[0] : Card Series: Synthetic GPU\nROCM-VERSION test-version', 'None')
-    (tmp_path / 'screen.json').write_text(json.dumps({'combination': None}))
+def job_text(name, body, gpu='0'):
+    """tests.test_nvref_report.write's file body."""
+    return f"# job {name} gpu={gpu} cwd=/x\n# echo 'RESULT matched=32 gen=32'; echo 'CHECK-DSL OK'\n" + body + "\n"
+
+
+def spread_session_files():
+    """Every file of the spread-diagnostic session except the certified import session itself."""
+    files = {'final.json': json.dumps(dict(final=r.config('S0'), search=dict(tested=['S0'], winners={}, excluded={}))),
+             'docker_pull.log': job_text('docker_pull', 'IMAGE ' + r.IMAGE, 'None'),
+             'golden_sha.log': job_text('golden_sha', '/synthetic/golden_c1024.txt: OK', 'None'),
+             'record.log': job_text('record', 'GPU[0] : Card Series: Synthetic GPU\nROCM-VERSION test-version', 'None'),
+             'screen.json': json.dumps({'combination': None})}
     for rnd in (1, 2):
         for end in ('open', 'close'):
-            write(tmp_path, f'a_r{rnd}_S0_{end}', log())
+            files[f'a_r{rnd}_S0_{end}.log'] = job_text(f'a_r{rnd}_S0_{end}', log())
         for arm in r.SCREEN_ARMS:
-            write(tmp_path, f'a_r{rnd}_{arm}', log(arm, ms=6))
+            files[f'a_r{rnd}_{arm}.log'] = job_text(f'a_r{rnd}_{arm}', log(arm, ms=6))
     for rnd in range(1, 6):
-        write(tmp_path, f'S0_r{rnd}', log(ms=5 if rnd < 5 else 4.9))
-    assert r.main([str(tmp_path)]) == 0
-    output = capsys.readouterr().out
-    assert 'SPREAD-BOUND fused−R: False' in output
-    assert '→ LEAD' in output
-    assert 'FULL-CLAIM ELIGIBLE' in output
-    assert 'ETX: step mean; vLLM: sample median' in output
-    assert 'FUSION step-mean basis' in output
-    assert 'FUSION RESULT wall_ms basis (pairs.py)' in output
-    assert 'Synthetic GPU | ROCm test-version' in output
+        files[f'S0_r{rnd}.log'] = job_text(f'S0_r{rnd}', log(ms=5 if rnd < 5 else 4.9))
+    return files
+
+
+def changed_final_session_files():
+    files = {'final.json': json.dumps(dict(final=r.config('S0'), search={})),
+             'F_r1.config.json': json.dumps(r.config('S4f'))}
+    for rnd in range(1, 6):
+        files[f'S0_r{rnd}.log'] = job_text(f'S0_r{rnd}', log())
+    return files
+
+
+FROZEN = Path(__file__).parent / 'e2e/data/vlbest_report_sessions.json'
+
+
+def test_frozen_report_sessions_match_the_harness():
+    # The report command over these sessions is executed in tests/e2e/test_api_vlbest_report.py.
+    assert json.loads(FROZEN.read_text()) == dict(spread=spread_session_files(), changed_final=changed_final_session_files())
 
 
 @pytest.mark.parametrize('arm', ['S4f', 'S5f', 'S6f'])
@@ -352,7 +362,8 @@ def test_changed_round_configuration_refused(tmp_path, monkeypatch):
     assert result['tested'] == ['S0']
 
 
-def test_changed_final_configuration_refused(tmp_path, capsys):
+def changed_final_configuration_refused(tmp_path, capsys):
+    """Mutation oracle; the unpatched command case is in tests/e2e/test_api_vlbest_report.py."""
     from etx.testing.certificates import certified_import_session as fixture_session
     from tests.test_nvref_report import write
     fixture_session(tmp_path)
@@ -370,7 +381,7 @@ def test_configuration_guard_mutations(tmp_path, monkeypatch, capsys):
         (r.screen, 'resolved[0] != resolved[1]',
          lambda patch: test_changed_round_configuration_refused(tmp_path, patch)),
         (r.report, "path.exists() and json.loads(path.read_text()) != cfg",
-         lambda patch: test_changed_final_configuration_refused(tmp_path, capsys)),
+         lambda patch: changed_final_configuration_refused(tmp_path, capsys)),
     ]:
         source = inspect.getsource(func)
         assert old in source

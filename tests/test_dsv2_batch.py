@@ -525,22 +525,10 @@ def test_routing_union_uses_the_executed_request_prefix():
     assert scope["mean_union"](8, [step]) == 24
 
 
-def test_report_does_not_project_from_legacy_subset_means(tmp_path, monkeypatch):
-    from examples.dsv2lite import batch_session as bs
-    for k in ("ETX_SESS_LOGDIR", "ETX_DSV2_FLEET", "ETX_DSV2_DATA"):
-        monkeypatch.setenv(k, str(tmp_path))
-    s = bs.BatchSession()
-    selection = {str(b): dict(config="aiter") for b in BATCHES}
-    (tmp_path / "vsel.json").write_text(json.dumps(dict(selection=selection)))
-    rounds = rounds_for({4: "9.0"}, {1: "4.2", 4: "6.0"})
-    (tmp_path / "brounds.json").write_text(json.dumps(dict(rounds=rounds)))
-    (tmp_path / "routing.json").write_text(json.dumps(dict(overall={"4": 15})))
-    s.report()
-    report = json.loads((tmp_path / "batch_report.json").read_text())
-    assert "PENDING" in report["batches"]["4"]["next"]["next"]
-
-
-# The batch_goldens certify/verify/export commands are executed in tests/e2e/test_api_dsv2_goldens.py.
+def test_frozen_report_rounds_match_the_parser():
+    # The report command over these rounds is executed in tests/e2e/test_api_dsv2_batch_report.py.
+    frozen = json.loads((ROOT / "tests/e2e/data/dsv2_report_rounds.json").read_text())
+    assert frozen == json.loads(json.dumps(dict(rounds=rounds_for({4: "9.0"}, {1: "4.2", 4: "6.0"}))))
 
 
 @pytest.mark.parametrize("bad_short", range(6))

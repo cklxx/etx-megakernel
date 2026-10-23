@@ -72,3 +72,11 @@ def test_attribution_batches_match_the_session():
     tree = ast.parse((ROOT / 'tests/e2e/test_api_dsv2_attribution_final.py').read_text())
     pinned = next(n.value for n in tree.body if isinstance(n, ast.Assign) and getattr(n.targets[0], 'id', '') == 'BATCHES')
     assert tuple(ast.literal_eval(pinned)) == tuple(BATCHES)
+
+
+def test_batch_session_batches_match_the_arms():
+    import ast
+    from examples.dsv2lite.arms import BATCHES
+    tree = ast.parse((ROOT / 'tests/e2e/test_api_dsv2_batch_report.py').read_text())
+    pinned = next(n.value for n in tree.body if isinstance(n, ast.Assign) and getattr(n.targets[0], 'id', '') == 'BATCHES')
+    assert tuple(ast.literal_eval(pinned)) == tuple(BATCHES)

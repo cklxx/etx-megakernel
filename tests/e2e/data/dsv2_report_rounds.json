@@ -1,0 +1,264 @@
+{
+ "rounds": [
+  {
+   "etx": {
+    "1": {
+     "latency_ms": "3.30000",
+     "requests": {
+      "0": {
+       "device_ms": "3.200000",
+       "interval_ms": "3.30000"
+      }
+     },
+     "step_ms": "3.200000",
+     "worst_request": 0
+    },
+    "4": {
+     "latency_ms": "9.",
+     "requests": {
+      "0": {
+       "device_ms": "3.200000",
+       "interval_ms": "9."
+      },
+      "1": {
+       "device_ms": "3.200000",
+       "interval_ms": "5.10000"
+      },
+      "2": {
+       "device_ms": "3.200000",
+       "interval_ms": "5.10000"
+      },
+      "3": {
+       "device_ms": "3.200000",
+       "interval_ms": "5.10000"
+      }
+     },
+     "step_ms": "9.0",
+     "worst_request": 0
+    }
+   },
+   "vllm": {
+    "aiter": {
+     "1": {
+      "legal": true,
+      "reason": null,
+      "step_ms": "4.2"
+     },
+     "4": {
+      "legal": true,
+      "reason": null,
+      "step_ms": "6.0"
+     }
+    }
+   }
+  },
+  {
+   "etx": {
+    "1": {
+     "latency_ms": "3.30000",
+     "requests": {
+      "0": {
+       "device_ms": "3.200000",
+       "interval_ms": "3.30000"
+      }
+     },
+     "step_ms": "3.200000",
+     "worst_request": 0
+    },
+    "4": {
+     "latency_ms": "9.",
+     "requests": {
+      "0": {
+       "device_ms": "3.200000",
+       "interval_ms": "9."
+      },
+      "1": {
+       "device_ms": "3.200000",
+       "interval_ms": "5.10000"
+      },
+      "2": {
+       "device_ms": "3.200000",
+       "interval_ms": "5.10000"
+      },
+      "3": {
+       "device_ms": "3.200000",
+       "interval_ms": "5.10000"
+      }
+     },
+     "step_ms": "9.0",
+     "worst_request": 0
+    }
+   },
+   "vllm": {
+    "aiter": {
+     "1": {
+      "legal": true,
+      "reason": null,
+      "step_ms": "4.2"
+     },
+     "4": {
+      "legal": true,
+      "reason": null,
+      "step_ms": "6.0"
+     }
+    }
+   }
+  },
+  {
+   "etx": {
+    "1": {
+     "latency_ms": "3.30000",
+     "requests": {
+      "0": {
+       "device_ms": "3.200000",
+       "interval_ms": "3.30000"
+      }
+     },
+     "step_ms": "3.200000",
+     "worst_request": 0
+    },
+    "4": {
+     "latency_ms": "9.",
+     "requests": {
+      "0": {
+       "device_ms": "3.200000",
+       "interval_ms": "9."
+      },
+      "1": {
+       "device_ms": "3.200000",
+       "interval_ms": "5.10000"
+      },
+      "2": {
+       "device_ms": "3.200000",
+       "interval_ms": "5.10000"
+      },
+      "3": {
+       "device_ms": "3.200000",
+       "interval_ms": "5.10000"
+      }
+     },
+     "step_ms": "9.0",
+     "worst_request": 0
+    }
+   },
+   "vllm": {
+    "aiter": {
+     "1": {
+      "legal": true,
+      "reason": null,
+      "step_ms": "4.2"
+     },
+     "4": {
+      "legal": true,
+      "reason": null,
+      "step_ms": "6.0"
+     }
+    }
+   }
+  },
+  {
+   "etx": {
+    "1": {
+     "latency_ms": "3.30000",
+     "requests": {
+      "0": {
+       "device_ms": "3.200000",
+       "interval_ms": "3.30000"
+      }
+     },
+     "step_ms": "3.200000",
+     "worst_request": 0
+    },
+    "4": {
+     "latency_ms": "9.",
+     "requests": {
+      "0": {
+       "device_ms": "3.200000",
+       "interval_ms": "9."
+      },
+      "1": {
+       "device_ms": "3.200000",
+       "interval_ms": "5.10000"
+      },
+      "2": {
+       "device_ms": "3.200000",
+       "interval_ms": "5.10000"
+      },
+      "3": {
+       "device_ms": "3.200000",
+       "interval_ms": "5.10000"
+      }
+     },
+     "step_ms": "9.0",
+     "worst_request": 0
+    }
+   },
+   "vllm": {
+    "aiter": {
+     "1": {
+      "legal": true,
+      "reason": null,
+      "step_ms": "4.2"
+     },
+     "4": {
+      "legal": true,
+      "reason": null,
+      "step_ms": "6.0"
+     }
+    }
+   }
+  },
+  {
+   "etx": {
+    "1": {
+     "latency_ms": "3.30000",
+     "requests": {
+      "0": {
+       "device_ms": "3.200000",
+       "interval_ms": "3.30000"
+      }
+     },
+     "step_ms": "3.200000",
+     "worst_request": 0
+    },
+    "4": {
+     "latency_ms": "9.",
+     "requests": {
+      "0": {
+       "device_ms": "3.200000",
+       "interval_ms": "9."
+      },
+      "1": {
+       "device_ms": "3.200000",
+       "interval_ms": "5.10000"
+      },
+      "2": {
+       "device_ms": "3.200000",
+       "interval_ms": "5.10000"
+      },
+      "3": {
+       "device_ms": "3.200000",
+       "interval_ms": "5.10000"
+      }
+     },
+     "step_ms": "9.0",
+     "worst_request": 0
+    }
+   },
+   "vllm": {
+    "aiter": {
+     "1": {
+      "legal": true,
+      "reason": null,
+      "step_ms": "4.2"
+     },
+     "4": {
+      "legal": true,
+      "reason": null,
+      "step_ms": "6.0"
+     }
+    }
+   }
+  }
+ ]
+}

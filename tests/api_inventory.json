@@ -8,7 +8,6 @@
     "test_byte_ledger.py",
     "test_cpu_check.py",
     "test_decode_entry.py",
-    "test_dsv2_batch.py",
     "test_dsv2_stamps.py",
     "test_dsv2lite.py",
     "test_experiment_session.py",
@@ -37,7 +36,6 @@
     "test_timeline.py",
     "test_two_gpu_preflight.py",
     "test_two_gpu_verify.py",
-    "test_vlbest_report.py",
     "test_xcd_account.py"
   ],
   "tests": {
@@ -221,12 +219,9 @@
       "reason": "Static arm configuration and explicit opt-in declarations."
     },
     "test_dsv2_batch.py": {
-      "classification": "mixed",
-      "owners": [
-        "API-18",
-        "API-24"
-      ],
-      "reason": "Layout/rule units plus batch gates, goldens, report verification and pair orchestration."
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Arm/gate/parser/study units, graph-build refusal probes, and batch-session/vLLM-bench CLI cases with process or vllm modules patched; the goldens and report commands are in tests/e2e (test_api_dsv2_goldens.py, test_api_dsv2_batch_report.py)."
     },
     "test_dsv2_batch_attribution.py": {
       "classification": "conformance",
@@ -928,12 +923,9 @@
       "reason": "ISA/dataflow/resource interpretation and source isolation."
     },
     "test_vlbest_report.py": {
-      "classification": "mixed",
-      "owners": [
-        "API-17",
-        "API-24"
-      ],
-      "reason": "Lever/proof predicates plus complete session search/final report recomputation."
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Proof/sample/screening/pairing units, screen() probes, the harness-flags case with process seams patched, and a mutation test whose oracle runs main() on mutated sources; the unpatched report commands are in tests/e2e/test_api_vlbest_report.py over frozen sessions."
     },
     "test_vlbest_session.py": {
       "classification": "conformance",
