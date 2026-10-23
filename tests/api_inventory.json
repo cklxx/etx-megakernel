@@ -16,7 +16,6 @@
     "test_glm53_seam.py",
     "test_gpu_jobs.py",
     "test_import_certificate.py",
-    "test_importer.py",
     "test_ktrace.py",
     "test_nvref_report.py",
     "test_packaging.py",
@@ -576,13 +575,9 @@
       "reason": "Randomized synchronization and known-broken protocol detection."
     },
     "test_importer.py": {
-      "classification": "mixed",
-      "owners": [
-        "API-08",
-        "API-11",
-        "API-24"
-      ],
-      "reason": "IR/ABI units plus the real slice -> hip_ir_local.sh -> import -> link -> gfx942 pipeline run unpatched (skipped without a vLLM tree); no public importer API exists to run it through yet."
+      "classification": "conformance",
+      "owners": [],
+      "reason": "IR/ABI units and an importer-seam probe: slice_device -> etx/importer/hip_ir_local.sh (internal toolchain wrapper, not a user command) -> import_kernel -> link -> gfx942 llc with a real LLVM; skipped without a vLLM tree. No user-facing command or entry point is invoked."
     },
     "test_inbody.py": {
       "classification": "conformance",
