@@ -15,8 +15,8 @@ from __future__ import annotations
 
 import numpy as np
 
-W = 64
-EMAX = 2 * W            # 2 logits per lane; the low key field has 7 bits
+W = 64                 # legacy default; emulators also accept wave_size=32
+EMAX = 128             # fixed expert capacity; the low key field has 7 bits
 f32 = np.float32
 
 
@@ -66,6 +66,8 @@ def dpp_wave_max(x) -> int:
     """etx_wave_max_u32: row_shr 1/2/4/8 with bound_ctrl (invalid source -> 0), row_bcast:15 (row_mask 0xa),
     row_bcast:31 (row_mask 0xc), v_readlane_b32 lane 63."""
     x = np.asarray(x, np.int64).copy()
+    if len(x) == 32:
+        return int(x.max())  # warp32 unsigned max primitive
     lane = np.arange(W)
     pos, row = lane % 16, lane // 16
     for n in (1, 2, 4, 8):
@@ -78,6 +80,7 @@ def dpp_wave_max(x) -> int:
 def wave_sum(v) -> np.float32:
     """etx_wave_sum: v += shfl_xor(v, off) for off = 32 .. 1; every lane ends with the same value."""
     v = np.asarray(v, np.float32).copy()
+    W = len(v)
     lane = np.arange(W)
     off = W // 2
     while off:
@@ -86,15 +89,18 @@ def wave_sum(v) -> np.float32:
     return f32(v[0])
 
 
-def _lanes(bits):
+def _lanes(bits, wave_size=64):
+    if wave_size not in (32, 64):
+        raise ValueError("wave_size must be 32 or 64")
+    W = wave_size
     E = len(bits)
     if not 1 <= E <= EMAX:
         raise ValueError("E must be in 1..128")
     lane = np.arange(W)
     v = bf16_to_f32(bits)
-    l = np.full((2, W), -np.inf, f32)
-    ok = np.zeros((2, W), bool)
-    for k in range(2):
+    l = np.full((EMAX // W, W), -np.inf, f32)
+    ok = np.zeros((EMAX // W, W), bool)
+    for k in range(len(l)):
         e = lane + k * W
         ok[k] = e < E
         l[k, ok[k]] = v[e[ok[k]]]
@@ -104,7 +110,8 @@ def _lanes(bits):
 def _softmax(l, ok, m):
     with np.errstate(all="ignore"):
         p = np.where(ok, np.exp((l - m).astype(f32)).astype(f32), f32(0))
-        s = wave_sum((p[0] + p[1]).astype(f32))      # s = 0 + p[0] + p[1] per lane, then the butterfly
+        # Accumulate each lane's two/four logits in source order, then butterfly.
+        s = wave_sum(np.add.accumulate(p, axis=0, dtype=f32)[-1])
         inv = f32(f32(1) / s)
         return np.where(ok, (p * inv).astype(f32), f32(0))
 
@@ -119,16 +126,17 @@ def _renorm(wts, renorm):
         return [f32(w / sel) for w in wts]
 
 
-def ref_topk(bits, K: int, renorm: bool):
+def ref_topk(bits, K: int, renorm: bool, wave_size=64):
     """The old path. ids 0x7fffffff where no lane passes `p > bv` (NaN rows: the existing bug)."""
-    lane, l, ok = _lanes(bits)
-    m = f32(np.fmax.reduce(np.fmax(l[0], l[1])))        # fmaxf ignores NaN
+    W = wave_size
+    lane, l, ok = _lanes(bits, wave_size)
+    m = f32(np.fmax.reduce(l.reshape(-1)))        # fmaxf ignores NaN
     p = _softmax(l, ok, m)
     taken = ~ok
     ids, wts = [], []
     for _ in range(K):
         bv = np.full(W, f32(-1)); bi = np.full(W, 0x7FFFFFFF, np.int64)
-        for k in range(2):
+        for k in range(len(l)):
             take = (~taken[k]) & (p[k] > bv)
             bv = np.where(take, p[k], bv); bi = np.where(take, lane + k * W, bi)
         off = W // 2
@@ -138,29 +146,30 @@ def ref_topk(bits, K: int, renorm: bool):
             bv = np.where(take, ov, bv); bi = np.where(take, oi, bi)
             off >>= 1
         b = int(bi[0])
-        for k in range(2):
+        for k in range(len(l)):
             taken[k] |= (lane + k * W) == b
         ids.append(b); wts.append(f32(bv[0]))
     return ids, _renorm(wts, renorm)
 
 
-def key_topk(bits, K: int, renorm: bool):
+def key_topk(bits, K: int, renorm: bool, wave_size=64):
     """etx_topk_key32."""
+    W = wave_size
     if not 1 <= K <= W:
-        raise ValueError("K must be in 1..64")
-    lane, l, ok = _lanes(bits)
-    key = np.zeros((2, W), np.int64)
-    for k in range(2):
+        raise ValueError(f"K must be in 1..{W}")
+    lane, l, ok = _lanes(bits, wave_size)
+    key = np.zeros((EMAX // W, W), np.int64)
+    for k in range(len(l)):
         e = lane + k * W
         key[k, ok[k]] = key32(l[k, ok[k]], e[ok[k]])
-    km = dpp_wave_max(np.maximum(key[0], key[1]))
+    km = dpp_wave_max(np.maximum.reduce(key, axis=0))
     key[key == km] = 0
     m = key32_logit(km)
     p = _softmax(l, ok, m)
     ids, wts = [], []
     for t in range(K):
         if t:
-            km = dpp_wave_max(np.maximum(key[0], key[1]))
+            km = dpp_wave_max(np.maximum.reduce(key, axis=0))
             key[key == km] = 0
         bi = key32_expert(km)
         ids.append(bi); wts.append(f32(p[bi // W, bi % W]))    # v_readlane of the winner lane's p
@@ -171,7 +180,7 @@ def tie_explained(bits, K, renorm, ref, key) -> bool:
     """True when ids differ only where the old path cannot tell experts apart: equal float p (an exp underflow or a
     rounding tie), or a NaN p (the old path then writes 0x7fffffff). The weight lists must then still agree."""
     lane, l, ok = _lanes(bits)
-    m = f32(np.fmax.reduce(np.fmax(l[0], l[1])))
+    m = f32(np.fmax.reduce(l.reshape(-1)))
     p = _softmax(l, ok, m).reshape(-1)[:len(bits)]
     if np.isnan(p).any():
         return True
