@@ -2,8 +2,8 @@
 
 Inputs are the last accepted token followed by k draft tokens (teacher forced).
 Every position returns full logits and an argmax. KDA heads scan the block;
-DSA runs its existing per-position causal index top-k; MoE up rows are grouped
-by expert across positions. State advances through the entire block: callers
+DSA runs its existing per-position causal index top-k; MoE up and down rows
+share each expert weight across positions. State advances through the block: callers
 must restore/replay state after a rejected suffix. No speculative rollback or
 GPU performance/correctness qualification is implied by the CPU check.
 """
@@ -31,10 +31,13 @@ def _positions(k):
 def build_from(stage, k, batch=1, options=None):
     """Build one verify step. Weights and runtime state are shared across positions.
 
+    Blocks support 2 through 6 positions (k=1 through 5).
     This first verify path supports phased pipeline placement; TP/EP layouts
     need their own multi-position dispatch and are explicitly refused.
     """
     count = _positions(k)
+    if count > 6:
+        raise ValueError('verify read-once MoE supports at most 6 positions (k <= 5)')
     options = Options() if options is None else options
     if not options.phased or options.parallel or options.attention_tp:
         raise ValueError('verify requires phased serial attention and nonparallel FFN')
@@ -43,6 +46,8 @@ def build_from(stage, k, batch=1, options=None):
     graph.symbols = list(base.symbols)
 
     def local(name, p):
+        if name not in base.tensors:
+            return f'p{p}_{name}'
         t = base.tensors[name]
         return name if t.role in ('weight', 'runtime') else f'p{p}_{name}'
 
@@ -119,6 +124,10 @@ def build_from(stage, k, batch=1, options=None):
                 copy(f'{layer}_{phase}', p)
         moe = stage['config']['mlp_layer_types'][i] == 'sparse'
         if moe:
+            for p in range(count):
+                graph.tensor(f'p{p}_{layer}_partial',
+                             ('B', (stage['dimensions']['TOPK'] + 1) * stage['dimensions']['H']),
+                             role='scratch', dtype='float32', bytes_per_elem=4)
             src = base.grid(layer + '_up')
             for p in range(count):
                 args = [layer + '_weights', layer + '_meta',
@@ -136,11 +145,33 @@ def build_from(stage, k, batch=1, options=None):
             total = n * (stage['dimensions']['EXPERTS'] + 1)
             emit(layer + '_expert_up', hip_link(SOURCE, 'glm53_verify_expert_up'),
                  src.device, total, args, reads, writes, (total, n, count, 0))
+            args = [layer + '_weights', layer + '_meta']
+            reads, writes = args.copy(), []
+            for p in range(count):
+                act, sel, partial = [local(layer + '_' + s, p)
+                                     for s in ('act', 'sel', 'partial')]
+                args.extend([act, sel, partial])
+                reads.extend([act, sel])
+                writes.append(partial)
+            # Partition the existing down task budget over experts; each lane
+            # loops over its output-row range in the read-once primitive.
+            mix_tiles = base.grid(layer + '_down').grid[1]
+            experts = stage['dimensions']['EXPERTS'] + 1
+            n = max(1, (mix_tiles + experts - 1) // experts)
+            total = n * experts
+            emit(layer + '_expert_down', hip_link(SOURCE, 'glm53_verify_expert_down'),
+                 src.device, total, args, reads, writes, (total, n, count, 0))
+            for p in range(count):
+                names = [layer + '_weights', layer + '_meta'] + [local(layer + '_' + s, p)
+                         for s in ('partial', 'sel', 'mid', 'hcf', 'out')]
+                emit(f'p{p}_{layer}_mix', hip_link(SOURCE, 'glm53_verify_expert_mix'),
+                     src.device, mix_tiles, names, names[:-1], names[-1:],
+                     (mix_tiles, 0, 0, 0))
         else:
             for p in range(count):
                 copy(layer + '_up', p)
-        for p in range(count):
-            copy(layer + '_down', p)
+            for p in range(count):
+                copy(layer + '_down', p)
     for phase in ('head', 'argmax', 'feedback'):
         for p in range(count):
             copy(phase, p)

@@ -113,3 +113,32 @@ def test_invalid_draft_counts(k):
 def test_unsupported_graphs_fail_explicitly(options):
     with pytest.raises(ValueError, match='verify requires'):
         build_from({}, 1, options=options)
+
+
+@pytest.mark.parametrize('k', [1, 3, 5])
+def test_read_once_moe_boundaries(module8, k):
+    spec = stage.validate(module8 / 'stage', allow_fixture=True, gate='module8')
+    g = build_from(spec, k, batch=2)
+    for i, kind in enumerate(spec['config']['mlp_layer_types']):
+        if kind != 'sparse':
+            continue
+        layer = f'l{i}'
+        up = g.grid(layer + '_expert_up')
+        down = g.grid(layer + '_expert_down')
+        assert down.body.symbol == 'glm53_verify_expert_down'
+        assert 'e_' + up.name in down.in_edges
+        assert down.consts[2] == k + 1
+        for p in range(k + 1):
+            partial = f'p{p}_{layer}_partial'
+            assert partial in down.writes
+            assert g.tensors[partial].shape == ('B', (spec['dimensions']['TOPK'] + 1) * spec['dimensions']['H'])
+            mix = g.grid(f'p{p}_{layer}_mix')
+            assert mix.body.symbol == 'glm53_verify_expert_mix'
+            assert partial in mix.reads
+            assert 'e_' + down.name in mix.in_edges
+            assert not any(x.name == f'p{p}_{layer}_down' for x in g.grids)
+
+
+def test_read_once_position_limit():
+    with pytest.raises(ValueError, match='at most 6 positions'):
+        build_from({}, 6)

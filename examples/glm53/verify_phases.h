@@ -32,40 +32,54 @@ extern "C" __device__ void glm53_verify_dsa_scan(const etx_ctx* c) {
   }
 }
 
-// An expert owns all selected position rows, rather than one position owning
-// all experts. args: weights, meta, (rt, act, sel) for each position.
-// cst: (total tiles, row tiles per expert, positions, 0).
-// Consecutive tile ranges own consecutive experts (EXPERTS = shared).
+// Each expert consumes a weight once for all positions. Separate graph grids
+// provide the global up -> down -> mix boundaries required by verify_moe.h.
+#include "examples/glm53/verify_moe.h"
+template<int P, bool Down> GLM_DEV void glm_verify_expert(const etx_ctx* c) {
+  const float *x[P],*sel[P];float* out[P];
+  for(int p=0;p<P;++p){
+    if constexpr(Down){
+      x[p]=GLM_PR(2+3*p,const float*,GLM_S_ACT);
+      sel[p]=GLM_PR(3+3*p,const float*,GLM_S_SEL);
+      out[p]=GLM_PR(4+3*p,float*,(GLM_TOPK+1)*GLM_H);
+    }else{
+      x[p]=GLM_PR(2+3*p,const float*,GLM_S_RT)+GLM_R4(GLM_EXPERTS);
+      out[p]=GLM_PR(3+3*p,float*,GLM_S_ACT);
+      sel[p]=GLM_PR(4+3*p,const float*,GLM_S_SEL);
+    }
+  }
+  const int T=c->cst[1],e=c->coord[1]/T,t=c->coord[1]%T;
+  if constexpr(Down)glm_verify_moe_down<P>(GLM_PB(0),GLM_PW(1),x,sel,out,e,t,T);
+  else glm_verify_moe_up<P>(GLM_PB(0),GLM_PW(1),x,sel,out,e,t,T);
+}
+template<bool Down> GLM_DEV void glm_verify_experts(const etx_ctx* c) {
+  switch(c->cst[2]){
+    case 2:glm_verify_expert<2,Down>(c);break;
+    case 3:glm_verify_expert<3,Down>(c);break;
+    case 4:glm_verify_expert<4,Down>(c);break;
+    case 5:glm_verify_expert<5,Down>(c);break;
+    case 6:glm_verify_expert<6,Down>(c);break;
+  }
+}
 extern "C" __device__ void glm53_verify_expert_up(const etx_ctx* c) {
-  const uint8_t* b=GLM_PB(0);const glm_weight* w=GLM_PW(1);
-  const int T=c->cst[1],expert=c->coord[1]/T;
-  const int gs=expert==GLM_EXPERTS?SG:EXPERTS+3*expert;
-  const int mi=w[gs].rows,t=c->coord[1]%T;
-  const int lo=(int)((int64_t)mi*t/T),hi=(int)((int64_t)mi*(t+1)/T);
-  if(lo==hi)return;
-  for(int p=0;p<c->cst[2];++p){
-    const float* rt=GLM_PR(2+3*p,const float*,GLM_S_RT);
-    float* act=GLM_PR(3+3*p,float*,GLM_S_ACT);
-    const float* sel=GLM_PR(4+3*p,const float*,GLM_S_SEL);
-    int k=expert==GLM_EXPERTS?GLM_TOPK:-1;
-    for(int j=0;j<GLM_TOPK;++j)if((int)sel[j]==expert)k=j;
-    if(k<0)continue;
-    float* x=(float*)c->lds+GLM_LDS_HEAD;
-    for(int j=GLM_LANE;j<GLM_H;j+=GLM_LANES)x[j]=rt[GLM_R4(GLM_EXPERTS)+j];
-    GLM_SYNC();
-    const int S=glm_group<GLM_KFP8>(w[gs]);
-    glm_each(0,(hi-lo+1)/2,S,[&](int u,int sl){
-      const glm_weight* ws[4]={&w[gs],&w[gs+1],&w[gs],&w[gs+1]};
-      const float* xs[4]={x,x,x,x};
-      const int r0=lo+2*u,r1=r0+1<hi?r0+1:r0;
-      int rows[4]={r0,r0,r1,r1};float acc[4];
-      glm_dots<4,GLM_KFP8>(b,ws,rows,xs,acc,S,sl);
-      if(sl==0)for(int i=0;i<2;++i)if(r0+i<hi){
-        const float gt=glm_bf(acc[2*i]),up=glm_bf(acc[2*i+1]);
-        const float a=fminf(gt,GLM_CLIP),v=fmaxf(-GLM_CLIP,fminf(up,GLM_CLIP));
-        act[k*GLM_INTERMAX+r0+i]=glm_bf(glm_bf(a*glm_sig(a))*v);
-      }
-    });
-    GLM_SYNC();
+  glm_verify_experts<false>(c);
+}
+extern "C" __device__ void glm53_verify_expert_down(const etx_ctx* c) {
+  glm_verify_experts<true>(c);
+}
+extern "C" __device__ void glm53_verify_expert_mix(const etx_ctx* c) {
+  const float* partial=GLM_PR(2,const float*,(GLM_TOPK+1)*GLM_H);
+  const float* sel=GLM_PR(3,const float*,GLM_S_SEL);
+  const float* mid=GLM_PR(4,const float*,GLM_S_MID);
+  const float* hcf=GLM_PR(5,const float*,GLM_S_HC);
+  glm_act* out=GLM_PR(6,glm_act*,GLM_HC*GLM_H);
+  float* lds=(float*)c->lds;float* hc=lds+16;
+  glm_hc_coeffs(GLM_PB(0),GLM_PW(1),F_FN,hcf,hc,lds+GLM_LDS_HEAD);
+  const int T=c->cst[0],t=c->coord[1];
+  const int lo=(int)((int64_t)GLM_H*t/T),hi=(int)((int64_t)GLM_H*(t+1)/T);
+  for(int j=lo+GLM_LANE;j<hi;j+=GLM_LANES){
+    const float y=glm_verify_moe_mix(partial,sel,j);
+    for(int k=0;k<GLM_HC;++k)
+      out[k*GLM_H+j]=glm_put(glm_mix1(hc,[&](int i){return mid[i];},y,k,j));
   }
 }
