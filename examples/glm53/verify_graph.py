@@ -84,14 +84,39 @@ def build_from(stage, k, batch=1, options=None):
              rename(g.reads), rename(g.writes), g.consts, replace(g.resource,
                  lds_bytes=max(g.resource.lds_bytes, resource.lds_bytes)))
 
-    for p in range(count):
-        copy('embedding', p)
+    def batched(name, symbol, device, shared, rows, reads, writes, flag=0):
+        args = list(shared)
+        rd, wr = list(shared), []
+        for p in range(count):
+            args.extend(local(x, p) for x in rows)
+            rd.extend(local(x, p) for x in reads)
+            wr.extend(local(x, p) for x in writes)
+        emit(name, hip_link(SOURCE, symbol), device, 1, args, rd, wr,
+             (1, flag, count, 0))
+
+    batched('embedding_rows', 'glm53_verify_embed', base.grid('embedding').device,
+            ['embedding_weights', 'embedding_meta'], ['step', 'embedded'],
+            ['step'], ['embedded'])
     for i, kind in enumerate(stage['config']['layer_types']):
         layer = f'l{i}'
         linear = kind == 'linear_attention'
-        for phase in ('hc', 'p1'):
-            for p in range(count):
-                copy(f'{layer}_{phase}', p)
+        d = stage['dimensions']
+        # Per-row activations and reusable coefficients, never copied weights.
+        hc = (2*d['HC'] + d['HC']*d['HC']+3)//4*4
+        work_size = (2*hc + d['H'] + 5*d['QDIM'] + 2*d['NH']*d['AD'] + 2*d['ID'] + d['QR'] + d['KVR'])
+        for p in range(count):
+            for suffix in ('vwork', 'scanwork', 'fwork'):
+                graph.tensor(local(layer+'_'+suffix, p), ('B', work_size), role='scratch',
+                             dtype='float32', bytes_per_elem=4)
+        src = base.grid(layer+'_p1')
+        previous = src.args[2]
+        batched(layer+'_prologue', 'glm53_verify_prologue', src.device,
+                [layer+'_weights', layer+'_meta'],
+                [previous, layer+'_hca', layer+'_p1', layer+'_vwork'],
+                [previous], [layer+'_hca', layer+'_p1', layer+'_vwork'], int(linear))
+        common_size = d['LD'] + d['LH'] + d['QDIM'] + d['POOL']*d['ID']
+        graph.tensor(layer+'_vcommon', ('B', common_size), role='scratch',
+                     dtype='float32', bytes_per_elem=4)
         if linear:
             src = base.grid(layer + '_kda')
             args = [layer + '_weights', layer + '_meta', layer + '_state']
@@ -119,21 +144,24 @@ def build_from(stage, k, batch=1, options=None):
                 writes.extend([p2, att])
             emit(layer + '_dsa_scan', hip_link(SOURCE, 'glm53_verify_dsa_scan'),
                  src.device, 1, args, reads, writes, (1, 0, count, src.consts[3]))
-        for phase in ('o', 'hcf', 'rt'):
-            for p in range(count):
-                copy(f'{layer}_{phase}', p)
+        batched(layer+'_output', 'glm53_verify_output', src.device,
+                [layer+'_weights', layer+'_meta'],
+                [previous, layer+'_vwork', layer+'_att', layer+'_mid'],
+                [previous, layer+'_vwork', layer+'_att'], [layer+'_mid'])
         moe = stage['config']['mlp_layer_types'][i] == 'sparse'
+        batched(layer+'_ffn_input', 'glm53_verify_ffn_input', src.device,
+                [layer+'_weights', layer+'_meta'],
+                [layer+'_mid', layer+'_hcf', layer+'_rt', layer+'_fwork'],
+                [layer+'_mid'], [layer+'_hcf', layer+'_rt', layer+'_fwork'], int(moe))
         if moe:
             for p in range(count):
                 graph.tensor(f'p{p}_{layer}_partial',
                              ('B', (stage['dimensions']['TOPK'] + 1) * stage['dimensions']['H']),
                              role='scratch', dtype='float32', bytes_per_elem=4)
             src = base.grid(layer + '_up')
-            for p in range(count):
-                args = [layer + '_weights', layer + '_meta',
-                        local(layer + '_rt', p), local(layer + '_sel', p)]
-                emit(f'p{p}_{layer}_route', hip_link(SOURCE, 'glm53_parallel_route'),
-                     src.device, 1, args, args[:3], args[3:], (1, 1, 0, 0))
+            batched(layer+'_route', 'glm53_verify_route', src.device,
+                    [layer+'_weights', layer+'_meta'], [layer+'_rt', layer+'_sel'],
+                    [layer+'_rt'], [layer+'_sel'])
             args = [layer + '_weights', layer + '_meta']
             reads, writes = args.copy(), []
             for p in range(count):
@@ -163,15 +191,18 @@ def build_from(stage, k, batch=1, options=None):
                  src.device, total, args, reads, writes, (total, n, count, 0))
             for p in range(count):
                 names = [layer + '_weights', layer + '_meta'] + [local(layer + '_' + s, p)
-                         for s in ('partial', 'sel', 'mid', 'hcf', 'out')]
+                         for s in ('partial', 'sel', 'mid', 'fwork', 'out')]
                 emit(f'p{p}_{layer}_mix', hip_link(SOURCE, 'glm53_verify_expert_mix'),
                      src.device, mix_tiles, names, names[:-1], names[-1:],
                      (mix_tiles, 0, 0, 0))
         else:
-            for p in range(count):
-                copy(layer + '_up', p)
-            for p in range(count):
-                copy(layer + '_down', p)
+            batched(layer+'_dense_up', 'glm53_verify_dense_up', src.device,
+                    [layer+'_weights', layer+'_meta'], [layer+'_rt', layer+'_act'],
+                    [layer+'_rt'], [layer+'_act'])
+            batched(layer+'_dense_down', 'glm53_verify_dense_down', src.device,
+                    [layer+'_weights', layer+'_meta'],
+                    [layer+'_act', layer+'_mid', layer+'_fwork', layer+'_out'],
+                    [layer+'_act', layer+'_mid', layer+'_fwork'], [layer+'_out'])
     # Normalize all rows before streaming each LM-head weight through every
     # position accumulator. Head scratch holds the normalized input between
     # the preparation and projection boundaries.

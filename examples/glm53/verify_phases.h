@@ -3,6 +3,139 @@
 #pragma once
 #include "examples/glm53/tiles.hip"
 
+
+// Verify rows use one owner per output row. Each scalar weight is consumed by
+// all position accumulators before advancing the column; no full weight copy
+// or position-private weight storage is needed. These are correctness-first
+// scalar tiles, not a GPU throughput qualification.
+#define GLM_VHC GLM_R4(GLM_HCN)
+#define GLM_VX (2*GLM_VHC)
+#define GLM_VA (GLM_VX+GLM_H)
+#define GLM_VG (GLM_VA+3*GLM_QDIM)
+#define GLM_VB (GLM_VG+GLM_QDIM)
+#define GLM_VKV (GLM_VB+GLM_QDIM)
+#define GLM_VNR (GLM_VKV+2*GLM_NH*GLM_AD+2*GLM_ID)
+#define GLM_VWORK (GLM_VNR+GLM_QR+GLM_KVR)
+#define GLM_VCOMMON (GLM_LD+GLM_LH+GLM_QDIM+GLM_POOL*GLM_ID)
+
+template<int P,class Out> GLM_DEV void glm_verify_rows(
+    const uint8_t* b,const glm_weight& w,const float* const* x,int lo,int hi,Out out){
+  for(int r=lo+GLM_LANE;r<hi;r+=GLM_LANES){
+    float acc[P]={};
+    for(int j=0;j<w.cols;++j){const float v=glm_w(b,w,r,j);
+      for(int p=0;p<P;++p)acc[p]+=v*x[p][j];}
+    for(int p=0;p<P;++p)out(p,r,acc[p]);
+  }
+}
+// The reductions and BF16 points match the decode scalar reference. Norm
+// parameters are streamed outside the position loop, including in-place use.
+template<int P> GLM_DEV void glm_verify_norm(const uint8_t* b,const glm_weight& w,
+    const float* const* x,float* const* y,int n,float* red){
+  float inv[P];
+  for(int p=0;p<P;++p){float part=0;
+    for(int i=GLM_LANE;i<n;i+=GLM_LANES)part+=x[p][i]*x[p][i];
+    inv[p]=1.0f/sqrtf(glm_bsum(part,red)/n+GLM_EPS);}
+  for(int i=GLM_LANE;i<n;i+=GLM_LANES){const float v=glm_w(b,w,i);
+    for(int p=0;p<P;++p)y[p][i]=glm_bf(glm_bf(x[p][i]*inv[p])*v);}
+  GLM_SYNC();
+}
+GLM_DEV void glm_verify_coeff(const float* z,float* hc){
+  float* post=hc;float* comb=post+GLM_HC;float* pre=comb+GLM_HC*GLM_HC;
+  for(int r=0;r<GLM_HCN;++r){
+    if(r<GLM_HC)pre[r]=glm_sig(z[r])+GLM_HCEPS;
+    else if(r<2*GLM_HC)post[r-GLM_HC]=2*glm_sig(z[r]);
+    else comb[r-2*GLM_HC]=z[r];}
+  for(int r=0;r<GLM_HC;++r){float mx=-INFINITY,den=0;
+    for(int c=0;c<GLM_HC;++c)mx=fmaxf(mx,comb[r*GLM_HC+c]);
+    for(int c=0;c<GLM_HC;++c){float v=expf(comb[r*GLM_HC+c]-mx);comb[r*GLM_HC+c]=v;den+=v;}
+    for(int c=0;c<GLM_HC;++c)comb[r*GLM_HC+c]=comb[r*GLM_HC+c]/den+GLM_HCEPS;}
+  for(int it=0;it<GLM_SINK;++it){
+    if(it)for(int r=0;r<GLM_HC;++r){float den=GLM_HCEPS;
+      for(int c=0;c<GLM_HC;++c)den+=comb[r*GLM_HC+c];
+      for(int c=0;c<GLM_HC;++c)comb[r*GLM_HC+c]/=den;}
+    for(int c=0;c<GLM_HC;++c){float den=GLM_HCEPS;
+      for(int r=0;r<GLM_HC;++r)den+=comb[r*GLM_HC+c];
+      for(int r=0;r<GLM_HC;++r)comb[r*GLM_HC+c]/=den;}}
+}
+// Compute all raw mHC rows and coefficients once, then collapse and normalize.
+// Src selects BF16 attention streams or FP32 FFN streams without changing math.
+template<int P,class Src> GLM_DEV void glm_verify_input(const uint8_t* b,
+    const glm_weight* w,int base,int norm,const Src* src,float* const* raw,
+    float* const* hc,float* const* x,float* red){
+  float inv[P];
+  for(int p=0;p<P;++p){float part=0;
+    for(int j=GLM_LANE;j<GLM_HC*GLM_H;j+=GLM_LANES){float v=src[p](j);part+=v*v;}
+    inv[p]=1.0f/sqrtf(glm_bsum(part,red)/(GLM_HC*GLM_H)+GLM_EPS);}
+  for(int r=0;r<GLM_HCN;++r){float acc[P]={};
+    for(int j=GLM_LANE;j<GLM_HC*GLM_H;j+=GLM_LANES){const float v=glm_w(b,w[base],r,j);
+      for(int p=0;p<P;++p)acc[p]+=src[p](j)*inv[p]*v;}
+    for(int p=0;p<P;++p){const float v=glm_bsum(acc[p],red);if(GLM_LANE==0)raw[p][r]=v;}}
+  // Three scale entries are shared by all rows, not loaded once per mHC row.
+  if(GLM_LANE==0){float scale[3];for(int i=0;i<3;++i)scale[i]=glm_w(b,w[base+2],i);
+    float z[P][GLM_HCN];
+    for(int r=0;r<GLM_HCN;++r){const float bias=glm_w(b,w[base+1],r);
+      for(int p=0;p<P;++p)z[p][r]=raw[p][r]*scale[r<GLM_HC?0:r<2*GLM_HC?1:2]+bias;}
+    for(int p=0;p<P;++p)glm_verify_coeff(z[p],hc[p]);}
+  GLM_SYNC();
+  for(int j=GLM_LANE;j<GLM_H;j+=GLM_LANES)for(int p=0;p<P;++p){float sum=0;
+    for(int k=0;k<GLM_HC;++k)sum+=hc[p][GLM_HC+GLM_HC*GLM_HC+k]*src[p](k*GLM_H+j);
+    x[p][j]=glm_bf(sum);}
+  GLM_SYNC();const float* cx[P];for(int p=0;p<P;++p)cx[p]=x[p];
+  glm_verify_norm<P>(b,w[norm],cx,x,GLM_H,red);
+}
+// args: weight/meta, (step, embedded) per row. Duplicate token IDs and mHC
+// streams share one embedding lookup; different IDs read their distinct rows.
+template<int P> GLM_DEV void glm_verify_embed(const etx_ctx* c){
+  int token[P];glm_act* out[P];
+  for(int p=0;p<P;++p){token[p]=glm53_step_load((const int*)c->args[2+2*p]+2*c->coord[0]+1);
+    out[p]=GLM_PR(3+2*p,glm_act*,GLM_HC*GLM_H);}
+  for(int j=GLM_LANE;j<GLM_H;j+=GLM_LANES)for(int p=0;p<P;++p){
+    bool seen=false;for(int q=0;q<p;++q)seen=seen||token[q]==token[p];if(seen)continue;
+    const glm_act v=glm_put(glm_w(GLM_PB(0),GLM_PW(1)[0],token[p],j));
+    for(int q=p;q<P;++q)if(token[q]==token[p])for(int k=0;k<GLM_HC;++k)out[q][k*GLM_H+j]=v;}
+}
+// args: weight/meta, (input, hca, p1, work) per row.
+template<int P> GLM_DEV void glm_verify_prologue(const etx_ctx* c){
+  glm_src_act src[P];float *raw[P],*hc[P],*x[P],*p1[P];
+  for(int p=0;p<P;++p){src[p]={GLM_PR(2+4*p,const glm_act*,GLM_HC*GLM_H)};
+    raw[p]=GLM_PR(3+4*p,float*,GLM_S_HC);p1[p]=GLM_PR(4+4*p,float*,GLM_S_P1);
+    hc[p]=GLM_PR(5+4*p,float*,GLM_VWORK);x[p]=hc[p]+GLM_VX;}
+  const uint8_t* b=GLM_PB(0);const glm_weight* w=GLM_PW(1);
+  glm_verify_input<P>(b,w,A_FN,N_ATTN,src,raw,hc,x,(float*)c->lds);
+  const int slots[6]={c->cst[1]?Q:QA,c->cst[1]?K:KVA,c->cst[1]?V:IK,
+                     c->cst[1]?FA:IG,c->cst[1]?BETA:IW,GA};
+  const int offsets[6]={0,c->cst[1]?GLM_QDIM:GLM_QR,
+    c->cst[1]?2*GLM_QDIM:GLM_QR+GLM_KVR,
+    c->cst[1]?3*GLM_QDIM:GLM_QR+GLM_KVR+GLM_ID,
+    c->cst[1]?3*GLM_QDIM+GLM_LD:GLM_QR+GLM_KVR+2*GLM_ID,
+    3*GLM_QDIM+GLM_LD+GLM_LH};
+  const float* cx[P];for(int p=0;p<P;++p)cx[p]=x[p];
+  for(int s=0;s<(c->cst[1]?6:5);++s)glm_verify_rows<P>(b,w[slots[s]],cx,0,w[slots[s]].rows,
+    [&](int p,int r,float v){p1[p][offsets[s]+r]=glm_bf(v);});
+}
+// args: weight/meta, (input, work, att, mid) per row. Coefficients computed by
+// prologue are reused here instead of fetching mHC parameters for every tile.
+template<int P> GLM_DEV void glm_verify_output(const etx_ctx* c){
+  const glm_act* in[P];const float *hc[P],*att[P];float* mid[P];
+  for(int p=0;p<P;++p){in[p]=GLM_PR(2+4*p,const glm_act*,GLM_HC*GLM_H);
+    hc[p]=GLM_PR(3+4*p,const float*,GLM_VWORK);att[p]=GLM_PR(4+4*p,const float*,GLM_S_ATT);
+    mid[p]=GLM_PR(5+4*p,float*,GLM_S_MID);}
+  const glm_weight& w=GLM_PW(1)[O];
+  glm_verify_rows<P>(GLM_PB(0),w,att,0,w.rows,[&](int p,int j,float v){
+    for(int k=0;k<GLM_HC;++k)mid[p][k*GLM_H+j]=glm_mix1(hc[p],[&](int i){return glm_get(in[p][i]);},glm_bf(v),k,j);});
+}
+// args: weight/meta, (mid, hcf, rt, work) per row.
+template<int P> GLM_DEV void glm_verify_ffn_input(const etx_ctx* c){
+  glm_src_f32 src[P];float *raw[P],*hc[P],*x[P],*rt[P];
+  for(int p=0;p<P;++p){src[p]={GLM_PR(2+4*p,const float*,GLM_S_MID)};
+    raw[p]=GLM_PR(3+4*p,float*,GLM_S_HC);rt[p]=GLM_PR(4+4*p,float*,GLM_S_RT);
+    hc[p]=GLM_PR(5+4*p,float*,GLM_VWORK)+GLM_VHC;x[p]=rt[p]+GLM_R4(GLM_EXPERTS);}
+  const uint8_t* b=GLM_PB(0);const glm_weight* w=GLM_PW(1);
+  glm_verify_input<P>(b,w,F_FN,N_FFN,src,raw,hc,x,(float*)c->lds);
+  if(c->cst[1]){const float* cx[P];for(int p=0;p<P;++p)cx[p]=x[p];
+    glm_verify_rows<P>(b,w[ROUTER],cx,0,w[ROUTER].rows,[&](int p,int r,float v){rt[p][r]=v;});}
+}
+
 // One head scans all positions in causal order, including its convolution and
 // recurrent state. args: weights, meta, state, (p1, att) for each position.
 extern "C" __device__ void glm53_verify_kda_scan(const etx_ctx* c) {
@@ -71,10 +204,8 @@ extern "C" __device__ void glm53_verify_expert_mix(const etx_ctx* c) {
   const float* partial=GLM_PR(2,const float*,(GLM_TOPK+1)*GLM_H);
   const float* sel=GLM_PR(3,const float*,GLM_S_SEL);
   const float* mid=GLM_PR(4,const float*,GLM_S_MID);
-  const float* hcf=GLM_PR(5,const float*,GLM_S_HC);
+  const float* hc=GLM_PR(5,const float*,GLM_VWORK)+GLM_VHC;
   glm_act* out=GLM_PR(6,glm_act*,GLM_HC*GLM_H);
-  float* lds=(float*)c->lds;float* hc=lds+16;
-  glm_hc_coeffs(GLM_PB(0),GLM_PW(1),F_FN,hcf,hc,lds+GLM_LDS_HEAD);
   const int T=c->cst[0],t=c->coord[1];
   const int lo=(int)((int64_t)GLM_H*t/T),hi=(int)((int64_t)GLM_H*(t+1)/T);
   for(int j=lo+GLM_LANE;j<hi;j+=GLM_LANES){
@@ -124,5 +255,130 @@ extern "C" __device__ void glm53_verify_head(const etx_ctx* c) {
     case 4:glm_verify_head<4>(c);break;
     case 5:glm_verify_head<5>(c);break;
     case 6:glm_verify_head<6>(c);break;
+  }
+}
+
+extern "C" __device__ void glm53_verify_embed(const etx_ctx* c){
+  switch(c->cst[2]){
+    case 1:glm_verify_embed<1>(c);break;
+    case 2:glm_verify_embed<2>(c);break;
+    case 3:glm_verify_embed<3>(c);break;
+    case 4:glm_verify_embed<4>(c);break;
+    case 5:glm_verify_embed<5>(c);break;
+    case 6:glm_verify_embed<6>(c);break;
+  }
+}
+
+extern "C" __device__ void glm53_verify_prologue(const etx_ctx* c){
+  switch(c->cst[2]){
+    case 1:glm_verify_prologue<1>(c);break;
+    case 2:glm_verify_prologue<2>(c);break;
+    case 3:glm_verify_prologue<3>(c);break;
+    case 4:glm_verify_prologue<4>(c);break;
+    case 5:glm_verify_prologue<5>(c);break;
+    case 6:glm_verify_prologue<6>(c);break;
+  }
+}
+
+extern "C" __device__ void glm53_verify_output(const etx_ctx* c){
+  switch(c->cst[2]){
+    case 1:glm_verify_output<1>(c);break;
+    case 2:glm_verify_output<2>(c);break;
+    case 3:glm_verify_output<3>(c);break;
+    case 4:glm_verify_output<4>(c);break;
+    case 5:glm_verify_output<5>(c);break;
+    case 6:glm_verify_output<6>(c);break;
+  }
+}
+
+extern "C" __device__ void glm53_verify_ffn_input(const etx_ctx* c){
+  switch(c->cst[2]){
+    case 1:glm_verify_ffn_input<1>(c);break;
+    case 2:glm_verify_ffn_input<2>(c);break;
+    case 3:glm_verify_ffn_input<3>(c);break;
+    case 4:glm_verify_ffn_input<4>(c);break;
+    case 5:glm_verify_ffn_input<5>(c);break;
+    case 6:glm_verify_ffn_input<6>(c);break;
+  }
+}
+
+// args: weights/meta, (rt, sel) per position. Routing remains per row;
+// correction bias is the only fixed input and is fetched once for the block.
+template<int P> GLM_DEV void glm_verify_route(const etx_ctx* c){
+  if(GLM_LANE!=0)return;
+  float bias[GLM_EXPERTS];
+  for(int e=0;e<GLM_EXPERTS;++e)bias[e]=glm_w(GLM_PB(0),GLM_PW(1)[BIAS],e);
+  for(int p=0;p<P;++p){
+    const float* rt=GLM_PR(2+2*p,const float*,GLM_S_RT);
+    float* sel=GLM_PR(3+2*p,float*,GLM_S_SEL);
+    float score[GLM_EXPERTS],biased[GLM_EXPERTS],prob[GLM_TOPK];int ids[GLM_TOPK];
+    for(int e=0;e<GLM_EXPERTS;++e){score[e]=glm_sig(rt[e]);biased[e]=score[e]+bias[e];}
+    for(int k=0;k<GLM_TOPK;++k){float best=-INFINITY;int id=INT_MAX;
+      for(int e=0;e<GLM_EXPERTS;++e){bool used=false;for(int j=0;j<k;++j)used=used||ids[j]==e;
+        if(!used&&biased[e]>best){best=biased[e];id=e;}}
+      ids[k]=id;prob[k]=score[id];}
+    float den=1e-20f;for(int k=0;k<GLM_TOPK;++k)den+=prob[k];
+    for(int k=0;k<GLM_TOPK;++k)prob[k]=prob[k]/den*GLM_ROUTE_SCALE;
+    for(int i=0;i<GLM_TOPK;++i)for(int j=i+1;j<GLM_TOPK;++j)if(ids[j]<ids[i]){
+      int id=ids[i];ids[i]=ids[j];ids[j]=id;float v=prob[i];prob[i]=prob[j];prob[j]=v;}
+    for(int k=0;k<GLM_TOPK;++k){sel[k]=(float)ids[k];sel[GLM_TOPK+k]=prob[k];}
+  }
+}
+// Dense gate/up: the same rounding and clipping as glm_ph_up, with all rows
+// consuming each gate/up weight before it is discarded.
+template<int P> GLM_DEV void glm_verify_dense_up(const etx_ctx* c){
+  const float* x[P];float* act[P];
+  for(int p=0;p<P;++p){x[p]=GLM_PR(2+2*p,const float*,GLM_S_RT)+GLM_R4(GLM_EXPERTS);
+    act[p]=GLM_PR(3+2*p,float*,GLM_S_ACT);}
+  const uint8_t* b=GLM_PB(0);const glm_weight* w=GLM_PW(1);
+  for(int r=GLM_LANE;r<w[MG].rows;r+=GLM_LANES){float gate[P]={},up[P]={};
+    for(int j=0;j<w[MG].cols;++j){float g=glm_w(b,w[MG],r,j),u=glm_w(b,w[MU],r,j);
+      for(int p=0;p<P;++p){gate[p]+=g*x[p][j];up[p]+=u*x[p][j];}}
+    for(int p=0;p<P;++p){float a=fminf(glm_bf(gate[p]),GLM_CLIP);
+      float v=fmaxf(-GLM_CLIP,fminf(glm_bf(up[p]),GLM_CLIP));
+      act[p][r]=glm_bf(glm_bf(a*glm_sig(a))*v);}}
+}
+// args: weights/meta, (act, mid, work, output) per position.
+template<int P> GLM_DEV void glm_verify_dense_down(const etx_ctx* c){
+  const float *act[P],*mid[P],*hc[P];glm_act* out[P];
+  for(int p=0;p<P;++p){act[p]=GLM_PR(2+4*p,const float*,GLM_S_ACT);
+    mid[p]=GLM_PR(3+4*p,const float*,GLM_S_MID);
+    hc[p]=GLM_PR(4+4*p,const float*,GLM_VWORK)+GLM_VHC;
+    out[p]=GLM_PR(5+4*p,glm_act*,GLM_HC*GLM_H);}
+  const glm_weight& w=GLM_PW(1)[MD];
+  glm_verify_rows<P>(GLM_PB(0),w,act,0,w.rows,[&](int p,int j,float v){
+    for(int k=0;k<GLM_HC;++k)out[p][k*GLM_H+j]=glm_put(glm_mix1(hc[p],[&](int i){return mid[p][i];},glm_bf(v),k,j));});
+}
+
+extern "C" __device__ void glm53_verify_route(const etx_ctx* c){
+  switch(c->cst[2]){
+    case 1:glm_verify_route<1>(c);break;
+    case 2:glm_verify_route<2>(c);break;
+    case 3:glm_verify_route<3>(c);break;
+    case 4:glm_verify_route<4>(c);break;
+    case 5:glm_verify_route<5>(c);break;
+    case 6:glm_verify_route<6>(c);break;
+  }
+}
+
+extern "C" __device__ void glm53_verify_dense_up(const etx_ctx* c){
+  switch(c->cst[2]){
+    case 1:glm_verify_dense_up<1>(c);break;
+    case 2:glm_verify_dense_up<2>(c);break;
+    case 3:glm_verify_dense_up<3>(c);break;
+    case 4:glm_verify_dense_up<4>(c);break;
+    case 5:glm_verify_dense_up<5>(c);break;
+    case 6:glm_verify_dense_up<6>(c);break;
+  }
+}
+
+extern "C" __device__ void glm53_verify_dense_down(const etx_ctx* c){
+  switch(c->cst[2]){
+    case 1:glm_verify_dense_down<1>(c);break;
+    case 2:glm_verify_dense_down<2>(c);break;
+    case 3:glm_verify_dense_down<3>(c);break;
+    case 4:glm_verify_dense_down<4>(c);break;
+    case 5:glm_verify_dense_down<5>(c);break;
+    case 6:glm_verify_dense_down<6>(c);break;
   }
 }
