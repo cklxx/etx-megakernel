@@ -6,7 +6,8 @@ from pathlib import Path
 import struct
 import pytest
 
-from examples.glm53 import stage,model,model_build,cpu_check
+from etx.models.glm53 import model_build
+from examples.glm53 import stage, model, cpu_check
 from examples.glm53.options import Options
 from etx.passes import compile_graph,verify_plan
 from etx.ir import Scope
@@ -102,7 +103,7 @@ def test_clipped_swiglu_matches_hf_at_saturation_boundaries(tmp_path):
 
 
 def test_model_session_has_real_model_and_two_visible_devices():
-    from etx.tools.gpu_jobs import load_session
+    from etx.experiments.jobs import load_session
     jobs,_=load_session(Path('examples/sessions/glm53_model.py'))
     job={j.name:j for j in jobs}
     assert [j.name for j in jobs]==['apt','etx_env','model_build','model_qualify','verify']

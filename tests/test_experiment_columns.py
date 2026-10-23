@@ -130,8 +130,9 @@ def test_native_capture_patcher_refuses_changed_anchors():
 
 def test_source_bound_capture_binding_sites():
     from examples.experiment_program.columns.patch_capture import patch_kernel,patch_host,patch_shim
+    from examples.dsv2lite.pinned import fleet_export
     root=Path(__file__).resolve().parents[1]
-    fleet=Path.home()/'code/etx-cache/fleet-3fb67a6/src/kernels/fleet_kernel.hip'
+    fleet=fleet_export()/'src/kernels/fleet_kernel.hip'
     out=patch_kernel(fleet.read_text())
     q=out.index('etx_column_ready(tc.column_capture,L,tc.tok,tc.pos,tc.epoch,1')
     assert out.rfind('rms_norm_lds',0,q) < q < out.index('gemv_rows(w.layer_qkv[L]',q)

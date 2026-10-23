@@ -2,14 +2,13 @@
 (examples/vllm_llm/decode.py). CPU only: the tests check the selection and the commands, and run no step."""
 import ast
 import json
-import subprocess
 import sys
 from pathlib import Path
 
 import pytest
 
 from examples.llm.model import load_dims
-from examples.vllm_llm import decode
+from etx.models.vllm_llm import decode
 from etx.select import plan
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -109,9 +108,6 @@ def test_mla_config_is_refused(tmp_path):
     (tmp_path / "config.json").write_text(json.dumps(c))
     with pytest.raises(decode.NotGQA, match="examples/dsv2lite"):
         decode.check_gqa(tmp_path / "config.json")
-    r = subprocess.run([sys.executable, "-m", "examples.vllm_llm.decode", str(tmp_path), "--dry-run"],
-                       cwd=ROOT, capture_output=True, text=True)
-    assert r.returncode == 2 and "examples/dsv2lite" in r.stderr
 
 
 def test_config_path_and_hf_dir(tmp_path):
@@ -125,19 +121,7 @@ def test_config_path_and_hf_dir(tmp_path):
     other.mkdir()
     (other / "config.json").write_text((hf / "config.json").read_text())
     assert decode.resolve(str(other)) == ("m2", other / "config.json")
-    r = subprocess.run([sys.executable, "-m", "examples.vllm_llm.decode", str(hf), "--dry-run"],
-                       cwd=ROOT, capture_output=True, text=True, timeout=120)
-    assert r.returncode == 0 and f"model {tmp_path.name}:" in r.stdout, r.stderr
     with pytest.raises(FileNotFoundError):
         decode.resolve("no-such-model")
 
 
-@pytest.mark.parametrize("name", decode.KNOWN)
-def test_dry_run_cli(name, tmp_path):
-    r = subprocess.run([sys.executable, "-m", "examples.vllm_llm.decode", name, "--dry-run",
-                        "--hf", str(tmp_path / "hf"), "--work", str(tmp_path / name)],
-                       cwd=ROOT, capture_output=True, text=True, timeout=120)
-    assert r.returncode == 0, r.stderr
-    assert f"model {name}:" in r.stdout and "[prep]" in r.stdout and "[build]" in r.stdout and "[run]" in r.stdout
-    has_golden = (ROOT / f"examples/llm/results/golden_c1024_{name}.txt").is_file()
-    assert ("no golden file" in r.stdout) == (not has_golden)

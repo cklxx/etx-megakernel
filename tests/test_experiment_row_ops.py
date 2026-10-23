@@ -70,16 +70,22 @@ def test_virtual_zero_fp32_bit_pattern_and_cancellation():
             assert bits(control)==bits(candidate)
 
 
-def test_checking_host_capture_is_real_original_boundary(tmp_path):
-    from pathlib import Path
-    from examples.experiment_program.row_ops.capture import checking_host
+def test_checking_host_capture_is_real_original_boundary(tmp_path, monkeypatch):
+    import hashlib
     import subprocess
-    from examples.experiment_program.row_ops.producer import BASE
-    original=tmp_path/'original.hip'
-    original.write_bytes(subprocess.check_output(['git','show',BASE+':examples/vllm_llm/host.hip'],cwd=Path(__file__).parents[1]))
-    out=tmp_path/'host.hip'
-    checking_host(original,out)
-    s=out.read_text()
+    from etx.testing import sealed_original_host
+    from etx.testing.row_ops import row_capture_probe
+
+    def no_process(*args, **kwargs):
+        raise AssertionError('historical capture conformance must not spawn Git or other processes')
+
+    monkeypatch.setattr(subprocess, 'Popen', no_process)
+    retained=sealed_original_host()
+    result=row_capture_probe(tmp_path)
+    assert result['historical_only'] and not result['device_qualification']
+    assert result['provenance']==retained['provenance']
+    assert hashlib.sha256((tmp_path/'original.hip').read_bytes()).hexdigest()==retained['provenance']['sha256']
+    s=result['source']
     assert s.index('row_capture.before(')<s.index('launch_imported(x.n + 1);')<s.index('row_capture.after();')
     assert '".wqkv"' in s
     assert s.index('row_ops/capture.h')<s.index('int main(')
@@ -175,7 +181,7 @@ def test_nonfinite_admission_never_passes():
 
 def test_winner_source_has_only_mechanism_no_probe_or_check(tmp_path):
     from examples.experiment_program.row_ops.integration import emit_winner
-    from examples.vllm_llm.bf16_300.source import current_source
+    from etx.models.vllm_llm.bf16_300.source import current_source
     original=tmp_path/'original.hip';original.write_text(current_source())
     for variant,marker in [('G09','float retained[4][8]'),('G10_UP','row_single_up'),('G10_DOWN','row_single_down')]:
         output=tmp_path/(variant+'.hip');m=emit_winner(variant,original,output);s=output.read_text()

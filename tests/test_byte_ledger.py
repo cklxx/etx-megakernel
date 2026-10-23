@@ -51,18 +51,8 @@ def test_phimoe_session_floor():
     assert round(r["floor_ms"], 3) == 3.059
 
 
-def test_cli_prints_breakdown_total_and_floor(capsys):
-    assert bl.main(["--config", str(CONFIGS / "phi-3.5-moe.json"), "--batch", "1", "--context", "1024"]) == 0
-    out = capsys.readouterr().out
-    assert "not a packed manifest" in out
-    assert out.count("\n   31 ") == 1 and "TOTAL 13.1537 GB" in out and "FLOOR 3.059 ms/token" in out
 
 
-def test_packed_manifest_file(tmp_path, capsys):
-    path = tmp_path / "vl.manifest"
-    path.write_text(bl.manifest_from_config(CONFIGS / "phi-3.5-moe.json") + "cfgf eps 1e-05\n")
-    assert bl.main(["--manifest", str(path), "--batch", "1", "--context", "1024"]) == 0
-    assert "(packed manifest)" in capsys.readouterr().out
 
 
 def refused(cfg, tensors, match, **kw):
@@ -127,13 +117,3 @@ def test_refuses_malformed_manifest_line():
         bl.read_manifest("cfg L 32\nweights.bin\n")
 
 
-def test_cli_refusal_names_input_and_prints_no_floor(tmp_path, capsys):
-    assert bl.main(["--manifest", str(tmp_path / "absent"), "--batch", "1", "--context", "1024"]) == 2
-    out = capsys.readouterr().out
-    assert "REFUSED: missing input: manifest" in out and "FLOOR" not in out
-    path = tmp_path / "vl.manifest"
-    path.write_text("\n".join(ln for ln in bl.manifest_from_config(CONFIGS / "phi-3.5-moe.json").splitlines()
-                              if not ln.startswith("cfg NKV ")))
-    assert bl.main(["--manifest", str(path), "--batch", "1", "--context", "1024"]) == 2
-    out = capsys.readouterr().out
-    assert "REFUSED: missing input: cfg NKV" in out and "FLOOR" not in out

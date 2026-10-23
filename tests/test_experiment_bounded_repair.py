@@ -33,7 +33,7 @@ def row_boundary(tiny,monkeypatch):
     from examples.experiment_program.row_ops import build,source,diagnostics,replay,producer,results
     from examples.experiment_program.row_ops.protocol import invocation_orders
     from examples.experiment_program.telemetry import capture
-    from examples.vllm_llm.bf16_300.build import preamble
+    from etx.models.vllm_llm.bf16_300.build import preamble
     from etx.ops import gemv
     normal=tiny/'normal';diagnostic=tiny/'diagnostic';normal.mkdir();diagnostic.mkdir()
     # Actual canonical generated sources, but explicitly nonexecutable CPU bytes.

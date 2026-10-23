@@ -5,9 +5,9 @@ from pathlib import Path
 
 import pytest
 
-from etx.tools.gpu_jobs import load_jobs, load_session
+from etx.experiments.jobs import load_jobs, load_session
 from examples.sessions import nvchk
-from tests.test_import_certificate import envelope, fixture_session
+from etx.testing.certificates import certificate_envelope as envelope, certified_import_session as fixture_session
 from tests.test_nvref_report import etx
 
 

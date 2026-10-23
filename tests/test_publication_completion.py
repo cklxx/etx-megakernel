@@ -18,7 +18,10 @@ def test_compiler_spill_counters_are_evidence_not_physical_equality():
 
 
 def test_actual_original_capture_hook_is_complete_not_row_zero():
-    original=subprocess.check_output(['git','show',capture.BASE+':examples/vllm_llm/host.hip'],cwd=W,text=True)
+    from etx.testing import sealed_original_host
+    retained=sealed_original_host()
+    assert retained['provenance']['revision']==capture.BASE and retained['historical_only']
+    original=retained['source']
     text=capture.checking_source(original)
     assert text.count('launch_imported(x.n + 1);')==original.count('launch_imported(x.n + 1);')
     assert 'rr*x.stride' in text and 'down?rr*32:0,down?32:256,256' in text
@@ -171,4 +174,5 @@ def test_integrated_staging_uses_real_parser_and_fixed_module_guard(tmp_path,mon
     monkeypatch.setattr(run,'program',lambda path,out,execute,trace_session:observed.append((path,out,execute,trace_session)) or dict(CPU_ONLY=True))
     assert run.main(argv[3:])==0 and len(observed)==1 and observed[0][2] is False
     bad=copy.deepcopy(c);bad['records']['G09']['preflight']=list(argv);p=tmp_path/'bad.json';p.write_text(json.dumps(bad))
-    with pytest.raises(ValueError,match='exact prepared module'):session.configuration(p)
+    from etx.experiments.sealed import configuration
+    with pytest.raises(ValueError,match='exact prepared module'):configuration(p)

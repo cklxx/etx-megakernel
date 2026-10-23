@@ -1,3 +1,4 @@
+import os
 import pytest
 from examples.experiment_program.validation import model_rule,system_rule,require_admission
 
@@ -75,7 +76,7 @@ def test_local_sources_are_real_disabled_mechanisms_without_fake_winner(tmp_path
     from examples.experiment_program.protocol import sha
     from pathlib import Path
     # The retained closure is read only. No model, native compiler or GPU runs.
-    reference=Path.home()/'code/etx/build/rocm22/final_kept'
+    reference=Path(os.environ.get('ETX_VALIDATION_REFERENCE','/nonexistent'))
     if not reference.is_dir():pytest.skip('local retained closure unavailable')
     for record,variant,marker in [('G09','g09','float retained[4][8]'),('G10','g10_up','row_single_up')]:
         result=prepare_sources(dict(record=record,variant=variant,model='qwen',batch=1,reference=str(reference)),tmp_path/record,local_validation=True)
@@ -241,7 +242,7 @@ def test_current_dsl_overlay_keeps_narrow_router_wrappers(tmp_path):
     from pathlib import Path
     from examples.experiment_program.validation_prepare import prepare_sources
     from examples.experiment_program.protocol import sha
-    reference=Path.home()/'code/etx/build/rocm22/final_kept'
+    reference=Path(os.environ.get('ETX_VALIDATION_REFERENCE','/nonexistent'))
     if not reference.is_dir():pytest.skip('read-only retained closure unavailable')
     before={str(p):sha(p) for p in (reference/'imp/imports.json',reference/'dsl_tiles.hip',reference/'imports.bc',reference/'imp_tiles.hip')}
     for record in ('G06','G09','G10'):

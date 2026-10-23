@@ -71,15 +71,3 @@ def test_memory_demand_groups_replicated_grids():
     assert dict(tl.memory_demand(tr)["low_by_kind"])["topk"] == pytest.approx(3.0)
 
 
-def test_raw_roundtrip_and_html(sim_trace, tmp_path):
-    _, _, pj, rows = sim_trace
-    raw = tmp_path / "t.bin"
-    from array import array
-    a = array("q", [v for r in rows for v in r]); raw.write_bytes(a.tobytes())
-    (tmp_path / "plan.json").write_text(json.dumps(pj))
-    (tmp_path / "b.json").write_text(json.dumps(dsb.spec()))
-    assert tl.main([str(tmp_path / "plan.json"), str(raw), "--bytes", str(tmp_path / "b.json"), "--grids", "_1$",
-                    "--html", str(tmp_path / "t.html"), "--json", str(tmp_path / "t.json")]) == 0
-    page = (tmp_path / "t.html").read_text()
-    assert page.startswith("<title>") and "gate_up_1" in page
-    assert json.loads((tmp_path / "t.json").read_text())["critical_span"] > 0

@@ -4,37 +4,16 @@ from pathlib import Path
 import pytest
 
 from examples.vllm_llm import batch_correctness as bc
-from test_qwen_batch_correctness import staged_model
+from etx.testing import qwen_staged_model as staged_model
 from tools import two_gpu_preflight as pf
 
 ROOT = Path(__file__).resolve().parent.parent
 
 
-def test_qwen_assets_pass_and_name_a_missing_reference(tmp_path, capsys):
-    model = staged_model(tmp_path, 8)
-    assert pf.main(['--qwen-model', str(model)]) == 0
-    out = capsys.readouterr().out
-    assert 'PREFLIGHT OK qwen-assets: batches 2,4,8; 20 files each' in out
-    assert out.rstrip().endswith('PREFLIGHT OK')
-
-    missing = bc.golden_names(8)[-1]
-    (model / missing).unlink()
-    assert pf.main(['--qwen-model', str(model)]) == 2
-    out = capsys.readouterr().out
-    assert 'PREFLIGHT FAIL qwen-assets: missing' in out and missing in out
 
 
-def test_qwen_hash_mode_rehashes_the_packed_weights(tmp_path, capsys):
-    model = staged_model(tmp_path, 8)
-    assert pf.main(['--qwen-model', str(model), '--hash']) == 0
-    assert 'weights hashed' in capsys.readouterr().out
 
 
-def test_missing_glm_stage_is_named_and_fails_closed(tmp_path, capsys):
-    assert pf.main(['--glm-stage', str(tmp_path / 'absent')]) == 2
-    out = capsys.readouterr().out
-    assert 'PREFLIGHT FAIL glm-stage: missing' in out and 'stage.json' in out
-    assert 'PREFLIGHT OK' not in out
 
 
 @pytest.fixture(scope='module')
@@ -47,21 +26,8 @@ def glm_fixture(tmp_path_factory):
     return out
 
 
-def test_synthetic_glm_stage_cannot_pass_production_preflight(glm_fixture, capsys):
-    assert pf.main(['--glm-stage', str(glm_fixture)]) == 2
-    out = capsys.readouterr().out
-    assert 'PREFLIGHT FAIL glm-stage: synthetic fixtures' in out
 
 
-def test_tampered_glm_identity_is_named(glm_fixture, tmp_path, capsys):
-    import shutil
-    copied = tmp_path / 'stage'
-    shutil.copytree(glm_fixture, copied)
-    stage = json.loads((copied / 'stage.json').read_text())
-    stage['revision'] = '0' * 40
-    (copied / 'stage.json').write_text(json.dumps(stage))
-    assert pf.main(['--glm-stage', str(copied)]) == 2
-    assert 'pinned GLM-5.3-Flash checkpoint' in capsys.readouterr().out
 
 
 def reference(tmp_path, staged, batch=2, **changes):

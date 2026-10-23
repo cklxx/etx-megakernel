@@ -556,7 +556,7 @@ def test_attention_tp_flag_requires_bool(value):
 
 @pytest.fixture(scope='module')
 def compile_only_spec():
-    from examples.glm53 import model_build
+    from etx.models.glm53 import model_build
     return model_build.production_compile_spec()
 
 

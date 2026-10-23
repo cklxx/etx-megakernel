@@ -191,7 +191,7 @@ def bounded_pack_directory(tmp_path):
 @pytest.mark.parametrize('batch',[2,4])
 def test_actual_g04_session_json_dependency(tmp_path,batch):
  from examples.experiment_program.routing import decode_records
- from examples.experiment_program.session import decision_for_dependencies
+ from etx.experiments.sealed import decision_for_dependencies
  from examples.experiment_program.routing.__main__ import ROLES
  raw=bytearray(32*26*8*64)
  for i in range(32*26*8):struct.pack_into('<16I',raw,i*64,33+i//(26*8),1,*range(6),*([0x3e800000]*6),0,0)
@@ -414,7 +414,8 @@ def test_publication_resource_terminal_precedes_any_device_or_capture(tmp_path,m
  stage.prepare(dict(staging_root=str(tmp_path/'staged'),records={'G11':dict(publication_preparation=str(proof))}),cfg,out)
  gate=dict(status='CLOSED_NATIVE_DIAGNOSTIC_RESOURCE',admitted=False,synthetic_cpu_only=True)
  monkeypatch.setattr(publication,'admission',lambda path:gate)
- monkeypatch.setattr(session,'run_logged',lambda *a,**k:pytest.fail('closed publication gate may not launch a child'))
+ from etx.experiments import sealed
+ monkeypatch.setattr(sealed,'run_logged',lambda *a,**k:pytest.fail('closed publication gate may not launch a child'))
  assert session.main(['preflight','--config',str(cfg),'--out',str(out),'--record','G11'])==0
  r=json.loads((out/'session.json').read_text())
  assert r['stages']['G11']==dict(status='CLOSED_LOCAL_DIAGNOSTIC',evidence=gate)

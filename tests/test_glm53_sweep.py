@@ -4,7 +4,8 @@ import json
 from pathlib import Path
 import sys
 import pytest
-from examples.glm53 import model_build, options, sweep
+from etx.models.glm53 import model_build
+from examples.glm53 import options, sweep
 
 
 def assembly(kernel='etx_megakernel_d0',lds=272,scratch=0,vgpr=80,sgpr=42,spills=0,occupancy=4):

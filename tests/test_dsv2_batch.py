@@ -14,12 +14,8 @@ from examples.dsv2lite.arms import ARMS, BATCH_ARMS, BATCHES, LEVERS_ALL
 ROOT = Path(__file__).resolve().parents[1]
 
 
-@pytest.mark.parametrize("binding", ["requests=8", "requestsz=8"])
-def test_deepseek_cli_rejects_unsupported_bindings_before_compilation(tmp_path, monkeypatch, binding):
-    from etx.tools import cli
-    monkeypatch.setattr(cli, "compile_graph", lambda *args, **kwargs: pytest.fail("unsupported binding reached compiler"))
-    with pytest.raises(ValueError, match="does not accept --bind.*" + binding.split("=")[0]):
-        cli.main(["compile", str(ROOT / "examples/dsv2lite/graph.py"), "--out", str(tmp_path), "--bind", binding])
+def test_deepseek_default_bindings_are_empty():
+    # CLI rejection coverage lives in external-only test_api_compiler.py.
     from examples.dsv2lite import graph
     assert graph.bindings() == {}
 
@@ -142,6 +138,7 @@ def test_batch_arms_carry_the_kept_recipe_without_d4():
 def test_session_start_transports_qwen_config_without_shell_expansion(tmp_path, config):
     import os
     import subprocess
+    import sys
     bindir = tmp_path / "bin"
     bindir.mkdir()
     ssh = bindir / "ssh"
@@ -159,7 +156,8 @@ def test_session_start_transports_qwen_config_without_shell_expansion(tmp_path, 
     capture = tmp_path / "transport.json"
     marker = tmp_path / "expanded"
     env = dict(os.environ, PATH=str(bindir) + os.pathsep + os.environ["PATH"],
-               TRANSPORT_CAPTURE=str(capture), ETX_N6_MARKER=str(marker), ETX_SESS_MAX_SECONDS="1200")
+               TRANSPORT_CAPTURE=str(capture), ETX_N6_MARKER=str(marker), ETX_SESS_MAX_SECONDS="1200",
+               ETX_PYTHON=sys.executable)
     env.pop("ETX_QWEN_G6_CONFIG", None)
     if config is not None:
         env["ETX_QWEN_G6_CONFIG"] = config
@@ -330,7 +328,7 @@ def test_the_host_prints_exactly_the_fields_the_rule_reads():
 
 def test_rerun_includes_required_artifact_producers_before_their_consumers(tmp_path, monkeypatch):
     import runpy
-    from etx.tools.gpu_jobs import Runner, load_jobs
+    from etx.experiments.jobs import Runner, load_jobs
     path = ROOT / "examples/sessions/rerun_skips.py"
     all_jobs = runpy.run_path(str(path))["_every"]
     writers = {w.lstrip("?"): name for name, job in all_jobs.items() for w in job.get("writes", [])}
@@ -364,7 +362,7 @@ def test_rerun_includes_required_artifact_producers_before_their_consumers(tmp_p
 # ---------------------------------------------------------------- the session
 @pytest.fixture(scope="module")
 def session():
-    from etx.tools.gpu_jobs import load_session
+    from etx.experiments.jobs import load_session
     jobs, limit = load_session(ROOT / "examples/sessions/ds_batch.py")
     return {j.name: j for j in jobs}, jobs, limit
 
@@ -534,7 +532,7 @@ def test_gate_runs_the_arm_it_names(tmp_path, monkeypatch):
 
 @pytest.mark.parametrize("name", ["x8_diag", "x8_diag_qwen"])
 def test_candidate_gate_declares_its_own_build(name):
-    from etx.tools.gpu_jobs import load_session
+    from etx.experiments.jobs import load_session
     jobs, _ = load_session(ROOT / f"examples/sessions/{name}.py")
     by = {j.name: j for j in jobs}
     for arm in ("x8p", "x8m", "x8k", "x8"):
@@ -725,7 +723,7 @@ def test_baseline_refuses_a_model_other_than_the_prepared_model(tmp_path, monkey
 
 
 def test_standalone_diagnostic_prepares_its_goldens():
-    from etx.tools.gpu_jobs import load_session
+    from etx.experiments.jobs import load_session
     jobs, _ = load_session(ROOT / "examples/sessions/x8_diag.py")
     names = [j.name for j in jobs]
     assert "prep_goldens" in names

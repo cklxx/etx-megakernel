@@ -12,7 +12,8 @@ from etx.tools.shared_state import check_plan, check_source, lds_inventory, sour
 
 ROOT = Path(__file__).resolve().parents[1]
 HOST = (ROOT / "examples/vllm_llm/host.hip").read_text()
-PREP = (ROOT / "examples/llm/prep.py").read_text()
+# The CLI (examples/llm/prep.py) and its implementation (etx/models/llm/prep.py) together.
+PREP = (ROOT / "examples/llm/prep.py").read_text() + (ROOT / "etx/models/llm/prep.py").read_text()
 
 
 def test_gate_exists_and_implies_teacher():

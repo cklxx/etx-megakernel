@@ -6,10 +6,10 @@ import subprocess
 import sys
 
 import pytest
-from examples.vllm_llm.attention_early_merge import evidence as e, session as s
-from examples.vllm_llm.attention_early_merge.build import capture_host, hybrid_host, clean_env
-from examples.vllm_llm.attention_early_merge.simulate import run
-from etx.tools.gpu_jobs import load_session
+from etx.models.vllm_llm.attention_early_merge import evidence as e, paths, session as s
+from etx.models.vllm_llm.attention_early_merge.build import capture_host, hybrid_host, clean_env
+from etx.models.vllm_llm.attention_early_merge.simulate import run
+from etx.experiments.jobs import load_session
 
 
 def test_protocol_and_numeric_order():
@@ -22,7 +22,7 @@ def test_protocol_and_numeric_order():
 def test_bf16_near_tie_and_cancellation_must_keep_partition_order():
     import itertools
     import struct
-    from examples.vllm_llm.attention_early_merge.simulate import ordered_sum
+    from etx.models.vllm_llm.attention_early_merge.simulate import ordered_sum
     def bf16_bits(value):
         bits=struct.unpack('<I',struct.pack('<f',value))[0]
         return (bits+0x7fff+((bits>>16)&1))>>16
@@ -77,7 +77,7 @@ def test_tokens_require_candidate_implementation():
 
 
 def test_stale_and_local_only_build(tmp_path,monkeypatch):
-    monkeypatch.setattr(e,'ROOT',tmp_path)
+    monkeypatch.setattr(paths,'ROOT',tmp_path)
     (tmp_path/'binary').write_bytes(b'fake')
     record=dict(runnable=False,hashes={'binary':e.sha(tmp_path/'binary')},sources={'binary':e.sha(tmp_path/'binary')})
     (tmp_path/'identity.json').write_text(json.dumps(record))
@@ -222,7 +222,7 @@ def test_real_supervisor_timeout(tmp_path):
 
 
 def test_retained_dispatcher_branch_and_signature_guard():
-    from examples.vllm_llm.attention_early_merge.build import retained_source
+    from etx.models.vllm_llm.attention_early_merge.build import retained_source
     source='\n'.join([
         'extern "C" __global__ void __launch_bounds__(ETX_THREADS, ETX_MIN_WG_PER_CU) etx_megakernel_d0(etx_params p) {',
         'retained_real_dispatch(p); }',
@@ -236,7 +236,7 @@ def test_retained_dispatcher_branch_and_signature_guard():
 
 
 def test_retained_generated_header_identity(tmp_path,monkeypatch):
-    monkeypatch.setattr(e,'ROOT',tmp_path)
+    monkeypatch.setattr(paths,'ROOT',tmp_path)
     (tmp_path/'source.py').write_text('source')
     fp=tmp_path/'full'; fp.mkdir()
     (fp/'code.s').write_text('assembly')
@@ -271,7 +271,7 @@ def test_import_comparison_ignores_only_output_path(tmp_path):
 
 
 def test_raw_import_hash_is_still_required(tmp_path,monkeypatch):
-    monkeypatch.setattr(e,'ROOT',tmp_path)
+    monkeypatch.setattr(paths,'ROOT',tmp_path)
     (tmp_path/'source.py').write_text('source'); (tmp_path/'imp').mkdir()
     (tmp_path/'imp/f.ll').write_text('original')
     record=dict(runnable=False,sources={'source.py':e.sha(tmp_path/'source.py')},

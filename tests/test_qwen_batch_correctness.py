@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 from examples.vllm_llm import batch_correctness as bc
-from etx.tools.gpu_jobs import load_session
+from etx.experiments.jobs import load_session
 from test_vllm_moe import _graph
 from etx.passes import compile_graph, verify_plan
 
@@ -145,17 +145,7 @@ def test_native_script_supervises_both_compiler_stages(tmp_path):
     assert all((d / name).exists() for name in ('native-ir.log', 'native-isa.log'))
 
 
-def staged_model(tmp_path, batch=8):
-    model = tmp_path / 'model'
-    (model / 'hf').mkdir(parents=True)
-    (model / 'hf/config.json').write_text((bc.ROOT / 'examples/llm/configs/qwen3-30b-a3b.json').read_text())
-    (model / 'hf/REVISION').write_text('a' * 40)
-    (model / 'vl.manifest').write_text('test fixture, not GPU inputs')
-    (model / 'vl.bin').write_bytes(b'fixture')
-    for r, name in enumerate(bc.golden_names(batch)):
-        (model / name).write_text('prompt: ' + ' '.join([str(r)] * 1024) + '\ngen: ' + ' '.join(['1'] * 32) + '\n')
-        (model / name.replace('golden', 'prefill', 1)).write_text('argmax: ' + ' '.join(['1'] * 1055) + '\nmargin: ' + ' '.join(['1.0'] * 1055))
-    return model
+from etx.testing import qwen_staged_model as staged_model  # noqa: E402  (shared with E2E preflight tests)
 
 
 def test_asset_fingerprint_includes_weights_and_every_reference(tmp_path):

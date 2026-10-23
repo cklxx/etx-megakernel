@@ -63,8 +63,3 @@ def test_stamps_patch_composes_and_preserves_lds_copy(tmp_path, pinned_src, patc
         patch_stamps.apply(copy)
 
 
-def test_stamps2_rejects_isolate_before_build(tmp_path):
-    env = {**os.environ, "ETX_DSV2_ISOLATE": "0:qkv_5", "ETX_OUT": str(tmp_path)}
-    result = subprocess.run(["bash", "examples/dsv2lite/build.sh", "/nonexistent-pinned-export", "-DETX_DSV2_STAMPS2"],
-                            env=env, capture_output=True, text=True)
-    assert result.returncode == 2 and "share prologue slots" in result.stderr

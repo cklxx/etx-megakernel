@@ -8,7 +8,7 @@ import types
 
 import pytest
 
-from etx.tools.gpu_jobs import load_session
+from etx.experiments.jobs import load_session
 from examples.sessions import vlbest as s
 from examples.vllm_llm import vlbest_report as r
 
@@ -198,7 +198,7 @@ def test_build_identity_gate(tmp_path, monkeypatch, mutation):
 
 
 def test_failed_identity_stops_all_gpu_jobs(tmp_path):
-    from etx.tools.gpu_jobs import Runner
+    from etx.experiments.jobs import Runner
     jobs, _ = load_session(SESSION)
     for j in jobs:
         j.cmd = 'exit 2' if j.name == 'build_identity' else 'true'
@@ -385,7 +385,7 @@ def test_vlbest3_graph():
 
 @pytest.mark.parametrize('failure', ['g0', 'moe_tune', 'moe_gate', 'a_r1_M1', 'F_r1', 'etx_r1'])
 def test_vlbest3_red_stop(tmp_path, failure):
-    from etx.tools.gpu_jobs import Runner
+    from etx.experiments.jobs import Runner
     jobs, _ = load_session(SESSION.with_name('vlbest3.py'))
     for job in jobs:
         job.cmd = 'exit 2' if job.name == failure else 'true'

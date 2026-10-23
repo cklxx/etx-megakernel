@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from etx.tools import gpu_jobs as gj
+from etx.experiments import jobs as gj
 
 ROOT = Path(__file__).resolve().parents[1]
 SESSION = ROOT / "examples/sessions/all_verify.py"

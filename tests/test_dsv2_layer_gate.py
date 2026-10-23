@@ -14,7 +14,8 @@ import subprocess
 import pytest
 
 from etx.session import batch
-from examples.dsv2lite import inplace_session as ins
+from etx.models.dsv2lite import session as ins
+from examples.dsv2lite import inplace_session as cli
 
 ROOT = Path(__file__).resolve().parents[1]
 SWITCH = "ETX_DS_LAYER_METRICS"
@@ -161,9 +162,9 @@ def test_layers_command_uses_own_reference_and_passes_switch_through_clean_env(t
     command = ["layers", ARM, "--reference-dir", str(reference)]
     if fail:
         with pytest.raises(ValueError, match="27/27 layer gate"):
-            ins.main(command)
+            cli.main(command)
     else:
-        ins.main(command)
+        cli.main(command)
     assert len(seen) == 1
     args, env = seen[0]
     assert str(logs / f"b_{ARM}" / "run") in args
@@ -182,7 +183,7 @@ def test_layers_command_uses_own_reference_and_passes_switch_through_clean_env(t
 def test_layers_cli_refuses_missing_reference_multi_request_and_ignored_reference(monkeypatch, args):
     monkeypatch.setattr(ins, "Session", lambda: pytest.fail("invalid diagnostic reached session construction"))
     with pytest.raises(SystemExit) as exc:
-        ins.main(args)
+        cli.main(args)
     assert exc.value.code == 2
 
 

@@ -8,7 +8,7 @@ import pytest
 from examples.vllm_llm import bench as b
 from examples.vllm_llm import import_certificate as cert
 from examples.vllm_llm.pairs import Refusal
-from tests.test_import_certificate import envelope, fixture_session
+from etx.testing.certificates import certificate_envelope as envelope, certified_import_session as fixture_session
 from tests.test_qwen300_hour import host_text
 
 

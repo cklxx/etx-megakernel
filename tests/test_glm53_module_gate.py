@@ -129,7 +129,7 @@ def test_unknown_gate_is_refused(staged):
 
 
 def test_module_session_runs_the_production_jobs_with_the_module_gate(monkeypatch):
-    from etx.tools.gpu_jobs import load_session
+    from etx.experiments.jobs import load_session
     monkeypatch.setenv('ETX_GLM_GATE', 'module')
     monkeypatch.setenv('ETX_GLM_BATCH', str(mg.BATCH))
     jobs, cap = load_session(ROOT / 'examples/sessions/glm53_model.py')
@@ -254,7 +254,8 @@ print(f'GLM-MODEL-EXECUTED batch={{batch}} layers={{len(m.spec["config"]["layer_
 
 def test_production_qualification_and_verify_end_to_end_on_a_cpu_launcher(prepared, tmp_path):
     """run.qualify and two_gpu_verify --gate module, unchanged, with build/run replaced by the CPU body."""
-    from examples.glm53 import model_build, run
+    from etx.models.glm53 import model_build
+    from examples.glm53 import run
     d, _ = prepared
     spec = stage.validate(d / 'stage', gate='module')
     build = tmp_path / 'record/model'

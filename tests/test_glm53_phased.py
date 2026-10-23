@@ -2,7 +2,8 @@
 import ctypes
 import pytest
 
-from examples.glm53 import cpu_check, model, model_build
+from etx.models.glm53 import model_build
+from examples.glm53 import cpu_check, model
 from examples.glm53.options import Options
 from etx.ir import Scope
 from etx.passes import compile_graph, verify_plan

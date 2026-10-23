@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from etx.tools.gpu_jobs import load_jobs
+from etx.experiments.jobs import load_jobs
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -62,7 +62,9 @@ def _references(parts):
         if module.split(".")[0] in sys.stdlib_module_names:
             # Environment setup uses `python3 -m venv`, supplied by Python.
             return
-        yield Path(module.replace(".", "/") + ".py")
+        package = Path(module.replace('.', '/'))
+        entry = package / '__main__.py'
+        yield entry if (ROOT / entry).is_file() else package.with_suffix('.py')
     else:
         script = args[0]
         if script.startswith(("/", "~", "$")) or ":" in script:
@@ -83,6 +85,7 @@ def test_session_python_references_exist(session):
 
 
 @pytest.mark.parametrize("command, expected", [
+    ("python3 -m examples.experiment_program preflight", ["examples/experiment_program/__main__.py"]),
     ("python3 -m examples.vllm_llm.nvref_report x", ["examples/vllm_llm/nvref_report.py"]),
     ("PYTHONPATH=. .venv/bin/python -u -m etx.tools.timeline x", ["etx/tools/timeline.py"]),
     ("python3 examples/llm/vllm_bench.py", ["examples/llm/vllm_bench.py"]),

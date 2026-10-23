@@ -10,8 +10,8 @@ import pytest
 from etx.ir import Scope
 from etx.passes import compile_graph
 from etx.passes.plan import verify_plan
-from etx.tools.gpu_jobs import load_session
-from examples.glm53 import seam
+from etx.experiments.jobs import load_session
+from etx.models.glm53 import seam
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -171,114 +171,19 @@ def test_malformed_failure_records(tmp_path, text):
         seam.parse_log(path)
 
 
-def test_offline_cli_without_gpu(tmp_path):
-    path = write_log(tmp_path, receipts(trace=True))
-    proc = subprocess.run([sys.executable, '-m', 'examples.glm53.seam', 'summary', str(path)],
-                          cwd=ROOT, text=True, capture_output=True, timeout=20)
-    assert proc.returncode == 0, proc.stderr
-    assert json.loads(proc.stdout)['status'] == 'COMPLETE'
-    path.write_text('truncated run\n')
-    proc = subprocess.run([sys.executable, '-m', 'examples.glm53.seam', 'summary', str(path)],
-                          cwd=ROOT, text=True, capture_output=True, timeout=20)
-    assert proc.returncode == 2 and 'INCOMPLETE' in proc.stderr
 
 
-@pytest.mark.parametrize('args', [
-    ['--iterations', '0'], ['--rounds', '-1'], ['--warmup', '0'],
-    ['--timeout', 'nan'], ['--batches', '1', '1'],
-])
-def test_run_arguments_fail_before_gpu_call(tmp_path, args):
-    logdir = tmp_path/'logs'
-    assert seam.main(['run', '--build-root', str(tmp_path/'build'), '--logdir', str(logdir), *args]) == 2
-    assert not logdir.exists()
 
 
-def test_runner_missing_binary_keeps_full_log_and_fails(tmp_path):
-    logs = tmp_path/'logs'
-    assert seam.main(['run', '--build-root', str(tmp_path/'missing'), '--logdir', str(logs), '--batches', '1']) == 2
-    assert (logs/'b1-trace0.log').exists()
 
 
-def test_cli_defaults_and_fake_binary_complete_dry_run(tmp_path, monkeypatch, capsys):
+def test_cli_defaults(tmp_path, monkeypatch):
+    # Internal probe: the parsed defaults handed to the runner (the dry run itself is in tests/e2e).
     captured = []
-    actual_run = seam.run
     monkeypatch.setattr(seam, 'run', captured.append)
     assert seam.main(['run', '--build-root', str(tmp_path/'build'), '--logdir', str(tmp_path/'default-logs')]) == 0
     args = captured[0]
     assert (args.batches, args.iterations, args.rounds, args.warmup) == ([1, 2, 4, 8], 1000, 5, 20)
-    monkeypatch.setattr(seam, 'run', actual_run)
-    # Execute the real orchestration against a CPU-only protocol fixture.
-    exe = tmp_path/'build'/'b1'/'run'
-    exe.parent.mkdir(parents=True)
-    (exe.parent/'plan.json').write_text('{"fixture": "CPU dry run, not a real plan"}\n')
-    (exe.parent/'plan_data.h').write_text('// CPU dry-run fixture\n')
-    cases = {str(int(trace)): '\n'.join(f'{k} {json.dumps(v)}' for k, v in
-                                      receipts(batch=1, trace=trace, iterations=1, rounds=1))
-             for trace in (False, True)}
-    exe.write_text(f'#!{sys.executable}\nimport json, sys\ncases = {cases!r}\n'
-                   'print("unfiltered fake native diagnostics")\nprint(cases[sys.argv[4]])\n')
-    exe.chmod(0o755)
-    logs = tmp_path/'dry-logs'
-    assert seam.main(['run', '--build-root', str(tmp_path/'build'), '--logdir', str(logs),
-                      '--batches', '1', '--iterations', '1', '--rounds', '1', '--warmup', '1']) == 0
-    for trace in (False, True):
-        log = logs/f'b1-trace{int(trace)}.log'
-        assert 'unfiltered fake native diagnostics' in log.read_text()
-        seam.parse_log(log)
-    manifest = json.loads((logs/'manifest.json').read_text())
-    assert manifest['status'] == 'COMPLETE' and not manifest['model_certification']
-    assert len(manifest['runs']) == 2
-    for entry in manifest['runs']:
-        assert entry['status'] == 'PASS'
-        assert entry['log_sha256'] == seam._sha256(entry['log'])
-        for artifact in entry['artifacts'].values():
-            assert artifact['sha256'] == seam._sha256(artifact['path'])
-    assert 'COMPLETE' in capsys.readouterr().out
-    all_logs = sorted(logs.glob('*.log'))
-    assert all(r['runner_manifest_verified'] for r in seam.summarize(all_logs)['runs'])
-    all_logs[0].write_text(all_logs[0].read_text()+'extra chatter after collection\n')
-    with pytest.raises(ValueError, match='hash'):
-        seam.summarize(all_logs)
-
-
-@pytest.mark.parametrize('wrong', [
-    dict(batch=2), dict(trace=True), dict(iterations=1), dict(rounds=1), dict(warmup=1),
-])
-def test_runner_rejects_internally_complete_wrong_contract(tmp_path, wrong):
-    requested = dict(batch=1, trace=False, iterations=2, rounds=2, warmup=2)
-    actual = dict(requested, **wrong)
-    data = '\n'.join(f'{k} {json.dumps(v)}' for k, v in receipts(**actual))
-    exe = tmp_path/'build'/'b1'/'run'
-    exe.parent.mkdir(parents=True)
-    (exe.parent/'plan.json').write_text('{}')
-    (exe.parent/'plan_data.h').write_text('// fixture')
-    exe.write_text(f'#!{sys.executable}\nprint({data!r})\n')
-    exe.chmod(0o755)
-    logs = tmp_path/'logs'
-    assert seam.main(['run', '--build-root', str(tmp_path/'build'), '--logdir', str(logs),
-                      '--batches', '1', '--iterations', '2', '--rounds', '2', '--warmup', '2']) == 2
-    # The receipt itself was complete; only the request contract catches this mismatch.
-    seam.parse_log(logs/'b1-trace0.log')
-    manifest = json.loads((logs/'manifest.json').read_text())
-    assert manifest['status'] == 'FAILED'
-    assert 'contract' in manifest['runs'][0]['error']
-    assert not (logs/'b1-trace1.log').exists()
-
-
-def test_runner_enforces_process_deadline_and_preserves_partial_log(tmp_path, capsys):
-    exe = tmp_path/'build'/'b1'/'run'
-    exe.parent.mkdir(parents=True)
-    (exe.parent/'plan.json').write_text('{"fixture": "CPU dry run, not a real plan"}\n')
-    (exe.parent/'plan_data.h').write_text('// CPU dry-run fixture\n')
-    exe.write_text('#!/bin/sh\nprintf "%s\\n" "partial native log"\nexec sleep 30\n')
-    exe.chmod(0o755)
-    logs = tmp_path/'timeout-logs'
-    assert seam.main(['run', '--build-root', str(tmp_path/'build'), '--logdir', str(logs),
-                      '--batches', '1', '--timeout', '0.2']) == 2
-    assert (logs/'b1-trace0.log').exists()  # Deadline may fire before the OS starts the child.
-    assert 'timed out' in capsys.readouterr().err
-    with pytest.raises(ValueError, match='INCOMPLETE'):
-        seam.parse_log(logs/'b1-trace0.log')
 
 
 def test_native_source_has_watchdogs_and_untimed_validation():

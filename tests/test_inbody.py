@@ -11,7 +11,7 @@ import pytest
 from etx.codegen import emit_kernel
 from etx.codegen.inbody import instrument
 from etx.tools import inbody
-from examples.vllm_llm.bf16_300 import dispatcher, launch, launch_source, pack
+from etx.models.vllm_llm.bf16_300 import dispatcher, launch, launch_source, pack
 
 
 def test_tick_waits_before_using_async_scalar_result(tmp_path):
@@ -222,7 +222,7 @@ def test_session_report_requires_all_five_full_runs():
 
 
 def test_off_identity_normalizes_only_source_locations():
-    from examples.vllm_llm.bf16_300.inbody_cpu import normalize_ir
+    from etx.models.vllm_llm.bf16_300.inbody_cpu import normalize_ir
     source='call void asm "", ""(), !srcloc !1\n!1 = !{i32 123, i64 456}\n!2 = !{i64 789}\nadd i64 456, 1\n'
     result=normalize_ir(source)
     assert '!1 = !{i32 0, i64 0}' in result

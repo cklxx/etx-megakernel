@@ -7,7 +7,7 @@ import sys
 import time
 
 import pytest
-from examples.vllm_llm.expert_merge import capture, inputs, prepare, protocol, runner, source
+from etx.models.vllm_llm.expert_merge import capture, inputs, paths, prepare, protocol, runner, source
 
 
 def test_source_keeps_producers_and_exact_statistics():
@@ -264,9 +264,9 @@ def archive_capture(tmp_path,monkeypatch):
     (build/'run').write_bytes(b'non-executable attestation fixture')
     (build/'vl_plan.txt').write_text('test-only plan\n')
     runner.dump(emitted/'source.json',dict(source_host='test-only',
-        generated_host=prepare.sha(emitted/'capture_host.hip'),capture_header=prepare.sha(capture.HERE/'capture.h')))
+        generated_host=prepare.sha(emitted/'capture_host.hip'),capture_header=prepare.sha(paths.HERE/'capture.h')))
     runner.dump(build/'hipcc_command.json',['hipcc',str(emitted/'capture_host.hip'),'-o',str(build/'run')])
-    monkeypatch.setattr(capture,'ROOT',root)
+    monkeypatch.setattr(paths,'ROOT',root)
     def no_git(*args,**kwargs):
         pytest.fail('archive attestation must not invoke Git')
     monkeypatch.setattr(capture.subprocess,'check_output',no_git)
@@ -310,7 +310,7 @@ def test_capture_git_identity(tmp_path,monkeypatch):
     capture.subprocess.run(['git','-c','user.name=Attestation Test','-c','user.email=test@example.invalid',
                             '-c','commit.gpgsign=false','-c','core.hooksPath=/dev/null',
                             'commit','-q','--allow-empty','-m','test fixture'],cwd=tmp_path,check=True)
-    monkeypatch.setattr(capture,'ROOT',tmp_path)
+    monkeypatch.setattr(paths,'ROOT',tmp_path)
     identity=capture.source_identity()
     assert identity['kind']=='git'
     assert len(identity['commit'])==40
@@ -335,7 +335,7 @@ def test_capture_complete_receipt_and_coverage(tmp_path,monkeypatch,layer,consum
 
 
 def test_session_job_graph(monkeypatch):
-    from etx.tools.gpu_jobs import load_session
+    from etx.experiments.jobs import load_session
     path=prepare.ROOT/'examples/sessions/qwen_expert_merge.py'
     monkeypatch.delenv('EEM_INPUT',raising=False)
     jobs,cap=load_session(path)

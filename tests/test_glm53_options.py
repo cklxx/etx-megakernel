@@ -4,7 +4,8 @@ from pathlib import Path
 import sys
 import pytest
 
-from examples.glm53 import model, model_build, options, run
+from etx.models.glm53 import model_build
+from examples.glm53 import model, options, run
 
 
 def test_original_defaults_and_planner_not_compiler_register_claim():

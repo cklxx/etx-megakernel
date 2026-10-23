@@ -12,7 +12,7 @@ from pathlib import Path
 from etx.codegen import manifest
 
 ROOT = Path(__file__).resolve().parents[1]
-BUILDS = [ROOT / "examples/vllm_llm/build.sh", ROOT / "examples/vllm_llm/rocm_build_check.sh"]
+BUILDS = [ROOT / "etx/models/vllm_llm/build.sh", ROOT / "examples/vllm_llm/rocm_build_check.sh"]
 
 
 def test_round14_nb_and_requests_come_from_the_plan():

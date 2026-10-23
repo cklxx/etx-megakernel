@@ -18,8 +18,8 @@ HIPCC_STUB = sys.executable
 EVIDENCE = ROOT / 'docs/evidence/qwen-batch-glm53'
 sys.path.insert(0, str(ROOT))
 
-from examples.glm53.run_all import (MONO_GFX942, WEIGHT_COPY_FACTOR, Failure,
-                                    annotate, reading_budget)
+from etx.models.glm53.run_all import (MONO_GFX942, WEIGHT_COPY_FACTOR, Failure,
+                                       annotate, reading_budget)
 
 
 def run(*flags, env=None):

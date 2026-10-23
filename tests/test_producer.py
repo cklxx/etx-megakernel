@@ -164,7 +164,8 @@ def test_lease_excludes_duplicate_and_retry_does_not_extend(tmp_path):
 
 
 def test_session_graph_resolution_and_cap(monkeypatch):
-    from etx.tools.gpu_jobs import load_session,main
+    from etx.experiments.jobs import load_session
+    from etx.tools.gpu_jobs import main
     jobs,cap=load_session(ROOT/'examples/sessions/qwen_producer.py')
     assert cap==3600
     assert [j.name for j in jobs if j.lane=='gpu']==['qualify','measure','diagnose']

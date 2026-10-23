@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from etx.tools.gpu_jobs import load_session
+from etx.experiments.jobs import load_session
 from examples.dsv2lite.arms import ARMS, SINGLE
 from examples.dsv2lite.acquire import ACQUIRE, RELAXED
 

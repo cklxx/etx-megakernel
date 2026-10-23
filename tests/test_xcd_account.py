@@ -48,16 +48,3 @@ def test_critical_account_telescopes(sim_trace):
     assert sum(e["sum_us"] for e in edges) + first_gap == pytest.approx(c["total"]["dep_gap"] + c["total"]["queue_gap"])
 
 
-def test_main_writes_outputs(sim_trace, tmp_path):
-    pj, rows = sim_trace
-    raw = tmp_path / "t.bin"
-    raw.write_bytes(array("q", [v for r in rows for v in r]).tobytes())
-    (tmp_path / "plan.json").write_text(json.dumps(pj))
-    (tmp_path / "b.json").write_text(json.dumps(dsb.spec()))
-    out = tmp_path / "acct"
-    assert xa.main([str(tmp_path / "plan.json"), str(raw), "--bytes", str(tmp_path / "b.json"), "--out", str(out),
-                    "--layer", "1"]) == 0
-    assert "critical path" in (out / "account.txt").read_text()
-    assert json.loads((out / "account.json").read_text())["workers"] > 0
-    assert (out / "xcd_layer1.svg").read_text().startswith("<svg")
-    assert set(json.loads((out / "xcd_series_step.json").read_text())["xcd"]) == {str(d) for d in range(pj["domains"])}

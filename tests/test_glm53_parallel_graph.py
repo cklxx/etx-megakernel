@@ -4,7 +4,8 @@ from dataclasses import replace
 import pytest
 from etx.ir import Scope
 from etx.passes import compile_graph, verify_plan
-from examples.glm53 import model, model_build
+from etx.models.glm53 import model_build
+from examples.glm53 import model
 from examples.glm53.options import Options
 
 

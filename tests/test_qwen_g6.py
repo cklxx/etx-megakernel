@@ -60,7 +60,7 @@ def test_timed_invocation_gate():
 
 
 def test_job_graph_gates_every_gpu_job_on_what_it_runs():
-    from etx.tools.gpu_jobs import load_session
+    from etx.experiments.jobs import load_session
     jobs, limit = load_session(ROOT / "examples/sessions/qwen_g6.py")
     by = {j.name: j for j in jobs}
     assert [j.name for j in jobs if j.lane == "gpu"] == ["moerows", "stage_pack", "certify_kept", "certify_kept_l1",
@@ -73,7 +73,7 @@ def test_job_graph_gates_every_gpu_job_on_what_it_runs():
 
 
 def test_staging_is_pinned_before_anything_is_fetched():
-    from etx.tools.gpu_jobs import load_session
+    from etx.experiments.jobs import load_session
     from examples.vllm_llm.vm_preflight import VLLM_TAG
     jobs, _ = load_session(ROOT / "examples/sessions/qwen_g6.py")
     by = {j.name: j for j in jobs}

@@ -2,8 +2,11 @@
 # Offline regression checks; optional argument permits mutation checks on a copy.
 set -eu
 SCRIPT=${1:-tools/session.sh}
+# Source checks read the transport implementation; behaviour checks drive the caller-facing script.
+IMPL=${2:-etx/session/transport.sh}
 bash -n "$SCRIPT"
-grep -F 'rsync -azL rocm-headers/inc $H:~/rocm-headers/ &&' "$SCRIPT" >/dev/null
+bash -n "$IMPL"
+grep -F 'rsync -azL rocm-headers/inc $H:~/rocm-headers/ &&' "$IMPL" >/dev/null
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT HUP INT TERM
 mkdir "$TMP/bin"
@@ -46,9 +49,9 @@ EOF
 cmp "$TMP/expected" "$COMMAND_LOG"
 grep -F 'Passing ETX_GLM_BATCH=2' "$TMP/output" >/dev/null
 # Preflight dry-runs the two sessions it packages, not vlbest.
-grep -F 'python3 -m etx.tools.gpu_jobs examples/sessions/qwen_batch_correctness.py --gpus 0 --dry-run' "$SCRIPT" >/dev/null
-grep -F 'python3 -m etx.tools.gpu_jobs examples/sessions/glm53_model.py --gpus 0,1 --dry-run' "$SCRIPT" >/dev/null
-! grep -F 'examples.sessions.vlbest --dry-run' "$SCRIPT" >/dev/null
+grep -F 'python3 -m etx.tools.gpu_jobs examples/sessions/qwen_batch_correctness.py --gpus 0 --dry-run' "$IMPL" >/dev/null
+grep -F 'python3 -m etx.tools.gpu_jobs examples/sessions/glm53_model.py --gpus 0,1 --dry-run' "$IMPL" >/dev/null
+! grep -F 'examples.sessions.vlbest --dry-run' "$IMPL" >/dev/null
 # status runs its remote command under `sh -c` like sshd: it must not count that shell (or awk)
 # as the runner, and must see a real `python3 -m etx.tools.gpu_jobs` process.
 mkdir -p "$TMP/home/sess" "$TMP/fake/etx/tools"

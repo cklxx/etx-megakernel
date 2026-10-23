@@ -1,17 +1,22 @@
+"""Session transport workflows through the external process API (tools/session.sh translator); local stubs, no host."""
 from pathlib import Path
-import subprocess
 import json
 import os
+import sys
 
 import pytest
+from etx.testing import run_command
+
+ROOT = Path(__file__).resolve().parents[2]
+run_cmd = run_command
 
 
 def test_session_sh():
-    script = Path(__file__).resolve().with_suffix('.sh')
-    subprocess.run(['bash', str(script)], cwd=script.parent.parent, check=True)
+    script = ROOT / 'tests/e2e/session_sh_offline.sh'
+    run_cmd(['bash', str(script)], cwd=ROOT, check=True,
+                   env=dict(os.environ, ETX_PYTHON=sys.executable))
 
 
-ROOT = Path(__file__).resolve().parent.parent
 
 
 def stub(tmp_path, name, body):
@@ -32,7 +37,8 @@ echo 7.14.0''')
     stub(tmp_path, 'sleep', 'echo "SLEEP $1"; touch "$HOME/slept"')
     stub(tmp_path, 'sudo', '[ "$*" = "docker info" ] && [ "${DOCKER_FAIL:-0}" = 0 ]')
     stub(tmp_path, 'python3', 'test -f etx/tools/gpu_jobs.py && echo "69 jobs; budget stub"')
-    env = dict(os.environ, HOME=str(tmp_path), PATH=str(tmp_path / 'bin') + ':' + os.environ['PATH'])
+    env = dict(os.environ, HOME=str(tmp_path), PATH=str(tmp_path / 'bin') + ':' + os.environ['PATH'],
+               ETX_PYTHON=sys.executable)
     return tmp_path, env
 
 
@@ -45,7 +51,7 @@ def pushed(tree):
 
 
 def run_session(env, *args):
-    return subprocess.run(['bash', str(ROOT / 'tools/session.sh'), *args],
+    return run_cmd(['bash', str(ROOT / 'tools/session.sh'), *args],
                           cwd=ROOT, env=env, text=True, capture_output=True)
 
 
@@ -96,7 +102,7 @@ def capture(dest):
 
 
 def report(dest):
-    return subprocess.run(['python3', str(ROOT / 'tools/session_postmortem.py'), str(dest)], text=True,
+    return run_cmd(['python3', str(ROOT / 'tools/session_postmortem.py'), str(dest)], text=True,
                           capture_output=True)
 
 
@@ -126,15 +132,15 @@ def box(tmp_path):
     """The box is this machine under HOME=tmp_path: ssh runs its command locally, rsync drops the host prefix."""
     stub(tmp_path, 'ssh', 'shift 5; exec bash -c "$*"')
     stub(tmp_path, 'rsync', 'a=(); for x in "$@"; do a+=("${x/#*@localhost:/$HOME/}"); done; exec /usr/bin/rsync "${a[@]}"')
-    env = dict(os.environ, HOME=str(tmp_path), PATH=str(tmp_path / 'bin') + ':' + os.environ['PATH'])
+    env = dict(os.environ, HOME=str(tmp_path), PATH=str(tmp_path / 'bin') + ':' + os.environ['PATH'],
+               ETX_PYTHON=sys.executable)
     return tmp_path, env
 
 
 def sealed_session(tmp_path, cmd):
-    import sys
     session = tmp_path / 'session.py'
     session.write_text(f'JOBS = [dict(name="work", lane="cpu", cmd={cmd!r})]\n')
-    subprocess.run([sys.executable, '-m', 'etx.tools.gpu_jobs', str(session), '--gpus', '', '--logdir',
+    run_cmd([sys.executable, '-m', 'etx.tools.gpu_jobs', str(session), '--gpus', '', '--logdir',
                     str(tmp_path / 'sess')], cwd=ROOT, check=False, capture_output=True, timeout=30)
     return max((tmp_path / 'sess').iterdir())
 
@@ -152,7 +158,7 @@ def test_fetch_copies_one_sealed_record_into_its_own_directory(box):
     assert run_session(env, 'fetch', 'localhost', str(dest)).returncode == 2          # R12: never onto a copy
     (got / 'pairs_x.json').write_text('changed\n')                                    # R04: the copy is checked
     (got / 'stale.json').write_text('{}')                                              # R12: nothing unsealed counts
-    out = subprocess.run(['python3', str(ROOT / 'etx/session/record.py'), 'verify', str(got)], text=True,
+    out = run_cmd(['python3', str(ROOT / 'etx/session/record.py'), 'verify', str(got)], text=True,
                          capture_output=True).stdout
     assert 'MISMATCH pairs_x.json' in out and 'NOT IN THE SEALED MANIFEST stale.json' in out
 
@@ -166,7 +172,7 @@ def test_incomplete_unsealed_and_absent_records_are_never_results(box):
     result = run_session(env, 'fetch', 'localhost', str(tmp_path / 'a'), 'unsealed')
     assert result.returncode == 3 and 'UNSEALED' in result.stdout
     for d in ('sess/unsealed', f'sess/{rec.name}'):
-        subprocess.run(['rm', '-rf', str(tmp_path / d)], check=True)
+        run_cmd(['rm', '-rf', str(tmp_path / d)], check=True)
     (tmp_path / 'sess/startup.abc').write_text("ModuleNotFoundError: No module named 'etx'\n")
     result = run_session(env, 'postmortem', 'localhost', str(tmp_path / 'pm'))       # R12: startup-failed box
     assert result.returncode == 1 and 'NO RECORD' in result.stdout and 'UNCAPTURED' in result.stdout
@@ -179,22 +185,22 @@ def test_stage_extracts_the_commit_into_a_new_directory(box, tmp_path):
     (repo / 'tools').mkdir(parents=True)
     (repo / 'tools/session.sh').write_bytes((ROOT / 'tools/session.sh').read_bytes())
     (repo / '.gitignore').write_text('*.pyc\n')
-    git = lambda *a: subprocess.run(['git', '-C', str(repo), *a], check=True, capture_output=True)
+    git = lambda *a: run_cmd(['git', '-C', str(repo), *a], check=True, capture_output=True)
     git('init', '-q'); git('add', '.'); git('-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', 'x')
     (repo / 'yaml.pyc').write_text('ignored, untracked')                           # R08: never staged
     (tmp / 'etx').mkdir()
     (tmp / 'etx/yaml.pyc').symlink_to(tmp / 'elsewhere')                            # R08': a used box's tree
-    result = subprocess.run(['bash', str(repo / 'tools/session.sh'), 'stage', 'localhost'], env=env, text=True,
+    # The copied translator stages its own repository with this checkout's etx.
+    env = dict(env, PYTHONPATH=str(ROOT))
+    result = run_cmd(['bash', str(repo / 'tools/session.sh'), 'stage', 'localhost'], env=env, text=True,
                             capture_output=True)
     assert result.returncode == 0, result.stdout + result.stderr
     staged = (tmp / 'etx').resolve()
     assert sorted(p.name for p in staged.iterdir()) == ['.gitignore', 'SOURCE_IDENTITY', 'tools']
-    from examples.dsv2lite.inplace_session import Session
-    s = object.__new__(Session)
-    s.root = staged
-    assert 'archive ' + staged.name[:64] in s.source_identity()
+    # The staged tree is named by its archive hash and records it (what the session harness checks).
+    assert 'archive ' + staged.name[:64] in (staged / 'SOURCE_IDENTITY').read_text()
     (repo / '.gitignore').write_text('changed\n')                                  # an uncommitted change: refused
-    assert subprocess.run(['bash', str(repo / 'tools/session.sh'), 'stage', 'localhost'], env=env,
+    assert run_cmd(['bash', str(repo / 'tools/session.sh'), 'stage', 'localhost'], env=env,
                           capture_output=True).returncode == 2
 
 
@@ -209,7 +215,7 @@ def test_failed_or_symlinked_refetch_never_yields_a_verifiable_old_capture(box):
     dest = tmp_path / 'failed'
     assert run_session(env, 'fetch', 'localhost', str(dest)).returncode != 0
     assert not (dest / rec.name).exists()
-    out = subprocess.run(['python3', str(ROOT / 'etx/session/record.py'), 'verify', str(dest / f'{rec.name}.partial')],
+    out = run_cmd(['python3', str(ROOT / 'etx/session/record.py'), 'verify', str(dest / f'{rec.name}.partial')],
                          text=True, capture_output=True)
     assert out.returncode != 0
     stub(tmp_path, 'rsync', 'a=(); for x in "$@"; do a+=("${x/#*@localhost:/$HOME/}"); done; exec /usr/bin/rsync "${a[@]}"')
@@ -219,3 +225,15 @@ def test_failed_or_symlinked_refetch_never_yields_a_verifiable_old_capture(box):
     (tmp_path / 'alias').symlink_to(real)
     assert run_session(env, 'fetch', 'localhost', str(tmp_path / 'alias')).returncode == 2
     assert {p.relative_to(real): p.read_bytes() for p in real.rglob('*') if p.is_file()} == before
+
+
+def test_driver_side_scripts_run_under_the_system_python():
+    # The transport runs these with the driver's system python3 (3.9 on macOS), not the project venv.
+    import ast
+    for name in ('etx/session/record.py', 'tools/session_postmortem.py'):
+        ast.parse((ROOT / name).read_text(), feature_version=(3, 9))
+        system = Path('/usr/bin/python3')
+        if system.is_file():
+            # Executing the module body evaluates annotations, which is where `str | None` broke 3.9.
+            run_cmd([str(system), '-I', '-c', 'import runpy,sys; runpy.run_path(sys.argv[1], run_name="driver")',
+                            str(ROOT / name)], check=True, capture_output=True, timeout=30)

@@ -4,6 +4,7 @@ family's accessors switch to agent-scope loads through the feature manifest; fle
 with tiles that do not implement it is refused."""
 from __future__ import annotations
 
+from pathlib import Path
 import re
 
 import pytest
@@ -111,9 +112,21 @@ def test_deepseek_l1_plan_without_fleet_accessors_is_refused(tmp_path, pinned_sr
     assert coh_check.main([str(mk), str(pinned_src)]) == 2
 
 
-def test_deepseek_build_scripts_add_the_family_accessors():
-    sh = open("examples/dsv2lite/build.sh").read()
-    assert re.search(r'ETX_COHERENCE:-declared\}" = l1.*\n.*l1_loads', sh)
+def test_deepseek_build_scripts_add_the_family_accessors(tmp_path):
+    # The build rule moved from examples/dsv2lite/build.sh into its library provider; check its behaviour.
+    import hashlib
+    from etx.external import ModelBuildRequest, PlanRequest, model
+    from etx.models import dsv2lite
+    root = Path(__file__).resolve().parents[1]
+    graph = root / "examples/dsv2lite/graph.py"
+    def refine(**variant):
+        work = model("dsv2lite", config=dict(declaration=str(graph), declaration_sha256=hashlib.sha256(graph.read_bytes()).hexdigest()))
+        return dsv2lite.refine(ModelBuildRequest(PlanRequest(work), str(root), str(tmp_path), str(root / "examples/dsv2lite/host.hip"),
+                                                 provider="dsv2lite", variant=dict(fleet="/fleet", **variant)))
+    l1 = refine(coherence="l1", patches="gemv_noinline")
+    assert l1.variant["patches"] == "gemv_noinline l1_loads" and l1.variant["fleet_src"] == f"{tmp_path}/fleet_src"
+    assert refine(coherence="l1", patches="l1_loads").variant["patches"] == "l1_loads"
+    assert refine(coherence="declared").variant["patches"] == "" and refine().variant["fleet_src"] == "/fleet/src"
     rc = open("examples/dsv2lite/rocm_build_check.sh").read()
     assert "ETX_DSV2_*|ETX_COHERENCE)" in rc and "+l1_loads" in rc
     assert "ETX_COHERENCE; do" in open("examples/vllm_llm/rocm_build_check.sh").read()

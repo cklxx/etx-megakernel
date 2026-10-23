@@ -8,6 +8,11 @@ if str(ROOT) not in sys.path:
 import pytest
 
 
+def pytest_configure(config):
+    from etx.testing import external_test_policy
+    config.pluginmanager.register(external_test_policy(ROOT / 'tests' / 'e2e'), 'etx-external-policy')
+
+
 @pytest.fixture(scope="session")
 def pinned_src():
     """fleet's src at 3fb67a6 (git archive, hash-checked; never its working tree)."""

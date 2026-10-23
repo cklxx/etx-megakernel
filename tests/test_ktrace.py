@@ -11,7 +11,7 @@ import pytest
 
 from etx.tools import ktrace
 from examples.vllm_llm.kcmp_report import decide
-from etx.tools.gpu_jobs import load_jobs
+from etx.experiments.jobs import load_jobs
 
 
 ROOT = Path(__file__).resolve().parents[1]

@@ -9,7 +9,7 @@ from examples.glm53 import boundary, oracle, prepare
 from examples.llm.model import load_dims
 from etx.ir import Scope
 from etx.passes import compile_graph, verify_plan
-from etx.tools.gpu_jobs import load_session
+from etx.experiments.jobs import load_session
 
 
 def test_exact_identity_architecture_and_complete_ownership():

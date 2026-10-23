@@ -3,7 +3,7 @@ import json
 
 import pytest
 
-from etx.tools import fresh_handoff as probe
+from etx.experiments import fresh_handoff as probe
 
 
 def fixture(root, monkeypatch, mode='cached', topology='cross'):

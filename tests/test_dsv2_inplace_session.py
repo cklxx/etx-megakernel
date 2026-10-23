@@ -11,8 +11,9 @@ import stat
 
 import pytest
 
-from etx.tools.gpu_jobs import load_session
-from examples.dsv2lite import inplace_session as ins
+from etx.experiments.jobs import load_session
+from etx.models.dsv2lite import session as ins
+from examples.dsv2lite import inplace_session as cli
 from etx.session.experiment import decide, ns, report, verify
 from examples.dsv2lite import arms as registry
 from examples.dsv2lite.arms import ARMS, LEVERS_ALL, SINGLE, full_result
@@ -283,10 +284,10 @@ def test_d5_two_way_pairs_require_every_invocation_complete(tmp_path, monkeypatc
     path = Path(os.environ["ETX_SESS_LOGDIR"]) / "pairs_alld5.json"
     if failure:
         with pytest.raises((ValueError, RuntimeError)):
-            ins.main(["pairs", "alld5"])
+            cli.main(["pairs", "alld5"])
         assert not path.exists()                 # no verdict from nine correct invocations
     else:
-        ins.main(["pairs", "alld5"])
+        cli.main(["pairs", "alld5"])
         report = json.loads(path.read_text())
         assert set(report["device_ms"]) == set(report["wall_ms"]) == {"all"}
         assert report["device_ms"]["all"]["median_us"] == pytest.approx(50)

@@ -165,7 +165,7 @@ def test_d4_verdict_and_trace_criterion(monkeypatch):
 
 
 def test_d4s_session_builds_the_three_arms_before_timing(monkeypatch):
-    from etx.tools.gpu_jobs import load_session
+    from etx.experiments.jobs import load_session
     monkeypatch.delenv("ETX_SESS_MAX_SECONDS", raising=False)
     jobs, limit = load_session(ROOT / "examples/sessions/ds_d4s.py")
     by = {j.name: j for j in jobs}
@@ -187,7 +187,7 @@ def test_d4s_session_builds_the_three_arms_before_timing(monkeypatch):
 
 
 def _slice_session(tmp_path, monkeypatch):
-    from examples.dsv2lite.inplace_session import Session
+    from etx.models.dsv2lite.session import Session
     for name in ("ETX_SESS_LOGDIR", "ETX_DSV2_FLEET", "ETX_DSV2_DATA"):
         monkeypatch.setenv(name, str(tmp_path / name))
     return Session()

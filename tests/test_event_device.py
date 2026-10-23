@@ -5,7 +5,8 @@ import re
 from etx.codegen.plan_header import emit_plan_header
 from etx.ir import Scope
 from etx.passes import compile_graph
-from examples.glm53 import model, model_build
+from etx.models.glm53 import model_build
+from examples.glm53 import model
 from examples.glm53.options import Options
 
 ROOT = Path(__file__).resolve().parents[1]

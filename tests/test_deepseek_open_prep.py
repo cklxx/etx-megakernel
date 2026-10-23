@@ -6,7 +6,7 @@ import pytest
 from examples.dsv2lite.arms import ARMS, build_env
 from examples.dsv2lite import reference_prepare as refs
 from examples.dsv2lite import x8_correctness as x8
-from etx.tools.gpu_jobs import load_session
+from etx.experiments.jobs import load_session
 
 
 def log(b=1, fail=None):

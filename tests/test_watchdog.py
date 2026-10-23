@@ -121,7 +121,7 @@ def test_corrupt_ledger_fails_closed(tmp_path,mutation):
 
 def test_diagnostic_header_csr_is_exact_original_arrivals():
     from etx.codegen.plan_header import emit_plan_header
-    from examples.vllm_llm.bf16_300 import dispatcher
+    from etx.models.vllm_llm.bf16_300 import dispatcher
     h=emit_plan_header(dispatcher.graph('/tmp/tiles.hip'))
     assert '#define ETX_ARRIVAL_SLOTS 1' in h
     assert 'etx_arrival_offsets[3] = {0, 1, 1}' in h

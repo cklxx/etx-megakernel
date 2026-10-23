@@ -1,0 +1,1143 @@
+{
+  "schema_version": 1,
+  "legacy_baseline": [
+    "test_attention_early_merge.py",
+    "test_bandwidth_phases.py",
+    "test_bench_params.py",
+    "test_bench_sim.py",
+    "test_byte_ledger.py",
+    "test_cpu_check.py",
+    "test_decode_entry.py",
+    "test_deepseek_open_prep.py",
+    "test_ds_batch_attribution_tool.py",
+    "test_dsv2_batch.py",
+    "test_dsv2_batch_attribution.py",
+    "test_dsv2_batch_mechanism.py",
+    "test_dsv2_d4.py",
+    "test_dsv2_d5.py",
+    "test_dsv2_inplace_session.py",
+    "test_dsv2_layer_gate.py",
+    "test_dsv2_stage_table.py",
+    "test_dsv2_stamps.py",
+    "test_dsv2lite.py",
+    "test_environment_guard.py",
+    "test_etx_bench.py",
+    "test_etx_bench_batch.py",
+    "test_experiment_bounded_repair.py",
+    "test_experiment_columns.py",
+    "test_experiment_issue_order.py",
+    "test_experiment_review_repair.py",
+    "test_experiment_row_ops.py",
+    "test_experiment_session.py",
+    "test_experiment_session_integration.py",
+    "test_experiment_validation.py",
+    "test_expert_merge.py",
+    "test_fresh_handoff.py",
+    "test_glm53_model.py",
+    "test_glm53_module_gate.py",
+    "test_glm53_options.py",
+    "test_glm53_pairs.py",
+    "test_glm53_parallel_variants.py",
+    "test_glm53_phased.py",
+    "test_glm53_preparation.py",
+    "test_glm53_run_all.py",
+    "test_glm53_seam.py",
+    "test_glm53_slice.py",
+    "test_glm53_sweep.py",
+    "test_gpu_jobs.py",
+    "test_import_certificate.py",
+    "test_importer.py",
+    "test_ktrace.py",
+    "test_layer_budget.py",
+    "test_nvchk.py",
+    "test_nvref_report.py",
+    "test_packaging.py",
+    "test_pairs.py",
+    "test_plan_exports.py",
+    "test_producer.py",
+    "test_producer_readiness.py",
+    "test_publication_completion.py",
+    "test_publication_gap.py",
+    "test_qwen300_hour.py",
+    "test_qwen300_session.py",
+    "test_qwen_batch_correctness.py",
+    "test_qwen_g6.py",
+    "test_qwen_staging.py",
+    "test_ref_numpy.py",
+    "test_reset_pair.py",
+    "test_runtime_link_selected_header.py",
+    "test_select_planner.py",
+    "test_selection_manifest.py",
+    "test_session_references.py",
+    "test_session_sh.py",
+    "test_session_sh.sh",
+    "test_timeline.py",
+    "test_two_gpu_preflight.py",
+    "test_two_gpu_verify.py",
+    "test_vlbest_report.py",
+    "test_vlbest_session.py",
+    "test_vm_preflight.py",
+    "test_x5.py",
+    "test_xcd_account.py"
+  ],
+  "tests": {
+    "test_acquire_contract.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "IR/plan/runtime contract mutations and validation of existing builds; no build lifecycle."
+    },
+    "test_adapter_slots.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Slot arithmetic, wave strides and readfirstlane emission."
+    },
+    "test_all_verify.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Inspects declared job order, artifact writers and dependency isolation without executing sessions."
+    },
+    "test_api_boundary.py": {
+      "classification": "conformance",
+      "owners": [
+        "API-02"
+      ],
+      "reason": "Present at initial snapshot; new API policy test, excluded from legacy baseline."
+    },
+    "test_api_conformance.py": {
+      "classification": "conformance",
+      "owners": [
+        "API-04"
+      ],
+      "reason": "Added during review; read and confirmed supported etx.testing.conformance planning probes."
+    },
+    "test_api_families.py": {
+      "classification": "conformance",
+      "owners": [
+        "API-02",
+        "API-27"
+      ],
+      "reason": "Executable 14-set scaffold census; static entry-point policy plus installed-probe key binding, no native execution."
+    },
+    "test_api_fixture_policy.py": {
+      "classification": "conformance",
+      "owners": [
+        "API-02"
+      ],
+      "reason": "Present at initial snapshot; new inherited-fixture policy test, excluded from legacy baseline."
+    },
+    "test_api_gemm_provider.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Frozen graph/runtime/plan/emission signatures and isolated imports behind etx.testing; no native execution."
+    },
+    "test_api_inventory.py": {
+      "classification": "conformance",
+      "owners": [
+        "API-02"
+      ],
+      "reason": "Inventory schema and seeded migration-exception refusals; added after review snapshot."
+    },
+    "test_arm_configs.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Configuration schema and individual fusion-proof parsing."
+    },
+    "test_attention_early_merge.py": {
+      "classification": "mixed",
+      "owners": [
+        "API-21",
+        "API-24"
+      ],
+      "reason": "Protocol/source units plus precheck/execution/receipt, timeout and CLI workflows."
+    },
+    "test_bandwidth_phases.py": {
+      "classification": "mixed",
+      "owners": [
+        "API-02",
+        "API-24"
+      ],
+      "reason": "Arithmetic/parser units plus retained plan/trace CLI reporting."
+    },
+    "test_bar2_argpf.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Barrier counts, parity slots and argument-prefetch emission."
+    },
+    "test_bench_params.py": {
+      "classification": "conformance",
+      "owners": [
+        "API-24"
+      ],
+      "reason": "Parser/derivation units; the log-directory-to-JSON command moved to tests/e2e/test_api_bench_params.py."
+    },
+    "test_bench_sim.py": {
+      "classification": "conformance",
+      "owners": [
+        "API-12",
+        "API-24"
+      ],
+      "reason": "Protocol/readiness/provenance probes now run behind etx.testing; lifecycle coverage moved intact to tests/e2e/test_api_experiment.py through etx.external. Historical exception retained only in legacy_baseline."
+    },
+    "test_bf16_300.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Publication protocol, numerical/source identity and dispatcher probes; no launcher lifecycle."
+    },
+    "test_bigk.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Macro gating, derivation and host guard agreement."
+    },
+    "test_byte_ledger.py": {
+      "classification": "conformance",
+      "owners": [
+        "API-24"
+      ],
+      "reason": "Byte arithmetic and malformed-input units; the config/manifest CLI cases moved to tests/e2e/test_api_byte_ledger.py."
+    },
+    "test_check_replicas.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Replicated-plan shape and host-check source contract."
+    },
+    "test_codegen.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Emitter dispatch/layout, cache lifetime and standalone generated-HIP compilation probes."
+    },
+    "test_coh_model.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Coherence range and unchanged off/unfused behavior."
+    },
+    "test_coherence.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Acquire/writeback lowering for individual tile/event cases."
+    },
+    "test_coherence_mode.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Coherence lowering/accessor contracts; build shells are source-inspected, not executed."
+    },
+    "test_coverage_gate.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Writer/barrier/queue inventory with deliberate source mutations."
+    },
+    "test_cpu_check.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Result/archive conformance uses etx.testing; eight lifecycle and operational cases moved intact to external-only tests/e2e/test_api_acceptance.py. Historical exception retained in legacy_baseline."
+    },
+    "test_cpu_numerical.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Kernel numerical references, tolerances and routing ties, not full-model generation."
+    },
+    "test_decode_entry.py": {
+      "classification": "conformance",
+      "owners": [
+        "API-24"
+      ],
+      "reason": "Entry/shape/selection units; dry-run CLI cases moved to tests/e2e/test_api_decode_entry.py."
+    },
+    "test_deepseek_open_prep.py": {
+      "classification": "mixed",
+      "owners": [
+        "API-18",
+        "API-24"
+      ],
+      "reason": "Recipe/parser units plus reference regeneration, durable receipts and diagnostics orchestration."
+    },
+    "test_documentation_ownership.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Document moves, links and sealed-byte integrity."
+    },
+    "test_ds_batch_attribution_tool.py": {
+      "classification": "mixed",
+      "owners": [
+        "API-18",
+        "API-24"
+      ],
+      "reason": "Arithmetic/filter units plus report-file CLI ingestion and attribution output."
+    },
+    "test_dsv2_acquire.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Static arm configuration and explicit opt-in declarations."
+    },
+    "test_dsv2_batch.py": {
+      "classification": "mixed",
+      "owners": [
+        "API-18",
+        "API-24"
+      ],
+      "reason": "Layout/rule units plus batch gates, goldens, report verification and pair orchestration."
+    },
+    "test_dsv2_batch_attribution.py": {
+      "classification": "mixed",
+      "owners": [
+        "API-18",
+        "API-24"
+      ],
+      "reason": "Counter/trace units plus arm execution, gating, stop behavior and final report."
+    },
+    "test_dsv2_batch_mechanism.py": {
+      "classification": "mixed",
+      "owners": [
+        "API-18",
+        "API-24"
+      ],
+      "reason": "Worker/queue units plus retained trace/evidence-file evaluation workflow."
+    },
+    "test_dsv2_d4.py": {
+      "classification": "mixed",
+      "owners": [
+        "API-18",
+        "API-24"
+      ],
+      "reason": "Placement/numerical probes plus recorded multi-arm pairs and interrupted-report handling."
+    },
+    "test_dsv2_d5.py": {
+      "classification": "mixed",
+      "owners": [
+        "API-18",
+        "API-24"
+      ],
+      "reason": "Prefetch/ISA/address probes plus private verify.build orchestration with fake outputs."
+    },
+    "test_dsv2_inplace_session.py": {
+      "classification": "mixed",
+      "owners": [
+        "API-18",
+        "API-24"
+      ],
+      "reason": "Threshold/parser units plus recorded operation/pairs E2E, sealing and verification."
+    },
+    "test_dsv2_kva.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Shared-QKV ownership, graph scopes and unsupported combinations."
+    },
+    "test_dsv2_layer_gate.py": {
+      "classification": "mixed",
+      "owners": [
+        "API-18",
+        "API-24"
+      ],
+      "reason": "Extracted host metric probes plus layers CLI and batch-gate workflows."
+    },
+    "test_dsv2_lever_argmax_tree.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Argmax numerical equivalence and narrow source rewriting."
+    },
+    "test_dsv2_lever_attn_prologue_live.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Ordered reductions, operand provenance and attention rewrite scope."
+    },
+    "test_dsv2_lever_coherent_loads.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Patched visibility, emitted acquires/writebacks and compatibility refusals."
+    },
+    "test_dsv2_lever_gemv_no_terminal.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Loop equivalence and rewrite restoration with small host probe."
+    },
+    "test_dsv2_lever_gemv_no_terminal_all.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Terminal-group coverage and three-loop rewrite equivalence."
+    },
+    "test_dsv2_lever_kchunk352.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Chunk coverage, event changes and incompatible-option refusals."
+    },
+    "test_dsv2_lever_l1_loads.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Accessor scope, acquire elimination and plan/accessor compatibility."
+    },
+    "test_dsv2_lever_merge_uv_waves.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Row ownership, patch idempotence and isolated arm delta."
+    },
+    "test_dsv2_lever_norm_gamma_early.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Numerical clamping and exact rewrite scope."
+    },
+    "test_dsv2_lever_norm_tree.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Ordered expression DAG and bitwise normalization equivalence."
+    },
+    "test_dsv2_lever_norm_tree_all.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Rewrite-site coverage and incompatible variant rejection."
+    },
+    "test_dsv2_lever_topk_rank.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Rank selection equivalence, retained softmax and fallback source."
+    },
+    "test_dsv2_snapshot.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Capture/replay graph structure and mutation refusals; no runtime capture execution."
+    },
+    "test_dsv2_stage_table.py": {
+      "classification": "mixed",
+      "owners": [
+        "API-18",
+        "API-24"
+      ],
+      "reason": "Replay consistency plus complete stage-table artifact generation/comparison."
+    },
+    "test_dsv2_stamps.py": {
+      "classification": "conformance",
+      "owners": [
+        "API-24"
+      ],
+      "reason": "Stamp parser/source-patch units; the executed build-shell rejection moved to tests/e2e/test_api_dsv2_stamps.py."
+    },
+    "test_dsv2lite.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Graph/planner/simulator invariants retained behind etx.testing; isolated compiler workflow moved intact to external-only E2E."
+    },
+    "test_e2e_pins.py": {
+      "classification": "conformance",
+      "owners": [
+        "API-24"
+      ],
+      "reason": "Keeps constants restated by external-only E2E tests equal to their internal sources."
+    },
+    "test_edgemap.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Index/map arithmetic, shape validation and C expressions."
+    },
+    "test_environment_guard.py": {
+      "classification": "mixed",
+      "owners": [
+        "API-17",
+        "API-24"
+      ],
+      "reason": "Threshold predicates plus guard subprocess/session ordering and pinned pairs."
+    },
+    "test_etx_bench.py": {
+      "classification": "mixed",
+      "owners": [
+        "API-17",
+        "API-24"
+      ],
+      "reason": "Parser/environment units plus full benchmark pipeline through private mocks."
+    },
+    "test_etx_bench_batch.py": {
+      "classification": "mixed",
+      "owners": [
+        "API-17",
+        "API-24"
+      ],
+      "reason": "Recipe/parser units plus identity capture and gated batched benchmark pipeline."
+    },
+    "test_event_device.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Event ownership, SYSTEM scope and foreign-rank diagnostic filtering."
+    },
+    "test_experiment_bounded_repair.py": {
+      "classification": "legacy-e2e",
+      "owners": [
+        "API-23",
+        "API-24"
+      ],
+      "reason": "Row CLI/readmission and router program pipelines consume synthetic artifacts and emit decisions."
+    },
+    "test_experiment_columns.py": {
+      "classification": "mixed",
+      "owners": [
+        "API-23",
+        "API-24"
+      ],
+      "reason": "Ownership/epoch/graph units plus CLI, preparation and registered program execution."
+    },
+    "test_experiment_issue_order.py": {
+      "classification": "mixed",
+      "owners": [
+        "API-23",
+        "API-24"
+      ],
+      "reason": "Source/resource units plus overlays, artifact archives and matrix continuation workflows."
+    },
+    "test_experiment_native_resources.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Register descriptor accounting and mismatch rejection."
+    },
+    "test_experiment_program.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Pair arithmetic, election protocol, capture indices and sealed-path validation."
+    },
+    "test_experiment_review_repair.py": {
+      "classification": "mixed",
+      "owners": [
+        "API-23",
+        "API-24"
+      ],
+      "reason": "ABI/schema units plus populated programs, preflight, telemetry and staged dependencies."
+    },
+    "test_experiment_router.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Router math/source anchors, raw parsers and small launch-index CPU probe."
+    },
+    "test_experiment_routing.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Binary record decoding and malformed capture rejection."
+    },
+    "test_experiment_row_ops.py": {
+      "classification": "mixed",
+      "owners": [
+        "API-23",
+        "API-24"
+      ],
+      "reason": "Numerical/address/alias units plus raw-export readmission and winner artifact preparation."
+    },
+    "test_experiment_session.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Process, raw-admission, source-scope, binding and ordering seams through etx.testing; four export/preparation/budget lifecycle cases moved intact to external-only tests/e2e/test_api_sealed.py."
+    },
+    "test_experiment_session_integration.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Bounded process, resume, dependency and provenance seams through etx.testing; preflight/run/resume/export operational cases moved to external-only tests/e2e/test_api_sealed.py."
+    },
+    "test_experiment_validation.py": {
+      "classification": "mixed",
+      "owners": [
+        "API-23",
+        "API-24"
+      ],
+      "reason": "Verdict/population units plus preparation, transcript admission and conditional workflows."
+    },
+    "test_expert_merge.py": {
+      "classification": "mixed",
+      "owners": [
+        "API-21",
+        "API-24"
+      ],
+      "reason": "Math/protocol units plus generate/build/capture/certify/time/session workflows."
+    },
+    "test_feature_manifest.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Feature declarations agree with emitted kernels and reset fences."
+    },
+    "test_floors.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Evidence-backed arithmetic and document/trace consistency, not experiment orchestration."
+    },
+    "test_folds.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Cost/model folding decisions against measured examples."
+    },
+    "test_fresh_handoff.py": {
+      "classification": "mixed",
+      "owners": [
+        "API-22",
+        "API-24"
+      ],
+      "reason": "Per-case validators plus complete archive/manifest analysis and missing-run reporting."
+    },
+    "test_fresh_sim.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Pure protocol simulation, traffic arithmetic and report-record provenance."
+    },
+    "test_glm53_attention_phases.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Compiled attention helper/head-combine comparisons, not complete decoder."
+    },
+    "test_glm53_bench.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Device-evidence parsing and certificate-field construction without benchmark execution."
+    },
+    "test_glm53_documentation.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Checklist formatting and documentation shell syntax."
+    },
+    "test_glm53_model.py": {
+      "classification": "mixed",
+      "owners": [
+        "API-14",
+        "API-15",
+        "API-24"
+      ],
+      "reason": "Planner/numerical probes plus full CPU/HF generation, staging and qualification."
+    },
+    "test_glm53_module_gate.py": {
+      "classification": "mixed",
+      "owners": [
+        "API-14",
+        "API-15",
+        "API-24"
+      ],
+      "reason": "Dtype/config units plus staging, CPU execution and production qualification-to-verification E2E."
+    },
+    "test_glm53_native_options.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "CPU bit identity, macro rejection and targeted ISA/cache-bit probes."
+    },
+    "test_glm53_options.py": {
+      "classification": "mixed",
+      "owners": [
+        "API-15",
+        "API-24"
+      ],
+      "reason": "Option/hash predicates plus generation/identity artifacts and build/qualify CLI routing."
+    },
+    "test_glm53_parallel_graph.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Rank ownership, scratch, SYSTEM edges and isolated graph changes."
+    },
+    "test_glm53_parallel_layout.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Byte-range ownership, sharding algebra and metadata/descriptor validation."
+    },
+    "test_glm53_parallel_phases.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "CPU helper-level EP/FFN equivalence, not full generation."
+    },
+    "test_glm53_parallel_variants.py": {
+      "classification": "mixed",
+      "owners": [
+        "API-15",
+        "API-24"
+      ],
+      "reason": "Matrix/identity units plus generated manifest directory and CLI workflow."
+    },
+    "test_glm53_phased.py": {
+      "classification": "mixed",
+      "owners": [
+        "API-15",
+        "API-24"
+      ],
+      "reason": "Plan/header probes plus full recurrent CPU generation and independent HF checks."
+    },
+    "test_glm53_preparation.py": {
+      "classification": "mixed",
+      "owners": [
+        "API-14",
+        "API-19",
+        "API-24"
+      ],
+      "reason": "Metadata/oracle predicates plus prepare CLI artifacts and boundary integration."
+    },
+    "test_glm53_residency.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Resource parser/residency arithmetic and source-only build gate ordering."
+    },
+    "test_glm53_run_all.py": {
+      "classification": "mixed",
+      "owners": [
+        "API-15",
+        "API-24"
+      ],
+      "reason": "Floor/certificate units plus subprocess pipeline planning, prerequisites and execution refusal."
+    },
+    "test_glm53_seam.py": {
+      "classification": "conformance",
+      "owners": [
+        "API-24"
+      ],
+      "reason": "Graph/oracle/parser units and the patched argument-defaults probe; summary/run command cases moved to tests/e2e/test_api_glm53_seam.py."
+    },
+    "test_glm53_slice.py": {
+      "classification": "mixed",
+      "owners": [
+        "API-14",
+        "API-15",
+        "API-24"
+      ],
+      "reason": "Window/identity/sample units plus snapshot staging, reference preparation and generation."
+    },
+    "test_glm53_sweep.py": {
+      "classification": "mixed",
+      "owners": [
+        "API-15",
+        "API-24"
+      ],
+      "reason": "Resource units plus all-rank build sweep, identities, failures and CLI summaries."
+    },
+    "test_gpu_jobs.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Atomic status and occupied-record seams through etx.testing; scheduler/CLI/lane/child lifecycle cases moved to external-only tests/e2e/test_api_jobs.py."
+    },
+    "test_head_local_protocol.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Completion election, visibility/reset faults and opt-in predicate."
+    },
+    "test_host_import_check.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Extracted production check/writer logic in CPU harness, not full qualification."
+    },
+    "test_import_certificate.py": {
+      "classification": "conformance",
+      "owners": [
+        "API-24"
+      ],
+      "reason": "Identity/coverage units, patched capture probes and the build-script compiler-status snippet; certificate CLI cases moved to tests/e2e/test_api_import_certificate.py."
+    },
+    "test_import_rounds.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Randomized synchronization and known-broken protocol detection."
+    },
+    "test_importer.py": {
+      "classification": "mixed",
+      "owners": [
+        "API-08",
+        "API-11",
+        "API-24"
+      ],
+      "reason": "IR/ABI units plus real slice-to-IR-to-import-to-link-to-gfx942 build workflow."
+    },
+    "test_inbody.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Timestamp ISA, binary/dependency analysis, immutable packs and instrumentation contracts."
+    },
+    "test_ir_verify.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "IR verification and negative cycle/writer/order cases."
+    },
+    "test_isa_fixes.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Router/normalization identity and option/shape guards."
+    },
+    "test_isa_hops.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Instruction dependency, branch, scratch, LDS and wait-chain analysis."
+    },
+    "test_joint_session.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Static job graph and individual Runner._state decisions without session execution."
+    },
+    "test_kernel_library.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Canonical capture ownership and importer equality through legacy/library paths."
+    },
+    "test_ktrace.py": {
+      "classification": "mixed",
+      "owners": [
+        "API-17",
+        "API-24"
+      ],
+      "reason": "Trace/decision units plus report CLI, vendor dry-run and session command integration."
+    },
+    "test_launch_spec.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Capture ABI/constants, importer behavior and model-instance specification agreement."
+    },
+    "test_layer_budget.py": {
+      "classification": "mixed",
+      "owners": [
+        "API-02",
+        "API-24"
+      ],
+      "reason": "Gap/dependency units plus plan/raw-trace CLI comparison and output artifacts."
+    },
+    "test_llm.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Shape refusals and graph/task-layout invariants without artifact/decoder lifecycle."
+    },
+    "test_load_phases.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Stamp arithmetic/decoding, overlay identity and targeted fence-elimination probe."
+    },
+    "test_machine.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Architecture data, hierarchy and synchronization scope contracts."
+    },
+    "test_manifest_class.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Macro derivation/publication and preprocessor contradiction traps."
+    },
+    "test_moe_mapping.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Expert/XCD mapping and divisibility properties."
+    },
+    "test_moerows_oracle.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Ownership/coldness oracle and deliberately bad schedules."
+    },
+    "test_multibatch_trace.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Trace completeness, dependency checks and family aggregation."
+    },
+    "test_multibatch_trace_summary.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Median arithmetic and incomplete/duplicate tuple rejection."
+    },
+    "test_no_arch_branches.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Architectural source-policy guard."
+    },
+    "test_nvchk.py": {
+      "classification": "mixed",
+      "owners": [
+        "API-17",
+        "API-24"
+      ],
+      "reason": "Version/job units plus executed check-shell failures and same-build report workflow."
+    },
+    "test_nvref2.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Structural AST comparison of session revisions, not execution."
+    },
+    "test_nvref_report.py": {
+      "classification": "conformance",
+      "owners": [
+        "API-24"
+      ],
+      "reason": "Session-declaration order/scheduler state probes and the pure verdict; report CLI cases moved to tests/e2e/test_api_nvref_report.py."
+    },
+    "test_operator_spec.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Packing, host/Python ABI agreement and resource/shape bounds."
+    },
+    "test_ops_gemv.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Tile/import entries, adapters, hooks and gated source layout."
+    },
+    "test_ops_tile_flags.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Reduction identity, row partition conditions and macro gating."
+    },
+    "test_packaging.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Packaged-resource assertions use the supported isolated-wheel probe; installed external CPU lifecycle assertions live in tests/e2e/test_api_installed.py."
+    },
+    "test_pairs.py": {
+      "classification": "conformance",
+      "owners": [
+        "API-24"
+      ],
+      "reason": "Pure spread-rule verdict unit; paired-log CLI decisions moved to tests/e2e/test_api_pairs.py."
+    },
+    "test_passes.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Compiler pass scopes, event elimination and invalid plans."
+    },
+    "test_phase_model.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Simulator cost arithmetic and measured-phase model consistency."
+    },
+    "test_pmodel_profile.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Profile costs and predictions against retained traces."
+    },
+    "test_prims.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Primitive lowering/source identity, isolated compilation and numerical equivalence."
+    },
+    "test_producer.py": {
+      "classification": "mixed",
+      "owners": [
+        "API-17",
+        "API-24"
+      ],
+      "reason": "Numerical/protocol mutations plus capture/replay, qualification, session and report workflows."
+    },
+    "test_producer_readiness.py": {
+      "classification": "mixed",
+      "owners": [
+        "API-13",
+        "API-17",
+        "API-24"
+      ],
+      "reason": "Trace/binding units plus staging/venv/preflight/archive and local push-to-start E2E."
+    },
+    "test_publication_completion.py": {
+      "classification": "mixed",
+      "owners": [
+        "API-23",
+        "API-24"
+      ],
+      "reason": "Reader/resource probes plus capture assembly, six-case recipe and staging."
+    },
+    "test_publication_gap.py": {
+      "classification": "mixed",
+      "owners": [
+        "API-23",
+        "API-24"
+      ],
+      "reason": "Resource/subgraph units plus terminal session staging/preflight without child launch."
+    },
+    "test_qwen300_hour.py": {
+      "classification": "mixed",
+      "owners": [
+        "API-17",
+        "API-24"
+      ],
+      "reason": "Pricing/threshold units plus tranche/pair/certificate/budget orchestration and analysis CLI."
+    },
+    "test_qwen300_session.py": {
+      "classification": "mixed",
+      "owners": [
+        "API-17",
+        "API-24"
+      ],
+      "reason": "Trace/routing units plus bounded execution, retries, staging and retained compiler logs."
+    },
+    "test_qwen_batch_correctness.py": {
+      "classification": "mixed",
+      "owners": [
+        "API-17",
+        "API-24"
+      ],
+      "reason": "Graph/parser units plus qualification pipeline, compiler supervision and execution packaging."
+    },
+    "test_qwen_g6.py": {
+      "classification": "mixed",
+      "owners": [
+        "API-17",
+        "API-24"
+      ],
+      "reason": "Rule/recipe units plus certified pair execution and persisted raw-log verdict."
+    },
+    "test_reset_pair.py": {
+      "classification": "mixed",
+      "owners": [
+        "API-17",
+        "API-24"
+      ],
+      "reason": "Identity/envelope predicates plus candidate-pair/tranche workflows with mocked hosts."
+    },
+    "test_router_study.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "BF16 numerical witnesses, reduction ordering and parser guards."
+    },
+    "test_routing_stats.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Statistical detection and analytical self-test."
+    },
+    "test_runtime_link_selected_header.py": {
+      "classification": "mixed",
+      "owners": [
+        "API-08",
+        "API-23",
+        "API-24"
+      ],
+      "reason": "Descriptor/header unit plus link_existing host rebuild using substituted execution."
+    },
+    "test_select_fallback_budget.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Planner fallback legality, budget constraints and manifest format."
+    },
+    "test_select_models.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Registry legality/cost predicates across model configurations."
+    },
+    "test_select_planner.py": {
+      "classification": "conformance",
+      "owners": [
+        "API-24"
+      ],
+      "reason": "Planner legality units plus fresh-interpreter probes of the private model/planner (python -c on internal modules for import isolation); no supported command is exercised."
+    },
+    "test_selection_manifest.py": {
+      "classification": "mixed",
+      "owners": [
+        "API-05",
+        "API-11",
+        "API-17",
+        "API-24"
+      ],
+      "reason": "Selection/mutation units plus model-to-header-to-compiled production reader workflow."
+    },
+    "test_session_proc.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Individual process executor streams/deadlines/cleanup contract."
+    },
+    "test_session_references.py": {
+      "classification": "mixed",
+      "owners": [
+        "API-13",
+        "API-24"
+      ],
+      "reason": "Static reference guards plus actual summary commands on current/stale records."
+    },
+    "test_sim.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Simulator completion, deadlock detection and critical-path accounting."
+    },
+    "test_split_events.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Cross-device event buffer lowering and counter initialization."
+    },
+    "test_stage_sim.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Pure staging-model arithmetic, feasibility and sourced parameters."
+    },
+    "test_test_paths.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Test-source portability policy and deliberate violations."
+    },
+    "test_tile_ab.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Individual verdict/log/trace parsing and population rejection."
+    },
+    "test_timeline.py": {
+      "classification": "conformance",
+      "owners": [
+        "API-24"
+      ],
+      "reason": "Dependency/accounting units on a simulated schedule; the plan/raw/bytes CLI case moved to tests/e2e/test_api_trace_reports.py."
+    },
+    "test_topk_key32.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Key encoding, numerical ties, SIMT probe and compile guards."
+    },
+    "test_two_gpu_preflight.py": {
+      "classification": "conformance",
+      "owners": [
+        "API-24"
+      ],
+      "reason": "Reference-record identity/layout units; staged Qwen/GLM preflight CLI cases moved to tests/e2e/test_api_two_gpu_preflight.py."
+    },
+    "test_two_gpu_verify.py": {
+      "classification": "conformance",
+      "owners": [
+        "API-24"
+      ],
+      "reason": "Receipt/seal verifier units on synthetic records (etx.testing.qualification_record); the final-lane command moved to tests/e2e/test_api_two_gpu_final_lane.py."
+    },
+    "test_verify_gaps.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "ISA/dataflow/resource interpretation and source isolation."
+    },
+    "test_vlbest_report.py": {
+      "classification": "mixed",
+      "owners": [
+        "API-17",
+        "API-24"
+      ],
+      "reason": "Lever/proof predicates plus complete session search/final report recomputation."
+    },
+    "test_vlbest_session.py": {
+      "classification": "mixed",
+      "owners": [
+        "API-17",
+        "API-24"
+      ],
+      "reason": "Arm/budget guards plus donor preparation, selected-arm execution, fallback and tuning."
+    },
+    "test_vllm_moe.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Graph, adapter, request independence, export and simulator invariants without lifecycle."
+    },
+    "test_vm_preflight.py": {
+      "classification": "mixed",
+      "owners": [
+        "API-13",
+        "API-17",
+        "API-24"
+      ],
+      "reason": "Environment predicates plus complete probe/fix/prepare CLI and shell workflows."
+    },
+    "test_watchdog.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Diagnostic ledger/index validation and emitted arrival CSR."
+    },
+    "test_whatif.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Layout/model bounds and simulated overlap."
+    },
+    "test_x5.py": {
+      "classification": "mixed",
+      "owners": [
+        "API-17",
+        "API-24"
+      ],
+      "reason": "Pricing/identity predicates plus certified-candidate execution and session ordering."
+    },
+    "test_xcd_account.py": {
+      "classification": "conformance",
+      "owners": [
+        "API-24"
+      ],
+      "reason": "Accounting identities on a simulated schedule; the CLI artifact case moved to tests/e2e/test_api_trace_reports.py."
+    },
+    "test_xcd_replay.py": {
+      "classification": "conformance",
+      "owners": [],
+      "reason": "Scheduler replay event ordering and overlap semantics."
+    }
+  }
+}

@@ -97,7 +97,7 @@ def test_spill_reaching_store_merge_and_non_chain_scratch():
 def test_prefetch_isolation_default_source_identity_and_on_wave_scope(monkeypatch):
     import subprocess, types
     from etx.codegen import emit_kernel
-    from examples.vllm_llm.bf16_300 import dispatcher
+    from etx.models.vllm_llm.bf16_300 import dispatcher
     plan=dispatcher.graph('/tmp/gap_tiles.hip')
     plan.graph.grids[1].body.pre_wait='etx_pre_dsl_moe_down'
     baseline=types.ModuleType('etx.codegen.baseline');baseline.__package__='etx.codegen'

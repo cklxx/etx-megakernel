@@ -223,7 +223,7 @@ def test_spread_bound_does_not_change_verdict():
 
 
 def test_report_spread_diagnostic_roundtrip(tmp_path, capsys):
-    from tests.test_import_certificate import fixture_session
+    from etx.testing.certificates import certified_import_session as fixture_session
     from tests.test_nvref_report import write
     fixture_session(tmp_path)
     search = dict(tested=['S0'], winners={}, excluded={})
@@ -353,7 +353,7 @@ def test_changed_round_configuration_refused(tmp_path, monkeypatch):
 
 
 def test_changed_final_configuration_refused(tmp_path, capsys):
-    from tests.test_import_certificate import fixture_session
+    from etx.testing.certificates import certified_import_session as fixture_session
     from tests.test_nvref_report import write
     fixture_session(tmp_path)
     (tmp_path / 'final.json').write_text(json.dumps(dict(final=r.config('S0'), search={})))

@@ -73,9 +73,3 @@ def test_derive():
     assert d["ready_wait"][0] == 0.25
 
 
-def test_main_runs(tmp_path):
-    (tmp_path / "hw_all.log").write_text(sample())
-    r = subprocess.run([sys.executable, "-m", "examples.vllm_llm.bench_params", str(tmp_path), "--json", str(tmp_path / "o.json")],
-                       cwd=ROOT, capture_output=True, text=True, timeout=600)
-    assert r.returncode == 0, r.stderr
-    assert "microbenchmark-only" in r.stdout

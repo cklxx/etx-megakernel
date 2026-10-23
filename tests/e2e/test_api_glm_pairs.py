@@ -1,8 +1,12 @@
-"""T10 pair verdicts from GLM bench certificates; synthetic certificates, no GPU."""
+"""T10 certificate CLI through the external process API; synthetic inputs, no GPU."""
 import json
+from pathlib import Path
+import sys
 
 import pytest
-from examples.glm53 import pairs
+from etx.external import ProcessRequest, execute
+
+ROOT = Path(__file__).resolve().parents[2]
 
 
 def cert(tmp_path, name, build, ms, **change):
@@ -21,12 +25,23 @@ def cert(tmp_path, name, build, ms, **change):
     return path
 
 
-def run(tmp_path, values, **kw):
+def cli(tmp_path, paths, *args):
+    output = tmp_path / f'command-{len(list(tmp_path.glob("command-*")))}'
+    request = ProcessRequest((sys.executable, '-m', 'examples.glm53.pairs',
+                              *(str(p) for p in paths), *args), str(ROOT), 20)
+    result = execute(request, output=output)
+    assert result.backend == 'host-process'
+    assert result.status in ('complete', 'failed'), (output / 'output.log').read_text()
+    return result.returncode
+
+
+def run(tmp_path, values):
     paths = []
     for i, (r, c) in enumerate(values):
         a = cert(tmp_path, f'r{i}', 'r', r); b = cert(tmp_path, f'c{i}', 'c', c)
         paths += [a, b] if i % 2 == 0 else [b, a]      # counterbalanced order
-    return pairs.main([str(p) for p in paths] + ['--out', str(tmp_path / 'out.json')]), json.loads((tmp_path / 'out.json').read_text())
+    code = cli(tmp_path, paths, '--out', str(tmp_path / 'out.json'))
+    return code, json.loads((tmp_path / 'out.json').read_text())
 
 
 def test_keep_needs_all_positive_median_above_2pct_and_twice_spread(tmp_path):
@@ -49,17 +64,17 @@ def test_no_established_gain(tmp_path, values):
                                     dict(qualification=dict(status='NOT-COMPLETE'))])
 def test_incomplete_or_uncorrected_runs_refuse(tmp_path, change):
     paths = [cert(tmp_path, 'r0', 'r', 30.0), cert(tmp_path, 'c0', 'c', 29.0, **change)]
-    assert pairs.main([str(p) for p in paths] + ['--pairs', '1']) == 2
+    assert cli(tmp_path, paths, '--pairs', '1') == 2
 
 
 @pytest.mark.parametrize('change', [dict(gpu='AMD Instinct MI325X'), dict(gpus=8), dict(batch=2), dict(context=512)])
 def test_mixed_conditions_refuse(tmp_path, change):
     paths = [cert(tmp_path, 'r0', 'r', 30.0), cert(tmp_path, 'c0', 'c', 29.0, **change)]
-    assert pairs.main([str(p) for p in paths] + ['--pairs', '1']) == 2
+    assert cli(tmp_path, paths, '--pairs', '1') == 2
 
 
 def test_wrong_pair_count_or_same_build_pair_refuses(tmp_path):
     r = [cert(tmp_path, f'r{i}', 'r', 30.0) for i in range(2)]
     c = [cert(tmp_path, f'c{i}', 'c', 29.0) for i in range(2)]
-    assert pairs.main([str(p) for p in (r[0], c[0])]) == 2                       # 1 pair, 5 expected
-    assert pairs.main([str(p) for p in (r[0], r[1], c[0], c[1])] + ['--pairs', '2']) == 2
+    assert cli(tmp_path, (r[0], c[0])) == 2                       # 1 pair, 5 expected
+    assert cli(tmp_path, (r[0], r[1], c[0], c[1]), '--pairs', '2') == 2

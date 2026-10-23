@@ -1,14 +1,17 @@
 """Local source/protocol tests; no device or performance evidence."""
 import hashlib
+import os
 from pathlib import Path
 import pytest
 from examples.experiment_program.issue_order.source import transform, prep_source, ATTENTION_SHA, statement_inventory
 from examples.experiment_program.issue_order.evidence import native_admission, validate_frame, decide
 from examples.experiment_program.protocol import resolve_path
 
-SNAP = Path('/Users/ckl/.hermes/cache/scratch/etx-hardware-complete-research/source/retained-attention.hip')
+# Retained native attention source, supplied explicitly by the caller.
+SNAP = Path(os.environ.get('ETX_ISSUE_ORDER_ATTENTION_SOURCE', ''))
 
 def source():
+    if not os.environ.get('ETX_ISSUE_ORDER_ATTENTION_SOURCE'): pytest.skip('ETX_ISSUE_ORDER_ATTENTION_SOURCE unset')
     snapshot=resolve_path(SNAP)
     if not snapshot.is_file(): pytest.skip('retained native source unavailable')
     return snapshot.read_text()

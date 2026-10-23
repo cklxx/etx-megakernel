@@ -12,7 +12,8 @@ from pathlib import Path
 
 import pytest
 
-from examples.glm53 import bench, model_build, oracle, reference, stage
+from etx.models.glm53 import model_build
+from examples.glm53 import bench, oracle, reference, stage
 from examples.glm53.prepare import (EVIDENCE, check_slice, metadata, parse_layers,
                                     partition, sha, slice_config, slice_split)
 

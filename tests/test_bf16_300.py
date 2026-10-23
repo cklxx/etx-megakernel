@@ -7,10 +7,10 @@ import struct
 import numpy as np
 import pytest
 
-from examples.vllm_llm.bf16_300.protocol import Head, ProtocolError, dry_run, queue_liveness, slot_participation, reset_queues
-from examples.vllm_llm.bf16_300 import build, check, source, dispatcher, attribution
+from etx.models.vllm_llm.bf16_300.protocol import Head, ProtocolError, dry_run, queue_liveness, slot_participation, reset_queues
+from etx.models.vllm_llm.bf16_300 import build, check, source, dispatcher, attribution, paths
 
-HERE = Path(source.__file__).parent
+HERE = paths.HERE   # declarations and native assets (fusion.hip)
 
 
 def ready():
@@ -67,7 +67,7 @@ def reject_case(name):
         # the checking harness has its own short deadline and goes red.
         import subprocess, sys
         result = subprocess.run([sys.executable, '-c',
-            "from examples.vllm_llm.bf16_300.protocol import queue_liveness; queue_liveness([['waiter', 'producer']], [('producer', 'waiter')])"],
+            "from etx.models.vllm_llm.bf16_300.protocol import queue_liveness; queue_liveness([['waiter', 'producer']], [('producer', 'waiter')])"],
             capture_output=True, text=True, timeout=0.5)
         assert 'ProtocolError: queue_progress' in result.stderr
         raise ProtocolError('queue_progress')
