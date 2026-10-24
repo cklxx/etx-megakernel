@@ -315,14 +315,21 @@ extern "C" uint64_t glm_reads_copy(uint64_t* out){
         '#include "examples/glm53/tiles.hip"', f'#include "{entry}"')
 
 
-def observed_step(cpu, spec, pos, tokens, sink):
+def observed_step(cpu, spec, pos, tokens, sink, *, tiles=None):
     """Execute decode or verify and deliver actual reader ranges to a sink.
 
     Works with a decode GraphCPU compiled using instrumented_shim as well.
-    VerifyGraphCPU(observe=True, k=0) uses the same verify tiles with one row.
+    The runner's explicit tiles selection identifies decode versus verify;
+    optional tiles validates that selection before any execution or reads.
+    A plain GraphCPU compiled with instrumented_shim is a decode runner.
     Events carry the invocation's starting position, rather than claiming a
     single position for reads shared across the verify block.
     """
+    actual_tiles = getattr(cpu, 'tiles', 'decode')
+    if tiles is not None and tiles not in ('decode', 'verify'):
+        raise ValueError("tiles must be 'decode' or 'verify'")
+    if tiles is not None and tiles != actual_tiles:
+        raise ValueError(f'requested {tiles} observation from {actual_tiles} tiles')
     lib = cpu.lib
     lib.glm_reads_size.restype = ctypes.c_uint64
     lib.glm_reads_copy.argtypes = [ctypes.POINTER(ctypes.c_uint64)]
@@ -347,24 +354,36 @@ def observed_step(cpu, spec, pos, tokens, sink):
 
 
 class VerifyGraphCPU:
-    """Run the verify graph's actual C++ tiles using graph_cpu's CPU shim.
+    """Run selected decode or verify C++ tiles using graph_cpu's CPU shim.
 
     step(pos, tokens) accepts shape (k+1, batch), returns tokens and full logits
     in position-major order. Buffers (including shared caches) persist across
     calls. The input block is validated before any state is changed.
+
+    tiles='decode' selects production decode (k=0 only); tiles='verify'
+    selects batched verify, including its one-row k=0 baseline. With no
+    selection, observation mode defaults to decode and normal execution to
+    verify. Tile selection never depends on k; batched observations must
+    explicitly select verify tiles.
     """
-    def __init__(self, stage_dir, k, batch, gate, work, options=None, poison=False, observe=False):
+    def __init__(self, stage_dir, k, batch, gate, work, options=None, poison=False, observe=False, *, tiles=None):
         import numpy as np
         from examples.glm53 import stage
-        self.np, self.batch, self.count = np, batch, (1 if observe and k == 0 else _positions(k))
+        self.tiles = ('decode' if observe else 'verify') if tiles is None else tiles
+        if self.tiles not in ('decode', 'verify'):
+            raise ValueError("tiles must be 'decode' or 'verify'")
+        single_row = isinstance(k, int) and not isinstance(k, bool) and k == 0
+        if self.tiles == 'decode' and not single_row:
+            raise ValueError('decode tiles require k=0; select verify for batched observations')
+        self.np, self.batch, self.count = np, batch, (1 if single_row else _positions(k))
         options = Options() if options is None else options
         stage_dir, work = Path(stage_dir), Path(work)
         spec = stage.validate(stage_dir, allow_fixture=True, gate=gate)
         self.d = spec['dimensions']
-        # Observe the same kernels with one row at k=0. Using decode's old
-        # tiled norm/prologue rereads would penalize true read-once verify
-        # phases with negative fixed violations. No FC-2a threshold is relaxed.
-        self.graph = build_from(spec, k, batch, options, _single_row=observe and k == 0)
+        # Decode observations retain the production grid layout and accesses.
+        # FC-2a explicitly selects verify for both its k=0 baseline and k>0.
+        self.graph = (model.build_from(spec, batch, options) if self.tiles == 'decode'
+                      else build_from(spec, k, batch, options, _single_row=single_row))
         work.mkdir(parents=True, exist_ok=True)
         (work / 'glm53_options.h').write_text(options.header())
         # Compile a separate TU, leaving graph_cpu and the decode tiles intact.

@@ -318,11 +318,11 @@ def main(argv=None):
         stage.stage(root / 'checkpoint', root / 'stage', maxlen=160, gate='module8')
         spec = stage.validate(root / 'stage', allow_fixture=True, gate='module8')
         for k in (0, 1, 3, 5):
-            print(f'FC-2a observing module8 k={k}', flush=True)
+            print(f'FC-2a observing module8 k={k} tiles=verify', flush=True)
             cpu = VerifyGraphCPU(root / 'stage', k, 1, 'module8', root / f'k{k}',
-                                 observe=True)
+                                 observe=True, tiles='verify')
             sink = ObservedBytes(spec)
-            observed_step(cpu, spec, 0, [[1]] * (k+1), sink)
+            observed_step(cpu, spec, 0, [[1]] * (k+1), sink, tiles='verify')
             observations[k] = sink.snapshot()
             experts[k] = {}
             for i, kind in enumerate(spec['config']['mlp_layer_types']):

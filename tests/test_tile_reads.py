@@ -55,9 +55,9 @@ def test_native_cpu_observation_matches_static_tiles(tmp_path):
     module_gate.checkpoint(tmp_path/'checkpoint', variant='module8')
     stage.stage(tmp_path/'checkpoint', tmp_path/'stage', maxlen=160, gate='module8')
     spec = stage.validate(tmp_path/'stage', allow_fixture=True, gate='module8')
-    cpu = VerifyGraphCPU(tmp_path/'stage', 0, 1, 'module8', tmp_path/'run', observe=True)
+    cpu = VerifyGraphCPU(tmp_path/'stage', 0, 1, 'module8', tmp_path/'run', observe=True, tiles='decode')
     sink = ObservedBytes(spec)
-    observed_step(cpu, spec, 0, [[1]], sink)
+    observed_step(cpu, spec, 0, [[1]], sink, tiles='decode')
     ids = cpu.buffers['l1_sel'].view(cpu.np.float32)[:2].astype(int).tolist()
     for slot, expert in enumerate(ids):
         for projection in ('gate', 'up', 'down'):

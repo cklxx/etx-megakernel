@@ -238,6 +238,7 @@ def test_fc2a_command_fails_closed(capsys):
     # Strict baseline coverage still fails for the unused position-zero APE.
     assert 'fixed observed=' not in output
     assert 'missing positive observed baseline' in output
+    assert 'FC-2a observing module8 k=0 tiles=verify' in output
     for k in (0, 1, 3, 5):
         assert f'observing module8 k={k}' in output
 

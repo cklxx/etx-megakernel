@@ -151,9 +151,9 @@ def test_head_streams_weights_once_for_all_positions(module8, k):
 
     spec = stage.validate(module8 / 'stage', allow_fixture=True, gate='module8')
     cpu = VerifyGraphCPU(module8 / 'stage', k, 1, 'module8',
-                         module8 / f'head-observed-k{k}', observe=True, poison=True)
+                         module8 / f'head-observed-k{k}', observe=True, poison=True, tiles='verify')
     sink = ObservedBytes(spec)
-    observed_step(cpu, spec, 0, [[1]] * (k + 1), sink)
+    observed_step(cpu, spec, 0, [[1]] * (k + 1), sink, tiles='verify')
     counts = sink.snapshot()
     for group in ('norm', 'head'):
         for name, rec in spec['weights'][group]['tensors'].items():
@@ -173,13 +173,13 @@ def test_all_fixed_payloads_stream_once(module8, k):
 
     spec = stage.validate(module8 / 'stage', allow_fixture=True, gate='module8')
     cpu = VerifyGraphCPU(module8 / 'stage', k, 1, 'module8',
-                         module8 / f'fixed-observed-k{k}', observe=True, poison=True)
+                         module8 / f'fixed-observed-k{k}', observe=True, poison=True, tiles='verify')
     # Position 80 exceeds the complete-pool budget even for k=1.
     # Repeat token IDs deliberately: embedding reads the distinct row once.
     for pos in (0, 80):
         _reset_state(cpu)
         sink = ObservedBytes(spec)
-        observed_step(cpu, spec, pos, [[1]] * (k + 1), sink)
+        observed_step(cpu, spec, pos, [[1]] * (k + 1), sink, tiles='verify')
         for group, blob in spec['weights'].items():
             for name, rec in blob['tensors'].items():
                 if name.startswith('mlp.experts.'):
@@ -195,7 +195,9 @@ def test_all_fixed_payloads_stream_once(module8, k):
 
 def test_single_row_observation_matches_decode(module8, sequential):
     cpu = VerifyGraphCPU(module8 / 'stage', 0, 2, 'module8',
-                         module8 / 'single-row-observed', observe=True, poison=True)
+                         module8 / 'single-row-observed', observe=True, poison=True, tiles='verify')
+    assert cpu.tiles == 'verify'
+    assert cpu.graph.grid('l1_expert_up').body.symbol == 'glm53_verify_expert_up'
     # This is an execution baseline, not an allowance for missing reads.
     _reset_state(sequential)
     for pos in range(82):
@@ -207,3 +209,37 @@ def test_single_row_observation_matches_decode(module8, sequential):
     for name, tensor in sequential.graph.tensors.items():
         if tensor.role == 'runtime':
             np.testing.assert_array_equal(cpu.buffers[name], sequential.buffers[name])
+
+
+def test_default_observation_is_production_decode(module8):
+    from examples.glm53.verify_graph import observed_step
+    from examples.spec.ledger import ObservedBytes
+
+    cpu = VerifyGraphCPU(module8 / 'stage', 0, 1, 'module8',
+                         module8 / 'default-decode-observed', observe=True)
+    assert cpu.tiles == 'decode'
+    assert cpu.graph.grid('l1_up').body.symbol == 'glm53_up'
+    spec = stage.validate(module8 / 'stage', allow_fixture=True, gate='module8')
+    sink = ObservedBytes(spec)
+    before = {name: cpu.buffers[name].copy() for name, tensor in cpu.graph.tensors.items()
+              if tensor.role == 'runtime'}
+    # A label cannot silently turn an already compiled decode into verify.
+    with pytest.raises(ValueError, match='requested verify observation from decode tiles'):
+        observed_step(cpu, spec, 0, [[1]], sink, tiles='verify')
+    with pytest.raises(ValueError, match='tiles must be'):
+        observed_step(cpu, spec, 0, [[1]], sink, tiles='automatic')
+    assert not any(sink.snapshot().values())
+    for name, value in before.items():
+        np.testing.assert_array_equal(cpu.buffers[name], value)
+
+
+@pytest.mark.parametrize('k,tiles,message', [
+    (1, 'decode', 'decode tiles require k=0'),
+    (1, None, 'decode tiles require k=0'),
+    (False, 'decode', 'decode tiles require k=0'),
+    (0, 'automatic', 'tiles must be'),
+])
+def test_invalid_observation_tile_selection(k, tiles, message, tmp_path):
+    with pytest.raises(ValueError, match=message):
+        VerifyGraphCPU(tmp_path / 'unused', k, 1, 'module8', tmp_path / 'unused-work',
+                       observe=True, tiles=tiles)
