@@ -6,7 +6,7 @@ import subprocess
 
 import pytest
 
-from etx.tools import floors as fl
+from etx.tools.costs import floors as fl
 
 ROOT = Path(__file__).resolve().parents[1]
 RTTS = (0.50, 0.69)

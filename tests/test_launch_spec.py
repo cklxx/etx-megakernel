@@ -67,7 +67,7 @@ def test_actual_captured_ir_imports_without_gpu(export):
 
 
 def test_conflicting_spec_constants_are_rejected(monkeypatch):
-    from etx.importer import launch_spec
+    from etx.ir import launch_spec
     records = launch_spec.registry()
     records['fused_moe_up_e8']['constants']['BLOCK_SIZE_N'] = 64
     monkeypatch.setattr(launch_spec, 'registry', lambda: records)

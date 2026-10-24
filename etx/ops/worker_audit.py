@@ -21,7 +21,7 @@ import os
 import re
 from pathlib import Path
 
-from etx.tools import timeline
+from etx.runtime import trace as timeline
 
 
 FLAG = "ETX_DSL_WORKER_AUDIT"

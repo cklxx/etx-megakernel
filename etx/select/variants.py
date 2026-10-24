@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Mapping
 
-from etx.importer.spec import OPERATORS
+from etx.ir.operator_spec import OPERATORS
 
 
 @dataclass(frozen=True)

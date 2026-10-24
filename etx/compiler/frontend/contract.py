@@ -13,7 +13,6 @@ import math
 from pathlib import Path
 import re
 
-from examples.llm.model import load_dims, rope_kind
 
 
 class ContractError(ValueError):
@@ -80,17 +79,31 @@ def validate_contract(data: dict, *, base_dir: str | Path = ".") -> dict:
                     or text.get("decoder_sparse_step", 1) != 1
                     or text.get("n_shared_experts", 0)
                     or text.get("shared_expert_intermediate_size", 0))
-        d = None if extended else load_dims(str(config))
+        # Contracts describe model metadata, independently of example graph
+        # dimensions and ETX_LLM_* experiment overrides.
+        if not extended:
+            if c.get("model_type") == "olmo2":
+                raise ValueError("olmo2 full-width q/k norms are not supported")
+            for key in ("hidden_size", "num_attention_heads", "vocab_size"):
+                if type(c[key]) is not int or c[key] <= 0:
+                    raise ValueError(f"{key}: expected positive integer")
+            expert_keys = ("num_experts", "num_local_experts", "n_routed_experts")
+            experts = next((int(c[k]) for k in expert_keys if c.get(k)), 0)
+            if not experts and any("expert" in k for k in c):
+                raise ValueError("config mentions experts but no supported expert count is set")
+            if experts and not 1 <= int(c.get("num_experts_per_tok", 0)) <= min(experts, 16):
+                raise ValueError("num_experts_per_tok outside supported Top-K range")
+            float(c.get("rms_norm_eps", 1e-6))
+            float((c.get("rope_parameters") or {}).get("rope_theta", c.get("rope_theta", 10000.0)))
     except (OSError, ValueError, KeyError, TypeError, ZeroDivisionError) as exc:
         raise ContractError(f"config {config}: {exc}") from exc
-    # Do not use d.L: load_dims intentionally honours ETX_LLM_LAYERS for experiments.
     c = text
     layers = c.get("num_hidden_layers")
     if type(layers) is not int or layers < 1:
         raise ContractError("config.num_hidden_layers: expected positive integer")
     experts = next((c[k] for k in ("num_experts", "num_local_experts", "n_routed_experts")
                     if c.get(k)), 0)
-    moe = d.moe if d is not None else experts > 0
+    moe = bool(experts)
     pattern = ["moe" if moe else "dense"] * layers
     if "mlp_layer_types" in c:
         pattern = [{"sparse": "moe", "dense": "dense"}.get(k, k)
@@ -105,7 +118,14 @@ def validate_contract(data: dict, *, base_dir: str | Path = ".") -> dict:
                    for n in range(layers)]
     if len(pattern) != layers or any(k not in ("dense", "moe") for k in pattern):
         raise ContractError("config: invalid layer pattern")
-    rope = "longrope" if rope_kind(c) == "longrope" else "neox"
+    rope = "neox"
+    for key in ("rope_scaling", "rope_parameters"):
+        params = c.get(key) or {}
+        kind = params.get("rope_type") or params.get("type") or "default"
+        if kind not in ("default", "longrope"):
+            raise ContractError(f"config: unsupported rope type {kind}")
+        if params:
+            rope = "longrope" if kind == "longrope" else "neox"
     if c.get("qk_rope_head_dim") == 0:
         rope = "none"
     attention = "mla" if c.get("kv_lora_rank") is not None else "gqa"
