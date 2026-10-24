@@ -260,7 +260,10 @@ def fc2a(spec, observations, *, experts):
                           if int(match[1]) in union else 0)
                 if n != target:
                     reasons.append(f'k={k} {group}/{tensor}: routed observed={n} '
-                                   f'expected={target} excess={n-target} bytes')
+                                   f'expected={target} excess={n-target} bytes; '
+                                   'case (b): device tiles re-read expert weights '
+                                   '(padded pairs/scales); CPU scalar scale counts '
+                                   'are not device HBM traffic')
             else:
                 target = observations.get(0, {}).get(key)
                 if target is None or target <= 0:
